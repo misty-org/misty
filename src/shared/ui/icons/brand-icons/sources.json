@@ -98,6 +98,11 @@
     "collection": "gilbarbara/logos",
     "adaptation": "White monochrome variant under prefers-color-scheme: dark; original artwork otherwise."
   },
+  "openrouter": {
+    "url": "https://unpkg.com/@lobehub/icons-static-svg@1.45.0/icons/openrouter.svg",
+    "collection": "LobeHub Icons",
+    "adaptation": "White monochrome variant under prefers-color-scheme: dark; original artwork otherwise."
+  },
   "perplexity": {
     "url": "https://raw.githubusercontent.com/gilbarbara/logos/main/logos/perplexity-icon.svg",
     "collection": "gilbarbara/logos"

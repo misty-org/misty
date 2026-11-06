@@ -1,28 +1,62 @@
+//! The vault root, a session's signing key, and sealing with them.
 use aes_gcm::{
     aead::{Aead, Payload},
     Aes256Gcm, KeyInit, Nonce,
 };
-use argon2::{Algorithm, Argon2, Params, Version};
-use base64::{
-    engine::general_purpose::{STANDARD, URL_SAFE_NO_PAD},
-    Engine,
-};
-use ed25519_dalek::{Signature, Signer, SigningKey, VerifyingKey};
+use base64::{engine::general_purpose::STANDARD, Engine};
+use ed25519_dalek::{Signer, SigningKey};
 use hkdf::Hkdf;
 use rand::{rngs::OsRng, RngCore};
-use sha2::{Digest, Sha256};
-use unicode_normalization::UnicodeNormalization;
+use serde::{Deserialize, Serialize};
+use sha2::Sha256;
+use uuid::Uuid;
 use zeroize::Zeroizing;
 
-use crate::{protocol::*, Error, Result};
+use crate::{Error, Result};
 
 const MAX_LOCAL_BYTES: usize = 32 << 20;
 
 mod clipboard;
 mod device;
 mod records;
-mod unlock;
 pub use clipboard::MAX_SEALED_CLIP_BYTES;
+
+pub(crate) fn valid_id(id: &str) -> bool {
+    Uuid::parse_str(id).is_ok_and(|u| !u.is_nil() && u.to_string() == id)
+}
+
+pub(crate) fn decode_fixed<const N: usize>(s: &str) -> Result<[u8; N]> {
+    if s.len() != N.div_ceil(3) * 4 {
+        return Err(Error::Invalid);
+    }
+    let bytes = Zeroizing::new(STANDARD.decode(s).map_err(|_| Error::Invalid)?);
+    bytes.as_slice().try_into().map_err(|_| Error::Invalid)
+}
+
+/// Sealed data kept on this computer.
+#[derive(Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct Envelope {
+    pub version: u8,
+    pub nonce: String,
+    pub ciphertext: String,
+}
+
+impl Envelope {
+    pub(crate) fn decode(&self, limit: usize) -> Result<([u8; 12], Vec<u8>)> {
+        if self.version != 1 || self.ciphertext.len() > limit.div_ceil(3) * 4 {
+            return Err(Error::Invalid);
+        }
+        let nonce = decode_fixed(&self.nonce)?;
+        let bytes = STANDARD
+            .decode(&self.ciphertext)
+            .map_err(|_| Error::Invalid)?;
+        if bytes.len() < 16 || bytes.len() > limit {
+            return Err(Error::Invalid);
+        }
+        Ok((nonce, bytes))
+    }
+}
 
 /// Canonical deployment and account identity come from authenticated native
 /// configuration, never a remotely supplied event or embedded webpage.
@@ -66,14 +100,6 @@ fn random<const N: usize>() -> [u8; N] {
     let mut bytes = [0; N];
     OsRng.fill_bytes(&mut bytes);
     bytes
-}
-
-/// A random 256-bit secret for the legacy wrapper (`VaultRoot::wrap`). Only
-/// vaults created before account wrappers still use one; nothing creates a
-/// new one outside tests.
-pub fn generate_sync_secret() -> Zeroizing<String> {
-    let secret = Zeroizing::new(random::<32>());
-    Zeroizing::new(STANDARD.encode(secret.as_ref()))
 }
 
 fn cipher(key: &[u8]) -> Result<Aes256Gcm> {
@@ -120,175 +146,14 @@ fn decrypt(
         .map_err(|_| Error::Unlock)
 }
 
-fn legacy_wrapping_key(
-    password: &str,
-    secret: &str,
-    salt: &[u8; 16],
-) -> Result<Zeroizing<[u8; 32]>> {
-    if !(12..=1024).contains(&password.len()) {
-        return Err(Error::Invalid);
-    }
-    let secret = Zeroizing::new(decode_fixed::<32>(secret)?);
-    let params = Params::new(65536, 3, 1, Some(32)).map_err(|_| Error::Invalid)?;
-    let mut memory = Zeroizing::new(vec![argon2::Block::default(); params.block_count()]);
-    let argon =
-        Argon2::new_with_secret(secret.as_ref(), Algorithm::Argon2id, Version::V0x13, params)
-            .map_err(|_| Error::Invalid)?;
-    let mut key = Zeroizing::new([0; 32]);
-    argon
-        .hash_password_into_with_memory(
-            password.as_bytes(),
-            salt,
-            key.as_mut(),
-            memory.as_mut_slice(),
-        )
-        .map_err(|_| Error::Unlock)?;
-    Ok(key)
-}
-
-impl KeyTransition {
-    /// Checks the signature against a vault's pinned root public key.
-    pub fn verify(
-        &self,
-        root_public_key: &str,
-        vault_id: &str,
-        envelope: &KeyEnvelope,
-    ) -> Result<()> {
-        let bytes = Self::signing_bytes(vault_id, self.generation, envelope)?;
-        let key = VerifyingKey::from_bytes(&decode_fixed::<32>(root_public_key)?)
-            .map_err(|_| Error::Identity)?;
-        let signature = Signature::from_bytes(&decode_fixed::<64>(&self.signature)?);
-        key.verify_strict(&bytes, &signature)
-            .map_err(|_| Error::Identity)
-    }
-}
-
-/// Two independent values derived on the device from one Misty password, so
-/// the person types a single password and the server still cannot open the
-/// vault. Argon2id stretches the password with a salt from the account's email;
-/// HKDF then splits the result by purpose. `login_credential` is what the
-/// server receives in place of the password. The wrapping key never leaves the
-/// device and is never derivable from the credential.
-///
-/// A password the server has seen in plaintext (an account that signed in
-/// before credentials existed, or one set through an email reset) must never
-/// seed these keys; the upgrade flow makes the person choose a new one.
-pub struct AccountKeys {
-    login_credential: Zeroizing<String>,
-    master: Zeroizing<[u8; 32]>,
-}
-
-impl AccountKeys {
-    /// The salt names the deployment as well as the email, so the same email and
-    /// password give a different credential on every Misty server: one that
-    /// receives a credential cannot sign in to another with it, and cannot reuse
-    /// guesses across them.
-    ///
-    /// Email and password are put in Unicode compatibility form (NFKC) first, so
-    /// the same text typed on another keyboard or operating system, composed or
-    /// decomposed, full-width or not, gives the same keys.
-    pub fn derive(deployment: &str, email: &str, password: &str) -> Result<Self> {
-        let deployment = deployment.trim().trim_end_matches('/').to_lowercase();
-        let email = email.trim().nfkc().collect::<String>().to_lowercase();
-        let password = Zeroizing::new(password.nfkc().collect::<String>());
-        if deployment.is_empty()
-            || deployment.len() > 2048
-            || deployment.contains('\0')
-            || email.is_empty()
-            || email.len() > 320
-            || !(1..=1024).contains(&password.len())
-        {
-            return Err(Error::Invalid);
-        }
-        let salt = Sha256::new()
-            .chain_update(b"misty.account-kdf.salt.v3\0")
-            .chain_update(deployment.as_bytes())
-            .chain_update(b"\0")
-            .chain_update(email.as_bytes())
-            .finalize();
-        let params = Params::new(65536, 3, 1, Some(32)).map_err(|_| Error::Invalid)?;
-        let mut memory = Zeroizing::new(vec![argon2::Block::default(); params.block_count()]);
-        let mut master = Zeroizing::new([0; 32]);
-        Argon2::new(Algorithm::Argon2id, Version::V0x13, params)
-            .hash_password_into_with_memory(
-                password.as_bytes(),
-                &salt,
-                master.as_mut(),
-                memory.as_mut_slice(),
-            )
-            .map_err(|_| Error::Unlock)?;
-        let mut credential = Zeroizing::new([0; 32]);
-        Hkdf::<Sha256>::new(None, master.as_ref())
-            .expand(b"misty.account.login-credential.v2", credential.as_mut())
-            .map_err(|_| Error::Invalid)?;
-        Ok(Self {
-            login_credential: Zeroizing::new(URL_SAFE_NO_PAD.encode(credential.as_ref())),
-            master,
-        })
-    }
-
-    /// 43 characters of URL-safe base64, sent to the server as the password.
-    pub fn login_credential(&self) -> &str {
-        &self.login_credential
-    }
-
-    fn wrapping_key(&self, salt: &[u8; 16]) -> Result<Zeroizing<[u8; 32]>> {
-        let mut key = Zeroizing::new([0; 32]);
-        Hkdf::<Sha256>::new(Some(salt), self.master.as_ref())
-            .expand(b"misty.sync.root-wrap.v2", key.as_mut())
-            .map_err(|_| Error::Invalid)?;
-        Ok(key)
-    }
-}
-
 impl VaultRoot {
     pub fn generate() -> Self {
         Self(Zeroizing::new(random()))
     }
 
-    /// Signs a device admission record: a device grant or the account's device
-    /// list (docs/sync/devices.md). Only payloads in those two domains
-    /// are signed here, so this path never signs sync protocol bytes.
-    pub fn sign_device_record(&self, payload: &[u8]) -> Result<String> {
-        const DOMAINS: [&[u8]; 2] = [
-            b"[\"misty.device.grant.v2\",",
-            b"[\"misty.device.list.v1\",",
-        ];
-        if payload.len() > 65536 || !DOMAINS.iter().any(|domain| payload.starts_with(domain)) {
-            return Err(Error::Invalid);
-        }
-        Ok(STANDARD.encode(self.signing_key()?.sign(payload).to_bytes()))
-    }
-
-    /// Verifies a device admission record against this vault's root key.
-    pub fn verify_device_record(public_key: &str, payload: &[u8], signature: &str) -> Result<()> {
-        let key = VerifyingKey::from_bytes(&decode_fixed::<32>(public_key)?)
-            .map_err(|_| Error::Identity)?;
-        let signature = Signature::from_bytes(&decode_fixed::<64>(signature)?);
-        key.verify_strict(payload, &signature)
-            .map_err(|_| Error::Identity)
-    }
-
-    /// A second handle to the same root, kept only while the vault is open so
-    /// this device can admit or remove devices.
+    /// A second handle to the same root, kept only while the vault is open.
     pub fn duplicate(&self) -> Self {
         Self(Zeroizing::new(*self.0))
-    }
-
-    /// The root's bytes, sealed by the caller to a newly approved device whose
-    /// key the person confirmed with a matching code.
-    pub fn transfer_bytes(&self) -> Zeroizing<[u8; 32]> {
-        Zeroizing::new(*self.0)
-    }
-
-    /// Accepts a root received from an approving device, only if it matches the
-    /// vault's root public key.
-    pub fn from_transfer(bytes: &[u8], expected_public_key: &str) -> Result<Self> {
-        let root = Self::from_protected(bytes)?;
-        if root.public_key()? != expected_public_key {
-            return Err(Error::Identity);
-        }
-        Ok(root)
     }
 
     pub(crate) fn protected_bytes(&self) -> &[u8; 32] {
@@ -317,15 +182,15 @@ impl VaultRoot {
         Ok(key)
     }
 
-    /// The key that seals cloud clipboard clips for this vault's devices
-    /// (docs/sync/clipboard.md). Every admitted device derives the same key.
-    pub fn clipboard_key(&self, scope: &VaultScope) -> Result<ClipboardKey> {
-        scope.validate()?;
-        let key = self.derive(
-            "misty.clipboard.key.v1",
-            &(&scope.deployment, &scope.account_id, &scope.vault_id),
-        )?;
-        Ok(ClipboardKey(key))
+    /// The key that seals the shared clipboard's clips for a vault's sessions.
+    pub fn vault_clipboard_key(&self, vault_id: &str) -> Result<ClipboardKey> {
+        Ok(ClipboardKey(self.derive("misty.vault.clipboard.v1", &vault_id)?))
+    }
+
+    /// Signs a vault operation: a change of its sealed root, admitting or removing a session, or
+    /// destroying it. Callers name their purpose in the first element of the payload.
+    pub(crate) fn sign_domain(&self, payload: &[u8]) -> Result<Vec<u8>> {
+        Ok(self.signing_key()?.sign(payload).to_bytes().to_vec())
     }
 
     fn signing_key(&self) -> Result<SigningKey> {
@@ -336,26 +201,12 @@ impl VaultRoot {
     pub fn public_key(&self) -> Result<String> {
         Ok(STANDARD.encode(self.signing_key()?.verifying_key().as_bytes()))
     }
-
-    pub fn wrap(&self, scope: &VaultScope, password: &str, secret: &str) -> Result<KeyEnvelope> {
-        let salt = random::<16>();
-        let key = legacy_wrapping_key(password, secret, &salt)?;
-        let aad = scope.aad("misty.sync.root-wrapper.v1", &(1, KDF))?;
-        let envelope = encrypt(key.as_ref(), self.0.as_ref(), &aad, 4096)?;
-        Ok(KeyEnvelope {
-            version: 1,
-            kdf: KDF.into(),
-            salt: STANDARD.encode(salt),
-            nonce: envelope.nonce,
-            ciphertext: envelope.ciphertext,
-        })
-    }
 }
 
 /// Seals clips in the shared clipboard's ring. A sealed clip is a 12-byte
 /// nonce followed by the AES-256-GCM ciphertext. The associated data binds it
 /// to its ring slot, so a clip cannot be moved to another slot; the key binds
-/// it to the deployment, account and vault.
+/// it to the vault.
 pub struct ClipboardKey(Zeroizing<[u8; 32]>);
 
 #[cfg(test)]

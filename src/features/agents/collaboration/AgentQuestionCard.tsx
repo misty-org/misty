@@ -1,6 +1,6 @@
 import { Check, ChevronDown, ChevronUp, MessageCircleQuestion } from "lucide-react";
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
-import { Button, IconButton, Input, Pressable } from "@/shared/ui";
+import { BackButton, Button, ErrorNotification, IconButton, Input, Pressable } from "@/shared/ui";
 import { useCollaborationStore } from "./store";
 import type { AgentQuestionAnswer, AgentQuestionSet } from "./types";
 import "./collaboration.css";
@@ -159,20 +159,12 @@ export function AgentQuestionCard({
           onChange={(event) => update({ ...answer, other: event.target.value })}
         />
       </div>
-      {error && (
-        <p role="alert" className="agent-question-error">
-          {error}
-        </p>
-      )}
+      <ErrorNotification message={error} onDismiss={() => setError("")} />
       <div className="agent-question-actions">
         <span className="agent-question-hint">
           {question.multiSelect ? "Choose any that apply" : "Choose one"} · Esc to hide
         </span>
-        {index > 0 && (
-          <Button variant="ghost" size="sm" onClick={() => setIndex(index - 1)}>
-            Back
-          </Button>
-        )}
+        {index > 0 && <BackButton onClick={() => setIndex(index - 1)} />}
         <Button
           variant={last ? "primary" : "outline"}
           size="sm"

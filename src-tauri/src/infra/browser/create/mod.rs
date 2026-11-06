@@ -1,6 +1,6 @@
 //! Creating a browser page webview and its favicon and compatibility probes.
 
-use super::super::space_windows;
+use super::super::profile_windows;
 use super::*;
 
 mod events;
@@ -28,38 +28,29 @@ pub async fn browser_webview_create(
         }
     };
     trace_create("start");
-    // The page's Space, and with it its website data, comes from the window that asks
+    // The page's profile, and with it its website data, comes from the window that asks
     // for it, never from the request.
     let owner = caller.window().label().to_owned();
-    let space =
-        space_windows::space_for_owner(&owner).ok_or("Only a Space window can open pages.")?;
-    let incognito = space_windows::incognito_session(&owner)
+    let profile = profile_windows::profile_for_owner(&owner)
+        .ok_or("Only a profile's window can open pages.")?;
+    let incognito = profile_windows::incognito_session(&owner)
         .or_else(eval_ephemeral_session)
-        .map(|session| space_windows::incognito_store_id(&session));
+        .map(|session| profile_windows::incognito_store_id(&session));
     request.private = incognito.is_some();
-    // On Windows each Space keeps its pages' data in its own folder, incognito included.
-    let space_data = space_windows::space_store_identity(&space);
-    // The personal Space uses its vault's store; every other Space its own.
-    request.profile_id = space_windows::space_store_identity(&space);
-    // Incognito pages never restore a synced session or bind an account profile.
-    let profile_lease = if request.private {
-        super::super::browser_sync::browser_profile_lease(Some(&app), None, None).await?
-    } else {
-        super::super::browser_sync::browser_profile_lease(
-            Some(&app),
-            request.profile_id.as_deref(),
-            request
-                .workspace_tab_id
-                .as_deref()
-                .map(|id| (id, request.url.as_str())),
-        )
-        .await?
-    };
+    #[cfg(any(target_os = "macos", windows))]
+    if !request.private {
+        crate::infra::vault::site_data::prepare_page(&profile, &request.url).await;
+    }
+    // Holds the account steady until the view has finished opening.
+    let page_store = super::super::profile_data::page_store(&profile).await?;
     trace_create("lease acquired");
+    // On Windows each profile keeps its pages' data in its own folder, incognito included.
+    let profile_data = page_store.store.clone();
+    // Incognito pages never bind a persistent store.
     request.profile_id = if request.private {
         None
     } else {
-        profile_lease.profile_id.clone()
+        page_store.store.clone()
     };
     let profile_identifier = browser_profile_identifier(request.profile_id.as_deref())?;
     // Integrations use Browser's navigation rules. Provider metadata identifies
@@ -94,17 +85,17 @@ pub async fn browser_webview_create(
         }
     }
     register_session(&state, &request.id, &request.scope_id)?;
-    record_request(&state, &request, &profile_lease.logical_profile_id)?;
+    record_request(&state, &request, &profile)?;
     let shortcut_token = shortcut_token_for(&state, &request.id)?;
     if let Some(webview) = app.get_webview(&label) {
         return adopt_existing(
-            &app, &state, &window, webview, &request, &space, position, size,
+            &app, &state, &window, webview, &request, &profile, position, size,
         );
     }
 
     let page_app = app.clone();
     let page_id = request.id.clone();
-    let page_space = space.clone();
+    let page_profile = profile.clone();
     let title_app = app.clone();
     let title_id = request.id.clone();
     let popup_app = app.clone();
@@ -112,10 +103,9 @@ pub async fn browser_webview_create(
     let download_app = app.clone();
     let download_id = request.id.clone();
     let replacing_extension_view =
-        super::super::extensions::pending_navigation(&space, &request.id).await;
-    let restoring_tab_session = profile_lease.tab_session.is_some() || replacing_extension_view;
+        super::super::extensions::pending_navigation(&profile, &request.id).await;
     let preview_only = request.preview_only;
-    let initial_url = if restoring_tab_session {
+    let initial_url = if replacing_extension_view {
         "about:blank".parse().map_err(|_| "Invalid bootstrap URL")?
     } else {
         external_url(&request.url)?
@@ -125,7 +115,7 @@ pub async fn browser_webview_create(
             .background_throttling(BackgroundThrottlingPolicy::Disabled),
         &app,
         if request.private {
-            space_data.as_deref()
+            profile_data.as_deref()
         } else {
             request.profile_id.as_deref()
         },
@@ -135,7 +125,11 @@ pub async fn browser_webview_create(
     // the native scrollbar during creation.
     #[cfg(not(windows))]
     let builder = builder.background_color(browser_background());
-    // An incognito view joins its Space's incognito session (see vendor/wry's
+    // WebView2's own autofill opens a native dropdown under the field, on top of everything the
+    // page draws, so it would cover Misty's saved sign-ins (`PasswordFillMenu`).
+    #[cfg(windows)]
+    let builder = builder.general_autofill_enabled(false);
+    // An incognito view joins its profile's incognito session (see vendor/wry's
     // MISTY-PATCH.md): the identifier names the session, never a persistent store.
     let builder = match incognito {
         Some(session) => builder.incognito(true).data_store_identifier(session),
@@ -148,7 +142,7 @@ pub async fn browser_webview_create(
     } else {
         let pointer = super::super::extensions::native::configuration(
             &app,
-            &space,
+            &profile,
             profile_identifier,
             request.private,
             request.url.clone(),
@@ -189,6 +183,16 @@ pub async fn browser_webview_create(
         .initialization_script_for_all_frames(if cfg!(windows) && !preview_only {
             include_str!("../scripts/background_tab.js")
         } else { "" })
+        .initialization_script_for_all_frames(if preview_only {
+            ""
+        } else {
+            page_tools::MEDIA_HOLD_SCRIPT
+        })
+        .initialization_script_for_all_frames(if request.hold_media && !preview_only {
+            page_tools::media_hold_state(true)
+        } else {
+            String::new()
+        })
         .initialization_script(browser_viewport_script(
             &shortcut_token,
             renderer(caller.window().label()).tracking,
@@ -198,7 +202,7 @@ pub async fn browser_webview_create(
         .initialization_script(kiri::page_script())
         .initialization_script(page_tools::media_tools::session::MEDIA_SESSION_PAGE_SCRIPT)
         .on_navigation(move |url| {
-            if restoring_tab_session && url.as_str() == "about:blank" { return true; }
+            if replacing_extension_view && url.as_str() == "about:blank" { return true; }
             // Misty's page scripts report over Kiri's host channel, never by
             // navigating, so every non-web scheme is refused here. This
             // callback includes frames, redirects and POST submissions.
@@ -211,7 +215,7 @@ pub async fn browser_webview_create(
         })
         .on_page_load(move |webview, payload| {
             if preview_only { return; }
-            page_load(&page_app, &page_space, &page_id, restoring_tab_session, webview, payload);
+            page_load(&page_app, &page_profile, &page_id, replacing_extension_view, webview, payload);
         })
         .on_document_title_changed(move |webview, title| {
             if preview_only { return; }
@@ -257,7 +261,7 @@ pub async fn browser_webview_create(
     if !preview_only {
         super::super::extensions::native::register(
             &webview,
-            &space,
+            &profile,
             &request.id,
             request.private,
             &request.url,
@@ -281,27 +285,6 @@ pub async fn browser_webview_create(
     engine_menu::install(&webview, false);
     #[cfg(target_os = "macos")]
     attachment_download_macos::install(&webview)?;
-    #[cfg(any(target_os = "macos", windows))]
-    if let Some(values) = profile_lease
-        .tab_session
-        .as_ref()
-        .filter(|_| !replacing_extension_view)
-    {
-        let url = external_url(&request.url)?;
-        if let Err(error) = super::super::website_data::session_storage::install(
-            &webview,
-            &url.origin().ascii_serialization(),
-            values,
-        )
-        .await
-        {
-            let _ = webview.close();
-            return Err(error);
-        }
-        webview
-            .navigate(url)
-            .map_err(|_| "Could not open restored tab")?;
-    }
     configure_browser_frame_rate(&webview)?;
     apply_macos_webview_theme(&webview, &request.theme)?;
     configure_browser_webview(&webview, request.native_live_resize)?;

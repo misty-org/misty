@@ -4,7 +4,7 @@ import { spacesApi } from "@/api/spaces/api";
 import type { SpaceMessage } from "@/api/spaces/dto/entities";
 import { isAgentAuthoredMessage } from "./messageHelpers";
 
-export interface ChatDisplayRow {
+interface ChatDisplayRow {
   message: SpaceMessage;
   compact: boolean;
   dateLabel: string;

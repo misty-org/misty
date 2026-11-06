@@ -13,19 +13,20 @@ import {
 // through per-page queues. State lives in browserRuntimeSets.ts; the work is split by stage.
 export { useBrowserRuntimeStore } from "./browserRuntimeStore";
 export type {
-  BrowserCompatibilityIssue,
+  
   BrowserHistory,
   BrowserInspection,
-  BrowserInteractiveControl,
+  
   BrowserMistyPage,
-  HistoryStep,
-  PagePreview,
+  
+  
 } from "./browserRuntimeTypes";
 
 export {
   browserOverlayReady,
   isBrowserLayoutMoving,
   reconcileBrowserOverlayState,
+  setBrowserNoticeRects,
   setBrowserPointerGestureActive,
   setBrowserPointerTrackingEnabled,
   setBrowserWebviewsSuspended,
@@ -49,12 +50,12 @@ export {
   browserRuntimeId,
   browserScopeId,
   browserTabIdForRuntime,
-  registerBrowserRuntime,
+  
   setBrowserRuntimeKeepLive,
 } from "./browserRuntimeSets";
 export {
   hideBrowserWebview,
-  navigateSyncedBrowserWebview,
+  
   scheduleStrayPageSweep,
 } from "./browserRuntimeVisibility";
 export {
@@ -107,5 +108,5 @@ export function browserContentHash(value: string): string {
   return `fnv1a32:${(hash >>> 0).toString(16).padStart(8, "0")}`;
 }
 
-/** Dispatched when the window's chrome color changes (its Space's color). */
+/** Dispatched when the window's chrome color changes (its profile's color). */
 export const windowChromeChangedEvent = "misty:window-chrome-changed";

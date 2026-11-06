@@ -9,7 +9,6 @@ import {
 } from "./AgentsPage.testFixtures";
 import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { expect, it } from "vitest";
-import { useWorkspaceStore } from "@/features/workspace";
 import { useMistyStore } from "@/features/misty/useMistyStore";
 
 it("edits a global agent without requiring a work Space", async () => {
@@ -19,11 +18,9 @@ it("edits a global agent without requiring a work Space", async () => {
   fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Launch coordinator" } });
   expect(screen.queryByLabelText("Agent work Space")).toBeNull();
   expect((screen.getByLabelText("Name") as HTMLInputElement).value).toBe("Launch coordinator");
-  expect(useWorkspaceStore.getState().activeScopeKey).toBe("space:Studio");
 });
 
 it("omits model and app permission setup for a new global agent", async () => {
-  useWorkspaceStore.setState({ activeScopeKey: "space:personal" });
   renderAgentsPage();
   chooseFromSwitcher("New agent");
   fireEvent.click(screen.getByText("Instructions", { selector: "summary" }));
@@ -33,17 +30,19 @@ it("omits model and app permission setup for a new global agent", async () => {
   expect(screen.queryByText("Select a Space to assign apps.")).toBeNull();
 });
 
-it("reopens historical conversations and starts new personal work without their old scope", async () => {
+it("shows the conversations of the window's Space and starts new work in it", async () => {
   useMistyStore.setState({
     conversations: [
-      { ...conversation("draft", "Launch draft"), spaceId: "Studio" },
-      { ...conversation("private", "Other Space draft"), spaceId: "Launch" },
+      { ...conversation("draft", "Launch draft"), spaceId: "home", personalSpace: true },
+      { ...conversation("private", "Other draft"), spaceId: "home", personalSpace: true },
+      { ...conversation("shared", "Team draft"), spaceId: "team" },
     ],
   });
   renderAgentsPage();
   const recents = screen.getByRole("region", { name: "Recent conversations" });
   expect(within(recents).getByRole("button", { name: "Launch draft" })).toBeTruthy();
-  fireEvent.click(within(recents).getByRole("button", { name: "Other Space draft" }));
+  expect(within(recents).queryByRole("button", { name: "Team draft" })).toBeNull();
+  fireEvent.click(within(recents).getByRole("button", { name: "Other draft" }));
   typeDraft("Continue this conversation");
   await act(async () => {
     fireEvent.click(screen.getByRole("button", { name: "Send to Misty" }));

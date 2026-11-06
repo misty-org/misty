@@ -2,7 +2,7 @@ import { Reply, X } from "lucide-react";
 import type { GlobalAiConversation } from "@/features/misty/types";
 import { useMistyStore } from "@/features/misty/useMistyStore";
 import { ModelKeyNeededButton, needsModelKey } from "@/features/settings/ModelKeyNeeded";
-import { Button, IconButton } from "@/shared/ui";
+import { Button, ErrorNotification, IconButton } from "@/shared/ui";
 
 /** The conversation's last error above the composer; a lost running task can reconnect. */
 export function AgentComposeError({
@@ -14,24 +14,15 @@ export function AgentComposeError({
   reconnect: boolean;
   dismiss: () => void;
 }) {
-  if (!error) return null;
   return (
-    <div role="alert" className="agent-compose-error">
-      <p>{error}</p>
-      {needsModelKey(error) && <ModelKeyNeededButton />}
+    <ErrorNotification message={error} onDismiss={dismiss}>
+      {needsModelKey(error ?? "") && <ModelKeyNeededButton />}
       {reconnect && (
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => void useMistyStore.getState().loadConversations(true)}
-        >
+        <Button type="button" variant="ghost" size="sm" onClick={() => void useMistyStore.getState().loadConversations(true)}>
           Reconnect to task
         </Button>
       )}
-      <IconButton label="Dismiss error" onClick={dismiss}>
-        <X size={16} />
-      </IconButton>
-    </div>
+    </ErrorNotification>
   );
 }
 

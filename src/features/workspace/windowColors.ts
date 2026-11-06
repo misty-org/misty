@@ -1,7 +1,7 @@
 /**
- * The color a virtual window carries, so windows are easy to tell apart. It tints the
- * window's chrome (frame, navigator and tab strip), never its content. The hues match
- * the tab group palette, without gray: gray would not tell windows apart.
+ * The color a profile carries, so its windows are easy to tell from another profile's. It tints
+ * the window's chrome (frame, navigator and tab strip), never its content. The hues match the
+ * tab group palette, without gray: gray would not tell windows apart.
  */
 export const windowColors = {
   blue: "#8ab4f8",

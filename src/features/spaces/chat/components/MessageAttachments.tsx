@@ -4,7 +4,7 @@ import type { SpaceLibraryItem, SpaceMessage, SpaceNode } from "@/api/spaces/dto
 import { Badge, Button } from "@/shared/ui";
 import { LibraryBig, Paperclip } from "lucide-react";
 
-export interface MessageAttachmentsProps {
+interface MessageAttachmentsProps {
   message: SpaceMessage;
   nodes: SpaceNode[];
   libraryItems: SpaceLibraryItem[];

@@ -12,7 +12,7 @@ export interface FeedbackDraft {
   frequency: FeedbackFrequency;
 }
 
-export interface FeedbackClientContext {
+interface FeedbackClientContext {
   appVersion?: string;
   platform?: string;
   releaseChannel?: string;

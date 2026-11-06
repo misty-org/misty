@@ -1,10 +1,12 @@
+import { isAllowedServerUrl } from "@/api/client/base-url";
+
 /**
  * What people type or paste in the setup wizard: a server address, or the setup link from a
  * welcome email (`https://mistysys.com/setup#server=<host>&key=<key>`, or an older server's own
  * `https://<server>/setup#key=<key>`). The website's setup page opens the app with
  * `misty://setup?server=<host>&key=<key>`. A server's API lives at `/v1` on its address.
  */
-export interface ServerAddress {
+interface ServerAddress {
   /** The address people know, such as `https://api.mistysys.com`. */
   origin: string;
   /** The API base every request goes to. */
@@ -24,7 +26,8 @@ export function isSetupKey(value: string): boolean {
 
 const loopbackHosts = new Set(["localhost", "127.0.0.1", "[::1]"]);
 
-/** A server address, or an error to show. Without a scheme, https is assumed. */
+/** A server address, or an error to show. Without a scheme, https is assumed. Only a development
+ * build takes plain http on this computer; a release build takes https domains alone. */
 export function parseServerAddress(input: string): ServerAddress | { error: string } {
   const text = input.trim();
   if (!text) return { error: "Enter your server's address." };
@@ -43,7 +46,9 @@ export function parseServerAddress(input: string): ServerAddress | { error: stri
     !loopbackHosts.has(url.hostname) &&
     !url.hostname.endsWith(".localhost")
   )
-    return { error: "Use an https:// address. Plain http works only on this computer." };
+    return { error: "Use an https:// address." };
+  if (!isAllowedServerUrl(url.href))
+    return { error: "Use your server's https:// domain, such as misty.example.com." };
   // The setup link and the API path both name the server itself.
   const path = url.pathname.replace(/\/+$/, "");
   const apiPath = /^(?:\/api)?\/v\d+$/i.test(path) ? path : "/v1";

@@ -60,8 +60,8 @@ const CardContent = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDi
 );
 CardContent.displayName = "CardContent";
 
-export { Card, CardContent, CardHeader, CardTitle };
+export { Card,    };
 
-export type CardProps = React.HTMLAttributes<HTMLDivElement> & {
+type CardProps = React.HTMLAttributes<HTMLDivElement> & {
   size?: "default" | "sm";
 };

@@ -1,5 +1,5 @@
 //! Arguments for `misty server`, which runs the development stack. A server
-//! is deployed with server/compose.yml instead (docs/self-hosting.md).
+//! is deployed with misty-server/compose.yml instead (docs/self-hosting.md).
 
 use super::*;
 
@@ -41,10 +41,6 @@ pub(super) enum ServerCommand {
         #[arg(long, default_value_t = 100)]
         tail: u32,
     },
-    Image {
-        #[command(subcommand)]
-        command: ImageCommand,
-    },
     Worker {
         #[command(subcommand)]
         command: WorkerCommand,
@@ -52,14 +48,6 @@ pub(super) enum ServerCommand {
     R2 {
         #[command(subcommand)]
         command: R2Command,
-    },
-}
-
-#[derive(Debug, Subcommand)]
-pub(super) enum ImageCommand {
-    Build {
-        #[arg(long)]
-        tag: String,
     },
 }
 

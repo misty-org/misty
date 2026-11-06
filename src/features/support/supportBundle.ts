@@ -4,7 +4,7 @@ import { readClientDebugEvents } from "@/shared/platform/clientDebug";
 
 import { readSystemErrors } from "./systemErrors";
 
-export interface SupportBundle {
+interface SupportBundle {
   schema_version: 1;
   generated_at: string;
   notice: string;

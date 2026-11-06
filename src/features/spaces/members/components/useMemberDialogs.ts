@@ -4,7 +4,7 @@ import { useLocation } from "react-router-dom";
 import type { SpaceMembersState } from "./useSpaceMembers";
 
 /**
- * The invite dialog and the transfer/remove confirmation. The server sends no email, so once an
+ * The invite dialog and the transfer/remove confirmation. Once an
  * invitation is made (or given a new link) the dialog shows its link to copy and pass on.
  *
  * Both leave their errors to the shared Spaces store, which is why the failure

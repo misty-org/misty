@@ -4,7 +4,7 @@ import { persist } from "zustand/middleware";
 const defaultAppRoute = "/browser";
 const workspaceRoutes = ["/browser", "/agents", "/spaces"];
 
-export interface AppRouteMemoryStore {
+interface AppRouteMemoryStore {
   lastAppRoute: string;
   rememberAppRoute: (path: string) => void;
   resetAppRoute: () => void;

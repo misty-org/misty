@@ -15,16 +15,10 @@ pub(super) async fn check(
     }
     for (view, id) in [(a, b_id), (ephemeral, a_id), (host, a_id)] {
         if !matches!(
-            cookies::read(view, id).await,
+            cookies::verify_storage_profile(view, id).await,
             Err(cookies::CookieStoreError::Profile)
         ) {
-            return Err("profile read guard failed");
-        }
-        if !matches!(
-            cookies::write(view, id, fixture(), false).await,
-            Err(cookies::CookieStoreError::Profile)
-        ) {
-            return Err("profile write guard failed");
+            return Err("profile guard failed");
         }
     }
     let tomorrow = std::time::SystemTime::now()
@@ -50,9 +44,15 @@ pub(super) async fn check(
                         cookie.http_only = http_only;
                         write(a, a_id, cookie.clone(), false).await?;
                         let actual = read(peer, a_id).await?;
+                        // Foundation never reports an explicit SameSite=None. Sync keeps it
+                        // from the synced copy; everything else must come back exact.
+                        let mut expected = cookie.clone();
+                        if matches!(expected.same_site, Some(SameSite::None)) {
+                            expected.same_site = None;
+                        }
                         if actual.len() != 1
                             || serde_json::to_value(&actual[0]).ok()
-                                != serde_json::to_value(&cookie).ok()
+                                != serde_json::to_value(&expected).ok()
                         {
                             return Err("cookie attributes changed in the live store");
                         }
@@ -89,6 +89,32 @@ pub(super) async fn check(
         return Err("final store not empty");
     }
     println!("PASS: {count} live cookie round trips, completion callbacks, profile guards, same-profile visibility, isolation, and host/domain coexistence");
-    staged_restore(a, b, a_id, b_id).await?;
+    // What sync does with another computer's cookies: bring them in, then sign out of them.
+    let mut source = Vec::new();
+    for name in ["session", "preferences", "csrf"] {
+        let mut cookie = fixture();
+        cookie.name = name.into();
+        write(a, a_id, cookie.clone(), false).await?;
+        write(b, b_id, cookie.clone(), false).await?;
+        source.push(cookie);
+    }
+    let names = |cookies: Vec<Cookie>| {
+        let mut names: Vec<String> = cookies.into_iter().map(|cookie| cookie.name).collect();
+        names.sort();
+        names
+    };
+    if names(read(b, b_id).await?) != names(source.clone()) {
+        return Err("applied copy differs from the source");
+    }
+    for cookie in source {
+        write(b, b_id, cookie, true).await?;
+    }
+    if !read(b, b_id).await?.is_empty() {
+        return Err("signing out did not clear the copy");
+    }
+    if read(a, a_id).await?.len() != 3 {
+        return Err("signing out changed the source profile");
+    }
+    println!("PASS: applying a copy and signing out, with the source profile untouched");
     Ok(())
 }

@@ -1,10 +1,6 @@
-import { AppWindowMac, Globe, LogOut, Palette, Pencil, Plus, Trash2 } from "lucide-react";
+import { LogOut, Pencil, Plus, Trash2 } from "lucide-react";
 import type { Space } from "@/api/spaces/dto/entities";
-import {
-  openSpaceWindow,
-  switchSpaceWindow,
-  useSpaceWindowStore,
-} from "@/features/workspace/spaceWindow";
+import { switchSpaceWindow } from "@/features/workspace/spaceWindow";
 import { DropdownMenuCheckboxItem, DropdownMenuSeparator, MenuItem } from "@/shared/ui";
 import {
   canManageSpaceLifecycle,
@@ -16,23 +12,18 @@ import { SpaceAvatar } from "../SpaceAvatar";
 import type { SpaceDialog } from "./SpaceDialogs";
 
 /**
- * The Space menu: your Spaces (choosing one switches this window, with a checkmark on the
- * one it shows), the Space in a new window, a new Space, then this Space's name, color,
- * sites and leaving or deleting it.
+ * The Space menu: your Spaces (choosing one shows it in this window, with a checkmark on the
+ * one it shows; tabs stay as they are), a new Space, then renaming, leaving or deleting this one.
  */
 export function SpaceMenuItems(props: {
   space: Space;
   onDialog: (dialog: SpaceDialog) => void;
   onCreate: () => void;
-  onError: (message: string) => void;
 }) {
   const { space, onDialog } = props;
   const spaces = useSpacesStore((state) => state.spaces);
-  const incognito = useSpaceWindowStore((state) => state.identity.incognito);
   const personal = preferredDefaultSpace(spaces);
   const isOwner = space.role === "owner";
-  const report = (action: Promise<unknown>) =>
-    void action.catch(() => props.onError("That Space couldn't open. Try again."));
   const later = (run: () => void) => () => window.setTimeout(run, 0);
   const spaceList = (
     <>
@@ -44,7 +35,7 @@ export function SpaceMenuItems(props: {
             key={item.id}
             checked={here}
             onSelect={() => {
-              if (!here) report(switchSpaceWindow(item.id, isPersonal));
+              if (!here) switchSpaceWindow(item.id, isPersonal);
             }}
           >
             <SpaceAvatar
@@ -59,18 +50,11 @@ export function SpaceMenuItems(props: {
     </>
   );
   const windowItems = (
-    <>
-      <MenuItem
-        icon={<AppWindowMac className="size-4" />}
-        label="Open in new window"
-        onSelect={() => report(openSpaceWindow(space.id, space.id === personal?.id))}
-      />
-      <MenuItem
-        icon={<Plus className="size-4" />}
-        label="New Space"
-        onSelect={later(props.onCreate)}
-      />
-    </>
+    <MenuItem
+      icon={<Plus className="size-4" />}
+      label="New Space"
+      onSelect={later(props.onCreate)}
+    />
   );
   const settings = (
     <>
@@ -81,18 +65,6 @@ export function SpaceMenuItems(props: {
           onSelect={later(() => onDialog("rename"))}
         />
       )}
-      {!incognito && (
-        <MenuItem
-          icon={<Palette className="size-4" />}
-          label="Color"
-          onSelect={later(() => onDialog("color"))}
-        />
-      )}
-      <MenuItem
-        icon={<Globe className="size-4" />}
-        label="Sites that open here"
-        onSelect={later(() => onDialog("sites"))}
-      />
       {isOwner && canManageSpaceLifecycle(space, "delete") ? (
         <>
           <DropdownMenuSeparator />

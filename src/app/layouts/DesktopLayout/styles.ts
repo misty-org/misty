@@ -41,7 +41,6 @@ export const windowsStandardControlButtonClass =
 export const windowsInlineControlsClass = "mr-1 flex shrink-0 items-center gap-0.5";
 export const windowsInlineControlButtonClass =
   "grid size-7 shrink-0 place-items-center rounded-md border-0 bg-transparent p-0 text-cream-muted transition-colors hover:bg-charcoal-hover hover:text-cream";
-export const windowsTitlebarCloseButtonClass = `${windowsTitlebarControlButtonClass} hover:bg-charcoal-active hover:text-cream-bright`;
 
 export const frameOverlayBaseClass = [
   "pointer-events-none fixed right-3 top-10 z-[90] grid min-w-36 grid-cols-[minmax(0,1fr)_auto]",

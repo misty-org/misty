@@ -11,13 +11,12 @@ import {
 } from "./mistyStoreHelpers";
 import { settleRun } from "./settleRun";
 import { useCollaborationStore } from "@/features/agents/agentCollaboration";
-import { localChats, markStoredChats } from "./localChats";
-import { syncLocalChats } from "./localChatSync";
+import { pendingServerDeletes } from "./pendingServerDeletes";
 import { submissionEpoch } from "./mistySubmissionEpoch";
 
 /**
- * Loads this device's chats and the server's, merges them, and re-attaches to a run still
- * streaming. `reconnect` keeps the open conversation; `expected` names the run to rejoin.
+ * Loads the person's conversations from the server and re-attaches to a run still streaming.
+ * `reconnect` keeps the open conversation; `expected` names the run to rejoin.
  */
 export function createLoadConversations(
   set: MistySet,
@@ -31,27 +30,10 @@ export function createLoadConversations(
       conversationsLoading: true,
     });
     try {
-      // Chats live on this device (docs/agents/chats-local.md). Its copy
-      // paints first when nothing is loaded yet; the server's newer turns merge in after.
-      const response = localChats.available()
-        ? await localChats
-            .conversations(accountId)
-            .catch(() => [])
-            .then(async (saved) => {
-              const local = saved.map(normalizeConversation);
-              markStoredChats(local);
-              if (get().accountId === accountId && !get().working && !get().conversations.length)
-                set({ conversations: local });
-              return {
-                conversations: await syncLocalChats(accountId, local, () => get().invocationId),
-              };
-            })
-        : // Outside the desktop app there is no device to keep chats: the server lists them.
-          await globalMistyApi.conversations("", (saved) => {
-            if (get().accountId !== accountId || get().working || get().conversations.length)
-              return;
-            set({ conversations: saved.conversations.map(normalizeConversation) });
-          });
+      const response = await globalMistyApi.conversations("", (saved) => {
+        if (get().accountId !== accountId || get().working || get().conversations.length) return;
+        set({ conversations: saved.conversations.map(normalizeConversation) });
+      });
       if (get().accountId !== accountId) return;
       if ((get().working && !reconnect) || epoch !== submissionEpoch()) {
         set({
@@ -59,9 +41,10 @@ export function createLoadConversations(
         });
         return;
       }
-      const conversations = response.conversations.map(normalizeConversation);
-      // What the device sync returned is saved already.
-      if (localChats.available()) markStoredChats(conversations);
+      void pendingServerDeletes.retry();
+      const conversations = response.conversations
+        .map(normalizeConversation)
+        .filter((conversation) => !pendingServerDeletes.has(conversation.id));
       if (
         expected &&
         (expected.accountId !== accountId ||

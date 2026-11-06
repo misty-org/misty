@@ -1,7 +1,7 @@
 //! Names the person gave to windows, tabs and groups, per account, in `misty.db`.
 use super::store::Store;
 use serde::Serialize;
-use std::{collections::BTreeMap, path::PathBuf};
+use std::collections::BTreeMap;
 
 #[derive(Clone, Serialize)]
 pub struct NavigationSnapshot {
@@ -11,8 +11,6 @@ pub struct NavigationSnapshot {
 
 pub struct NavigationNamesService {
     store: Store,
-    /// `navigation.json` from an earlier layout, imported once when no names exist yet.
-    legacy_path: PathBuf,
 }
 
 fn valid_name(value: &str) -> bool {
@@ -39,54 +37,17 @@ fn read_names(store: &Store, account: &str) -> Result<BTreeMap<String, String>, 
     rows.collect::<Result<_, _>>().map_err(|e| e.to_string())
 }
 
-/// Imports an earlier `navigation.json` (`{"version":1,"accounts":{...}}`) once.
-fn import_legacy(store: &Store, legacy: &std::path::Path) -> Result<(), String> {
-    store
-        .import_once("navigation.json", |connection| -> Result<(), rusqlite::Error> {
-            let Ok(bytes) = std::fs::read(legacy) else {
-                return Ok(());
-            };
-            #[derive(serde::Deserialize)]
-            struct Legacy {
-                #[serde(default)]
-                accounts: BTreeMap<String, BTreeMap<String, String>>,
-            }
-            let Ok(document) = serde_json::from_slice::<Legacy>(&bytes) else {
-                return Ok(());
-            };
-            for (account, names) in document.accounts {
-                for (key, name) in names {
-                    if valid_key(&account) && valid_key(&key) && valid_name(&name) {
-                        connection.execute(
-                            "INSERT OR IGNORE INTO navigation_names (account, key, name) VALUES (?1, ?2, ?3)",
-                            rusqlite::params![account, key, name],
-                        )?;
-                    }
-                }
-            }
-            Ok(())
-        })
-        .map_err(|e| e.to_string())
-}
-
 impl NavigationNamesService {
-    pub fn new(store: Store, legacy_path: PathBuf) -> Self {
-        Self { store, legacy_path }
+    pub fn new(store: Store) -> Self {
+        Self { store }
     }
 
     pub async fn snapshot(&self, account: &str) -> NavigationSnapshot {
-        let (store, legacy, account) = (
-            self.store.clone(),
-            self.legacy_path.clone(),
-            account.to_owned(),
-        );
-        let result = tokio::task::spawn_blocking(move || {
-            import_legacy(&store, &legacy)?;
-            read_names(&store, &account)
-        })
-        .await
-        .map_err(|e| e.to_string())
-        .and_then(|result| result);
+        let (store, account) = (self.store.clone(), account.to_owned());
+        let result = tokio::task::spawn_blocking(move || read_names(&store, &account))
+            .await
+            .map_err(|e| e.to_string())
+            .and_then(|result| result);
         match result {
             Ok(names) => NavigationSnapshot { names, error: None },
             Err(error) => NavigationSnapshot {
@@ -134,10 +95,7 @@ mod tests {
     use super::*;
 
     fn service(directory: &tempfile::TempDir) -> NavigationNamesService {
-        NavigationNamesService::new(
-            Store::at(directory.path().join("misty.db")),
-            directory.path().join("navigation.json"),
-        )
+        NavigationNamesService::new(Store::at(directory.path().join("misty.db")))
     }
 
     #[tokio::test]
@@ -171,27 +129,6 @@ mod tests {
             .await
             .names
             .contains_key("tab:1"));
-    }
-
-    #[tokio::test]
-    async fn an_earlier_navigation_file_is_imported_once() {
-        let directory = tempfile::tempdir().unwrap();
-        std::fs::write(
-            directory.path().join("navigation.json"),
-            br#"{"version":1,"accounts":{"account-a":{"tab:1":"Old name"}}}"#,
-        )
-        .unwrap();
-        let service = service(&directory);
-        assert_eq!(
-            service.snapshot("account-a").await.names["tab:1"],
-            "Old name"
-        );
-        service
-            .update("account-a".into(), "tab:1".into(), None)
-            .await
-            .unwrap();
-        // The file does not come back after the name was removed.
-        assert!(service.snapshot("account-a").await.names.is_empty());
     }
 
     #[test]

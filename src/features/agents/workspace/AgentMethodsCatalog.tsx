@@ -9,7 +9,7 @@ import {
 } from "@/api/ai/agent-methods";
 import { observeAccountChanges } from "@/api/account-events";
 import { useMistyStore } from "@/features/misty/useMistyStore";
-import { Button, Input, SkeletonList } from "@/shared/ui";
+import { Button, ErrorNotification, Input, SkeletonList } from "@/shared/ui";
 import { describeNextRun, describeSchedule } from "../workflows/scheduleSummary";
 import { WorkflowScheduleDialog } from "../workflows/WorkflowScheduleDialog";
 import { AgentMethodEditor } from "./AgentMethodEditor";
@@ -171,14 +171,11 @@ export function AgentMethodsCatalog({
           onChange={(e) => setQuery(e.target.value)}
         />
       </div>
-      {error && (
-        <div role="alert" className="agent-method-error">
-          <p>{error}</p>
-          <Button variant="ghost" size="sm" onClick={() => void refresh()}>
-            Reload
-          </Button>
-        </div>
-      )}
+      <ErrorNotification message={error} onDismiss={() => setError("")}>
+        <Button type="button" variant="ghost" size="sm" onClick={() => void refresh()}>
+          Reload
+        </Button>
+      </ErrorNotification>
       {notice && (
         <p role="status" className="agent-method-hint">
           {notice}

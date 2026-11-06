@@ -1,6 +1,6 @@
 import { spaceAgentsApi } from "@/api/spaces/space-agents";
 import { useSpacesStore } from "@/features/spaces";
-import { Button, Skeleton } from "@/shared/ui";
+import { Button, ErrorNotification, Skeleton } from "@/shared/ui";
 import { Check } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -82,11 +82,7 @@ export function AgentSpaceField({ agentId }: { agentId: string }) {
           })}
         </div>
       )}
-      {error ? (
-        <p role="alert" className="mt-2 text-xs text-cream-muted">
-          {error}
-        </p>
-      ) : null}
+      <ErrorNotification message={error} />
     </section>
   );
 }

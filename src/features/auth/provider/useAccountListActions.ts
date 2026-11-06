@@ -3,7 +3,7 @@ import {
   restoreAccountWorkspace,
   saveAccountWorkspace,
 } from "@/features/workspace";
-import { flushWorkspaceRecovery } from "@/features/browser-sync/recovery";
+import { flushWorkspaceRecovery } from "@/features/workspace/recoveryStorage";
 import { useCallback } from "react";
 import { resetAccountScopedState, type AuthUser } from "../authSession";
 import { listSavedAccountSessions, removeSavedAccountSession } from "../store/useAuthTokenStore";

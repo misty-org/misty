@@ -12,6 +12,8 @@ export const dockingMetrics = {
   /** Between a panel and the window's edge, on every side: wide enough that a panel's rounded
    * corner sits inside the window's own instead of being cut by it. */
   edge: 6,
+  /** The Space bar's own height, below the window edge. */
+  spaceBar: 36,
   paneRadius: 12,
 };
 export const dockingMotion = { duration: 300, easing: "ease-in-out" };
@@ -51,7 +53,8 @@ export function dockingGeometry({
   };
   frame["--pane-frame"] = `${edge}px`;
   frame["--pane-seam-color"] = "transparent";
-  for (const side of ["top", "right", "bottom", "left"] as const) frame[`--pane-seam-${side}`] = `${seams[side]}px`;
+  for (const side of ["top", "right", "bottom", "left"] as const)
+    frame[`--pane-seam-${side}`] = `${seams[side]}px`;
   // A pane's corner is its margin plus the page's own radius, so the page curve sits inside it.
   for (const y of ["top", "bottom"] as const)
     for (const x of ["left", "right"] as const)

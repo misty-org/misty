@@ -8,7 +8,7 @@ export function revealMainWindow(): Promise<void> {
 /** Where the window buttons sit relative to their usual spot (20pt from the left, 19pt down):
  * the vertical sidebar moves them onto its panel. Every call to the window style carries the
  * current value, so the order the shell and the sidebar mount in never undoes it. */
-export type TrafficLightOffset = { x: number; y: number };
+type TrafficLightOffset = { x: number; y: number };
 /** Where the vertical sidebar's content starts, from the window's left edge: the strip's 8pt
  * padding, the panel's 1pt border and its 10pt padding (docking-drawers.css). The window buttons start
  * here too, so the red one lines up with the address bar. */
@@ -42,13 +42,15 @@ export function enableModernWindowStyle(
   return pendingWindowStyle;
 }
 
-/** They slide `distance` points and fade over `durationMs`, as the sidebar beside them does. */
+/** They move with the bar that holds them over `durationMs`: `distance` points sideways with the
+ * sidebar, or `rise` points up with the Space bar. They never fade: away, they sit off the window. */
 export function setTrafficLightsVisible(
   visible: boolean,
   distance = 0,
   durationMs = 0,
+  rise = 0,
 ): Promise<void> {
-  return invoke("set_traffic_lights_visible", { visible, distance, durationMs });
+  return invoke("set_traffic_lights_visible", { visible, distance, rise, durationMs });
 }
 
 export function appSnapshot(): Promise<AppSnapshot> {

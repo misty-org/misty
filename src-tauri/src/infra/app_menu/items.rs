@@ -41,7 +41,14 @@ pub(super) fn command_item<R: Runtime, M: Manager<R>>(
 fn renderer_owned_accelerator(command_id: &str) -> bool {
     matches!(
         command_id,
-        "search.toggle" | "app.command_palette" | "app.zoom_in" | "app.zoom_out" | "app.zoom_reset"
+        "search.toggle"
+            | "app.command_palette"
+            | "app.zoom_in"
+            | "app.zoom_out"
+            | "app.zoom_reset"
+            | "browser.zoom_in"
+            | "browser.zoom_out"
+            | "browser.zoom_reset"
     )
 }
 

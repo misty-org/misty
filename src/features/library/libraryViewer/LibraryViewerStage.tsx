@@ -3,7 +3,7 @@ import { Button, IconButton } from "@/shared/ui";
 import { ChevronLeft, ChevronRight, ClipboardCopy } from "lucide-react";
 import type { CSSProperties, RefObject } from "react";
 
-export interface LibraryViewerStageProps {
+interface LibraryViewerStageProps {
   displayName: string;
   mimeType: string;
   contentUrl: string;

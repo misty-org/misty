@@ -32,6 +32,8 @@ impl LeaseMeter {
 
     /// Valid when there is a lease and it has not expired.
     pub fn valid(&self, now: i64) -> bool {
-        self.lease.as_ref().is_some_and(|lease| now < lease.expires_at)
+        self.lease
+            .as_ref()
+            .is_some_and(|lease| now < lease.expires_at)
     }
 }

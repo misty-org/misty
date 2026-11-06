@@ -130,7 +130,7 @@ it("preserves another conversation selected while deletion is pending", async ()
   );
   const removal = useMistyStore.getState().deleteConversation("chat-1");
   useMistyStore.setState({
-    conversations: [conversation, { ...conversation, id: "chat-2", agentId: "agent-2" }],
+    conversations: [{ ...conversation, id: "chat-2", agentId: "agent-2" }],
     activeConversationId: "chat-2",
     selectedAgentId: "agent-2",
     query: "another draft",

@@ -57,11 +57,11 @@ pub fn forward(
     } else {
         "misty://capture-state"
     };
-    let _ = crate::infra::space_windows::emit_to_primary(&app, event, payload);
+    let _ = crate::infra::profile_windows::emit_to_primary(&app, event, payload);
 }
 
 fn require_main(webview: &Webview) -> Result<(), String> {
-    crate::infra::space_windows::is_person_window(webview.label())
+    crate::infra::profile_windows::is_person_window(webview.label())
         .then_some(())
         .ok_or_else(|| "Main Misty window required.".into())
 }

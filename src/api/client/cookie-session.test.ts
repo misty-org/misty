@@ -41,7 +41,7 @@ describe("JWT cookie transport", () => {
       "https://misty.example/v1/me",
     ]);
     expect(browserFetch).not.toHaveBeenCalled();
-    expect(native.invoke).toHaveBeenCalledWith("auth_cookie_capture", {
+    expect(native.invoke).toHaveBeenCalledWith("auth_session_capture", {
       apiBase: "https://misty.example/v1",
       accountId: null,
     });

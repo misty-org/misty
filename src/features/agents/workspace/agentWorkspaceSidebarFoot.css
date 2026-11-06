@@ -27,6 +27,12 @@
 .agent-studio-get-started-header[aria-expanded="false"] > svg {
   transform: rotate(-90deg);
 }
+.agent-studio-get-started-note {
+  margin: 2px 0 4px;
+  padding: 0 8px;
+  font-size: 13px;
+  color: var(--color-cream);
+}
 .agent-studio-get-started ul {
   display: grid;
   gap: 2px;

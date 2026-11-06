@@ -96,11 +96,11 @@ function clearHookOrderRecoveryAttempt(): void {
   }
 }
 
-export interface RenderErrorBoundaryProps {
+interface RenderErrorBoundaryProps {
   children: ReactNode;
   scope?: "workspace" | "tab";
 }
 
-export interface RenderErrorBoundaryState {
+interface RenderErrorBoundaryState {
   error: Error | null;
 }

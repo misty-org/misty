@@ -17,7 +17,6 @@ export interface VoiceSettings {
   dictionary: string[];
   agentHandoff: boolean;
   captureSources: CaptureSources;
-  keepRecordings: boolean;
 }
 
 const styles: DictationStyle[] = ["plain", "casual", "formal"];
@@ -41,6 +40,5 @@ export function voiceSettings(document: Record<string, unknown> | undefined): Vo
       .slice(0, 200),
     agentHandoff: booleanSetting(doc, "voice", "agent_handoff", true),
     captureSources: sources.includes(capture) ? capture : "mic-tab",
-    keepRecordings: booleanSetting(doc, "voice", "keep_recordings", false),
   };
 }

@@ -3,10 +3,10 @@ import {
   Button,
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  ErrorNotification,
   Input,
 } from "@/shared/ui";
 import { DialogField } from "./DialogField";
@@ -21,12 +21,11 @@ export function TextDialog({ model }: { model: TextDialogModel }) {
 
   return (
     <Dialog open={Boolean(state)} onOpenChange={(open) => !open && !model.saving && model.close()}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent aria-describedby={undefined} className="sm:max-w-md">
         {state ? (
           <form className="grid gap-5" onSubmit={model.submit}>
             <DialogHeader>
               <DialogTitle>{state.title}</DialogTitle>
-              <DialogDescription>Save this change to the current Space Library.</DialogDescription>
             </DialogHeader>
 
             <DialogField label={state.primaryLabel}>
@@ -54,14 +53,7 @@ export function TextDialog({ model }: { model: TextDialogModel }) {
                 />
               </DialogField>
             ) : null}
-            {model.error ? (
-              <p
-                className="rounded-lg border border-charcoal-active/25 bg-charcoal-active px-3 py-2 text-sm text-cream-bright"
-                role="alert"
-              >
-                {model.error}
-              </p>
-            ) : null}
+            <ErrorNotification message={model.error} />
 
             <DialogFooter>
               <Button type="button" variant="outline" disabled={model.saving} onClick={model.close}>

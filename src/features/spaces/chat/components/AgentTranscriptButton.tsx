@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { X } from "lucide-react";
 import { agentMentionsApi, type AgentMentionStep } from "@/api/spaces/agent-mentions";
 import { StatusRow, StatusTable, type StatusState } from "@/features/agents";
-import { Button, IconButton, Skeleton } from "@/shared/ui";
+import { Button, ErrorNotification, IconButton, Skeleton } from "@/shared/ui";
 import { useChatSidePanel } from "../store/chatSidePanelStore";
 
 const states: Record<string, { state: StatusState; verb: string }> = {
@@ -81,11 +81,14 @@ export function AgentTranscriptCard({ requestId }: { requestId: string }) {
         <p className="m-0 mb-3 text-xs text-cream-muted">
           What the agent did to answer you. Only you can see this.
         </p>
-        {failedId === requestId ? (
-          <p role="alert" className="text-sm">
-            The transcript couldn&apos;t be loaded. Close this and try again.
-          </p>
-        ) : steps === null ? (
+        <ErrorNotification
+          message={
+            failedId === requestId
+              ? "The transcript couldn't be loaded. Close this and try again."
+              : ""
+          }
+        />
+        {failedId === requestId ? null : steps === null ? (
           <Skeleton className="h-24 w-full" />
         ) : steps.length === 0 ? (
           <p className="text-sm">The agent answered without any recorded steps.</p>

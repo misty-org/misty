@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 import { useFocusModeStore } from "@/features/app-shell";
-import { useBrowserSearchStore } from "@/features/browser-sync/search";
+import { useBrowserSearchStore } from "@/features/browser-search/search";
 import { useShortcutHandler } from "@/features/shortcuts";
 import { setBrowserWebviewsSuspended } from "@/features/webviews/browserRuntime";
 

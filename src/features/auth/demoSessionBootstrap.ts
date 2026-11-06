@@ -49,4 +49,4 @@ export function parseDemoAccount(rawAccount: string): DemoAccount {
   return account;
 }
 
-export type DemoAccount = Omit<SavedAccountSession, "lastUsedAt">;
+type DemoAccount = Omit<SavedAccountSession, "lastUsedAt">;

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Button } from "@/shared/ui";
+import { Button, ErrorNotification } from "@/shared/ui";
 import { runSnapshotSpace, saveProjectSnapshot } from "../../agentArtifacts";
 import { plainFailure } from "./undoText";
 
@@ -58,15 +58,12 @@ export function SnapshotLine({
       </p>
     );
   return (
-    <p
-      className="misty-diff-note flex items-center gap-2"
-      role={status.state === "failed" ? "alert" : undefined}
-    >
-      <span>
-        {status.state === "failed"
-          ? status.message
-          : `${name} isn’t saved to the agent’s Space yet.`}
-      </span>
+    <p className="misty-diff-note flex items-center gap-2">
+      <ErrorNotification
+        message={status.state === "failed" ? status.message : ""}
+        onDismiss={() => setStatus({ state: "missing" })}
+      />
+      <span>{`${name} isn’t saved to the agent’s Space yet.`}</span>
       <Button
         variant="ghost"
         size="sm"

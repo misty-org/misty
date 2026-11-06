@@ -36,8 +36,8 @@ export function ServerSection() {
     <>
       {error ? <DesktopSettingsNotice>{error}</DesktopSettingsNotice> : null}
       <Section
-        title="Server"
-        description="Your account, sync, Spaces and agent chats live on a Misty server. This choice stays on this device."
+        title="Connection"
+        description="Your account, sync, Spaces and agent chats live on a Misty server. This choice stays on this computer."
       >
         <Row
           label="Misty server"
@@ -56,7 +56,7 @@ export function ServerSection() {
         {host ? (
           <Row
             label="Browse only"
-            description="Signs out and leaves this server. Your tabs and browsing stay on this device."
+            description="Signs out and leaves this server. Your tabs and browsing stay on this computer."
           >
             <Button variant="outline" size="sm" disabled={leaving} onClick={() => void leave()}>
               Leave server

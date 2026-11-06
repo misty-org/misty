@@ -2,7 +2,6 @@
 import "../agentsWorkspace.css";
 import "../workspace/agentWorkspaceFrame.css";
 import { MistyContextBar } from "@/features/misty/MistyContextBar";
-import { MistyFolderWork } from "@/features/misty/MistyFolderWork";
 import { useGlobalMistyAttachments } from "@/features/misty/useGlobalMistyAttachments";
 import { useMistyStore } from "@/features/misty/useMistyStore";
 import type { AgentProfile } from "@/shared/schemas";
@@ -23,7 +22,6 @@ import { useConversationVoice, type AgentVoiceControl } from "./useConversationV
 import { useDraftStatus } from "./useDraftStatus";
 import { useFollowLatestMessage } from "./useFollowLatestMessage";
 import { replyPrompt } from "./replyQuote";
-import { AgentControlBar } from "../workspace/AgentControlBar";
 import { usePermissionMode } from "../collaboration/permissionMode";
 import { AgentQuestionCard } from "../collaboration/AgentQuestionCard";
 import { WaitingForYouCard } from "@/features/agent-interventions/WaitingForYouCard";
@@ -34,7 +32,6 @@ export function AgentWorkspaceConversation({
   conversationId,
   emptyContent,
   initialDraft = "",
-  showControlBar = false,
   spaceId: _legacySpaceId,
   accountId,
   onCreate,
@@ -46,7 +43,6 @@ export function AgentWorkspaceConversation({
   conversationId?: string;
   emptyContent?: ReactNode;
   initialDraft?: string;
-  showControlBar?: boolean;
   spaceId: string;
   accountId: string;
   onCreate: () => void;
@@ -245,13 +241,6 @@ export function AgentWorkspaceConversation({
           </p>
         )}
         <MistyContextBar />
-        {showControlBar && agent ? (
-          <AgentControlBar>
-            <MistyFolderWork accountId={accountId} disabled={state.working} hideIdle />
-          </AgentControlBar>
-        ) : (
-          <MistyFolderWork accountId={accountId} disabled={state.working} />
-        )}
         <WaitingForYouCard
           accountId={accountId}
           agentName={agent?.name || "Misty"}

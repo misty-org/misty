@@ -1,3 +1,4 @@
+import { ErrorNotification } from "@/shared/ui";
 import { useEffect, useState } from "react";
 import {
   inboundChannelsApi,
@@ -54,7 +55,7 @@ export function InboundTasksSection() {
       ? "This connection needs attention. Reconnect it in Agents › Integrations."
       : fallback;
   return (
-    <DesktopSettingsSection title="Tasks from email and Slack">
+    <DesktopSettingsSection title="Tasks">
       <DesktopSettingsRow
         label="Email"
         description={note(
@@ -83,11 +84,7 @@ export function InboundTasksSection() {
           onChange={(value) => void toggle("slack", value)}
         />
       </DesktopSettingsRow>
-      {error ? (
-        <p role="alert" className="mt-2 text-xs text-cream-muted">
-          {error}
-        </p>
-      ) : null}
+      <ErrorNotification message={error} onDismiss={() => setError("")} />
     </DesktopSettingsSection>
   );
 }

@@ -11,23 +11,6 @@ describe("shortcut dispatcher", () => {
     useWorkspaceStore.getState().reset();
   });
 
-  it("does not dispatch workspace shortcuts underneath the sleeping device overlay", () => {
-    const overlay = document.createElement("div");
-    overlay.dataset.deviceSyncSleep = "";
-    document.body.appendChild(overlay);
-    const handler = vi.fn();
-    const remove = registerShortcutHandler("search.toggle", handler);
-    expect(
-      dispatchShortcutEvent(
-        new KeyboardEvent("keydown", { key: "k", code: "KeyK", ctrlKey: true }),
-      ),
-    ).toBe(false);
-    expect(invokeShortcutCommand("search.toggle")).toBe(false);
-    expect(handler).not.toHaveBeenCalled();
-    remove();
-    overlay.remove();
-  });
-
   it("runs a tool's shortcut only while that tool is focused", () => {
     useWorkspaceStore.getState().openSurface({
       surfaceId: "agents",
@@ -134,16 +117,17 @@ describe("shortcut dispatcher", () => {
     remove();
   });
 
-  it("dispatches Ctrl+Minus to app zoom out", () => {
+  it("dispatches Ctrl+Shift+Minus to app zoom out", () => {
     const handler = vi.fn();
     const remove = registerShortcutHandler("app.zoom_out", handler);
 
     expect(
       dispatchShortcutEvent(
         new KeyboardEvent("keydown", {
-          key: "-",
+          key: "_",
           code: "Minus",
           ctrlKey: true,
+          shiftKey: true,
         }),
       ),
     ).toBe(true);
@@ -151,7 +135,7 @@ describe("shortcut dispatcher", () => {
     remove();
   });
 
-  it("dispatches Cmd+Minus to app zoom out on macOS", () => {
+  it("dispatches Cmd+Shift+Minus to app zoom out on macOS, and Cmd+Minus never", () => {
     useSettingsStore.setState({
       shortcuts: {
         detectedPlatform: "macos",
@@ -166,12 +150,15 @@ describe("shortcut dispatcher", () => {
     const handler = vi.fn();
     const remove = registerShortcutHandler("app.zoom_out", handler);
 
+    dispatchShortcutEvent(new KeyboardEvent("keydown", { key: "-", code: "Minus", metaKey: true }));
+    expect(handler).not.toHaveBeenCalled();
     expect(
       dispatchShortcutEvent(
         new KeyboardEvent("keydown", {
-          key: "-",
+          key: "_",
           code: "Minus",
           metaKey: true,
+          shiftKey: true,
         }),
       ),
     ).toBe(true);

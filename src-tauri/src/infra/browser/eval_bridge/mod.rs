@@ -188,8 +188,8 @@ fn denied() -> Response {
 }
 
 fn main_view(app: &AppHandle) -> Result<Webview, String> {
-    crate::infra::space_windows::primary_webview(app)
-        .ok_or_else(|| "No Space window is open.".to_owned())
+    crate::infra::profile_windows::primary_webview(app)
+        .ok_or_else(|| "No Misty window is open.".to_owned())
 }
 
 fn lease(task: &str, renew: bool) -> Value {

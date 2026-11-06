@@ -25,7 +25,7 @@ async function run(
   source: ImportSourceRequest,
   extensions: ImportedExtension[],
 ): Promise<ImportOutcome> {
-  // Everything lands in this window's Space; native code picks its store.
+  // Everything lands in this window's profile; native code picks its store.
   const target = { source };
   switch (kind) {
     case "bookmarks": {
@@ -53,7 +53,9 @@ async function run(
       const { settings, sitePermissionsAdded } = await browserImport.settings(target);
       const { applied, skipped } = applyImportedSettings(settings);
       if (sitePermissionsAdded)
-        applied.push(`camera and microphone choices for ${plural(sitePermissionsAdded, "site")}`);
+        applied.push(
+          `camera, microphone and location choices for ${plural(sitePermissionsAdded, "site")}`,
+        );
       const parts = [
         applied.length ? `Now using ${applied.join(", ")}.` : "No settings needed changing.",
         ...skipped.map((note) => `${note}.`),
@@ -87,7 +89,7 @@ async function run(
   }
 }
 
-/** Imports each chosen kind into this window's Space in turn; one kind failing never
+/** Imports each chosen kind into this window's profile in turn; one kind failing never
  * stops the rest. */
 export async function runImport(
   source: ImportSourceRequest,

@@ -110,12 +110,6 @@
   gap: 8px;
   margin-top: 24px;
 }
-.agent-method-error {
-  font-size: 13px;
-  line-height: 1.6;
-  margin-block: 16px;
-  overflow-wrap: anywhere;
-}
 .agent-method-examples {
   margin-top: 36px;
 }

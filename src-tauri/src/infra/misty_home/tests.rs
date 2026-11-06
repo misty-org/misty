@@ -33,21 +33,13 @@ fn keeps_user_data_and_moves_only_retired_paths_to_trash() {
     let trash = base.join("Trash");
     fs::create_dir_all(root.join("plugins/public")).unwrap();
     fs::create_dir_all(root.join(".local/data")).unwrap();
-    fs::create_dir_all(root.join("config")).unwrap();
     fs::write(root.join(".local/data/keep.txt"), "kept").unwrap();
-    fs::write(root.join("config/settings.json"), "{}").unwrap();
-    fs::write(
-        root.join("home.json"),
-        r#"{"format":"misty-home","layoutVersion":1}"#,
-    )
-    .unwrap();
 
     let report = ensure_at(&root, &Trash::Folder(trash.clone())).unwrap();
 
     assert_eq!(report.retired, vec!["plugins".to_owned()]);
     assert!(!root.join("plugins").exists());
     assert!(root.join(".local/data/keep.txt").is_file());
-    assert!(root.join("config/settings.json").is_file());
     let moved = fs::read_dir(&trash)
         .unwrap()
         .next()

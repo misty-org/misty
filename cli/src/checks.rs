@@ -10,8 +10,19 @@ use crate::{
 
 pub fn release(workspace: &Workspace) -> Result<()> {
     CommandSpec::new("bash")
-        .args([".githooks/checks.sh", "all"])
+        .args([".githooks/checks.sh", "release"])
         .run(&workspace.misty)
+}
+
+pub fn all(workspace: &Workspace) -> Result<()> {
+    app(workspace)?;
+    CommandSpec::new(npm())
+        .args(["run", "test:scripts"])
+        .run(&workspace.misty)?;
+    server(workspace)?;
+    website(workspace)?;
+    features(workspace)?;
+    cli(workspace)
 }
 
 pub fn app(workspace: &Workspace) -> Result<()> {
@@ -89,6 +100,7 @@ pub fn app(workspace: &Workspace) -> Result<()> {
 
 pub fn server(workspace: &Workspace) -> Result<()> {
     workspace.validate()?;
+    workspace.require_server()?;
     let formatted = CommandSpec::new("gofmt")
         .args(["-l", "."])
         .capture(&workspace.server)?;
@@ -112,12 +124,12 @@ pub fn server(workspace: &Workspace) -> Result<()> {
         CommandSpec::new("./scripts/check-container-contract.sh").run(&workspace.server)?;
     }
 
-    let worker = workspace.server.join("apps/journal-collab");
+    let worker = workspace.server.join("services/journal-collab");
     CommandSpec::new(npm()).args(["ci"]).run(&worker)?;
     for script in ["typecheck", "test", "test:runtime", "audit:production"] {
         CommandSpec::new(npm()).args(["run", script]).run(&worker)?;
     }
-    let runtime = workspace.server.join("apps/agent-runtime");
+    let runtime = workspace.misty.join("src-tauri/services/agent-runtime");
     CommandSpec::new(npm()).args(["ci"]).run(&runtime)?;
     for script in ["typecheck", "test", "build"] {
         CommandSpec::new(npm())

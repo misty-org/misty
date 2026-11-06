@@ -128,8 +128,3 @@
   color: var(--color-cream-muted);
   font-size: 12px;
 }
-.agent-question-error {
-  margin: 0;
-  color: var(--color-cream);
-  font-size: 12px;
-}

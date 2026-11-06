@@ -7,7 +7,7 @@ import { LibraryMetadataForm } from "./LibraryMetadataForm";
 import { LibraryMetadataList } from "./LibraryMetadataList";
 import { LibraryVersionList } from "./LibraryVersionList";
 
-export interface LibraryViewerSidebarProps {
+interface LibraryViewerSidebarProps {
   item: SpaceLibraryItem;
   mimeType: string;
   canEdit: boolean;

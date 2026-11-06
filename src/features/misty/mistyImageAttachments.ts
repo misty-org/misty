@@ -42,7 +42,7 @@ export async function uploadMistyImage(
     let text: string;
     if (file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
       const { extractMistyDocumentText } = await import("./mistyDocumentText");
-      text = extractMistyDocumentText(originalBytes);
+      text = await extractMistyDocumentText(originalBytes);
     } else text = await file.text();
     const renditionFile = new File([text], file.name + ".txt", { type: "text/plain" });
     if (!text.trim()) throw new Error("This document has no readable text.");

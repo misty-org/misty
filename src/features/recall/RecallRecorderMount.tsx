@@ -1,6 +1,5 @@
 import { useEffect } from "react";
 import { browserPageTools, browserRuntimeId } from "@/features/browser";
-import { publicBetaFeatureEnabled } from "@/features/launch";
 import { useSettingsStore } from "@/features/settings";
 import { allLayoutPanes, parseBrowserViewState, useWorkspaceStore } from "@/features/workspace";
 import { hasTauriInternals } from "@/shared/platform/tauri";
@@ -8,7 +7,7 @@ import { memoryApi } from "./api";
 import { recallSettings } from "./recallSettings";
 import { RecallRecorder, type ActivePage } from "./recorder/recorder";
 import { useRecallStore } from "./useRecallStore";
-import { isIncognitoWindow } from "@/features/workspace/spaceWindow";
+import { isIncognitoWindow } from "@/features/workspace/profileWindow";
 import { windowSpaceId } from "./windowSpace";
 
 /** The browser page in the focused pane of the focused window. */
@@ -31,9 +30,31 @@ function activePage(): ActivePage | null {
   };
 }
 
+/** Every browser tab in the window, in front or not. */
+function openTabs(): ActivePage[] {
+  const layout = useWorkspaceStore.getState().layout;
+  return allLayoutPanes(layout).flatMap((pane) =>
+    pane.views.flatMap((view) => {
+      if (view.surfaceId !== "browser") return [];
+      const state = parseBrowserViewState(view.state);
+      if (!state.url) return [];
+      return [
+        {
+          runtimeId: browserRuntimeId(view),
+          url: state.url,
+          title: view.title ?? "",
+          private: isIncognitoWindow(),
+          agentOwned: state.agentOwned,
+          spaceId: windowSpaceId(),
+        },
+      ];
+    }),
+  );
+}
+
 /** Runs Memory's page recorder in the main window while Memory is on. */
 export function RecallRecorderMount() {
-  const enabled = publicBetaFeatureEnabled("recall") && hasTauriInternals();
+  const enabled = hasTauriInternals();
   useEffect(() => {
     if (!enabled) return;
     const settings = () => recallSettings(useSettingsStore.getState().settings?.document);
@@ -44,7 +65,11 @@ export function RecallRecorderMount() {
       attentive: () => document.visibilityState === "visible" && document.hasFocus(),
       onFull: (message) => useRecallStore.getState().setNotice(message),
     });
-    const check = () => recorder.observe(activePage());
+    const check = () => {
+      const front = activePage();
+      recorder.observe(front);
+      recorder.observeTabs(openTabs(), front?.runtimeId);
+    };
     check();
     const unsubscribe = useWorkspaceStore.subscribe(check);
     const unsubscribeSettings = useSettingsStore.subscribe(check);

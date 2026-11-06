@@ -7,30 +7,43 @@ export const assistantApi = {
       `/misty/conversations${query ? `?q=${encodeURIComponent(query)}` : ""}`,
       { onCached },
     ),
-  /**
-   * The device that starts a chat keeps it (docs/agents/chats-local.md);
-   * without a device the chat waits in the inbox for the first device to take it.
-   */
-  createConversation: <T>(title: string, spaceId?: string, agentId?: string, deviceId?: string) =>
+  /** A new conversation goes to the Space the window shows; none is the personal Space. */
+  createConversation: <T>(title: string, spaceId?: string, agentId?: string) =>
     apiRequest<T>("/misty/conversations", {
       method: "POST",
-      body: JSON.stringify({ title, space_id: spaceId, agent_id: agentId, device_id: deviceId }),
+      body: JSON.stringify({ title, space_id: spaceId, agent_id: agentId }),
     }),
-  /**
-   * What a device needs for its local chats: "legacy" is the one-time copy of chats from
-   * before chats moved to devices; "device" is this device's chats that ran in the last
-   * two days, and the inbox of chats no device keeps yet.
-   */
-  conversationsInScope: <T>(scope: "legacy" | "device", deviceId = "") =>
-    apiRequest<{ conversations: T[] }>(
-      `/misty/conversations?${new URLSearchParams({ scope, ...(deviceId ? { device_id: deviceId } : {}) })}`,
-    ),
-  /** Takes a chat from the inbox, or one from before chats moved to devices, for this device. */
-  keepConversationOnDevice: (conversationId: string, deviceId: string) =>
-    apiRequest<{ id: string; keptOnDeviceId: string }>(
-      `/misty/conversations/${encodeURIComponent(conversationId)}`,
-      { method: "PATCH", body: JSON.stringify({ keep_on_device: deviceId }) },
-    ),
+  /** Takes finished turns out of a conversation, so the next run's history doesn't have them. */
+  dropTurns: (conversationId: string, invocationIds: string[]) =>
+    apiRequest(`/misty/conversations/${encodeURIComponent(conversationId)}/turns`, {
+      method: "POST",
+      body: JSON.stringify({ action: "detach", invocation_ids: invocationIds }),
+    }),
+  /** Moves a turn to another of the person's conversations. */
+  moveTurn: (conversationId: string, invocationId: string, toConversationId: string) =>
+    apiRequest(`/misty/conversations/${encodeURIComponent(conversationId)}/turns`, {
+      method: "POST",
+      body: JSON.stringify({
+        action: "move",
+        invocation_ids: [invocationId],
+        to_conversation_id: toConversationId,
+      }),
+    }),
+  /** Saves a reply's edited requirements ledger (docs/agents/checkpoints.md). */
+  saveLedger: (conversationId: string, invocationId: string, rows: unknown[]) =>
+    apiRequest(`/misty/conversations/${encodeURIComponent(conversationId)}/ledger`, {
+      method: "POST",
+      body: JSON.stringify({ invocation_id: invocationId, rows }),
+    }),
+  /** Teach-mode lessons and courses. */
+  lessons: <L, C>() => apiRequest<{ lessons: L[]; courses: C[] }>("/misty/lessons"),
+  saveLesson: (kind: "lesson" | "course", id: string, document: unknown) =>
+    apiRequest(`/misty/lessons/${kind}/${encodeURIComponent(id)}`, {
+      method: "PUT",
+      body: JSON.stringify(document),
+    }),
+  removeLesson: (kind: "lesson" | "course", id: string) =>
+    apiRequest(`/misty/lessons/${kind}/${encodeURIComponent(id)}`, { method: "DELETE" }),
   deleteConversation: (conversationId: string) =>
     apiRequest(`/misty/conversations/${encodeURIComponent(conversationId)}`, {
       method: "DELETE",

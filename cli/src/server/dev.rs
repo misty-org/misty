@@ -39,18 +39,7 @@ pub fn initialize_development_secrets(workspace: &Workspace) -> Result<()> {
     if ensure_connected_devices_development_config(&devices)? {
         println!("Configured Connected Devices for local development.");
     }
-    let worker = workspace.server.join("apps/journal-collab");
-    let dev_vars = worker.join(".dev.vars");
-    let server_env = worker.join(".secrets/server.env");
-    match (dev_vars.is_file(), server_env.is_file()) {
-        (false, false) => generate_worker_secrets(workspace),
-        (false, true) => restore_development_worker_secrets(&server_env, &dev_vars),
-        (true, true) => Ok(()),
-        (true, false) => bail!(
-            "development Worker secrets are partially configured; restore {} from backup before continuing (existing Worker keys were preserved)",
-            server_env.display()
-        ),
-    }
+    ensure_worker_secrets(workspace)
 }
 
 pub(crate) fn ensure_connected_devices_development_config(path: &Path) -> Result<bool> {
@@ -179,31 +168,16 @@ pub fn validate_development_secrets(workspace: &Workspace) -> Result<()> {
     if pepper.len() < 32 {
         bail!("device pairing pepper must contain at least 32 bytes");
     }
-    let server_path = workspace
-        .server
-        .join("apps/journal-collab/.secrets/server.env");
-    let worker_path = workspace.server.join("apps/journal-collab/.dev.vars");
-    require_private_file(&server_path)?;
-    require_private_file(&worker_path)?;
-    let mut server = read_environment(&server_path)?;
-    for name in [TICKET_PRIVATE_KEY, CONTROL_SECRET, PROJECTION_SECRET] {
-        if let Some(value) = values.get(name).filter(|value| !value.is_empty()) {
-            server.insert(name.into(), value.clone());
-        }
-    }
-    let worker = read_environment(&worker_path)?;
     let signing = SigningKey::from_pkcs8_der(
-        &STANDARD.decode(required_map_value(&server, TICKET_PRIVATE_KEY)?)?,
+        &STANDARD.decode(required_map_value(&values, TICKET_PRIVATE_KEY)?)?,
     )?;
     if STANDARD.encode(VerifyingKey::from(&signing).to_bytes())
-        != required_map_value(&worker, TICKET_PUBLIC_KEY)?
+        != required_map_value(&values, TICKET_PUBLIC_KEY)?
     {
-        bail!("server and Worker ticket keys do not match; restore the matching bundle");
+        bail!("the Worker ticket keys do not match; restore the matching pair");
     }
     for name in [CONTROL_SECRET, PROJECTION_SECRET] {
-        if required_map_value(&server, name)? != required_map_value(&worker, name)? {
-            bail!("server and Worker {name} do not match");
-        }
+        required_map_value(&values, name)?;
     }
     let salt = STANDARD.decode(required_map_value(&values, ROOM_SALT)?)?;
     if salt.len() < 32 {
@@ -213,7 +187,7 @@ pub fn validate_development_secrets(workspace: &Workspace) -> Result<()> {
 }
 
 pub(super) fn diagnostic_secrets(workspace: &Workspace) -> Result<Vec<String>> {
-    let mut secrets: Vec<String> = environment::effective(workspace, Target::Dev)?
+    Ok(environment::effective(workspace, Target::Dev)?
         .into_iter()
         .filter(|(name, _)| {
             ["TOKEN", "SECRET", "KEY", "PASSWORD", "PEPPER", "SALT"]
@@ -221,17 +195,7 @@ pub(super) fn diagnostic_secrets(workspace: &Workspace) -> Result<Vec<String>> {
                 .any(|part| name.contains(part))
         })
         .map(|(_, value)| value)
-        .collect();
-    for relative in [
-        "apps/journal-collab/.dev.vars",
-        "apps/journal-collab/.secrets/server.env",
-    ] {
-        let path = workspace.server.join(relative);
-        if path.exists() {
-            secrets.extend(read_environment(&path)?.into_values());
-        }
-    }
-    Ok(secrets)
+        .collect())
 }
 
 pub fn deploy_development(workspace: &Workspace) -> Result<()> {

@@ -1,19 +1,19 @@
 import { ExtensionsSettings } from "@/features/extensions/ExtensionsSettings";
-import { BrowserSyncSettings } from "@/features/browser-sync/BrowserSyncSettings";
 import {
-  Cpu,
-  History,
+  Brain,
+  Cloud,
+  EyeOff,
   KeyRound,
   Keyboard,
   MessagesSquare,
   Mic,
   Palette,
   Puzzle,
-  RefreshCw,
   Server,
-  Shield,
   ShieldCheck,
+  Sparkles,
   SlidersHorizontal,
+  UserCircle,
   Wrench,
   type LucideIcon,
 } from "lucide-react";
@@ -26,20 +26,20 @@ import { BrowserLinksSettings, DownloadsSettings } from "./sections/BrowserSecti
 import { CodingToolsSection } from "./sections/CodingToolsSection";
 import { ModelsSection } from "./models/ModelsSection";
 import {
-  AboutSection,
   AgentConnectionsSection,
   AgentDefaultsSection,
   AgentPermissionsSection,
   CompanionSection,
-  DevicesSection,
 } from "./sections/FeatureSections";
 import { GeneralSection } from "./sections/GeneralSection";
 import { MemorySection } from "./sections/MemorySection";
 import { MistySection } from "./sections/MistySection";
 import { PasswordsSettings } from "./sections/PasswordsSettings";
 import { PrivacySection } from "./sections/PrivacySection";
+import { AccountSection } from "./sections/account/AccountSection";
 import { ServerSection } from "./sections/ServerSection";
 import { ShortcutsSection } from "./sections/ShortcutsSection";
+import { SyncSection } from "./sections/SyncSection";
 import { TabsSettings } from "./sections/TabsSettings";
 import { UpdatesSection } from "./sections/UpdatesSection";
 import { VoiceSection } from "./sections/VoiceSection";
@@ -56,7 +56,8 @@ export {
  * Sidebar pages. Each opens one scrolling page; the registry blocks of a page render on it in
  * order. Page names are one word that never echoes its group's name (docs/settings/README.md).
  */
-export type SettingsArea =
+type SettingsArea =
+  | "account"
   | "general"
   | "server"
   | "appearance"
@@ -72,40 +73,41 @@ export type SettingsArea =
   | "access"
   | "memory";
 
-export interface SettingsAreaInfo {
+interface SettingsAreaInfo {
   label: string;
   icon: LucideIcon;
 }
 
 export const settingsAreas: Record<SettingsArea, SettingsAreaInfo> = {
+  account: { label: "Profile", icon: UserCircle },
   general: { label: "General", icon: SlidersHorizontal },
   server: { label: "Server", icon: Server },
-  appearance: { label: "Appearance", icon: Palette },
+  appearance: { label: "Interface", icon: Palette },
   shortcuts: { label: "Shortcuts", icon: Keyboard },
   voice: { label: "Voice", icon: Mic },
-  privacy: { label: "Privacy", icon: Shield },
+  privacy: { label: "Privacy", icon: EyeOff },
   advanced: { label: "Advanced", icon: Wrench },
   passwords: { label: "Passwords", icon: KeyRound },
   extensions: { label: "Extensions", icon: Puzzle },
-  sync: { label: "Sync", icon: RefreshCw },
-  models: { label: "Models", icon: Cpu },
-  conversations: { label: "Conversations", icon: MessagesSquare },
+  sync: { label: "Sync", icon: Cloud },
+  models: { label: "Models", icon: Sparkles },
+  conversations: { label: "Behavior", icon: MessagesSquare },
   access: { label: "Access", icon: ShieldCheck },
-  memory: { label: "Memory", icon: History },
+  memory: { label: "Memory", icon: Brain },
 };
 
 /** Sidebar groups, named by feature, in sidebar order. */
 export const settingsGroups: readonly { label: string; areas: readonly SettingsArea[] }[] = [
-  { label: "Account", areas: ["server"] },
+  { label: "Account", areas: ["account", "server"] },
   {
-    label: "Settings",
+    label: "App",
     areas: ["general", "appearance", "shortcuts", "voice", "privacy", "advanced"],
   },
   { label: "Browser", areas: ["passwords", "extensions", "sync"] },
   { label: "Agents", areas: ["models", "conversations", "access", "memory"] },
 ];
 
-export interface SettingsRegistryEntry {
+interface SettingsRegistryEntry {
   id: SettingsSection;
   label: string;
   area: SettingsArea;
@@ -132,7 +134,7 @@ export const settingsRegistry: readonly SettingsRegistryEntry[] = [
   block("general", "browser-tabs", "Tabs", TabsSettings),
   block("general", "browser-downloads", "Downloads", DownloadsSettings),
   block("general", "updates", "Updates", UpdatesSection),
-  block("general", "about", "Account", AboutSection, "resource"),
+  block("account", "account", "Profile", AccountSection, "resource"),
   block("server", "server", "Server", ServerSection),
   block("appearance", "appearance", "Appearance", AppearanceSection),
   block("shortcuts", "shortcuts", "Shortcuts", ShortcutsSection),
@@ -142,8 +144,7 @@ export const settingsRegistry: readonly SettingsRegistryEntry[] = [
   block("advanced", "advanced", "Advanced", AdvancedSection),
   block("passwords", "passwords", "Passwords", PasswordsSettings, "resource"),
   block("extensions", "browser-extensions", "Extensions", ExtensionsSettings, "resource"),
-  block("sync", "sync", "Sync", BrowserSyncSettings),
-  block("sync", "devices", "Devices", DevicesSection, "resource"),
+  block("sync", "sync", "Sync", SyncSection),
   block("models", "models", "Models", ModelsSection),
   block("conversations", "agents-defaults", "Conversations", AgentDefaultsSection),
   block("conversations", "misty", "Misty", MistySection, "resource"),

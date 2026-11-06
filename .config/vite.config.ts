@@ -1,4 +1,4 @@
-import { loadAppEnv, publicAppEnv, appEnvironmentUpdates } from "../cli/tasks/app-env.ts";
+import { publicAppEnv } from "../cli/tasks/app-env.ts";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
@@ -21,7 +21,7 @@ const nodeShims: Record<string, string> = {
 };
 
 export default defineConfig(({ command, mode }) => {
-  const env = loadAppEnv(process.cwd());
+  const env = process.env;
   if (
     !["desktop", "development", "production", "test"].includes(mode) ||
     (env.VITE_MISTY_TARGET?.trim() && env.VITE_MISTY_TARGET.trim().toLowerCase() !== "desktop")
@@ -44,7 +44,7 @@ export default defineConfig(({ command, mode }) => {
     root: resolve(process.cwd(), "src/app"),
     publicDir: false,
     envDir: false,
-    plugins: [appEnvironmentUpdates(process.cwd()), react(), tailwindcss()],
+    plugins: [react(), tailwindcss()],
     define: {
       "import.meta.env.MISTY_SHELL_MACOS": JSON.stringify(
         ["darwin", "macos"].includes(process.env.TAURI_ENV_PLATFORM || process.platform),
@@ -126,8 +126,7 @@ export default defineConfig(({ command, mode }) => {
         // graph. Watching them makes Vite reload every open development app.
         ignored: [
           resolve(import.meta.dirname, "../dist/**"),
-          "**/src-tauri/target/**",
-          resolve(import.meta.dirname, "../server/**"),
+          "**/target/**",
           resolve(import.meta.dirname, "../.impeccable/**"),
         ],
       },

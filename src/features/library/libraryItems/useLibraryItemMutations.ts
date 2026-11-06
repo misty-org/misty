@@ -3,7 +3,7 @@ import type { SpaceLibraryItem } from "@/api/spaces/dto/entities";
 import { confirmAction } from "@/shared/lib/confirmAction";
 import type { SpaceLibraryData } from "../types/useSpaceLibraryData";
 
-export type LibraryItemPatch = Partial<
+type LibraryItemPatch = Partial<
   Pick<SpaceLibraryItem, "display_name" | "caption" | "hidden" | "tags">
 >;
 

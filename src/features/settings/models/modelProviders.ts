@@ -1,5 +1,5 @@
 /** A model provider a key can be saved for, as the server and the native header name it. */
-export interface ModelProvider {
+interface ModelProvider {
   id: string;
   label: string;
   /** Takes a server address (device setting) rather than, or as well as, a key. */

@@ -1,5 +1,4 @@
 import type { WindowColor } from "./windowColors";
-import type { MistyTabGroup } from "./tabGroups";
 import type { DockingLayout } from "@/features/app-shell/dockingLayout";
 import { browserHomeUrl } from "./browserHome";
 export * from "./browserSearchEngine";
@@ -14,8 +13,6 @@ export type WorkspaceSurfaceId = "space" | "browser" | "agents" | "scheduled" | 
 
 export type WorkspaceGroupKey = `space:${string}` | `tool:${WorkspaceSurfaceId}` | `app:${string}`;
 type WorkspaceInstancePolicy = "multiple" | "single";
-/** A Space window's own layout (`space:<id>`, or `space:personal` for the personal Space). */
-export type WorkspaceScopeKey = `space:${string}`;
 type DockMountPolicy = "keep-alive" | "suspend" | "unmount";
 export type DockSplitDirection = "left" | "right" | "up" | "down";
 export type DockDropZone = "center" | DockSplitDirection;
@@ -25,8 +22,6 @@ export interface BrowserViewState {
   url: string;
   faviconUrl: string | null;
   agentOwned?: boolean;
-  /** Native browser profile identity; preserved across navigation. */
-  profileId?: string;
   /** Saved website used to open this tab, independent of its current URL. */
   bookmarkId?: string;
 }
@@ -53,10 +48,6 @@ export function parseBrowserViewState(value: unknown): BrowserViewState {
         ? candidate.faviconUrl
         : browserFaviconUrl(url),
     agentOwned: candidate.agentOwned === true || undefined,
-    profileId:
-      typeof candidate.profileId === "string" && /^[a-f0-9]{64}$/.test(candidate.profileId)
-        ? candidate.profileId
-        : undefined,
     bookmarkId:
       typeof bookmarkId === "string" && /^[A-Za-z0-9:_.-]{1,200}$/.test(bookmarkId)
         ? bookmarkId
@@ -185,9 +176,9 @@ export interface WorkspaceTab {
   focusedPaneId: string;
 }
 
-/** An OS window of one Space, as the sync tree stores it (window → tab → pane → view). */
+/** An OS window of one profile (window → tab → pane → view). */
 export interface WorkspaceWindow {
-  /** The Space's color, which tints the window's chrome. */
+  /** The profile's color, which tints the window's chrome. */
   color?: WindowColor;
   dockingLayout?: DockingLayout;
   id: string;
@@ -197,23 +188,9 @@ export interface WorkspaceWindow {
   lastFocusedAt: number;
 }
 
-export interface WorkspaceSnapshot {
-  tabGroups?: MistyTabGroup[];
-  version: 2 | 3 | 4;
-  accountId: string;
-  deviceId: string;
-  savedAt: number;
-  layout: WorkspaceLayout;
-  lastUsedViewByGroup: Partial<Record<WorkspaceGroupKey, string>>;
-  windows?: WorkspaceWindow[];
-  activeWindowId?: string;
-}
-
 export interface OpenWorkspaceSurfaceRequest {
   surfaceId: WorkspaceSurfaceId;
   groupKey: WorkspaceGroupKey;
-  /** Layout scope is separate from tab identity for tools hosted by a Space. */
-  scopeKey?: WorkspaceScopeKey;
   title: string;
   route: string;
   instanceKey?: string;

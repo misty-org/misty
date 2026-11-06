@@ -57,7 +57,7 @@ export async function captureAccountCookies(base: string, accountId?: string): P
 
 async function persistAccountCookies(base: string, accountId?: string): Promise<void> {
   if (!hasTauriInternals()) return;
-  await invoke("auth_cookie_capture", { apiBase: base, accountId: accountId ?? null });
+  await invoke("auth_session_capture", { apiBase: base, accountId: accountId ?? null });
 }
 
 export async function restoreAccountCookies(
@@ -66,7 +66,7 @@ export async function restoreAccountCookies(
 ): Promise<boolean> {
   if (!hasTauriInternals()) return true;
   return withSessionLock(base, async () => {
-    const restored = await invoke<boolean>("auth_cookie_restore", { apiBase: base, accountId });
+    const restored = await invoke<boolean>("auth_session_restore", { apiBase: base, accountId });
     clearRefreshResult(base);
     return restored;
   });
@@ -74,7 +74,7 @@ export async function restoreAccountCookies(
 
 export async function forgetAccountCookies(base: string, accountId: string): Promise<void> {
   if (!hasTauriInternals()) return;
-  await invoke("auth_cookie_forget", { apiBase: base, accountId });
+  await invoke("auth_session_forget", { apiBase: base, accountId });
 }
 
 // Refresh is shared by simultaneous requests. Web Locks also serialize browser
@@ -162,7 +162,7 @@ export async function cookieSessionFetch(
   const options: RequestInit = { credentials: "include", ...init, headers };
   const revision = refreshRevision;
   const path = url.slice(base.length).split("?")[0];
-  // A signed-out desktop has an empty cookie jar. Answer account requests
+  // A signed-out desktop holds no session. Answer account requests
   // locally instead of sending them, and never try to refresh a session.
   const signedOut = isApiSignedOut();
   if (signedOut && !signedOutPaths.has(path)) {
@@ -173,7 +173,7 @@ export async function cookieSessionFetch(
   }
   // /me and refresh have both rejected this generation. Keep background
   // producers local until a successful login/cookie restore or account switch.
-  // Explicit bearer/device credentials are independent of the account cookie.
+  // Explicit bearer/device credentials are independent of the account session.
   const rejected = refreshResults.get(base);
   if (
     rejected?.generation === generation &&
@@ -209,6 +209,8 @@ export async function cookieSessionFetch(
       "/auth/refresh",
       "/auth/google",
       "/auth/google/complete",
+      // A refused setup key says nothing about this device's session.
+      "/setup-keys/redeem",
     ].includes(path)
   )
     return response;
@@ -225,10 +227,20 @@ export async function cookieSessionFetch(
   return send();
 }
 
+/**
+ * A request to a server this device has not moved to yet, through that server's own native
+ * client. It involves no session of this device, so nothing here refreshes or signs out.
+ */
+export async function otherServerFetch(url: string, init: RequestInit): Promise<Response> {
+  const headers = new Headers(init.headers);
+  headers.set("X-Misty-CSRF", "1");
+  return accountFetch(url, { credentials: "include", ...init, headers });
+}
+
 async function accountFetch(input: RequestInfo | URL, init: RequestInit): Promise<Response> {
-  // Desktop account cookies live in Rust, not the WebView. Login, normal
-  // requests, refresh and retries must all use that same cookie jar. Scoped
-  // app credentials and explicitly anonymous requests must never inherit it.
+  // Desktop account tokens live in Rust, not the WebView. Login, normal requests,
+  // refresh and retries all go through that native client, which adds the bearer.
+  // Scoped app credentials and explicitly anonymous requests must never inherit it.
   const usesAccountCookies =
     init.credentials !== "omit" && !new Headers(init.headers).has("Authorization");
   const response = await (hasTauriInternals() && usesAccountCookies

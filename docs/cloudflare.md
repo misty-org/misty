@@ -1,9 +1,9 @@
 # Cloudflare
 
 Every Misty server runs on your own Cloudflare account; Misty has none you depend on. The setup
-container of `server/compose.yml` provisions all of it through the Cloudflare API on each start,
+container of `misty-server/compose.yml` provisions all of it through the Cloudflare API on each start,
 reusing what it made before by name ([self-hosting.md](self-hosting.md)). You give it a token, an
-account and a zone in `server/.env/cloudflare.env`, and never run Wrangler or the `misty` CLI.
+account and a zone in `~/.misty/server/prod/cloudflare.env`, and never run Wrangler or the `misty` CLI.
 
 | Part | Name (from `MISTY_HOSTNAME`, dots as dashes) | What it does |
 | --- | --- | --- |
@@ -13,7 +13,6 @@ account and a zone in `server/.env/cloudflare.env`, and never run Wrangler or th
 | Backup bucket | `misty-<host>-backups` | Encrypted nightly database dumps, under a 30-day lock |
 | Two R2 tokens | `misty-<host> library`, `misty-<host> backups` | One bucket each; the API holds only the Library one |
 | Collaboration Worker | `misty-<host>-collab` | Saves and co-edits notes and drawings (Durable Objects) |
-| web-fetch Worker | `misty-<host>-web-fetch` | Reads one public page for agent runs when no device is online |
 
 A hostname longer than 40 characters is shortened in these names.
 
@@ -44,7 +43,7 @@ start; setup stops and says so otherwise.
    app (and `MISTY_ALLOWED_ORIGINS`), and the backup bucket's lock and expiry rules.
 5. Keeps each bucket's token while it exists. If its value was lost, setup rolls that token's
    value instead of creating another.
-6. Uploads each Worker when its code, settings or secrets changed since the last upload, with the
+6. Uploads the Worker when its code, settings or secrets changed since the last upload, with the
    API's address and the Worker's secrets as bindings, and keeps it on workers.dev. The
    collaboration Worker gets only the public half of the ticket key; the private half never leaves
    the server.
@@ -59,15 +58,10 @@ only tickets the API signs with an Ed25519 key that never leaves the server, and
 the API to save documents. Notes and drawings are always saved through it; there is no read-only
 mode.
 
-## web-fetch Worker
-
-`web.fetch` reads public pages for agent runs when none of your devices is online (scheduled runs,
-email and Slack entries). It reads one public page without cookies, keeps nothing and never calls
-your server. See [server/apps/web-fetch/README.md](../server/apps/web-fetch/README.md).
 
 ## Development
 
-The development stack (`server/compose.dev.yml`) uses its own tunnel and collaboration Worker,
-which `misty setup cloudflare` and `misty server deploy` provision ([server/README.md](../server/README.md)).
-The setup container is tested against a fake Cloudflare API (`server/deploy/setup/fakecloudflare`),
+The development stack (`misty-server/compose.dev.yml`) uses its own tunnel and collaboration Worker,
+which `misty setup cloudflare` and `misty server deploy` provision ([misty-server/README.md](https://github.com/misty-org/misty-server/blob/main/README.md)).
+The setup container is tested against a fake Cloudflare API (`misty-server/deploy/setup/fakecloudflare`),
 never the real one.

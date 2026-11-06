@@ -1,6 +1,8 @@
 import { observeAccountChanges } from "@/api/account-events";
 import { useAuth } from "@/features/auth";
+import { conversationInSpace } from "@/features/misty/conversationSpace";
 import { useMistyStore } from "@/features/misty/useMistyStore";
+import { useSpaceWindowStore } from "@/features/workspace/spaceWindow";
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useAgentAccess } from "./components/AgentAccess";
@@ -44,8 +46,9 @@ export function useAgentsPageState() {
   const workingAgentId = useMistyStore((s) => s.selectedAgentId);
   const conversations = useMistyStore((s) => s.conversations);
   const activeConversationId = useMistyStore((s) => s.activeConversationId);
-  const conversationSpaceId =
-    conversations.find((c) => c.id === activeConversationId)?.spaceId ?? "";
+  const space = useSpaceWindowStore((s) => s.identity);
+  // The chat surface doesn't change with the conversation's Space.
+  const conversationSpaceId = "";
   useEffect(() => {
     setSelected(undefined);
     setSettingsModalOpen(false);
@@ -106,7 +109,9 @@ export function useAgentsPageState() {
     previousWorkspacePage.current = workspacePage;
   }, [workspacePage, accessRetry]);
   const agentConversations = conversations.filter(
-    (c) => c.agentId === profile?.id || (!c.agentId && profile?.system_managed),
+    (c) =>
+      conversationInSpace(c, space) &&
+      (c.agentId === profile?.id || (!c.agentId && profile?.system_managed)),
   );
   const conversation = agentConversations.find((c) => c.id === activeConversationId);
   // Feeds the Recents status dots.

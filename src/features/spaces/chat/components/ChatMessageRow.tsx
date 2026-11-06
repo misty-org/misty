@@ -1,7 +1,7 @@
 import type { SpaceChatMessagesProps } from "./ChatMessages";
 import type { SpaceMessage } from "@/api/spaces/dto/entities";
-import { Avatar, AvatarFallback, AvatarImage, Button } from "@/shared/ui";
-import { Bot, CircleAlert } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage, Button, ErrorNotification } from "@/shared/ui";
+import { Bot } from "lucide-react";
 import { Fragment, memo, type FormEvent } from "react";
 import { ChatDateDivider, formatChatMessageTime } from "./ChatDisplay";
 import { MessageAttachments } from "./MessageAttachments";
@@ -15,7 +15,7 @@ import { MessageReactions } from "./MessageReactions";
 import { MessageReplyPreview } from "./MessageReplyPreview";
 import { initials, isAgentAuthoredMessage } from "./messageHelpers";
 
-export interface ChatMessageRowProps {
+interface ChatMessageRowProps {
   message: SpaceMessage;
   compact: boolean;
   dateLabel: string | undefined;
@@ -193,15 +193,13 @@ function ChatMessageRowView({
           {transcriptRequestId ? <AgentTranscriptButton requestId={transcriptRequestId} /> : null}
 
           {message.local_delivery_state === "failed" ? (
-            <div className="mt-1 flex items-center gap-1.5 text-2xs text-cream-muted" role="alert">
-              <CircleAlert className="size-3" aria-hidden="true" />
-              Message couldn’t be sent.
+            <ErrorNotification message="Message couldn’t be sent.">
               {props.onRetry && (
-                <Button variant="ghost" size="sm" onClick={() => props.onRetry?.(message)}>
+                <Button type="button" variant="ghost" size="sm" onClick={() => props.onRetry?.(message)}>
                   Retry
                 </Button>
               )}
-            </div>
+            </ErrorNotification>
           ) : null}
 
           <MessageAttachments

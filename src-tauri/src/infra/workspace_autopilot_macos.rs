@@ -35,7 +35,8 @@ pub(super) extern "C" fn desktop_stopped(value: *const std::ffi::c_char) {
     let payload =
         unsafe { serde_json::from_slice::<Value>(std::ffi::CStr::from_ptr(value).to_bytes()) };
     if let (Some(app), Ok(payload)) = (DESKTOP_APP.get(), payload) {
-        let _ = crate::infra::space_windows::emit(&app, "misty://desktop-control-stopped", payload);
+        let _ =
+            crate::infra::profile_windows::emit(&app, "misty://desktop-control-stopped", payload);
     }
 }
 /// A press on the desktop control island: the in-app island performs it.
@@ -46,7 +47,7 @@ pub(super) extern "C" fn desktop_island(value: *const std::ffi::c_char) {
     let payload =
         unsafe { serde_json::from_slice::<Value>(std::ffi::CStr::from_ptr(value).to_bytes()) };
     if let (Some(app), Ok(payload)) = (DESKTOP_APP.get(), payload) {
-        let _ = crate::infra::space_windows::emit(&app, "misty://agent-island", payload);
+        let _ = crate::infra::profile_windows::emit(&app, "misty://agent-island", payload);
     }
 }
 pub(super) unsafe fn decode(pointer: *mut std::ffi::c_char) -> Result<Value, String> {

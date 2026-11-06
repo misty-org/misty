@@ -18,7 +18,7 @@ which file answers which question. It also holds that feature's interface rules.
 | --- | --- |
 | Agents: harness, browser, chats, cursor companion, evals | [agents/](agents/README.md) |
 | Spaces: owner and members, switching, color | [spaces/](spaces/README.md) |
-| Sync, devices and the shared clipboard | [sync/](sync/README.md) |
+| Sync, profiles, signed-in sessions and the shared clipboard | [sync/](sync/README.md) |
 | Accounts on a shared server: setup keys, limits, the operator API and console | [cloud/](cloud/README.md) |
 | Voice, notes and memory | [voice-memory/](voice-memory/README.md) |
 | Browser: tabs, media controls, platform limits | [browser/](browser/README.md) |

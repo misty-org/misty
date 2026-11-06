@@ -37,7 +37,7 @@ export interface ImportedBookmarkRoots {
   other: ImportedBookmarkNode[];
   mobile: ImportedBookmarkNode[];
 }
-export interface ImportedBookmarks {
+interface ImportedBookmarks {
   roots: ImportedBookmarkRoots;
   skipped: number;
 }
@@ -64,13 +64,13 @@ export interface ImportedSettings {
   searchEngine?: { name: string; url: string } | null;
   homepage?: string | null;
   restoreSession?: boolean | null;
-  sitePermissions: { origin: string; kind: "camera" | "microphone"; allow: boolean }[];
+  sitePermissions: { origin: string; kind: "camera" | "microphone" | "location"; allow: boolean }[];
 }
-/** History, site permissions and sign-ins land in the calling window's Space. */
-export interface ImportTargetRequest {
+/** History, site permissions and sign-ins land in the calling window's profile. */
+interface ImportTargetRequest {
   source: ImportSourceRequest;
 }
-export interface ImportAdded {
+interface ImportAdded {
   added: number;
   /** Sign-ins the source browser locks to itself. */
   locked: number;

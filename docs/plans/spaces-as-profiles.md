@@ -2,12 +2,15 @@
 
 Graduates to: docs/spaces/
 
+Partly superseded: browsing now lives in profiles and one vault per account, not in Spaces
+([sync](../sync/README.md)). What's left to build here is what still applies to Spaces as shared content.
+
 Status: planned 2026-10-16; built in part since. Built: vaults per Space on the server (Phase 1),
 switching a window's Space in place with the Space row (Phase 3b, which replaced Phase 3's OS
 window per Space), the memory tree per Space (Phase 7), and private and public layers with each
 agent's home Space (Phase 9). Per-Space integration picks (Phase 8) were built and then dropped.
 "Where the code stands" describes the code before this work. Design:
-[Spaces as profiles](../spaces/as-profiles.md). The engine probe for separate
+[sync](../sync/README.md). The engine probe for separate
 website data per Space is `src-tauri/tests/webextensions/space-probe.m`. It builds on
 [Spaces, simplified](../spaces/simplified.md), which is in `main`.
 
@@ -22,20 +25,20 @@ These are the single-Space assumptions the plan removes, with where they live to
 
 | Area | Today | File |
 | --- | --- | --- |
-| Server vault | One vault per user: `browser_sync_vaults` has `PRIMARY KEY (user_id)`; `BrowserSyncVault(userID)` reads it | `server/internal/browsersync/store.go`, baseline migration |
+| Server vault | One vault per user: `browser_sync_vaults` has `PRIMARY KEY (user_id)`; `BrowserSyncVault(userID)` reads it | `misty-server/internal/browsersync/store.go`, baseline migration |
 | Desktop sync | One `Session` per process (`static SESSION`) | `src-tauri/src/infra/browser_sync/mod.rs` |
 | Store choice | One `SELECTED_PROFILE`; switching errors until every view closes | `src-tauri/src/infra/browser_sync/profile.rs` |
 | Store identity | `default_profile_id(scope)` hashes deployment, account and `vault_id` into the logical profile; the encrypted registry binds it to a physical store | `browser_sync/profile.rs`, `infra/browser_profile.rs`, `browser_create.rs` |
 | Windows | One app window labelled `main`, about 155 `"main"` uses under `src-tauri/src`; virtual windows inside it | `src/features/workspace/windows.ts`, `windowColors.ts`, `DesktopLayout/WorkspaceWindowMenu.tsx` |
 | Device profiles | `profile:<id>` scopes, each with a random store and its own virtual windows | `src/features/workspace/browserProfiles.ts`, `DesktopLayout/BrowserProfileMenu.tsx`, `infra/browser/profile_cleanup.rs` |
 | Extensions | One `static MistyExtensionHost *host`; `configureStore:` rebuilds the controller on store change; packages under `extensions/<account>` | `src-tauri/native/macos/MistyExtensions.m`, `infra/extensions/mod.rs` |
-| Collections | `bookmarks`, `tab_groups`, `history`, `extension_sync`, `passwords` | `src-tauri/crates/browser-sync/src/collections.rs`, `server/internal/browsersync/store_records.go` (`syncRecordCollections`) |
+| Collections | `bookmarks`, `tab_groups`, `history`, `extension_sync`, `passwords` | `src-tauri/crates/browser-sync/src/collections.rs`, `misty-server/internal/browsersync/store_records.go` (`syncRecordCollections`) |
 | Device-local data | Site permissions (per store, in `misty.db`), downloads and history (`misty.db`), search engine and custom bangs (settings store) | `browser_site_permissions_db.rs`, `browser_library.rs`, `workspace/browserSearchEngine.ts`, `settings/store/useSettingsStore.ts` |
-| Memory | `memory_events`, `memory_backlog`, `misty_memories`, `agent_methods`, `agent_method_versions`, `agent_method_lessons`, `ai_recaps`; tools `memory.pref.*`, `memory.history.*`, `memory.workflow.*` run on the server | `server/internal/platform/db/{memory_events,misty_memories,agent_methods,agent_method_lessons,ai_recaps}.go`, `httpapi/{agent_memory_tools,recall_agent_tools,agent_method_tools}.go` |
+| Memory | `memory_events`, `memory_backlog`, `misty_memories`, `agent_methods`, `agent_method_versions`, `agent_method_lessons`, `ai_recaps`; tools `memory.pref.*`, `memory.history.*`, `memory.workflow.*` run on the server | `misty-server/internal/platform/db/{memory_events,misty_memories,agent_methods,agent_method_lessons,ai_recaps}.go`, `httpapi/{agent_memory_tools,recall_agent_tools,agent_method_tools}.go` |
 | Device jobs | `workflow_device_node_jobs`, claimed by the device; runs wait on a deadline | `httpapi/device_job_wait.go`, `device_job_claim_wait.go`, `device_agent_tools.go` |
-| Integrations | Composio holds every account; one `composio_sessions` row per user; no per-Space choice | `server/internal/integrations/composio/`, migration `20271004050000_composio_sessions.sql` |
+| Integrations | Composio holds every account; one `composio_sessions` row per user; no per-Space choice | `misty-server/internal/integrations/composio/`, migration `20271004050000_composio_sessions.sql` |
 | Agents | `misty_ask_identities` with `space_agents(space_id, agent_id, owner_user_id)` membership; no home Space | migration `20271024000000_space_agents.sql` |
-| Storage | Plans limit cloud storage and AI usage, not Spaces; `cloudusage` measures vault bytes per account | `server/internal/cloudusage/`, migration `20271003120000_account_cloud_measurements.sql` |
+| Storage | Plans limit cloud storage and AI usage, not Spaces; `cloudusage` measures vault bytes per account | `misty-server/internal/cloudusage/`, migration `20271003120000_account_cloud_measurements.sql` |
 | macOS | `minimumSystemVersion` 12.0; 12–13 fall back to ephemeral stores (`browser_requires_ephemeral_store`) | `src-tauri/tauri.conf.json`, `browser.rs`, `browser_macos.rs` |
 
 ## Phases at a glance
@@ -64,8 +67,8 @@ Space vault's bytes count toward its owner's storage through `cloudusage`, as th
 today.
 
 Every phase follows the repo's rules: goose migrations under
-`server/internal/platform/db/migrations/` dated after `20271027000000`, server DB tests through
-`server/test.sh`, contract gates in `src/tests/contracts`, CRLF kept in the files that use it, and the
+`misty-server/internal/platform/db/migrations/` dated after `20271027000000`, server DB tests through
+`misty-server/test.sh`, contract gates in `src/tests/contracts`, CRLF kept in the files that use it, and the
 check in the Tauri shell rather than the bare Vite port. There are no users, so nothing is migrated
 for people: local data becomes the personal Space and the rest is dropped.
 
@@ -123,13 +126,13 @@ password, without the server learning anything new.
   per vault, so revoking a device revokes it in every vault in one transaction.
 
 **Touches.**
-- `server/internal/browsersync/store.go`: `BrowserSyncVault(userID)` becomes `BrowserSyncVaults(userID)` and
+- `misty-server/internal/browsersync/store.go`: `BrowserSyncVault(userID)` becomes `BrowserSyncVaults(userID)` and
   `BrowserSyncVaultForSpace(userID, spaceID)`; `CreateBrowserSyncVault` takes the Space and either a
   password envelope (personal) or a Space envelope (other Spaces); revoke spans vaults.
-- `server/internal/browsersync/http.go` and handlers: `GET /sync/vaults`, `POST /sync/vaults` (create for a
+- `misty-server/internal/browsersync/http.go` and handlers: `GET /sync/vaults`, `POST /sync/vaults` (create for a
   Space the caller is a member of), the existing per-vault routes keep taking `vault_id`.
-- `server/internal/platform/db/devices_unified.go`, `devices_lists.go`: device lists span vaults.
-- `server/internal/platform/db/spaces_create.go` and Space delete/leave: deleting a Space or
+- `misty-server/internal/platform/db/devices_unified.go`, `devices_lists.go`: device lists span vaults.
+- `misty-server/internal/platform/db/spaces_create.go` and Space delete/leave: deleting a Space or
   leaving it deletes that member's vault rows (ciphertext only) through the existing object deletion
   jobs.
 - `src-tauri/crates/browser-sync/src/crypto.rs`: `VaultRoot::seal_space_root` /
@@ -145,7 +148,7 @@ password, without the server learning anything new.
 **Tests.** Store tests (`store_test.go`, `store_vectors_test.go`) for two vaults per user, the unique
 rule, membership checks on create and cascade on leave; crypto vectors in the crate
 (`tests/encryption.rs`) for sealing and opening a Space root and refusing a root sealed for another
-`vault_id`; contract test in `server/test/contract/http/api/` for the list and create routes.
+`vault_id`; contract test in `misty-server/test/contract/http/api/` for the list and create routes.
 
 **Done.** A test account can create a second vault for a Space it belongs to, list both, and open
 the second with only the personal root; a non-member can't create one.
@@ -441,7 +444,7 @@ Space) shows up only at runtime; route every callback through the host that rais
   microphone, notifications, pop-ups), `SEARCH` (default engine, custom engines, custom bangs) and
   `DOWNLOADS` (url, file name, size, finished time, device that holds the file). All sealed like the
   others; extensions and site permissions native-only, never projected to a renderer.
-- `server/internal/browsersync/store_records.go`: add the names to `syncRecordCollections`.
+- `misty-server/internal/browsersync/store_records.go`: add the names to `syncRecordCollections`.
 - `src-tauri/src/infra/browser_site_permissions*.rs`: read and write through the Space's collection;
   `misty.db` keeps a cache keyed by store (it already keys by `profile_key`).
 - `src-tauri/src/infra/browser_library/`, `browser_downloads.rs`: record finished downloads into
@@ -647,7 +650,7 @@ accounts that Space uses; the chat card offers "Use <account>" for a pick.
 Every Space item has a private/public toggle, except the layers that are always one or the other.
 One check, in one place: a private layer opens only for its owner, and for the owner's own agents on
 runs the owner asked for. Agents have a home Space. The layer map is in the
-[brief](../spaces/as-profiles.md#private-and-public).
+[Spaces](../spaces/README.md).
 
 **Touches.**
 - **Layers in the code.** Every agent tool, device job and read path declares the layer it touches

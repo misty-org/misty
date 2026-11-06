@@ -17,6 +17,7 @@ import {
   DropdownMenuTrigger,
   MenuItem,
   ContextMenuAction,
+  ErrorNotification,
   IconButton,
   itemTones,
   CollectionSelectionBar,
@@ -102,11 +103,7 @@ export function DrawingCollection(props: {
         onClear={selection.clear}
         onDelete={() => props.onDeleteMany(selection.selectedIds)}
       />
-      {props.bulkError && (
-        <p role="alert" className="text-sm text-cream-muted">
-          {props.bulkError}
-        </p>
-      )}
+      <ErrorNotification message={props.bulkError} />
       {
         <CollectionItems
           columnSetId="drawings"

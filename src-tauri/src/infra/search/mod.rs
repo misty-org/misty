@@ -1,4 +1,4 @@
-//! Address bar search: Space search engines and suggestions.
+//! Address bar search: a profile's search engines and suggestions.
 
-pub mod space;
+pub mod profile;
 pub mod suggest;

@@ -1,3 +1,4 @@
+import { ErrorNotification } from "@/shared/ui";
 import { useEffect, useState, type ReactNode } from "react";
 import { aiSurfaceApi, type AiUserSettings } from "@/features/ai-surface/api";
 import { DesktopSettingsRow, DesktopSettingsSection } from "../components/DesktopSettingsUI";
@@ -61,11 +62,7 @@ export function AgentSitesSection(props: { children?: ReactNode }) {
           }
         />
       </DesktopSettingsRow>
-      {error ? (
-        <p role="alert" className="mt-2 text-xs text-cream-muted">
-          {error}
-        </p>
-      ) : null}
+      <ErrorNotification message={error} onDismiss={() => setError("")} />
     </DesktopSettingsSection>
   );
 }

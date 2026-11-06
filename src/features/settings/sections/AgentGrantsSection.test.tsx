@@ -26,7 +26,7 @@ it("shows a skeleton first, then grants by agent, and revokes one", async () => 
   let resolve!: (value: { grants: (typeof push)[] }) => void;
   mocks.list.mockReturnValueOnce(new Promise((done) => (resolve = done)));
   render(<AgentGrantsSection />);
-  expect(screen.getByRole("status", { name: "Remembered approvals" })).toBeTruthy();
+  expect(screen.getByRole("status", { name: "Approvals" })).toBeTruthy();
   expect(screen.queryByText(/Loading/)).toBeNull();
   await act(async () => resolve({ grants: [push] }));
   expect(screen.getByText("Push to misty-org/misty")).toBeTruthy();

@@ -5,7 +5,7 @@ fn fields(value: Value) -> Fields {
 }
 
 #[test]
-fn folders_without_a_parent_keep_the_shape_older_versions_accept() {
+fn folders_without_a_parent_leave_out_the_tree_fields() {
     let flat = fields(serde_json::json!({
         "label": "Work", "icon": "folder", "order": 1.0, "hidden": false
     }));

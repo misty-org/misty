@@ -15,7 +15,7 @@ import type { MistyGet, MistySet } from "./mistyStoreHelpers";
 import type { subscribeToAiInvocation } from "@/features/ai-surface/api";
 
 /** The turn a stream belongs to; events for any other turn are ignored. */
-export interface StreamedTurn {
+interface StreamedTurn {
   accountId: string;
   epoch: number;
   invocationId: string;

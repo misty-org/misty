@@ -3,9 +3,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const saved = vi.hoisted(() => ({ state: null as unknown, revision: 0 }));
 vi.mock("@/native/invoke", () => ({
   invoke: vi.fn(async (command: string, args: { revision?: number; document?: unknown }) => {
-    if (command === "settings_profile_state")
+    if (command === "settings_session_state")
       return { revision: saved.revision, state: saved.state };
-    if (command === "settings_profile_commit") {
+    if (command === "settings_session_commit") {
       if (args.revision !== saved.revision) throw new Error("SETTINGS_REVISION_CONFLICT");
       saved.state = args.document;
       saved.revision += 1;
@@ -36,6 +36,16 @@ describe("hosted deployment routing", () => {
     });
     await choice.saveServerChoice({ mode: "none" });
     expect(await deployment.resolveApiBase()).toBe("");
+  });
+
+  it("forgets a saved server a release build can't use", async () => {
+    saved.state = { version: 1, choice: { mode: "server", url: "http://127.0.0.1:8081/v1" } };
+    vi.stubEnv("DEV", false);
+    vi.resetModules();
+    const release = await import("@/api/deployment/serverChoice");
+    expect(await release.loadServerChoice()).toBeNull();
+    expect(release.currentApiBase()).toBe("");
+    vi.unstubAllEnvs();
   });
 
   it("namespaces local state under the Hosted scope", () => {

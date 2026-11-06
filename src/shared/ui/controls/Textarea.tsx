@@ -9,7 +9,7 @@ const textareaVariants = {
     "placeholder:text-cream-muted disabled:cursor-not-allowed disabled:opacity-50",
     "aria-invalid:border-charcoal-active aria-invalid:ring-3 aria-invalid:ring-charcoal-active/20",
     "md:text-sm bg-charcoal-card aria-invalid:border-charcoal-active/50",
-    "aria-invalid:ring-charcoal-active/40 hover:border-charcoal-active focus-visible:border-cream-muted",
+    "aria-invalid:ring-charcoal-active/40 hover:border-charcoal-active",
   ],
   // A chat composer's message box: no frame, since the composer card around it is the frame.
   composer: [
@@ -18,7 +18,7 @@ const textareaVariants = {
   ],
 } as const;
 
-export type TextareaProps = React.ComponentProps<"textarea"> & {
+type TextareaProps = React.ComponentProps<"textarea"> & {
   variant?: keyof typeof textareaVariants;
 };
 

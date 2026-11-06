@@ -1,12 +1,13 @@
 import { invoke } from "@/native/invoke";
 import { create } from "zustand";
-import { normalizeApiBaseUrl, withDefaultApiPath } from "@/api/client/base-url";
+import { isAllowedServerUrl, normalizeApiBaseUrl, withDefaultApiPath } from "@/api/client/base-url";
 
 /**
- * Which Misty server this device uses, chosen in the setup wizard and kept in this device's
- * settings (`misty.db`; settings never sync). With none, Misty is the browser only and signed
- * out. A development build falls back to `VITE_MISTY_PUBLIC_API_URL`, or the local dev stack,
- * until someone chooses.
+ * Which Misty server this device uses, chosen before signing in or in Settings and kept in this
+ * device's settings (`misty.db`; settings never sync). With none, Misty is the browser only and
+ * signed out. Until someone chooses, a development build's requests fall back to
+ * `VITE_MISTY_PUBLIC_API_URL`, or the local dev stack; the sign-in pages still ask, with that
+ * address filled in.
  */
 export type ServerChoice = { mode: "server"; url: string } | { mode: "none" };
 
@@ -28,8 +29,21 @@ export function developmentServer(): string {
   return withDefaultApiPath(base);
 }
 
+/**
+ * Misty's own server, which a device only uses once someone chooses Misty Pro. An account's
+ * credential derives from this address, so it matches the website's in each kind of build.
+ */
+export function mistyProServer(): string {
+  return import.meta.env.DEV ? "https://dev-api.mistysys.com/v1" : "https://api.mistysys.com/v1";
+}
+
+/** Misty's website, in each kind of build. */
+export function mistyWebsite(): string {
+  return import.meta.env.DEV ? "http://localhost:5176" : "https://mistysys.com";
+}
+
 /** The API base a choice means: its server's, "" for browsing only, or the development default. */
-export function apiBaseFor(choice: ServerChoice | null): string {
+function apiBaseFor(choice: ServerChoice | null): string {
   if (!choice) return developmentServer();
   return choice.mode === "server" ? choice.url : "";
 }
@@ -37,7 +51,11 @@ export function apiBaseFor(choice: ServerChoice | null): string {
 function isChoice(value: unknown): value is ServerChoice {
   if (!value || typeof value !== "object") return false;
   const choice = value as { mode?: unknown; url?: unknown };
-  return choice.mode === "none" || (choice.mode === "server" && typeof choice.url === "string");
+  if (choice.mode === "none") return true;
+  // A server saved before the https rule counts as no choice, so the wizard asks again.
+  return (
+    choice.mode === "server" && typeof choice.url === "string" && isAllowedServerUrl(choice.url)
+  );
 }
 
 interface ServerChoiceState {
@@ -58,7 +76,7 @@ interface Snapshot {
 }
 
 // The same `settings_state` rows the device preferences use, in a scope of their own.
-const snapshot = () => invoke<Snapshot>("settings_profile_state", { scope });
+const snapshot = () => invoke<Snapshot>("settings_session_state", { scope });
 
 async function read(): Promise<ServerChoice | null> {
   try {
@@ -95,7 +113,7 @@ export async function saveServerChoice(choice: ServerChoice): Promise<void> {
   for (let attempt = 0; ; attempt++) {
     const { revision } = await snapshot();
     try {
-      await invoke("settings_profile_commit", { scope, revision, document });
+      await invoke("settings_session_commit", { scope, revision, document });
       break;
     } catch (error) {
       if (attempt >= 5 || !String(error).includes("SETTINGS_REVISION_CONFLICT")) throw error;

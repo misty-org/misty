@@ -19,13 +19,7 @@ export function openTabsProvider(deps: OmniboxDeps): OmniboxProvider {
       const bookmarks = deps.bookmarks?.() ?? [];
       const bookmarkedUrls = new Set(bookmarks.map((b) => urlKey(b.url)));
       for (const tab of deps.openTabs()) {
-        if (
-          tab.tabId === input.tabId ||
-          tab.agentOwned ||
-          tab.private !== input.private ||
-          (tab.profileId ?? "") !== (input.profileId ?? "")
-        )
-          continue;
+        if (tab.tabId === input.tabId || tab.agentOwned || tab.private !== input.private) continue;
         const described = describeUrl(tab.url);
         if (!described) continue;
         const isBookmarked = bookmarkedUrls.has(urlKey(tab.url));

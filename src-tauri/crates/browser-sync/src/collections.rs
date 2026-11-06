@@ -1,220 +1,27 @@
-//! Collections: rarely changed, vault-wide records (bookmarks, saved tab
-//! groups, history), pulled rather than pushed and kept out of the live
-//! workspace protocol.
-//!
-//! Each record is sealed on its own with associated data binding it to its
-//! collection, keyed id and version, so the server can neither move one record
-//! onto another nor roll it back unnoticed. The server sees a collection name,
-//! the keyed id (an HMAC of the record id), a version and ciphertext.
-//!
-//! Writes are a compare-and-swap on the record's version. A write that loses
-//! is retried on the server's copy (last writer wins), except that an edit
-//! never recreates a record another device deleted.
-use std::collections::BTreeMap;
-
-use serde::{Deserialize, Serialize};
-
-use crate::document::ViewRecord;
-
+//! The names of what a profile keeps as records, each a collection in the local store.
 pub const BOOKMARKS: &str = "bookmarks";
 pub const TAB_GROUPS: &str = "tab_groups";
-/// Browsing history, in hourly batches written by the device that browsed.
+/// Browsing history, in hourly batches written by the computer that browsed.
 pub const HISTORY: &str = "history";
 /// Extension-owned declared sync settings. Native-only, never projected to a renderer.
 pub const EXTENSION_SYNC: &str = "extension_sync";
 /// Saved website sign-ins. Native-only, never projected to a renderer; the
 /// server only ever holds each one sealed with the vault key.
 pub const PASSWORDS: &str = "passwords";
-/// A Space's own settings that travel with its vault (the sites it claims).
-/// Native-only, never projected to a renderer.
-pub const SPACE_SETTINGS: &str = "space_settings";
-/// The Space's installed extensions: store id, version and on/off. Each
-/// device fetches the packages from the store itself. Native-only.
+/// The profile's installed extensions: store id, version and on/off. Each
+/// computer fetches the packages from the store itself. Native-only.
 pub const EXTENSIONS: &str = "extensions";
 /// Per-site camera, microphone, notification and pop-up choices. Native-only.
 pub const SITE_PERMISSIONS: &str = "site_permissions";
 /// The default search engine, custom engines and custom bangs.
 pub const SEARCH: &str = "search";
-/// Finished downloads. The file stays on the device that downloaded it.
+/// Finished downloads. The file stays on the computer that downloaded it.
 pub const DOWNLOADS: &str = "downloads";
-pub const COLLECTIONS: [&str; 10] = [
-    BOOKMARKS,
-    TAB_GROUPS,
-    HISTORY,
-    EXTENSION_SYNC,
-    PASSWORDS,
-    SPACE_SETTINGS,
-    EXTENSIONS,
-    SITE_PERMISSIONS,
-    SEARCH,
-    DOWNLOADS,
-];
-/// Collections the renderer's sync view carries; the rest are read natively
-/// on demand (history and downloads are too large to copy into every view).
-pub const PROJECTED: [&str; 2] = [BOOKMARKS, TAB_GROUPS];
-/// Collections native code reads on demand and applies itself. The worker
-/// counts pulled rows per collection so it can tell them a pull changed one.
-pub const NATIVE_APPLIED: [&str; 4] = [EXTENSIONS, SITE_PERMISSIONS, SEARCH, DOWNLOADS];
-/// The newest finished downloads a Space keeps, like the local list.
+/// The newest finished downloads a profile keeps, like the local list.
 pub const MAX_DOWNLOADS: usize = 1_000;
-/// The shared clipboard's ring of sealed clips. It is not a record
-/// collection: the worker moves its ciphertext without opening it.
+/// The shared clipboard's ring of sealed clips.
 pub const CLIPBOARD: &str = "clipboard";
 /// How many clips the ring keeps.
 pub const CLIPBOARD_SLOTS: u8 = 20;
 /// The largest sealed clip the server stores (the same limit on both sides).
 pub const CLIPBOARD_MAX_BYTES: usize = 256 * 1024;
-
-mod sealing;
-pub use sealing::{open, record_key, seal};
-
-/// A record as the server last confirmed it. `None` is a deletion.
-#[derive(Clone, Serialize, Deserialize)]
-pub struct Confirmed {
-    pub version: u64,
-    pub record: Option<ViewRecord>,
-}
-
-/// One collection on this machine: what the server confirmed, and this
-/// machine's writes it has not accepted yet. Persisted sealed, whole.
-#[derive(Clone, Default, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct Collection {
-    /// Server sequence read through.
-    pub cursor: u64,
-    pub confirmed: BTreeMap<String, Confirmed>,
-    /// Keyed id → the record to write (`None` deletes).
-    pub pending: BTreeMap<String, Option<ViewRecord>>,
-    /// The collection has been pulled completely at least once.
-    #[serde(default)]
-    pub loaded: bool,
-}
-
-/// One write to send: the keyed id, the version it replaces, and the record.
-pub struct Write {
-    pub key: String,
-    pub base_version: u64,
-    pub record: Option<ViewRecord>,
-}
-
-impl Collection {
-    /// What the UI shows: confirmed records with pending writes on top.
-    pub fn view(&self) -> Vec<ViewRecord> {
-        let mut out: BTreeMap<&str, &ViewRecord> = self
-            .confirmed
-            .iter()
-            .filter_map(|(key, c)| c.record.as_ref().map(|r| (key.as_str(), r)))
-            .collect();
-        for (key, record) in &self.pending {
-            match record {
-                Some(record) => out.insert(key, record),
-                None => out.remove(key.as_str()),
-            };
-        }
-        out.into_values().cloned().collect()
-    }
-
-    /// Whether a record with this keyed id was deleted (by anyone) and the
-    /// deletion is confirmed.
-    pub fn deleted(&self, key: &str) -> bool {
-        self.confirmed.get(key).is_some_and(|c| c.record.is_none())
-    }
-
-    pub fn write(&mut self, key: String, record: Option<ViewRecord>) {
-        self.pending.insert(key, record);
-    }
-
-    /// Queues a write, except a delete of a record the server never had,
-    /// which is moot: the pending create (if any) is dropped instead.
-    /// `settled`: fully pulled, with no push in flight that could still land
-    /// a create. Returns whether anything was queued.
-    pub fn queue(&mut self, key: String, record: Option<ViewRecord>, settled: bool) -> bool {
-        let on_server = self.confirmed.get(&key).is_some_and(|c| c.record.is_some());
-        if record.is_none() && settled && !on_server {
-            self.pending.remove(&key);
-            return false;
-        }
-        self.write(key, record);
-        true
-    }
-
-    pub fn outgoing(&self) -> Vec<Write> {
-        self.pending
-            .iter()
-            .map(|(key, record)| Write {
-                key: key.clone(),
-                base_version: self.confirmed.get(key).map_or(0, |c| c.version),
-                record: record.clone(),
-            })
-            .collect()
-    }
-
-    /// A pulled row. A full re-read (`reset`) starts from nothing confirmed.
-    pub fn pulled(&mut self, key: String, version: u64, record: Option<ViewRecord>) {
-        if self
-            .confirmed
-            .get(&key)
-            .is_some_and(|c| c.version >= version)
-        {
-            return;
-        }
-        self.settle(&key, record.as_ref());
-        self.confirmed.insert(key, Confirmed { version, record });
-    }
-
-    /// The server's answer to one write of `sent`. An edit made while the
-    /// write was in flight stays pending and goes next, on the new version.
-    pub fn answered(
-        &mut self,
-        key: &str,
-        sent: &Option<ViewRecord>,
-        applied: bool,
-        version: u64,
-        current: Option<Confirmed>,
-    ) {
-        if applied {
-            if self.pending.get(key) == Some(sent) {
-                self.pending.remove(key);
-            }
-            self.confirmed.insert(
-                key.to_owned(),
-                Confirmed {
-                    version,
-                    record: sent.clone(),
-                },
-            );
-            return;
-        }
-        // Lost: keep the server's copy and retry on it, unless someone
-        // deleted the record, which an edit never undoes.
-        let current = current.unwrap_or(Confirmed {
-            version,
-            record: None,
-        });
-        self.settle(key, current.record.as_ref());
-        if current.version > 0 {
-            self.confirmed.insert(key.to_owned(), current);
-        }
-    }
-
-    /// Drops a pending write the server state has made moot: it already
-    /// holds the same record, or it deleted what the write would edit.
-    fn settle(&mut self, key: &str, server: Option<&ViewRecord>) {
-        let moot = match (self.pending.get(key), server) {
-            (Some(Some(mine)), Some(theirs)) => {
-                mine.fields == theirs.fields && mine.kind == theirs.kind
-            }
-            (Some(Some(_)), None) => self.confirmed.get(key).is_some_and(|c| c.record.is_some()),
-            (Some(None), None) => true,
-            _ => false,
-        };
-        if moot {
-            self.pending.remove(key);
-        }
-    }
-}
-
-pub mod wire;
-
-#[cfg(test)]
-mod tests;

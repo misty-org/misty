@@ -44,19 +44,15 @@ pub(super) fn new_window(
 /// the events the workspace shows.
 pub(super) fn page_load(
     page_app: &AppHandle,
-    page_space: &str,
+    page_profile: &str,
     page_id: &str,
-    restoring_tab_session: bool,
+    replacing_extension_view: bool,
     webview: Webview,
     payload: tauri::webview::PageLoadPayload<'_>,
 ) {
-    crate::infra::extensions::native::tab_event(page_app, Some(page_space), page_id, "updated");
-    if restoring_tab_session && payload.url().as_str() == "about:blank" {
+    crate::infra::extensions::native::tab_event(page_app, Some(page_profile), page_id, "updated");
+    if replacing_extension_view && payload.url().as_str() == "about:blank" {
         return;
-    }
-    #[cfg(any(target_os = "macos", windows))]
-    if matches!(payload.event(), tauri::webview::PageLoadEvent::Finished) {
-        crate::infra::website_data::session_storage::clear(&webview);
     }
     let locked = page_app
         .state::<BrowserSessionState>()

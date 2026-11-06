@@ -26,18 +26,27 @@ describe("one chat system", () => {
     );
   });
 
-  it("lists every chat together, newest first, titled by the chat", () => {
-    const agentChat = conversation({
-      id: "conversation_1",
-      kind: "direct",
-      direct_agent_id: "agent_1",
+  it("lists channels newest first, and DMs apart, titled by the other person", () => {
+    const channel = conversation({
+      id: "channel_1",
       title: "Trip plans",
       updated_at: "2026-10-16T02:00:00Z",
     });
-    const groups = groupConversations([conversation({ id: "c1" }), agentChat]);
+    const dm = conversation({
+      id: "dm_1",
+      kind: "dm",
+      title: "me & Sam",
+      participants: [
+        { kind: "person", user_id: "me", name: "Me" },
+        { kind: "person", user_id: "sam", name: "Sam" },
+      ] as never,
+    });
+    const groups = groupConversations([conversation({ id: "c1" }), channel, dm]);
     expect(groups.map((group) => group.conversations.map((item) => item.id))).toEqual([
-      ["conversation_1", "c1"],
+      ["channel_1", "c1"],
+      ["dm_1"],
     ]);
-    expect(conversationName(agentChat, "me")).toBe("Trip plans");
+    expect(conversationName(channel, "me")).toBe("Trip plans");
+    expect(conversationName(dm, "me")).toBe("Sam");
   });
 });

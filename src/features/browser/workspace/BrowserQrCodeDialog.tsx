@@ -1,13 +1,6 @@
 import { QRCodeSVG } from "qrcode.react";
 import { useEffect, useState } from "react";
-import {
-  Button,
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogTitle,
-} from "@/shared/ui";
+import { Button, Dialog, DialogContent, DialogFooter, DialogTitle } from "@/shared/ui";
 import { useBrowserOverlayControl } from "./useBrowserOverlayControl";
 
 /** Share this page with a phone: scan the code to open the same address. */
@@ -29,9 +22,8 @@ export function BrowserQrCodeDialog(props: {
   }, [props.request]);
   return (
     <Dialog open={overlay.open} onOpenChange={overlay.onOpenChange}>
-      <DialogContent className="sm:max-w-sm">
+      <DialogContent aria-describedby={undefined} className="sm:max-w-sm">
         <DialogTitle>Scan to open this page</DialogTitle>
-        <DialogDescription>Point a phone's camera at the code.</DialogDescription>
         <div className="grid justify-items-center gap-3 py-2">
           <div className="rounded-xl bg-white p-3">
             <QRCodeSVG value={url} size={200} level="M" />

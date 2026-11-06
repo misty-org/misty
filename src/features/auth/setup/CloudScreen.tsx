@@ -1,7 +1,11 @@
+import { accountApi } from "@/api/account/api";
+import { probeServer } from "@/api/deployment/probe";
+import { currentApiBase } from "@/api/deployment/serverChoice";
 import { useAuth } from "../authState";
 import AuthField from "../components/AuthField";
 import AuthMessage from "../components/AuthMessage";
-import { accountRedeemSetupKey } from "../store/useAccountStore";
+import { authButtonClass } from "../components/authButtonClass";
+import { accountFinishSetupKey, accountRedeemSetupKey } from "../store/useAccountStore";
 import { Button, Spinner } from "@/shared/ui";
 import { useEffect, useState, type FormEvent } from "react";
 import { isSetupKey, parseServerAddress, parseSetupLink } from "./serverAddress";
@@ -9,13 +13,16 @@ import { takeSetupLink, useSetupLinkStore } from "./setupLinkStore";
 import { useServerSwitch } from "./useServerSwitch";
 
 /**
- * Misty Cloud, or any server's sign-in link: the link holds the server and a one-time setup key.
+ * Any server's sign-in link: the link holds the server and a one-time setup key.
  * The server address and the key typed apart work too, and a `misty://setup` link fills both
  * in. The key signs in once; the person then chooses a password (`ChoosePasswordScreen`).
  */
-export function CloudScreen(props: { onRedeemed: () => void; onBusy: (busy: boolean) => void }) {
+export function CloudScreen(props: {
+  onRedeemed: (hasPassword: boolean) => void;
+  onBusy: (busy: boolean) => void;
+}) {
   const { authenticateAccount, transitioning } = useAuth();
-  const { switchTo } = useServerSwitch();
+  const { moveTo } = useServerSwitch();
   // A misty://setup link fills the fields once; it is let go after the first render.
   const [opened] = useState(() => useSetupLinkStore.getState().link);
   useEffect(() => void takeSetupLink(), []);
@@ -37,12 +44,26 @@ export function CloudScreen(props: { onRedeemed: () => void; onBusy: (busy: bool
     setBusy(true);
     props.onBusy(true);
     try {
-      if (!(await switchTo(target.apiBase))) {
+      if (!(await probeServer(target.apiBase))) {
         setError("Misty couldn't reach that server. Check the link and your connection.");
         return;
       }
-      await authenticateAccount(() => accountRedeemSetupKey(target.setupKey));
-      props.onRedeemed();
+      // Moving signs out of the current server, so the new one takes the key first: a key it
+      // refuses leaves this device signed in where it was.
+      const redeemed =
+        currentApiBase() === target.apiBase
+          ? null
+          : await accountApi.redeemSetupKeyOn(target.apiBase, target.setupKey);
+      await moveTo(target.apiBase);
+      let provider: string | undefined;
+      await authenticateAccount(async () => {
+        const user = await (redeemed
+          ? accountFinishSetupKey(redeemed)
+          : accountRedeemSetupKey(target.setupKey));
+        provider = user.provider;
+        return user;
+      });
+      props.onRedeemed(provider !== "google");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "That setup key didn't work.");
     } finally {
@@ -56,7 +77,7 @@ export function CloudScreen(props: { onRedeemed: () => void; onBusy: (busy: bool
     <form className="flex flex-col gap-3.5" onSubmit={(event) => void submit(event)}>
       <AuthField
         id="setup-link"
-        label="Setup link"
+        label="Sign-in link"
         value={link}
         placeholder="https://mistysys.com/setup#server=…"
         autoComplete="off"
@@ -74,15 +95,12 @@ export function CloudScreen(props: { onRedeemed: () => void; onBusy: (busy: bool
           onChange={setKey}
         />
       ) : null}
-      <p className="m-0 text-sm text-cream-muted">
-        A sign-in link holds the server address and a key, which also work typed apart. A key works
-        once and lasts seven days.
-      </p>
       {error ? <AuthMessage tone="error" message={error} /> : null}
       <Button
         type="submit"
         variant="primary"
         size="lg"
+        className={authButtonClass}
         disabled={disabled || !ready}
         aria-busy={busy}
       >

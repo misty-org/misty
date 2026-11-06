@@ -29,8 +29,7 @@ export function TabGroupTabMenu({
 }) {
   const groups = useWorkspaceStore((s) => s.tabGroups);
   const layout = useWorkspaceStore((s) => s.layout);
-  const scope = useWorkspaceStore((s) => s.activeScopeKey);
-  const saved = groups.filter((g) => g.scopeKey === scope && g.savedTabs?.length);
+  const saved = groups.filter((g) => g.savedTabs?.length);
   const available = groups.filter((g) => layoutTabs(layout).some((t) => t.tabGroupId === g.id));
   return (
     <>

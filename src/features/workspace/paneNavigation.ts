@@ -1,4 +1,4 @@
-export type PaneDirection = "left" | "right" | "up" | "down";
+type PaneDirection = "left" | "right" | "up" | "down";
 
 export interface PaneBounds {
   id: string;

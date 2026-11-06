@@ -41,7 +41,7 @@ fn saved_providers() -> Vec<String> {
 }
 
 /// This device's model choices and keys, for the agent runtime on this computer. None when
-/// no agent model has a usable provider.
+/// no agent model has a usable provider and no Soniox key is saved.
 pub async fn current_document(app: &tauri::AppHandle) -> Option<Value> {
     let runtime = app.try_state::<MistyRuntime>()?;
     let document = runtime.settings.document().await.ok()?;

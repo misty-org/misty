@@ -1,16 +1,13 @@
 import { useEffect, useState, type FormEvent } from "react";
 import type { Space } from "@/api/spaces/dto/entities";
-import { Button, cn, Input, PopoverContent } from "@/shared/ui";
-import { SpaceColorPanel } from "./SpaceColorPanel";
+import { Button, cn, ErrorNotification, Input, PopoverContent } from "@/shared/ui";
 import { SpaceMembers } from "../../members";
 import { LeaveDeleteSpaceDialogs } from "../LeaveDeleteSpaceDialogs";
-import { SpaceSiteLinks } from "../SpaceSiteLinks";
 import { useSpaceLifecycleActions } from "../useSpaceLifecycleActions";
 import { useSpacesStore } from "../../store/useSpacesStore";
 
 /** The small windows the Space menu and People open, in place of a settings page. */
-export type SpaceDialog =
-  "rename" | "color" | "sites" | "members" | "invite" | "leave" | "delete" | null;
+export type SpaceDialog = "rename" | "members" | "invite" | "leave" | "delete" | null;
 
 export function SpaceDialogs({
   space,
@@ -34,7 +31,7 @@ export function SpaceDialogs({
     }
     onClose();
   }, [open, clearError, setLeaveOpen, setDeleteOpen, setDeleteConfirmation, onClose]);
-  const wide = open === "sites" || open === "members" || open === "invite";
+  const wide = open === "members" || open === "invite";
   return (
     <>
       {isSpacePanel(open) && (
@@ -51,8 +48,6 @@ export function SpaceDialogs({
           onEscapeKeyDown={onClose}
         >
           {open === "rename" && <RenameSpace space={space} onDone={onClose} />}
-          {open === "color" && <SpaceColorPanel />}
-          {open === "sites" && <SpaceSiteLinks spaceId={space.id} />}
           {(open === "members" || open === "invite") && (
             <SpaceMembers embedded spaceId={space.id} invite={open === "invite"} />
           )}
@@ -69,8 +64,6 @@ export const isSpacePanel = (dialog: SpaceDialog) =>
 
 function panelLabel(dialog: SpaceDialog, name: string) {
   if (dialog === "rename") return `Rename ${name}`;
-  if (dialog === "color") return "Space color";
-  if (dialog === "sites") return `Sites that open in ${name}`;
   return `People in ${name}`;
 }
 
@@ -106,11 +99,10 @@ function RenameSpace({ space, onDone }: { space: Space; onDone: () => void }) {
         value={name}
         onChange={(event) => setName(event.target.value)}
       />
-      {failed && (
-        <p role="alert" className="mb-0 mt-3 text-sm text-cream">
-          The name wasn't saved. Try again.
-        </p>
-      )}
+      <ErrorNotification
+        message={failed ? "The name wasn't saved. Try again." : ""}
+        onDismiss={() => setFailed(false)}
+      />
       <div className="mt-3 flex justify-end gap-2">
         <Button variant="outline" type="button" onClick={onDone}>
           Cancel

@@ -17,6 +17,7 @@ import {
   DropdownMenuTrigger,
   MenuItem,
   ContextMenuAction,
+  ErrorNotification,
   IconButton,
   CollectionSkeleton,
   itemTones,
@@ -130,19 +131,12 @@ export function JournalCollection(props: {
         onClear={selection.clear}
         onDelete={() => props.onDeleteMany?.(selection.selectedIds)}
       />
-      {props.bulkError && (
-        <p role="alert" className="text-sm text-cream-muted">
-          {props.bulkError}
-        </p>
-      )}
-      {props.error && (
-        <div className="flex items-center gap-3 text-sm text-cream-muted" role="alert">
-          Notes couldn’t load.
-          <Button variant="ghost" size="sm" onClick={props.onRetry}>
-            Retry
-          </Button>
-        </div>
-      )}
+      <ErrorNotification message={props.bulkError} />
+      <ErrorNotification message={props.error ? "Notes couldn’t load." : ""}>
+        <Button type="button" variant="ghost" size="sm" onClick={props.onRetry}>
+          Retry
+        </Button>
+      </ErrorNotification>
       {props.loading ? (
         <CollectionSkeleton label="Loading notes" view={view} />
       ) : (

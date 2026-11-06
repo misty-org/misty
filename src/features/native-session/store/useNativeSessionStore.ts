@@ -80,7 +80,7 @@ export const useNativeSessionStore = create<NativeSessionStore>((set) => ({
   },
 }));
 
-export type NativeSessionStore = {
+type NativeSessionStore = {
   status: NativeSession | null;
   systemError: string;
   loadSystem: () => Promise<void>;

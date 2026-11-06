@@ -1,12 +1,12 @@
 //! Live transcription on this computer: the app mints the one-time ticket the runtime's relay
-//! (`server/apps/agent-runtime/src/live/`) checks, signed with this launch's secret, and the
+//! (`src-tauri/services/agent-runtime/src/live/`) checks, signed with this launch's secret, and the
 //! relay streams to Soniox on the device's own key. Must match `ticket.ts`.
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 use serde::Serialize;
 use serde_json::json;
 
 const DOMAIN: &str = "misty-live-ticket\n";
-const MODEL: &str = "soniox/stt-rt-v4";
+const MODEL: &str = "soniox/stt-rt-v5";
 /// A ticket must be used within a minute.
 const TICKET_SECONDS: u64 = 60;
 /// The longest one session may stream, across its channels.

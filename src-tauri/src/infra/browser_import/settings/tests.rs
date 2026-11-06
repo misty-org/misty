@@ -10,7 +10,8 @@ fn reads_chromium_preferences() {
                "default_search_provider_data":{"template_url_data":{"short_name":"DuckDuckGo","url":"https://duckduckgo.com/?q={searchTerms}"}},
                "profile":{"content_settings":{"exceptions":{
                  "media_stream_camera":{"https://meet.example:443,*":{"setting":1},"[*.]wild.example,*":{"setting":1}},
-                 "media_stream_mic":{"https://meet.example:443,*":{"setting":2}}}}}}"#,
+                 "media_stream_mic":{"https://meet.example:443,*":{"setting":2}},
+                 "geolocation":{"https://maps.example:443,*":{"setting":1}}}}}}"#,
         )
         .unwrap();
     let settings = read(Family::Chromium, dir.path());
@@ -29,6 +30,11 @@ fn reads_chromium_preferences() {
                 origin: "https://meet.example".into(),
                 kind: "microphone",
                 allow: false
+            },
+            SitePermission {
+                origin: "https://maps.example".into(),
+                kind: "location",
+                allow: true
             },
         ]
     );

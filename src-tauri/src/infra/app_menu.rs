@@ -1,5 +1,5 @@
 #[cfg(target_os = "macos")]
-use super::space_windows;
+use super::profile_windows;
 #[cfg(target_os = "macos")]
 use tauri::{
     menu::{AboutMetadata, CheckMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu},
@@ -14,10 +14,10 @@ use items::command_item;
 
 pub const SHORTCUT_MENU_PREFIX: &str = "shortcut.";
 pub const SHORTCUT_MENU_EVENT: &str = "misty://shortcut-command";
-/// Menu items that open a Space's window: `space.open.<key>`.
-const SPACE_MENU_PREFIX: &str = "space.open.";
+/// Menu items that open a profile's window: `profile.open.<id>`.
+const PROFILE_MENU_PREFIX: &str = "profile.open.";
 
-/// The shortcuts the menu was last built with, so a change to the Spaces can rebuild it.
+/// The shortcuts the menu was last built with, so a change to the profiles can rebuild it.
 #[cfg(target_os = "macos")]
 static LAST_SNAPSHOT: std::sync::Mutex<Option<ShortcutsSnapshot>> = std::sync::Mutex::new(None);
 #[cfg(target_os = "macos")]
@@ -38,23 +38,23 @@ extern "C" fn dock_choice(key: *const std::ffi::c_char) {
         .to_string_lossy()
         .into_owned();
     if let Some(app) = DOCK_APP.get() {
-        let _ = space_windows::open_space(app, &key);
+        let _ = profile_windows::open_profile(app, &key);
     }
 }
 
-/// The Spaces, with a checkmark beside the one the window used last shows. Choosing one
-/// switches that window to it.
+/// The profiles, with a checkmark beside the one the window used last belongs to. Choosing one
+/// brings its window forward, opening one if it has none.
 #[cfg(target_os = "macos")]
-fn spaces_menu<R: Runtime>(app: &AppHandle<R>, title: &str) -> tauri::Result<Submenu<R>> {
+fn profiles_menu<R: Runtime>(app: &AppHandle<R>, title: &str) -> tauri::Result<Submenu<R>> {
     let menu = Submenu::new(app, title, true)?;
-    let shown = space_windows::focused(app)
-        .and_then(|window| space_windows::space_for_window(window.label()));
-    for space in space_windows::listed_spaces() {
-        let open = shown.as_deref() == Some(space.key.as_str());
+    let shown = profile_windows::focused(app)
+        .and_then(|window| profile_windows::profile_for_window(window.label()));
+    for profile in profile_windows::listed_profiles() {
+        let open = shown.as_deref() == Some(profile.id.as_str());
         menu.append(&CheckMenuItem::with_id(
             app,
-            format!("{SPACE_MENU_PREFIX}{}", space.key),
-            &space.name,
+            format!("{PROFILE_MENU_PREFIX}{}", profile.id),
+            &profile.name,
             true,
             open,
             None::<&str>,
@@ -65,40 +65,30 @@ fn spaces_menu<R: Runtime>(app: &AppHandle<R>, title: &str) -> tauri::Result<Sub
 
 #[cfg(target_os = "macos")]
 fn refresh_dock() {
-    let spaces: Vec<_> = space_windows::listed_spaces()
+    let profiles: Vec<_> = profile_windows::listed_profiles()
         .into_iter()
-        .map(|space| {
+        .map(|profile| {
             serde_json::json!({
-                "key": space.key,
-                "name": space.name,
-                "open": space_windows::space_is_open(&space.key),
+                "key": profile.id,
+                "name": profile.name,
+                "open": profile_windows::profile_is_open(&profile.id),
             })
         })
         .collect();
-    if let Ok(json) = std::ffi::CString::new(serde_json::Value::from(spaces).to_string()) {
+    if let Ok(json) = std::ffi::CString::new(serde_json::Value::from(profiles).to_string()) {
         unsafe { misty_space_dock_set(json.as_ptr()) };
     }
 }
 
-/// Rebuilds the Window menu's Spaces and the Dock menu after Spaces open, close or
+/// Rebuilds the Window menu's profiles and the Dock menu after profiles open, close or
 /// change name.
 #[cfg(target_os = "macos")]
-pub fn refresh_spaces<R: Runtime>(app: &AppHandle<R>) {
+pub fn refresh_profiles<R: Runtime>(app: &AppHandle<R>) {
     let snapshot = LAST_SNAPSHOT.lock().ok().and_then(|last| last.clone());
     if let Ok(menu) = build_menu(app, snapshot.as_ref()) {
         let _ = app.set_menu(menu);
     }
     refresh_dock();
-}
-
-/// Shows the Spaces menu at the pointer in `window` (⌘⇧N).
-#[cfg(target_os = "macos")]
-pub fn popup_spaces<R: Runtime>(
-    app: &AppHandle<R>,
-    window: &tauri::Window<R>,
-) -> Result<(), String> {
-    let menu = spaces_menu(app, "Spaces").map_err(|error| error.to_string())?;
-    window.popup_menu(&menu).map_err(|error| error.to_string())
 }
 
 /// Installs the native macOS menu. AppKit handles these accelerators before a
@@ -216,9 +206,44 @@ fn build_menu<R: Runtime>(
                 "Cmd+R",
             )?,
             &PredefinedMenuItem::separator(manager)?,
-            &command_item(manager, snapshot, "app.zoom_in", "Zoom In", "Cmd+Plus")?,
-            &command_item(manager, snapshot, "app.zoom_out", "Zoom Out", "Cmd+Minus")?,
-            &command_item(manager, snapshot, "app.zoom_reset", "Actual Size", "Cmd+0")?,
+            // Zooming acts on the page; the app's own scale is the same keys with Shift.
+            &command_item(manager, snapshot, "browser.zoom_in", "Zoom In", "Cmd+Plus")?,
+            &command_item(
+                manager,
+                snapshot,
+                "browser.zoom_out",
+                "Zoom Out",
+                "Cmd+Minus",
+            )?,
+            &command_item(
+                manager,
+                snapshot,
+                "browser.zoom_reset",
+                "Actual Size",
+                "Cmd+0",
+            )?,
+            &PredefinedMenuItem::separator(manager)?,
+            &command_item(
+                manager,
+                snapshot,
+                "app.zoom_in",
+                "Scale App Up",
+                "Cmd+Shift+Plus",
+            )?,
+            &command_item(
+                manager,
+                snapshot,
+                "app.zoom_out",
+                "Scale App Down",
+                "Cmd+Shift+Minus",
+            )?,
+            &command_item(
+                manager,
+                snapshot,
+                "app.zoom_reset",
+                "Reset App Scale",
+                "Cmd+Shift+0",
+            )?,
         ],
     )?;
     let window = Submenu::with_items(
@@ -226,15 +251,15 @@ fn build_menu<R: Runtime>(
         "Window",
         true,
         &[
-            &spaces_menu(manager, "Spaces")?,
+            &profiles_menu(manager, "Profiles")?,
             &command_item(
                 manager,
                 snapshot,
-                "workspace.open_space",
-                "Open Space…",
-                "Cmd+Shift+N",
+                "workspace.new_window",
+                "New Window",
+                "Cmd+N",
             )?,
-            &plain_command_item(manager, "workspace.new_space", "New Space…")?,
+            &plain_command_item(manager, "workspace.new_profile", "Add Profile…")?,
             &command_item(
                 manager,
                 snapshot,
@@ -292,16 +317,22 @@ fn build_menu<R: Runtime>(
 /// Forwards native menu choices to the central renderer dispatcher.
 #[cfg(target_os = "macos")]
 pub fn handle_menu_event(app: &AppHandle, id: &str) -> bool {
-    if let Some(key) = id.strip_prefix(SPACE_MENU_PREFIX) {
-        let _ = space_windows::switch_focused(app, key);
+    if let Some(key) = id.strip_prefix(PROFILE_MENU_PREFIX) {
+        let _ = profile_windows::open_profile(app, key);
         // A check item toggles itself when chosen; the rebuilt menu shows what is open.
-        refresh_spaces(app);
+        refresh_profiles(app);
         return true;
     }
     let Some(command_id) = id.strip_prefix(SHORTCUT_MENU_PREFIX) else {
         return false;
     };
+    // With every window closed there's nothing to act in, so the choice brings them back, as the
+    // Dock icon does.
+    if profile_windows::primary(app).is_none() {
+        let _ = profile_windows::restore(app);
+        return true;
+    }
     // A menu choice acts in the window the person used last, incognito included.
-    space_windows::emit_to_focused(app, SHORTCUT_MENU_EVENT, command_id);
+    profile_windows::emit_to_focused(app, SHORTCUT_MENU_EVENT, command_id);
     true
 }

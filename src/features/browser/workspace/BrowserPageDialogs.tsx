@@ -10,7 +10,6 @@ import type { useBrowserPageCommands } from "./useBrowserPageCommands";
 export function BrowserPageDialogs(props: {
   tab: WorkspaceView;
   url: string;
-  profileId?: string;
   page: ReturnType<typeof useBrowserPageCommands>;
 }) {
   const runtimeId = browserRuntimeId(props.tab);
@@ -34,7 +33,6 @@ export function BrowserPageDialogs(props: {
       <BrowserClearDataDialog
         request={props.page.clearDataRequest}
         tabId={props.tab.id}
-        profileId={props.profileId}
         suspensionReason={`browser-clear-data:${runtimeId}`}
       />
     </>

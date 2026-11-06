@@ -3,9 +3,9 @@ import {
   Button,
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogTitle,
+  ErrorNotification,
   Field,
   Input,
   Select,
@@ -52,9 +52,8 @@ export function BookmarkEditor(props: {
         if (!open) props.onClose();
       }}
     >
-      <DialogContent className="sm:max-w-sm">
+      <DialogContent aria-describedby={undefined} className="sm:max-w-sm">
         <DialogTitle>{props.bookmark ? "Edit bookmark" : "Add bookmark"}</DialogTitle>
-        <DialogDescription>Keep a link in your bookmark library.</DialogDescription>
         <form
           className="grid gap-4"
           onSubmit={(e) => {
@@ -112,11 +111,7 @@ export function BookmarkEditor(props: {
               />
             </Field>
           )}
-          {error && (
-            <p role="alert" className="text-sm text-destructive">
-              {error}
-            </p>
-          )}
+          <ErrorNotification message={error} onDismiss={() => setError("")} />
           <DialogFooter>
             {props.bookmark && (
               <Button

@@ -75,7 +75,7 @@ fn report(stage: &str, result: &Result<(), String>) {
 pub(crate) async fn run(app: AppHandle) -> bool {
     let mut passed = true;
     let setup = async {
-        wait_for("main window", || crate::infra::space_windows::primary_webview(&app).is_some()).await?;
+        wait_for("main window", || crate::infra::profile_windows::primary_webview(&app).is_some()).await?;
         tokio::time::sleep(Duration::from_secs(3)).await;
         let url = serve()?;
         use sha2::{Digest, Sha256};
@@ -85,7 +85,7 @@ pub(crate) async fn run(app: AppHandle) -> bool {
             "x": 0, "y": 60, "width": 800, "height": 550,
         }))
         .map_err(|error| error.to_string())?;
-        let main = crate::infra::space_windows::primary_webview(&app).ok_or("Missing main view")?;
+        let main = crate::infra::profile_windows::primary_webview(&app).ok_or("Missing main view")?;
         browser_webview_create(main, app.clone(), app.state::<BrowserSessionState>(), request).await?;
         // A cold dev launch can take a while to settle the shell and the tab.
         let mut last = String::new();

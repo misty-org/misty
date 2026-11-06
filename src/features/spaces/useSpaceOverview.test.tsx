@@ -34,7 +34,7 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
-it("uses versioned operations and preserves conversation participants when renaming", async () => {
+it("uses versioned operations and renames a chat by its name alone", async () => {
   const file = { id: "f", display_name: "File", version: 3, favorite: false };
   const conversation = {
     id: "c",
@@ -66,10 +66,7 @@ it("uses versioned operations and preserves conversation participants when renam
   expect(api.updateLibraryItem).not.toHaveBeenCalledWith("personal", file, { favorite: true });
   expect(api.trashLibraryItem).toHaveBeenCalledWith("personal", "f");
   await byKind("chat").rename!("Chat");
-  expect(api.updateConversation).toHaveBeenCalledWith("personal", "c", "Chat", [
-    { kind: "person", user_id: "owner" },
-    { kind: "person", user_id: "sam" },
-  ]);
+  expect(api.updateConversation).toHaveBeenCalledWith("personal", "c", "Chat");
 });
 
 it("lets every member manage files but keeps note, drawing and chat roles", async () => {

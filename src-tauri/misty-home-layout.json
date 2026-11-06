@@ -1,10 +1,9 @@
 {
-  "layoutVersion": 5,
+  "layoutVersion": 6,
   "directories": [
     ".local/data",
     "profiles",
-    "cache",
-    "tmp"
+    "cache"
   ],
   "privateFiles": [],
   "retired": [
@@ -15,23 +14,17 @@
     ".keys",
     ".local/bin",
     ".local/bin/misty-proxy",
+    ".local/data/browser-sync",
     ".profiles",
     ".release",
     ".template",
     ".version",
     "assets",
     "cloud",
-    "config/automations",
-    "config/file_sidebar.json",
-    "config/imgui.ini",
-    "config/misty.json",
-    "config/open-with-approved.json",
-    "config/saved-searches.json",
-    "config/sessions",
-    "config/settings.before-profiles.json",
-    "config/workspaces.json",
-    "db/misty.db",
+    "config",
+    "db",
     "forms",
+    "home.json",
     "local",
     "logs",
     "mnt",
@@ -42,6 +35,7 @@
     "restic",
     "scripts",
     "session.json",
+    "tmp",
     "workflows"
   ]
 }

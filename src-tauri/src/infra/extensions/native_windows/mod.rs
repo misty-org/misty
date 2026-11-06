@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
-//! Extensions on Windows run in WebView2, which is Chromium. Each Space has its
-//! own host, as on macOS: Misty installs each extension a Space loads into the
-//! profile behind every open browser view of that Space (the Space's own data
+//! Extensions on Windows run in WebView2, which is Chromium. Each Misty profile has its
+//! own host, as on macOS: Misty installs each extension a Misty profile loads into the
+//! profile behind every open browser view of that Misty profile (the Misty profile's own data
 //! folder), and reconciles a profile when one of its views opens, so a profile
-//! runs exactly the extensions loaded for its Space.
+//! runs exactly the extensions loaded for its Misty profile.
 //!
 //! Each version runs from its own copy of the package, holding only the
 //! granted permissions and sites, since WebView2 grants whatever a manifest
@@ -67,7 +67,7 @@ struct Loaded {
 
 #[derive(Default)]
 struct Host {
-    /// The Space's key; its views are the only ones this host touches.
+    /// The Misty profile's key; its views are the only ones this host touches.
     space: String,
     account: String,
     loaded: HashMap<String, Loaded>,
@@ -100,10 +100,10 @@ fn base(app: &tauri::AppHandle) -> Result<PathBuf, String> {
         .join("webview2"))
 }
 
-/// A Space's staged copies of an extension. The personal Space keeps the
-/// account's folder from before Spaces.
+/// A Misty profile's staged copies of an extension. The personal Misty profile keeps the
+/// account's folder from before Misty profiles.
 fn extension_root(host: &Host, id: &str) -> Result<PathBuf, String> {
-    let name = if host.space == crate::infra::space_windows::PERSONAL {
+    let name = if host.space == crate::infra::profile_windows::PERSONAL {
         format!("{}:{id}", host.account)
     } else {
         format!("{}:{}:{id}", host.account, host.space)
@@ -111,9 +111,9 @@ fn extension_root(host: &Host, id: &str) -> Result<PathBuf, String> {
     Ok(base(app()?)?.join(short(&name)))
 }
 
-/// A removal waits per Space: the same extension may still run in another Space.
+/// A removal waits per Misty profile: the same extension may still run in another Misty profile.
 fn removal(space: &str, crx: &str) -> String {
-    if space == crate::infra::space_windows::PERSONAL {
+    if space == crate::infra::profile_windows::PERSONAL {
         crx.to_owned()
     } else {
         format!("{space}:{crx}")
@@ -165,7 +165,12 @@ fn emit(host: &Host, kind: &str, mut data: Value) {
     data["account"] = json!(host.account);
     data["space"] = json!(host.space);
     if let Ok(app) = app() {
-        crate::infra::space_windows::emit_to_space(app, &host.space, "misty://extensions", data);
+        crate::infra::profile_windows::emit_to_profile(
+            app,
+            &host.space,
+            "misty://extensions",
+            data,
+        );
     }
 }
 
@@ -178,7 +183,7 @@ pub async fn request(value: Value) -> Result<Value, String> {
     }
     let mut hosts = hosts().lock().await;
     if operation == "configure" && account.is_empty() {
-        // Signing out stops every Space's host.
+        // Signing out stops every Misty profile's host.
         for host in hosts.values_mut() {
             unload_all(host).await;
         }
@@ -186,10 +191,10 @@ pub async fn request(value: Value) -> Result<Value, String> {
         return Ok(json!({"supported": true}));
     }
     if space.is_empty() {
-        return Err("Extensions run in a Space.".into());
+        return Err("Extensions run in a profile.".into());
     }
     if operation == "release-space" || operation == "remove-space" {
-        // The Space's views are gone; a removed Space's profile folder, with its
+        // The Misty profile's views are gone; a removed Misty profile's profile folder, with its
         // extensions' storage, goes with its website data.
         hosts.remove(space);
         return Ok(json!({}));
@@ -249,16 +254,16 @@ pub async fn request(value: Value) -> Result<Value, String> {
     }
 }
 
-/// The Space a browser view belongs to, from the window that holds it.
-fn view_space(view: &Webview) -> Option<String> {
-    crate::infra::space_windows::space_for_owner(view.window().label())
+/// The Misty profile a browser view belongs to, from the window that holds it.
+fn view_profile(view: &Webview) -> Option<String> {
+    crate::infra::profile_windows::profile_for_owner(view.window().label())
 }
 
-/// Reconciles the profile behind a newly opened browser view, for its Space.
+/// Reconciles the profile behind a newly opened browser view, for its Misty profile.
 pub fn register(view: &Webview) {
     let view = view.clone();
     tauri::async_runtime::spawn(async move {
-        let Some(space) = view_space(&view) else {
+        let Some(space) = view_profile(&view) else {
             return;
         };
         let mut hosts = hosts().lock().await;

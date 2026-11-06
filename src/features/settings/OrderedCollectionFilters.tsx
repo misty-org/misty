@@ -1,9 +1,9 @@
 import { useState, type ComponentProps } from "react";
-import { CollectionFilters } from "@/shared/ui";
+import { CollectionFilters, ErrorNotification } from "@/shared/ui";
 import { useDevicePreferences } from "./devicePreferences/store";
 import { resolveSetting } from "./devicePreferences/model";
 
-export type CollectionTabs = "space" | "journal" | "library";
+type CollectionTabs = "space" | "journal" | "library";
 
 /** Append new tabs, ignore unavailable ones, and never duplicate a saved tab. */
 export function orderedTabs<T extends { value: string }>(options: T[], raw: string): T[] {
@@ -62,11 +62,7 @@ export function OrderedCollectionFilters({
             : undefined
         }
       />
-      {failure && (
-        <p role="alert" className="text-sm text-cream-muted">
-          {failure}
-        </p>
-      )}
+      <ErrorNotification message={failure} onDismiss={() => setFailure(undefined)} />
     </>
   );
 }

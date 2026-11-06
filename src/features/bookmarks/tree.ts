@@ -1,4 +1,4 @@
-import type { SharedRecord } from "@/features/browser-sync/model";
+import type { SharedRecord } from "@/features/workspace/profileRecordModel";
 
 /** The roots every major browser has. Other bookmarks keeps the ID and stored
  * label ("Bookmarks") of the former single default folder. */

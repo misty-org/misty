@@ -26,7 +26,7 @@ fn listen(app: tauri::AppHandle, chord: Chord, stop: Arc<AtomicBool>) {
     while !stop.load(Ordering::SeqCst) {
         match subscription.events.recv_timeout(Duration::from_millis(500)) {
             Ok(HotkeyEvent::Down) => {
-                let _ = crate::infra::space_windows::emit_to_primary(&app, EVENT, "agents");
+                let _ = crate::infra::profile_windows::emit_to_primary(&app, EVENT, "agents");
             }
             Ok(_) | Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {}
             Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => break,
@@ -42,7 +42,7 @@ pub fn global_hotkey_signed_out(
     app: tauri::AppHandle,
     enabled: bool,
 ) -> Result<bool, String> {
-    if !crate::infra::space_windows::is_person_window(webview.label()) {
+    if !crate::infra::profile_windows::is_person_window(webview.label()) {
         return Err("Only Misty's windows can arm hotkeys.".into());
     }
     let mut armed = ARMED.lock().map_err(|_| "Hotkeys are busy.")?;

@@ -24,7 +24,7 @@ type AppThemeTokens = {
   info: string;
   shadow: string;
 };
-export type AppThemeSnapshot = {
+type AppThemeSnapshot = {
   themeId: string;
   mode: ResolvedAppTheme;
   tokens: AppThemeTokens;

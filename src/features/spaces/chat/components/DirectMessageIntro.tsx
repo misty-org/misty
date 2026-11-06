@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { spacesApi } from "@/api/spaces/api";
 import { Avatar, AvatarFallback, AvatarImage } from "@/shared/ui";
 
-export interface DirectRecipient {
+interface DirectRecipient {
   userId: string;
   name: string;
 }

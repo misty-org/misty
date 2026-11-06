@@ -8,7 +8,7 @@ import type {
 } from "./browserRuntimeTypes";
 
 /** Per-tab browser state the UI renders: history, errors, notices, grants and previews. */
-export interface BrowserRuntimeUiState {
+interface BrowserRuntimeUiState {
   /** Local, session-only thumbnails. Never included in workspace persistence or sync. */
   previews: Record<string, PagePreview>;
   grants: Record<string, ActiveBrowserAgentGrant[]>;

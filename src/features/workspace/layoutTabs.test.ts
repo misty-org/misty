@@ -128,13 +128,9 @@ describe("window → tabs → panes", () => {
     state().renameTab(id, "Research");
     browser("https://two.example");
     const persisted = JSON.parse(JSON.stringify(partialWorkspaceStore(state())));
-    const saved = JSON.parse(JSON.stringify(state().createSnapshot("account", "device")));
     const expectedIds = allLayoutViews(state().layout).map((view) => view.id);
     state().reset();
     useWorkspaceStore.setState(migrateWorkspaceStore(persisted, 11));
-    expect(allLayoutViews(state().layout).map((view) => view.id)).toEqual(expectedIds);
-    state().reset();
-    state().replaceSnapshot(saved);
     expect(allLayoutViews(state().layout).map((view) => view.id)).toEqual(expectedIds);
     state().selectTab(id);
     expect(dockLeaves(state().layout.root)).toHaveLength(2);

@@ -6,7 +6,7 @@ import { NotePreview } from "./components/NotePreview";
 import { NoteReadingPane } from "./components/NoteReadingPane";
 import { SpaceNotesView, type NotesViewRuntime, type SpaceNotesProps } from "./SpaceNotesView";
 import { useNotesStore } from "./store/useNotesStore";
-export type { SpaceNotesProps } from "./SpaceNotesView";
+;
 const emptyMembers: never[] = [];
 export function SpaceNotes(props: SpaceNotesProps) {
   const { user } = useAuth();

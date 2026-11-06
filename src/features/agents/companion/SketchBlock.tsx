@@ -3,7 +3,8 @@ import { PenLine } from "lucide-react";
 import { drawingsApi } from "@/api/drawings/api";
 import { Button, Skeleton } from "@/shared/ui";
 import { useWorkspaceStore, workspaceSurfaceFromRoute } from "@/features/workspace";
-import { useSpaceWindowStore } from "@/features/workspace/spaceWindow";
+import { windowSpace } from "@/features/spaces/defaultSpace";
+import { useSpacesStore } from "@/features/spaces/core";
 import { parseSketch, sketchSkeleton } from "./companionSketch";
 import { renderSketch } from "./sketchRender";
 import "./sketchBlock.css";
@@ -46,7 +47,7 @@ export function SketchBlock({ source }: { source: string }) {
   if (!sketch) return null;
 
   const save = async () => {
-    const spaceId = useSpaceWindowStore.getState().space?.spaceId;
+    const spaceId = windowSpace(useSpacesStore.getState().spaces)?.id;
     if (!spaceId) {
       setNotice("Open a Space in this window to save drawings there.");
       return;

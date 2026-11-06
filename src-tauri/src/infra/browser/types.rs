@@ -35,6 +35,9 @@ pub struct BrowserWebviewCreateRequest {
     /// The agent run this tab works for, for an agent's own tab.
     #[serde(default)]
     pub agent_run_id: Option<String>,
+    /// From another computer, with nobody here looking at it: it plays nothing until released.
+    #[serde(default)]
+    pub hold_media: bool,
 }
 
 #[derive(Debug, Deserialize)]

@@ -3,7 +3,7 @@ import { deviceModelCall } from "@/api/device-models";
 import { agentsDeviceSnapshot, ensureServerAgentDevice } from "@/features/agents";
 import type { LiveChannel } from "./liveTranscriber";
 
-export interface LiveTicket {
+interface LiveTicket {
   ticket: string;
   /** The relay's WebSocket address. */
   url: string;
@@ -33,7 +33,7 @@ export function voiceDeviceId(): Promise<string> {
   device ??= (async () => {
     const snapshot = await agentsDeviceSnapshot();
     if (!snapshot.device || snapshot.device.status === "revoked")
-      throw new Error("Add this device to your account to use voice.");
+      throw new Error("Sign in on this computer to use voice.");
     return (await ensureServerAgentDevice(snapshot.device)).id;
   })().catch((error) => {
     device = undefined;

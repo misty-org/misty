@@ -4,12 +4,12 @@ import type { GlobalAiMessage } from "@/features/misty/types";
 import { useMistyStore } from "@/features/misty/useMistyStore";
 import { useEffect, useState } from "react";
 
-/**
- * Keeps a fetched timeline with its reply, so the chat saved on this device has it after
- * the server lets the run go (docs/agents/chats-local.md).
- */
-function keepProgress(invocationId: string, items: AiProgressItem[]) {
-  if (!items.length) return;
+type StoredHistory = Awaited<ReturnType<typeof aiSurfaceApi.invocationProgress>>;
+
+/** Keeps a fetched timeline with its reply, with the reply's sources, notebook and sub-agents. */
+function keepProgress(invocationId: string, stored: StoredHistory) {
+  const items = stored.items ?? [];
+  if (!items.length && !stored.citations?.length && !stored.notebook && !stored.subagents) return;
   const owns = (message: GlobalAiMessage) =>
     message.role === "assistant" && message.invocationId === invocationId && !message.progress;
   useMistyStore.setState((state) => ({
@@ -18,7 +18,16 @@ function keepProgress(invocationId: string, items: AiProgressItem[]) {
         ? {
             ...conversation,
             messages: conversation.messages.map((message) =>
-              owns(message) ? { ...message, progress: items } : message,
+              owns(message)
+                ? {
+                    ...message,
+                    progress: items,
+                    citations:
+                      message.citations ?? (stored.citations as GlobalAiMessage["citations"]),
+                    notebook: message.notebook ?? stored.notebook,
+                    subagents: message.subagents ?? stored.subagents,
+                  }
+                : message,
             ),
           }
         : conversation,
@@ -27,7 +36,7 @@ function keepProgress(invocationId: string, items: AiProgressItem[]) {
 }
 
 /** Finished replies never change, so each is fetched once per session. */
-const finished = new Map<string, Promise<AiProgressItem[]>>();
+const finished = new Map<string, Promise<StoredHistory>>();
 
 function settled(message: GlobalAiMessage) {
   return (
@@ -49,19 +58,16 @@ export function useMessageProgress(message: GlobalAiMessage): AiProgressItem[] |
     let current = true;
     let request = finished.get(invocationId);
     if (!request) {
-      request = aiSurfaceApi.invocationProgress(invocationId).then(
-        (response) => response.items ?? [],
-        () => {
-          // Leave the reply without a timeline, and try again next time it shows.
-          finished.delete(invocationId);
-          return [];
-        },
-      );
+      request = aiSurfaceApi.invocationProgress(invocationId).catch(() => {
+        // Leave the reply without a timeline, and try again next time it shows.
+        finished.delete(invocationId);
+        return { items: [] };
+      });
       finished.set(invocationId, request);
     }
-    void request.then((items) => {
-      if (current) setLoaded({ id: invocationId, items });
-      keepProgress(invocationId, items);
+    void request.then((stored) => {
+      if (current) setLoaded({ id: invocationId, items: stored.items ?? [] });
+      keepProgress(invocationId, stored);
     });
     return () => {
       current = false;

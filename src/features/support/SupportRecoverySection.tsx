@@ -1,6 +1,6 @@
 import { clientMetadata } from "./clientMetadata";
 import { openSystemExternalLink } from "@/shared/platform/openExternalLink";
-import { Button } from "@/shared/ui";
+import { Button, ErrorNotification } from "@/shared/ui";
 import {
   AlertTriangle,
   Compass,
@@ -11,7 +11,7 @@ import {
   RotateCcw,
   ShieldCheck,
 } from "lucide-react";
-import { useSetupStore } from "@/features/setup";
+import { openSignInSheet } from "@/features/auth/serverSetup";
 import { useState } from "react";
 import { buildPublicFeedbackIssueUrl, type FeedbackDraft } from "./feedbackIssue";
 import { downloadSupportBundle } from "./supportBundle";
@@ -36,6 +36,7 @@ const initialDraft: FeedbackDraft = {
 export function SupportRecoverySection({ onClose }: { onClose?: () => void } = {}) {
   const [draft, setDraft] = useState(initialDraft);
   const [notice, setNotice] = useState("");
+  const [failure, setFailure] = useState("");
   const [working, setWorking] = useState<"bundle" | "feedback" | "">("");
   const [resetArmed, setResetArmed] = useState(false);
   const [reloadArmed, setReloadArmed] = useState(false);
@@ -43,7 +44,7 @@ export function SupportRecoverySection({ onClose }: { onClose?: () => void } = {
   const reopenSetup = () => {
     onClose?.();
     window.dispatchEvent(new CustomEvent("misty:close-settings"));
-    useSetupStore.getState().reopenSetup();
+    openSignInSheet("device");
   };
 
   const updateDraft = <Key extends keyof FeedbackDraft>(key: Key, value: FeedbackDraft[Key]) =>
@@ -53,6 +54,7 @@ export function SupportRecoverySection({ onClose }: { onClose?: () => void } = {
     if (!draft.summary.trim() || !draft.details.trim() || working) return;
     setWorking("feedback");
     setNotice("");
+    setFailure("");
     try {
       const metadata = await clientMetadata();
       await openSystemExternalLink(
@@ -64,7 +66,7 @@ export function SupportRecoverySection({ onClose }: { onClose?: () => void } = {
       );
       setNotice("Your draft opened in GitHub. Review it there before publishing the ticket.");
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : "Misty couldn’t open the feedback page.");
+      setFailure(error instanceof Error ? error.message : "Misty couldn’t open the feedback page.");
     } finally {
       setWorking("");
     }
@@ -74,11 +76,12 @@ export function SupportRecoverySection({ onClose }: { onClose?: () => void } = {
     if (working) return;
     setWorking("bundle");
     setNotice("");
+    setFailure("");
     try {
       await downloadSupportBundle();
       setNotice("Diagnostic bundle saved. Review the JSON file before attaching it publicly.");
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : "Misty couldn’t create the bundle.");
+      setFailure(error instanceof Error ? error.message : "Misty couldn’t create the bundle.");
     } finally {
       setWorking("");
     }
@@ -130,7 +133,7 @@ export function SupportRecoverySection({ onClose }: { onClose?: () => void } = {
           <RecoveryAction
             icon={Compass}
             title="Run setup again"
-            detail="Opens the first-run setup from the beginning. Your current choices stay selected."
+            detail="Import from another browser, add extensions and choose where tabs sit. Your current choices stay selected."
             action="Open setup"
             onClick={reopenSetup}
           />
@@ -219,6 +222,7 @@ export function SupportRecoverySection({ onClose }: { onClose?: () => void } = {
           {notice}
         </p>
       ) : null}
+      <ErrorNotification message={failure} onDismiss={() => setFailure("")} />
     </>
   );
 }

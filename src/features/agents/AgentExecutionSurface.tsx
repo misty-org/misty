@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { usePersonalAgentsStore } from "./personalAgentsStore";
 import { continueQueuedLocalWork, pauseLocalExecution, useLocalExecution } from "./localExecution";
-import { Button, ViewportLayer } from "@/shared/ui";
+import { Button, ErrorNotification, ViewportLayer } from "@/shared/ui";
 import { AgentControlIsland } from "./AgentControlIsland";
 
 import { TaskArtifacts } from "./TaskArtifactList";
@@ -113,12 +113,9 @@ export function AgentExecutionSurface() {
             </nav>
           </div>
         </div>
-        {error && (
-          <div role="alert" className="flex items-center gap-3 px-4 pb-3 text-sm text-cream-muted">
-            <p className="m-0">{error}</p>
-            {needsModelKey(error) && <ModelKeyNeededButton />}
-          </div>
-        )}
+        <ErrorNotification message={error} onDismiss={() => setError("")}>
+          {needsModelKey(error) && <ModelKeyNeededButton />}
+        </ErrorNotification>
       </ViewportLayer>
       <AgentControlIsland />
     </>

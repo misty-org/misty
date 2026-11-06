@@ -39,7 +39,7 @@ export function PickerPlaces(props: PickerPlacesProps) {
       </PlacesSection>
 
       {props.devices.length > 0 ? (
-        <PlacesSection label="Devices">
+        <PlacesSection label="Computers">
           {props.devices.map((device) => (
             <PlaceRow
               key={device.id}
@@ -94,7 +94,7 @@ function pathIsInside(path: string, root: string): boolean {
   return path.startsWith(`${normalizedRoot}/`);
 }
 
-export interface PickerPlacesProps {
+interface PickerPlacesProps {
   homePath: string;
   activePath: string;
   devices: MountedDevice[];

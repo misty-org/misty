@@ -2,7 +2,7 @@
  * Splits composer text into plain and `@Name` segments, matched against the
  * Space's actual roster so only real mentions light up (not just any `@`).
  */
-export interface MentionSegment {
+interface MentionSegment {
   text: string;
   mention: boolean;
 }

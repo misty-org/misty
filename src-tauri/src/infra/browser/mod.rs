@@ -123,6 +123,8 @@ mod title_probe;
 use title_probe::*;
 mod view_close;
 pub use view_close::*;
+mod renderer_reload;
+pub use renderer_reload::close_pages_on_renderer_load;
 mod account_views;
 pub(crate) use account_views::*;
 mod agent_tab_close;
@@ -218,10 +220,10 @@ fn watch_page_focus(webview: &Webview, id: &str) {
     });
 }
 
-pub(super) fn browser_owner_label(app: &AppHandle, id: &str) -> String {
+pub(in crate::infra) fn browser_owner_label(app: &AppHandle, id: &str) -> String {
     app.get_webview(&format!("misty-browser-{id}"))
         .map(|view| view.window().label().to_owned())
-        .or_else(|| crate::infra::space_windows::primary_label(app))
+        .or_else(|| crate::infra::profile_windows::primary_label(app))
         .unwrap_or_default()
 }
 
@@ -265,7 +267,10 @@ fn external_url(raw: &str) -> Result<Url, String> {
 }
 
 mod bounds;
+mod fullscreen;
+mod paste;
 use bounds::{logical_bounds, set_webview_bounds_if_changed};
+pub(crate) use paste::paste_into_page;
 
 fn apply_browser_pointer_tracking(webview: &Webview, enabled: bool) -> Result<(), String> {
     webview

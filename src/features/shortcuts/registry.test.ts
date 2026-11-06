@@ -28,18 +28,21 @@ describe("shortcut platform defaults", () => {
     });
   });
 
-  it("accepts Control as an alternate app zoom modifier on macOS", () => {
+  it("zooms the page with Cmd +, - and 0 and scales the app with Shift added", () => {
+    expect(shortcutCommandsById.get("browser.zoom_in")?.defaults.macos.primary).toBe("Cmd+Plus");
+    expect(shortcutCommandsById.get("browser.zoom_out")?.defaults.macos.primary).toBe("Cmd+Minus");
+    expect(shortcutCommandsById.get("browser.zoom_reset")?.defaults.macos.primary).toBe("Cmd+0");
     expect(shortcutCommandsById.get("app.zoom_in")?.defaults.macos).toEqual({
-      primary: "Cmd+Plus",
-      alternate: "Ctrl+Plus",
+      primary: "Cmd+Shift+Plus",
+      alternate: "Ctrl+Shift+Plus",
     });
     expect(shortcutCommandsById.get("app.zoom_out")?.defaults.macos).toEqual({
-      primary: "Cmd+Minus",
-      alternate: "Ctrl+Minus",
+      primary: "Cmd+Shift+Minus",
+      alternate: "Ctrl+Shift+Minus",
     });
     expect(shortcutCommandsById.get("app.zoom_reset")?.defaults.macos).toEqual({
-      primary: "Cmd+0",
-      alternate: "Ctrl+0",
+      primary: "Cmd+Shift+0",
+      alternate: "Ctrl+Shift+0",
     });
   });
 
@@ -52,8 +55,8 @@ describe("shortcut platform defaults", () => {
     );
   });
 
-  it("opens Spaces and incognito windows like Chrome opens profiles", () => {
-    expect(shortcutCommandsById.get("workspace.open_space")?.defaults.macos.primary).toBe(
+  it("opens new and incognito windows as Chrome does", () => {
+    expect(shortcutCommandsById.get("workspace.new_window")?.defaults.macos.primary).toBe(
       "Cmd+Shift+N",
     );
     expect(shortcutCommandsById.get("workspace.new_incognito_window")?.defaults.macos.primary).toBe(

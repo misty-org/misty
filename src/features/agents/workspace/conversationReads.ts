@@ -1,3 +1,4 @@
+import { globalMistyApi } from "@/features/misty/globalMistyApi";
 import { useMistyStore } from "@/features/misty/useMistyStore";
 
 const time = (value?: string) => (value ? Date.parse(value) || 0 : 0);
@@ -14,10 +15,10 @@ const setReadAt = (conversationId: string, lastReadAt: string) =>
   }));
 
 /**
- * Marks a conversation read on this device. Chats live on the device that keeps them
- * (docs/agents/chats-local.md), so read state does too: the dot clears at
- * once and is saved with the chat.
+ * Marks a conversation read. The dot clears at once, and the server remembers it for the
+ * person's other signed-in sessions.
  */
 export function markConversationRead(conversationId: string) {
   setReadAt(conversationId, new Date().toISOString());
+  void globalMistyApi.markConversationRead(conversationId).catch(() => undefined);
 }

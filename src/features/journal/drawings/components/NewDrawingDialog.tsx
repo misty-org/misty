@@ -5,12 +5,13 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  ErrorNotification,
   Input,
   Label,
 } from "@/shared/ui";
 import { useEffect, useState } from "react";
 
-export interface NewDrawingDialogProps {
+interface NewDrawingDialogProps {
   reportError?: (input: { title: string; error: unknown; scope: string }) => void;
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -75,11 +76,14 @@ export function NewDrawingDialog({
             }}
           />
         </div>
-        {failed ? (
-          <p role="alert" className="text-sm text-cream-muted">
-            Drawing could not be created. Your title is saved here; try Create drawing again.
-          </p>
-        ) : null}
+        <ErrorNotification
+          message={
+            failed
+              ? "Drawing could not be created. Your title is saved here; try Create drawing again."
+              : ""
+          }
+          onDismiss={() => setFailed(false)}
+        />
         <DialogFooter>
           <Button type="button" variant="ghost" size="sm" onClick={() => onOpenChange(false)}>
             Cancel

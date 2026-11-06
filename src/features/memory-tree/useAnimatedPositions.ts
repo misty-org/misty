@@ -1,6 +1,8 @@
-import { animate } from "motion";
 import { useEffect, useRef, useState } from "react";
 import { type Point } from "./layout";
+
+const glideMs = 600;
+const easeOutQuint = (t: number) => 1 - (1 - t) ** 5;
 
 const reducedMotion = () =>
   typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
@@ -38,20 +40,23 @@ export function useAnimatedPositions(
     }
     const from = new Map<string, Point>();
     for (const [id, to] of target) from.set(id, startOf(id, latest.current, parentOf, to));
-    const controls = animate(0, 1, {
-      duration: 0.6,
-      ease: [0.22, 1, 0.36, 1],
-      onUpdate: (t) => {
-        const next = new Map<string, Point>();
-        for (const [id, to] of target) {
-          const start = from.get(id) ?? to;
-          next.set(id, { x: start.x + (to.x - start.x) * t, y: start.y + (to.y - start.y) * t });
-        }
-        latest.current = next;
-        setCurrent(next);
-      },
-    });
-    return () => controls.stop();
+    let frame = 0;
+    let startedAt: number | undefined;
+    const step = (time: number) => {
+      startedAt ??= time;
+      const progress = Math.min((time - startedAt) / glideMs, 1);
+      const t = easeOutQuint(progress);
+      const next = new Map<string, Point>();
+      for (const [id, to] of target) {
+        const start = from.get(id) ?? to;
+        next.set(id, { x: start.x + (to.x - start.x) * t, y: start.y + (to.y - start.y) * t });
+      }
+      latest.current = next;
+      setCurrent(next);
+      if (progress < 1) frame = requestAnimationFrame(step);
+    };
+    frame = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(frame);
   }, [target, parentOf]);
 
   return current;

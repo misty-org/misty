@@ -61,6 +61,11 @@ describe("Google sign-in entry", () => {
     expect(success).toHaveBeenCalledOnce();
     expect(busy.mock.calls.map(([value]) => value)).toEqual([true, false]);
   });
+  it("shows Google before the server has answered", async () => {
+    mocks.available.mockReturnValue(new Promise(() => undefined));
+    await render();
+    expect(container.querySelector("button")!.textContent).toContain("Continue with Google");
+  });
   it("hides Google when the server has no credentials", async () => {
     mocks.available.mockResolvedValue({ enabled: false });
     await render();
@@ -83,11 +88,13 @@ describe("Google sign-in entry", () => {
     );
     await render();
     await act(async () => container.querySelector("button")!.click());
-    const cancel = Array.from(container.querySelectorAll("button")).find((button) =>
-      button.textContent?.includes("Cancel"),
-    )!;
-    await act(async () => cancel.click());
+    // The one button turns into Cancel, and leaving says nothing: the person chose it.
+    const buttons = container.querySelectorAll("button");
+    expect(buttons).toHaveLength(1);
+    expect(buttons[0].textContent).toContain("Cancel Google sign-in");
+    await act(async () => buttons[0].click());
     expect(success).not.toHaveBeenCalled();
-    expect(error).toHaveBeenCalledWith("Google sign-in cancelled.");
+    expect(error.mock.calls.every(([message]) => message === "")).toBe(true);
+    expect(container.querySelector("button")!.textContent).toContain("Continue with Google");
   });
 });

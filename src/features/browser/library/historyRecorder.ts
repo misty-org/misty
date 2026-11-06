@@ -1,33 +1,35 @@
 import {
   isBrowserInternalUrl,
+  isUnseenPreload,
   parseBrowserViewState,
   useWorkspaceStore,
   type WorkspaceView,
 } from "@/features/workspace";
-import { mapAllWorkspaceWindowViews } from "@/features/workspace/windows";
+import { allLayoutViews } from "@/features/workspace/layoutTabs";
 import { browserLibrary } from "./native";
-import { isIncognitoWindow } from "@/features/workspace/spaceWindow";
+import { isIncognitoWindow } from "@/features/workspace/profileWindow";
 
-/** Finds a tab in any virtual window or Space, active or not. */
+/** Finds a tab of this window, active or not. */
 function findWorkspaceView(tabId: string): WorkspaceView | null {
-  let found: WorkspaceView | null = null;
-  mapAllWorkspaceWindowViews(useWorkspaceStore.getState(), (tab) => {
-    if (!found && tab.id === tabId) found = tab;
-    return tab;
-  });
-  return found;
+  const views = allLayoutViews(useWorkspaceStore.getState().layout);
+  return views.find((tab) => tab.id === tabId) ?? null;
 }
 
 /**
  * History belongs to the person browsing: private tabs, pages an agent opens
- * for its own work, and Misty's own pages are left out.
+ * for its own work, pages loaded ahead of being opened, and Misty's own pages
+ * are left out.
  */
-function historyTarget(tabId: string): { profileId?: string } | null {
+function belongsInHistory(tabId: string): boolean {
   const tab = findWorkspaceView(tabId);
-  if (!tab) return null;
+  if (!tab) return false;
   const state = parseBrowserViewState(tab.state);
-  if (state.agentOwned || isIncognitoWindow() || isBrowserInternalUrl(state.url)) return null;
-  return { profileId: state.profileId };
+  return (
+    !state.agentOwned &&
+    !isIncognitoWindow() &&
+    !isBrowserInternalUrl(state.url) &&
+    !isUnseenPreload(tabId)
+  );
 }
 /**
  * Records a finished page load as a visit, so the address bar's recent pages and history
@@ -35,18 +37,15 @@ function historyTarget(tabId: string): { profileId?: string } | null {
  */
 export function recordBrowserVisit(tabId: string, url: string): void {
   if (!/^https?:\/\//i.test(url)) return;
-  const target = historyTarget(tabId);
-  if (!target) return;
-  const tab = findWorkspaceView(tabId);
-  const title = tab?.title ?? "";
-  void browserLibrary.recordVisit({ ...target, url, title }).catch(() => undefined);
+  if (!belongsInHistory(tabId)) return;
+  const title = findWorkspaceView(tabId)?.title ?? "";
+  void browserLibrary.recordVisit({ url, title }).catch(() => undefined);
 }
 
 export function recordBrowserVisitTitle(tabId: string, url: string, title: string): void {
   if (!/^https?:\/\//i.test(url) || !title.trim()) return;
-  const target = historyTarget(tabId);
-  if (!target) return;
-  void browserLibrary.setVisitTitle({ ...target, url, title }).catch(() => undefined);
+  if (!belongsInHistory(tabId)) return;
+  void browserLibrary.setVisitTitle({ url, title }).catch(() => undefined);
 }
 
 export function browserViewUrl(tabId: string): string | null {

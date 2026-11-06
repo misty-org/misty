@@ -1,68 +1,59 @@
-//! Development journal-collab Worker secrets.
+//! Development journal-collab Worker secrets, kept in the development crypto/journal.env.
 
 use super::*;
 
-pub fn build_image(workspace: &Workspace, tag: &str) -> Result<()> {
-    if tag.trim().is_empty() {
-        bail!("image tag cannot be empty");
-    }
-    CommandSpec::new("docker")
-        .args(["build", "--tag", tag, "."])
-        .run(&workspace.server)
-}
-
 pub fn generate_worker_secrets(workspace: &Workspace) -> Result<()> {
-    let worker = workspace.server.join("apps/journal-collab");
-    for path in [worker.join(".secrets/server.env"), worker.join(".dev.vars")] {
-        if path.exists() {
-            bail!("Worker keys already exist at {}; use misty setup server to validate or restore the bundle without rotating keys", path.display());
-        }
+    let path = journal_environment(workspace);
+    let contents = read_journal_environment(&path)?;
+    if !environment_values(&contents, TICKET_PRIVATE_KEY).is_empty() {
+        bail!("Worker keys already exist in {}; use misty setup server to validate them without rotating keys", path.display());
     }
-    let development_environment =
-        environment::root(workspace, Target::Dev).join("crypto/journal.env");
     let mut random = OsRng;
     let secrets = JournalSecrets::generate(&mut random)?;
-    ensure_room_salt(&development_environment, &mut random)?;
+    append_private(&path, &contents, &secrets.environment())?;
+    ensure_room_salt(&path, &mut random)?;
 
-    let server_env = secrets.server_environment();
-    write_private(&worker.join(".secrets/server.env"), server_env.as_bytes())?;
-    restore_development_worker_secrets(
-        &worker.join(".secrets/server.env"),
-        &worker.join(".dev.vars"),
-    )?;
-
-    println!("Wrote Cloudflare local secrets to:");
-    println!("  {}", worker.join(".dev.vars").display());
-    println!("  {}", worker.join(".secrets/server.env").display());
-    println!(
-        "Kept the server room salt in {}.",
-        development_environment.display()
-    );
+    println!("Wrote the Worker secrets to {}.", path.display());
     println!("The private signing key was not printed.");
     println!("Deploy the Worker with `misty server deploy` after Cloudflare setup.");
     Ok(())
 }
 
-pub(super) fn restore_development_worker_secrets(
-    server_path: &Path,
-    worker_path: &Path,
-) -> Result<()> {
-    let values = read_environment(server_path)?;
-    let encoded = values
-        .get(TICKET_PRIVATE_KEY)
-        .context("server ticket private key is missing")?;
-    let signing = SigningKey::from_pkcs8_der(&STANDARD.decode(encoded)?)?;
-    let secrets = JournalSecrets {
-        private: encoded.clone(),
-        public: STANDARD.encode(VerifyingKey::from(&signing).to_bytes()),
-        control: values
-            .get(CONTROL_SECRET)
-            .context("server control secret is missing")?
-            .clone(),
-        projection: values
-            .get(PROJECTION_SECRET)
-            .context("server projection secret is missing")?
-            .clone(),
+/// Generates what is missing and never replaces a key.
+pub(super) fn ensure_worker_secrets(workspace: &Workspace) -> Result<()> {
+    let path = journal_environment(workspace);
+    let contents = read_journal_environment(&path)?;
+    let Some(encoded) = environment_values(&contents, TICKET_PRIVATE_KEY)
+        .first()
+        .copied()
+    else {
+        return generate_worker_secrets(workspace);
     };
-    write_private(worker_path, secrets.worker_environment().as_bytes())
+    if environment_values(&contents, TICKET_PUBLIC_KEY).is_empty() {
+        let signing = SigningKey::from_pkcs8_der(&STANDARD.decode(encoded)?)?;
+        let public = STANDARD.encode(VerifyingKey::from(&signing).to_bytes());
+        append_private(&path, &contents, &format!("{TICKET_PUBLIC_KEY}={public}\n"))?;
+    }
+    ensure_room_salt(&path, &mut OsRng)
+}
+
+fn journal_environment(workspace: &Workspace) -> std::path::PathBuf {
+    environment::root(workspace, Target::Dev).join("crypto/journal.env")
+}
+
+fn read_journal_environment(path: &Path) -> Result<String> {
+    match fs::read_to_string(path) {
+        Ok(contents) => Ok(contents),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(String::new()),
+        Err(error) => Err(error).with_context(|| format!("could not read {}", path.display())),
+    }
+}
+
+fn append_private(path: &Path, contents: &str, addition: &str) -> Result<()> {
+    let mut updated = contents.to_owned();
+    if !updated.is_empty() && !updated.ends_with('\n') {
+        updated.push('\n');
+    }
+    updated.push_str(addition);
+    write_private(path, updated.as_bytes())
 }

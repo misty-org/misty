@@ -1,3 +1,4 @@
+import { ErrorNotification } from "@/shared/ui";
 import { useEffect, useState } from "react";
 import { aiSurfaceApi } from "@/features/ai-surface/api";
 import { DesktopSettingsRow } from "../components/DesktopSettingsUI";
@@ -41,11 +42,7 @@ export function PaymentsAskSection() {
           onChange={(value) => void change(value)}
         />
       </DesktopSettingsRow>
-      {error ? (
-        <p role="alert" className="mt-2 text-xs text-cream-muted">
-          {error}
-        </p>
-      ) : null}
+      <ErrorNotification message={error} onDismiss={() => setError("")} />
     </>
   );
 }

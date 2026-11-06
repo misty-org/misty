@@ -1,8 +1,7 @@
 import { useMemo } from "react";
 import { useWorkspaceStore } from "@/features/workspace/useWorkspaceStore";
-import { resolveDirectAddress } from "@/features/browser-sync/address";
-import type { SharedRecord } from "@/features/browser-sync/model";
-import { useBrowserSyncStore } from "@/features/browser-sync/store";
+import { resolveDirectAddress } from "@/features/browser/address";
+import type { SharedRecord } from "@/features/workspace/profileRecordModel";
 import {
   bookmarkRoots,
   bookmarkTree,
@@ -14,8 +13,8 @@ import {
 
 export * from "./tree";
 
-// Keep the encrypted v1 wire names and IDs. They now represent bookmark folders
-// and bookmarks only; live tab grouping has a separate model and lifecycle.
+// Records of the window's profile (profileRecords.ts), shown through the workspace store. Live
+// tab grouping has a separate model and lifecycle.
 export function useBookmarkLibrary() {
   const folders = useWorkspaceStore((s) => s.bookmarkFolders);
   const items = useWorkspaceStore((s) => s.bookmarks);
@@ -39,14 +38,6 @@ export function bookmarkUrl(value: string) {
   return url.href;
 }
 
-export const nestedFoldersUnavailable =
-  "Update Misty on your other devices to put folders inside folders.";
-/** Folders below a root other than Other bookmarks need every synced device
- * to understand nesting. Without sync, nothing else has to. */
-export function canNestBookmarkFolders() {
-  const sync = useBrowserSyncStore.getState().session?.sync;
-  return !sync || sync.nested_bookmarks === true;
-}
 /** The next order after a folder's existing subfolders and links. */
 function nextOrder(folderId: string) {
   return (
@@ -62,7 +53,6 @@ function nextOrder(folderId: string) {
  * bookmarks store none, which keeps them readable by older versions. */
 function placement(parentId: string): { parent_id?: string } {
   if (parentId === otherBookmarksId) return {};
-  if (!canNestBookmarkFolders()) throw new Error(nestedFoldersUnavailable);
   return { parent_id: parentId };
 }
 

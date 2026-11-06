@@ -1,7 +1,14 @@
 import { ChevronLeft, ChevronRight, Sparkles } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { memoryApi, type MemoryEvent } from "@/features/recall";
-import { Button, CollectionHeading, CollectionPage, IconButton, Skeleton } from "@/shared/ui";
+import {
+  Button,
+  CollectionHeading,
+  CollectionPage,
+  ErrorNotification,
+  IconButton,
+  Skeleton,
+} from "@/shared/ui";
 import { dayBounds, dayLabel, shiftDay, todayKey } from "./days";
 
 const kindLabel: Record<MemoryEvent["kind"], string> = {
@@ -75,11 +82,7 @@ export function JournalDay(props: { filters: ReactNode }) {
         }
       />
       {props.filters}
-      {problem && (
-        <p role="alert" className="text-sm text-cream-muted">
-          {problem}
-        </p>
-      )}
+      <ErrorNotification message={problem} onDismiss={() => setProblem("")} />
       {summarizing && (
         <div className="flex flex-col gap-2" aria-hidden>
           <Skeleton className="h-4 w-2/3" />

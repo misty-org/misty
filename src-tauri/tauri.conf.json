@@ -4,7 +4,7 @@
   "version": "0.1.0-beta.1",
   "identifier": "com.misty.desktop",
   "build": {
-    "beforeDevCommand": "npm run dev:desktop",
+    "beforeDevCommand": "node cli/tasks/run-tool.ts vite --mode desktop",
     "devUrl": "http://127.0.0.1:5173",
     "beforeBuildCommand": "npm run build:desktop",
     "frontendDist": "../dist"

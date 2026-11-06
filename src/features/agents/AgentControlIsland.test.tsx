@@ -225,7 +225,7 @@ it("mirrors itself on the desktop island and acts on its presses", async () => {
   await waitFor(() => expect(mocks.queue).toHaveBeenCalledWith("Next one"));
 });
 
-it("shows the exact desktop blocker without relying on a tooltip", () => {
+it("shows the exact desktop blocker without relying on a tooltip", async () => {
   show({ ready: true, desktopControl: true });
   render(<AgentControlIsland />);
   fireEvent(
@@ -234,5 +234,5 @@ it("shows the exact desktop blocker without relying on a tooltip", () => {
       detail: { taskId: "task", message: "Allow dev1 in Accessibility" },
     }),
   );
-  expect(screen.getByRole("alert").textContent).toBe("Allow dev1 in Accessibility");
+  expect((await screen.findByRole("alert")).textContent).toBe("Allow dev1 in Accessibility");
 });

@@ -2,7 +2,7 @@ import { useAuth } from "@/features/auth";
 import { codeProjectsApi } from "@/api/spaces/code-projects";
 import { ProjectReviewSheet, useProjectReview } from "@/features/agents";
 import { useWorkspaceViewTitle } from "@/features/workspace";
-import { openInNewBrowserTab } from "@/features/browser-sync/searchTargets";
+import { openInNewBrowserTab } from "@/features/browser-search/searchTargets";
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { confirmAction } from "@/shared/lib/confirmAction";
@@ -18,6 +18,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
   EmptyState,
+  ErrorNotification,
   IconButton,
   itemTones,
   CollectionSelectionBar,
@@ -152,11 +153,7 @@ export function SpaceCode({
           ) : null
         }
       />
-      {code.error ? (
-        <p role="alert" className="m-0 text-sm text-cream-muted">
-          {code.error}
-        </p>
-      ) : null}
+      <ErrorNotification message={code.error} />
       <CollectionSelectionBar
         count={selection.selectedIds.length}
         busy={bulkDeleting}
@@ -164,11 +161,7 @@ export function SpaceCode({
         onClear={selection.clear}
         onDelete={() => void deleteSelected()}
       />
-      {bulkError && (
-        <p role="alert" className="text-sm text-cream-muted">
-          {bulkError}
-        </p>
-      )}
+      <ErrorNotification message={bulkError} onDismiss={() => setBulkError("")} />
       {!code.projects ? (
         <CollectionSkeleton label="Projects" view="list" />
       ) : items.length ? (

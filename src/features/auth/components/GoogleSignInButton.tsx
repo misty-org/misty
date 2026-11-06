@@ -1,11 +1,17 @@
 import { accountApi } from "@/api/account/api";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { BrandIcon, Button, Input, Label } from "@/shared/ui";
+import { BrandIcon, Button, cn, ErrorNotification, Input, Label } from "@/shared/ui";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "../AuthContext";
 import { deliverGoogleSignInCode } from "../googleSignInCode";
+import {
+  closeGoogleSignInSheet,
+  mistyIsDefaultBrowser,
+  openGoogleSignInSheet,
+} from "../googleSignInSheet";
 import { accountGoogleSignIn, accountGoogleReauthenticate } from "../store/useAccountStore";
+import { authFormButtonClass } from "./authButtonClass";
 
 export default function GoogleSignInButton({
   disabled,
@@ -21,7 +27,9 @@ export default function GoogleSignInButton({
   reauthenticate?: (token: string) => Promise<void>;
 }) {
   const { authenticateAccount } = useAuth();
-  const [available, setAvailable] = useState(false);
+  // Every server has Google sign-in, so the button shows at once rather than popping in after the
+  // server answers. It only goes away if the server says it has none.
+  const [available, setAvailable] = useState(true);
   const [pending, setPending] = useState(false);
   const [awaitingCode, setAwaitingCode] = useState(false);
   const [code, setCode] = useState("");
@@ -64,7 +72,13 @@ export default function GoogleSignInButton({
     try {
       const launch = async (url: string) => {
         if (popup) popup.location.replace(url);
-        else await openUrl(url); // Google authentication requires the system browser.
+        // The person's default browser. If that is Misty, a tab would be one of our own webviews,
+        // which Google's policy rules out, so macOS's session takes it to another browser.
+        else if (
+          !(await mistyIsDefaultBrowser()) ||
+          !(await openGoogleSignInSheet(url, () => operation.abort()))
+        )
+          await openUrl(url);
       };
       const awaiting = () => setAwaitingCode(true);
       if (reauthenticate)
@@ -72,15 +86,11 @@ export default function GoogleSignInButton({
       else await authenticateAccount(() => accountGoogleSignIn(launch, operation.signal, awaiting));
       onSuccess();
     } catch (error) {
-      onError(
-        operation.signal.aborted
-          ? "Google sign-in cancelled."
-          : error instanceof Error
-            ? error.message
-            : "Could not sign in with Google.",
-      );
+      if (!operation.signal.aborted)
+        onError(error instanceof Error ? error.message : "Could not sign in with Google.");
     } finally {
       popup?.close();
+      closeGoogleSignInSheet();
       controller.current = null;
       setAwaitingCode(false);
       setCode("");
@@ -93,8 +103,8 @@ export default function GoogleSignInButton({
   // The "or" rule belongs to the button: with Google sign-in off, nothing dangles under the form.
   if (!available) return null;
   return (
-    <div className="flex flex-col gap-2">
-      <div className="mb-2 flex items-center gap-3 text-xs text-cream-muted" aria-hidden="true">
+    <div className="flex flex-col gap-5">
+      <div className="flex items-center gap-3 text-sm text-cream-muted" aria-hidden="true">
         <span className="h-px flex-1 bg-charcoal-border" />
         or
         <span className="h-px flex-1 bg-charcoal-border" />
@@ -102,48 +112,46 @@ export default function GoogleSignInButton({
       <Button
         type="button"
         variant="outline"
-        className="h-10 gap-2.5"
-        disabled={disabled || pending}
-        onClick={() => void signIn()}
+        size="lg"
+        className={cn(authFormButtonClass, "gap-2.5")}
+        // The form is busy while Google is open, but this is how to leave it.
+        disabled={disabled && !pending}
+        onClick={() => (pending ? controller.current?.abort() : void signIn())}
       >
         <BrandIcon brand="google-logo" size={18} aria-hidden />
-        {pending ? "Waiting for Google…" : "Continue with Google"}
+        {pending ? "Cancel Google sign-in" : "Continue with Google"}
       </Button>
-      {pending ? (
-        <>
-          <p className="text-center text-sm text-cream-muted">
-            Finish signing in in your browser, then return to Misty.
-          </p>
-          {awaitingCode ? (
-            // Not a <form>: this button can sit inside the sign-up form.
-            <div className="grid gap-2">
-              <Label className="text-sm text-cream" htmlFor="google-sign-in-code">
-                If Misty didn't open from your browser, enter the code it shows.
-              </Label>
-              <Input
-                id="google-sign-in-code"
-                value={code}
-                autoComplete="one-time-code"
-                placeholder="ABCDE-FGHJK"
-                maxLength={11}
-                onChange={(event) => setCode(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key !== "Enter") return;
-                  event.preventDefault();
-                  submitCode();
-                }}
-                className="h-11 bg-transparent px-3.5 text-cream placeholder:text-cream-muted"
-              />
-              {codeError ? <p className="text-sm text-cream-muted">{codeError}</p> : null}
-              <Button type="button" variant="outline" onClick={submitCode}>
-                Finish signing in
-              </Button>
-            </div>
-          ) : null}
-          <Button type="button" variant="ghost" onClick={() => controller.current?.abort()}>
-            Cancel Google sign-in
+      {pending && awaitingCode ? (
+        // Not a <form>: this button can sit inside the sign-up form.
+        <div className="grid gap-2">
+          <Label className="text-sm text-cream" htmlFor="google-sign-in-code">
+            Code from your browser
+          </Label>
+          <Input
+            id="google-sign-in-code"
+            value={code}
+            autoComplete="one-time-code"
+            placeholder="ABCDE-FGHJK"
+            maxLength={11}
+            onChange={(event) => setCode(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key !== "Enter") return;
+              event.preventDefault();
+              submitCode();
+            }}
+            className="h-11 bg-transparent px-3.5 text-cream placeholder:text-cream-muted"
+          />
+          <ErrorNotification message={codeError} onDismiss={() => setCodeError("")} />
+          <Button
+            type="button"
+            variant="outline"
+            size="lg"
+            className={authFormButtonClass}
+            onClick={submitCode}
+          >
+            Finish signing in
           </Button>
-        </>
+        </div>
       ) : null}
     </div>
   );

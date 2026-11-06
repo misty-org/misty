@@ -8,6 +8,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  ErrorNotification,
 } from "@/shared/ui";
 import { extensionsNative } from "./native";
 import { finishPermission, installations, updateInstallation, useExtensionsStore } from "./store";
@@ -47,8 +48,7 @@ export function ExtensionPermissionRequest() {
         <DialogHeader>
           <DialogTitle>Allow additional access?</DialogTitle>
           <DialogDescription>
-            {extension?.name ?? "An extension"} is requesting additional permissions. Approved
-            access follows your account.
+            {extension?.name ?? "An extension"} is asking for more access.
           </DialogDescription>
         </DialogHeader>
         <ul className="list-inside list-disc break-words text-sm">
@@ -58,11 +58,7 @@ export function ExtensionPermissionRequest() {
             </li>
           ))}
         </ul>
-        {error && (
-          <p role="alert" className="text-sm">
-            {error}
-          </p>
-        )}
+        <ErrorNotification message={error} onDismiss={() => setError("")} />
         <DialogFooter>
           <Button variant="ghost" disabled={busy} onClick={() => void respond(false)}>
             Deny

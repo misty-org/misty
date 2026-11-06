@@ -161,7 +161,7 @@ function ClockTimeControl(props: {
   );
 }
 
-/** Which side of this window the tab sidebar sits on. Each Space's window keeps its own. */
+/** Which side of this window the tab sidebar sits on. Each window keeps its own. */
 function WindowTabsRow() {
   const layout = useWindowDockingLayout();
   const setLayout = useWorkspaceStore((state) => state.setWindowDockingLayout);

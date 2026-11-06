@@ -1,7 +1,7 @@
 import YProvider from "y-partyserver/provider";
 import type * as Y from "yjs";
 
-export interface CollaborationProviderTicket {
+interface CollaborationProviderTicket {
   ticket: string;
   room: string;
   url: string;

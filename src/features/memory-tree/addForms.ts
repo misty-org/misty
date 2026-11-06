@@ -6,10 +6,9 @@ export const FACT_KINDS = [
   { value: "instruction", label: "Instruction" },
 ] as const;
 
-export interface AddForm {
+interface AddForm {
   /** The menu row and the dialog's title. */
   menu: string;
-  help: string;
   titleLabel?: string;
   titleRequired?: boolean;
   descriptionLabel?: string;
@@ -22,14 +21,12 @@ export interface AddForm {
 export const addForms: Record<MemoryBranch, AddForm> = {
   moments: {
     menu: "Add a note",
-    help: "A note in your own words. You and your agents can find it by meaning.",
     titleLabel: "Title (optional)",
     textLabel: "Note",
     textMax: 20000,
   },
   summaries: {
     menu: "Add a summary",
-    help: "A recap you wrote, kept with the ones Misty writes.",
     titleLabel: "Title",
     titleRequired: true,
     textLabel: "Summary",
@@ -37,14 +34,12 @@ export const addForms: Record<MemoryBranch, AddForm> = {
   },
   facts: {
     menu: "Add a fact",
-    help: "Something Misty should remember about you, like a preference or how you like things done.",
     textLabel: "What should Misty remember?",
     textMax: 1000,
     kinds: true,
   },
   workflows: {
     menu: "Add a workflow",
-    help: "Steps Misty can follow again, saved under your Misty agent.",
     titleLabel: "Name",
     titleRequired: true,
     descriptionLabel: "What it's for (optional)",

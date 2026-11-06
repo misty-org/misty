@@ -37,4 +37,4 @@ export function BrowserInternalPage(props: BrowserInternalPageProps & { page: In
   }
 }
 
-export type { BrowserInternalPageProps } from "./types";
+;

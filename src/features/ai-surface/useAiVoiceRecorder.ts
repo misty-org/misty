@@ -5,7 +5,7 @@ import { microphoneSettingsHint } from "@/shared/platform/desktopOs";
 
 const voiceInputStorageKey = "misty.voice.input-device";
 
-export interface AiVoiceInputDevice {
+interface AiVoiceInputDevice {
   deviceId: string;
   label: string;
 }
@@ -87,7 +87,7 @@ export function useAiVoiceRecorder({
     const epoch = ++generation.current;
     onError("");
     if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
-      onError("Voice recording is not available on this device.");
+      onError("Voice recording is not available on this computer.");
       return;
     }
     setRequesting(true);
@@ -232,7 +232,7 @@ function microphoneErrorMessage(reason: unknown): string {
     return `Microphone access is off. ${microphoneSettingsHint()}`;
   }
   if (name === "NotFoundError" || name === "DevicesNotFoundError") {
-    return "Misty could not find a microphone on this device.";
+    return "Misty could not find a microphone on this computer.";
   }
   if (name === "NotReadableError" || name === "TrackStartError") {
     return "Another app or system setting is preventing Misty from using the microphone.";

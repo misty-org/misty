@@ -10,11 +10,12 @@ import { settleRun } from "./settleRun";
 import { startRunReconciler } from "./runReconciler";
 import { resetMistyDraftAttachments } from "./draftAttachments";
 import { createMistyConversationActions } from "./mistyConversationActions";
-import { persistLocalChats } from "./localChatSync";
 import { advanceSubmissionEpoch } from "./mistySubmissionEpoch";
+import { conversationInSpace } from "./conversationSpace";
+import { onSpaceWindowSwitch } from "@/features/workspace/spaceWindow";
 import { resetSteering, steerResponse } from "./mistySteering";
 
-export type { MistyState } from "./mistyState";
+;
 export const useMistyStore = create<MistyState>((set, get) => ({
   ...createMistyPanelState(set, get),
   executionMode: "user",
@@ -68,7 +69,12 @@ export const useMistyStore = create<MistyState>((set, get) => ({
   submitAnswer: createSubmitAnswer(set, get),
 }));
 
-// Every change to a chat is saved on this device (docs/agents/chats-local.md).
-persistLocalChats((listener) => useMistyStore.subscribe(listener));
+// A window shows its current Space's conversations; choosing another Space closes one from the last.
+onSpaceWindowSwitch((space) => {
+  const { activeConversationId, conversations, working } = useMistyStore.getState();
+  const open = conversations.find((item) => item.id === activeConversationId);
+  if (open && !working && !conversationInSpace(open, space))
+    useMistyStore.setState({ activeConversationId: "" });
+});
 
 startRunReconciler(useMistyStore);

@@ -21,7 +21,7 @@ function requestHeaders(request: Request): Headers {
   return headers;
 }
 
-/** Keeps cookie headers inside Rust, with streamed responses and cancellation. */
+/** Keeps account tokens inside Rust, with streamed responses and cancellation. */
 export async function nativeAccountFetch(
   input: RequestInfo | URL,
   init: AccountRequestInit,

@@ -40,18 +40,14 @@ fn restart_requires_same_key_and_account_and_retries_lost_ack() {
     let path = dir.path().join("recovery.sqlite");
     let s = scope();
     let root = VaultRoot::generate();
-    let secret = misty_browser_sync::crypto::generate_sync_secret();
-    let wrapped = root.wrap(&s, "fixture-password", &secret).unwrap();
-    let public = root.public_key().unwrap();
-    let mut store = RecoveryStore::open(&path, s.clone(), root).unwrap();
+    let mut store = RecoveryStore::open(&path, s.clone(), root.duplicate()).unwrap();
     store.write("workspace", 0, "first").unwrap();
     drop(store);
     assert!(RecoveryStore::open(&path, s.clone(), VaultRoot::generate()).is_err());
-    let restore = || VaultRoot::unlock(&s, &wrapped, "fixture-password", &secret, &public).unwrap();
     let mut other = s.clone();
     other.account_id = "other-account".into();
-    assert!(RecoveryStore::open(&path, other, restore()).is_err());
-    let mut store = RecoveryStore::open(&path, s.clone(), restore()).unwrap();
+    assert!(RecoveryStore::open(&path, other, root.duplicate()).is_err());
+    let mut store = RecoveryStore::open(&path, s.clone(), root.duplicate()).unwrap();
     assert_eq!(store.write("workspace", 0, "first").unwrap().revision, 1);
     store.write("workspace", 1, "second").unwrap();
     assert!(store.write("workspace", 0, "stale").is_err());
@@ -161,18 +157,13 @@ fn pending_saves_replay_when_the_store_reopens() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("recovery.sqlite");
     let root = VaultRoot::generate();
-    let secret = misty_browser_sync::crypto::generate_sync_secret();
-    let wrapped = root.wrap(&scope(), "fixture-password", &secret).unwrap();
-    let public = root.public_key().unwrap();
-    let reopen =
-        || VaultRoot::unlock(&scope(), &wrapped, "fixture-password", &secret, &public).unwrap();
-    let mut store = RecoveryStore::open(&path, scope(), root).unwrap();
+    let mut store = RecoveryStore::open(&path, scope(), root.duplicate()).unwrap();
     store.write("workspace", 0, "saved").unwrap();
     failing_inserts(&path, true);
     assert!(store.write("workspace", 1, "waiting").unwrap().pending);
     drop(store);
     failing_inserts(&path, false);
-    let store = RecoveryStore::open(&path, scope(), reopen()).unwrap();
+    let store = RecoveryStore::open(&path, scope(), root).unwrap();
     let read = store.read("workspace").unwrap().unwrap();
     assert_eq!(
         (read.revision, read.value.as_str(), read.pending),

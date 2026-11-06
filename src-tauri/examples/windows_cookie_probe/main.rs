@@ -6,7 +6,6 @@
 #[path = "../../src/infra/website_data"]
 mod website_data {
     pub(super) mod cookie_cdp;
-    pub(super) mod cookie_restore;
     pub(super) use cookie_store_windows as cookie_store;
     #[allow(dead_code, reason = "the probe exercises only cookie reads and writes")]
     pub(super) mod cookie_store_windows;
@@ -21,7 +20,7 @@ mod website_data {
 #[path = "../../src/infra/browser_profile.rs"]
 mod browser_profile;
 #[cfg(windows)]
-#[allow(dead_code, reason = "the probe uses only CDP calls")]
+#[allow(dead_code, unused_imports, reason = "the probe uses only CDP calls")]
 #[path = "../../src/infra/webview2.rs"]
 mod webview2;
 

@@ -120,6 +120,11 @@
     background: transparent;
   }
 
+  /* WebView2 adds its own reveal button to password fields; `Input` already draws one. */
+  input::-ms-reveal {
+    display: none;
+  }
+
   button,
   input,
   textarea,
@@ -163,5 +168,15 @@
   ::selection {
     background-color: var(--misty-theme-active);
     color: var(--misty-theme-text-bright);
+  }
+
+  /* A site icon that wouldn't show on this theme: a black glyph on a dark one, a white glyph on a
+     light one. It gets a small backing in the theme's brightest text color (`siteIconLoader.ts`). */
+  .dark .misty-site-icon[data-tone="dark"],
+  :root:not(.dark) .misty-site-icon[data-tone="light"] {
+    box-sizing: border-box;
+    padding: 1px;
+    border-radius: 3px;
+    background-color: var(--misty-theme-text-bright);
   }
 }

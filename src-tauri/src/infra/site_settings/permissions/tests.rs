@@ -26,6 +26,7 @@ fn temporary_permissions_are_shared_by_store_isolated_and_resettable() {
     let allowed = Permissions {
         camera: Decision::Allow,
         microphone: Decision::Block,
+        location: Decision::Ask,
     };
     unsafe {
         let persisted_before = read_store();
@@ -50,6 +51,7 @@ fn a_new_temporary_session_does_not_inherit_closed_session_permissions() {
                 Permissions {
                     camera: Decision::Allow,
                     microphone: Decision::Allow,
+                    location: Decision::Ask,
                 },
             )
             .unwrap();
@@ -66,6 +68,7 @@ fn private_session_permissions_end_with_the_session() {
     let allowed = Permissions {
         camera: Decision::Allow,
         microphone: Decision::Ask,
+        location: Decision::Ask,
     };
     unsafe {
         let persisted_before = read_store();

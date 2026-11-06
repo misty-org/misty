@@ -6,9 +6,8 @@ import { useWorkspaceStore } from "./useWorkspaceStore";
 import { externalLinkMode } from "./externalLinkSettings";
 
 /**
- * Opens a link another app handed to this Space window. Native code has already
- * picked the window: the Space whose "Open these sites in this Space" claims the
- * site, else the one used last (`space_windows/links.rs`).
+ * Opens a link another app handed to this window. Native code has already picked the window:
+ * the profile that claims the site, else the one used last (`profile_windows/links.rs`).
  */
 export function openExternalLink(url: string): WorkspaceView {
   if (externalLinkMode() === "peek") {

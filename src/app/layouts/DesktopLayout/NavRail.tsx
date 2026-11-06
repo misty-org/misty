@@ -8,7 +8,7 @@ import { useShallow } from "zustand/react/shallow";
 import { emailName, initialsForProfile } from "./helpers";
 import { profileDockClass } from "./styles";
 
-export const ProfileNavButton = memo(
+export const AccountNavButton = memo(
   forwardRef<
     HTMLButtonElement,
     Omit<ButtonHTMLAttributes<HTMLButtonElement>, "className"> & {
@@ -20,7 +20,7 @@ export const ProfileNavButton = memo(
       /** Labels the button with the signed-in account's display name. */
       showAccountName?: boolean;
     }
-  >(function ProfileNavButton(
+  >(function AccountNavButton(
     { open, className, avatarClassName, label, showAccountName, ...buttonProps },
     ref,
   ) {
@@ -49,7 +49,7 @@ export const ProfileNavButton = memo(
         className={cn("group/profile", props.className ?? profileDockClass)}
         variant="ghost"
         type="button"
-        aria-label="Profile"
+        aria-label="Account"
         aria-haspopup="menu"
         aria-expanded={props.open}
         {...buttonProps}

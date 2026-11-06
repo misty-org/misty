@@ -24,7 +24,7 @@ interface ShortcutInvocation {
   scope: ShortcutScope;
 }
 
-export type ShortcutHandler = (invocation: ShortcutInvocation) => boolean | void;
+type ShortcutHandler = (invocation: ShortcutInvocation) => boolean | void;
 
 interface HandlerRegistration {
   token: symbol;
@@ -152,7 +152,6 @@ export function dispatchShortcutEvent(event: KeyboardEvent, editableOverride?: b
   // Plain typing in a field: every command allowed in one needs Cmd, Ctrl or Option,
   // so skip the registry scan below rather than run it on each keystroke.
   if (editable && !event.metaKey && !event.ctrlKey && !event.altKey) return false;
-  if (document.querySelector("[data-device-sync-sleep]")) return false;
   const activeScope = focusedShortcutScope();
   const snapshot = useSettingsStore.getState().shortcuts;
   const platform = snapshot?.detectedPlatform ?? detectShortcutPlatform();
@@ -195,7 +194,6 @@ export function dispatchShortcutEvent(event: KeyboardEvent, editableOverride?: b
 }
 
 export function invokeShortcutCommand(commandId: string): boolean {
-  if (document.querySelector("[data-device-sync-sleep]")) return false;
   const definition = shortcutCommandsById.get(commandId);
   if (!definition) return false;
   const activeScope = focusedShortcutScope();

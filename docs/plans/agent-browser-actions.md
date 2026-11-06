@@ -216,7 +216,7 @@ proof, instead of a vague "could not complete".
 
 ## 9. The benchmark package
 
-The evals that sat under `server/apps/agent-runtime/evals/` (odysseys, voice, pointing,
+The evals that sat under `src-tauri/services/agent-runtime/evals/` (odysseys, voice, pointing,
 free-model) were removed on October 31, 2026, with the server-side runtime they drove; their code
 is in git history. They shared a judge, spend and watchdog code and were tied to the runtime's
 package. Rebuild them on the desktop runtime as their own package:

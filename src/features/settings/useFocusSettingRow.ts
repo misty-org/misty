@@ -23,12 +23,13 @@ export function useFocusSettingRow(focus: { label: string; request: number }) {
       // Scroll only the page. scrollIntoView also scrolls the clipped frame around it, which
       // slid the whole settings window up and hid its close button.
       const scroller = element.closest<HTMLElement>("[data-settings-scroller]");
-      if (scroller) {
+      if (scroller && wholeBlock) scroller.scrollTop = 0;
+      else if (scroller) {
         const offset = element.getBoundingClientRect().top - scroller.getBoundingClientRect().top;
         scroller.scrollTop =
           scroller.scrollTop +
           offset -
-          (wholeBlock ? 0 : (scroller.clientHeight - element.offsetHeight) / 2);
+          (scroller.clientHeight - element.offsetHeight) / 2;
       }
       const target = wholeBlock
         ? element

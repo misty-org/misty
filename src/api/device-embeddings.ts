@@ -1,7 +1,7 @@
 import { deviceModelCall } from "@/api/device-models";
 
 /** The server's vector size for search and memory. */
-export const embeddingDimensions = 768;
+const embeddingDimensions = 768;
 
 /** Vectors on this computer's embedding model, at the server's size, with that model's ID. */
 export function embedOnDevice(values: string[], signal?: AbortSignal) {

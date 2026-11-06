@@ -1,4 +1,4 @@
-export type { MetadataDialogModel, TextDialogModel } from "./model/libraryDialogTypes";
+;
 
 import type { MetadataDialogModel, TextDialogModel } from "./model/libraryDialogTypes";
 import { MetadataDialog } from "./libraryDialogs/MetadataDialog";

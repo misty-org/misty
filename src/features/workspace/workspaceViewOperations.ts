@@ -1,7 +1,6 @@
-import { useBrowserSyncStore } from "@/features/browser-sync/store";
 import { allLayoutViews } from "@/features/workspace/layoutTabs";
 import { workspaceViewHasUnsavedChanges } from "@/features/workspace/unsavedChanges";
-import type { WorkspaceDockNode, WorkspaceLayout, WorkspaceScopeKey, WorkspaceView } from "./model";
+import type { WorkspaceDockNode, WorkspaceLayout, WorkspaceView } from "./model";
 
 export function removeDockView(
   node: WorkspaceDockNode,
@@ -32,12 +31,11 @@ export function compareViewRecency(a: WorkspaceView, b: WorkspaceView): number {
   return b.lastFocusedAt - a.lastFocusedAt || b.createdAt - a.createdAt;
 }
 
-export function nextWorkspaceFocusTimestamp(
-  layoutsByScope: Partial<Record<WorkspaceScopeKey, WorkspaceLayout>>,
-): number {
-  const latest = Object.values(layoutsByScope)
-    .flatMap((layout) => (layout ? allLayoutViews(layout) : []))
-    .reduce((maximum, tab) => Math.max(maximum, tab.lastFocusedAt), 0);
+export function nextWorkspaceFocusTimestamp(layout: WorkspaceLayout): number {
+  const latest = allLayoutViews(layout).reduce(
+    (maximum, tab) => Math.max(maximum, tab.lastFocusedAt),
+    0,
+  );
   return Math.max(Date.now(), latest + 1);
 }
 
@@ -53,30 +51,7 @@ export function lastUsedUpdatesForView(
   return updates;
 }
 
-export function canCloseWorkspaceView(
-  _tab?: WorkspaceView,
-  _scopedTabs?: WorkspaceView[],
-): boolean {
-  const session = useBrowserSyncStore.getState().session;
-  const live = (deviceId?: string | null) =>
-    !!deviceId && (session?.presence?.find((item) => item.device_id === deviceId)?.online ?? true);
-  // Legacy workspaces have one active device; others follow it. Device trees
-  // take edits from every machine on them, so nothing is ever read-only.
-  const following =
-    session &&
-    session.full_sync !== false &&
-    !session.sync &&
-    !!session.workspace.active_device?.device_id &&
-    session.workspace.active_device.device_id !== session.device_id &&
-    live(session.workspace.active_device.device_id);
-  if (following) {
-    window.dispatchEvent(
-      new CustomEvent("misty:workspace-notice", {
-        detail: "Continue on this device before closing tabs in the synced workspace.",
-      }),
-    );
-    return false;
-  }
+export function canCloseWorkspaceView(_tab?: WorkspaceView): boolean {
   if (_tab && workspaceViewHasUnsavedChanges(_tab.id)) {
     window.dispatchEvent(
       new CustomEvent("misty:workspace-notice", {

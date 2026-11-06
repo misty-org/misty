@@ -8,6 +8,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
+  ErrorNotification,
   Input,
 } from "@/shared/ui";
 import GoogleSignInButton from "./components/GoogleSignInButton";
@@ -43,7 +44,7 @@ export function AccountExportDialog(props: {
     setBusy(true);
     setError("");
     try {
-      setSaved(saveAccountExport(await requestAccountExport(props.email, proof)));
+      setSaved(saveAccountExport(await requestAccountExport(proof)));
     } catch (cause) {
       setError(accountExportError(cause));
     } finally {
@@ -60,10 +61,7 @@ export function AccountExportDialog(props: {
       <AlertDialogContent className="max-w-sm">
         <AlertDialogHeader>
           <AlertDialogTitle>Export account</AlertDialogTitle>
-          <AlertDialogDescription>
-            Misty saves one file with your account's data and a link to each note, drawing and file.
-            The links work for 15 minutes. Library files can also be downloaded from the Library.
-          </AlertDialogDescription>
+          <AlertDialogDescription>The links work for 15 minutes.</AlertDialogDescription>
         </AlertDialogHeader>
         {props.google ? (
           <GoogleSignInButton
@@ -85,11 +83,8 @@ export function AccountExportDialog(props: {
             onChange={(event) => setPassword(event.target.value)}
           />
         )}
-        {error ? (
-          <p className="m-0 text-sm text-cream" role="alert">
-            {error}
-          </p>
-        ) : saved ? (
+        <ErrorNotification message={error} onDismiss={() => setError("")} />
+        {!error && saved ? (
           <p className="m-0 text-sm text-cream-muted" role="status">
             Saved {saved} to your downloads.
           </p>

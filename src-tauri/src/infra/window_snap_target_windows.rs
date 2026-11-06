@@ -83,7 +83,7 @@ pub fn window_set_maximize_button(
     rect: Option<MaximizeButtonRect>,
 ) -> Result<(), String> {
     let window = webview.window();
-    if !crate::infra::space_windows::is_space_window(window.label()) {
+    if !crate::infra::profile_windows::is_person_window(window.label()) {
         return Ok(());
     }
     let _ = app_handle().set(app);

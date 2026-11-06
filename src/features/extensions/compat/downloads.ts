@@ -57,7 +57,7 @@ function downloadItem(entry: BrowserDownloadEntry) {
 
 async function currentEntries(): Promise<BrowserDownloadEntry[]> {
   await useBrowserDownloadsStore.getState().refresh();
-  // Extensions see the files on this device, not the Space's other devices.
+  // Extensions see the files on this computer.
   return useBrowserDownloadsStore.getState().entries.filter((entry) => !entry.device);
 }
 

@@ -19,7 +19,7 @@ describe("account limits", () => {
   });
 
   it("words each limit with what to do next", () => {
-    expect(accountLimitMessage("device_limit_reached")).toContain("Settings › Devices");
+    expect(accountLimitMessage("device_limit_reached")).toContain("Sign out of one");
     expect(accountLimitMessage("storage_limit_reached")).toContain("Free some space");
     expect(accountLimitMessage("owner_storage_quota_exceeded")).toBe(
       accountLimitMessage("storage_limit_reached"),

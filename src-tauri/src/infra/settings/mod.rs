@@ -2,11 +2,6 @@ mod defaults;
 pub(super) mod migration;
 pub mod profile_store;
 
-use std::{
-    fs,
-    path::{Path, PathBuf},
-};
-
 use rusqlite::OptionalExtension;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -23,8 +18,6 @@ use super::store::Store;
 #[derive(Debug, Clone)]
 pub struct SettingsService {
     store: Store,
-    /// The settings file of an earlier layout, imported once if present.
-    legacy_path: PathBuf,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -61,17 +54,12 @@ impl SettingsService {
     pub fn new(environment: AppEnvironmentService) -> Self {
         Self {
             store: environment.store(),
-            legacy_path: environment.settings_path(),
         }
     }
 
     pub async fn snapshot(&self) -> ApiResult<SettingsSnapshot> {
-        let (store, legacy) = (self.store.clone(), self.legacy_path.clone());
-        blocking(move || {
-            import_legacy_settings(&store, &legacy)?;
-            load_settings(&store)
-        })
-        .await
+        let store = self.store.clone();
+        blocking(move || load_settings(&store)).await
     }
 
     pub async fn save(&self, request: SaveSettingsRequest) -> ApiResult<SettingsSnapshot> {
@@ -82,7 +70,7 @@ impl SettingsService {
         saved
     }
 
-    /// The saved sections-and-keys document, read without importing or normalizing.
+    /// The saved sections-and-keys document, read without normalizing.
     pub async fn document(&self) -> ApiResult<Value> {
         let store = self.store.clone();
         blocking(move || load_settings_document(&store)).await
@@ -91,31 +79,6 @@ impl SettingsService {
 
 fn db_error(error: rusqlite::Error) -> ApiError {
     ApiError::Message(format!("Settings persistence failed: {error}"))
-}
-
-/// Imports `config/settings.json` from an earlier layout, once. The old file is left
-/// where it is.
-fn import_legacy_settings(store: &Store, legacy: &Path) -> ApiResult<()> {
-    store
-        .import_once(
-            "settings.json",
-            |connection| -> Result<(), rusqlite::Error> {
-                let Ok(raw) = fs::read_to_string(legacy) else {
-                    return Ok(());
-                };
-                if let Some(document) = serde_json::from_str::<Value>(&raw)
-                    .ok()
-                    .filter(Value::is_object)
-                {
-                    connection.execute(
-                        "INSERT OR IGNORE INTO settings_document (id, document) VALUES (1, ?1)",
-                        [document.to_string()],
-                    )?;
-                }
-                Ok(())
-            },
-        )
-        .map_err(db_error)
 }
 
 fn load_settings(store: &Store) -> ApiResult<SettingsSnapshot> {

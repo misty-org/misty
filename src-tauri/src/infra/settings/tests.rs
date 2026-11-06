@@ -120,31 +120,3 @@ fn load_settings_normalizes_imgui_settings_schema_without_clobbering_existing_va
         );
     }
 }
-
-#[test]
-fn an_earlier_settings_file_is_imported_once_and_left_in_place() {
-    let (directory, store) = test_store();
-    let legacy = directory.path().join("settings.json");
-    fs::write(
-        &legacy,
-        r#"{"general":{"custom_general_value":"from file"}}"#,
-    )
-    .unwrap();
-    import_legacy_settings(&store, &legacy).unwrap();
-    assert_eq!(
-        load_settings_document(&store).unwrap()["general"]["custom_general_value"],
-        "from file"
-    );
-    // Later edits are never overwritten by the old file.
-    save_settings_document(
-        &store,
-        &json!({"general":{"custom_general_value":"edited"}}),
-    )
-    .unwrap();
-    import_legacy_settings(&store, &legacy).unwrap();
-    assert_eq!(
-        load_settings_document(&store).unwrap()["general"]["custom_general_value"],
-        "edited"
-    );
-    assert!(legacy.exists());
-}

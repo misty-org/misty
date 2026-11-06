@@ -1,6 +1,6 @@
 //! The device control channel (docs/sync/devices.md): one socket per
-//! device carrying presence, device-list hints and removal. It never carries
-//! file data, and devices never connect to each other directly.
+//! session carrying presence, job hints and removal. It never carries file
+//! data, and sessions never connect to each other directly.
 use std::{
     sync::{Arc, Mutex, OnceLock},
     time::Duration,
@@ -34,9 +34,6 @@ pub struct ChannelSnapshot {
     pub peers: Vec<PeerPresence>,
 }
 
-/// A device-list hint ("devices", "device-admission", "jobs") or "ready".
-pub type EventHandler = Arc<dyn Fn(String) + Send + Sync>;
-
 struct Running {
     snapshot: Arc<Mutex<ChannelSnapshot>>,
 }
@@ -54,7 +51,6 @@ pub struct ChannelConfig {
     pub http: DeviceHttp,
     pub local_device_id: String,
     pub server_device_id: String,
-    pub on_event: EventHandler,
 }
 
 /// Starts (or restarts) the channel for this account's device.
@@ -93,7 +89,7 @@ pub fn snapshot() -> ChannelSnapshot {
 
 fn emit<S: Serialize + Clone>(app: &Option<AppHandle>, event: &str, payload: S) {
     if let Some(app) = app {
-        let _ = crate::infra::space_windows::emit(&app, event, payload);
+        let _ = crate::infra::profile_windows::emit(&app, event, payload);
     }
 }
 
@@ -241,8 +237,8 @@ fn handle_frame(
 ) -> bool {
     let app = &config.app;
     match frame["type"].as_str().unwrap_or_default() {
-        "ready" | "admitted" => {
-            let admitted = frame["type"] == "admitted" || frame["state"] == "admitted";
+        "ready" => {
+            let admitted = frame["state"] == "admitted";
             let peers: Vec<PeerPresence> =
                 serde_json::from_value(frame["presence"].clone()).unwrap_or_default();
             if let Ok(mut value) = snapshot.lock() {
@@ -255,7 +251,6 @@ fn handle_frame(
             }
             emit_snapshot(app, snapshot);
             emit(app, "misty:devices-event", json!({"topic": "devices"}));
-            (config.on_event)("ready".to_owned());
         }
         "presence.delta" => {
             let Ok(peer) = serde_json::from_value::<PeerPresence>(frame["device"].clone()) else {
@@ -279,7 +274,6 @@ fn handle_frame(
         "event" => {
             let topic = frame["topic"].as_str().unwrap_or_default();
             emit(app, "misty:devices-event", json!({ "topic": topic }));
-            (config.on_event)(topic.to_owned());
         }
         "revoked" => return true,
         _ => {}

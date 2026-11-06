@@ -32,7 +32,7 @@ fn ask(app: &AppHandle, closing: Option<&str>) {
         }
         None => {
             let _ = crate::infra::tray::show_main_window(app);
-            crate::infra::space_windows::emit_to_primary(app, UNSAVED_BEFORE_QUIT, payload);
+            crate::infra::profile_windows::emit_to_primary(app, UNSAVED_BEFORE_QUIT, payload);
         }
     }
 }
@@ -50,22 +50,21 @@ pub fn run_event(app: &AppHandle, event: RunEvent) {
     // also covers the time no window is open to hear them.
     #[cfg(target_os = "macos")]
     if let RunEvent::Opened { urls } = &event {
-        crate::infra::space_windows::route_app_links(
+        crate::infra::profile_windows::route_app_links(
             app,
             urls.iter().map(|url| url.to_string()).collect(),
         );
     }
     if let RunEvent::ExitRequested { api, .. } = &event {
-        if must_ask() && crate::infra::space_windows::primary(app).is_some() {
+        if must_ask() && crate::infra::profile_windows::primary(app).is_some() {
             api.prevent_exit();
             ask(app, None);
         } else {
-            // The Spaces open now reopen at the next launch.
-            crate::infra::space_windows::quitting();
+            // The windows open now reopen at the next launch.
+            crate::infra::profile_windows::quitting();
         }
     }
     if matches!(event, RunEvent::Exit) {
-        crate::infra::browser_sync::flush_before_exit();
         // Coding tools started for agents never outlive Misty.
         crate::agents::runners::registry::stop_all();
         // Its runs wait in the runtime's local store for the next launch.
@@ -76,7 +75,7 @@ pub fn run_event(app: &AppHandle, event: RunEvent) {
 /// Closing the main window would take its unsaved changes with it.
 pub fn window_event(window: &Window, event: &WindowEvent) {
     if let WindowEvent::CloseRequested { api, .. } = event {
-        if crate::infra::space_windows::is_person_window(window.label()) && must_ask() {
+        if crate::infra::profile_windows::is_person_window(window.label()) && must_ask() {
             api.prevent_close();
             ask(window.app_handle(), Some(window.label()));
         }
@@ -91,7 +90,7 @@ pub fn app_quit_confirmed(
     app: AppHandle,
     closing: bool,
 ) -> Result<(), String> {
-    if !crate::infra::space_windows::is_person_window(webview.label()) {
+    if !crate::infra::profile_windows::is_person_window(webview.label()) {
         return Err("Only the main workspace can confirm quitting".into());
     }
     if closing {

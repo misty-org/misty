@@ -32,6 +32,13 @@ pub(crate) fn profile_key(profile_id: Option<String>) -> String {
         .unwrap_or_else(|| "default".to_owned())
 }
 
+/// History belongs to the profile of the window asking.
+fn window_key(webview: &tauri::Webview) -> Result<String, String> {
+    let profile = crate::infra::profile_windows::profile_for_window(webview.window().label())
+        .ok_or("This window has no profile.")?;
+    crate::infra::profile_windows::store_for_profile(&profile).map(profile_key)
+}
+
 fn text(value: &str, limit: usize) -> String {
     value.trim().chars().take(limit).collect()
 }
@@ -39,7 +46,6 @@ fn text(value: &str, limit: usize) -> String {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BrowserHistoryRecordRequest {
-    pub profile_id: Option<String>,
     pub url: String,
     #[serde(default)]
     pub title: String,
@@ -50,12 +56,12 @@ pub struct BrowserHistoryRecordRequest {
 
 fn browser_history_record_blocking(
     app: AppHandle,
+    profile: String,
     request: BrowserHistoryRecordRequest,
 ) -> Result<(), String> {
     let Some(url) = history_url(&request.url) else {
         return Ok(());
     };
-    let profile = profile_key(request.profile_id);
     let title = text(&request.title, 500);
     let now = now_ms();
     let connection = library(&app)?;
@@ -82,6 +88,7 @@ fn browser_history_record_blocking(
 /// Titles often arrive after the page finishes loading.
 fn browser_history_set_title_blocking(
     app: AppHandle,
+    profile: String,
     request: BrowserHistoryRecordRequest,
 ) -> Result<(), String> {
     let Some(url) = history_url(&request.url) else {
@@ -95,7 +102,7 @@ fn browser_history_set_title_blocking(
         .execute(
             "UPDATE visits SET title = ?3, changed = 1
              WHERE id = (SELECT id FROM visits WHERE profile_id = ?1 AND url = ?2 AND origin = '' ORDER BY visited_at DESC LIMIT 1)",
-            params![profile_key(request.profile_id), url, title],
+            params![profile, url, title],
         )
         .map_err(|error| error.to_string())?;
     Ok(())
@@ -104,7 +111,6 @@ fn browser_history_set_title_blocking(
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BrowserHistoryQueryRequest {
-    pub profile_id: Option<String>,
     #[serde(default)]
     pub text: String,
     /// Only visits before this time (ms), for paging.
@@ -131,6 +137,7 @@ fn like_pattern(value: &str) -> String {
 
 fn browser_history_query_blocking(
     app: AppHandle,
+    profile: String,
     request: BrowserHistoryQueryRequest,
 ) -> Result<Vec<BrowserHistoryVisit>, String> {
     let connection = library(&app)?;
@@ -146,7 +153,7 @@ fn browser_history_query_blocking(
     let rows = statement
         .query_map(
             params![
-                profile_key(request.profile_id),
+                profile,
                 request.before.unwrap_or(i64::MAX),
                 search,
                 like_pattern(&search),
@@ -185,33 +192,41 @@ async fn off_main_thread<R: Send + 'static>(
 #[tauri::command]
 pub async fn browser_history_record(
     app: AppHandle,
+    webview: tauri::Webview,
     request: BrowserHistoryRecordRequest,
 ) -> Result<(), String> {
-    off_main_thread(move || browser_history_record_blocking(app, request)).await
+    let profile = window_key(&webview)?;
+    off_main_thread(move || browser_history_record_blocking(app, profile, request)).await
 }
 
 #[tauri::command]
 pub async fn browser_history_set_title(
     app: AppHandle,
+    webview: tauri::Webview,
     request: BrowserHistoryRecordRequest,
 ) -> Result<(), String> {
-    off_main_thread(move || browser_history_set_title_blocking(app, request)).await
+    let profile = window_key(&webview)?;
+    off_main_thread(move || browser_history_set_title_blocking(app, profile, request)).await
 }
 
 #[tauri::command]
 pub async fn browser_history_query(
     app: AppHandle,
+    webview: tauri::Webview,
     request: BrowserHistoryQueryRequest,
 ) -> Result<Vec<BrowserHistoryVisit>, String> {
-    off_main_thread(move || browser_history_query_blocking(app, request)).await
+    let profile = window_key(&webview)?;
+    off_main_thread(move || browser_history_query_blocking(app, profile, request)).await
 }
 
 #[tauri::command]
 pub async fn browser_history_suggest(
     app: AppHandle,
+    webview: tauri::Webview,
     request: BrowserHistoryQueryRequest,
 ) -> Result<Vec<BrowserHistorySuggestion>, String> {
-    off_main_thread(move || browser_history_suggest_blocking(app, request)).await
+    let profile = window_key(&webview)?;
+    off_main_thread(move || browser_history_suggest_blocking(app, profile, request)).await
 }
 
 #[tauri::command]
@@ -225,15 +240,19 @@ pub async fn browser_history_delete(
 #[tauri::command]
 pub async fn browser_history_forget(
     app: AppHandle,
+    webview: tauri::Webview,
     request: BrowserHistoryForgetRequest,
 ) -> Result<(), String> {
-    off_main_thread(move || browser_history_forget_blocking(app, request)).await
+    let profile = window_key(&webview)?;
+    off_main_thread(move || browser_history_forget_blocking(app, profile, request)).await
 }
 
 #[tauri::command]
 pub async fn browser_history_clear(
     app: AppHandle,
+    webview: tauri::Webview,
     request: BrowserHistoryClearRequest,
 ) -> Result<(), String> {
-    off_main_thread(move || browser_history_clear_blocking(app, request)).await
+    let profile = window_key(&webview)?;
+    off_main_thread(move || browser_history_clear_blocking(app, profile, request)).await
 }

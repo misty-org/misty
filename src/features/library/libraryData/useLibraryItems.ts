@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { LibraryCollectionKind } from "../types/useSpaceLibraryData";
 import type { LibraryMediaType } from "./useLibraryView";
 
-export interface UseLibraryItemsOptions {
+interface UseLibraryItemsOptions {
   spaceId: string;
   collection: LibraryCollectionKind;
   searchQuery: string;

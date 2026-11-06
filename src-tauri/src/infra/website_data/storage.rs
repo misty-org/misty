@@ -1,233 +1,93 @@
-//! Native transport for website storage. Plaintext stays between the website's
-//! own origin and the native vault; it never crosses the Misty renderer bridge.
-use super::budget::Held;
-use super::signin_scope::with_unsynced;
-use misty_browser_sync::document::{credentials::Area, CredentialRecord};
+//! Native transport for website storage. Plaintext stays between the website's own origin and
+//! the native records; it never crosses the Misty renderer bridge.
+use serde::Deserialize;
 use serde_json::{json, Value};
 use std::collections::BTreeMap;
-use tauri::{Manager, Webview};
+#[cfg(windows)]
+use tauri::Manager;
+use tauri::Webview;
 
 const SCRIPT: &str = include_str!("storage.js");
 mod evaluate;
-pub(super) use evaluate::*;
+pub(crate) use evaluate::{read_page, write_page, PageStorage, StorageError};
 
-struct OriginView(Webview);
-impl Drop for OriginView {
+/// A hidden, inert document on one origin. It runs no website script and makes no request, so
+/// reading or writing a site's storage never refreshes its cookies or races its pages. It
+/// closes when dropped; if the window holding it closes first, it is simply gone and the next
+/// operation says so.
+pub(crate) struct InertOrigin(Webview);
+
+impl Drop for InertOrigin {
     fn drop(&mut self) {
         let _ = self.0.close();
     }
 }
 
-/// A minimal origin document prevents website scripts from racing an import.
-/// Website pages are opened only after native storage readback has completed.
-pub(super) struct WebsiteStorage {
-    owner: Webview,
-    physical: String,
-    origins: BTreeMap<String, OriginView>,
-    held: Held,
-}
-impl WebsiteStorage {
-    pub fn new(owner: Webview, physical: String) -> Self {
-        Self {
-            owner,
-            physical,
-            origins: BTreeMap::new(),
-            held: Held::default(),
-        }
-    }
-    /// Local data that could not sync keeps its local value: restore neither
-    /// writes its synced stand-in nor reports a difference on readback.
-    pub fn with_held(mut self, held: Held) -> Self {
-        self.held = held;
-        self
-    }
-    pub(super) async fn origin_view(&mut self, origin: &str) -> Result<&Webview, String> {
-        self.origin(origin, None).await
-    }
-    async fn origin(&mut self, origin: &str, view_id: Option<&str>) -> Result<&Webview, String> {
-        let key =
-            serde_json::to_string(&(origin, view_id)).map_err(|_| "Invalid website origin")?;
-        if self.origins.get(&key).is_some_and(|view| {
-            self.owner
-                .app_handle()
-                .get_webview(view.0.label())
-                .is_none()
-        }) {
-            self.origins.remove(&key);
-        }
-        if !self.origins.contains_key(&key) {
-            let url: url::Url = "about:blank".parse().map_err(|_| "Invalid storage URL")?;
-            let expected = origin.to_owned();
-            let script = format!(
-                "if (window === top && location.origin === {}) {{ window.stop(); document.open(); document.write('<!doctype html><title>Misty storage</title>'); document.close(); globalThis.__mistyStorageReady = true; }}",
-                serde_json::to_string(origin).map_err(|_| "Invalid website origin")?
-            );
-            let builder = tauri::WebviewBuilder::new(
-                format!("misty-browser-storage-{}", uuid::Uuid::new_v4()),
-                tauri::WebviewUrl::External(url),
-            )
-            .focused(false)
-            .initialization_script(script)
-            .on_navigation(move |url| {
-                url.as_str() == "about:blank" || url.origin().ascii_serialization() == expected
-            });
-            #[cfg(target_os = "macos")]
-            let builder = builder.data_store_identifier(
-                super::super::browser_profile::data_store_identifier(Some(&self.physical))?,
-            );
-            #[cfg(windows)]
-            let builder = super::super::browser::with_browser_data(
+impl InertOrigin {
+    /// Opens `origin` in a store, held by `owner`: any window can hold it, since the store, not
+    /// the window, decides whose data it reaches.
+    pub(crate) async fn open(
+        owner: &tauri::Window,
+        physical: &str,
+        origin: &str,
+    ) -> Result<Self, String> {
+        let url: url::Url = "about:blank".parse().map_err(|_| "Invalid storage URL")?;
+        let expected = origin.to_owned();
+        let builder = tauri::WebviewBuilder::new(
+            format!("misty-browser-storage-{}", uuid::Uuid::new_v4()),
+            tauri::WebviewUrl::External(url),
+        )
+        .focused(false)
+        .on_navigation(move |url| {
+            url.as_str() == "about:blank" || url.origin().ascii_serialization() == expected
+        });
+        // Windows answers the document's request with nothing, so its content is written here. Mac
+        // loads the content directly in `open_origin`, and rewriting it mid-parse wedges it.
+        #[cfg(windows)]
+        let builder = builder.initialization_script(format!(
+            "if (window === top && location.origin === {}) {{ window.stop(); document.open(); document.write('<!doctype html><title>Misty storage</title>'); document.close(); }}",
+            serde_json::to_string(origin).map_err(|_| "Invalid website origin")?
+        ));
+        #[cfg(target_os = "macos")]
+        let builder = builder.data_store_identifier(
+            super::super::browser_profile::data_store_identifier(Some(physical))?,
+        );
+        #[cfg(windows)]
+        let builder =
+            super::super::browser::with_browser_data(builder, owner.app_handle(), Some(physical))?;
+        let created = {
+            let _creating = super::super::browser::creation_guard::Creating::enter();
+            owner.add_child(
                 builder,
-                self.owner.app_handle(),
-                Some(&self.physical),
-            )?;
-            let created = {
-                let _creating = super::super::browser::creation_guard::Creating::enter();
-                self.owner.window().add_child(
-                    builder,
-                    tauri::LogicalPosition::new(-10000., -10000.),
-                    tauri::LogicalSize::new(1., 1.),
-                )
-            };
-            let view = created.map_err(|_| "Could not open website storage")?;
-            let view = OriginView(view);
-            view.0
-                .hide()
-                .map_err(|_| "Could not hide website storage")?;
-            open_origin(&view.0, origin).await?;
-            self.origins.insert(key.clone(), view);
-        }
-        let view = &self
-            .origins
-            .get(&key)
-            .ok_or("Website storage is unavailable")?
-            .0;
+                tauri::LogicalPosition::new(-10000., -10000.),
+                tauri::LogicalSize::new(1., 1.),
+            )
+        };
+        let view = Self(created.map_err(|_| "Could not open website storage")?);
+        view.0
+            .hide()
+            .map_err(|_| "Could not hide website storage")?;
+        open_origin(&view.0, origin).await?;
         let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(10);
         loop {
             if view
+                .0
                 .url()
                 .is_ok_and(|url| url.origin().ascii_serialization() == origin)
+                && evaluate::ready(&view.0, origin).await
             {
-                let script =
-                    "return globalThis.__mistyStorageReady === true ? 'ready' : '';".to_owned();
-                #[cfg(target_os = "macos")]
-                let ready = super::super::browser_macos::evaluate_browser_async_javascript(
-                    view.clone(),
-                    script,
-                )
-                .await;
-                #[cfg(windows)]
-                let ready = super::cookie_store::evaluate_storage(view, &self.physical, script)
-                    .await
-                    .map_err(|_| "Website storage is not ready".to_string());
-                if ready.is_ok_and(|value| value == "ready") {
-                    break;
-                }
+                return Ok(view);
             }
             if tokio::time::Instant::now() > deadline {
                 return Err("Website storage connection timed out".into());
             }
             tokio::time::sleep(std::time::Duration::from_millis(50)).await;
         }
-        Ok(view)
     }
-    pub async fn apply(&mut self, target: &[CredentialRecord]) -> Result<(), String> {
-        let mut values: BTreeMap<(String, Option<String>), serde_json::Map<String, Value>> =
-            BTreeMap::new();
-        for record in target
-            .iter()
-            .filter(|record| !self.held.holds(&record.area))
-        {
-            let (origin, tab, field) = match &record.area {
-                Area::LocalStorage { origin } => (origin, None, "local"),
-                Area::IndexedDb { origin } => (origin, None, "indexed"),
-                Area::SessionStorage { origin, view_id } => {
-                    (origin, Some(view_id.clone()), "session")
-                }
-                Area::Cookies => continue,
-            };
-            let write = values.entry((origin.clone(), tab)).or_default();
-            write.insert(field.into(), record.payload.clone());
-            if let Some(hold) = self
-                .held
-                .databases
-                .get(origin)
-                .filter(|_| field == "indexed")
-            {
-                write.insert("hold".into(), json!(hold));
-            }
-        }
-        for ((origin, tab), write) in values {
-            let physical = self.physical.clone();
-            let view = self.origin(&origin, tab.as_deref()).await?;
-            evaluate(view, &physical, &origin, Some(Value::Object(write))).await?;
-        }
-        Ok(())
-    }
-    pub async fn readback(
-        &mut self,
-        target: &[CredentialRecord],
-    ) -> Result<Vec<CredentialRecord>, String> {
-        let mut values = BTreeMap::new();
-        let mut observed = vec![];
-        for record in target {
-            if self.held.holds(&record.area) {
-                observed.push(record.clone());
-                continue;
-            }
-            let (origin, tab, field) = match &record.area {
-                Area::LocalStorage { origin } => (origin, None, "local"),
-                Area::IndexedDb { origin } => (origin, None, "indexed"),
-                Area::SessionStorage { origin, view_id } => {
-                    (origin, Some(view_id.as_str()), "session")
-                }
-                Area::Cookies => continue,
-            };
-            let key = (origin.clone(), tab.map(str::to_owned));
-            if !values.contains_key(&key) {
-                let physical = self.physical.clone();
-                let view = self.origin(origin, tab).await?;
-                values.insert(key.clone(), evaluate(view, &physical, origin, None).await?);
-            }
-            let mut record = record.clone();
-            // Storage outside the sign-in scope is never written, so it is not compared.
-            let actual = with_unsynced(&record.area, values[&key][field].clone(), &record.payload);
-            record.payload = match self
-                .held
-                .databases
-                .get(origin)
-                .filter(|_| field == "indexed")
-            {
-                Some(hold) => with_held_databases(actual, &record.payload, hold),
-                None => actual,
-            };
-            observed.push(record);
-        }
-        Ok(observed)
-    }
-}
 
-/// Held databases were not written, so report their synced copies in place of
-/// whatever local version the page holds.
-fn with_held_databases(
-    mut actual: Value,
-    target: &Value,
-    hold: &std::collections::BTreeSet<String>,
-) -> Value {
-    let named = |db: &Value| db["name"].as_str().is_some_and(|name| hold.contains(name));
-    if let Some(databases) = actual["databases"].as_array_mut() {
-        databases.retain(|db| !named(db));
-        databases.extend(
-            target["databases"]
-                .as_array()
-                .into_iter()
-                .flatten()
-                .filter(|db| named(db))
-                .cloned(),
-        );
-        databases.sort_by(|a, b| a["name"].as_str().cmp(&b["name"].as_str()));
+    pub(crate) fn view(&self) -> &Webview {
+        &self.0
     }
-    actual
 }
 
 /// Build an inert same-origin document without making a website request or

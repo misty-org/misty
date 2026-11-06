@@ -7,8 +7,8 @@ import type { SettingsSection } from "./settingsTypes";
 
 /** Sections that no longer exist on their own resolve to the block that holds them now. */
 const retiredSections: Partial<Record<SettingsSection, SettingsSection>> = {
-  account: "about",
-  support: "about",
+  about: "account",
+  support: "account",
   diagnostics: "advanced",
   search: "browser-links",
   browser: "browser-links",
@@ -17,6 +17,7 @@ const retiredSections: Partial<Record<SettingsSection, SettingsSection>> = {
   "browser-privacy": "privacy",
   "browser-signins": "passwords",
   profiles: "sync",
+  devices: "sync",
   "browser-handoff": "sync",
   "browser-import": "general",
   "spaces-defaults": "general",

@@ -1,6 +1,6 @@
 import { RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
-import { Button, Skeleton } from "@/shared/ui";
+import { Button, ErrorNotification, Skeleton } from "@/shared/ui";
 import { projectGitDiff } from "../../store/useAgentsStore";
 import { DiffCounts, DiffView } from "./DiffView";
 import type { DiffSet } from "./diffTypes";
@@ -44,11 +44,8 @@ export function ProjectReview({ scopeId, name }: { scopeId: string; name: string
         </span>
       </header>
       <div className="min-h-0 flex-1 overflow-auto px-4 pb-4">
-        {error ? (
-          <p role="alert" className="misty-diff-note">
-            {error}
-          </p>
-        ) : diff === undefined ? (
+        <ErrorNotification message={error} />
+        {error ? null : diff === undefined ? (
           <div className="grid gap-2" aria-hidden="true">
             <Skeleton className="h-5 w-48" />
             <Skeleton className="h-24 w-full" />

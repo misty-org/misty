@@ -1,19 +1,53 @@
 # Agents
 
 Misty's agents work in your browser, on your computer, signed in as you, while you watch.
-The model loop runs in the agent runtime on that computer (`server/apps/agent-runtime`, a
-helper process of the app), and every model call goes through its AI SDK on the device's own
-models and keys. The server never calls a model. Chats live on the device that started them.
+The model loop runs in the agent runtime on that computer (`src-tauri/services/agent-runtime`, a
+helper process of the app), and every model call goes through its AI SDK on that computer's own
+models and keys. The server never calls a model or holds a key. Conversations are stored on the
+server, per person per Space.
+
+## Where conversations live
+
+Approved November 4, 2026. This replaces keeping chats on the computer that started them.
+
+- **On the server, per person per Space.** Each conversation has one Space for its whole life:
+  a new one goes to the window's current Space. Its turns (`ai_invocations`, whose request holds
+  the prompt), their events (`ai_invocation_events`: replies, the timeline, sources, notebook,
+  sub-agents), tool output (`misty_ask_conversation_events`, as `tool_result`) and folders and read
+  state are all there. Nothing here is encrypted.
+- **Always private to their owner.** Row security and the queries both limit a conversation to the
+  person who started it. Nobody else in its Space can list or read it, the Space's owner included.
+- **Tool output is kept.** Each finished call's output is stored, up to 256 KiB. Screenshots go to
+  the object store where Library files live (`ai_conversation_attachments`, scope `tool_output`), and
+  the stored output names them. They aren't offered to the model as attachments.
+- **What's never stored.** Model keys and search keys, which never reach the server. A result marked
+  redacted, such as a connected app's, stays sealed: only that the call happened is stored. Fields
+  named like a credential are replaced before storing.
+- **What that means.** What an agent reads on a signed-in page is stored on the server and readable
+  by whoever runs it, and sits in backups for up to 30 days after deletion. The vault's guarantee
+  doesn't extend to it. Get started says so where someone first uses agents.
+- **Retention.** Settings › Agents › Conversation retention governs it. A conversation with no
+  activity for that long is deleted with everything stored for it, and older turns, tool output and
+  screenshots go from conversations still in use (`PurgeExpiredAgentConversations`,
+  `PurgeExpiredAITransients`).
+- **Any signed-in session can read and continue one.** A run still works on the computer it was sent
+  from (`runtime_endpoint` is pinned at admission), so continuing from another computer runs there.
+- **A run names its Space and its profile,** and uses that profile's sign-ins in the window it
+  started from. A schedule chooses its profile when it's made (`workflow_schedules.profile`, the first
+  profile by default). A computer without that profile can't claim the run, and the schedule says why.
+- **Choosing a Space changes what a window shows and where new conversations go,** never tabs. Each
+  window remembers its own (`spaceWindow.ts`), and the list comes from the server across all Spaces.
+- **Leaving a Space takes your conversations in it,** like the rest of your private layer there, and
+  touches no browsing data.
 
 ## Read first
 
 | To learn about | Read |
 | --- | --- |
 | How the agent works today: loop, tools, what the model sees, how a run ends | [harness.md](harness.md) |
-| Where the runtime runs, how runs reach it, model calls on the device | [runtime.md](runtime.md) |
+| Where the runtime runs, how runs reach it, model calls on the computer | [runtime.md](runtime.md) |
 | The approved architecture and its security invariants | [architecture.md](architecture.md) |
 | The agent browser beside a chat | [browser.md](browser.md) |
-| Where chats are stored and why | [chats-local.md](chats-local.md) |
 | The agent at your cursor, push-to-talk, Teach mode | [cursor-companion.md](cursor-companion.md) |
 | Resuming a run without redoing finished work | [checkpoints.md](checkpoints.md) |
 | Delegating code to installed coding tools | [coding-tools.md](coding-tools.md) |
@@ -21,12 +55,12 @@ models and keys. The server never calls a model. Chats live on the device that s
 | Mockups (agent chat, cursor companion) | [mockups/](mockups/) |
 
 In flight: [agent browser actions](../plans/agent-browser-actions.md). Code lives in
-`src/features/agents/` (see its `DESIGN.md`), `server/apps/agent-runtime/` and
+`src/features/agents/` (see its `DESIGN.md`), `src-tauri/services/agent-runtime/` and
 `src-tauri/src/infra/browser/page_agent/`.
 
 ## Interface rules
 
-- Exception: status dots on agent conversation rows (the Agents sidebar Recents) follow Claude's session list: gray at rest, pulsing while queued or working, amber when the run needs the user, red when it failed, using the `--misty-status-*` tokens in `src/styles/App.css`. A settled run's dot is filled until its conversation is read on this device (chats live on the device that started them, `docs/agents/chats-local.md`) and a hollow gray ring afterwards, meaning nothing new. Every dot keeps a text label (tooltip and screen reader). Do not spread status color to other surfaces.
+- Exception: status dots on agent conversation rows (the Agents sidebar Recents) follow Claude's session list: gray at rest, pulsing while queued or working, amber when the run needs the user, red when it failed, using the `--misty-status-*` tokens in `src/styles/App.css`. A settled run's dot is filled until its conversation is read, in any signed-in session, and a hollow gray ring afterwards, meaning nothing new. Every dot keeps a text label (tooltip and screen reader). Do not spread status color to other surfaces.
 
 - Exception: diffs (`src/features/agents/components/changes/`) tint added lines green and removed lines red, like Claude Code and Codex, with matching +/− counts. The tint marks the line's change, never state; file headers, buttons, selection and focus stay monochrome, and other surfaces don't borrow these colors.
 

@@ -6,11 +6,12 @@ export const globalMistyApi = {
     query = "",
     onCached?: (value: { conversations: GlobalAiConversation[] }) => void,
   ) => assistantApi.conversations<GlobalAiConversation>(query, onCached),
-  createConversation: (title: string, spaceId?: string, agentId?: string, deviceId?: string) =>
-    assistantApi.createConversation<GlobalAiConversation>(title, spaceId, agentId, deviceId),
-  conversationsInScope: (scope: "legacy" | "device", deviceId = "") =>
-    assistantApi.conversationsInScope<GlobalAiConversation>(scope, deviceId),
-  keepConversationOnDevice: assistantApi.keepConversationOnDevice,
+  createConversation: (title: string, spaceId?: string, agentId?: string) =>
+    assistantApi.createConversation<GlobalAiConversation>(title, spaceId, agentId),
+  dropTurns: assistantApi.dropTurns,
+  moveTurn: assistantApi.moveTurn,
+  saveLedger: assistantApi.saveLedger,
+  markConversationRead: assistantApi.markConversationRead,
   deleteConversation: assistantApi.deleteConversation,
   renameConversation: assistantApi.renameConversation,
   complete: assistantApi.complete,

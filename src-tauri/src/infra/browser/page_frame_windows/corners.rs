@@ -147,6 +147,34 @@ pub(super) fn paint_cap(cap: HWND, corner: usize, radius: i32, color: [u8; 3]) {
     }
 }
 
+/// A notice's box with rounded corners, keeping only the pixels the notice
+/// wholly covers. The page keeps the rest, so nothing behind the page shows
+/// through the notice's corners.
+///
+/// # Safety
+/// Returns a region the caller must hand to the system or delete.
+pub(super) unsafe fn notice_hole(left: i32, top: i32, right: i32, bottom: i32, radius: i32) -> HRGN {
+    let region = CreateRectRgn(left, top, right, bottom);
+    let radius = radius.clamp(0, (right - left).min(bottom - top) / 2);
+    for row in 0..radius {
+        // Pixels not wholly inside the arc, counted in from the outer edge.
+        let kept = (0..radius)
+            .take_while(|&x| arc_coverage(radius, x, row) < 1.0)
+            .count() as i32;
+        if kept == 0 {
+            continue;
+        }
+        for y in [top + row, bottom - 1 - row] {
+            for (from, to) in [(left, left + kept), (right - kept, right)] {
+                let strip = CreateRectRgn(from, y, to, y + 1);
+                CombineRgn(region, region, strip, RGN_DIFF);
+                DeleteObject(strip);
+            }
+        }
+    }
+    region
+}
+
 /// The client area minus the pixels wholly outside each rounded corner's arc,
 /// or null (no clipping) when every corner is square. Pixels the arc crosses
 /// stay, for the corner caps to smooth.

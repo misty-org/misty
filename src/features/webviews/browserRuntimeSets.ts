@@ -16,8 +16,6 @@ export type BrowserSyncInput = {
   originSpaceId?: string;
   /** Opaque host-issued context used by agent browser grants. */
   scopeId?: string;
-  /** Host-derived account/deployment profile for native browser views. */
-  profileId?: string;
   providerId?: string;
   profileProviderId?: string;
   tab: WorkspaceView;

@@ -33,11 +33,6 @@ vi.mock("@/features/spaces/defaultSpace", () => ({
   preferredDefaultSpace: () => null,
 }));
 
-vi.mock("@/features/workspace/useWorkspaceStore", () => ({
-  useWorkspaceStore: (selector: (state: { activeScopeKey: string }) => unknown) =>
-    selector({ activeScopeKey: "" }),
-}));
-
 vi.mock("@/app/layouts/DesktopLayout", () => ({
   DesktopLayout: () => <div data-testid="desktop-layout">Desktop Layout Content</div>,
 }));
@@ -51,8 +46,7 @@ vi.mock("@/features/updater/UpdateNotices", () => ({
 }));
 
 vi.mock("@/features/connected-devices", () => ({
-  ConnectedDevicesProvider: (props: { children: React.ReactNode }) => <>{props.children}</>,
-  DevicePairingLinkDialog: () => null,
+  DeviceSessionBridge: () => null,
 }));
 
 import { AppFrameLayout } from "./AppFrameLayout";
@@ -289,7 +283,7 @@ describe("AppFrameLayout", () => {
     expect(container.querySelector('[data-testid="update-notices"]')).not.toBeNull();
   });
 
-  it("keeps sibling sync identities distinct and resets the workspace only when the account changes", async () => {
+  it("resets the workspace only when the account changes", async () => {
     const errors = vi.spyOn(console, "error").mockImplementation(() => {});
     const view = () => (
       <MemoryRouter initialEntries={["/browser"]}>

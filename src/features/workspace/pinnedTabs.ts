@@ -4,7 +4,7 @@ import { parseBrowserViewState, type WorkspaceTab } from "./model";
 import { contiguousTabs } from "./tabGroups";
 import type { WorkspaceStore } from "./useWorkspaceStore";
 import { withActiveWindowLayout } from "./windows";
-import { isIncognitoWindow } from "./spaceWindow";
+import { isIncognitoWindow } from "./profileWindow";
 
 export interface PinnedTabActions {
   /** Pins a single-page web tab at its current page. False when it can't be pinned. */
@@ -36,10 +36,7 @@ export function pinnedTabActions(
     const state = get();
     const active = state.layout.activeTabId ?? tabs[0]?.id;
     set(
-      withActiveWindowLayout(
-        state,
-        activateTab({ ...state.layout, tabs: contiguousTabs(tabs) }, active!),
-      ),
+      withActiveWindowLayout(activateTab({ ...state.layout, tabs: contiguousTabs(tabs) }, active!)),
     );
   };
   return {

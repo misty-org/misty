@@ -9,7 +9,7 @@ import {
   type WorkspaceView,
 } from "@/features/workspace";
 import { invoke } from "@tauri-apps/api/core";
-import { normalizeBrowserAddress } from "@/features/browser-sync/address";
+import { normalizeBrowserAddress } from "@/features/browser/address";
 import { setBrowserError } from "./browserErrors";
 import {
   browserRuntimeCreated,

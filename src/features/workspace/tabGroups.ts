@@ -1,9 +1,9 @@
 import { singleViewTab } from "./layoutTabs";
-import type { WorkspaceTab, WorkspaceScopeKey, WorkspaceView } from "./model";
+import type { WorkspaceTab, WorkspaceView } from "./model";
 import { createBrowserViewState } from "./model";
 import { createBlankWorkspaceView } from "./workspaceDefaultView";
 import type { WorkspaceStore } from "./useWorkspaceStore";
-import { isIncognitoWindow, windowSpaceScope } from "./spaceWindow";
+import { isIncognitoWindow } from "./profileWindow";
 
 export const tabGroupColors = {
   gray: "#a6a6ad",
@@ -21,7 +21,6 @@ export interface MistyTabGroup {
   id: string;
   name: string;
   color: TabGroupColor;
-  scopeKey: WorkspaceScopeKey;
   /** Device-local UI state; no webviews are unmounted on collapse. */
   collapsed: boolean;
   /** Present only while closed. Private layouts are never saved. */
@@ -76,9 +75,8 @@ export function migrateSavedLinkGroups(
       name: folder.fields.label,
       color: "blue",
       collapsed: false,
-      scopeKey: windowSpaceScope(),
       savedTabs: sites.map((site) => {
-        const tab = createBlankWorkspaceView(windowSpaceScope());
+        const tab = createBlankWorkspaceView();
         const view = {
           ...tab,
           id: `saved:${site.id}`,

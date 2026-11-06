@@ -89,7 +89,7 @@ export async function openBrowserAsk(snapshot: BrowserAskSnapshot): Promise<void
     const local = await agentsDeviceSnapshot();
     if (!stillCurrent()) return;
     if (!local.device || local.device.status === "revoked")
-      notice = "Connect this Misty device to let an agent interact with the page.";
+      notice = "Sign in to let an agent interact with the page.";
     else {
       const device = await ensureServerAgentDevice(local.device);
       if (!stillCurrent()) return;

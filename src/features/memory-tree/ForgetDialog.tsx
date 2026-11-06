@@ -8,6 +8,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
+  ErrorNotification,
   Skeleton,
 } from "@/shared/ui";
 import { treeApi } from "./api";
@@ -63,18 +64,17 @@ export function ForgetDialog({
           <AlertDialogTitle>Forget {label}</AlertDialogTitle>
           <AlertDialogDescription asChild>
             <div>
-              {error ? (
-                error
-              ) : total === null ? (
+              {total === null ? (
                 <Skeleton className="h-4 w-56" />
               ) : total === 0 ? (
                 "There's nothing to forget here."
               ) : (
-                `This removes ${total.toLocaleString()} ${total === 1 ? "memory" : "memories"}. They leave search, and your agents can no longer read them.`
+                `This removes ${total.toLocaleString()} ${total === 1 ? "memory" : "memories"}.`
               )}
             </div>
           </AlertDialogDescription>
         </AlertDialogHeader>
+        <ErrorNotification message={error} onDismiss={() => setError("")} />
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
           <AlertDialogAction

@@ -40,26 +40,3 @@ fn fingerprint_distinguishes_remote_file_ref_provider_metadata() {
     );
     assert_ne!(first_fingerprint, ClipboardService::fingerprint_for(&third));
 }
-
-#[test]
-fn remote_lamport_clock_rejects_stale_payloads_and_breaks_ties_by_endpoint() {
-    let service = ClipboardService::new(None, None);
-    let remote = |revision, endpoint: &str, text: &str| ClipboardPayload {
-        kind: ClipboardPayloadKind::Text,
-        source_device_id: endpoint.to_owned(),
-        revision,
-        text: text.to_owned(),
-        ..ClipboardPayload::default()
-    };
-    service.accept_remote_payload(remote(7, "endpoint-b", "new"));
-    service.accept_remote_payload(remote(6, "endpoint-z", "stale"));
-    service.accept_remote_payload(remote(7, "endpoint-a", "lower tie"));
-    assert_eq!(service.latest_shared().text, "new");
-
-    service.accept_remote_payload(remote(7, "endpoint-c", "higher tie"));
-    assert_eq!(service.latest_shared().text, "higher tie");
-    assert_eq!(
-        service.latest_shared().origin,
-        ClipboardOrigin::RemoteShared
-    );
-}

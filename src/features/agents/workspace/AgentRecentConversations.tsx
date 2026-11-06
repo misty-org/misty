@@ -3,7 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { Plus } from "lucide-react";
 import { useMistyStore } from "@/features/misty/useMistyStore";
 import { globalMistyError } from "@/features/misty/globalMistyActions";
-import { IconButton } from "@/shared/ui";
+import { ErrorNotification, IconButton } from "@/shared/ui";
 import { AgentFolderGroup } from "../folders/AgentFolderGroup";
 import { useAgentFoldersStore, type AgentConversationFolder } from "../folders/agentFoldersStore";
 import { useConversationDrop, type ConversationDrop } from "../folders/useConversationDrop";
@@ -245,11 +245,7 @@ export const AgentRecentConversations = memo(function AgentRecentConversations({
       <span className="sr-only" role="status">
         {announcement}
       </span>
-      {error && (
-        <p role="alert" className="px-2 py-1 text-xs text-cream-muted">
-          {error}
-        </p>
-      )}
+      <ErrorNotification message={error} onDismiss={() => setError("")} />
     </section>
   );
 });

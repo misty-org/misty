@@ -17,7 +17,7 @@ import {
 } from "./localExecutionState";
 import { createWorkspaceView } from "./localExecutionView";
 
-export interface LocalExecutionOptions {
+interface LocalExecutionOptions {
   normalTabs: boolean;
   openWhenMissing?: boolean;
   /** The page a newly opened tab starts on. */

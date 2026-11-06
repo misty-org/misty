@@ -152,8 +152,7 @@ const MIGRATIONS: &[&str] = &[
     // 15: projects' old access switches become remembered approvals on the server; this
     // marks a project whose switches were carried over (the switches stay for reference)
     "ALTER TABLE local_agent_scopes ADD COLUMN grants_migrated INTEGER NOT NULL DEFAULT 0;",
-    // 16: agent chats kept on this device (conversations with their messages, their
-    // folders, and import markers), one JSON document per row
+    // 16: agent chats from when they lived on this device, one JSON document per row
     "CREATE TABLE agent_chats (
          account TEXT NOT NULL,
          kind TEXT NOT NULL,
@@ -162,6 +161,35 @@ const MIGRATIONS: &[&str] = &[
          updated_at INTEGER NOT NULL,
          PRIMARY KEY (account, kind, id)
      ) WITHOUT ROWID;",
+    // 17: hours to rewrite belong to one profile, and remember when they were marked so a
+    // deletion made during an upload stays marked
+    "DROP TABLE history_dirty;
+     CREATE TABLE history_dirty (
+         profile_id TEXT NOT NULL,
+         origin TEXT NOT NULL,
+         hour INTEGER NOT NULL,
+         marked_at INTEGER NOT NULL,
+         PRIMARY KEY (profile_id, origin, hour)
+     );",
+    // 18: what this database no longer keeps. Agent chats are on the server, the file
+    // organizer and the Kura bridge are gone, and the file list's table was never used. The
+    // device id and the marks that an account's first profile was seeded move into
+    // `settings_state`, and projects' old switches are approvals now.
+    "INSERT OR IGNORE INTO settings_state (scope, revision, document)
+         SELECT 'device:id', 1, json_quote(value) FROM local_agent_settings WHERE key = 'device_id';
+     INSERT OR IGNORE INTO settings_state (scope, revision, document)
+         SELECT name, 1, 'true' FROM legacy_imports WHERE name LIKE 'profile-collections:%';
+     DROP TABLE local_agent_settings;
+     DROP TABLE agent_chats;
+     DROP TABLE agent_file_grants;
+     DROP TABLE agent_file_manifests;
+     DROP TABLE explorer_library;
+     DROP TABLE kura_approvals;
+     DROP TABLE legacy_imports;
+     ALTER TABLE local_agent_scopes DROP COLUMN allow_installs;
+     ALTER TABLE local_agent_scopes DROP COLUMN allow_push;
+     ALTER TABLE local_agent_scopes DROP COLUMN allow_push_default;
+     ALTER TABLE local_agent_scopes DROP COLUMN grants_migrated;",
 ];
 
 #[derive(Debug, Clone)]
@@ -207,29 +235,6 @@ impl Store {
             let _ = std::fs::set_permissions(&self.path, std::fs::Permissions::from_mode(0o600));
         }
         Ok(connection)
-    }
-
-    /// Runs `import` once per `name` in this database (and records it), so an earlier
-    /// layout's file is imported a single time and never overwrites later edits.
-    pub fn import_once<E: From<rusqlite::Error>>(
-        &self,
-        name: &str,
-        import: impl FnOnce(&Connection) -> Result<(), E>,
-    ) -> Result<(), E> {
-        let mut connection = self.connect()?;
-        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
-        let done: bool = transaction.query_row(
-            "SELECT EXISTS(SELECT 1 FROM legacy_imports WHERE name = ?1)",
-            [name],
-            |row| row.get(0),
-        )?;
-        if done {
-            return Ok(());
-        }
-        import(&transaction)?;
-        transaction.execute("INSERT INTO legacy_imports (name) VALUES (?1)", [name])?;
-        transaction.commit()?;
-        Ok(())
     }
 
     fn open_once(&self) -> rusqlite::Result<Connection> {

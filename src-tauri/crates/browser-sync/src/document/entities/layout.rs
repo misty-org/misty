@@ -78,16 +78,10 @@ pub struct Tab {
     pub title: String,
     pub order: f64,
     pub tree: SplitTree,
-    /// The page a pinned tab returns to; absent for unpinned tabs, so their
-    /// records keep the shape older versions accept (see `PINNED_TAB_FIELDS`).
+    /// The page a pinned tab returns to; absent for unpinned tabs.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pinned_url: Option<String>,
 }
-
-/// Tab fields that versions before pinned tabs reject. They are only written
-/// once every device understands them (control version 3); until then sync
-/// drops them. A null value removes the field, so unpinning restores the old shape.
-pub const PINNED_TAB_FIELDS: [&str; 1] = ["pinned_url"];
 
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -100,8 +94,7 @@ pub enum Surface {
     Extensions,
 }
 
-/// Moving a view is one field: concurrent moves cannot combine a tab from
-/// one device with a pane/order from another.
+/// Moving a view is one field, so two moves can never combine into a third place.
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Placement {

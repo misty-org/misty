@@ -1,7 +1,6 @@
 import { CursorCompanionController } from "@/features/agents";
 import { CapturePanel, DictationController } from "@/features/voice";
-import { RecallRecorderMount } from "@/features/recall";
-import { ScreenMemoryMount } from "@/features/screen-memory";
+import { MorningBriefMount, RecallRecorderMount } from "@/features/recall";
 import { type AppTab } from "@/features/app-shell";
 import {
   AccountClosingNotice,
@@ -13,20 +12,19 @@ import {
   useAuth,
 } from "@/features/auth";
 import { useExtensionsRuntime } from "@/features/extensions/useExtensionsRuntime";
-import { DevicePasswordsMerge } from "@/features/passwords/DevicePasswordsMerge";
 import { ExtensionPermissionRequest } from "@/features/extensions/ExtensionPermissionRequest";
 import { ExtensionInstallRequest } from "@/features/extensions/ExtensionInstallRequest";
-import { SpaceImportRequest } from "@/features/browser-import/SpaceImportRequest";
-import { BrowserSyncBadge, SyncMenuItem } from "@/features/browser-sync/BrowserSyncBadge";
+import { ProfileImportRequest } from "@/features/browser-import/ProfileImportRequest";
 import { NavigationNamesBoundary } from "@/features/navigation-names/NavigationNamesBoundary";
-import { blockIfUnsaved, useSettingsStore } from "@/features/settings";
+import { blockIfUnsaved } from "@/features/settings";
 import {
   setBrowserWebviewsSuspended,
   windowChromeChangedEvent,
 } from "@/features/webviews/browserRuntime";
 import { useWindowDockingLayout } from "@/features/workspace";
 import { windowChromeBackground } from "@/features/workspace/windowColors";
-import { useSpaceWindowStore } from "@/features/workspace/spaceWindow";
+import { useProfileWindowStore } from "@/features/workspace/profileWindow";
+import { ProfileDialogs } from "@/features/profiles/ProfileDialogs";
 import { appZoomRenderScale, useAppZoomValue } from "@/shared/hooks/useAppZoom";
 import { cn } from "@/shared/ui";
 import { useEffect, useRef, useState } from "react";
@@ -46,6 +44,7 @@ import { useDesktopBootstrap } from "./useDesktopBootstrap";
 import { useDesktopFrameStyle } from "./useDesktopFrameStyle";
 import { useDesktopRouteEffects } from "./useDesktopRouteEffects";
 import { useDesktopShellStatus } from "./useDesktopShellStatus";
+import { VaultStartup } from "@/features/vault";
 import { useDesktopShortcuts } from "./useDesktopShortcuts";
 import { useDesktopTitlebarGeometry } from "./useDesktopTitlebarGeometry";
 import { useDesktopWindowChrome } from "./useDesktopWindowChrome";
@@ -58,15 +57,7 @@ import { WindowsTitlebarControls } from "./WindowsTitlebarControls";
 import { useCaptionSlot } from "./useCaptionSlot";
 import { useSidebarCollapsedStore } from "@/features/app-shell/sidebarCollapsed";
 import { WorkspaceCanvas } from "./WorkspaceCanvas";
-export type {
-  AppNoticeEntry,
-  AppNoticeKind,
-  AppNoticeSource,
-  DesktopPlatform,
-  FramePacingState,
-  WindowBounds,
-  WindowRect,
-} from "@/app/layouts/model";
+;
 
 export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab }) {
   useExtensionsRuntime();
@@ -90,7 +81,7 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
 
   const framePacingOverlayEnabled = useDesktopShellStatus();
 
-  const [profileOpen, setProfileOpen] = useState(false);
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const docking = useWindowDockingLayout();
   const focusMode = useFocusModeShortcuts();
   const {
@@ -112,11 +103,11 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
   useDesktopShortcuts({ navigate, openSettingsOverlay, signedIn: Boolean(user) });
 
   useEffect(() => {
-    setBrowserWebviewsSuspended(profileOpen || settingsOpen, "shell-overlay");
+    setBrowserWebviewsSuspended(accountMenuOpen || settingsOpen, "shell-overlay");
     return () => setBrowserWebviewsSuspended(false, "shell-overlay");
-  }, [profileOpen, settingsOpen]);
+  }, [accountMenuOpen, settingsOpen]);
 
-  useEffect(() => setProfileOpen(false), [docking]);
+  useEffect(() => setAccountMenuOpen(false), [docking]);
   const shellRef = useRef<HTMLElement>(null);
   useDockingTransition(shellRef, `${docking.navigation}:${docking.tabs}:${focusMode}`);
 
@@ -149,10 +140,10 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
   useOtherWindowsHiddenWhileAddingAccount(
     isAuthRoute && Boolean((location.state as { addingAccount?: boolean } | null)?.addingAccount),
   );
-  // The window takes its Space's color, which tints everything around the content region.
-  // Signed out a window shows no Space, so it keeps the plain chrome.
-  const spaceChrome = useSpaceWindowStore((state) => windowChromeBackground(state.space?.color));
-  const windowChrome = user ? spaceChrome : undefined;
+  // The window takes its profile's color, which tints everything around the content region.
+  const windowChrome = useProfileWindowStore((state) =>
+    windowChromeBackground(state.profile.color),
+  );
   useEffect(() => {
     const shell = shellRef.current;
     if (windowChrome && !isAuthRoute)
@@ -161,24 +152,15 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
     // Pages smooth their rounded corners with this color; let them measure it again.
     window.dispatchEvent(new Event(windowChromeChangedEvent));
   }, [windowChrome, isAuthRoute]);
-  const openSyncSettings = () => {
-    useSettingsStore.getState().setActiveSection("sync");
-    openSettingsOverlay();
-  };
-  // Sync is a button next to Settings, under the tabs. It needs an account, so it isn't
-  // shown while nobody is signed in.
-  const syncButton = user ? (
-    <BrowserSyncBadge key={user.id} accountId={user.id} onOpenSettings={openSyncSettings} />
-  ) : null;
   const stripAccount = !isAuthRoute ? (
     <AccountIsland
-      open={profileOpen}
+      open={accountMenuOpen}
       onOpenChange={(open) => {
         if (open) {
           if (blockIfUnsaved()) return;
           setSettingsOpen(false);
         }
-        setProfileOpen(open);
+        setAccountMenuOpen(open);
       }}
       onOpenAccountSettings={openAccountSettings}
       settingsOpen={settingsOpen || location.pathname.startsWith("/settings")}
@@ -188,7 +170,6 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
       onSignIn={(again) =>
         again ? openSignInSheet("expired", user?.email) : openSignInSheet("account")
       }
-      sync={syncButton}
     />
   ) : null;
   // The sidebar's bottom edge: downloads on the left, chat on the right.
@@ -197,14 +178,11 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
       <StripDownloads />
     </>
   );
-  const browserChrome = {
-    accountItems: <SyncMenuItem accountId={user?.id ?? ""} />,
-  };
   return (
     <NavigationNamesBoundary userId={user?.id ?? ""} enabled={!isAuthRoute}>
       <ExtensionPermissionRequest />
       <ExtensionInstallRequest />
-      <SpaceImportRequest />
+      <ProfileImportRequest />
       <main
         ref={shellRef}
         className={cn(
@@ -280,7 +258,6 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
                 hideTabStrip={focusMode}
                 stripFootEnd={stripFootEnd}
                 stripAccount={stripAccount}
-                browserChrome={browserChrome}
               />
             )}
             {!isAuthRoute && user?.id ? (
@@ -289,7 +266,7 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
                 <DictationController key={`dictation-${user.id}`} />
                 <CapturePanel key={`capture-${user.id}`} />
                 <RecallRecorderMount key={`recall-${user.id}`} />
-                <ScreenMemoryMount key={`screen-memory-${user.id}`} />
+                <MorningBriefMount key={`morning-brief-${user.id}`} />
               </DeferUntilIdle>
             ) : null}
           </>
@@ -302,7 +279,8 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
         <AccountSuspendedNotice />
         <AccountClosingNotice />
         {!isAuthRoute && user ? <ServerAlertsNotice /> : null}
-        {!isAuthRoute && user ? <DevicePasswordsMerge key={user.id} accountId={user.id} /> : null}
+        {!isAuthRoute ? <ProfileDialogs /> : null}
+        {!isAuthRoute && user ? <VaultStartup key={user.id} /> : null}
         {!isAuthRoute ? (
           <DesktopShellOverlays
             settingsOpen={settingsOpen}

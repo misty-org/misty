@@ -6,6 +6,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  ErrorNotification,
   SkeletonList,
   Spinner,
 } from "@/shared/ui";
@@ -52,7 +53,10 @@ export function InstallReviewDialog({
         if (!next && !busy) onClose();
       }}
     >
-      <DialogContent className="max-h-[85vh] overflow-y-auto">
+      <DialogContent
+        aria-describedby={review ? "extension-review-description" : undefined}
+        className="max-h-[85vh] overflow-y-auto"
+      >
         <DialogHeader>
           <DialogTitle className="flex min-w-0 items-center gap-3">
             {review && (
@@ -70,24 +74,26 @@ export function InstallReviewDialog({
                   : "Add extension"}
             </span>
           </DialogTitle>
-          <DialogDescription>
-            {review
-              ? `${storeNames[review.entry.store]} · Version ${review.entry.version}. ` +
-                "Review the access it asks for. Extensions you add sync to your Misty account."
-              : "Misty downloads the extension from its store and checks its signature before you review it."}
-          </DialogDescription>
+          {review ? (
+            <DialogDescription id="extension-review-description">
+              {storeNames[review.entry.store]} · Version {review.entry.version}
+            </DialogDescription>
+          ) : null}
         </DialogHeader>
         {!review && !failure && <SkeletonList label="Extension access" rows={3} lines={1} />}
         {!review && failure && (
           <>
-            <p role="alert" className="text-sm">
-              {failure}
-            </p>
+            <ErrorNotification message={failure}>
+              {onRetry && (
+                <Button size="sm" variant="outline" onClick={onRetry}>
+                  Try again
+                </Button>
+              )}
+            </ErrorNotification>
             <DialogFooter>
               <Button variant="ghost" onClick={onClose}>
                 Close
               </Button>
-              {onRetry && <Button onClick={onRetry}>Try again</Button>}
             </DialogFooter>
           </>
         )}
@@ -118,11 +124,7 @@ export function InstallReviewDialog({
                 <p key={finding}>{finding}</p>
               ))}
             </div>
-            {failure && (
-              <p role="alert" className="text-sm">
-                {failure}
-              </p>
-            )}
+            <ErrorNotification message={failure} />
             <DialogFooter>
               <Button variant="ghost" disabled={busy} onClick={onClose}>
                 Cancel
@@ -159,9 +161,7 @@ export function UninstallDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Remove {removing?.name}?</DialogTitle>
-          <DialogDescription>
-            This removes the extension and its saved settings from this device.
-          </DialogDescription>
+          <DialogDescription>Its saved settings are removed from this computer.</DialogDescription>
         </DialogHeader>
         <DialogFooter>
           <Button variant="ghost" onClick={onClose}>

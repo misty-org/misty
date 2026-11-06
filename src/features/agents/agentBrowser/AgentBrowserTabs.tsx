@@ -10,6 +10,7 @@ import {
   type AgentBrowserTab,
   type AgentBrowserView,
 } from "./agentBrowserStore";
+import { SiteIcon } from "@/features/webviews/SiteIcon";
 
 const agentTabLabel = (tab: AgentBrowserTab | undefined) => {
   if (!tab) return "Page";
@@ -38,13 +39,10 @@ function AgentTabIcon({ tab, active }: { tab: AgentBrowserTab | undefined; activ
     );
   if (icon && !failed)
     return (
-      <img
-        alt=""
+      <SiteIcon
         className="size-4 shrink-0 select-none rounded-sm object-contain"
-        decoding="async"
-        draggable={false}
-        src={icon}
-        onError={() => setFailed(true)}
+        url={icon}
+        onFailed={() => setFailed(true)}
       />
     );
   return <Globe className="size-4 shrink-0" aria-hidden="true" />;

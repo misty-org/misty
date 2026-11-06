@@ -89,7 +89,7 @@ fn base_url(settings: &Value, provider: &str) -> Option<String> {
 }
 
 /// This device's model choices and the keys they need. None when no agent model has a usable
-/// provider.
+/// provider and there's no Soniox key for the live relay.
 pub fn document(settings: &Value, key: &dyn Fn(&str) -> Option<String>) -> Option<Value> {
     let mut providers = Map::new();
     let mut models = Map::new();
@@ -127,7 +127,17 @@ pub fn document(settings: &Value, key: &dyn Fn(&str) -> Option<String>) -> Optio
         }
         models.insert(role.to_owned(), Value::String(model.to_owned()));
     }
-    if !models.contains_key("agent") {
+    // The live relay always streams to Soniox, whichever transcription model is chosen, and
+    // subtitles and captures don't need an agent model.
+    if !providers.contains_key("soniox") {
+        let api_key = key("soniox")
+            .map(|key| key.trim().to_owned())
+            .filter(|key| !key.is_empty());
+        if let Some(api_key) = api_key {
+            providers.insert("soniox".to_owned(), json!({ "apiKey": api_key }));
+        }
+    }
+    if !models.contains_key("agent") && !providers.contains_key("soniox") {
         return None;
     }
     let reasoning = text(settings, "reasoning")

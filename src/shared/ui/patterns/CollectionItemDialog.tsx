@@ -2,6 +2,7 @@ import { useId, useState } from "react";
 import { Button } from "../controls/Button";
 import { Input } from "../controls/Input";
 import { Label } from "../controls/Label";
+import { ErrorNotification } from "../feedback/Notification";
 import {
   Dialog,
   DialogContent,
@@ -80,11 +81,7 @@ export function CollectionItemDialog({
               />
             </div>
           )}
-          {error && (
-            <p role="alert" className="text-sm text-cream-muted">
-              {error}
-            </p>
-          )}
+          <ErrorNotification message={error} onDismiss={() => setError("")} />
           <DialogFooter>
             <Button type="button" variant="ghost" disabled={busy} onClick={onClose}>
               Cancel

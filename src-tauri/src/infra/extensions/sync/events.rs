@@ -17,10 +17,10 @@ pub async fn observe(app: &tauri::AppHandle, event: Value) {
     let Some(account) = event["account"].as_str() else {
         return;
     };
-    let Some(space) = event["space"].as_str() else {
+    let Some(profile) = event["space"].as_str() else {
         return;
     };
-    let scope = journal_scope(account, space);
+    let scope = journal_scope(account, profile);
     let Some(id) = event["id"]
         .as_str()
         .filter(|v| super::super::catalog::Store::of(v).is_some())
@@ -29,7 +29,7 @@ pub async fn observe(app: &tauri::AppHandle, event: Value) {
         return;
     };
     let installation = {
-        let state = service(space).lock().await;
+        let state = service(profile).lock().await;
         if state.account != account {
             return;
         }
@@ -44,7 +44,7 @@ pub async fn observe(app: &tauri::AppHandle, event: Value) {
     };
     let _guard = journal_lock().lock().await;
     {
-        let state = service(space).lock().await;
+        let state = service(profile).lock().await;
         if state.account != account || state.desired.get(&id) != Some(&installation) {
             return;
         }
@@ -96,22 +96,22 @@ pub async fn observe(app: &tauri::AppHandle, event: Value) {
     })();
     if result.is_ok() && event["kind"] == "sync-ready" {
         if let Ok(mut ready) = ready().lock() {
-            ready.insert(readiness_key(account, space, &id));
+            ready.insert(readiness_key(account, profile, &id));
         }
-        // Previously restored local data remains usable while the vault is locked.
+        // Previously restored local data remains usable.
         if read(app, &scope, &installation).is_ok_and(|journal| journal.initialized) {
             let _ = native::request(
-                json!({"operation":"sync-restored","account":account,"space":space,"id":id}),
+                json!({"operation":"sync-restored","account":account,"space":profile,"id":id}),
             )
             .await;
         }
     }
     if result.is_err() {
-        crate::infra::space_windows::emit_to_space(
+        crate::infra::profile_windows::emit_to_profile(
             app,
-            space,
+            profile,
             "misty://extensions",
-            json!({"kind":"sync-status","account":account,"space":space,"id":id,"detail":"Extension settings could not be saved for sync. Retry after checking sync access."}),
+            json!({"kind":"sync-status","account":account,"space":profile,"id":id,"detail":"Extension settings could not be saved for sync. Retry after checking sync access."}),
         );
     }
 }

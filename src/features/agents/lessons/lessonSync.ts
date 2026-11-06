@@ -1,4 +1,5 @@
 import type { GlobalAiConversation, GlobalAiMessage } from "@/features/misty/types";
+import { globalMistyApi } from "@/features/misty/globalMistyApi";
 import { useMistyStore } from "@/features/misty/useMistyStore";
 import { useCollaborationStore } from "../collaboration/store";
 import { companionReply } from "../companion/companionReply";
@@ -117,9 +118,11 @@ function moveTurn(fromId: string, toId: string, runId: string) {
     ),
   });
   useMistyStore.getState().selectConversation(toId);
-  if (!rest.length)
-    void useMistyStore
-      .getState()
-      .deleteConversation(fromId)
-      .catch(() => undefined);
+  // The server moves the turn first: deleting the emptied chat would take it along otherwise.
+  void globalMistyApi
+    .moveTurn(fromId, runId, toId)
+    .then(() => {
+      if (!rest.length) return useMistyStore.getState().deleteConversation(fromId);
+    })
+    .catch(() => undefined);
 }

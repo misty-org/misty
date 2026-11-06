@@ -193,7 +193,7 @@ const uiSubjects: Record<string, string> = {
   thread: "threads",
   space: "Spaces",
   agent: "agents",
-  device: "devices",
+  device: "signed-in sessions",
 };
 
 /** A tool name split into its verb and what it acts on, such as "Searched" and "web". */

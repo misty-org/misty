@@ -1,11 +1,7 @@
-//! This account's devices: identity, trust, approval and the device channel.
+//! This account's devices: identity, trust and the device channel.
 
 #[cfg(desktop)]
 pub mod admission;
-#[cfg(desktop)]
-pub mod approval;
-#[cfg(desktop)]
-pub mod approval_approver;
 #[cfg(desktop)]
 pub mod channel;
 #[cfg(desktop)]

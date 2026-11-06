@@ -59,8 +59,8 @@ built the agent harness myself and measure it on the Odysseys web-agent benchmar
  ┌───────────────────────────────────────▼─────────────────────────────────────────────────────┐
  │ Go API (server/): accounts, sync relay (ciphertext only), Spaces, files, memory,             │
  │   agent.gate: tool catalog, policy/approvals, action journal, billing, device job queue      │
- │ Agent runtime (server/apps/agent-runtime): AI SDK loop on a durable workflow; model gateway │
- │ Postgres · Cloudflare Workers (web-fetch fallback, journal collaboration with Yjs)          │
+ │ Agent runtime (src-tauri/services/agent-runtime): AI SDK loop on a durable workflow; model gateway │
+ │ Postgres · Cloudflare Worker (journal collaboration with Yjs)            │
  └─────────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -109,7 +109,7 @@ built the agent harness myself and measure it on the Odysseys web-agent benchmar
 ### Agent harness
 - **Small first turn:** every run starts in `answer` with a small tool set;
   `agent_tool_load` adds families (Misty data, connected apps, sub-agents), `agent_tool_use`
-  switches toolsets. No router model. (`server/apps/agent-runtime/src/toolsets.ts`)
+  switches toolsets. No router model. (`src-tauri/services/agent-runtime/src/toolsets.ts`)
 - **Programs, not clicks:** `browser_run` takes a JS program, so a 10-item list is a loop in
   one call instead of 10 model turns.
 - **Context:** stable prompt (page state appended, never rewritten) so the prompt cache
@@ -210,7 +210,7 @@ Full evidence notes from this audit: the coordinating session's notes folder,
   first agent turn 21,700–22,000 tokens on Oct 19 03:00–10:00 UTC (Haiku 5.5, 45 runs), then
   10,818 when pass A started at 11:00 (7 runs). 22,000 → 10,700 is −51.4%.
 - **What caused it:** deferring Misty's own data tools only, about 50 of a run's 65 tools
-  and roughly 9,000 tokens (`server/apps/agent-runtime/src/toolsets.ts:17`, `agent_tool_load`
+  and roughly 9,000 tokens (`src-tauri/services/agent-runtime/src/toolsets.ts:17`, `agent_tool_load`
   and `agent_tool_use`; tests in `test/toolsets.test.ts`). Compaction and checkpoints are real
   but separate; they don't touch the first turn.
 - **Compaction:** `src/context/condenser.ts`, one interface over five stages (stale snapshots
@@ -251,7 +251,7 @@ the wrong word.**
   12B active). Chosen because GLM-5.3-Flash accepted at most 8 images per prompt on NIM and
   failed the judge (`docs/agents/evals/free-model.md`, `odysseys.md`).
 - **Where the numbers are:** only in the gitignored local reports,
-  `server/apps/agent-runtime/evals/odysseys/reports/*/report.json` (50 Nemotron folders, 45
+  `src-tauri/services/agent-runtime/evals/odysseys/reports/*/report.json` (50 Nemotron folders, 45
   graded runs, 2026-10-21 to 22). Not in any doc or commit. **Back them up** (copy the
   reports somewhere safe) before you cite them.
 - **What they show:** of the 16 tasks tried on Oct 21, 11 reached a perfect rubric score at
@@ -277,10 +277,10 @@ the wrong word.**
   give-ups; IPv4-first provider calls; consent-banner decline; parallel tool calls; repairing
   garbled document IDs; DNS check on guessed domains; waiting for new tabs to load; a
   progress watchdog instead of a wall clock; not mistaking narration for the answer.
-- **Rerun:** `server/apps/agent-runtime/evals/odysseys/README.md`. In short: NVIDIA key in
-  `server/.env/dev/integrations/ai.env`, `MISTY_ALLOW_MODEL_OVERRIDE=1`; `misty server up`;
+- **Rerun:** `src-tauri/services/agent-runtime/evals/odysseys/README.md`. In short: NVIDIA key in
+  `misty-server/.env/dev/integrations/ai.env`, `MISTY_ALLOW_MODEL_OVERRIDE=1`; `misty server up`;
   start the desktop with `MISTY_BROWSER_EVAL_BRIDGE_PORT`/`_TOKEN` and
-  `MISTY_EVAL_EPHEMERAL_PAGES=1`; then from `server/apps/agent-runtime`:
+  `MISTY_EVAL_EPHEMERAL_PAGES=1`; then from `src-tauri/services/agent-runtime`:
   `MISTY_ODYSSEYS=1 MISTY_ODYSSEYS_MODEL=nim/nvidia/nemotron-3.5-super-vl-120b-a12b MISTY_ODYSSEYS_JUDGE=gemini/gemini-3.1-flash-lite MISTY_ODYSSEYS_TASKS=<ids> … npm run eval:odysseys`.
   Restart the app before each pass (a WebKit page-process leak is still open).
 - **Suggested wording:** "Ran a failure-driven eval loop on the Odysseys long-horizon web
@@ -512,4 +512,4 @@ several "Apple Development" certificates exist, use the SHA-1 from
 - Resume bullets: the numbers I couldn't trace are flagged in section 4 with suggested
   wording; I didn't change your resume.
 - The Nemotron reports that back bullet 3 live only in a gitignored folder
-  (`server/apps/agent-runtime/evals/odysseys/reports/`). Copy them somewhere safe.
+  (`src-tauri/services/agent-runtime/evals/odysseys/reports/`). Copy them somewhere safe.

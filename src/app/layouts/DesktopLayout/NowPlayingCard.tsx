@@ -19,6 +19,7 @@ import {
 import type { BrowserMediaInfo } from "@/features/browser/library";
 import { parseBrowserViewState, type WorkspaceView } from "@/features/workspace/model";
 import { IconButton, MarqueeGroup, OverflowFadeText, PlaybackClock, Pressable } from "@/shared/ui";
+import { SiteIcon } from "@/features/webviews/SiteIcon";
 
 type Action = "play" | "pause" | "previoustrack" | "nexttrack";
 
@@ -174,12 +175,7 @@ export function NowPlayingCard(props: {
       ) : null}
       <div className="misty-now-playing-controls">
         {state.faviconUrl ? (
-          <img
-            className="misty-now-playing-source"
-            src={state.faviconUrl}
-            alt=""
-            draggable={false}
-          />
+          <SiteIcon className="misty-now-playing-source" url={state.faviconUrl} />
         ) : (
           <span className="misty-now-playing-source" aria-hidden="true" />
         )}

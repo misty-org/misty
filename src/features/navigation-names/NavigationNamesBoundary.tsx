@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useState, type ReactNode } from "react";
 import { resolveApiBase } from "@/api/deployment/api";
 import { hasTauriInternals } from "@/shared/platform/tauri";
+import { Notification } from "@/shared/ui";
 import { refreshNavigationNames, useNavigationNames } from "./store";
 
 export function NavigationNamesBoundary({
@@ -85,12 +86,9 @@ function AccountNavigationNamesBoundary({
   return (
     <>
       {state.error && (
-        <div
-          role="alert"
-          className="fixed bottom-3 left-3 layer-menu-raised max-w-md rounded-md bg-charcoal-card p-3 text-sm text-cream shadow-lg"
-        >
+        <Notification key={state.error} tone="error">
           {state.error} Your last valid names are retained. Fix navigation.json to retry.
-        </div>
+        </Notification>
       )}
       {children}
     </>

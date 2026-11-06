@@ -30,17 +30,17 @@ import {
   setBrowserWebviewsSuspended,
 } from "@/features/webviews/browserRuntime";
 import {
-  Button,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  ErrorNotification,
   MenuItem,
   Portal,
 } from "@/shared/ui";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 
-export interface BrowserMenuPresentation {
+interface BrowserMenuPresentation {
   key: string;
   x: number;
   y: number;
@@ -263,23 +263,11 @@ export function BrowserContextMenuBridge() {
   return (
     <>
       {menu ? <BrowserContextMenuView key={menu.key} menu={menu} onSelect={select} /> : null}
-      {error ? (
-        <div
-          role="alert"
-          className="fixed right-4 top-16 layer-menu max-w-sm rounded-md bg-charcoal-card p-3 text-sm text-cream shadow-md ring-1 ring-cream/10"
-        >
-          <p>{error}</p>
-          {needsModelKey(error) && <ModelKeyNeededButton onOpen={() => setError(null)} />}
-          <Button
-            variant="ghost"
-            size="sm"
-            className="mt-2 text-cream-muted"
-            onClick={() => setError(null)}
-          >
-            Dismiss
-          </Button>
-        </div>
-      ) : null}
+      <ErrorNotification message={error} onDismiss={() => setError(null)}>
+        {error && needsModelKey(error) ? (
+          <ModelKeyNeededButton onOpen={() => setError(null)} />
+        ) : null}
+      </ErrorNotification>
     </>
   );
 }

@@ -7,7 +7,7 @@ import engineTable from "@/shared/schemas/browser-search-engines.json";
  * suggestions from the `suggest` endpoints, so a changed endpoint is a data
  * fix in one file.
  */
-export interface BrowserSearchEngine {
+interface BrowserSearchEngine {
   id: string;
   name: string;
   /** `%s` is replaced with the URI-encoded query. */

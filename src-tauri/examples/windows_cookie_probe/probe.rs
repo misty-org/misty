@@ -1,16 +1,6 @@
 //! The probe itself: synthetic cookies through live WebView2 profiles.
-use super::{
-    browser,
-    website_data::{cookie_restore::StagedCookieProfile, cookie_store as cookies},
-};
-use misty_browser_sync::{
-    document::{
-        credentials::{Area, Cookie, SameSite},
-        CredentialRecord,
-    },
-    restore::QuiescentProfile,
-};
-use serde_json::json;
+use super::{browser, website_data::cookie_store as cookies};
+use misty_browser_sync::document::credentials::{Cookie, SameSite};
 use std::{
     path::PathBuf,
     sync::{
@@ -41,10 +31,15 @@ fn fixture() -> Cookie {
         partition_key: None,
     }
 }
-fn canonical(cookies: Vec<Cookie>) -> Result<serde_json::Value> {
-    Area::Cookies
-        .canonical_payload(&json!(cookies))
-        .map_err(|_| "invalid cookie readback")
+/// In a set order, since a store lists its cookies however it likes.
+fn canonical(cookies: Vec<Cookie>) -> Result<Vec<String>> {
+    let mut encoded = cookies
+        .iter()
+        .map(serde_json::to_string)
+        .collect::<std::result::Result<Vec<_>, _>>()
+        .map_err(|_| "invalid cookie readback")?;
+    encoded.sort();
+    Ok(encoded)
 }
 async fn read(view: &Webview, id: &str) -> Result<Vec<Cookie>> {
     let read = cookies::read(view, id)
@@ -140,51 +135,27 @@ async fn check(
     {
         return Err("exact deletion removed the wrong cookie scope");
     }
-    let logical = "a".repeat(64);
-    let record = CredentialRecord {
-        sequence: 1,
-        profile_id: logical.clone(),
-        area: Area::Cookies,
-        payload: json!(target),
-    };
-    let mut backend = StagedCookieProfile::for_generation(b.clone(), logical, b_id.into());
-    backend
-        .preflight(&[record.clone()])
-        .await
-        .map_err(|_| "restore preflight failed")?;
-    backend
-        .apply(&[record.clone()])
-        .await
-        .map_err(|_| "restore apply failed")?;
-    let actual = backend
-        .readback(&[record.clone()])
-        .await
-        .map_err(|_| "restore readback failed")?;
-    if Area::Cookies
-        .canonical_payload(&actual[0].payload)
-        .map_err(|_| "invalid readback")?
-        != Area::Cookies
-            .canonical_payload(&record.payload)
-            .map_err(|_| "invalid target")?
-    {
-        return Err("restored profile differs from target");
+    // What sync does with another computer's cookies: bring them in, then sign out of them.
+    for cookie in &target {
+        cookies::write(b, b_id, cookie.clone(), false)
+            .await
+            .map_err(|_| "applying a copy failed")?;
     }
-    let logout = CredentialRecord {
-        payload: json!([]),
-        sequence: 2,
-        ..record
-    };
-    backend
-        .apply(&[logout.clone()])
-        .await
-        .map_err(|_| "logout apply failed")?;
+    if canonical(read(b, b_id).await?)? != canonical(target.clone())? {
+        return Err("applied copy differs from the source");
+    }
+    for cookie in &target {
+        cookies::write(b, b_id, cookie.clone(), true)
+            .await
+            .map_err(|_| "deleting a copy failed")?;
+    }
     if !read(b, b_id).await?.is_empty() {
-        return Err("logout did not clear restored profile");
+        return Err("signing out did not clear the copy");
     }
     if read(a, a_id).await?.is_empty() {
-        return Err("logout changed source profile");
+        return Err("signing out changed the source profile");
     }
-    println!("PASS: 32 cookie variants, native callbacks, profile boundaries, host/domain deletion, restore readback and logout isolation");
+    println!("PASS: 32 cookie variants, native callbacks, profile boundaries, host/domain deletion, applying a copy and signing out in isolation");
     Ok(())
 }
 fn child(root: PathBuf) -> i32 {

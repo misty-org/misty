@@ -97,17 +97,24 @@ async fn opencode_turn_over_sse_answers_through_the_bridge() {
         async move {
             let path = request.uri().path().to_owned();
             if path == "/event" {
-                let frames = async_stream::stream! {
-                    let frame = |value: Value| Ok::<_, std::io::Error>(format!("data: {value}\n\n"));
-                    let mine = |kind: &str, mut properties: Value| { properties["sessionID"] = json!("ses_1"); json!({ "type": kind, "properties": properties }) };
-                    yield frame(mine("session.status", json!({ "status": { "type": "busy" } })));
-                    yield frame(mine("permission.asked", json!({ "id": "per_1", "permission": "edit", "patterns": ["src/main.rs"] })));
+                let frame = |value: Value| Ok::<_, std::io::Error>(format!("data: {value}\n\n"));
+                let mine = |kind: &str, mut properties: Value| { properties["sessionID"] = json!("ses_1"); json!({ "type": kind, "properties": properties }) };
+                let asked = vec![
+                    frame(mine("session.status", json!({ "status": { "type": "busy" } }))),
+                    frame(mine("permission.asked", json!({ "id": "per_1", "permission": "edit", "patterns": ["src/main.rs"] }))),
+                ];
+                let answered = vec![
+                    frame(mine("message.part.delta", json!({ "partID": "p", "delta": "Fixed." }))),
+                    frame(json!({ "type": "message.updated", "properties": { "info": { "id": "m", "sessionID": "ses_1", "role": "assistant",
+                        "time": { "completed": 1 }, "tokens": { "input": 20, "output": 5, "cache": { "read": 0, "write": 0 } } } } })),
+                    frame(mine("session.status", json!({ "status": { "type": "idle" } }))),
+                ];
+                let after_answer = futures_util::stream::once(async move {
                     notify.notified().await;
-                    yield frame(mine("message.part.delta", json!({ "partID": "p", "delta": "Fixed." })));
-                    yield frame(json!({ "type": "message.updated", "properties": { "info": { "id": "m", "sessionID": "ses_1", "role": "assistant",
-                        "time": { "completed": 1 }, "tokens": { "input": 20, "output": 5, "cache": { "read": 0, "write": 0 } } } } }));
-                    yield frame(mine("session.status", json!({ "status": { "type": "idle" } })));
-                };
+                    futures_util::stream::iter(answered)
+                })
+                .flatten();
+                let frames = futures_util::stream::iter(asked).chain(after_answer);
                 return Body::from_stream(frames).into_response_body();
             }
             let bytes = axum::body::to_bytes(request.into_body(), 1 << 20).await.unwrap();

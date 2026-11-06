@@ -16,7 +16,7 @@ export interface AddedKey {
   saved: string[];
 }
 
-export interface ChatgptStatus {
+interface ChatgptStatus {
   signedIn: boolean;
   email: string;
   /** The plan-usage grant was given; without it requests can't use the plan. */

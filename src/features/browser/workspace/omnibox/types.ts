@@ -12,7 +12,6 @@ export interface OmniboxInput {
   tabId: string;
   /** The page the tab shows now; never suggested back to itself. */
   currentUrl: string;
-  profileId?: string;
   /** Private tabs send nothing to search engines and read no durable history. */
   private: boolean;
   /** The tab's own back/forward list, oldest first. */

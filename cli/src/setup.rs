@@ -44,24 +44,6 @@ pub fn run(workspace: &Workspace, options: Setup) -> Result<()> {
 }
 
 pub fn desktop(workspace: &Workspace) -> Result<()> {
-    let path = workspace.misty.join(".env");
-    if !path.exists() {
-        let values = if environment::root(workspace, Target::Dev).exists() {
-            environment::read(workspace, Target::Dev)?
-        } else {
-            Default::default()
-        };
-        let port = values
-            .get("MISTY_HOST_PORT")
-            .map(String::as_str)
-            .unwrap_or("8081");
-        let port: u16 = port.parse()?;
-        crate::artifacts::write_private(
-            &path,
-            format!("MISTY_PUBLIC_API_URL=http://127.0.0.1:{port}/v1\n").as_bytes(),
-        )?;
-        println!("Created desktop API configuration in .env");
-    }
     install_desktop_dependencies(workspace)
 }
 

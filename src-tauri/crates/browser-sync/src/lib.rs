@@ -1,24 +1,18 @@
 //! Native-only browser synchronization. Secret types deliberately cannot be
 //! serialized or formatted; the web renderer only receives projected UI state.
-pub mod batch;
 pub mod collections;
 pub mod crypto;
 pub mod document;
+pub mod local;
 pub mod password;
-pub mod protocol;
 pub mod recovery;
 mod recovery_pending;
-pub mod restore;
 pub mod secure_store;
-pub mod store;
 pub mod transport;
-pub mod worker;
-pub mod workspace;
+pub mod vault;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
-    #[error("This device is following sync. Make it active to publish changes.")]
-    InactiveDevice,
     #[error("Invalid sync data")]
     Invalid,
     #[error("Sync identity or signature did not match")]

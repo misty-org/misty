@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { browserNoticeRadius, type BrowserNoticeRect } from "./browserBlockingOverlay";
 import { checkBrowserOverlayTransparency } from "./browserOverlayGuard";
 import { notifyBrowserSettled } from "./browserSwitchHandoff";
 import {
@@ -14,6 +15,10 @@ let browserOverlayResumeGeneration = 0;
 let browserOverlayActive = false;
 let browserPointerTrackingEnabled: boolean | null = null;
 let browserPointerTrackingQueue = Promise.resolve();
+let browserNotices: BrowserNoticeRect[] = [];
+let sentBrowserNotices = "";
+
+const browserNoticeReason = "browser-notice";
 
 /** Whether a layout move holds the pages: they keep their place until it has settled. */
 export function isBrowserLayoutMoving(): boolean {
@@ -32,6 +37,40 @@ export function setBrowserWebviewsSuspended(suspended: boolean, reason = "defaul
   } else if (!isSuspended && wasSuspended && typeof window !== "undefined") {
     scheduleBrowserOverlayResume();
   }
+  syncBrowserNotices();
+}
+
+/** On Windows a notice's box is cut out of the pages, which stay above the renderer and live. */
+function noticesCutThroughPages(): boolean {
+  return typeof navigator !== "undefined" && /win/i.test(navigator.platform);
+}
+
+/** Elsewhere notices hold the pages beneath the renderer so they can draw over them. */
+export function setBrowserNoticeRects(rects: BrowserNoticeRect[]): void {
+  browserNotices = rects;
+  if (noticesCutThroughPages()) syncBrowserNotices();
+  else setBrowserWebviewsSuspended(rects.length > 0, browserNoticeReason);
+}
+
+/** On macOS and Windows the page stays live around a notice. On macOS that lasts only until
+ * something else also holds the pages: a menu or dialog over the page still takes every click. */
+function syncBrowserNotices(): void {
+  const cutThrough = noticesCutThroughPages();
+  if (!cutThrough && (typeof navigator === "undefined" || !/mac/i.test(navigator.platform))) return;
+  const onlyNotices =
+    browserWebviewSuspensions.size === 1 && browserWebviewSuspensions.has(browserNoticeReason);
+  const rects = cutThrough || onlyNotices ? browserNotices : [];
+  const sent = JSON.stringify(rects);
+  if (sent === sentBrowserNotices) return;
+  sentBrowserNotices = sent;
+  browserOverlayQueue = browserOverlayQueue
+    .catch(() => undefined)
+    .then(() =>
+      invoke<void>("browser_webviews_set_notice_rects", {
+        rects,
+        radius: browserNoticeRadius(),
+      }).catch(() => undefined),
+    );
 }
 
 /** Reassert renderer ownership after a host reload or return to the window.
@@ -40,6 +79,8 @@ export function reconcileBrowserOverlayState(): void {
   browserPointerGestureActive = false;
   browserOverlayResumeGeneration += 1;
   setBrowserOverlayActive(browserWebviewSuspensions.size > 0);
+  sentBrowserNotices = "";
+  syncBrowserNotices();
 }
 
 export function setBrowserPointerGestureActive(active: boolean): void {

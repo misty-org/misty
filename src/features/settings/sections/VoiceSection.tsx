@@ -137,20 +137,13 @@ export function VoiceSection(props: SettingsContentProps) {
           />
         </SettingsRow>
       </SettingsSectionBlock>
-      <SettingsSectionBlock title="Captures">
+      <SettingsSectionBlock title="Listening">
         <SettingsRow label="Default sources">
           <DropdownControl
             value={voice.captureSources}
             options={sources}
             disabled={props.working}
             onValueChange={(value) => set("capture_sources", value)}
-          />
-        </SettingsRow>
-        <SettingsRow label="Keep recordings" description="Recordings count toward your storage.">
-          <SwitchControl
-            checked={voice.keepRecordings}
-            disabled={props.working}
-            onChange={(value) => set("keep_recordings", value)}
           />
         </SettingsRow>
       </SettingsSectionBlock>

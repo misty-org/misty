@@ -30,7 +30,7 @@ pub struct RestoreRequest {
     view_id: String,
 }
 
-/// Restores a tab from the page state the previous driver saved.
+/// Restores a tab from its saved page state.
 #[tauri::command]
 pub async fn browser_page_state_restore(
     app: AppHandle,
@@ -38,12 +38,15 @@ pub async fn browser_page_state_restore(
     request: RestoreRequest,
 ) -> Result<RestoreReport, String> {
     require_main(&webview_caller)?;
+    valid_tab(&request.view_id)?;
     let view = webview(&app, &request.runtime_id)?;
-    let (handle, workspace) = super::super::super::browser_sync::page_state_reader().await?;
-    let Some(plaintext) = handle
-        .read_page_slot(workspace, request.view_id, PAGE_STATE)
-        .await
-        .map_err(|e| e.to_string())?
+    let Some(plaintext) = window_records(&webview_caller)?
+        .raw_read(
+            crate::infra::profile_data::PAGE_STATE,
+            &slot_id(&request.view_id, STATE_SLOT),
+        )
+        .await?
+        .filter(|plaintext| plaintext.len() <= MAX_STATE_BYTES)
     else {
         return Ok(RestoreReport {
             status: "none",
@@ -99,85 +102,4 @@ pub async fn browser_page_state_restore(
         withheld,
         url: saved.url,
     })
-}
-
-/// Current interactable controls for the agent pass. Values of sensitive or
-/// secret fields are removed before they leave native code.
-#[tauri::command]
-pub async fn browser_page_state_controls(
-    app: AppHandle,
-    webview_caller: Webview,
-    runtime_id: String,
-) -> Result<Value, String> {
-    require_main(&webview_caller)?;
-    let view = webview(&app, &runtime_id)?;
-    let mut controls = run(&view, json!({ "op": "controls" })).await?;
-    if let Some(items) = controls.as_array_mut() {
-        for item in items.iter_mut() {
-            let meta: FieldMeta = serde_json::from_value(item.clone()).unwrap_or_default();
-            let class = if item["role"] == "field" {
-                classify::classify(&meta, false)
-            } else {
-                Class::Normal
-            };
-            if let Some(obj) = item.as_object_mut() {
-                obj.remove("locators");
-                obj.remove("key");
-                if class != Class::Normal {
-                    obj.insert("withheld".into(), json!(true));
-                }
-            }
-        }
-    }
-    Ok(controls)
-}
-
-#[derive(Deserialize, Serialize)]
-pub struct AgentAction {
-    #[serde(rename = "type")]
-    kind: String,
-    #[serde(default)]
-    r#ref: Option<String>,
-    #[serde(default)]
-    value: Option<Value>,
-    #[serde(default)]
-    dy: Option<f64>,
-}
-
-/// Executes one restricted agent action: click, type, select, check, scroll.
-/// Submitting and leaving the origin are refused by the page runtime.
-#[tauri::command]
-pub async fn browser_page_state_act(
-    app: AppHandle,
-    webview_caller: Webview,
-    runtime_id: String,
-    action: AgentAction,
-) -> Result<Value, String> {
-    require_main(&webview_caller)?;
-    if !matches!(
-        action.kind.as_str(),
-        "click" | "type" | "select" | "check" | "scroll"
-    ) {
-        return Err("That action is not allowed while restoring.".into());
-    }
-    let view = webview(&app, &runtime_id)?;
-    run(&view, json!({ "op": "act", "action": action })).await
-}
-
-/// Guards a tab against submission while an agent restores it, and reports
-/// the time of the user's last real input so restoring can yield to them.
-#[tauri::command]
-pub async fn browser_page_state_guard(
-    app: AppHandle,
-    webview_caller: Webview,
-    runtime_id: String,
-    on: bool,
-) -> Result<u64, String> {
-    require_main(&webview_caller)?;
-    let view = webview(&app, &runtime_id)?;
-    run(&view, json!({ "op": "guard", "on": on })).await?;
-    Ok(run(&view, json!({ "op": "user_at" }))
-        .await?
-        .as_u64()
-        .unwrap_or(0))
 }

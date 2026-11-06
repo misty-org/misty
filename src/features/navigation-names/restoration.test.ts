@@ -39,8 +39,6 @@ it("retains names through automatic updates, navigation, Spaces, restoration and
   });
   store.renameView(tab.id, "Latest page");
   expect(navigationName(tabNameKey(tab.id), "Latest page")).toBe("School");
-  store.setScope("space:family");
-  store.setScope("space:personal");
   expect(navigationName(tabNameKey(tab.id), "Latest page")).toBe("School");
   const migrated = normalizeWorkspaceLayout(
     JSON.parse(JSON.stringify(useWorkspaceStore.getState().layout)),

@@ -94,7 +94,7 @@ export function MistySection(_props: SettingsContentProps & { page?: "misty" | "
           </SettingsRow>
           <SettingsRow
             label="Conversation retention"
-            description="How long conversations are kept."
+            description="How long conversations are kept on the server."
             muted={!settings || !settings.enabled}
           >
             <ChoiceControl

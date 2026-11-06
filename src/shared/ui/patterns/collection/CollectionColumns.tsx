@@ -12,7 +12,7 @@ import {
 } from "../../overlays/DropdownMenu";
 import { cn } from "../../utils";
 
-export type ColumnSchema = { id: string; columns: { key: string; label: string }[] };
+type ColumnSchema = { id: string; columns: { key: string; label: string }[] };
 export const CollectionColumnsContext = createContext<{
   schema: ColumnSchema | null;
   register: (schema: ColumnSchema | null) => void;

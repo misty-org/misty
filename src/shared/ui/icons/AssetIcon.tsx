@@ -105,7 +105,7 @@ function fallbackIcon(path: string | null): LucideIcon {
   return ImageOff;
 }
 
-export interface AssetIconProps {
+interface AssetIconProps {
   src: string;
   size?: number;
   color?: boolean;
@@ -114,7 +114,7 @@ export interface AssetIconProps {
   title?: string;
 }
 
-export interface MaskIconStyle extends CSSProperties {
+interface MaskIconStyle extends CSSProperties {
   WebkitMask: string;
   mask: string;
 }

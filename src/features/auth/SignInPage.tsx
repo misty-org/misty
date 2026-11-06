@@ -1,18 +1,18 @@
 import { Avatar, AvatarFallback, Button, IconButton, Pressable } from "@/shared/ui";
 import { Trash2, UserPlus } from "lucide-react";
 import { useState } from "react";
-import { Navigate, NavLink, useLocation, useNavigate } from "react-router-dom";
-import { routes } from "@/features/app-shell";
+import { Navigate, NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "./AuthContext";
 import { SavedAccountSessionUnavailableError } from "./sessionErrors";
 import AuthCard from "./components/AuthCard";
 import AuthMessage from "./components/AuthMessage";
 import AuthShell from "./components/AuthShell";
 import SignInForm from "./components/SignInForm";
+import { ServerStep, useNeedsServer } from "./setup/ServerStep";
+import { useFinishSignIn } from "./signInSheet/useFinishSignIn";
 import type { SavedAccountSession } from "./store/accountVault";
 
 export default function SignIn() {
-  const navigate = useNavigate();
   const location = useLocation();
   const { accounts, user, transitioning, resumeAccount, removeAccount } = useAuth();
   const routeState = location.state as {
@@ -26,13 +26,13 @@ export default function SignIn() {
       ? rawFrom
       : "/browser";
   const addingAccount = Boolean(routeState?.addingAccount);
+  const finishSignIn = useFinishSignIn(from, !user);
+  const needsServer = useNeedsServer();
   const reauthenticateEmail = routeState?.reauthenticateEmail ?? "";
   // Saved accounts come first, even when adding one; with none, straight to the login form.
   const [mode, setMode] = useState<"chooser" | "login">(
     accounts.length > 0 && !reauthenticateEmail ? "chooser" : "login",
   );
-  const back = () =>
-    user ? navigate(from, { replace: true }) : navigate(routes.welcome, { replace: true });
   const [email, setEmail] = useState(reauthenticateEmail);
   const [error, setError] = useState(
     reauthenticateEmail
@@ -47,7 +47,7 @@ export default function SignIn() {
     setBusyAccountId(account.id);
     try {
       await resumeAccount(account.id);
-      navigate(from, { replace: true });
+      finishSignIn();
     } catch (resumeError) {
       if (resumeError instanceof SavedAccountSessionUnavailableError) {
         setEmail(account.email);
@@ -82,9 +82,19 @@ export default function SignIn() {
   // Only an explicit Add account action should keep a signed-in user here.
   if (user && !addingAccount && !transitioning) return <Navigate to={from} replace />;
 
+  if (needsServer) {
+    return (
+      <AuthShell title="Choose a server">
+        <AuthCard>
+          <ServerStep />
+        </AuthCard>
+      </AuthShell>
+    );
+  }
+
   if (mode === "chooser") {
     return (
-      <AuthShell title="Choose an account" onBack={back}>
+      <AuthShell title="Choose an account">
         <AuthCard>
           <div className="flex flex-col gap-2">
             {accounts.map((account) => (
@@ -117,7 +127,7 @@ export default function SignIn() {
                 </Pressable>
                 <IconButton
                   label={`Remove ${account.email}`}
-                  title="Remove from this device"
+                  title="Remove from this computer"
                   className="mr-1 shrink-0 opacity-0 transition-opacity focus-visible:opacity-100 group-hover:opacity-100"
                   onClick={() => void handleRemove(account)}
                   disabled={Boolean(busyAccountId) || transitioning}
@@ -156,17 +166,9 @@ export default function SignIn() {
       title={
         reauthenticateEmail
           ? "Sign in again"
-          : addingAccount
+          : addingAccount && user
             ? "Add another account"
             : "Welcome back"
-      }
-      onBack={
-        accounts.length > 0
-          ? () => {
-              setError("");
-              setMode("chooser");
-            }
-          : back
       }
     >
       <AuthCard
@@ -185,7 +187,7 @@ export default function SignIn() {
           onEmailChange={setEmail}
           error={error}
           onErrorChange={setError}
-          onSuccess={() => navigate(from, { replace: true })}
+          onSuccess={finishSignIn}
         />
       </AuthCard>
     </AuthShell>

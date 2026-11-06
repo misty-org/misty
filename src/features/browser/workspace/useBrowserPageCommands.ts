@@ -20,6 +20,9 @@ import {
   browserRuntimeId,
   useBrowserRuntimeStore,
 } from "@/features/webviews/browserRuntime";
+import { isIncognitoWindow } from "@/features/workspace/profileWindow";
+import { cloudClipboardPaste } from "@/native/cloud-clipboard";
+import { stepPageZoom } from "./pageZoom";
 
 export interface BrowserPageCommands {
   newTab: () => void;
@@ -120,7 +123,7 @@ export function useBrowserPageCommands(input: {
 
   const commands: BrowserPageCommands = {
     newTab: () => void invokeShortcutCommand("search.toggle"),
-    newWindow: () => void invokeShortcutCommand("workspace.open_space"),
+    newWindow: () => void invokeShortcutCommand("workspace.new_window"),
     newIncognitoWindow: () => void invokeShortcutCommand("workspace.new_incognito_window"),
     reopenView: () => void invokeShortcutCommand("workspace.reopen_tab"),
     reopenClosedTab: (index) => {
@@ -194,6 +197,29 @@ export function useBrowserPageCommands(input: {
   useShortcutHandler(
     "browser.downloads",
     run(() => openPage("downloads")),
+    focused,
+    100,
+  );
+  // Cmd/Ctrl +, - and 0 zoom only the page; on any other surface they do nothing.
+  const zoom = (direction: "in" | "out" | "reset") =>
+    run(
+      pageLive
+        ? () =>
+            void stepPageZoom(id, state.url, Boolean(isIncognitoWindow()), direction).catch(
+              (error: unknown) => report(tab.id, error),
+            )
+        : undefined,
+    );
+  useShortcutHandler("browser.zoom_in", zoom("in"), focused, 100);
+  useShortcutHandler("browser.zoom_out", zoom("out"), focused, 100);
+  useShortcutHandler("browser.zoom_reset", zoom("reset"), focused, 100);
+  useShortcutHandler(
+    "browser.cloud_paste",
+    run(
+      pageLive
+        ? () => void cloudClipboardPaste(id).catch((error: unknown) => report(tab.id, error))
+        : undefined,
+    ),
     focused,
     100,
   );

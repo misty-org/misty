@@ -1,6 +1,5 @@
 import { apiRequest } from "@/api/client/request";
 import { ApiRequestError } from "@/api/client/errors";
-import { deriveLoginCredential, isCredentialEmail } from "./store/accountCredential";
 
 /** How the person proves it is them: their Misty password, or a fresh Google sign-in. */
 export type AccountExportProof = { password: string } | { reauthenticationToken: string };
@@ -8,34 +7,54 @@ export type AccountExportProof = { password: string } | { reauthenticationToken:
 const refused = (error: unknown) =>
   error instanceof ApiRequestError && error.code === "account_reauthentication_failed";
 
-function exportBody(proof: AccountExportProof, password?: string) {
-  return JSON.stringify(
-    "reauthenticationToken" in proof
-      ? { reauthentication_token: proof.reauthenticationToken }
-      : { password },
-  );
+/** What a request that needs the person to prove it is them sends. */
+function proofFields(
+  proof: AccountExportProof,
+): { password: string } | { reauthentication_token: string } {
+  return "reauthenticationToken" in proof
+    ? { reauthentication_token: proof.reauthenticationToken }
+    : { password: proof.password };
 }
 
 /**
  * The server's account export (`POST /me/export`): the account's data, and a link to each
- * note, drawing and file that works for 15 minutes. A Misty password is sent as the credential
- * derived on this device, and as typed only for an account this device hasn't seen sign in
- * with a credential (an older account still holds its password that way), as at sign-in.
+ * note, drawing and file that works for 15 minutes.
  */
-export async function requestAccountExport(
-  email: string,
-  proof: AccountExportProof,
-): Promise<unknown> {
-  const send = (password?: string) =>
-    apiRequest<unknown>("/me/export", { method: "POST", body: exportBody(proof, password) });
-  if ("reauthenticationToken" in proof) return send();
-  const credential = await deriveLoginCredential(email, proof.password);
-  if (!credential) return send(proof.password);
+export function requestAccountExport(proof: AccountExportProof): Promise<unknown> {
+  return apiRequest<unknown>("/me/export", {
+    method: "POST",
+    body: JSON.stringify(proofFields(proof)),
+  });
+}
+
+/** Starts deleting the account (`POST /me/deletion`); the server removes it after 30 days. */
+export async function requestAccountDeletion(proof: AccountExportProof): Promise<void> {
+  await apiRequest<unknown>("/me/deletion", {
+    method: "POST",
+    body: JSON.stringify({ ...proofFields(proof), confirmation: "DELETE" }),
+  });
+}
+
+/** What the dialog says when the account couldn't be deleted. */
+export function accountDeletionError(error: unknown): string {
+  if (refused(error)) return "That password didn't work. Try again.";
+  if (error instanceof ApiRequestError && error.code === "account_deletion_space_ownership") {
+    const names = ownedSpaceNames(error.responseText);
+    return names
+      ? `Hand over or delete the Spaces you own first: ${names}.`
+      : "Hand over or delete the Spaces you own first.";
+  }
+  if (error instanceof ApiRequestError && error.code === "account_deletion_already_pending")
+    return "This account is already being deleted.";
+  return "The account couldn't be deleted. Try again.";
+}
+
+function ownedSpaceNames(responseText: string): string {
   try {
-    return await send(credential);
-  } catch (error) {
-    if (!refused(error) || isCredentialEmail(email)) throw error;
-    return send(proof.password);
+    const { spaces } = JSON.parse(responseText) as { spaces?: { name: string }[] };
+    return (spaces ?? []).map((space) => space.name).join(", ");
+  } catch {
+    return "";
   }
 }
 

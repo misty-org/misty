@@ -4,11 +4,10 @@ import { openSignInSheet, useAuth } from "@/features/auth";
 import { useWorkspaceViewFocused } from "@/features/workspace/WorkspaceViewRouteScope";
 import type { WorkspaceView } from "@/features/workspace/core";
 import { SpaceOverviewProvider } from "./useSpaceOverview";
-import { Button, CollectionSkeleton, Skeleton } from "@/shared/ui";
+import { Button, CollectionSkeleton, ErrorNotification, Skeleton } from "@/shared/ui";
 import { GlobalCreateSpaceDialog } from "./GlobalCreateSpaceDialog";
 import { SpaceSectionView } from "./SpaceSectionView";
 import { preferredDefaultSpace, windowSpace } from "./defaultSpace";
-import { openSpaceWindow } from "@/features/workspace/spaceWindow";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { defaultSpaceRoute } from "./defaultSpaceRoute";
 import { useSpacesStore } from "./store/useSpacesStore";
@@ -29,26 +28,14 @@ export function SpaceWorkspaceSurface({ tab }: { tab: WorkspaceView }) {
   const invitations = useSpacesStore((state) => state.invitations);
   const respondInvite = useSpacesStore((state) => state.respondInvite);
   const space = spaces.find((item) => item.id === route.activeSpaceId);
-  // A window shows only its own Space; another Space opens in its own window.
+  // Any Space opens here, in this tab; a bare route lands on the window's current one.
   const fallback = hasTauriInternals() ? windowSpace(spaces) : preferredDefaultSpace(spaces);
-  const elsewhere = Boolean(
-    ready && fallback && route.activeSpaceId && route.activeSpaceId !== fallback.id,
-  );
   const [inviteError, setInviteError] = useState("");
   useEffect(() => {
     if (!route.activeSpaceId && ready && fallback) {
       navigate(defaultSpaceRoute(fallback.id), { replace: true });
     }
   }, [fallback, ready, route.activeSpaceId, navigate]);
-  useEffect(() => {
-    if (!elsewhere || !fallback || !hasTauriInternals()) return;
-    const other = spaces.find((item) => item.id === route.activeSpaceId);
-    if (other)
-      void openSpaceWindow(other.id, other.id === preferredDefaultSpace(spaces)?.id).catch(
-        () => undefined,
-      );
-    navigate(defaultSpaceRoute(fallback.id), { replace: true });
-  }, [elsewhere, fallback, spaces, route.activeSpaceId, navigate]);
   useEffect(() => {
     if (!route.activeSpaceId) return;
     const base = `/spaces/${encodeURIComponent(route.activeSpaceId)}`;
@@ -68,14 +55,7 @@ export function SpaceWorkspaceSurface({ tab }: { tab: WorkspaceView }) {
       </div>
     );
 
-  if (!ready && error)
-    return (
-      <div className="grid h-full place-content-center gap-3 text-center text-sm text-cream-muted">
-        <p role="alert">Spaces could not be loaded.</p>
-        <Button onClick={() => void load({ force: true })}>Retry</Button>
-      </div>
-    );
-  if (!ready || (elsewhere && hasTauriInternals()))
+  if (!ready)
     return (
       <div className="flex h-full min-h-0 flex-col overflow-hidden bg-charcoal-workspace">
         <div className="flex h-11 shrink-0 items-center gap-3 border-b border-charcoal-border px-3">
@@ -86,6 +66,11 @@ export function SpaceWorkspaceSurface({ tab }: { tab: WorkspaceView }) {
         <div className="flex min-w-0 flex-1 flex-col p-6">
           <CollectionSkeleton label="Spaces" view="grid" />
         </div>
+        <ErrorNotification message={error ? "Spaces could not be loaded." : ""}>
+          <Button type="button" variant="ghost" size="sm" onClick={() => void load({ force: true })}>
+            Retry
+          </Button>
+        </ErrorNotification>
       </div>
     );
 
@@ -108,7 +93,7 @@ export function SpaceWorkspaceSurface({ tab }: { tab: WorkspaceView }) {
                 );
               }}
             />
-            {inviteError && <p role="alert">{inviteError}</p>}
+            <ErrorNotification message={inviteError} onDismiss={() => setInviteError("")} />
             <Button onClick={create}>Create Space</Button>
           </div>
         )}

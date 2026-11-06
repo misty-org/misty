@@ -9,7 +9,6 @@ import {
 } from "@/features/workspace";
 import { layoutTabs } from "@/features/workspace/layoutTabs";
 import { closePeek, usePeekStore } from "@/features/workspace/peek";
-import { mapAllWorkspaceWindowLayouts } from "@/features/workspace/windows";
 import { useCallback, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
@@ -19,8 +18,9 @@ export function useLegacyTabTitles() {
   const legacyNamesReady = useNavigationNames((state) => state.ready);
   useEffect(() => {
     if (!legacyNamesReady) return;
-    useWorkspaceStore.setState(
-      mapAllWorkspaceWindowLayouts(useWorkspaceStore.getState(), (layout) => ({
+    const { layout } = useWorkspaceStore.getState();
+    useWorkspaceStore.setState({
+      layout: {
         ...layout,
         tabs: layoutTabs(layout).map((tab) => {
           if (!tab.legacyNameKeys) return tab;
@@ -30,8 +30,8 @@ export function useLegacyTabTitles() {
             title: rest.title ?? legacyNameKeys.map((key) => legacyNames[key]).find(Boolean),
           };
         }),
-      })),
-    );
+      },
+    });
   }, [legacyNames, legacyNamesReady]);
 }
 

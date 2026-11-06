@@ -1,4 +1,4 @@
-//! One device key for sync trust, agents and the shared clipboard
+//! One key for this session's signed requests, policies and agent run grants
 //! (docs/sync/devices.md), kept in the credential store. The private
 //! key never leaves native code: every signature here prefixes an allow-listed
 //! domain, so one made for one purpose is never valid for another.
@@ -15,15 +15,9 @@ pub const REGISTER_DOMAIN: &str = "misty.device.register.v1";
 pub const CHANNEL_DOMAIN: &str = "misty.device.channel.v1";
 pub const POLICY_DOMAIN: &str = "misty.device.policy.v1";
 pub const RUN_GRANT_DOMAIN: &str = "misty.device.run-grant.v1";
-pub const ADMISSION_DOMAIN: &str = "misty.device.admission.v1";
 
 /// Records this key may sign as JSON arrays, by their leading domain.
-const RECORD_DOMAINS: [&str; 4] = [
-    REGISTER_DOMAIN,
-    POLICY_DOMAIN,
-    RUN_GRANT_DOMAIN,
-    ADMISSION_DOMAIN,
-];
+const RECORD_DOMAINS: [&str; 3] = [REGISTER_DOMAIN, POLICY_DOMAIN, RUN_GRANT_DOMAIN];
 
 pub struct DeviceIdentity {
     signing: SigningKey,
@@ -147,6 +141,7 @@ mod tests {
         for domain in [
             "misty.device.grant.v2",
             "misty.device.list.v1",
+            "misty.device.admission.v1",
             "misty.sync.device.v1",
         ] {
             let payload = serde_json::to_vec(&(domain, "acct")).unwrap();

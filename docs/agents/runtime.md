@@ -14,10 +14,10 @@ Cloud plan, and the server's last model path went the same day. Model sign-ins l
 2. The desktop's delivery worker (`src/features/agents/runtimeDeliveries.ts`) holds a claim
    open: `POST /devices/{id}/agent-runtime/deliveries/claim`, signed with the device key,
    held up to 25 s and woken on the `runtime` account topic.
-   - A delivery goes to the device the run is pinned to (`runtime_endpoint 'device:<id>'`).
-   - A run not started yet goes to the device that keeps its chat.
-   - A run with neither (+misty email, @misty Slack, a schedule with no computer) goes to
-     the first of the person's desktops that claims it.
+   - A delivery goes to the computer the run is pinned to (`runtime_endpoint 'device:<id>'`), which
+     admission sets to the computer it was sent from.
+   - A run sent from no computer (+misty email, @misty Slack, a schedule with no computer) goes to
+     the first of the person's computers that claims it.
 3. The server runs its usual checks and pins a start to the claiming device. It hands over
    the run's key: `HMAC-SHA256(server secret, "misty-run-key" || 0 || runID)`. The key opens
    that run's `/internal/agent-runtime/runs/{runID}/…` calls and nothing else, and the server
@@ -33,7 +33,7 @@ Cloud plan, and the server's last model path went the same day. Model sign-ins l
 
 ## The helper process
 
-`src-tauri/src/infra/agent_runtime/` starts the nitro build of `server/apps/agent-runtime`
+`src-tauri/src/infra/agent_runtime/` starts the nitro build of `src-tauri/services/agent-runtime`
 under Node on `127.0.0.1`, on a free port:
 
 - **Launch secret:** a fresh secret for each launch signs every `/v1` call, so nothing else
@@ -48,7 +48,7 @@ under Node on `127.0.0.1`, on a free port:
 - **The run's model:** the run reports the device's models in its `context` request, and
   the server sizes and records the run by them.
 - **Development:** uses the checkout's `.output`, so run `npm run build` in
-  `server/apps/agent-runtime` first, and the system `node`.
+  `src-tauri/services/agent-runtime` first, and the system `node`.
 - **Release builds** (`cli/src/release/runtime.rs`):
   - ship `.output` as the `agent-runtime` resource and the Node named by
     `MISTY_RELEASE_NODE` as the `misty-node` sidecar;
@@ -102,9 +102,13 @@ The renderer calls `deviceModelCall` (`src/api/device-models.ts`). That goes to 
 - **Tasks that wait:** a +misty email or @misty Slack task that arrives while none of the
   person's computers is on gets a reply in its thread saying it starts once one is.
 
+## Reading a page
+
+`web.fetch` runs in the runtime too (`src-tauri/services/agent-runtime/src/web-fetch/`), on every run, with no key. A run is always on the computer that started it, so the server never fetches a page itself; what the fetch returned is stored with the conversation ([README.md](README.md#where-conversations-live)). Every address and redirect must resolve only to public addresses, checked as it connects, so an untrusted page can't send the agent into the person's own network.
+
 ## Web search
 
-`web.search` runs in the runtime itself (`server/apps/agent-runtime/src/web-search/`), on the
+`web.search` runs in the runtime itself (`src-tauri/services/agent-runtime/src/web-search/`), on the
 search service and key the person keeps in Settings › Models ([byok.md](../byok.md#web-search)).
 It has the same name, input, output and description as when the server ran it, and never goes
 through the server's MCP gateway.
@@ -127,6 +131,8 @@ through the server's MCP gateway.
 
 ## What the server keeps
 
+- **Conversations:** turns, replies, the timeline and tool output, for their owner
+  ([README.md](README.md#where-conversations-live)). Each run's earlier turns come from there.
 - **No model path and no search:** the server has no model client, no operator model or key,
   no search key or provider, and no voice routes. `/agent-voice/*`, `/me/voice/live/ticket`, `/internal/voice/live/credential`,
   `/ai/me/voice/cleanup`, `/ai/models`, `/me/screen-model/*`, `/me/companion/refine-point/*`,

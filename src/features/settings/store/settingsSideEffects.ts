@@ -6,12 +6,12 @@ import {
   type StoredDockingLayout,
 } from "@/features/app-shell/dockingLayout";
 import { configureTabHistoryBudget } from "@/features/webviews/tabHistory";
-import { configurePageRestore } from "@/features/browser-sync/pageRestoreSettings";
+import { configureExcludedSites } from "@/features/page-state/settings";
 import type { ShortcutsSnapshot } from "@/native/ipc";
 import { configureStartupPreference } from "@/features/app-shell";
 import { configureBrowserHomeUrl } from "@/features/workspace/browserHome";
 import { configureBrowserSearchSuggestions } from "@/features/workspace/browserSearchEngine";
-import { configureDeviceBangs } from "@/features/workspace/spaceSearch";
+import { configureDeviceBangs } from "@/features/workspace/profileSearch";
 import {
   configureWorkspaceDefaultView,
   workspaceDefaultViewIndex,
@@ -27,7 +27,6 @@ import { configureBrowserMouseGestures } from "@/features/webviews/mouseGestures
 import { configureHiddenTabSleep } from "@/features/webviews/hiddenTabSleep";
 import { configureTabArchive } from "@/features/workspace/tabArchiveSettings";
 import { configureExternalLinks } from "@/features/workspace/externalLinkSettings";
-import { invoke } from "@/native/invoke";
 import { configureLinkPreviews } from "@/features/link-preview/settings";
 import { settingsBoolean, settingsNumber, settingsString } from "./preferences";
 
@@ -69,21 +68,13 @@ export function applySettingsSideEffects(
   } catch {
     /* Invalid legacy data uses the last applied presets. */
   }
-  configurePageRestore({
-    enabled: settingsBoolean(document, "privacy", "page_state_restore", true),
-    agent: settingsBoolean(document, "privacy", "page_state_agent_restore", true),
-    excludedSites: settingsString(document, "privacy", "page_state_excluded_sites", ""),
-  });
+  configureExcludedSites(settingsString(document, "privacy", "page_state_excluded_sites", ""));
   configureTabHistoryBudget(settingsNumber(document, "general", "browser_tab_history_kb", 256));
-  // This device's own sync frequency: the native sync worker scales its send timings by it.
-  void invoke("browser_sync_set_frequency", {
-    frequency: settingsString(document, "sync", "sync_frequency", "balanced"),
-  }).catch(() => undefined);
   configureBrowserHomeUrl(settingsString(document, "general", "browser_homepage", ""));
   configureBrowserSearchSuggestions(
     settingsBoolean(document, "general", "browser_search_suggestions", false),
   );
-  // Bangs are Space data; the device's own list applies while no Space vault is open.
+  // Bangs are the profile's; this computer's own list applies while those can't be read.
   configureDeviceBangs(settingsString(document, "general", "browser_custom_bangs_json", "[]"));
   configureBrowserSiteZoom(settingsString(document, "general", "browser_site_zoom_json", "[]"));
   configureBrowserSiteStyles(settingsString(document, "general", "browser_site_styles_json", "[]"));

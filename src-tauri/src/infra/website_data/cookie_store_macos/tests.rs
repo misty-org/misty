@@ -86,7 +86,25 @@ fn rejects_silent_expiry_shortening() {
         import_cookie(&cookie),
         Err(CookieStoreError::Unsupported)
     ));
-    assert!(!representable(&cookie));
+    // A cookie that came from another engine still goes in, at what this one allows.
+    let native = clamped_cookie(&cookie).expect("clamped expiry is accepted");
+    let stored = export_cookie(&native)
+        .unwrap()
+        .expires_unix_seconds
+        .unwrap();
+    assert!(stored < cookie.expires_unix_seconds.unwrap());
+}
+
+#[test]
+fn a_clamped_write_refuses_any_other_change() {
+    let mut cookie = fixture();
+    cookie.partition_key = Some(misty_browser_sync::document::credentials::PartitionKey {
+        top_level_site: "https://example.test".into(),
+        has_cross_site_ancestor: false,
+    });
+    cookie.expires_unix_seconds = Some(tomorrow());
+    // Foundation has no partition: it would silently broaden the cookie.
+    assert!(clamped_cookie(&cookie).is_err());
 }
 
 #[test]

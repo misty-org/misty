@@ -1,7 +1,7 @@
 import { platform as osPlatform } from "@tauri-apps/plugin-os";
 import { hasTauriInternals } from "./tauri";
 
-export type DesktopOs = "macos" | "windows" | "linux";
+type DesktopOs = "macos" | "windows" | "linux";
 
 /** The operating system Misty runs on: the native answer in the app, the browser's guess elsewhere. */
 export function desktopOs(): DesktopOs {

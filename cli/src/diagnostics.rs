@@ -198,7 +198,7 @@ pub fn run(workspace: &Workspace, options: Doctor) -> Result<()> {
     Ok(())
 }
 
-fn version_at_least(version: &str, major: u32, minor: u32) -> bool {
+pub(crate) fn version_at_least(version: &str, major: u32, minor: u32) -> bool {
     let mut parts = version.trim().trim_start_matches('v').split('.');
     let found = (
         parts

@@ -83,27 +83,6 @@
   padding: 12px 24px 16px;
   flex-shrink: 0;
 }
-.agent-compose-error,
-.agents-notice {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  color: var(--color-cream);
-  background: var(--color-charcoal-card);
-  font-size: 12px;
-}
-.agent-compose-error p,
-.agents-notice p {
-  flex: 1;
-  min-width: 0;
-  overflow-wrap: anywhere;
-  margin: 0;
-}
-.agent-compose-error {
-  margin-bottom: 8px;
-  border-radius: var(--radius-md);
-}
 .agent-compose-status,
 .agent-compose-hint {
   margin: 6px 0 0;

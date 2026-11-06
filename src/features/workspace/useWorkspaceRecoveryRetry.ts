@@ -5,7 +5,7 @@ import {
   readApiSessionGeneration,
 } from "@/api/client/session";
 import { nativeWorkspaceRecoveryEnabled } from "./workspaceRecoveryPlatform";
-import { isLocalProfile } from "./profileId";
+import { isLocalAccountScope } from "./accountScope";
 import {
   continueWithTemporaryWorkspace,
   restoreNativeWorkspace,
@@ -72,10 +72,10 @@ export function useWorkspaceRecoveryRetry(accountId: string) {
   }, [accountId, needsRecovery]);
 }
 
-export async function retryWorkspaceRecovery(accountId: string, valid: () => boolean) {
+async function retryWorkspaceRecovery(accountId: string, valid: () => boolean) {
   try {
     // The local profile has no account cookies to restore first.
-    if (!isLocalProfile(accountId)) await readApiAuthToken();
+    if (!isLocalAccountScope(accountId)) await readApiAuthToken();
     if (valid()) await restoreNativeWorkspace(accountId);
   } catch (error) {
     if (valid()) continueWithTemporaryWorkspace(accountId, error);

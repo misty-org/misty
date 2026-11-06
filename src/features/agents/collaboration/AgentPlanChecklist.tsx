@@ -1,7 +1,7 @@
 import { Flag } from "lucide-react";
 import { useState } from "react";
 import { useMistyStore } from "@/features/misty/useMistyStore";
-import { Button } from "@/shared/ui";
+import { Button, ErrorNotification } from "@/shared/ui";
 import { statusText, StepIcon } from "./ChecklistStatus";
 import { PlanRiskTag } from "./PlanRiskTag";
 import { useCollaborationStore } from "./store";
@@ -90,11 +90,7 @@ export function AgentPlanChecklist({
           Set as goal
         </Button>
       )}
-      {error && (
-        <p role="alert" className="agent-question-error">
-          {error}
-        </p>
-      )}
+      <ErrorNotification message={error} onDismiss={() => setError("")} />
     </section>
   );
 }

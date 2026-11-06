@@ -1,5 +1,5 @@
 import { useNativeSessionStore } from "@/features/native-session";
-import { profileIdFor } from "@/features/workspace/profileId";
+import { accountScopeFor } from "@/features/workspace/accountScope";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { readInitialUser, type AuthUser } from "./authSession";
 import type { SavedAccountSession } from "./store/accountVault";
@@ -33,7 +33,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => setSessionExpired(false), [user]);
   // Signing in from the local profile adopts it and signing out returns to it, so the window
   // keeps its pages; only switching between two accounts starts the app over.
-  const [outletKey, setOutletKey] = useState(() => profileIdFor(activeUser?.id));
+  const [outletKey, setOutletKey] = useState(() => accountScopeFor(activeUser?.id));
   const previousUserId = useRef(activeUser?.id);
   useEffect(() => {
     const previous = previousUserId.current;

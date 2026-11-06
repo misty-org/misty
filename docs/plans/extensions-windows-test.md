@@ -1,6 +1,6 @@
 # Windows extension test
 
-Part of [extensions-sync-plan.md](extensions-sync-plan.md), Track 1 step 1. Record pass or fail and what you saw. Chrome Web Store extensions only.
+Record pass or fail and what you saw. Chrome Web Store extensions only.
 
 ## Run Misty
 

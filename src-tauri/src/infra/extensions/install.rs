@@ -4,13 +4,13 @@ use super::*;
 pub(super) async fn prepare(
     app: &tauri::AppHandle,
     account: &str,
-    space: &str,
+    profile: &str,
     id: &str,
 ) -> Result<package::Review, String> {
     let epoch = ACCOUNT_EPOCH.load(std::sync::atomic::Ordering::Acquire);
     let entry = cancellable(epoch, catalog::latest(id)).await?;
     {
-        let state = service(space).lock().await;
+        let state = service(profile).lock().await;
         if state.account != account {
             return Err("The extension account changed.".into());
         }
@@ -24,7 +24,7 @@ pub(super) async fn prepare(
     }
     let bytes = cancellable(epoch, catalog::bytes(&entry.download_url, 64 * 1024 * 1024)).await?;
     let token = uuid::Uuid::new_v4().to_string();
-    let path = root(app, account, space)?.join("staging").join(&token);
+    let path = root(app, account, profile)?.join("staging").join(&token);
     let staging = path.clone();
     let prepared_token = token.clone();
     let mut review = tauri::async_runtime::spawn_blocking(move || {
@@ -39,7 +39,7 @@ pub(super) async fn prepare(
     let native_review = cancellable(
         epoch,
         native::request(
-            json!({"operation":"validate","account":account,"space":space,"runtimePath":path.join("runtime")}),
+            json!({"operation":"validate","account":account,"space":profile,"runtimePath":path.join("runtime")}),
         ),
     )
     .await;
@@ -73,7 +73,7 @@ pub(super) async fn prepare(
         serde_json::to_vec(&review).map_err(|e| e.to_string())?,
     )
     .map_err(|e| e.to_string())?;
-    let mut state = service(space).lock().await;
+    let mut state = service(profile).lock().await;
     if state.account != account || ACCOUNT_EPOCH.load(std::sync::atomic::Ordering::Acquire) != epoch
     {
         let _ = std::fs::remove_dir_all(&path);
@@ -90,12 +90,12 @@ pub async fn extensions_prepare(
     id: String,
 ) -> Result<package::Review, ExtensionFailure> {
     let result: Result<_, String> = async {
-        let space = native::caller_space(&caller)?;
-        let account = service(&space).lock().await.account.clone();
+        let profile = native::caller_profile(&caller)?;
+        let account = service(&profile).lock().await.account.clone();
         if account.is_empty() {
             return Err("Sign in to install extensions.".into());
         }
-        prepare(&app, &account, &space, &id).await
+        prepare(&app, &account, &profile, &id).await
     }
     .await;
     result.map_err(ExtensionFailure::from)
@@ -103,11 +103,11 @@ pub async fn extensions_prepare(
 
 pub(super) async fn commit(
     app: &tauri::AppHandle,
-    space: &str,
+    profile: &str,
     token: &str,
 ) -> Result<package::Review, String> {
     let (account, path) = {
-        let mut state = service(space).lock().await;
+        let mut state = service(profile).lock().await;
         (
             state.account.clone(),
             state
@@ -120,7 +120,7 @@ pub(super) async fn commit(
     if review.blocked {
         return Err("This extension requires unavailable browser APIs.".into());
     }
-    let package = root(app, &account, space)?
+    let package = root(app, &account, profile)?
         .join("packages")
         .join(&review.entry.id);
     std::fs::create_dir_all(&package).map_err(|e| e.to_string())?;
@@ -172,7 +172,7 @@ pub async fn extensions_commit(
     generation: Option<String>,
 ) -> Result<package::Review, ExtensionFailure> {
     let result: Result<_, String> = async {
-        let space = native::caller_space(&caller)?;
+        let profile = native::caller_profile(&caller)?;
         let _guard = lifecycle().lock().await;
         if generation
             .as_ref()
@@ -180,9 +180,9 @@ pub async fn extensions_commit(
         {
             return Err("Invalid installation generation.".into());
         }
-        let review = commit(&app, &space, &token).await?;
+        let review = commit(&app, &profile, &token).await?;
         if let Some(generation) = generation {
-            let state = service(&space).lock().await;
+            let state = service(&profile).lock().await;
             if !state
                 .desired
                 .get(&review.entry.id)
@@ -193,7 +193,7 @@ pub async fn extensions_commit(
                 sync::seed_local(
                     &app,
                     &account,
-                    &space,
+                    &profile,
                     &Installation {
                         id: review.entry.id.clone(),
                         guid: review.entry.guid.clone(),

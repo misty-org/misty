@@ -1,5 +1,5 @@
-import { Button, cn, EmptyState, Skeleton, SkeletonDocument } from "@/shared/ui";
-import { ChevronLeft, Link2 } from "lucide-react";
+import { BackButton, Button, cn, EmptyState, Skeleton, SkeletonDocument } from "@/shared/ui";
+import { Link2 } from "lucide-react";
 import { Suspense, useEffect, useState, type ComponentType } from "react";
 import type { UnifiedNote } from "../model/types";
 import type { NativeNotesApi } from "../noteServices";
@@ -59,19 +59,7 @@ export function NoteReadingPaneView(
   return (
     <article className={paneClass} aria-label={note.title}>
       <header className={cn(headerClass, false)}>
-        {props.onBack ? (
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="h-8 gap-1.5 px-2 text-cream-muted hover:text-cream-bright"
-            onClick={props.onBack}
-            aria-label="Back to notes"
-          >
-            <ChevronLeft size={16} />
-            <span className="text-xs font-medium">Notes</span>
-          </Button>
-        ) : null}
+        {props.onBack ? <BackButton onClick={props.onBack} aria-label="Back to notes" /> : null}
         <div className="flex min-w-0 flex-1 items-center gap-2">
           {collaborative && note.spaceId ? (
             <NoteTitleInput

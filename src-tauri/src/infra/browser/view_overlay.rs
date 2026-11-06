@@ -74,6 +74,70 @@ pub fn browser_webviews_set_overlay_active(
     }
 }
 
+/// Where the renderer's notices are: left, top, right and bottom in its points, so a notice
+/// doesn't hold the page. On macOS the page sits beneath and clicks past a notice reach it; on
+/// Windows the page stays on top with the notice's box cut out of it. Linux still holds the page.
+#[tauri::command]
+pub fn browser_webviews_set_notice_rects(
+    caller: Webview,
+    app: AppHandle,
+    rects: Vec<[f64; 4]>,
+    radius: f64,
+) -> Result<(), String> {
+    #[cfg(windows)]
+    {
+        remember_main_macos_webview(&app, caller.window().label())?;
+        let window = caller.window();
+        let scale = window.scale_factor().map_err(|error| error.to_string())?;
+        // Rounded inward: a pixel the notice only partly covers stays the page's, or what's
+        // behind the page would show along the edge.
+        let holes = rects
+            .iter()
+            .map(|[left, top, right, bottom]| {
+                [
+                    (left * scale).ceil() as i32,
+                    (top * scale).ceil() as i32,
+                    (right * scale).floor() as i32,
+                    (bottom * scale).floor() as i32,
+                ]
+            })
+            .collect();
+        page_frame_windows::set_notice_holes(
+            renderer(window.label()).native as isize,
+            (radius * scale).round() as i32,
+            holes,
+        );
+        let mut errors = Vec::new();
+        for (label, webview) in app.webviews() {
+            if label.starts_with("misty-browser-") && webview.window().label() == window.label() {
+                if let Err(error) = page_frame_windows::reapply(&webview) {
+                    errors.push(error);
+                }
+            }
+        }
+        return if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors.join("; "))
+        };
+    }
+    #[cfg(target_os = "macos")]
+    {
+        let _ = (app, radius);
+        caller
+            .with_webview(move |platform_webview| unsafe {
+                let view: &objc2_app_kit::NSView = &*platform_webview.inner().cast();
+                crate::infra::browser_pointer_guard_macos::set_notice_rects(view, rects);
+            })
+            .map_err(|error| error.to_string())
+    }
+    #[cfg(not(any(target_os = "macos", windows)))]
+    {
+        let _ = (caller, app, rects, radius);
+        Ok(())
+    }
+}
+
 #[tauri::command]
 pub fn browser_webviews_set_pointer_tracking(
     caller: Webview,

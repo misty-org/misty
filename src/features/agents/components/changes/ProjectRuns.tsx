@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Button, SkeletonList } from "@/shared/ui";
+import { Button, ErrorNotification, SkeletonList } from "@/shared/ui";
 import { projectCheckpoints, projectUndo } from "../../store/useAgentsStore";
 import { plainFailure, undoneText } from "./undoText";
 
@@ -52,8 +52,12 @@ export function ProjectRuns({
   return (
     <section className="misty-project-runs" aria-label="Coding runs you can undo">
       <h3>Coding runs you can undo</h3>
-      {notice ? (
-        <p className="misty-diff-note" role={notice.failed ? "alert" : "status"}>
+      <ErrorNotification
+        message={notice?.failed ? notice.text : ""}
+        onDismiss={() => setNotice(undefined)}
+      />
+      {notice && !notice.failed ? (
+        <p className="misty-diff-note" role="status">
           {notice.text}
         </p>
       ) : null}

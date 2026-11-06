@@ -12,7 +12,7 @@ impact you expect. We will acknowledge the report and keep you informed until it
 ## Scope
 
 In scope: the desktop app (`src/`, `src-tauri/`, `kiri/`), the `misty` CLI (`cli/`) and the server
-(`server/`), including sync encryption, device admission, agent permissions and the browser's
+([misty-server](https://github.com/misty-org/misty-server)), including sync encryption, device admission, agent permissions and the browser's
 handling of untrusted pages.
 
 Out of scope: findings that need an already compromised device or account, social engineering,

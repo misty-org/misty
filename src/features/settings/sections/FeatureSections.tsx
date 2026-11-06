@@ -4,10 +4,9 @@ import {
   removeProject,
   CompanionAppearanceSettings,
 } from "@/features/agents";
-import { openAccountSettingsInBrowser } from "@/features/account/openAccountSettings";
 import { confirmAction } from "@/shared/lib/confirmAction";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { Button, SkeletonList } from "@/shared/ui";
+import { Button, ErrorNotification, SkeletonList } from "@/shared/ui";
 import { useEffect, useState } from "react";
 import {
   DesktopSettingsRow as Row,
@@ -16,7 +15,6 @@ import {
 import { definitionById, fromLegacy } from "../devicePreferences/registry";
 import { useDevicePreferences } from "../devicePreferences/store";
 import { ChoiceControl, SwitchControl } from "../SettingsControls";
-import { DevicesSettings } from "./devices/DevicesSettings";
 import { useSettingsStore } from "../store/useSettingsStore";
 import { AgentGrantsSection } from "./AgentGrantsSection";
 import { AgentSitesSection } from "./AgentSitesSection";
@@ -27,7 +25,7 @@ import { PreferenceRow } from "./PreferenceRow";
 export function AgentDefaultsSection() {
   return (
     <>
-      <Section title="Conversations">
+      <Section title="Defaults">
         <CollaborationModeRow />
         <PreferenceRow id="agents.plan_deep_thinking" />
         <PanelSideRow />
@@ -78,9 +76,6 @@ export function AgentConnectionsSection() {
 export function CompanionSection() {
   return hasTauriInternals() ? <CompanionAppearanceSettings /> : null;
 }
-export function DevicesSection() {
-  return hasTauriInternals() ? <DevicesSettings /> : null;
-}
 /** What agents may do: remembered approvals (server-owned), project folders on a desktop, and
  * sites they only read. */
 export function AgentPermissionsSection() {
@@ -116,22 +111,13 @@ function AgentScopeList() {
       </Section>
     );
   if (!scopes.length)
-    return error ? (
-      <Section title="Projects">
-        <p role="alert" className="text-sm text-cream-muted">
-          Project folders could not be loaded.
-        </p>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="mt-2"
-          onClick={() => void refresh()}
-        >
+    return (
+      <ErrorNotification message={error} onDismiss={() => setError("")}>
+        <Button type="button" variant="outline" size="sm" onClick={() => void refresh()}>
           Try again
         </Button>
-      </Section>
-    ) : null;
+      </ErrorNotification>
+    );
   return (
     <Section title="Projects" description="Add one from a chat’s Project menu.">
       {scopes.map((s) => (
@@ -164,34 +150,11 @@ function AgentScopeList() {
           </Button>
         </Row>
       ))}
-      {error && (
-        <p role="alert" className="py-2 text-sm text-cream-muted">
-          {error}
-          <Button
-            type="button"
-            variant="link"
-            className="ml-2 h-auto p-0"
-            onClick={() => void refresh()}
-          >
-            Try again
-          </Button>
-        </p>
-      )}
-    </Section>
-  );
-}
-/** The way to the account on the Misty server's website, which owns account data. */
-export function AboutSection() {
-  return (
-    <Section title="Account">
-      <Row
-        label="Account"
-        description="Your profile, invites and account data are managed on your Misty server's website."
-      >
-        <Button variant="outline" size="sm" onClick={() => void openAccountSettingsInBrowser()}>
-          Manage account
+      <ErrorNotification message={error} onDismiss={() => setError("")}>
+        <Button type="button" variant="outline" size="sm" onClick={() => void refresh()}>
+          Try again
         </Button>
-      </Row>
+      </ErrorNotification>
     </Section>
   );
 }

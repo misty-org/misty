@@ -4,6 +4,7 @@ import { confirmAction } from "@/shared/lib/confirmAction";
 import { openExternalLink } from "@/shared/platform/openExternalLink";
 import {
   Button,
+  ErrorNotification,
   IconButton,
   Input,
   Popover,
@@ -167,11 +168,7 @@ export function ConnectedAppsCatalog() {
   };
   return (
     <>
-      {error ? (
-        <p role="alert" className="agent-integrations-description">
-          {error}
-        </p>
-      ) : null}
+      <ErrorNotification message={error} />
       {!available ? (
         <p className="agent-integrations-description">
           Connected apps are not set up on this Misty server.

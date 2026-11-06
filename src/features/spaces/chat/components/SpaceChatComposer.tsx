@@ -25,7 +25,7 @@ const MAX_MESSAGE_LENGTH = 3000;
 // place in the toolbar once it's actually useful information.
 const MESSAGE_LENGTH_WARNING_THRESHOLD = MAX_MESSAGE_LENGTH - 200;
 
-export interface SpaceChatComposerProps {
+interface SpaceChatComposerProps {
   draft: SpaceChatDraft;
   suggestions: ChatSuggestionsState;
   input: ReturnType<typeof useComposerInput>;

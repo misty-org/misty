@@ -215,6 +215,6 @@ describe("ProjectReview", () => {
     store.projectGitDiff.mockRejectedValueOnce("This project isn't a Git repository yet.");
     render(<ProjectReview scopeId="scope_site" name="bakery-site" />);
     await act(async () => {});
-    expect(screen.getByRole("alert").textContent).toMatch(/isn't a Git repository yet/);
+    expect((await screen.findByRole("alert")).textContent).toMatch(/isn't a Git repository yet/);
   });
 });

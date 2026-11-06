@@ -1,2 +1,2 @@
-export { FirstRunSetup } from "./FirstRunSetup";
-export { isSetupCompletedForAccount, useSetupStore } from "./useSetupStore";
+;
+export { useSetupStore } from "./useSetupStore";

@@ -11,18 +11,18 @@ pub fn register(builder: Builder<Wry>) -> Builder<Wry> {
         if !platform::plugins::mac_rounded_corners::main_window_ready() {
             return;
         }
-        if let Some(window) = infra::space_windows::primary(app) {
+        if let Some(window) = infra::profile_windows::primary(app) {
             let _ = window.show();
             let _ = window.unminimize();
             let _ = window.set_focus();
         } else {
-            let _ = infra::space_windows::restore(app);
+            let _ = infra::profile_windows::restore(app);
         }
         // Links opened while Misty runs, as the default browser, go to the Space
-        // that claims their site, else to the last focused Space window.
+        // that claims their site, else to the last focused window.
         let urls = infra::default_browser::web_urls(args.iter().skip(1));
         if !urls.is_empty() {
-            infra::space_windows::route_app_links(app, urls);
+            infra::profile_windows::route_app_links(app, urls);
         }
     }));
 
@@ -71,10 +71,10 @@ pub fn register(builder: Builder<Wry>) -> Builder<Wry> {
     builder.on_window_event(|window, event| {
         platform::app_lifecycle::window_event(window, event);
         #[cfg(desktop)]
-        infra::space_windows::window_event(window, event);
+        infra::profile_windows::window_event(window, event);
         #[cfg(all(desktop, not(target_os = "macos")))]
         {
-            if !infra::space_windows::is_app_window(window.label()) {
+            if !infra::profile_windows::is_app_window(window.label()) {
                 return;
             }
 

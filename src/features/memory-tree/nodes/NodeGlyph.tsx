@@ -1,5 +1,5 @@
 import { cn } from "@/shared/ui";
-import { SavedWebsiteIcon } from "@/features/browser-sync/SavedWebsiteIcon";
+import { SavedWebsiteIcon } from "@/features/browser/SavedWebsiteIcon";
 import { type MemoryNode } from "../model";
 import { nodeVisual } from "./nodeVisual";
 

@@ -89,4 +89,4 @@ const MenuTrigger = React.forwardRef<HTMLButtonElement, MenuTriggerProps>(
 MenuTrigger.displayName = "MenuTrigger";
 
 export { MenuTrigger };
-export type { MenuTriggerProps };
+;

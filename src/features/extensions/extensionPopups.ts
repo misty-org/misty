@@ -5,7 +5,7 @@ import { extensionsNative } from "./native";
 
 /**
  * Popup-type windows an extension opens (a game or panel from its toolbar
- * button) float as small windows, as in Chrome. Each is a tab of this Space
+ * button) float as small windows, as in Chrome. Each is a tab of this window
  * window whose page is moved into the floating host; the extension sees it as
  * a window of its own. This tracks the pair so closing either side closes the other.
  */

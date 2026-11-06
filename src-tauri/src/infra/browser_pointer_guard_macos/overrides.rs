@@ -9,11 +9,12 @@ pub(super) unsafe fn install_pointer_event_overrides(class: &AnyClass) {
         objc2::sel!(mouseEntered:),
         objc2::sel!(cursorUpdate:),
     ] {
-        install_pointer_event_override(class, selector);
+        let replacement: unsafe extern "C-unwind" fn(_, _, _) = pointer_event;
+        install_method_override(class, selector, std::mem::transmute(replacement));
     }
 }
 
-pub(super) unsafe fn install_pointer_event_override(class: &AnyClass, selector: Sel) {
+pub(super) unsafe fn install_method_override(class: &AnyClass, selector: Sel, replacement: Imp) {
     unsafe extern "C" {
         fn class_addMethod(
             cls: *const AnyClass,
@@ -34,8 +35,6 @@ pub(super) unsafe fn install_pointer_event_override(class: &AnyClass, selector: 
     let Some(method) = class.instance_method(selector) else {
         return;
     };
-    let replacement: unsafe extern "C-unwind" fn(_, _, _) = pointer_event;
-    let replacement: Imp = std::mem::transmute(replacement);
     let types = method_getTypeEncoding(method);
     if class_addMethod(class, selector, replacement, types) != 0 {
         implementations.insert((class_key, selector), method.implementation() as usize);
@@ -56,34 +55,24 @@ unsafe extern "C-unwind" fn pointer_event(this: &AnyObject, command: Sel, event:
         .lock()
         .ok()
         .and_then(|owners| owners.get(&(this as *const AnyObject as usize)).copied());
-    if browser_root.is_some_and(|root| browser_is_below_renderer(root)) {
+    if browser_root.is_some_and(|root| browser_is_below_renderer(root))
+        && !notice_passes_event_to_page(event)
+    {
         return;
     }
     let belongs_to_main = main_tracking_owners()
         .lock()
         .map(|owners| owners.contains(&(this as *const AnyObject as usize)))
         .unwrap_or(false);
-    if !belongs_to_main || !browser_child_covers_event(event) {
+    if !belongs_to_main
+        || !(browser_child_covers_event(event) || notice_hides_event_from_renderer(event))
+    {
         call_original_pointer_event(this, command, event);
     }
 }
 
 pub(super) unsafe fn browser_child_covers_event(event: &NSEvent) -> bool {
-    let Some(main_pointer) = MAIN_WEBVIEW_VIEW.get().copied() else {
-        return false;
-    };
-    let main: &NSView = &*(main_pointer as *const NSView);
-    let Some(parent) = main.superview() else {
-        return false;
-    };
-    let subviews = parent.subviews();
-    let Some(main_index) = subviews
-        .iter()
-        .position(|candidate| std::ptr::eq(&*candidate as *const NSView, main as *const NSView))
-    else {
-        return false;
-    };
-    let point = parent.convertPoint_fromView(event.locationInWindow(), None);
+    let window: *mut AnyObject = objc2::msg_send![event, window];
     let Ok(browser_views) = browser_webview_views().lock() else {
         return false;
     };
@@ -92,19 +81,25 @@ pub(super) unsafe fn browser_child_covers_event(event: &NSEvent) -> bool {
         if browser.isHidden() {
             return false;
         }
-        let Some(browser_parent) = browser.superview() else {
-            return false;
-        };
-        if !std::ptr::eq(&*browser_parent, &*parent) {
+        // Only this window's pages cover this window's renderer.
+        let in_window = browser.window().is_some_and(|candidate| {
+            std::ptr::eq(
+                &*candidate as *const _ as *const AnyObject,
+                window as *const AnyObject,
+            )
+        });
+        if !in_window {
             return false;
         }
-        let browser_is_above_main = subviews.iter().enumerate().any(|(index, candidate)| {
-            index > main_index
-                && std::ptr::eq(&*candidate as *const NSView, browser as *const NSView)
-        });
+        let Some(parent) = browser.superview() else {
+            return false;
+        };
+        let browser_is_above_main = page_and_renderer_order(browser)
+            .is_some_and(|(browser_index, main_index)| browser_index > main_index);
         if !browser_is_above_main {
             return false;
         }
+        let point = parent.convertPoint_fromView(event.locationInWindow(), None);
         let frame = browser.frame();
         point.x >= frame.origin.x
             && point.y >= frame.origin.y

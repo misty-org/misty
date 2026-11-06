@@ -4,8 +4,8 @@ import {
   Button,
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogTitle,
+  ErrorNotification,
   Input,
   Spinner,
   cn,
@@ -22,16 +22,10 @@ export function CreateSpaceDialog({ dialog }: { dialog: ReturnType<typeof useCre
       open={dialog.open}
       onOpenChange={(open) => (open ? dialog.setOpen(true) : dialog.close())}
     >
-      <DialogContent
-        aria-describedby="create-space-description"
-        className="max-w-[440px] gap-0 p-0"
-      >
+      <DialogContent aria-describedby={undefined} className="max-w-[440px] gap-0 p-0">
         <form className="contents" onSubmit={(event) => void dialog.submit(event)}>
           <header className="px-6 pb-4 pt-5">
             <DialogTitle className="text-lg">Create a Space</DialogTitle>
-            <DialogDescription id="create-space-description" className="mt-1">
-              A shared place for people and their agents to chat and make things.
-            </DialogDescription>
           </header>
 
           <div className="grid gap-5 border-t border-charcoal-border px-6 py-4">
@@ -65,11 +59,7 @@ export function CreateSpaceDialog({ dialog }: { dialog: ReturnType<typeof useCre
           </div>
 
           <footer className="flex items-center justify-end gap-2 border-t border-charcoal-border px-6 py-3">
-            {dialog.createError ? (
-              <p role="alert" className="m-0 mr-auto text-sm text-cream">
-                {dialog.createError}
-              </p>
-            ) : null}
+            <ErrorNotification message={dialog.createError} />
             <Button
               type="button"
               variant="outline"

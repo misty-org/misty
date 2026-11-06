@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef } from "react";
-import { publicBetaFeatureEnabled } from "@/features/launch";
 import { useSettingsStore } from "@/features/settings";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { DictationController as Controller } from "./dictationEngine";
@@ -13,7 +12,7 @@ export function DictationController() {
   const document = useSettingsStore((state) => state.settings?.document);
   const settings = useMemo(() => voiceSettings(document), [document]);
   const controller = useRef<Controller | null>(null);
-  const enabled = publicBetaFeatureEnabled("voiceDictation") && hasTauriInternals();
+  const enabled = hasTauriInternals();
 
   useEffect(() => {
     if (!enabled) return;

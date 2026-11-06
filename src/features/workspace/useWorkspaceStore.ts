@@ -9,7 +9,7 @@ import { type DockingLayout } from "@/features/app-shell/dockingLayout";
 import {
   initialBookmarkNavigation,
   type BookmarkNavigationState,
-} from "@/features/browser-sync/navigationDefaults";
+} from "@/features/bookmarks/navigationDefaults";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import {
@@ -24,21 +24,11 @@ import type {
   DockSplitDirection,
   OpenWorkspaceSurfaceRequest,
   WorkspaceGroupKey,
-  WorkspaceScopeKey,
-  WorkspaceSnapshot,
   WorkspaceView,
 } from "./model";
-import {
-  currentWindows,
-  initialWorkspaceWindow,
-  normalizeWorkspaceLayout,
-  showSpaceScope,
-  type WorkspaceWindowsState,
-} from "./windows";
-import { migrateRetiredWorkspaceViews } from "./workspaceMigrations";
+import { initialWorkspaceWindow, type WorkspaceWindowsState } from "./windows";
 import { type ClosedWorkspaceItem } from "./closedWorkspaceItems";
 import { migrateWorkspaceStore, partialWorkspaceStore } from "./workspaceStorePersistence";
-import { upgradeWorkspaceShape } from "./workspaceShapeUpgrade";
 import { workspaceOpenActions } from "./workspaceOpenActions";
 import { workspacePaneActions } from "./workspacePaneActions";
 import { workspaceTabActions } from "./workspaceTabActions";
@@ -60,9 +50,6 @@ export interface WorkspaceStore
   closeTab: (id: string) => boolean;
   renameTab: (id: string, title: string) => void;
   reorderTabs: (ids: string[]) => void;
-  setScope: (scopeKey: WorkspaceScopeKey) => void;
-  /** Shows another Space in this window (after the native side switched it). */
-  showSpace: (scopeKey: WorkspaceScopeKey) => void;
   openSurface: (request: OpenWorkspaceSurfaceRequest) => WorkspaceView;
   openDestination: (request: OpenWorkspaceSurfaceRequest) => WorkspaceView;
   commitPlaceholder: (tabId: string) => void;
@@ -97,8 +84,6 @@ export interface WorkspaceStore
   fillEmptyPanes: () => void;
   updateSplitRatio: (splitId: string, ratio: number) => void;
   toggleSidebar: (tabId: string) => void;
-  replaceSnapshot: (snapshot: WorkspaceSnapshot) => void;
-  createSnapshot: (accountId: string, deviceId: string) => WorkspaceSnapshot;
   reset: () => void;
 }
 
@@ -112,53 +97,12 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
       ...initialTabGroups(),
       lastUsedViewByGroup: {},
       closedItems: [],
-      // Every scope is a Space now, so a scope change is a Space change with its window id.
-      setScope: (scopeKey) => {
-        const update = showSpaceScope(get(), scopeKey);
-        if (update) set(update);
-      },
-      showSpace: (scopeKey) => {
-        const update = showSpaceScope(get(), scopeKey);
-        if (update) set(update);
-      },
       ...tabGroupActions(set, get),
       ...pinnedTabActions(set, get),
       ...workspaceOpenActions(set, get),
       ...workspaceViewActions(set, get),
       ...workspaceTabActions(set, get),
       ...workspacePaneActions(set, get),
-      replaceSnapshot: (saved) => {
-        const snapshot = upgradeWorkspaceShape(saved);
-        const current = get();
-        // A snapshot from before Spaces had windows may hold several; this window
-        // takes the one that was active.
-        const window =
-          snapshot.windows?.find((item) => item.id === snapshot.activeWindowId) ??
-          snapshot.windows?.[0];
-        const layout = normalizeWorkspaceLayout(
-          migrateRetiredWorkspaceViews(window?.layout ?? snapshot.layout),
-          current.activeScopeKey,
-        );
-        set({
-          layout,
-          layoutsByScope: { ...current.layoutsByScope, [current.activeScopeKey]: layout },
-          activeWindowId: window?.id ?? current.activeWindowId,
-          ...(window?.dockingLayout ? { dockingLayout: window.dockingLayout } : {}),
-          lastUsedViewByGroup: snapshot.lastUsedViewByGroup ?? {},
-          ...(snapshot.tabGroups ? { tabGroups: snapshot.tabGroups } : {}),
-        });
-      },
-      createSnapshot: (accountId, deviceId) => ({
-        version: 4,
-        tabGroups: get().tabGroups,
-        accountId,
-        deviceId,
-        savedAt: Date.now(),
-        layout: get().layout,
-        lastUsedViewByGroup: get().lastUsedViewByGroup,
-        windows: currentWindows(get()),
-        activeWindowId: get().activeWindowId,
-      }),
       reset: () => {
         set(initialTabGroups());
         set({

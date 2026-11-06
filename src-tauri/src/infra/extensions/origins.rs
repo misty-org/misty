@@ -1,8 +1,8 @@
-//! Extension page hosts and the Spaces that run each, and each Space's controller.
+//! Extension page hosts and the profiles that run each, and each profile's controller.
 use super::*;
 
-/// Extension page hosts, with the Spaces that run each extension. The same
-/// extension keeps one host in every Space; each Space's controller serves it.
+/// Extension page hosts, with the profiles that run each extension. The same
+/// extension keeps one host in every profile; each profile's controller serves it.
 pub(super) fn origins(
 ) -> &'static std::sync::RwLock<BTreeMap<String, std::collections::BTreeSet<String>>> {
     static ORIGINS: OnceLock<
@@ -10,26 +10,26 @@ pub(super) fn origins(
     > = OnceLock::new();
     ORIGINS.get_or_init(Default::default)
 }
-pub(super) fn allow_origin(space: &str, host: String) {
+pub(super) fn allow_origin(profile: &str, host: String) {
     if let Ok(mut origins) = origins().write() {
-        origins.entry(host).or_default().insert(space.to_owned());
+        origins.entry(host).or_default().insert(profile.to_owned());
     }
 }
-pub(super) fn drop_origin(space: &str, host: &str) {
+pub(super) fn drop_origin(profile: &str, host: &str) {
     if let Ok(mut origins) = origins().write() {
-        if let Some(spaces) = origins.get_mut(host) {
-            spaces.remove(space);
-            if spaces.is_empty() {
+        if let Some(profiles) = origins.get_mut(host) {
+            profiles.remove(profile);
+            if profiles.is_empty() {
                 origins.remove(host);
             }
         }
     }
 }
-pub(super) fn drop_space_origins(space: &str) {
+pub(super) fn drop_profile_origins(profile: &str) {
     if let Ok(mut origins) = origins().write() {
-        origins.retain(|_, spaces| {
-            spaces.remove(space);
-            !spaces.is_empty()
+        origins.retain(|_, profiles| {
+            profiles.remove(profile);
+            !profiles.is_empty()
         });
     }
 }
@@ -57,12 +57,12 @@ pub(super) fn uuid_for(value: &str) -> String {
     let hash = Sha256::digest(value.as_bytes());
     uuid::Uuid::from_bytes(hash[..16].try_into().unwrap()).to_string()
 }
-/// The extension controller a Space's host uses. The personal Space keeps the
-/// account's controller from before Spaces, and with it every extension's storage.
-pub(super) fn controller_id(account: &str, space: &str) -> String {
-    if space == crate::infra::space_windows::PERSONAL {
+/// The extension controller a profile's host uses. The personal profile keeps the
+/// account's controller from before profiles, and with it every extension's storage.
+pub(super) fn controller_id(account: &str, profile: &str) -> String {
+    if profile == crate::infra::profile_windows::PERSONAL {
         uuid_for(account)
     } else {
-        uuid_for(&format!("{account}:space:{space}"))
+        uuid_for(&format!("{account}:space:{profile}"))
     }
 }

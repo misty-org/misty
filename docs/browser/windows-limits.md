@@ -18,6 +18,8 @@ been run on a Windows machine, and the checks that keep the two platforms in ste
   - Rounded page corners are clipped with a window region, so their edge isn't anti-aliased.
   - Snap Layouts opens through Win+Z on Windows 11, at the top of the window rather than under the
     button.
+- **Forms:** WebView2's own form autofill is off for pages, because its native dropdown would cover
+  Misty's saved sign-ins. Pages don't offer past form entries or saved addresses.
 - **Browser import:** Chrome 127+ sign-ins use app-bound encryption and can't be imported; the
   import result says so and what to do instead.
 - **Release:** a signed release needs the Authenticode certificate and the release secrets; the
@@ -35,13 +37,14 @@ been run on a Windows machine, and the checks that keep the two platforms in ste
 ## Checks that need a person
 
 Install, update, turn off and remove a store extension; a desktop task with "ask first" and
-Escape mid-task; Snap Layouts, pane dimming and click-to-focus; a download with Cancel; importing
+Escape mid-task; a video in full screen from a split pane (the page fills the window, and leaving full screen puts it back in its pane: `infra/browser/fullscreen.rs`); Snap Layouts, pane dimming and click-to-focus; a download with Cancel; importing
 sign-ins from Edge; a signed update from one build to the next; and an uninstall that leaves no
 default-browser or launch-on-login entries.
 
 ## Keeping it caught up
 
 - Any new `#[cfg(target_os = "macos")]` command needs a Windows branch or a line here.
-- `desktop-windows` in `.githooks/checks.sh` keeps the Windows build compiling from any machine.
+- `.githooks/checks.sh release` keeps the Windows build compiling from any machine. Run it when cutting a
+  release: commits and pushes only run tests.
 - Add Windows tests beside macOS ones. Tests that touch real tools use private copies, so they
   never change the person's installation.

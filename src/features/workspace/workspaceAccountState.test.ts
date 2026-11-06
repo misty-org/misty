@@ -37,8 +37,7 @@ describe("workspaceAccountState per-account isolation", () => {
     resetWorkspaceAccountState();
     restoreAccountWorkspace("user-b");
 
-    // User B starts in this window's Space with none of A's tabs
-    expect(useWorkspaceStore.getState().activeScopeKey).toBe("space:personal");
+    // User B starts with none of A's tabs
     expect(titles()).not.toContain("Code Editor");
     saveAccountWorkspace("user-b");
 
@@ -54,13 +53,15 @@ describe("workspaceAccountState per-account isolation", () => {
   });
 
   it("removeAccountWorkspace purges persisted state for deleted account", () => {
-    useWorkspaceStore.getState().setScope("space:temp");
+    const tab = useWorkspaceStore.getState().openBrowserView({ url: "https://deleted.example" });
     saveAccountWorkspace("deleted-user");
     removeAccountWorkspace("deleted-user");
 
     resetWorkspaceAccountState();
     restoreAccountWorkspace("deleted-user");
-    expect(useWorkspaceStore.getState().activeScopeKey).toBe("space:personal");
+    expect(
+      allLayoutViews(useWorkspaceStore.getState().layout).map((view) => view.id),
+    ).not.toContain(tab.id);
   });
 });
 
@@ -74,8 +75,8 @@ it("backs up each legacy account before migration and removes its backup on acco
   saveAccountWorkspace("legacy-owner");
   expect(localStorage.getItem(workspaceRecoveryKey(key))).toBe(raw);
   expect(JSON.parse(localStorage.getItem(key)!)).toMatchObject({
-    version: 17,
-    state: { activeScopeKey: "space:personal" },
+    version: 18,
+    state: { activeWindowId: useWorkspaceStore.getState().activeWindowId },
   });
   removeAccountWorkspace("legacy-owner");
   expect(localStorage.getItem(key)).toBeNull();

@@ -44,7 +44,7 @@ pub(super) fn start(app: AppHandle, state: Arc<CursorCompanionState>) {
                             let _ = window.hide();
                         }
                     }
-                    let _ = crate::infra::space_windows::emit_to_primary(
+                    let _ = crate::infra::profile_windows::emit_to_primary(
                         &events_app,
                         "misty://cursor-shortcut",
                         json!({"turn":turn,"held":held}),
@@ -73,7 +73,7 @@ pub(super) fn start(app: AppHandle, state: Arc<CursorCompanionState>) {
             if let Some((turn, _, record)) = recording.as_mut() {
                 if let Some((sequence, pcm)) = record.drain() {
                     if current(&audio_state, *turn) {
-                        let _ = crate::infra::space_windows::emit_to_primary(
+                        let _ = crate::infra::profile_windows::emit_to_primary(
                             &audio_app,
                             "misty://cursor-audio",
                             json!({"turn":turn,"sequence":sequence,"audio":STANDARD.encode(pcm)}),
@@ -92,7 +92,7 @@ pub(super) fn start(app: AppHandle, state: Arc<CursorCompanionState>) {
                         continue;
                     }
                     if !audio_state.held.load(Ordering::SeqCst) {
-                        let _ = crate::infra::space_windows::emit_to_primary(
+                        let _ = crate::infra::profile_windows::emit_to_primary(
                             &audio_app,
                             "misty://cursor-recorded",
                             json!({"turn":turn,"durationMs":0}),
@@ -108,7 +108,7 @@ pub(super) fn start(app: AppHandle, state: Arc<CursorCompanionState>) {
                         }
                         Ok(_) => {
                             if current(&audio_state, turn) {
-                                let _ = crate::infra::space_windows::emit_to_primary(
+                                let _ = crate::infra::profile_windows::emit_to_primary(
                                     &audio_app,
                                     "misty://cursor-recorded",
                                     json!({"turn":turn,"durationMs":0}),
@@ -132,13 +132,13 @@ pub(super) fn start(app: AppHandle, state: Arc<CursorCompanionState>) {
                         let (sequence, pcm, duration) = record.finish();
                         if current(&audio_state, turn) {
                             if !pcm.is_empty() {
-                                let _ = crate::infra::space_windows::emit_to_primary(
+                                let _ = crate::infra::profile_windows::emit_to_primary(
                                     &audio_app,
                                     "misty://cursor-audio",
                                     json!({"turn":turn,"sequence":sequence,"audio":STANDARD.encode(pcm)}),
                                 );
                             }
-                            let _ = crate::infra::space_windows::emit_to_primary(
+                            let _ = crate::infra::profile_windows::emit_to_primary(
                                 &audio_app,
                                 "misty://cursor-recorded",
                                 json!({"turn":turn,"durationMs":duration}),
@@ -146,7 +146,7 @@ pub(super) fn start(app: AppHandle, state: Arc<CursorCompanionState>) {
                         }
                     } else if let Ok((turn, false)) = event {
                         if current(&audio_state, turn) {
-                            let _ = crate::infra::space_windows::emit_to_primary(
+                            let _ = crate::infra::profile_windows::emit_to_primary(
                                 &audio_app,
                                 "misty://cursor-recorded",
                                 json!({"turn":turn,"durationMs":0}),

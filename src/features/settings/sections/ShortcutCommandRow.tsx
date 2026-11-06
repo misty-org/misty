@@ -4,7 +4,7 @@ import {
   type ShortcutSlot,
 } from "@/features/shortcuts";
 import type { ShortcutBindingSet } from "@/native/ipc";
-import { Button, cn, IconButton, Pressable } from "@/shared/ui";
+import { Button, cn, ErrorNotification, IconButton, Pressable } from "@/shared/ui";
 import { RotateCcw, Trash2 } from "lucide-react";
 import { DesktopSettingsRow } from "../components/DesktopSettingsUI";
 import { settingsDisabledControlClass } from "../settingsConstants";
@@ -46,25 +46,7 @@ export function ShortcutCommandRow(props: {
   return (
     <DesktopSettingsRow
       label={definition.label}
-      description={
-        props.problem ? (
-          <span role="alert" className="text-cream">
-            {props.problem.message}
-            {props.problem.onReassign ? (
-              <span className="ml-2 inline-flex gap-1.5 align-middle">
-                <Button type="button" size="sm" onClick={props.problem.onReassign}>
-                  Reassign
-                </Button>
-                <Button type="button" size="sm" variant="outline" onClick={props.problem.onCancel}>
-                  Cancel
-                </Button>
-              </span>
-            ) : null}
-          </span>
-        ) : (
-          definition.description || undefined
-        )
-      }
+      description={definition.description || undefined}
     >
       {slot("Primary", "primary")}
       {slot("Alternate", "alternate")}
@@ -77,6 +59,20 @@ export function ShortcutCommandRow(props: {
       >
         <RotateCcw size={13} />
       </IconButton>
+      {props.problem ? (
+        <ErrorNotification message={props.problem.message} onDismiss={props.problem.onCancel}>
+          {props.problem.onReassign ? (
+            <span className="ml-2 inline-flex gap-1.5 align-middle">
+              <Button type="button" size="sm" onClick={props.problem.onReassign}>
+                Reassign
+              </Button>
+              <Button type="button" size="sm" variant="outline" onClick={props.problem.onCancel}>
+                Cancel
+              </Button>
+            </span>
+          ) : null}
+        </ErrorNotification>
+      ) : null}
     </DesktopSettingsRow>
   );
 }

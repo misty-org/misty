@@ -10,10 +10,10 @@ are in [`kiri/README.md`](../../kiri/README.md), next to the code in `kiri/`.
 
 ## Extensions
 
-Kiri's WebExtension layer is what runs browser extensions in Misty. The current direction
-(Chrome MV3 extensions on every platform; ad blocking and passwords are extensions, not native
-features) and what is left are in [extensions-sync-plan.md](../plans/extensions-sync-plan.md).
-How the interface works is in `src/features/extensions/DESIGN.md`. The Windows checklist is
-[extensions-windows-test.md](../plans/extensions-windows-test.md).
-
-When the extension plan ships, its facts move into this folder.
+Kiri's WebExtension layer is what runs browser extensions in Misty: Chrome MV3 extensions on every
+platform, and ad blocking and password managers are extensions, not native features. How the
+interface works is in `src/features/extensions/DESIGN.md`. What is left is trying real extensions in
+the app on each platform; the Windows checklist is
+[extensions-windows-test.md](../plans/extensions-windows-test.md). The live intake test
+(`windows_limited_apis_for_chrome_store_extensions`, run with `--ignored`) shows which APIs WebView2
+doesn't offer.

@@ -1,19 +1,22 @@
 import { describe, expect, it } from "vitest";
 import { windowChromeBackground } from "./windowColors";
-import { useSpaceWindowStore } from "./spaceWindow";
+import { useProfileWindowStore } from "./profileWindow";
 import { currentWindow, initialWorkspaceWindow } from "./windows";
 
-describe("Space colors", () => {
-  it("tints only a colored Space's window chrome", () => {
+describe("profile colors", () => {
+  it("tints only a colored profile's window chrome", () => {
     expect(windowChromeBackground(undefined)).toBeUndefined();
     expect(windowChromeBackground("blue")).toContain("color-mix");
   });
 
-  it("gives the window its Space's color and name", () => {
-    useSpaceWindowStore.setState({ space: { key: "personal", name: "Personal", color: "pink" } });
+  it("gives the window its profile's color and name", () => {
+    const before = useProfileWindowStore.getState().profile;
+    useProfileWindowStore.setState({
+      profile: { id: "work", name: "Work", color: "pink", order: 1, sites: [] },
+    });
     const window = currentWindow(initialWorkspaceWindow());
     expect(window.color).toBe("pink");
-    expect(window.title).toBe("Personal");
-    useSpaceWindowStore.setState({ space: null });
+    expect(window.title).toBe("Work");
+    useProfileWindowStore.setState({ profile: before });
   });
 });

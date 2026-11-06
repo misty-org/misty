@@ -13,15 +13,18 @@ import {
   DialogContent,
   DialogDescription,
   DialogTitle,
+  ErrorNotification,
   Input,
   OptionSelect,
   Switch,
 } from "@/shared/ui";
+import { currentProfile } from "@/features/workspace/profileWindow";
 import { methodError } from "../workspace/agentMethodDefinition";
 import { AgentMethodInputFields } from "../workspace/AgentMethodInputFields";
 import { ScheduleRuleEditor } from "./ScheduleRuleEditor";
 import { ruleFor } from "./scheduleRules";
 import { ScheduleComputerField } from "./ScheduleComputerField";
+import { ScheduleProfileField } from "./ScheduleProfileField";
 import { describeSchedule } from "./scheduleSummary";
 
 const localZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -51,6 +54,7 @@ export function WorkflowScheduleDialog({
   const [inputs, setInputs] = useState<AgentMethodInputs>(existing?.inputs ?? {});
   const [enabled, setEnabled] = useState(existing?.enabled ?? true);
   const [deviceId, setDeviceId] = useState(existing?.device_id ?? "");
+  const [profile, setProfile] = useState(existing?.profile ?? currentProfile().id);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const run = async (action: () => Promise<void>) => {
@@ -86,6 +90,7 @@ export function WorkflowScheduleDialog({
         inputs,
         enabled,
         device_id: deviceId,
+        profile,
       });
       onSaved(schedule);
     });
@@ -172,18 +177,20 @@ export function WorkflowScheduleDialog({
                 onChange={setInputs}
               />
             )}
+            <ScheduleProfileField value={profile} onChange={setProfile} />
             <ScheduleComputerField value={deviceId} onChange={setDeviceId} />
+            {existing?.last_error?.startsWith("This schedule uses a profile") ? (
+              <p className="agent-method-hint" role="status">
+                {existing.last_error}
+              </p>
+            ) : null}
             {existing?.state === "awaiting_device" && existing.due_at ? (
               <p className="agent-method-hint" role="status">
                 A run due {new Date(existing.due_at).toLocaleString()} is waiting for its computer.
               </p>
             ) : null}
           </fieldset>
-          {error && (
-            <p role="alert" className="agent-method-error">
-              {error}
-            </p>
-          )}
+          <ErrorNotification message={error} onDismiss={() => setError("")} />
           <footer>
             {existing && (
               <Button

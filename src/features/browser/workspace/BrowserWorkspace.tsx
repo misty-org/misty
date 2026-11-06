@@ -1,5 +1,5 @@
 import { ExtensionsToolbar } from "@/features/extensions/ExtensionsToolbar";
-import { supportsSitePermissions } from "@/features/browser-sync/sitePermissions";
+import { supportsSitePermissions } from "@/features/browser/sitePermissions";
 import {
   browserInternalPage,
   dockLeaves,
@@ -17,7 +17,6 @@ import { BrowserAgentsButton, BrowserMistyButton } from "./BrowserMistyPanel";
 import { BrowserNavigationButtons } from "./BrowserNavigationButtons";
 import { BrowserOmnibox } from "./BrowserOmnibox";
 import { BrowserPaneLayoutMenu } from "./BrowserPaneLayoutMenu";
-import { useBrowserChromeSlot } from "./browserChromeSlot";
 import {
   browserRuntimeCreated,
   browserRuntimeId,
@@ -45,7 +44,7 @@ import { useBrowserPagePreview } from "./useBrowserPagePreview";
 import { useBrowserReadingTools } from "./useBrowserReadingTools";
 import { useBrowserToolbarPlacement } from "./useBrowserToolbarPlacement";
 import { useBrowserWebviewGeometry } from "./useBrowserWebviewGeometry";
-import { isIncognitoWindow } from "@/features/workspace/spaceWindow";
+import { isIncognitoWindow } from "@/features/workspace/profileWindow";
 export function BrowserWorkspace(props: { tab?: WorkspaceView }) {
   const fallbackTab = useWorkspaceStore((store) => {
     const panes = dockLeaves(store.layout.root);
@@ -82,7 +81,6 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceView }) {
   const runtimeError = useBrowserRuntimeStore((runtime) => runtime.errors[tab.id] ?? null);
   const pageLoading = useBrowserRuntimeStore((runtime) => runtime.loading[tab.id] ?? false);
   const internalPage = browserInternalPage(state.url);
-  const profileId = state.profileId;
   useBrowserPagePreview(tab, pageHostRef, nativeRuntime && active && !pageLoading && !runtimeError);
   const { isOffline, handleRetry, handleGoHome } = useBrowserOnlineStatus(
     tab,
@@ -155,7 +153,6 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceView }) {
       <BrowserSiteInfo id={browserRuntimeId(tab)} url={state.url} active={active} />
     ) : null;
   const paneLayout = <BrowserPaneLayoutMenu tabId={tab.id} />;
-  const chrome = useBrowserChromeSlot();
   const { paneFocused, sidebar } = useBrowserToolbarPlacement(tab.id);
   const navButtons = (
     <BrowserNavigationButtons
@@ -182,6 +179,7 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceView }) {
       mistyPage={mistyPage}
       mistyPageLoading={mistyPageLoading}
       onAttachPage={() => void attachPageToMisty()}
+      pageId={browserRuntimeId(tab)}
     />
   );
   const browserMenu = (sidebarMenu: boolean) => (
@@ -192,7 +190,6 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceView }) {
       agentOwned={Boolean(state.agentOwned)}
       nativeRuntime={nativeRuntime}
       commands={page.commands}
-      account={chrome?.accountItems}
       anchor={moreAnchor}
       tools={menuTools}
     />
@@ -260,7 +257,7 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceView }) {
       ) : (
         toolbar
       )}
-      <BrowserPageDialogs tab={tab} url={state.url} profileId={profileId} page={page} />
+      <BrowserPageDialogs tab={tab} url={state.url} page={page} />
       <BrowserNotices tab={tab} active={active} />
 
       <BrowserPageStage
@@ -273,7 +270,6 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceView }) {
         annotationsActive={annotationsActive}
         onCloseAnnotations={() => setAnnotationsActive(false)}
         internalPage={internalPage}
-        profileId={profileId}
         isOffline={isOffline}
         nativeRuntime={nativeRuntime}
         commands={page.commands}

@@ -9,6 +9,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
   FileInput,
+  toolbarIconProps,
 } from "@/shared/ui";
 import { createSpaceItem, type SpaceCreateKind } from "../../home/createSpaceItem";
 
@@ -78,9 +79,9 @@ export function SpaceCreateMenu({
             disabled={busy}
             variant="primary"
             size="sm"
-            className="h-7 gap-1.5 px-2 text-xs"
+            className="h-7 gap-1 pr-2 pl-1.5 text-xs"
           >
-            <Plus className="size-3.5" aria-hidden="true" />
+            <Plus {...toolbarIconProps} className="size-4.5" />
             <span>New</span>
           </Button>
         </DropdownMenuTrigger>

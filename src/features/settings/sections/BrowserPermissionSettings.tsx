@@ -8,9 +8,10 @@ import {
 import { Button, SkeletonList } from "@/shared/ui";
 import {
   permissionLabels,
+  sitePermissionKinds,
   supportsSitePermissions,
   type SavedSitePermission,
-} from "@/features/browser-sync/sitePermissions";
+} from "@/features/browser/sitePermissions";
 
 export function BrowserPermissionSettings() {
   const [entries, setEntries] = useState<SavedSitePermission[]>([]);
@@ -53,12 +54,12 @@ export function BrowserPermissionSettings() {
   };
   return (
     <DesktopSettingsSection
-      title="Website permissions"
-      description="Camera and microphone choices. Each Space keeps its own."
+      title="Permissions"
+      description="Camera, microphone and location choices. Each profile keeps its own."
     >
       {loading ? (
         <SkeletonList
-          label="Website permissions"
+          label="Permissions"
           rows={3}
           leading="none"
           trailing
@@ -73,10 +74,14 @@ export function BrowserPermissionSettings() {
                 label={entry.origin}
                 description={
                   <>
-                    Camera: {permissionLabels[entry.permissions.camera]} · Microphone:{" "}
-                    {permissionLabels[entry.permissions.microphone]}
-                    {new Set(entries.map((other) => other.space)).size > 1
-                      ? ` · ${entry.space}`
+                    {sitePermissionKinds
+                      .map(
+                        ({ kind, label }) =>
+                          `${label}: ${permissionLabels[entry.permissions[kind]]}`,
+                      )
+                      .join(" · ")}
+                    {new Set(entries.map((other) => other.profileName)).size > 1
+                      ? ` · ${entry.profileName}`
                       : ""}
                   </>
                 }

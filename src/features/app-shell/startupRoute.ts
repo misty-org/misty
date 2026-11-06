@@ -22,7 +22,7 @@ export const startupViewOption = (storedIndex: number) =>
   Math.max(0, startupViewStoredIndexes.indexOf(storedIndex));
 export const startupViewStoredIndex = (option: number) => startupViewStoredIndexes[option] ?? 0;
 
-export interface StartupPreference {
+interface StartupPreference {
   reopenLastSession: boolean;
   startupViewIndex: number;
 }

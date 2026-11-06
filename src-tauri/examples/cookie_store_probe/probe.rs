@@ -8,17 +8,15 @@ use std::sync::{
     atomic::{AtomicI32, Ordering},
     Arc, Mutex,
 };
-use tauri::{LogicalPosition, LogicalSize, Webview, WebviewBuilder, WebviewUrl};
+use tauri::{LogicalPosition, LogicalSize, Manager, Webview, WebviewBuilder, WebviewUrl};
 
 type Result<T> = std::result::Result<T, &'static str>;
 
 mod app;
 mod live;
-mod restore;
 
 use app::run_child;
 use live::check;
-use restore::staged_restore;
 
 pub(crate) fn profile() -> String {
     format!(
@@ -44,7 +42,7 @@ pub(crate) fn fixture() -> Cookie {
 }
 
 pub(crate) async fn read(view: &Webview, id: &str) -> Result<Vec<Cookie>> {
-    let read = cookies::read(view, id)
+    let read = cookies::read(view.app_handle(), id)
         .await
         .map_err(|_| "native read failed")?;
     // Every probe cookie is synthetic and valid; a skip is a regression.
@@ -55,38 +53,9 @@ pub(crate) async fn read(view: &Webview, id: &str) -> Result<Vec<Cookie>> {
 }
 
 pub(crate) async fn write(view: &Webview, id: &str, cookie: Cookie, delete: bool) -> Result<()> {
-    cookies::write(view, id, cookie, delete)
+    cookies::write(view.app_handle(), id, cookie, delete)
         .await
         .map_err(|_| "native write failed")
-}
-
-pub(crate) fn generation_view(owner: &Webview, physical: &str) -> Result<Webview> {
-    use std::io::Write;
-    // Record before creating a native store. The supervisor always launches
-    // cleanup after this process exits, including panic/error/timeout paths.
-    let log =
-        std::env::var_os("MISTY_COOKIE_PROBE_PROFILE_LOG").ok_or("missing profile cleanup log")?;
-    let mut file = std::fs::OpenOptions::new()
-        .append(true)
-        .open(log)
-        .map_err(|_| "open cleanup log")?;
-    writeln!(file, "{physical}").map_err(|_| "write cleanup log")?;
-    file.sync_all().map_err(|_| "sync cleanup log")?;
-    owner
-        .window()
-        .add_child(
-            WebviewBuilder::new(
-                format!("misty-browser-generation-{}", &physical[..16]),
-                WebviewUrl::External("about:blank".parse().unwrap()),
-            )
-            .data_store_identifier(
-                browser_profile::data_store_identifier(Some(physical))
-                    .map_err(|_| "generation store ID")?,
-            ),
-            LogicalPosition::new(0., 0.),
-            LogicalSize::new(100., 100.),
-        )
-        .map_err(|_| "create generation view")
 }
 
 // Remove only freshly generated IDs; no profile paths are traversed.

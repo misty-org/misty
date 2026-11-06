@@ -4,7 +4,6 @@ use std::{
 };
 
 use anyhow::{bail, Result};
-use regex::Regex;
 use serde_json::Value;
 
 use crate::{process::CommandSpec, workspace::Workspace};
@@ -14,16 +13,56 @@ use super::model::{
     WINDOWS_ARM_PLATFORM, WINDOWS_PLATFORM,
 };
 
-pub(super) fn normalize_version(raw: &str) -> Result<String> {
+pub fn normalize_version(raw: &str) -> Result<String> {
     let version = raw
         .trim()
         .strip_prefix("misty-v")
         .or_else(|| raw.trim().strip_prefix('v'))
         .unwrap_or(raw.trim());
-    if !Regex::new(r"^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$")?.is_match(version) {
+    if !valid_version(version) {
         bail!("release version is not valid semantic version syntax: {version}");
     }
     Ok(version.to_owned())
+}
+
+/// `1.2.3`, with an optional `-prerelease` of letters, digits, dots and hyphens.
+fn valid_version(version: &str) -> bool {
+    let (core, prerelease) = match version.split_once('-') {
+        Some((core, prerelease)) => (core, Some(prerelease)),
+        None => (version, None),
+    };
+    let parts: Vec<&str> = core.split('.').collect();
+    parts.len() == 3
+        && parts
+            .iter()
+            .all(|part| !part.is_empty() && part.bytes().all(|byte| byte.is_ascii_digit()))
+        && prerelease.map_or(true, |text| {
+            !text.is_empty()
+                && text
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || byte == b'.' || byte == b'-')
+        })
+}
+
+/// The `version` under `[package]` in a Cargo.toml.
+fn cargo_package_version(manifest: &str) -> Option<String> {
+    let mut in_package = false;
+    for line in manifest.lines().map(str::trim) {
+        if line.starts_with('[') {
+            in_package = line == "[package]";
+        } else if in_package {
+            if let Some((key, value)) = line.split_once('=') {
+                if key.trim() == "version" {
+                    let value = value.split('#').next().unwrap_or_default().trim();
+                    return value
+                        .strip_prefix('"')
+                        .and_then(|rest| rest.strip_suffix('"'))
+                        .map(str::to_owned);
+                }
+            }
+        }
+    }
+    None
 }
 
 pub(super) fn verify_versions(workspace: &Workspace, expected: &str) -> Result<()> {
@@ -31,19 +70,13 @@ pub(super) fn verify_versions(workspace: &Workspace, expected: &str) -> Result<(
     let tauri: Value = serde_json::from_slice(&fs::read(
         workspace.misty.join("src-tauri/tauri.conf.json"),
     )?)?;
-    let cargo: toml::Value = toml::from_str(&fs::read_to_string(
+    let cargo = cargo_package_version(&fs::read_to_string(
         workspace.misty.join("src-tauri/Cargo.toml"),
-    )?)?;
+    )?);
     let versions = [
         ("package.json", package["version"].as_str()),
         ("src-tauri/tauri.conf.json", tauri["version"].as_str()),
-        (
-            "src-tauri/Cargo.toml",
-            cargo
-                .get("package")
-                .and_then(|value| value.get("version"))
-                .and_then(toml::Value::as_str),
-        ),
+        ("src-tauri/Cargo.toml", cargo.as_deref()),
     ];
     let mismatches = versions
         .into_iter()

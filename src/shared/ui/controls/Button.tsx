@@ -14,7 +14,7 @@ const buttonVariants = cva(
     "group/button inline-flex shrink-0 items-center rounded-md border",
     "border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap",
     "transition-none outline-none select-none",
-    "focus-visible:border-charcoal-active focus-visible:ring-3",
+    "focus-visible:ring-3",
     "focus-visible:ring-charcoal-active/50 disabled:pointer-events-none",
     "disabled:opacity-50 aria-invalid:border-charcoal-active",
     "aria-invalid:ring-3 aria-invalid:ring-charcoal-active/20",
@@ -27,7 +27,7 @@ const buttonVariants = cva(
       variant: {
         default: "bg-charcoal-active text-cream-bright hover:bg-[#494949]",
         destructive:
-          "border-charcoal-active bg-charcoal-card text-cream-bright hover:bg-charcoal-active focus-visible:border-charcoal-active focus-visible:ring-charcoal-active/40",
+          "border-charcoal-active bg-charcoal-card text-cream-bright hover:bg-charcoal-active focus-visible:ring-charcoal-active/40",
         // Every variant fills on hover and while open/pressed, so interactive
         // controls read the same across the app.
         outline: [
@@ -56,11 +56,12 @@ const buttonVariants = cva(
           "data-[state=open]:bg-control-active data-[state=open]:text-cream",
           // A menu trigger whose setting is on, e.g. agent access or a narrowed viewport.
           "data-[active=true]:bg-control-active data-[active=true]:text-cream",
-          "focus-visible:border-transparent focus-visible:ring-2 focus-visible:ring-cream/15 disabled:opacity-40",
+          "focus-visible:ring-2 focus-visible:ring-cream/15 disabled:opacity-40",
         ],
         link: "text-cream-bright underline-offset-4 hover:underline",
         // The one filled call to action on a surface: sign in, confirm, mark all read.
-        primary: "bg-cream-bright text-charcoal-bg hover:bg-cream-action-hover",
+        // Its fill reaches under the border, so it is as big as an outlined button beside it.
+        primary: "bg-cream-bright bg-clip-border text-charcoal-bg hover:bg-cream-action-hover",
         // Controls drawn over images and video: a dark translucent disc that reads on any media.
         overlay: [
           "border-cream/10 bg-charcoal-bg/75 text-cream backdrop-blur-sm",

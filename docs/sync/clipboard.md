@@ -4,15 +4,15 @@ Approved direction (October 7, 2026; revised October 12, 2026: clips travel thro
 
 ## Goal
 
-What you copy on one admitted Misty device can be pasted on your others, wherever they are, and nobody but your devices can read it.
+What you copy on one signed-in session can be pasted on your others, wherever they are, and nobody but your sessions can read it. The shared clipboard is its own buffer: it never writes to a computer's system clipboard on its own.
 
 ## Rules
 
 1. **Clips are end-to-end encrypted.** A clip is compressed, then sealed on the device with a key derived from the vault root. Misty's server only ever holds ciphertext.
 2. **Clips ride on sync.** The account's sync connection carries them as a small ring of records in a `clipboard` collection. There is no separate service and no direct connection between devices.
-3. **Every copy publishes.** When the Clipboard control is on for a device, every change to its system clipboard is published. The Clipboard control in Settings › Devices is the off switch, and the server refuses the ring to a device whose signed policy turns it off.
-4. **Small clips only.** A clip must fit one ring record. Text and images shrink to fit; files cross as their names.
-5. **Kura has no account.** Kura, the standalone file manager, reaches the clipboard only through the Misty app running on the same machine, and only after the person allows it in Misty.
+3. **Every copy publishes, nothing writes back.** When the Clipboard control is on for a device, every change to its system clipboard is published. Opening the Clipboard menu or using Paste latest first takes whatever is on this computer's system clipboard into the buffer if the watcher hasn't yet, so the newest clip is always what you last copied. A clip that arrives from another device only joins the list; the system clipboard changes only when the person clicks Copy on a clip. The Clipboard control in Settings › Devices is the off switch, and the server refuses the ring to a device whose signed policy turns it off.
+4. **No duplicates.** Copying what the newest clip already holds adds nothing. Copying what an older clip holds moves that clip to the top instead of adding a second one.
+5. **Small clips only.** A clip must fit one ring record. Text and images shrink to fit; files cross as their names.
 
 ## What a clip holds
 
@@ -35,31 +35,20 @@ What you copy on one admitted Misty device can be pasted on your others, whereve
 
 ## Surfaces
 
-**Misty.** The browser menu has a Clipboard submenu listing recent clips: device name, kind, size and time, in text.
+**Misty.** The browser menu's Tools has a Clipboard submenu listing recent clips: device name, kind, size and time, in text.
 
-- Clicking a clip copies it to this device's clipboard.
+- Paste latest (Cmd+Option+V, Ctrl+Alt+V on Windows; rebindable in Settings › Shortcuts) types the newest text clip into the field focused in the page, without touching the system clipboard. An image newest clip can't be typed in; use Copy.
+- Clicking Copy on a clip puts it on this device's clipboard.
+- The list shows everything copied in the last 24 hours (at most 20 clips).
 - An image clip also offers Save to Downloads.
 - The first load shows a skeleton list.
-- When the clipboard is off for this device, the menu says so and links to Settings › Devices.
-
-**Kura.** The sidebar has a Clipboard section with the same list and a Paste here action for the current folder.
-
-- Without Misty running, it says "Open Misty and sign in to share your clipboard across devices".
-- Copy and paste inside Kura need nothing from Misty, because Misty syncs the system clipboard on its own.
-
-## Kura bridge
-
-- Misty listens on a user-only local socket. On macOS this is a Unix socket in a 0700 directory under Misty's application support folder; on Windows it is the named pipe `\\.\pipe\com.misty.desktop.clipboard.<user SID>`, which only that user can open and which Misty creates before anything else can claim the name.
-- Requests are JSON lines: `hello`, `list`, `subscribe`, `copy`, `materialize` (write a clip into a folder Kura names).
-- The first `hello` from Kura asks in Misty: "Allow Kura to use your Misty clipboard?" Allowing it stores a token in the credential store. The person can revoke it in Settings › Devices.
-- The bridge never exposes keys or account data. Only clip content that this device could already paste crosses the bridge.
+- When sync is off on this computer, the menu says so and links to Settings › Sync.
 
 ## Threats and answers
 
 | Threat | Answer |
 |---|---|
 | Compromised server or operator | Sees ciphertext, sizes and timing only. Cannot decrypt, and cannot move a clip to another slot without it failing to open. |
-| Stolen session cookie | Registers a pending device only. Pending devices have no sync identity and no ring. |
+| Stolen session cookie | Can't read the ring: it needs the vault key. |
 | Hostile clip from a compromised device | Refused if it does not decrypt, does not parse, or expands past 4 MiB. Images are decoded only when pasted. |
-| Another local app impersonates Kura | The socket is user-only and needs an approved token. It can read only what a paste could already read. |
 | Password manager copies | Published like any copy, per the person's choice. Turning the Clipboard control off stops it on that device. |

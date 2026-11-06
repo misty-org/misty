@@ -1,16 +1,7 @@
-import { MoreHorizontal, Plus, RefreshCw, Search, Trash2 } from "lucide-react";
+import { Search } from "lucide-react";
 import { useEffect, useState } from "react";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  IconButton,
-  Input,
-  SegmentedControl,
-} from "@/shared/ui";
+import { Input, SegmentedControl } from "@/shared/ui";
 import { MemoryFilterMenu } from "./MemoryFilterMenu";
-import { addForms, addOrder } from "./addForms";
 import { type MemoryRange } from "./model";
 import { useMemoryTreeStore } from "./useMemoryTreeStore";
 
@@ -20,15 +11,18 @@ const ranges = [
   { value: "all", label: "All" },
 ] as const;
 
-/** Search by meaning, the time window, filters and refresh: no title, the page is the tree. */
-export function MemoryTreeToolbar({ spaceName }: { spaceName: string }) {
+/** Search by meaning, the time window and filters. */
+export function MemoryTreeToolbar() {
   const range = useMemoryTreeStore((s) => s.range);
   const setRange = useMemoryTreeStore((s) => s.setRange);
-  const refresh = useMemoryTreeStore((s) => s.refresh);
   const search = useMemoryTreeStore((s) => s.search);
-  const askForget = useMemoryTreeStore((s) => s.askForget);
-  const askAdd = useMemoryTreeStore((s) => s.askAdd);
+  const query = useMemoryTreeStore((s) => s.query);
   const [text, setText] = useState("");
+
+  // A thread picked in the recap searches the tree, and the box says so.
+  useEffect(() => {
+    setText((current) => (current.trim() === query ? current : query));
+  }, [query]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => void search(text), 350);
@@ -37,7 +31,7 @@ export function MemoryTreeToolbar({ spaceName }: { spaceName: string }) {
 
   return (
     <div className="flex items-center gap-2 border-b border-charcoal-border px-3 py-2">
-      <div className="relative min-w-0 flex-1">
+      <div className="relative w-full max-w-sm min-w-0">
         <Search
           className="pointer-events-none absolute inset-y-0 left-2.5 my-auto size-3.5 text-cream-muted"
           aria-hidden="true"
@@ -58,38 +52,6 @@ export function MemoryTreeToolbar({ spaceName }: { spaceName: string }) {
         onChange={(next) => void setRange(next)}
       />
       <MemoryFilterMenu />
-      <IconButton label="Refresh" onClick={() => void refresh()}>
-        <RefreshCw />
-      </IconButton>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <IconButton label="Add a memory">
-            <Plus />
-          </IconButton>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-52">
-          {addOrder.map((branch) => (
-            <DropdownMenuItem key={branch} onSelect={() => askAdd(branch)}>
-              {addForms[branch].menu}
-            </DropdownMenuItem>
-          ))}
-        </DropdownMenuContent>
-      </DropdownMenu>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <IconButton label="More">
-            <MoreHorizontal />
-          </IconButton>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-52">
-          <DropdownMenuItem
-            onSelect={() => askForget({ id: "space", label: `everything in ${spaceName}` })}
-          >
-            <Trash2 aria-hidden="true" />
-            Forget everything…
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
     </div>
   );
 }

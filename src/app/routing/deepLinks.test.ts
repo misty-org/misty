@@ -31,6 +31,12 @@ describe("Misty deep links", () => {
     ).toBe("/invite/token-123");
   });
 
+  it("leaves the app where it is on a bare link, as model sign-ins open", () => {
+    expect(
+      routeForMistyDeepLink("misty://", isDeepLinkRouteAllowed, resolveAuthDeepLinkRoute),
+    ).toBeNull();
+  });
+
   it("hands Google sign-in codes only to a sign-in that is waiting", () => {
     const route = (url: string) =>
       routeForMistyDeepLink(url, isDeepLinkRouteAllowed, resolveAuthDeepLinkRoute);

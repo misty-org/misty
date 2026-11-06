@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   cloudClipboardChangedEvent,
   cloudClipboardCopy,
+  cloudClipboardPaste,
   cloudClipboardSave,
   cloudClipboardView,
   type CloudClip,
@@ -11,24 +12,27 @@ import {
 import { errorText } from "@/shared/lib/format";
 import { formatBytes } from "@/shared/lib/fileFormat";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { Button, MenuSubmenu, SkeletonList } from "@/shared/ui";
+import { Button, ErrorNotification, MenuSubmenu, SkeletonList } from "@/shared/ui";
+import { ShortcutText } from "@/features/shortcuts";
 import { listen } from "@tauri-apps/api/event";
 
 const statusText: Record<CloudClipboardView["status"], string> = {
-  off: "Clipboard sharing is off for this device.",
-  locked: "Unlock sync on this device to share your clipboard.",
+  off: "Clipboard sharing is off for this signed-in session.",
+  locked: "Unlock sync on this computer to share your clipboard.",
   connecting: "Connecting to your shared clipboard.",
   ready: "",
-  unavailable: "Your shared clipboard can't be reached right now.",
+  unavailable: "",
 };
 
 /**
- * Recent clips from this account's devices, as a submenu of the browser menu. Copying one
- * puts it on this device's clipboard. The menu mounts it fresh each time it opens.
+ * Everything copied on this account's devices in the last 24 hours, as a submenu of the browser
+ * menu. It is its own buffer: Paste latest types the newest clip into the page and Copy puts one
+ * on this device's clipboard, and nothing else ever changes the system clipboard. The menu mounts it fresh each time it opens.
  */
-export function BrowserClipboardButton() {
+export function BrowserClipboardButton(props: { pageId: string }) {
   const [view, setView] = useState<CloudClipboardView | null>(null);
   const [message, setMessage] = useState("");
+  const [failure, setFailure] = useState("");
   const refresh = useCallback(() => {
     if (!hasTauriInternals()) return;
     void cloudClipboardView()
@@ -53,11 +57,13 @@ export function BrowserClipboardButton() {
 
   const run = (action: () => Promise<string>) => {
     setMessage("");
+    setFailure("");
     void action()
       .then(setMessage)
-      .catch((error: unknown) => setMessage(errorText(error)));
+      .catch((error: unknown) => setFailure(errorText(error)));
   };
 
+  const newest = view?.clips[0];
   return (
     <MenuSubmenu icon={<ClipboardList />} label="Clipboard" width="lg">
       <div className="grid gap-1">
@@ -79,17 +85,34 @@ export function BrowserClipboardButton() {
                 className="w-full font-normal"
                 onClick={() => {
                   window.dispatchEvent(
-                    new CustomEvent("misty:open-settings", { detail: { section: "devices" } }),
+                    new CustomEvent("misty:open-settings", { detail: { section: "sync" } }),
                   );
                 }}
               >
-                Open Devices settings
+                Open Sync settings
               </Button>
             ) : null}
             {view.status !== "off" && view.clips.length === 0 ? (
               <p className="px-2 py-1 text-sm text-cream-muted">
-                Copy something on any of your devices and it shows up here.
+                Everything you copy while signed in shows up here for 24 hours.
               </p>
+            ) : null}
+            {newest && newest.kind !== "image" ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                justify="start"
+                className="w-full font-normal"
+                onClick={() =>
+                  run(async () => {
+                    await cloudClipboardPaste(props.pageId);
+                    return "Pasted into the page.";
+                  })
+                }
+              >
+                <span className="min-w-0 flex-1 truncate text-left">Paste latest</span>
+                <ShortcutText commandId="browser.cloud_paste" />
+              </Button>
             ) : null}
             <ul className="grid">
               {view.clips.map((clip) => (
@@ -99,7 +122,7 @@ export function BrowserClipboardButton() {
                   onCopy={() =>
                     run(async () => {
                       await cloudClipboardCopy(clip.clipId);
-                      return "Copied to this device.";
+                      return "Copied to this computer.";
                     })
                   }
                   onSave={() =>
@@ -113,6 +136,13 @@ export function BrowserClipboardButton() {
             </ul>
           </>
         )}
+        <ErrorNotification
+          message={
+            failure ||
+            (view?.status === "unavailable" ? "Your shared clipboard can't be reached right now." : "")
+          }
+          onDismiss={() => setFailure("")}
+        />
         {message ? (
           <p role="status" className="px-2 pb-1 text-xs text-cream-muted">
             {message}
@@ -132,7 +162,9 @@ function ClipRow(props: { clip: CloudClip; onCopy: () => void; onSave: () => voi
     : clip.fileNames.length > 0
       ? clip.fileNames.join(", ")
       : clip.preview || "Text";
-  const source = clip.fromThisDevice ? "This device" : clip.deviceName || "Another device";
+  const source = clip.fromThisDevice
+    ? "This computer"
+    : clip.deviceName || "Another signed-in session";
   return (
     <li className="flex items-center gap-2 px-2 py-1.5">
       <div className="min-w-0 flex-1">

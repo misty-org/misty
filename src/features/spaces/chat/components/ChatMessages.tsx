@@ -37,9 +37,6 @@ export interface SpaceChatMessagesProps {
 
 export { DeleteMessageDialog } from "./DeleteMessageDialog";
 import { SystemErrorNotice } from "@/features/support/systemErrors";
-import { errorText as systemErrorMessage } from "@/shared/lib/format";
-import { Button } from "@/shared/ui";
-import { CircleAlert, RefreshCw } from "lucide-react";
 import { useLayoutEffect, useMemo, useRef } from "react";
 import { buildChatDisplayRows, useMemberAvatarUrls } from "./ChatDisplay";
 import { ChatMessageRow } from "./ChatMessageRow";
@@ -80,31 +77,12 @@ export function SpaceChatMessages(props: SpaceChatMessagesProps) {
     >
       <div>
         {props.error ? (
-          <>
-            <SystemErrorNotice
-              error={props.error}
-              scope={`social:${props.spaceId}`}
-              title="Messages could not be loaded"
-            />
-            <div
-              className="mb-3 flex items-start gap-3 rounded-xl border border-charcoal-border bg-charcoal-card px-4 py-3"
-              role="alert"
-            >
-              <CircleAlert className="mt-0.5 size-4 shrink-0 text-cream-muted" />
-              <div className="min-w-0 flex-1">
-                <p className="m-0 text-sm font-medium text-cream-bright">
-                  Messages couldn’t be loaded
-                </p>
-                <p className="m-0 mt-0.5 text-xs leading-5 text-cream-muted">
-                  {systemErrorMessage(props.error)}
-                </p>
-              </div>
-              <Button type="button" size="sm" variant="secondary" onClick={props.onReload}>
-                <RefreshCw data-icon="inline-start" />
-                Try again
-              </Button>
-            </div>
-          </>
+          <SystemErrorNotice
+            error={props.error}
+            scope={`social:${props.spaceId}`}
+            title="Messages could not be loaded"
+            onRetry={props.onReload}
+          />
         ) : null}
 
         {props.loading && props.messages.length === 0 ? (

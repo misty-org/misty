@@ -8,6 +8,10 @@
   <string>Misty hears other apps' sound only during a capture or screen recording you started, to turn it into notes. Misty's own sound is never included.</string>
   <key>NSCameraUsageDescription</key>
   <string>Misty uses your camera only after you approve a camera action, and stops capture when that action finishes.</string>
+  <key>NSLocationUsageDescription</key>
+  <string>Misty shares your location only with websites you allow to use it, from the site's permissions.</string>
+  <key>NSLocationWhenInUseUsageDescription</key>
+  <string>Misty shares your location only with websites you allow to use it, from the site's permissions.</string>
   <!-- Declares the misty: deep link (also configured for the deep-link plugin) and web links,
        so macOS can offer Misty as the default browser. Choosing it stays the user's decision. -->
   <key>CFBundleURLTypes</key>

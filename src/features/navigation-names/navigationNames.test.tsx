@@ -89,7 +89,7 @@ it("keeps the editor open when a save fails and accepts blur commits", async () 
   expect(screen.getByRole("textbox")).toBe(input);
   fireEvent.blur(input);
   await waitFor(() => expect(screen.queryByRole("textbox")).toBeNull());
-  expect(screen.getByRole("button").textContent).toBe("School");
+  expect(screen.getByRole("button", { name: "School" }).textContent).toBe("School");
 });
 it("validates names without changing meaningful numbers", () => {
   expect(validateNavigationName("  Project 2026  ")).toBe("Project 2026");

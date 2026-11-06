@@ -1,3 +1,4 @@
+import { otherServerFetch } from "@/api/client/cookie-session";
 import { httpRequest } from "@/api/client/http";
 import {
   notifyApiSessionInvalid,
@@ -7,13 +8,7 @@ import {
 import { resolveApiBase } from "@/api/deployment/api";
 import { desktopOs } from "@/shared/platform/desktopOs";
 import { addRequestCorrelation } from "@/shared/platform/requestCorrelation";
-import type {
-  AccountHandoffPath,
-  AccountMeResponse,
-  LoginResponse,
-  ServerAlert,
-  SetupKeyResponse,
-} from "./types";
+import type { AccountMeResponse, LoginResponse, ServerAlert, SetupKeyResponse } from "./types";
 import {
   AccountApiError,
   errorMessage,
@@ -48,20 +43,39 @@ export const accountApi = {
       email,
       password,
     }),
-  register: (body: unknown) => requestJson<LoginResponse>("POST", "/register", body),
+  /** Whether a waiting sign-up's email has been confirmed. Opens no session and sends no email. */
+  confirmationStatus: (email: string, password: string) =>
+    requestJson<{ status: "confirm_email" | "confirmed" }>("POST", "/login", {
+      email,
+      password,
+      waiting: true,
+    }),
+  /** A server that sends email makes the account only once its email is confirmed. */
+  register: (body: unknown) =>
+    requestJson<LoginResponse | { status: "confirm_email" }>("POST", "/register", body),
   /** A setup key from a sign-in link. Answers like `/login`, plus `password_reset_token`. */
   redeemSetupKey: (setupKey: string) =>
     requestJson<SetupKeyResponse>("POST", "/setup-keys/redeem", { setup_key: setupKey }),
   /**
-   * Both values are opaque to the server: in the desktop app they are derived from the password
-   * on the device. `resetToken`, from a setup key's sign-in, stands in for the current password.
+   * The same on a server this device has not moved to yet. Moving signs out of the current
+   * server, so the new one takes the key first; a key it refuses leaves this device as it was.
    */
+  redeemSetupKeyOn: async (apiBase: string, setupKey: string) => {
+    const path = "/setup-keys/redeem";
+    const url = `${apiBase}${path}`;
+    const body = { setup_key: setupKey };
+    const response = await otherServerFetch(url, {
+      method: "POST",
+      headers: addRequestCorrelation(requestHeaders(body, null) ?? new Headers()),
+      body: JSON.stringify(body),
+    });
+    return parseResponse<SetupKeyResponse>(response, "POST", path, url);
+  },
+  /** `resetToken`, from a setup key's sign-in, stands in for the current password. */
   changePassword: (currentPassword: string, newPassword: string, resetToken?: string) =>
     requestJson<{ status: string }>("PUT", "/me/password", {
       current_password: currentPassword,
       new_password: newPassword,
-      // The new value is derived on the device, so the server records it holds no plain password.
-      credential: true,
       ...(resetToken ? { reset_token: resetToken } : {}),
     }),
   /** The alerts service's open problems; only the server's owner may read them. */
@@ -71,21 +85,17 @@ export const accountApi = {
       status?: string;
     }>("POST", "/logout"),
   me: () => requestJson<AccountMeResponse>("GET", "/me"),
-  handoff: (path?: AccountHandoffPath) =>
-    requestJson<{
-      url: string;
-    }>(
-      "POST",
-      "/auth/handoff",
-      path
-        ? {
-            path,
-          }
-        : {},
-    ),
+  /** Answers the username as the server stored it. */
+  updateUsername: (username: string) =>
+    requestJson<{ username: string }>("PUT", "/me/username", { username }),
   avatar: async () => {
     const response = await accountAvatarRequest();
     return response.blob();
+  },
+  /** The endpoint takes a raw PNG body, not multipart. */
+  uploadAvatar: async (png: Blob) => {
+    const response = await accountAvatarRequest(png);
+    return (await response.json()) as { avatar_version: number };
   },
   resolveBase: resolveApiBase,
 };
@@ -132,16 +142,18 @@ async function requestJson<T>(
     throw new Error(message);
   }
 }
-async function accountAvatarRequest(): Promise<Response> {
+async function accountAvatarRequest(png?: Blob): Promise<Response> {
   const accountGeneration = readApiSessionGeneration();
   const apiBase = await resolveRequiredAccountApiBase();
   assertAccountGeneration(accountGeneration);
   const token = await readApiAuthToken();
   assertAccountGeneration(accountGeneration);
   const headers = addRequestCorrelation(requestHeaders(undefined, token) ?? new Headers());
+  if (png) headers.set("Content-Type", "image/png");
   const response = await httpRequest(`${apiBase}/me/avatar`, {
-    method: "GET",
+    method: png ? "PUT" : "GET",
     headers,
+    body: png,
     credentials: "include",
   });
   assertAccountGeneration(accountGeneration);

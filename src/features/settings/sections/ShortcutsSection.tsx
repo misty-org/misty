@@ -186,9 +186,7 @@ export function ShortcutsSection(props: SettingsContentProps) {
 
   return (
     <>
-      <SettingsSectionBlock
-        title={query.trim() ? "Matching commands" : shownCategory || "Commands"}
-      >
+      <SettingsSectionBlock title={query.trim() ? "Matches" : "Commands"}>
         <SettingsRow label="Show shortcut hints" description="In menus, tooltips and buttons.">
           <SwitchControl
             checked={booleanSetting(props.document, "shortcuts", "shortcut_hints_enabled", true)}

@@ -13,11 +13,7 @@ pub fn status(workspace: &Workspace) -> Result<()> {
         // Keep incomplete or failed jobs visible so their logs remain discoverable.
         let is_job = matches!(
             service,
-            "setup"
-                | "dev-init"
-                | "migrate"
-                | "database-permissions"
-                | "cloudflare-deploy"
+            "setup" | "dev-init" | "migrate" | "database-permissions" | "cloudflare-deploy"
         );
         if is_job && state == "exited" && row["ExitCode"].as_i64() == Some(0) {
             continue;

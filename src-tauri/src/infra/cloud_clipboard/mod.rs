@@ -30,7 +30,7 @@ use views::{fresh, payload, summary, unique_path};
 const CLIP_LIFETIME_MS: i64 = 24 * 60 * 60 * 1000;
 pub const HISTORY_EVENT: &str = "misty://clipboard-history";
 
-/// One clip in the popover and in Kura's sidebar. Contains only what this
+/// One clip in the popover. Contains only what this
 /// device could already paste.
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -54,10 +54,8 @@ pub enum CloudStatus {
     Off,
     /// The vault is locked here, so there is no key to seal clips with.
     Locked,
-    Connecting,
+    /// The ring is being followed.
     Ready,
-    /// Sync is unreachable right now.
-    Unavailable,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -69,8 +67,6 @@ pub struct CloudClipboardView {
     pub notice: Option<String>,
 }
 
-pub(super) type ClipHandler = Arc<dyn Fn(ClipboardPayload) + Send + Sync>;
-
 #[derive(Clone, Default)]
 pub struct CloudClipboard {
     inner: Arc<Inner>,
@@ -79,40 +75,22 @@ pub struct CloudClipboard {
 #[derive(Default)]
 struct Inner {
     generation: AtomicU64,
-    changes: Changes,
     session: RwLock<Option<Arc<ring::Session>>>,
     status: Mutex<CloudStatus>,
     notice: Mutex<Option<String>>,
     /// Open clips by ring slot, newest first.
     history: Mutex<Vec<(u8, Clip)>>,
-    handler: RwLock<Option<ClipHandler>>,
     app: RwLock<Option<AppHandle>>,
-}
-
-struct Changes(tokio::sync::broadcast::Sender<()>);
-
-impl Default for Changes {
-    fn default() -> Self {
-        Self(tokio::sync::broadcast::channel(16).0)
-    }
 }
 
 pub struct CloudStart {
     pub app: AppHandle,
-    pub account_id: String,
     /// This device's id on the server, recorded with each clip it shares.
     pub server_device_id: String,
     pub device_name: String,
 }
 
 impl CloudClipboard {
-    /// Called with every clip that arrives from another device.
-    pub fn set_handler(&self, handler: ClipHandler) {
-        if let Ok(mut slot) = self.inner.handler.write() {
-            *slot = Some(handler);
-        }
-    }
-
     /// Starts (or restarts) for this device. It keeps running until `stop`
     /// and follows the device's policy and vault state.
     pub fn start(&self, start: CloudStart) {
@@ -133,11 +111,6 @@ impl CloudClipboard {
             history.clear();
         }
         self.inner.set_status(CloudStatus::Off);
-    }
-
-    /// Fires whenever the clip list or the status changes.
-    pub fn subscribe(&self) -> tokio::sync::broadcast::Receiver<()> {
-        self.inner.changes.0.subscribe()
     }
 
     pub fn view(&self) -> CloudClipboardView {
@@ -164,6 +137,19 @@ impl CloudClipboard {
                 .ok()
                 .and_then(|notice| notice.clone()),
         }
+    }
+
+    /// The id of the newest clip, the one cloud paste uses.
+    pub fn latest_clip_id(&self) -> Option<String> {
+        let now = chrono::Utc::now().timestamp_millis();
+        self.inner
+            .history
+            .lock()
+            .ok()?
+            .iter()
+            .map(|(_, clip)| clip)
+            .find(|clip| fresh(clip, now))
+            .map(|clip| clip.header.clip_id.clone())
     }
 
     /// A clip as a payload this device can paste.
@@ -239,7 +225,6 @@ impl Inner {
     }
 
     fn notify(&self) {
-        let _ = self.changes.0.send(());
         if let Some(app) = self.app.read().ok().and_then(|app| app.clone()) {
             let _ = app.emit(HISTORY_EVENT, ());
         }
@@ -263,9 +248,5 @@ impl Inner {
             .find(|clip| clip.header.clip_id == clip_id && fresh(clip, now))
             .cloned()
             .ok_or_else(|| "That clip expired.".to_owned())
-    }
-
-    fn handler(&self) -> Option<ClipHandler> {
-        self.handler.read().ok().and_then(|handler| handler.clone())
     }
 }

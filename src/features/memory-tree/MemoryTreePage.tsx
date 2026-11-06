@@ -1,13 +1,23 @@
 import { ReactFlowProvider } from "@xyflow/react";
-import { useEffect } from "react";
-import { Button, EmptyState, ErrorState } from "@/shared/ui";
+import { ChevronLeft } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useRecapRequest } from "@/features/recall";
+import { Button, cn, EmptyState, ErrorState, Pressable } from "@/shared/ui";
 import { AddMemoryDialog } from "./AddMemoryDialog";
-import { CaptureControl } from "./CaptureControl";
 import { ForgetDialog } from "./ForgetDialog";
 import { MemoryTreeCanvas } from "./MemoryTreeCanvas";
 import { MemoryTreeSkeleton } from "./MemoryTreeSkeleton";
 import { MemoryTreeToolbar } from "./MemoryTreeToolbar";
+import { RecapSheet } from "./RecapSheet";
 import { useMemoryTreeStore } from "./useMemoryTreeStore";
+
+const DRAWER_MS = 220;
+const drawerWidth = "w-[min(27.5rem,45vw)]";
+
+const drawerHandle =
+  "absolute inset-y-0 right-0 z-10 my-auto flex h-16 w-6 items-center justify-center " +
+  "rounded-l-lg border border-r-0 border-charcoal-border bg-charcoal-card text-cream-muted " +
+  "hover:bg-charcoal-hover hover:text-cream-bright";
 
 /** The Forget dialog for whichever node asked, from a node's menu or the toolbar. */
 function ForgetHost() {
@@ -38,21 +48,36 @@ export function MemoryTreePage({ spaceId, spaceName }: { spaceId: string; spaceN
   );
   const open = useMemoryTreeStore((s) => s.open);
   const refresh = useMemoryTreeStore((s) => s.refresh);
+  const requestedDay = useRecapRequest((s) => s.day);
+  const [recap, setRecap] = useState<{ day: string | null } | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  // The drawer mounts closed and opens on the next frame, so its width has something to animate.
+  useEffect(() => {
+    if (!recap) return;
+    const frame = requestAnimationFrame(() => setDrawerOpen(true));
+    return () => cancelAnimationFrame(frame);
+  }, [recap]);
+
+  // Closed, it stays until it has finished sliding away.
+  useEffect(() => {
+    if (!recap || drawerOpen) return;
+    const timer = window.setTimeout(() => setRecap(null), DRAWER_MS);
+    return () => window.clearTimeout(timer);
+  }, [recap, drawerOpen]);
 
   useEffect(() => {
     void open(spaceId);
   }, [open, spaceId]);
 
+  useEffect(() => {
+    if (!requestedDay) return;
+    setRecap({ day: requestedDay });
+    useRecapRequest.setState({ day: null });
+  }, [requestedDay]);
+
   let body;
-  if (status === "unavailable")
-    body = (
-      <EmptyState
-        className="h-full"
-        title="Memory isn't available yet"
-        description="It isn't turned on for this Misty server."
-      />
-    );
-  else if (status === "error")
+  if (status === "error")
     body = (
       <ErrorState
         className="h-full"
@@ -66,7 +91,12 @@ export function MemoryTreePage({ spaceId, spaceName }: { spaceId: string; spaceN
       <EmptyState
         className="h-full"
         title="Nothing remembered yet"
-        description="Pages you read, things you say and screens you capture will grow here."
+        description="Pages you read, things you say and tabs you open will grow here."
+        action={
+          <Button onClick={() => useMemoryTreeStore.getState().askAdd("facts")}>
+            Add a memory
+          </Button>
+        }
       />
     );
   else
@@ -78,10 +108,39 @@ export function MemoryTreePage({ spaceId, spaceName }: { spaceId: string; spaceN
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-charcoal-bg">
-      <MemoryTreeToolbar spaceName={spaceName} />
-      <div className="relative min-h-0 flex-1">
-        {body}
-        {status !== "unavailable" && status !== "error" && <CaptureControl />}
+      <MemoryTreeToolbar />
+      <div className="flex min-h-0 flex-1">
+        <div className="relative min-w-0 flex-1">
+          {body}
+          {status !== "error" && !drawerOpen && (
+            <Pressable
+              aria-label="Open recap"
+              title="Recap"
+              onClick={() => setRecap({ day: null })}
+              className={drawerHandle}
+            >
+              <ChevronLeft className="size-4" aria-hidden="true" />
+            </Pressable>
+          )}
+        </div>
+        {status !== "error" && recap && (
+          <div
+            inert={!drawerOpen}
+            style={{ transitionDuration: `${DRAWER_MS}ms` }}
+            className={cn(
+              "shrink-0 overflow-hidden transition-[width] ease-out motion-reduce:transition-none",
+              drawerOpen ? drawerWidth : "w-0",
+            )}
+          >
+            <RecapSheet
+              key={spaceId}
+              spaceId={spaceId}
+              startDay={recap.day}
+              className={drawerWidth}
+              onClose={() => setDrawerOpen(false)}
+            />
+          </div>
+        )}
       </div>
       <ForgetHost />
       <AddHost />

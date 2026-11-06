@@ -1,7 +1,4 @@
-use std::sync::{
-    atomic::{AtomicBool, Ordering},
-    Arc, Mutex,
-};
+use std::sync::{Arc, Mutex};
 
 use super::{ClipboardOrigin, ClipboardPayload, ClipboardPayloadKind};
 use crate::domain::clock::now_epoch_ms;
@@ -23,12 +20,10 @@ pub trait SharedClipboardClient: Send + Sync {
 #[derive(Default)]
 struct ClipboardState {
     local: ClipboardPayload,
-    shared: ClipboardPayload,
     last_seen_fingerprint: Vec<u8>,
     device_id: String,
     device_name: String,
     next_revision: u64,
-    last_remote_clock: Option<(u64, String)>,
     on_change: Option<ClipboardChangeCallback>,
 }
 
@@ -36,7 +31,6 @@ pub struct ClipboardService {
     native: Option<Arc<dyn NativeClipboard>>,
     shared_client: Option<Arc<dyn SharedClipboardClient>>,
     state: Mutex<ClipboardState>,
-    apply_in_flight: AtomicBool,
 }
 
 impl ClipboardService {
@@ -51,7 +45,6 @@ impl ClipboardService {
                 next_revision: 1,
                 ..ClipboardState::default()
             }),
-            apply_in_flight: AtomicBool::new(false),
         })
     }
 
@@ -76,55 +69,12 @@ impl ClipboardService {
         state.device_name = device_name;
     }
 
-    pub fn latest_shared(&self) -> ClipboardPayload {
-        self.state
-            .lock()
-            .expect("clipboard state lock")
-            .shared
-            .clone()
-    }
-
     pub fn publish_payload_to_shared(&self, payload: &ClipboardPayload) -> bool {
         !payload.empty()
             && self
                 .shared_client
                 .as_ref()
                 .is_some_and(|client| client.publish(payload))
-    }
-
-    pub fn apply_shared_to_system_async(self: &Arc<Self>) -> bool {
-        if self.apply_in_flight.swap(true, Ordering::AcqRel) {
-            return false;
-        }
-        let payload = self.latest_shared();
-        if payload.empty() {
-            self.apply_in_flight.store(false, Ordering::Release);
-            return false;
-        }
-        let service = Arc::clone(self);
-        std::thread::spawn(move || {
-            let _ = service.apply_payload_to_system(payload);
-            service.apply_in_flight.store(false, Ordering::Release);
-        });
-        true
-    }
-
-    pub fn accept_remote_payload(&self, mut payload: ClipboardPayload) {
-        payload.origin = ClipboardOrigin::RemoteShared;
-        {
-            let mut state = self.state.lock().expect("clipboard state lock");
-            let clock = (payload.revision, payload.source_device_id.clone());
-            if state
-                .last_remote_clock
-                .as_ref()
-                .is_some_and(|current| current >= &clock)
-            {
-                return;
-            }
-            state.last_remote_clock = Some(clock);
-            state.next_revision = state.next_revision.max(payload.revision.saturating_add(1));
-        }
-        self.set_shared_payload(payload);
     }
 
     pub fn finalize_payload(
@@ -190,23 +140,27 @@ impl ClipboardService {
     }
 
     fn on_native_clipboard_changed(&self) {
-        let Some(native) = &self.native else {
-            return;
-        };
-        let Some(payload) = native.read_payload().filter(|payload| !payload.empty()) else {
-            return;
-        };
+        let _ = self.capture_system();
+    }
+
+    /// Takes whatever is on the system clipboard into the shared buffer if it hasn't been yet,
+    /// and returns it. The clipboard watcher does this on every change; invoking the shared
+    /// clipboard does it again so a copy the watcher missed is never left out.
+    pub fn capture_system(&self) -> Option<ClipboardPayload> {
+        let native = self.native.as_ref()?;
+        let payload = native.read_payload().filter(|payload| !payload.empty())?;
         let fingerprint = Self::fingerprint_for(&payload);
         {
             let mut state = self.state.lock().expect("clipboard state lock");
             if fingerprint == state.last_seen_fingerprint {
-                return;
+                return None;
             }
             state.last_seen_fingerprint = fingerprint;
         }
         let payload = self.finalize_payload(payload, ClipboardOrigin::LocalSystem);
         self.set_local_payload(payload.clone());
         let _ = self.publish_payload_to_shared(&payload);
+        Some(payload)
     }
 
     pub(crate) fn apply_payload_to_system(&self, mut payload: ClipboardPayload) -> bool {
@@ -232,17 +186,6 @@ impl ClipboardService {
         let callback = {
             let mut state = self.state.lock().expect("clipboard state lock");
             state.local = payload.clone();
-            state.on_change.clone()
-        };
-        if let Some(callback) = callback {
-            callback(payload);
-        }
-    }
-
-    fn set_shared_payload(&self, payload: ClipboardPayload) {
-        let callback = {
-            let mut state = self.state.lock().expect("clipboard state lock");
-            state.shared = payload.clone();
             state.on_change.clone()
         };
         if let Some(callback) = callback {

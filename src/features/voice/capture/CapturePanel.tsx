@@ -1,11 +1,9 @@
 import { FileText, ListChecks, MessageSquare, Mic, MicOff, Square, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { publicBetaFeatureEnabled } from "@/features/launch";
-import { Button, IconButton, Input, Skeleton, Textarea } from "@/shared/ui";
+import { Button, IconButton, Input, Notification, Skeleton, Textarea } from "@/shared/ui";
 import type { VoiceNoteMode } from "./captureApi";
 import { openCapturedNote, askAboutCapturedNote } from "./openNote";
 import { speakersOf } from "./transcriptTurns";
-import { useRecordingStore } from "../recording/useRecordingStore";
 import { useCaptureStore } from "./useCaptureStore";
 
 const sourceLabel = {
@@ -13,7 +11,6 @@ const sourceLabel = {
   tab: "This tab",
   system: "System audio",
   app: "An app",
-  recording: "Screen recording",
 } as const;
 
 /**
@@ -23,39 +20,30 @@ const sourceLabel = {
  */
 export function CapturePanel() {
   const store = useCaptureStore();
-  const recording = useRecordingStore();
-  const notice = store.notice || recording.notice;
-  const close = () => {
-    useRecordingStore.setState({ notice: undefined });
-    store.close();
-  };
+  const notice = store.notice;
+  const close = store.close;
   const end = useRef<HTMLDivElement>(null);
   useEffect(() => end.current?.scrollIntoView({ block: "end" }), [store.turns.length]);
-  if (!publicBetaFeatureEnabled("voiceNotes")) return null;
   if (store.phase === "idle" && !notice) return null;
   if (store.phase === "idle")
     return (
-      <aside
-        role="status"
-        className="fixed right-4 bottom-4 z-50 flex max-w-80 items-start gap-2 rounded-lg border border-cream-border bg-background p-3 text-sm shadow-lg"
-      >
-        <span className="flex-1">{notice}</span>
-        <IconButton size="xs" label="Dismiss" onClick={close}>
-          <X />
-        </IconButton>
-      </aside>
+      <Notification key={notice} onDismiss={close}>
+        {notice}
+      </Notification>
     );
   const listening = store.phase === "live" || store.phase === "starting";
   const busy = store.phase === "working" || store.phase === "saving";
   const make = (mode: VoiceNoteMode) => void store.makeNote(mode);
   return (
     <aside
-      aria-label="Capture"
+      aria-label="Listening"
+      data-misty-notification="true"
+      data-misty-window-drag-block="true"
       className="fixed right-4 bottom-4 z-50 flex max-h-[70vh] w-96 flex-col gap-3 rounded-lg border border-cream-border bg-background p-4 shadow-lg"
     >
       <header className="flex items-center gap-2">
         <div className="min-w-0 flex-1">
-          <div className="truncate text-sm font-medium">{store.title || "Capture"}</div>
+          <div className="truncate text-sm font-medium">{store.title || "Listening"}</div>
           <div className="text-xs text-cream-muted">
             {store.source ? sourceLabel[store.source.kind] : "Transcript"}
             {store.phase === "live" ? " · Listening" : store.phase === "saving" ? " · Saving" : ""}
@@ -74,9 +62,7 @@ export function CapturePanel() {
               size="sm"
               variant="ghost"
               disabled={store.phase !== "live"}
-              onClick={() =>
-                void (store.source?.kind === "recording" ? recording.stop() : store.stop())
-              }
+              onClick={() => void store.stop()}
             >
               <Square /> Stop
             </Button>

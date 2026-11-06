@@ -18,7 +18,7 @@ export const useAppStore = create<AppStore>((set) => ({
   },
 }));
 
-export interface AppStore {
+interface AppStore {
   app: AppSnapshot | null;
   error: string | null;
   message: string | null;

@@ -1,8 +1,8 @@
-//! Engine hooks: requests the engine raises on its own (camera and microphone
-//! prompts) and controls only the engine has (stopping capture). One file per
+//! Engine hooks: requests the engine raises on its own (camera, microphone and
+//! location prompts) and controls only the engine has (stopping capture). One file per
 //! OS; the rules they apply live in `crate::permissions`.
 
-use crate::permissions::{MediaKind, Verdict};
+use crate::permissions::{MediaKind, PermissionKind, Verdict};
 use std::{
     sync::{Arc, OnceLock},
     time::Duration,
@@ -13,6 +13,8 @@ use tauri::Webview;
 mod linux;
 #[cfg(target_os = "macos")]
 mod macos;
+#[cfg(target_os = "macos")]
+mod macos_location;
 #[cfg(not(any(target_os = "macos", windows, target_os = "linux")))]
 mod unsupported;
 #[cfg(windows)]
@@ -50,30 +52,117 @@ pub struct MediaRequest {
     pub store: Option<StoreScope>,
 }
 
-/// The host's answer to capture requests, normally backed by its
-/// site-permission store and `permissions::media_verdict`.
-pub trait MediaPolicy: Send + Sync + 'static {
-    fn media_verdict(&self, request: &MediaRequest) -> Verdict;
+/// A request for the device's location, with origins canonicalized.
+#[derive(Clone, Debug)]
+pub struct LocationRequest {
+    /// The embedder's label for the tab.
+    pub webview: String,
+    pub top_origin: Option<String>,
+    /// The frame that asked. Engines that cannot tell report the top origin.
+    pub requester_origin: Option<String>,
+    pub store: Option<StoreScope>,
 }
 
-static MEDIA_POLICY: OnceLock<Arc<dyn MediaPolicy>> = OnceLock::new();
+/// A request the policy answered `Verdict::Prompt`, for a host that asks in its own interface.
+#[derive(Clone, Debug)]
+pub struct PermissionAsk {
+    /// The embedder's label for the tab.
+    pub webview: String,
+    pub top_origin: Option<String>,
+    /// The frame that asked. Engines that cannot tell report the top origin.
+    pub requester_origin: Option<String>,
+    pub kinds: Vec<PermissionKind>,
+    pub store: Option<StoreScope>,
+}
+
+/// The engine's held decision. Dropping it unanswered refuses the request, as WebKit requires
+/// every decision to be answered. It may only be answered or dropped on the main thread.
+pub struct AskAnswer(Option<Box<dyn FnOnce(bool)>>);
+
+// The engine's handler is only ever touched on the main thread, as the type's rule says.
+unsafe impl Send for AskAnswer {}
+
+impl AskAnswer {
+    #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+    pub(crate) fn new(answer: impl FnOnce(bool) + 'static) -> Self {
+        Self(Some(Box::new(answer)))
+    }
+
+    pub fn answer(mut self, allow: bool) {
+        if let Some(answer) = self.0.take() {
+            answer(allow);
+        }
+    }
+}
+
+impl Drop for AskAnswer {
+    fn drop(&mut self) {
+        if let Some(answer) = self.0.take() {
+            answer(false);
+        }
+    }
+}
+
+/// The host's answer to permission requests, normally backed by its
+/// site-permission store and `permissions::media_verdict` /
+/// `permissions::location_verdict`.
+pub trait SitePolicy: Send + Sync + 'static {
+    fn media_verdict(&self, request: &MediaRequest) -> Verdict;
+    fn location_verdict(&self, request: &LocationRequest) -> Verdict;
+
+    /// Asks the person in the host's own interface. Handing the answer back leaves the question
+    /// to the engine, which on macOS shows WebKit's own dialog.
+    fn ask(&self, _request: PermissionAsk, answer: AskAnswer) -> Result<(), AskAnswer> {
+        Err(answer)
+    }
+}
+
+static SITE_POLICY: OnceLock<Arc<dyn SitePolicy>> = OnceLock::new();
 
 /// Installs the host's policy. The first call wins.
-pub fn set_media_policy(policy: impl MediaPolicy) {
-    let _ = MEDIA_POLICY.set(Arc::new(policy));
+pub fn set_site_policy(policy: impl SitePolicy) {
+    let _ = SITE_POLICY.set(Arc::new(policy));
 }
 
 /// Without a policy the engine keeps its own behavior: it asks.
 pub(crate) fn media_verdict(request: &MediaRequest) -> Verdict {
-    MEDIA_POLICY
+    SITE_POLICY
         .get()
         .map_or(Verdict::Prompt, |policy| policy.media_verdict(request))
 }
 
-/// Routes the tab's camera and microphone requests through the policy.
-/// Safe to call again for the same tab.
-pub fn install_media_permissions(webview: &Webview) -> Result<(), String> {
-    platform::install_media_permissions(webview)
+pub(crate) fn location_verdict(request: &LocationRequest) -> Verdict {
+    SITE_POLICY
+        .get()
+        .map_or(Verdict::Prompt, |policy| policy.location_verdict(request))
+}
+
+/// Whether the host asks for itself. `None` means it took the answer.
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+pub(crate) fn ask(request: PermissionAsk, answer: AskAnswer) -> Option<AskAnswer> {
+    match SITE_POLICY.get() {
+        Some(policy) => policy.ask(request, answer).err(),
+        None => Some(answer),
+    }
+}
+
+/// Whether the system refuses this app the device's location, so a site's grant reaches nothing.
+/// Only macOS can tell; call it on the main thread.
+pub fn location_blocked_by_system() -> bool {
+    #[cfg(target_os = "macos")]
+    {
+        macos_location::blocked_by_system()
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        false
+    }
+}
+
+/// Routes the tab's camera, microphone and location requests through the
+/// policy. Safe to call again for the same tab.
+pub fn install_site_permissions(webview: &Webview) -> Result<(), String> {
+    platform::install_site_permissions(webview)
 }
 
 /// What the engine knows about the tab's current page.

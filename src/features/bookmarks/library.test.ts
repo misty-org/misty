@@ -11,20 +11,20 @@ import {
   removeBookmarkFolder,
   saveBookmark,
 } from "./library";
-import { recordChanges } from "@/features/browser-sync/recordChanges";
+import { encodedRecords, recordWrites } from "@/features/workspace/profileRecords";
 const state = () => useWorkspaceStore.getState();
 beforeEach(() => state().reset());
-it("keeps old saved-link identities and encrypted wire records while editing a bookmark", () => {
+it("keeps old saved-link identities and writes only the edited record", () => {
   const folder = createBookmarkFolder("Research");
   const id = saveBookmark({ title: "Example", url: "example.com", folderId: folder });
-  const before = state().bookmarks;
+  const before = encodedRecords([...state().bookmarkFolders, ...state().bookmarks]);
   saveBookmark({ id, title: "Renamed", url: "https://example.com/", folderId: folder });
   expect(bookmarks(state().bookmarks)).toEqual([
     { id, folderId: folder, title: "Renamed", url: "https://example.com/", order: 0 },
   ]);
-  expect(recordChanges(before, state().bookmarks)).toEqual([
-    { action: "patch", kind: "bookmark", id, fields: { title: "Renamed" } },
-  ]);
+  const writes = recordWrites(before, [...state().bookmarkFolders, ...state().bookmarks]);
+  expect(writes.map((write) => write.id)).toEqual([id]);
+  expect(writes[0].record?.fields).toMatchObject({ title: "Renamed" });
   expect(bookmarkFolders(state().bookmarkFolders)[0].name).toBe("Research");
 });
 it("removes a folder without losing its bookmarks or editing open pages", () => {

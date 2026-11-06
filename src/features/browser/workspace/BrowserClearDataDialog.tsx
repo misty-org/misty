@@ -7,6 +7,7 @@ import {
   DialogDescription,
   DialogFooter,
   DialogTitle,
+  ErrorNotification,
   Field,
   Select,
   SelectContent,
@@ -43,11 +44,10 @@ const choices: { id: Choice; label: string; detail: string }[] = [
   },
 ];
 
-/** Clear browsing data for this tab's Space. */
+/** Clear browsing data for this window's profile. */
 export function BrowserClearDataDialog(props: {
   request: number;
   tabId: string;
-  profileId?: string;
   suspensionReason: string;
 }) {
   const overlay = useBrowserOverlayControl(props.suspensionReason);
@@ -59,7 +59,6 @@ export function BrowserClearDataDialog(props: {
     <ClearBrowsingDataDialog
       open={overlay.open}
       onOpenChange={overlay.onOpenChange}
-      profileId={props.profileId}
       onCleared={() =>
         useBrowserRuntimeStore.getState().setNotice(props.tabId, "Browsing data cleared.")
       }
@@ -71,7 +70,6 @@ export function BrowserClearDataDialog(props: {
 export function ClearBrowsingDataDialog(props: {
   open: boolean;
   onOpenChange(open: boolean): void;
-  profileId?: string;
   onCleared(): void;
 }) {
   const [range, setRange] = useState(1);
@@ -89,15 +87,13 @@ export function ClearBrowsingDataDialog(props: {
     setWorking(true);
     setError(null);
     try {
-      if (selected.has("history"))
-        await browserLibrary.clearHistory({ profileId: props.profileId, since });
+      if (selected.has("history")) await browserLibrary.clearHistory({ since });
       if (selected.has("downloads")) {
         await browserLibrary.removeDownloads({ since });
         await useBrowserDownloadsStore.getState().refresh();
       }
       const kinds = (["cookies", "cache"] as const).filter((kind) => selected.has(kind));
-      if (kinds.length)
-        await browserLibrary.clearWebsiteData({ profileId: props.profileId, kinds, since });
+      if (kinds.length) await browserLibrary.clearWebsiteData({ kinds, since });
       props.onOpenChange(false);
       props.onCleared();
     } catch (failure) {
@@ -111,7 +107,7 @@ export function ClearBrowsingDataDialog(props: {
     <Dialog open={props.open} onOpenChange={props.onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogTitle>Clear browsing data</DialogTitle>
-        <DialogDescription>Applies to this Space on this device.</DialogDescription>
+        <DialogDescription>Applies to this profile on this computer.</DialogDescription>
         <Field label="Time range">
           <Select value={String(range)} onValueChange={(value) => setRange(Number(value))}>
             <SelectTrigger className="w-full">
@@ -150,15 +146,11 @@ export function ClearBrowsingDataDialog(props: {
         </div>
         {selected.has("cookies") ? (
           <p className="rounded-md bg-charcoal-card px-3 py-2 text-xs text-cream-muted">
-            If Sync is on, website sign-ins saved from another device can be restored the next time
-            this device syncs.
+            If Sync is on, website sign-ins saved from another signed-in session can be restored the
+            next time this computer syncs.
           </p>
         ) : null}
-        {error ? (
-          <p role="alert" className="text-sm text-destructive">
-            {error}
-          </p>
-        ) : null}
+        <ErrorNotification message={error} onDismiss={() => setError(null)} />
         <DialogFooter>
           <Button type="button" variant="ghost" onClick={() => props.onOpenChange(false)}>
             Cancel

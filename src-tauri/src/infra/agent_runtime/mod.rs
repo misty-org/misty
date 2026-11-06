@@ -1,7 +1,7 @@
 //! The agent runtime on this computer (docs/plans/desktop-runtime.md).
 //!
 //! Agents run here, not on the server. The app starts the runtime
-//! (`server/apps/agent-runtime`, built with nitro) as a helper process on loopback, gives it
+//! (`src-tauri/services/agent-runtime`, built with nitro) as a helper process on loopback, gives it
 //! this device's model keys and choices, and hands it the runs the server queues for this
 //! device (`agent_runtime_deliver`). Every call to it is signed with a secret made for this
 //! launch, so nothing else on the computer can drive it. Its runs are kept under
@@ -66,7 +66,7 @@ fn entry(app: &tauri::AppHandle) -> Option<PathBuf> {
         .map(|dir| dir.join("agent-runtime/server/index.mjs"));
     let checkout = cfg!(debug_assertions).then(|| {
         PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("../server/apps/agent-runtime/.output/server/index.mjs")
+            .join("services/agent-runtime/.output/server/index.mjs")
     });
     std::env::var_os("MISTY_AGENT_RUNTIME_ENTRY")
         .map(PathBuf::from)

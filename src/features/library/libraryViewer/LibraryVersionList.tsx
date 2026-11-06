@@ -5,7 +5,7 @@ import { Trash2 } from "lucide-react";
 import { formatTime } from "../libraryFormat";
 import { libraryRenditionStatus } from "../SpaceLibraryViewerUtils";
 
-export interface LibraryVersionListProps {
+interface LibraryVersionListProps {
   versions: LibraryEditVersion[];
   activeEdit: LibraryEditVersion | null;
   canEdit: boolean;

@@ -4,6 +4,7 @@ import {
   Button,
   Checkbox,
   CollectionFilters,
+  ErrorNotification,
   IconButton,
   ListRow,
   ListRowButton,
@@ -67,7 +68,6 @@ export function HistoryPage(props: BrowserInternalPageProps) {
       setLoading(true);
       try {
         const page = await browserLibrary.history({
-          profileId: props.profileId,
           text,
           before: before ?? range.before,
           limit: pageSize,
@@ -88,7 +88,7 @@ export function HistoryPage(props: BrowserInternalPageProps) {
         if (id === requestId.current) setLoading(false);
       }
     },
-    [props.profileId, text, section],
+    [text, section],
   );
 
   const archived = section === "archived";
@@ -169,11 +169,7 @@ export function HistoryPage(props: BrowserInternalPageProps) {
         />
       }
     >
-      {error ? (
-        <p role="alert" className="mb-3 text-sm text-cream-muted">
-          {error}
-        </p>
-      ) : null}
+      <ErrorNotification message={error} onDismiss={() => setError(null)} />
       {archived ? (
         <ArchivedTabsList
           text={text}

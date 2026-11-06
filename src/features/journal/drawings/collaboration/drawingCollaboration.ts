@@ -6,7 +6,7 @@ import * as Y from "yjs";
 import { drawingsApi } from "@/api/drawings/api";
 import type { DrawingAssetReference, DrawingCollaborationTicket } from "../types";
 
-export interface DrawingCollaborationSession {
+interface DrawingCollaborationSession {
   key: string;
   spaceId: string;
   drawingId: string;

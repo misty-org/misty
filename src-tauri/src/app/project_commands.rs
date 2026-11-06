@@ -1,6 +1,5 @@
 //! Projects for coding: choosing, creating or cloning a project folder,
-//! publishing one to GitHub, forgetting one, what changed in it, and carrying
-//! old project switches over. The
+//! publishing one to GitHub, forgetting one, and what changed in it. The
 //! coding itself runs in the person's own coding tool (runner_commands).
 //! Every command answers only Misty's main window.
 #![cfg(desktop)]
@@ -17,11 +16,10 @@ use crate::{
     },
     app::runtime::MistyRuntime,
     error::{ApiError, ApiResult},
-    infra::agents::projects::LegacyProjectFlags,
 };
 
 fn require_main(webview: &tauri::Webview) -> ApiResult<()> {
-    if crate::infra::space_windows::is_space_window(webview.label()) {
+    if crate::infra::profile_windows::is_person_window(webview.label()) {
         Ok(())
     } else {
         Err(ApiError::Message(
@@ -178,36 +176,4 @@ pub async fn project_git_diff(
         .await
         .map_err(|_| ApiError::Message("Reading the changes stopped unexpectedly.".into()))?
         .map_err(ApiError::Message)
-}
-
-/// Projects whose old switches still need carrying over, with each one's
-/// GitHub remote for a remembered push.
-#[tauri::command]
-pub async fn project_legacy_flags(
-    webview: tauri::Webview,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<Vec<(LegacyProjectFlags, Option<String>)>> {
-    require_main(&webview)?;
-    let mut out = Vec::new();
-    for flags in state.agents.legacy_project_flags().await? {
-        let remote = state
-            .agents
-            .project(flags.scope_id.clone())
-            .await
-            .ok()
-            .and_then(|p| crate::agents::runners::tauri_host::github_remote(&p.root));
-        out.push((flags, remote));
-    }
-    Ok(out)
-}
-
-/// Records that a project's old switches were carried over.
-#[tauri::command]
-pub async fn project_legacy_flags_done(
-    webview: tauri::Webview,
-    state: State<'_, MistyRuntime>,
-    scope_id: String,
-) -> ApiResult<()> {
-    require_main(&webview)?;
-    state.agents.mark_project_flags_migrated(scope_id).await
 }

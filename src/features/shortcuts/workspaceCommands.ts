@@ -5,27 +5,27 @@ import { tabFeatureCommands } from "./browserFeatureCommands";
 /** Window, tab and pane commands. */
 export const workspaceCommands: ShortcutCommandDefinition[] = [
   ...tabFeatureCommands,
-  command("workspace.open_space", "Open Space", {
-    description: "List your Spaces; each opens in its own window, with its own sign-ins.",
+  command("workspace.new_window", "New window", {
+    description: "Open another window of this profile.",
     category: "Windows",
     scope: "workspace",
-    aliases: ["switch space", "spaces", "new window", "profile"],
+    aliases: ["window", "open window"],
     mac: "Cmd+Shift+N",
     windows: "Ctrl+Shift+N",
     allowInEditable: true,
     nativeMenu: true,
   }),
-  command("workspace.new_space", "New Space", {
-    description: "Make a Space for another part of your life, with its own tabs and sign-ins.",
+  command("workspace.new_profile", "New profile", {
+    description: "Add a profile, with its own tabs, sign-ins, bookmarks and extensions.",
     category: "Windows",
     scope: "workspace",
-    aliases: ["create space", "add space", "profile"],
+    aliases: ["add profile", "create profile"],
     allowInEditable: true,
     nativeMenu: true,
   }),
   command("workspace.new_incognito_window", "New incognito window", {
     description:
-      "Browse in this Space without saving history, cookies or site data. Its incognito windows share one session until the last one closes.",
+      "Browse in this profile without saving history, cookies or site data. Its incognito windows share one session until the last one closes.",
     category: "Windows",
     scope: "workspace",
     aliases: ["incognito", "private window", "private browsing"],
@@ -35,7 +35,7 @@ export const workspaceCommands: ShortcutCommandDefinition[] = [
     nativeMenu: true,
   }),
   command("workspace.close_window", "Close window", {
-    description: "Close this window. Its Space keeps its tabs for the next time it opens.",
+    description: "Close this window. Its tabs stay in the profile.",
     category: "Windows",
     scope: "workspace",
     aliases: ["close space"],
@@ -56,14 +56,14 @@ export const workspaceCommands: ShortcutCommandDefinition[] = [
   }),
   command("workspace.new_tab", "New tab", {
     description: "Open the keyboard-first New Tab picker.",
-    category: "Tabs and panes",
+    category: "Tabs",
     scope: "workspace",
     aliases: ["add tab", "tool picker"],
     allowInEditable: true,
   }),
   command("workspace.close_tab", "Close tab", {
     description: "Close the active tab in the focused pane.",
-    category: "Tabs and panes",
+    category: "Tabs",
     scope: "workspace",
     mac: "Cmd+W",
     windows: "Ctrl+W",
@@ -72,7 +72,7 @@ export const workspaceCommands: ShortcutCommandDefinition[] = [
   }),
   command("workspace.reopen_tab", "Reopen closed tab", {
     description: "Restore the most recently closed tab in the focused pane.",
-    category: "Tabs and panes",
+    category: "Tabs",
     scope: "workspace",
     mac: "Cmd+Shift+T",
     windows: "Ctrl+Shift+T",
@@ -81,7 +81,7 @@ export const workspaceCommands: ShortcutCommandDefinition[] = [
   }),
   command("workspace.next_tab", "Next tab", {
     description: "Move to the next tab in the focused pane, wrapping at the end.",
-    category: "Tabs and panes",
+    category: "Tabs",
     scope: "workspace",
     mac: "Cmd+Shift+RightBracket",
     macAlternate: "Ctrl+Tab",
@@ -93,7 +93,7 @@ export const workspaceCommands: ShortcutCommandDefinition[] = [
   }),
   command("workspace.previous_tab", "Previous tab", {
     description: "Move to the previous tab in the focused pane, wrapping at the start.",
-    category: "Tabs and panes",
+    category: "Tabs",
     scope: "workspace",
     mac: "Cmd+Shift+LeftBracket",
     macAlternate: "Ctrl+Shift+Tab",
@@ -105,7 +105,7 @@ export const workspaceCommands: ShortcutCommandDefinition[] = [
   }),
   command("workspace.focus_pane_left", "Focus pane left", {
     description: "Move focus to the pane on the left.",
-    category: "Tabs and panes",
+    category: "Tabs",
     scope: "workspace",
     mac: "Option+H",
     windows: "Alt+H",
@@ -113,7 +113,7 @@ export const workspaceCommands: ShortcutCommandDefinition[] = [
   }),
   command("workspace.focus_pane_right", "Focus pane right", {
     description: "Move focus to the pane on the right.",
-    category: "Tabs and panes",
+    category: "Tabs",
     scope: "workspace",
     mac: "Option+L",
     windows: "Alt+L",
@@ -121,7 +121,7 @@ export const workspaceCommands: ShortcutCommandDefinition[] = [
   }),
   command("workspace.focus_pane_up", "Focus pane above", {
     description: "Move focus to the pane above.",
-    category: "Tabs and panes",
+    category: "Tabs",
     scope: "workspace",
     mac: "Option+K",
     windows: "Alt+K",
@@ -129,7 +129,7 @@ export const workspaceCommands: ShortcutCommandDefinition[] = [
   }),
   command("workspace.focus_pane_down", "Focus pane below", {
     description: "Move focus to the pane below.",
-    category: "Tabs and panes",
+    category: "Tabs",
     scope: "workspace",
     mac: "Option+J",
     windows: "Alt+J",
@@ -137,17 +137,17 @@ export const workspaceCommands: ShortcutCommandDefinition[] = [
   }),
   command("workspace.split_right", "Split pane right", {
     description: "Create a pane to the right of the focused pane.",
-    category: "Tabs and panes",
+    category: "Tabs",
     scope: "workspace",
   }),
   command("workspace.split_down", "Split pane below", {
     description: "Create a pane below the focused pane.",
-    category: "Tabs and panes",
+    category: "Tabs",
     scope: "workspace",
   }),
   command("workspace.close_pane", "Close focused pane", {
     description: "Close the focused pane and move its tabs into another pane.",
-    category: "Tabs and panes",
+    category: "Tabs",
     scope: "workspace",
   }),
   command("navigation.back", "Go back", {

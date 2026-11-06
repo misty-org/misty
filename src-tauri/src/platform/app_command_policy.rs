@@ -1,11 +1,15 @@
 //! Application commands have no implicit permission to run in content views.
 //! Plugin commands are separately checked by Tauri's per-WebView capabilities.
-use crate::infra::space_windows;
+use crate::infra::profile_windows;
 
 /// What an incognito window may never reach: account data, sync, recovery, history,
 /// memory and agents. Incognito is entirely local and Misty does nothing with it.
-const ACCOUNT_DATA: [&str; 10] = [
+const ACCOUNT_DATA: [&str; 14] = [
     "agent",
+    "profile_records_",
+    "profile_tabs_",
+    "profile_extensions_",
+    "vault_",
     "browser_history",
     "browser_library",
     "cursor_companion_",
@@ -18,16 +22,18 @@ const ACCOUNT_DATA: [&str; 10] = [
 ];
 
 pub fn allows(label: &str, command: &str) -> bool {
-    if space_windows::is_incognito_window(label)
+    if profile_windows::is_incognito_window(label)
         && ACCOUNT_DATA
             .iter()
             .any(|prefix| command.starts_with(prefix))
     {
         return false;
     }
-    if command.starts_with("agent_files_")
-        || command.starts_with("extensions_")
-        || command.starts_with("browser_sync_")
+    if command.starts_with("extensions_")
+        || command.starts_with("profile_records_")
+        || command.starts_with("profile_tabs_")
+        || command.starts_with("profile_extensions_")
+        || command.starts_with("vault_")
         || command.starts_with("browser_recovery_")
         // Copies of account data; only the main workspace reads or clears them.
         || command.starts_with("api_cache_")
@@ -36,10 +42,10 @@ pub fn allows(label: &str, command: &str) -> bool {
         // Saves and removes the device's model provider keys.
         || command.starts_with("model_keys_")
     {
-        return space_windows::is_space_window(label);
+        return profile_windows::is_person_window(label);
     }
     match label {
-        _ if space_windows::is_app_window(label) => true,
+        _ if profile_windows::is_app_window(label) => true,
         _ if label
             .strip_prefix("misty-cursor-")
             .and_then(|id| id.parse::<u32>().ok())
@@ -68,7 +74,7 @@ mod tests {
                 "cursor_companion_snap",
                 "cursor_companion_capture_region",
                 "cursor_companion_watch_clicks",
-                "browser_sync_state",
+                "profile_records_list",
                 "code_read_text_file",
             ] {
                 assert!(!allows(label, command), "{label}: {command}");
@@ -87,27 +93,11 @@ mod tests {
     #[test]
     fn vault_commands_are_main_workspace_only() {
         for command in [
-            "agent_files_choose",
-            "agent_files_prepare",
-            "agent_files_apply",
-            "agent_files_undo",
-            "agent_files_revoke",
             "extensions_prepare",
             "extensions_action",
             "extensions_reconcile",
-            "browser_sync_availability",
-            "browser_sync_use_account_password",
-            "browser_sync_setup",
-            "browser_sync_connect",
-            "browser_sync_state",
-            "browser_sync_account_feed",
-            "browser_sync_edit",
-            "browser_sync_activate",
-            "browser_sync_claim",
-            "browser_sync_flush",
-            "browser_sync_lock",
-            "browser_sync_forget_key",
-            "browser_sync_delete_vault",
+            "profile_records_list",
+            "profile_records_write",
             "browser_recovery_open",
             "browser_recovery_read",
             "browser_recovery_write",
@@ -136,21 +126,13 @@ mod tests {
         }
     }
 
+    /// Filling a sign-in is the app's choice, made in its own menu. A website view can't ask.
     #[test]
-    fn password_derivation_is_for_misty_windows_only() {
-        for command in ["account_login_credential", "account_check_password"] {
-            for label in ["window-1", "incognito-1"] {
-                assert!(allows(label, command), "{label}: {command}");
-            }
-            // Website views and agent windows cannot use them to test password guesses.
-            for label in [
-                "browser-a",
-                "misty-agent-01951d32-40ac-7000-8000-000000000001",
-                "misty-cursor-1",
-                "window-1-spoof",
-            ] {
-                assert!(!allows(label, command), "{label}: {command}");
-            }
+    fn only_app_windows_fill_a_sign_in_into_a_page() {
+        assert!(allows("window-1", "browser_page_password_fill"));
+        assert!(allows("incognito-1", "browser_page_password_fill"));
+        for label in ["misty-browser-a", "render-control", "misty-cursor-1"] {
+            assert!(!allows(label, "browser_page_password_fill"), "{label}");
         }
     }
 
@@ -203,12 +185,14 @@ mod tests {
     fn content_views_cannot_inherit_host_commands() {
         for label in ["browser-a", "unknown", "misty-main", "space-spoof"] {
             for command in [
+                "profile_create",
+                "profile_delete",
                 "code_read_text_file",
                 "terminal_create",
                 "save_authenticated_user",
-                "auth_cookie_restore",
-                "auth_cookie_capture",
-                "auth_cookie_forget",
+                "auth_session_restore",
+                "auth_session_capture",
+                "auth_session_forget",
                 "auth_http_start",
                 "auth_http_read",
                 "auth_http_cancel",

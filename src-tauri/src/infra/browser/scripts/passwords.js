@@ -1,7 +1,9 @@
-// Saved sign-ins: offer, fill and capture. Runs in the same initialization
-// closure as the context menu (sendHostNavigation, encode, shortcutToken), in
-// the top-level page only. Misty checks the page's real address before it
-// sends any sign-in, and asks before saving one.
+// Saved sign-ins: ask for the menu, fill and capture. Runs in the same
+// initialization closure as the context menu (sendHostNavigation, encode,
+// shortcutToken), in the top-level page only. This is the page's own JavaScript
+// world, so anything here can be hooked or called by the page. It therefore draws
+// nothing and can't ask for a sign-in: Misty's own interface shows the saved
+// sign-ins, and only a click there fills one. A page learns nothing before that.
 (() => {
   if (window.top !== window) return;
   // Captured before page scripts run, so a page cannot intercept fills here.
@@ -34,64 +36,34 @@
   };
 
   let target = null;
-  let menu = null;
-  const closeMenu = () => {
-    menu?.remove();
-    menu = null;
+  let hideTimer = 0;
+  let filledAt = -Infinity;
+  let asked = false;
+  const hide = () => {
+    if (!asked) return;
+    asked = false;
+    send('hide', '');
   };
-  const showMenu = (field, entries) => {
-    closeMenu();
-    if (!entries.length || document.activeElement !== field) return;
-    const host = document.createElement('div');
-    const shadow = host.attachShadow({ mode: 'closed' });
-    const rect = field.getBoundingClientRect();
-    host.style.cssText =
-      'all:initial;position:fixed;z-index:2147483647;left:' + Math.round(rect.left) + 'px;top:' +
-      Math.round(rect.bottom + 4) + 'px;min-width:' + Math.round(Math.max(rect.width, 220)) + 'px';
-    const list = document.createElement('div');
-    list.setAttribute('role', 'listbox');
-    list.setAttribute('style',
-      'font:13px -apple-system,system-ui,sans-serif;background:#1c1c1e;color:#f2f2f2;border:1px solid #3a3a3c;' +
-      'border-radius:8px;padding:4px;box-shadow:0 8px 24px rgba(0,0,0,.35)');
-    for (const entry of entries) {
-      const row = document.createElement('button');
-      row.type = 'button';
-      row.textContent = entry.username || 'Saved password';
-      row.setAttribute('style',
-        'display:block;width:100%;text-align:left;padding:6px 8px;border:0;border-radius:6px;' +
-        'background:transparent;color:inherit;font:inherit;cursor:pointer');
-      row.addEventListener('mouseenter', () => { row.style.background = '#3a3a3c'; });
-      row.addEventListener('mouseleave', () => { row.style.background = 'transparent'; });
-      // Keep focus in the field so the fill lands where the person was typing.
-      row.addEventListener('mousedown', (event) => event.preventDefault());
-      row.addEventListener('click', (event) => {
-        if (!event.isTrusted) return;
-        closeMenu();
-        send('fill', '&id=' + encode('' + entry.id));
-      });
-      list.append(row);
-    }
-    const note = document.createElement('div');
-    note.textContent = 'Saved in Misty';
-    note.setAttribute('style', 'padding:4px 8px 2px;color:#8e8e93;font-size:11px');
-    list.append(note);
-    shadow.append(list);
-    document.documentElement.append(host);
-    menu = host;
+  // Fractions of the page, so the menu lands under the field at any zoom. A page can
+  // lie about these; Misty keeps the menu inside the page and ignores early clicks.
+  const place = (field) => {
+    const box = field.getBoundingClientRect();
+    const fraction = (value, size) => encode('' + value / (size || 1));
+    return '&left=' + fraction(box.left, innerWidth) + '&bottom=' + fraction(box.bottom, innerHeight) +
+      '&width=' + fraction(box.width, innerWidth);
   };
 
   Object.defineProperty(window, '__MISTY_PASSWORDS__', {
     value: Object.freeze({
-      offer(entries) {
-        if (!target || !Array.isArray(entries)) return;
-        showMenu(target, entries.filter((entry) => entry && typeof entry.id === 'string').slice(0, 20));
-      },
       fill(username, password) {
         const field = target?.type === 'password' ? target : target && passwordIn(target.form || document);
         if (!field || typeof password !== 'string') return;
         const user = usernameFor(field);
         if (user && typeof username === 'string' && username) setValue(user, username);
         setValue(field, password);
+        // The click moved focus to Misty. Coming back must not reopen the menu.
+        filledAt = performance.now();
+        field.focus();
       },
     }),
     writable: false,
@@ -104,13 +76,20 @@
     if (!event.isTrusted || !(field instanceof HTMLInputElement)) return;
     const password = field.type === 'password' ? field : passwordIn(field.form || document);
     if (!password || (field !== password && usernameFor(password) !== field)) return;
+    clearTimeout(hideTimer);
     target = field;
-    send('list', '');
+    if (performance.now() - filledAt < 1000) return;
+    asked = true;
+    send('list', place(field));
   }, true);
-  document.addEventListener('focusout', () => setTimeout(closeMenu, 150), true);
+  document.addEventListener('focusout', () => {
+    clearTimeout(hideTimer);
+    hideTimer = setTimeout(hide, 150);
+  }, true);
   document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape') closeMenu();
+    if (event.key === 'Escape') hide();
   }, true);
+  window.addEventListener('pagehide', hide, true);
 
   // A submitted sign-in goes to Misty, which asks before saving it.
   let lastCaptured = '';

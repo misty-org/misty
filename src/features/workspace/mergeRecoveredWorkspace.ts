@@ -29,11 +29,6 @@ export function mergeRecoveredWorkspace(
     ...recovered,
     ...live,
     layout,
-    layoutsByScope: {
-      ...recovered.layoutsByScope,
-      ...live.layoutsByScope,
-      [current.activeScopeKey]: layout,
-    },
     activeWindowId: current.activeWindowId,
     tabGroups: records(
       recovered.tabGroups ?? [],

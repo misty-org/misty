@@ -26,7 +26,6 @@ export function BrowserPageStage({
   annotationsActive,
   onCloseAnnotations,
   internalPage,
-  profileId,
   isOffline,
   nativeRuntime,
   commands,
@@ -44,7 +43,6 @@ export function BrowserPageStage({
   annotationsActive: boolean;
   onCloseAnnotations: () => void;
   internalPage: ReturnType<typeof browserInternalPage>;
-  profileId: string | undefined;
   isOffline: boolean;
   nativeRuntime: boolean;
   commands: ReturnType<typeof useBrowserPageCommands>["commands"];
@@ -97,7 +95,6 @@ export function BrowserPageStage({
           {internalPage ? (
             <BrowserInternalPage
               page={internalPage}
-              profileId={profileId}
               navigate={navigate}
               openInNewView={commands.openInNewTab}
               openPage={commands.openPage}

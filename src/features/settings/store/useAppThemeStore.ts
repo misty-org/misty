@@ -11,7 +11,7 @@ export const useAppThemeStore = create<AppThemeStore>()((set) => ({
 
 export type ResolvedAppTheme = "dark" | "light";
 
-export type AppThemeStore = {
+type AppThemeStore = {
   resolvedTheme: ResolvedAppTheme;
   setResolvedTheme: (resolvedTheme: ResolvedAppTheme) => void;
 };

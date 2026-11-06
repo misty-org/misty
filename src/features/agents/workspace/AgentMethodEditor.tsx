@@ -7,6 +7,7 @@ import {
   DialogContent,
   DialogDescription,
   DialogTitle,
+  ErrorNotification,
   Input,
   OptionSelect,
   Textarea,
@@ -97,17 +98,18 @@ export function AgentMethodEditor({
         if (!open && !busy) onClose();
       }}
     >
-      <DialogContent className="agent-studio-dialog agent-method-dialog">
+      <DialogContent
+        aria-describedby={method ? "agent-method-description" : undefined}
+        className="agent-studio-dialog agent-method-dialog"
+      >
         <DialogTitle>
           {method ? "Edit" : "New"} {noun}
         </DialogTitle>
-        <DialogDescription>
-          {kind === "skill"
-            ? "Reusable guidance for this agent. Up to eight enabled skills apply to new tasks."
-            : "Save a reusable method with inputs and a work location."}{" "}
-          {method &&
-            `Editing version ${method.version}. Existing runs and schedules keep their saved version.`}
-        </DialogDescription>
+        {method ? (
+          <DialogDescription id="agent-method-description">
+            Editing version {method.version}.
+          </DialogDescription>
+        ) : null}
         <form onSubmit={(event) => void save(event)}>
           <fieldset disabled={busy} className="agent-method-fields">
             <label>
@@ -227,11 +229,7 @@ export function AgentMethodEditor({
               {kind === "skill" ? "Use this skill in new tasks" : "Enabled"}
             </label>
           </fieldset>
-          {error && (
-            <p role="alert" className="agent-method-error">
-              {error}
-            </p>
-          )}
+          <ErrorNotification message={error} onDismiss={() => setError("")} />
           <footer>
             <Button type="button" variant="ghost" disabled={busy} onClick={onClose}>
               Cancel

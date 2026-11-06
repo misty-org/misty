@@ -1,3 +1,7 @@
+import {
+  addSitePermissionAsk,
+  type SitePermissionAsk,
+} from "@/features/browser/sitePermissionAsks";
 import type { UnlistenFn } from "@tauri-apps/api/event";
 import { listen } from "@tauri-apps/api/event";
 import type { NavigateFunction } from "react-router-dom";
@@ -117,12 +121,23 @@ export function listenBrowserInteractionEvents({
       releaseRendererFocus();
       focusBrowserRuntimeTab(payload.id);
     }),
-    listen<{ x: number; y: number }>("misty://browser-page-pointer-down", ({ payload }) => {
-      const scale = getAppliedAppRenderScale();
-      if (isDisposed()) return;
-      releaseRendererFocus();
-      focusBrowserPageAt(payload.x / scale, payload.y / scale);
-    }),
+    listen<{ x: number; y: number; navigate?: "back" | "forward" }>(
+      "misty://browser-page-pointer-down",
+      ({ payload }) => {
+        const scale = getAppliedAppRenderScale();
+        if (isDisposed()) return;
+        releaseRendererFocus();
+        focusBrowserPageAt(payload.x / scale, payload.y / scale);
+        // A mouse's back or forward side button: Go back or forward in the page just focused.
+        // Loaded on use, which also lets the focus settle first.
+        if (payload.navigate) {
+          const command = payload.navigate === "back" ? "navigation.back" : "navigation.forward";
+          void import("@/features/shortcuts").then(({ invokeShortcutCommand }) =>
+            invokeShortcutCommand(command),
+          );
+        }
+      },
+    ),
     listen<BrowserAskSnapshot>("misty://browser-ask-context", ({ payload }) => {
       if (isDisposed()) return;
       focusBrowserRuntimeTab(payload.id);
@@ -145,6 +160,9 @@ export function listenBrowserInteractionEvents({
         url: payload,
       });
       if (tab) navigate(tab.route);
+    }),
+    listen<SitePermissionAsk>("misty://browser-permission-ask", ({ payload }) => {
+      if (!isDisposed()) addSitePermissionAsk(payload);
     }),
     listen<BrowserPopupEvent>("misty://browser-popup", ({ payload }) => {
       if (isDisposed()) return;
@@ -173,11 +191,6 @@ export function listenBrowserInteractionEvents({
         if (entry?.state === "cancelled" || !tabId) return;
         useBrowserRuntimeStore.getState().setError(tabId, payload.error || "The download failed.");
       });
-    }),
-    // Another device finished or removed a download in this Space.
-    listen("misty:space-downloads-changed", () => {
-      if (isDisposed()) return;
-      void useBrowserDownloadsStore.getState().refresh();
     }),
   ];
 }

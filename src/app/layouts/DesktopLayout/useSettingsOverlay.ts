@@ -1,5 +1,3 @@
-import { openAccountSettingsInBrowser } from "@/features/account";
-import { useAppStore } from "@/features/app-shell";
 import {
   blockIfUnsaved,
   openSettingsEvent,
@@ -8,7 +6,7 @@ import {
 } from "@/features/settings";
 import { useCallback, useEffect, useState } from "react";
 
-/** Settings overlay open state, its window events and the account hand-off. */
+/** Settings overlay open state, its window events and the way to the account's page. */
 export function useSettingsOverlay(options: { refreshUser: () => Promise<unknown> }) {
   const { refreshUser } = options;
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -24,22 +22,9 @@ export function useSettingsOverlay(options: { refreshUser: () => Promise<unknown
     setSettingsOpen(false);
     refreshUserAfterSettings();
   }, [refreshUserAfterSettings]);
-  // Account management lives on the website. Opening it hands the current
-  // session off to the browser rather than rendering anything locally.
   const openAccountSettings = useCallback(() => {
-    if (blockIfUnsaved()) return;
-    setSettingsOpen(false);
-    void openAccountSettingsInBrowser().catch((error: unknown) => {
-      // The hand-off needs the network, so an offline click has to say so
-      // rather than silently opening nothing.
-      useAppStore
-        .getState()
-        .setError(
-          error instanceof Error
-            ? error.message
-            : "Could not open account settings. Check your connection and try again.",
-        );
-    });
+    useSettingsStore.getState().setActiveSection("account");
+    setSettingsOpen(true);
   }, []);
 
   useEffect(() => {

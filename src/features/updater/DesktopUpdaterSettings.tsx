@@ -11,11 +11,13 @@ import { Button, Progress } from "@/shared/ui";
 import {
   applyUpdateProgress,
   EMPTY_UPDATE_PROGRESS,
+  isNoReleaseError,
   readableUpdateError,
   type UpdateProgress,
 } from "./updateProgress";
 
-type UpdateState = "idle" | "checking" | "available" | "current" | "installing" | "error";
+type UpdateState =
+  "idle" | "checking" | "available" | "current" | "noRelease" | "installing" | "error";
 
 export function DesktopUpdaterSettings() {
   const updateRef = useRef<Update | null>(null);
@@ -50,6 +52,10 @@ export function DesktopUpdaterSettings() {
       setAvailableVersion(nextUpdate.version);
       setState("available");
     } catch (cause) {
+      if (isNoReleaseError(cause)) {
+        setState("noRelease");
+        return;
+      }
       setError(readableUpdateError(cause));
       setState("error");
     } finally {
@@ -97,15 +103,17 @@ export function DesktopUpdaterSettings() {
       ? "Checking…"
       : state === "current"
         ? "You’re up to date"
-        : state === "available"
-          ? `Version ${availableVersion} is ready`
-          : state === "installing"
-            ? progress.percent === null
-              ? "Downloading update…"
-              : `Downloading update… ${progress.percent}%`
-            : state === "error"
-              ? "The last check failed"
-              : "Not checked";
+        : state === "noRelease"
+          ? "No release has been published yet"
+          : state === "available"
+            ? `Version ${availableVersion} is ready`
+            : state === "installing"
+              ? progress.percent === null
+                ? "Downloading update…"
+                : `Downloading update… ${progress.percent}%`
+              : state === "error"
+                ? "The last check failed"
+                : "Not checked";
 
   return (
     <>

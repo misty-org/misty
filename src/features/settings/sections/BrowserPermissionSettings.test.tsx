@@ -1,18 +1,18 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type * as SitePermissionModule from "@/features/browser-sync/sitePermissions";
+import type * as SitePermissionModule from "@/features/browser/sitePermissions";
 import { BrowserPermissionSettings } from "./BrowserPermissionSettings";
 const invoke = vi.hoisted(() => vi.fn());
 vi.mock("@tauri-apps/api/core", () => ({ invoke }));
-vi.mock("@/features/browser-sync/sitePermissions", async (original) => ({
+vi.mock("@/features/browser/sitePermissions", async (original) => ({
   ...(await original<typeof SitePermissionModule>()),
   supportsSitePermissions: () => true,
 }));
 const entry = {
   origin: "https://example.com",
   profile: "profile-a",
-  permissions: { camera: "block", microphone: "ask" },
+  permissions: { camera: "block", microphone: "ask", location: "ask" },
   space: "Work",
 };
 describe("saved website permissions", () => {
@@ -45,8 +45,8 @@ describe("saved website permissions", () => {
       profile: "profile-a",
       origin: "https://example.com",
     });
-    expect(container.querySelector('[aria-label="Website permissions"]')).toBeNull();
-    expect(container.querySelector('[role="alert"]')).toBeNull();
+    expect(container.querySelector('[aria-label="Permissions"]')).toBeNull();
+    expect(document.body.querySelector('[role="alert"]')).toBeNull();
   });
   it("reconciles a persisted reset if stopping capture subsequently fails", async () => {
     invoke
@@ -65,10 +65,10 @@ describe("saved website permissions", () => {
       container.querySelector('button[aria-label="Reset permissions for https://example.com"]'),
     ).toBeNull();
     // Failures show in plain language, never the native error text.
-    expect(container.querySelector('[role="alert"]')?.textContent).toContain(
+    expect(document.body.querySelector('[role="alert"]')?.textContent).toContain(
       "Site permissions could not be reset.",
     );
-    expect(container.querySelector('[role="alert"]')?.textContent).not.toContain("timed out");
+    expect(document.body.querySelector('[role="alert"]')?.textContent).not.toContain("timed out");
     expect(container.textContent).not.toContain("Camera: Block");
   });
 });

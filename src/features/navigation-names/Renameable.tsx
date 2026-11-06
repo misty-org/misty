@@ -13,6 +13,7 @@ import {
   ContextMenuAction,
   ContextMenuContent,
   ContextMenuTrigger,
+  ErrorNotification,
   Input,
   Portal,
 } from "@/shared/ui";
@@ -179,18 +180,9 @@ export function Renameable({
                 }
               }}
             />
-            {error && (
-              <div role="alert" className="rounded bg-charcoal-card p-2 text-xs text-cream">
-                {error}
-              </div>
-            )}
           </div>,
         )}
-      {!editing && error && (
-        <span role="alert" className="text-xs text-cream">
-          {error}
-        </span>
-      )}
+      <ErrorNotification message={error} onDismiss={() => setError("")} />
     </>
   );
 }

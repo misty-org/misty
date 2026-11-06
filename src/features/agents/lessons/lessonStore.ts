@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { localChats } from "@/features/misty/localChats";
+import { assistantApi } from "@/api/assistant/api";
 import { applyLessonReply } from "./lessonRouter";
 import type { Course, CoursePlan, Lesson, LessonPatch, LessonRoute } from "./lessonTypes";
 
@@ -52,17 +52,18 @@ function newCourse(
   };
 }
 
-/** Lessons and courses on this device (lessonTypes.ts), saved beside their chats in misty.db. */
+/** Lessons and courses (lessonTypes.ts), on the server like the chats they belong to. */
 export const useLessonStore = create<LessonStore>((set, get) => {
   const save = (before: Record<string, Lesson>, after: Record<string, Lesson>) => {
     const accountId = get().accountId;
     for (const lesson of Object.values(after))
-      if (before[lesson.id] !== lesson)
-        void localChats.saveLesson(accountId, lesson).catch(() => undefined);
+      if (accountId && before[lesson.id] !== lesson)
+        void assistantApi.saveLesson("lesson", lesson.id, lesson).catch(() => undefined);
   };
   const saveCourse = (course: Course) => {
     set({ courses: { ...get().courses, [course.id]: course } });
-    void localChats.saveCourse(get().accountId, course).catch(() => undefined);
+    if (get().accountId)
+      void assistantApi.saveLesson("course", course.id, course).catch(() => undefined);
   };
   return {
     accountId: "",
@@ -72,10 +73,10 @@ export const useLessonStore = create<LessonStore>((set, get) => {
     async load(accountId) {
       if (get().accountId === accountId) return;
       set({ accountId, lessons: {}, courses: {}, pendingCourse: {} });
-      const [lessons, courses] = await Promise.all([
-        localChats.lessons<Lesson>(accountId).catch(() => []),
-        localChats.courses<Course>(accountId).catch(() => []),
-      ]);
+      if (!accountId) return;
+      const { lessons, courses } = await assistantApi
+        .lessons<Lesson, Course>()
+        .catch(() => ({ lessons: [] as Lesson[], courses: [] as Course[] }));
       if (get().accountId !== accountId) return;
       set({
         lessons: Object.fromEntries(lessons.map((lesson) => [lesson.id, lesson])),
@@ -129,7 +130,8 @@ export const useLessonStore = create<LessonStore>((set, get) => {
       const { [lessonId]: removed, ...rest } = get().lessons;
       if (!removed) return;
       set({ lessons: rest });
-      void localChats.deleteLesson(get().accountId, lessonId).catch(() => undefined);
+      if (get().accountId)
+        void assistantApi.removeLesson("lesson", lessonId).catch(() => undefined);
     },
   };
 });

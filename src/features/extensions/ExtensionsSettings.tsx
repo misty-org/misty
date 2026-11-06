@@ -14,7 +14,7 @@ import { openStorePage } from "./openStorePage";
 import {
   offeredStores,
   parseInstallations,
-  spaceInstallationsRaw,
+  profileInstallationsRaw,
   storeHomes,
   storeNames,
   updateInstallation,
@@ -42,7 +42,7 @@ export function ExtensionsSettings() {
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState("");
   const [removing, setRemoving] = useState<Installation | null>(null);
-  const installed = parseInstallations(spaceInstallationsRaw(profile)).filter(
+  const installed = parseInstallations(profileInstallationsRaw(profile)).filter(
     (item) => item.installed,
   );
   const agentAccess = profile
@@ -72,7 +72,7 @@ export function ExtensionsSettings() {
         </DesktopSettingsNotice>
       )}
       <DesktopSettingsSection
-        title="Extensions"
+        title="Stores"
         description="Choose Add to Misty on an extension’s store page."
       >
         {offeredStoreRows().map(({ store, description }) => (

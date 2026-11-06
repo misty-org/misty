@@ -88,6 +88,13 @@ export function installOverflowFade(root: HTMLElement = document.body) {
     discover(root);
     tracked.forEach(queue);
   };
+  // A label that changes size reports itself to the observer above. Sweeping the whole page waits
+  // for the window to settle, or a drag re-reads every label on every step.
+  let resizeTimer = 0;
+  const refreshAfterResize = () => {
+    window.clearTimeout(resizeTimer);
+    resizeTimer = window.setTimeout(refresh, 120);
+  };
   const mutations = new MutationObserver((records) => {
     for (const record of records) {
       const element =
@@ -141,7 +148,7 @@ export function installOverflowFade(root: HTMLElement = document.body) {
     attributeOldValue: true,
     attributeFilter: ["class", "style", "dir"],
   });
-  window.addEventListener("resize", refresh);
+  window.addEventListener("resize", refreshAfterResize);
   document.fonts?.addEventListener?.("loadingdone", refresh);
   void document.fonts?.ready?.then?.(() => {
     if (!disposed) refresh();
@@ -153,7 +160,8 @@ export function installOverflowFade(root: HTMLElement = document.body) {
     resize?.disconnect();
     cancelAnimationFrame(frame);
     cancelIdle(idle);
-    window.removeEventListener("resize", refresh);
+    window.clearTimeout(resizeTimer);
+    window.removeEventListener("resize", refreshAfterResize);
     document.fonts?.removeEventListener?.("loadingdone", refresh);
     tracked.forEach((element) => element.removeAttribute(marker));
     tracked.clear();

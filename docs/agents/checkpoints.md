@@ -9,7 +9,7 @@ Built as: runtime `src/ledger.ts` (`agent_ledger` tool, reconcile, report), app 
 A run with ten parts finishes nine and fails one (captcha, bad link, missing input). "Try again" re-sends the
 prompt, so the model redoes all ten. The finish report already names the failed part
 (`agent_finish.remaining`, `src/features/agents/progress/unfinished.ts`), and the chat history sent to the model
-comes from this device's copy (`historyTurns`), but nothing records which parts passed or what proves it.
+comes from the server's stored turns, but nothing records which parts passed or what proves it.
 
 ## Decisions
 
@@ -26,7 +26,7 @@ comes from this device's copy (`historyTurns`), but nothing records which parts 
 
 ### Ledger
 
-One row per requirement, stored with the assistant message in this device's chat copy (`misty.db`):
+One row per requirement, stored with the assistant message on the server (an edit to the rows is saved with `POST /misty/conversations/{id}/ledger`):
 
 ```
 id, requirement, state: pending | done | failed | blocked | skipped,

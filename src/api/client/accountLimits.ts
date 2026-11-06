@@ -9,11 +9,13 @@ const storageFull =
 
 export const accountLimitMessages: Record<string, string> = {
   device_limit_reached:
-    "This account has as many devices as its plan allows. Remove one you no longer use in Settings › Devices, then try again.",
+    "This account has as many signed-in sessions as its plan allows. Sign out of one you no longer use, then try again.",
+  no_devices_allowed:
+    "This account can't add signed-in sessions yet. Get Misty Pro at mistysys.com/pricing, or ask whoever runs your Misty server.",
   storage_limit_reached: storageFull,
   owner_storage_quota_exceeded: storageFull,
   account_suspended:
-    "This account is suspended, and its data is kept. Contact whoever runs your Misty server; for Misty Cloud, write to support@mistysys.com.",
+    "This account is suspended, and its data is kept. Contact whoever runs your Misty server; for Misty Pro, write to support@mistysys.com.",
   account_closing:
     "This account is closing and is read-only. You can still open and export everything until it is deleted. Subscribe again to keep it.",
 };
@@ -31,6 +33,12 @@ export const useAccountSuspension = create<{ suspended: boolean }>(() => ({ susp
  * `account_closing`, or null while the account is not closing. A closing account is read-only.
  */
 export const useAccountClosing = create<{ deleteAt: string | null }>(() => ({ deleteAt: null }));
+
+/** Whether `/me` says this account may have no devices, so sync and Spaces can't start. */
+export const useAccountNotSetUp = create<{ notSetUp: boolean; hasDevices: boolean }>(() => ({
+  notSetUp: false,
+  hasDevices: false,
+}));
 
 /** The closing notice's words: read-only, until when, and how to keep the account. */
 export function accountClosingMessage(deleteAt: string | null): string {
@@ -103,5 +111,12 @@ export function noteAccountResponse(input: RequestInfo | URL, response: Response
   if (useAccountSuspension.getState().suspended && signedInPaths.test(path))
     useAccountSuspension.setState({ suspended: false });
   if (/\/me$/.test(path))
-    void readJson(response).then((body) => body && noteClosing(body.delete_at));
+    void readJson(response).then((body) => {
+      if (!body) return;
+      noteClosing(body.delete_at);
+      useAccountNotSetUp.setState({
+        notSetUp: body.devices_allowed === false,
+        hasDevices: body.devices_allowed === true,
+      });
+    });
 }

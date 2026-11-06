@@ -1,7 +1,8 @@
 import { useEffect } from "react";
-import { browserBlockingOverlayOpen } from "./browserBlockingOverlay";
+import { browserBlockingOverlayOpen, browserNoticeRects } from "./browserBlockingOverlay";
 import {
   reconcileBrowserOverlayState,
+  setBrowserNoticeRects,
   setBrowserPointerGestureActive,
   setBrowserWebviewsSuspended,
 } from "./browserRuntime";
@@ -52,6 +53,7 @@ export function useBrowserOverlaySuspension(): void {
     const synchronize = () => {
       frame = 0;
       setBrowserWebviewsSuspended(browserBlockingOverlayOpen(), reason);
+      setBrowserNoticeRects(browserNoticeRects());
     };
     const schedule = () => {
       if (frame) return;
@@ -64,12 +66,16 @@ export function useBrowserOverlaySuspension(): void {
       childList: true,
       subtree: true,
     });
+    // Notices stay pinned to the window's corner, so resizing moves them.
+    window.addEventListener("resize", schedule);
     synchronize();
     reconcileBrowserOverlayState();
     return () => {
       if (frame) window.cancelAnimationFrame(frame);
       observer.disconnect();
+      window.removeEventListener("resize", schedule);
       setBrowserWebviewsSuspended(false, reason);
+      setBrowserNoticeRects([]);
     };
   }, []);
 }

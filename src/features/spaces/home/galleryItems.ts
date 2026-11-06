@@ -36,7 +36,7 @@ export interface GalleryItem {
   removeLabel?: string;
 }
 
-export type GalleryFilter = "all" | "chats" | "notes" | "drawings" | "images" | "files" | "code";
+type GalleryFilter = "all" | "chats" | "notes" | "drawings" | "images" | "files" | "code";
 
 /** The Space home's tabs, in order. */
 export const galleryFilters: ReadonlyArray<{

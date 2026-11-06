@@ -1,15 +1,34 @@
 import { pendingServerDeletes } from "./pendingServerDeletes";
+import { splitLedger } from "@/features/agents/checkpointLedger";
 import { selectedPersonalAgent } from "@/features/agents/personalAgentsStore";
 import { globalMistyError } from "./globalMistyActions";
 import { globalMistyApi } from "./globalMistyApi";
 import type { MistyState } from "./mistyState";
 import { normalizeConversation, type MistyGet, type MistySet } from "./mistyStoreHelpers";
 import { updateMistyDraftAttachments } from "./draftAttachments";
-import { localChats } from "./localChats";
-import { thisDeviceId } from "./localChatSync";
+import { spaceWindow } from "@/features/workspace/spaceWindow";
 import { submissionEpoch } from "./mistySubmissionEpoch";
 
 import { createLoadConversations } from "./loadConversations";
+/** Changes to a conversation's turns on their way to the server. A run sent next waits for them,
+ * so its history doesn't have what the person just took out. */
+const turnChanges = new Map<string, Promise<unknown>>();
+
+function changeTurns(conversationId: string, change: () => Promise<unknown>) {
+  const next = (turnChanges.get(conversationId) ?? Promise.resolve())
+    .then(change)
+    .catch(() => undefined)
+    .finally(() => {
+      if (turnChanges.get(conversationId) === next) turnChanges.delete(conversationId);
+    });
+  turnChanges.set(conversationId, next);
+  return next;
+}
+
+export function turnChangesSettled(conversationId: string): Promise<unknown> {
+  return turnChanges.get(conversationId) ?? Promise.resolve();
+}
+
 /** Loading, opening, creating, renaming and deleting Misty conversations. */
 export function createMistyConversationActions(
   set: MistySet,
@@ -29,13 +48,12 @@ export function createMistyConversationActions(
     newConversation: async (_legacySpaceId, requestedAgentId) => {
       const accountId = get().accountId;
       const epoch = submissionEpoch();
-      // This device keeps the chat it starts.
+      // It goes to the Space this window shows.
       const conversation = normalizeConversation(
         await globalMistyApi.createConversation(
           "New conversation",
-          "",
+          spaceWindow().spaceId ?? "",
           requestedAgentId || get().selectedAgentId || selectedPersonalAgent("")?.id,
-          (await thisDeviceId()) ?? undefined,
         ),
       );
       // A browser handoff can await the server while the user switches accounts.
@@ -89,10 +107,7 @@ export function createMistyConversationActions(
             get().invocationConversationId === conversationId)
         )
           throw new Error("Stop the response before deleting this conversation.");
-        // The server's row only admits and bills the chat's runs; the chat itself is here.
-        // A server that is down must not block deleting a chat that lives here: its row is
-        // removed on a later sync.
-        await localChats.deleteConversation(requestAccount, conversationId);
+        // Gone at once; a server that can't be reached is told on a later load.
         if (existing.remote) void pendingServerDeletes.delete(conversationId);
         if (get().accountId !== requestAccount) return;
         updateMistyDraftAttachments(requestAccount, conversationId, (attachments) => {
@@ -139,8 +154,6 @@ export function createMistyConversationActions(
       const existing = get().conversations.find((item) => item.id === conversationId);
       if (!existing || !normalized || normalized === existing.title) return;
       try {
-        // The name lives with the chat on this device; the server's copy only stops it
-        // from naming the chat itself.
         const renamed = { title: normalized };
         if (existing.remote)
           void globalMistyApi.renameConversation(conversationId, normalized).catch(() => undefined);
@@ -158,6 +171,13 @@ export function createMistyConversationActions(
       }
     },
     setMessageLedger: (conversationId, messageId, content) => {
+      const invocationId = get()
+        .conversations.find((item) => item.id === conversationId)
+        ?.messages.find((message) => message.id === messageId)?.invocationId;
+      if (invocationId)
+        void changeTurns(conversationId, () =>
+          globalMistyApi.saveLedger(conversationId, invocationId, splitLedger(content).rows),
+        );
       set({
         conversations: get().conversations.map((item) =>
           item.id === conversationId
@@ -175,6 +195,15 @@ export function createMistyConversationActions(
       const existing = get().conversations.find((item) => item.id === conversationId);
       const index = existing?.messages.findIndex((message) => message.id === messageId) ?? -1;
       if (!existing || index < 0 || get().working) return;
+      const dropped = existing.messages.slice(index).flatMap((message) => {
+        if (message.invocationId) return [message.invocationId];
+        const run = /^(invocation_.+)-user$/.exec(message.id)?.[1];
+        return run ? [run] : [];
+      });
+      if (existing.remote && dropped.length)
+        void changeTurns(conversationId, () =>
+          globalMistyApi.dropTurns(conversationId, [...new Set(dropped)]),
+        );
       set({
         conversations: get().conversations.map((item) =>
           item.id === conversationId ? { ...item, messages: item.messages.slice(0, index) } : item,

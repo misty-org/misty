@@ -7,12 +7,12 @@ mod console;
 mod desktop;
 mod diagnostics;
 mod environment;
+mod guide;
 mod home;
 mod process;
 mod release;
 mod server;
 mod setup;
-mod tasks;
 mod website;
 mod workspace;
 

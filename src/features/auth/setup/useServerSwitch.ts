@@ -1,5 +1,5 @@
 import { probeServer } from "@/api/deployment/probe";
-import { currentApiBase, saveServerChoice } from "@/api/deployment/serverChoice";
+import { currentApiBase, mistyProServer, saveServerChoice } from "@/api/deployment/serverChoice";
 import { useAuth } from "../authState";
 import { useCallback } from "react";
 
@@ -16,16 +16,30 @@ export function useServerSwitch() {
     }
   }, [user, accounts, logout, removeAccount]);
 
-  /** Checks the server answers, then makes it this device's server. False when it doesn't. */
-  const switchTo = useCallback(
+  /** Makes it this device's server, leaving the current one. */
+  const moveTo = useCallback(
     async (apiBase: string) => {
-      if (!(await probeServer(apiBase))) return false;
       if (currentApiBase() && currentApiBase() !== apiBase) await leave();
       await saveServerChoice({ mode: "server", url: apiBase });
-      return true;
     },
     [leave],
   );
+
+  /** Checks the server answers, then moves to it. False when it doesn't. */
+  const switchTo = useCallback(
+    async (apiBase: string) => {
+      if (!(await probeServer(apiBase))) return false;
+      await moveTo(apiBase);
+      return true;
+    },
+    [moveTo],
+  );
+
+  /** Moves to Misty Pro's server, or says why it can't. */
+  const switchToMistyPro = useCallback(async () => {
+    if (!(await switchTo(mistyProServer())))
+      throw new Error("Misty couldn't reach Misty Pro. Check your connection.");
+  }, [switchTo]);
 
   /** Misty as the browser only: signed out, with no server. */
   const browseOnly = useCallback(async () => {
@@ -33,5 +47,5 @@ export function useServerSwitch() {
     await saveServerChoice({ mode: "none" });
   }, [leave]);
 
-  return { switchTo, browseOnly };
+  return { moveTo, switchTo, switchToMistyPro, browseOnly };
 }

@@ -144,9 +144,9 @@ pub(crate) fn show_main_window<R: Runtime>(app: &AppHandle<R>) -> Result<(), Str
     if !crate::platform::plugins::mac_rounded_corners::main_window_ready() {
         return Ok(());
     }
-    let Some(window) = crate::infra::space_windows::primary(app) else {
-        // Every window was closed: reopen the Spaces that were open, or the personal one.
-        return crate::infra::space_windows::restore(app);
+    let Some(window) = crate::infra::profile_windows::primary(app) else {
+        // Every window was closed: reopen the windows that were open, or the first profile's.
+        return crate::infra::profile_windows::restore(app);
     };
     window
         .show()

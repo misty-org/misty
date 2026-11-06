@@ -138,11 +138,15 @@ pub fn browser_webview_reconcile(
 }
 
 #[tauri::command]
-pub fn browser_webview_navigate(
+pub async fn browser_webview_navigate(
     app: AppHandle,
     request: BrowserNavigateRequest,
 ) -> Result<(), String> {
     let url = external_url(&request.url)?;
+    #[cfg(any(target_os = "macos", windows))]
+    if let Some(webview) = app.get_webview(&webview_label(&request.id)?) {
+        crate::infra::vault::site_data::prepare_own_page(&webview, &url).await;
+    }
     let state = app.state::<BrowserSessionState>();
     {
         let mut sessions = state

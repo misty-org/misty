@@ -13,4 +13,4 @@ export { hostAddress } from "./workspace/BrowserOmniboxView";
 export { visibleBrowserBounds } from "./workspace/browserHostBounds";
 export { usePresentedPageHost } from "./workspace/BrowserPageStage";
 export { browserTabRowStyles } from "./workspace/browserTabRowStyles";
-export { browserToolbarStyles } from "./workspace/browserToolbarStyles";
+;

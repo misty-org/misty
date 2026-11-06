@@ -97,7 +97,7 @@ export function Notification({
         {title ? <p className="mb-1 font-semibold leading-snug">{title}</p> : null}
         <div
           className={cn(
-            "text-xs leading-relaxed text-cream-muted [&_button]:mt-2 [&_button]:mr-2",
+            "text-sm leading-snug text-cream-muted [&_button]:mt-2 [&_button]:mr-2 [&_button]:text-sm [&_button]:font-medium",
             "[&_button]:rounded [&_button]:px-2 [&_button]:py-1 [&_button]:text-cream",
             "[&_button]:underline [&_button]:underline-offset-2",
             "[&_button]:hover:bg-charcoal-hover [&_button]:focus-visible:outline-2",
@@ -121,5 +121,35 @@ export function Notification({
       </button>
     </aside>,
     target,
+  );
+}
+
+/**
+ * An error shown as a notification, never inline. Renders nothing while `message` is empty, and
+ * shows again whenever the message changes. `onDismiss` is where the owner clears its error state,
+ * so the same failure can notify again after a retry. Put a retry button in `children`.
+ */
+export function ErrorNotification({
+  message,
+  title,
+  children,
+  onDismiss,
+}: {
+  message: ReactNode;
+  title?: string;
+  children?: ReactNode;
+  onDismiss?: () => void;
+}) {
+  if (!message) return null;
+  return (
+    <Notification
+      key={typeof message === "string" ? message : undefined}
+      tone="error"
+      title={title}
+      onDismiss={onDismiss}
+    >
+      {message}
+      {children}
+    </Notification>
   );
 }

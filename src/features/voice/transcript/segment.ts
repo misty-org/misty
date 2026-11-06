@@ -1,4 +1,3 @@
-// Adapted from @audeeo/core (MIT, Matthew Chen), github.com/kannachi323/audeeo at packages/core, rev 2be9ad63. See LICENSE in this folder.
 /** BCP-47-ish language code, or "auto" for detection. */
 export type Language = string;
 

@@ -1,4 +1,4 @@
-//! What a browser tab asks of its Space's extensions: agent actions, store
+//! What a browser tab asks of its profile's extensions: agent actions, store
 //! pages' install and remove buttons, the context menu and view swaps.
 use super::*;
 
@@ -13,10 +13,10 @@ pub(crate) fn agent_extension_id(value: &Value) -> Option<String> {
     catalog::Store::of(&id).map(|_| id)
 }
 
-/// The Space a browser tab belongs to.
-fn tab_space(tab: &str) -> Result<String, String> {
+/// The profile a browser tab belongs to.
+fn tab_profile(tab: &str) -> Result<String, String> {
     native::app()
-        .and_then(|app| native::page_space(app, tab))
+        .and_then(|app| native::page_profile(app, tab))
         .ok_or_else(|| "This tab is closed.".into())
 }
 
@@ -27,9 +27,9 @@ pub(crate) async fn agent_action(
     tab: &str,
     script: Option<String>,
 ) -> Result<Value, String> {
-    // The tab's own Space answers: its extensions and its agent access.
-    let space = tab_space(tab)?;
-    let state = service(&space).lock().await;
+    // The tab's own profile answers: its extensions and its agent access.
+    let profile = tab_profile(tab)?;
+    let state = service(&profile).lock().await;
     if !state.agent_access {
         return Err("Agent access to extensions is disabled.".into());
     }
@@ -45,10 +45,10 @@ pub(crate) async fn agent_action(
     let account = state.account.clone();
     drop(state);
     let mut value = native::request(
-        json!({"operation":operation,"account":account,"space":space,"id":id,"tabId":tab,"script":script}),
+        json!({"operation":operation,"account":account,"space":profile,"id":id,"tabId":tab,"script":script}),
     )
     .await?;
-    let state = service(&space).lock().await;
+    let state = service(&profile).lock().await;
     if state.account != account
         || !state.agent_access
         || id.as_ref().is_some_and(|id| {
@@ -76,8 +76,8 @@ pub(crate) async fn authorize_agent_url(url: &url::Url) -> Result<(), String> {
     if url.scheme() != EXTENSION_SCHEME {
         return Ok(());
     }
-    for space in spaces_running() {
-        let state = service(&space).lock().await;
+    for profile in profiles_running() {
+        let state = service(&profile).lock().await;
         if state.agent_access
             && state.desired.values().any(|v| {
                 v.installed
@@ -103,21 +103,23 @@ pub(crate) fn is_chrome_store_id(value: &str) -> bool {
 /// for `key`, a Chrome Web Store ID or Firefox Add-ons slug read from the
 /// tab's own address.
 pub(crate) async fn request_store_install(app: &tauri::AppHandle, tab: &str, key: &str) {
-    // The store page's own Space installs it.
-    let Ok(space) = tab_space(tab) else { return };
-    let account = service(&space).lock().await.account.clone();
-    crate::infra::space_windows::emit_to_space(
+    // The store page's own profile installs it.
+    let Ok(profile) = tab_profile(tab) else {
+        return;
+    };
+    let account = service(&profile).lock().await.account.clone();
+    crate::infra::profile_windows::emit_to_profile(
         app,
-        &space,
+        &profile,
         "misty://extensions",
-        json!({"kind":"store-install","account":account,"space":space,"id":key}),
+        json!({"kind":"store-install","account":account,"space":profile,"id":key}),
     );
 }
 
 /// The installed extension a store page shows, if any. Firefox Add-ons pages
 /// name a slug, which the store resolves to its ID once per slug.
 pub(crate) async fn store_installation(tab: &str, key: &str) -> Option<String> {
-    let space = tab_space(tab).ok()?;
+    let profile = tab_profile(tab).ok()?;
     fn slugs() -> &'static std::sync::Mutex<BTreeMap<String, String>> {
         static SLUGS: OnceLock<std::sync::Mutex<BTreeMap<String, String>>> = OnceLock::new();
         SLUGS.get_or_init(Default::default)
@@ -133,7 +135,7 @@ pub(crate) async fn store_installation(tab: &str, key: &str) -> Option<String> {
         slugs().lock().ok()?.insert(key.to_owned(), id.clone());
         id
     };
-    let state = service(&space).lock().await;
+    let state = service(&profile).lock().await;
     state
         .desired
         .get(&id)
@@ -146,23 +148,25 @@ pub(crate) async fn request_store_remove(app: &tauri::AppHandle, tab: &str, key:
     let Some(id) = store_installation(tab, key).await else {
         return;
     };
-    let Ok(space) = tab_space(tab) else { return };
-    let account = service(&space).lock().await.account.clone();
-    crate::infra::space_windows::emit_to_space(
+    let Ok(profile) = tab_profile(tab) else {
+        return;
+    };
+    let account = service(&profile).lock().await.account.clone();
+    crate::infra::profile_windows::emit_to_profile(
         app,
-        &space,
+        &profile,
         "misty://extensions",
-        json!({"kind":"store-remove","account":account,"space":space,"id":id}),
+        json!({"kind":"store-remove","account":account,"space":profile,"id":id}),
     );
 }
 
-pub(crate) async fn pending_navigation(space: &str, tab: &str) -> bool {
-    let account = service(space).lock().await.account.clone();
+pub(crate) async fn pending_navigation(profile: &str, tab: &str) -> bool {
+    let account = service(profile).lock().await.account.clone();
     if account.is_empty() {
         return false;
     }
     native::request(
-        json!({"operation":"pending-navigation","account":account,"space":space,"tabId":tab}),
+        json!({"operation":"pending-navigation","account":account,"space":profile,"tabId":tab}),
     )
     .await
     .is_ok_and(|v| v["pending"] == true)
@@ -172,8 +176,8 @@ pub(crate) fn has_extensions() -> bool {
     origins().read().is_ok_and(|v| !v.is_empty())
 }
 pub(crate) async fn context_menu(tab: &str) -> Result<Value, String> {
-    let space = tab_space(tab)?;
-    let state = service(&space).lock().await;
+    let profile = tab_profile(tab)?;
+    let state = service(&profile).lock().await;
     let account = state.account.clone();
     let allowed: Vec<String> = state
         .desired
@@ -183,7 +187,7 @@ pub(crate) async fn context_menu(tab: &str) -> Result<Value, String> {
         .collect();
     drop(state);
     native::request(
-        json!({"operation":"context-menu","account":account,"space":space,"tabId":tab,"allowedIds":allowed}),
+        json!({"operation":"context-menu","account":account,"space":profile,"tabId":tab,"allowedIds":allowed}),
     )
     .await
 }

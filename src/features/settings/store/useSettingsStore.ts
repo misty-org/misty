@@ -27,7 +27,7 @@ import { create } from "zustand";
 import type { SettingsSection, SettingValue } from "../types/store";
 import { settingsBoolean } from "./preferences";
 import { applySettingsSideEffects, currentShortcutOverrides } from "./settingsSideEffects";
-export type { SettingsSection, SettingValue } from "../types/store";
+export type { SettingsSection,  } from "../types/store";
 export * from "./preferences";
 
 let settingsLoad: Promise<void> | null = null;
@@ -210,7 +210,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
   },
 }));
 
-export interface SettingsStore {
+interface SettingsStore {
   activeSection: SettingsSection;
   /** The row (its label) or block (`page:<id>`) to bring into view once its page shows. */
   focusTarget: { label: string; request: number };

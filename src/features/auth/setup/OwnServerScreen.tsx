@@ -1,14 +1,15 @@
 import { developmentServer } from "@/api/deployment/serverChoice";
 import AuthField from "../components/AuthField";
 import AuthMessage from "../components/AuthMessage";
+import { authButtonClass } from "../components/authButtonClass";
 import { Button, Spinner } from "@/shared/ui";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { useState, type FormEvent } from "react";
 import { parseServerAddress } from "./serverAddress";
 import { useServerSwitch } from "./useServerSwitch";
 
-/** The website's guide to running a Misty server. A placeholder until the website ships it. */
-export const selfHostingDocsUrl = "https://misty.example/docs/self-hosting";
+/** The docs' guide to running a Misty server. */
+const selfHostingDocsUrl = "https://docs.mistysys.com/self-hosting";
 
 /** A Misty server you run: its address first, then the usual sign-in on that server. */
 export function OwnServerScreen(props: {
@@ -52,23 +53,20 @@ export function OwnServerScreen(props: {
         disabled={busy}
         onChange={setAddress}
       />
-      <p className="m-0 text-sm text-cream-muted">
-        Running one yourself?{" "}
-        <Button
-          type="button"
-          variant="link"
-          className="h-auto p-0 text-sm text-cream"
-          onClick={() => void openUrl(selfHostingDocsUrl)}
-        >
-          Read how to set up a server
-        </Button>
-        .
-      </p>
+      <Button
+        type="button"
+        variant="link"
+        className="h-auto self-start p-0 text-sm text-cream"
+        onClick={() => void openUrl(selfHostingDocsUrl)}
+      >
+        How to set up a server
+      </Button>
       {error ? <AuthMessage tone="error" message={error} /> : null}
       <Button
         type="submit"
         variant="primary"
         size="lg"
+        className={authButtonClass}
         disabled={busy || !address.trim()}
         aria-busy={busy}
       >

@@ -5,7 +5,7 @@ import { confirmAction } from "@/shared/lib/confirmAction";
 import type { FormEvent } from "react";
 import type { SpaceLibraryData } from "../types/useSpaceLibraryData";
 
-export type MetadataDialogAction = "add_tags" | "remove_tags" | "set_date" | "set_location";
+type MetadataDialogAction = "add_tags" | "remove_tags" | "set_date" | "set_location";
 
 /** Actions that apply to the whole selection, including the bulk metadata dialog. */
 export function useLibraryBulkActions(data: SpaceLibraryData, reload: () => Promise<void>) {

@@ -1,18 +1,17 @@
-//! Page-state capture and restoration for synced tabs.
+//! Page-state capture and restoration for tabs.
 //!
 //! Capture is two-phase: the page reports field metadata, native code
 //! classifies each field, and only permitted values are then read. The saved
-//! state is written to the tab's encrypted page-state slot in the workspace this
-//! device drives. Restore reads that slot after a device switch and applies it
-//! locally; fields it cannot place are returned for the agent pass, minus
-//! anything sensitive or secret. Nothing here submits a form.
+//! state is written to the tab's encrypted record in its window's profile.
+//! Restore reads that record when the tab wakes and applies it locally; fields
+//! it cannot place are returned for the agent pass, minus anything sensitive or
+//! secret. Nothing here submits a form.
 mod classify;
 pub mod history;
 
 use std::collections::BTreeSet;
 
 use classify::{Class, FieldMeta};
-use misty_browser_sync::workspace::protocol::PAGE_STATE;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use tauri::{AppHandle, Manager, Webview};
@@ -21,6 +20,27 @@ mod restore;
 pub use restore::*;
 
 const RUNTIME: &str = include_str!("runtime.js");
+/// The slots a tab keeps, each one record: `<view id>:<slot>`.
+const STATE_SLOT: &str = "state";
+const HISTORY_SLOT: &str = "history";
+/// A saved page's ceiling, as its slot had.
+const MAX_STATE_BYTES: usize = 4 << 20;
+
+fn valid_tab(view_id: &str) -> Result<(), String> {
+    (!view_id.is_empty() && view_id.len() <= 200)
+        .then_some(())
+        .ok_or_else(|| "Tab identifier is invalid.".into())
+}
+
+fn slot_id(view_id: &str, slot: &str) -> String {
+    format!("{view_id}:{slot}")
+}
+
+/// The records of the profile a window belongs to.
+fn window_records(webview: &Webview) -> Result<crate::infra::profile_data::ProfileRecords, String> {
+    crate::infra::profile_data::window_records(webview.window().label())
+        .ok_or_else(|| "This computer's key storage is unavailable.".into())
+}
 
 fn webview(app: &AppHandle, runtime_id: &str) -> Result<Webview, String> {
     let valid = !runtime_id.is_empty()
@@ -97,7 +117,7 @@ pub struct CaptureRequest {
     force: bool,
 }
 
-/// Captures a tab's page state into its encrypted slot. Returns whether a new
+/// Captures a tab's page state into its encrypted record. Returns whether a new
 /// state was written. The renderer never receives field values.
 #[tauri::command]
 pub async fn browser_page_state_capture(
@@ -106,6 +126,7 @@ pub async fn browser_page_state_capture(
     request: CaptureRequest,
 ) -> Result<bool, String> {
     require_main(&webview_caller)?;
+    valid_tab(&request.view_id)?;
     let view = webview(&app, &request.runtime_id)?;
     let described = run(&view, json!({ "op": "describe", "force": request.force })).await?;
     if described.is_null() {
@@ -208,16 +229,21 @@ pub async fn browser_page_state_capture(
         captured_at: now_ms(),
     };
     let plaintext = serde_json::to_vec(&saved).map_err(|_| "Could not encode page state")?;
-    let handle = super::super::browser_sync::page_state_worker().await?;
-    handle
-        .write_page_slot(request.view_id, PAGE_STATE, Some(plaintext))
-        .await
-        .map_err(|e| e.to_string())?;
+    if plaintext.len() > MAX_STATE_BYTES {
+        return Err("This page's state exceeds the size limit.".into());
+    }
+    window_records(&webview_caller)?
+        .raw_write(
+            crate::infra::profile_data::PAGE_STATE,
+            &slot_id(&request.view_id, STATE_SLOT),
+            Some(plaintext),
+        )
+        .await?;
     Ok(true)
 }
 
 fn require_main(webview: &Webview) -> Result<(), String> {
-    crate::infra::space_windows::is_space_window(webview.label())
+    crate::infra::profile_windows::is_person_window(webview.label())
         .then_some(())
         .ok_or_else(|| "Page state is only available to the main window.".into())
 }

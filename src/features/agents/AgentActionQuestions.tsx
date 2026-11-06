@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Button } from "@/shared/ui";
+import { Button, ErrorNotification } from "@/shared/ui";
 import {
   actionQuestionText,
   actionQuestionVerb,
@@ -92,11 +92,7 @@ export function AgentActionQuestions() {
           </StatusTable>
         );
       })}
-      {error ? (
-        <p className="m-0 px-1 text-xs text-cream-muted" role="alert">
-          {error}
-        </p>
-      ) : null}
+      <ErrorNotification message={error} onDismiss={() => setError("")} />
     </div>
   );
 }

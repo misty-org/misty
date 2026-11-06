@@ -4,7 +4,7 @@ import { snapshotPage } from "./pageSnapshot";
 import { pagePreviewGeneration, savePagePreview } from "@/features/webviews/browserRuntime";
 import { invoke } from "@tauri-apps/api/core";
 import { getAppliedAppRenderScale } from "@/shared/hooks/useAppZoom";
-import { isIncognitoWindow } from "./spaceWindow";
+import { isIncognitoWindow } from "./profileWindow";
 
 /** All host-rendered tools, including misty:// pages, get a real content preview. */
 export function useWorkspacePagePreview(

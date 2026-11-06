@@ -22,7 +22,7 @@ pub(super) fn provider_popup(
     if super::creation_guard::in_flight() {
         return None;
     }
-    let _lifecycle = super::super::browser_sync::popup_lifecycle_lease()?;
+    let _lifecycle = super::super::profile_data::popup_lifecycle_lease()?;
     let state = app.state::<BrowserSessionState>();
     let (provider, profile, logical_profile, oauth_callback, origin_space_id, private) = {
         let sessions = state.sessions.lock().ok()?;

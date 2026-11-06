@@ -86,9 +86,9 @@ function formatErrorDetail(error: unknown): string | undefined {
   }
 }
 
-export type ClientDebugLevel = "info" | "warn" | "error";
+type ClientDebugLevel = "info" | "warn" | "error";
 
-export interface ClientDebugEvent {
+interface ClientDebugEvent {
   id: string;
   createdAt: string;
   level: ClientDebugLevel;

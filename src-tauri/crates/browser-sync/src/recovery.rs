@@ -13,6 +13,8 @@ pub(crate) const MAX_BYTES: usize = 16 << 20;
 const MAX_TOTAL_BYTES: u64 = 128 << 20;
 const MAX_RECORDS: u64 = 128;
 const MAX_ARCHIVES: u64 = 32;
+/// The most revisions a record can reach, the largest integer JSON carries exactly.
+const MAX_REVISION: u64 = 9_007_199_254_740_991;
 
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -121,7 +123,7 @@ impl RecoveryStore {
         let Some((revision, envelope)) = row else {
             return Ok(None);
         };
-        if revision > crate::protocol::MAX_COUNTER || envelope.len() > MAX_BYTES * 2 {
+        if revision > MAX_REVISION || envelope.len() > MAX_BYTES * 2 {
             return Err(Error::TooLarge);
         }
         let raw = self.root.open_local(
@@ -163,7 +165,7 @@ impl RecoveryStore {
         }
         let revision = expected
             .checked_add(1)
-            .filter(|v| *v <= crate::protocol::MAX_COUNTER)
+            .filter(|v| *v <= MAX_REVISION)
             .ok_or(Error::TooLarge)?;
         let raw = Zeroizing::new(value.as_bytes().to_vec());
         let encrypted = serde_json::to_string(&self.root.seal_local(

@@ -22,10 +22,10 @@ Cloudflare Worker, never on the server.
 
 | Piece | Runs on |
 |---|---|
-| Agent loop (durable run, model turns, compaction) | Your server, `server/apps/agent-runtime` (AI SDK on Vercel Workflow, `workflows/space-task-agent.ts`) |
-| `agent.gate`: admission and model routing, the tool catalog and its rules, the action journal (`log.run`), the device job queue | Your server, the Go API and Postgres (`server/internal/platform/httpapi/`) |
+| Agent loop (durable run, model turns, compaction) | Your server, `src-tauri/services/agent-runtime` (AI SDK on Vercel Workflow, `workflows/space-task-agent.ts`) |
+| `agent.gate`: admission and model routing, the tool catalog and its rules, the action journal (`log.run`), the device job queue | Your server, the Go API and Postgres (`misty-server/internal/platform/httpapi/`) |
 | Model calls, web search | The person's device, on their own provider and key ([byok.md](../byok.md)); `web.search` runs in the desktop runtime on the device's search key (Decodo or Serper), offered only when the device has one ([runtime.md](runtime.md#web-search)) |
-| `web.fetch` | The person's device (`src-tauri/src/infra/agents/web_fetch.rs`); the Cloudflare Worker in `server/apps/web-fetch` when no device is online |
+| `web.fetch` | The agent runtime on the person's device (`src-tauri/services/agent-runtime/src/web-fetch/`) |
 | `browser_run` programs, the page layer, screen capture, desktop control | The person's device, inside the Misty app |
 | Coding | The person's device, through their own coding tools |
 
@@ -145,8 +145,9 @@ The single-step tools and `browser_run` share one text-first page layer on the d
 
 `web.fetch` reads one public page with no cookies or saved sign-ins and returns its title, final
 URL and readable text, or the parts that answer the question for long pages, marked as untrusted
-page data. It runs on the device (`web_fetch.rs`, `webFetchText.ts`), with the Worker as the
-offline path. Both check that every address, including each redirect, is public. Pages that
+page data. It runs in the agent runtime on the device (`src-tauri/services/agent-runtime/src/web-fetch/`),
+on every run, since a run is always on the computer that started it. It checks that every
+address, including each redirect, is public, at the moment it connects. Pages that
 render only with JavaScript or need a sign-in come back with a reason, and the agent opens its
 own tab. The routing note in the system prompt says: answer from search and fetch; open a
 browser only to act, sign in, or read what fetch can't.
@@ -228,7 +229,7 @@ tool calls, minutes and prompt-cache hit rate.
 2. No router: every run starts in `agent.tool.answer` and moves up with `agent_tool_use`.
 3. Teach mode runs the tutor's fast lane, never the agent loop.
 4. The cursor captures every display on every request.
-5. `web.fetch` runs on the device, with a Worker fallback, never on the server.
+5. `web.fetch` runs on the device, in the agent runtime, never on the server.
 6. Agent names never use UI labels; no aliases.
 7. No cloud browsers: all browsing is local, in the agent's own tabs.
 8. `browser_run` programs run on the person's computer, in a sandbox that can only use the page

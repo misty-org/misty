@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { passwordsApi, type SavedLogin } from "@/features/passwords/api";
 import { generatePassword } from "@/features/passwords/generate";
-import { Button, Input } from "@/shared/ui";
+import { Button, ErrorNotification, Input } from "@/shared/ui";
 
 /** Adds a sign-in, or changes the username and password of a saved one. */
 export function PasswordEditor(props: { login: SavedLogin | null; onDone(saved: boolean): void }) {
@@ -71,11 +71,7 @@ export function PasswordEditor(props: { login: SavedLogin | null; onDone(saved: 
           Generate
         </Button>
       </div>
-      {error ? (
-        <p role="alert" className="text-sm text-cream-muted">
-          {error}
-        </p>
-      ) : null}
+      <ErrorNotification message={error} onDismiss={() => setError(null)} />
       <div className="flex justify-end gap-2">
         <Button type="button" variant="ghost" disabled={busy} onClick={() => props.onDone(false)}>
           Cancel

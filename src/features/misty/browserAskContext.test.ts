@@ -108,12 +108,12 @@ it("rejects non-web and oversized snapshots before device registration", async (
   expect(fixture.register).not.toHaveBeenCalled();
   expect(fixture.open).not.toHaveBeenCalled();
 });
-it("keeps captured-page assistance available when a local device is unavailable", async () => {
+it("keeps captured-page assistance available when this session is unavailable", async () => {
   fixture.local.mockResolvedValue({ device: { id: "local", status: "revoked" } });
   await openBrowserAsk(snapshot());
   expect(fixture.open.mock.calls[0][0]).toMatchObject({
     deviceContexts: [],
-    notice: expect.stringMatching(/Connect this Misty device/),
+    notice: expect.stringMatching(/Sign in to let an agent/),
   });
   expect(fixture.register).not.toHaveBeenCalled();
 });

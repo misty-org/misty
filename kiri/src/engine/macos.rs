@@ -1,9 +1,13 @@
-//! WebKit on macOS: the UI delegate's media-capture callback, and capture
-//! state on the view.
+//! WebKit on macOS: the UI delegate's media-capture and geolocation
+//! callbacks, and capture state on the view. A request still to be asked is held here while the
+//! host asks in its own interface. The positions themselves come from `macos_location`.
 #![allow(unexpected_cfgs)]
 
-use super::{media_verdict, MediaRequest, PageFacts, Reply, StoreScope};
-use crate::permissions::{canonical_origin, MediaKind, Verdict};
+use super::{
+    ask, location_verdict, media_verdict, AskAnswer, LocationRequest, MediaRequest, PageFacts,
+    PermissionAsk, Reply, StoreScope,
+};
+use crate::permissions::{canonical_origin, MediaKind, PermissionKind, Verdict};
 use objc::runtime::{Class, Object, Sel};
 use objc::{msg_send, sel, sel_impl};
 use objc2_foundation::NSProcessInfo;
@@ -16,7 +20,7 @@ use std::{
 };
 use tauri::Webview;
 
-const DELEGATE_CLASS: &str = "KiriMediaPermissionDelegate";
+const DELEGATE_CLASS: &str = "KiriSitePermissionDelegate";
 
 /// Native view → the embedder's tab label, recorded at install.
 fn labels() -> &'static Mutex<HashMap<usize, String>> {
@@ -66,6 +70,45 @@ unsafe fn requester_origin(origin: &WKSecurityOrigin) -> Option<String> {
     canonical_origin(&format!("{}://{host}{port}", origin.protocol())).ok()
 }
 
+fn label(webview: *mut Object) -> String {
+    labels()
+        .lock()
+        .ok()
+        .and_then(|labels| labels.get(&(webview as usize)).cloned())
+        .unwrap_or_default()
+}
+
+/// WKPermissionDecision: Prompt=0, Grant=1, Deny=2. On Prompt WebKit shows its
+/// own sheet naming the requesting site.
+fn decision(verdict: Verdict) -> usize {
+    match verdict {
+        Verdict::Prompt => 0,
+        Verdict::Grant => 1,
+        Verdict::Deny => 2,
+    }
+}
+
+type DecisionBlock = block2::Block<dyn Fn(usize)>;
+
+/// Answers a request, first offering one still to be asked to the host. The handler outlives this
+/// callback only as the copy the answer holds.
+unsafe fn answer(handler: *mut Object, verdict: Verdict, request: impl FnOnce() -> PermissionAsk) {
+    let handler = handler.cast::<DecisionBlock>();
+    if verdict == Verdict::Prompt {
+        if let Some(held) = block2::RcBlock::copy(handler) {
+            let answer = AskAnswer::new(move |allow| {
+                held.call((decision(if allow { Verdict::Grant } else { Verdict::Deny }),));
+            });
+            let Some(returned) = ask(request(), answer) else {
+                return;
+            };
+            // The host won't ask. Forget the held answer without answering: WebKit asks instead.
+            std::mem::forget(returned);
+        }
+    }
+    (&*handler).call((decision(verdict),));
+}
+
 extern "C" fn media_permission(
     _delegate: &Object,
     _selector: Sel,
@@ -78,11 +121,7 @@ extern "C" fn media_permission(
     unsafe {
         let view = &*webview.cast::<WKWebView>();
         let request = MediaRequest {
-            webview: labels()
-                .lock()
-                .ok()
-                .and_then(|labels| labels.get(&(webview as usize)).cloned())
-                .unwrap_or_default(),
+            webview: label(webview),
             top_origin: page_url(view).and_then(|url| canonical_origin(&url).ok()),
             requester_origin: requester_origin(&*origin.cast::<WKSecurityOrigin>()),
             // WKMediaCaptureType: Camera=0, Microphone=1, CameraAndMicrophone=2.
@@ -94,17 +133,55 @@ extern "C" fn media_permission(
             },
             store: Some(store_scope(view)),
         };
-        // WKPermissionDecision: Prompt=0, Grant=1, Deny=2.
-        let decision: usize = match media_verdict(&request) {
-            Verdict::Prompt => 0,
-            Verdict::Grant => 1,
-            Verdict::Deny => 2,
+        let ask = PermissionAsk {
+            webview: request.webview.clone(),
+            top_origin: request.top_origin.clone(),
+            requester_origin: request.requester_origin.clone(),
+            kinds: match request.kind {
+                Some(MediaKind::Camera) => vec![PermissionKind::Camera],
+                Some(MediaKind::Microphone) => vec![PermissionKind::Microphone],
+                Some(MediaKind::CameraAndMicrophone) => {
+                    vec![PermissionKind::Camera, PermissionKind::Microphone]
+                }
+                None => Vec::new(),
+            },
+            store: request.store.clone(),
         };
-        (&*handler.cast::<block2::Block<dyn Fn(usize)>>()).call((decision,));
+        answer(handler, media_verdict(&request), || ask);
     }
 }
 
-pub(super) fn install_media_permissions(webview: &Webview) -> Result<(), String> {
+/// WebKit's private `WKUIDelegatePrivate` geolocation callback (macOS 12+).
+/// Without it WebKit refuses every location request on macOS. A grant then
+/// reads the position through `macos_location`.
+extern "C" fn location_permission(
+    _delegate: &Object,
+    _selector: Sel,
+    webview: *mut Object,
+    origin: *mut Object,
+    _frame: *mut Object,
+    handler: *mut Object,
+) {
+    unsafe {
+        let view = &*webview.cast::<WKWebView>();
+        let request = LocationRequest {
+            webview: label(webview),
+            top_origin: page_url(view).and_then(|url| canonical_origin(&url).ok()),
+            requester_origin: requester_origin(&*origin.cast::<WKSecurityOrigin>()),
+            store: Some(store_scope(view)),
+        };
+        let ask = PermissionAsk {
+            webview: request.webview.clone(),
+            top_origin: request.top_origin.clone(),
+            requester_origin: request.requester_origin.clone(),
+            kinds: vec![PermissionKind::Location],
+            store: request.store.clone(),
+        };
+        answer(handler, location_verdict(&request), || ask);
+    }
+}
+
+pub(super) fn install_site_permissions(webview: &Webview) -> Result<(), String> {
     let label = webview.label().to_owned();
     webview
         .with_webview(move |native| unsafe {
@@ -112,6 +189,7 @@ pub(super) fn install_media_permissions(webview: &Webview) -> Result<(), String>
             if let Ok(mut labels) = labels().lock() {
                 labels.insert(view as usize, label);
             }
+            super::macos_location::attach(view);
             let delegate: *mut Object = msg_send![view, UIDelegate];
             if delegate.is_null() || (*delegate).class().name() == DELEGATE_CLASS {
                 return;
@@ -119,11 +197,16 @@ pub(super) fn install_media_permissions(webview: &Webview) -> Result<(), String>
             let subclass = Class::get(DELEGATE_CLASS).unwrap_or_else(|| {
                 let mut declaration =
                     objc::declare::ClassDecl::new(DELEGATE_CLASS, (*delegate).class())
-                        .expect("unique media permission delegate class");
+                        .expect("unique site permission delegate class");
                 declaration.add_method(
                     sel!(webView:requestMediaCapturePermissionForOrigin:initiatedByFrame:type:decisionHandler:),
                     media_permission
                         as extern "C" fn(&Object, Sel, *mut Object, *mut Object, *mut Object, usize, *mut Object),
+                );
+                declaration.add_method(
+                    sel!(_webView:requestGeolocationPermissionForOrigin:initiatedByFrame:decisionHandler:),
+                    location_permission
+                        as extern "C" fn(&Object, Sel, *mut Object, *mut Object, *mut Object, *mut Object),
                 );
                 declaration.register()
             });

@@ -2,7 +2,7 @@ import * as React from "react";
 import { cn } from "../utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./Select";
 
-export type SelectOption = { value: string; label: React.ReactNode; disabled?: boolean };
+type SelectOption = { value: string; label: React.ReactNode; disabled?: boolean };
 
 type OptionSelectProps = {
   value: string;

@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { apiBlobRequest } from "@/api/client";
-import { publicBetaFeatureEnabled } from "@/features/launch";
 import {
   memoryApi,
   PAUSED_UNTIL_RESUMED,
@@ -8,14 +7,13 @@ import {
   useRecallStore,
   type MemoryStatus,
 } from "@/features/recall";
-import { Button } from "@/shared/ui";
+import { Button, ErrorNotification } from "@/shared/ui";
 import {
   DesktopSettingsRow as SettingsRow,
   DesktopSettingsSection as SettingsSectionBlock,
 } from "../components/DesktopSettingsUI";
 import { ChoiceControl, SwitchControl, TextAreaControl } from "../SettingsControls";
 import type { SettingsContentProps } from "../settingsTypes";
-import { ScreenCaptureSettings } from "./ScreenCaptureSettings";
 
 type Forget = "hour" | "today" | "all";
 
@@ -28,17 +26,17 @@ export function MemorySection(props: SettingsContentProps) {
   const [status, setStatus] = useState<MemoryStatus | null>(null);
   const [confirming, setConfirming] = useState<Forget | null>(null);
   const [result, setResult] = useState("");
-  const available = publicBetaFeatureEnabled("recall");
+  const [failure, setFailure] = useState("");
   useEffect(() => {
-    if (!available || !memory.enabled) return;
+    if (!memory.enabled) return;
     void memoryApi.status().then(setStatus, () => setStatus(null));
-  }, [available, memory.enabled]);
-  if (!available) return null;
+  }, [memory.enabled]);
   const paused = memory.pausedUntil > Date.now();
   const pause = paused ? (memory.pausedUntil >= PAUSED_UNTIL_RESUMED ? "resume" : "hour") : "off";
   const forget = async (what: Forget) => {
     if (confirming !== what) return setConfirming(what);
     setConfirming(null);
+    setFailure("");
     const now = new Date();
     const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const from = what === "hour" ? new Date(now.getTime() - 3_600_000) : midnight;
@@ -48,7 +46,7 @@ export function MemorySection(props: SettingsContentProps) {
       );
       setResult(forgotten === 1 ? "Forgot 1 item." : `Forgot ${forgotten} items.`);
     } catch {
-      setResult("That couldn't be forgotten. Try again.");
+      setFailure("That couldn't be forgotten. Try again.");
     }
   };
   const exportAll = async () => {
@@ -60,12 +58,12 @@ export function MemorySection(props: SettingsContentProps) {
       link.click();
       URL.revokeObjectURL(link.href);
     } catch {
-      setResult("The export couldn't be made. Try again.");
+      setFailure("The export couldn't be made. Try again.");
     }
   };
   return (
     <>
-      <SettingsSectionBlock title="Memory">
+      <SettingsSectionBlock title="Remembering">
         <SettingsRow
           label="Remember pages I read"
           description="Never private, sign-in, banking, health or email pages."
@@ -112,6 +110,13 @@ export function MemorySection(props: SettingsContentProps) {
             onChange={(value) => set("remember_dictation", value)}
           />
         </SettingsRow>
+        <SettingsRow label="Morning brief" muted={!memory.enabled}>
+          <SwitchControl
+            checked={memory.morningBrief}
+            disabled={props.working || !memory.enabled}
+            onChange={(value) => set("morning_brief", value)}
+          />
+        </SettingsRow>
         <SettingsRow
           label="Sites Memory skips"
           description="One per line. Covers subdomains."
@@ -131,8 +136,7 @@ export function MemorySection(props: SettingsContentProps) {
           </p>
         )}
       </SettingsSectionBlock>
-      <ScreenCaptureSettings {...props} />
-      <SettingsSectionBlock title="Your Memory">
+      <SettingsSectionBlock title="Data">
         <SettingsRow label="Forget recent">
           <div className="flex gap-2">
             <Button size="sm" variant="ghost" onClick={() => void forget("hour")}>
@@ -161,6 +165,7 @@ export function MemorySection(props: SettingsContentProps) {
             {result}
           </p>
         )}
+        <ErrorNotification message={failure} onDismiss={() => setFailure("")} />
       </SettingsSectionBlock>
     </>
   );

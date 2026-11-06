@@ -2,7 +2,7 @@ import type { LibraryEditVersion, SpaceLibraryItem } from "@/api/spaces/dto/enti
 import { Button, DialogClose, IconButton } from "@/shared/ui";
 import { ClipboardCopy, Copy, SlidersHorizontal, Trash2, X } from "lucide-react";
 
-export interface LibraryViewerToolbarProps {
+interface LibraryViewerToolbarProps {
   item: SpaceLibraryItem;
   activeEdit: LibraryEditVersion | null;
   renditionReady: boolean;

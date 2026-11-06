@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { sidebarWidthMin, useSidebarWidthStore } from "@/features/app-shell/sidebarWidth";
+import { useSitePermissionAsks } from "@/features/browser/sitePermissionAsks";
 import { useSidebarCollapsedStore } from "@/features/app-shell/sidebarCollapsed";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -7,15 +8,17 @@ import {
   enableModernWindowStyle,
   setTrafficLightsVisible,
   trafficLightOffsetDefault,
+  trafficLightRestY,
 } from "@/native/runtime";
 import {
   setBrowserPointerTrackingEnabled,
   setBrowserWebviewsSuspended,
 } from "@/features/webviews/browserRuntime";
+import { dockingMetrics } from "./dockingGeometry";
 
-/** The sidebar header is 40pt tall inside the panel's 8pt margin, so the window buttons that sit
- * on it drop to its centerline: 8 + 1 + 20 = 29pt, 10 below their usual 19. */
-const lightsDrop = 10;
+/** The sidebar header shares the Space bar's centerline, so the window buttons that sit on it drop
+ * to that line whichever side the tabs are on. */
+const lightsDrop = dockingMetrics.edge + dockingMetrics.spaceBar / 2 - trafficLightRestY;
 /** The first button's frame is 22pt from the window edge: 3pt right of the panel's content edge
  * (8 + 1 + 10 = 19pt), because the circle sits inside its frame, so the circle's edge lines up
  * with the address field's. */
@@ -39,6 +42,12 @@ export function SidebarDrawer(props: { side: "left" | "right"; children: ReactNo
   const panel = useRef<HTMLDivElement>(null);
   const [resizing, setResizing] = useState(false);
   const hidden = collapsed && !revealed;
+  // A site's permission question opens from a button on the sidebar, so it comes out to ask; the
+  // open popup then holds it out until it is answered.
+  const asking = useSitePermissionAsks((state) => state.asks.length > 0);
+  useEffect(() => {
+    if (collapsed && asking) setRevealed(true);
+  }, [collapsed, asking]);
 
   useEffect(() => {
     if (!collapsed) {
@@ -102,8 +111,8 @@ export function SidebarDrawer(props: { side: "left" | "right"; children: ReactNo
     return () => setBrowserWebviewsSuspended(false, "sidebar-reveal");
   }, [collapsed, revealed]);
 
-  // The window buttons belong to the left sidebar: they slide out and back in with it, and
-  // the first state is applied without motion.
+  // The window buttons belong to the left sidebar: they start as its slide does and move with it,
+  // and the first state is applied without motion.
   useEffect(() => {
     if (props.side !== "left" || !hasTauriInternals()) return;
     const nativeWindow = getCurrentWindow();
@@ -114,7 +123,7 @@ export function SidebarDrawer(props: { side: "left" | "right"; children: ReactNo
       void enableModernWindowStyle(nativeWindow, trafficLightOffsetDefault).catch(() => undefined);
   }, [props.side]);
   const lightsSettled = useRef(false);
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (props.side !== "left" || !hasTauriInternals()) return;
     const distance = panel.current?.offsetWidth ?? 0;
     const duration = lightsSettled.current ? 300 : 0;

@@ -14,7 +14,7 @@ interface SetupLinkState {
 
 export const useSetupLinkStore = create<SetupLinkState>(() => ({ link: null, revision: 0 }));
 
-/** Opens the setup wizard on Misty Cloud with the link's server and key filled in. */
+/** Opens the setup wizard on Misty Pro with the link's server and key filled in. */
 export function openSetupLink(link: SetupLink): void {
   useSetupLinkStore.setState((state) => ({ link, revision: state.revision + 1 }));
   openSignInSheet("setup");

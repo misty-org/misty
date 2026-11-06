@@ -60,6 +60,8 @@ export interface WorkflowSchedule extends ScheduleTiming {
   state: "idle" | "running" | "failed" | "awaiting_device" | "device_claimed";
   /** The computer whose Misty browser runs it; absent runs without a browser. */
   device_id?: string;
+  /** The profile whose sign-ins runs use, chosen when the schedule is made. */
+  profile: string;
   /** The run waiting for its computer, and later runs that passed meanwhile. */
   due_at?: string;
   missed_count?: number;
@@ -114,6 +116,7 @@ export const agentMethodsApi = {
       enabled: boolean;
       /** "" runs without a browser; absent keeps the current computer. */
       device_id?: string;
+      profile?: string;
     },
   ) =>
     apiRequest<{ schedule: WorkflowSchedule }>(`${base}/${encodeURIComponent(methodId)}/schedule`, {
@@ -129,10 +132,10 @@ export const agentMethodsApi = {
       `/ai/workflow-schedules/device-runs?device_id=${encodeURIComponent(deviceId)}`,
     ),
   /** Takes a waiting run for this computer; the run must then start with its grant. */
-  claimDeviceRun: (scheduleId: string, deviceId: string) =>
+  claimDeviceRun: (scheduleId: string, deviceId: string, profiles: string[]) =>
     apiRequest<DeviceRunClaim>(
       `/ai/workflow-schedules/${encodeURIComponent(scheduleId)}/device-claim`,
-      { method: "POST", body: JSON.stringify({ device_id: deviceId }) },
+      { method: "POST", body: JSON.stringify({ device_id: deviceId, profiles }) },
     ),
   instantiate: (versionId: string, inputs: AgentMethodInputs) =>
     apiRequest<{ prompt: string; method: AgentMethod }>(`${base}/instantiate`, {
@@ -142,8 +145,10 @@ export const agentMethodsApi = {
 };
 
 /** What a computer needs to start a scheduled run it claimed. */
-export interface DeviceRunClaim {
+interface DeviceRunClaim {
   claim: string;
+  profile: string;
+  space_id: string;
   schedule_id: string;
   agent_id: string;
   conversation_id: string;

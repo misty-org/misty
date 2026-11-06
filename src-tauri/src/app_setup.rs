@@ -1,5 +1,5 @@
 //! What Misty does once Tauri has built the app: services, shared state, tray, menus and the
-//! Space windows that were open at quit.
+//! windows that were open at quit.
 use crate::app::runtime::MistyRuntime;
 #[cfg(desktop)]
 use crate::infra::browser::agent_control::BrowserExecutionState;
@@ -13,6 +13,8 @@ use tauri::Manager;
 pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     #[cfg(target_os = "macos")]
     crate::platform::plugins::mac_pip_observer::install(app.handle());
+    #[cfg(target_os = "macos")]
+    crate::platform::plugins::mac_live_resize::install();
     #[cfg(target_os = "macos")]
     crate::platform::plugins::mac_traffic_lights::install();
     // Debug-only: the browser benchmark runs its tasks in Misty's own
@@ -51,13 +53,6 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
             .map(std::path::Path::to_path_buf)
             .unwrap_or_default(),
     );
-    app.manage(infra::agents::files::AgentFilesState::default());
-    #[cfg(all(desktop, any(unix, windows)))]
-    infra::clipboard_bridge::start(
-        app.handle().clone(),
-        runtime.environment.store(),
-        runtime.environment.config_dir(),
-    );
     app.manage(runtime);
     #[cfg(desktop)]
     app.manage(BrowserSessionState::default());
@@ -86,7 +81,14 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     infra::drives::start_device_change_listener(app.handle().clone());
     #[cfg(windows)]
     infra::misty_context_windows::start_foreground_watch();
-    #[cfg(desktop)] // Every window belongs to a Space: reopen those open at quit.
-    infra::space_windows::restore(app.handle())?;
+    #[cfg(desktop)]
+    {
+        infra::profile_data::forward_changes(app.handle().clone());
+        infra::site_settings::permissions::follow_remote_changes(app.handle().clone());
+        infra::vault::follow_remote_list(app.handle().clone());
+        infra::vault::site_data::start(app.handle());
+        // Every window belongs to a profile: reopen those open at quit.
+        infra::profile_windows::restore(app.handle())?;
+    }
     Ok(())
 }

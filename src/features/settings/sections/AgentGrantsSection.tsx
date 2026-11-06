@@ -67,9 +67,9 @@ export function AgentGrantsSection() {
   return (
     <>
       {error ? <DesktopSettingsNotice>{error}</DesktopSettingsNotice> : null}
-      <Section title="Remembered approvals">
+      <Section title="Approvals">
         {grants === null && !error ? (
-          <SkeletonList label="Remembered approvals" rows={3} leading="none" trailing />
+          <SkeletonList label="Approvals" rows={3} leading="none" trailing />
         ) : null}
         {groups.flatMap((group) =>
           group.grants.map((grant) => (

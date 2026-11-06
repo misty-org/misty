@@ -5,7 +5,7 @@ import { createContext, useContext, useState, type ReactNode } from "react";
  * Each line reports how far it has to slide; all of them follow the longest one's rhythm, and a
  * line that gets to its end sooner waits there until the direction changes.
  */
-export interface MarqueeGroupState {
+interface MarqueeGroupState {
   /** When the shared rhythm began, on the document timeline, in milliseconds. */
   epoch: number;
   longest(): number;

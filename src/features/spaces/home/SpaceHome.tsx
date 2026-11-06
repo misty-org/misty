@@ -12,6 +12,7 @@ import {
   CollectionSearch,
   CollectionSkeleton,
   CollectionViewToggle,
+  ErrorNotification,
   CollectionSelectionBar,
   useCollectionRefinement,
 } from "@/shared/ui";
@@ -186,24 +187,19 @@ export function SpaceHome({ space }: { space: Space }) {
         onClear={selection.clear}
         onDelete={() => void deleteSelected()}
       />
-      {deleteError && (
-        <p role="alert" className="text-sm text-cream-muted">
-          {deleteError}
-        </p>
-      )}
-      {openError && (
-        <p role="alert" className="text-sm text-cream">
-          {openError}
-        </p>
-      )}
-      {gallery.failed.length > 0 && (
-        <div role="status" className="flex items-center gap-3 text-sm text-cream-muted">
-          Couldn't load {gallery.failed.join(" and ")}. The rest is shown.
-          <Button variant="ghost" size="sm" onClick={gallery.reload}>
-            Retry
-          </Button>
-        </div>
-      )}
+      <ErrorNotification message={deleteError} onDismiss={() => setDeleteError("")} />
+      <ErrorNotification message={openError} onDismiss={() => setOpenError("")} />
+      <ErrorNotification
+        message={
+          gallery.failed.length > 0
+            ? `Couldn't load ${gallery.failed.join(" and ")}. The rest is shown.`
+            : ""
+        }
+      >
+        <Button type="button" variant="ghost" size="sm" onClick={gallery.reload}>
+          Retry
+        </Button>
+      </ErrorNotification>
       {gallery.loading ? (
         <CollectionSkeleton label="Space contents" view={view} />
       ) : view === "grid" ? (

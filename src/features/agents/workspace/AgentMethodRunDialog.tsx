@@ -1,7 +1,14 @@
 import { useRef, useState } from "react";
 import { agentMethodsApi, type AgentMethod, type AgentMethodInputs } from "@/api/ai/agent-methods";
 import { useMistyStore } from "@/features/misty/useMistyStore";
-import { Button, Dialog, DialogContent, DialogDescription, DialogTitle } from "@/shared/ui";
+import {
+  Button,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+  ErrorNotification,
+} from "@/shared/ui";
 import { methodError, methodTargetLabel } from "./agentMethodDefinition";
 import { AgentMethodInputFields } from "./AgentMethodInputFields";
 
@@ -94,10 +101,7 @@ export function AgentMethodRunDialog({
           {method.kind === "template" ? "Use" : "Run"} {method.definition.title}
         </DialogTitle>
         <DialogDescription>
-          Version {method.version} · {methodTargetLabel(method.definition)}.{" "}
-          {method.kind === "template"
-            ? "This opens an unsent draft."
-            : "The task uses your agent’s existing access and approvals."}
+          Version {method.version} · {methodTargetLabel(method.definition)}
         </DialogDescription>
         <form onSubmit={(event) => void submit(event)}>
           <fieldset disabled={busy} className="agent-method-fields">
@@ -107,11 +111,7 @@ export function AgentMethodRunDialog({
               onChange={setInputs}
             />
           </fieldset>
-          {error && (
-            <p role="alert" className="agent-method-error">
-              {error}
-            </p>
-          )}
+          <ErrorNotification message={error} onDismiss={() => setError("")} />
           <footer>
             <Button type="button" variant="ghost" disabled={busy} onClick={onClose}>
               Cancel

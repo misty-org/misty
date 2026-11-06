@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { ApiRequestError } from "@/api/client/errors";
 
-export type DeviceModelCall =
+type DeviceModelCall =
   | "cleanup"
   | "voice-transcription"
   | "screen-model"
@@ -12,8 +12,7 @@ export type DeviceModelCall =
   | "voice-notes"
   | "transcribe-diarized"
   | "model-test"
-  | "follow-up"
-  | "restore-step";
+  | "follow-up";
 
 /**
  * One model call on the agent runtime on this computer, with this device's own models and keys

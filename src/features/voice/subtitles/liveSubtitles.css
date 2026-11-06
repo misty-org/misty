@@ -1,0 +1,329 @@
+/* The live subtitles panel, from Audeeo's styles: dark, monochrome, with what was said dimmer than
+   its translation. Status is carried by text, never by color. */
+.subtitle-panel {
+  position: absolute;
+  inset: 0;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid #3b3b3b;
+  border-radius: 20px;
+  background: #191919;
+  color: #f1f1f1;
+  cursor: default;
+  user-select: none;
+}
+
+.subtitle-header {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 0;
+  min-height: 44px;
+  padding: 10px 10px 4px 18px;
+}
+
+.subtitle-header-leading {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.subtitle-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.subtitle-setup {
+  display: block;
+  width: 100%;
+  height: 24px;
+  padding: 2px 0;
+  background: transparent;
+  color: #dedede;
+  font-size: 12px;
+  line-height: 20px;
+  font-weight: 400;
+  text-align: left;
+  overflow: hidden;
+}
+
+.subtitle-setup:hover {
+  background: transparent;
+  filter: brightness(1.1);
+}
+
+.subtitle-setup-row {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  animation: subtitle-roll-in 400ms cubic-bezier(0.45, 0, 0.2, 1) both;
+}
+
+.subtitle-setup-row > span {
+  color: #aaa;
+}
+
+.subtitle-setup-row > strong {
+  font-weight: 500;
+}
+
+@keyframes subtitle-roll-in {
+  from {
+    transform: translateY(100%);
+  }
+}
+
+.subtitle-content {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.subtitle-captions {
+  display: grid;
+  align-content: start;
+  gap: 4px;
+  padding: 10px 20px 16px;
+  overflow-wrap: anywhere;
+}
+
+.subtitle-line {
+  margin: 0;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  line-height: 1.35;
+}
+
+.subtitle-captions:has(.subtitle-line-translation) .subtitle-line-source {
+  color: #adadad;
+}
+
+/* In the middle of the panel, until it's listening. */
+.subtitle-toggle {
+  position: absolute;
+  inset: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: fit-content;
+  height: 40px;
+  margin: auto;
+  padding: 0 16px;
+  border: 1px solid #555;
+  border-radius: 20px;
+  background: #2b2b2b;
+  color: #f1f1f1;
+  font-size: 13px;
+  font-weight: 500;
+  transition: opacity 150ms ease;
+}
+
+.subtitle-toggle svg {
+  width: 16px;
+  height: 16px;
+}
+
+.subtitle-toggle.is-start {
+  border-color: #fff;
+  background: #fff;
+  color: #191919;
+}
+
+.subtitle-toggle.is-start:hover:not(:disabled) {
+  border-color: #e8e8e8;
+  background: #e8e8e8;
+}
+
+.subtitle-toggle.is-start svg {
+  fill: currentColor;
+}
+
+.subtitle-busy {
+  animation: subtitle-spin 1s linear infinite;
+}
+
+@keyframes subtitle-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.subtitle-notice {
+  flex-shrink: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 0;
+  max-height: 76px;
+  margin: 0 16px 8px;
+  padding: 6px 8px 6px 12px;
+  overflow: auto;
+  border-radius: 10px;
+  background: #2b2b2b;
+  color: #dedede;
+  font-size: 13px;
+}
+
+.subtitle-footer {
+  position: relative;
+  flex-shrink: 0;
+  padding: 8px 12px 14px;
+}
+
+.subtitle-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: fit-content;
+  max-width: 100%;
+  margin-inline: auto;
+  padding: 5px;
+  border: 1px solid #ffffff0c;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #2b2b2bf5, #232323f5);
+  box-shadow: 0 6px 18px #0004;
+}
+
+.subtitle-tool {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  height: 34px;
+  padding: 6px 10px;
+  border-radius: 12px;
+  background: transparent;
+  color: #bdbdbd;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.subtitle-tool:hover,
+.subtitle-tool[aria-expanded="true"] {
+  background: #ffffff0d;
+  color: #f1f1f1;
+}
+
+.subtitle-tool svg {
+  width: 16px;
+  height: 16px;
+}
+
+.subtitle-tool .subtitle-tool-chevron {
+  width: 14px;
+  height: 14px;
+  opacity: 0.65;
+  transition: transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.subtitle-tool[aria-expanded="true"] .subtitle-tool-chevron {
+  transform: rotate(180deg);
+  opacity: 1;
+}
+
+.subtitle-card {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% - 2px);
+  left: 0;
+  z-index: 10;
+  margin-inline: auto;
+  width: min(320px, calc(100% - 24px));
+  max-height: 248px;
+  padding: 14px;
+  overflow: hidden auto;
+  overscroll-behavior: contain;
+  border: 1px solid #555;
+  border-radius: 12px;
+  background: #232323;
+  box-shadow: 0 8px 24px #0006;
+}
+
+.subtitle-card-context {
+  width: min(360px, calc(100% - 24px));
+}
+
+.subtitle-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+}
+
+.subtitle-field {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  color: #dedede;
+  font-size: 13px;
+}
+
+.subtitle-volume {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.subtitle-history {
+  flex: 1;
+  min-height: 0;
+  padding: 8px 18px 16px;
+  overflow-y: auto;
+}
+
+.subtitle-save {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #333;
+  font-size: 13px;
+}
+
+.subtitle-history-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 0;
+  border-bottom: 1px solid #2b2b2b;
+}
+
+.subtitle-history-copy {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+}
+
+.subtitle-history-copy strong {
+  font-weight: 500;
+}
+
+.subtitle-history-copy p {
+  margin: 2px 0 0;
+  overflow: hidden;
+  color: #adadad;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.subtitle-history-empty {
+  margin: 16px 0 0;
+  color: #adadad;
+  font-size: 13px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .subtitle-setup-row,
+  .subtitle-busy {
+    animation: none;
+  }
+}

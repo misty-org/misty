@@ -25,20 +25,19 @@ pub(super) fn browser_history_delete_blocking(
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BrowserHistoryForgetRequest {
-    pub profile_id: Option<String>,
     pub url: String,
 }
 
 /// Removes every visit to one page, as when a suggestion is deleted from the address bar.
 pub(super) fn browser_history_forget_blocking(
     app: AppHandle,
+    profile: String,
     request: BrowserHistoryForgetRequest,
 ) -> Result<(), String> {
     let Some(url) = history_url(&request.url) else {
         return Ok(());
     };
     let connection = library(&app)?;
-    let profile = profile_key(request.profile_id);
     mark_dirty(
         &connection,
         "profile_id = ?1 AND url = ?2",
@@ -56,34 +55,28 @@ pub(super) fn browser_history_forget_blocking(
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BrowserHistoryClearRequest {
-    /// Every profile when absent.
-    pub profile_id: Option<String>,
     /// Visits at or after this time (ms); everything when absent.
     pub since: Option<i64>,
 }
 
 pub(super) fn browser_history_clear_blocking(
     app: AppHandle,
+    profile: String,
     request: BrowserHistoryClearRequest,
 ) -> Result<(), String> {
     let since = request.since.unwrap_or(0);
     let connection = library(&app)?;
-    match &request.profile_id {
-        Some(profile) => mark_dirty(
-            &connection,
-            "profile_id = ?1 AND visited_at >= ?2",
-            params![profile_key(Some(profile.clone())), since],
-        ),
-        None => mark_dirty(&connection, "visited_at >= ?1", params![since]),
-    }?;
-    match request.profile_id {
-        Some(profile) => connection.execute(
+    mark_dirty(
+        &connection,
+        "profile_id = ?1 AND visited_at >= ?2",
+        params![profile, since],
+    )?;
+    connection
+        .execute(
             "DELETE FROM visits WHERE profile_id = ?1 AND visited_at >= ?2",
-            params![profile_key(Some(profile)), since],
-        ),
-        None => connection.execute("DELETE FROM visits WHERE visited_at >= ?1", params![since]),
-    }
-    .map_err(|error| error.to_string())?;
+            params![profile, since],
+        )
+        .map_err(|error| error.to_string())?;
     Ok(())
 }
 
@@ -97,8 +90,10 @@ pub(super) fn mark_dirty(
     connection
         .execute(
             &format!(
-                "INSERT OR IGNORE INTO history_dirty(origin, hour)
-                 SELECT DISTINCT origin, visited_at / 3600000 FROM visits WHERE {filter}"
+                "INSERT OR REPLACE INTO history_dirty(profile_id, origin, hour, marked_at)
+                 SELECT DISTINCT profile_id, origin, visited_at / 3600000,
+                        CAST(unixepoch('subsec') * 1000 AS INTEGER)
+                 FROM visits WHERE {filter}"
             ),
             values,
         )

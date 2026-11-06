@@ -4,19 +4,17 @@ import {
   favoritesId,
   appsId,
   bookmarkTree,
-  canNestBookmarkFolders,
   mobileBookmarksId,
-  nestedFoldersUnavailable,
   otherBookmarksId,
   type BookmarkTree,
 } from "@/features/bookmarks/library";
-import type { SharedRecord } from "@/features/browser-sync/model";
+import type { SharedRecord } from "@/features/workspace/profileRecordModel";
 import { useWorkspaceStore } from "@/features/workspace/useWorkspaceStore";
 import { browserImport, type ImportedBookmarkNode, type ImportedBookmarkRoots } from "./native";
 
 type Folders = SharedRecord<"folder">[];
 type Links = SharedRecord<"bookmark">[];
-export interface BookmarkMergeResult {
+interface BookmarkMergeResult {
   folders: Folders;
   bookmarks: Links;
   added: { links: number; folders: number };
@@ -137,8 +135,6 @@ function mergeImportedBookmarks(
 
 /** Applies an import to the library in one change. */
 export function importBookmarks(roots: ImportedBookmarkRoots) {
-  if (needsNestedFolders(roots) && !canNestBookmarkFolders())
-    throw new Error(nestedFoldersUnavailable);
   const state = useWorkspaceStore.getState();
   const result = mergeImportedBookmarks(
     { folders: state.bookmarkFolders, bookmarks: state.bookmarks },

@@ -1,7 +1,7 @@
 import { browserLibrary, type BrowserHistoryVisit } from "@/features/browser";
 import { allLayoutViews, parseBrowserViewState, useWorkspaceStore } from "@/features/workspace";
 import { compatObject, compatTime, emitCompatEvent, type CompatHandler } from "./events";
-import { isIncognitoWindow } from "@/features/workspace/spaceWindow";
+import { isIncognitoWindow } from "@/features/workspace/profileWindow";
 
 const day = 24 * 60 * 60 * 1000;
 
@@ -74,11 +74,6 @@ export function watchVisits(): () => void {
   return useWorkspaceStore.subscribe((state, prior) => {
     if (state.layout === prior.layout) return;
     const current = historyAddresses();
-    // Switching Spaces shows other tabs; it does not visit their pages.
-    if (state.activeScopeKey !== prior.activeScopeKey) {
-      previous = current;
-      return;
-    }
     for (const [id, page] of current) {
       if (previous.get(id)?.url === page.url) continue;
       emitCompatEvent("history.onVisited", [

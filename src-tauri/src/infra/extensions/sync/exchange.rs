@@ -5,42 +5,32 @@ use super::*;
 pub(super) async fn pass(
     app: &tauri::AppHandle,
     account: &str,
-    space: &str,
+    profile: &str,
     installation: &Installation,
-    handle: &misty_browser_sync::worker::WorkerHandle,
+    stored: &crate::infra::profile_data::ProfileRecords,
 ) -> Result<(), String> {
     let epoch = ACCOUNT_EPOCH.load(Ordering::Acquire);
-    let scope = journal_scope(account, space);
+    let scope = journal_scope(account, profile);
     if !ready()
         .lock()
         .map_err(|_| "The extension sync bridge is unavailable.")?
-        .contains(&readiness_key(account, space, &installation.id))
+        .contains(&readiness_key(account, profile, &installation.id))
     {
         return Ok(());
     }
     {
-        let state = service(space).lock().await;
+        let state = service(profile).lock().await;
         if state.account != account || state.desired.get(&installation.id) != Some(installation) {
             return Ok(());
         }
     }
-    if !handle
-        .records_ready(EXTENSION_SYNC.into())
-        .await
-        .map_err(|e| e.to_string())?
-    {
-        return Ok(());
-    }
     let _guard = journal_lock().lock().await;
-    if !current(account, space, installation, epoch).await {
+    if !current(account, profile, installation, epoch).await {
         return Ok(());
     }
     let mut journal = read(app, &scope, installation)?;
-    let (_, records) = handle
-        .records_list(EXTENSION_SYNC.into())
-        .await
-        .map_err(|e| e.to_string())?;
-    if !current(account, space, installation, epoch).await {
+    let records = stored.records_list(EXTENSION_SYNC).await?;
+    if !current(account, profile, installation, epoch).await {
         return Ok(());
     }
     if records.iter().any(|r| {
@@ -50,14 +40,14 @@ pub(super) async fn pass(
     }) {
         // Removal records have their own IDs and are never extension-writable.
         // A stale settings update or offline storage edit cannot erase them.
-        forget(account, space, &installation.id);
-        let _=native::request(json!({"operation":"remove","account":account,"space":space,"id":installation.id,"guid":installation.guid})).await;
-        if !current(account, space, installation, epoch).await {
+        forget(account, profile, &installation.id);
+        let _=native::request(json!({"operation":"remove","account":account,"space":profile,"id":installation.id,"guid":installation.guid})).await;
+        if !current(account, profile, installation, epoch).await {
             return Ok(());
         }
         remove_local(app, &scope, installation)?;
-        drop_origin(space, &installation_origin(account, &installation.guid));
-        let mut state = service(space).lock().await;
+        drop_origin(profile, &installation_origin(account, &installation.guid));
+        let mut state = service(profile).lock().await;
         if state.account == account {
             state.loaded.remove(&installation.id);
             state.states.remove(&installation.id);
@@ -68,11 +58,11 @@ pub(super) async fn pass(
             }
         }
         drop(state);
-        crate::infra::space_windows::emit_to_space(
+        crate::infra::profile_windows::emit_to_profile(
             app,
-            space,
+            profile,
             "misty://extensions",
-            json!({"kind":"uninstalled","account":account,"space":space,"id":installation.id,"generation":installation.generation}),
+            json!({"kind":"uninstalled","account":account,"space":profile,"id":installation.id,"generation":installation.generation}),
         );
         return Ok(());
     }
@@ -143,11 +133,8 @@ pub(super) async fn pass(
         })
         .collect();
     if !writes.is_empty() {
-        handle
-            .records_write(EXTENSION_SYNC.into(), writes)
-            .await
-            .map_err(|e| e.to_string())?;
-        if !current(account, space, installation, epoch).await {
+        stored.records_write(EXTENSION_SYNC, writes).await?;
+        if !current(account, profile, installation, epoch).await {
             return Ok(());
         }
         journal.pending.clear();
@@ -161,8 +148,8 @@ pub(super) async fn pass(
         }
     });
     if !remote.is_empty() {
-        native::request(json!({"operation":"sync-apply","account":account,"space":space,"id":installation.id,"changes":remote})).await?;
-        if !current(account, space, installation, epoch).await {
+        native::request(json!({"operation":"sync-apply","account":account,"space":profile,"id":installation.id,"changes":remote})).await?;
+        if !current(account, profile, installation, epoch).await {
             return Ok(());
         }
         for (key, change) in remote {
@@ -179,7 +166,7 @@ pub(super) async fn pass(
         write(app, &scope, installation, &journal)?;
     }
     native::request(
-        json!({"operation":"sync-restored","account":account,"space":space,"id":installation.id}),
+        json!({"operation":"sync-restored","account":account,"space":profile,"id":installation.id}),
     )
     .await?;
     Ok(())

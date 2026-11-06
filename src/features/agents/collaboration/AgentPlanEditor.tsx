@@ -1,7 +1,14 @@
 import { GripVertical, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { reorderIds, usePointerReorder } from "@/shared/hooks/usePointerReorder";
-import { Button, IconButton, Input, OptionSelect, Textarea } from "@/shared/ui";
+import {
+  Button,
+  ErrorNotification,
+  IconButton,
+  Input,
+  OptionSelect,
+  Textarea,
+} from "@/shared/ui";
 import { useCollaborationStore } from "./store";
 import type { AgentPlan, AgentPlanStep, PlanRisk } from "./types";
 
@@ -143,11 +150,7 @@ export function AgentPlanEditor({
         <Plus aria-hidden="true" />
         Add step
       </Button>
-      {error && (
-        <p role="alert" className="agent-question-error">
-          {error}
-        </p>
-      )}
+      <ErrorNotification message={error} onDismiss={() => setError("")} />
       <div className="agent-plan-actions">
         <Button variant="primary" size="sm" disabled={!valid || busy} onClick={() => void save()}>
           {busy ? "Saving…" : "Save as new version"}

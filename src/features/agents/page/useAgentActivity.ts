@@ -48,7 +48,7 @@ export const activityStateLabels: Record<string, string> = {
   canceled: "Canceled",
   completed_with_errors: "Done with errors",
   awaiting_approval: "Needs approval",
-  awaiting_device: "Waiting for device",
+  awaiting_device: "Waiting for signed-in session",
   awaiting_intervention: "Needs attention",
 };
 

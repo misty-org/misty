@@ -15,7 +15,7 @@ export default function AuthField({
   onChange,
 }: AuthFieldProps) {
   return (
-    <div className="grid gap-1.5">
+    <div className="grid gap-2">
       <Label className="text-sm text-cream" htmlFor={id}>
         {label}
       </Label>
@@ -31,13 +31,13 @@ export default function AuthField({
         required={required}
         disabled={disabled}
         onChange={(event) => onChange(event.target.value)}
-        className="h-10 bg-transparent px-3.5 text-cream placeholder:text-cream-muted"
+        className="h-11 bg-transparent px-3 text-cream placeholder:text-cream-muted"
       />
     </div>
   );
 }
 
-export interface AuthFieldProps {
+interface AuthFieldProps {
   id: string;
   label: string;
   type?: string;

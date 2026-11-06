@@ -5,7 +5,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { openSignInSheet, useAuth } from "@/features/auth";
 import { spacesApi } from "@/api/spaces/api";
 import type { SpaceInvitationPreview } from "@/api/spaces/dto/entities";
-import { Button, Card, Spinner } from "@/shared/ui";
+import { Button, Card, ErrorNotification, Spinner } from "@/shared/ui";
 import { useSpacesStore } from "../store/useSpacesStore";
 
 export function SpaceInvitationRedemption() {
@@ -90,11 +90,7 @@ export function SpaceInvitationRedemption() {
             )}
           </>
         ) : null}
-        {error ? (
-          <p className="mb-0 mt-4 rounded-lg bg-charcoal-active p-3 text-sm text-cream-bright">
-            {error}
-          </p>
-        ) : null}
+        <ErrorNotification message={error} onDismiss={() => setError("")} />
       </Card>
     </div>
   );

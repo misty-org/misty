@@ -5,10 +5,10 @@ import { layoutTabs } from "./layoutTabs";
 import { parseBrowserViewState } from "./model";
 import { useWorkspaceStore } from "./useWorkspaceStore";
 import { tabArchiveHours } from "./tabArchiveSettings";
-import { isIncognitoWindow } from "./spaceWindow";
+import { isIncognitoWindow } from "./profileWindow";
 
 /** A tab closed for being idle, kept so it can be opened again. */
-export interface ArchivedTab {
+interface ArchivedTab {
   id: string;
   accountId: string;
   url: string;

@@ -1,7 +1,9 @@
 import { personalAgentsApi } from "@/api/agents/native";
 import type { AgentProfile, AgentProfileInput } from "@/shared/schemas";
 import {
+  BackButton,
   Button,
+  ErrorNotification,
   Field,
   Input,
   NavIsland,
@@ -225,16 +227,10 @@ export function AgentSetup(props: {
           </>
         )}
       </fieldset>
-      {error && (
-        <p role="alert" className="text-sm text-cream-muted">
-          {error}
-        </p>
-      )}
+      <ErrorNotification message={error} onDismiss={() => setError("")} />
       <div className="flex items-center justify-between gap-3">
         {step > 0 ? (
-          <Button type="button" variant="ghost" disabled={busy} onClick={() => setStep(step - 1)}>
-            Back
-          </Button>
+          <BackButton size="default" disabled={busy} onClick={() => setStep(step - 1)} />
         ) : (
           <span />
         )}

@@ -2,7 +2,7 @@ export function recordRemoveError(error: unknown): void {
   recordTokenDebugEvent({
     level: "error",
     scope: "account-auth-token",
-    message: "Could not remove the active Misty session from the device keystore.",
+    message: "Could not remove the active Misty session from this computer's keystore.",
     detail: errorDetail(error),
   });
 }

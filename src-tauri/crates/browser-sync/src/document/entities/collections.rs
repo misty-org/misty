@@ -74,6 +74,12 @@ pub enum SiteDecision {
     Block,
 }
 
+impl SiteDecision {
+    pub fn is_ask(&self) -> bool {
+        *self == Self::Ask
+    }
+}
+
 /// A site's permission choices in a Space. A site with every choice at Ask
 /// has no record.
 #[derive(Clone, Serialize, Deserialize)]
@@ -87,6 +93,9 @@ pub struct SitePermission {
     pub notifications: SiteDecision,
     #[serde(default)]
     pub popups: SiteDecision,
+    /// Left out while Ask, so devices from before location still read the record.
+    #[serde(default, skip_serializing_if = "SiteDecision::is_ask")]
+    pub location: SiteDecision,
     pub updated_at: i64,
 }
 

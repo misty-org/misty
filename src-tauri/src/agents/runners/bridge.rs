@@ -63,8 +63,7 @@ pub fn decide(request: &PermissionRequest, context: &BridgeContext) -> Decision 
     }
     if !context.lease_valid {
         return Decision::Deny {
-            reason:
-                "Misty's lease for this run expired. Stop and report what is left.".into(),
+            reason: "Misty's lease for this run expired. Stop and report what is left.".into(),
         };
     }
     let action = grant_action(request.kind).unwrap_or("project.edit");

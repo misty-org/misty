@@ -21,7 +21,7 @@ const MAX_EDGE: u32 = 2000;
 static TARGET: Mutex<Option<String>> = Mutex::new(None);
 
 fn main_window(app: &AppHandle) -> Result<tauri::Window, String> {
-    crate::infra::space_windows::primary(app).ok_or_else(|| "Misty window closed".into())
+    crate::infra::profile_windows::primary(app).ok_or_else(|| "Misty window closed".into())
 }
 
 /// The window's rectangle in physical screen pixels.
@@ -138,7 +138,7 @@ fn webview_at(app: &AppHandle, x: f64, y: f64) -> Option<(Webview, f64, f64)> {
     let (local_x, local_y) = (x - f64::from(origin.x), y - f64::from(origin.y));
     // Page webviews sit above the main one; the topmost containing the point wins.
     let mut candidates: Vec<Webview> = window.webviews();
-    candidates.sort_by_key(|view| crate::infra::space_windows::is_app_window(view.label()));
+    candidates.sort_by_key(|view| crate::infra::profile_windows::is_app_window(view.label()));
     candidates.into_iter().find_map(|view| {
         let position = view.position().ok()?;
         let size = view.size().ok()?;
@@ -155,7 +155,7 @@ fn target_view(app: &AppHandle) -> Option<Webview> {
     let target = TARGET.lock().ok()?.clone();
     target
         .and_then(|label| app.get_webview(&label))
-        .or_else(|| crate::infra::space_windows::primary_webview(app))
+        .or_else(|| crate::infra::profile_windows::primary_webview(app))
 }
 
 /// Performs one validated action in the Misty window.

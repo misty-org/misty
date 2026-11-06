@@ -1,7 +1,7 @@
 import { Check, Copy, ExternalLink, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useWorkspaceStore } from "@/features/workspace";
-import { Badge, Button, cn } from "@/shared/ui";
+import { Badge, Button, cn, ErrorNotification } from "@/shared/ui";
 import { formatWhen } from "./format";
 import { type MemoryNode, sourceLabels } from "./model";
 import { NodeGlyph } from "./nodes/NodeGlyph";
@@ -59,11 +59,7 @@ export function MemoryPopover({ node }: { node: MemoryNode }) {
           ? "Searchable by you and your agents."
           : "Not searchable yet. New memories are indexed within the hour."}
       </p>
-      {error && (
-        <p role="alert" className="m-0 text-xs text-cream-muted">
-          {error}
-        </p>
-      )}
+      <ErrorNotification message={error} onDismiss={() => setError("")} />
       {confirming ? (
         <div className="flex flex-col gap-2">
           <p className="m-0 text-xs text-cream">

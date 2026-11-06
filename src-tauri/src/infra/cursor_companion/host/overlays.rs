@@ -113,7 +113,7 @@ pub(super) async fn rebuild(app: &AppHandle) -> Result<(), String> {
             .lock()
             .map_err(|_| "Companion unavailable")?
             .displays = frames;
-        let _ = crate::infra::space_windows::emit_to_primary(
+        let _ = crate::infra::profile_windows::emit_to_primary(
             &app,
             "misty://cursor-displays-changed",
             (),

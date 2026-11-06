@@ -1,6 +1,6 @@
 import sprite from "@/shared/assets/misty-cloud-expression-cycle.webp?inline";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { Button, Slider, Switch } from "@/shared/ui";
+import { Button, ErrorNotification, Slider, Switch } from "@/shared/ui";
 import { useState } from "react";
 import { DesktopSettingsRow, DesktopSettingsSection } from "@/features/settings";
 import {
@@ -61,11 +61,7 @@ export function CompanionAppearanceSettings() {
           </Button>
         </div>
       </DesktopSettingsRow>
-      {error && (
-        <p role="alert" className="border-t border-charcoal-border py-3 text-sm text-cream">
-          {error}
-        </p>
-      )}
+      <ErrorNotification message={error} onDismiss={() => setError("")} />
     </DesktopSettingsSection>
   );
 }

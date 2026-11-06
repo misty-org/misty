@@ -31,7 +31,7 @@ you bring.
   against Arc's and Zen's tab sets. Parity C16 (browse with no account) and C17 (open source).
   This replaces the 2026-10-23 split that kept sync, the runtime and Spaces proprietary.
 - **Two tiers (2026-10-30).** Free is every feature, set up yourself: your own server, Cloudflare
-  and Composio accounts and models. Without a server Free is the browser alone. Misty Cloud is
+  and Composio accounts and models. Without a server Free is the browser alone. Misty Pro is
   one shared server set up for you, about $10 a month, charging for storage, connected devices
   and app actions, never for AI or web search ([cloud/](cloud/README.md)). Its Stripe side lives
   in the private misty-billing service; the open repo holds only generic per-account limits.
@@ -45,11 +45,11 @@ you bring.
 - **Nothing is optional (2026-10-30).** Every server runs Cloudflare (Tunnel, R2, Workers),
   Composio and Google sign-in, from one Compose file and four env files that its setup
   container fills in ([self-hosting.md](self-hosting.md)). The CLI is for development only.
-- **The open server sends no email (2026-10-31).** It hands out links instead: sign-in links
-  (which also reset a forgotten password) and Space invitation links, and its alerts show in the
-  console and the owner's app. Misty Cloud's emails are sent by the private misty-billing
-  service ([cloud/](cloud/README.md)).
-- **Unlimited sync on your own server.** Rate limits only handle abuse; Misty Cloud caps storage by plan.
+- **The server sends all email, if you want it to (2026-11-03).** With Mailjet set up it sends
+  sign-in links (which also reset a forgotten password), Space invitations and closing notices;
+  without it, it hands out the links ([self-hosting.md](self-hosting.md#email)). Its alerts show in
+  the console and the owner's app. The private misty-billing service sends no email.
+- **Unlimited sync on your own server.** Rate limits only handle abuse; Misty Pro caps storage by plan.
 - **No cloud browser.** Misty doesn't chase "runs while your laptop is off".
 - **No mobile during the beta.**
 - **No MCP server.** Misty doesn't host outside agents (built 2026-10-12, then
@@ -62,7 +62,7 @@ you bring.
 2. Workflow parity: C1, C2, C8 (built 2026-10-12, uncommitted; see "Built" in §2)
 3. One extension system for Chrome and Firefox add-ons (built 2026-10-12 on macOS,
    uncommitted; see §3)
-4. Voice, notes and memory: dictation everywhere, voice to notes, capture sessions
+4. Voice, notes and memory: dictation everywhere, voice to notes, tab visits
    and browser-scoped recall (approved 2026-10-14; see §4)
 
 Done: unlimited sync (2026-10-11, uncommitted; see the end).
@@ -125,7 +125,7 @@ Grok Bot do". The IDs come from `competitors.md`.
 - **C1 Scheduled tasks that drive the browser.**
   - A schedule runs on the computer it was made on, while Misty is open and the
     computer is awake (keep-awake already exists). There is no computer picker
-    (2026-10-19, [agent-chats-local](agents/chats-local.md)).
+    ([agents](agents/README.md#where-conversations-live)).
   - Today scheduled runs get no device (`workflow_schedules.go`).
   - A missed run waits until the computer is back and says so. It never runs in
     the cloud.
@@ -220,32 +220,30 @@ Still open:
 ## 4. Voice, notes and memory
 Approved 2026-10-14. The design is
 [docs/voice-memory/README.md](voice-memory/README.md) (revision 2,
-with mockups). The work happens on `voice-memory/audeeo-soniox`, which builds on
-the agent permissions branch (`agents/permissions-coding-clis`).
+with mockups).
 
-Status (2026-10-15): phases 0–6 are on the branch, behind the `voiceDictation`,
-`voiceNotes`, `recall` and `captureSessions` flags plus the server switches
-`MISTY_VOICE_LIVE` and `MISTY_RECALL`. They are not yet run on a real Mac or
-Windows machine. The brief's "as built" notes list what changed from the plan
-and what is left.
+Status (2026-11-04): phases 0–6 are built and no flags hold them back. Screen
+recording was removed in favor of recaps in the memory tree. They are not yet run
+on a real Mac or Windows machine. The brief's "as built" notes list what changed
+from the plan and what is left.
 
 - **On demand only.** Nothing records the whole computer. The microphone is open
   only while you hold the dictation key, run a capture you started, or talk to
   the agent at your cursor. Agents never open it.
-- **Speech runs in the cloud, through Audeeo's pipeline.** Live audio goes to
+- **Speech runs in the cloud.** Live audio goes to
   Soniox realtime with diarization, through a relay in the agent runtime. Files
   go through the AI SDK `transcribe` with the Soniox provider. Notes and
   summaries use the fast model. Everything runs on the person's own keys.
-- **Capture comes from `audeeo-core`**, extracted from Audeeo (branch
-  `audeeo-core` there): one Rust crate for the mic, system audio and per-process
-  audio, and one TS package for segments with speakers.
-- **Memory is browser-scoped, on by default, with exclusions.** It covers pages,
-  agent turns, voice, recordings, notes, drawings and downloads. The tools are
+- **Capture is Misty's own `misty-audio-capture` crate**
+  (`src-tauri/crates/audio-capture`): the mic, system audio and per-process audio,
+  with segments with speakers in TypeScript beside it.
+- **Memory is browser-scoped, on by default, with exclusions.** It covers
+  pages, agent turns, voice, notes, drawings and downloads. The tools are
   `recall.*`, because `memory.*` already means agent preferences.
 
-Phases, each behind a flag:
-0. Brief, mockups and the `audeeo-core` extraction.
-1. Audio foundation: `audeeo-core` in the desktop app, the runtime relay and
+Phases:
+0. Brief, mockups and the audio capture crate.
+1. Audio foundation: `misty-audio-capture` in the desktop app, the runtime relay and
    `transcribe-diarized`, tickets, the voice meter and senses, and
    `global_hotkey.rs`.
 2. Dictation everywhere.
@@ -253,7 +251,7 @@ Phases, each behind a flag:
    `voice-notes`, and the `voice.*` tools.
 4. Memory: the recorder and its privacy rules, `memory_events`, the retrieval
    kinds, `recall.*` and `recall.read`, the Journal day, and the backlog.
-5. Capture sessions (screen recording).
+5. Tab visits and recaps in the memory tree.
 6. Cursor agent upgrades, and the Windows checks in
    [windows-limits.md](browser/windows-limits.md).
 

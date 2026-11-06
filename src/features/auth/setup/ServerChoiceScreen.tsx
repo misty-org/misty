@@ -1,13 +1,14 @@
-import { Pressable } from "@/shared/ui";
+import { Pressable, Spinner } from "@/shared/ui";
 import { Cloud, Globe, Server } from "lucide-react";
 import type { ReactNode } from "react";
 
 export type ServerChoiceTarget = "cloud" | "own" | "browse";
 
-function Choice(props: {
+/** One server to choose, as a full-width row. */
+export function ServerOption(props: {
   icon: ReactNode;
   label: string;
-  description: string;
+  busy?: boolean;
   disabled?: boolean;
   onSelect: () => void;
 }) {
@@ -16,46 +17,40 @@ function Choice(props: {
       disabled={props.disabled}
       onClick={props.onSelect}
       className={
-        "flex w-full items-start gap-3 rounded-lg border border-charcoal-border px-4 py-3 " +
+        "flex w-full items-center gap-3 rounded-lg border border-charcoal-border px-4 py-3 " +
         "hover:border-charcoal-active hover:bg-charcoal-hover"
       }
     >
-      <span className="mt-0.5 text-cream-muted [&_svg]:size-[18px]" aria-hidden="true">
-        {props.icon}
+      <span className="text-cream-muted [&_svg]:size-[18px]" aria-hidden="true">
+        {props.busy ? <Spinner size="sm" label={false} /> : props.icon}
       </span>
-      <span className="grid gap-0.5">
-        <span className="text-[15px] font-medium text-cream-bright">{props.label}</span>
-        <span className="text-sm text-cream-muted">{props.description}</span>
-      </span>
+      <span className="text-md font-medium text-cream-bright">{props.label}</span>
     </Pressable>
   );
 }
 
-/** The wizard's first step: Misty Cloud, a server you run, or the browser alone. */
+/** The wizard's first step: sign in on Misty Pro, a server you run, or the browser alone. */
 export function ServerChoiceScreen(props: {
   busy?: boolean;
   onChoose: (target: ServerChoiceTarget) => void;
 }) {
   return (
     <div className="grid gap-2.5">
-      <Choice
+      <ServerOption
         icon={<Cloud />}
-        label="Misty Cloud"
-        description="Paste the link from your welcome email."
+        label="Misty Pro"
         disabled={props.busy}
         onSelect={() => props.onChoose("cloud")}
       />
-      <Choice
+      <ServerOption
         icon={<Server />}
-        label="My own server"
-        description="Sign in to a Misty server you run."
+        label="Self-hosted"
         disabled={props.busy}
         onSelect={() => props.onChoose("own")}
       />
-      <Choice
+      <ServerOption
         icon={<Globe />}
         label="Just browse"
-        description="Use Misty as a browser. You can add a server later in Settings."
         disabled={props.busy}
         onSelect={() => props.onChoose("browse")}
       />

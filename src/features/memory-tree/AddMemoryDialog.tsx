@@ -4,10 +4,10 @@ import {
   Button,
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  ErrorNotification,
   Field,
   Input,
   SegmentedControl,
@@ -55,10 +55,9 @@ export function AddMemoryDialog({ branch }: { branch: MemoryBranch }) {
 
   return (
     <Dialog open onOpenChange={(open) => !open && close()}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent aria-describedby={undefined} className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>{form.menu}</DialogTitle>
-          <DialogDescription>{form.help}</DialogDescription>
         </DialogHeader>
         <div className="grid gap-3">
           {form.kinds && (
@@ -87,7 +86,7 @@ export function AddMemoryDialog({ branch }: { branch: MemoryBranch }) {
               />
             </Field>
           )}
-          <Field label={form.textLabel} error={error || undefined}>
+          <Field label={form.textLabel}>
             <Textarea
               value={text}
               rows={form.textMax > 2000 ? 7 : 4}
@@ -95,6 +94,7 @@ export function AddMemoryDialog({ branch }: { branch: MemoryBranch }) {
               onChange={(e) => setText(e.target.value)}
             />
           </Field>
+          <ErrorNotification message={error} onDismiss={() => setError("")} />
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={close}>

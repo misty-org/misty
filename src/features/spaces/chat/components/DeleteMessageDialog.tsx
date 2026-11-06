@@ -23,9 +23,7 @@ export function DeleteMessageDialog({
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>Delete this message?</AlertDialogTitle>
-          <AlertDialogDescription>
-            This removes the message from the Space conversation for everyone.
-          </AlertDialogDescription>
+          <AlertDialogDescription>It&apos;s removed for everyone.</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>

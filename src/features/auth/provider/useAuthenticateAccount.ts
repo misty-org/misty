@@ -1,10 +1,10 @@
-import { flushWorkspaceRecovery } from "@/features/browser-sync/recovery";
+import { flushWorkspaceRecovery } from "@/features/workspace/recoveryStorage";
 import { useNativeSessionStore } from "@/features/native-session";
 import {
   adoptAccountWorkspace,
   liveWorkspace,
-  localProfileId,
-  profileIdFor,
+  localAccountScope,
+  accountScopeFor,
   removeAccountWorkspace,
   restoreAccountWorkspace,
   saveAccountWorkspace,
@@ -42,7 +42,7 @@ export function useAuthenticateAccount(
       const previousAccountId = previousUser?.id ?? "";
       // Signed out, the window's tabs belong to the local profile; they are kept for when
       // nobody is signed in again.
-      const previousProfileId = profileIdFor(previousAccountId);
+      const previousScope = accountScopeFor(previousAccountId);
       const previousMe = useUserStore.getState().me;
       const fromLocal = !previousAccountId;
       let authenticated: AuthUser | null = null;
@@ -55,7 +55,7 @@ export function useAuthenticateAccount(
       beginAccountOperation();
       try {
         await flushWorkspaceRecovery();
-        await saveAccountWorkspace(previousProfileId);
+        await saveAccountWorkspace(previousScope);
         resetAccountScopedState(previousAccountId);
         authenticated ??= await request();
         const me = await accountFetchMe();
@@ -69,7 +69,7 @@ export function useAuthenticateAccount(
         if (live) {
           await adoptAccountWorkspace(nextUser.id, live);
           // The tabs are the account's now; the local profile starts empty if it returns.
-          await Promise.resolve(removeAccountWorkspace(localProfileId)).catch(() => undefined);
+          await Promise.resolve(removeAccountWorkspace(localAccountScope)).catch(() => undefined);
         } else {
           await restoreAccountWorkspace(nextUser.id);
         }
@@ -93,7 +93,7 @@ export function useAuthenticateAccount(
         if (await tryRestoreSavedSession(previousAccountId)) {
           try {
             if (previousUser) await saveAuthenticatedUser(previousUser);
-            await restoreAccountWorkspace(previousProfileId);
+            await restoreAccountWorkspace(previousScope);
             if (previousMe?.id === previousAccountId) useUserStore.getState().setMe(previousMe);
             if (previousUser?.id === previousAccountId) setUserState(previousUser);
             restoredPreviousAccount = true;
@@ -108,7 +108,7 @@ export function useAuthenticateAccount(
           setUserState(null);
           // Back to the local profile's windows and tabs.
           if (live)
-            await Promise.resolve(adoptAccountWorkspace(previousProfileId, live)).catch(
+            await Promise.resolve(adoptAccountWorkspace(previousScope, live)).catch(
               () => undefined,
             );
         }

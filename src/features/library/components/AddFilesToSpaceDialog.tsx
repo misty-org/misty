@@ -168,10 +168,7 @@ export function AddFilesToSpaceDialog({
       <DialogContent className="flex max-h-[min(720px,calc(100vh-48px))] max-w-lg flex-col overflow-hidden">
         <DialogHeader>
           <DialogTitle>Add copies to a Space</DialogTitle>
-          <DialogDescription>
-            Misty uploads copies to the selected Space Library. Your originals stay in Files and are
-            never moved or replaced. This beta supports files up to 128 MB each.
-          </DialogDescription>
+          <DialogDescription>Files up to 128 MB each.</DialogDescription>
         </DialogHeader>
 
         <div className="grid min-h-0 gap-4 overflow-hidden">

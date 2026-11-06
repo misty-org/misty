@@ -2,7 +2,6 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { FileText, PencilRuler, Plus } from "lucide-react";
 import { useAuth } from "@/features/auth";
-import { publicBetaFeatureEnabled } from "@/features/launch";
 import { CaptureMenu } from "@/features/voice";
 import { useSpacesStore } from "@/features/spaces/core";
 import { useSpaceOverview } from "@/features/spaces/useSpaceOverview";
@@ -17,6 +16,7 @@ import {
   CollectionItems,
   CollectionViewToggle,
   CollectionSkeleton,
+  ErrorNotification,
   useCollectionRefinement,
   itemTones,
   CollectionSelectionBar,
@@ -30,7 +30,7 @@ export const journalSections = [
   { value: "notes", label: "Notes" },
   { value: "drawings", label: "Drawings" },
   // A day of Memory: what you read, said and recorded.
-  ...(publicBetaFeatureEnabled("recall") ? [{ value: "day", label: "Day" }] : []),
+  { value: "day", label: "Day" },
 ];
 
 export function JournalAllCollection(props: {
@@ -138,24 +138,13 @@ export function JournalAllCollection(props: {
         filterControl={refinement.control}
         actions={<CollectionViewToggle value={view} onChange={setView} />}
       />
-      {data.failed && (
-        <div role="alert" className="flex items-center gap-3 text-sm text-cream-muted">
-          Some items couldn’t load.
-          <Button variant="ghost" size="sm" onClick={data.retry}>
-            Retry
-          </Button>
-        </div>
-      )}
-      {actions.error && (
-        <p role="alert" className="text-sm text-cream-muted">
-          {actions.error}
-        </p>
-      )}
-      {bulkError && (
-        <p role="alert" className="text-sm text-cream-muted">
-          {bulkError}
-        </p>
-      )}
+      <ErrorNotification message={data.failed ? "Some items couldn’t load." : ""}>
+        <Button type="button" variant="ghost" size="sm" onClick={data.retry}>
+          Retry
+        </Button>
+      </ErrorNotification>
+      <ErrorNotification message={actions.error} />
+      <ErrorNotification message={bulkError} onDismiss={() => setBulkError("")} />
       <CollectionSelectionBar
         count={selection.selectedIds.length}
         busy={bulkBusy}

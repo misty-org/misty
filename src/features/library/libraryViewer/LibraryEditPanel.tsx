@@ -29,7 +29,7 @@ const colorRanges = [
   { key: "grayscale", label: "Grayscale", min: 0, max: 1, step: 0.05 },
 ] as const;
 
-export interface LibraryEditPanelProps {
+interface LibraryEditPanelProps {
   draft: LibraryEditDefinition;
   onChange: Dispatch<SetStateAction<LibraryEditDefinition>>;
   isImage: boolean;

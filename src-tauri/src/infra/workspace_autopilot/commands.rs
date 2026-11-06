@@ -17,7 +17,7 @@ pub fn agent_workspace_context(
     }
     #[cfg(not(any(target_os = "macos", windows)))]
     return Err("Misty window control isn't available on this system".into());
-    if !crate::infra::space_windows::is_space_window(webview.label())
+    if !crate::infra::profile_windows::is_person_window(webview.label())
         || context.to_string().len() > 32000
     {
         return Err("Invalid workspace context".into());
@@ -75,7 +75,7 @@ pub fn agent_workspace_context(
 /// window back; the desktop is taken back by the next visual tool call.
 #[tauri::command]
 pub fn agent_control_yield(webview: Webview, task_id: String, yielded: bool) -> Result<(), String> {
-    if !crate::infra::space_windows::is_space_window(webview.label()) {
+    if !crate::infra::profile_windows::is_person_window(webview.label()) {
         return Ok(());
     }
     let desktop = {
@@ -121,7 +121,7 @@ pub fn agent_control_island(
     task_id: String,
     island: Value,
 ) -> Result<(), String> {
-    if !crate::infra::space_windows::is_space_window(webview.label())
+    if !crate::infra::profile_windows::is_person_window(webview.label())
         || island.to_string().len() > 4000
     {
         return Err("Invalid control island update".into());

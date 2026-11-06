@@ -89,28 +89,19 @@ pub(super) fn normalize_settings_document(document: &mut Value) -> bool {
             ("dictionary", json!("")),
             ("agent_handoff", json!(true)),
             ("capture_sources", json!("mic-tab")),
-            ("keep_recordings", json!(false)),
+            ("subtitle_preferences", json!("{}")),
         ],
     );
-    // Memory: off until the person turns it on; a pause is a time in ms.
+    // Memory: on until the person turns it off; a pause is a time in ms.
     changed |= ensure_section_defaults(
         root,
         "recall",
         &[
-            ("enabled", json!(false)),
+            ("enabled", json!(true)),
             ("paused_until", json!(0)),
             ("excluded_sites", json!("")),
             ("remember_dictation", json!(true)),
-        ],
-    );
-    // Screen memory: a capture session the person starts. It ends after this many idle minutes.
-    changed |= ensure_section_defaults(
-        root,
-        "screen_memory",
-        &[
-            ("idle_minutes", json!(30)),
-            ("excluded_apps", json!("")),
-            ("keep_days", json!(30)),
+            ("morning_brief", json!(true)),
         ],
     );
     changed |= ensure_section_defaults(
