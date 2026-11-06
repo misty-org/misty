@@ -109,8 +109,8 @@ fn close_tags_that_match_nothing_cost_nothing() {
 
 #[test]
 fn the_plain_entry_point_reads_a_page_and_a_page_with_no_element_fails() {
-    assert_eq!(readable_text(&page("<p>Hi</p>"), "https://example.com/").unwrap().text, "Hi");
-    assert_eq!(readable_text("just words", "https://example.com/"), Err(ReadableError::NoDocumentElement));
+    assert_eq!(readable_page(&page("<p>Hi</p>"), "text/html", "", READABLE_LIMIT).unwrap().text, "Hi");
+    assert_eq!(readable_page("just words", "text/html", "", READABLE_LIMIT), Err(ReadableError::NoDocumentElement));
 }
 
 /// One page's result recorded from the TypeScript by `test/web-tools.record.test.ts`.
@@ -152,7 +152,7 @@ const KNOWN_DIFFERENCES: [(&str, &str, &str); 6] = [
 #[test]
 #[allow(clippy::disallowed_methods)] // Test fixtures, not a path anything gave us.
 fn matches_every_page_recorded_from_the_typescript() {
-    let folder = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/web_fetch");
+    let folder = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../agent/tests/fixtures/web_fetch");
     let recorded: Vec<Recorded> = serde_json::from_str(&std::fs::read_to_string(folder.join("readable.json")).unwrap()).unwrap();
     assert!(recorded.len() >= 60);
     let mut wrong = Vec::new();

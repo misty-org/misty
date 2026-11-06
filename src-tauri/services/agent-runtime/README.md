@@ -1,10 +1,11 @@
 # Misty Agent Runtime
 
-The durable agent loop for Misty, built on the AI SDK's `WorkflowAgent` and the
-Workflow engine. It runs only on the person's computer: the desktop app starts it
-as a helper process (`src-tauri/src/infra/agent_runtime/`, see
-docs/agents/runtime.md), and every model call happens here on that device's own
-keys. It has no database access of its own: run activation, context, checkpoints,
+The TypeScript version of the agent loop, built on the AI SDK's `WorkflowAgent` and
+the Workflow engine. Misty runs agents on the Rust crate (`src-tauri/crates/agent`),
+and no release ships this. It stays until the crate scores the same or better, and
+only a debug build with `MISTY_AGENT_RUNTIME=typescript` starts it, as a helper
+process (`src-tauri/src/infra/agent_runtime/typescript_baseline/`, see
+docs/agents/runtime.md). Every model call happens here on that device's own keys. It has no database access of its own: run activation, context, checkpoints,
 steering, time budgets and completion go through the Go API's internal routes
 (`/internal/agent-runtime/runs/{runID}/…`), signed with the run's own key, and
 every tool call goes to Misty's authenticated MCP endpoint (`/mcp`).

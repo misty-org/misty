@@ -170,7 +170,7 @@ pub(crate) async fn device_web_search(context: &SearchContext<'_>, input: &JsVal
                 answer
             }
             Err(failure) => {
-                eprintln!("[misty-agent-runtime] web_search_failed {}", object([("provider", string(saved.provider.name())), ("status", JsValue::Number(f64::from(failure.status)))]).stringify());
+                crate::runtime::logger::process_log(&format!("web_search_failed {}", object([("provider", string(saved.provider.name())), ("status", JsValue::Number(f64::from(failure.status)))]).stringify()));
                 return if failure.status == 401 || failure.status == 403 {
                     let name = if saved.provider == SearchProviderId::Decodo { "Decodo" } else { "Serper" };
                     ToolExecutionResponse::tool_error("web_search_key_refused", &format!("{name} didn't accept this device's search key. Continue without web search, and tell the person to check the key in Settings › Models."))

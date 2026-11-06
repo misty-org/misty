@@ -19,13 +19,7 @@ const CONTAINER: &str = "Misty.DocumentWorker";
 const MAX_RESPONSE: u64 = 4 * 1024 * 1024;
 
 fn worker() -> Result<&'static [u8], String> {
-    builtin_worker("document-processing", PROTOCOL)
-}
-
-fn builtin_worker(service: &str, protocol: u32) -> Result<&'static [u8], String> {
-    // Executable bytes are part of the signed Misty binary, never downloaded or
-    // resolved from a user-controlled directory.
-    include!(concat!(env!("OUT_DIR"), "/builtin_workers.rs"))
+    crate::infra::builtin_workers::builtin_worker("document-processing", PROTOCOL)
 }
 
 /// The largest document the worker accepts, as on macOS.

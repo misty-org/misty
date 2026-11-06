@@ -27,6 +27,7 @@ interface Options {
 }
 
 async function world({ turns = 100, models = () => ({ agent: "anthropic/agent-model", fast: "anthropic/fast-model" }) }: Options = {}) {
+  const app = { runtime: "typescript" };
   let invocations = 0;
   const stack = await startMock((request, response) => {
     if (request.path === "/login") return sendJson(response, 200, {}, { "set-cookie": "misty_session=abc; Path=/" });
@@ -57,7 +58,7 @@ async function world({ turns = 100, models = () => ({ agent: "anthropic/agent-mo
   });
   const bridge = await startMock((request, response) => {
     if (request.headers.authorization !== `Bearer ${token}`) return sendJson(response, 401, {});
-    if (request.path === "/models") return sendJson(response, 200, { ok: true, result: { models: models(), reasoning: "low", search: "serper" } });
+    if (request.path === "/models") return sendJson(response, 200, { ok: true, result: { models: models(), reasoning: "low", search: "serper", runtime: app.runtime } });
     if (request.path === "/run-grants") return sendJson(response, 200, { ok: true, result: [{ signed: true }] });
     if (request.path === "/pages") return sendJson(response, 200, { ok: true, result: { pages: [{ label: "misty-browser-a", url: "https://shop.test", runId: `invocation_${invocations}` }] } });
     if (request.path === "/capture") return sendJson(response, 200, { ok: true, result: { dataUrl: image } });
@@ -83,7 +84,7 @@ async function world({ turns = 100, models = () => ({ agent: "anthropic/agent-mo
     MISTY_ODYSSEYS_TASKS: "46ecc9a5dc,8f005e9f09",
     MISTY_ODYSSEYS_REPORTS: join(dir, "reports"),
   };
-  return { stack, bridge, judge, dir, env };
+  return { stack, bridge, judge, dir, env, app };
 }
 
 const pass = async (env: Record<string, string | undefined>) => {
@@ -95,8 +96,9 @@ const reportOf = (folder: string) => JSON.parse(readFileSync(join(folder, "repor
 
 describe("a whole pass", () => {
   it("runs the tasks, records the pass, and two passes compare", async () => {
-    const { dir, env, stack, judge } = await world();
+    const { dir, env, stack, judge, app } = await world();
     await pass(env);
+    app.runtime = "rust";
     await pass({ ...env, MISTY_ODYSSEYS_RUNTIME: "rust" });
 
     const [first, second] = folders(dir);
@@ -141,6 +143,12 @@ describe("a whole pass", () => {
     expect(stderr).toContain("gave this run 20 turns, not 100");
     expect(reportOf(folders(dir)[0]!).stopped).toContain("gave this run 20 turns");
     expect(reportOf(folders(dir)[0]!).runs).toEqual([]);
+  }, 60_000);
+
+  it("refuses a pass labelled with a runtime the app isn't on", async () => {
+    const { env, app } = await world();
+    app.runtime = "rust";
+    await expect(pass(env)).rejects.toMatchObject({ code: 2, stderr: expect.stringContaining("the app is on rust") });
   }, 60_000);
 
   it("refuses to start with no agent model on the device", async () => {

@@ -19,6 +19,7 @@ use crate::{
             provider::SearchProviderId,
             search_step::{DeviceSearch, SearchEndpoints, WebSearchCache},
         },
+        web_fetch::reader::PageReader,
     },
     sdk::{generate_text, prepare_call, resolve_model, start_stream, CallOptions, GenerateSettings, ModelError, ModelStream},
 };
@@ -152,6 +153,7 @@ pub(crate) struct RunDeps {
     pub(crate) http: reqwest::Client,
     pub(crate) search_cache: WebSearchCache,
     pub(crate) search_endpoints: SearchEndpoints,
+    pub(crate) page_reader: Arc<dyn PageReader>,
     pub(crate) clock: Clock,
     pub(crate) before_tool: Option<ToolHook>,
 }

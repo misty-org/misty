@@ -60,6 +60,7 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     #[cfg(desktop)]
     runtime.agents.restore_folder_grants();
     app.manage(runtime);
+    infra::agent_runtime::resume_at_launch(app.handle());
     #[cfg(desktop)]
     infra::permissions::restore(app.handle());
     #[cfg(desktop)]

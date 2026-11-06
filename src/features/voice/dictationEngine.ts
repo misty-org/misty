@@ -146,18 +146,18 @@ export class DictationController {
     this.live = live;
     try {
       // The microphone is already open; its audio waits in the transcriber
-      // while the ticket and socket open, so the first words are kept.
-      const device = await voiceDeviceId();
-      const ticket = await voiceApi.liveTicket({
-        device_id: device,
-        channels: ["mic"],
-        language: this.settings.language,
-      });
+      // while the session opens, so the first words are kept.
+      await voiceDeviceId();
       if (turn !== this.turn) return;
-      await live.connect(ticket.url, ticket.ticket, {
-        language: this.settings.language,
-        context: this.settings.dictionary.length ? { terms: this.settings.dictionary } : undefined,
-      });
+      await live.connect(
+        { channels: ["mic"], language: this.settings.language },
+        {
+          language: this.settings.language,
+          context: this.settings.dictionary.length
+            ? { terms: this.settings.dictionary }
+            : undefined,
+        },
+      );
     } catch (error) {
       if (turn !== this.turn) return;
       live.close();

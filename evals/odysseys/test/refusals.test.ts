@@ -1,6 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import { assertRuntime } from "../bridge.ts";
 import { EvalClient } from "../client.ts";
 import { loadConfig } from "../config.ts";
 import { chooseDevice } from "../device.ts";
@@ -48,6 +49,14 @@ describe("a pass that would mean nothing", () => {
   it("needs to know its runtime", () => {
     expect(() => loadConfig({ ...good, MISTY_ODYSSEYS_RUNTIME: "" })).toThrow("MISTY_ODYSSEYS_RUNTIME");
     expect(() => loadConfig({ ...good, MISTY_ODYSSEYS_RUNTIME: "python" })).toThrow("MISTY_ODYSSEYS_RUNTIME");
+  });
+
+  it("refuses a report labelled with a runtime the app isn't on", () => {
+    expect(() => assertRuntime("rust", "rust")).not.toThrow();
+    expect(() => assertRuntime("typescript", "typescript")).not.toThrow();
+    expect(() => assertRuntime("rust", "typescript")).toThrow("MISTY_AGENT_RUNTIME=typescript");
+    expect(() => assertRuntime("typescript", "rust")).toThrow("the app is on rust");
+    expect(() => assertRuntime("rust", undefined)).toThrow("an unknown runtime");
   });
 
   it("refuses a turn limit a server can't honor", () => {

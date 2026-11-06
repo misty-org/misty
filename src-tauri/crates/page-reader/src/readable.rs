@@ -11,15 +11,14 @@ use std::{
 
 use regex::Regex;
 
-use crate::runtime::{
+use crate::{
+    html_tree::{NodeKind, Page},
     js_regex::js_regex,
     text::{js_len, js_prefix, js_trim},
 };
 
-use super::html_tree::{NodeKind, Page};
-
 /// How much text a page returns unless the caller says otherwise.
-pub(crate) const READABLE_LIMIT: usize = 15_000;
+pub const READABLE_LIMIT: usize = 15_000;
 
 fn is_block(name: &str) -> bool {
     matches!(
@@ -38,7 +37,7 @@ static WORD: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"[\p{L}\p{N}]{3,}").
 
 /// Pricing pages draw one billing period (usually yearly) until a toggle is switched, and a fetch
 /// can't switch it. When the text has prices and names a billing period, say so.
-pub(crate) fn billing_note(text: &str) -> Option<&'static str> {
+pub fn billing_note(text: &str) -> Option<&'static str> {
     if !HAS_PRICE.is_match(text) || !NAMES_PERIOD.is_match(text) {
         return None;
     }
@@ -47,7 +46,7 @@ pub(crate) fn billing_note(text: &str) -> Option<&'static str> {
 
 /// A page a fetch can't read: an error, a sign-in wall or a script-only shell with little text. The
 /// agent's own browser tab can (docs/agents/evals/odysseys.md).
-pub(crate) fn browser_note(status: u16, text: &str) -> Option<&'static str> {
+pub fn browser_note(status: u16, text: &str) -> Option<&'static str> {
     if status < 400 && js_len(&SPACES.replace_all(text, " ")) >= 600 && !SCRIPT_SHELL.is_match(text) {
         return None;
     }
@@ -55,16 +54,16 @@ pub(crate) fn browser_note(status: u16, text: &str) -> Option<&'static str> {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct ReadablePage {
-    pub(crate) title: String,
-    pub(crate) text: String,
+pub struct ReadablePage {
+    pub title: String,
+    pub text: String,
     /// Text was left out: the page was longer than the limit.
-    pub(crate) truncated: bool,
+    pub truncated: bool,
 }
 
 /// Why a page couldn't be read.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum ReadableError {
+pub enum ReadableError {
     /// Nothing in the page is an element, once scripts and chrome are gone.
     NoDocumentElement,
 }
@@ -196,7 +195,7 @@ fn size(page: &Page, id: Option<usize>) -> usize {
     id.map_or(0, |id| js_len(&SPACES.replace_all(&page.text_content(id), " ")))
 }
 
-pub(crate) fn readable_page(html: &str, content_type: &str, question: &str, limit: usize) -> Result<ReadablePage, ReadableError> {
+pub fn readable_page(html: &str, content_type: &str, question: &str, limit: usize) -> Result<ReadablePage, ReadableError> {
     if !(content_type.contains("html") || content_type.contains("xml") || content_type.is_empty()) {
         let text = js_trim(html);
         return Ok(ReadablePage { title: String::new(), text: js_prefix(text, limit).to_owned(), truncated: js_len(text) > limit });
@@ -217,12 +216,6 @@ pub(crate) fn readable_page(html: &str, content_type: &str, question: &str, limi
     let picked = if js_trim(question).is_empty() { Vec::new() } else { relevant(&all, question, limit) };
     let text = if picked.is_empty() { full } else { picked.join("\n") };
     Ok(ReadablePage { title, text: js_prefix(&text, limit).to_owned(), truncated: true })
-}
-
-/// The plain entry point for a page with no question. Its address plays no part, as it never did in
-/// the TypeScript; it's here for the confined worker this moves to, which reads one page by address.
-pub(crate) fn readable_text(html: &str, _url: &str) -> Result<ReadablePage, ReadableError> {
-    readable_page(html, "text/html", "", READABLE_LIMIT)
 }
 
 #[cfg(test)]

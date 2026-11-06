@@ -41,7 +41,10 @@ desktop_windows() {
   cargo xwin check --locked --quiet --all-targets --target x86_64-pc-windows-msvc --manifest-path cli/Cargo.toml
 }
 browser_sync_crate() { cargo test --locked --quiet --tests --manifest-path src-tauri/crates/browser-sync/Cargo.toml; }
-agent_crate() { cargo test --locked --quiet --tests --manifest-path src-tauri/crates/agent/Cargo.toml; }
+agent_crate() {
+  cargo test --locked --quiet --tests --manifest-path src-tauri/crates/page-reader/Cargo.toml
+  cargo test --locked --quiet --tests --manifest-path src-tauri/crates/agent/Cargo.toml
+}
 # Kiri's core tests need no Tauri; the desktop crate builds its native side.
 kiri_crate() { cargo test --locked --quiet --tests --no-default-features --manifest-path kiri/Cargo.toml; }
 desktop_services() {

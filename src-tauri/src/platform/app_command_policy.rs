@@ -181,6 +181,27 @@ mod tests {
         }
     }
 
+    /// Voice and live transcription are a person's own: the commands behind them belong to the voice
+    /// set, which an incognito window doesn't have, and each one checks the window again.
+    #[test]
+    fn voice_sessions_open_only_in_a_persons_window() {
+        let sets = action_sets();
+        let voice = &sets["action-voice"];
+        for command in [
+            "agent_runtime_voice_open",
+            "agent_runtime_live_open",
+            "agent_runtime_session_send",
+            "agent_runtime_session_close",
+        ] {
+            assert!(voice.iter().any(|name| name == command), "{command}");
+            assert!(commands_for("person-window-actions").contains(command));
+            assert!(!commands_for("incognito-window-actions").contains(command));
+        }
+        assert!(profile_windows::is_person_window("window-1"));
+        assert!(!profile_windows::is_person_window("incognito-1"));
+        assert!(!profile_windows::is_person_window("misty-browser-a"));
+    }
+
     /// Capabilities scoped by window would also cover website views attached to that window, and one
     /// with remote URLs would grant commands to websites. Only Kiri's single entry point may reach
     /// them.

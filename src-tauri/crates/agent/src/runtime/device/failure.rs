@@ -82,7 +82,7 @@ pub(super) fn answered(path: &str, result: Result<Value, CallError>) -> Result<V
     result.map_err(|error| {
         let failure = model_call_failure(&error);
         if failure.status >= 500 {
-            eprintln!("[misty-agent-runtime] device call /v1/device/{path} failed {error}");
+            super::super::logger::process_log(&format!("device call /v1/device/{path} failed {error}"));
         }
         failure
     })

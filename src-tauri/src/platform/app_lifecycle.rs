@@ -65,13 +65,16 @@ pub fn run_event(app: &AppHandle, event: RunEvent) {
         }
     }
     if matches!(event, RunEvent::Exit) {
-        // Its runs wait in the runtime's local store for the next launch.
+        // Its runs wait in their files for the next launch.
         crate::infra::agent_runtime::stop();
     }
 }
 
 /// Closing the main window would take its unsaved changes with it.
 pub fn window_event(window: &Window, event: &WindowEvent) {
+    if matches!(event, WindowEvent::Destroyed) {
+        crate::infra::agent_runtime::sessions::close_for_window(window.label());
+    }
     if let WindowEvent::CloseRequested { api, .. } = event {
         if crate::infra::profile_windows::is_person_window(window.label()) && must_ask() {
             api.prevent_close();

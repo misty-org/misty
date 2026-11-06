@@ -1,233 +1,291 @@
-//! The agent runtime on this computer (docs/plans/desktop-runtime.md).
+//! The agent runtime on this computer (docs/agents/runtime.md).
 //!
-//! Agents run here, not on the server. The app starts the runtime
-//! (`src-tauri/services/agent-runtime`, built with nitro) as a helper process on loopback, gives it
-//! this device's model keys and choices, and hands it the runs the server queues for this
-//! device (`agent_runtime_deliver`). Every call to it is signed with a secret made for this
-//! launch, so nothing else on the computer can drive it. Its runs are kept under
-//! `~/.misty/runtime`, so a run continues after Misty quits and opens again.
-use crate::infra::file_access::{self, fs, fs_async};
+//! Agents run here, not on the server, on the `misty-agent` crate inside this process. The app gives
+//! it this device's model keys and choices and hands it the runs the server queues for this device
+//! (`agent_runtime_deliver`). Its runs are kept under `~/.misty/runtime/runs`, so a run continues after
+//! Misty quits and opens again.
+//!
+//! A run failing must never take down the browser. The crate runs each one as its own task, and
+//! everything called from here goes through [`contained`] or a session's task. That rests on panics
+//! unwinding, so a build that makes them abort doesn't compile.
+#[cfg(panic = "abort")]
+compile_error!(
+    "Misty needs panics to unwind: with panic=abort, one failed agent run closes the whole browser."
+);
+
 pub mod calls;
 pub mod live;
+mod log;
+pub mod sessions;
+#[cfg(debug_assertions)]
+mod typescript_baseline;
 
 use std::{
-    path::PathBuf,
-    process::Stdio,
-    sync::OnceLock,
-    time::{Duration, Instant},
+    future::Future,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc, Mutex, OnceLock, PoisonError,
+    },
+    time::Duration,
 };
 
-use base64::{engine::general_purpose::STANDARD, Engine};
-use rand::RngCore;
-use tauri::Manager;
-use tokio::{
-    process::{Child, Command},
-    sync::Mutex,
+use misty_agent::runtime::{
+    device::DeviceCalls, runtime_client_builder, AgentRuntime, AgentRuntimeOptions, Logger,
 };
 
-struct Running {
-    base: String,
-    secret: Vec<u8>,
-    child: Child,
+use crate::infra::{
+    file_access::{fs, fs_async},
+    page_reader::ConfinedPageReader,
+};
+
+pub(crate) struct Running {
+    pub(crate) runtime: AgentRuntime,
+    pub(crate) calls: DeviceCalls,
+    pub(crate) client: reqwest::Client,
 }
 
-static RUNNING: Mutex<Option<Running>> = Mutex::const_new(None);
+static RUNNING: Mutex<Option<Arc<Running>>> = Mutex::new(None);
+/// Held while the runtime starts, so there is only ever one, and a change to the models made while it
+/// starts waits and is applied afterwards.
+static STARTING: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+/// One model document at a time, so an older one can't land after a newer one.
+static PUSHING: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+static STOPPED: AtomicBool = AtomicBool::new(false);
 static APP: OnceLock<tauri::AppHandle> = OnceLock::new();
 
-/// Settings the runtime would otherwise read from its environment. On this computer it works
-/// only on the keys the app gives it, and keeps its runs in its local store.
-const INHERITED: [&str; 18] = [
-    "OPENAI_API_KEY",
-    "ANTHROPIC_API_KEY",
-    "CLAUDE_API_KEY",
-    "GEMINI_API_KEY",
-    "GOOGLE_GENERATIVE_AI_API_KEY",
-    "OPENROUTER_API_KEY",
-    "AI_GATEWAY_API_KEY",
-    "VERCEL_OIDC_TOKEN",
-    "NVIDIA_API_KEY",
-    "OLLAMA_API_KEY",
-    "OPENAI_COMPATIBLE_API_KEY",
-    "ELEVENLABS_API_KEY",
-    "SONIOX_API_KEY",
-    "MISTY_AGENT_MODEL",
-    "MISTY_AGENT_RUNTIME_CONTROL_SECRET_PREVIOUS",
-    "MISTY_INTERNAL_API_BASE",
-    "WORKFLOW_TARGET_WORLD",
-    "WORKFLOW_POSTGRES_URL",
-];
+/// A Library recording may take minutes to transcribe. A call past this answers as one the Node
+/// process didn't answer.
+const CALL_LIMIT: Duration = Duration::from_secs(600);
+/// Node's own limit for opening a connection, which nothing in the runtime sets per call.
+const CONNECT_LIMIT: Duration = Duration::from_secs(10);
+const NOT_ANSWERED: &str = "Misty's agent runtime didn't answer.";
 
-/// Where the runtime's build is: `MISTY_AGENT_RUNTIME_ENTRY`, the app's resources, or in a
-/// development build the checkout's `.output`.
-fn entry(app: &tauri::AppHandle) -> Option<PathBuf> {
-    let bundled = app
-        .path()
-        .resource_dir()
-        .ok()
-        .map(|dir| dir.join("agent-runtime/server/index.mjs"));
-    let checkout = cfg!(debug_assertions).then(|| {
-        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("services/agent-runtime/.output/server/index.mjs")
-    });
-    std::env::var_os("MISTY_AGENT_RUNTIME_ENTRY")
-        .map(PathBuf::from)
-        .into_iter()
-        .chain(bundled)
-        .chain(checkout)
-        .find(|path| file_access::looks::program_is_installed(path))
+fn current() -> Option<Arc<Running>> {
+    RUNNING
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+        .clone()
 }
 
-/// The Node that runs it: `MISTY_AGENT_RUNTIME_NODE`, the one shipped beside the app, or one
-/// installed on this computer. An app opened from the Dock has no shell PATH, so the usual
-/// install folders are tried too.
-fn node() -> PathBuf {
-    let name = if cfg!(windows) {
-        "misty-node.exe"
-    } else {
-        "misty-node"
-    };
-    let shipped = std::env::current_exe()
-        .ok()
-        .and_then(|exe| exe.parent().map(|dir| dir.join(name)));
-    std::env::var_os("MISTY_AGENT_RUNTIME_NODE")
-        .map(PathBuf::from)
-        .into_iter()
-        .chain(shipped)
-        .chain(["/opt/homebrew/bin/node", "/usr/local/bin/node"].map(PathBuf::from))
-        .find(|path| file_access::looks::program_is_installed(path))
-        .unwrap_or_else(|| PathBuf::from("node"))
+/// Node's `fetch` used no proxy, and neither do the crate's page fetches. A proxy would also see every
+/// model key.
+fn client() -> Result<reqwest::Client, String> {
+    runtime_client_builder()
+        .no_proxy()
+        .connect_timeout(CONNECT_LIMIT)
+        .build()
+        .map_err(|_| "Misty couldn't start its agent runtime.".to_owned())
+}
+
+/// The folder the runtime keeps its runs and log in.
+pub(crate) fn data_dir() -> Option<std::path::PathBuf> {
+    crate::infra::paths::misty_home_dir().map(|home| home.join("runtime"))
+}
+
+/// Gives the runtime this device's models. A document that couldn't be read changes nothing, so a
+/// passing failure can't look like a person with no keys.
+async fn push_models(app: &tauri::AppHandle, runtime: &AgentRuntime) -> Result<(), String> {
+    let _pushing = PUSHING.lock().await;
+    let document = crate::infra::models::device_document(app)
+        .await?
+        .unwrap_or_else(|| serde_json::json!({}));
+    runtime
+        .set_device_models(&document)
+        .map_err(|_| "Misty couldn't give its agent runtime this device's models.".to_owned())
 }
 
 async fn start(app: &tauri::AppHandle) -> Result<Running, String> {
-    let entry = entry(app).ok_or("Misty's agent runtime isn't installed.")?;
-    let home = crate::infra::paths::misty_home_dir()
-        .ok_or("Misty's data folder is unavailable.")?
-        .join("runtime");
-    fs_async::create_dir_all(home.join("world"))
+    let home = data_dir().ok_or("Misty's data folder is unavailable.")?;
+    fs_async::create_dir_all(&home)
         .await
         .map_err(|_| "Misty couldn't create the agent runtime's folder.")?;
-    let port = std::net::TcpListener::bind("127.0.0.1:0")
-        .and_then(|listener| listener.local_addr())
-        .map_err(|_| "No local port is free for the agent runtime.")?
-        .port();
-    let mut secret = vec![0u8; 32];
-    rand::thread_rng().fill_bytes(&mut secret);
-    let log = fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(home.join("runtime.log"))
-        .map_err(|_| "Misty couldn't open the agent runtime's log.")?;
-    let base = format!("http://127.0.0.1:{port}");
-    let mut command = Command::new(node());
-    command
-        .arg(&entry)
-        .env("PORT", port.to_string())
-        .env("NITRO_PORT", port.to_string())
-        .env("HOST", "127.0.0.1")
-        .env("NITRO_HOST", "127.0.0.1")
-        .env("NODE_ENV", "production")
-        .env("MISTY_RUNTIME_DESKTOP", "1")
-        .env("MISTY_RUNTIME_LIVE_TRANSCRIBE", "1")
-        .env(
-            "MISTY_AGENT_RUNTIME_CONTROL_SECRET",
-            STANDARD.encode(&secret),
-        )
-        .env("WORKFLOW_LOCAL_DATA_DIR", home.join("world"))
-        .env("WORKFLOW_LOCAL_BASE_URL", &base)
-        .stdin(Stdio::null())
-        .stdout(log.try_clone().map_err(|error| error.to_string())?)
-        .stderr(log)
-        .kill_on_drop(true);
-    if let Some(dir) = entry.parent() {
-        command.current_dir(dir);
+    let client = client()?;
+    let runtime = AgentRuntime::new(AgentRuntimeOptions {
+        data_dir: home.clone(),
+        client: client.clone(),
+        logger: Logger::to(log::sink(home.join("runtime.log"))),
+        internal_api_base: None,
+        page_reader: Arc::new(ConfinedPageReader),
+        before_tool: None,
+    })
+    .map_err(|_| "Misty couldn't open the agent runtime's runs.")?;
+    // Before resuming: a run picked up with no models fails at once with `model_key_needed`.
+    push_models(app, &runtime).await?;
+    if let Err(error) = runtime.resume_unfinished().await {
+        // The files stay for the next launch, and everything else still works.
+        eprintln!(
+            "Could not resume the agent runtime's runs: {}",
+            error.kind()
+        );
     }
-    for name in INHERITED {
-        command.env_remove(name);
-    }
-    let mut child = command
-        .spawn()
-        .map_err(|_| "Misty couldn't start its agent runtime. Is Node installed?")?;
-    let deadline = Instant::now() + Duration::from_secs(15);
-    while Instant::now() < deadline {
-        if let Ok(Some(_)) = child.try_wait() {
-            return Err(
-                "Misty's agent runtime stopped as it started. See ~/.misty/runtime/runtime.log."
-                    .into(),
-            );
-        }
-        if calls::healthy(&base).await {
-            return Ok(Running {
-                base,
-                secret,
-                child,
-            });
-        }
-        tokio::time::sleep(Duration::from_millis(200)).await;
-    }
-    let _ = child.start_kill();
-    Err("Misty's agent runtime didn't start in time.".into())
+    let calls = DeviceCalls::new(runtime.device_models(), client.clone());
+    Ok(Running {
+        runtime,
+        calls,
+        client,
+    })
 }
 
-/// The running runtime's address and launch secret, starting it when it isn't running.
-pub(crate) async fn ensure(app: &tauri::AppHandle) -> Result<(String, Vec<u8>), String> {
+/// The running runtime, starting it when it isn't running.
+pub(crate) async fn ensure(app: &tauri::AppHandle) -> Result<Arc<Running>, String> {
+    if let Some(running) = current() {
+        return Ok(running);
+    }
+    let _starting = STARTING.lock().await;
+    if let Some(running) = current() {
+        return Ok(running);
+    }
+    if STOPPED.load(Ordering::SeqCst) {
+        return Err("Misty is closing.".to_owned());
+    }
     let _ = APP.set(app.clone());
-    let mut running = RUNNING.lock().await;
-    if let Some(current) = running.as_mut() {
-        if matches!(current.child.try_wait(), Ok(None)) {
-            return Ok((current.base.clone(), current.secret.clone()));
+    let running = Arc::new(start(app).await?);
+    *RUNNING.lock().unwrap_or_else(PoisonError::into_inner) = Some(running.clone());
+    Ok(running)
+}
+
+/// Runs left unfinished when Misty last closed go on as it opens, without waiting for the next
+/// delivery. With none on disk nothing starts, so someone who only browses never reaches the keychain
+/// for model keys.
+pub fn resume_at_launch(app: &tauri::AppHandle) {
+    #[cfg(debug_assertions)]
+    if typescript_baseline::selected() {
+        return;
+    }
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        let unfinished = data_dir()
+            .and_then(|home| fs::read_dir(home.join("runs")).ok())
+            .into_iter()
+            .flatten()
+            .flatten()
+            .any(|entry| {
+                entry
+                    .path()
+                    .extension()
+                    .is_some_and(|extension| extension == "json")
+            });
+        if unfinished {
+            if let Err(error) = ensure(&app).await {
+                eprintln!("Could not resume the agent runtime's runs: {error}");
+            }
+        }
+    });
+}
+
+/// Runs a call on a task of its own: a panic in it fails this call alone, and so does a call that
+/// never ends.
+pub(crate) async fn contained<T: Send + 'static>(
+    work: impl Future<Output = T> + Send + 'static,
+) -> Result<T, String> {
+    contained_within(CALL_LIMIT, work).await
+}
+
+async fn contained_within<T: Send + 'static>(
+    limit: Duration,
+    work: impl Future<Output = T> + Send + 'static,
+) -> Result<T, String> {
+    let mut task = tokio::spawn(work);
+    match tokio::time::timeout(limit, &mut task).await {
+        Ok(Ok(value)) => Ok(value),
+        // What a panic says can't be trusted to be free of keys, so it isn't passed on.
+        Ok(Err(_)) => Err(NOT_ANSWERED.to_owned()),
+        Err(_) => {
+            task.abort();
+            Err(NOT_ANSWERED.to_owned())
         }
     }
-    let started = start(app).await?;
-    let address = (started.base.clone(), started.secret.clone());
-    *running = Some(started);
-    drop(running);
-    // A run started before the runtime had the device's models would fail at once.
-    push_models(app, &address).await?;
-    Ok(address)
 }
 
-async fn push_models(
-    app: &tauri::AppHandle,
-    (base, secret): &(String, Vec<u8>),
-) -> Result<(), String> {
-    let document = crate::infra::models::current_document(app)
-        .await
-        .unwrap_or_else(|| serde_json::json!({}));
-    let (status, _) = calls::post(base, secret, "/v1/local/models", "models", &document).await?;
-    (200..300)
-        .contains(&status)
-        .then_some(())
-        .ok_or_else(|| "Misty couldn't give its agent runtime this device's models.".into())
-}
-
-/// Gives the running runtime this device's new model choices and keys.
+/// Gives the running runtime this device's new model choices and keys, and the ChatGPT token Rust
+/// just refreshed.
 pub fn models_changed() {
     let Some(app) = APP.get().cloned() else {
+        // Nothing has started, and starting reads the models fresh.
+        #[cfg(debug_assertions)]
+        typescript_baseline::models_changed();
         return;
     };
     tauri::async_runtime::spawn(async move {
-        let address = {
-            let mut running = RUNNING.lock().await;
-            let Some(current) = running.as_mut() else {
-                return;
-            };
-            if !matches!(current.child.try_wait(), Ok(None)) {
-                return;
-            }
-            (current.base.clone(), current.secret.clone())
+        // If it's starting, what it read may already be out of date.
+        drop(STARTING.lock().await);
+        let Some(running) = current() else {
+            return;
         };
-        if let Err(error) = push_models(&app, &address).await {
+        if let Err(error) = push_models(&app, &running.runtime).await {
             eprintln!("Could not give the agent runtime this device's models: {error}");
         }
     });
 }
 
-/// Stops the runtime with Misty. Its runs wait in its local store for the next launch.
+/// Which runtime this app uses, for the Odysseys report (debug builds only: the bridge that asks isn't
+/// in a release).
+#[cfg(debug_assertions)]
+pub(crate) fn runtime_name() -> &'static str {
+    if typescript_baseline::selected() {
+        "typescript"
+    } else {
+        "rust"
+    }
+}
+
+/// Stops the runtime with Misty. Its runs stop where they stand and wait in their files for the next
+/// launch.
 pub fn stop() {
-    if let Ok(mut running) = RUNNING.try_lock() {
-        if let Some(current) = running.as_mut() {
-            let _ = current.child.start_kill();
+    STOPPED.store(true, Ordering::SeqCst);
+    sessions::stop_all();
+    #[cfg(debug_assertions)]
+    typescript_baseline::stop();
+    let running = RUNNING
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+        .take();
+    if let Some(running) = running {
+        running.runtime.shutdown();
+    }
+    crate::infra::page_reader::clean_up();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn a_panic_in_a_call_fails_that_call_and_nothing_else() {
+        let failed = contained(async {
+            if true {
+                panic!("a run went wrong with sk-secret");
+            }
+        })
+        .await;
+        assert_eq!(failed.unwrap_err(), NOT_ANSWERED);
+        assert_eq!(contained(async { 7 }).await.unwrap(), 7);
+    }
+
+    #[tokio::test]
+    async fn a_call_that_never_ends_is_given_up_on() {
+        let failed =
+            contained_within(Duration::from_millis(10), std::future::pending::<()>()).await;
+        assert_eq!(failed.unwrap_err(), NOT_ANSWERED);
+    }
+
+    /// `cfg(panic)` above covers what's being built now; this covers the setting anyone would change.
+    #[test]
+    fn no_build_profile_makes_panics_abort() {
+        let manifest = include_str!("../../../Cargo.toml");
+        assert!(manifest.contains("[profile.release]"));
+        for line in manifest.lines().map(str::trim) {
+            assert!(
+                !(line.starts_with("panic") && line.contains('=')),
+                "Cargo.toml sets {line}, and a failed run has to stay inside its task"
+            );
         }
-        *running = None;
+        assert!(cfg!(panic = "unwind"));
+    }
+
+    #[test]
+    fn the_client_builds_without_a_proxy() {
+        let _ = rustls::crypto::ring::default_provider().install_default();
+        assert!(client().is_ok());
     }
 }

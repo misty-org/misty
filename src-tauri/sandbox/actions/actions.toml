@@ -14,8 +14,6 @@ permissions = [
   "allow-agent-foreground-queue",
   "allow-agent-runtime-call",
   "allow-agent-runtime-deliver",
-  "allow-agent-runtime-live-ticket",
-  "allow-agent-runtime-voice-ticket",
   "allow-agent-workspace-acquire",
   "allow-agent-workspace-bind-scope",
   "allow-agent-workspace-context",
@@ -403,6 +401,10 @@ permissions = [
 identifier = "action-voice"
 description = "Dictation and voice"
 permissions = [
+  "allow-agent-runtime-live-open",
+  "allow-agent-runtime-session-close",
+  "allow-agent-runtime-session-send",
+  "allow-agent-runtime-voice-open",
   "allow-voice-capture-mute",
   "allow-voice-capture-sources",
   "allow-voice-capture-start",

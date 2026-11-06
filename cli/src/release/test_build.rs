@@ -10,23 +10,20 @@ use crate::{
     workspace::Workspace,
 };
 
-use super::{config, runtime};
+use super::config;
 
 /// The website the app links to, when `MISTY_RELEASE_WEB_URL` doesn't name another.
 const DEFAULT_WEBSITE: &str = "https://mistysys.com";
 
-pub fn run(workspace: &Workspace, agents: bool) -> Result<PathBuf> {
+pub fn run(workspace: &Workspace) -> Result<PathBuf> {
     workspace.validate()?;
-    if agents {
-        runtime::prepare_for_host(workspace)?;
-    }
     let temporary = tempfile::Builder::new()
         .prefix("misty-test-build-")
         .tempdir()?;
     let config_path = temporary.path().join("tauri.test.conf.json");
     std::fs::write(
         &config_path,
-        serde_json::to_vec_pretty(&config::test_build(agents))?,
+        serde_json::to_vec_pretty(&config::test_build())?,
     )?;
     let website =
         std::env::var("MISTY_RELEASE_WEB_URL").unwrap_or_else(|_| DEFAULT_WEBSITE.to_owned());

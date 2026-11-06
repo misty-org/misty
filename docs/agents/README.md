@@ -1,9 +1,8 @@
 # Agents
 
 Misty's agents work in your browser, on your computer, signed in as you, while you watch.
-The model loop runs in the agent runtime on that computer (`src-tauri/services/agent-runtime`, a
-helper process of the app), and every model call goes through its AI SDK on that computer's own
-models and keys. The server never calls a model or holds a key. Conversations are stored on the
+The model loop runs in the agent runtime inside the app on that computer (`src-tauri/crates/agent`),
+and every model call goes through its own model clients on that computer's own models and keys. The server never calls a model or holds a key. Conversations are stored on the
 server, per person per Space.
 
 ## Where conversations live
@@ -54,7 +53,7 @@ Approved November 4, 2026. This replaces keeping chats on the computer that star
 | Mockups (agent chat, cursor companion) | [mockups/](mockups/) |
 
 In flight: [agent browser actions](../plans/agent-browser-actions.md). Code lives in
-`src/features/agents/` (see its `DESIGN.md`), `src-tauri/services/agent-runtime/` and
+`src/features/agents/` (see its `DESIGN.md`), `src-tauri/crates/agent/` and
 `src-tauri/src/infra/browser/page_agent/`.
 
 ## Interface rules

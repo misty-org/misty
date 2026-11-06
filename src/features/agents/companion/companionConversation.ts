@@ -1,3 +1,4 @@
+import { OPEN, type RuntimeSocket } from "@/api/runtimeSocket";
 import { CompanionVoicePlayback } from "./companionVoicePlayback";
 import {
   deferred,
@@ -25,7 +26,7 @@ interface Options {
 
 /** Persistent, push-to-talk conversation; transport loss never replays work. */
 export class CompanionConversation {
-  private socket?: WebSocket;
+  private socket?: RuntimeSocket;
   private closed = false;
   private ready = deferred();
   private inputReady = deferred();
@@ -64,7 +65,7 @@ export class CompanionConversation {
       if (this.closed) return;
       try {
         this.current();
-        this.receive(JSON.parse(data));
+        this.receive(JSON.parse(data as string));
       } catch (e) {
         this.fail(e);
       }
@@ -77,7 +78,7 @@ export class CompanionConversation {
   }
   private send(event: object) {
     this.current();
-    if (this.socket?.readyState !== WebSocket.OPEN || this.socket.bufferedAmount > 3 * 1024 * 1024)
+    if (this.socket?.readyState !== OPEN || this.socket.bufferedAmount > 3 * 1024 * 1024)
       throw new Error("The voice connection cannot keep up.");
     this.socket.send(JSON.stringify(event));
   }

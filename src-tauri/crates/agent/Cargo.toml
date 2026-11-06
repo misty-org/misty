@@ -17,7 +17,8 @@ futures-util = "0.3"
 hex = "0.4"
 brotli-decompressor = "5"
 flate2 = { version = "1", default-features = false, features = ["rust_backend"] }
-html5ever = "0.38"
+# Reading a page, and the JavaScript string and regex rules it shares with the runtime.
+misty-page-reader = { path = "../page-reader" }
 rand = "0.8"
 regex = "1"
 reqwest = { version = "0.13.4", default-features = false, features = ["json", "rustls-no-provider", "stream"] }

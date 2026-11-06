@@ -20,12 +20,11 @@ use super::{
     tool_transport::{object, string, HarnessCheckpoint, ToolCheckpoints, ToolTransport},
     toolsets::agent_tools,
     transcript::stringify_output,
-    web_fetch::{
-        readable::{billing_note, browser_note},
-        tool::web_fetch_descriptor,
-    },
+    web_fetch::tool::web_fetch_descriptor,
     web_search::{provider::SearchProviderId, tool::{device_tool_activity, web_search_descriptor}},
 };
+
+use misty_page_reader::readable::{billing_note, browser_note};
 
 #[allow(clippy::disallowed_methods)] // Test fixtures, not a path anything gave us.
 pub(crate) fn recorded() -> JsValue {

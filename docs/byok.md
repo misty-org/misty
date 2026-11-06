@@ -1,7 +1,7 @@
 # Models on your device
 
 Every model call in Misty runs on this computer, on a model account you bring. Agents run in the
-agent runtime the app starts beside itself ([agents/runtime.md](agents/runtime.md)),
+agent runtime inside the app ([agents/runtime.md](agents/runtime.md)),
 and the server never calls a model or holds a model key. Misty has no keys of its own, no house
 model and no billing for AI: you choose the provider and the model, and your provider bills you,
 or your ChatGPT plan covers it.
@@ -26,8 +26,8 @@ step after signing in:
 
 **Check the agent model** asks the chosen model to call a tool and to read a screenshot a tool
 returned, the two things every agent run needs, and says which one works. It runs on the device's
-runtime (`/v1/device/model-test`, with the checks in
-`src-tauri/services/agent-runtime/src/model-checks.ts`).
+runtime (the `model-test` device call, with the checks in
+`src-tauri/crates/agent/src/runtime/device/model_checks.rs`).
 
 Model IDs are `<provider>/<model as the provider names it>`, for example
 `anthropic/claude-sonnet-5-5`, `chatgpt/gpt-6.1-sol`, `openrouter/anthropic/claude-sonnet-5.5`,
@@ -75,10 +75,10 @@ Keys and sign-ins live in Misty's credential store (sealed rows in `misty.db` wh
 is in the OS keychain), read only by the app's native layer (`src-tauri/src/infra/models/`).
 The web layer sees a key only while you paste it, and can never read one back.
 
-The native layer gives the runtime on this computer a model document over its signed local
-route (`POST /v1/local/models`): the providers you set up, the model for each role, the
-reasoning effort and the web search service with its key (`search`). The runtime keeps it in
-memory and sends each key only to its provider. Base
+The native layer gives the runtime, in the same process, a model document (`set_device_models`):
+the providers you set up, the model for each role, the reasoning effort and the web search service
+with its key (`search`). The runtime keeps it in memory and sends each key only to its provider. Keys
+are never logged. Base
 URLs are called from this computer, so a model server on it or on your network works.
 
 No key, search key or model choice ever goes to a Misty server.
@@ -107,7 +107,7 @@ This is OpenAI's ChatGPT plan usage for open-source and locally hosted apps
 - **Requests** go to the Responses API with the access token as the bearer, `store: false` and
   `stream: true`. System text moves into `instructions`, and `max_output_tokens`, `temperature`,
   `top_p`, `previous_response_id` and the other fields the preview refuses are dropped
-  (`src-tauri/services/agent-runtime/src/chatgpt-provider.ts`). A plan usage limit shows as a 429.
+  (`src-tauri/crates/agent/src/sdk/`). A plan usage limit shows as a 429.
 - **Signing out** revokes the refresh token at the issuer's revocation endpoint and clears the
   tokens. If OpenAI doesn't confirm it, Settings says so; you can disconnect Misty in ChatGPT's
   settings.

@@ -11,7 +11,7 @@ use std::{
     time::Duration,
 };
 
-use misty_agent::runtime::{AgentRuntime, AgentRuntimeOptions, Logger, RuntimeApiError, StartRequest, StartedRun, ToolHook};
+use misty_agent::runtime::{AgentRuntime, AgentRuntimeOptions, InProcessPageReader, Logger, RuntimeApiError, StartRequest, StartedRun, ToolHook};
 use serde_json::json;
 use sha2::{Digest, Sha256};
 use support::{
@@ -42,6 +42,7 @@ fn runtime_at(data: &std::path::Path, base: &str, logger: Logger, before_tool: O
         client: reqwest::Client::builder().no_proxy().build().unwrap(),
         logger,
         internal_api_base: None,
+        page_reader: Arc::new(InProcessPageReader),
         before_tool,
     })
     .unwrap();

@@ -11,7 +11,7 @@ use super::{
     prompt_cache::prune_stale_page_snapshots,
     working_set::{cut_old_results, CUT_BATCH_CHARS, KEEP_RESULTS, WORKING_TOKENS},
 };
-use crate::sdk::Message;
+use crate::{runtime::logger::process_log, sdk::Message};
 
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct ContextPressure {
@@ -139,7 +139,7 @@ impl Condenser for PeriodicSummary<'_> {
                     condensed(messages, after, pressure.estimate)
                 }
                 Err(error) => {
-                    eprintln!("[misty-agent-runtime] periodic summary failed {error}");
+                    process_log(&format!("periodic summary failed {error}"));
                     None
                 }
             }
@@ -168,7 +168,7 @@ impl Condenser for SummarizedSteps<'_> {
             match (self.summarize)(plan.older.clone()).await {
                 Ok(summary) => condensed(messages, apply_compaction(&plan, &summary), pressure.estimate),
                 Err(error) => {
-                    eprintln!("[misty-agent-runtime] context compaction failed {error}");
+                    process_log(&format!("context compaction failed {error}"));
                     None
                 }
             }
@@ -203,12 +203,12 @@ pub(crate) async fn condense<'a>(messages: &'a [Message], measured: Measured, co
             continue;
         };
         // Each condenser that changes the transcript costs the next call its cached prefix.
-        eprintln!(
-            "[misty-agent-runtime] condensed {{\"step\":\"{}\",\"beforeChars\":{},\"afterChars\":{}}}",
+        process_log(&format!(
+            "condensed {{\"step\":\"{}\",\"beforeChars\":{},\"afterChars\":{}}}",
             step.name(),
             message_bytes(&current),
             message_bytes(&result.messages)
-        );
+        ));
         estimate = result.estimate;
         current = Cow::Owned(result.messages);
     }

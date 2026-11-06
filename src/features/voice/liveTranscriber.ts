@@ -1,7 +1,14 @@
+import { RuntimeSocket } from "@/api/runtimeSocket";
 import { Transcript } from "./transcript/transcript";
 import type { Segment } from "./transcript/segment";
 
 export type LiveChannel = "mic" | "system";
+
+/** What a session listens to, and how it decodes it: this device's Soniox key does the rest. */
+export interface LiveSession {
+  channels: LiveChannel[];
+  language: string;
+}
 
 export interface SocketLike {
   binaryType: string;
@@ -35,9 +42,9 @@ const PREROLL_LIMIT_BYTES = 30 * 16_000 * 2;
 const channelByte: Record<LiveChannel, number> = { mic: 0, system: 1 };
 
 /**
- * One live transcription session against Misty's relay. Audio pushed before
- * the socket is ready is kept (up to 30 s) and sent first, so speech that
- * starts on key-down is never lost while the ticket and socket open.
+ * One live transcription session against the agent runtime on this computer.
+ * Audio pushed before it is ready is kept (up to 30 s) and sent first, so
+ * speech that starts on key-down is never lost while the session opens.
  */
 export class LiveTranscriber {
   readonly transcript = new Transcript();
@@ -50,14 +57,13 @@ export class LiveTranscriber {
 
   constructor(
     private readonly events: LiveTranscriberEvents = {},
-    private readonly open: (url: string) => SocketLike = (url) =>
-      new WebSocket(url) as unknown as SocketLike,
+    private readonly open: (session: LiveSession) => SocketLike = (session) =>
+      new RuntimeSocket({ kind: "live", ...session }) as unknown as SocketLike,
   ) {}
 
-  /** Connects with a ticket; resolves once the relay is listening. */
+  /** Opens the session; resolves once the relay is listening. */
   connect(
-    url: string,
-    ticket: string,
+    session: LiveSession,
     start: {
       language?: string;
       target?: string;
@@ -71,7 +77,7 @@ export class LiveTranscriber {
   ) {
     return new Promise<void>((resolve, reject) => {
       if (this.ended) return reject(new Error("Dictation ended."));
-      const socket = this.open(`${url}?ticket=${encodeURIComponent(ticket)}`);
+      const socket = this.open(session);
       socket.binaryType = "arraybuffer";
       this.socket = socket;
       socket.onopen = () => socket.send(JSON.stringify({ type: "start", ...start }));

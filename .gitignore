@@ -160,7 +160,6 @@ artifacts/
 midscene_run/
 
 # The agent runtime's Node sidecar, copied in by the release build.
-src-tauri/binaries/
 src-tauri/services/agent-runtime/.output/
 
 # Tauri generates one permission file per app command at build.

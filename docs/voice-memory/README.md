@@ -219,11 +219,11 @@ per Space. The vault's guarantee doesn't extend to it.
 
 ```
 desktop (Tauri)                                   providers
-audio-capture ──16 kHz PCM, per channel──▶ local runtime /v1/live/transcribe ──▶ Soniox realtime
-  Mic | System | Processes(pids)          (ticket minted by Rust with the launch secret)
+audio-capture ──16 kHz PCM, per channel──▶ runtime in the app (live session) ──▶ Soniox realtime
+  Mic | System | Processes(pids)          (opened only by a person's own window)
 global_hotkey (down/up)
 voice/dictation → insert (page | paste)
-                                          local runtime /v1/device/transcribe-diarized ──▶ Soniox async
+                                          runtime in the app (transcribe-diarized) ──▶ Soniox async
                                           local runtime voice-notes, day-summary (fast model)
 recall recorder (page_read.js, privacy) ─▶ Go /me/memory/events ─▶ memory_events
                                                                   ─▶ ai_retrieval (memory_*)
@@ -253,15 +253,11 @@ Memory indexing, as built:
   Each session runs with diarization, endpoint detection, language identification and
   context (the personal dictionary, the page title and attendees). It maps tokens into
   segments (`src/live/segment.ts`).
-- **The relay runs on this computer.** It is a WebSocket route of the local runtime and
+- **The relay runs on this computer.** It is a session with the runtime inside the app
+  (`src-tauri/src/infra/agent_runtime/live.rs`, `agent_runtime_live_open`) on a Tauri channel, and
   needs a Soniox key on the device, which the app gives the runtime whenever one is saved and an
-  agent model is usable, whichever transcription model is chosen.
-- **Tickets.** Rust mints a one-time ticket with the runtime's launch secret
-  (`src-tauri/src/infra/agent_runtime/live.rs`, `agent_runtime_live_ticket`).
-  - The ticket is `v1.<claims>.<hmac>` under the `misty-live-ticket` domain. Its claims are
-    session, device, channels, limit, model and a one-minute expiry.
-  - The runtime verifies the ticket statelessly and spends the session id. The server takes
-    no part in it.
+  agent model is usable, whichever transcription model is chosen. Only a person's own window can open
+  one, and the server takes no part in it.
 - **Wire format.** Binary frames are one channel byte (0 for mic, 1 for system)
   followed by 16 kHz PCM16. Text frames are `start` (language and context) and
   `finish`. The relay sends `ready`, `segment`, `limit`, `error` and `finished`.
@@ -336,8 +332,7 @@ person's desktop, from the Library and the transcript.
 
 There are none. Dictation, voice notes, recaps and Memory are on every app and
 every server, and each needs only the person's own setup: a Soniox key for speech, a fast model for
-cleanup and recaps, and the Memory switch, on by default, for what gets remembered. The app sets
-`MISTY_RUNTIME_LIVE_TRANSCRIBE` itself each time it starts the runtime.
+cleanup and recaps, and the Memory switch, on by default, for what gets remembered.
 
 ## Tests
 
@@ -368,7 +363,7 @@ The plan assumed the cursor agent worked like this:
 
 It didn't. The companion ran OpenAI realtime speech-to-speech over one socket
 (the server's `/agent-voice/realtime`, removed October 31, 2026; the spoken conversation now
-runs at the local runtime's `/v1/device/voice`, [agents/runtime.md](../agents/runtime.md)):
+runs in the runtime inside the app, [agents/runtime.md](../agents/runtime.md)):
 - Speech is committed as an audio turn. The model's own tools (`show_on_screen`,
   `start_task`) start the work.
 - Replies, including task results read back with `task.read`, are spoken as streamed
