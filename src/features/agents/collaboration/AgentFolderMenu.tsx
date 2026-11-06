@@ -1,8 +1,10 @@
 import { FolderOpen } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { confirmAction } from "@/shared/lib/confirmAction";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import {
   DropdownMenu,
+  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuRadioGroup,
@@ -16,6 +18,12 @@ import { agentsDeviceSnapshot, shareFolder } from "../store/useAgentsStore";
 import { useConversationFolder } from "../store/useConversationFolder";
 
 const none = "none";
+
+/** What sharing allows, said before the picker opens, since Auto doesn't pause for it. */
+export const shareFolderWarning =
+  "Agents in chats you give this folder to can read its files. In Auto, a page could trick an agent into sending them out over the web, and Misty won't stop to ask.";
+const writeWarning = (name: string) =>
+  `Agents in this chat will be able to add and edit files in “${name}”. They can't delete, rename or move anything, but an edit can overwrite a file's contents, and there's no undo.`;
 
 /**
  * The composer strip's folder menu: the folder on this computer the conversation
@@ -34,6 +42,14 @@ export function AgentFolderMenu({
     conversationId ? (s.byConversation[conversationId] ?? null) : s.draft,
   );
   const setFolder = useConversationFolder((s) => s.setFolder);
+  const setWritable = useConversationFolder((s) => s.setWritable);
+  const canWrite = useConversationFolder((s) =>
+    chosen
+      ? conversationId
+        ? s.writes[conversationId] === chosen
+        : s.draftWrites === chosen
+      : false,
+  );
   const load = useCallback(
     () =>
       agentsDeviceSnapshot()
@@ -48,6 +64,7 @@ export function AgentFolderMenu({
   const current = folders.find((folder) => folder.id === chosen);
   const add = async () => {
     setFailed("");
+    if (!(await confirmAction(shareFolderWarning, "Share a folder"))) return;
     try {
       const added = await shareFolder();
       await load();
@@ -56,6 +73,11 @@ export function AgentFolderMenu({
       const text = typeof error === "string" ? error : error instanceof Error ? error.message : "";
       setFailed(text && !text.includes("_") ? text : "That folder couldn’t be added.");
     }
+  };
+  const toggleWrite = async (allow: boolean) => {
+    if (!current) return;
+    if (allow && !(await confirmAction(writeWarning(current.displayName), "Allow changes"))) return;
+    setWritable(conversationId, current.id, allow);
   };
   return (
     <>
@@ -83,6 +105,14 @@ export function AgentFolderMenu({
             ))}
           </DropdownMenuRadioGroup>
           <DropdownMenuSeparator />
+          {current ? (
+            <DropdownMenuCheckboxItem
+              checked={canWrite}
+              onCheckedChange={(checked) => void toggleWrite(checked === true)}
+            >
+              Allow changes
+            </DropdownMenuCheckboxItem>
+          ) : null}
           <DropdownMenuItem onSelect={() => void add()}>
             <FolderOpen aria-hidden="true" />
             <span className="min-w-0 flex-1 truncate">Share a folder…</span>

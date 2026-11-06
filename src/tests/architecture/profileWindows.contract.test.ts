@@ -26,7 +26,7 @@ describe("Profile window labels contract", () => {
   });
 
   it("gives app windows window labels in the capabilities, never main", () => {
-    const capability = JSON.parse(readFileSync("src-tauri/capabilities/default.json", "utf8")) as {
+    const capability = JSON.parse(readFileSync("src-tauri/sandbox/capabilities/default.json", "utf8")) as {
       webviews: string[];
     };
     expect(capability.webviews).toContain("window-*");

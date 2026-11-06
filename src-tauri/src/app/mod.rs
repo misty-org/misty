@@ -13,4 +13,6 @@ pub mod plugins;
 pub mod runtime;
 #[cfg(desktop)]
 pub mod shared_folder_commands;
+#[cfg(desktop)]
+pub mod shell_commands;
 pub mod shortcut_commands;

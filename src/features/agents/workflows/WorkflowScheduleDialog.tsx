@@ -24,6 +24,7 @@ import { AgentMethodInputFields } from "../workspace/AgentMethodInputFields";
 import { ScheduleRuleEditor } from "./ScheduleRuleEditor";
 import { ruleFor } from "./scheduleRules";
 import { ScheduleComputerField } from "./ScheduleComputerField";
+import { ScheduleFolderField } from "./ScheduleFolderField";
 import { ScheduleProfileField } from "./ScheduleProfileField";
 import { describeSchedule } from "./scheduleSummary";
 
@@ -178,6 +179,7 @@ export function WorkflowScheduleDialog({
               />
             )}
             <ScheduleProfileField value={profile} onChange={setProfile} />
+            <ScheduleFolderField workflowId={method.id} />
             <ScheduleComputerField value={deviceId} onChange={setDeviceId} />
             {existing?.last_error?.startsWith("This schedule uses a profile") ? (
               <p className="agent-method-hint" role="status">

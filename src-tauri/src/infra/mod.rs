@@ -1,5 +1,6 @@
 pub mod account;
 pub mod agent_runtime;
+pub mod agent_shell;
 pub mod agents;
 #[cfg(target_os = "macos")]
 pub mod app_menu;

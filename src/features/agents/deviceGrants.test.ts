@@ -32,6 +32,17 @@ it("attaches only the chat's folder, with the read-only tools", async () => {
   expect(contexts[0]!.capabilities).toEqual(["folder.list", "folder.read", "folder.send"]);
 });
 
+it("adds write access only when the chat granted it", async () => {
+  const contexts = await desktopDeviceGrants("scope_docs", true);
+  expect(contexts[0]!.capabilities).toContain("folder.write");
+});
+
+it("gives the shell to the workspace grant, never to a folder", async () => {
+  const contexts = await desktopDeviceGrants("scope_docs");
+  expect(contexts[0]!.capabilities).not.toContain("shell.run");
+  expect(contexts[1]!.capabilities).toContain("shell.run");
+});
+
 it("sends a new chat's folder and hands the choice to the new conversation", async () => {
   useConversationFolder.setState({ byConversation: {}, draft: "scope_blog" });
   const contexts = await chatDeviceGrants("conversation-new", true);

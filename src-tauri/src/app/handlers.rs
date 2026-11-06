@@ -1,5 +1,5 @@
-//! Every command the app's own windows may invoke, behind the per-window policy
-//! in `platform::app_command_policy`.
+//! Every command the app's own windows may invoke. `src-tauri/sandbox/` says which window gets which,
+//! and `platform::app_command_policy` holds windows to their exact labels.
 use tauri::ipc::Invoke;
 use tauri::Wry;
 
@@ -88,6 +88,12 @@ pub fn invoke_handler() -> impl Fn(Invoke<Wry>) -> bool + Send + Sync + 'static 
             #[cfg(desktop)]
             crate::app::device_job_commands::device_verify_job,
             #[cfg(desktop)]
+            crate::app::shell_commands::device_shell_job,
+            #[cfg(desktop)]
+            crate::app::shell_commands::device_shell_cancel,
+            #[cfg(desktop)]
+            crate::app::shell_commands::agents_forget_workspace,
+            #[cfg(desktop)]
             crate::app::shared_folder_commands::agents_share_folder,
             #[cfg(desktop)]
             crate::app::shared_folder_commands::agents_forget_folder,
@@ -152,10 +158,7 @@ pub fn invoke_handler() -> impl Fn(Invoke<Wry>) -> bool + Send + Sync + 'static 
             crate::infra::agents::workspace::agent_workspace_bind_scope,
         ));
     move |invoke: Invoke<Wry>| {
-        if !crate::platform::app_command_policy::allows(
-            invoke.message.webview_ref().label(),
-            invoke.message.command(),
-        ) {
+        if !crate::platform::app_command_policy::allows(invoke.message.webview_ref().label()) {
             invoke
                 .resolver
                 .reject("This view cannot invoke Host commands.");

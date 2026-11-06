@@ -3,6 +3,7 @@ import {
   agentsDeviceSnapshot,
   forgetFolder,
   shareFolder,
+  shareFolderWarning,
   CompanionAppearanceSettings,
 } from "@/features/agents";
 import { confirmAction } from "@/shared/lib/confirmAction";
@@ -108,6 +109,7 @@ function AgentScopeList() {
       </Section>
     );
   const share = async () => {
+    if (!(await confirmAction(shareFolderWarning, "Share a folder"))) return;
     try {
       await shareFolder();
       await refresh();
