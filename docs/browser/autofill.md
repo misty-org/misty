@@ -34,7 +34,9 @@ Cards lists, to add, change and delete. The switches belong to the computer and 
   card fields, or the reverse. Nothing already typed is overwritten, except in the chosen field.
 - **Security codes are never read, saved or filled.** The field classifier has no type for one, and
   `Card` refuses unknown fields, so a record with a code can't validate.
-- **Cards only on https,** for filling and saving. Addresses work on any http(s) page.
+- **Cards only on https,** for filling and saving. Addresses work on any http(s) page. A development
+  build also takes `localhost` and `127.0.0.1` for cards, so a local page can test them; a release
+  never does.
 - **The chooser fills only the page that asked,** and only while that page is on the same origin,
   checked before and after the prompt. A chooser expires in 2 minutes, a save offer in 10.
 - **A card number never comes back out of native code.** Settings and the chooser get the brand, last
