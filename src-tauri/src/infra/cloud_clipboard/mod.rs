@@ -4,6 +4,7 @@
 //! derived from the vault root; the server only ever holds ciphertext.
 #![cfg(desktop)]
 
+use crate::infra::file_access::fs;
 mod clip;
 mod ring;
 mod views;
@@ -169,14 +170,15 @@ impl CloudClipboard {
         let Some(image) = clip.header.image.as_ref() else {
             return Err("This clip has no files.".into());
         };
-        std::fs::create_dir_all(directory).map_err(|error| error.to_string())?;
+        fs::create_dir_all(directory).map_err(|error| error.to_string())?;
         let extension = if image.mime_type == "image/jpeg" {
             "jpg"
         } else {
             "png"
         };
         let target = unique_path(directory, &format!("Clipboard image.{extension}"));
-        std::fs::write(&target, &clip.image).map_err(|error| error.to_string())?;
+        fs::write(&target, &clip.image).map_err(|error| error.to_string())?;
+        crate::infra::file_access::quarantine::mark_from_internet(&target);
         Ok(vec![target])
     }
 }

@@ -58,6 +58,7 @@ permissions = [
   "allow-power-keep-awake",
   "allow-profiles-list",
   "allow-reveal-main-window",
+  "allow-sandbox-pick-save-file",
   "allow-save-authenticated-user",
   "allow-server-host-resolves-public",
   "allow-set-traffic-lights-visible",
@@ -347,6 +348,14 @@ description = "A profile's synced tabs"
 permissions = [
   "allow-profile-tabs-publish",
   "allow-profile-tabs-sync",
+]
+
+[[set]]
+identifier = "action-sandbox"
+description = "See and change what Misty is allowed to reach"
+permissions = [
+  "allow-sandbox-permission-set",
+  "allow-sandbox-permissions-list",
 ]
 
 [[set]]

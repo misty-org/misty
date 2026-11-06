@@ -1,14 +1,15 @@
 import { useEffect, useState } from "react";
 import { confirmAction } from "@/shared/lib/confirmAction";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { OptionSelect } from "@/shared/ui";
+import { OptionSelect, Switch } from "@/shared/ui";
 import type { AgentScope } from "../model/types";
 import { agentsDeviceSnapshot } from "../store/useAgentsStore";
 import { useScheduleFolders } from "./useScheduleFolders";
 
 const none = "none";
 const writeWarning = (name: string) =>
-  `This workflow runs with nobody watching. It will be able to add and edit files in “${name}”. It can't delete, rename or move anything, but an edit can overwrite a file's contents, and there's no undo.`;
+  `This workflow runs with nobody watching. It will be able to add and edit files in “${name}”. ` +
+  "It can't delete, rename or move anything, but an edit can overwrite a file's contents, and there's no undo.";
 
 /** A scheduled workflow's shared folder on this computer, and whether it may change files there. */
 export function ScheduleFolderField({ workflowId }: { workflowId: string }) {
@@ -51,12 +52,12 @@ export function ScheduleFolderField({ workflowId }: { workflowId: string }) {
       </label>
       {current ? (
         <label>
-          <input
-            type="checkbox"
-            checked={chosen?.writable === true}
-            onChange={(event) => void toggle(event.target.checked)}
-          />{" "}
           Allow changes
+          <Switch
+            aria-label="Allow changes"
+            checked={chosen?.writable === true}
+            onCheckedChange={(checked) => void toggle(checked)}
+          />
         </label>
       ) : null}
     </>

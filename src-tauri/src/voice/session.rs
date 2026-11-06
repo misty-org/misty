@@ -3,6 +3,7 @@
 use super::dictation::{Action, Dictation};
 use super::insert::{self, Inserted};
 use crate::infra::global_hotkey::{self, Chord, HotkeyEvent, Subscription};
+use crate::infra::permissions::{self, Permission};
 use base64::{engine::general_purpose::STANDARD, Engine};
 use misty_audio_capture::{AudioSource, Capture};
 use serde_json::json;
@@ -204,6 +205,7 @@ pub fn voice_dictation_stop(
 #[tauri::command]
 pub async fn voice_dictation_insert(
     webview: Webview,
+    app: AppHandle,
     text: String,
     force: bool,
 ) -> Result<serde_json::Value, String> {
@@ -213,6 +215,11 @@ pub async fn voice_dictation_insert(
     }
     if !force && insert::misty_is_frontmost() {
         return Ok(json!({"inserted": "misty"}));
+    }
+    // `force` is a page in one of Misty's own tabs. Anything else goes to another app, and this is
+    // the only way dictation reaches one.
+    if !force && !permissions::ensure_async(&app, Permission::DictationTyping).await {
+        return Ok(json!({"inserted": "not-allowed"}));
     }
     let result = tauri::async_runtime::spawn_blocking(move || insert::paste_into_frontmost(&text))
         .await

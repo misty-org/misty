@@ -13,12 +13,18 @@ pub struct ProfileStateSnapshot {
     pub state: Option<Value>,
 }
 
+/// Scopes only native code writes: what the person has granted. Windows reach `profile_state`, and a
+/// window must not be able to grant itself anything or read what it's been granted this way.
+pub fn is_protected_scope(scope: &str) -> bool {
+    scope.starts_with("grant:") || scope.starts_with("permission:")
+}
+
 pub fn profile_state(
     store: &Store,
     scope: &str,
     update: Option<(i64, Value)>,
 ) -> ApiResult<ProfileStateSnapshot> {
-    if scope.is_empty() || scope.len() > 1024 {
+    if scope.is_empty() || scope.len() > 1024 || is_protected_scope(scope) {
         return Err(ApiError::Message("Invalid settings scope".into()));
     }
     let result = (|| -> Result<ProfileStateSnapshot, Box<dyn std::error::Error>> {
@@ -78,5 +84,16 @@ mod tests {
             .unwrap()
             .state
             .is_none());
+    }
+
+    #[test]
+    fn windows_cannot_write_or_read_what_was_granted() {
+        let directory = tempfile::tempdir().unwrap();
+        let store = Store::at(directory.path().join("misty.db"));
+        let state = serde_json::json!({"on":true});
+        for scope in ["grant:downloads", "permission:screen-capture"] {
+            assert!(profile_state(&store, scope, Some((0, state.clone()))).is_err());
+            assert!(profile_state(&store, scope, None).is_err());
+        }
     }
 }

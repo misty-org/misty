@@ -1,5 +1,6 @@
 //! Erasing a profile's website data store once the profile is deleted.
 use super::*;
+use crate::infra::file_access::fs;
 
 /// Closes the store's pages and erases its data. The caller picks the store natively.
 pub(super) async fn remove(app: AppHandle, profile_id: String) -> Result<(), String> {
@@ -45,7 +46,7 @@ async fn remove_profile_directory(directory: &std::path::Path) -> Result<(), Str
     let mut attempt = 0;
     loop {
         attempt += 1;
-        match std::fs::remove_dir_all(directory) {
+        match fs::remove_dir_all(directory) {
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
             Err(error) if attempt < ATTEMPTS && is_locked(&error) => {
                 tokio::time::sleep(Duration::from_millis(250 * u64::from(attempt.min(4)))).await;

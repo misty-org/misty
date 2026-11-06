@@ -1,11 +1,13 @@
 //! Reuse a verified download across websites within one live agent task.
 //! Model-visible IDs select receipts, never arbitrary filesystem paths.
 use super::{BrowserAgentExecuteRequest, BrowserDownload, BrowserSessionState};
+use crate::infra::file_access::fs;
+use crate::infra::file_access::fs::OpenOptions;
 use base64::{engine::general_purpose::STANDARD, Engine};
 use serde::Serialize;
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
-use std::{fs::OpenOptions, io::Read, path::Path};
+use std::{io::Read, path::Path};
 use tauri::AppHandle;
 
 const MAX_FILE_BYTES: u64 = 10 * 1024 * 1024;
@@ -19,17 +21,14 @@ pub(super) struct DownloadFile {
 }
 
 fn read_file(path: &Path) -> Result<Vec<u8>, String> {
-    let metadata = std::fs::symlink_metadata(path).map_err(|_| "task_download_unavailable")?;
+    let metadata = fs::symlink_metadata(path).map_err(|_| "task_download_unavailable")?;
     if !metadata.is_file() || metadata.len() == 0 || metadata.len() > MAX_FILE_BYTES {
         return Err("task_download_unsupported: expected a file between 1 byte and 10 MB".into());
     }
     let mut options = OpenOptions::new();
     options.read(true);
     #[cfg(unix)]
-    {
-        use std::os::unix::fs::OpenOptionsExt;
-        options.custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK);
-    }
+    options.custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK);
     let file = options
         .open(path)
         .map_err(|_| "task_download_unavailable")?;
@@ -174,6 +173,8 @@ pub(super) fn resume_downloads(
 }
 
 #[cfg(test)]
+// Tests build their fixtures directly, outside the file gate.
+#[allow(clippy::disallowed_methods, clippy::disallowed_types)]
 mod tests {
     use super::*;
 

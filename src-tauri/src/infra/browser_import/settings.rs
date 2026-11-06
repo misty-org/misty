@@ -2,6 +2,7 @@
 //! and camera, microphone and location decisions for sites.
 use super::discover::Family;
 use super::snapshot::Snapshot;
+use crate::infra::file_access::fs;
 use serde::Serialize;
 use serde_json::Value;
 use std::path::Path;
@@ -70,7 +71,7 @@ fn origin(value: &str) -> Option<String> {
 }
 
 fn chromium(profile: &Path) -> ImportedSettings {
-    let prefs: Value = std::fs::read(profile.join("Preferences"))
+    let prefs: Value = fs::read(profile.join("Preferences"))
         .ok()
         .and_then(|bytes| serde_json::from_slice(&bytes).ok())
         .unwrap_or_default();
@@ -146,7 +147,7 @@ fn chromium_permissions(prefs: &Value) -> Vec<SitePermission> {
 
 /// `user_pref("name", value);` lines from Firefox's prefs.js.
 fn firefox_prefs(profile: &Path) -> std::collections::HashMap<String, Value> {
-    let text = std::fs::read_to_string(profile.join("prefs.js")).unwrap_or_default();
+    let text = fs::read_to_string(profile.join("prefs.js")).unwrap_or_default();
     text.lines()
         .filter_map(|line| {
             let inner = line.trim().strip_prefix("user_pref(")?.strip_suffix(");")?;
@@ -175,7 +176,7 @@ fn firefox(profile: &Path) -> ImportedSettings {
 
 /// `search.json.mozlz4`: an 8-byte magic, a 4-byte size and an LZ4 block.
 fn firefox_search(profile: &Path) -> Option<SearchEngine> {
-    let bytes = std::fs::read(profile.join("search.json.mozlz4")).ok()?;
+    let bytes = fs::read(profile.join("search.json.mozlz4")).ok()?;
     let body = bytes.strip_prefix(b"mozLz40\0")?;
     let size = u32::from_le_bytes(body.get(..4)?.try_into().ok()?) as usize;
     if size > 16 << 20 {
@@ -250,4 +251,6 @@ fn firefox_permissions(profile: &Path) -> Vec<SitePermission> {
 }
 
 #[cfg(test)]
+// Tests build their fixtures directly, outside the file gate.
+#[allow(clippy::disallowed_methods, clippy::disallowed_types)]
 mod tests;

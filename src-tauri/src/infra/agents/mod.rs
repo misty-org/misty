@@ -1,12 +1,10 @@
+use crate::infra::file_access::{self, fs};
 mod shared_folders;
 mod storage;
 pub mod web_fetch;
 pub mod workspace;
 
-use std::{
-    fs,
-    path::{Component, Path, PathBuf},
-};
+use std::path::{Component, Path, PathBuf};
 
 use chrono::Utc;
 use rusqlite::{Connection, OptionalExtension};
@@ -64,14 +62,18 @@ impl AgentService {
 
     /// Shares a folder the person chose. Agents can read it and nothing more.
     pub async fn share_folder(&self, path: PathBuf, protected: &[PathBuf]) -> ApiResult<Value> {
-        let root = canonical(&path)
+        // The person just picked this in the system's dialog, but it's only granted once it has
+        // passed the checks below, so this look comes first.
+        let chosen = file_access::looks::chosen_folder(&path)
             .map_err(|error| ApiError::Message(format!("Could not open that folder: {error}")))?;
-        if !root.is_dir() {
+        let root = shared_folders::plain_path(&chosen.real);
+        if !chosen.is_folder {
             return Err(ApiError::Message("Choose a folder, not a file.".into()));
         }
         shared_folders::check_root(&root, protected, dirs::home_dir().as_deref())
             .map_err(ApiError::Message)?;
-        run_db(self.database_path.clone(), move |connection| {
+        let granted = root.clone();
+        let shared = run_db(self.database_path.clone(), move |connection| {
             let device = device_id(connection)?;
             let local_path = root.to_string_lossy().into_owned();
             let display_name = root
@@ -98,7 +100,22 @@ impl AgentService {
             };
             Ok(json!({ "id": id, "displayName": display_name, "kind": "local_folder" }))
         })
-        .await
+        .await?;
+        file_access::allow_shared_folder(&granted, file_access::Access::Read);
+        Ok(shared)
+    }
+
+    /// Gives the file gate the folders shared before, when Misty starts.
+    pub fn restore_folder_grants(&self) {
+        let folders = (|| -> rusqlite::Result<Vec<String>> {
+            let connection = Store::at(&self.database_path).connect()?;
+            let mut statement = connection.prepare("SELECT local_path FROM local_agent_scopes")?;
+            let rows = statement.query_map([], |row| row.get(0))?;
+            rows.collect()
+        })();
+        for folder in folders.unwrap_or_default() {
+            file_access::allow_shared_folder(Path::new(&folder), file_access::Access::Read);
+        }
     }
 
     /// A shared folder's real path, for a job already checked against its grant.
@@ -115,11 +132,22 @@ impl AgentService {
     }
 
     pub async fn revoke_folder_scope(&self, scope_id: String) -> ApiResult<()> {
-        run_db(self.database_path.clone(), move |connection| {
+        let folder = run_db(self.database_path.clone(), move |connection| {
+            let folder: Option<String> = connection
+                .query_row(
+                    "SELECT local_path FROM local_agent_scopes WHERE id=?1",
+                    [&scope_id],
+                    |row| row.get(0),
+                )
+                .optional()?;
             connection.execute("DELETE FROM local_agent_scopes WHERE id=?1", [scope_id])?;
-            Ok(())
+            Ok(folder)
         })
-        .await
+        .await?;
+        if let Some(folder) = folder {
+            file_access::revoke_shared_folder(Path::new(&folder));
+        }
+        Ok(())
     }
 
     /// Lists one directory inside a granted folder. Hidden entries are skipped.
@@ -144,7 +172,7 @@ impl AgentService {
                 return Err(validation_error("Folder path is outside its device scope."));
             }
             let directory = canonical(root.join(relative_path)).map_err(io_error)?;
-            if !directory.starts_with(&root) || !directory.is_dir() {
+            if !directory.starts_with(&root) || !fs::is_dir(&directory) {
                 return Err(validation_error("Folder path is outside its device scope."));
             }
             let mut entries = Vec::new();
@@ -229,4 +257,6 @@ pub(crate) fn validation_error(message: &str) -> rusqlite::Error {
 }
 
 #[cfg(test)]
+// Tests build their fixtures directly, outside the file gate.
+#[allow(clippy::disallowed_methods, clippy::disallowed_types)]
 mod tests;

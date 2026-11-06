@@ -1,8 +1,7 @@
 //! The browser benchmark's way into Misty's own browser (debug builds only).
 //!
-//! The Odysseys eval (removed October 31, 2026, docs/agents/evals/odysseys.md)
-//! ran a real model against real pages through it; evals rebuilt on the desktop
-//! runtime can use it again. With this bridge each task runs in a Misty tab, in the system
+//! The Odysseys eval (evals/odysseys, docs/agents/evals/odysseys.md) runs a real
+//! model against real pages through it. With this bridge each task runs in a Misty tab, in the system
 //! webview (WKWebView on macOS, WebView2 on Windows), through the same agent
 //! path production uses: a native task lease, a grant for the tab, and
 //! `browser_agent_execute` with its page layer, site checks and input rules.
@@ -28,6 +27,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 mod grants;
+mod models;
 mod pages;
 mod processes;
 
@@ -127,6 +127,7 @@ pub(crate) fn start_if_requested(app: &AppHandle) {
             .route("/processes", post(processes::processes))
             .route("/capture", post(pages::capture))
             .route("/run-grants", post(grants::run_grants))
+            .route("/models", post(models::models))
             .with_state(bridge);
         match tokio::net::TcpListener::bind(("127.0.0.1", port)).await {
             Ok(listener) => {

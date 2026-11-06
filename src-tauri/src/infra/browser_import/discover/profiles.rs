@@ -1,14 +1,15 @@
 //! Listing a browser's profiles from its data folder.
 use super::*;
+use crate::infra::file_access::fs;
 
 pub(super) fn has_data(dir: &Path) -> bool {
     ["Bookmarks", "History", "Preferences"]
         .iter()
-        .any(|file| dir.join(file).is_file())
+        .any(|file| fs::is_file(dir.join(file)))
 }
 
 pub(super) fn chromium_profiles(user_data: &Path) -> Vec<BrowserProfile> {
-    let state: serde_json::Value = std::fs::read(user_data.join("Local State"))
+    let state: serde_json::Value = fs::read(user_data.join("Local State"))
         .ok()
         .and_then(|bytes| serde_json::from_slice(&bytes).ok())
         .unwrap_or_default();
@@ -51,7 +52,7 @@ pub(super) fn chromium_profiles(user_data: &Path) -> Vec<BrowserProfile> {
 }
 
 pub(super) fn firefox_profiles(dir: &Path) -> Vec<BrowserProfile> {
-    let Ok(ini) = std::fs::read_to_string(dir.join("profiles.ini")) else {
+    let Ok(ini) = fs::read_to_string(dir.join("profiles.ini")) else {
         return Vec::new();
     };
     let mut profiles = Vec::new();
@@ -66,7 +67,7 @@ pub(super) fn firefox_profiles(dir: &Path) -> Vec<BrowserProfile> {
                 } else {
                     PathBuf::from(&path)
                 };
-                if full.join("places.sqlite").is_file() {
+                if fs::is_file(full.join("places.sqlite")) {
                     profiles.push(BrowserProfile {
                         last_used: None,
                         id: path,
@@ -99,7 +100,7 @@ pub(super) fn firefox_profiles(dir: &Path) -> Vec<BrowserProfile> {
 }
 
 pub(super) fn safari_profile(dir: &Path) -> Vec<BrowserProfile> {
-    if !dir.is_dir() {
+    if !fs::is_dir(dir) {
         return Vec::new();
     }
     vec![BrowserProfile {

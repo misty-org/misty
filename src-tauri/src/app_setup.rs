@@ -11,6 +11,8 @@ use crate::{infra, voice};
 use tauri::Manager;
 
 pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
+    // Before anything below opens a file in Misty's own folders.
+    infra::file_access::configure(app.handle());
     #[cfg(target_os = "macos")]
     crate::platform::plugins::mac_pip_observer::install(app.handle());
     #[cfg(target_os = "macos")]
@@ -55,7 +57,11 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     );
     #[cfg(desktop)]
     infra::retired_coding_data::remove_once_in_background(&runtime.environment);
+    #[cfg(desktop)]
+    runtime.agents.restore_folder_grants();
     app.manage(runtime);
+    #[cfg(desktop)]
+    infra::permissions::restore(app.handle());
     #[cfg(desktop)]
     app.manage(BrowserSessionState::default());
     app.manage(infra::agents::workspace::AgentWorkspaceState::default());

@@ -21,9 +21,11 @@ const none = "none";
 
 /** What sharing allows, said before the picker opens, since Auto doesn't pause for it. */
 export const shareFolderWarning =
-  "Agents in chats you give this folder to can read its files. In Auto, a page could trick an agent into sending them out over the web, and Misty won't stop to ask.";
+  "Agents in chats you give this folder to can read its files. " +
+  "In Auto, a page could trick an agent into sending them out over the web, and Misty won't stop to ask.";
 const writeWarning = (name: string) =>
-  `Agents in this chat will be able to add and edit files in “${name}”. They can't delete, rename or move anything, but an edit can overwrite a file's contents, and there's no undo.`;
+  `Agents in this chat will be able to add and edit files in “${name}”. ` +
+  "They can't delete, rename or move anything, but an edit can overwrite a file's contents, and there's no undo.";
 
 /**
  * The composer strip's folder menu: the folder on this computer the conversation

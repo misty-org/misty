@@ -189,7 +189,7 @@ Full evidence notes from this audit: the coordinating session's notes folder,
   signature like Chromium (`src-tauri/src/infra/extensions/crx/mod.rs`, publisher key pinned).
   Can't do blocking `webRequest` on WebKit, so uBlock Origin Lite works but full uBO doesn't.
 - **How to show it:** open `kiri/README.md` "Four ways in"; the `plugin:kiri|call` flow
-  (origin from the engine, not the payload); `src-tauri/capabilities/kiri.json` (website
+  (origin from the engine, not the payload); `src-tauri/sandbox/capabilities/kiri.json` (website
   webviews get only `kiri:default`).
 - **Suggested wording:** "Building an agentic desktop browser on native OS webviews
   (WKWebView, WebView2), with a Rust web-platform layer for site permissions, camera and

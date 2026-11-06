@@ -5,6 +5,7 @@
 //! types into the out-of-process one by its frame ref and checks the field took the text.
 //! Run with `cargo test --lib webview2_frames -- --ignored`.
 use super::frames::{frame_of, markdown, shows, trees, REF_RANGE};
+use crate::infra::file_access::fs;
 use crate::infra::{browser_content_world::evaluate_in_frame, browser_frames};
 use serde_json::json;
 use std::{
@@ -200,7 +201,7 @@ fn webview2_frames_read_and_type_across_origins() {
     let code = output.load(Ordering::SeqCst);
     // WebView2 keeps profile files open briefly after the views close.
     for _ in 0..50 {
-        if std::fs::remove_dir_all(root.path()).is_ok() {
+        if fs::remove_dir_all(root.path()).is_ok() {
             break;
         }
         std::thread::sleep(Duration::from_millis(100));

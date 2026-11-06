@@ -10,7 +10,7 @@ import {
   type WorkspaceView,
   useWorkspaceStore,
 } from "@/features/workspace";
-import { save } from "@tauri-apps/plugin-dialog";
+import { pickSaveFile } from "@/native/sandbox";
 import { desktopOs } from "@/shared/platform/desktopOs";
 import { useState } from "react";
 import { browserPageTools } from "../library/native";
@@ -161,9 +161,9 @@ export function useBrowserPageCommands(input: {
       void (async () => {
         const archive = webArchiveFormat();
         const html = { name: "HTML", extensions: ["html"] };
-        const path = await save({
+        const path = await pickSaveFile({
           title: "Save page as",
-          defaultPath: `${safeFileName(tab.title)}.${archive?.extensions[0] ?? "html"}`,
+          defaultName: `${safeFileName(tab.title)}.${archive?.extensions[0] ?? "html"}`,
           filters: archive ? [archive, html] : [html],
         });
         if (!path) return;

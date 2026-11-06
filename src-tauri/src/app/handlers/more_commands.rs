@@ -239,6 +239,12 @@ macro_rules! with_more_commands {
             crate::app::commands::devices_snapshot,
             crate::app::commands::explorer_list_directory,
             #[cfg(desktop)]
+            crate::infra::permissions::commands::sandbox_permissions_list,
+            #[cfg(desktop)]
+            crate::infra::permissions::commands::sandbox_permission_set,
+            #[cfg(desktop)]
+            crate::infra::permissions::commands::sandbox_pick_save_file,
+            #[cfg(desktop)]
             crate::app::commands::navigation_names_snapshot,
             crate::app::commands::navigation_names_update,
             crate::app::commands::settings_snapshot,

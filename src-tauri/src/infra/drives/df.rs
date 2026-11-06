@@ -1,6 +1,6 @@
 //! Mounted volumes read from `df -kP`, with the details macOS and Linux add.
+use crate::infra::file_access;
 use std::collections::HashSet;
-use std::fs;
 use std::path::Path;
 use std::process::Command;
 
@@ -75,9 +75,7 @@ fn device_details(row: &DfRow) -> DeviceDetails {
         } else {
             is_removable_mount(&row.mount_path)
         },
-        writable: fs::metadata(&row.mount_path)
-            .map(|metadata| !metadata.permissions().readonly())
-            .unwrap_or(false),
+        writable: file_access::looks::mount_is_writable(Path::new(&row.mount_path)),
     };
     #[cfg(target_os = "macos")]
     {

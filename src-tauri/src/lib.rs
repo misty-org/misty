@@ -1,3 +1,4 @@
+use crate::infra::file_access::fs;
 mod app;
 mod app_setup;
 #[cfg(all(desktop, debug_assertions))]
@@ -21,7 +22,7 @@ pub fn run() {
         let data = home.join(".local").join("data");
         // The store only adopts a folder that exists; on a fresh data root it would
         // otherwise fall back to ~/.misty and split secrets from the data they unlock.
-        let _ = std::fs::create_dir_all(&data);
+        let _ = fs::create_dir_all(&data);
         let _ = misty_credential_store::configure_root(data);
     }
     // Use one TLS provider for backend calls and updates.

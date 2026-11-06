@@ -4,6 +4,7 @@
 //! the package's address, version and SHA-256; `crx.rs` then checks the
 //! store's signature before anything unpacks.
 use super::catalog::{self, CatalogEntry, Store, REMOVED};
+use crate::infra::file_access::fs;
 use base64::Engine;
 use serde_json::Value;
 use std::path::Path;
@@ -155,10 +156,10 @@ fn message(runtime: &Path, manifest: &Value, value: &str) -> String {
             continue;
         }
         let path = runtime.join("_locales").join(locale).join("messages.json");
-        let Some(messages) = std::fs::metadata(&path)
+        let Some(messages) = fs::metadata(&path)
             .ok()
             .filter(|m| m.is_file() && m.len() <= 4 * 1024 * 1024)
-            .and_then(|_| std::fs::read(&path).ok())
+            .and_then(|_| fs::read(&path).ok())
             .and_then(|bytes| serde_json::from_slice::<Value>(&bytes).ok())
         else {
             continue;
@@ -193,11 +194,11 @@ fn icon(runtime: &Path, manifest: &Value) -> Option<String> {
         return None;
     }
     let path = runtime.join(relative);
-    let metadata = std::fs::symlink_metadata(&path).ok()?;
+    let metadata = fs::symlink_metadata(&path).ok()?;
     if !metadata.is_file() || metadata.len() > 512 * 1024 {
         return None;
     }
-    let bytes = std::fs::read(path).ok()?;
+    let bytes = fs::read(path).ok()?;
     bytes.starts_with(b"\x89PNG\r\n\x1a\n").then(|| {
         format!(
             "data:image/png;base64,{}",
@@ -207,6 +208,8 @@ fn icon(runtime: &Path, manifest: &Value) -> Option<String> {
 }
 
 #[cfg(test)]
+// Tests build their fixtures directly, outside the file gate.
+#[allow(clippy::disallowed_methods, clippy::disallowed_types)]
 mod tests {
     use super::*;
 

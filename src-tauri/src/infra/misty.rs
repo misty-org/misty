@@ -1,8 +1,8 @@
 use crate::app::runtime::MistyRuntime;
+use crate::infra::file_access::fs;
 use crate::infra::paths;
 use serde::{Deserialize, Serialize};
 use std::{
-    fs,
     path::{Path, PathBuf},
     sync::Mutex,
 };
@@ -161,7 +161,7 @@ fn installed_version_path(home: &Path) -> PathBuf {
 
 fn read_installed_version(home: &Path) -> Result<Option<String>, String> {
     let path = installed_version_path(home);
-    if !path.exists() {
+    if !fs::exists(&path) {
         return Ok(None);
     }
     let version = fs::read_to_string(&path)
@@ -172,4 +172,6 @@ fn read_installed_version(home: &Path) -> Result<Option<String>, String> {
 }
 
 #[cfg(test)]
+// Tests build their fixtures directly, outside the file gate.
+#[allow(clippy::disallowed_methods, clippy::disallowed_types)]
 mod tests;

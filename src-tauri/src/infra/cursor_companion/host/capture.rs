@@ -8,6 +8,11 @@ use std::{
 };
 use tauri::{AppHandle, Manager, Webview};
 
+use crate::infra::permissions::{self, Permission};
+
+pub(super) const SCREEN_CAPTURE_OFF: &str =
+    "Misty needs your OK to see your screen. You can allow it under Settings, Agents, Access.";
+
 use super::screens::{choose_primary, native_handle, person_works_in, window_name};
 use super::{
     current, displays, host_state, on_main, platform, require_main, CursorCompanionState, PREFIX,
@@ -20,6 +25,9 @@ pub async fn cursor_companion_capture(
     turn: u64,
 ) -> Result<Vec<Value>, String> {
     require_main(&webview)?;
+    if !permissions::ensure_async(&app, Permission::ScreenCapture).await {
+        return Err(SCREEN_CAPTURE_OFF.into());
+    }
     capture_displays(app, turn).await
 }
 #[tauri::command]
@@ -58,7 +66,12 @@ pub async fn task_visual(app: &AppHandle, task_id: &str) -> Result<Option<Vec<Va
     );
     Ok(Some(captures))
 }
+/// Every capture of the whole screen comes through here. It only checks, because an agent's task
+/// can reach it with nobody at the window; the person gets asked in `cursor_companion_capture`.
 async fn capture_displays(app: AppHandle, turn: u64) -> Result<Vec<Value>, String> {
+    if !permissions::is_on(&app, Permission::ScreenCapture) {
+        return Err(SCREEN_CAPTURE_OFF.into());
+    }
     let state = host_state(&app);
     if !current(&state, turn) {
         return Err("Capture interrupted".into());

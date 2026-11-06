@@ -1,9 +1,7 @@
 //! Each chat's private folder. It lasts until the chat is deleted, has a size limit, and no other
 //! chat can see it.
-use std::{
-    fs,
-    path::{Path, PathBuf},
-};
+use crate::infra::file_access::fs;
+use std::path::{Path, PathBuf};
 
 use sha2::{Digest, Sha256};
 
@@ -32,9 +30,7 @@ pub(super) fn prepare(misty_dir: &Path, key: &str) -> Result<PathBuf, String> {
     let path = folder(misty_dir, key);
     fs::create_dir_all(&path).map_err(|_| "shell_workspace_unavailable".to_owned())?;
     restrict_to_owner(&path);
-    let path = path
-        .canonicalize()
-        .map_err(|_| "shell_workspace_unavailable".to_owned())?;
+    let path = fs::canonicalize(&path).map_err(|_| "shell_workspace_unavailable".to_owned())?;
     if folder_bytes(&path) > MAX_WORKSPACE_BYTES {
         return Err("shell_workspace_full".into());
     }
@@ -85,12 +81,12 @@ fn remove_link(link: &Path) -> std::io::Result<()> {
 
 #[cfg(unix)]
 fn make_link(target: &Path, link: &Path) -> std::io::Result<()> {
-    std::os::unix::fs::symlink(target, link)
+    fs::symlink(target, link)
 }
 
 #[cfg(windows)]
 fn make_link(target: &Path, link: &Path) -> std::io::Result<()> {
-    std::os::windows::fs::symlink_dir(target, link)
+    fs::symlink_dir(target, link)
 }
 
 /// The bytes held by the files under `folder`, without following links.

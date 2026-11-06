@@ -1,5 +1,6 @@
 //! Where a profile's extension packages live, and which version of each runs.
 use super::*;
+use crate::infra::file_access::fs;
 
 pub(super) fn account_root(app: &tauri::AppHandle, account: &str) -> Result<PathBuf, String> {
     Ok(app
@@ -26,10 +27,9 @@ pub(super) struct PackageSelection {
     pub(super) previous: Option<String>,
 }
 pub(super) fn selected_package(root: &Path, previous: bool) -> Result<PathBuf, String> {
-    let selection: PackageSelection = serde_json::from_slice(
-        &std::fs::read(root.join("selection.json")).map_err(|e| e.to_string())?,
-    )
-    .map_err(|e| e.to_string())?;
+    let selection: PackageSelection =
+        serde_json::from_slice(&fs::read(root.join("selection.json")).map_err(|e| e.to_string())?)
+            .map_err(|e| e.to_string())?;
     let version = if previous {
         selection
             .previous
@@ -43,7 +43,7 @@ pub(super) fn selected_package(root: &Path, previous: bool) -> Result<PathBuf, S
     Ok(root.join("versions").join(version))
 }
 pub(super) fn read_review(root: &Path) -> Result<package::Review, String> {
-    serde_json::from_slice(&std::fs::read(root.join("review.json")).map_err(|e| e.to_string())?)
+    serde_json::from_slice(&fs::read(root.join("review.json")).map_err(|e| e.to_string())?)
         .map_err(|e| e.to_string())
 }
 
@@ -52,7 +52,7 @@ pub(super) fn prune_versions(root: &Path) {
         return;
     };
     let previous = selected_package(root, true).ok();
-    let Ok(entries) = std::fs::read_dir(root.join("versions")) else {
+    let Ok(entries) = fs::read_dir(root.join("versions")) else {
         return;
     };
     for entry in entries.flatten() {
@@ -64,7 +64,7 @@ pub(super) fn prune_versions(root: &Path) {
             && name.bytes().all(|v| v.is_ascii_hexdigit())
             && entry.file_type().is_ok_and(|v| v.is_dir())
         {
-            let _ = std::fs::remove_dir_all(path);
+            let _ = fs::remove_dir_all(path);
         }
     }
 }

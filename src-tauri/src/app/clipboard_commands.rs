@@ -4,6 +4,7 @@
 //! the system clipboard as files.
 #![cfg(desktop)]
 
+use crate::infra::file_access::fs_async;
 use std::{
     collections::HashSet,
     env,
@@ -89,11 +90,15 @@ pub async fn clipboard_cloud_paste(
 #[tauri::command]
 pub async fn clipboard_cloud_save(
     webview: tauri::Webview,
+    app: tauri::AppHandle,
     state: State<'_, MistyRuntime>,
     clip_id: String,
 ) -> Result<Vec<String>, String> {
     require_main(&webview)?;
     let downloads = dirs::download_dir().ok_or("Misty can't find your Downloads folder.")?;
+    if !crate::infra::permissions::ensure_downloads_folder_async(&app).await {
+        return Err("Misty needs your OK to save to the Downloads folder.".to_owned());
+    }
     let saved = state
         .cloud_clipboard
         .save_clip_files(&clip_id, &downloads)
@@ -125,7 +130,7 @@ pub async fn clipboard_write_file_bytes(items: Vec<ClipboardFileBytes>) -> ApiRe
     let staging = env::temp_dir()
         .join("misty-library-clipboard")
         .join(copy_id.to_string());
-    tokio::fs::create_dir_all(&staging).await.map_err(|error| {
+    fs_async::create_dir_all(&staging).await.map_err(|error| {
         ApiError::Message(format!(
             "The Library clipboard staging folder could not be created: {error}"
         ))
@@ -163,13 +168,11 @@ pub async fn clipboard_write_file_bytes(items: Vec<ClipboardFileBytes>) -> ApiRe
             suffix += 1;
         }
         let path = staging.join(file_name);
-        tokio::fs::write(&path, &item.bytes)
-            .await
-            .map_err(|error| {
-                ApiError::Message(format!(
-                    "A Library item could not be prepared for the clipboard: {error}"
-                ))
-            })?;
+        fs_async::write(&path, &item.bytes).await.map_err(|error| {
+            ApiError::Message(format!(
+                "A Library item could not be prepared for the clipboard: {error}"
+            ))
+        })?;
         references.push(PasteItem {
             path: path.to_string_lossy().into_owned(),
             is_directory: false,

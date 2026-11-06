@@ -101,7 +101,7 @@ async fn serve(
     if !scope.is_allowed(&path) {
         return Err(StatusCode::FORBIDDEN);
     }
-    let mut file = tokio::fs::File::open(&path)
+    let mut file = crate::infra::file_access::fs_async::open_for_asset_protocol(&path)
         .await
         .map_err(|error| match error.kind() {
             std::io::ErrorKind::NotFound => StatusCode::NOT_FOUND,

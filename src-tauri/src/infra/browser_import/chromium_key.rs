@@ -108,7 +108,7 @@ pub fn key(browser: Browser, profile: &Path) -> Result<CookieKey, String> {
     use base64::Engine as _;
     let state = [profile.join("Local State"), profile.join("../Local State")]
         .into_iter()
-        .find_map(|path| std::fs::read(path).ok())
+        .find_map(|path| crate::infra::file_access::fs::read(path).ok())
         .and_then(|bytes| serde_json::from_slice::<serde_json::Value>(&bytes).ok())
         .ok_or_else(|| format!("{}'s sign-in key could not be found.", browser.name()))?;
     let protected = state["os_crypt"]["encrypted_key"]

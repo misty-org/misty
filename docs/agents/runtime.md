@@ -143,5 +143,6 @@ through the server's MCP gateway.
   `MISTY_AGENT_RUNTIME_URL` in a production environment stops the server at startup.
 - **No X-Misty-Models:** no server receives an account's keys. An older app's header is
   dropped on arrival.
-- **Evals:** the Odysseys campaign ended on October 31, 2026, and its server-side eval stack
-  is gone. Evals need rebuilding on the desktop runtime ([evals/odysseys.md](evals/odysseys.md)).
+- **Evals:** the Odysseys runner (`evals/odysseys/`, [evals/odysseys.md](evals/odysseys.md)) drives
+  the desktop through the product path. The server's only part is `eval_turn_limit`, honored only
+  on a development server.

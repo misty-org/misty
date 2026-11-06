@@ -2,7 +2,7 @@
 
 Status: all five phases built 2026-10-21, uncommitted, not run against a live stack. Decisions below were made by the user.
 
-Built as: runtime `src/ledger.ts` (`agent_ledger` tool, reconcile, report), app `src/features/agents/checkpoints/` (ledger comment, resume turn, `LedgerTable`), and `MISTY_ODYSSEYS_RESUME_FAILED` in the Odysseys eval. "Start from here" is Retry on any older answer's table: it drops what came after and resumes that ledger. The model-facing tool surface is not narrowed on resume: the resume prompt scopes the work to the open rows instead.
+Built as: runtime `src/ledger.ts` (`agent_ledger` tool, reconcile, report), and app `src/features/agents/checkpoints/` (ledger comment, resume turn, `LedgerTable`). "Start from here" is Retry on any older answer's table: it drops what came after and resumes that ledger. The model-facing tool surface is not narrowed on resume: the resume prompt scopes the work to the open rows instead.
 
 ## Problem
 

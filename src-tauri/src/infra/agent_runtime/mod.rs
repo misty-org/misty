@@ -6,6 +6,7 @@
 //! device (`agent_runtime_deliver`). Every call to it is signed with a secret made for this
 //! launch, so nothing else on the computer can drive it. Its runs are kept under
 //! `~/.misty/runtime`, so a run continues after Misty quits and opens again.
+use crate::infra::file_access::{self, fs, fs_async};
 pub mod calls;
 pub mod live;
 
@@ -73,7 +74,7 @@ fn entry(app: &tauri::AppHandle) -> Option<PathBuf> {
         .into_iter()
         .chain(bundled)
         .chain(checkout)
-        .find(|path| path.is_file())
+        .find(|path| file_access::looks::program_is_installed(path))
 }
 
 /// The Node that runs it: `MISTY_AGENT_RUNTIME_NODE`, the one shipped beside the app, or one
@@ -93,7 +94,7 @@ fn node() -> PathBuf {
         .into_iter()
         .chain(shipped)
         .chain(["/opt/homebrew/bin/node", "/usr/local/bin/node"].map(PathBuf::from))
-        .find(|path| path.is_file())
+        .find(|path| file_access::looks::program_is_installed(path))
         .unwrap_or_else(|| PathBuf::from("node"))
 }
 
@@ -102,7 +103,7 @@ async fn start(app: &tauri::AppHandle) -> Result<Running, String> {
     let home = crate::infra::paths::misty_home_dir()
         .ok_or("Misty's data folder is unavailable.")?
         .join("runtime");
-    tokio::fs::create_dir_all(home.join("world"))
+    fs_async::create_dir_all(home.join("world"))
         .await
         .map_err(|_| "Misty couldn't create the agent runtime's folder.")?;
     let port = std::net::TcpListener::bind("127.0.0.1:0")
@@ -111,7 +112,7 @@ async fn start(app: &tauri::AppHandle) -> Result<Running, String> {
         .port();
     let mut secret = vec![0u8; 32];
     rand::thread_rng().fill_bytes(&mut secret);
-    let log = std::fs::OpenOptions::new()
+    let log = fs::OpenOptions::new()
         .create(true)
         .append(true)
         .open(home.join("runtime.log"))

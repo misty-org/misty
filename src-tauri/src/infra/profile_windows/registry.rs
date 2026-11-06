@@ -7,6 +7,7 @@
 //! belongs to the first account to ask for it, so nobody is signed out by an upgrade or by
 //! signing in.
 use super::*;
+use crate::infra::file_access::fs;
 use serde::Deserialize;
 use std::collections::BTreeSet;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -122,7 +123,7 @@ fn valid_profile(profile: &ProfileEntry) -> bool {
 
 pub(super) fn load() -> Registry {
     let saved: Saved = saved_path()
-        .and_then(|path| std::fs::read(path).ok())
+        .and_then(|path| fs::read(path).ok())
         .and_then(|bytes| serde_json::from_slice(&bytes).ok())
         .unwrap_or_default();
     Registry {
@@ -175,8 +176,8 @@ pub(super) fn save(state: &Registry) {
     };
     if let Ok(bytes) = serde_json::to_vec_pretty(&saved) {
         let temporary = path.with_extension("json.tmp");
-        if std::fs::write(&temporary, bytes).is_ok() {
-            let _ = std::fs::rename(&temporary, &path);
+        if fs::write(&temporary, bytes).is_ok() {
+            let _ = fs::rename(&temporary, &path);
         }
     }
 }

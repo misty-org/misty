@@ -2,8 +2,9 @@
 //! confined by `sandbox-exec` to a private working folder. Misty's own
 //! process never parses them. Windows uses the same worker in an
 //! AppContainer (see `document_worker_windows`).
+use crate::infra::file_access::fs;
+use crate::infra::file_access::fs::File;
 use std::{
-    fs::File,
     io::{Read, Seek, SeekFrom, Write},
     os::unix::{
         fs::{FileExt, PermissionsExt},
@@ -51,8 +52,8 @@ fn builtin_worker(service: &str, protocol: u32) -> Result<&'static [u8], String>
 /// Builds the sandboxed command that runs `executable` with `work` as its only
 /// writable folder and tight resource limits. There is no permissive fallback.
 fn sandboxed_command(executable: &Path, work: &Path) -> std::io::Result<Command> {
-    let executable = executable.canonicalize()?;
-    let work = work.canonicalize()?;
+    let executable = fs::canonicalize(executable)?;
+    let work = fs::canonicalize(work)?;
     let mut command = Command::new("/usr/bin/sandbox-exec");
     command
         .args(["-p", PROFILE, "-D"])
@@ -136,8 +137,8 @@ pub(crate) fn process(path: &Path, stop: &AtomicBool) -> Result<Value, String> {
         .tempdir()
         .map_err(|_| "Could not create document workspace.")?;
     let executable = work.path().join("worker");
-    std::fs::write(&executable, worker()?).map_err(|_| "Could not stage document processor.")?;
-    std::fs::set_permissions(&executable, std::fs::Permissions::from_mode(0o500))
+    fs::write(&executable, worker()?).map_err(|_| "Could not stage document processor.")?;
+    fs::set_permissions(&executable, fs::Permissions::from_mode(0o500))
         .map_err(|_| "Could not prepare processor permissions.")?;
     let started = Instant::now();
     stage_input(
@@ -147,7 +148,7 @@ pub(crate) fn process(path: &Path, stop: &AtomicBool) -> Result<Value, String> {
         started,
     )?;
 
-    let mut output = tempfile::tempfile().map_err(|_| "Could not receive document output.")?;
+    let mut output = File::unnamed_temp().map_err(|_| "Could not receive document output.")?;
     let mut command = sandboxed_command(&executable, work.path())
         .map_err(|_| "Could not confine document processor.")?;
     command.stdin(Stdio::piped()).stdout(Stdio::from(

@@ -1,8 +1,8 @@
 import { invoke } from "@tauri-apps/api/core";
 import { emitTo, listen, type UnlistenFn } from "@tauri-apps/api/event";
-import { save } from "@tauri-apps/plugin-dialog";
 import { create } from "zustand";
 import { useSettingsStore } from "@/features/settings";
+import { pickSaveFile } from "@/native/sandbox";
 import { errorText } from "@/shared/lib/format";
 import { useCaptureStore } from "../capture/useCaptureStore";
 import { deleteSubtitleSession, subtitleHistory, subtitleSessionText } from "./savedSubtitles";
@@ -75,8 +75,8 @@ async function start() {
 async function exportSession(id: string) {
   const text = subtitleSessionText(id);
   if (text === undefined) return;
-  const path = await save({
-    defaultPath: `Live subtitles ${id.slice(0, 10)}.txt`,
+  const path = await pickSaveFile({
+    defaultName: `Live subtitles ${id.slice(0, 10)}.txt`,
     filters: [{ name: "Text", extensions: ["txt"] }],
   });
   if (path) await invoke("voice_subtitles_export", { path, text });

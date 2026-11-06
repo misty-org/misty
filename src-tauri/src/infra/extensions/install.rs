@@ -1,5 +1,6 @@
 //! Downloading, reviewing and committing an extension package before it loads.
 use super::*;
+use crate::infra::file_access::fs;
 
 pub(super) async fn prepare(
     app: &tauri::AppHandle,
@@ -30,7 +31,7 @@ pub(super) async fn prepare(
     let mut review = tauri::async_runtime::spawn_blocking(move || {
         let result = package::extract(&bytes, entry, &staging, prepared_token);
         if result.is_err() {
-            let _ = std::fs::remove_dir_all(&staging);
+            let _ = fs::remove_dir_all(&staging);
         }
         result
     })
@@ -46,7 +47,7 @@ pub(super) async fn prepare(
     let native_review = match native_review {
         Ok(value) => value,
         Err(error) => {
-            let _ = std::fs::remove_dir_all(&path);
+            let _ = fs::remove_dir_all(&path);
             return Err(error);
         }
     };
@@ -68,7 +69,7 @@ pub(super) async fn prepare(
         review.hosts.sort();
         review.hosts.dedup();
     }
-    std::fs::write(
+    fs::write(
         path.join("review.json"),
         serde_json::to_vec(&review).map_err(|e| e.to_string())?,
     )
@@ -76,7 +77,7 @@ pub(super) async fn prepare(
     let mut state = service(profile).lock().await;
     if state.account != account || ACCOUNT_EPOCH.load(std::sync::atomic::Ordering::Acquire) != epoch
     {
-        let _ = std::fs::remove_dir_all(&path);
+        let _ = fs::remove_dir_all(&path);
         return Err("The account changed during download.".into());
     }
     state.prepared.insert(token, path);
@@ -123,7 +124,7 @@ pub(super) async fn commit(
     let package = root(app, &account, profile)?
         .join("packages")
         .join(&review.entry.id);
-    std::fs::create_dir_all(&package).map_err(|e| e.to_string())?;
+    fs::create_dir_all(&package).map_err(|e| e.to_string())?;
     let digest = review
         .entry
         .digest
@@ -131,15 +132,15 @@ pub(super) async fn commit(
         .ok_or("Invalid package digest.")?
         .to_ascii_lowercase();
     let versions = package.join("versions");
-    std::fs::create_dir_all(&versions).map_err(|e| e.to_string())?;
+    fs::create_dir_all(&versions).map_err(|e| e.to_string())?;
     let destination = versions.join(&digest);
-    if destination.exists() {
-        std::fs::remove_dir_all(&path).map_err(|e| e.to_string())?;
+    if fs::exists(&destination) {
+        fs::remove_dir_all(&path).map_err(|e| e.to_string())?;
     } else {
-        std::fs::rename(&path, &destination).map_err(|e| e.to_string())?;
+        fs::rename(&path, &destination).map_err(|e| e.to_string())?;
     }
     // Loaded views keep their immutable resource directory throughout activation.
-    let old: PackageSelection = std::fs::read(package.join("selection.json"))
+    let old: PackageSelection = fs::read(package.join("selection.json"))
         .ok()
         .and_then(|v| serde_json::from_slice(&v).ok())
         .unwrap_or_default();
@@ -152,7 +153,7 @@ pub(super) async fn commit(
         },
     };
     let temporary = tempfile::NamedTempFile::new_in(&package).map_err(|e| e.to_string())?;
-    std::fs::write(
+    fs::write(
         temporary.path(),
         serde_json::to_vec(&selection).map_err(|e| e.to_string())?,
     )

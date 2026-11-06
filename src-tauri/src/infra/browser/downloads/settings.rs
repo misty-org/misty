@@ -55,6 +55,7 @@ pub fn browser_set_download_directory(directory: String) -> Result<(), String> {
         let home = dirs::home_dir().ok_or("Choose a folder for downloads.")?;
         let safe = crate::platform::synced_paths::download_directory(&path, &home);
         if safe.is_none() {
+            crate::infra::file_access::set_chosen_download_folder(None);
             *user_download_directory()
                 .lock()
                 .map_err(|_| "Download settings are unavailable.".to_owned())? = None;
@@ -64,6 +65,8 @@ pub fn browser_set_download_directory(directory: String) -> Result<(), String> {
     } else {
         return Err("Choose a folder for downloads.".to_owned());
     };
+    // A folder the person chose counts as granted.
+    crate::infra::file_access::set_chosen_download_folder(chosen.as_deref());
     *user_download_directory()
         .lock()
         .map_err(|_| "Download settings are unavailable.".to_owned())? = chosen;

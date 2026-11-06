@@ -1,9 +1,12 @@
 //! Commands on single downloads: progress, cancel, open, reveal and removal from the list.
 use super::*;
+use crate::infra::file_access::{self, fs, looks};
 
+/// A download the person is acting on in the list. Misty saved this file itself and recorded where,
+/// so the file gate allows that one file for what they're doing with it.
 pub(super) fn download_path(app: &AppHandle, id: &str) -> Result<(PathBuf, String), String> {
     let connection = library(app)?;
-    connection
+    let found = connection
         .query_row(
             "SELECT path, state FROM downloads WHERE id = ?1",
             params![id],
@@ -16,7 +19,9 @@ pub(super) fn download_path(app: &AppHandle, id: &str) -> Result<(PathBuf, Strin
         )
         .optional()
         .map_err(|error| error.to_string())?
-        .ok_or_else(|| "That download is no longer in the list.".to_owned())
+        .ok_or_else(|| "That download is no longer in the list.".to_owned())?;
+    file_access::allow_recorded_download(&found.0);
+    Ok(found)
 }
 
 #[derive(Debug, Serialize)]
@@ -73,7 +78,7 @@ pub(super) async fn native_progress(
             .map(|(id, path)| {
                 let (received, total) = wry::download_progress(&path).unwrap_or_else(|| {
                     (
-                        std::fs::metadata(&path)
+                        looks::recorded_download(std::path::Path::new(&path))
                             .map(|meta| meta.len() as i64)
                             .unwrap_or(0),
                         -1,
@@ -103,7 +108,7 @@ pub(super) async fn native_progress(
         .into_iter()
         .map(|(id, path)| BrowserDownloadProgress {
             id,
-            received: std::fs::metadata(&path)
+            received: looks::recorded_download(std::path::Path::new(&path))
                 .map(|meta| meta.len() as i64)
                 .unwrap_or(0),
             total: -1,
@@ -143,8 +148,8 @@ pub async fn browser_download_cancel(
         let _ = receiver.await;
     }
     // The engine removes its partial file; clean up anything left behind.
-    if path.is_file() {
-        let _ = std::fs::remove_file(&path);
+    if fs::is_file(&path) {
+        let _ = fs::remove_file(&path);
     }
     Ok(())
 }
@@ -155,7 +160,7 @@ pub fn browser_download_open(
     request: BrowserDownloadIdRequest,
 ) -> Result<(), String> {
     let (path, _) = download_path(&app, &request.id)?;
-    if !path.is_file() {
+    if !fs::is_file(&path) {
         return Err("The file was moved or deleted.".to_owned());
     }
     app.opener()
@@ -169,7 +174,7 @@ pub fn browser_download_reveal(
     request: BrowserDownloadIdRequest,
 ) -> Result<(), String> {
     let (path, _) = download_path(&app, &request.id)?;
-    if !path.exists() {
+    if !fs::exists(&path) {
         return Err("The file was moved or deleted.".to_owned());
     }
     app.opener()

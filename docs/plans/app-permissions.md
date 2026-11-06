@@ -69,12 +69,14 @@ window, and `src-tauri/src/platform/app_command_policy.rs` narrows that by name 
 | Write access to a shared folder | The person turns it on, per folder, per chat |
 | A file | The system file picker, for that file only |
 
-- All file access in the Rust app goes through one module that refuses anything without a grant.
-  Clippy's `disallowed_methods` bans direct `std::fs` calls elsewhere.
+- All file access in the Rust app goes through one module, `src-tauri/src/infra/file_access`, that
+  refuses anything without a grant. Clippy's `disallowed_methods` bans direct `std::fs` calls
+  elsewhere. Other crates, such as `misty-browser-sync`, aren't behind it yet.
 - Only a click in Misty's own interface can create a grant. Websites, files and agents can't.
 - macOS also prompts on its own for Downloads, Desktop and Documents, so a person may see two prompts
   there. Windows has no equivalent.
-- Downloads are never opened or run automatically. Check that they carry macOS's quarantine flag.
+- Downloads are never opened or run automatically. On macOS 26.5, WKDownload adds the quarantine flag
+  by itself, and Misty adds it to what it writes itself. Windows' Mark of the Web hasn't been checked.
 
 ## Permissions: defaults plus what the person adds
 
@@ -151,7 +153,7 @@ so the Rust version should behave the same. No third-party Rust LLM library, inc
 ### How it gets done
 
 1. Record a baseline: the TypeScript runtime's benchmark scores on fixed tasks and models, since scores
-   mean little across different models.
+   mean little across different models ([running Odysseys](../agents/evals/odysseys.md#running-it)).
 2. A small test: the OpenAI-compatible client and the agent loop in Rust, measuring memory and one
    benchmark task, and comparing its requests with the TypeScript runtime's.
 3. Port the rest, one provider at a time, comparing against the baseline.

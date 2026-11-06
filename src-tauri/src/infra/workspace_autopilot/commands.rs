@@ -28,6 +28,20 @@ pub fn agent_workspace_context(
         context["accountId"].as_str().unwrap_or(""),
         context["spaceId"].as_str().unwrap_or(""),
     )?;
+    // The one way into desktop control, on either system. Only a person's window gets here. The
+    // lock waits until after asking, since it can take the person a while to answer.
+    if start
+        && context["desktopControl"] == true
+        && !crate::infra::permissions::ensure(
+            &app,
+            crate::infra::permissions::Permission::DesktopControl,
+        )
+    {
+        return Err(
+            "Misty needs your OK to control other apps. You can allow it under Settings, Agents, Access."
+                .into(),
+        );
+    }
     let mut state = session().lock().map_err(|_| "workspace_unavailable")?;
     if start {
         let desktop = context["desktopControl"] == true;

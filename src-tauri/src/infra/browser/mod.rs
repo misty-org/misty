@@ -282,6 +282,8 @@ fn apply_browser_pointer_tracking(webview: &Webview, enabled: bool) -> Result<()
 }
 
 #[cfg(test)]
+// Tests build their fixtures directly, outside the file gate.
+#[allow(clippy::disallowed_methods, clippy::disallowed_types)]
 mod tests;
 
 pub(crate) mod profile_cleanup;

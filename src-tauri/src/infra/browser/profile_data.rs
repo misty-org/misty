@@ -26,7 +26,7 @@ pub(in crate::infra) fn browser_data_directory(
     #[cfg(not(target_os = "macos"))]
     {
         let _ = app;
-        std::fs::create_dir_all(&path).map_err(|error| error.to_string())?;
+        crate::infra::file_access::fs::create_dir_all(&path).map_err(|error| error.to_string())?;
     }
     Ok(path)
 }

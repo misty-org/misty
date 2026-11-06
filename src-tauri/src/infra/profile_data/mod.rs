@@ -2,6 +2,7 @@
 //! through a [`ProfileRecords`] handle. It works with no vault and no account; the vault link
 //! only copies these records to and from the server. Also the account-change barrier, which
 //! keeps browser views and data from outliving the account they belong to.
+use crate::infra::file_access::fs;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, OnceLock};
 
@@ -28,6 +29,8 @@ pub(crate) use seed::seed_first_profile;
 pub use tabs::*;
 
 #[cfg(test)]
+// Tests build their fixtures directly, outside the file gate.
+#[allow(clippy::disallowed_methods, clippy::disallowed_types)]
 mod tests;
 
 /// One change to a profile's records.
@@ -50,7 +53,7 @@ pub const RECORDS_CHANGED_EVENT: &str = "misty://profile-records-changed";
 struct OpenStore {
     scope: String,
     store: Arc<Mutex<LocalStore>>,
-    _lock: std::fs::File,
+    _lock: fs::File,
 }
 
 static OPEN: Mutex<Option<OpenStore>> = Mutex::new(None);
@@ -87,13 +90,10 @@ pub(crate) fn account_dir(scope: &str) -> Result<PathBuf, String> {
         .join(".local")
         .join("sync")
         .join(account_identity(scope));
-    let mut builder = std::fs::DirBuilder::new();
+    let mut builder = fs::DirBuilder::new();
     builder.recursive(true);
     #[cfg(unix)]
-    {
-        use std::os::unix::fs::DirBuilderExt;
-        builder.mode(0o700);
-    }
+    builder.mode(0o700);
     builder
         .create(&directory)
         .map_err(|_| "Could not create local storage")?;
@@ -110,8 +110,8 @@ fn set_aside(path: &std::path::Path) -> Result<(), String> {
     let aside = path.with_file_name(format!("records.lost-{stamp}.sqlite"));
     for suffix in ["", "-wal", "-shm"] {
         let from = PathBuf::from(format!("{}{suffix}", path.display()));
-        if from.exists() {
-            std::fs::rename(&from, format!("{}{suffix}", aside.display()))
+        if fs::exists(&from) {
+            fs::rename(&from, format!("{}{suffix}", aside.display()))
                 .map_err(|_| "Could not set aside local storage")?;
         }
     }
@@ -125,7 +125,7 @@ fn open_key(identity: &str, path: &std::path::Path) -> Result<LocalKey, String> 
     {
         Some(key) => Ok(key),
         None => {
-            if path.exists() {
+            if fs::exists(&path) {
                 set_aside(path)?;
             }
             secure_store::create_local_records_key(identity)
@@ -169,14 +169,11 @@ const LOCK_RETRY: std::time::Duration = std::time::Duration::from_millis(25);
 /// Holds a database for this process. A process being spawned holds a copy of every open file
 /// until it execs, which keeps a lock this app just released looking held for a moment; only a
 /// lock that stays busy is another Misty's.
-pub(crate) fn lock_database(path: &std::path::Path) -> Result<std::fs::File, String> {
-    let mut options = std::fs::OpenOptions::new();
+pub(crate) fn lock_database(path: &std::path::Path) -> Result<fs::File, String> {
+    let mut options = fs::OpenOptions::new();
     options.read(true).write(true).create(true).truncate(false);
     #[cfg(unix)]
-    {
-        use std::os::unix::fs::OpenOptionsExt;
-        options.mode(0o600);
-    }
+    options.mode(0o600);
     let file = options
         .open(path.with_extension("lock"))
         .map_err(|_| "Could not lock local storage")?;

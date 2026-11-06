@@ -57,7 +57,7 @@ pub(super) fn payload(clip: &Clip) -> ClipboardPayload {
 
 pub(super) fn unique_path(directory: &Path, name: &str) -> PathBuf {
     let candidate = directory.join(name);
-    if !candidate.exists() {
+    if !fs::exists(&candidate) {
         return candidate;
     }
     let path = Path::new(name);
@@ -71,6 +71,6 @@ pub(super) fn unique_path(directory: &Path, name: &str) -> PathBuf {
         .unwrap_or_default();
     (2..)
         .map(|index| directory.join(format!("{stem} {index}{extension}")))
-        .find(|candidate| !candidate.exists())
+        .find(|candidate| !fs::exists(candidate))
         .expect("an unused name")
 }

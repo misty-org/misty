@@ -7,9 +7,10 @@
 //!
 //! The helper speaks through two files the supervisor opens: a request it
 //! reads as standard input and a response it writes as standard output.
+use crate::infra::file_access::fs;
+use crate::infra::file_access::fs::File;
 use std::{
     ffi::OsStr,
-    fs::File,
     io::{Read, Seek, SeekFrom, Write},
     path::Path,
     sync::atomic::{AtomicBool, Ordering},
@@ -69,16 +70,16 @@ impl Workspace {
             return Err("The helper was cancelled.".into());
         }
         let executable = self.path().join("helper.exe");
-        std::fs::write(&executable, helper).map_err(|_| "Could not stage the helper.")?;
+        fs::write(&executable, helper).map_err(|_| "Could not stage the helper.")?;
         // Both files live outside the helper's folder; it reaches them only
         // through the handles it inherits.
-        let mut input = tempfile::tempfile().map_err(|_| "Could not stage the request.")?;
+        let mut input = File::unnamed_temp().map_err(|_| "Could not stage the request.")?;
         input
             .write_all(request)
             .and_then(|_| input.seek(SeekFrom::Start(0)).map(|_| ()))
             .map_err(|_| "Could not stage the request.")?;
-        let mut output = tempfile::tempfile().map_err(|_| "Could not receive the response.")?;
-        let errors = File::create("NUL").map_err(|_| "Could not start the helper.")?;
+        let mut output = File::unnamed_temp().map_err(|_| "Could not receive the response.")?;
+        let errors = fs::null_device().map_err(|_| "Could not start the helper.")?;
         let job = Job::new(&JobLimits {
             process_memory: limits.memory_bytes,
             process_cpu: limits.cpu,
@@ -143,7 +144,7 @@ impl Workspace {
 
 /// The bytes held by the files under `folder`, without following links.
 fn folder_bytes(folder: &Path) -> u64 {
-    std::fs::read_dir(folder)
+    fs::read_dir(folder)
         .into_iter()
         .flatten()
         .flatten()

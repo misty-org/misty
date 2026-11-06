@@ -1,6 +1,7 @@
 //! Device browser profiles were retired. Their website data stores are erased once, on the
 //! first launch after: the renderer names the ones its saved state still listed.
 use super::*;
+use crate::infra::file_access::fs;
 
 /// Present once the retired profiles were erased on this device.
 fn marker() -> Option<std::path::PathBuf> {
@@ -33,7 +34,7 @@ pub async fn browser_retired_profiles_erase(
         return Err("Only a profile's window can erase retired profiles.".into());
     }
     let marker = marker().ok_or("Misty's data folder is unavailable.")?;
-    if marker.exists() {
+    if fs::exists(&marker) {
         return Ok(());
     }
     for id in profile_ids.into_iter().filter(|id| retired(id)) {
@@ -41,5 +42,5 @@ pub async fn browser_retired_profiles_erase(
             eprintln!("Could not erase a retired browser profile: {error}");
         }
     }
-    std::fs::write(&marker, b"").map_err(|error| error.to_string())
+    fs::write(&marker, b"").map_err(|error| error.to_string())
 }

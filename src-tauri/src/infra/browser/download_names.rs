@@ -43,7 +43,7 @@ pub(super) fn reserve_download_path(
             format!("{stem} ({index})")
         };
         let candidate = directory.join(candidate_name);
-        if !candidate.exists() && !reserved.contains(&candidate) {
+        if !crate::infra::file_access::fs::exists(&candidate) && !reserved.contains(&candidate) {
             reserved.insert(candidate.clone());
             return candidate;
         }
