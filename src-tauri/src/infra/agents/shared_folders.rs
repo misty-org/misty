@@ -1,6 +1,6 @@
-//! Which folders can be projects: never the disk, the home folder itself,
-//! system or library folders, folders holding keys or app data, or Misty's own
-//! data. Coding tools run inside the chosen folder, so this is the boundary.
+//! Which folders a person can share with agents, read-only: never the disk, the
+//! home folder itself, system or library folders, hidden folders in the home
+//! folder (they hold keys and app settings), or Misty's own data.
 use std::path::{Path, PathBuf};
 
 /// Windows' verbatim prefixes (`\\?\`) removed, so paths compare as people see them.
@@ -15,7 +15,7 @@ pub fn plain_path(path: &Path) -> PathBuf {
     }
 }
 
-/// Why a folder can't be a project, or Ok.
+/// Why a folder can't be shared, or Ok.
 pub fn check_root(root: &Path, protected: &[PathBuf], home: Option<&Path>) -> Result<(), String> {
     let refuse = |why: &str| Err(why.to_owned());
     let root = &plain_path(root);
@@ -33,18 +33,18 @@ pub fn check_root(root: &Path, protected: &[PathBuf], home: Option<&Path>) -> Re
         .map(|folder| folder.to_string_lossy().to_lowercase());
         for folder in system {
             if lower == folder || lower.starts_with(&format!("{folder}\\")) {
-                return refuse("System folders can't be projects.");
+                return refuse("System folders can't be shared.");
             }
         }
         let temp = plain_path(&std::env::temp_dir());
         if let Some(home) = home.filter(|_| !root.starts_with(&temp)) {
             if root.starts_with(home.join("AppData")) {
-                return refuse("That folder holds app data or keys, so it can't be a project.");
+                return refuse("That folder holds app data or keys, so it can't be shared.");
             }
         }
     }
     if !root.is_absolute() || root.parent().is_none() {
-        return refuse("Choose a project folder, not the whole disk.");
+        return refuse("Choose a folder, not the whole disk.");
     }
     if protected
         .iter()
@@ -75,19 +75,19 @@ pub fn check_root(root: &Path, protected: &[PathBuf], home: Option<&Path>) -> Re
     ] {
         let inside = root.starts_with(system) && !matches!(system, "/Volumes" | "/Users" | "/home");
         if root == Path::new(system) || (inside && !temporary) {
-            return refuse("System folders can't be projects.");
+            return refuse("System folders can't be shared.");
         }
     }
     if let Some(home) = home {
         if root == home || home.starts_with(root) {
             return refuse("Choose a folder inside your home folder, not the home folder itself.");
         }
-        for private in [
-            "Library", ".ssh", ".aws", ".config", ".gnupg", ".kube", ".docker", ".claude", ".codex",
-        ] {
-            if root.starts_with(home.join(private)) {
-                return refuse("That folder holds app data or keys, so it can't be a project.");
-            }
+        let private = root.strip_prefix(home).ok().and_then(|inside| {
+            let first = inside.components().next()?.as_os_str().to_string_lossy();
+            Some(first == "Library" || first.starts_with('.'))
+        });
+        if private == Some(true) {
+            return refuse("That folder holds app data or keys, so it can't be shared.");
         }
     }
     Ok(())
@@ -108,7 +108,7 @@ mod tests {
             "/Users",
             "/etc/nginx",
             "/Users/me/.ssh/keys",
-            "/Users/me/.codex/x",
+            "/Users/me/.anything/x",
             "/Users/me/Library/Application Support/Misty",
         ] {
             assert!(
@@ -117,10 +117,10 @@ mod tests {
             );
         }
         for path in [
-            "/Users/me/code/app",
+            "/Users/me/papers/2026",
             "/tmp/scratch",
             "/Volumes/Work/site",
-            "/home/me/code/app",
+            "/home/me/papers",
         ] {
             assert!(
                 check_root(Path::new(path), &misty, Some(home)).is_ok(),

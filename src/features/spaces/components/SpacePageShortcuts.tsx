@@ -6,7 +6,7 @@ import { useWorkspaceViewFocused } from "@/features/workspace/WorkspaceViewRoute
 import { preloadSpaceSection } from "../SpaceSectionView";
 
 /** ⌘1 to ⌘5 open these Space home tabs. */
-const shortcutFilters = ["", "notes", "drawings", "files", "code"] as const;
+const shortcutFilters = ["", "notes", "drawings", "files"] as const;
 
 /**
  * A Space's page shortcuts (⌘1 to ⌘5 open the home's filters). There is no bar: the
@@ -41,7 +41,6 @@ export function SpacePageShortcuts({ space }: { space: Space }) {
   useShortcutHandler("space.section_2", () => void openPage(homeTab(1)), focused);
   useShortcutHandler("space.section_3", () => void openPage(homeTab(2)), focused);
   useShortcutHandler("space.section_4", () => void openPage(homeTab(3)), focused);
-  useShortcutHandler("space.section_5", () => void openPage(homeTab(4)), focused);
 
   return null;
 }

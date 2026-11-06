@@ -1,6 +1,6 @@
 import { memo, useMemo } from "react";
 import { Link } from "react-router-dom";
-import { CalendarClock, Flag, Inbox } from "lucide-react";
+import { CalendarClock, Flag } from "lucide-react";
 import { MistyMarkdown } from "@/features/ai-surface/MistyMarkdown";
 import { MistyActivityStatus } from "@/features/misty/MistyActivityStatus";
 import { MistyMessageAttachments } from "@/features/misty/MistyMessageAttachments";
@@ -21,7 +21,6 @@ import { AgentNotebookCard } from "./AgentNotebookCard";
 import { AgentRunOutcome } from "./AgentRunOutcome";
 import { AgentSubagents } from "./AgentSubagents";
 import { CollapsibleText, EarlierReply, MistyAvatar } from "./AgentTranscriptParts";
-import { AnswerChanges } from "./changes/AnswerChanges";
 import { visibleConversationContent } from "./conversationTurns";
 import { splitFailure } from "./failureSummary";
 import { splitReplyQuote } from "./replyQuote";
@@ -105,11 +104,6 @@ function AgentMessageView(props: AgentMessageProps) {
             <CalendarClock size={13} aria-hidden="true" />
             Sent by scheduled task
           </span>
-        ) : message.source === "inbound_task" ? (
-          <span className="flex items-center gap-1.5 text-xs text-cream-muted">
-            <Inbox size={13} aria-hidden="true" />
-            Sent from email or Slack
-          </span>
         ) : null}
         <div
           className={cn(
@@ -190,7 +184,6 @@ function AgentMessageView(props: AgentMessageProps) {
             }
           />
         ) : null}
-        <AnswerChanges message={message} conversationId={props.conversationId} />
         {message.citations?.length ? (
           <div className="mt-3 flex flex-wrap gap-1.5">
             {message.citations.map((citation) => (

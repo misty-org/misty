@@ -59,11 +59,6 @@ impl AppEnvironmentService {
     pub fn misty_dir(&self) -> PathBuf {
         self.inner.misty_dir.clone()
     }
-
-    /// Undo copies of coding runs (agents::checkpoints).
-    pub fn checkpoints_dir(&self) -> PathBuf {
-        self.inner.misty_dir.join("checkpoints")
-    }
 }
 
 impl AppEnvironment {

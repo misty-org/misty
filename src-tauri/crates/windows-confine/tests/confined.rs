@@ -182,18 +182,18 @@ fn commands_reach_only_the_project() {
 }
 
 #[test]
-fn the_project_folder_itself_survives_its_commands() {
+fn the_working_folder_itself_survives_its_commands() {
     let mut scratch = Scratch::new();
-    let project = scratch.path("project");
-    std::fs::create_dir_all(project.join("src")).unwrap();
-    scratch.grant(&project, Access::Inside);
+    let work = scratch.path("work");
+    std::fs::create_dir_all(work.join("src")).unwrap();
+    scratch.grant(&work, Access::Inside);
     let output = scratch.run(
-        &project,
-        &format!("rmdir /s /q \"{}\" & echo done", project.display()),
+        &work,
+        &format!("rmdir /s /q \"{}\" & echo done", work.display()),
     );
     assert!(output.contains("done"), "{output}");
-    assert!(project.is_dir(), "{output}");
-    assert!(!project.join("src").exists(), "contents may be removed");
+    assert!(work.is_dir(), "{output}");
+    assert!(!work.join("src").exists(), "contents may be removed");
 }
 
 #[test]

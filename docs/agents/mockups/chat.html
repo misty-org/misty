@@ -75,8 +75,6 @@
   .actions span{cursor:pointer}.actions span:hover{color:var(--text)}
   .sources{margin-top:10px;display:flex;gap:6px;flex-wrap:wrap}
   .chip{font-size:12.5px;border:1px solid var(--border);border-radius:999px;padding:1px 10px;color:var(--muted)}
-  .diff .ln{font:12px/1.55 var(--mono);padding:0 12px;display:block}
-  .ln.a{background:rgba(70,160,90,.14)}.ln.r{background:rgba(200,80,80,.14)}
   .island{border:1px solid var(--border);border-radius:16px;background:var(--card);padding:10px 12px;margin-top:4px}
   .island .line{display:flex;justify-content:space-between;gap:12px;font-size:14px}
   .island .line .m{color:var(--faint);font-size:13px}
@@ -139,10 +137,10 @@
     <tr><td>Questions for you</td><td><code>collaboration/AgentQuestionCard.tsx</code>, <code>AgentActionQuestions.tsx</code></td><td>Card, popup-style alertdialog in the island</td></tr>
     <tr><td>You answered</td><td><code>collaboration/AgentAnsweredQuestions.tsx</code></td><td>Icon plus run-on sentence</td></tr>
     <tr><td>App / screen requests</td><td><code>agents</code> AppRequestCard, <code>misty/ScreenRequestCard.tsx</code></td><td>Cards, icons, "…" status strings</td></tr>
-    <tr><td>Event lines</td><td><code>AgentConversationView.tsx</code> goal continuation, summarized divider; <code>continuationEvent.ts</code></td><td>Flag icon; user-turn labels with calendar and inbox icons</td></tr>
+    <tr><td>Event lines</td><td><code>AgentConversationView.tsx</code> goal continuation, summarized divider; <code>continuationEvent.ts</code></td><td>Flag icon; user-turn label with a calendar icon</td></tr>
     <tr><td>Control island</td><td><code>AgentControlIsland.tsx</code>, <code>agentControlStatus.ts</code></td><td>Sentence-style status, icon-only buttons, "Stopped. Completed changes have not been undone." as prose</td></tr>
     <tr><td>Cursor bubble, companion panel</td><td><code>CursorOverlayMarkup.tsx</code>, <code>AgentCompanionPanel.tsx</code></td><td>"Working…" / "Listening…" plain text with ellipsis</td></tr>
-    <tr><td>Sources, changes</td><td>citations in <code>AgentConversationView.tsx</code>, <code>changes/AnswerChanges.tsx</code></td><td>Chips are fine; diffs keep their approved tint</td></tr>
+    <tr><td>Sources</td><td>citations in <code>AgentConversationView.tsx</code></td><td>Chips are fine</td></tr>
   </table>
   </div>
 
@@ -297,17 +295,10 @@
     </section>
 
     <section class="board">
-      <div class="board-label">K</div><div class="board-title">Changes and sources</div>
-      <p class="src">changes/AnswerChanges · citations</p>
-      <div class="answer"><p>Updated the hero heading and added the recipes section.</p></div>
-      <div class="table">
-        <div class="row"><span class="verb">Edited</span><span class="tgt"><span class="file">&#9638;</span> index.html</span><span class="st">+24 −3</span></div>
-        <div class="diff" style="border-top:1px solid var(--border);padding:6px 0">
-          <span class="ln r">- &lt;h1&gt;Peaches&lt;/h1&gt;</span><span class="ln a">+ &lt;h1&gt;Peach Vibe&lt;/h1&gt;</span>
-        </div>
-      </div>
+      <div class="board-label">K</div><div class="board-title">Sources</div>
+      <p class="src">citations</p>
+      <div class="answer"><p>Peaches are in season from May to September.</p></div>
       <div class="sources"><span class="chip">nhs.uk</span><span class="chip">usda.gov</span></div>
-      <p class="was"><b>Unchanged:</b> the approved diff tint and counts. File rows join the same table.</p>
     </section>
   </div>
 
@@ -353,9 +344,8 @@
       <div class="user"><p>Keep improving the site until it scores 90</p></div>
       <div class="event"><span class="evic"><svg viewBox="0 0 24 24"><path d="M4 22V4M4 4h13l-2 4 2 4H4"/></svg></span>Continued toward the goal</div>
       <div class="event"><span class="evic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>Sent by scheduled task · Mon 9:00</div>
-      <div class="event"><span class="evic"><svg viewBox="0 0 24 24"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.5 5h13L22 12v6H2v-6z"/></svg></span>Sent from email</div>
       <div class="event rule">Earlier messages summarized</div>
-      <p class="was"><b>Now:</b> centered muted lines, keeping their small icons (flag, clock, inbox) and the app logo for connections.</p>
+      <p class="was"><b>Now:</b> centered muted lines, keeping their small icons (flag, clock) and the app logo for connections.</p>
     </section>
 
     <section class="board">

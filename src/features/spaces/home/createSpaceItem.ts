@@ -4,7 +4,7 @@ import { notesApi } from "@/api/notes/api";
 import { preloadSpaceSection } from "../SpaceSectionView";
 import { spaceChatPath } from "../chat/chatRoute";
 
-export type SpaceCreateKind = "chat" | "note" | "drawing" | "file" | "code";
+export type SpaceCreateKind = "chat" | "note" | "drawing" | "file";
 
 /** Runs the same create action from the Home gallery and the Space bar. */
 export async function createSpaceItem(
@@ -28,10 +28,7 @@ export async function createSpaceItem(
   } else if (kind === "chat") {
     await preloadSpaceSection("social");
     navigate(spaceChatPath(spaceId));
-  } else if (kind === "file") {
-    openFilePicker();
   } else {
-    await preloadSpaceSection("code");
-    navigate(`${base}/code`);
+    openFilePicker();
   }
 }

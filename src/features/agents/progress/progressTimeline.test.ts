@@ -149,15 +149,6 @@ describe("progress timeline", () => {
     expect(stepMeta(steps[0])).toBe("Tried 2×");
   });
 
-  it("names code project tools as whole phrases", () => {
-    expect(toolLabel("code.run", true)).toBe("Running a command");
-    expect(toolLabel("code_edit", false)).toBe("Edited a file");
-    expect(toolLabel("code_preview", false)).toBe("Opened a preview");
-    expect(toolLabel("git_commit", false)).toBe("Committed changes");
-    expect(toolLabel("git.push", true)).toBe("Pushing to GitHub");
-    expect(toolLabel("git_pull_request", false)).toBe("Opened a pull request");
-  });
-
   it("names tools in plain words", () => {
     expect(toolLabel("browser.tab.list", false)).toBe("Listed tabs");
     expect(toolLabel("misty_notes_search", true)).toBe("Searching notes");

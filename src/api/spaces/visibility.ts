@@ -7,7 +7,7 @@ import { apiRequest } from "@/api/client";
 export type ItemVisibility = "public" | "private";
 
 /** The Space items with a private/public toggle. Channels, threads and DMs have none. */
-export type VisibilityItemKind = "note" | "drawing" | "library_item" | "code_project" | "agent";
+export type VisibilityItemKind = "note" | "drawing" | "library_item" | "agent";
 
 /** Only the item's owner can flip it. */
 export async function setItemVisibility(

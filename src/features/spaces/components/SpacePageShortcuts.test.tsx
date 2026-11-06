@@ -92,8 +92,8 @@ it("opens the home's filters with the other section shortcuts", async () => {
   mount();
   await press("space.section_2");
   await waitFor(() => expect(route()).toBe("/spaces/family/home?filter=notes"));
-  await press("space.section_5");
-  await waitFor(() => expect(route()).toBe("/spaces/family/home?filter=code"));
+  await press("space.section_4");
+  await waitFor(() => expect(route()).toBe("/spaces/family/home?filter=files"));
 });
 
 it("follows the focused Space", async () => {

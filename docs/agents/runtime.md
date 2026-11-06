@@ -16,8 +16,8 @@ Cloud plan, and the server's last model path went the same day. Model sign-ins l
    held up to 25 s and woken on the `runtime` account topic.
    - A delivery goes to the computer the run is pinned to (`runtime_endpoint 'device:<id>'`), which
      admission sets to the computer it was sent from.
-   - A run sent from no computer (+misty email, @misty Slack, a schedule with no computer) goes to
-     the first of the person's computers that claims it.
+   - A run sent from no computer (a schedule with no computer) goes to the first of the person's
+     computers that claims it.
 3. The server runs its usual checks and pins a start to the claiming device. It hands over
    the run's key: `HMAC-SHA256(server secret, "misty-run-key" || 0 || runID)`. The key opens
    that run's `/internal/agent-runtime/runs/{runID}/…` calls and nothing else, and the server
@@ -99,8 +99,6 @@ The renderer calls `deviceModelCall` (`src/api/device-models.ts`). That goes to 
   have aged out of the window. The runtime writes the notes on the fast model as the run ends.
   The server recomputes which turns those were before saving the notes
   (`device_summaries.go`).
-- **Tasks that wait:** a +misty email or @misty Slack task that arrives while none of the
-  person's computers is on gets a reply in its thread saying it starts once one is.
 
 ## Reading a page
 

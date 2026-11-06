@@ -169,9 +169,9 @@ everything with them:
   Library downloads, sync pulls and replays, Space chats, notes and drawings.
 - Every change answers 403 `account_closing` with a `message` that names the deletion date and
   says subscribing again keeps the account, and with `delete_at`. That covers sync pushes,
-  uploads, saving notes and drawings, Space changes, settings, device registration, agent runs and
-  tool calls, and inbound email and Slack tasks.
-- Closing cancels the agent work under way (personal and inbound invocations, and runs it asked for
+  uploads, saving notes and drawings, Space changes, settings, device registration, and agent runs
+  and tool calls.
+- Closing cancels the agent work under way (personal invocations, and runs it asked for
   or its agents were doing). Its schedules wait instead of running, and come back on `resume`.
 - `GET /me` carries `delete_at` while the account is closing, and `null` otherwise.
 
@@ -186,8 +186,8 @@ else is refused before a handler runs. Writes that arrive another way are refuse
 the sync socket's record, favicon, workspace and claim writes in their transactions
 (`db.RequireAccountWritableTx`, answered as `account_closing`; the device keeps the write queued
 and offers it again ten minutes later), agent tool calls in the MCP server, new runs in
-`CreateCreatorAgentRun`, mentions of the account's agents in `CreateAgentMemberRequest`, inbound
-tasks, recaps and continuations in `AIActionAvailable`, and schedules in
+`CreateCreatorAgentRun`, mentions of the account's agents in `CreateAgentMemberRequest`, recaps
+and continuations in `AIActionAvailable`, and schedules in
 `ClaimDueWorkflowSchedules`. Note and drawing tickets carry the `viewer` role, so the collaboration
 Worker's rooms take no edits from it.
 

@@ -31,8 +31,8 @@ section id lands is `settingsRouting.ts`).
 | | Extensions | Stores, and one section per installed extension |
 | | Sync | Before setup, the setup wizard opens; after it, Setup (Open setup, frequency), Restore, Workspaces, Websites, Recovery and Devices |
 | Agents | Models | Sign-ins, Provider and keys, Choices, Voice keys, Search |
-| | Conversations | Defaults, Screens, Misty, Cursor, Coding, Tasks |
-| | Access | Limits (paying, sensitive and blocked sites), Approvals, Projects |
+| | Conversations | Defaults, Screens, Misty, Cursor |
+| | Access | Limits (paying, sensitive and blocked sites), Approvals, Shared folders |
 | | Memory | Remembering, Data, Context |
 
 Open a page from code with `openSettings(section, focus?)` from `@/features/settings`: the

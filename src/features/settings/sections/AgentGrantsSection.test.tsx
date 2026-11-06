@@ -14,10 +14,10 @@ const push = {
   id: "grant_1",
   agent_id: "agent_1",
   agent_name: "Builder",
-  action: "git.push",
-  scope_kind: "repo",
-  scope_id: "misty-org/misty",
-  label: "Push to misty-org/misty",
+  action: "schedule.remove",
+  scope_kind: "schedule",
+  scope_id: "schedule_1",
+  label: "Remove the weekly digest schedule",
   created_at: "2026-10-01T00:00:00Z",
   use_count: 0,
 };
@@ -29,13 +29,13 @@ it("shows a skeleton first, then grants by agent, and revokes one", async () => 
   expect(screen.getByRole("status", { name: "Approvals" })).toBeTruthy();
   expect(screen.queryByText(/Loading/)).toBeNull();
   await act(async () => resolve({ grants: [push] }));
-  expect(screen.getByText("Push to misty-org/misty")).toBeTruthy();
+  expect(screen.getByText("Remove the weekly digest schedule")).toBeTruthy();
   expect(screen.getByText(/Builder · Not used yet/)).toBeTruthy();
   mocks.revoke.mockResolvedValueOnce(undefined);
   mocks.list.mockResolvedValueOnce({ grants: [] });
   await act(async () => fireEvent.click(screen.getByRole("button", { name: "Revoke" })));
   expect(mocks.revoke).toHaveBeenCalledWith("grant_1");
-  expect(screen.queryByText("Push to misty-org/misty")).toBeNull();
+  expect(screen.queryByText("Remove the weekly digest schedule")).toBeNull();
 });
 
 it("revokes every grant for an agent", async () => {

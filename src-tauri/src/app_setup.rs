@@ -53,6 +53,8 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
             .map(std::path::Path::to_path_buf)
             .unwrap_or_default(),
     );
+    #[cfg(desktop)]
+    infra::retired_coding_data::remove_once_in_background(&runtime.environment);
     app.manage(runtime);
     #[cfg(desktop)]
     app.manage(BrowserSessionState::default());

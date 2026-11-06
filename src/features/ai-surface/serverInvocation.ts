@@ -22,7 +22,6 @@ export function toServerInvocation(input: AiInvocationRequest) {
     lesson_index: input.lessonIndex,
     media_context: input.mediaContext,
     permission_mode: input.permissionMode,
-    coding_tool: input.codingTool,
     display_captures: input.displayCaptures?.map((c) => ({
       id: c.id,
       name: c.name,

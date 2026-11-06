@@ -12,7 +12,6 @@ const tiles: Tile[] = [
   { id: "note", label: "Note" },
   { id: "drawing", label: "Drawing" },
   { id: "file", label: "File" },
-  { id: "code", label: "Code" },
 ];
 
 /**

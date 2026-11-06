@@ -153,10 +153,7 @@ built the agent harness myself and measure it on the Odysseys web-agent benchmar
 - **Agents:** act only in their own tabs; programs run in QuickJS with no network, files or
   globals; consequential actions (pay, send, delete, post) pass a policy gate; grants are
   leased and expire; sub-agents inherit the parent's grants, never more.
-- **Coding:** handed to the person's own coding CLI (Claude Code, Codex…) through its
-  permission protocol, never with bypass flags (a test pins this). Seatbelt now sandboxes the
-  documents worker (`infra/documents/worker_macos.rs`); the old Seatbelt coding harness was
-  removed.
+- **Documents:** Seatbelt sandboxes the documents worker (`infra/documents/worker_macos.rs`).
 - **`web.fetch`:** no cookies, and every address and redirect must be public (SSRF guard).
 - **Prompt injection:** page text is data in tool results; the gate, not the model, decides
   what a tool may do; the agent can't reach your signed-in tabs; risky actions can ask first.
@@ -438,11 +435,6 @@ so the later checks were driven through the app's stores.
 - `3025a8ef0` The production audit failed on advisories published since the lockfile was
   last updated: DOMPurify (critical sanitizer bypass), undici, vite and zod. Patched releases
   within the current majors; zod 4.6.7 pinned for `@midscene` through `overrides`.
-- `c084214aa` A race in the coding-tool push guard: the shared `pre-push` hook was rewritten
-  in place, so a tool starting at the same moment could run an empty (passing) hook. It
-  showed up as a flaky engine test. Now written and renamed into place.
-
-**Verified working**
 - Welcome → import skip → extensions → tab side → browser, with no sign-in.
 - Address bar: typed hosts (`example.com`, `github.com/tauri-apps/tauri`) open as URLs.
 - Real sites: Google, GitHub, Wikipedia, YouTube (video plays: `readyState` 4, time advancing),

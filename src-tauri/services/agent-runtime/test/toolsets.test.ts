@@ -8,15 +8,15 @@ const catalogOf = (names: string[]) => modelCatalog(names.map((name) => ({ name,
 const call = (toolName: string, input: unknown): ModelMessage => ({ role: "assistant", content: [{ type: "tool-call", toolCallId: toolName, toolName, input }] });
 
 describe("agent.tool", () => {
-  const catalog = catalogOf(["web.search", "web.fetch", "note.search", "screen.open", "screen.look", "code.delegate", "integration.search", "integration.execute", "agent.delegate", "browser.tab.list"]);
+  const catalog = catalogOf(["web.search", "web.fetch", "note.search", "screen.open", "screen.look", "browser.workspace.focus", "integration.search", "integration.execute", "agent.delegate", "browser.tab.list"]);
   const tools = agentTools(catalog);
   const all = [...catalog.tools.map((item) => item.modelName), ...Object.keys(tools.tools)];
 
-  it("starts in answer, with its own tab one call away and sub-agents ready, and hides projects and apps", () => {
+  it("starts in answer, with its own tab one call away and sub-agents ready, and hides apps", () => {
     expect(tools.initial).toBe("answer");
     const shown = tools.visible(all, toolState([], tools.initial));
     expect(shown).toEqual(expect.arrayContaining(["web_search", "web_fetch", "screen_look", "screen_open", "browser_tab_list", "agent_delegate", toolUseTool, toolLoadTool]));
-    for (const hidden of ["code_delegate", "integration_search", "integration_execute", "note_search"]) expect(shown).not.toContain(hidden);
+    for (const hidden of ["browser_workspace_focus", "integration_search", "integration_execute", "note_search"]) expect(shown).not.toContain(hidden);
   });
 
   it("keeps sub-agents behind a load when the run can't open its own tabs", () => {
@@ -39,7 +39,6 @@ describe("agent.tool", () => {
     const state = toolState([call(toolUseTool, { tool: "browse" }), call(toolLoadTool, { family: "integration" })], tools.initial);
     const shown = tools.visible(all, state);
     expect(shown).toEqual(expect.arrayContaining(["screen_open", "integration_search", "integration_execute"]));
-    expect(shown).not.toContain("code_delegate");
   });
 
   it("offers only the toolsets and families the run has", () => {

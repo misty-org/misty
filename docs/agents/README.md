@@ -50,7 +50,6 @@ Approved November 4, 2026. This replaces keeping chats on the computer that star
 | The agent browser beside a chat | [browser.md](browser.md) |
 | The agent at your cursor, push-to-talk, Teach mode | [cursor-companion.md](cursor-companion.md) |
 | Resuming a run without redoing finished work | [checkpoints.md](checkpoints.md) |
-| Delegating code to installed coding tools | [coding-tools.md](coding-tools.md) |
 | Benchmarks: the Odysseys campaign, which ended October 31, 2026 | [evals/odysseys.md](evals/odysseys.md) |
 | Mockups (agent chat, cursor companion) | [mockups/](mockups/) |
 
@@ -61,8 +60,6 @@ In flight: [agent browser actions](../plans/agent-browser-actions.md). Code live
 ## Interface rules
 
 - Exception: status dots on agent conversation rows (the Agents sidebar Recents) follow Claude's session list: gray at rest, pulsing while queued or working, amber when the run needs the user, red when it failed, using the `--misty-status-*` tokens in `src/styles/App.css`. A settled run's dot is filled until its conversation is read, in any signed-in session, and a hollow gray ring afterwards, meaning nothing new. Every dot keeps a text label (tooltip and screen reader). Do not spread status color to other surfaces.
-
-- Exception: diffs (`src/features/agents/components/changes/`) tint added lines green and removed lines red, like Claude Code and Codex, with matching +/− counts. The tint marks the line's change, never state; file headers, buttons, selection and focus stay monochrome, and other surfaces don't borrow these colors.
 
 - Exception: agent conversations (`src/features/agents/`, the control island, the cursor companion panel) follow `docs/agents/mockups/chat.html` (the mockup) and the rules below. Every list of steps (checklist, sub-agents, plan, app and screen requests, unfinished work) is the shared `StatusTable` from `progress/StatusTable.tsx`: a status icon, a status word, the thing itself and a short result. Working text shimmers. Status icons are allowed; amber marks "waiting for you", red marks "failed" and a soft green marks "done" (`--misty-status-*`), always with the word beside them. Connected apps show their `BrandIcon` logo. Actions are real buttons (primary for the one that moves things forward), never underlined links. The final answer is plain formatted text in the transcript, never a banner, toast or error popup; a run that did not finish shows its answer and a "Not finished" table, and a failure shows as a table row where it happened.
 

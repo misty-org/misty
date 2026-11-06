@@ -93,16 +93,94 @@ fn migration_18_keeps_the_device_id_and_drops_what_is_no_longer_kept() {
             .unwrap();
         assert_eq!(found, 0, "{table} is gone");
     }
-    // The folder itself is still shared.
-    let access: String = connection
+    assert!(connection
+        .prepare("SELECT allow_push FROM local_agent_scopes")
+        .is_err());
+}
+
+#[test]
+fn migration_19_stops_sharing_folders_shared_with_write_access() {
+    let mut connection = Connection::open_in_memory().unwrap();
+    for sql in &MIGRATIONS[..18] {
+        connection.execute_batch(sql).unwrap();
+    }
+    connection
+        .execute_batch(
+            "PRAGMA user_version = 18;
+             INSERT INTO local_agent_scopes (id,device_id,display_name,local_path,created_at,access)
+                 VALUES ('w','d','Site','/site','t','write'), ('r','d','Papers','/papers','t','read');",
+        )
+        .unwrap();
+    migrate(&mut connection).unwrap();
+    let kept: Vec<String> = connection
+        .prepare("SELECT id FROM local_agent_scopes")
+        .unwrap()
+        .query_map([], |row| row.get(0))
+        .unwrap()
+        .collect::<Result<_, _>>()
+        .unwrap();
+    assert_eq!(kept, ["r"]);
+    assert!(connection
+        .prepare("SELECT access FROM local_agent_scopes")
+        .is_err());
+}
+
+#[test]
+fn migration_20_removes_only_the_coding_preferences() {
+    let mut connection = Connection::open_in_memory().unwrap();
+    for sql in &MIGRATIONS[..19] {
+        connection.execute_batch(sql).unwrap();
+    }
+    connection
+        .execute_batch(
+            r#"PRAGMA user_version = 19;
+             INSERT INTO settings_document VALUES (1,
+                 '{"agent":{"mode":"plan","coding_default_tool":"claude","coding_usage_cap":"50"},"general":{"coding_usage_cap":"kept"}}');
+             INSERT INTO settings_state (scope, revision, document) VALUES
+                 ('["hosted"]', 4, '{"version":3,"values":{"agents.mode":"plan","agents.coding_default_tool":"codex","agents.coding_fallback_tool":"none","agents.coding_usage_cap":"50"}}'),
+                 ('settings-baseline:hosted', 2, '{"agent":{"mode":"act","coding_fallback_tool":"pi"}}'),
+                 ('clean', 7, '{ "version": 3, "values": {"agents.mode": "act"} }'),
+                 ('device:id', 1, '"device_old"'),
+                 ('profile-collections:a', 1, 'true'),
+                 ('broken', 3, '{not json "coding_default_tool"');"#,
+        )
+        .unwrap();
+    migrate(&mut connection).unwrap();
+
+    let document: String = connection
         .query_row(
-            "SELECT access FROM local_agent_scopes WHERE id = 's'",
+            "SELECT document FROM settings_document WHERE id = 1",
             [],
             |row| row.get(0),
         )
         .unwrap();
-    assert_eq!(access, "write");
-    assert!(connection
-        .prepare("SELECT allow_push FROM local_agent_scopes")
-        .is_err());
+    assert_eq!(
+        document,
+        r#"{"agent":{"mode":"plan"},"general":{"coding_usage_cap":"kept"}}"#
+    );
+    let state = |scope: &str| -> (i64, String) {
+        connection
+            .query_row(
+                "SELECT revision, document FROM settings_state WHERE scope = ?1",
+                [scope],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .unwrap()
+    };
+    assert_eq!(
+        state(r#"["hosted"]"#),
+        (5, r#"{"version":3,"values":{"agents.mode":"plan"}}"#.into())
+    );
+    assert_eq!(
+        state("settings-baseline:hosted"),
+        (3, r#"{"agent":{"mode":"act"}}"#.into())
+    );
+    // Nothing else changes, not even its spacing or revision.
+    assert_eq!(
+        state("clean"),
+        (7, r#"{ "version": 3, "values": {"agents.mode": "act"} }"#.into())
+    );
+    assert_eq!(state("device:id"), (1, r#""device_old""#.into()));
+    assert_eq!(state("profile-collections:a"), (1, "true".into()));
+    assert_eq!(state("broken"), (3, r#"{not json "coding_default_tool""#.into()));
 }

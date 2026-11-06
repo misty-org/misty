@@ -2,10 +2,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { drawingsApi } from "@/api/drawings/api";
 import { notesApi } from "@/api/notes/api";
 import { spacesApi } from "@/api/spaces/api";
-import { codeProjectsApi } from "@/api/spaces/code-projects";
 import {
   chatItem,
-  codeItem,
   drawingItem,
   libraryGalleryItem,
   noteItem,
@@ -24,7 +22,7 @@ interface SpaceGallery {
   reload: () => void;
 }
 
-/** Everything made in a Space: chats, notes, drawings, files and images, and code projects. */
+/** Everything made in a Space: chats, notes, drawings, files and images. */
 export function useSpaceGallery(
   spaceId: string,
   me: string,
@@ -89,17 +87,9 @@ export function useSpaceGallery(
               : {}),
           })),
         ),
-      codeProjectsApi.list(spaceId, controller.signal).then((r) =>
-        r.projects.map((project) => ({
-          ...codeItem(spaceId, project),
-          ...(isSpaceOwner || project.owner_user_id === me
-            ? { remove: () => codeProjectsApi.unlink(spaceId, project.id), removeLabel: "Unlink" }
-            : {}),
-        })),
-      ),
     ]).then((results) => {
       if (!live) return;
-      const names = ["chats", "notes", "drawings", "files", "code projects"];
+      const names = ["chats", "notes", "drawings", "files"];
       setItems(results.flatMap((result) => (result.status === "fulfilled" ? result.value : [])));
       setFailed(
         results.flatMap((result, index) => (result.status === "rejected" ? [names[index]] : [])),

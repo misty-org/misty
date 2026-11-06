@@ -124,8 +124,6 @@ pub(super) fn renderer_headers(headers: &HeaderMap) -> Vec<(String, String)> {
 impl AccountClient {
     pub(super) fn new() -> Result<Arc<Self>, String> {
         let http = reqwest::Client::builder()
-            // The server admits coding only from the Misty app, which names
-            // itself with this user agent (coding_access.go).
             .user_agent(format!(
                 "MistyDesktop/{} ({})",
                 env!("CARGO_PKG_VERSION"),

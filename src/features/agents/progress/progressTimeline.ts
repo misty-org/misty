@@ -141,36 +141,6 @@ const verbs: Record<string, [running: string, done: string]> = {
   fetch: ["Fetching", "Fetched"],
 };
 
-/** Code project tools read better as whole phrases than as verb + "code". */
-const codePhrases: Record<string, [running: string, done: string, subject: string]> = {
-  delegate: ["Handing", "Handed", "coding to your coding tool"],
-  wait: ["Waiting for", "Waited for", "your coding tool"],
-  read: ["Reading", "Read", "a file"],
-  list: ["Listing", "Listed", "files"],
-  find: ["Finding", "Found", "files"],
-  search: ["Searching", "Searched", "files"],
-  write: ["Writing", "Wrote", "a file"],
-  edit: ["Editing", "Edited", "a file"],
-  run: ["Running", "Ran", "a command"],
-  start: ["Starting", "Started", "a process"],
-  logs: ["Reading", "Read", "process output"],
-  processes: ["Checking", "Checked", "processes"],
-  stop: ["Stopping", "Stopped", "a process"],
-  preview: ["Opening", "Opened", "a preview"],
-};
-
-/** Git tools in a project. */
-const gitPhrases: Record<string, [running: string, done: string, subject: string]> = {
-  status: ["Checking", "Checked", "Git status"],
-  diff: ["Reviewing", "Reviewed", "changes"],
-  log: ["Reading", "Read", "history"],
-  commit: ["Committing", "Committed", "changes"],
-  branch: ["Switching", "Switched", "branches"],
-  push: ["Pushing", "Pushed", "to GitHub"],
-  pull: ["Pulling", "Pulled", "from GitHub"],
-  pull_request: ["Opening", "Opened", "a pull request"],
-};
-
 /**
  * The app's words for what a tool acts on. Tools carry the agent's own names
  * (docs/agents/harness.md, Agent vocabulary); people see the UI's labels.
@@ -204,16 +174,6 @@ export function toolParts(name: string, running: boolean): { verb: string; subje
     return { verb: running ? "Getting" : "Got", subject: "more tools" };
   if (/^log[._]work[._]checklist$/.test(name))
     return { verb: running ? "Updating" : "Updated", subject: "checklist" };
-  const code = /^code[._](\w+)$/.exec(name)?.[1];
-  if (code && codePhrases[code]) {
-    const [ing, ed, subject] = codePhrases[code];
-    return { verb: running ? ing : ed, subject };
-  }
-  const git = /^git[._](\w+)$/.exec(name)?.[1];
-  if (git && gitPhrases[git]) {
-    const [ing, ed, subject] = gitPhrases[git];
-    return { verb: running ? ing : ed, subject };
-  }
   const parts = name
     .replace(/^misty[._]/, "")
     .split(/[._]/)

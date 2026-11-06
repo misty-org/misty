@@ -68,8 +68,8 @@ export interface AiContextReference {
 }
 export interface AiInvocationDeviceContext {
   deviceId: string;
-  /** A browser tab, a folder shared with agents, a project, or the Misty browser itself. */
-  kind: "browser_tab" | "local_folder" | "project_folder" | "workspace";
+  /** A browser tab, a folder shared with agents, or the Misty browser itself. */
+  kind: "browser_tab" | "local_folder" | "workspace";
   opaqueRef: string;
   displayName?: string;
   capabilities: string[];
@@ -100,7 +100,6 @@ export type AiArtifactKind =
   | "roadmap_patch"
   | "drawing_patch"
   | "message_draft"
-  | "code_patch"
   | "terminal_command"
   | "browser_action"
   | "transfer_plan"
@@ -241,8 +240,6 @@ export interface AiInvocationRequest {
   mediaContext?: MediaContext;
   /** Ask or Auto for this turn. Omitted uses the chat's choice or its agent's default. */
   permissionMode?: "ask" | "auto";
-  /** The coding tool a delegated coding run uses this turn; omitted uses the Settings default. */
-  codingTool?: string;
   idempotencyKey: string;
   timezone?: string;
 }

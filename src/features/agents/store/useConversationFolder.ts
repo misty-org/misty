@@ -1,11 +1,11 @@
 import { create } from "zustand";
 
 /**
- * The project each conversation works in, or none (docs/agents/coding-tools.md).
- * Projects are folders on this computer, so the choice is per device and kept
- * in local storage. A new chat's choice is a draft until the conversation exists.
+ * The shared folder each conversation can read, or none. Folders are on this
+ * computer, so the choice is per device and kept in local storage. A new chat's
+ * choice is a draft until the conversation exists.
  */
-const storageKey = "misty.conversationProjects.v1";
+const storageKey = "misty.conversationFolders.v1";
 
 function load(): Record<string, string> {
   try {
@@ -30,25 +30,25 @@ function save(byConversation: Record<string, string>) {
   }
 }
 
-interface ConversationProjectState {
+interface ConversationFolderState {
   byConversation: Record<string, string>;
   /** The new chat's choice, before it has an id. */
   draft: string | null;
-  /** The project a conversation (or the new chat) uses; null for none. */
-  project(conversationId: string | undefined): string | null;
-  setProject(conversationId: string | undefined, scopeId: string | null): void;
+  /** The folder a conversation (or the new chat) can read; null for none. */
+  folder(conversationId: string | undefined): string | null;
+  setFolder(conversationId: string | undefined, scopeId: string | null): void;
   /** Gives a just-created conversation the new chat's choice. */
   adoptDraft(conversationId: string): void;
-  /** Forgets a project everywhere (it was removed). */
+  /** Forgets a folder everywhere (it stopped being shared). */
   forget(scopeId: string): void;
 }
 
-export const useConversationProject = create<ConversationProjectState>((set, get) => ({
+export const useConversationFolder = create<ConversationFolderState>((set, get) => ({
   byConversation: load(),
   draft: null,
-  project: (conversationId) =>
+  folder: (conversationId) =>
     conversationId ? (get().byConversation[conversationId] ?? null) : get().draft,
-  setProject: (conversationId, scopeId) => {
+  setFolder: (conversationId, scopeId) => {
     if (!conversationId) return set({ draft: scopeId });
     const byConversation = { ...get().byConversation };
     if (scopeId) byConversation[conversationId] = scopeId;
@@ -58,7 +58,7 @@ export const useConversationProject = create<ConversationProjectState>((set, get
   },
   adoptDraft: (conversationId) => {
     const { draft } = get();
-    if (draft && !get().byConversation[conversationId]) get().setProject(conversationId, draft);
+    if (draft && !get().byConversation[conversationId]) get().setFolder(conversationId, draft);
     set({ draft: null });
   },
   forget: (scopeId) => {
