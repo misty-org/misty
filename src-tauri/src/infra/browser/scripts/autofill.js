@@ -80,11 +80,14 @@
   let target = null;
   let targetKind = '';
   let chip = null;
+  let closeTimer = 0;
   const closeChip = () => {
     chip?.remove();
     chip = null;
   };
   const showChip = (field, kind) => {
+    // The field focus just left may still have its close waiting, which isn't about this chip.
+    clearTimeout(closeTimer);
     closeChip();
     const host = document.createElement('div');
     const shadow = host.attachShadow({ mode: 'closed' });
@@ -162,7 +165,10 @@
     targetKind = kind;
     send('focus', '&kind=' + kind);
   }, true);
-  document.addEventListener('focusout', () => setTimeout(closeChip, 150), true);
+  document.addEventListener('focusout', () => {
+    clearTimeout(closeTimer);
+    closeTimer = setTimeout(closeChip, 150);
+  }, true);
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape') closeChip();
   }, true);
