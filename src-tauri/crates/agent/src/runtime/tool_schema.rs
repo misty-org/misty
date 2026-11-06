@@ -27,6 +27,20 @@ pub(crate) fn normalize_tool_input_schema(schema: &RawJson) -> RawJson {
     RawJson::from_text(JsValue::Object(normalized).stringify()).unwrap_or_else(|_| schema.clone())
 }
 
+/// An MCP tool's schema in the order the TypeScript sent it: reading it through the MCP SDK put `type`
+/// first, and the benchmarks are tuned on those requests. Everything else, at every depth, stays put.
+pub(crate) fn type_first(schema: &RawJson) -> RawJson {
+    let Some(JsValue::Object(mut fields)) = JsValue::from_raw(schema) else {
+        return schema.clone();
+    };
+    let Some(at) = fields.iter().position(|(name, _)| name == "type") else {
+        return schema.clone();
+    };
+    let field = fields.remove(at);
+    fields.insert(0, field);
+    RawJson::from_text(JsValue::Object(fields).stringify()).unwrap_or_else(|_| schema.clone())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -72,5 +86,16 @@ mod tests {
     fn a_combinator_inside_the_properties_stays() {
         let input = r#"{"type":"object","properties":{"a":{"anyOf":[{"type":"string"}]}}}"#;
         assert_eq!(normalize_tool_input_schema(&raw(input)).get(), input);
+    }
+
+    #[test]
+    fn an_mcp_schema_goes_out_with_its_type_first_and_nothing_else_moved() {
+        let input = raw(r#"{"additionalProperties":false,"properties":{"a":{"maxLength":1,"type":"string"}},"required":["a"],"type":"object"}"#);
+        assert_eq!(
+            type_first(&input).get(),
+            r#"{"type":"object","additionalProperties":false,"properties":{"a":{"maxLength":1,"type":"string"}},"required":["a"]}"#
+        );
+        let untyped = r#"{"properties":{}}"#;
+        assert_eq!(type_first(&raw(untyped)).get(), untyped);
     }
 }

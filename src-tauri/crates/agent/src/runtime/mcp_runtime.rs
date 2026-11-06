@@ -17,7 +17,7 @@ use super::{
     text::js_prefix,
     tool_discovery::{collect_tool_pages, ToolPage},
     tool_execution::ToolExecutionResponse,
-    tool_schema::normalize_tool_input_schema,
+    tool_schema::{normalize_tool_input_schema, type_first},
     tool_transport::{object, string},
 };
 
@@ -57,7 +57,7 @@ fn describe(tool: &ListedTool) -> McpRemoteTool {
     McpRemoteTool {
         name: tool.name.clone(),
         description: js_prefix(description, 2_000).to_owned(),
-        input_schema: normalize_tool_input_schema(&schema),
+        input_schema: type_first(&normalize_tool_input_schema(&schema)),
         read_only,
         // Device tools and anything that waits for the person stay serial: a run holds one durable
         // wait at a time.

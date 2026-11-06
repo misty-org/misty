@@ -170,4 +170,5 @@ through the server's MCP gateway.
   dropped on arrival.
 - **Evals:** the Odysseys runner (`evals/odysseys/`, [evals/odysseys.md](evals/odysseys.md)) drives
   the desktop through the product path. The server's only part is `eval_turn_limit`, honored only
-  on a development server.
+  on a development server. `evals/smoke/` runs one agent through the real app on a scripted local
+  model and a throwaway server, with no key.

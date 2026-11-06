@@ -29,3 +29,26 @@ pub(super) async fn run_grants(
         signed.and_then(|records| serde_json::to_value(records).map_err(|error| error.to_string())),
     )
 }
+
+#[derive(Deserialize)]
+struct ShareFolder {
+    path: String,
+}
+
+/// Shares a folder as `agents_share_folder` does, without the system picker a test can't click.
+pub(super) async fn share_folder(
+    AxumState(bridge): AxumState<Bridge>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Response {
+    let body = match request::<ShareFolder>(&bridge, &headers, &body) {
+        Ok(body) => body,
+        Err(response) => return response,
+    };
+    let state = bridge.app.state::<MistyRuntime>();
+    let shared = state
+        .agents
+        .share_folder(body.path.into(), &[state.environment.misty_dir()])
+        .await;
+    reply(shared.map_err(|error| error.to_string()))
+}

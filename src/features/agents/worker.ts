@@ -19,6 +19,7 @@ import { DeviceOperationNotAttempted, type ClaimedWorkflowNodeJob } from "./work
 import { HeldClaims } from "./workerHeldClaim";
 import { claimNextWorkflowNodeJob, deviceExecutionRemaining, renewJobLease } from "./workerClaims";
 import { abortable, executeWorkflowNodeOnDevice } from "./workerExecute";
+import { watchRunningJob } from "./runningJobs";
 
 const leaseHeartbeatMs = 20_000;
 // Realtime notifications drop while the socket reconnects (every 15 to 60 s on the dev stack), and
@@ -168,6 +169,7 @@ export class DesktopAgentJobWorker {
     let timer: ReturnType<typeof setTimeout> | undefined;
     let heartbeat: ReturnType<typeof setInterval> | undefined;
     let renewing = false;
+    let stopWatching = () => {};
     let began = false;
     let report: () => Promise<unknown>;
     const arm = () => {
@@ -192,14 +194,16 @@ export class DesktopAgentJobWorker {
       leaseExpiresAt = job.leaseExpiresAt;
       controller.signal.throwIfAborted();
       arm();
-      heartbeat = setInterval(() => {
+      const look = () => {
         if (renewing || controller.signal.aborted) return;
         renewing = true;
         void renewJobLease(job, claim.leaseToken, localDeviceId, deviceId, controller, (next) => {
           leaseExpiresAt = next;
           arm();
         }).finally(() => (renewing = false));
-      }, leaseHeartbeatMs);
+      };
+      heartbeat = setInterval(look, leaseHeartbeatMs);
+      stopWatching = watchRunningJob(look);
       const output = await abortable(
         executeWorkflowNodeOnDevice(job, controller.signal, () => leaseExpiresAt),
         controller.signal,
@@ -233,6 +237,7 @@ export class DesktopAgentJobWorker {
     } finally {
       clearTimeout(timer);
       clearInterval(heartbeat);
+      stopWatching();
       this.active.delete(controller);
       this.held.noteJob();
     }

@@ -30,6 +30,7 @@ mod grants;
 mod models;
 mod pages;
 mod processes;
+mod window_eval;
 
 mod open;
 use open::*;
@@ -127,7 +128,10 @@ pub(crate) fn start_if_requested(app: &AppHandle) {
             .route("/processes", post(processes::processes))
             .route("/capture", post(pages::capture))
             .route("/run-grants", post(grants::run_grants))
+            .route("/share-folder", post(grants::share_folder))
             .route("/models", post(models::models))
+            .route("/windows", post(window_eval::windows))
+            .route("/window-eval", post(window_eval::window_eval))
             .with_state(bridge);
         match tokio::net::TcpListener::bind(("127.0.0.1", port)).await {
             Ok(listener) => {
