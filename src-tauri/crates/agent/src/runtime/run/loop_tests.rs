@@ -286,6 +286,7 @@ impl Harness {
             http: reqwest::Client::new(),
             search_cache: WebSearchCache::default(),
             search_endpoints: SearchEndpoints::default(),
+            page_reader: Arc::new(crate::runtime::web_fetch::reader::InProcessPageReader),
             clock: Arc::new(move || clock.load(Ordering::SeqCst)),
             before_tool: None,
         })

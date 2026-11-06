@@ -4,7 +4,6 @@ mod metadata;
 mod model;
 mod preflight;
 mod publish;
-mod runtime;
 mod stage;
 mod state;
 pub mod test_build;

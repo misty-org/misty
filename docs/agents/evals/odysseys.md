@@ -34,7 +34,8 @@ with different search services can't be compared.
 
 ### Recording a baseline
 
-1. Build the runtime, which `misty desktop dev` doesn't do, and start the dev stack. It runs with
+1. For a TypeScript baseline, build that runtime, which `misty desktop dev` doesn't do. The Rust
+   runtime needs no build of its own. Then start the dev stack. It runs with
    `MISTY_ENVIRONMENT=development`, the only setting where the server honors an eval's turn limit.
 
    ```bash
@@ -44,10 +45,12 @@ with different search services can't be compared.
 
 2. Start the desktop in development with the eval bridge and a throwaway page session. The token is
    any 24 or more characters of your own. `MISTY_DATA_ROOT` keeps this copy's settings apart from
-   your real ones, since a profile alone shares `misty.db`.
+   your real ones, since a profile alone shares `misty.db`. `MISTY_AGENT_RUNTIME=typescript` runs the
+   TypeScript runtime on its old path. Without it the app is on the Rust one. Only a debug build reads
+   this, and the old path is marked for deletion.
 
    ```bash
-   MISTY_DATA_ROOT="$HOME/.misty-odysseys" MISTY_EVAL_EPHEMERAL_PAGES=1 \
+   MISTY_AGENT_RUNTIME=typescript MISTY_DATA_ROOT="$HOME/.misty-odysseys" MISTY_EVAL_EPHEMERAL_PAGES=1 \
      MISTY_BROWSER_EVAL_BRIDGE_PORT=47123 MISTY_BROWSER_EVAL_BRIDGE_TOKEN=<token> \
      misty desktop dev
    ```
@@ -109,14 +112,14 @@ It prints each task's score side by side, the overall rubric average and perfect
 - **Refused:** different agent, fast or embedding models, reasoning, web search, task list, task
   data, turn limit or judge, or a pass that didn't finish.
 
-Each report records the runtime, the device's models, the turn limit, the commits of both
+Each report records the runtime, checked against the app, the device's models, the turn limit, the commits of both
 repositories and whether they had uncommitted changes, the judge and the task list. It holds no key.
 
 ### Settings
 
 | Variable | Meaning |
 |---|---|
-| `MISTY_ODYSSEYS_RUNTIME` | Required: `typescript` or `rust`. The person states which runtime the app is using |
+| `MISTY_ODYSSEYS_RUNTIME` | Required: `typescript` or `rust`. The pass refuses to start if the app, asked through the bridge, says it's on the other one |
 | `MISTY_BROWSER_EVAL_BRIDGE`, `MISTY_BROWSER_EVAL_BRIDGE_TOKEN` | Required: the bridge's address on this computer and the app's token |
 | `MISTY_ODYSSEYS_JUDGE_MODEL`, `MISTY_ODYSSEYS_JUDGE_KEY` | Required: `anthropic/<model>`, `google/<model>` or `openai/<model>`, and its key |
 | `MISTY_ODYSSEYS_JUDGE_BASE_URL` | An OpenAI-compatible provider's address, such as `https://openrouter.ai/api/v1`. The model goes to it as written |

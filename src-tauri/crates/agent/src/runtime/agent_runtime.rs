@@ -174,7 +174,8 @@ impl Inner {
 
 impl AgentRuntime {
     pub fn new(options: AgentRuntimeOptions) -> io::Result<Self> {
-        let AgentRuntimeOptions { data_dir, client, logger, internal_api_base, before_tool } = options;
+        let AgentRuntimeOptions { data_dir, client, logger, internal_api_base, page_reader, before_tool } = options;
+        logger.use_for_process();
         let models = Arc::new(DeviceModelStore::default());
         let control: Arc<dyn ControlPlane> = Arc::new(HttpControlPlane { client: client.clone() });
         let gateway: Arc<dyn McpGateway> = Arc::new(HttpMcpGateway { http: client.clone(), sessions: McpSessions::default() });
@@ -191,6 +192,7 @@ impl AgentRuntime {
             http: client,
             search_cache: WebSearchCache::default(),
             search_endpoints: SearchEndpoints::default(),
+            page_reader,
             clock: Arc::new(super::clock::now_ms),
             before_tool,
         };

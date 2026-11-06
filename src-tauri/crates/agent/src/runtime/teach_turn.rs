@@ -21,7 +21,7 @@ use super::{
     runtime_errors::{RuntimeError, StepFailure},
     text::{js_is_space, js_trim},
     tool_transport::{object, string, CheckpointState, HarnessCheckpoint},
-    web_fetch::fetch_step::run_device_web_fetch,
+    web_fetch::fetch_step::{run_device_web_fetch, FetchContext},
     web_search::search_step::{run_device_web_search, SearchContext},
 };
 
@@ -182,7 +182,7 @@ async fn lookup(shared: &RunShared, run_as: &str, input: &JsValue) -> JsValue {
         let context = SearchContext { client: &deps.http, saved: saved.as_ref(), cache: &deps.search_cache, endpoints: &deps.search_endpoints, now_ms: (deps.clock)().max(0) as u64 };
         run_device_web_search(&context, input).await
     } else {
-        run_device_web_fetch(input).await
+        run_device_web_fetch(FetchContext { reader: deps.page_reader.as_ref(), logger: &deps.logger }, input).await
     };
     result.unwrap_or_else(|error| object([("error", string(error.to_string()))]))
 }

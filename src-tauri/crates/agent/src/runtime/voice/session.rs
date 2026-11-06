@@ -14,7 +14,7 @@ use super::super::{
     js_json::JsValue,
     text::js_prefix,
 };
-use crate::sdk::Message;
+use crate::{runtime::logger::process_log, sdk::Message};
 
 /// The reply: words to say, or one tool to call. A field is `None` when the model didn't write it as
 /// text, which ends the turn in a session failure when the turn needs that field.
@@ -292,9 +292,9 @@ impl<'m> VoiceSession<'m> {
             return;
         }
         match stop {
-            Stop::Protocol(message) => eprintln!("[misty-agent-runtime] voice session failed {message}"),
-            Stop::Call(error) => eprintln!("[misty-agent-runtime] voice session failed {error}"),
-            Stop::Aborted => eprintln!("[misty-agent-runtime] voice session failed This operation was aborted"),
+            Stop::Protocol(message) => process_log(&format!("voice session failed {message}")),
+            Stop::Call(error) => process_log(&format!("voice session failed {error}")),
+            Stop::Aborted => process_log("voice session failed This operation was aborted"),
         }
         self.emit(json!({ "type": "error", "message": STOPPED }));
     }

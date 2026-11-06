@@ -751,7 +751,7 @@ dependencies = [
  "flate2",
  "futures-util",
  "hex",
- "html5ever",
+ "misty-page-reader",
  "rand 0.8.8",
  "regex",
  "reqwest",
@@ -763,6 +763,16 @@ dependencies = [
  "tokio",
  "tokio-tungstenite",
  "url",
+]
+
+[[package]]
+name = "misty-page-reader"
+version = "0.1.0"
+dependencies = [
+ "html5ever",
+ "regex",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

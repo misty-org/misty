@@ -50,6 +50,8 @@ pub(crate) enum WebFetchFailed {
     FetchFailed,
     TooManyRedirects,
     UnsupportedContent,
+    /// The page arrived, but whatever reads it failed.
+    ReadFailed,
 }
 
 impl WebFetchFailed {
@@ -58,6 +60,7 @@ impl WebFetchFailed {
             Self::InvalidUrl => "invalid_url",
             Self::PrivateAddress => "private_address",
             Self::FetchTimeout => "fetch_timeout",
+            Self::ReadFailed => "page_read_failed",
             Self::FetchFailed => "fetch_failed",
             Self::TooManyRedirects => "too_many_redirects",
             Self::UnsupportedContent => "unsupported_content",

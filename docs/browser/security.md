@@ -17,10 +17,13 @@ Most serious first.
    reach further than `.misty` and grants: Misty's file picker lists any folder
    (`file_access/looks.rs`), the `asset:` scope in `tauri.conf.json` still covers whole folders like
    Documents, and `misty-browser-sync` and the credential store open their files themselves.
-2. **The agent runtime isn't confined.** The Node process started by
-   `src-tauri/src/infra/agent_runtime/mod.rs` handles untrusted web content with full user rights,
-   while document parsing is sandboxed. The same file honors `MISTY_AGENT_RUNTIME_NODE` and
-   `MISTY_AGENT_RUNTIME_ENTRY` in release builds and falls back to a Node found on the computer.
+2. **Agent code runs in the main process.** The runtime is a crate inside Misty, with Misty's rights,
+   and it holds the person's model keys. It rests on Rust's memory safety and on agents reaching only
+   the fixed actions list, with each run's panics kept inside its own task. Untrusted input stays
+   outside: pages go to a confined worker, and documents and the shell to their own. Its run store
+   (`src-tauri/crates/agent/src/runtime/run/store.rs`) opens its files itself, like the other two named
+   above, in its own folder only. `sandbox-exec` on macOS holds the workers, and the Windows page reader
+   hasn't been run.
 3. **Sites can detect Misty.** `window.__TAURI_INTERNALS__` and `window.__MISTY_PASSWORDS__` are
    visible to every page, though the user agent presents as Safari.
 4. **Kiri may trust an iframe as its parent page on Windows.** `kiri/src/plugin.rs` identifies the
@@ -44,9 +47,11 @@ Most serious first.
 | Extensions | Nothing runs, and nothing runs wider, than the person approved on this computer. See [below](#extension-permissions) | `src-tauri/src/infra/extensions/approvals.rs` |
 | Native messages from pages | Each needs a per-tab token, built so page hooks never see it | `src-tauri/src/infra/browser/scripts/` |
 | The app's own interface | `script-src 'self'` blocks injected scripts | `src-tauri/tauri.conf.json` |
-| Untrusted documents | Parsed in a worker under `sandbox-exec` or an AppContainer | `src-tauri/src/infra/documents/` |
+| Untrusted documents | Parsed in a worker under `sandbox-exec` or an AppContainer | `src-tauri/src/infra/documents/`, `src-tauri/sandbox/permissions/document-worker.sb` |
+| Untrusted pages `web.fetch` reads | Read in a worker with no network and no files, under `sandbox-exec` or an AppContainer. A failure fails the fetch, with no second try in Misty's process. On macOS a test has the real worker try to read and list files, write, connect, resolve a name and start a program from inside its profile, and all are refused. Windows hasn't been run | `src-tauri/src/infra/page_reader/`, `src-tauri/sandbox/permissions/page-reader.sb` |
 | Agent programs | Run in QuickJS with no network, files or globals | [harness](../agents/harness.md) |
-| The runtime's local port | `/v1` routes need a signed request and voice sockets a one-time ticket. Workflow routes have no auth, but need custom headers a website can't send without CORS approval, so other local processes can reach them | `src-tauri/services/agent-runtime/src/index.ts` |
+| Driving the agent runtime | There is no local port or socket to reach: only app commands, and voice and live sessions open only from a person's own window, which the window that opened one alone can use. Debug builds can still run the old TypeScript runtime with `MISTY_AGENT_RUNTIME=typescript`, on a signed local port. It isn't compiled into a release | `src-tauri/src/infra/agent_runtime/`, `src-tauri/sandbox/actions/actions.toml` |
+| A failed agent run | Runs, device calls and sessions are separate tasks, so a panic ends that one and leaves the browser. A build with `panic=abort` doesn't compile, and tests panic inside a call and a session | `src-tauri/src/infra/agent_runtime/mod.rs` |
 | Releases | macOS builds are notarized, Windows builds signed, updates verified with minisign, and the eval bridge isn't compiled in | `cli/src/release/`, `src-tauri/src/infra/browser/eval_bridge/mod.rs` |
 
 The webviews sandbox their own page processes. Nothing in Misty's code overrides TLS errors or

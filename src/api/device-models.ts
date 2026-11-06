@@ -25,7 +25,12 @@ export async function deviceModelCall<T>(
   signal?: AbortSignal,
 ): Promise<T> {
   signal?.throwIfAborted();
-  const call = invoke<{ status: number; body: unknown }>("agent_runtime_call", { name, body });
+  // As text, because Rust would otherwise parse it into a map that sorts its keys, and a schema has
+  // to reach the model in the order it was written.
+  const call = invoke<{ status: number; body: unknown }>("agent_runtime_call", {
+    name,
+    body: JSON.stringify(body),
+  });
   const reply = await (signal
     ? Promise.race([
         call,

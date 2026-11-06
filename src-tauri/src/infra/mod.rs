@@ -27,6 +27,8 @@ mod browser_profile;
 pub(crate) mod browser_profile_view;
 pub mod browser_provider;
 pub mod browser_shortcuts;
+#[cfg(any(target_os = "macos", windows))]
+pub(crate) mod builtin_workers;
 pub mod cloud_clipboard;
 pub mod credential_store;
 #[cfg(desktop)]
@@ -57,6 +59,7 @@ pub mod misty_home;
 pub mod models;
 pub mod native_clipboard;
 pub mod navigation_names;
+pub(crate) mod page_reader;
 pub mod paths;
 #[cfg(desktop)]
 pub mod permissions;

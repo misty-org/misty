@@ -1,14 +1,34 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { CompanionConversation } from "./companionConversation";
 
-const mocks = vi.hoisted(() => ({
-  ticket: vi.fn(),
-  append: vi.fn(),
-  close: vi.fn(),
-  tool: vi.fn(),
-}));
-// The socket comes from the agent runtime on this computer (agent_runtime_voice_ticket).
-vi.mock("@tauri-apps/api/core", () => ({ invoke: mocks.ticket }));
+const mocks = vi.hoisted(() => {
+  class Socket {
+    static all: Socket[] = [];
+    readyState = 1;
+    bufferedAmount = 0;
+    opened = Promise.resolve();
+    onmessage?: (e: { data: string }) => void;
+    onerror?: () => void;
+    onclose?: () => void;
+    sent: Record<string, unknown>[] = [];
+    constructor() {
+      Socket.all.push(this);
+    }
+    send(s: string) {
+      this.sent.push(JSON.parse(s));
+    }
+    receive(e: object) {
+      this.onmessage?.({ data: JSON.stringify(e) });
+    }
+    close() {
+      this.readyState = 3;
+    }
+  }
+  return { Socket, append: vi.fn(), close: vi.fn(), tool: vi.fn() };
+});
+// The socket is a session with the agent runtime on this computer.
+vi.mock("@/api/runtimeSocket", () => ({ OPEN: 1, RuntimeSocket: mocks.Socket }));
+const { Socket } = mocks;
 vi.mock("./companionVoicePlayback", () => ({
   CompanionVoicePlayback: class {
     constructor(
@@ -27,40 +47,15 @@ vi.mock("./companionVoicePlayback", () => ({
     heard = () => ({ itemId: "reply", audioEndMs: 420 });
   },
 }));
-class Socket {
-  static OPEN = 1;
-  static all: Socket[] = [];
-  readyState = 1;
-  bufferedAmount = 0;
-  onmessage?: (e: { data: string }) => void;
-  onerror?: () => void;
-  onclose?: () => void;
-  sent: Record<string, unknown>[] = [];
-  constructor(readonly url: URL) {
-    Socket.all.push(this);
-  }
-  send(s: string) {
-    this.sent.push(JSON.parse(s));
-  }
-  receive(e: object) {
-    this.onmessage?.({ data: JSON.stringify(e) });
-  }
-  close() {
-    this.readyState = 3;
-  }
-}
 let sessions: CompanionConversation[] = [];
 beforeEach(() => {
   vi.clearAllMocks();
   Socket.all = [];
-  vi.stubGlobal("WebSocket", Socket);
-  mocks.ticket.mockResolvedValue({ url: "ws://127.0.0.1:4000/v1/device/voice?ticket=one" });
   mocks.tool.mockResolvedValue("task");
 });
 afterEach(() => {
   sessions.forEach((s) => s.close());
   sessions = [];
-  vi.unstubAllGlobals();
 });
 const tick = async () => {
   for (let i = 0; i < 15; i++) await Promise.resolve();
@@ -109,7 +104,6 @@ it("commits directly, streams one reply and reuses the authenticated socket", as
   socket.receive({ type: "turn.ready" });
   await tick();
   expect(Socket.all).toHaveLength(1);
-  expect(mocks.ticket).toHaveBeenCalledOnce();
   expect(mocks.tool).not.toHaveBeenCalled();
 });
 it("stops buffered audio immediately and waits for cancellation before a new recording", async () => {

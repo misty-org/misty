@@ -25,7 +25,24 @@ export interface DeviceModels {
   search: string | null;
 }
 
+/**
+ * Which runtime the app is really on. `MISTY_ODYSSEYS_RUNTIME` names what the person means to measure,
+ * and the debug app's bridge knows what it started: a report mustn't carry a label that isn't true.
+ */
+export function assertRuntime(meant: string, running: string | undefined): void {
+  if (running !== meant)
+    throw new Error(
+      `This pass says it measures the ${meant} runtime, but the app is on ${running ?? "an unknown runtime"}. ` +
+        "Start the app with MISTY_AGENT_RUNTIME=typescript to measure TypeScript, and without it to measure Rust.",
+    );
+}
+
 export async function deviceModels(bridge: Bridge): Promise<DeviceModels> {
-  const reply = await bridgeCall<{ models: Record<string, string> | null; reasoning: string | null; search: string | null }>(bridge, "/models", {});
-  return { models: reply.models ?? {}, reasoning: reply.reasoning, search: reply.search };
+  return (await deviceState(bridge)).device;
+}
+
+/** The device's models and, from the app itself, the runtime it's on. */
+export async function deviceState(bridge: Bridge): Promise<{ device: DeviceModels; runtime: string | undefined }> {
+  const reply = await bridgeCall<{ models: Record<string, string> | null; reasoning: string | null; search: string | null; runtime?: string }>(bridge, "/models", {});
+  return { device: { models: reply.models ?? {}, reasoning: reply.reasoning, search: reply.search }, runtime: reply.runtime };
 }

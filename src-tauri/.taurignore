@@ -1,5 +1,5 @@
 # Native services have their own Cargo output directories. Watching their
 # generated files causes native rebuilds to trigger further rebuilds.
 **/target/**
-# The agent runtime is TypeScript and has its own build; the app starts its output.
+# The TypeScript runtime has its own build, and only a debug baseline starts its output.
 services/agent-runtime/**

@@ -6,7 +6,7 @@
 //   npm run pass
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { deviceModels } from "./bridge.ts";
+import { assertRuntime, deviceModels, deviceState } from "./bridge.ts";
 import { EvalClient, FatalPassError } from "./client.ts";
 import { loadConfig } from "./config.ts";
 import { chooseDevice, deviceContexts, type AccountDevice } from "./device.ts";
@@ -33,8 +33,10 @@ if (!agentId) throw new Error("This account has no agent.");
 const { devices } = await client.json<{ devices: AccountDevice[] }>("/devices");
 const identity = { userId: me.id, agentId, deviceId: chooseDevice(devices, config.deviceId) };
 
+const { device, runtime: appRuntime } = await deviceState(config.bridge);
+// The report's label comes from the person, so the app has to agree with it.
+assertRuntime(config.runtime, appRuntime);
 // The run's model comes from the device. A pass with none would measure nothing.
-const device = await deviceModels(config.bridge);
 if (!device.models.agent) throw new Error("This device has no usable agent model. Save a model key and choose an agent model in the dev app's Settings › Models.");
 // The desktop must be signed in to this account on this server, or nothing it signs will count.
 await deviceContexts(config.bridge, config.deviceApiBase, identity.deviceId, identity.userId, identity.agentId);

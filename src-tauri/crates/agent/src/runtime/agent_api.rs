@@ -4,7 +4,7 @@ use std::{fmt, path::PathBuf, sync::Arc};
 
 use thiserror::Error;
 
-use super::logger::Logger;
+use super::{logger::Logger, web_fetch::reader::PageReader};
 
 /// Lets a test make a tool misbehave.
 #[doc(hidden)]
@@ -100,6 +100,9 @@ pub struct AgentRuntimeOptions {
     pub logger: Logger,
     /// What a start with no callback URL goes to. There's no built-in server address.
     pub internal_api_base: Option<String>,
+    /// Who reads pages `web.fetch` gets. There's no default, so the app can't end up reading untrusted
+    /// pages in its own process by leaving this out.
+    pub page_reader: Arc<dyn PageReader>,
     /// Lets a test make a tool misbehave. Nothing else sets it.
     #[doc(hidden)]
     pub before_tool: Option<ToolHook>,

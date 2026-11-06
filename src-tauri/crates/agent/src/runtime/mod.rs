@@ -135,3 +135,5 @@ pub(crate) mod tools_parity_tests;
 pub use agent_api::{runtime_client_builder, AgentRuntimeOptions, ResumedRuns, RuntimeApiError, StartRequest, StartedRun, ToolHook};
 pub use agent_runtime::AgentRuntime;
 pub use logger::{LogSink, Logger};
+pub use misty_page_reader::readable::ReadablePage;
+pub use web_fetch::reader::{InProcessPageReader, PageReadError, PageReader};

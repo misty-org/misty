@@ -3150,6 +3150,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "misty-agent"
+version = "0.1.0"
+dependencies = [
+ "base64 0.22.1",
+ "brotli-decompressor",
+ "chrono",
+ "flate2",
+ "futures-util",
+ "hex",
+ "misty-page-reader",
+ "rand 0.8.6",
+ "regex",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "sha2",
+ "thiserror 1.0.69",
+ "tokio",
+ "tokio-tungstenite",
+ "url",
+]
+
+[[package]]
 name = "misty-audio-capture"
 version = "0.1.0"
 dependencies = [
@@ -3229,9 +3252,11 @@ dependencies = [
  "kiri",
  "libc",
  "lz4_flex",
+ "misty-agent",
  "misty-audio-capture",
  "misty-browser-sync",
  "misty-credential-store",
+ "misty-page-reader",
  "misty-windows-confine",
  "objc",
  "objc2",
@@ -3276,6 +3301,16 @@ dependencies = [
  "zeroize",
  "zip",
  "zstd",
+]
+
+[[package]]
+name = "misty-page-reader"
+version = "0.1.0"
+dependencies = [
+ "html5ever",
+ "regex",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

@@ -157,7 +157,8 @@ so the Rust version should behave the same. No third-party Rust LLM library, inc
    benchmark task, and comparing its requests with the TypeScript runtime's.
 3. Port the rest, one provider at a time, comparing against the baseline.
 4. Delete the TypeScript runtime when the Rust one scores the same or better on the same tasks and
-   models. Node stays for development until then.
+   models. Node stays for development until then, and no release has it: only a debug build with
+   `MISTY_AGENT_RUNTIME=typescript` starts it (`infra/agent_runtime/typescript_baseline/`).
 
 `src-tauri/services/agent-runtime/test/sdk-parity.record.test.ts` records what the Vercel AI SDK sends and
 parses against a local mock, and `src-tauri/crates/agent/tests/sdk_parity.rs` replays those fixtures against
@@ -239,7 +240,8 @@ Once granted, commands can add and edit files there, but can't delete, rename or
 ## What's been tested
 
 A confined shell on macOS 26.5, on scratch files. An earlier test ran the Node runtime under a similar
-profile, and writes, deletes and process starts outside its folder were denied the same way.
+profile, and writes, deletes and process starts outside its folder were denied the same way. The page
+reader on the same macOS, as the second table says.
 
 
 | Check | Result |
@@ -253,10 +255,34 @@ profile, and writes, deletes and process starts outside its folder were denied t
 | The same two from `/Library/Developer/CommandLineTools/usr/bin` | Worked, but not every Mac has them |
 | `ruby` | Failed |
 
+The page reader's real worker, in its real profile, from its debug build's probes
+(`infra/page_reader/macos_tests.rs`):
+
+| Check | Result |
+| --- | --- |
+| Every page recorded from the TypeScript runtime (84), read in the worker and in-process | Same results |
+| Read a file in the home folder or `/etc/passwd`, list the home folder | Denied |
+| Write in its own folder, or outside | Denied |
+| Connect to a live local listener or `1.1.1.1:443`, resolve a name | Denied |
+| Start `/usr/bin/true` | Denied |
+| A worker that fails, a page over the limit, a copy changed on disk | The fetch fails or the copy is replaced; nothing reads in-process |
+
+A worker written fresh for each read took about 160 ms, and a kept copy about 9 ms (release build, 30
+reads of a small page, median, from a test script rather than the app).
+
+The Rust runtime, with a device model set and idle, in a small program with no model call
+(`crates/agent/examples/idle_memory.rs`, release build with the app's size settings): 7.6 MB resident,
+against 328 MB for one reading of the Node runtime. That's the crate alone, not the Misty app or a
+running agent.
+
+The app's commands and tasks have tests, including a panic inside a call and inside a session.
+
 Not tested yet:
 
-- The Rust runtime, including its model clients, memory use and benchmark scores.
-- Page reading in a confined worker.
+- The Rust runtime in the running app: a run claimed and finished, resumed after a restart, voice and
+  live transcription end to end, the channels through a real webview, and any real provider.
+- Benchmark scores, and memory during a run.
+- The page reader on Windows, which has only been compiled, and how long each read takes there.
 - The real `shell.run` path, the shell on Windows, and whether scripts without network or packages still
   save steps in the benchmarks.
 

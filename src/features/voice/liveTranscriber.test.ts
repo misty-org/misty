@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { LiveTranscriber, type SocketLike } from "./liveTranscriber";
+import { LiveTranscriber, type LiveSession, type SocketLike } from "./liveTranscriber";
 
 class FakeSocket implements SocketLike {
   binaryType = "blob";
@@ -9,7 +9,7 @@ class FakeSocket implements SocketLike {
   onmessage: SocketLike["onmessage"] = null;
   onclose: SocketLike["onclose"] = null;
   onerror: SocketLike["onerror"] = null;
-  constructor(public url: string) {}
+  constructor(public session: LiveSession) {}
   send(data: string | ArrayBufferLike | ArrayBufferView) {
     this.sent.push(typeof data === "string" ? data : new Uint8Array(data as ArrayBuffer));
     if (typeof data === "string" && JSON.parse(data).type === "finish")
@@ -40,13 +40,13 @@ const segment = (id: string, text: string, final: boolean, revision = 1) => ({
 describe("LiveTranscriber", () => {
   it("keeps audio spoken before the relay is ready and sends it first", async () => {
     let socket!: FakeSocket;
-    const live = new LiveTranscriber({}, (url) => (socket = new FakeSocket(url)));
+    const live = new LiveTranscriber({}, (session) => (socket = new FakeSocket(session)));
     live.push("mic", Uint8Array.from([1, 2]));
-    const connected = live.connect("wss://relay/v1/live/transcribe", "v1.a.b", {
-      language: "en",
-      context: { terms: ["Misty"] },
-    });
-    expect(socket.url).toBe("wss://relay/v1/live/transcribe?ticket=v1.a.b");
+    const connected = live.connect(
+      { channels: ["mic"], language: "en" },
+      { language: "en", context: { terms: ["Misty"] } },
+    );
+    expect(socket.session).toEqual({ channels: ["mic"], language: "en" });
     socket.onopen?.({});
     expect(JSON.parse(socket.sent[0] as string)).toEqual({
       type: "start",
@@ -67,8 +67,11 @@ describe("LiveTranscriber", () => {
 
   it("keeps a translation that arrives after its speech, out of the transcript's words", async () => {
     let socket!: FakeSocket;
-    const live = new LiveTranscriber({}, (url) => (socket = new FakeSocket(url)));
-    const connected = live.connect("wss://relay", "v1.a.b", { language: "auto", target: "en" });
+    const live = new LiveTranscriber({}, (session) => (socket = new FakeSocket(session)));
+    const connected = live.connect(
+      { channels: ["system"], language: "auto" },
+      { language: "auto", target: "en" },
+    );
     socket.onopen?.({});
     expect(JSON.parse(socket.sent[0] as string)).toEqual({
       type: "start",
@@ -91,9 +94,9 @@ describe("LiveTranscriber", () => {
     const changes: string[] = [];
     const live = new LiveTranscriber(
       { onChange: (t) => changes.push(t.text()) },
-      (url) => (socket = new FakeSocket(url)),
+      (session) => (socket = new FakeSocket(session)),
     );
-    const connected = live.connect("wss://r", "t", {});
+    const connected = live.connect({ channels: ["mic"], language: "en" }, {});
     socket.relay({ type: "ready", channels: ["mic"], maxMs: 1 });
     await connected;
     socket.relay({ type: "segment", segment: segment("1", "Let's move", false) });
@@ -109,9 +112,9 @@ describe("LiveTranscriber", () => {
     const notices: string[] = [];
     const live = new LiveTranscriber(
       { onNotice: (n) => notices.push(n) },
-      (url) => (socket = new FakeSocket(url)),
+      (session) => (socket = new FakeSocket(session)),
     );
-    const connected = live.connect("wss://r", "t", {});
+    const connected = live.connect({ channels: ["mic"], language: "en" }, {});
     socket.relay({
       type: "error",
       message: "Live transcription couldn't start. Try again in a moment.",

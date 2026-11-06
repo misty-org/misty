@@ -42,9 +42,18 @@ fn saved_providers() -> Vec<String> {
 
 /// This device's model choices and keys, for the agent runtime on this computer. None when
 /// no agent model has a usable provider and no Soniox key is saved.
+#[cfg(debug_assertions)]
 pub async fn current_document(app: &tauri::AppHandle) -> Option<Value> {
-    let runtime = app.try_state::<MistyRuntime>()?;
-    let document = runtime.settings.document().await.ok()?;
+    device_document(app).await.ok().flatten()
+}
+
+/// The same, where it matters why there is none: an error is settings or a keychain that couldn't be
+/// read, and `None` is a person with no models. Telling the runtime a passing failure means no models
+/// would fail every run it resumed with `model_key_needed`.
+pub async fn device_document(app: &tauri::AppHandle) -> Result<Option<Value>, String> {
+    const UNREADABLE: &str = "Misty couldn't read this device's models.";
+    let runtime = app.try_state::<MistyRuntime>().ok_or(UNREADABLE)?;
+    let document = runtime.settings.document().await.map_err(|_| UNREADABLE)?;
     let section = document.get("models").cloned().unwrap_or(Value::Null);
     let uses_chatgpt = header::ROLES.iter().any(|(_, setting)| {
         section
@@ -63,13 +72,22 @@ pub async fn current_document(app: &tauri::AppHandle) -> Option<Value> {
     }
     let token = chatgpt.map(|(token, _)| token);
     tokio::task::spawn_blocking(move || {
-        header::document(&section, &|provider| match provider {
+        let unreadable = std::cell::Cell::new(false);
+        let document = header::document(&section, &|provider| match provider {
             "chatgpt" => token.clone(),
-            _ => load_key(provider),
-        })
+            _ => crate::infra::credential_store::load(KEY_SERVICE, provider).unwrap_or_else(|_| {
+                unreadable.set(true);
+                None
+            }),
+        });
+        if unreadable.get() {
+            Err(UNREADABLE.to_owned())
+        } else {
+            Ok(document)
+        }
     })
     .await
-    .ok()?
+    .map_err(|_| UNREADABLE.to_owned())?
 }
 
 fn provider(id: &str) -> Result<&str, String> {

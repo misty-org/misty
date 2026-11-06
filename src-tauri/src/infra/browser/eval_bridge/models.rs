@@ -12,7 +12,10 @@ pub(super) async fn models(
         return response;
     }
     let document = crate::infra::models::current_document(&bridge.app).await;
-    reply(Ok(without_keys(document.as_ref())))
+    let mut answer = without_keys(document.as_ref());
+    // A report says which runtime it measured, and this is what checks the person's word for it.
+    answer["runtime"] = json!(crate::infra::agent_runtime::runtime_name());
+    reply(Ok(answer))
 }
 
 /// Only names known to carry no secret are copied; providers and their keys never are.

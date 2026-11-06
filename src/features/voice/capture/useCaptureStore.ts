@@ -2,7 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { create } from "zustand";
 import { rememberCapture } from "@/features/recall";
-import { voiceApi, voiceDeviceId } from "../api";
+import { voiceDeviceId } from "../api";
 import { LiveTranscriber, type LiveChannel } from "../liveTranscriber";
 import { captureApi, type VoiceNoteMode, type VoiceSourceKind, type VoiceTurn } from "./captureApi";
 import { savedTurns } from "./transcriptTurns";
@@ -136,8 +136,7 @@ export const useCaptureStore = create<CaptureStore>((set, get) => ({
       ),
     );
     try {
-      const device = await voiceDeviceId();
-      const ticket = await voiceApi.liveTicket({ device_id: device, channels, language });
+      await voiceDeviceId();
       const hearsOther = source.kind === "system" || source.kind === "app";
       if (source.mic || source.kind === "mic" || hearsOther) {
         current.native = true;
@@ -154,7 +153,7 @@ export const useCaptureStore = create<CaptureStore>((set, get) => ({
         current.tabId = source.tabId;
         current.sessions.add(await invoke<number>("voice_tab_capture_start", { id: source.tabId }));
       }
-      await live.connect(ticket.url, ticket.ticket, { language, context: { text: source.title } });
+      await live.connect({ channels, language }, { language, context: { text: source.title } });
       if (running === current) set({ phase: "live" });
     } catch (error) {
       await release(current);

@@ -24,29 +24,10 @@ const MAX_RESPONSE: u64 = 4 * 1024 * 1024;
 const STAGING_TIMEOUT: Duration = Duration::from_secs(60);
 const PROCESSING_TIMEOUT: Duration = Duration::from_secs(120);
 
-const PROFILE: &str = r#"(version 1)
-(deny default)
-(allow process-exec (literal (param "TOOL")))
-(allow file-read* (literal (param "TOOL")) (subpath (param "WORK"))
-  (subpath "/System/Library") (subpath "/usr/lib")
-  (subpath "/System/Volumes/Preboot/Cryptexes/OS/System/Library")
-  (subpath "/System/Volumes/Preboot/Cryptexes/OS/usr/lib")
-  (literal "/") (literal "/dev/null") (literal "/dev/urandom")
-  (regex #"^/(opt/homebrew|usr/local)/(Cellar|opt)/.*[.]dylib$")
-  (regex #"^/(opt/homebrew|usr/local)/(Cellar|opt)/.*/lib$"))
-(allow file-write* (subpath (param "WORK")))
-(allow sysctl-read)
-(allow file-read-metadata)
-"#;
+const PROFILE: &str = include_str!("../../../sandbox/permissions/document-worker.sb");
 
 fn worker() -> Result<&'static [u8], String> {
-    builtin_worker("document-processing", PROTOCOL)
-}
-
-fn builtin_worker(service: &str, protocol: u32) -> Result<&'static [u8], String> {
-    // Executable bytes are part of the signed Misty binary, never downloaded or
-    // resolved from a user-controlled directory.
-    include!(concat!(env!("OUT_DIR"), "/builtin_workers.rs"))
+    crate::infra::builtin_workers::builtin_worker("document-processing", PROTOCOL)
 }
 
 /// Builds the sandboxed command that runs `executable` with `work` as its only

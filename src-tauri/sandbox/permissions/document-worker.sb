@@ -1,0 +1,16 @@
+;; permission-document-worker: what the worker that parses an untrusted document may reach. It reads
+;; the one private copy it's handed and writes only in its own folder, with no network. See
+;; src-tauri/src/infra/documents.
+(version 1)
+(deny default)
+(allow process-exec (literal (param "TOOL")))
+(allow file-read* (literal (param "TOOL")) (subpath (param "WORK"))
+  (subpath "/System/Library") (subpath "/usr/lib")
+  (subpath "/System/Volumes/Preboot/Cryptexes/OS/System/Library")
+  (subpath "/System/Volumes/Preboot/Cryptexes/OS/usr/lib")
+  (literal "/") (literal "/dev/null") (literal "/dev/urandom")
+  (regex #"^/(opt/homebrew|usr/local)/(Cellar|opt)/.*[.]dylib$")
+  (regex #"^/(opt/homebrew|usr/local)/(Cellar|opt)/.*/lib$"))
+(allow file-write* (subpath (param "WORK")))
+(allow sysctl-read)
+(allow file-read-metadata)

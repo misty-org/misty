@@ -92,7 +92,6 @@ Releases build, sign and upload from your computer; GitHub holds the source, the
 | `APPLE_SIGNING_IDENTITY` | Installed Developer ID Application certificate, on macOS |
 | `MISTY_NOTARY_KEYCHAIN_PROFILE` | Configured `notarytool` Keychain profile, on macOS |
 | `WINDOWS_CERTIFICATE_THUMBPRINT` / `WINDOWS_TIMESTAMP_URL` | Local certificate and HTTPS timestamp service, on Windows |
-| `MISTY_RELEASE_NODE` | The Node binary the app ships: universal on macOS, an `.exe` on Windows |
 
 Restore the updater key from your backup, then run `npm run release:keys` to check it against `release/trust.json` and save its path. Authenticate `gh`, install the release Rust targets and `cargo-cyclonedx`, and run `misty doctor release`.
 
@@ -102,6 +101,6 @@ The steps run in this order, each one confirmed first:
 2. Build and upload: compiles, signs, notarizes and uploads verified assets to the draft. For both systems, run `misty release` on each at the same commit.
 3. Publish: downloads the hosted files, checks their updater signatures, and makes the release public and latest, which is where installed apps look for `latest.json`. Published assets cannot be replaced, so a fix needs a new version.
 
-A release has no built-in server: people choose Misty Cloud, their own server or browsing only in the setup wizard. Its Content Security Policy (`cli/src/release/config.rs`) therefore lets the app reach any `https:` and `wss:` origin, as development does, plus the agent runtime's live relay on `ws://127.0.0.1`; plain `http:` stays closed and only the app's own scripts run.
+A release has no built-in server: people choose Misty Cloud, their own server or browsing only in the setup wizard. Its Content Security Policy (`cli/src/release/config.rs`) therefore lets the app reach any `https:` and `wss:` origin, as development does; plain `http:` and `ws:` stay closed and only the app's own scripts run.
 
 macOS builds are universal and need both Apple Silicon and Intel Rust targets.

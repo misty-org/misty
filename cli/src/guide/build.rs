@@ -24,10 +24,6 @@ pub(super) fn run(workspace: &Workspace) -> Result<()> {
     if kind == Kind::Release {
         return super::release::run(workspace, false);
     }
-    let agents = cliclack::confirm("Include agents? The build takes longer")
-        .initial_value(false)
-        .interact()?;
-
     offer_latest_code(workspace)?;
     let problems = tools::missing(workspace);
     if !problems.is_empty() {
@@ -40,16 +36,13 @@ pub(super) fn run(workspace: &Workspace) -> Result<()> {
     install_dependencies(workspace)?;
 
     cliclack::log::step("Building. The first build takes a while.")?;
-    let installer = test_build::run(workspace, agents)?;
+    let installer = test_build::run(workspace)?;
 
     cliclack::log::success(format!("Built {}", installer.display()))?;
     if cfg!(windows) {
         cliclack::log::info(
             "Windows warns about unsigned apps: choose More info, then Run anyway.",
         )?;
-    }
-    if !agents {
-        cliclack::log::info("This build has no agents.")?;
     }
     if cliclack::confirm("Show it in its folder?")
         .initial_value(true)

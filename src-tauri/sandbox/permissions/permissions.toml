@@ -8,11 +8,11 @@ description = "The chat's workspace and system tools, with no network. See agent
 
 [[permission]]
 identifier = "permission-document-worker"
-description = "The one file it's handed, with no network. See src-tauri/src/infra/documents."
+description = "The one file it's handed, with no network. See document-worker.sb."
 
 [[permission]]
 identifier = "permission-page-reader"
-description = "The page it's handed, with no network or files."
+description = "The page it's handed, with no network or files. See page-reader.sb."
 
 [[permission]]
 identifier = "permission-browser-import"

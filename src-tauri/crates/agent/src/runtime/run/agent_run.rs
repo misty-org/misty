@@ -23,7 +23,10 @@ use crate::runtime::{
     tool_execution::rejected_without_effect,
     tool_monitor::RejectedCalls,
     tool_transport::{HarnessCheckpoint, ToolCheckpoints, ToolTransport},
-    web_fetch::{fetch_step::run_device_web_fetch, tool::WEB_FETCH_TOOL},
+    web_fetch::{
+        fetch_step::{run_device_web_fetch, FetchContext},
+        tool::WEB_FETCH_TOOL,
+    },
     web_search::{
         search_step::{run_device_web_search, SearchContext},
         tool::WEB_SEARCH_TOOL,
@@ -116,7 +119,7 @@ impl RunShared {
             return run_device_web_search(&context, value).await;
         }
         if name == WEB_FETCH_TOOL {
-            return run_device_web_fetch(value).await;
+            return run_device_web_fetch(FetchContext { reader: deps.page_reader.as_ref(), logger: &deps.logger }, value).await;
         }
         let input = locked(&self.documents).repair(name, value).into_owned();
         let output = execute_tool(&self.tool_deps(environment), call_id, name, &input, resumed).await?;

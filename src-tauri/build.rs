@@ -201,7 +201,12 @@ fn build_builtin_workers() {
     let profile = env::var("PROFILE").expect("Cargo profile");
     let out_dir = PathBuf::from(env::var_os("OUT_DIR").expect("Cargo output directory"));
     let mut source = String::from("match (service, protocol) {\n");
-    for (service, protocol) in [("document-processing", 6)] {
+    // The page reader's code is in a crate the agent runtime shares, outside its service's folder.
+    let shared = root.with_file_name("crates").join("page-reader");
+    for input in ["src", "Cargo.toml"] {
+        println!("cargo:rerun-if-changed={}", shared.join(input).display());
+    }
+    for (service, protocol) in [("document-processing", 6), ("page-reader", 1)] {
         let directory = root.join(service);
         for input in ["src", "Cargo.toml", "Cargo.lock"] {
             println!("cargo:rerun-if-changed={}", directory.join(input).display());

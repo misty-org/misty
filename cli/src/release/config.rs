@@ -16,14 +16,12 @@ pub(super) fn public_environment() -> Result<BTreeMap<String, String>> {
 /// The release Content Security Policy. The server is chosen in the app, never at build time,
 /// and the renderer reaches it, its storage and its collaboration Worker directly (the Spaces
 /// socket, note collaboration, signed downloads), so any `https:` and `wss:` origin may be
-/// reached, as in development. Plain `http:` and `ws:` stay closed except the agent runtime's
-/// live relay on this computer. Account cookies live in Rust, never in the WebView, and only the
-/// app's own scripts run (`script-src 'self'`).
+/// reached, as in development. Plain `http:` and `ws:` stay closed. Account cookies live in Rust,
+/// never in the WebView, and only the app's own scripts run (`script-src 'self'`).
 pub(super) fn csp() -> String {
     [
         "default-src 'self' customprotocol: asset:",
-        // ws://127.0.0.1 is the live transcription relay of the agent runtime on this computer.
-        "connect-src 'self' ipc: asset: http://asset.localhost http://ipc.localhost ws://127.0.0.1:* https: wss:",
+        "connect-src 'self' ipc: asset: http://asset.localhost http://ipc.localhost https: wss:",
         "frame-src 'self' asset: http://asset.localhost customprotocol: misty-extension: http://misty-extension.localhost",
         "img-src 'self' asset: http://asset.localhost blob: data: https:",
         "media-src 'self' blob: asset: http://asset.localhost",
@@ -62,9 +60,7 @@ pub fn build() -> Result<Value> {
         "app": { "security": { "csp": csp } },
         "bundle": {
             "createUpdaterArtifacts": true,
-            "windows": windows,
-            "resources": super::runtime::bundle_settings()["resources"],
-            "externalBin": super::runtime::bundle_settings()["externalBin"]
+            "windows": windows
         },
         "plugins": {
             "updater": {
@@ -77,16 +73,10 @@ pub fn build() -> Result<Value> {
 }
 
 /// A build to try before releasing: the same policy, without signing or updater artifacts.
-pub(super) fn test_build(agents: bool) -> Value {
-    let mut bundle = json!({ "createUpdaterArtifacts": false });
-    if agents {
-        let runtime = super::runtime::bundle_settings();
-        bundle["resources"] = runtime["resources"].clone();
-        bundle["externalBin"] = runtime["externalBin"].clone();
-    }
+pub(super) fn test_build() -> Value {
     json!({
         "app": { "security": { "csp": csp() } },
-        "bundle": bundle
+        "bundle": { "createUpdaterArtifacts": false }
     })
 }
 
@@ -152,10 +142,10 @@ mod tests {
     }
 
     #[test]
-    fn a_release_reaches_any_https_server_and_the_local_relay() {
+    fn a_release_reaches_any_https_server() {
         let csp = csp();
         let connect = directive(&csp, "connect-src");
-        for source in ["https:", "wss:", "ws://127.0.0.1:*", "ipc:"] {
+        for source in ["https:", "wss:", "ipc:"] {
             assert!(connect.contains(&source), "connect-src lacks {source}");
         }
         assert!(directive(&csp, "img-src").contains(&"https:"));
@@ -171,7 +161,9 @@ mod tests {
         assert!(!connect
             .iter()
             .any(|source| source.starts_with("http://localhost")
-                || source.starts_with("ws://localhost")));
+                || source.starts_with("http://127.0.0.1")
+                || source.starts_with("ws://localhost")
+                || source.starts_with("ws://127.0.0.1")));
         assert_eq!(directive(&csp, "script-src"), vec!["'self'"]);
         assert!(!csp.contains("unsafe-eval"));
     }

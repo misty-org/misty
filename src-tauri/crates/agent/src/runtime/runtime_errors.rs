@@ -258,7 +258,7 @@ pub(crate) fn classify_runtime_error(error: &RuntimeError) -> ClassifiedError {
     // can never be found (a whole Odysseys run ended this way with nothing logged).
     let description = runtime_error_description(error, 0);
     let flat = SPACES.replace_all(&description, " ");
-    eprintln!("[misty-agent-runtime] unclassified_failure {}", js_prefix(&flat, 1_500));
+    super::logger::process_log(&format!("unclassified_failure {}", js_prefix(&flat, 1_500)));
     classified("agent_runtime_failed", "Misty could not complete this request.")
 }
 

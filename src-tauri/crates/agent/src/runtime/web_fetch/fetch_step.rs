@@ -1,11 +1,13 @@
 //! One page read on this device, answered like a Misty tool call.
 use std::sync::LazyLock;
 
+use misty_page_reader::readable::{billing_note, browser_note, READABLE_LIMIT};
 use regex::Regex;
 
 use crate::runtime::{
     js_json::JsValue,
     js_regex::js_regex,
+    logger::Logger,
     runtime_errors::RuntimeError,
     text::js_trim,
     tool_execution::{settle_device_call, ToolExecutionResponse},
@@ -14,8 +16,15 @@ use crate::runtime::{
 
 use super::{
     public_fetch::{fetch_public_page, WebFetchFailed},
-    readable::{billing_note, browser_note, readable_page, READABLE_LIMIT},
+    reader::{PageReadError, PageReader},
 };
+
+/// What a run's fetches need from the app.
+#[derive(Clone, Copy)]
+pub(crate) struct FetchContext<'a> {
+    pub(crate) reader: &'a dyn PageReader,
+    pub(crate) logger: &'a Logger,
+}
 
 /// What each failure tells the model, so it can plan around it.
 fn failure_words(code: WebFetchFailed) -> &'static str {
@@ -26,6 +35,7 @@ fn failure_words(code: WebFetchFailed) -> &'static str {
         WebFetchFailed::FetchFailed => "the page could not be reached",
         WebFetchFailed::TooManyRedirects => "the page redirected too many times",
         WebFetchFailed::UnsupportedContent => "that file or page is not readable text",
+        WebFetchFailed::ReadFailed => "the page could not be read here; opening it in your own browser tab may work",
     }
 }
 
@@ -38,7 +48,7 @@ pub(crate) fn fetch_refused(status: u16, title: &str) -> bool {
 }
 
 /// One page read on this device. Answers like a Misty tool call: a result, or a coded failure.
-pub(crate) async fn device_web_fetch(input: &JsValue) -> ToolExecutionResponse {
+pub(crate) async fn device_web_fetch(context: FetchContext<'_>, input: &JsValue) -> ToolExecutionResponse {
     let address = js_trim(input.get("url").and_then(JsValue::as_str).unwrap_or(""));
     if address.is_empty() {
         return ToolExecutionResponse::tool_error("invalid_arguments", "web.fetch needs a url.");
@@ -49,9 +59,16 @@ pub(crate) async fn device_web_fetch(input: &JsValue) -> ToolExecutionResponse {
         Ok(page) => page,
         Err(code) => return failed(code),
     };
-    // A page with no element at all threw in the TypeScript's parser, which read as a failed fetch.
-    let Ok(readable) = readable_page(&page.body, &page.content_type, question, READABLE_LIMIT) else {
-        return failed(WebFetchFailed::FetchFailed);
+    let readable = match context.reader.read(&page.body, &page.content_type, question, READABLE_LIMIT).await {
+        Ok(readable) => readable,
+        // A page with no element at all threw in the TypeScript's parser, which read as a failed fetch.
+        Err(PageReadError::NoDocumentElement) => return failed(WebFetchFailed::FetchFailed),
+        // Reading is where the page is contained, so a failure there fails this fetch and nothing
+        // tries the page again somewhere with less around it.
+        Err(PageReadError::Reader(reason)) => {
+            context.logger.text(&format!("web_fetch_reader_failed {reason}"));
+            return failed(WebFetchFailed::ReadFailed);
+        }
     };
     let note = if fetch_refused(page.status, &readable.title) {
         Some(REFUSED_NOTE)
@@ -74,21 +91,28 @@ pub(crate) async fn device_web_fetch(input: &JsValue) -> ToolExecutionResponse {
 
 /// Runs web.fetch on the device, with the same outcomes as a call through Misty's gateway:
 /// a failure is rejected without effect, so the model may correct it or carry on.
-pub(crate) async fn run_device_web_fetch(input: &JsValue) -> Result<JsValue, RuntimeError> {
-    settle_device_call(device_web_fetch(input).await).await
+pub(crate) async fn run_device_web_fetch(context: FetchContext<'_>, input: &JsValue) -> Result<JsValue, RuntimeError> {
+    settle_device_call(device_web_fetch(context, input).await).await
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::runtime::tool_transport::object;
+    use crate::runtime::{tool_transport::object, web_fetch::reader::InProcessPageReader};
+
+    const READER: InProcessPageReader = InProcessPageReader;
+
+    fn context(logger: &Logger) -> FetchContext<'_> {
+        FetchContext { reader: &READER, logger }
+    }
 
     #[tokio::test]
     async fn answers_failures_in_words_the_model_can_act_on() {
+        let logger = Logger::default();
         let code = |response: &ToolExecutionResponse| response.tool_error.as_ref().unwrap().stringify();
-        assert!(code(&device_web_fetch(&JsValue::Object(Vec::new())).await).contains("invalid_arguments"));
+        assert!(code(&device_web_fetch(context(&logger), &JsValue::Object(Vec::new())).await).contains("invalid_arguments"));
         assert_eq!(
-            code(&device_web_fetch(&object([("url", string("http://127.0.0.1/"))])).await),
+            code(&device_web_fetch(context(&logger), &object([("url", string("http://127.0.0.1/"))])).await),
             r#"{"code":"private_address","message":"that address is not a public website"}"#
         );
     }
@@ -104,7 +128,8 @@ mod tests {
 
     #[tokio::test]
     async fn a_failed_fetch_is_rejected_without_effect() {
-        let failed = run_device_web_fetch(&object([("url", string("file:///etc/passwd"))])).await.unwrap_err();
+        let logger = Logger::default();
+        let failed = run_device_web_fetch(context(&logger), &object([("url", string("file:///etc/passwd"))])).await.unwrap_err();
         assert!(crate::runtime::tool_execution::rejected_without_effect(&failed));
         assert_eq!(failed.to_string(), "invalid_url: use an http or https address");
     }

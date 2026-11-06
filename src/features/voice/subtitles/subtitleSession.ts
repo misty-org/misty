@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { errorText } from "@/shared/lib/format";
-import { voiceApi, voiceDeviceId } from "../api";
+import { voiceDeviceId } from "../api";
 import { decodePcm } from "../capture/useCaptureStore";
 import { LiveTranscriber, type LiveChannel } from "../liveTranscriber";
 import type { Transcript } from "../transcript/transcript";
@@ -90,12 +90,7 @@ export class SubtitleSession {
     );
     try {
       const pids = await this.appPids(prefs);
-      const device = await voiceDeviceId();
-      const ticket = await voiceApi.liveTicket({
-        device_id: device,
-        channels: [channel],
-        language,
-      });
+      await voiceDeviceId();
       if (this.over) return;
       this.nativeOpen = true;
       const id = await invoke<number>("voice_capture_start", {
@@ -112,11 +107,10 @@ export class SubtitleSession {
         await invoke("voice_capture_stop");
         return;
       }
-      await live.connect(ticket.url, ticket.ticket, {
-        language,
-        target,
-        context: sonioxContext(prefs.context),
-      });
+      await live.connect(
+        { channels: [channel], language },
+        { language, target, context: sonioxContext(prefs.context) },
+      );
       if (!this.over) this.host.draw({ status: "live" });
     } catch (error) {
       if (!this.over) await this.finish(errorText(error) || "Subtitles couldn't start.");
