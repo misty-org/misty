@@ -106,6 +106,15 @@ pub(super) fn normalize_settings_document(document: &mut Value) -> bool {
     );
     changed |= ensure_section_defaults(
         root,
+        "autofill",
+        &[
+            ("addresses_enabled", json!(true)),
+            ("cards_enabled", json!(true)),
+            ("offer_to_save", json!(true)),
+        ],
+    );
+    changed |= ensure_section_defaults(
+        root,
         "advanced",
         &[("frame_pacing_overlay_enabled", json!(false))],
     );

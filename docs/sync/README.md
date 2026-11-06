@@ -34,7 +34,7 @@ profile is open there.
 |---|---|
 | Tabs, splits, tab groups, pinned tabs | Same everywhere. The newest tabs from elsewhere load ahead of being opened |
 | Bookmarks, history, downloads list | Same everywhere. Downloaded files stay where they were downloaded |
-| Saved passwords | Same everywhere, within the profile |
+| Saved passwords, addresses and cards | Same everywhere, within the profile ([autofill](../browser/autofill.md)) |
 | Cookies | Merged per cookie, newest wins. Signing out of a site signs out everywhere |
 | localStorage | Whole origin, newest wins, up to 8 MiB per site |
 | Back/forward list, scroll, form state | Per tab. Sensitive fields stay excluded |

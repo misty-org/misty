@@ -5,6 +5,8 @@ import { Button, Notification } from "@/shared/ui";
 import { useEffect } from "react";
 import { setBrowserError } from "./browserErrors";
 import { browserRuntimeId, useBrowserRuntimeStore } from "@/features/webviews/browserRuntime";
+import { AutofillChip } from "./AutofillChip";
+import { AutofillOfferNotice } from "./AutofillOfferNotice";
 import { PasswordFillMenu } from "./PasswordFillMenu";
 import { PasswordOfferNotice } from "./PasswordOfferNotice";
 
@@ -45,8 +47,10 @@ export function BrowserNotices({ tab, active }: { tab: WorkspaceView; active: bo
         </>
       ) : null}
 
+      <AutofillChip tabId={tab.id} runtimeId={browserRuntimeId(tab)} active={active} />
       <PasswordFillMenu tabId={tab.id} runtimeId={browserRuntimeId(tab)} active={active} />
       <PasswordOfferNotice runtimeId={browserRuntimeId(tab)} active={active} />
+      <AutofillOfferNotice runtimeId={browserRuntimeId(tab)} active={active} />
       {downloadNotice || compatibilityIssue ? (
         <Notification
           key={downloadNotice ?? compatibilityIssue?.url}

@@ -17,6 +17,7 @@ const kindNames: Record<string, string> = {
   history: "History",
   extension_sync: "Extension settings",
   passwords: "Passwords",
+  autofill: "Addresses and cards",
   extensions: "Extensions",
   site_permissions: "Site permissions",
   search: "Search",

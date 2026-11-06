@@ -173,6 +173,20 @@ permissions = [
 ]
 
 [[set]]
+identifier = "action-browser-autofill"
+description = "Saved addresses and cards, and filling them into pages"
+permissions = [
+  "allow-browser-autofill-address-save",
+  "allow-browser-autofill-addresses-list",
+  "allow-browser-autofill-card-save",
+  "allow-browser-autofill-cards-list",
+  "allow-browser-autofill-choose",
+  "allow-browser-autofill-delete",
+  "allow-browser-autofill-offer-respond",
+  "allow-browser-autofill-open",
+]
+
+[[set]]
 identifier = "action-browser-history"
 description = "Read and change browsing history"
 permissions = [

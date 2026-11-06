@@ -21,6 +21,7 @@ import type { ComponentType } from "react";
 import type { SettingOwnership } from "./devicePreferences/registry";
 import { AdvancedSection } from "./sections/AdvancedSection";
 import { AppearanceSection } from "./sections/AppearanceSection";
+import { AutofillSettings } from "./sections/AutofillSettings";
 import { BrowserPermissionSettings } from "./sections/BrowserPermissionSettings";
 import { BrowserLinksSettings, DownloadsSettings } from "./sections/BrowserSection";
 import { ModelsSection } from "./models/ModelsSection";
@@ -141,6 +142,7 @@ export const settingsRegistry: readonly SettingsRegistryEntry[] = [
   block("privacy", "browser-permissions", "Websites", BrowserPermissionSettings, "resource"),
   block("advanced", "advanced", "Advanced", AdvancedSection),
   block("passwords", "passwords", "Passwords", PasswordsSettings, "resource"),
+  block("passwords", "autofill", "Autofill", AutofillSettings),
   block("extensions", "browser-extensions", "Extensions", ExtensionsSettings, "resource"),
   block("sync", "sync", "Sync", SyncSection),
   block("models", "models", "Models", ModelsSection),

@@ -52,6 +52,10 @@ pub(super) fn browser_viewport_script(
                 "\n",
                 include_str!("passwords.js"),
                 "\n",
+                include_str!("autofill_fields.js"),
+                "\n",
+                include_str!("autofill.js"),
+                "\n",
                 include_str!("extension_store.js")
             ),
         )
