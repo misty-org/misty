@@ -33,7 +33,7 @@ fn readiness_key(account: &str, profile: &str, id: &str) -> String {
 }
 /// Where a profile's journal and removals are kept on this device: the account for
 /// the personal profile, as before profiles, and the account and profile otherwise.
-fn journal_scope(account: &str, profile: &str) -> String {
+pub(super) fn journal_scope(account: &str, profile: &str) -> String {
     if profile == crate::infra::profile_windows::PERSONAL {
         account.to_owned()
     } else {

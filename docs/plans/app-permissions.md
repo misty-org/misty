@@ -93,8 +93,7 @@ window, and `src-tauri/src/platform/app_command_policy.rs` narrows that by name 
 | Dictation typing into other apps | Off, asks on first use | On or off in Settings |
 | Extensions | What the person approves on install, from the store's manifest | Remove or change it per extension |
 
-Extension permissions get audited before the MVP, since the security audit didn't check how they're
-enforced. Any fixes may touch Kiri.
+The audit of how they're enforced is in [browser security](../browser/security.md#extension-permissions).
 
 ## The agent runtime: Rust, inside Misty
 
@@ -292,7 +291,7 @@ Coding is removed, and its leftovers get deleted, which can't be undone:
 4. The `sandbox/` folder and `AppManifest`, one window at a time.
 5. The file gate, the first-download prompt and first-use prompts.
 6. Move the allowed job list into native code.
-7. Audit extension permissions.
+7. Audit extension permissions. Done 2026-11-06.
 8. Bring Windows level with macOS, then release both.
 
 Update [browser security](../browser/security.md) as each step lands, and fold this plan into it when

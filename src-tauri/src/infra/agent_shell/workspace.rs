@@ -84,9 +84,25 @@ fn make_link(target: &Path, link: &Path) -> std::io::Result<()> {
     fs::symlink(target, link)
 }
 
+/// A junction rather than a symbolic link, because Windows only lets administrators and developer
+/// mode make those.
 #[cfg(windows)]
 fn make_link(target: &Path, link: &Path) -> std::io::Result<()> {
-    fs::symlink_dir(target, link)
+    use std::os::windows::process::CommandExt;
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    let status = std::process::Command::new("cmd.exe")
+        .args(["/d", "/c", "mklink", "/J"])
+        .arg(link)
+        .arg(target)
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .creation_flags(CREATE_NO_WINDOW)
+        .status()?;
+    if status.success() {
+        Ok(())
+    } else {
+        Err(std::io::ErrorKind::Other.into())
+    }
 }
 
 /// The bytes held by the files under `folder`, without following links.

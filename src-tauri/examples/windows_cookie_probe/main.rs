@@ -3,6 +3,14 @@
 //! No network navigation, live provider accounts, or existing browser profiles.
 // Mirrors `infra::website_data`, so the modules' `super::` paths resolve here too.
 #[cfg(windows)]
+/// The included app files go through the app's file gate. This probe is its own small program with
+/// nothing to gate, so plain file access stands in for it.
+mod infra {
+    pub(crate) mod file_access {
+        pub(crate) use std::fs;
+    }
+}
+
 #[path = "../../src/infra/website_data"]
 mod website_data {
     pub(super) mod cookie_cdp;

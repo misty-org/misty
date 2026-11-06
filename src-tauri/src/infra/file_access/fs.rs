@@ -1,5 +1,7 @@
 //! `std::fs`, through the gate. Each function has the standard signature and checks the path first,
 //! so swapping `use std::fs` for this is the whole change at a call site.
+// Some of these only have callers on one platform.
+#![cfg_attr(windows, allow(dead_code))]
 use std::{
     fs, io,
     path::{Path, PathBuf},

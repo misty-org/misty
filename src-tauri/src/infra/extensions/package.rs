@@ -27,6 +27,11 @@ pub struct Review {
     pub private_allowed: bool,
     pub has_options: bool,
     pub manifest_version: u64,
+    /// What it asks for that the person hasn't approved on this computer yet.
+    #[serde(default)]
+    pub added_permissions: Vec<String>,
+    #[serde(default)]
+    pub added_hosts: Vec<String>,
 }
 
 fn strings(value: &Value) -> Vec<String> {
@@ -162,7 +167,24 @@ pub fn inspect(manifest: &Value, entry: CatalogEntry, token: String) -> Result<R
         private_allowed: manifest["incognito"] != "not_allowed",
         has_options: manifest.get("options_ui").is_some() || manifest.get("options_page").is_some(),
         manifest_version: version,
+        added_permissions: Vec::new(),
+        added_hosts: Vec::new(),
     })
+}
+
+/// Windows reads some names as something else: `a:b` writes to a stream of `a`, `a.` and `a `
+/// are `a`, and `con` or `aux` are devices. Packages come from the same stores on every
+/// computer, so no platform accepts them.
+fn portable_path(name: &str) -> bool {
+    const DEVICES: [&str; 22] = [
+        "con", "prn", "aux", "nul", "com1", "com2", "com3", "com4", "com5", "com6", "com7", "com8",
+        "com9", "lpt1", "lpt2", "lpt3", "lpt4", "lpt5", "lpt6", "lpt7", "lpt8", "lpt9",
+    ];
+    !name.contains(':')
+        && name.split('/').all(|part| {
+            let stem = part.split('.').next().unwrap_or_default().to_ascii_lowercase();
+            !part.ends_with(['.', ' ']) && !DEVICES.contains(&stem.as_str())
+        })
 }
 
 pub fn extract(
@@ -198,6 +220,7 @@ pub fn extract(
         let relative = Path::new(name);
         if name.contains('\\')
             || name.contains('\0')
+            || !portable_path(name)
             || relative
                 .components()
                 .any(|p| !matches!(p, Component::Normal(_)))

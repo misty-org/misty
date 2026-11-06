@@ -15,6 +15,7 @@ import {
   offeredStores,
   parseInstallations,
   profileInstallationsRaw,
+  requestInstall,
   storeHomes,
   storeNames,
   updateInstallation,
@@ -48,6 +49,7 @@ export function ExtensionsSettings() {
   const agentAccess = profile
     ? Boolean(resolveSetting(profile, "extensions.agent_access").value)
     : true;
+  const waiting = runtime.fromProfile.filter(({ id }) => !installed.some((item) => item.id === id));
   async function work(action: () => Promise<unknown>) {
     setBusy(true);
     setFailure("");
@@ -87,6 +89,17 @@ export function ExtensionsSettings() {
           description="Within their existing browser access."
         />
       </DesktopSettingsSection>
+      {waiting.length > 0 && (
+        <DesktopSettingsSection title="From your other computers">
+          {waiting.map(({ id, name }) => (
+            <DesktopSettingsRow key={id} label={name || id}>
+              <Button variant="outline" onClick={() => requestInstall(id)}>
+                Review
+              </Button>
+            </DesktopSettingsRow>
+          ))}
+        </DesktopSettingsSection>
+      )}
       {!runtime.ready && installed.length > 0 ? (
         <SkeletonList label="Extensions" rows={Math.min(installed.length, 4)} trailing />
       ) : (

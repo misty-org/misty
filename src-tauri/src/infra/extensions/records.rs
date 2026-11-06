@@ -114,6 +114,7 @@ pub(crate) fn reconciled(
 #[derive(serde::Serialize)]
 pub struct ListedExtension {
     id: String,
+    name: String,
     enabled: bool,
 }
 
@@ -140,6 +141,7 @@ pub async fn profile_extensions_list(webview: tauri::Webview) -> Result<ProfileE
         .filter_map(parse)
         .map(|extension| ListedExtension {
             id: extension.store_id,
+            name: extension.name,
             enabled: extension.enabled,
         })
         .collect();

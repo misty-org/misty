@@ -1,3 +1,4 @@
+#[cfg(target_os = "macos")]
 use crate::infra::file_access::fs;
 // Retain the original browser profile for existing embedded tabs.
 const LEGACY_STORE_ID: [u8; 16] = [

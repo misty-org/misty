@@ -1,6 +1,8 @@
 //! The few places Misty looks at a path no grant covers. Each learns only what kind of thing a path
 //! is, its real location, or a folder's names, sizes and dates, never a file's contents, and each
 //! has its own function so reading this file lists them all.
+// Some of these only have callers on one platform.
+#![cfg_attr(windows, allow(dead_code))]
 use std::{
     fs, io,
     path::{Path, PathBuf},

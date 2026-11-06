@@ -4,16 +4,18 @@
 //! no network, no environment beyond what's set here, and no way to reach tabs, keys or the rest of
 //! `.misty`.
 //!
-//! Rust starts every command itself, so the limits don't depend on anything an agent wrote. Only
-//! macOS has its OS wall so far, so commands are refused elsewhere rather than run without one.
+//! Rust starts every command itself, so the limits don't depend on anything an agent wrote. Linux has
+//! no OS wall here yet, so commands are refused there rather than run without one.
 mod workspace;
 
 #[cfg(target_os = "macos")]
 mod macos;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod output;
 #[cfg(target_os = "macos")]
 mod process_tree;
+#[cfg(windows)]
+mod windows;
 
 #[cfg(all(test, target_os = "macos"))]
 // Tests build their fixtures directly, outside the file gate.
@@ -95,7 +97,17 @@ async fn platform_run(
     macos::run(workspace, request, timeout, stop).await
 }
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(windows)]
+async fn platform_run(
+    workspace: &Path,
+    request: &ShellRequest,
+    timeout: Duration,
+    stop: Arc<AtomicBool>,
+) -> Result<ShellOutcome, String> {
+    windows::run(workspace, request, timeout, stop).await
+}
+
+#[cfg(not(any(target_os = "macos", windows)))]
 async fn platform_run(
     _workspace: &Path,
     _request: &ShellRequest,

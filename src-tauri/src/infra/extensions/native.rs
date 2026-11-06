@@ -26,6 +26,9 @@ extern "C" {
     );
     fn misty_extensions_navigation(view: *mut c_void, action: *mut c_void) -> bool;
     fn misty_extensions_set_compat_channel(install: extern "C" fn(*mut c_void));
+    fn misty_extensions_set_navigation_policy(
+        policy: extern "C" fn(*const c_char, *const c_char, *const c_char) -> bool,
+    );
     fn misty_extensions_compat_message(message: *mut c_void, reply: *mut c_void);
     fn misty_extensions_supported() -> bool;
     fn misty_extensions_tab_event(
@@ -66,6 +69,7 @@ pub fn initialize(app: &tauri::AppHandle) {
         // Compat requests ride Kiri's extension transport.
         kiri::extensions::bridge::set_extension_channel(CompatHost);
         misty_extensions_set_compat_channel(install_compat_channel);
+        misty_extensions_set_navigation_policy(navigation_policy);
         wry::set_native_navigation_interceptor(|view, action| {
             misty_extensions_navigation(view, action)
         });
@@ -225,6 +229,9 @@ pub fn caller_profile(view: &tauri::Webview) -> Result<String, String> {
         Err("Only the Misty workspace can manage extensions.".into())
     }
 }
+
+#[cfg(all(test, target_os = "macos"))]
+mod checks;
 
 /// The scheme extension pages load from: WebKit's on macOS, Chromium's in
 /// WebView2 on Windows.

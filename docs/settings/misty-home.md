@@ -33,7 +33,8 @@ Nothing else holds a credential.
 `misty.db` holds (one numbered migration each, `PRAGMA user_version`): credentials,
 settings, navigation names, keyboard shortcuts, the signed-in session record, trusted-device
 records, site permissions, shared agent folders, the browser library (downloads and history),
-extension sync journals and pending removals, and the layout version. Files from an earlier
+extension sync journals, pending removals and what the person approved for each extension, and the
+layout version. Files from an earlier
 layout are not read.
 
 Two stores stay outside `misty.db` on purpose: the browser-sync vault and the workspace

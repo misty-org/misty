@@ -51,14 +51,15 @@ pub async fn extensions_check_updates(
                 if current.entry.digest == latest.digest {
                     return Ok::<_, String>(None);
                 }
+                let approval =
+                    approvals::read(&sync::journal_scope(&account, &profile), &installation.id)?;
+                // Never approved here: it isn't running, and the row in Settings says so.
+                if approval.is_none() {
+                    return Ok::<_, String>(None);
+                }
                 let review = prepare(&app, &account, &profile, &installation.id).await?;
-                if review.blocked
-                    || review
-                        .permissions
-                        .iter()
-                        .any(|p| !installation.permissions.contains(p))
-                    || review.hosts.iter().any(|p| !installation.hosts.contains(p))
-                {
+                // The old version keeps running until the person answers.
+                if approvals::needs_review(approval.as_ref(), &review) {
                     return Ok(Some(InstalledState {
                         new_tab: None,
                         id: installation.id.clone(),
@@ -68,7 +69,7 @@ pub async fn extensions_check_updates(
                         review: Some(review),
                     }));
                 }
-                commit(&app, &profile, &review.token).await?;
+                commit(&app, &profile, &review.token, false).await?;
                 Ok(Some(
                     activate(&app, &account, &profile, &installation).await?,
                 ))

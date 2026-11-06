@@ -61,7 +61,7 @@ function InstallRequest() {
   const [review, setReview] = useState<ExtensionReview | null>(null);
   const [failure, setFailure] = useState("");
   const [busy, setBusy] = useState(false);
-  const [privateAccess, setPrivateAccess] = useState(true);
+  const [privateAccess, setPrivateAccess] = useState(false);
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     setReview(null);
@@ -76,7 +76,12 @@ function InstallRequest() {
       .prepare(key)
       .then((value) => {
         if (!current) return;
-        setPrivateAccess(value.privateAllowed);
+        // Private tabs stay off until the person turns them on, here or in Settings. A review of
+        // something already added keeps what they chose.
+        setPrivateAccess(
+          installations().find((item) => item.id === value.entry.id && item.installed)
+            ?.privateAccess ?? false,
+        );
         setReview(value);
       })
       .catch((error: unknown) => {

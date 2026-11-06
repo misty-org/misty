@@ -53,7 +53,7 @@ export function ExtensionSettingsItem({
       {local?.status === "needs-review" && (
         <DesktopSettingsRow
           label="Review access"
-          description="This version asks for access you haven't approved on this computer."
+          description="It asks for access you haven't approved on this computer."
         >
           <Button variant="outline" disabled={busy} onClick={() => requestInstall(item.id)}>
             Review

@@ -48,8 +48,9 @@ export const extensionsNative = {
    * extension ID, or a Firefox Add-ons slug from the add-on's page.
    */
   prepare: (id: string) => invoke<ExtensionReview>("extensions_prepare", { id }),
-  commit: (token: string, generation: string | null = null) =>
-    invoke<ExtensionReview>("extensions_commit", { token, generation }),
+  /** `approved` is the person's yes to the review of this token; only its dialog passes true. */
+  commit: (token: string, generation: string | null, approved: boolean) =>
+    invoke<ExtensionReview>("extensions_commit", { token, generation, approved }),
   reconcile: (account: string, installations: Installation[], agentAccess: boolean) =>
     invoke<InstalledState[]>("extensions_reconcile", {
       account,

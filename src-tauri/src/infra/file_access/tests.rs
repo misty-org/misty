@@ -1,3 +1,5 @@
+// Most of these paths are Unix paths, so the Windows build uses fewer of the imports.
+#![cfg_attr(windows, allow(unused_imports))]
 use std::{fs as std_fs, io::ErrorKind, path::PathBuf};
 
 use super::{check, fs};

@@ -124,6 +124,7 @@ mod tests {
             "misty-cursor-",
             "misty-cursor-spoof",
             "misty-browser-a",
+            "misty-popup-01951d32-40ac-7000-8000-000000000001",
             "browser-a",
             "render-control",
             "misty-agent-01951d32-40ac-7000-8000-000000000001",
@@ -190,6 +191,8 @@ mod tests {
             "misty-browser-storage-1",
             "misty-browser-capture-1",
             "render-control",
+            // The small window an extension's popup page moves into.
+            "misty-popup-01951d32-40ac-7000-8000-000000000001",
         ];
         for raw in CAPABILITIES {
             let capability: serde_json::Value = serde_json::from_str(raw).unwrap();
@@ -197,6 +200,12 @@ mod tests {
             assert!(capability.get("windows").is_none(), "{name} is scoped by window");
             if name == "kiri-pages" {
                 assert_eq!(capability["permissions"], serde_json::json!(["kiri:default"]));
+                // Extension pages sit in the same views, but under their own schemes, which
+                // this list has to leave out for them to reach no command at all.
+                assert_eq!(
+                    capability["remote"]["urls"],
+                    serde_json::json!(["https://*:*", "http://*:*"])
+                );
                 continue;
             }
             assert!(capability.get("remote").is_none(), "{name} grants remote URLs");

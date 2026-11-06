@@ -101,6 +101,7 @@ export function useExtensionsRuntime() {
   const profilesReady = useDevicePreferences((s) => s.ready);
   const profilesError = useDevicePreferences((s) => s.error);
   const raw = profileInstallationsRaw(profile);
+  const reconcileRequest = useExtensionsStore((s) => s.reconcileRequest);
   const agentAccess = profile
     ? Boolean(resolveSetting(profile, "extensions.agent_access").value)
     : true;
@@ -148,7 +149,7 @@ export function useExtensionsRuntime() {
     return () => {
       current = false;
     };
-  }, [account, profilesReady, profilesError, raw, agentAccess, runtimeGeneration]);
+  }, [account, profilesReady, profilesError, raw, agentAccess, runtimeGeneration, reconcileRequest]);
   useEffect(() => {
     if (!hasTauriInternals()) return;
     let cancelled = false;

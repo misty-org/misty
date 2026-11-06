@@ -112,6 +112,7 @@ pub async fn browser_agent_execute(
             } else {
                 None
             };
+            crate::infra::extensions::trust_navigation(&id, &target);
             view.navigate(target.clone())
                 .map_err(|error| error.to_string())?;
             let mut landed = json!({"ok": true, "url": url});

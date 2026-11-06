@@ -88,6 +88,7 @@
 - (void)webExtensionController:(WKWebExtensionController *)controller openNewTabUsingConfiguration:(WKWebExtensionTabConfiguration *)configuration forExtensionContext:(WKWebExtensionContext *)context completionHandler:(void (^)(id<WKWebExtensionTab>,NSError *))done {
     BOOL privateTab=[configuration.window isPrivateForWebExtensionContext:context];
     if (privateTab && !context.hasAccessToPrivateData) { done(nil,ExtensionError(@"Private access is disabled.")); return; }
+    if (!MistyExtensionMayOpen(context, configuration.url)) { done(nil,ExtensionError(@"This URL cannot be opened by an extension.")); return; }
     // Misty has no pinned or reader-mode tabs; those requests open an ordinary tab.
     NSMutableDictionary *options=[@{@"focused":@(configuration.shouldBeActive),@"index":@(configuration.index)} mutableCopy];
     NSString *windowId=((MistyExtensionWindow *)configuration.window).identifier;
@@ -108,7 +109,7 @@
     self.openRequests[requestId]=[^(MistyExtensionTab *tab,NSError *error) { done(tab.window,error); } copy];
     NSMutableArray *tabs=[NSMutableArray array]; for (MistyExtensionTab *tab in configuration.tabs) [tabs addObject:tab.identifier];
     NSMutableArray *urls=[NSMutableArray array]; for (NSURL *url in configuration.tabURLs) {
-        if (![@[@"http",@"https",@"webkit-extension",@"about"] containsObject:url.scheme]) { [self.openRequests removeObjectForKey:requestId]; done(nil,ExtensionError(@"This URL cannot be opened.")); return; }
+        if (![@[@"http",@"https",@"webkit-extension",@"about"] containsObject:url.scheme] || !MistyExtensionMayOpen(context, url)) { [self.openRequests removeObjectForKey:requestId]; done(nil,ExtensionError(@"This URL cannot be opened.")); return; }
         [urls addObject:url.absoluteString];
     }
     [self event:@"open-window" data:@{@"requestId":requestId,@"urls":urls,@"tabs":tabs,@"private":@(configuration.shouldBePrivate),@"focused":@(configuration.shouldBeFocused)}];

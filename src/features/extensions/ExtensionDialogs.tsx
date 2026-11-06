@@ -13,7 +13,7 @@ import {
 import { SettingsControlLabelContext } from "@/features/settings";
 import { SwitchControl } from "@/features/settings/SettingsControls";
 import { ExtensionIcon } from "./ExtensionIcon";
-import { permissionLabel } from "./permissions";
+import { accessLabels } from "./permissions";
 import { storeNames } from "./store";
 import type { ExtensionReview, Installation } from "./types";
 
@@ -46,6 +46,11 @@ export function InstallReviewDialog({
   onInstall(review: ExtensionReview): void;
 }) {
   const name = review?.entry.name || "this extension";
+  // A new version's review is about what's new; everything else was already approved here.
+  const added = review ? [...review.addedPermissions, ...review.addedHosts] : [];
+  const asked = review ? [...review.permissions, ...review.hosts] : [];
+  const onlyNew = existing && added.length > 0;
+  const access = accessLabels(onlyNew ? added : asked);
   return (
     <Dialog
       open={open}
@@ -53,10 +58,7 @@ export function InstallReviewDialog({
         if (!next && !busy) onClose();
       }}
     >
-      <DialogContent
-        aria-describedby={review ? "extension-review-description" : undefined}
-        className="max-h-[85vh] overflow-y-auto"
-      >
+      <DialogContent aria-describedby={undefined} className="max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex min-w-0 items-center gap-3">
             {review && (
@@ -74,11 +76,6 @@ export function InstallReviewDialog({
                   : "Add extension"}
             </span>
           </DialogTitle>
-          {review ? (
-            <DialogDescription id="extension-review-description">
-              {storeNames[review.entry.store]} · Version {review.entry.version}
-            </DialogDescription>
-          ) : null}
         </DialogHeader>
         {!review && !failure && <SkeletonList label="Extension access" rows={3} lines={1} />}
         {!review && failure && (
@@ -99,15 +96,19 @@ export function InstallReviewDialog({
         )}
         {review && (
           <>
-            <ul className="max-h-52 overflow-y-auto list-inside list-disc space-y-1 break-words text-sm">
-              {[...review.permissions, ...review.hosts].map((permission) => (
-                <li key={permission} title={permission}>
-                  {permissionLabel(permission)}
-                </li>
-              ))}
-            </ul>
-            {!review.permissions.length && !review.hosts.length && (
-              <p className="text-sm">No additional permissions requested.</p>
+            {access.length > 0 ? (
+              <>
+                <p className="text-sm">{onlyNew ? "It now also asks to:" : "It asks to:"}</p>
+                <ul className="max-h-52 overflow-y-auto list-inside list-disc space-y-1 break-words text-sm">
+                  {access.map(({ label, source }) => (
+                    <li key={label} title={source}>
+                      {label}
+                    </li>
+                  ))}
+                </ul>
+              </>
+            ) : (
+              <p className="text-sm">It doesn't ask for any access.</p>
             )}
             <SettingsControlLabelContext.Provider value="Allow private tabs">
               <label className="flex items-center justify-between gap-3 text-sm">
@@ -120,6 +121,9 @@ export function InstallReviewDialog({
               </label>
             </SettingsControlLabelContext.Provider>
             <div className="space-y-2 text-sm text-cream-muted">
+              <p>
+                {storeNames[review.entry.store]}, version {review.entry.version}.
+              </p>
               {review.findings.map((finding) => (
                 <p key={finding}>{finding}</p>
               ))}

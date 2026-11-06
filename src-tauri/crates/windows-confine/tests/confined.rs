@@ -182,6 +182,37 @@ fn commands_reach_only_the_project() {
 }
 
 #[test]
+fn add_edit_access_adds_and_edits_but_never_deletes() {
+    let mut scratch = Scratch::new();
+    let work = scratch.path("work");
+    let shared = scratch.path("shared");
+    std::fs::create_dir_all(&work).unwrap();
+    std::fs::create_dir_all(shared.join("sub")).unwrap();
+    std::fs::write(shared.join("keep.txt"), "keep").unwrap();
+    std::fs::write(shared.join("sub").join("deep.txt"), "keep").unwrap();
+    scratch.grant(&work, Access::Inside);
+    scratch.grant(&shared, Access::AddEdit);
+    let at = shared.display();
+    let command = format!(
+        "(echo new> \"{at}\\new.txt\" && echo added) \
+         & (echo more>> \"{at}\\keep.txt\" && echo edited) \
+         & (mkdir \"{at}\\made\" && echo made-folder) \
+         & (del /q \"{at}\\keep.txt\") \
+         & (rmdir /s /q \"{at}\\sub\") \
+         & (ren \"{at}\\keep.txt\" renamed.txt || echo blocked-rename) \
+         & (move \"{at}\\keep.txt\" moved.txt || echo blocked-move)"
+    );
+    let output = scratch.run(&work, &command);
+    for expected in ["added", "edited", "made-folder", "blocked-rename", "blocked-move"] {
+        assert!(output.contains(expected), "{expected}: {output}");
+    }
+    assert!(shared.join("keep.txt").exists(), "{output}");
+    assert!(shared.join("sub").join("deep.txt").exists(), "{output}");
+    assert!(!shared.join("renamed.txt").exists(), "{output}");
+    assert!(!work.join("moved.txt").exists(), "{output}");
+}
+
+#[test]
 fn the_working_folder_itself_survives_its_commands() {
     let mut scratch = Scratch::new();
     let work = scratch.path("work");

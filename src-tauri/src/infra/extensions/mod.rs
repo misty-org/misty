@@ -2,6 +2,7 @@ use crate::infra::file_access::fs;
 pub mod popup;
 
 // SPDX-License-Identifier: MIT
+mod approvals;
 mod catalog;
 mod chrome_store;
 mod compat;
@@ -17,7 +18,9 @@ pub(crate) mod records;
 pub(crate) mod runtime;
 mod sync;
 mod tabs;
+mod web_access;
 pub(crate) use profiles::{release_profile, remove_profile};
+pub(crate) use web_access::{page_may_open, trust_navigation};
 pub(crate) use tabs::{
     agent_action, agent_extension_id, authorize_agent_url, context_menu, has_extensions,
     is_chrome_store_id, pending_navigation, request_store_install, request_store_remove,

@@ -10,8 +10,8 @@ use tauri::State;
 use crate::app::device_commands::{context, require_device_window};
 use crate::app::runtime::MistyRuntime;
 use crate::infra::{
-    devices::admission, devices::identity::canonical_request, devices::records::SignedRecord,
-    devices::trust,
+    devices::admission, devices::agent_jobs, devices::identity::canonical_request,
+    devices::records::SignedRecord, devices::trust,
 };
 
 /// The largest file a `folder.send` job hands to the Space's Library, the
@@ -110,6 +110,9 @@ pub async fn device_verify_job(
     config: Value,
 ) -> Result<(), String> {
     require_device_window(&webview)?;
+    if !agent_jobs::is_agent_job(&operation) {
+        return Err("device_job_not_allowed".to_owned());
+    }
     let grant: SignedRecord = serde_json::from_value(config["runGrant"].clone())
         .map_err(|_| "device_grant_invalid".to_owned())?;
     trust::verify_job_grant(&grant, &scope_id, &operation)

@@ -4,8 +4,8 @@
 // Each running extension gets a hidden page in its own origin
 // (__misty_compat__/host.html). The extension's background and pages reach it
 // over a same-origin BroadcastChannel; the page reaches Misty through a
-// reply-capable script message handler. Requests are checked against the
-// permissions the account granted before Misty reads or changes anything.
+// reply-capable script message handler. Requests are checked against what the
+// person approved on this computer before Misty reads or changes anything.
 #import "MistyExtensions.h"
 #import "MistyExtensionsInternal.h"
 
@@ -14,11 +14,17 @@
 static NSString *CompatPermission(id method) {
     if (![method isKindOfClass:NSString.class]) return nil;
     if ([@[@"i18n.detectLanguage", @"tabs.move", @"tabs.group", @"tabs.ungroup", @"runtime.reportError"] containsObject:method]) return @"";
+    // Only the person's click opens or runs a download; no extension permission covers it.
+    if ([method isEqual:@"downloads.open"]) return nil;
     NSString *namespace = [method componentsSeparatedByString:@"."].firstObject;
     return @{@"notifications":@"notifications", @"downloads":@"downloads", @"history":@"history",
              @"topSites":@"topSites", @"search":@"search", @"sessions":@"sessions",
              @"browsingData":@"browsingData", @"find":@"find", @"idle":@"idle", @"tts":@"tts",
              @"bookmarks":@"bookmarks", @"tabGroups":@"tabGroups", @"userScripts":@"userScripts"}[namespace];
+}
+
+bool misty_extensions_compat_requires(const char *method, const char *permission) {
+    return [CompatPermission([NSString stringWithUTF8String:method]) isEqual:[NSString stringWithUTF8String:permission]];
 }
 
 /// Kiri's extension transport installer (kiri/src/extensions/bridge.rs).
