@@ -1,0 +1,35 @@
+;; permission-agent-shell: what an agent's shell command may reach. It starts with nothing and adds
+;; system tools, a private workspace and, when the person granted it, one shared folder. The rules
+;; for that folder are in src-tauri/src/infra/agent_shell/macos.rs.
+(version 1)
+(deny default)
+(allow process-fork)
+(allow process-exec*)
+(allow signal (target same-sandbox))
+(allow sysctl-read)
+(allow file-read-metadata)
+;; System tools, read and run. Nothing here holds the person's own files.
+(allow file-read*
+  (subpath "/System") (subpath "/usr") (subpath "/bin") (subpath "/sbin")
+  (subpath "/Library/Apple") (subpath "/Library/Developer/CommandLineTools")
+  (subpath "/Library/Frameworks") (subpath "/Applications/Xcode.app")
+  (subpath "/opt/homebrew") (subpath "/private/var/select")
+  (subpath "/private/var/db/timezone") (subpath "/private/etc")
+  (literal "/") (literal "/etc") (literal "/var") (literal "/tmp") (literal "/private")
+  (literal "/private/var") (literal "/dev") (literal "/dev/null") (literal "/dev/zero")
+  (literal "/dev/urandom") (literal "/dev/random") (literal "/dev/tty") (literal "/dev/fd"))
+(allow file-write-data (literal "/dev/null") (literal "/dev/zero") (literal "/dev/tty"))
+(allow file-ioctl (literal "/dev/null") (literal "/dev/tty"))
+(allow mach-lookup
+  (global-name "com.apple.system.opendirectoryd.libinfo")
+  (global-name "com.apple.system.logger")
+  (global-name "com.apple.logd")
+  (global-name "com.apple.diagnosticd")
+  (global-name "com.apple.system.notification_center"))
+(allow ipc-posix-shm-read-data (ipc-posix-name "apple.shm.notification_center"))
+(allow ipc-posix-shm-read-metadata)
+;; The chat's own workspace: everything is allowed inside it.
+(allow file-read* file-write* (subpath (param "WORKSPACE")))
+;; No network and no listening, with no way to add it. A profile's localhost rule would also match
+;; 0.0.0.0, so a local listener would open the machine to the network.
+(deny network*)

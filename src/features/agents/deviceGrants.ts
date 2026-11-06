@@ -18,6 +18,8 @@ const workspaceCapabilities = [
   "browser.session",
   // Programs against the agent's own tabs (docs/agents/harness.md, browser_run).
   "browser.run",
+  // Commands in the chat's private workspace (docs/plans/app-permissions.md).
+  "shell.run",
 ];
 
 /**
@@ -28,6 +30,7 @@ const workspaceCapabilities = [
  */
 export async function desktopDeviceGrants(
   folderId: string | null = null,
+  folderWritable = false,
 ): Promise<AiInvocationDeviceContext[]> {
   if (!hasTauriInternals()) return [];
   const local = await agentsDeviceSnapshot().catch(() => null);
@@ -42,7 +45,7 @@ export async function desktopDeviceGrants(
       kind: "local_folder",
       opaqueRef: scope.id,
       displayName: scope.displayName,
-      capabilities: folderCapabilities,
+      capabilities: folderWritable ? [...folderCapabilities, "folder.write"] : folderCapabilities,
       metadata: { source: "shared-folder" },
     }));
   return [
@@ -70,5 +73,7 @@ export async function chatDeviceGrants(
   const folders = useConversationFolder.getState();
   const folder = folders.folder(conversationId) ?? (startsConversation ? folders.draft : null);
   if (startsConversation) folders.adoptDraft(conversationId);
-  return desktopDeviceGrants(folder).catch(() => []);
+  return desktopDeviceGrants(folder, folder ? folders.writable(folder, conversationId) : false).catch(
+    () => [],
+  );
 }

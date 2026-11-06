@@ -107,11 +107,24 @@ fn main() {
     if env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows") {
         embed_common_controls_manifest();
         let windows = tauri_build::WindowsAttributes::new_without_app_manifest();
-        tauri_build::try_build(tauri_build::Attributes::new().windows_attributes(windows))
+        tauri_build::try_build(sandbox_attributes().windows_attributes(windows))
             .expect("tauri build failed");
     } else {
-        tauri_build::build();
+        tauri_build::try_build(sandbox_attributes()).expect("tauri build failed");
     }
+}
+
+/// The sandbox's actions, grants and permissions (docs/plans/app-permissions.md). Listing the app's
+/// commands makes Tauri refuse any command no capability allows, for every window.
+fn sandbox_attributes() -> tauri_build::Attributes {
+    const APP_COMMANDS: &[&str] = include!("sandbox/app_commands.in");
+    tauri_build::Attributes::new()
+        .capabilities_path_pattern("./sandbox/capabilities/*.json")
+        .app_manifest(
+            tauri_build::AppManifest::new()
+                .commands(APP_COMMANDS)
+                .permissions_path_pattern("./sandbox/*/*.toml"),
+        )
 }
 
 /// Tauri's Windows manifest only asks for Common Controls 6, and only the app

@@ -101,6 +101,19 @@ impl AgentService {
         .await
     }
 
+    /// A shared folder's real path, for a job already checked against its grant.
+    pub async fn folder_root(&self, scope_id: String) -> ApiResult<PathBuf> {
+        run_db(self.database_path.clone(), move |connection| {
+            let root: String = connection.query_row(
+                "SELECT local_path FROM local_agent_scopes WHERE id=?1",
+                [&scope_id],
+                |row| row.get(0),
+            )?;
+            canonical(root).map_err(io_error)
+        })
+        .await
+    }
+
     pub async fn revoke_folder_scope(&self, scope_id: String) -> ApiResult<()> {
         run_db(self.database_path.clone(), move |connection| {
             connection.execute("DELETE FROM local_agent_scopes WHERE id=?1", [scope_id])?;

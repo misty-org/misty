@@ -5,7 +5,7 @@
 use serde_json::json;
 use tauri::{plugin::TauriPlugin, AppHandle, Emitter, Wry};
 
-/// Kiri serves browser tabs only. `capabilities/kiri.json` scopes the same set.
+/// Kiri serves browser tabs only. `sandbox/capabilities/kiri.json` scopes the same set.
 const WEBVIEW_PREFIX: &str = "misty-browser-";
 
 struct MistyHost {

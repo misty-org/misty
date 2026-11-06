@@ -1,3 +1,5 @@
+import { invoke } from "@tauri-apps/api/core";
+import { hasTauriInternals } from "@/shared/platform/tauri";
 import { pendingServerDeletes } from "./pendingServerDeletes";
 import { splitLedger } from "@/features/agents/checkpointLedger";
 import { selectedPersonalAgent } from "@/features/agents/personalAgentsStore";
@@ -109,6 +111,9 @@ export function createMistyConversationActions(
           throw new Error("Stop the response before deleting this conversation.");
         // Gone at once; a server that can't be reached is told on a later load.
         if (existing.remote) void pendingServerDeletes.delete(conversationId);
+        // Its shell workspace goes with it. Anything it saved to a shared folder stays.
+        if (hasTauriInternals())
+          void invoke("agents_forget_workspace", { conversationId }).catch(() => undefined);
         if (get().accountId !== requestAccount) return;
         updateMistyDraftAttachments(requestAccount, conversationId, (attachments) => {
           attachments.forEach((attachment) => {

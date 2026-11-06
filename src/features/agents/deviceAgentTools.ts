@@ -22,6 +22,7 @@ export const deviceAgentOperations = new Set([
   "browser.tab.open",
   "bookmark.list",
   "bookmark.add",
+  "shell.run",
 ]);
 
 const readLimit = 20_000;
@@ -81,6 +82,21 @@ export async function runDeviceAgentOperation(
       const truncated = document.truncated || text.length > readLimit;
       text = text.slice(0, readLimit);
       return { name: document.displayName, mimeType: document.mimeType, text, truncated };
+    }
+    case "shell.run": {
+      // Rust checks the job's grant and runs it under its OS profile; this only passes it along.
+      const cancel = () => void invoke("device_shell_cancel", { jobId: job.id }).catch(() => {});
+      signal.addEventListener("abort", cancel, { once: true });
+      try {
+        return await invoke<Record<string, unknown>>("device_shell_job", {
+          jobId: job.id,
+          scopeId: job.scopeId,
+          input: job.input,
+          config: job.config,
+        });
+      } finally {
+        signal.removeEventListener("abort", cancel);
+      }
     }
     case "browser.tab.list": {
       const tabs: Array<{ id: string; title: string; url: string }> = [];

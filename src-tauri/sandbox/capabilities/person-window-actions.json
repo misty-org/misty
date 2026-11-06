@@ -1,0 +1,39 @@
+{
+  "$schema": "../../gen/schemas/desktop-schema.json",
+  "identifier": "person-window-actions",
+  "description": "What a person's own Misty window can do",
+  "platforms": [
+    "macOS",
+    "windows",
+    "linux"
+  ],
+  "webviews": [
+    "window-*"
+  ],
+  "permissions": [
+    "action-agent",
+    "action-api-cache",
+    "action-app",
+    "action-auth",
+    "action-browser",
+    "action-browser-history",
+    "action-browser-import",
+    "action-browser-passwords",
+    "action-browser-recovery",
+    "action-clipboard",
+    "action-cursor-companion",
+    "action-devices",
+    "action-extension-popup",
+    "action-extensions",
+    "action-misty-screen",
+    "action-model-keys",
+    "action-profile",
+    "action-profile-extensions",
+    "action-profile-records",
+    "action-profile-tabs",
+    "action-settings",
+    "action-shortcuts",
+    "action-vault",
+    "action-voice"
+  ]
+}

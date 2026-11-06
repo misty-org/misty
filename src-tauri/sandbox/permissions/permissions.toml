@@ -1,0 +1,31 @@
+# Permissions: who may use an action and how far. Misty's defaults, and the person can add on
+# (docs/plans/app-permissions.md). Processes are held to theirs by the OS, in the .sb profile beside
+# this file or in the code named below. Nothing here allows a command by itself.
+
+[[permission]]
+identifier = "permission-agent-shell"
+description = "The chat's workspace and system tools, with no network. See agent-shell.sb."
+
+[[permission]]
+identifier = "permission-document-worker"
+description = "The one file it's handed, with no network. See src-tauri/src/infra/documents."
+
+[[permission]]
+identifier = "permission-page-reader"
+description = "The page it's handed, with no network or files."
+
+[[permission]]
+identifier = "permission-browser-import"
+description = "Read another browser's profile. Off until the person's first import."
+
+[[permission]]
+identifier = "permission-screen-capture"
+description = "Capture the screen for the cursor companion. Off until first use."
+
+[[permission]]
+identifier = "permission-desktop-control"
+description = "Control other apps on Windows. Off until first use."
+
+[[permission]]
+identifier = "permission-dictation-typing"
+description = "Type dictated text into other apps. Off until first use."
