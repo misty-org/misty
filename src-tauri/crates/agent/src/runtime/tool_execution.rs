@@ -116,7 +116,7 @@ pub(crate) fn normalize_tool_outcome(response: &ToolExecutionResponse) -> Result
 }
 
 /// The call being continued. Each wait says whether it was met.
-pub(crate) trait ToolContinuation {
+pub(crate) trait ToolContinuation: Send {
     fn request(&mut self, attempt: u32) -> BoxFuture<'_, Result<ToolExecutionResponse, RuntimeError>>;
     fn device(&mut self, attempt: u32) -> BoxFuture<'_, Result<bool, RuntimeError>>;
     /// `None` when nothing here can wait for a person.

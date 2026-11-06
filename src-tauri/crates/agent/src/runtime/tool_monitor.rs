@@ -39,8 +39,8 @@ pub(crate) struct ToolEnd {
 /// Calls Misty rejected without any effect, filled in by whoever runs the calls.
 pub(crate) type RejectedCalls = Arc<Mutex<HashSet<String>>>;
 
-#[derive(Default)]
-struct MonitorState {
+#[derive(Clone, Debug, Default, PartialEq, serde::Deserialize, serde::Serialize)]
+pub(crate) struct MonitorState {
     // Misty name of the observation the next turn must make before acting.
     required_inspection: String,
     handoff: String,
@@ -65,6 +65,15 @@ pub(crate) struct ToolMonitor(Arc<Inner>);
 impl ToolMonitor {
     pub(crate) fn new(catalog: Arc<ModelCatalog>, order: SerialToolLifecycle, checkpoints: Arc<dyn ToolCheckpoints>, rejected: RejectedCalls) -> Self {
         Self(Arc::new(Inner { catalog, order, checkpoints, rejected, state: Mutex::new(MonitorState::default()) }))
+    }
+
+    /// What a saved run keeps of this monitor.
+    pub(crate) fn saved(&self) -> MonitorState {
+        self.0.state().clone()
+    }
+
+    pub(crate) fn restore(&self, saved: MonitorState) {
+        *self.0.state() = saved;
     }
 
     pub(crate) fn required_inspection(&self) -> String {
@@ -102,8 +111,18 @@ impl ToolMonitor {
     }
 
     pub(crate) async fn on_end(&self, event: ToolEnd) -> Result<(), RuntimeError> {
+        self.on_end_then(event, async { Ok(()) }).await
+    }
+
+    /// `on_end`, with `then` run before the next call may start, so a run's file records this call's
+    /// result and what it decided before anything that depends on them happens.
+    pub(crate) async fn on_end_then(&self, event: ToolEnd, then: impl Future<Output = Result<(), RuntimeError>>) -> Result<(), RuntimeError> {
         let id = event.tool_call.tool_call_id.clone();
-        self.0.order.finish(&id, self.0.ended(event)).await
+        let ended = async {
+            self.0.ended(event).await?;
+            then.await
+        };
+        self.0.order.finish(&id, ended).await
     }
 }
 

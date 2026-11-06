@@ -2,6 +2,8 @@
 // Each test file uses a different part of this.
 #![allow(dead_code)]
 
+pub mod run_backend;
+
 use std::{
     collections::BTreeMap,
     sync::{Arc, Mutex},
@@ -171,4 +173,66 @@ pub async fn serve_replies(replies: Vec<Reply>) -> MockServer {
         }
     });
     MockServer { base_url, captured }
+}
+
+/// Answers each request from `handler`, each on its own task, until the test ends. A handler may take
+/// as long as it likes: a client that gives up just drops the connection.
+pub async fn serve_fn<F, Fut>(handler: F) -> String
+where
+    F: Fn(Captured) -> Fut + Send + Sync + 'static,
+    Fut: std::future::Future<Output = Reply> + Send + 'static,
+{
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let base_url = format!("http://{}", listener.local_addr().unwrap());
+    let handler = Arc::new(handler);
+    tokio::spawn(async move {
+        while let Ok((mut socket, _)) = listener.accept().await {
+            let handler = handler.clone();
+            tokio::spawn(async move {
+                let mut buffer = Vec::new();
+                let mut chunk = [0u8; 8192];
+                let head_end = loop {
+                    if let Some(end) = ends_at(&buffer) {
+                        break end;
+                    }
+                    let Ok(read) = socket.read(&mut chunk).await else { return };
+                    if read == 0 {
+                        return;
+                    }
+                    buffer.extend_from_slice(&chunk[..read]);
+                };
+                let head = String::from_utf8_lossy(&buffer[..head_end]).to_string();
+                let mut lines = head.split("\r\n");
+                let mut request_line = lines.next().unwrap_or_default().split(' ');
+                let method = request_line.next().unwrap_or_default().to_owned();
+                let path = request_line.next().unwrap_or_default().to_owned();
+                let mut headers = BTreeMap::new();
+                for line in lines {
+                    if let Some((name, value)) = line.split_once(':') {
+                        headers.insert(name.trim().to_lowercase(), value.trim().to_owned());
+                    }
+                }
+                let length: usize = headers.get("content-length").and_then(|v| v.parse().ok()).unwrap_or(0);
+                while buffer.len() < head_end + length {
+                    let Ok(read) = socket.read(&mut chunk).await else { return };
+                    if read == 0 {
+                        return;
+                    }
+                    buffer.extend_from_slice(&chunk[..read]);
+                }
+                let body = parsed_body(&headers, &buffer[head_end..]);
+                let reply = handler(Captured { method, path, headers, body }).await;
+                let head = format!(
+                    "HTTP/1.1 {} Status\r\ncontent-type: {}\r\ncontent-length: {}\r\nconnection: close\r\n\r\n",
+                    reply.status,
+                    reply.content_type,
+                    reply.body.len()
+                );
+                let _ = socket.write_all(head.as_bytes()).await;
+                let _ = socket.write_all(&reply.body).await;
+                let _ = socket.shutdown().await;
+            });
+        }
+    });
+    base_url
 }

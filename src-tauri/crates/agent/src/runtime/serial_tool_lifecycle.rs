@@ -67,6 +67,24 @@ impl SerialToolLifecycle {
         self.state.lock().unwrap_or_else(PoisonError::into_inner)
     }
 
+    /// A saved run's stop and pause, and the calls they declined. A restart reruns only unfinished
+    /// calls, so the place in line needs no saving.
+    pub(crate) fn saved(&self) -> (String, String, HashMap<String, String>) {
+        let state = self.state();
+        (state.stopped_reason.clone(), state.paused_reason.clone(), state.declined.clone())
+    }
+
+    pub(crate) fn restored(stopped_reason: String, paused_reason: String, declined: HashMap<String, String>) -> Self {
+        let this = Self::default();
+        {
+            let mut state = this.state();
+            state.stopped_reason = stopped_reason;
+            state.paused_reason = paused_reason;
+            state.declined = declined;
+        }
+        this
+    }
+
     pub(crate) fn stop(&self, reason: &str) {
         let mut state = self.state();
         if state.stopped_reason.is_empty() {

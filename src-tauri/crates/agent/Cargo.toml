@@ -14,6 +14,7 @@ name = "misty_agent"
 base64 = "0.22"
 chrono = { version = "0.4", default-features = false, features = ["std"] }
 futures-util = "0.3"
+hex = "0.4"
 brotli-decompressor = "5"
 flate2 = { version = "1", default-features = false, features = ["rust_backend"] }
 html5ever = "0.38"
@@ -23,9 +24,11 @@ reqwest = { version = "0.13.4", default-features = false, features = ["json", "r
 serde = { version = "1", features = ["derive"] }
 # `raw_value` keeps tool schemas and call inputs in their original key order (`src/sdk/raw_json.rs`).
 serde_json = { version = "1", features = ["raw_value"] }
+sha2 = "0.10"
 thiserror = "1"
 url = "2"
-tokio = { version = "1", features = ["net", "sync", "time"] }
+tokio = { version = "1", features = ["macros", "net", "rt", "sync", "time"] }
+tokio-tungstenite = { version = "0.30", default-features = false, features = ["connect", "rustls-tls-native-roots"] }
 
 [dev-dependencies]
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
