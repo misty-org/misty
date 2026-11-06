@@ -8,7 +8,6 @@ type Section = "apps" | "skills";
 
 /**
  * Everything an agent can reach and do: account apps and its skills, one tab each.
- * Projects are attached per chat from the composer's Project menu.
  */
 export function IntegrationsPage(
   skills: Omit<ComponentProps<typeof AgentMethodsCatalog>, "kind" | "embedded" | "children">,

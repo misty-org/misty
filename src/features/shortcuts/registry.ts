@@ -94,8 +94,8 @@ const shellCommands: ShortcutCommandDefinition[] = [
 // Each tool keeps its Cmd/Ctrl+Shift number from when there were more tools.
 const toolSlots = [["browser", "Browser", 6]] as const;
 
-/** The Space home's tabs, on ⌘1 to ⌘5 while a Space is focused (browser tabs elsewhere). */
-const spaceSections = ["Home", "Notes", "Drawings", "Files", "Code"] as const;
+/** The Space home's tabs, on ⌘1 to ⌘4 while a Space is focused (browser tabs elsewhere). */
+const spaceSections = ["Home", "Notes", "Drawings", "Files"] as const;
 
 const tabAndToolCommands = [
   ...spaceSections.map((label, index) =>

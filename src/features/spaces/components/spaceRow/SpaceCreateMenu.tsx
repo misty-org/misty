@@ -18,7 +18,6 @@ const createOptions: { kind: SpaceCreateKind; label: string }[] = [
   { kind: "note", label: "Note" },
   { kind: "drawing", label: "Drawing" },
   { kind: "file", label: "File" },
-  { kind: "code", label: "Code" },
 ];
 
 export function SpaceCreateMenu({

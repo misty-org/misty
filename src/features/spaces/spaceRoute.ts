@@ -8,7 +8,6 @@ const validSections = new Set([
   "notes",
   "drawings",
   "library",
-  "code",
   "memory",
   "members",
   "settings",

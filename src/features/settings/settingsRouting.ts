@@ -28,7 +28,6 @@ const retiredSections: Partial<Record<SettingsSection, SettingsSection>> = {
   journal: "general",
   library: "general",
   terminal: "general",
-  code: "agents-coding",
   agents: "agents-defaults",
 };
 

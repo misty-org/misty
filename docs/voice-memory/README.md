@@ -4,8 +4,7 @@ Revision 5 (2026-11-04): no flags, no video of the screen, and recaps in the mem
 (as built, 2026-10-15): the owner approved the plan on October 14, 2026. This brief records the
 direction, the surfaces and the choices made on the plan's open questions. It builds on
 the [agents-at-cursor brief](../agents/cursor-companion.md) (revision 3): the island,
-the mist and push-to-talk come from it. It also builds on the agent permissions work on
-`agents/permissions-coding-clis` (Ask/Auto, `agent_grants`, `grants.Decide`, the live
+the mist and push-to-talk come from it. It also builds on the agent permissions work (Ask/Auto, `agent_grants`, `grants.Decide`, the live
 checklist).
 
 Mockups live next to this file:

@@ -2,7 +2,6 @@ import "./agentsWorkspace.css";
 import { AgentSettingsModal } from "./components/AgentSettingsModal";
 import { AgentSetup } from "./components/AgentSetup";
 import { AgentSwitcher } from "./components/AgentSwitcher";
-import { ProjectReviewSheet } from "./components/changes/ProjectReviewSheet";
 import { AgentEditor } from "./components/AgentEditor";
 import { AgentDiscardDialog } from "./page/AgentDiscardDialog";
 import { AgentWorkspaceFrame } from "./workspace/AgentWorkspaceFrame";
@@ -71,8 +70,6 @@ function AgentsWorkspacePage() {
   const taskContent = <AgentsTaskContent state={state} actions={actions} view={view} />;
   return (
     <main ref={workspaceRef} className="agents-workspace" data-settings-open={settingsModalOpen}>
-      {/* Review panel for a project's changes, opened from answers and Projects. */}
-      <ProjectReviewSheet />
       {showWorkspace && profile ? (
         <AgentWorkspaceFrame
           key={`${user?.id}:${profile.id}`}

@@ -26,10 +26,18 @@ if (import.meta.env.DEV || import.meta.env.VITE_MISTY_DEBUG === "1") {
 }
 const root = ReactDOM.createRoot(document.getElementById("root") as HTMLElement);
 export const startup = bootstrap();
-/** Marks from when an account's password also derived its vault keys. Nothing reads them now. */
+/**
+ * What removed features left behind: marks from when an account's password also derived its vault
+ * keys, and each chat's project and coding tool. Nothing reads them now.
+ */
 function removeRetiredStorage() {
   try {
-    for (const key of ["misty-credential-accounts", "misty-password-pending"])
+    for (const key of [
+      "misty-credential-accounts",
+      "misty-password-pending",
+      "misty.conversationProjects.v1",
+      "misty.conversationCodingTools.v1",
+    ])
       localStorage.removeItem(key);
   } catch {
     // Without storage there is nothing to remove.

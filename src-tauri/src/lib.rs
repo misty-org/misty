@@ -1,4 +1,3 @@
-mod agents;
 mod app;
 mod app_setup;
 #[cfg(all(desktop, debug_assertions))]

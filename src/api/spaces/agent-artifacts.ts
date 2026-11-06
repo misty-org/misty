@@ -11,7 +11,7 @@ interface SpaceAgentArtifact {
   agent_name: string;
   owner_user_id: string;
   owner_name: string;
-  kind: "download" | "file" | "image" | "code" | "document";
+  kind: "download" | "file" | "image" | "document";
   created_at: string;
   /** Only the agent's owner gets the private conversation and run. */
   conversation_id?: string;

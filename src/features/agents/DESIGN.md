@@ -4,7 +4,7 @@ Agents opens straight into the selected agent's New task conversation. Conversat
 
 ## Colors
 
-Use Misty's semantic charcoal/cream tokens. Status uses text, icons and contrast: no colored status dots (except the Recents dots AGENTS.md allows), tinted selections or accent-colored focus rings. Cloud avatar colors are identity artwork, not status. Connected apps and coding tools show their official `BrandIcon` logos; everything around them stays monochrome.
+Use Misty's semantic charcoal/cream tokens. Status uses text, icons and contrast: no colored status dots (except the Recents dots AGENTS.md allows), tinted selections or accent-colored focus rings. Cloud avatar colors are identity artwork, not status. Connected apps show their official `BrandIcon` logos; everything around them stays monochrome.
 
 ## Entry
 
@@ -26,10 +26,9 @@ Rename uses a focused shared dialog; Delete asks for confirmation and explains t
 
 The message box is one row (attach, text, voice, send; `MistyComposer layout="inline"`), with its controls in one quiet strip beneath it (`components/ComposerStrip.tsx`). Chips are labeled, have no chevrons, and brighten on hover or while their menu is open. Menus carry no helper copy.
 
-- **Order:** Project, Mode and Code, left to right. Models and reasoning effort are chosen in Settings › Models, not in the composer.
-- **Project:** projects on this computer only. Coding is independent of it.
+- **Order:** Folder, then Mode, left to right. Models and reasoning effort are chosen in Settings › Models, not in the composer.
+- **Folder:** a read-only folder shared from this computer, or none.
 - **Mode:** Manual, Auto, Plan and Teach as checkmarked choices, then Goal. Shift+Tab switches modes. Plan gives the composer a dashed frame and a "Plan with…" placeholder.
-- **Code:** the conversation's coding tool, with or without a project: Settings default, then each tool with its logo (`CodingToolIcon`). Tools not installed or signed in are listed but can't be picked, with the reason in words. "Manage tools" opens Settings › Coding tools.
 - **Narrow (the Misty panel, a container narrower than 560px):** every chip shows only its icon; names stay in tooltips and for assistive technology.
 - **Control bar:** sits on top of the composer as a tab behind its top edge and holds folder work. Screens open on demand, so there is no work-location choice.
 
@@ -51,4 +50,4 @@ Answers offer Copy, Reply, Good/Bad response and Read aloud, plus Try again on a
 ## Workflows and Integrations
 
 - **Workflows:** one page. Saved workflows (templates included) list first, then a "Start from an example" gallery with category chips. A workflow owns at most one schedule: any number of rules in one timezone, plus skipped dates, inputs and an on/off switch; scheduled runs use the latest version. Rows show the schedule in words and the next run. A workflow works with connected apps or in this Misty window.
-- **Integrations:** chip tabs for Apps, Skills and Projects (Projects on desktop only). Apps are tiles with connected apps first; a tile opens a popup card with that app's accounts (Reconnect, Disconnect, Add account).
+- **Integrations:** chip tabs for Apps and Skills. Apps are tiles with connected apps first; a tile opens a popup card with that app's accounts (Reconnect, Disconnect, Add account).

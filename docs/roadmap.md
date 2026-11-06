@@ -59,7 +59,7 @@ you bring.
 
 ## Work, in order
 1. Agents live in Spaces (built 2026-10-12; simplified 2026-10-16, see §1)
-2. Workflow parity: C1, C2, C8 (built 2026-10-12, uncommitted; see "Built" in §2)
+2. Workflow parity: C1, C2 (built 2026-10-12, uncommitted; see "Built" in §2)
 3. One extension system for Chrome and Firefox add-ons (built 2026-10-12 on macOS,
    uncommitted; see §3)
 4. Voice, notes and memory: dictation everywhere, voice to notes, tab visits
@@ -94,9 +94,7 @@ listings with ask/auto/off, the Agents page as a separate chat system).
   threads, one hop deep.
 - **Artifacts are Files,** credited to the agent and run that made them, with
   live previews. They count against the agent owner's storage.
-- **Code projects stay local folders,** linked to a Space
-  (`space_code_projects`); others see the changes and the GitHub link. Coding is
-  open to everyone.
+- **Shared folders stay on the person's computer,** read-only and chosen per chat.
 
 ### Navigation
 The tab strip is the only bar; the rail, pills and launcher are gone. ⌘T opens
@@ -112,13 +110,12 @@ split. No ⌘K, no Global Misty.
   cleanup). Not pushed.
 
 ### Still open
-- Link a project to a Space from the composer's Project menu.
 - Bias the panel's best guess with device-local pick history.
 - Show an agent's live work lines in channel replies, not only its answer.
 
 ---
 
-## 2. Workflow parity: C1, C2, C8
+## 2. Workflow parity: C1, C2
 These close the gaps that stop Misty from claiming "does what Muse, Dots and
 Grok Bot do". The IDs come from `competitors.md`.
 
@@ -140,10 +137,10 @@ Grok Bot do". The IDs come from `competitors.md`.
   - It applies to Misty's agents.
   - It's a small, specific check, not a revival of the retired general approval
     system.
-- **C8 Give the agent a task by email or Slack.**
-  - Forward an email or mention Misty in Slack to start a task.
-  - It runs through the existing Composio Gmail and Slack connections, and the
-    answer comes back to the same thread.
+
+Giving the agent a task by email or Slack (C8) was built, then removed on
+2026-11-06 as too much for the MVP. Work starts from scheduled workflows and from
+mentions in Misty's own chat. Gmail and Slack stay as connected apps an agent can use.
 
 ### Built (2026-10-12, uncommitted)
 - **C2:** the page runtime sorts the control a step acts on into payment,
@@ -165,14 +162,6 @@ Grok Bot do". The IDs come from `competitors.md`.
   and the claim. Runs missed while the computer was away fold into one late
   run, whose conversation says when it was due and how many it covers. The
   computer stays awake for 15 minutes before a run.
-- **C8:** Settings › Agents › Connections has switches for email and Slack
-  (migration `20271012040000_inbound_tasks`). Email tasks: forward to
-  you+misty@… Only mail in your Sent folder counts. Slack tasks: write
-  "@misty" in a message of your own. A minute-by-minute check uses Composio's
-  proxy to call the Gmail and Slack REST APIs, limited to those two hosts.
-  Each message starts one Misty task, and the answer goes back to the thread.
-  Slack needs the connection's `search:read` and `chat:write` scopes; a
-  missing scope shows in Settings in plain words.
 
 ---
 

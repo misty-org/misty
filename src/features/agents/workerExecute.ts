@@ -10,7 +10,6 @@ export async function executeWorkflowNodeOnDevice(
   job: ClaimedWorkflowNodeJob["job"],
   signal: AbortSignal,
   lease: () => string | null | undefined,
-  deviceId: string,
 ): Promise<Record<string, unknown>> {
   signal.throwIfAborted();
   // Every job carries the run grant the asking device signed. This device
@@ -41,10 +40,6 @@ export async function executeWorkflowNodeOnDevice(
   if (job.operation.startsWith("browser.")) return executeBrowserJob(job, signal, lease());
   if (deviceAgentOperations.has(job.operation)) {
     return runDeviceAgentOperation(job, signal);
-  }
-  if (job.operation === "code.delegate") {
-    // Coding through the person's own tool; the run reports on its own.
-    return (await import("./coding/codingRun")).startCodingRun(job, deviceId);
   }
   if (job.operation !== "read_content") {
     throw new Error(`unsupported_device_operation:${job.operation}`);

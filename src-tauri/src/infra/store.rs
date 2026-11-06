@@ -190,6 +190,31 @@ const MIGRATIONS: &[&str] = &[
      ALTER TABLE local_agent_scopes DROP COLUMN allow_push;
      ALTER TABLE local_agent_scopes DROP COLUMN allow_push_default;
      ALTER TABLE local_agent_scopes DROP COLUMN grants_migrated;",
+    // 19: folders are shared read-only. Ones shared with write access stop being shared; their files stay.
+    "DELETE FROM local_agent_scopes WHERE access = 'write';
+     ALTER TABLE local_agent_scopes DROP COLUMN access;",
+    // 20: coding is gone, so its three device preferences go too: from the settings document,
+    // from the saved values, and from the frozen first-run copy of the document kept in
+    // `settings_state`. A document that isn't valid JSON is left as it is, so this can't fail.
+    "UPDATE settings_document
+     SET document = json_remove(document, '$.agent.coding_default_tool',
+         '$.agent.coding_fallback_tool', '$.agent.coding_usage_cap')
+     WHERE CASE WHEN json_valid(document) THEN coalesce(
+         json_type(document, '$.agent.coding_default_tool'),
+         json_type(document, '$.agent.coding_fallback_tool'),
+         json_type(document, '$.agent.coding_usage_cap')) IS NOT NULL ELSE 0 END;
+     UPDATE settings_state
+     SET revision = revision + 1, document = json_remove(document,
+         '$.values.\"agents.coding_default_tool\"', '$.values.\"agents.coding_fallback_tool\"',
+         '$.values.\"agents.coding_usage_cap\"', '$.agent.coding_default_tool',
+         '$.agent.coding_fallback_tool', '$.agent.coding_usage_cap')
+     WHERE CASE WHEN json_valid(document) THEN coalesce(
+         json_type(document, '$.values.\"agents.coding_default_tool\"'),
+         json_type(document, '$.values.\"agents.coding_fallback_tool\"'),
+         json_type(document, '$.values.\"agents.coding_usage_cap\"'),
+         json_type(document, '$.agent.coding_default_tool'),
+         json_type(document, '$.agent.coding_fallback_tool'),
+         json_type(document, '$.agent.coding_usage_cap')) IS NOT NULL ELSE 0 END;",
 ];
 
 #[derive(Debug, Clone)]

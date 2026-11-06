@@ -255,7 +255,7 @@ export interface AgentArtifactProvenance {
   agent_id: string;
   conversation_id?: string;
   run_id?: string;
-  kind: "download" | "file" | "image" | "code" | "document";
+  kind: "download" | "file" | "image" | "document";
 }
 
 export interface LibraryUploadOptions {

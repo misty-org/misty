@@ -64,6 +64,8 @@ pub mod power_keep_awake;
 pub mod profile_data;
 #[cfg(desktop)]
 pub mod profile_windows;
+#[cfg(desktop)]
+pub mod retired_coding_data;
 pub mod search;
 pub mod settings;
 pub mod shortcuts;

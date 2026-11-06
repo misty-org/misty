@@ -12,11 +12,11 @@ async fn folder_scopes_list_only_inside_the_chosen_folder() {
         database_path: state.path().join("misty.db"),
     };
     let scope = service
-        .register_folder_scope(folder.path().to_path_buf())
+        .share_folder(folder.path().to_path_buf(), &[])
         .await
         .unwrap();
     let again = service
-        .register_folder_scope(folder.path().to_path_buf())
+        .share_folder(folder.path().to_path_buf(), &[])
         .await
         .unwrap();
     assert_eq!(scope["id"], again["id"], "a folder is granted once");

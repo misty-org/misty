@@ -1,4 +1,4 @@
-pub mod projects;
+mod shared_folders;
 mod storage;
 pub mod web_fetch;
 pub mod workspace;
@@ -25,7 +25,7 @@ use storage::{device_snapshot_sync, scoped_file_path_sync};
 /// A folder's canonical path as it is stored and compared: on Windows without
 /// the `\\?\` prefix canonicalizing adds, so every path here has one form.
 pub(crate) fn canonical(path: impl AsRef<Path>) -> std::io::Result<PathBuf> {
-    fs::canonicalize(path).map(|path| crate::agents::project_root::plain_path(&path))
+    fs::canonicalize(path).map(|path| shared_folders::plain_path(&path))
 }
 
 #[derive(Clone)]
@@ -62,14 +62,15 @@ impl AgentService {
         run_db(self.database_path.clone(), device_snapshot_sync).await
     }
 
-    /// Records a folder as an agent scope, as sharing one did before projects.
-    #[cfg(test)]
-    pub(crate) async fn register_folder_scope(&self, path: PathBuf) -> ApiResult<Value> {
+    /// Shares a folder the person chose. Agents can read it and nothing more.
+    pub async fn share_folder(&self, path: PathBuf, protected: &[PathBuf]) -> ApiResult<Value> {
         let root = canonical(&path)
             .map_err(|error| ApiError::Message(format!("Could not open that folder: {error}")))?;
         if !root.is_dir() {
             return Err(ApiError::Message("Choose a folder, not a file.".into()));
         }
+        shared_folders::check_root(&root, protected, dirs::home_dir().as_deref())
+            .map_err(ApiError::Message)?;
         run_db(self.database_path.clone(), move |connection| {
             let device = device_id(connection)?;
             let local_path = root.to_string_lossy().into_owned();

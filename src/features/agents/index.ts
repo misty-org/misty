@@ -1,8 +1,5 @@
 export { default as AgentsPage } from "./AgentsPage";
-export { agentsDeviceSnapshot, removeProject } from "./store/useAgentsStore";
-export { projectRemote } from "./store/projectGitHub";
-export { ProjectReviewSheet } from "./components/changes/ProjectReviewSheet";
-export { useProjectReview } from "./components/changes/useProjectReview";
+export { agentsDeviceSnapshot, forgetFolder, shareFolder } from "./store/useAgentsStore";
 export { ensureServerAgentDevice } from "./store/useAgentDeviceStore";
 
 export { CompanionAppearanceSettings } from "./companion/CompanionAppearanceSettings";
@@ -21,13 +18,11 @@ export { usePersonalAgentsStore } from "./personalAgentsStore";
 export type { AppRequest } from "./apps/api";
 export { AppRequestCard } from "./apps/AppRequestCard";
 export { StatusRow, StatusTable, type StatusState } from "./progress/StatusTable";
-export { codingToolForTurn, useConversationCodingTool } from "./store/useConversationCodingTool";
 
 export { settleProgress, withAnswer, withToolEvent } from "./progress/progressTimeline";
 export { WorkflowSchedulesBridge } from "./workflows/WorkflowSchedulesBridge";
 export { grantsApi, groupGrants, lastUsedText } from "./grants/api";
 export type { AgentGrant } from "./grants/api";
-export {  codingTools,  } from "./coding/codingTools";
 ;
 // Dictation hands "Hey <agent>, …" to an agent through the cursor session.
 export { useCompanionState } from "./companion/companionState";

@@ -1,6 +1,5 @@
 import type { SpaceDrawing } from "@/api/drawings/types";
 import type { ServerSpaceNote } from "@/api/notes/api";
-import type { SpaceCodeProject } from "@/api/spaces/code-projects";
 import type { SpaceConversation } from "@/api/spaces/dto/conversation-types";
 import type { SpaceLibraryItem } from "@/api/spaces/dto/entities";
 import type { ItemVisibility, VisibilityItemKind } from "@/api/spaces/visibility";
@@ -8,7 +7,7 @@ import { libraryItemMIME } from "@/features/library";
 import { conversationPath } from "../chat/chatRoute";
 
 /** One thing made in a Space, as the Space home shows it. */
-export type GalleryKind = "chat" | "note" | "drawing" | "image" | "file" | "code";
+export type GalleryKind = "chat" | "note" | "drawing" | "image" | "file";
 
 export interface GalleryItem {
   /** Unique across kinds, for React keys. */
@@ -22,7 +21,6 @@ export interface GalleryItem {
   href: string;
   excerpt?: string;
   libraryItem?: SpaceLibraryItem;
-  repo?: string;
   /** Who a chat is with. */
   people?: string[];
   /** The item's layer; a private item shows a lock and the word "Private". */
@@ -36,7 +34,7 @@ export interface GalleryItem {
   removeLabel?: string;
 }
 
-type GalleryFilter = "all" | "chats" | "notes" | "drawings" | "images" | "files" | "code";
+type GalleryFilter = "all" | "chats" | "notes" | "drawings" | "images" | "files";
 
 /** The Space home's tabs, in order. */
 export const galleryFilters: ReadonlyArray<{
@@ -50,7 +48,6 @@ export const galleryFilters: ReadonlyArray<{
   { id: "drawings", label: "Drawings", kind: "drawing" },
   { id: "images", label: "Images", kind: "image" },
   { id: "files", label: "Files", kind: "file" },
-  { id: "code", label: "Code", kind: "code" },
 ];
 
 export function isGalleryFilter(value: string | null): value is GalleryFilter {
@@ -126,20 +123,6 @@ export function libraryGalleryItem(spaceId: string, item: SpaceLibraryItem): Gal
     libraryItem: item,
     visibility: item.visibility,
     toggle: { kind: "library_item", id: item.id },
-  };
-}
-
-export function codeItem(spaceId: string, project: SpaceCodeProject): GalleryItem {
-  return {
-    key: `code:${project.id}`,
-    kind: "code",
-    title: project.name || project.github_repo || "Code project",
-    updatedAt: project.updated_at || project.linked_at,
-    creatorId: project.owner_user_id,
-    href: `${base(spaceId)}/code`,
-    repo: project.github_repo,
-    visibility: project.visibility,
-    toggle: { kind: "code_project", id: project.id },
   };
 }
 

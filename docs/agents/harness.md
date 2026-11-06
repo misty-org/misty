@@ -27,10 +27,9 @@ Cloudflare Worker, never on the server.
 | Model calls, web search | The person's device, on their own provider and key ([byok.md](../byok.md)); `web.search` runs in the desktop runtime on the device's search key (Decodo or Serper), offered only when the device has one ([runtime.md](runtime.md#web-search)) |
 | `web.fetch` | The agent runtime on the person's device (`src-tauri/services/agent-runtime/src/web-fetch/`) |
 | `browser_run` programs, the page layer, screen capture, desktop control | The person's device, inside the Misty app |
-| Coding | The person's device, through their own coding tools |
 
 ```
-request: agent.entry.composer | .cursor | .schedule | .email | .integration.<app>
+request: agent.entry.composer | .cursor | .schedule
   └─ Agent loop: small tool surface, prompt stable between compactions
      ├─ browser_run ─ agent.gate (Go: catalog · policy · journal · model route)
      │    └─ Device: the program in a sandbox inside the Misty app (no network, files or globals)
@@ -58,7 +57,7 @@ general to the specific. The model sees dots as underscores (`memory.history.sea
 | `log.work.*` | One run's checklist and findings, which the person sees |
 | `log.run` | The system record of every model turn and tool call (not a model tool) |
 | `agent.tool.*` | What a run can do: `answer`, `browse`, `desktop`, `code` |
-| `agent.entry.*` | Where a request comes from and how the reply returns: `composer`, `cursor`, `schedule`, `email`, `integration.slack` |
+| `agent.entry.*` | Where a request comes from and how the reply returns: `composer`, `cursor`, `schedule` |
 | `agent.gate` | Misty's API side of a run |
 | `agent.finish`, `agent.delegate`, `agent.wait` | Ending a run, and sub-agents |
 
@@ -76,8 +75,7 @@ Every run starts small. `agent.tool` says what a run can do (`src/toolsets.ts`):
   `screen_open` for the agent's own tab, and `browser_run`.
 - **browse**: adds the 17 single-step page tools (snapshot, steps, forms, page skills, the
   screen agent) for what a program cannot do.
-- **desktop**: control other apps on the computer. **code**: hand coding in an attached project
-  to the person's coding tool.
+- **desktop**: control other apps on the computer.
 
 `agent_tool_use` switches, and `agent_tool_load` adds a family: `integration` (connected apps),
 `agent` (sub-agents) or `misty` (notes, drawings, files, chats, Spaces, memory, workflows). A
@@ -87,8 +85,7 @@ website; a run with its own tabs starts with sub-agents loaded. There is no rout
 
 `agent.entry` sets the reply format and what the screen contributes: the cursor captures every
 display on every request, cursor first, and replies in short spoken sentences with pointing tags;
-the composer replies in formatted text; schedules, email and Slack reply in their own format with
-no screen. Each model family gets a short prompt note (`src/model-family.ts`). Teach mode turns
+the composer replies in formatted text; schedules reply in their own format with no screen. Each model family gets a short prompt note (`src/model-family.ts`). Teach mode turns
 run the tutor's fast lane (`src/teach-turn.ts`), never the agent loop
 ([agents-at-cursor brief](cursor-companion.md)).
 

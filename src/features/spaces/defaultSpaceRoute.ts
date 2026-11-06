@@ -9,7 +9,7 @@ export function defaultSpaceRoute(spaceId: string): string {
   const route =
     tool === "journal"
       ? "notes"
-      : ["home", "chat", "notes", "drawings", "library", "code"].includes(tool)
+      : ["home", "chat", "notes", "drawings", "library"].includes(tool)
         ? tool
         : "home";
   return `/spaces/${encodeURIComponent(spaceId)}/${route}`;

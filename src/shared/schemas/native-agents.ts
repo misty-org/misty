@@ -19,8 +19,6 @@ export const AgentProfileSchema = AgentProfileInputSchema.extend({
   id: z.string(),
   owner_user_id: z.string(),
   system_managed: z.boolean(),
-  /** Who does the work: Misty's cloud loop, or a coding tool on the person's device. */
-  runner: z.string().default("misty"),
   /** The agent's home Space. The Agents page groups agents by it. */
   space_id: z.string().default(""),
   version: z.number().int().positive(),

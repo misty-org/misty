@@ -1,11 +1,6 @@
 import { chatDeviceGrants } from "@/features/agents/deviceGrants";
 import { useCollaborationStore } from "@/features/agents/agentCollaboration";
-import {
-  codingToolForTurn,
-  lessonTurnPayload,
-  useConversationCodingTool,
-  useLessonStore,
-} from "@/features/agents";
+import { lessonTurnPayload, useLessonStore } from "@/features/agents";
 import {
   runtimeAiApi as aiSurfaceApi,
   subscribeAgentsInvocation as subscribeToAiInvocation,
@@ -107,7 +102,7 @@ export async function startInvocation(set: MistySet, get: MistyGet, turn: Prepar
       uncertainAdmissions.get(admission) ??
       `global-answer-${globalMistyId()}`;
     uncertainAdmissions.set(admission, idempotencyKey);
-    // The chat's project and this computer's Misty browser travel with a desktop chat.
+    // The chat's folder and this computer's Misty browser travel with a desktop chat.
     const grants = await chatDeviceGrants(conversationId, startsConversation);
     const created = await aiSurfaceApi.createInvocation({
       agentId: get().conversations.find((c) => c.id === conversationId)?.agentId || requestAgentId,
@@ -166,7 +161,6 @@ export async function startInvocation(set: MistySet, get: MistyGet, turn: Prepar
           )
         : {}),
       permissionMode,
-      codingTool: codingToolForTurn(conversationId, startsConversation),
       selection,
       capture,
       ...(conversationId.startsWith("local-")
@@ -206,7 +200,6 @@ export async function startInvocation(set: MistySet, get: MistyGet, turn: Prepar
     });
     if (startsConversation) {
       useCollaborationStore.getState().adoptDraftMode(conversationId);
-      useConversationCodingTool.getState().adoptDraft(conversationId);
     }
     set({
       invocationId: created.invocationId,

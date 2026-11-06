@@ -88,35 +88,9 @@ pub fn invoke_handler() -> impl Fn(Invoke<Wry>) -> bool + Send + Sync + 'static 
             #[cfg(desktop)]
             crate::app::device_job_commands::device_verify_job,
             #[cfg(desktop)]
-            crate::app::runner_commands::coding_engines_detect,
+            crate::app::shared_folder_commands::agents_share_folder,
             #[cfg(desktop)]
-            crate::app::runner_commands::coding_route,
-            #[cfg(desktop)]
-            crate::app::runner_commands::coding_project_remote,
-            #[cfg(desktop)]
-            crate::app::runner_commands::coding_run_turn,
-            #[cfg(desktop)]
-            crate::app::runner_commands::coding_runner_answer,
-            #[cfg(desktop)]
-            crate::app::project_commands::project_choose,
-            #[cfg(desktop)]
-            crate::app::project_commands::project_new,
-            #[cfg(desktop)]
-            crate::app::project_commands::project_remove,
-            #[cfg(desktop)]
-            crate::app::project_commands::project_publish,
-            #[cfg(desktop)]
-            crate::app::project_commands::project_clone,
-            #[cfg(desktop)]
-            crate::app::project_commands::project_git_diff,
-            #[cfg(desktop)]
-            crate::app::checkpoint_commands::project_checkpoints,
-            #[cfg(desktop)]
-            crate::app::checkpoint_commands::project_run_diff,
-            #[cfg(desktop)]
-            crate::app::checkpoint_commands::project_undo,
-            #[cfg(desktop)]
-            crate::app::checkpoint_commands::project_snapshot,
+            crate::app::shared_folder_commands::agents_forget_folder,
             #[cfg(desktop)]
             crate::app::device_job_commands::device_read_shared_file,
             #[cfg(desktop)]

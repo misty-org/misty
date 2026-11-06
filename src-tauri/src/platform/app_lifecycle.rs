@@ -65,8 +65,6 @@ pub fn run_event(app: &AppHandle, event: RunEvent) {
         }
     }
     if matches!(event, RunEvent::Exit) {
-        // Coding tools started for agents never outlive Misty.
-        crate::agents::runners::registry::stop_all();
         // Its runs wait in the runtime's local store for the next launch.
         crate::infra::agent_runtime::stop();
     }

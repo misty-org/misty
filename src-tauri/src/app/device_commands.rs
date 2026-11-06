@@ -50,9 +50,8 @@ pub(super) async fn shared_folders(state: &MistyRuntime) -> Vec<SharedFolder> {
         .map(|scopes| {
             scopes
                 .iter()
-                // Every project is offered to the person's other devices
-                // read-only (list, read, send); editing and commands stay on
-                // this computer, since no device policy grants "code".
+                // Every shared folder is offered to the person's other devices
+                // read-only (list, read, send).
                 .filter_map(|scope| {
                     Some(SharedFolder {
                         scope_id: scope["id"].as_str()?.to_owned(),

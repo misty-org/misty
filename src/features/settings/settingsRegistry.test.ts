@@ -77,7 +77,6 @@ describe("settings routing", () => {
       "browser menu": ["general", "general"],
       "update notice": ["updates", "general"],
       "clipboard devices": ["devices", "sync"],
-      "coding tools": ["agents-coding", "conversations"],
       "extensions toolbar": ["browser-extensions", "extensions"],
       "passwords sync": ["sync", "sync"],
     };

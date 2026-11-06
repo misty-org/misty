@@ -48,3 +48,11 @@ Everything an earlier layout kept elsewhere is retired when the layout version r
 `.auth` credential files, `home.json` (the version is now a row in `misty.db`), `config/`
 settings and the JSON files that moved into `misty.db`, `db/`, `tmp/`, the old
 `.local/data/browser-sync` folder, `cache` under its old name, and the old CLI binary folder.
+
+The coding feature left a `checkpoints` folder in the home. Unlike other retired paths it is
+deleted, not moved to the Trash, by a one-time cleanup at launch (`infra/retired_coding_data.rs`).
+It removes only `<misty home>/checkpoints`, only when that is a real directory, and on its own
+thread, so launch never waits or fails because of it. A removal that fails is tried again next
+launch. A mark in `settings_state` stops it running once it has worked or there was nothing to
+remove. `misty.db` migration 20 removes the `coding_*` preferences, and `HostMain.tsx` removes the
+old browser storage keys.

@@ -2,10 +2,7 @@ export interface AgentScope {
   id: string;
   deviceId: string;
   displayName: string;
-  /** A project is shared with write access: agents edit it and run commands. */
-  kind: "local_folder" | "project_folder";
-  /** Projects only: the folder is a Git repository. */
-  git?: boolean;
+  kind: "local_folder";
   relativePath?: string | null;
   available: boolean;
 }

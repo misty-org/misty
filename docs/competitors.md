@@ -133,7 +133,7 @@ Goal: Misty has everything the others have, so no public row shows Misty losing.
 | C5 | Block the agent on chosen sites, as a setting | Comet, Dia | Site blocks exist in the page runtime | S | 5 |
 | C6 | Ask several models at once and merge the answers | Comet (Max) | Model breadth already there; a natural fit | M | 6 |
 | C7 | Create decks, docs and reports as files | Comet, Dia | Journal for notes; no file output | L | 7 |
-| C8 | Send the agent a task by email or Slack | Comet, Aside (Slack, Telegram, Discord) | Composio Gmail and Slack | M | 8 |
+| C8 | Send the agent a task by email or Slack | Comet, Aside (Slack, Telegram, Discord) | Built, then removed on 2026-11-06 as too much for the MVP; Gmail and Slack stay as connected apps | M | not planned |
 | C9 | Ship the cross-device clipboard; confirm agents at the cursor | Misty-only rows | Built | S | 9 |
 | C10 | Model choice for everyone | — (lead, not parity) | Done: bring your own key, any model per job (`docs/byok.md`) | S | done |
 | C12 | Chrome Web Store extensions | Comet, Dia, Aside, Arc, Helium, Brave (Zen takes Firefox add-ons) | In progress through Kiri | L | 12 |

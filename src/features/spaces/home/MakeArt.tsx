@@ -1,8 +1,8 @@
 /**
  * Small gray drawings of what each "Create" tile makes: a miniature chat,
- * page, canvas, drop zone and diff. Monochrome on purpose; shapes, not color, tell them apart.
+ * page, canvas and drop zone. Monochrome on purpose; shapes, not color, tell them apart.
  */
-export function MakeArt({ kind }: { kind: "chat" | "note" | "drawing" | "file" | "code" }) {
+export function MakeArt({ kind }: { kind: "chat" | "note" | "drawing" | "file" }) {
   const sheet = "rounded-md border border-charcoal-border bg-charcoal-card";
   const line = "block h-1.5 rounded-full bg-cream-muted/25";
   const strong = "block h-1.5 rounded-full bg-cream-muted/50";
@@ -37,25 +37,14 @@ export function MakeArt({ kind }: { kind: "chat" | "note" | "drawing" | "file" |
         <rect x="84" y="14" width="30" height="18" rx="5" />
       </svg>
     );
-  if (kind === "file")
-    return (
-      <span
-        aria-hidden
-        className="grid h-[70%] w-[46%] place-items-center rounded-md border border-dashed border-cream-muted/30"
-      >
-        <svg viewBox="0 0 24 24" className="size-6 fill-none stroke-cream-muted/60 stroke-[1.7]">
-          <path d="M12 16V5M7 10l5-5 5 5M5 19h14" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </span>
-    );
   return (
     <span
       aria-hidden
-      className={`${sheet} flex w-[66%] flex-col gap-0.5 px-2 py-1.5 font-mono text-3xs leading-snug`}
+      className="grid h-[70%] w-[46%] place-items-center rounded-md border border-dashed border-cream-muted/30"
     >
-      <span className="text-cream-muted/60">src/app.ts</span>
-      <span className="text-cream-muted/90">+ export()</span>
-      <span className="text-cream-muted/40 line-through">- legacy()</span>
+      <svg viewBox="0 0 24 24" className="size-6 fill-none stroke-cream-muted/60 stroke-[1.7]">
+        <path d="M12 16V5M7 10l5-5 5 5M5 19h14" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
     </span>
   );
 }

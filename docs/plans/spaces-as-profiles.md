@@ -634,9 +634,7 @@ the Space's picks, and `integration.connect` shows a pick card (`agent_app_reque
 with the request's `space_id`) when the person has accounts the Space doesn't use. Connected
 accounts live in Composio, so the migration can't seed them: the first listing that sees an account
 picks it in the personal Space once (`space_integration_seen`), and an account connected from a
-run's Connect card becomes that Space's pick. The direct proxy callers (inbound +misty email and
-Slack, GitHub repos for code projects) still use the person's first active account; move them onto
-picks with phase 9.
+run's Connect card becomes that Space's pick.
 
 **Built (2026-10-16).** Migration `20271028050000_space_integration_picks.sql`;
 `postgres/space_integration_picks.go`; API `GET /integrations/apps` (each account lists the Spaces
@@ -662,7 +660,7 @@ runs the owner asked for. Agents have a home Space. The layer map is in the
   (`device_agent_tools.go` folders, tabs, bookmarks), integration picks (8), private chats and
   agent settings.
 - **The private/public toggle.** Gallery items (`space_notes`, `space_drawings`, `space_nodes` for
-  files and images, `space_code_projects`) and agents in a Space (`space_agents`) get
+  files and images) and agents in a Space (`space_agents`) get
   `visibility text NOT NULL CHECK (visibility IN ('public','private'))` and an owner column where
   one is missing. Every list, read, search and change query adds "public, or owned by the viewer",
   enforced in the RLS policies so a forgotten filter still can't leak. Private agents don't appear

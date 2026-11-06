@@ -19,7 +19,7 @@ live in that feature's folder: [agents](../agents/README.md), [browser](../brows
 
 - Exception: tab groups use their chosen color: the filled label chip, the outlines of the group's tabs and the editor's swatches. Hover, focus and the rest of the tab strip stay monochrome, and a selected swatch shows a checkmark.
 
-- Exception: official brand logos for connected apps (Integrations rows and tiles, and the app chips under the Agents composer), for coding tools in the composer's Code menu (via `CodingToolIcon`) and for source browsers in the browser import flow (onboarding, Settings and the Bookmarks page) keep their original artwork via `BrandIcon` from `src/shared/ui/icons/brand-icons`. Never recolor them or hand-draw a substitute; apps without artwork fall back to a monochrome Lucide icon. Status around them stays text and icons.
+- Exception: official brand logos for connected apps (Integrations rows and tiles, and the app chips under the Agents composer) and for source browsers in the browser import flow (onboarding, Settings and the Bookmarks page) keep their original artwork via `BrandIcon` from `src/shared/ui/icons/brand-icons`. Never recolor them or hand-draw a substitute; apps without artwork fall back to a monochrome Lucide icon. Status around them stays text and icons.
 
 - Exception: the night light (Settings › Interface › Night light, `src/features/settings/store/nightLight.ts`) lays one warm multiply tint over the whole window and every browser page while it is on. It is off by default, the only setting that schedules anything visual, and the only place that warmth may appear. The theme itself stays Dark, Light or System.
 
@@ -37,7 +37,6 @@ live in that feature's folder: [agents](../agents/README.md), [browser](../brows
 | Item-type icon glyphs | Shared tones (`itemTones.ts`) | this page |
 | Tab groups | The group's chosen color | this page |
 | Each profile's window chrome | The profile's color | [sync](../sync/README.md) |
-| Connected-app, coding-tool and browser logos | Original artwork | this page |
+| Connected-app and browser logos | Original artwork | this page |
 | Agent status dots and status tables | `--misty-status-*` | [agents](../agents/README.md) |
-| Diffs | Green and red lines | [agents](../agents/README.md) |
 | Night light | One warm tint | this page |

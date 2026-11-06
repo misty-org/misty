@@ -1,7 +1,8 @@
 import type { AgentScope } from "@/features/agents";
 import {
   agentsDeviceSnapshot,
-  removeProject,
+  forgetFolder,
+  shareFolder,
   CompanionAppearanceSettings,
 } from "@/features/agents";
 import { confirmAction } from "@/shared/lib/confirmAction";
@@ -18,7 +19,6 @@ import { ChoiceControl, SwitchControl } from "../SettingsControls";
 import { useSettingsStore } from "../store/useSettingsStore";
 import { AgentGrantsSection } from "./AgentGrantsSection";
 import { AgentSitesSection } from "./AgentSitesSection";
-import { InboundTasksSection } from "./InboundTasksSection";
 import { PaymentsAskSection } from "./PaymentsAskSection";
 import { ScreenLocationSection } from "./ScreenLocationSection";
 import { PreferenceRow } from "./PreferenceRow";
@@ -70,13 +70,10 @@ function CollaborationModeRow() {
     </Row>
   );
 }
-export function AgentConnectionsSection() {
-  return <InboundTasksSection />;
-}
 export function CompanionSection() {
   return hasTauriInternals() ? <CompanionAppearanceSettings /> : null;
 }
-/** What agents may do: remembered approvals (server-owned), project folders on a desktop, and
+/** What agents may do: remembered approvals (server-owned), shared folders on a desktop, and
  * sites they only read. */
 export function AgentPermissionsSection() {
   return (
@@ -99,62 +96,60 @@ function AgentScopeList() {
         setScopes(s.scopes);
         setError("");
       })
-      .catch(() => setError("Project folders could not be loaded. Try again."))
+      .catch(() => setError("Shared folders could not be loaded. Try again."))
       .finally(() => setLoading(false));
   useEffect(() => {
     void refresh();
   }, []);
   if (loading)
     return (
-      <Section title="Projects">
-        <SkeletonList label="Projects" rows={2} leading="none" trailing />
+      <Section title="Shared folders">
+        <SkeletonList label="Shared folders" rows={2} leading="none" trailing />
       </Section>
     );
-  if (!scopes.length)
-    return (
-      <ErrorNotification message={error} onDismiss={() => setError("")}>
-        <Button type="button" variant="outline" size="sm" onClick={() => void refresh()}>
-          Try again
-        </Button>
-      </ErrorNotification>
-    );
+  const share = async () => {
+    try {
+      await shareFolder();
+      await refresh();
+    } catch (failure) {
+      const text = typeof failure === "string" ? failure : "";
+      setError(text && !text.includes("_") ? text : "That folder couldn’t be shared.");
+    }
+  };
   return (
-    <Section title="Projects" description="Add one from a chat’s Project menu.">
+    <Section title="Shared folders">
       {scopes.map((s) => (
-        <Row
-          key={s.id}
-          label={s.displayName}
-          description={s.kind === "project_folder" ? "Coding tools work here." : "Read only."}
-        >
+        <Row key={s.id} label={s.displayName}>
           <Button
             variant="outline"
             onClick={() =>
               void (async () => {
                 if (
                   !(await confirmAction(
-                    `Stop using “${s.displayName}” as a project? Its files stay on this computer.`,
-                    "Remove project",
+                    `Stop sharing “${s.displayName}” with agents? Its files stay on this computer.`,
+                    "Stop sharing",
                   ))
                 )
                   return;
                 try {
-                  await removeProject(s.id);
+                  await forgetFolder(s.id);
                   await refresh();
                 } catch {
-                  setError("Project access could not be removed. Try again.");
+                  setError("Folder access could not be removed. Try again.");
                 }
               })()
             }
           >
-            Remove access
+            Stop sharing
           </Button>
         </Row>
       ))}
-      <ErrorNotification message={error} onDismiss={() => setError("")}>
-        <Button type="button" variant="outline" size="sm" onClick={() => void refresh()}>
-          Try again
+      <Row label="Add a folder">
+        <Button variant="outline" onClick={() => void share()}>
+          Share a folder
         </Button>
-      </ErrorNotification>
+      </Row>
+      <ErrorNotification message={error} onDismiss={() => setError("")} />
     </Section>
   );
 }

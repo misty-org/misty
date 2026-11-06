@@ -23,10 +23,8 @@ import { AdvancedSection } from "./sections/AdvancedSection";
 import { AppearanceSection } from "./sections/AppearanceSection";
 import { BrowserPermissionSettings } from "./sections/BrowserPermissionSettings";
 import { BrowserLinksSettings, DownloadsSettings } from "./sections/BrowserSection";
-import { CodingToolsSection } from "./sections/CodingToolsSection";
 import { ModelsSection } from "./models/ModelsSection";
 import {
-  AgentConnectionsSection,
   AgentDefaultsSection,
   AgentPermissionsSection,
   CompanionSection,
@@ -149,8 +147,6 @@ export const settingsRegistry: readonly SettingsRegistryEntry[] = [
   block("conversations", "agents-defaults", "Conversations", AgentDefaultsSection),
   block("conversations", "misty", "Misty", MistySection, "resource"),
   block("conversations", "agents-companion", "Cursor", CompanionSection),
-  block("conversations", "agents-coding", "Coding", CodingToolsSection, "resource"),
-  block("conversations", "agents-connections", "Tasks", AgentConnectionsSection, "resource"),
   block("access", "agents-permissions", "Access", AgentPermissionsSection, "resource"),
   block("memory", "recall", "Memory", MemorySection),
   block("memory", "agents-memory", "Remembered", MistyMemorySection, "resource"),

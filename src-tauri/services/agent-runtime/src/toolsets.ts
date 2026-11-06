@@ -3,15 +3,15 @@ import type { ModelCatalog } from "./model-tools.js";
 
 // agent.tool (docs/agents/harness.md, Tool surface). A run starts in
 // answer: everything that reads, searches, fetches pages or works with the
-// person's own data. browse, desktop and code add the tools that act on a
-// screen or a project; agent.tool.load adds connected apps or sub-agents. The
+// person's own data. browse and desktop add the tools that act on a
+// screen; agent.tool.load adds connected apps or sub-agents. The
 // model sees only what its current agent.tool allows, so a quick answer never
 // wades through browser and desktop tools.
 
 export const toolUseTool = "agent_tool_use";
 export const toolLoadTool = "agent_tool_load";
 
-type Toolset = "answer" | "browse" | "desktop" | "code";
+type Toolset = "answer" | "browse" | "desktop";
 type Family = "integration" | "agent" | "misty";
 
 // The person's Misty data and its social and workflow tools: about 50 of a run's 65 tools and
@@ -37,7 +37,6 @@ function toolsetOf(name: string): Toolset | Family | undefined {
   if (name === "screen.open" || name === "browser.run") return undefined;
   if (name.startsWith("browser.workspace.")) return "desktop";
   if (name.startsWith("browser.") && !name.startsWith("browser.tab.")) return "browse";
-  if (name.startsWith("code.")) return "code";
   if (name.startsWith("integration.")) return "integration";
   if (name === "agent.delegate" || name === "agent.wait") return "agent";
   if (mistyData.some((prefix) => name === prefix || name.startsWith(prefix))) return "misty";
@@ -48,7 +47,6 @@ const toolsetWords: Record<Toolset, string> = {
   answer: "answer: read, search, fetch pages and work with the person's own data (the default)",
   browse: "browse: also the single-step page tools (snapshot, steps, forms, page skills, screen agent) for what a browser_run program cannot do",
   desktop: "desktop: also control other apps on the person's computer",
-  code: "code: also hand coding in an attached project to the person's coding tool",
 };
 const familyWords: Record<Family, string> = {
   integration: "integration: the person's connected apps (Gmail, Calendar, Slack, GitHub and others)",
@@ -75,7 +73,7 @@ export function toolState(messages: ModelMessage[], initial: Toolset = "answer")
 
 export function agentTools(catalog: ModelCatalog, request = "") {
   const offered = new Set(catalog.tools.map((item) => toolsetOf(item.name)).filter((value): value is Toolset | Family => value !== undefined));
-  const toolsets = (["answer", "browse", "desktop", "code"] as const).filter((name) => name === "answer" || offered.has(name));
+  const toolsets = (["answer", "browse", "desktop"] as const).filter((name) => name === "answer" || offered.has(name));
   // Browser tools exist only once a browser is attached (a screen the agent
   // opened, or a tab the person shared), so such a run starts in browse, unless it
   // has browser_run: then pages are worked with programs, and the 17 single-step

@@ -5,17 +5,15 @@ pub(super) fn device_snapshot_sync(connection: &mut Connection) -> rusqlite::Res
     let device_id = device_id(connection)?;
     let scopes = {
         let mut statement = connection.prepare(
-            "SELECT id,device_id,display_name,access,local_path FROM local_agent_scopes ORDER BY created_at",
+            "SELECT id,device_id,display_name FROM local_agent_scopes ORDER BY created_at",
         )?;
         let rows = statement
             .query_map([], |row| {
-                let project = row.get::<_, String>(3)? == "write";
                 Ok(json!({
                     "id": row.get::<_, String>(0)?,
                     "deviceId": row.get::<_, String>(1)?,
                     "displayName": row.get::<_, String>(2)?,
-                    "kind": if project { "project_folder" } else { "local_folder" },
-                    "git": project && Path::new(&row.get::<_, String>(4)?).join(".git").is_dir(),
+                    "kind": "local_folder",
                     "relativePath": Value::Null,
                     "available": true,
                 }))

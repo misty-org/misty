@@ -22,9 +22,8 @@ and ⌘T is the way in.
 | **Notes** | Documents, written by people and agents |
 | **Drawings** | Canvases |
 | **Files** | Files and folders, shown as cards with live previews |
-| **Code** | Code projects linked to the Space, with their GitHub repo and changes |
 
-The sections sit in the Space page's own header, with ⌘1 to ⌘5. There is no
+The sections sit in the Space page's own header, with ⌘1 to ⌘4. There is no
 Space rail or tool strip.
 
 ## Members and agents
@@ -64,9 +63,8 @@ Space rail or tool strip.
   reach Misty. Agent outputs are ordinary files, credited to the agent and run
   that made them.
 - Trash is an ordinary collection for every member: there is no Library lock.
-- Code lists `space_code_projects`: each row shows the project, its owner, its
-  GitHub repo and latest changes. Project files stay on the owner's device; the
-  others see the changes and the GitHub link. Coding is open to everyone.
+- Agents can read a folder on the person's computer only when it's shared and
+  chosen for that chat. Shared folders are read-only.
 
 ## Navigation
 
@@ -97,8 +95,6 @@ are dropped by migration, with no export.
 
 ## Still open
 
-- Projects are linked from the Code section's "Link a project" menu; the
-  composer's Project menu doesn't offer it yet.
 - Device-local pick history doesn't bias the panel's guess yet.
 - Agent work in channel replies shows the final answer, not the live work lines.
 

@@ -201,7 +201,7 @@ export class DesktopAgentJobWorker {
         }).finally(() => (renewing = false));
       }, leaseHeartbeatMs);
       const output = await abortable(
-        executeWorkflowNodeOnDevice(job, controller.signal, () => leaseExpiresAt, deviceId),
+        executeWorkflowNodeOnDevice(job, controller.signal, () => leaseExpiresAt),
         controller.signal,
       );
       report = () =>

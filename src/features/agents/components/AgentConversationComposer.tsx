@@ -6,9 +6,8 @@ import type { useGlobalMistyAttachments } from "@/features/misty/useGlobalMistyA
 import { useMistyStore } from "@/features/misty/useMistyStore";
 import type { AgentProfile } from "@/shared/schemas";
 import { IconButton, Spinner } from "@/shared/ui";
-import { AgentCodingToolMenu } from "../collaboration/AgentCodingToolMenu";
+import { AgentFolderMenu } from "../collaboration/AgentFolderMenu";
 import { AgentModeMenu } from "../collaboration/AgentModeToggle";
-import { AgentProjectMenu } from "../collaboration/AgentProjectMenu";
 import type { usePermissionMode } from "../collaboration/permissionMode";
 import type { useCollaborationComposer } from "../collaboration/useCollaborationComposer";
 import { ComposerStrip } from "./ComposerStrip";
@@ -112,7 +111,7 @@ export function AgentConversationComposer({
         }
       />
       <ComposerStrip
-        project={<AgentProjectMenu conversationId={conversationId} />}
+        folder={<AgentFolderMenu conversationId={conversationId} />}
         mode={
           <AgentModeMenu
             conversationId={conversationId}
@@ -120,7 +119,6 @@ export function AgentConversationComposer({
             permission={permission}
           />
         }
-        code={<AgentCodingToolMenu conversationId={conversationId} disabled={working} />}
       />
       {/* Working status belongs to the transcript, under the message that started it. */}
       {(voice.recording || voice.transcribing) && (

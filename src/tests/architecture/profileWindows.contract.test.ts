@@ -9,17 +9,12 @@ import { repositoryPath, walk } from "./repositoryPolicy";
  * longer exists, and fail silently.
  */
 const helper = /^src-tauri\/src\/infra\/profile_windows(\.rs|\/)/;
-// Git's default branch in repository fixtures, not a window.
-const gitBranchFixtures = new Set([
-  "src-tauri/src/agents/project_git.rs",
-  "src-tauri/src/agents/checkpoints/tests.rs",
-]);
 
 describe("Profile window labels contract", () => {
   it('names no window "main" outside the profile windows helper', () => {
     const failures = walk("src-tauri/src", new Set([".rs"]))
       .map((path) => [repositoryPath(path), readFileSync(path, "utf8")] as const)
-      .filter(([path]) => !helper.test(path) && !gitBranchFixtures.has(path))
+      .filter(([path]) => !helper.test(path))
       .flatMap(([path, text]) =>
         text
           .split("\n")

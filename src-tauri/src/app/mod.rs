@@ -1,7 +1,5 @@
 //! Application entry points: Tauri command handlers and shared runtime state.
 
-#[cfg(desktop)]
-pub mod checkpoint_commands;
 pub mod clipboard_commands;
 pub mod commands;
 #[cfg(desktop)]
@@ -12,9 +10,7 @@ pub mod device_commands;
 pub mod device_job_commands;
 pub mod handlers;
 pub mod plugins;
-#[cfg(desktop)]
-pub mod project_commands;
-#[cfg(desktop)]
-pub mod runner_commands;
 pub mod runtime;
+#[cfg(desktop)]
+pub mod shared_folder_commands;
 pub mod shortcut_commands;
