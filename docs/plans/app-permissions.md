@@ -155,8 +155,12 @@ so the Rust version should behave the same. No third-party Rust LLM library, inc
 2. A small test: the OpenAI-compatible client and the agent loop in Rust, measuring memory and one
    benchmark task, and comparing its requests with the TypeScript runtime's.
 3. Port the rest, one provider at a time, comparing against the baseline.
-4. Delete the TypeScript runtime when the Rust one scores the same or better on the same tasks and models. Node stays for development until
-   then.
+4. Delete the TypeScript runtime when the Rust one scores the same or better on the same tasks and
+   models. Node stays for development until then.
+
+`src-tauri/services/agent-runtime/test/sdk-parity.record.test.ts` records what the Vercel AI SDK sends and
+parses against a local mock, and `src-tauri/crates/agent/tests/sdk_parity.rs` replays those fixtures against
+the Rust clients, with no model keys.
 
 There's no rush: the target is scores the same or better than the baseline, and the MVP waits for that. No
 release ships Node, even temporarily.

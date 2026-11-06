@@ -1,0 +1,48 @@
+{
+  "name": "server_error",
+  "modelId": "nvidia/test-model",
+  "credentialProvider": "nvidia",
+  "options": {
+    "prompt": [
+      {
+        "role": "user",
+        "content": [
+          {
+            "type": "text",
+            "text": "Go."
+          }
+        ]
+      }
+    ]
+  },
+  "status": 503,
+  "contentType": "application/json",
+  "response": "{\"error\":{\"message\":\"Down\",\"type\":\"server_error\"}}",
+  "sent": [
+    {
+      "method": "POST",
+      "path": "/v1/chat/completions",
+      "headers": {
+        "accept": "*/*",
+        "authorization": "Bearer test-key-parity",
+        "content-type": "application/json"
+      },
+      "body": {
+        "model": "test-model",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Go."
+          }
+        ],
+        "stream": true
+      }
+    }
+  ],
+  "parts": [],
+  "thrown": {
+    "name": "AI_APICallError",
+    "statusCode": 503,
+    "isRetryable": true
+  }
+}
