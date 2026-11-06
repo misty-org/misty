@@ -10,9 +10,9 @@ use std::{collections::HashSet, sync::LazyLock};
 use regex::Regex;
 
 #[allow(unused_imports)]
-pub(crate) use parse::parse_ledger_input;
+pub(crate) use parse::{parse_carried_rows, parse_ledger_input};
 #[allow(unused_imports)]
-pub(crate) use rows::{ledger_input_schema, EvidenceKind, LedgerEvidence, LedgerRow, Needs, RowState, SentRow};
+pub(crate) use rows::{ledger_input_schema, EvidenceKind, LedgerEvidence, LedgerRow, Needs, RowField, RowState, SentRow};
 
 use super::{
     js_json::JsValue,
@@ -50,6 +50,11 @@ impl Ledger {
                 row
             })
             .collect();
+        Self { rows }
+    }
+
+    /// A saved ledger coming back after a restart, its rows exactly as they were.
+    pub(crate) fn restored(rows: Vec<LedgerRow>) -> Self {
         Self { rows }
     }
 

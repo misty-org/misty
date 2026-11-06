@@ -92,6 +92,11 @@ pub(crate) fn js_regex(pattern: &str, ignore_case: bool) -> Regex {
     Regex::new(&translate(pattern, ignore_case)).expect("a fixed pattern from the TypeScript runtime compiles")
 }
 
+/// `js_regex` for a pattern from outside the runtime, such as a tool schema's.
+pub(crate) fn try_js_regex(pattern: &str, ignore_case: bool) -> Option<Regex> {
+    Regex::new(&translate(pattern, ignore_case)).ok()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

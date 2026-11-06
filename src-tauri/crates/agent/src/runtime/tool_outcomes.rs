@@ -166,7 +166,7 @@ pub(crate) fn tool_failure_signature(tool_name: &str, input: &JsValue) -> String
     format!("{tool_name}:{}", stable_tool_value(input).stringify())
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 pub(crate) struct ToolFailure {
     pub(crate) tool_name: String,
     pub(crate) error: String,

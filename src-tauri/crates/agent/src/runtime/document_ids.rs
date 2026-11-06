@@ -29,6 +29,15 @@ pub(crate) struct DocumentIds {
 }
 
 impl DocumentIds {
+    /// What a saved run keeps: each tab's latest documentId, and every one issued.
+    pub(crate) fn saved(&self) -> (HashMap<String, String>, HashSet<String>) {
+        (self.latest.clone(), self.issued.clone())
+    }
+
+    pub(crate) fn restored(latest: HashMap<String, String>, issued: HashSet<String>) -> Self {
+        Self { latest, issued }
+    }
+
     /// Notes the documentId a browser call's result reports for its tab. `output` is the result as
     /// text: a string result itself, or any other result's `JSON.stringify`.
     pub(crate) fn note(&mut self, input: &JsValue, output: &str) {

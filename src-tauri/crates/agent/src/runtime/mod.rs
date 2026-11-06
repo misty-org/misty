@@ -1,5 +1,42 @@
 //! Runs agents on top of [`crate::sdk`].
 
+pub mod device;
+pub mod live;
+pub mod voice;
+#[allow(dead_code)]
+pub(crate) mod agent_api;
+#[allow(dead_code)]
+pub(crate) mod agent_runtime;
+#[allow(dead_code)]
+pub(crate) mod clock;
+#[allow(dead_code)]
+pub(crate) mod control_plane;
+#[allow(dead_code)]
+pub(crate) mod control_plane_steps;
+#[allow(dead_code)]
+pub(crate) mod device_hooks;
+#[allow(dead_code)]
+pub(crate) mod device_models;
+#[allow(dead_code)]
+pub(crate) mod instance_model;
+#[allow(dead_code)]
+pub(crate) mod logger;
+#[allow(dead_code)]
+pub(crate) mod mcp_client;
+#[allow(dead_code)]
+pub(crate) mod mcp_endpoint;
+#[allow(dead_code)]
+pub(crate) mod mcp_runtime;
+#[allow(dead_code)]
+pub(crate) mod mcp_sessions;
+#[allow(dead_code)]
+pub(crate) mod run;
+#[allow(dead_code)]
+pub(crate) mod start_receipt;
+#[allow(dead_code)]
+pub(crate) mod teach_turn;
+#[allow(dead_code)]
+pub(crate) mod tool_calls;
 #[allow(dead_code)]
 pub(crate) mod text;
 #[allow(dead_code)]
@@ -94,3 +131,7 @@ pub(crate) mod web_fetch;
 pub(crate) mod web_search;
 #[cfg(test)]
 pub(crate) mod tools_parity_tests;
+
+pub use agent_api::{runtime_client_builder, AgentRuntimeOptions, ResumedRuns, RuntimeApiError, StartRequest, StartedRun, ToolHook};
+pub use agent_runtime::AgentRuntime;
+pub use logger::{LogSink, Logger};

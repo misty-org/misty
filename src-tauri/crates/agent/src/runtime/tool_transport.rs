@@ -12,6 +12,13 @@ pub(crate) enum CheckpointState {
 }
 
 impl CheckpointState {
+    pub(crate) fn from_report(state: super::compaction_model::CheckpointState) -> Self {
+        match state {
+            super::compaction_model::CheckpointState::Running => Self::Running,
+            super::compaction_model::CheckpointState::Completed => Self::Completed,
+        }
+    }
+
     pub(crate) fn as_str(self) -> &'static str {
         match self {
             Self::Running => "running",
