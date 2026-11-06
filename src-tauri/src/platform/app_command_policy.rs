@@ -167,6 +167,7 @@ mod tests {
             "cursor_companion_",
             "misty_screen",
             "browser_passwords",
+            "browser_autofill",
             "browser_site_data",
             "voice_",
             "dictation_",
@@ -201,6 +202,27 @@ mod tests {
         assert!(profile_windows::is_person_window("window-1"));
         assert!(!profile_windows::is_person_window("incognito-1"));
         assert!(!profile_windows::is_person_window("misty-browser-a"));
+    }
+
+    /// Saved addresses and cards belong to a profile, so private windows never reach them, and
+    /// neither does anything else that isn't a person's own window.
+    #[test]
+    fn saved_addresses_and_cards_stay_with_the_people_windows() {
+        let person = commands_for("person-window-actions");
+        let incognito = commands_for("incognito-window-actions");
+        for command in [
+            "browser_autofill_open",
+            "browser_autofill_choose",
+            "browser_autofill_offer_respond",
+            "browser_autofill_addresses_list",
+            "browser_autofill_address_save",
+            "browser_autofill_cards_list",
+            "browser_autofill_card_save",
+            "browser_autofill_delete",
+        ] {
+            assert!(person.contains(command), "{command}");
+            assert!(!incognito.contains(command), "incognito reached {command}");
+        }
     }
 
     /// Capabilities scoped by window would also cover website views attached to that window, and one

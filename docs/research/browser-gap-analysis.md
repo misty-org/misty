@@ -96,6 +96,11 @@ Not run in the app yet; typecheck, new unit tests and `cargo check` pass.
 - Boosts: font and text-size controls in the per-site Customize dialog.
 - Ad and tracker blocking, **partial**: an in-page blocker (`scripts/adblock.js`) for known third-party hosts plus common ad-slot hiding, off by default (Settings › Browser). System webviews give no request-level hook, so a native content blocker is still the real fix.
 
+## Update 2026-11-05: built after this analysis
+
+Not run in the app yet; see [autofill](../browser/autofill.md).
+- Card and address autofill, the rest of item 2 apart from the breach check.
+
 ## 3. Ranked gap table
 
 Effort: S = days, M = 1-3 weeks, L = a month or more. Ranked by demand first, then low effort.

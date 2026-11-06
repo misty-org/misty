@@ -27,6 +27,8 @@ been run on a Windows machine, and the checks that keep the two platforms in ste
 
 ## Built but not yet run on Windows
 
+- Addresses and cards ([autofill.md](autofill.md)): the Windows Hello prompt before a card fills, and
+  filling itself. They compile for `x86_64-pc-windows-msvc` but haven't run on a device.
 - Voice and Memory (`docs/voice-memory/README.md`): WASAPI capture, the hold-to-talk hook,
   dictation insertion, the dictation pill's no-activate behavior, transcribing a tab, and screen
   recording. They compile for `x86_64-pc-windows-msvc` but haven't run on a device.

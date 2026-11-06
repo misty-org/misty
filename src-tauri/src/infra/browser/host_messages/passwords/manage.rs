@@ -3,7 +3,7 @@ use super::*;
 
 /// The profile whose passwords this window manages: its own. Only a profile's windows (no
 /// incognito windows, no pages) can.
-fn managed_profile(webview: &Webview) -> Result<String, String> {
+pub(crate) fn managed_profile(webview: &Webview) -> Result<String, String> {
     let label = webview.window().label().to_owned();
     if !crate::infra::profile_windows::is_person_window(webview.label())
         || !crate::infra::profile_windows::is_person_window(&label)

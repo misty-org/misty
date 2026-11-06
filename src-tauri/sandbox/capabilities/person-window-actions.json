@@ -17,6 +17,7 @@
     "action-app",
     "action-auth",
     "action-browser",
+    "action-browser-autofill",
     "action-browser-history",
     "action-browser-import",
     "action-browser-passwords",
