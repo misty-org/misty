@@ -3,6 +3,7 @@ import { subscribeAccountEvents } from "@/api/account-events";
 import { resolveApiBase } from "@/api/deployment/api";
 import { devicesApi } from "@/api/devices/api";
 import { diag } from "./diagnostics";
+import { recheckRunningJobs } from "./runningJobs";
 import { ensureServerAgentDevice, signedAgentDeviceRequest } from "./store/useAgentDeviceStore";
 import { agentsDeviceSnapshot } from "./store/useAgentsStore";
 
@@ -112,6 +113,8 @@ export class RuntimeDeliveryWorker {
       outcome = { error: "agent_runtime_unavailable" };
     }
     diag("runtime", `${delivery.operation} ${delivery.run_id} ${outcome.error ?? "ok"}`);
+    // The run's own job, such as a shell command, shouldn't work on until its next heartbeat.
+    if (delivery.operation === "runtime.cancel") recheckRunningJobs();
     // Retry only the report of what happened, never the delivery itself.
     for (let attempt = 0; attempt < 3; attempt++) {
       try {

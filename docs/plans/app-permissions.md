@@ -277,14 +277,53 @@ running agent.
 
 The app's commands and tasks have tests, including a panic inside a call and inside a session.
 
+### The running app
+
+A real agent through the real desktop app on macOS 26.5, in a debug build, with a scripted local model
+on `openai-compatible` and a throwaway server. `evals/smoke/` runs all of this again.
+
+| Check | Result |
+| --- | --- |
+| Common commands from a person's window | Worked; unknown commands and missing plugins were refused |
+| Agents, model keys, voice and folder sharing from an incognito window | Refused by Tauri's ACL, "not allowed on window" |
+| "not allowed" in the app's output and the window's console, through every step | None |
+| Choosing the server, registering the first account, saving a key, listing models, Check the agent model | Worked |
+| A run claimed and finished: a text reply, `web_fetch` of a public page, `shell_run` in its workspace | Worked |
+| `web_fetch` of a local address | Refused, `private_address` |
+| `rm -rf` outside, in the home folder and elsewhere; listing the home folder; `curl` | Refused, and the files survived |
+| Between turns: request keys, tools, system prompt | The same on every turn, and the prompt only grew |
+| `screen_open`, `browser_run`, the notebook, a second message, a message during a run | Worked |
+| One chat reading another's workspace | Refused. A chat kept its workspace across runs, and it went when the chat was deleted |
+| Shared folder, read-only | Reading and `folder_read` worked; adding, editing and deleting were refused |
+| Shared folder, with write access | Adding and editing worked; `rm`, `rm -rf`, `mv` and `find -delete` were refused, and the files survived |
+| The app killed while the model held a reply | The run carried on after a relaunch: the same request byte for byte, the earlier call IDs, and the finished command not run again |
+| The app killed during a command | The run ended as failed, saying the outcome couldn't be verified, and the command wasn't run again. The command's process outlived the app and kept running |
+| Cancel while the model thinks | The run stopped and the model's connection dropped |
+| Cancel during a command | The command stopped about 130 ms later |
+| Manual | Paused before `shell_run`. Approved, it ran; denied, it never ran and the model was told |
+| Plan | `shell_run` wasn't offered |
+| A voice session | Opened on a real channel; ping, a typed turn and its transcript went through, and the turn reached the fast model. It stopped at speech, with no provider key |
+| A live session with no Soniox key | Refused as it opened |
+
+Resident memory of the app in the same debug build, read from `ps`, without WebKit's helper processes.
+The same scripted run on both runtimes, and the Node process added for TypeScript:
+
+| Runtime | Idle | During a run |
+| --- | --- | --- |
+| Rust | 158 to 164 MB | 159 to 165 MB |
+| TypeScript | 153 to 154 MB + Node 284 to 356 MB | 153 to 154 MB + Node 417 to 422 MB |
+
+On that script the run's own turns matched the TypeScript runtime's byte for byte, with IDs and dates
+taken out (`evals/smoke/parity.mjs`). The other three calls, the requirements list, the finish check
+and the title, had the same contents but stream in Rust and don't in TypeScript.
+
 Not tested yet:
 
-- The Rust runtime in the running app: a run claimed and finished, resumed after a restart, voice and
-  live transcription end to end, the channels through a real webview, and any real provider.
-- Benchmark scores, and memory during a run.
+- Any real provider, spoken audio in or out, and live transcription with a key.
+- Benchmark scores, and memory in a release build or on a long run.
 - The page reader on Windows, which has only been compiled, and how long each read takes there.
-- The real `shell.run` path, the shell on Windows, and whether scripts without network or packages still
-  save steps in the benchmarks.
+- The shell on Windows, and whether scripts without network or packages still save steps in the
+  benchmarks.
 
 ## What this doesn't cover
 
