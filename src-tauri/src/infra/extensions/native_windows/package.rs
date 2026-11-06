@@ -1,6 +1,7 @@
 //! An extension's package as WebView2 runs it: the checks before install,
 //! the copy holding only what the person granted, and what its manifest
 //! says about its toolbar button.
+use crate::infra::file_access::fs;
 use std::path::{Component, Path, PathBuf};
 
 use base64::Engine;
@@ -26,8 +27,7 @@ pub(super) fn crx_id(key: &[u8]) -> String {
 
 pub(super) fn read_manifest(runtime: &Path) -> Result<Value, String> {
     serde_json::from_slice(
-        &std::fs::read(runtime.join("manifest.json"))
-            .map_err(|_| "The extension has no manifest.")?,
+        &fs::read(runtime.join("manifest.json")).map_err(|_| "The extension has no manifest.")?,
     )
     .map_err(|_| "Invalid extension manifest JSON.".into())
 }
@@ -126,8 +126,8 @@ pub(super) fn granted_manifest(
 /// refuses an extension with a folder named like that, and WebView2 reports it
 /// as "Access is denied", so every real store extension failed to install.
 pub(super) fn copy_tree(from: &Path, to: &Path) -> std::io::Result<()> {
-    std::fs::create_dir_all(to)?;
-    for entry in std::fs::read_dir(from)? {
+    fs::create_dir_all(to)?;
+    for entry in fs::read_dir(from)? {
         let entry = entry?;
         if entry.file_name().to_string_lossy().starts_with("__misty_") {
             continue;
@@ -137,7 +137,7 @@ pub(super) fn copy_tree(from: &Path, to: &Path) -> std::io::Result<()> {
         if kind.is_dir() {
             copy_tree(&entry.path(), &target)?;
         } else if kind.is_file() {
-            std::fs::copy(entry.path(), target)?;
+            fs::copy(entry.path(), target)?;
         }
     }
     Ok(())
@@ -155,15 +155,15 @@ pub(super) fn stage(root: &Path, runtime: &Path, manifest: &Value) -> Result<Pat
         hex::encode(Sha256::digest(&bytes))
     ));
     let folder = root.join(version);
-    if folder.join("manifest.json").is_file() {
+    if fs::is_file(folder.join("manifest.json")) {
         return Ok(folder);
     }
     let staging = root.join(format!(".staging-{}", uuid::Uuid::new_v4()));
     let staged = copy_tree(runtime, &staging)
-        .and_then(|_| std::fs::write(staging.join("manifest.json"), &bytes))
-        .and_then(|_| std::fs::rename(&staging, &folder));
+        .and_then(|_| fs::write(staging.join("manifest.json"), &bytes))
+        .and_then(|_| fs::rename(&staging, &folder));
     if staged.is_err() {
-        let _ = std::fs::remove_dir_all(&staging);
+        let _ = fs::remove_dir_all(&staging);
         return Err("Misty could not prepare this extension's files.".into());
     }
     Ok(folder)
@@ -171,9 +171,9 @@ pub(super) fn stage(root: &Path, runtime: &Path, manifest: &Value) -> Result<Pat
 
 /// Removes every version folder but `current`.
 pub(super) fn prune(root: &Path, current: &Path) {
-    for entry in std::fs::read_dir(root).into_iter().flatten().flatten() {
+    for entry in fs::read_dir(root).into_iter().flatten().flatten() {
         if entry.path() != current {
-            let _ = std::fs::remove_dir_all(entry.path());
+            let _ = fs::remove_dir_all(entry.path());
         }
     }
 }
@@ -189,7 +189,7 @@ pub(super) fn localized(loaded: &Loaded, text: &str) -> String {
     let Some(locale) = loaded.manifest["default_locale"].as_str() else {
         return text.to_owned();
     };
-    let messages: Value = std::fs::read(
+    let messages: Value = fs::read(
         loaded
             .folder
             .join("_locales")
@@ -247,11 +247,11 @@ pub(super) fn icon(loaded: &Loaded) -> String {
         Some(e) if e == "jpg" || e == "jpeg" => "image/jpeg",
         _ => return String::new(),
     };
-    match std::fs::metadata(&file) {
+    match fs::metadata(&file) {
         Ok(meta) if meta.len() <= MAX_ICON_BYTES => {}
         _ => return String::new(),
     }
-    std::fs::read(&file)
+    fs::read(&file)
         .map(|bytes| {
             format!(
                 "data:{mime};base64,{}",
@@ -271,7 +271,7 @@ pub(super) fn action_of(manifest: &Value) -> &Value {
 
 /// The ID of an extension staged under `root`, from any staged manifest.
 pub(super) fn staged_crx(root: &Path) -> Option<String> {
-    std::fs::read_dir(root).ok()?.flatten().find_map(|entry| {
+    fs::read_dir(root).ok()?.flatten().find_map(|entry| {
         let manifest = read_manifest(&entry.path()).ok()?;
         let key = base64::engine::general_purpose::STANDARD
             .decode(manifest["key"].as_str()?)

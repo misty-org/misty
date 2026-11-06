@@ -61,7 +61,7 @@ pub fn read(browser: Browser, profile: &Path) -> Result<ReadCookies, String> {
             // Newer Chrome keeps cookies under Network/.
             let file = [profile.join("Network/Cookies"), profile.join("Cookies")]
                 .into_iter()
-                .find(|path| path.is_file())
+                .find(|path| crate::infra::file_access::fs::is_file(path))
                 .ok_or_else(|| "That browser has no saved sign-ins.".to_owned())?;
             let snapshot = Snapshot::sqlite(&file)?;
             let key = super::chromium_key::key(browser, profile)?;
@@ -82,7 +82,7 @@ pub fn count(browser: Browser, profile: &Path) -> Result<usize, String> {
         _ => (
             [profile.join("Network/Cookies"), profile.join("Cookies")]
                 .into_iter()
-                .find(|path| path.is_file())
+                .find(|path| crate::infra::file_access::fs::is_file(path))
                 .ok_or_else(|| "That browser has no saved sign-ins.".to_owned())?,
             "SELECT COUNT(DISTINCT host_key) FROM cookies WHERE is_persistent = 1",
         ),

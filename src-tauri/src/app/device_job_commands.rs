@@ -2,6 +2,7 @@
 //! requests and run grants natively, and checking a job's grant before acting.
 #![cfg(desktop)]
 
+use crate::infra::file_access::fs;
 use serde::Deserialize;
 use serde_json::Value;
 use tauri::State;
@@ -149,7 +150,7 @@ pub async fn device_read_shared_file(
         .map_err(|_| "invalid_scope".to_owned())?;
     let bytes = tokio::task::spawn_blocking(move || -> Result<Vec<u8>, String> {
         use std::io::Read;
-        let file = std::fs::File::open(&path).map_err(|_| "file_unavailable".to_owned())?;
+        let file = fs::File::open(&path).map_err(|_| "file_unavailable".to_owned())?;
         let metadata = file.metadata().map_err(|_| "file_unavailable".to_owned())?;
         if !metadata.is_file() {
             return Err("not_a_file".into());

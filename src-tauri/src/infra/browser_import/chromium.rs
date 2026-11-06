@@ -3,11 +3,12 @@
 use super::model::{
     chromium_time_ms, title, web_address, BookmarkNode, BookmarkRoots, Limits, MAX_DEPTH,
 };
+use crate::infra::file_access::fs;
 use serde_json::Value;
 use std::path::Path;
 
 pub fn bookmarks(profile: &Path) -> Result<(BookmarkRoots, usize), String> {
-    let bytes = std::fs::read(profile.join("Bookmarks"))
+    let bytes = fs::read(profile.join("Bookmarks"))
         .map_err(|_| "This profile has no bookmarks to import.".to_owned())?;
     parse_bookmarks(&bytes)
 }

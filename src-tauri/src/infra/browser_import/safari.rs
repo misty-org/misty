@@ -1,11 +1,12 @@
 //! Safari's bookmarks (`Bookmarks.plist`). Its history is read in `history`.
 //! macOS lets an app read these only with Full Disk Access.
 use super::model::{title, web_address, BookmarkNode, BookmarkRoots, Limits, MAX_DEPTH};
+use crate::infra::file_access::fs;
 use plist::Value;
 use std::path::Path;
 
 pub fn bookmarks(profile: &Path) -> Result<(BookmarkRoots, usize), String> {
-    let bytes = std::fs::read(profile.join("Bookmarks.plist")).map_err(|error| {
+    let bytes = fs::read(profile.join("Bookmarks.plist")).map_err(|error| {
         if error.kind() == std::io::ErrorKind::PermissionDenied {
             "Allow Misty under Privacy & Security > Full Disk Access to import from Safari."
                 .to_owned()

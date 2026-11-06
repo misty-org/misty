@@ -2,6 +2,7 @@
 //! them with the account's installations, and checking for updates.
 use super::install::{commit, prepare};
 use super::*;
+use crate::infra::file_access::fs;
 
 mod actions;
 pub use actions::*;
@@ -139,7 +140,7 @@ async fn activate(
 /// browser tab loads. Only a plain path inside the package counts.
 fn new_tab_page(runtime: &Path, origin: &str) -> Option<String> {
     let manifest: Value =
-        serde_json::from_slice(&std::fs::read(runtime.join("manifest.json")).ok()?).ok()?;
+        serde_json::from_slice(&fs::read(runtime.join("manifest.json")).ok()?).ok()?;
     let page = manifest
         .pointer("/chrome_url_overrides/newtab")?
         .as_str()?
@@ -224,7 +225,7 @@ pub async fn extensions_reconcile(
             let removed=installation.clone(); let removed_profile=profile.clone();
             tauri::async_runtime::spawn(async move { sync::remove(&removed_profile,&removed).await; });
             let package = root(&app, &account, &profile)?.join("packages").join(&installation.id);
-            if package.exists() { std::fs::remove_dir_all(package).map_err(|e| e.to_string())?; }
+            if fs::exists(&package) { fs::remove_dir_all(package).map_err(|e| e.to_string())?; }
             let mut state = service(&profile).lock().await; state.states.remove(&installation.id); state.loaded.remove(&installation.id);
             continue;
         }

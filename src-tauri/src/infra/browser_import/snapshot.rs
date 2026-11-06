@@ -1,5 +1,6 @@
 //! Browsers lock their databases while they run. Imports read a private copy
 //! (with its write-ahead log) and never open or change the original.
+use crate::infra::file_access::fs;
 use rusqlite::{Connection, OpenFlags};
 use std::path::{Path, PathBuf};
 use tempfile::TempDir;
@@ -19,20 +20,20 @@ impl Snapshot {
             .tempdir()
             .map_err(|_| "Misty could not make room to read that browser.".to_owned())?;
         let path = dir.path().join(name);
-        std::fs::copy(source, &path).map_err(|error| copy_error(&error))?;
+        fs::copy(source, &path).map_err(|error| copy_error(&error))?;
         for suffix in ["-wal", "-shm"] {
             let mut side = source.as_os_str().to_owned();
             side.push(suffix);
             let mut target = path.as_os_str().to_owned();
             target.push(suffix);
-            let _ = std::fs::copy(PathBuf::from(side), PathBuf::from(target));
+            let _ = fs::copy(PathBuf::from(side), PathBuf::from(target));
         }
         Ok(Self { _dir: dir, path })
     }
 
     /// Read-write on the copy only, so SQLite can fold the copied log in.
     pub fn open(&self) -> Result<Connection, String> {
-        Connection::open_with_flags(
+        fs::open_sqlite_with_flags(
             &self.path,
             OpenFlags::SQLITE_OPEN_READ_WRITE | OpenFlags::SQLITE_OPEN_NO_MUTEX,
         )

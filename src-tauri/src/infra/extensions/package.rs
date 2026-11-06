@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 use super::catalog::{is_chrome_id, CatalogEntry, Store};
+use crate::infra::file_access::fs;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::{
     collections::HashSet,
-    fs,
     io::{Cursor, Read},
     path::{Component, Path},
 };
@@ -271,4 +271,6 @@ pub fn extract(
 }
 
 #[cfg(test)]
+// Tests build their fixtures directly, outside the file gate.
+#[allow(clippy::disallowed_methods, clippy::disallowed_types)]
 mod tests;

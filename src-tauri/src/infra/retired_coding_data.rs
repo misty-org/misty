@@ -7,8 +7,9 @@
 //! was nothing to remove, a mark in `settings_state` means it never runs again.
 use super::environment::AppEnvironmentService;
 use super::store::Store;
+use crate::infra::file_access::fs;
 use std::{
-    fs, io,
+    io,
     path::{Path, PathBuf},
 };
 
@@ -68,6 +69,8 @@ fn remove_checkpoints_folder(misty_dir: &Path) -> io::Result<()> {
 }
 
 #[cfg(test)]
+// Tests build their fixtures directly, outside the file gate.
+#[allow(clippy::disallowed_methods, clippy::disallowed_types)]
 mod tests {
     use super::*;
 

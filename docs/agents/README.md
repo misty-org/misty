@@ -50,7 +50,7 @@ Approved November 4, 2026. This replaces keeping chats on the computer that star
 | The agent browser beside a chat | [browser.md](browser.md) |
 | The agent at your cursor, push-to-talk, Teach mode | [cursor-companion.md](cursor-companion.md) |
 | Resuming a run without redoing finished work | [checkpoints.md](checkpoints.md) |
-| Benchmarks: the Odysseys campaign, which ended October 31, 2026 | [evals/odysseys.md](evals/odysseys.md) |
+| Benchmarks: running Odysseys and comparing runtimes, and the campaign that ended October 31, 2026 | [evals/odysseys.md](evals/odysseys.md) |
 | Mockups (agent chat, cursor companion) | [mockups/](mockups/) |
 
 In flight: [agent browser actions](../plans/agent-browser-actions.md). Code lives in

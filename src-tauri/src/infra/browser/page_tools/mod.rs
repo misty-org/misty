@@ -2,6 +2,7 @@
 //! page, print, save the page and open Web Inspector.
 
 use super::*;
+use crate::infra::file_access::fs;
 use std::sync::Mutex;
 use std::time::Duration;
 
@@ -183,7 +184,7 @@ pub async fn browser_webview_save_page(
     #[cfg(target_os = "macos")]
     if path.extension().and_then(|value| value.to_str()) == Some("webarchive") {
         let bytes = web_archive(&webview).await?;
-        return std::fs::write(&path, bytes).map_err(|error| error.to_string());
+        return save_page_file(&path, bytes);
     }
     // A single-file web page with its images and styles, as Chromium saves it.
     #[cfg(windows)]
@@ -197,14 +198,22 @@ pub async fn browser_webview_save_page(
         let data = snapshot["data"]
             .as_str()
             .ok_or_else(|| "The page could not be saved.".to_owned())?;
-        return std::fs::write(&path, data).map_err(|error| error.to_string());
+        return save_page_file(&path, data);
     }
     let value = eval_json(&webview, "document.documentElement.outerHTML".to_owned()).await?;
     let html = serde_json::from_str::<Option<String>>(&value)
         .ok()
         .flatten()
         .ok_or_else(|| "The page could not be saved.".to_owned())?;
-    std::fs::write(&path, format!("<!DOCTYPE html>\n{html}")).map_err(|error| error.to_string())
+    save_page_file(&path, format!("<!DOCTYPE html>\n{html}"))
+}
+
+/// Writes where the person just chose in the save dialog. The contents came from the web, so the
+/// file is marked the way a download is.
+fn save_page_file(path: &Path, contents: impl AsRef<[u8]>) -> Result<(), String> {
+    fs::write(path, contents).map_err(|error| error.to_string())?;
+    crate::infra::file_access::quarantine::mark_from_internet(path);
+    Ok(())
 }
 
 #[cfg(target_os = "macos")]

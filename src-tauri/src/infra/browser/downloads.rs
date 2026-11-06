@@ -1,6 +1,7 @@
 //! Download events, destinations and history for browser pages.
 
 use super::*;
+use crate::infra::file_access::{self, fs};
 
 mod settings;
 pub use settings::*;
@@ -36,9 +37,21 @@ pub(super) fn handle_download_event(
                 );
                 return false;
             };
-            if let Err(error) = std::fs::create_dir_all(&download_dir) {
-                emit_download_failure(app, &state, tab_id, &url, &error.to_string());
+            #[cfg(any(target_os = "macos", windows))]
+            let asks_each_time = !agent_download && ask_download_location();
+            #[cfg(not(any(target_os = "macos", windows)))]
+            let asks_each_time = false;
+            // A folder is only for saving into when nothing else names the file. Downloads
+            // through the save dialog are that one file's grant, so they don't need the folder.
+            if !agent_download && !asks_each_time && !may_save_to_download_folder(app) {
+                emit_download_failure(app, &state, tab_id, &url, DOWNLOADS_NOT_ALLOWED);
                 return false;
+            }
+            if let Err(error) = fs::create_dir_all(&download_dir) {
+                if !asks_each_time {
+                    emit_download_failure(app, &state, tab_id, &url, &error.to_string());
+                    return false;
+                }
             }
             let suggested = destination
                 .file_name()
@@ -51,7 +64,7 @@ pub(super) fn handle_download_event(
             let path =
                 reserve_download_path(&state, &download_dir, &sanitize_download_name(suggested));
             #[cfg(any(target_os = "macos", windows))]
-            let path = if !agent_download && ask_download_location() {
+            let path = if asks_each_time {
                 if let Ok(mut reserved) = state.reserved_downloads.lock() {
                     reserved.remove(&path);
                 }
@@ -59,10 +72,11 @@ pub(super) fn handle_download_event(
                 else {
                     return false;
                 };
+                file_access::allow_picked_file(&chosen, file_access::Access::Write);
                 // The save dialog already confirmed replacing an existing file,
                 // and the engine will not write over one.
-                if chosen.is_file() {
-                    let _ = std::fs::remove_file(&chosen);
+                if fs::is_file(&chosen) {
+                    let _ = fs::remove_file(&chosen);
                 }
                 if let Ok(mut reserved) = state.reserved_downloads.lock() {
                     reserved.insert(chosen.clone());
@@ -71,6 +85,8 @@ pub(super) fn handle_download_event(
             } else {
                 path
             };
+            // Finishing this one mustn't depend on the folder's grant staying as it is now.
+            file_access::allow_recorded_download(&path);
             *destination = path.clone();
             let record = requested_download(&state, tab_id, &url, &path);
             if record.initiator == "human" && !tab_is_private(&state, tab_id) {
@@ -118,6 +134,19 @@ pub(super) fn handle_download_event(
         _ => true,
     }
 }
+
+/// Whether downloads can go to the usual folder: a folder the person chose counts as granted, and
+/// the Downloads folder asks the first time. WebKit and WebView2 ask for a destination on the main
+/// thread and expect an answer before returning, so the wait happens here, in place.
+fn may_save_to_download_folder(app: &AppHandle) -> bool {
+    let chosen = user_download_directory()
+        .lock()
+        .is_ok_and(|directory| directory.is_some());
+    chosen || crate::infra::permissions::ensure_downloads_folder(app)
+}
+
+const DOWNLOADS_NOT_ALLOWED: &str =
+    "Misty needs your OK to save to the Downloads folder. Start the download again to allow it.";
 
 pub(super) fn tab_is_private(state: &BrowserSessionState, tab_id: &str) -> bool {
     state
@@ -237,8 +266,7 @@ pub(super) fn finish_download(
     };
     let resolved_path = pending.as_ref().map(|item| Path::new(&item.path));
     let success = success
-        && resolved_path
-            .is_some_and(|path| std::fs::metadata(path).is_ok_and(|meta| meta.is_file()));
+        && resolved_path.is_some_and(|path| fs::metadata(path).is_ok_and(|meta| meta.is_file()));
     let file = if success {
         resolved_path.and_then(|path| task_files::fingerprint(path).ok())
     } else {

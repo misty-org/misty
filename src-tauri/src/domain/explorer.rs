@@ -1,7 +1,7 @@
 //! The read-only folder listing behind Misty's file picker, and the file
 //! references the clipboard copies.
+use crate::infra::file_access::looks;
 use std::{
-    fs,
     path::{Path, PathBuf},
     time::UNIX_EPOCH,
 };
@@ -108,11 +108,9 @@ pub fn list_directory(
         .filter(|path| !path.trim().is_empty())
         .map(PathBuf::from)
         .unwrap_or(home_dir);
-    let path = requested
-        .canonicalize()
-        .unwrap_or_else(|_| requested.clone());
+    let path = looks::picker_real_path(&requested).unwrap_or_else(|_| requested.clone());
     let show_hidden = request.show_hidden.unwrap_or(false);
-    let read_dir = fs::read_dir(&path).map_err(|err| {
+    let read_dir = looks::picker_list(&path).map_err(|err| {
         ApiError::Message(format!(
             "Failed to list directory {}: {err}",
             path.display()
@@ -147,7 +145,7 @@ pub fn list_directory(
             .then_with(|| left.name.to_lowercase().cmp(&right.name.to_lowercase()))
     });
 
-    let metadata = fs::symlink_metadata(&path).ok();
+    let metadata = looks::picker_entry(&path).ok();
     Ok(DirectoryListing {
         parent_path: path.parent().map(display_path),
         path: display_path(&path),
@@ -168,7 +166,7 @@ pub fn list_directory(
 }
 
 fn file_entry(path: PathBuf, name: String) -> Option<FileEntry> {
-    let metadata = fs::symlink_metadata(&path).ok()?;
+    let metadata = looks::picker_entry(&path).ok()?;
     let file_type = metadata.file_type();
     let kind = if file_type.is_symlink() {
         FileKind::Symlink

@@ -44,6 +44,7 @@ mod drives_windows;
 pub mod environment;
 pub mod explorer;
 pub mod extensions;
+pub mod file_access;
 pub mod global_hotkey;
 #[cfg(target_os = "macos")]
 pub mod google_sign_in_sheet;
@@ -57,6 +58,8 @@ pub mod models;
 pub mod native_clipboard;
 pub mod navigation_names;
 pub mod paths;
+#[cfg(desktop)]
+pub mod permissions;
 #[cfg(desktop)]
 mod plugin_routes;
 #[cfg(desktop)]

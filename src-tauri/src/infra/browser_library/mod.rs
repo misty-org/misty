@@ -3,6 +3,7 @@
 //! downloads list (the files stay here); history syncs through the browser sync.
 
 #[cfg(desktop)]
+use crate::infra::file_access::looks;
 pub mod history;
 
 use rusqlite::{params, Connection, OptionalExtension};
@@ -103,7 +104,7 @@ pub(crate) fn download_finished(app: &AppHandle, id: &str, success: bool, error:
         .optional()
         .ok()
         .flatten()
-        .and_then(|path| std::fs::metadata(path).ok())
+        .and_then(|path: String| looks::recorded_download(Path::new(&path)))
         .map(|meta| meta.len() as i64);
     // A cancelled download also reports failure; keep it marked as cancelled.
     let _ = connection.execute(
@@ -141,7 +142,8 @@ fn entry(row: &rusqlite::Row<'_>) -> rusqlite::Result<BrowserDownloadEntry> {
     Ok(BrowserDownloadEntry {
         id: row.get(0)?,
         url: row.get(1)?,
-        exists: state == "finished" && Path::new(&path).is_file(),
+        exists: state == "finished"
+            && looks::recorded_download(Path::new(&path)).is_some_and(|file| file.is_file()),
         file_name,
         path,
         state,

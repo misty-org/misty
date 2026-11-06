@@ -1,5 +1,6 @@
 //! Loading, stopping and removing extensions, and reconciling each open profile to them.
 use super::*;
+use crate::infra::file_access::fs;
 
 pub(super) async fn load(host: &mut Host, request: &Value) -> Result<Value, String> {
     let app = app()?;
@@ -70,7 +71,7 @@ pub(super) async fn remove_extension(host: &mut Host, id: &str) {
         ledger.removed.insert(removed);
     });
     if let Ok(root) = extension_root(host, id) {
-        let _ = std::fs::remove_dir_all(root);
+        let _ = fs::remove_dir_all(root);
     }
 }
 

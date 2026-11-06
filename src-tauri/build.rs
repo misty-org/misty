@@ -1,3 +1,6 @@
+// A build script runs at compile time, on the source tree, so the app's file gate doesn't apply.
+#![allow(clippy::disallowed_methods, clippy::disallowed_types)]
+
 use std::{
     env,
     path::{Path, PathBuf},

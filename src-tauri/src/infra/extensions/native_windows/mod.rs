@@ -14,12 +14,15 @@
 //! WebView2 deletes an extension's storage when it is removed, so turning an
 //! extension off disables it and only removing it from Misty uninstalls it.
 
+use crate::infra::file_access::fs;
 mod lifecycle;
 mod package;
 mod profile;
 #[cfg(test)]
 mod store_probe;
 #[cfg(test)]
+// Tests build their fixtures directly, outside the file gate.
+#[allow(clippy::disallowed_methods, clippy::disallowed_types)]
 mod tests;
 mod toolbar;
 
@@ -144,7 +147,7 @@ fn ledger() -> Ledger {
     app()
         .and_then(ledger_file)
         .ok()
-        .and_then(|path| std::fs::read(path).ok())
+        .and_then(|path| fs::read(path).ok())
         .and_then(|bytes| serde_json::from_slice(&bytes).ok())
         .unwrap_or_default()
 }
@@ -154,8 +157,8 @@ fn update_ledger(change: impl FnOnce(&mut Ledger)) {
     change(&mut ledger);
     if let (Ok(app), Ok(bytes)) = (app(), serde_json::to_vec(&ledger)) {
         if let Ok(path) = ledger_file(app) {
-            let _ = std::fs::create_dir_all(path.parent().unwrap_or(&path));
-            let _ = std::fs::write(path, bytes);
+            let _ = fs::create_dir_all(path.parent().unwrap_or(&path));
+            let _ = fs::write(path, bytes);
         }
     }
 }

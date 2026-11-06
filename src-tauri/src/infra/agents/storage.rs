@@ -61,7 +61,7 @@ pub(super) fn scoped_file_path_sync(
     }
     let root = canonical(root).map_err(io_error)?;
     let target = canonical(root.join(relative_path)).map_err(io_error)?;
-    if !target.starts_with(&root) || !target.is_file() {
+    if !target.starts_with(&root) || !crate::infra::file_access::fs::is_file(&target) {
         return Err(validation_error(
             "Document path is outside its device scope.",
         ));

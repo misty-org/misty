@@ -5,10 +5,10 @@
 //! permissions; it never deletes. Paths retired by an earlier layout are moved
 //! to the Trash (the Recycle Bin on Windows) so the user can still recover
 //! them.
-use crate::infra::paths;
+use crate::infra::{file_access::fs, paths};
 use serde::Deserialize;
 use std::{
-    fs, io,
+    io,
     path::{Path, PathBuf},
 };
 
@@ -59,7 +59,7 @@ fn ensure_at(root: &Path, trash: &Trash) -> io::Result<HomeReport> {
     for relative in &layout.private_files {
         use std::os::unix::fs::PermissionsExt;
         let path = root.join(relative);
-        if path.is_file() {
+        if fs::is_file(&path) {
             fs::set_permissions(&path, fs::Permissions::from_mode(0o600))?;
         }
     }
@@ -84,7 +84,7 @@ fn retire(
 ) -> io::Result<()> {
     let present: Vec<&String> = retired
         .iter()
-        .filter(|relative| root.join(relative).symlink_metadata().is_ok())
+        .filter(|relative| fs::symlink_metadata(root.join(relative)).is_ok())
         .collect();
     if present.is_empty() {
         return Ok(());
@@ -171,7 +171,7 @@ fn recycle(path: &Path) -> io::Result<()> {
 }
 
 fn secure_dir(path: &Path, report: &mut HomeReport, relative: &str) -> io::Result<()> {
-    if !path.is_dir() {
+    if !fs::is_dir(path) {
         fs::create_dir_all(path)?;
         if !relative.is_empty() {
             report.created.push(relative.to_owned());
@@ -192,4 +192,6 @@ fn secure_dir(path: &Path, report: &mut HomeReport, relative: &str) -> io::Resul
 }
 
 #[cfg(test)]
+// Tests build their fixtures directly, outside the file gate.
+#[allow(clippy::disallowed_methods, clippy::disallowed_types)]
 mod tests;

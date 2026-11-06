@@ -5,6 +5,7 @@
 //! AES-256-GCM under a key held in Misty's credential store (the OS keychain), and bound to
 //! its account and key, so a copied database file reveals nothing. The cache is a copy: it
 //! can be deleted at any time and the server stays the source of truth.
+use crate::infra::file_access::fs;
 use std::{
     path::PathBuf,
     sync::{Mutex, OnceLock},
@@ -69,13 +70,13 @@ fn cipher() -> Result<Aes256Gcm, String> {
 }
 
 fn open(dir: PathBuf) -> Result<Cache, String> {
-    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     let path = dir.join("cache.sqlite");
-    let connection = Connection::open(&path).map_err(|e| e.to_string())?;
+    let connection = fs::open_sqlite(&path).map_err(|e| e.to_string())?;
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        let _ = std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600));
+        let _ = fs::set_permissions(&path, fs::Permissions::from_mode(0o600));
     }
     connection
         .execute_batch(

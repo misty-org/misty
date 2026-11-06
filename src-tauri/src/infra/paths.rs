@@ -19,6 +19,7 @@ fn resolve_desktop_home_dir() -> Option<PathBuf> {
 /// home folder finds this one, the credential store included.
 #[cfg(test)]
 #[ctor::ctor]
+#[allow(clippy::disallowed_methods)] // It runs before anything else, and only in tests.
 fn isolate_tests() {
     let home = env::temp_dir().join(format!("misty-test-{}", std::process::id()));
     let _ = std::fs::create_dir_all(&home);

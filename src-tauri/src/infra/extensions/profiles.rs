@@ -1,6 +1,7 @@
 //! A profile's extension host over its life: made when its window first runs
 //! extensions, freed when its last window closes, erased with the profile.
 use super::*;
+use crate::infra::file_access::fs;
 
 /// Packages installed before profiles lived in `extensions/<account>`; they move
 /// under the personal profile once, so the personal profile keeps every extension.
@@ -8,13 +9,13 @@ pub(super) fn adopt_account_packages(app: &tauri::AppHandle, account: &str) -> R
     let base = account_root(app, account)?;
     let personal = base.join(crate::infra::profile_windows::PERSONAL);
     let packages = base.join("packages");
-    if personal.exists() || !packages.exists() {
+    if fs::exists(&personal) || !fs::exists(&packages) {
         return Ok(());
     }
-    std::fs::create_dir_all(&personal).map_err(|e| e.to_string())?;
-    std::fs::rename(&packages, personal.join("packages")).map_err(|e| e.to_string())?;
+    fs::create_dir_all(&personal).map_err(|e| e.to_string())?;
+    fs::rename(&packages, personal.join("packages")).map_err(|e| e.to_string())?;
     // Unfinished downloads from before are only staging; nothing points at them.
-    let _ = std::fs::remove_dir_all(base.join("staging"));
+    let _ = fs::remove_dir_all(base.join("staging"));
     Ok(())
 }
 
@@ -54,8 +55,8 @@ pub(crate) async fn remove_profile(app: &tauri::AppHandle, key: &str) -> Result<
     .await
     .map(|_| ());
     let folder = root(app, &account, key)?;
-    if folder.exists() {
-        if let Err(error) = std::fs::remove_dir_all(folder) {
+    if fs::exists(&folder) {
+        if let Err(error) = fs::remove_dir_all(folder) {
             result = result.and(Err(error.to_string()));
         }
     }
@@ -67,7 +68,7 @@ async fn forget_profile(key: &str) -> String {
     let account = {
         let mut state = service(key).lock().await;
         for path in state.prepared.values() {
-            let _ = std::fs::remove_dir_all(path);
+            let _ = fs::remove_dir_all(path);
         }
         std::mem::take(&mut *state).account
     };

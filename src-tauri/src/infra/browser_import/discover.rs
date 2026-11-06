@@ -1,5 +1,6 @@
 //! Finds the browsers installed for this user and their profiles. The renderer
 //! only ever names a browser and a profile ID from this list; paths stay here.
+use crate::infra::file_access::{fs, ImportFolder};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
@@ -115,7 +116,7 @@ impl Browser {
                 Browser::Firefox => Some(roaming.join("Mozilla/Firefox")),
                 Browser::Zen => Some(roaming.join("zen")),
                 // Arc for Windows is a packaged app with a versioned folder name.
-                Browser::Arc => std::fs::read_dir(local.join("Packages"))
+                Browser::Arc => fs::read_dir(local.join("Packages"))
                     .ok()?
                     .flatten()
                     .find(|entry| {
@@ -141,11 +142,11 @@ impl Browser {
                 Browser::Firefox => [".mozilla/firefox", "snap/firefox/common/.mozilla/firefox"]
                     .into_iter()
                     .map(|path| home.join(path))
-                    .find(|path| path.join("profiles.ini").is_file()),
+                    .find(|path| fs::is_file(path.join("profiles.ini"))),
                 Browser::Zen => [".zen", ".var/app/app.zen_browser.zen/.zen"]
                     .into_iter()
                     .map(|path| home.join(path))
-                    .find(|path| path.join("profiles.ini").is_file()),
+                    .find(|path| fs::is_file(path.join("profiles.ini"))),
                 Browser::Arc | Browser::Safari => None,
             };
         }
@@ -219,10 +220,69 @@ fn last_used(family: Family, profile: &Path) -> Option<i64> {
     };
     files
         .iter()
-        .filter_map(|file| std::fs::metadata(profile.join(file)).ok()?.modified().ok())
+        .filter_map(|file| fs::metadata(profile.join(file)).ok()?.modified().ok())
         .max()
         .and_then(|time| time.duration_since(std::time::UNIX_EPOCH).ok())
         .map(|elapsed| elapsed.as_millis() as i64)
+}
+
+/// Every folder the importer reads, for the file gate while `permission-browser-import` is on.
+/// Nothing here touches the disk, so it can run before the gate allows any of it.
+pub fn import_folders() -> Vec<ImportFolder> {
+    #[cfg(target_os = "macos")]
+    let folders: Vec<ImportFolder> = Browser::ALL
+        .into_iter()
+        .filter_map(Browser::data_dir)
+        .map(ImportFolder::Whole)
+        .collect();
+    #[cfg(windows)]
+    let folders: Vec<ImportFolder> = {
+        let packages = dirs::data_local_dir()
+            .map(|local| local.join("Packages"))
+            .into_iter()
+            .flat_map(|packages| {
+                [
+                    ImportFolder::ListingOnly(packages.clone()),
+                    ImportFolder::NamesStarting(packages, "TheBrowserCompany.Arc_"),
+                ]
+            });
+        Browser::ALL
+            .into_iter()
+            .filter(|browser| *browser != Browser::Arc)
+            .filter_map(Browser::data_dir)
+            .map(ImportFolder::Whole)
+            .chain(packages)
+            .collect()
+    };
+    #[cfg(all(unix, not(target_os = "macos")))]
+    let folders: Vec<ImportFolder> = {
+        let home = dirs::home_dir();
+        let config = dirs::config_dir();
+        const FIREFOX_AND_ZEN: [&str; 4] = [
+            ".mozilla/firefox",
+            "snap/firefox/common/.mozilla/firefox",
+            ".zen",
+            ".var/app/app.zen_browser.zen/.zen",
+        ];
+        const CHROMIUM_FAMILY: [&str; 6] = [
+            "google-chrome",
+            "microsoft-edge",
+            "BraveSoftware/Brave-Browser",
+            "vivaldi",
+            "opera",
+            "chromium",
+        ];
+        home.iter()
+            .flat_map(|home| FIREFOX_AND_ZEN.map(|path| home.join(path)))
+            .chain(
+                config
+                    .iter()
+                    .flat_map(|config| CHROMIUM_FAMILY.map(|path| config.join(path))),
+            )
+            .map(ImportFolder::Whole)
+            .collect()
+    };
+    folders
 }
 
 /// The profile the renderer chose, looked up again here.
@@ -240,4 +300,6 @@ pub fn resolve(browser: Browser, profile: &str) -> Result<BrowserProfile, String
 }
 
 #[cfg(test)]
+// Tests build their fixtures directly, outside the file gate.
+#[allow(clippy::disallowed_methods, clippy::disallowed_types)]
 mod tests;

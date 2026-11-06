@@ -1,8 +1,8 @@
 //! Untrusted documents are parsed on Windows by the same bundled
 //! worker macOS uses, confined in an AppContainer (see
 //! `platform::windows::sandbox`). Misty's own process never parses them.
+use crate::infra::file_access::fs::File;
 use std::{
-    fs::File,
     io::{Read, Write},
     path::Path,
     sync::atomic::AtomicBool,
@@ -93,6 +93,8 @@ pub(crate) fn process(path: &Path, stop: &AtomicBool) -> Result<Value, String> {
 }
 
 #[cfg(test)]
+// Tests build their fixtures directly, outside the file gate.
+#[allow(clippy::disallowed_methods, clippy::disallowed_types)]
 mod tests {
     use super::*;
 

@@ -21,6 +21,7 @@ import { useSettingsStore } from "../store/useSettingsStore";
 import { AgentGrantsSection } from "./AgentGrantsSection";
 import { AgentSitesSection } from "./AgentSitesSection";
 import { PaymentsAskSection } from "./PaymentsAskSection";
+import { SandboxPermissionsSection } from "./SandboxPermissionsSection";
 import { ScreenLocationSection } from "./ScreenLocationSection";
 import { PreferenceRow } from "./PreferenceRow";
 export function AgentDefaultsSection() {
@@ -75,7 +76,7 @@ export function CompanionSection() {
   return hasTauriInternals() ? <CompanionAppearanceSettings /> : null;
 }
 /** What agents may do: remembered approvals (server-owned), shared folders on a desktop, and
- * sites they only read. */
+ * sites they only read. Then what Misty itself may reach on this computer. */
 export function AgentPermissionsSection() {
   return (
     <>
@@ -84,6 +85,7 @@ export function AgentPermissionsSection() {
       </AgentSitesSection>
       <AgentGrantsSection />
       {hasTauriInternals() ? <AgentScopeList /> : null}
+      {hasTauriInternals() ? <SandboxPermissionsSection /> : null}
     </>
   );
 }

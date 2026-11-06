@@ -21,6 +21,7 @@ mod safari;
 mod settings;
 mod snapshot;
 
+pub use discover::import_folders;
 use discover::{Browser, BrowserProfile, BrowserSource, Family};
 use extensions::ImportedExtension;
 use model::BookmarkRoots;
@@ -28,6 +29,10 @@ use serde::{Deserialize, Serialize};
 use settings::ImportedSettings;
 use tauri::AppHandle;
 use tauri_plugin_dialog::DialogExt;
+
+use super::permissions::Permission;
+
+const IMPORT_OFF: &str = "Misty needs your OK to read your other browsers. You can allow it under Settings, Agents, Access.";
 
 #[derive(Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -128,15 +133,38 @@ fn read_bookmarks(
     }
 }
 
+/// The one way into other browsers' files. Every import starts here, in the person's window, so
+/// this is where the person is asked; a window that isn't theirs is refused without a prompt.
 #[tauri::command]
-pub async fn browser_import_discover() -> Vec<BrowserSource> {
-    tokio::task::spawn_blocking(discover::discover)
-        .await
-        .unwrap_or_default()
+pub async fn browser_import_discover(
+    webview: tauri::Webview,
+    app: AppHandle,
+) -> Result<Vec<BrowserSource>, String> {
+    if !super::profile_windows::is_person_window(webview.label()) {
+        return Err("Import from a profile's window.".into());
+    }
+    if !super::permissions::ensure_async(&app, Permission::BrowserImport).await {
+        return Err(IMPORT_OFF.into());
+    }
+    blocking(|| Ok(discover::discover())).await
+}
+
+/// Every other command reads a source the person already allowed. It refuses when that's off, and
+/// the file gate refuses the same files underneath it.
+fn require_import(app: &AppHandle) -> Result<(), String> {
+    if super::permissions::is_on(app, Permission::BrowserImport) {
+        Ok(())
+    } else {
+        Err(IMPORT_OFF.into())
+    }
 }
 
 #[tauri::command]
-pub async fn browser_import_preview(request: ImportSourceRequest) -> Result<ImportPreview, String> {
+pub async fn browser_import_preview(
+    app: AppHandle,
+    request: ImportSourceRequest,
+) -> Result<ImportPreview, String> {
+    require_import(&app)?;
     blocking(move || {
         let source = profile(&request)?;
         let family = request.browser.family();
@@ -158,8 +186,10 @@ pub async fn browser_import_preview(request: ImportSourceRequest) -> Result<Impo
 
 #[tauri::command]
 pub async fn browser_import_bookmarks(
+    app: AppHandle,
     request: ImportSourceRequest,
 ) -> Result<ImportedBookmarks, String> {
+    require_import(&app)?;
     blocking(move || {
         let source = profile(&request)?;
         let (roots, skipped) = read_bookmarks(request.browser, &source.path)?;
@@ -182,6 +212,7 @@ pub async fn browser_import_history(
     app: AppHandle,
     request: ImportTargetRequest,
 ) -> Result<Added, String> {
+    require_import(&app)?;
     let target = super::browser_library::history::profile_key(profile_store(&webview)?);
     blocking(move || {
         let source = profile(&request.source)?;
@@ -208,8 +239,10 @@ pub struct ImportedSettingsResult {
 #[tauri::command]
 pub async fn browser_import_settings(
     webview: tauri::Webview,
+    app: AppHandle,
     request: ImportTargetRequest,
 ) -> Result<ImportedSettingsResult, String> {
+    require_import(&app)?;
     let misty_profile = profile_store(&webview)?;
     blocking(move || {
         let source = profile(&request.source)?;
@@ -241,6 +274,7 @@ pub async fn browser_import_signins(
     app: AppHandle,
     request: ImportTargetRequest,
 ) -> Result<Added, String> {
+    require_import(&app)?;
     let misty_profile = profile_store(&webview)?;
     let source = request.source.clone();
     let read = blocking(move || {

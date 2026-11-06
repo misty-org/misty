@@ -2,6 +2,7 @@
 //! Every store (settings, navigation names, shortcuts, approvals, device trust, ...) is a
 //! set of tables here, created by numbered migrations. The version is SQLite's own
 //! `user_version`; a database newer than this build is refused, never downgraded.
+use crate::infra::file_access::fs;
 use rusqlite::{Connection, TransactionBehavior};
 use std::path::{Path, PathBuf};
 
@@ -234,7 +235,7 @@ impl Store {
     /// Opens the database, creating it and applying any missing migrations.
     pub fn connect(&self) -> rusqlite::Result<Connection> {
         if let Some(parent) = self.path.parent() {
-            std::fs::create_dir_all(parent).map_err(|error| {
+            fs::create_dir_all(parent).map_err(|error| {
                 rusqlite::Error::SqliteFailure(
                     rusqlite::ffi::Error::new(rusqlite::ffi::SQLITE_CANTOPEN),
                     Some(format!("Could not create the data folder: {error}")),
@@ -257,13 +258,13 @@ impl Store {
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
-            let _ = std::fs::set_permissions(&self.path, std::fs::Permissions::from_mode(0o600));
+            let _ = fs::set_permissions(&self.path, fs::Permissions::from_mode(0o600));
         }
         Ok(connection)
     }
 
     fn open_once(&self) -> rusqlite::Result<Connection> {
-        let mut connection = Connection::open(&self.path)?;
+        let mut connection = fs::open_sqlite(&self.path)?;
         connection.busy_timeout(std::time::Duration::from_secs(5))?;
         connection.execute_batch(
             "PRAGMA journal_mode = WAL; PRAGMA synchronous = FULL;

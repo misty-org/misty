@@ -224,6 +224,8 @@ export class DictationController {
         phase: "notice",
         note: "Allow Accessibility so Misty can paste for you. Your words are on the clipboard.",
       });
+    else if (result.inserted === "not-allowed")
+      this.show({ phase: "notice", note: "Misty didn’t type that, since you said not now." });
     else if (result.inserted === "keys-held")
       this.show({ phase: "notice", note: "Your words are on the clipboard." });
     else this.show({ phase: "done" });

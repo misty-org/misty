@@ -17,6 +17,7 @@ use crate::domain::{
     explorer::PasteItem,
 };
 use crate::error::ApiResult;
+use crate::infra::file_access::looks;
 use sha2::{Digest, Sha256};
 
 /// The macOS clipboard bridge uses the system's image decoder. App preview
@@ -103,14 +104,14 @@ impl NativeClipboard for SystemClipboardAdapter {
             let file_refs: Vec<_> = paths
                 .into_iter()
                 .take(100)
-                .filter(|path| path.exists())
-                .map(|path| ClipboardFileRef {
+                .filter_map(|path| Some((looks::clipboard_file(&path)?, path)))
+                .map(|(file, path)| ClipboardFileRef {
                     display_name: path
                         .file_name()
                         .map(|name| name.to_string_lossy().into_owned())
                         .unwrap_or_else(|| "File".to_owned()),
                     local_path: path.to_string_lossy().into_owned(),
-                    is_dir: path.is_dir(),
+                    is_dir: file.is_folder,
                     ..ClipboardFileRef::default()
                 })
                 .collect();
@@ -204,7 +205,7 @@ impl NativeClipboard for SystemClipboardAdapter {
                     .iter()
                     .filter(|item| !item.local_path.is_empty())
                     .map(|item| PathBuf::from(&item.local_path))
-                    .filter(|path| path.exists())
+                    .filter(|path| looks::clipboard_file(path).is_some())
                     .collect();
                 if paths.is_empty() {
                     clipboard.set_text(payload.text.clone()).is_ok()

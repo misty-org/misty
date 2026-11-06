@@ -1,5 +1,5 @@
 #[cfg(not(windows))]
-use std::fs;
+use crate::infra::file_access::fs;
 use std::{
     env,
     path::{Path, PathBuf},
@@ -87,7 +87,7 @@ fn current_target() -> PathBuf {
 }
 
 #[cfg(target_os = "macos")]
-fn launch_entry_path() -> Option<PathBuf> {
+pub(crate) fn launch_entry_path() -> Option<PathBuf> {
     dirs::home_dir().map(|home| {
         home.join("Library")
             .join("LaunchAgents")
@@ -96,17 +96,17 @@ fn launch_entry_path() -> Option<PathBuf> {
 }
 
 #[cfg(target_os = "linux")]
-fn launch_entry_path() -> Option<PathBuf> {
+pub(crate) fn launch_entry_path() -> Option<PathBuf> {
     dirs::config_dir().map(|config| config.join("autostart").join("misty.desktop"))
 }
 
 #[cfg(target_os = "windows")]
-fn launch_entry_path() -> Option<PathBuf> {
+pub(crate) fn launch_entry_path() -> Option<PathBuf> {
     None
 }
 
 #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
-fn launch_entry_path() -> Option<PathBuf> {
+pub(crate) fn launch_entry_path() -> Option<PathBuf> {
     None
 }
 
@@ -185,7 +185,7 @@ fn disable() -> Result<(), String> {
     let Some(path) = launch_entry_path() else {
         return Ok(());
     };
-    if path.exists() {
+    if fs::exists(&path) {
         fs::remove_file(&path)
             .map_err(|error| format!("Could not remove {}: {error}", path.display()))?;
     }

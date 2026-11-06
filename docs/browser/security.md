@@ -11,7 +11,11 @@ problem, see [SECURITY.md](../../SECURITY.md).
 Most serious first.
 
 1. **The app has no OS sandbox.** `src-tauri/Entitlements.plist` has no App Sandbox, so a bug in
-   the main process or the app's own windows runs with the person's full user rights.
+   the main process or the app's own windows runs with the person's full user rights. The file gate
+   (below) keeps Misty's own code to what's granted, but can't stop a memory bug. Three things still
+   reach further than `.misty` and grants: Misty's file picker lists any folder
+   (`file_access/looks.rs`), the `asset:` scope in `tauri.conf.json` still covers whole folders like
+   Documents, and `misty-browser-sync` and the credential store open their files themselves.
 2. **The agent runtime isn't confined.** The Node process started by
    `src-tauri/src/infra/agent_runtime/mod.rs` handles untrusted web content with full user rights,
    while document parsing is sandboxed. The same file honors `MISTY_AGENT_RUNTIME_NODE` and
@@ -29,7 +33,10 @@ Most serious first.
 | Boundary | What protects it | Code |
 | --- | --- | --- |
 | Websites reaching app commands | Tauri rejects remote origins with no permission entry, and a per-window allowlist sits on top | `src-tauri/src/platform/app_command_policy.rs` |
-| Plugin access | Website tabs get only `kiri:default`, and a test checks the other capabilities don't reach them | `src-tauri/capabilities/` |
+| Plugin access | Website tabs get only `kiri:default`, and a test checks the other capabilities don't reach them | `src-tauri/sandbox/capabilities/` |
+| Files the app itself touches | One gate refuses anything without a grant, and clippy bans the standard calls elsewhere. It checks real paths, so `..` and links can't get around it. Tests cover this; the prompts haven't been tried in the running app | `src-tauri/src/infra/file_access/`, `src-tauri/clippy.toml` |
+| Other browsers, the screen, other apps, typing | Off until the person says yes to a native prompt. Background calls are refused without one. Settings › Agents › Access changes them | `src-tauri/src/infra/permissions/` |
+| Downloads | The folder is asked for on the first download. Nothing opens or runs a download except the person's click. On macOS 26.5 a WKDownload carried `com.apple.quarantine` in a small test program, not in Misty itself. Misty adds the flag to pages and clipboard images it saves | `src-tauri/src/infra/browser/downloads.rs`, `src-tauri/src/infra/file_access/quarantine.rs` |
 | Local files | A custom `asset:` handler refuses website tabs, which Tauri's own handler does not | `src-tauri/src/platform/asset_protocol.rs` |
 | Navigation | App windows stay on bundled pages; tabs load only http(s) and extension pages | `src-tauri/src/platform/navigation_guard.rs`, `src-tauri/src/infra/browser/mod.rs` |
 | Saved passwords | A page never sees saved sign-ins or asks for one. Misty draws the menu, ignores clicks in its first half second, and only a click there fills, into the site the sign-in was saved for. The fix's tests pass, but it hasn't been tried in the running app | `src/features/browser/workspace/PasswordFillMenu.tsx`, `src-tauri/src/infra/browser/host_messages/passwords/manage.rs` |

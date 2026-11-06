@@ -4,12 +4,156 @@ The goal, rules and loop for improving Misty's agent against Odysseys, the long-
 benchmark other AI browsers report on. Written October 17, 2026. The harness it measures is
 [agent-harness.md](../harness.md).
 
-The campaign ended on October 31, 2026. Its evals (Odysseys, free-model, voice and pointing)
-drove a server-side agent runtime, which was removed with them: agents and every model call now
-run on the person's desktop ([runtime.md](../runtime.md)). Evals need rebuilding on the desktop
-runtime, as the benchmark package in [agent browser actions](../../plans/agent-browser-actions.md)
-describes. The eval code is in git history. This page stays as the record of what the campaign
-found, which the harness code cites.
+The campaign ended on October 31, 2026. Its evals drove a server-side agent runtime, which was
+removed with them: agents and every model call now run on the person's desktop
+([runtime.md](../runtime.md)). The Odysseys runner came back on November 6, 2026 in `evals/odysseys/`
+to record a baseline of the TypeScript runtime and compare the Rust one against it
+([app permissions](../../plans/app-permissions.md#how-it-gets-done)). How to run it comes first
+below. From [Goal](#goal) on, this page is the record of what the campaign found, which the harness
+code cites. The scores in that record came from another runtime and judge, so never compare a new
+pass with them.
+
+## Running it
+
+The runner drives Misty only the way a person's composer does: a request to the local server, a run
+on this computer's own models, and pictures through the debug build's eval bridge. It knows nothing
+about how the runtime is built, so the same pass measures either one. Each task is one new chat with
+the same permission a desktop chat has, and the agent runs in Auto, so nothing pauses for a person.
+
+### What you must provide
+
+- **A model key saved in the dev app:** Settings › Models, with the agent model, fast model and
+  reasoning you want to measure. The run's model comes from there. The runner never names one.
+- **A judge key:** set for the eval process only, with no file. It can be any provider's.
+- **A sign-in for a local test account:** an email and password on the dev stack, in a file outside
+  the repository. On a fresh stack the first account registers itself from the app. After that, a
+  new account needs an invitation or `MISTY_ALLOWED_EMAILS`. Don't use your own account.
+
+A web search key in Settings › Models is optional, but the report records the service, and passes
+with different search services can't be compared.
+
+### Recording a baseline
+
+1. Build the runtime, which `misty desktop dev` doesn't do, and start the dev stack. It runs with
+   `MISTY_ENVIRONMENT=development`, the only setting where the server honors an eval's turn limit.
+
+   ```bash
+   (cd src-tauri/services/agent-runtime && npm run build)
+   misty server up
+   ```
+
+2. Start the desktop in development with the eval bridge and a throwaway page session. The token is
+   any 24 or more characters of your own. `MISTY_DATA_ROOT` keeps this copy's settings apart from
+   your real ones, since a profile alone shares `misty.db`.
+
+   ```bash
+   MISTY_DATA_ROOT="$HOME/.misty-odysseys" MISTY_EVAL_EPHEMERAL_PAGES=1 \
+     MISTY_BROWSER_EVAL_BRIDGE_PORT=47123 MISTY_BROWSER_EVAL_BRIDGE_TOKEN=<token> \
+     misty desktop dev
+   ```
+
+3. In that app, sign in to the test account on the local server (`http://127.0.0.1:8081/v1`), then
+   save the model key and choose the models in Settings › Models. **Check the agent model** there
+   confirms it calls tools and reads screenshots.
+
+4. Save the test account's sign-in where only you can read it:
+
+   ```bash
+   mkdir -p ~/.misty/odysseys
+   printf '{"email": "%s", "password": "%s"}' '<email>' '<password>' > ~/.misty/odysseys/signin.json
+   chmod 600 ~/.misty/odysseys/signin.json
+   ```
+
+5. Install the runner and run its tests, which need no key:
+
+   ```bash
+   cd evals/odysseys
+   npm ci
+   npm test
+   ```
+
+6. Run the pass. `read -rs` keeps the judge's key out of your shell history.
+
+   ```bash
+   read -rs MISTY_ODYSSEYS_JUDGE_KEY && export MISTY_ODYSSEYS_JUDGE_KEY
+   MISTY_ODYSSEYS_RUNTIME=typescript \
+     MISTY_BROWSER_EVAL_BRIDGE=http://127.0.0.1:47123 MISTY_BROWSER_EVAL_BRIDGE_TOKEN=<token> \
+     MISTY_ODYSSEYS_JUDGE_MODEL=<provider/model> \
+     MISTY_ODYSSEYS_SPLIT=dev MISTY_ODYSSEYS_LIMIT=40 MISTY_ODYSSEYS_TURNS=100 \
+     npm run pass
+   ```
+
+Each pass writes `reports/<time>-<runtime>/report.json`, git-ignored, and for each task a folder with
+`steps.jsonl`, the screenshots and `result.json`, which holds the judge's reasoning per rubric item.
+The report updates after each task, so stopping with Ctrl-C keeps what's done and cancels the run in
+progress, but a stopped pass can't be compared.
+
+Scores vary a lot between runs of the same code (see [Batch 16](#batch-16-october-18)), so record
+the baseline more than once and keep every folder.
+
+### Comparing
+
+Run the candidate the same way, with `MISTY_ODYSSEYS_RUNTIME=rust` and the same settings, then:
+
+```bash
+npm run compare -- reports/<baseline> reports/<candidate>
+```
+
+It prints each task's score side by side, the overall rubric average and perfect tasks, and
+`Same or better: yes` or `no`. It exits 0 for yes, 1 for no and 2 when it refuses.
+
+- **Same or better:** neither the rubric average nor the count of perfect tasks fell, and every task
+  has a real score in both passes. A run that did no work, or a rubric the judge gave no verdict on,
+  has no score. `npm run regrade -- reports/<pass>/<task>` judges a saved run again without running
+  it, with the same judge.
+- **Refused:** different agent, fast or embedding models, reasoning, web search, task list, task
+  data, turn limit or judge, or a pass that didn't finish.
+
+Each report records the runtime, the device's models, the turn limit, the commits of both
+repositories and whether they had uncommitted changes, the judge and the task list. It holds no key.
+
+### Settings
+
+| Variable | Meaning |
+|---|---|
+| `MISTY_ODYSSEYS_RUNTIME` | Required: `typescript` or `rust`. The person states which runtime the app is using |
+| `MISTY_BROWSER_EVAL_BRIDGE`, `MISTY_BROWSER_EVAL_BRIDGE_TOKEN` | Required: the bridge's address on this computer and the app's token |
+| `MISTY_ODYSSEYS_JUDGE_MODEL`, `MISTY_ODYSSEYS_JUDGE_KEY` | Required: `anthropic/<model>`, `google/<model>` or `openai/<model>`, and its key |
+| `MISTY_ODYSSEYS_JUDGE_BASE_URL` | An OpenAI-compatible provider's address, such as `https://openrouter.ai/api/v1`. The model goes to it as written |
+| `MISTY_ODYSSEYS_JUDGE_IMAGES`, `MISTY_ODYSSEYS_JUDGE_LANES` | Pictures per judge call (60), and rubrics judged at once (5) |
+| `MISTY_ODYSSEYS_SPLIT` | `dev` (default), `holdout`, `rest` or `all` |
+| `MISTY_ODYSSEYS_TASKS` | Task ids or id prefixes, instead of a split |
+| `MISTY_ODYSSEYS_LIMIT`, `MISTY_ODYSSEYS_OFFSET` | How many tasks, from where (10 from 0) |
+| `MISTY_ODYSSEYS_TURNS` | Model turns per task, 21 to 200 (100, as the paper allows). The pass stops if the server gives a run anything else |
+| `MISTY_ODYSSEYS_PARALLEL` | Tasks at once (1) |
+| `MISTY_ODYSSEYS_EARLY_STOP` | `1` stops when 4 of the first 6 tasks fail, for iterating. Off by default, since a stopped pass can't be compared |
+| `MISTY_ODYSSEYS_WATCH_MINUTES` | How often the progress watch looks at a run (3). No clock ends a run: it's stopped only after four quiet looks or two with nothing but repeated results, and still graded |
+| `MISTY_ODYSSEYS_TASK_MINUTES` | An optional hard cap per task; a task past it stops the pass |
+| `MISTY_ODYSSEYS_API`, `MISTY_ODYSSEYS_DEVICE_API_BASE` | The stack's address (`http://127.0.0.1:8081`) and the one the app signed in with (that address plus `/v1`) |
+| `MISTY_ODYSSEYS_DEVICE` | The device, when the account has more than one |
+| `MISTY_ODYSSEYS_SIGNIN` | The sign-in file (`~/.misty/odysseys/signin.json`) |
+
+The runner refuses a stack, a device address or a bridge that isn't on this computer, and a judge
+address on plain `http` unless it's on this computer.
+
+### What changed from the campaign's runner
+
+- **The model comes from the device.** The runner reads it through the bridge's `/models`, which
+  returns model names without keys. If it changes during a pass, the pass can't be compared.
+- **The judge calls its provider with plain `fetch`,** on its own key, with the same prompts and
+  parse (`judge.ts`, held still by `test/judge.test.ts`). It sets no reasoning, and there's no
+  fallback judge, since a pass must have one judge.
+- **The server's only eval setting is `eval_turn_limit`,** honored only with
+  `MISTY_ENVIRONMENT=development` (`internal/platform/httpapi/turn_limits.go` in misty-server). It
+  also gives the run four hours of execution. An ordinary run gets 20 turns.
+- **Tool results come from `/ai/invocations/{id}/tool-output`,** the stored conversation, instead of a
+  debug event, for both the judge's action history and the progress watch.
+- **Nothing reads a database.** The conversation id comes from the request's answer.
+- **Spend is no longer metered.** The agent runs on the device's key, so the runner can't see its
+  usage. Reports count the judge's tokens only, so set a limit at your provider. See
+  [Cost and time](#cost-and-time-rough).
+- **Left in git history:** checkpoints and resumed passes (a resumed pass isn't a score) and
+  BU Bench, in `16f188f4d~1:server/apps/agent-runtime/evals/odysseys/`.
 
 ## Goal
 

@@ -5,28 +5,24 @@
 //! person could have picked: inside their home folder (or on an external drive,
 //! or on Windows another local drive), never hidden, and never where the system
 //! or apps keep configuration that runs on its own.
-use std::path::{Component, Path, PathBuf, Prefix};
+#[cfg(windows)]
+use std::path::Prefix;
+use std::path::{Component, Path, PathBuf};
 
-/// Windows network (UNC) and device paths are refused before anything touches
-/// the filesystem: even checking one makes Windows sign in to that server.
-pub fn is_local_path(path: &Path) -> bool {
-    match path.components().next() {
-        Some(Component::Prefix(prefix)) => {
-            matches!(prefix.kind(), Prefix::Disk(_) | Prefix::VerbatimDisk(_))
-        }
-        _ => true,
-    }
-}
+use crate::infra::file_access::looks;
+
+pub use crate::infra::file_access::is_local_path;
 
 pub fn download_directory(candidate: &Path, home: &Path) -> Option<PathBuf> {
     if !is_local_path(candidate) {
         return None;
     }
-    let directory = std::fs::canonicalize(candidate).ok()?;
-    if !directory.is_dir() {
+    let chosen = looks::chosen_folder(candidate).ok()?;
+    if !chosen.is_folder {
         return None;
     }
-    let home = std::fs::canonicalize(home).unwrap_or_else(|_| home.to_path_buf());
+    let directory = chosen.real;
+    let home = looks::chosen_folder(home).map_or_else(|_| home.to_path_buf(), |home| home.real);
     let relative = if let Ok(relative) = directory.strip_prefix(&home) {
         relative.to_path_buf()
     } else if cfg!(target_os = "macos") {
@@ -114,14 +110,13 @@ fn other_drive(_directory: &Path) -> Option<PathBuf> {
 /// name check catches.
 #[cfg(windows)]
 fn hidden_within(directory: &Path, relative: &Path) -> bool {
-    use std::os::windows::fs::MetadataExt;
     use windows_sys::Win32::Storage::FileSystem::{FILE_ATTRIBUTE_HIDDEN, FILE_ATTRIBUTE_SYSTEM};
     directory
         .ancestors()
         .take(relative.components().count())
         .any(|folder| {
-            std::fs::metadata(folder).map_or(true, |metadata| {
-                metadata.file_attributes() & (FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_SYSTEM) != 0
+            looks::chosen_folder_attributes(folder).map_or(true, |attributes| {
+                attributes & (FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_SYSTEM) != 0
             })
         })
 }
@@ -132,6 +127,8 @@ fn hidden_within(_directory: &Path, _relative: &Path) -> bool {
 }
 
 #[cfg(test)]
+// Tests build their fixtures directly, outside the file gate.
+#[allow(clippy::disallowed_methods, clippy::disallowed_types)]
 mod tests {
     use super::*;
 

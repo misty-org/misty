@@ -126,7 +126,7 @@ pub(crate) fn computer_name() -> String {
     #[cfg(target_os = "windows")]
     let name = windows_device_name();
     #[cfg(not(any(target_os = "macos", target_os = "windows")))]
-    let name = std::fs::read_to_string("/etc/hostname").ok();
+    let name = crate::infra::file_access::fs::read_to_string("/etc/hostname").ok();
     let name: String = name
         .unwrap_or_default()
         .trim()

@@ -94,7 +94,7 @@ it("releases the native menu and suspension on unmount", async () => {
 
 it("grants menu focus to the local host without granting remote pages native access", () => {
   const capability = JSON.parse(
-    readFileSync(`${process.cwd()}/src-tauri/capabilities/default.json`, "utf8"),
+    readFileSync(`${process.cwd()}/src-tauri/sandbox/capabilities/default.json`, "utf8"),
   );
   expect(capability.permissions).toContain("core:webview:allow-set-webview-focus");
   expect(capability.webviews).toEqual(["window-*", "incognito-*"]);

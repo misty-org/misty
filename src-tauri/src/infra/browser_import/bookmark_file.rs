@@ -1,5 +1,6 @@
 //! Reading and saving the bookmarks HTML file every browser reads.
 use super::*;
+use crate::infra::file_access::{self, fs};
 
 /// Reads a bookmarks HTML file the person picks. `None` when they cancel.
 #[tauri::command]
@@ -20,12 +21,13 @@ pub async fn browser_import_bookmarks_file(
     let path = file
         .into_path()
         .map_err(|_| "Choose a file on this computer.".to_owned())?;
+    file_access::allow_picked_file(&path, file_access::Access::Read);
     blocking(move || {
-        let size = std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
+        let size = fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
         if size > 64 << 20 {
             return Err("That file is too large to be a bookmarks file.".to_owned());
         }
-        let bytes = std::fs::read(&path).map_err(|_| "That file could not be read.".to_owned())?;
+        let bytes = fs::read(&path).map_err(|_| "That file could not be read.".to_owned())?;
         let (roots, skipped) = netscape::parse(&String::from_utf8_lossy(&bytes))?;
         Ok(Some(ImportedBookmarks { roots, skipped }))
     })
@@ -55,7 +57,8 @@ pub async fn browser_import_save_bookmarks(
     let path = file
         .into_path()
         .map_err(|_| "Choose a location on this computer.".to_owned())?;
-    std::fs::write(path, netscape::write(&roots))
+    file_access::allow_picked_file(&path, file_access::Access::Write);
+    fs::write(path, netscape::write(&roots))
         .map_err(|_| "The bookmarks file could not be saved there.".to_owned())?;
     Ok(true)
 }

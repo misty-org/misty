@@ -16,6 +16,8 @@ mod output;
 mod process_tree;
 
 #[cfg(all(test, target_os = "macos"))]
+// Tests build their fixtures directly, outside the file gate.
+#[allow(clippy::disallowed_methods, clippy::disallowed_types)]
 mod tests;
 
 use std::{

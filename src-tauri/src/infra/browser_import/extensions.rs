@@ -1,6 +1,7 @@
 //! Extensions the person installed themselves, by ID and name, so the app can
 //! offer the same ones from Misty's extension catalog.
 use super::discover::Family;
+use crate::infra::file_access::fs;
 use serde::Serialize;
 use serde_json::Value;
 use std::path::Path;
@@ -25,7 +26,7 @@ pub fn read(family: Family, profile: &Path) -> Vec<ImportedExtension> {
 }
 
 fn json(path: &Path) -> Value {
-    std::fs::read(path)
+    fs::read(path)
         .ok()
         .and_then(|bytes| serde_json::from_slice(&bytes).ok())
         .unwrap_or_default()
@@ -80,7 +81,7 @@ fn chromium(profile: &Path) -> Vec<ImportedExtension> {
             let version = manifest["version"].as_str().unwrap_or_default();
             let raw = manifest["name"].as_str().map(str::to_owned).or_else(|| {
                 // Newer versions keep the manifest beside the extension, not in preferences.
-                std::fs::read_dir(profile.join("Extensions").join(id))
+                fs::read_dir(profile.join("Extensions").join(id))
                     .ok()?
                     .flatten()
                     .find_map(|dir| {
@@ -118,6 +119,8 @@ fn firefox(profile: &Path) -> Vec<ImportedExtension> {
 }
 
 #[cfg(test)]
+// Tests build their fixtures directly, outside the file gate.
+#[allow(clippy::disallowed_methods, clippy::disallowed_types)]
 mod tests {
     use super::*;
 

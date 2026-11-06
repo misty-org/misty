@@ -1,3 +1,4 @@
+use crate::infra::file_access::fs;
 // Retain the original browser profile for existing embedded tabs.
 const LEGACY_STORE_ID: [u8; 16] = [
     0x68, 0x25, 0x8f, 0x34, 0x88, 0x8a, 0x4a, 0xbd, 0xa6, 0x21, 0x8f, 0x4c, 0xe2, 0x63, 0x71, 0x96,
@@ -53,18 +54,18 @@ pub(crate) fn link_webview_data(
         .join("WebsiteDataStore")
         .join(uuid::Uuid::from_bytes(identifier).hyphenated().to_string());
     let link = webview_home(home, profile)?;
-    std::fs::create_dir_all(link.parent().ok_or("Invalid profile folder.")?)
+    fs::create_dir_all(link.parent().ok_or("Invalid profile folder.")?)
         .map_err(|error| error.to_string())?;
-    match std::fs::symlink_metadata(&link) {
+    match fs::symlink_metadata(&link) {
         Ok(meta) if meta.file_type().is_symlink() => {
-            if std::fs::read_link(&link).is_ok_and(|current| current == target) {
+            if fs::read_link(&link).is_ok_and(|current| current == target) {
                 return Ok(());
             }
-            std::fs::remove_file(&link).map_err(|error| error.to_string())?;
+            fs::remove_file(&link).map_err(|error| error.to_string())?;
         }
         // An empty folder from an earlier layout gives way; one with files is left alone.
         Ok(meta) if meta.is_dir() => {
-            if std::fs::remove_dir(&link).is_err() {
+            if fs::remove_dir(&link).is_err() {
                 return Ok(());
             }
         }
@@ -72,7 +73,7 @@ pub(crate) fn link_webview_data(
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
         Err(error) => return Err(error.to_string()),
     }
-    std::os::unix::fs::symlink(&target, &link).map_err(|error| error.to_string())
+    fs::symlink(&target, &link).map_err(|error| error.to_string())
 }
 
 /// The host supplies a validated 256-bit identity (logical hash or native
@@ -97,6 +98,8 @@ pub fn data_store_identifier(profile: Option<&str>) -> Result<[u8; 16], String> 
 }
 
 #[cfg(test)]
+// Tests build their fixtures directly, outside the file gate.
+#[allow(clippy::disallowed_methods, clippy::disallowed_types)]
 mod tests {
     use super::*;
 

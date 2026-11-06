@@ -71,7 +71,11 @@ export function BrowserImportFlow(props: {
     browserImport
       .discover()
       .then((found) => live && setSources(found))
-      .catch(() => live && setSources([]));
+      .catch((error: unknown) => {
+        if (!live) return;
+        setSources([]);
+        setIssue(error instanceof Error ? error.message : String(error));
+      });
     return () => {
       live = false;
     };

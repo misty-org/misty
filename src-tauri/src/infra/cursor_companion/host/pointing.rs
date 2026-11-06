@@ -4,6 +4,8 @@
 mod region;
 mod snap;
 pub use region::capture_region;
+
+use crate::infra::permissions::{self, Permission};
 pub use snap::snap_point;
 
 use super::{current, displays, host_state, require_main};
@@ -70,6 +72,9 @@ pub async fn cursor_companion_capture_region(
     size: f64,
 ) -> Result<Value, String> {
     require_main(&webview)?;
+    if !permissions::ensure_async(&app, Permission::ScreenCapture).await {
+        return Err(super::capture::SCREEN_CAPTURE_OFF.into());
+    }
     let state = host_state(&app);
     if !current(&state, turn) {
         return Err("Companion interrupted".into());

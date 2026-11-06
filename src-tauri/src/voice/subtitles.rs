@@ -1,6 +1,7 @@
 //! The live subtitles panel: a floating window above every app, fullscreen ones included. It
 //! doesn't take focus when it appears, but can be clicked and typed in, and it only draws what the
 //! window that opened it sends. Docs: docs/voice-memory/README.md.
+use crate::infra::file_access::fs;
 use tauri::{
     AppHandle, Manager, PhysicalPosition, Webview, WebviewUrl, WebviewWindow, WebviewWindowBuilder,
 };
@@ -114,5 +115,5 @@ pub fn voice_capture_sources(webview: Webview) -> Result<serde_json::Value, Stri
 #[tauri::command]
 pub fn voice_subtitles_export(webview: Webview, path: String, text: String) -> Result<(), String> {
     require_person_window(&webview)?;
-    std::fs::write(path, text).map_err(|_| "That session couldn't be exported.".into())
+    fs::write(path, text).map_err(|_| "That session couldn't be exported.".into())
 }

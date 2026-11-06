@@ -1,3 +1,4 @@
+use crate::infra::file_access::fs;
 pub mod popup;
 
 // SPDX-License-Identifier: MIT
@@ -194,7 +195,7 @@ pub async fn close_account() {
     for profile in profiles_running() {
         let mut state = service(&profile).lock().await;
         for path in state.prepared.values() {
-            let _ = std::fs::remove_dir_all(path);
+            let _ = fs::remove_dir_all(path);
         }
         *state = ExtensionService::default();
     }

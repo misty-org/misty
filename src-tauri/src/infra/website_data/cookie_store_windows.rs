@@ -50,11 +50,9 @@ unsafe fn verify_profile(view: &ICoreWebView2, expected: &Path) -> Result<()> {
     let actual = webview2::owned_string(|p| environment.UserDataFolder(p))
         .map(PathBuf::from)
         .ok_or(CookieStoreError::Unavailable)?;
-    let actual = actual
-        .canonicalize()
+    let actual = crate::infra::file_access::fs::canonicalize(&actual)
         .map_err(|_| wrong_store(&format!("can't resolve the view's folder {actual:?}")))?;
-    let expected = expected
-        .canonicalize()
+    let expected = crate::infra::file_access::fs::canonicalize(&expected)
         .map_err(|_| wrong_store(&format!("can't resolve the profile's folder {expected:?}")))?;
     if actual != expected {
         return Err(wrong_store(&format!(

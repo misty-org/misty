@@ -1,4 +1,5 @@
 //! Account-scoped local recovery, independent of any vault.
+use crate::infra::file_access::fs;
 use misty_browser_sync::{
     crypto::VaultScope,
     recovery::{RecoveryRecord, RecoveryStore},
@@ -13,7 +14,7 @@ struct Client {
     deployment: String,
     account: String,
     store: RecoveryStore,
-    _lock: std::fs::File,
+    _lock: fs::File,
 }
 static CLIENT: OnceLock<Mutex<Option<Client>>> = OnceLock::new();
 /// Keys whose newest save reached neither the database nor its pending slot.
@@ -96,7 +97,7 @@ fn remove_recovery_files(directory: &std::path::Path) -> Result<(), String> {
         "recovery.sqlite-wal",
         "recovery.sqlite-shm",
     ] {
-        match std::fs::remove_file(directory.join(name)) {
+        match fs::remove_file(directory.join(name)) {
             Ok(()) => {}
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
             Err(_) => {
@@ -106,7 +107,7 @@ fn remove_recovery_files(directory: &std::path::Path) -> Result<(), String> {
             }
         }
     }
-    match std::fs::remove_dir_all(directory.join("recovery-pending")) {
+    match fs::remove_dir_all(directory.join("recovery-pending")) {
         Ok(()) => {}
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
         Err(_) => {
@@ -150,7 +151,7 @@ pub async fn browser_recovery_forget(
             );
         }
         let directory = recovery_directory(&app, &deployment, &account_id)?;
-        let _lock = if directory.exists() {
+        let _lock = if fs::exists(&directory) {
             Some(super::profile_data::lock_database(
                 &directory.join("recovery.sqlite"),
             )?)
@@ -202,19 +203,17 @@ pub async fn browser_recovery_open(
             vault_id: "d32b3d14-d7b6-4d4c-a674-d36bb5aefb74".into(),
         };
         let directory = recovery_directory(&app, &deployment, &account_id)?;
-        let mut builder = std::fs::DirBuilder::new();
+        let mut builder = fs::DirBuilder::new();
         builder.recursive(true);
         #[cfg(unix)]
-        {
-            use std::os::unix::fs::DirBuilderExt;
-            builder.mode(0o700);
-        }
+        builder.mode(0o700);
         builder
             .create(&directory)
             .map_err(|_| "Could not create workspace storage")?;
         let path = directory.join("recovery.sqlite");
         let lock = super::profile_data::lock_database(&path)?;
-        let key = secure_store::workspace_recovery_root(&scope, !path.exists()).map_err(error)?;
+        let key =
+            secure_store::workspace_recovery_root(&scope, !fs::exists(&path)).map_err(error)?;
         let store = RecoveryStore::open(&path, scope, key).map_err(error)?;
         let pending = store.pending_keys().unwrap_or_default();
         let id = uuid::Uuid::new_v4().to_string();

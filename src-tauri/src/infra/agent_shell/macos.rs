@@ -54,9 +54,7 @@ pub(super) async fn run(
     let mut profile = BASE_PROFILE.to_owned();
     let mut command = Command::new("/usr/bin/sandbox-exec");
     if let Some(folder) = &request.folder {
-        let root = folder
-            .root
-            .canonicalize()
+        let root = crate::infra::file_access::fs::canonicalize(&folder.root)
             .map_err(|_| "shell_folder_unavailable".to_owned())?;
         profile.push_str(&folder_rules(folder.writable));
         command.arg("-D").arg(format!("FOLDER={}", root.display()));
