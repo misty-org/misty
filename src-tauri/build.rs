@@ -120,7 +120,7 @@ fn main() {
     }
 }
 
-/// The sandbox's actions, grants and permissions (docs/plans/app-permissions.md). Listing the app's
+/// The sandbox's actions, grants and permissions. Listing the app's
 /// commands makes Tauri refuse any command no capability allows, for every window.
 fn sandbox_attributes() -> tauri_build::Attributes {
     const APP_COMMANDS: &[&str] = include!("sandbox/app_commands.in");

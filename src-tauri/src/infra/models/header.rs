@@ -1,5 +1,5 @@
 //! This device's model choices and provider keys, and its web search key, as the JSON the
-//! agent runtime on this computer takes (docs/agents/runtime.md). Built here and only here;
+//! agent runtime on this computer takes. Built here and only here;
 //! the renderer never sees it, it is never logged, and it never leaves the computer.
 use serde_json::{json, Map, Value};
 
@@ -33,9 +33,22 @@ pub const ROLES: [(&str, &str); 5] = [
 /// the device setting `search_provider` names (Decodo when unset), with its saved key.
 pub const SEARCH_PROVIDERS: [&str; 2] = ["decodo", "serper"];
 
+/// The connected apps key (`infra::composio`). It's kept with the keys above and never goes in the
+/// runtime's document: only the native Composio client reads it.
+pub const COMPOSIO_KEY: &str = "composio";
+
 const REASONING: [&str; 6] = ["none", "minimal", "low", "medium", "high", "xhigh"];
 const DEFAULT_REASONING: &str = "low";
 const MAX_MODEL_ID: usize = 200;
+const MAX_VOICE_ID: usize = 64;
+
+/// A voice ID goes into the address of a speech request, so it's only ever letters, digits, `-` or `_`.
+fn is_voice_id(voice: &str) -> bool {
+    voice.len() <= MAX_VOICE_ID
+        && voice
+            .chars()
+            .all(|character| character.is_ascii_alphanumeric() || matches!(character, '-' | '_'))
+}
 
 pub fn is_provider(id: &str) -> bool {
     PROVIDERS.contains(&id)
@@ -143,6 +156,7 @@ pub fn document(settings: &Value, key: &dyn Fn(&str) -> Option<String>) -> Optio
     let reasoning = text(settings, "reasoning")
         .filter(|value| REASONING.contains(value))
         .unwrap_or(DEFAULT_REASONING);
+    let speech_voice = text(settings, "speech_voice").filter(|voice| is_voice_id(voice));
     let mut document = json!({
         "version": 1,
         "providers": providers,
@@ -151,6 +165,9 @@ pub fn document(settings: &Value, key: &dyn Fn(&str) -> Option<String>) -> Optio
     });
     if let Some(search) = search(settings, key) {
         document["search"] = search;
+    }
+    if let Some(voice) = speech_voice {
+        document["speechVoice"] = Value::String(voice.to_owned());
     }
     Some(document)
 }

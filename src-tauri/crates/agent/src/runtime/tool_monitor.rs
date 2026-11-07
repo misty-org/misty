@@ -186,11 +186,16 @@ impl Inner {
             ("duration_ms".to_owned(), JsValue::Number(event.duration_ms as f64)),
             ("success".to_owned(), JsValue::Bool(confirmed)),
         ];
-        // The timeline's query and links for a call Misty never saw.
+        // The timeline's row comes from these (`local_run::events`), and nothing leaves the computer:
+        // its query and links for a tool this runtime runs, and otherwise the call's arguments and
+        // result.
         if confirmed && self.catalog.local(&call.tool_name) {
             if let JsValue::Object(activity) = device_tool_activity(&call.input, output) {
                 fields.extend(activity);
             }
+        } else if confirmed {
+            fields.push(("device_arguments".to_owned(), call.input.clone()));
+            fields.push(("device_result".to_owned(), output.cloned().unwrap_or(JsValue::Null)));
         }
         self.checkpoints
             .checkpoint(HarnessCheckpoint {

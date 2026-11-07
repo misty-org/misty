@@ -87,7 +87,6 @@ fn account_identity(scope: &str) -> String {
 pub(crate) fn account_dir(scope: &str) -> Result<PathBuf, String> {
     let directory = super::paths::misty_home_dir()
         .ok_or("Local application storage is unavailable")?
-        .join(".local")
         .join("sync")
         .join(account_identity(scope));
     let mut builder = fs::DirBuilder::new();
@@ -202,7 +201,7 @@ pub fn window_records(label: &str) -> Option<ProfileRecords> {
 }
 
 /// The records of the profile that opens its pages in `store_key`, as
-/// `site_settings::permissions::profile_key` names a store: downloads and site permissions file
+/// `site_settings::permissions::store_key` names a store: downloads and site permissions file
 /// things under that key. A store no profile of this account uses has none.
 pub fn store_records(store_key: &str) -> Option<ProfileRecords> {
     let profile = profile_windows::listed_profiles()
@@ -211,7 +210,7 @@ pub fn store_records(store_key: &str) -> Option<ProfileRecords> {
             profile_windows::store_for_profile(&profile.id)
                 .ok()
                 .and_then(|store| {
-                    crate::infra::site_settings::permissions::profile_key(store.as_deref()).ok()
+                    crate::infra::site_settings::permissions::store_key(store.as_deref()).ok()
                 })
                 .is_some_and(|key| key == store_key)
         })?;

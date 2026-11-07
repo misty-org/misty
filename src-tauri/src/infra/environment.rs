@@ -36,15 +36,9 @@ impl AppEnvironmentService {
         self.inner.snapshot()
     }
 
-    /// The database every store lives in: `~/.misty/.local/data/misty.db`.
+    /// The database every store lives in: `~/.misty/data/misty.db`.
     pub fn store(&self) -> crate::infra::store::Store {
-        crate::infra::store::Store::at(
-            self.inner
-                .misty_dir
-                .join(".local")
-                .join("data")
-                .join("misty.db"),
-        )
+        crate::infra::store::Store::in_home(&self.inner.misty_dir)
     }
 
     pub fn cache_dir(&self) -> PathBuf {

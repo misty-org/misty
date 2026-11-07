@@ -95,12 +95,6 @@ impl RunGrant {
         ))
     }
 
-    /// Reads who claims to have signed it, so their key can be looked up.
-    pub fn claimed_requester(record: &SignedRecord) -> Option<String> {
-        let (_, fields) = record.fields(RUN_GRANT_DOMAIN)?;
-        fields.get(2)?.as_str().map(str::to_owned)
-    }
-
     pub fn verify(record: &SignedRecord, requester_public_key: &str, now: i64) -> Option<Self> {
         let (bytes, fields) = record.fields(RUN_GRANT_DOMAIN)?;
         if !verify_device_signature(requester_public_key, &bytes, &record.signature) {

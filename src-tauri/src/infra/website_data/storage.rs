@@ -50,11 +50,11 @@ impl InertOrigin {
         ));
         #[cfg(target_os = "macos")]
         let builder = builder.data_store_identifier(
-            super::super::browser_profile::data_store_identifier(Some(physical))?,
+            super::super::profile_store::data_store_identifier(Some(physical))?,
         );
         #[cfg(windows)]
         let builder =
-            super::super::browser::with_browser_data(builder, owner.app_handle(), Some(physical))?;
+            super::super::browser::with_store_data(builder, owner.app_handle(), Some(physical))?;
         let created = {
             let _creating = super::super::browser::creation_guard::Creating::enter();
             owner.add_child(

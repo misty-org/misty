@@ -3,6 +3,8 @@
 #[cfg(desktop)]
 pub mod admission;
 #[cfg(desktop)]
+pub mod agent_grants;
+#[cfg(desktop)]
 pub(crate) mod agent_jobs;
 #[cfg(desktop)]
 pub mod channel;

@@ -11,7 +11,7 @@ use super::{
     companion_images::{companion_image_parts, DisplayCapture, ScreenControl, TaskFile},
     js_json::JsValue,
     model_input::{initial_messages, TaskInput},
-    model_tools::{visual_tool_output, McpRemoteTool, ModelCatalog},
+    model_tools::{visual_tool_output, CatalogTool, ModelCatalog},
     proof_tabs::proof_tabs_refusal,
     runtime_errors::{classify_runtime_error, visible_error_message, RuntimeError},
     serial_tool_lifecycle::SerialToolLifecycle,
@@ -40,7 +40,7 @@ fn json(value: &str) -> JsValue {
     JsValue::parse(value).unwrap()
 }
 
-fn assert_descriptor(tool: &McpRemoteTool, want: &JsValue) {
+fn assert_descriptor(tool: &CatalogTool, want: &JsValue) {
     assert_eq!(tool.name, text(want.get("name")));
     assert_eq!(tool.description, text(want.get("description")));
     assert_eq!(tool.input_schema.get(), want.get("inputSchema").unwrap().stringify());
@@ -65,8 +65,8 @@ fn execution_instructions_and_proof_tab_refusals() {
     assert_eq!(proof_tabs_refusal("keep it open", &[], None, Some("browser_run")).unwrap(), text(recorded.get("proofTabsProgram")));
 }
 
-fn descriptor(name: &str) -> McpRemoteTool {
-    McpRemoteTool {
+fn descriptor(name: &str) -> CatalogTool {
+    CatalogTool {
         name: name.to_owned(),
         description: name.to_owned(),
         input_schema: RawJson::from_text(r#"{"type":"object","properties":{}}"#.to_owned()).unwrap(),

@@ -5,7 +5,7 @@ use regex::Regex;
 
 use super::{
     js_regex::js_regex,
-    mcp_errors::classify_mcp_transport_error,
+    tool_errors::classify_tool_transport_error,
     text::{js_prefix, js_trim},
 };
 
@@ -142,7 +142,7 @@ pub(crate) fn rethrow_step_error(error: RuntimeError) -> StepFailure {
         }
         return StepFailure::Fatal("authorization_or_state_changed: Misty's authorization or run state changed.".to_owned());
     }
-    let failure = classify_mcp_transport_error(&error);
+    let failure = classify_tool_transport_error(&error);
     if failure.transient {
         return StepFailure::Retryable { message: failure.message.to_owned(), retry_after_ms: failure.retry_after_ms };
     }

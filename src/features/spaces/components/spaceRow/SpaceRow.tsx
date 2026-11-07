@@ -1,9 +1,7 @@
-import { Bot, Brain, House, Library, MessagesSquare, Plus, UsersRound } from "lucide-react";
+import { Brain, House, Library, MessagesSquare, Plus, UsersRound } from "lucide-react";
 import { useCallback, useState } from "react";
-import { showAgentsPanel, useMistyPanelStore } from "@/features/agents";
 import { useWorkspaceStore, workspaceSurfaceFromRoute } from "@/features/workspace";
 import {
-  appIcon,
   Button,
   cn,
   DropdownMenu,
@@ -28,8 +26,6 @@ import { SpaceMenuItems } from "./SpaceMenuItems";
 import { SpaceCreateMenu } from "./SpaceCreateMenu";
 import { useWindowSpace } from "./useWindowSpace";
 
-const AgentsIcon = appIcon("agents") ?? Bot;
-
 type RowAlignment = "left" | "center" | "right";
 
 const rowClass = (alignment: RowAlignment) =>
@@ -47,16 +43,6 @@ const rowDivider = (
 /** The chevron is thin, so it takes the 20px of the sidebar's thin glyphs (browserToolbar.css),
  * at their stroke. */
 const rowChevronClass = "size-5 stroke-[1.75] text-cream-muted";
-
-/** Agents in a side panel beside the page; pressed while that panel is open. */
-function AgentsPanelButton() {
-  const shown = useMistyPanelStore((s) => s.open);
-  return (
-    <IconButton label="Agents" aria-pressed={shown} onClick={showAgentsPanel}>
-      <AgentsIcon {...toolbarIconProps} className="size-4" />
-    </IconButton>
-  );
-}
 
 /** Opens one of the Space's pages in the focused pane. */
 function openSpaceRoute(route: string) {
@@ -85,9 +71,6 @@ export function SpaceRowPreview({
         </IconButton>
         <IconButton label="Chat" onClick={onSignIn}>
           <MessagesSquare {...toolbarIconProps} className="size-4" />
-        </IconButton>
-        <IconButton label="Agents" onClick={onSignIn}>
-          <AgentsIcon {...toolbarIconProps} className="size-4" />
         </IconButton>
         <IconButton label="Library" onClick={onSignIn}>
           <Library {...toolbarIconProps} className="size-4" />
@@ -122,7 +105,6 @@ export function SpaceRow({
   alignment?: RowAlignment;
 }) {
   const space = useWindowSpace();
-  const chatShown = useMistyPanelStore((s) => s.chatOpen);
   const [dialog, setDialog] = useState<SpaceDialog>(null);
   const [error, setError] = useState("");
   const close = useCallback(() => setDialog(null), []);
@@ -134,10 +116,6 @@ export function SpaceRow({
       </div>
     );
   const base = `/spaces/${encodeURIComponent(space.id)}`;
-  const page = (to: "home" | "chat") => {
-    if (to === "chat") useMistyPanelStore.getState().show("chat");
-    else openSpaceRoute(`${base}/home`);
-  };
   const name = spaceNavigationName(space);
   const pageButton = (route: string, label: string, Icon: typeof House) => (
     <IconButton label={label} onClick={() => openSpaceRoute(`${base}/${route}`)}>
@@ -152,13 +130,10 @@ export function SpaceRow({
         data-browser-toolbar
         data-sidebar
       >
-        <IconButton label={`${space.name || "Space"} home`} onClick={() => page("home")}>
+        <IconButton label={`${space.name || "Space"} home`} onClick={() => openSpaceRoute(`${base}/home`)}>
           <House {...toolbarIconProps} className="size-4" />
         </IconButton>
-        <IconButton label="Chat" aria-pressed={chatShown} onClick={() => page("chat")}>
-          <MessagesSquare {...toolbarIconProps} className="size-4" />
-        </IconButton>
-        <AgentsPanelButton />
+        {pageButton("chat", "Chat", MessagesSquare)}
         {pageButton("library", "Library", Library)}
         <MemoryButton onOpen={() => openSpaceRoute(`${base}/memory`)} />
       </div>

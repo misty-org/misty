@@ -1,5 +1,6 @@
 import { subscribeAgentsInvocation as subscribeToAiInvocation } from "@/features/agents/AgentsRuntime";
-import { globalMistyApi } from "./globalMistyApi";
+import { adoptSignedOutAgents } from "@/features/agents/agentAccount";
+import { followAddress } from "@/features/ai-surface/localRunParts";
 import type { MistyState } from "./mistyState";
 import {
   applyGlobalInvocationEvent,
@@ -11,12 +12,12 @@ import {
 } from "./mistyStoreHelpers";
 import { settleRun } from "./settleRun";
 import { useCollaborationStore } from "@/features/agents/agentCollaboration";
-import { pendingServerDeletes } from "./pendingServerDeletes";
+import { localChats, markStoredChats } from "./localChats";
+import { syncLocalChats } from "./localChatSync";
 import { submissionEpoch } from "./mistySubmissionEpoch";
 
 /**
- * Loads the person's conversations from the server and re-attaches to a run still streaming.
- * `reconnect` keeps the open conversation; `expected` names the run to rejoin.
+ * Loads this device's chats and re-attaches to a run still going. `reconnect` keeps the open conversation; `expected` names the run to rejoin.
  */
 export function createLoadConversations(
   set: MistySet,
@@ -30,10 +31,19 @@ export function createLoadConversations(
       conversationsLoading: true,
     });
     try {
-      const response = await globalMistyApi.conversations("", (saved) => {
-        if (get().accountId !== accountId || get().working || get().conversations.length) return;
-        set({ conversations: saved.conversations.map(normalizeConversation) });
+      // Chats live on this device.
+      // Native code may ask the person first, which the chats on this account don't wait for.
+      void adoptSignedOutAgents(accountId).then((moved) => {
+        if (moved > 0 && get().accountId === accountId) void get().loadConversations(reconnect);
       });
+      const saved = await localChats.conversations(accountId).catch(() => []);
+      const local = saved.map(normalizeConversation);
+      markStoredChats(local);
+      if (get().accountId === accountId && !get().working && !get().conversations.length)
+        set({ conversations: local });
+      const response = {
+        conversations: await syncLocalChats(accountId, local, () => get().invocationId),
+      };
       if (get().accountId !== accountId) return;
       if ((get().working && !reconnect) || epoch !== submissionEpoch()) {
         set({
@@ -41,10 +51,9 @@ export function createLoadConversations(
         });
         return;
       }
-      void pendingServerDeletes.retry();
-      const conversations = response.conversations
-        .map(normalizeConversation)
-        .filter((conversation) => !pendingServerDeletes.has(conversation.id));
+      const conversations = response.conversations.map(normalizeConversation);
+      // What the sync returned is saved already.
+      markStoredChats(conversations);
       if (
         expected &&
         (expected.accountId !== accountId ||
@@ -114,13 +123,13 @@ export function createLoadConversations(
         const { conversation, message } = running;
         const invocationId = message.invocationId!;
         set({ working: true, invocationId, invocationConversationId: conversation.id });
-        // Replay the saved stream into an empty response so deltas are never duplicated.
+        // Replay what the run has said into an empty response, so deltas are never duplicated.
         patchConversationMessage(set, get, conversation.id, message.id, {
           content: "",
           activity: "Reconnecting to the task…",
         });
         replaceActiveGlobalInvocationStream(
-          subscribeToAiInvocation(`/ai/invocations/${encodeURIComponent(invocationId)}/events`, {
+          subscribeToAiInvocation(followAddress(invocationId), {
             onEvent: (event) => {
               if (
                 get().accountId !== accountId ||
@@ -139,6 +148,15 @@ export function createLoadConversations(
                   conversation.id,
                   () => void get().loadConversations(true),
                   () => get().working,
+                  {
+                    runId: invocationId,
+                    completed: event.type === "invocation.completed",
+                    waitingOnPerson:
+                      get()
+                        .conversations.find((c) => c.id === conversation.id)
+                        ?.messages.find((m) => m.id === message.id)?.appRequest?.state ===
+                      "pending",
+                  },
                 );
               if (event.type === "artifact.proposed" || event.type === "approval.required") {
                 patchConversationMessage(set, get, conversation.id, message.id, {

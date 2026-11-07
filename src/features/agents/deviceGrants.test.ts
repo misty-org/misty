@@ -14,7 +14,7 @@ vi.mock("./store/useAgentsStore", () => ({
   })),
 }));
 vi.mock("./store/useAgentDeviceStore", () => ({
-  ensureServerAgentDevice: vi.fn(async () => ({ id: "device_1" })),
+  ensureAgentDevice: vi.fn(async () => ({ id: "device_1" })),
 }));
 
 import { chatDeviceGrants, desktopDeviceGrants } from "./deviceGrants";

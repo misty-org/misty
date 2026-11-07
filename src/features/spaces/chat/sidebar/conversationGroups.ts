@@ -28,7 +28,7 @@ export function groupConversations(conversations: SpaceConversation[]): Conversa
 }
 /** A conversation is titled by its name; a DM by the other people in it. */
 export function conversationName(conversation: SpaceConversation, currentUserId?: string) {
-  if (conversation.kind === "dm" || conversation.kind === "direct") {
+  if (conversation.kind === "dm") {
     const others = conversation.participants.filter(
       (p) => p.user_id && p.user_id !== currentUserId,
     );

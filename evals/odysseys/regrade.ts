@@ -5,7 +5,7 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { judgeImagesFrom, judgeLanesFrom } from "./config.ts";
-import { judgeFromEnv } from "./judge-config.ts";
+import { judgeFromEnv, withAgentsEnv } from "./judge-config.ts";
 import { judgeTask } from "./judge.ts";
 import type { Step } from "./recorder.ts";
 import { judgeRecord, loadPass } from "./report.ts";
@@ -15,7 +15,7 @@ import { loadTasks, selectTasks } from "./tasks.ts";
 const argument = process.argv[2];
 if (!argument) throw new Error("Usage: npm run regrade -- <task folder>");
 const dir = resolve(argument);
-const judge = judgeFromEnv(process.env);
+const judge = judgeFromEnv(withAgentsEnv(process.env));
 const maxImages = judgeImagesFrom(process.env);
 const pass = loadPass(dirname(dir));
 const wanted = judgeRecord(judge, maxImages);

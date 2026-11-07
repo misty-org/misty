@@ -64,12 +64,13 @@ export class CursorCompanionTypedTurns {
     const generation = s.turn;
     s.invocationId = undefined;
     s.captures = [];
-    s.change({ visible: true, phase: "processing", error: undefined });
+    // Only what the talk shortcut started shows at the cursor; anything else answers in its chat.
+    s.change({ visible: voiceOwned, phase: "processing", error: undefined });
     const controller = new AbortController();
     s.abort = controller;
     try {
       // Every request at the cursor carries every display, the cursor's first
-      // (docs/agents/harness.md, Tool surface); the model judges what matters.
+      // the model judges what matters.
       // Without screen access the request still goes, with no screenshots.
       // The video in front, read alongside the screens; it never holds the turn up.
       const media = frontMediaContext();
@@ -137,7 +138,7 @@ export class CursorCompanionTypedTurns {
     s.invocationId = current.invocationId;
     s.submittedConversationId = current.activeConversationId;
     // A drawing in the reply is drawn at the cursor as it streams.
-    if (s.invocationId) s.sketch.follow(s.invocationId);
+    if (s.invocationId && voiceOwned) s.sketch.follow(s.invocationId);
     if (!s.invocationId) {
       s.owned = false;
       throw new Error(current.error || "The companion could not start. Please try again.");

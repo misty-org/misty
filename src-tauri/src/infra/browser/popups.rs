@@ -24,7 +24,7 @@ pub(super) fn provider_popup(
     }
     let _lifecycle = super::super::profile_data::popup_lifecycle_lease()?;
     let state = app.state::<BrowserSessionState>();
-    let (provider, profile, logical_profile, oauth_callback, origin_space_id, private) = {
+    let (provider, store, profile, oauth_callback, origin_space_id, private) = {
         let sessions = state.sessions.lock().ok()?;
         let source = sessions.get(source_id)?;
         let provider = source.profile_provider.clone();
@@ -36,8 +36,8 @@ pub(super) fn provider_popup(
         }
         (
             provider,
-            source.profile_id.clone(),
-            source.logical_profile_id.clone(),
+            source.store_id.clone(),
+            source.profile.clone(),
             source.oauth_callback.clone(),
             source.origin_space_id.clone(),
             source.private,
@@ -51,8 +51,8 @@ pub(super) fn provider_popup(
             url,
             features,
             provider,
+            store,
             profile,
-            logical_profile,
             oauth_callback,
             origin_space_id,
             private,
@@ -68,8 +68,8 @@ fn create_popup(
     url: &Url,
     features: tauri::webview::NewWindowFeatures,
     provider: Option<String>,
+    store: Option<String>,
     profile: Option<String>,
-    logical_profile: Option<String>,
     oauth_callback: Option<(
         super::super::browser_provider::OAuthCallback,
         std::time::Instant,
@@ -117,8 +117,8 @@ fn create_popup(
     {
         let mut sessions = state.sessions.lock().ok()?;
         let session = sessions.get_mut(&id)?;
-        session.profile_id = profile;
-        session.logical_profile_id = logical_profile;
+        session.store_id = store;
+        session.profile = profile;
         session.profile_provider = provider;
         session.popup_parent = agent_download_source.clone();
         session.provider_id = None;

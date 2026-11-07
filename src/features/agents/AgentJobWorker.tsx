@@ -1,11 +1,10 @@
-import { readAccountAuthToken } from "@/features/auth";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { useEffect, useState } from "react";
-import { useAuth } from "@/features/auth/AuthContext";
-import { DesktopAgentJobWorker } from "./worker";
-import { RuntimeDeliveryWorker } from "./runtimeDeliveries";
+import { useAgentAccountId } from "./agentAccount";
 import { DeviceEmbeddingWorker } from "./deviceEmbeddings";
 import { endAllHostedSessions } from "./hostedSessions";
+import { startLocalToolHost } from "./localTools/host";
+import { startLocalRunWork } from "./localTools";
 import { watchLocalExecutionForKeepAwake } from "./keepAwake";
 import { useLocalExecution } from "./localExecution";
 import { isHostWindow, onHostWindow } from "@/features/workspace/profileWindow";
@@ -29,27 +28,17 @@ function useHostWindow() {
   return host;
 }
 
+/** The work this computer owes its agents, in the one window that hosts it. An account isn't needed. */
 export function AgentJobWorker() {
-  const { user } = useAuth();
+  const accountId = useAgentAccountId();
   const host = useHostWindow();
 
   useEffect(() => {
-    if (!hasTauriInternals() || !host || !user?.id) return;
-    let canceled = false;
-    let worker: DesktopAgentJobWorker | null = null;
-    let runtime: RuntimeDeliveryWorker | null = null;
-    let embeddings: DeviceEmbeddingWorker | null = null;
-    void readAccountAuthToken().then((token) => {
-      if (canceled || !token) return;
-      worker = new DesktopAgentJobWorker();
-      worker.start(user.id);
-      // Agent runs themselves work on this computer's own runtime.
-      runtime = new RuntimeDeliveryWorker();
-      runtime.start(user.id);
-      // So do the vectors search and memory rank by.
-      embeddings = new DeviceEmbeddingWorker();
-      embeddings.start();
-    });
+    if (!hasTauriInternals() || !host) return;
+    const stopRunWork = startLocalRunWork();
+    // The vectors memory ranks by are made here too.
+    const embeddings = new DeviceEmbeddingWorker();
+    embeddings.start();
     // This computer stays awake while its own agent task runs.
     const unwatch = watchLocalExecutionForKeepAwake((listener) => {
       const running = (state: ReturnType<typeof useLocalExecution.getState>) =>
@@ -58,15 +47,19 @@ export function AgentJobWorker() {
       return useLocalExecution.subscribe((state) => listener(running(state)));
     });
     return () => {
-      canceled = true;
-      worker?.stop();
-      runtime?.stop();
-      embeddings?.stop();
+      embeddings.stop();
+      stopRunWork();
       unwatch();
       // The agent's own sessions end with this account here.
       void endAllHostedSessions();
     };
-  }, [host, user?.id]);
+  }, [host, accountId]);
+  // Once per page, whatever the account does: restarting this would abandon the calls it's running,
+  // and the account reads as signed out for a moment on every load.
+  useEffect(() => {
+    if (!hasTauriInternals() || !host) return;
+    return startLocalToolHost();
+  }, [host]);
   // Sessions it hosts show in the control island.
   return null;
 }

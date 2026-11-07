@@ -4,6 +4,7 @@ use super::*;
 
 mod placement;
 pub(super) use placement::*;
+pub(crate) use placement::stack_subtitles_panel;
 
 #[cfg(target_os = "macos")]
 pub(super) fn apply_macos_webview_theme(webview: &Webview, _value: &str) -> Result<(), String> {
@@ -150,7 +151,10 @@ pub(super) unsafe fn browser_stacking_is_correct(
 
 #[cfg(target_os = "macos")]
 pub(super) fn present_macos_webview(webview: &Webview) -> Result<(), String> {
-    position_macos_webview(webview, true)
+    position_macos_webview(webview, true)?;
+    // A new page lands on top of its siblings, the subtitles panel included.
+    stack_subtitles_panel(webview.app_handle(), webview.window().label());
+    Ok(())
 }
 
 /// Returns keyboard focus to a page that lost it to the app view, so typing continues where

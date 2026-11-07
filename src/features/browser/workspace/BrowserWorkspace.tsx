@@ -13,10 +13,9 @@ import { useEffect, useRef, useState } from "react";
 import { BrowserDownloadsButton } from "./BrowserDownloadsButton";
 import { BrowserFindBar } from "./BrowserFindBar";
 import { BrowserMenuTools } from "./BrowserMenuTools";
-import { BrowserAgentsButton, BrowserMistyButton } from "./BrowserMistyPanel";
+import { BrowserAgentsButton } from "./BrowserMistyPanel";
 import { BrowserNavigationButtons } from "./BrowserNavigationButtons";
 import { BrowserOmnibox } from "./BrowserOmnibox";
-import { BrowserPaneLayoutMenu } from "./BrowserPaneLayoutMenu";
 import {
   browserRuntimeCreated,
   browserRuntimeId,
@@ -152,7 +151,6 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceView }) {
     supportsSitePermissions() && /^https?:/.test(state.url) ? (
       <BrowserSiteInfo id={browserRuntimeId(tab)} url={state.url} active={active} />
     ) : null;
-  const paneLayout = <BrowserPaneLayoutMenu tabId={tab.id} />;
   const { paneFocused, sidebar } = useBrowserToolbarPlacement(tab.id);
   const navButtons = (
     <BrowserNavigationButtons
@@ -196,7 +194,6 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceView }) {
   );
   const sidebarTrailing = (
     <>
-      <ExtensionsToolbar tabId={browserRuntimeId(tab)} agentOwned={state.agentOwned} pinnedOnly />
       {siteInfo}
       {browserMenu(true)}
     </>
@@ -211,13 +208,12 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceView }) {
       trailing={sidebar ? sidebarTrailing : undefined}
     />
   );
-  // Tools for this page: extensions (when any are installed), then Agents beside Chat. Pane
-  // layout lives in the ⋯ menu here; the sidebar keeps its button beside back and forward.
+  // Tools for this page: extensions (when any are installed), then Agents. Pane
+  // layout lives in the ⋯ menu here; the sidebar has its own tools row.
   const toolButtons = (
     <>
       <ExtensionsToolbar tabId={browserRuntimeId(tab)} agentOwned={state.agentOwned} />
       <BrowserAgentsButton />
-      <BrowserMistyButton />
       <BrowserDownloadsButton
         suspensionReason={`browser-downloads:${browserRuntimeId(tab)}`}
         onShowAll={() => page.commands.openPage("downloads")}
@@ -250,7 +246,13 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceView }) {
               badges={state.agentOwned || isIncognitoWindow() ? badges : null}
               address={omnibox}
               addressRef={moreAnchor}
-              layout={paneLayout}
+              extensions={
+                <ExtensionsToolbar
+                  tabId={browserRuntimeId(tab)}
+                  agentOwned={state.agentOwned}
+                  pinnedOnly
+                />
+              }
             />
           ) : null}
         </>

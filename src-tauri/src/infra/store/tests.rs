@@ -77,7 +77,6 @@ fn migration_18_keeps_the_device_id_and_drops_what_is_no_longer_kept() {
     assert_eq!(moved, ["profile-collections:a"]);
     for table in [
         "local_agent_settings",
-        "agent_chats",
         "agent_file_grants",
         "agent_file_manifests",
         "explorer_library",

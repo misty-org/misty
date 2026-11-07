@@ -23,11 +23,11 @@ pub(super) fn record_request(
         session.provider_id = request.provider_id.clone();
         session.private = request.private;
         session.agent_run_id = request.agent_run_id.clone();
-        if request.profile_id.is_some() {
-            session.profile_id = request.profile_id.clone();
+        if request.store_id.is_some() {
+            session.store_id = request.store_id.clone();
         }
         // Incognito pages keep no profile in what the renderer and agents observe.
-        session.logical_profile_id = (!request.private).then(|| profile.to_owned());
+        session.profile = (!request.private).then(|| profile.to_owned());
         if request.profile_provider_id.is_some() || request.provider_id.is_some() {
             session.profile_provider = request
                 .profile_provider_id
@@ -93,7 +93,7 @@ pub(super) fn adopt_existing(
 
 /// Debug builds only: with `MISTY_EVAL_EPHEMERAL_PAGES=1` every page opens in one temporary
 /// session for this run of the app, so benchmarks browse the live web with no saved
-/// sign-ins while the app itself stays signed in (docs/agents/evals/odysseys.md).
+/// sign-ins while the app itself stays signed in.
 pub(super) fn eval_ephemeral_session() -> Option<String> {
     let enabled = cfg!(debug_assertions)
         && std::env::var("MISTY_EVAL_EPHEMERAL_PAGES").is_ok_and(|value| value == "1");

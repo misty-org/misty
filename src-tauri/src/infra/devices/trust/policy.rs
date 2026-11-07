@@ -40,37 +40,3 @@ pub fn forget_after_removal() {
         current.save()
     });
 }
-
-/// A device job's grant, checked before this device acts: signed by this
-/// device itself, naming it, covering the scope and the operation, and
-/// unexpired. An agent run works on the device the person sent it from, so a
-/// grant another device signed is refused.
-pub fn verify_job_grant(
-    record: &SignedRecord,
-    scope_id: &str,
-    capability: &str,
-) -> ApiResult<RunGrant> {
-    let denied = || ApiError::Message("device_grant_invalid".to_owned());
-    let guard = state().lock().map_err(lock_error)?;
-    let current = guard.as_ref().ok_or_else(denied)?;
-    let own_id = current.file.server_device_id.clone().ok_or_else(denied)?;
-    let requester = RunGrant::claimed_requester(record).ok_or_else(denied)?;
-    if requester != own_id {
-        return Err(denied());
-    }
-    let own_key = crate::infra::devices::identity::DeviceIdentity::load(
-        &current.file.account_id,
-        &current.file.local_device_id,
-    )
-    .map_err(|_| denied())?
-    .public_key();
-    let grant = RunGrant::verify(record, &own_key, now()).ok_or_else(denied)?;
-    if grant.account_id != current.file.account_id
-        || grant.requester_device_id != own_id
-        || grant.target_device_id != own_id
-        || !grant.allows(scope_id, capability)
-    {
-        return Err(denied());
-    }
-    Ok(grant)
-}

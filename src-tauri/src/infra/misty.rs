@@ -1,22 +1,10 @@
 use crate::app::runtime::MistyRuntime;
-use crate::infra::file_access::fs;
 use crate::infra::paths;
 use serde::{Deserialize, Serialize};
-use std::{
-    path::{Path, PathBuf},
-    sync::Mutex,
-};
+use std::sync::Mutex;
 
 #[derive(Debug, Serialize)]
 pub struct NativeSystemInfo {
-    os: String,
-    arch: String,
-    misty_home: String,
-    install_dir: String,
-    legacy_install_dir: String,
-    db_path: String,
-    setup_path: String,
-    installed_version: Option<String>,
     current_user: Option<CurrentUser>,
 }
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -39,8 +27,9 @@ struct StoredSession {
 static SESSION_LOCK: Mutex<()> = Mutex::new(());
 
 fn session_store() -> Result<super::store::Store, String> {
-    misty_home_dir()
-        .map(|home| super::store::Store::at(home.join(".local").join("data").join("misty.db")))
+    paths::misty_home_dir()
+        .map(|home| super::store::Store::in_home(&home))
+        .ok_or_else(|| "Could not resolve Misty data directory".to_string())
 }
 
 fn read_session() -> StoredSession {
@@ -75,8 +64,9 @@ fn write_session(session: &StoredSession) -> Result<(), String> {
 }
 
 fn session_info() -> Result<NativeSystemInfo, String> {
-    let stored = read_session();
-    build_system_info(stored.user)
+    Ok(NativeSystemInfo {
+        current_user: read_session().user,
+    })
 }
 
 /// Async so the file work never runs on the UI thread.
@@ -100,7 +90,7 @@ pub async fn sign_out_misty(
     blocking(|| {
         let _guard = SESSION_LOCK.lock().map_err(|_| "Misty session is busy.")?;
         write_session(&StoredSession::default())?;
-        build_system_info(None)
+        Ok(NativeSystemInfo { current_user: None })
     })
     .await
 }
@@ -113,62 +103,6 @@ pub async fn save_authenticated_user(user: CurrentUser) -> Result<NativeSystemIn
         session_info()
     })
     .await
-}
-
-fn build_system_info(current_user: Option<CurrentUser>) -> Result<NativeSystemInfo, String> {
-    let home = misty_home_dir()?;
-    let install_dir = misty_bin_dir()?;
-    let legacy_install_dir = legacy_misty_bin_dir()?;
-    let db_path = misty_db_path()?;
-    let setup_path = std::env::current_exe()
-        .unwrap_or_else(|_| PathBuf::from("Misty"))
-        .display()
-        .to_string();
-    let installed_version = read_installed_version(&home)?;
-
-    Ok(NativeSystemInfo {
-        os: std::env::consts::OS.to_string(),
-        arch: std::env::consts::ARCH.to_string(),
-        misty_home: home.display().to_string(),
-        install_dir: install_dir.display().to_string(),
-        legacy_install_dir: legacy_install_dir.display().to_string(),
-        db_path: db_path.display().to_string(),
-        setup_path,
-        installed_version,
-        current_user,
-    })
-}
-
-fn misty_home_dir() -> Result<PathBuf, String> {
-    paths::misty_home_dir().ok_or_else(|| "Could not resolve Misty data directory".to_string())
-}
-
-fn misty_bin_dir() -> Result<PathBuf, String> {
-    misty_home_dir().map(|home| home.join(".local").join("bin"))
-}
-
-fn legacy_misty_bin_dir() -> Result<PathBuf, String> {
-    misty_home_dir().map(|home| home.join("local").join("bin"))
-}
-
-fn misty_db_path() -> Result<PathBuf, String> {
-    misty_home_dir().map(|home| home.join(".local").join("data").join("misty.db"))
-}
-
-fn installed_version_path(home: &Path) -> PathBuf {
-    home.join(".version")
-}
-
-fn read_installed_version(home: &Path) -> Result<Option<String>, String> {
-    let path = installed_version_path(home);
-    if !fs::exists(&path) {
-        return Ok(None);
-    }
-    let version = fs::read_to_string(&path)
-        .map_err(|error| format!("Could not read installed Misty version: {error}"))?
-        .trim()
-        .to_string();
-    Ok((!version.is_empty()).then_some(version))
 }
 
 #[cfg(test)]

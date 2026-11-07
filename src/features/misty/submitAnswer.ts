@@ -1,4 +1,5 @@
 import { turnModes } from "@/features/agents/agentCollaboration";
+import { loadLocalModes } from "@/features/agents/localRun";
 import { settleLocalExecution } from "@/features/agents/localExecution";
 import { thinkingEffort, thinkingMode } from "@/features/agents/thinkingMode";
 import { awaitConversationTitle, openTurn } from "./conversationTurn";
@@ -166,13 +167,14 @@ export function createSubmitAnswer(set: MistySet, get: MistyGet): MistyState["su
     const startsConversation = !get()
       .conversations.find((c) => c.id === conversationId)
       ?.messages.some((message) => !isEcho(message));
+    if (!startsConversation) await loadLocalModes(accountId, conversationId).catch(() => undefined);
     const modes = turnModes(conversationId, startsConversation);
-    const permissionMode = modes.permissionMode;
+    const permissionMode = companion?.permissionMode ?? modes.permissionMode;
     // The companion in Teach mode sends every turn as a lesson step.
     const collaborationMode = companion?.collaborationMode ?? modes.collaborationMode;
     echo.settle(conversationId);
     // The server names a new conversation with a separate model call; until then its title is a skeleton.
-    if (startsConversation && !companion?.continuation)
+    if (startsConversation && !companion?.continuation && !companion?.schedule)
       awaitConversationTitle(conversationId, normalized, normalized.slice(0, 56));
     updateConversation(set, get, conversationId, (conversation) =>
       openTurn(conversation, {
@@ -182,6 +184,7 @@ export function createSubmitAnswer(set: MistySet, get: MistyGet): MistyState["su
         isEcho,
         echoed: echo.echoed,
         continuation: Boolean(companion?.continuation),
+        keepTitle: Boolean(companion?.schedule),
         reasoningEffort: thinkingEffort(requestedThinking),
       }),
     );

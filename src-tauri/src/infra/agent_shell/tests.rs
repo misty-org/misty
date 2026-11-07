@@ -27,6 +27,7 @@ fn scene() -> Scene {
     fs::write(folder.join("a.txt"), "keep").unwrap();
     fs::write(folder.join("sub/b.txt"), "keep").unwrap();
     fs::write(folder.join(".env"), "TOKEN=1").unwrap();
+    fs::write(folder.join("agents.env"), "TOKEN=1").unwrap();
     fs::write(outside.join("o.txt"), "keep").unwrap();
     Scene { _temp: temp, misty, folder, outside }
 }
@@ -128,7 +129,7 @@ async fn write_access_adds_and_edits_but_never_deletes() {
 async fn secret_files_stay_closed_even_in_a_shared_folder() {
     let scene = scene();
     let folder = Some((scene.folder.as_path(), true));
-    for command in ["cat shared-folder/.env", "echo x > shared-folder/.env"] {
+    for command in ["cat shared-folder/.env", "echo x > shared-folder/.env", "cat shared-folder/agents.env"] {
         let outcome = shell(&scene, "chat", command, folder).await;
         assert_ne!(outcome.exit_code, Some(0), "{command}");
     }

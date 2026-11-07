@@ -1,5 +1,4 @@
 import { WorkflowsPage } from "./WorkflowsPage";
-import { AgentMentionsPage } from "./AgentMentionsPage";
 import { IntegrationsPage } from "../apps/IntegrationsPage";
 
 export function AgentWorkspaceCatalog({
@@ -11,7 +10,7 @@ export function AgentWorkspaceCatalog({
 }: {
   agentName: string;
   agentId: string;
-  page: "workflows" | "integrations" | "mentions";
+  page: "workflows" | "integrations";
   onUse(prompt: string): void;
   onConversation(id: string): void;
   onStartWork(action: () => void): void;
@@ -20,9 +19,7 @@ export function AgentWorkspaceCatalog({
     <div className={`agent-studio-pages ${page}`}>
       {/* Keyed so each page starts at the top. */}
       <div key={page} className="agent-studio-page-scroll">
-        {page === "mentions" ? (
-          <AgentMentionsPage key={agentId} agentId={agentId} />
-        ) : page === "integrations" ? (
+        {page === "integrations" ? (
           <IntegrationsPage
             key={agentId}
             agentId={agentId}

@@ -1,6 +1,9 @@
 import { create } from "zustand";
+import { setRunStateAccount } from "../localTools/runState/documents";
 import { collaborationApi } from "./api";
 import { upsertChecklist } from "./checklists";
+import { upsertQuestionSet, withVersion } from "./storeLists";
+import { continueGoalAfterRun, type LocalRunEnd } from "./localApi";
 import type {
   AgentGoal,
   AgentPlan,
@@ -67,41 +70,19 @@ interface CollaborationStore {
   ): Promise<string | undefined>;
   /**
    * After a run ends, looks for the server's goal continuation and attaches to
-   * it. `reconnect` reloads conversations and subscribes to running work.
+   * it. `reconnect` reloads conversations and subscribes to running work. With the chat's state on
+   * this computer, the goal's next turn starts here instead, from what `finished` says about the run.
    */
-  afterRunSettled(conversationId: string, reconnect: () => void, working: () => boolean): void;
+  afterRunSettled(
+    conversationId: string,
+    reconnect: () => void,
+    working: () => boolean,
+    finished?: LocalRunEnd,
+  ): void;
 }
 
 const loading = new Map<string, Promise<ConversationCollaboration | undefined>>();
 const polls = new Map<string, Array<ReturnType<typeof setTimeout>>>();
-
-/** The plan's history with this version current and earlier ones superseded. */
-function withVersion(history: ConversationCollaboration["planHistory"], plan: AgentPlan) {
-  const entry = {
-    id: plan.id,
-    version: plan.version,
-    author: plan.author,
-    title: plan.plan.title,
-    state: plan.state,
-    createdAt: plan.createdAt,
-  };
-  return [
-    entry,
-    ...history
-      .filter((item) => item.id !== plan.id)
-      .map((item) =>
-        item.version < plan.version && (item.state === "proposed" || item.state === "approved")
-          ? { ...item, state: "superseded" as const }
-          : item,
-      ),
-  ].slice(0, 10);
-}
-
-function upsertQuestionSet(sets: AgentQuestionSet[], set: AgentQuestionSet) {
-  return [set, ...sets.filter((item) => item.id !== set.id)]
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-    .slice(0, 20);
-}
 
 export const useCollaborationStore = create<CollaborationStore>((set, get) => {
   const patch = (
@@ -141,6 +122,7 @@ export const useCollaborationStore = create<CollaborationStore>((set, get) => {
     },
     setAccount(accountId) {
       if (accountId === get().accountId) return;
+      setRunStateAccount(accountId);
       loading.clear();
       for (const timers of polls.values()) timers.forEach((timer) => clearTimeout(timer));
       polls.clear();
@@ -226,7 +208,11 @@ export const useCollaborationStore = create<CollaborationStore>((set, get) => {
     },
     async answer(questionSet, answers) {
       const accountId = get().accountId;
-      const result = await collaborationApi.answer(questionSet.id, answers);
+      const result = await collaborationApi.answer(
+        questionSet.id,
+        answers,
+        questionSet.conversationId,
+      );
       if (!sameAccount(accountId)) return undefined;
       patch(questionSet.conversationId, (current) => ({
         questionSets: upsertQuestionSet(current.questionSets, result.questionSet),
@@ -259,34 +245,18 @@ export const useCollaborationStore = create<CollaborationStore>((set, get) => {
       patch(goal.conversationId, () => ({ goal: status === "cleared" ? null : result.goal }));
       return result.prompt;
     },
-    afterRunSettled(conversationId, reconnect, working) {
+    afterRunSettled(conversationId, reconnect, working, finished) {
       if (!conversationId) return;
       const accountId = get().accountId;
-      polls.get(conversationId)?.forEach((timer) => clearTimeout(timer));
-      // The server starts a continuation once the finished run settles; look a
-      // few times, then stop. Questions and plans also refresh here.
-      const timers = [1_500, 4_000, 9_000].map((delay) =>
-        setTimeout(() => {
+      void (
+        finished ? continueGoalAfterRun(accountId, conversationId, finished) : Promise.resolve()
+      )
+        .catch(() => undefined)
+        .then((prompt) => {
           if (!sameAccount(accountId)) return;
-          void get()
-            .load(conversationId)
-            .then((state) => {
-              if (!state || !sameAccount(accountId)) return;
-              const stop = () => {
-                polls.get(conversationId)?.forEach((timer) => clearTimeout(timer));
-                polls.delete(conversationId);
-              };
-              // Only a pursued goal continues on its own; nothing else to wait for.
-              if (state.goal?.status !== "pursuing" && !state.runningInvocationId) return stop();
-              if (state.runningInvocationId && !working()) {
-                polls.get(conversationId)?.forEach((timer) => clearTimeout(timer));
-                polls.delete(conversationId);
-                reconnect();
-              }
-            });
-        }, delay),
-      );
-      polls.set(conversationId, timers);
+          void get().load(conversationId);
+          if (prompt) get().queueTurn(conversationId, prompt);
+        });
     },
   };
 });

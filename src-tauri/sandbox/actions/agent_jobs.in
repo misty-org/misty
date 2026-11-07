@@ -1,5 +1,5 @@
 // Every job an agent can ask this computer to run. A job's name is the action, and anything not on
-// this list is refused natively, however it arrives (docs/plans/app-permissions.md).
+// this list is refused natively, however it arrives.
 &[
     "bookmark.add",
     "bookmark.list",

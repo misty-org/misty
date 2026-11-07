@@ -1,4 +1,5 @@
 import { spaceAgentsApi, type SpaceAgent } from "@/api/spaces/space-agents";
+import { usePersonalAgentsStore } from "@/features/agents/personalAgentsStore";
 import { setItemVisibility, type ItemVisibility } from "@/api/spaces/visibility";
 import { useCallback, useEffect, useState } from "react";
 
@@ -35,7 +36,11 @@ export function useSpaceAgentMembers(spaceId: string) {
     error,
     /** Brings one of your agents into this Space. */
     bring: (agentId: string) =>
-      change(() => spaceAgentsApi.add(spaceId, agentId), "That agent couldn’t be added."),
+      change(() => {
+        // A Space sees the agent's name, and nothing else about it.
+        const mine = usePersonalAgentsStore.getState().agents.find((agent) => agent.id === agentId);
+        return spaceAgentsApi.add(spaceId, agentId, mine?.name ?? "");
+      }, "That agent couldn’t be added."),
     /** Takes an agent out; its owner or the Space's owner may. */
     remove: (agentId: string) =>
       change(() => spaceAgentsApi.remove(spaceId, agentId), "That agent couldn’t be removed."),

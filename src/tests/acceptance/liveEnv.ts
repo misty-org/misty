@@ -1,17 +1,18 @@
 import { existsSync, readFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 
 /**
- * Live acceptance runs read the same development environment the local server
- * uses, without printing it. Process variables take precedence.
+ * Live acceptance runs read the benchmark keys, without printing them. Process
+ * variables take precedence.
  */
-const envFiles = ["../misty-server/.env/dev/integrations/ai.env"];
+const envFiles = [join(homedir(), ".misty/.env/client/agents.env")];
 
 function fileValues(): Record<string, string> {
   const values: Record<string, string> = {};
   for (const file of envFiles) {
-    const path = new URL(`../../../${file}`, import.meta.url);
-    if (!existsSync(path)) continue;
-    for (const line of readFileSync(path, "utf8").split("\n")) {
+    if (!existsSync(file)) continue;
+    for (const line of readFileSync(file, "utf8").split("\n")) {
       const match = /^([A-Z0-9_]+)=(.*)$/.exec(line.trim());
       if (match) values[match[1]] = match[2].replace(/^(['"])(.*)\1$/, "$2");
     }

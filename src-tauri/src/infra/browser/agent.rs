@@ -7,13 +7,28 @@ use operations::{request_browser, type_browser, visual_browser};
 
 #[tauri::command]
 pub async fn browser_agent_execute(
+    caller: Webview,
     app: AppHandle,
     state: State<'_, BrowserSessionState>,
     request: BrowserAgentExecuteRequest,
 ) -> Result<Value, String> {
+    // An incognito window has the rest of this command's set, for browsing; agents aren't part of it.
+    if !crate::infra::profile_windows::is_person_window(caller.label()) {
+        return Err("Only a profile's window can run agents.".to_owned());
+    }
+    execute_agent_request(app, state, request).await
+}
+
+pub(crate) async fn execute_agent_request(
+    app: AppHandle,
+    state: State<'_, BrowserSessionState>,
+    mut request: BrowserAgentExecuteRequest,
+) -> Result<Value, String> {
     if !is_browser_capability(&request.operation) {
         return Err("Unsupported browser agent operation.".to_owned());
     }
+    let store = app.state::<crate::app::runtime::MistyRuntime>().environment.store();
+    request.policy = crate::infra::agent_runtime::tool_gate::page_policy(&store, request.policy_call.as_deref());
     super::super::agents::workspace::authorize_scope(
         &app,
         &request.scope_id,
@@ -61,7 +76,7 @@ pub async fn browser_agent_execute(
             .map_err(|error| error.to_string())?;
         // Nothing reaches a blocked site: the device refuses before any input.
         if let Some(reason) =
-            page_agent::site_blocked(&url, &request.site_blocks.clone().unwrap_or_default())
+            page_agent::site_blocked(&url, &request.policy.site_blocks.clone().unwrap_or_default())
         {
             return Err(reason);
         }
@@ -106,6 +121,10 @@ pub async fn browser_agent_execute(
                 .ok_or_else(|| "Browser tab is not running.".to_owned())?;
             let previous = view.url().map_err(|error| error.to_string())?;
             let target = external_url(url)?;
+            // A program builds addresses as it runs, so each is judged as it opens.
+            if let Some(active) = request.policy.call.as_ref().filter(|call| call.tool == "browser.run") {
+                crate::infra::agent_runtime::tool_gate::program_opens(&app, &store, active, url).await?;
+            }
             let snapshot = request.input["includeSnapshot"] != false;
             let mark = if snapshot {
                 page_agent::mark_document(&app, &id).await

@@ -1,4 +1,4 @@
-//! The companion's spoken conversation, on the desktop's own models (docs/agents/runtime.md). One
+//! The companion's spoken conversation, on the desktop's own models. One
 //! session is one push-to-talk session in the protocol `companionConversation.ts` speaks: a turn is
 //! heard (audio, or typed text), answered on the fast model, which may hand work to the app as a tool
 //! call, and spoken sentence by sentence. Context and task status come from the app, which keeps the

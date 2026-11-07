@@ -2,6 +2,9 @@ import { invoke } from "@/native/invoke";
 import { useCallback, useEffect, useState } from "react";
 import { addModelKey, signInToOpenRouter, type AddedKey } from "./modelAccounts";
 
+/** Fires in this window when a saved key changes, so what depends on one can look again. */
+export const modelKeysChangedEvent = "misty:model-keys-changed";
+
 /**
  * Provider keys live in the device keychain, written and read only by the native app.
  * The renderer learns which providers have a key, never the key itself.
@@ -26,6 +29,7 @@ export function useSavedModelKeys() {
     setError("");
     try {
       setSaved(await work());
+      window.dispatchEvent(new CustomEvent(modelKeysChangedEvent));
       return true;
     } catch (cause) {
       setError(typeof cause === "string" ? cause : "The keychain couldn't be reached.");

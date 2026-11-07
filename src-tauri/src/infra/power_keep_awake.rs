@@ -1,5 +1,5 @@
 //! Keeps this computer from idling to sleep while an agent works on it
-//! (docs/sync/devices.md). Only idle system sleep is held:
+//! Only idle system sleep is held:
 //! the display may still turn off, and closing a laptop lid still sleeps it.
 
 /// Holds or releases the keep-awake assertion. Repeating a call is harmless.

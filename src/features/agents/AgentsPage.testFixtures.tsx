@@ -1,3 +1,5 @@
+import type * as Actual1 from "./agentAccount";
+import type * as Actual2 from "@/features/misty/localChats";
 import "./components/agentCloudAvatars.testFixtures";
 import type * as AgentsRuntimeModule from "./AgentsRuntime";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
@@ -23,6 +25,21 @@ const fixture = vi.hoisted(() => ({
   },
 }));
 vi.mock("@/features/auth", () => ({ useAuth: () => ({ user: { id: "owner" } }) }));
+vi.mock("./agentAccount", async (original) => ({
+  ...(await original<typeof Actual1>()),
+  useAgentAccountId: () => "owner",
+}));
+// A chat's load reads misty.db, which holds what the test put in the store.
+vi.mock("@/features/misty/localChats", async (original) => {
+  const actual = await original<typeof Actual2>();
+  return {
+    ...actual,
+    localChats: {
+      ...actual.localChats,
+      conversations: async () => (await import("@/features/misty/useMistyStore")).useMistyStore.getState().conversations,
+    },
+  };
+});
 vi.mock("./AgentsRuntime", async (original) => ({
   ...(await original<typeof AgentsRuntimeModule>()),
   useAgentsAuth: () => ({ user: { id: "owner" } }),
@@ -39,7 +56,7 @@ vi.mock("./personalAgentsStore", () => ({
     load: fixture.load,
   }),
 }));
-vi.mock("@/api/agents/native", () => ({
+vi.mock("@/features/agents/personalAgentsApi", () => ({
   personalAgentsApi: {
     save: fixture.save,
     apps: async () => ({ app_ids: [] }),

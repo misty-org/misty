@@ -1,10 +1,10 @@
 use super::*;
-use crate::runtime::model_tools::McpRemoteTool;
+use crate::runtime::model_tools::CatalogTool;
 
 fn catalog_of(names: &[&str]) -> ModelCatalog {
     let descriptors = names
         .iter()
-        .map(|name| McpRemoteTool {
+        .map(|name| CatalogTool {
             name: (*name).to_owned(),
             description: (*name).to_owned(),
             input_schema: RawJson::from_text(r#"{"type":"object","properties":{}}"#.to_owned()).unwrap(),

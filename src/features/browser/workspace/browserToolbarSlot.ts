@@ -9,19 +9,19 @@ import { create } from "zustand";
 export const useBrowserToolbarSlot = create<{
   nav: HTMLElement | null;
   top: HTMLElement | null;
-  /** The sidebar footer's slot for the pane layout menu. */
-  foot: HTMLElement | null;
+  /** The tools row above the address field, where a browser page puts its pinned extensions. */
+  tools: HTMLElement | null;
   /** How many browser pages are filling the nav slot; the stand-in shows only at zero. */
   navClaims: number;
   setNav(slot: HTMLElement | null): void;
   setTop(slot: HTMLElement | null): void;
-  setFoot(slot: HTMLElement | null): void;
+  setTools(slot: HTMLElement | null): void;
   /** A page takes the nav slot; the returned function gives it back. */
   claimNav(): () => void;
 }>((set) => ({
   nav: null,
   top: null,
-  foot: null,
+  tools: null,
   navClaims: 0,
   claimNav: () => {
     set((state) => ({ navClaims: state.navClaims + 1 }));
@@ -34,5 +34,5 @@ export const useBrowserToolbarSlot = create<{
   },
   setNav: (nav) => set({ nav }),
   setTop: (top) => set({ top }),
-  setFoot: (foot) => set({ foot }),
+  setTools: (tools) => set({ tools }),
 }));

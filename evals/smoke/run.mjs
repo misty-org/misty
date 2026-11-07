@@ -1,5 +1,7 @@
 // Sending a real message from the app's own store, and reading back what the mock model received.
 import { execSync } from "node:child_process";
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { bridge, inWindow } from "./bridge.mjs";
 
 const mockPort = process.env.MISTY_SMOKE_MOCK_PORT ?? 18098;
@@ -7,8 +9,8 @@ const mockAddress = `http://127.0.0.1:${mockPort}`;
 export const mockBase = `${mockAddress}/v1`;
 
 export const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
-export const finish = (id = undefined) => ({
-  tools: [{ id, name: "agent_finish", args: { outcome: "completed", summary: "The smoke step is done.", remaining: [] } }],
+export const finish = (id = undefined, summary = "The smoke step is done.") => ({
+  tools: [{ id, name: "agent_finish", args: { outcome: "completed", summary, remaining: [] } }],
 });
 export const shell = (id, command, extra = {}) => ({ ...extra, tools: [{ id, name: "shell_run", args: { command } }] });
 export const findInWorkspaces = (root, name) =>
@@ -93,7 +95,7 @@ export function sendInChat(prompt) {
   );
 }
 
-/** The run's state on the server, as the app reads it. */
+/** The run's state on this computer, as the app reads it. */
 export function runState(invocationId) {
   return inWindow(
     `const { aiSurfaceApi } = await __smoke.module("features/ai-surface/api.ts");
@@ -121,3 +123,42 @@ export async function windowErrors(window) {
 
 /** What the last turn's tools answered, as one text. */
 export const output = async () => (await mock.toolResults()).map((result) => result.content).join("\n");
+
+/** Waits for the mock to hold a reply, and says how many it holds. */
+export async function untilHeld(timeoutMs = 40_000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline && !(await mock.held())) await sleep(150);
+  return mock.held();
+}
+
+/** Stops the turn going in the open chat, as the Stop button does. */
+export const cancelTurn = () =>
+  inWindow(
+    `const misty = (await __smoke.module("features/misty/useMistyStore.ts")).useMistyStore;
+     await misty.getState().cancelResponse();
+     return true;`,
+  );
+
+/** A reply in a chat, by the run that wrote it, as the app holds it. */
+export const replyOf = (conversationId, invocationId) =>
+  inWindow(
+    `const misty = (await __smoke.module("features/misty/useMistyStore.ts")).useMistyStore;
+     const chat = misty.getState().conversations.find((item) => item.id === ${JSON.stringify(conversationId)});
+     return chat?.messages.find((message) => message.role === "assistant" && message.invocationId === ${JSON.stringify(invocationId)}) ?? null;`,
+  );
+
+/** Waits until the store has settled the turn it's following, so the chat shows how it ended. */
+export const settled = () =>
+  inWindow(
+    `const misty = (await __smoke.module("features/misty/useMistyStore.ts")).useMistyStore;
+     await __smoke.until(() => !misty.getState().working, "the turn to settle", 30000);
+     return true;`,
+    { timeoutMs: 40_000 },
+  );
+
+/** Everything the app sent the throwaway server, from line `since` of its request log on. */
+export function serverRequests(scratch, since = 0) {
+  const file = resolve(scratch, "stack/server-requests.jsonl");
+  if (!existsSync(file)) return [];
+  return readFileSync(file, "utf8").split("\n").filter(Boolean).slice(since).map((line) => JSON.parse(line));
+}

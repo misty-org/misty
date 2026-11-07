@@ -1,9 +1,9 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { liveAcceptanceEnabled } from "./liveEnv";
-import { MistyClient, seedSpaceMember, type InvocationRun } from "./mistyClient";
+import { defaultAgentId, MistyClient, seedSpaceMember, type InvocationRun } from "./mistyClient";
 import { writeAcceptanceReport } from "./report";
 
-// Phases 1–3, live: the acceptance prompts from docs/agents/architecture.md
+// Phases 1–3, live: the acceptance prompts
 // BRIEF.md, sent to the local development server (its runtime, model and
 // Composio project) as a fresh account with known notes and a team chat.
 // Phase 4 runs separately in screenAct.acceptance.ts.
@@ -50,7 +50,7 @@ function record(name: string, prompt: string, run: InvocationRun) {
 }
 
 async function ask(name: string, prompt: string, options: Record<string, unknown> = {}) {
-  const run = await client.invoke(prompt, { agent_id: agentId, ...options });
+  const run = await client.invoke(prompt, { agentId, ...options });
   record(name, prompt, run);
   return run;
 }
@@ -58,8 +58,7 @@ async function ask(name: string, prompt: string, options: Record<string, unknown
 describe.skipIf(!liveAcceptanceEnabled)("acceptance prompts on the local server", () => {
   beforeAll(async () => {
     client = await MistyClient.register();
-    const agents = await client.json<{ agents: Array<{ id: string }> }>("/misty/agents");
-    agentId = agents.agents[0]?.id ?? "";
+    agentId = await defaultAgentId();
     const personal = await space("Personal");
     const launch = await space("Launch team");
     await note(personal, "Grocery list");
@@ -95,7 +94,7 @@ describe.skipIf(!liveAcceptanceEnabled)("acceptance prompts on the local server"
     const run = await ask(
       "phase1-update-note",
       "update the note I just read: add a line saying Book the venue.",
-      { conversation_id: read.conversationId },
+      { conversationId: read.conversationId },
     );
     expect(run.terminal).toBe("invocation.completed");
     expect(ran(run, "note_update")).toBe(true);

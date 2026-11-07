@@ -3,8 +3,8 @@
 use super::*;
 
 pub fn up(workspace: &Workspace, build: bool, verbose: bool) -> Result<()> {
-    environment::check(workspace, Target::Dev)?;
-    let devices = environment::root(workspace, Target::Dev).join("crypto/devices.env");
+    environment::check(workspace)?;
+    let devices = environment::root(workspace).join("crypto/devices.env");
     if ensure_connected_devices_development_config(&devices)? {
         println!("Configured Connected Devices for local development.");
     }
@@ -35,7 +35,7 @@ pub fn up(workspace: &Workspace, build: bool, verbose: bool) -> Result<()> {
 }
 
 pub fn initialize_development_secrets(workspace: &Workspace) -> Result<()> {
-    let devices = environment::root(workspace, Target::Dev).join("crypto/devices.env");
+    let devices = environment::root(workspace).join("crypto/devices.env");
     if ensure_connected_devices_development_config(&devices)? {
         println!("Configured Connected Devices for local development.");
     }
@@ -161,7 +161,7 @@ pub fn logs(workspace: &Workspace, service: Option<&str>, follow: bool, tail: u3
 }
 
 pub fn validate_development_secrets(workspace: &Workspace) -> Result<()> {
-    let values = environment::read(workspace, Target::Dev)?;
+    let values = environment::read(workspace)?;
     let key = required_map_value(&values, DEVICE_TICKET_PRIVATE_KEY)?;
     SigningKey::from_pkcs8_der(&STANDARD.decode(key)?).context("invalid device signing key")?;
     let pepper = STANDARD.decode(required_map_value(&values, DEVICE_PAIRING_PEPPER)?)?;
@@ -187,7 +187,7 @@ pub fn validate_development_secrets(workspace: &Workspace) -> Result<()> {
 }
 
 pub(super) fn diagnostic_secrets(workspace: &Workspace) -> Result<Vec<String>> {
-    Ok(environment::effective(workspace, Target::Dev)?
+    Ok(environment::effective(workspace)?
         .into_iter()
         .filter(|(name, _)| {
             ["TOKEN", "SECRET", "KEY", "PASSWORD", "PEPPER", "SALT"]
@@ -199,7 +199,7 @@ pub(super) fn diagnostic_secrets(workspace: &Workspace) -> Result<Vec<String>> {
 }
 
 pub fn deploy_development(workspace: &Workspace) -> Result<()> {
-    environment::check(workspace, Target::Dev)?;
+    environment::check(workspace)?;
     println!("Deploying development collaboration Worker…");
     development_compose()
         .args(["run", "--rm", "--no-deps", "--build", "setup", "deploy"])

@@ -1,6 +1,6 @@
 //! The browser benchmark's way into Misty's own browser (debug builds only).
 //!
-//! The Odysseys eval (evals/odysseys, docs/agents/evals/odysseys.md) runs a real
+//! The Odysseys eval runs a real
 //! model against real pages through it. With this bridge each task runs in a Misty tab, in the system
 //! webview (WKWebView on macOS, WebView2 on Windows), through the same agent
 //! path production uses: a native task lease, a grant for the tab, and
@@ -128,6 +128,9 @@ pub(crate) fn start_if_requested(app: &AppHandle) {
             .route("/processes", post(processes::processes))
             .route("/capture", post(pages::capture))
             .route("/run-grants", post(grants::run_grants))
+            .route("/run-follow", post(grants::run_follow))
+            .route("/run-record", post(grants::run_record))
+            .route("/run-cancel", post(grants::run_cancel))
             .route("/share-folder", post(grants::share_folder))
             .route("/allow-folder-changes", post(grants::allow_folder_changes))
             .route("/models", post(models::models))

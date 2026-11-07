@@ -51,10 +51,19 @@ pub(super) unsafe fn install_method_override(class: &AnyClass, selector: Sel, re
 }
 
 unsafe extern "C-unwind" fn pointer_event(this: &AnyObject, command: Sel, event: &NSEvent) {
+    let covered_by_panel = match pointer_at_panel(this as *const AnyObject as usize, event) {
+        PointerAtPanel::OwnInside => return call_original_pointer_event(this, command, event),
+        PointerAtPanel::OwnOutside => return,
+        PointerAtPanel::Covered => true,
+        PointerAtPanel::Elsewhere => false,
+    };
     let browser_root = browser_tracking_owners()
         .lock()
         .ok()
         .and_then(|owners| owners.get(&(this as *const AnyObject as usize)).copied());
+    if covered_by_panel && browser_root.is_some() {
+        return;
+    }
     if browser_root.is_some_and(|root| browser_is_below_renderer(root))
         && !notice_passes_event_to_page(event)
     {
@@ -64,6 +73,9 @@ unsafe extern "C-unwind" fn pointer_event(this: &AnyObject, command: Sel, event:
         .lock()
         .map(|owners| owners.contains(&(this as *const AnyObject as usize)))
         .unwrap_or(false);
+    if covered_by_panel && belongs_to_main {
+        return;
+    }
     if !belongs_to_main
         || !(browser_child_covers_event(event) || notice_hides_event_from_renderer(event))
     {

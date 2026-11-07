@@ -6,7 +6,7 @@ type SetupReason = "setup" | "device" | "tabs" | "wizard" | "rerun";
 
 /**
  * What asked for an account or for setup. Misty works as a full browser without an account;
- * anything that needs one goes to the welcome pages (docs/browser/no-account.md).
+ * anything that needs one goes to the welcome pages.
  */
 type SignInReason =
   "account" | "sync" | "space" | "invite" | "agents" | "expired" | SetupReason;

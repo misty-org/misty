@@ -11,7 +11,7 @@ const fixture = vi.hoisted(() => ({
 }));
 vi.mock("@/features/agents", () => ({
   agentsDeviceSnapshot: fixture.local,
-  ensureServerAgentDevice: fixture.register,
+  ensureAgentDevice: fixture.register,
 }));
 vi.mock("@/shared/platform/tauri", () => ({ hasTauriInternals: () => fixture.native }));
 vi.mock("@tauri-apps/api/window", () => ({ getCurrentWindow: () => ({ label: "main" }) }));

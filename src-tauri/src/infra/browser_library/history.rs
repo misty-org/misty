@@ -26,8 +26,8 @@ fn history_url(value: &str) -> Option<String> {
     Some(url.to_string())
 }
 
-pub(crate) fn profile_key(profile_id: Option<String>) -> String {
-    profile_id
+pub(crate) fn store_key(store: Option<String>) -> String {
+    store
         .filter(|value| !value.is_empty() && value.len() <= 128)
         .unwrap_or_else(|| "default".to_owned())
 }
@@ -36,7 +36,7 @@ pub(crate) fn profile_key(profile_id: Option<String>) -> String {
 fn window_key(webview: &tauri::Webview) -> Result<String, String> {
     let profile = crate::infra::profile_windows::profile_for_window(webview.window().label())
         .ok_or("This window has no profile.")?;
-    crate::infra::profile_windows::store_for_profile(&profile).map(profile_key)
+    crate::infra::profile_windows::store_for_profile(&profile).map(store_key)
 }
 
 fn text(value: &str, limit: usize) -> String {

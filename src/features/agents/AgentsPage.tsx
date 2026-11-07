@@ -18,8 +18,6 @@ import { useSpacesStore } from "@/features/spaces";
  * FORM: Polar's page columns and catalog density inside Misty; no Spaces navigation.
  * SIGNATURE: The conversation stays mounted across catalogs.
  * BOUNDARY: New workflow, skill, connector and window-execution UI has no backend actions.
- * FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review,
- *   the verdict, DESIGN.md, and every shipping raster carrying its provenance
  */
 export default function NativeAgentsPage() {
   return <AgentsWorkspacePage />;

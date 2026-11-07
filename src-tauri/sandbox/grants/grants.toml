@@ -1,5 +1,5 @@
 # Grants: which of the person's things Misty can reach. Each is driven by a click, and what was
-# actually granted lives in misty.db on this device and never syncs (docs/plans/app-permissions.md).
+# actually granted lives in misty.db on this device and never syncs.
 # Enforced by the file gate, src-tauri/src/infra/file_access. Nothing here allows a command by itself.
 
 [[permission]]

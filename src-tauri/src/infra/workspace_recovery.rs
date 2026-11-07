@@ -44,13 +44,13 @@ fn main_only(view: &tauri::Webview) -> Result<(), String> {
     Ok(())
 }
 /// The account scope the app uses while nobody is signed in. Its recovery belongs to this
-/// computer, so it opens without an account session (docs/browser/no-account.md).
+/// computer, so it opens without an account session.
 const LOCAL_ACCOUNT_SCOPE: &str = "local";
 
 /// The deployment an account scope's recovery is filed under. Recovery is this device's own data,
 /// sealed with a key in the OS keychain, so it does not ask the server: an account whose
 /// session expired keeps its windows and tabs while it waits to sign in again
-/// (docs/browser/no-account.md). The local scope has no deployment.
+/// The local scope has no deployment.
 fn recovery_deployment(api_base: &str, account: &str) -> Result<String, String> {
     if account == LOCAL_ACCOUNT_SCOPE {
         return Ok(LOCAL_ACCOUNT_SCOPE.to_owned());
@@ -85,7 +85,6 @@ fn recovery_directory(
     let _ = app;
     Ok(super::paths::misty_home_dir()
         .ok_or("Workspace storage is unavailable")?
-        .join(".local")
         .join("data")
         .join("workspace-recovery")
         .join(identity))

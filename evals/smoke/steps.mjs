@@ -1,4 +1,4 @@
-// What the smoke test checks first (README.md): the app's permissions, signing in, choosing models and
+// What the smoke test checks first: the app's permissions, signing in, choosing models and
 // the agent's tools. Each step works the app's real interface or its real modules through the debug
 // bridge, and reads what the mock model received.
 import { mkdirSync, existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -100,11 +100,37 @@ export const firstSteps = {
     check("models", "the key saved", answer.added.saved.includes("openai-compatible"), JSON.stringify(answer.added));
     check("models", "the provider's models listed", answer.listed.some((model) => model.id === "openai-compatible/mock-agent"), JSON.stringify(answer.listed));
     check("models", "Check the agent model passes tools and images", answer.test.tools.ok && answer.test.images.ok, JSON.stringify(answer.test));
-    const { runtime } = await bridge("/models");
-    check("models", "the app reports its runtime", ["rust", "typescript"].includes(runtime), runtime);
   },
 
-  async agent({ check, dataRoot, scratch, runtime }) {
+  // A Space lists an agent as a name under its person: no agent row on the server, so the id is the computer's.
+  async spaceAgents({ check }) {
+    const answer = await inWindow(
+      `const { apiRequest } = await __smoke.module("api/client/index.ts");
+       const { spaceAgentsApi } = await __smoke.module("api/spaces/space-agents.ts");
+       const { spacesApi } = await __smoke.module("api/spaces/api.ts");
+       const { spaces } = await apiRequest("/spaces");
+       const home = spaces.find((space) => space.is_default);
+       const id = "agent-only-on-this-computer";
+       const mention = (agent_id) => [{ type: "text", text: "Can you check? " }, { type: "mention", agent_id, label: "Researcher" }];
+       const added = await spaceAgentsApi.add(home.id, id, "Researcher");
+       const listed = await spaceAgentsApi.list(home.id);
+       const mine = await spaceAgentsApi.mine();
+       const sent = await spacesApi.sendMessage(home.id, mention(id), [], [], [], "", "smoke-mention-listed");
+       const unlisted = await spacesApi.sendMessage(home.id, mention("agent-nobody-listed"), [], [], [], "", "smoke-mention-unlisted").then(() => "sent", () => "refused");
+       await spaceAgentsApi.remove(home.id, id);
+       const after = await spaceAgentsApi.list(home.id);
+       return { added, listed: listed.agents, mine: mine.agents, sent: sent.message ?? sent, unlisted, after: after.agents };`,
+      { timeoutMs: 30_000 },
+    );
+    const id = "agent-only-on-this-computer";
+    check("spaceAgents", "an agent with no server row is brought into a Space", answer.added.agent_id === id && answer.added.agent_name === "Researcher", JSON.stringify(answer.added));
+    check("spaceAgents", "the Space and the person's list show it", answer.listed.some((item) => item.agent_id === id) && answer.mine.some((item) => item.agent_id === id), JSON.stringify(answer.listed));
+    check("spaceAgents", "a mention by its id is accepted", answer.sent.content?.some((span) => span.agent_id === id), JSON.stringify(answer.sent));
+    check("spaceAgents", "a mention of an unlisted id is refused", answer.unlisted === "refused", answer.unlisted);
+    check("spaceAgents", "taking it out empties the list", !answer.after.some((item) => item.agent_id === id), JSON.stringify(answer.after));
+  },
+
+  async agent({ check, dataRoot, scratch }) {
     mkdirSync(resolve(scratch, "victim"), { recursive: true });
     const victim = resolve(scratch, "victim/keep.txt");
     const homeVictim = resolve(homedir(), `.misty-smoke-victim-${process.pid}/keep.txt`);
@@ -153,7 +179,7 @@ export const firstSteps = {
       check("agent", "the home folder can't be listed", /ls=[1-9]/.test(result("call_a4")), result("call_a4"));
       check("agent", "commands have no network", !/curl=0/.test(result("call_a4")), result("call_a4"));
       check("agent", "the file is in the chat's workspace", findInWorkspaces(dataRoot, "made.txt"));
-      writeFileSync(resolve(scratch, `requests-${runtime}.json`), JSON.stringify(await mock.requests(), null, 1));
+      writeFileSync(resolve(scratch, "requests.json"), JSON.stringify(await mock.requests(), null, 1));
     } finally {
       rmSync(resolve(homeVictim, ".."), { recursive: true, force: true });
     }
@@ -233,7 +259,8 @@ export const firstSteps = {
       { tools: [{ id: "call_p2", name: "browser_run", args: { code: parallel } }] },
       finish(),
     ]);
-    run = await startChat("Read three pages at once");
+    // Agents open private addresses only when the person's own request names them.
+    run = await startChat(`Read three pages at once from ${mockRoot}`);
     check("tools", "a program over several tabs completes", (await waitForState(run.invocationId, undefined, 90_000)) === "completed");
     out = await output();
     check("tools", "browser_run reads every tab it opened", names.every((name) => out.includes(`Slow page ${name}`)), out);

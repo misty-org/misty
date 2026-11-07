@@ -27,7 +27,7 @@ function chooseLabel(mode: MistyFilePickerMode, multiple: boolean): string {
 
 /**
  * Picks files through the system's own dialog, the one thing that grants a file: what it returns
- * is the only thing Misty's windows can then read (`docs/browser/security.md`). Misty has no view of
+ * is the only thing Misty's windows can then read. Misty has no view of
  * a person's folders of its own.
  */
 export function MistyFilePicker({

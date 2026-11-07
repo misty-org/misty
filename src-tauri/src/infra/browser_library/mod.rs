@@ -36,7 +36,7 @@ pub(crate) fn now_ms() -> i64 {
 pub(crate) fn library(_app: &AppHandle) -> Result<MutexGuard<'static, Connection>, String> {
     if LIBRARY.get().is_none() {
         let home = super::paths::misty_home_dir().ok_or("Misty's data folder is unavailable.")?;
-        let store = Store::at(home.join(".local").join("data").join("misty.db"));
+        let store = Store::in_home(&home);
         let connection = open(&store)?;
         let _ = LIBRARY.set(Mutex::new(connection));
     }

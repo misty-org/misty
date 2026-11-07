@@ -3,7 +3,7 @@
 #import "../../native/macos/MistyExtensions.h"
 #import <WebKit/WebKit.h>
 
-// Stands in for Kiri's extension transport (kiri/src/extensions/bridge.rs),
+// Stands in for Kiri's extension transport (crates/kiri/src/extensions/bridge.rs),
 // which the app installs from Rust: the same handler name and admission rule.
 @interface ProbeCompatChannel : NSObject <WKScriptMessageHandlerWithReply>
 @end

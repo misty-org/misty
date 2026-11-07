@@ -213,7 +213,7 @@ pub async fn browser_import_history(
     request: ImportTargetRequest,
 ) -> Result<Added, String> {
     require_import(&app)?;
-    let target = super::browser_library::history::profile_key(profile_store(&webview)?);
+    let target = super::browser_library::history::store_key(profile_store(&webview)?);
     blocking(move || {
         let source = profile(&request.source)?;
         let visits = history::read(request.source.browser.family(), &source.path)?;

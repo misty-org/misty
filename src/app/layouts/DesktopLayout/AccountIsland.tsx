@@ -21,9 +21,10 @@ const rowButtonClass = [
 ].join(" ");
 
 /**
- * The sidebar's closing row, inside its panel: the signed-in account, then Settings as a quiet
- * button. Signed out, the account is a Sign in button. An expired session looks the same, and a
- * notice says why: nothing on this computer is removed, and signing in brings the account back.
+ * The sidebar's closing row, inside its panel: the signed-in account, then Agents and Settings as
+ * quiet buttons. Signed out, the account is a Sign in button, and Agents still opens: agents need no
+ * account. An expired session looks the same, and a notice says why: nothing on this computer is
+ * removed, and signing in brings the account back.
  */
 export function AccountIsland(props: {
   open: boolean;
@@ -80,7 +81,7 @@ export function AccountIsland(props: {
       )}
       {expired && !noticeDismissed ? (
         <Notification onDismiss={() => setNoticeDismissed(true)}>
-          You've been signed out. Sign in to get your Spaces, sync and agents back.
+          You've been signed out. Sign in to get your Spaces and sync back.
           <br />
           <Button
             type="button"

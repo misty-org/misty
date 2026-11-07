@@ -1,4 +1,4 @@
-# All file access goes through one gate, src/infra/file_access (docs/plans/app-permissions.md). It
+# All file access goes through one gate, src/infra/file_access. It
 # refuses anything without a grant, so calling the standard library directly would skip the check.
 # Only file_access allows these, and tests may build fixtures with them.
 disallowed-methods = [

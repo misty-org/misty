@@ -62,11 +62,6 @@ export class MistyScreenDevice implements AbstractInterface {
       adapter: SurfaceAdapter;
       execute: ScreenExecute;
       allowConsequential: boolean;
-      /**
-       * Asks the person in the control island before a consequential action
-       * (roadmap C2). Resolves false when they refuse or don't answer.
-       */
-      confirm?: (description: string) => Promise<boolean>;
       /** Aborting it ends the goal; the device aborts it to stop or fail. */
       controller: AbortController;
     },
@@ -113,7 +108,11 @@ export class MistyScreenDevice implements AbstractInterface {
     try {
       return await this.options.execute<T>(operation, input);
     } catch (error) {
-      if (/browser_snapshot_stale/.test(String((error as Error)?.message ?? error))) throw error;
+      const message = String((error as Error)?.message ?? error);
+      if (/browser_snapshot_stale/.test(message)) throw error;
+      // Native code judged what's under the point and asked. The person's no ends the goal.
+      const stopped = /browser_action_(?:declined|unconfirmed): (.*)/s.exec(message);
+      if (stopped) this.end({ status: "needs_confirmation", summary: stopped[1]! });
       // A closed screen, revoked grant or Stop cannot recover by replanning.
       this.failure = error;
       this.options.controller.abort(error);
@@ -138,15 +137,6 @@ export class MistyScreenDevice implements AbstractInterface {
         status: "needs_confirmation",
         summary: `Stopped before a consequential action: ${plan.description}. Ask the user, then call again with allowConsequential if they agree.`,
       });
-    if (
-      plan.consequential &&
-      this.options.confirm &&
-      !(await this.options.confirm(plan.description))
-    )
-      this.end({
-        status: "needs_confirmation",
-        summary: `The person didn't allow “${plan.description}” in Misty, so it wasn't done. Don't try another way; tell them it wasn't done.`,
-      });
     const before = this.frame ?? (await this.capture());
     const mapped = this.options.adapter.input(action, {
       documentId: before.documentId,
@@ -159,7 +149,7 @@ export class MistyScreenDevice implements AbstractInterface {
       this.dispatched = true;
       result = await this.device(this.options.adapter.interact, mapped.input);
     } catch (error) {
-      if (this.failure) throw error;
+      if (this.failure || this.stop) throw error;
       // The page moved under a stale frame; plan again on a fresh one.
       await this.capture();
       this.planned = true;

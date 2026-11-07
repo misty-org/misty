@@ -25,7 +25,7 @@ pub(super) fn ciphers() -> &'static std::sync::Mutex<BTreeMap<String, Aes256Gcm>
 fn db() -> Result<rusqlite::Connection, String> {
     let home =
         crate::infra::paths::misty_home_dir().ok_or("Misty's data folder is unavailable.")?;
-    crate::infra::store::Store::at(home.join(".local").join("data").join("misty.db"))
+    crate::infra::store::Store::in_home(&home)
         .connect()
         .map_err(|e| e.to_string())
 }

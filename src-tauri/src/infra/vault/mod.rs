@@ -224,6 +224,7 @@ async fn start(
         }
     }));
     tasks.push(history::spawn(app.clone()));
+    tasks.push(super::memory::vault_link::spawn(app.clone()));
     let previous = ACTIVE.lock().await.replace(Active {
         scope,
         vault_id,

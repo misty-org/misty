@@ -1,4 +1,5 @@
 import { spaceAgentsApi } from "@/api/spaces/space-agents";
+import { usePersonalAgentsStore } from "../personalAgentsStore";
 import { useSpacesStore } from "@/features/spaces";
 import { Button, ErrorNotification, Skeleton } from "@/shared/ui";
 import { Check } from "lucide-react";
@@ -37,7 +38,11 @@ export function AgentSpaceField({ agentId }: { agentId: string }) {
     setError("");
     try {
       if (inSpace) await spaceAgentsApi.remove(spaceId, agentId);
-      else await spaceAgentsApi.add(spaceId, agentId);
+      else {
+        // A Space sees the agent's name and role, and nothing else about it.
+        const mine = usePersonalAgentsStore.getState().agents.find((agent) => agent.id === agentId);
+        await spaceAgentsApi.add(spaceId, agentId, mine?.name ?? "");
+      }
       const next = new Set(joined);
       if (inSpace) next.delete(spaceId);
       else next.add(spaceId);

@@ -58,9 +58,6 @@ impl CallEnvironment for TurnEnvironment<'_> {
         })
     }
 
-    fn embed_query<'a>(&'a self, query: &'a str) -> BoxFuture<'a, Option<(String, Vec<f64>)>> {
-        self.run.shared.deps.device.embed_query(query)
-    }
 }
 
 fn call_input(call: &CallRecord) -> JsValue {

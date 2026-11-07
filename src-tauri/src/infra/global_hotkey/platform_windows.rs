@@ -75,8 +75,6 @@ unsafe extern "system" fn keyboard(code: i32, message: WPARAM, data: LPARAM) -> 
                     modifiers.shift &= system.shift;
                     if apply(modifiers, event.vkCode as u16, event.scanCode, down) {
                         dispatch(Input::Modifiers(*modifiers));
-                    } else if down {
-                        dispatch(Input::KeyboardActivity);
                     }
                 }
             });

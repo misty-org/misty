@@ -41,7 +41,7 @@ pub(crate) struct HarnessCheckpoint {
 }
 
 impl HarnessCheckpoint {
-    /// The checkpoint as the server reads it.
+    /// The checkpoint as `local_run::events` reads it.
     pub(crate) fn to_json(&self) -> JsValue {
         let mut fields = vec![
             ("node_id".to_owned(), string(&self.node_id)),
@@ -67,7 +67,7 @@ pub(crate) trait ToolCheckpoints: Send + Sync {
     fn checkpoint(&self, event: HarnessCheckpoint) -> BoxFuture<'_, Result<(), RuntimeError>>;
 }
 
-/// Runs a catalog tool through Misty's gateway. `None` is a call that returned nothing.
+/// Runs a catalog tool. `None` is a call that returned nothing.
 pub(crate) trait ToolTransport: ToolCheckpoints {
     fn run<'a>(
         &'a self,

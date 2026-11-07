@@ -1,40 +1,29 @@
 // The person's own computer as a run's device: runs carry the workspace context a chat sent
-// from it carries, signed through the debug build's eval bridge, so device tools (the agent's
-// own browser session, its programs and shell) run on it as they would for a real request.
-import { bridgeCall, type Bridge } from "./bridge.ts";
+// from it carries, so device tools (the agent's own browser session, its programs and shell) run on it
+// as they would for a real request. The app signs it as the run starts.
+import { windowCall, type Bridge } from "./bridge.ts";
 
-// The same grant a desktop chat carries (src/features/agents/deviceGrants.ts).
-export const workspaceCapabilities = ["browser.tab.list", "browser.tab.open", "bookmark.list", "bookmark.add", "browser.session", "browser.run", "shell.run"];
-
-export interface AccountDevice {
-  id: string;
-  name?: string;
-  revokedAt?: string | null;
+export interface Identity {
+  agentId: string;
+  deviceId: string;
 }
 
-/** The device a pass runs on: the one named, else the account's only one. */
-export function chooseDevice(devices: AccountDevice[], named: string): string {
-  const active = devices.filter((device) => !device.revokedAt);
-  if (named) {
-    if (!active.some((device) => device.id === named))
-      throw new Error(`Device ${named} isn't on this account. Sign the dev app in to the test account first.`);
-    return named;
-  }
-  if (active.length === 1) return active[0]!.id;
-  if (!active.length) throw new Error("This account has no device. Sign the dev app in to the test account first.");
-  throw new Error(`This account has ${active.length} devices. Set MISTY_ODYSSEYS_DEVICE to one of: ${active.map((device) => device.id).join(", ")}.`);
+/** Who a pass runs as: the app's default agent, on this computer. Works signed in or signed out. */
+export function identityOf(bridge: Bridge): Promise<Identity> {
+  return windowCall<Identity>(
+    bridge,
+    `const { personalAgentsApi } = await module("features/agents/personalAgentsApi.ts");
+     const { thisComputerDeviceId } = await module("features/agents/workflows/deviceScheduledRuns.ts");
+     const { agents } = await personalAgentsApi.list();
+     return { agentId: agents[0]?.id ?? "", deviceId: (await thisComputerDeviceId()) ?? "" };`,
+  );
 }
 
-/** The workspace context for one run, with a fresh grant the desktop signs. */
-export async function deviceContexts(bridge: Bridge, apiBase: string, deviceId: string, userId: string, agentId: string): Promise<unknown[]> {
-  const scope = `workspace:${deviceId}`;
-  const signed = await bridgeCall<unknown[]>(bridge, "/run-grants", {
-    apiBase,
-    accountId: userId,
-    // Each benchmark run keeps its own workspace.
-    grants: [{ targetDeviceId: deviceId, agentId, chatKey: `odysseys-${crypto.randomUUID()}`, capabilities: workspaceCapabilities, scopes: [scope] }],
-  });
-  if (!signed[0]) throw new Error("run grant: the desktop signed nothing");
-  return [{ device_id: deviceId, kind: "workspace", opaque_ref: scope, display_name: "Misty browser",
-    capabilities: workspaceCapabilities, metadata: { source: "desktop" }, run_grant: signed[0] }];
+/** The workspace context for one run, as a chat sent from this computer carries it. */
+export function deviceContexts(bridge: Bridge): Promise<unknown[]> {
+  return windowCall<unknown[]>(
+    bridge,
+    `const { desktopDeviceGrants } = await module("features/agents/deviceGrants.ts");
+     return desktopDeviceGrants();`,
+  );
 }

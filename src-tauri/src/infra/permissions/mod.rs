@@ -1,5 +1,5 @@
 //! First-use permissions: things Misty can do with the rest of the computer that stay off until the
-//! person says yes (docs/plans/app-permissions.md). Answers live in `settings_state` in `misty.db`,
+//! person says yes. Answers live in `settings_state` in `misty.db`,
 //! on this device, and never sync.
 //!
 //! [`ensure`] asks, so it's for a person's action in a window. Anything else, such as a background

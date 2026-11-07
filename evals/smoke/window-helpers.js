@@ -13,6 +13,7 @@ if (!window.__smoke) {
   const visible = (element) => element.getClientRects().length > 0;
   const named = (element) => (element.innerText || element.getAttribute("aria-label") || element.value || "").trim();
   const repo = __REPO__;
+  window.__smokeRepo = repo;
   window.__smoke = {
     errors,
     /** The app's own module, the same instance the app uses. */

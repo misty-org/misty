@@ -1,8 +1,8 @@
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { EvalClient, FatalPassError } from "../client.ts";
+import { EvalClient } from "../client.ts";
 import { composerRequest, didNoWork } from "../perform.ts";
 import { Recorder, summarize, visual } from "../recorder.ts";
 import { summary, line } from "../results.ts";
@@ -16,32 +16,24 @@ afterEach(async () => {
   mock = undefined;
 });
 
-const sse = (...events: unknown[]) => events.map((event, index) => `id: ${index}\ndata: ${JSON.stringify(event)}\n\n`).join("");
 const run = "invocation_1";
-const stack = (events: unknown[], turns = 100) =>
+const token = "token";
+/** The debug bridge, with a run that has said these events. */
+const bridgeWith = (events: unknown[], state = "completed") =>
   startMock((request, response) => {
-    if (request.path === "/login") return sendJson(response, 200, { ok: true }, { "set-cookie": "misty_session=abc; Path=/; HttpOnly" });
-    if (request.path === "/ai/invocations")
-      return sendJson(response, 202, { invocationId: run, conversationId: "conversation_1", eventsUrl: `/ai/invocations/${run}/events`, modelTurnLimit: turns });
-    if (request.path.endsWith("/events")) {
-      response.writeHead(200, { "content-type": "text/event-stream" });
-      response.end(sse(...events));
-      return;
-    }
-    if (request.path.endsWith("/tool-output")) return sendJson(response, 200, { items: [{ tool_call_id: "call_1", tool_name: "browser.run", output: { url: "https://a.test", title: "A" } }] });
-    sendJson(response, 202, { state: "canceled" });
+    if (request.headers.authorization !== `Bearer ${token}`) return sendJson(response, 401, {});
+    if (request.path === "/window-eval") return sendJson(response, 200, { ok: true, result: { invocationId: run, conversationId: "conversation_1" } });
+    if (request.path === "/run-follow") return sendJson(response, 200, { ok: true, result: { state, events } });
+    if (request.path === "/run-record") return sendJson(response, 200, { ok: true, result: [{ tool_call_id: "call_1", tool_name: "browser.run", output: { url: "https://a.test", title: "A" } }] });
+    sendJson(response, 200, { ok: true, result: { ok: true } });
   });
-const signIn = () => {
-  const file = join(mkdtempSync(join(tmpdir(), "odysseys-client-")), "signin.json");
-  writeFileSync(file, JSON.stringify({ email: "test@example.test", password: "not-real" }));
-  return file;
-};
+const clientOf = (server: Mock) => new EvalClient({ url: server.url, token });
 const task = { id: "t", prompt: "Find a hotel.", startUrl: "", level: "easy", referenceLength: 1, rubrics: [], split: "dev" } satisfies OdysseysTask;
-const identity = { userId: "u", agentId: "a", deviceId: "device_1" };
+const identity = { agentId: "a", deviceId: "device_1" };
 
 describe("driving the product path", () => {
-  it("signs in, sends a composer request with the eval's turn limit, and follows the run", async () => {
-    mock = await stack([
+  it("starts a composer request in the app with the eval's turn limit, and follows the run", async () => {
+    mock = await bridgeWith([
       { type: "invocation.started" },
       { type: "tool.started", toolCallId: "call_1", toolName: "browser.run" },
       { type: "tool.completed", toolCallId: "call_1", toolName: "browser.run" },
@@ -49,20 +41,21 @@ describe("driving the product path", () => {
       { type: "response.delta", delta: "lo" },
       { type: "invocation.completed" },
     ]);
-    const client = await EvalClient.open(mock.url, signIn());
+    const client = clientOf(mock);
     const seen: unknown[] = [];
-    const result = await client.run(composerRequest(task, identity, [{ device_id: "device_1" }]), { timeoutMs: 5_000, turns: 100, observe: async (event) => void seen.push(event.type) });
+    const result = await client.run(composerRequest(task, identity, [{ deviceId: "device_1" }]), { timeoutMs: 5_000, turns: 100, observe: async (event) => void seen.push(event.type) });
     expect(result).toMatchObject({ invocationId: run, conversationId: "conversation_1", terminal: "invocation.completed", answer: "Hello", tools: ["browser_run"] });
     expect(seen[0]).toBe("eval.created");
     expect(client.active.size).toBe(0);
     expect(didNoWork(result)).toBe(false);
 
-    const post = mock.seen.find((item) => item.path === "/ai/invocations")!;
-    expect(post.headers.cookie).toContain("misty_session=abc");
-    expect(post.headers["x-misty-csrf"]).toBe("1");
-    const body = JSON.parse(post.body) as Record<string, unknown>;
-    expect(body).toMatchObject({ prompt: "Find a hotel.", mode: "drawer", surface_id: "global", window_label: "main", origin_device_id: "device_1", permission_mode: "auto", collaboration_mode: "act", eval_turn_limit: 100, execution_mode: "user" });
-    expect(post.headers["idempotency-key"]).toBe(body.idempotency_key);
+    const started = mock.seen.find((item) => item.path === "/window-eval")!;
+    const { script } = JSON.parse(started.body) as { script: string };
+    expect(script).toContain("aiSurfaceApi.createInvocation(request)");
+    expect(script).toContain('"prompt":"Find a hotel."');
+    expect(script).toContain('"evalTurnLimit":100');
+    expect(script).toContain('"permissionMode":"auto"');
+    expect(script).toContain('"executionMode":"user"');
   });
 
   it("never names a model: the device's settings choose it", () => {
@@ -70,59 +63,35 @@ describe("driving the product path", () => {
     expect(Object.keys(body).filter((key) => /model|effort|thinking|override/.test(key))).toEqual([]);
   });
 
-  it("stops the pass when the server didn't honor the turn limit", async () => {
-    mock = await stack([], 20);
-    const client = await EvalClient.open(mock.url, signIn());
-    const attempt = client.run({ prompt: "x" }, { timeoutMs: 5_000, turns: 100 });
-    await expect(attempt).rejects.toBeInstanceOf(FatalPassError);
-    await expect(attempt).rejects.toThrow("gave this run 20 turns, not 100");
-    expect(mock.seen.some((item) => item.path === `/ai/invocations/${run}/cancel`)).toBe(true);
-  });
-
   it("cancels a run that waits for a person", async () => {
-    mock = await stack([{ type: "tool.started", toolName: "browser.run" }, { type: "app.request", appRequest: { id: "r" } }, { type: "invocation.completed" }]);
-    const client = await EvalClient.open(mock.url, signIn());
-    const result = await client.run({ prompt: "x" }, { timeoutMs: 5_000, turns: 100 });
+    mock = await bridgeWith([{ type: "tool.started", toolName: "browser.run" }, { type: "app.request", appRequest: { id: "r" } }, { type: "invocation.completed" }]);
+    const result = await clientOf(mock).run({ prompt: "x" }, { timeoutMs: 5_000, turns: 100 });
     expect(result.terminal).toBe("needs_person:app.request");
-    expect(mock.seen.some((item) => item.path === `/ai/invocations/${run}/cancel`)).toBe(true);
+    expect(mock.seen.some((item) => item.path === "/run-cancel")).toBe(true);
   });
 
-  it("cancels a run whose stream closed early, and records why a run failed", async () => {
-    mock = await stack([{ type: "response.delta", delta: "partial" }]);
-    const client = await EvalClient.open(mock.url, signIn());
-    const closed = await client.run({ prompt: "x" }, { timeoutMs: 5_000, turns: 100 });
+  it("cancels a run nothing knows of, and records why a run failed", async () => {
+    mock = await bridgeWith([{ type: "response.delta", delta: "partial" }], "missing");
+    const closed = await clientOf(mock).run({ prompt: "x" }, { timeoutMs: 5_000, turns: 100 });
     expect(closed.terminal).toBe("stream.ended");
-    expect(mock.seen.some((item) => item.path === `/ai/invocations/${run}/cancel`)).toBe(true);
+    expect(mock.seen.some((item) => item.path === "/run-cancel")).toBe(true);
     await mock.close();
-    mock = await stack([{ type: "invocation.failed", error: "model_key_needed" }]);
-    const failed = await (await EvalClient.open(mock.url, signIn())).run({ prompt: "x" }, { timeoutMs: 5_000, turns: 100 });
+    mock = await bridgeWith([{ type: "invocation.failed", error: "model_key_needed" }]);
+    const failed = await clientOf(mock).run({ prompt: "x" }, { timeoutMs: 5_000, turns: 100 });
     expect(failed).toMatchObject({ terminal: "invocation.failed", error: "model_key_needed" });
     expect(didNoWork(failed)).toBe(true);
   });
 
   it("stops a run the watch gives up on, and cancels it", async () => {
-    mock = await startMock((request, response) => {
-      if (request.path === "/ai/invocations") return sendJson(response, 202, { invocationId: run, eventsUrl: `/ai/invocations/${run}/events`, modelTurnLimit: 100 });
-      if (request.path.endsWith("/events")) {
-        response.writeHead(200, { "content-type": "text/event-stream" });
-        response.write(": heartbeat\n\n");
-        return;
-      }
-      sendJson(response, 202, {});
-    });
-    const client = new EvalClient(mock.url);
-    const result = await client.run({ prompt: "x" }, { timeoutMs: Infinity, turns: 100, watch: { everyMs: 20, check: async () => "stalled: no activity" } });
+    mock = await bridgeWith([], "running");
+    const result = await clientOf(mock).run({ prompt: "x" }, { timeoutMs: Infinity, turns: 100, watch: { everyMs: 20, check: async () => "stalled: no activity" } });
     expect(result.terminal).toBe("stalled: no activity");
-    expect(mock.seen.some((item) => item.path === `/ai/invocations/${run}/cancel`)).toBe(true);
+    expect(mock.seen.some((item) => item.path === "/run-cancel")).toBe(true);
   });
 
-  it("explains a missing sign-in file", async () => {
-    await expect(EvalClient.open("http://127.0.0.1:1", join(tmpdir(), "no-such-signin.json"))).rejects.toThrow("No sign-in file");
-  });
-
-  it("reads a run's stored tool output", async () => {
-    mock = await stack([]);
-    const outputs = await new EvalClient(mock.url).toolOutputs(run);
+  it("reads what a run's tools answered from its journal", async () => {
+    mock = await bridgeWith([]);
+    const outputs = await clientOf(mock).toolOutputs(run);
     expect(outputs[0]).toMatchObject({ tool_call_id: "call_1", tool_name: "browser.run" });
   });
 });

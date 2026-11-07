@@ -55,7 +55,35 @@ pub fn is_private_file(path: &Path) -> bool {
     windows::is_restricted(path)
 }
 
-/// `~/.misty/.local/data`, or the configured root.
+/// The folder that holds `misty.db` in the Misty home at `home`.
+pub fn home_data_dir(home: &Path) -> PathBuf {
+    home.join("data")
+}
+
+/// Moves `.local/data` and `.local/sync`, where earlier layouts kept them, up to `data` and
+/// `sync`. Run it before anything opens the database: a store opened first would make a new, empty
+/// `data` beside the real one. A new folder that already holds something is never replaced; the
+/// old one then stays where it is. Doing nothing is the common case and costs two lookups.
+pub fn move_out_of_dot_local(home: &Path) -> io::Result<()> {
+    let old = home.join(".local");
+    for name in ["data", "sync"] {
+        let from = old.join(name);
+        if !from.is_dir() {
+            continue;
+        }
+        let to = home.join(name);
+        // Only succeeds on an empty folder, which holds nothing to keep.
+        let _ = fs::remove_dir(&to);
+        if !to.exists() {
+            fs::rename(&from, &to)?;
+        }
+    }
+    // Only succeeds once nothing is left in it.
+    let _ = fs::remove_dir(&old);
+    Ok(())
+}
+
+/// `~/.misty/data`, or the configured root.
 pub fn data_dir() -> io::Result<PathBuf> {
     if let Some(root) = OVERRIDE_ROOT.get() {
         data_directory(root)?;
@@ -64,9 +92,8 @@ pub fn data_dir() -> io::Result<PathBuf> {
     let home = dirs::home_dir().ok_or_else(|| io::Error::other("Home directory unavailable"))?;
     let directory = home.join(".misty");
     private_directory(&directory)?;
-    let directory = directory.join(".local");
-    private_directory(&directory)?;
-    let directory = directory.join("data");
+    move_out_of_dot_local(&directory)?;
+    let directory = home_data_dir(&directory);
     data_directory(&directory)?;
     Ok(directory)
 }
@@ -125,7 +152,7 @@ const LAYOUT_TABLE: &str =
     "CREATE TABLE IF NOT EXISTS layout (id INTEGER PRIMARY KEY CHECK (id = 1), version INTEGER NOT NULL)";
 
 fn layout_connection(home: &Path) -> io::Result<rusqlite::Connection> {
-    let data = home.join(".local").join("data");
+    let data = home_data_dir(home);
     fs::create_dir_all(&data)?;
     let connection = rusqlite::Connection::open(data.join("misty.db")).map_err(io::Error::other)?;
     connection
@@ -139,7 +166,7 @@ fn layout_connection(home: &Path) -> io::Result<rusqlite::Connection> {
 
 /// The layout version the Misty home at `home` was last brought to, if it has been.
 pub fn layout_version(home: &Path) -> io::Result<Option<u32>> {
-    if !home.join(".local").join("data").join("misty.db").is_file() {
+    if !home_data_dir(home).join("misty.db").is_file() {
         return Ok(None);
     }
     let connection = layout_connection(home)?;

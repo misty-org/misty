@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { ChevronDown, Circle, CircleCheck } from "lucide-react";
 import { Pressable } from "@/shared/ui";
 import { observeAccountChanges } from "@/api/account-events";
-import { onboardingApi, type OnboardingStep } from "@/api/assistant/onboarding";
+import { onboardingSteps, type OnboardingStep } from "@/features/ai-surface/localAiSettings";
 import { useMistyStore } from "@/features/misty/useMistyStore";
 import { browserHomeUrl } from "@/features/workspace/browserHome";
 import { useWorkspaceStore } from "@/features/workspace/useWorkspaceStore";
@@ -42,7 +42,7 @@ function useAccountProgress(accountId: string) {
         appsApi
           .list()
           .then(({ apps }) => current && setApps(apps.some((app) => app.status === "active"))),
-        onboardingApi.steps().then(({ steps }) => current && setSteps(steps)),
+        onboardingSteps().then((steps) => current && setSteps(steps)),
       ]).catch(() => undefined);
     // Also reruns when the window regains focus, as after connecting an app in the browser.
     const stop = observeAccountChanges(accountId, ["onboarding"], load);
@@ -59,11 +59,6 @@ const askOnPage = () => {
   useWorkspaceStore.getState().openBrowserView({ url: browserHomeUrl() });
   useMistyPanelStore.getState().setOpen(true);
 };
-
-/** What someone needs to know before their first task. */
-const agentStorageDisclosure =
-  "What an agent reads on a signed-in page is stored on the server, outside your vault: " +
-  "whoever runs the server can read it, and backups keep it for up to 30 days after you delete it.";
 
 /**
  * The first steps with agents, ticked off from what the account has actually done. It
@@ -112,7 +107,6 @@ export function AgentGetStarted({
         </span>
         <ChevronDown aria-hidden="true" />
       </Pressable>
-      <p className="agent-studio-get-started-note">{agentStorageDisclosure}</p>
       {!collapsed && (
         <ul>
           {steps.map((step) => (

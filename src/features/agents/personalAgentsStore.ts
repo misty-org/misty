@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import type { AgentProfile } from "@/shared/schemas";
-import { personalAgentsApi } from "@/api/agents/native";
+import { listPersonalAgents, personalAgentsApi } from "./personalAgentsApi";
 
 interface PersonalAgentsState {
   accountId: string;
@@ -27,11 +27,7 @@ export const usePersonalAgentsStore = create<PersonalAgentsState>((set, get) => 
     }
     set({ loading: true });
     try {
-      // The saved copy paints first on a first visit; the fresh list replaces it.
-      const { agents } = await personalAgentsApi.list((saved) => {
-        if (revision === request && get().accountId === accountId && !get().agents.length)
-          set({ agents: saved.agents });
-      });
+      const { agents } = await personalAgentsApi.list();
       if (revision === request && get().accountId === accountId)
         set({ agents, loading: false, error: "" });
     } catch (error) {
@@ -49,4 +45,12 @@ export function selectedPersonalAgent(_spaceId: string) {
     state.agents.find((a) => a.id === state.selected.global && a.enabled) ??
     state.agents.find((a) => a.system_managed)
   );
+}
+
+/** The agent a run works as, from the account's own list. Null when it names none we know. */
+export async function personalAgentFor(account: string, agentId: string) {
+  if (!agentId) return null;
+  const known = usePersonalAgentsStore.getState();
+  const agents = known.accountId === account && known.agents.length ? known.agents : await listPersonalAgents(account);
+  return agents.find((agent) => agent.id === agentId) ?? null;
 }

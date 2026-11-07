@@ -1,17 +1,17 @@
 //! Runs one tool call in the run, holding device and user-action waits on durable hooks. Every attempt
-//! keeps the call's effect identity. Ported from `tool-calls.ts`.
+//! keeps the call's effect identity.
 use std::{sync::Arc, time::Instant};
 
 use futures_util::future::BoxFuture;
 
 use super::{
-    control_plane::{ControlPlane, RuntimeIdentity},
+    control_plane::RuntimeIdentity,
     device_hooks::DeviceHooks,
     js_json::JsValue,
+    local_tools::{run_local_tool, LocalToolHost},
     logger::Logger,
-    mcp_errors::classify_mcp_transport_error,
-    mcp_runtime::{McpCall, McpGateway},
-    mcp_sessions::McpRunAccess,
+    tool_errors::classify_tool_transport_error,
+    tool_gateway::{GatewayCall, ToolGateway},
     run::step::step,
     runtime_errors::{recoverable_tool_error, rethrow_step_error, RuntimeError, StepFailure},
     tool_execution::{continue_tool_execution, ToolContinuation, ToolExecutionResponse},
@@ -26,17 +26,17 @@ pub(crate) struct SavedWait {
     pub(crate) intervention: Option<String>,
 }
 
-/// Where a call records that it's waiting, and how a query's embedding is made.
+/// Where a call records that it's waiting.
 pub(crate) trait CallEnvironment: Send + Sync {
     fn waiting<'a>(&'a self, call_id: &'a str, wait: Option<SavedWait>) -> BoxFuture<'a, Result<(), RuntimeError>>;
-    /// `embedDeviceCall`, with the embedding model's name: a failure leaves the search without one.
-    fn embed_query<'a>(&'a self, query: &'a str) -> BoxFuture<'a, Option<(String, Vec<f64>)>>;
 }
 
 pub(crate) struct ToolCallDeps<'a> {
     pub(crate) identity: &'a RuntimeIdentity,
-    pub(crate) control: &'a dyn ControlPlane,
-    pub(crate) gateway: &'a dyn McpGateway,
+    pub(crate) gateway: &'a dyn ToolGateway,
+    pub(crate) local: Option<&'a dyn LocalToolHost>,
+    /// The run's saved turn, which tells a provider's reused call id from a repeat after a restart.
+    pub(crate) turn: i64,
     pub(crate) hooks: &'a Arc<DeviceHooks>,
     pub(crate) environment: &'a dyn CallEnvironment,
     pub(crate) logger: &'a Logger,
@@ -81,7 +81,7 @@ impl ToolContinuation for Continuation<'_> {
     fn request(&mut self, attempt: u32) -> BoxFuture<'_, Result<ToolExecutionResponse, RuntimeError>> {
         Box::pin(async move {
             // A restart skips what the saved wait already went through, and never repeats a request
-            // the server answered with that wait.
+            // that was answered with that wait.
             if let Some(saved) = self.resumed.as_ref().filter(|saved| attempt <= saved.attempt) {
                 return Ok(match saved.intervention.as_ref().filter(|_| attempt == saved.attempt) {
                     Some(id) => {
@@ -110,8 +110,7 @@ impl ToolContinuation for Continuation<'_> {
         Box::pin(self.wait(attempt, None))
     }
 
-    // Engine wake tokens are opaque. The server owns the separate user-action wait and requires a
-    // trusted user decision before sending this wake signal.
+    // Wake tokens are opaque. Only what's outside the model's reach answers one (`resume_device`).
     fn intervention(&mut self, attempt: u32) -> Option<BoxFuture<'_, Result<bool, RuntimeError>>> {
         let id = self.intervention.take();
         Some(Box::pin(self.wait(attempt, id)))
@@ -127,26 +126,16 @@ pub(crate) async fn execute_tool(deps: &ToolCallDeps<'_>, call_id: &str, name: &
 async fn request_tool_execution(deps: &ToolCallDeps<'_>, call_id: &str, name: &str, input: &JsValue, token: &str) -> Result<ToolExecutionResponse, StepFailure> {
     let started = Instant::now();
     let outcome = async {
-        // The run's bearer is reused while it has more than a minute left.
-        let access = match deps.gateway.cached_access(deps.identity) {
-            Some(access) => access,
-            None => {
-                let payload = object([("intervention_wait_version", JsValue::Number(1.0))]);
-                let key = format!("{}:mcp-token:{call_id}", deps.identity.misty_run_id);
-                McpRunAccess::from_json(&deps.control.request(deps.identity, "mcp-token", payload, key).await?)
-            }
+        let response = match deps.local.filter(|host| host.runs(name)) {
+            Some(host) => run_local_tool(host, &deps.identity.misty_run_id, call_id, deps.turn, name, input).await,
+            None => deps.gateway.call(GatewayCall { identity: deps.identity, call_id, name, input, device_hook_token: token }).await?,
         };
-        let authorized = started.elapsed();
-        let call_meta = query_embedding(deps.environment, name, input).await;
-        let call = McpCall { identity: deps.identity, access, call_id, name, input, device_hook_token: token, call_meta };
-        let response = deps.gateway.call(call).await?;
         // One line per call for timing; never arguments or results.
         let timing = object([
             ("run", string(deps.identity.misty_run_id.as_str())),
             ("call", string(call_id)),
             ("tool", string(name)),
-            ("token_ms", JsValue::Number(authorized.as_millis() as f64)),
-            ("mcp_ms", JsValue::Number((started.elapsed() - authorized).as_millis() as f64)),
+            ("tool_ms", JsValue::Number(started.elapsed().as_millis() as f64)),
         ]);
         deps.logger.line("tool_timing", &timing);
         Ok::<_, RuntimeError>(response)
@@ -169,33 +158,9 @@ async fn request_tool_execution(deps: &ToolCallDeps<'_>, call_id: &str, name: &s
             });
         }
     }
-    let failure = classify_mcp_transport_error(&error);
+    let failure = classify_tool_transport_error(&error);
     if failure.recognized && !failure.transient {
         return Ok(ToolExecutionResponse::tool_error(failure.code, failure.message));
     }
     Err(rethrow_step_error(error))
-}
-
-/// Tools that rank the person's memory by meaning; their query is embedded here.
-fn is_meaning_search(name: &str) -> bool {
-    matches!(name, "memory.history.search" | "memory.pref.list")
-}
-
-/// The server calls no model, so a memory search's query is embedded on the device's embedding model
-/// and the vector travels with the call. Without one, search finds nothing, as it does on a server
-/// with no embedding model.
-async fn query_embedding(environment: &dyn CallEnvironment, name: &str, input: &JsValue) -> Vec<(String, JsValue)> {
-    let query = input.get("query").and_then(JsValue::as_str).filter(|query| super::text::js_len(super::text::js_trim(query)) >= 3);
-    let Some(query) = query.filter(|_| is_meaning_search(name)) else {
-        return Vec::new();
-    };
-    let lower = query.to_lowercase();
-    let normalized: Vec<&str> = lower.split(super::text::js_is_space).filter(|word| !word.is_empty()).collect();
-    let Some((model, embedding)) = environment.embed_query(&normalized.join(" ")).await else {
-        return Vec::new();
-    };
-    vec![
-        ("misty/query_embedding".to_owned(), JsValue::Array(embedding.into_iter().map(JsValue::Number).collect())),
-        ("misty/query_embedding_model".to_owned(), string(model)),
-    ]
 }

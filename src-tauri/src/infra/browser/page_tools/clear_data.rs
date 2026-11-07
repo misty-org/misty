@@ -39,7 +39,7 @@ pub async fn browser_clear_website_data(
     let profile = crate::infra::profile_windows::profile_for_window(webview.window().label())
         .ok_or("This window has no profile.")?;
     let store = crate::infra::profile_windows::store_for_profile(&profile)?;
-    let identifier = browser_profile_identifier(store.as_deref())?;
+    let identifier = data_store_identifier(store.as_deref())?;
     #[cfg(target_os = "macos")]
     return clear_webkit_website_data(&app, identifier, kinds, request.since).await;
     #[cfg(windows)]
@@ -119,7 +119,7 @@ async fn clear_webview2_website_data(
     }
     let start = since.max(0) as f64 / 1000.0;
     let end = Utc::now().timestamp_millis() as f64 / 1000.0 + 60.0;
-    let view = crate::infra::browser_profile_view::ProfileView::open(app, profile)?;
+    let view = crate::infra::profile_store_view::StoreView::open(app, profile)?;
     let (send, receive) = tokio::sync::oneshot::channel();
     let send = Mutex::new(Some(send));
     with_core(&view, move |core, _| {

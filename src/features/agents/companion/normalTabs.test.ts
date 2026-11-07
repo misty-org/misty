@@ -33,7 +33,7 @@ vi.mock("@/features/webviews/browserRuntime", () => ({
   browserRuntimeCreated: mocks.created,
   browserScopeId: (tab: { id: string }) => `scope:${tab.id}`,
 }));
-vi.mock("../store/useAgentDeviceStore", () => ({ ensureServerAgentDevice: mocks.device }));
+vi.mock("../store/useAgentDeviceStore", () => ({ ensureAgentDevice: mocks.device }));
 vi.mock("../store/useAgentsStore", () => ({ agentsDeviceSnapshot: mocks.snapshot }));
 import { companionBrowserContext } from "./normalTabs";
 beforeEach(() => {

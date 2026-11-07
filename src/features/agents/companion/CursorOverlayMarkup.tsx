@@ -1,4 +1,3 @@
-import sprite from "@/shared/assets/misty-cloud-expression-cycle.webp?inline";
 import type { CSSProperties, RefObject } from "react";
 import { normalizeCompanionSize } from "./companionSize";
 import type { Presentation } from "./protocol";
@@ -37,7 +36,6 @@ export function CursorOverlayMarkup({
           } as CSSProperties
         }
       >
-        <img className="cursor-sprite" src={sprite} alt="" />
         <div ref={meter} className="cursor-waveform">
           {[0, 1, 2, 3, 4].map((i) => (
             <span key={i} />

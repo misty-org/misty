@@ -1,4 +1,4 @@
-//! Device job commands (docs/sync/devices.md): signing this device's
+//! Device job commands: signing this device's
 //! requests and run grants natively, and checking a job's grant before acting.
 #![cfg(desktop)]
 
@@ -7,11 +7,13 @@ use serde::Deserialize;
 use serde_json::Value;
 use tauri::State;
 
-use crate::app::device_commands::{context, require_device_window};
+use crate::app::device_commands::{context, local_device_id, require_device_window};
 use crate::app::runtime::MistyRuntime;
 use crate::infra::{
-    devices::admission, devices::agent_jobs, devices::identity::canonical_request,
-    devices::records::SignedRecord, devices::trust,
+    devices::agent_grants::{self, GrantRequest},
+    devices::agent_jobs,
+    devices::identity::canonical_request,
+    devices::records::SignedRecord,
 };
 
 /// The largest file a `folder.send` job hands to the Space's Library, the
@@ -55,7 +57,6 @@ pub async fn device_sign_request(
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RunGrantRequest {
-    pub target_device_id: String,
     #[serde(default)]
     pub agent_id: String,
     /// The chat or scheduled run. A grant with no chat can't run commands.
@@ -65,41 +66,37 @@ pub struct RunGrantRequest {
     pub scopes: Vec<String>,
 }
 
-/// Signs run grants for an agent chat, one per target device.
+/// Signs run grants for an agent chat. They need no account: an agent works on this computer.
 #[tauri::command]
 pub async fn device_sign_run_grants(
     webview: tauri::Webview,
     state: State<'_, MistyRuntime>,
-    api_base: String,
-    account_id: String,
     grants: Vec<RunGrantRequest>,
 ) -> Result<Vec<SignedRecord>, String> {
     require_device_window(&webview)?;
-    sign_run_grants(&state, &api_base, &account_id, grants).await
+    sign_run_grants(&state, grants).await
 }
 
 /// One signing path for chats and for the debug-only eval bridge.
 pub(crate) async fn sign_run_grants(
     state: &MistyRuntime,
-    api_base: &str,
-    account_id: &str,
     grants: Vec<RunGrantRequest>,
 ) -> Result<Vec<SignedRecord>, String> {
     if grants.len() > 16 {
         return Err("Too many devices in one request.".into());
     }
-    let context = context(state, api_base, account_id).await?;
+    let device = local_device_id(state).await?;
     grants
         .into_iter()
         .map(|grant| {
-            admission::sign_run_grant(
-                &context,
-                &grant.target_device_id,
-                &grant.agent_id,
-                &grant.chat_key,
-                grant.capabilities,
-                grant.scopes,
-                6 * 3600,
+            agent_grants::sign(
+                &device,
+                GrantRequest {
+                    agent_id: grant.agent_id,
+                    chat_key: grant.chat_key,
+                    capabilities: grant.capabilities,
+                    scopes: grant.scopes,
+                },
             )
         })
         .collect()
@@ -109,6 +106,7 @@ pub(crate) async fn sign_run_grants(
 #[tauri::command]
 pub async fn device_verify_job(
     webview: tauri::Webview,
+    state: State<'_, MistyRuntime>,
     operation: String,
     scope_id: String,
     config: Value,
@@ -119,9 +117,8 @@ pub async fn device_verify_job(
     }
     let grant: SignedRecord = serde_json::from_value(config["runGrant"].clone())
         .map_err(|_| "device_grant_invalid".to_owned())?;
-    trust::verify_job_grant(&grant, &scope_id, &operation)
-        .map(|_| ())
-        .map_err(|_| "device_grant_invalid".to_owned())
+    let device = local_device_id(&state).await.map_err(|_| "device_grant_invalid".to_owned())?;
+    agent_grants::verify(&device, &grant, &scope_id, &operation).map(|_| ())
 }
 
 /// Reads the file a `folder.send` job names: checks its grant and resolves the
@@ -138,8 +135,8 @@ pub async fn device_read_shared_file(
     require_device_window(&webview)?;
     let grant: SignedRecord = serde_json::from_value(config["runGrant"].clone())
         .map_err(|_| "device_grant_invalid".to_owned())?;
-    trust::verify_job_grant(&grant, &scope_id, "folder.send")
-        .map_err(|_| "device_grant_invalid".to_owned())?;
+    let device = local_device_id(&state).await.map_err(|_| "device_grant_invalid".to_owned())?;
+    agent_grants::verify(&device, &grant, &scope_id, "folder.send")?;
     if input["scopeId"].as_str() != Some(scope_id.as_str()) {
         return Err("invalid_scope".into());
     }

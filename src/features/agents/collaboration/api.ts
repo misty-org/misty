@@ -1,5 +1,4 @@
-import { cachedRequest } from "@/api/cache/cached-request";
-import { apiRequest } from "@/api/client";
+import { localCollaborationApi } from "./localApi";
 import type {
   AgentGoal,
   AgentPlan,
@@ -11,61 +10,31 @@ import type {
   PermissionMode,
 } from "./types";
 
-const segment = encodeURIComponent;
-
+/** A chat's collaboration state, in misty.db beside the chat. */
 export const collaborationApi = {
-  get: (conversationId: string) =>
-    cachedRequest<ConversationCollaboration>(
-      `/me/conversations/${segment(conversationId)}/collaboration`,
-    ),
+  get: (conversationId: string): Promise<ConversationCollaboration> =>
+    localCollaborationApi.get(conversationId),
   setMode: (conversationId: string, mode: ConversationMode) =>
-    apiRequest<{ mode: ConversationMode }>(`/me/conversations/${segment(conversationId)}/mode`, {
-      method: "PUT",
-      body: JSON.stringify({ mode }),
-    }),
+    localCollaborationApi.setMode(conversationId, mode),
   setPermissionMode: (conversationId: string, permissionMode: PermissionMode | "") =>
-    apiRequest<{ permissionMode: PermissionMode | "" }>(
-      `/me/conversations/${segment(conversationId)}/mode`,
-      { method: "PUT", body: JSON.stringify({ permission_mode: permissionMode }) },
-    ),
-  answer: (questionSetId: string, answers: AgentQuestionAnswer[]) =>
-    apiRequest<{ questionSet: AgentQuestionSet; continuation?: { prompt: string } }>(
-      `/me/agent-questions/${segment(questionSetId)}/answer`,
-      { method: "POST", body: JSON.stringify({ answers }) },
-    ),
-  approvePlan: (plan: AgentPlan) =>
-    apiRequest<{ plan: AgentPlan; mode: ConversationMode; prompt: string }>(
-      `/me/agent-plans/${segment(plan.id)}/approve`,
-      { method: "POST", body: JSON.stringify({ version: plan.version }) },
-    ),
-  revisePlan: (plan: AgentPlan, payload: AgentPlanPayload) =>
-    apiRequest<{ plan: AgentPlan }>(`/me/agent-plans/${segment(plan.id)}/revise`, {
-      method: "POST",
-      body: JSON.stringify({ plan: payload }),
-    }),
-  rejectPlan: (plan: AgentPlan) =>
-    apiRequest<{ plan: AgentPlan }>(`/me/agent-plans/${segment(plan.id)}/reject`, {
-      method: "POST",
-      body: "{}",
-    }),
+    localCollaborationApi.setPermissionMode(conversationId, permissionMode),
+  answer: (
+    questionSetId: string,
+    answers: AgentQuestionAnswer[],
+    conversationId: string,
+  ): Promise<{ questionSet: AgentQuestionSet; continuation?: { prompt: string } }> =>
+    localCollaborationApi.answer(questionSetId, answers, conversationId),
+  approvePlan: (plan: AgentPlan) => localCollaborationApi.approvePlan(plan),
+  revisePlan: (plan: AgentPlan, payload: AgentPlanPayload) => localCollaborationApi.revisePlan(plan, payload),
+  rejectPlan: (plan: AgentPlan) => localCollaborationApi.rejectPlan(plan),
   setGoal: (
     conversationId: string,
     input: { objective: string; successCriteria: string[]; budgetTokens?: number },
-  ) =>
-    apiRequest<{ goal: AgentGoal; prompt: string }>(
-      `/me/conversations/${segment(conversationId)}/goal`,
-      {
-        method: "POST",
-        body: JSON.stringify(input),
-      },
-    ),
+  ) => localCollaborationApi.setGoal(conversationId, input),
   controlGoal: (
     goal: AgentGoal,
     status: "paused" | "pursuing" | "cleared",
     budgetTokens?: number,
-  ) =>
-    apiRequest<{ goal: AgentGoal; prompt?: string }>(`/me/agent-goals/${segment(goal.id)}`, {
-      method: "PATCH",
-      body: JSON.stringify({ status, budgetTokens: budgetTokens ?? 0 }),
-    }),
+  ): Promise<{ goal: AgentGoal; prompt?: string }> =>
+    localCollaborationApi.controlGoal(goal, status, budgetTokens),
 };

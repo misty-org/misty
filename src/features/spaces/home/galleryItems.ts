@@ -74,7 +74,6 @@ export function chatItem(
     creatorId: conversation.created_by_user_id,
     href: conversationPath(spaceId, conversation),
     people,
-    private: conversation.kind === "direct",
   };
 }
 

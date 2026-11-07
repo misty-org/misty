@@ -9,7 +9,7 @@ use serde_json::json;
 use walkdir::WalkDir;
 
 use crate::{
-    environment::{self, Target},
+    environment,
     process::{npm, CommandSpec},
     workspace::Workspace,
 };
@@ -71,7 +71,7 @@ pub fn dev(workspace: &Workspace, profile: Option<&str>, route: Option<&str>) ->
 
 /// The development stack's API and website, which the app uses until someone chooses a server.
 fn development_addresses(workspace: &Workspace) -> Vec<(&'static str, String)> {
-    let values = environment::read(workspace, Target::Dev).unwrap_or_default();
+    let values = environment::read(workspace).unwrap_or_default();
     let api = values
         .get("MISTY_DEV_API_ORIGIN")
         .map(|origin| format!("{}/v1", origin.trim_end_matches('/')));

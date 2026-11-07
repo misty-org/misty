@@ -49,7 +49,8 @@ type AiTrigger =
   | "scheduled_task"
   | "event"
   | "handoff"
-  | "continuation";
+  | "continuation"
+  | "delegated";
 type AiPrivacyClass = "shared" | "private" | "device" | "provider";
 type AiRisk = "observe" | "draft" | "consequential" | "dangerous";
 type AiApprovalPolicy =
@@ -127,6 +128,8 @@ export interface AiArtifact<TOperations = unknown> {
   expiresAt: string;
   state: "proposed" | "applying" | "applied" | "rejected" | "stale" | "failed";
   error?: string;
+  /** The run that proposed it, told when the proposal is applied. */
+  invocationId?: string;
 }
 export interface AiCitation {
   id: string;
@@ -203,6 +206,10 @@ export interface AiInvocationRequest {
   profile?: string;
   /** The computer it was sent from, where the run works. */
   originDeviceId?: string;
+  /** The chat's earlier turns, oldest first: the server keeps no transcript. */
+  historyTurns?: { invocation_id?: string; prompt: string; reply?: string; created_at: string }[];
+  /** The chat's running notes on older turns, as the last run sent them. */
+  historyNotes?: unknown;
   /** A scheduled run this computer claimed and is starting (roadmap C1). */
   scheduleId?: string;
   scheduleClaim?: string;
@@ -225,6 +232,8 @@ export interface AiInvocationRequest {
   selection?: AiSelectionSnapshot;
   capture?: AiCaptureAttachment;
   attachmentIds?: string[];
+  /** Each attachment's file name, kept on this computer for uploading it. Never sent. */
+  attachmentNames?: Record<string, string>;
   deviceContexts?: AiInvocationDeviceContext[];
   thinkingMode?: "normal" | "deep";
   modelId?: string;
@@ -233,6 +242,13 @@ export interface AiInvocationRequest {
   conversationId?: string;
   /** Plan researches and proposes; Act does the work; Teach is a lesson. Omitted uses the conversation's mode. */
   collaborationMode?: "act" | "plan" | "teach";
+  /** A sub-agent: it shows in this run, and works in its notebook. */
+  parentRunId?: string;
+  notebookKey?: string;
+  /** How a sub-agent's prompt was started, which keeps it from starting its own. */
+  delegatedFrom?: string;
+  /** More model turns than a run gets, for a benchmark. Debug builds only. */
+  evalTurnLimit?: number;
   /** A Teach turn's lesson and the paused lessons it may resume, kept on this device. */
   lesson?: LessonPayload;
   lessonIndex?: LessonSummaryPayload[];

@@ -176,6 +176,7 @@ it("holds a walkthrough step until its target is clicked, then asks for the next
       prompt: "teach me to commit",
       conversationId: "conversation",
       look: true,
+      voice: true,
     }),
   );
   expect(mocks.submit.mock.calls[0][6]).toMatchObject({
@@ -231,6 +232,7 @@ it("snaps a point to the control Accessibility finds", async () => {
       prompt: "where's commit?",
       conversationId: "conversation",
       look: true,
+      voice: true,
     }),
   );
   complete("snap", "right there. [POINT:112,58:click Commit:screen1]");

@@ -337,3 +337,58 @@ fn a_deletion_is_forgotten_with_the_server_but_only_once_sent() {
     left.sort();
     assert_eq!(left, ["recent", "unsent"]);
 }
+
+#[test]
+fn the_inbox_lists_what_the_server_changed_until_it_is_taken() {
+    use crate::collections::{BOOKMARKS, MEMORY};
+    let directory = tempfile::tempdir().unwrap();
+    let mut store = LocalStore::open(&directory.path().join("a.db"), &LocalKey::generate()).unwrap();
+    store.apply_remote("", MEMORY, "one", 1, 10, Some(b"first")).unwrap();
+    store.apply_remote("", MEMORY, "two", 2, 11, None).unwrap();
+    store.apply_remote("", BOOKMARKS, "other", 3, 12, Some(b"{}")).unwrap();
+    let mut listed = store.inbox("", MEMORY, 10).unwrap();
+    listed.sort_by(|a, b| a.0.cmp(&b.0));
+    assert_eq!(listed.len(), 2);
+    assert_eq!(listed[0].0, "one");
+    assert_eq!(listed[0].1.as_ref().unwrap().as_slice(), b"first");
+    assert_eq!(listed[1].0, "two");
+    assert!(listed[1].1.is_none());
+    assert!(store.inbox("", BOOKMARKS, 10).unwrap().is_empty());
+    store.inbox_done("", MEMORY, &["one".to_owned()]).unwrap();
+    assert_eq!(store.inbox("", MEMORY, 10).unwrap().len(), 1);
+    // A local edit isn't news, and a later change lists it again.
+    store.write_one("", MEMORY, "mine", Some(b"here")).unwrap();
+    assert_eq!(store.inbox("", MEMORY, 10).unwrap().len(), 1);
+    store.apply_remote("", MEMORY, "one", 4, 20, Some(b"second")).unwrap();
+    assert_eq!(store.inbox("", MEMORY, 10).unwrap().len(), 2);
+}
+
+#[test]
+fn a_full_listing_that_drops_a_record_lists_it_as_deleted() {
+    use crate::collections::MEMORY;
+    let directory = tempfile::tempdir().unwrap();
+    let mut store = LocalStore::open(&directory.path().join("a.db"), &LocalKey::generate()).unwrap();
+    store.apply_remote("", MEMORY, "gone", 1, 10, Some(b"x")).unwrap();
+    store.inbox_done("", MEMORY, &["gone".to_owned()]).unwrap();
+    store.begin_full_listing().unwrap();
+    store.finish_full_listing().unwrap();
+    let listed = store.inbox("", MEMORY, 10).unwrap();
+    assert_eq!(listed.len(), 1);
+    assert_eq!(listed[0].0, "gone");
+    assert!(listed[0].1.is_none());
+}
+
+#[test]
+fn memory_waits_with_history_for_the_slower_batch() {
+    use crate::collections::{BOOKMARKS, HISTORY, MEMORY};
+    let directory = tempfile::tempdir().unwrap();
+    let mut store = LocalStore::open(&directory.path().join("a.db"), &LocalKey::generate()).unwrap();
+    store.write_one("", MEMORY, "a", Some(b"x")).unwrap();
+    store.write_one("", HISTORY, "b", Some(b"x")).unwrap();
+    store.write_one("", BOOKMARKS, "c", Some(b"x")).unwrap();
+    let now: Vec<String> = store.dirty_for_push(10, false).unwrap().into_iter().map(|row| row.collection).collect();
+    assert_eq!(now, [BOOKMARKS]);
+    let due = store.dirty_for_push(10, true).unwrap();
+    assert_eq!(due[0].collection, BOOKMARKS);
+    assert_eq!(due.len(), 3);
+}

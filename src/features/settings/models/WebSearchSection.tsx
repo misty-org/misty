@@ -44,3 +44,23 @@ export function WebSearchSection({ keys }: { keys: SavedModelKeys }) {
     </Section>
   );
 }
+
+/**
+ * Settings › Models › Connected apps. Agents use the person's apps through their own Composio
+ * project on this key, kept like the search key but read only by native code. Without it, agents
+ * use each app's web page.
+ */
+export function ConnectedAppsKeySection({ keys }: { keys: SavedModelKeys }) {
+  return (
+    <Section title="Connected apps">
+      <ModelKeyRow
+        label="Composio key"
+        description="Goes only to Composio. Without it, agents use each app’s web page."
+        providerId="composio"
+        saved={keys.saved}
+        onSave={keys.save}
+        onRemove={keys.remove}
+      />
+    </Section>
+  );
+}

@@ -1,6 +1,5 @@
-import sprite from "@/shared/assets/misty-cloud-expression-cycle.webp?inline";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { Button, ErrorNotification, Slider, Switch } from "@/shared/ui";
+import { Button, ErrorNotification, Slider } from "@/shared/ui";
 import { useState } from "react";
 import { DesktopSettingsRow, DesktopSettingsSection } from "@/features/settings";
 import {
@@ -22,23 +21,8 @@ export function CompanionAppearanceSettings() {
   };
   return (
     <DesktopSettingsSection title="Cursor">
-      <DesktopSettingsRow label="Show beside your cursor">
-        <Switch
-          aria-label="Show cursor companion"
-          checked={presentation.showCompanion ?? true}
-          disabled={!control}
-          onCheckedChange={(visible) => change({ kind: "visibility", visible })}
-        />
-      </DesktopSettingsRow>
       <DesktopSettingsRow label="Size">
         <div className="flex items-center gap-3">
-          <div className="flex size-10 shrink-0 items-center justify-center" aria-hidden="true">
-            <img
-              src={sprite}
-              alt=""
-              style={{ width: (32 * size) / 100, height: (32 * size) / 100 }}
-            />
-          </div>
           <Slider
             aria-label="Companion size"
             aria-valuetext={`${size}%`}

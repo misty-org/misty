@@ -22,6 +22,7 @@ export function validEvent(value: unknown): value is AccountEvent {
       "library-renditions",
       "device-pairing",
       "devices",
+      "conversation-titles",
     ].includes(event.topic) &&
     (event.id === undefined || (typeof event.id === "string" && event.id.length <= 200))
   );

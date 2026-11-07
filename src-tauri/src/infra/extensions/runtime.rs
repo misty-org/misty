@@ -183,7 +183,7 @@ async fn profile_store(
     profile: &str,
 ) -> Result<(crate::infra::profile_data::PageStore, String), String> {
     let lease = crate::infra::profile_data::page_store(profile).await?;
-    let identifier = crate::infra::browser_profile::data_store_identifier(lease.store.as_deref())?;
+    let identifier = crate::infra::profile_store::data_store_identifier(lease.store.as_deref())?;
     Ok((lease, uuid::Uuid::from_bytes(identifier).to_string()))
 }
 

@@ -1,4 +1,5 @@
-import { apiRequest } from "@/api/client";
+import { invoke } from "@/native/invoke";
+import { supersedeRunQuestions } from "@/features/agents/localRun";
 import {
   conversationMessage,
   updateConversation,
@@ -7,7 +8,7 @@ import {
 } from "./mistyStoreHelpers";
 
 let steeringRequest:
-  | { accountId: string; invocationId: string; text: string; key: string; pending?: Promise<void> }
+  | { accountId: string; invocationId: string; text: string; pending?: Promise<void> }
   | undefined;
 
 /** Forgets a follow-up in flight, when the account changes. */
@@ -15,7 +16,7 @@ export function resetSteering() {
   steeringRequest = undefined;
 }
 
-/** Sends a follow-up to the running task; repeating the same text reuses its idempotency key. */
+/** Sends a follow-up to the running task; repeating the same text while it's going sends it once. */
 export async function steerResponse(
   set: MistySet,
   get: MistyGet,
@@ -40,14 +41,18 @@ export async function steerResponse(
       accountId: state.accountId,
       invocationId: state.invocationId,
       text,
-      key: crypto.randomUUID(),
     };
   const request = steeringRequest;
   if (request.pending) return request.pending;
   request.pending = (async () => {
-    const receipt = await apiRequest<{ sequence: number }>(
-      `/ai/invocations/${encodeURIComponent(request.invocationId)}/steering`,
-      { method: "POST", body: JSON.stringify({ text, idempotencyKey: request.key }) },
+    const sequence = await invoke<string | null>("agent_run_steer", {
+      runId: request.invocationId,
+      text,
+    });
+    if (!sequence) throw new Error("This task has finished. Send this as a new message.");
+    const receipt = { sequence };
+    void supersedeRunQuestions(request.accountId, conversationId!, request.invocationId).catch(
+      () => undefined,
     );
     if (get().accountId !== request.accountId) return;
     const id = `${request.invocationId}-steering-${receipt.sequence}`;

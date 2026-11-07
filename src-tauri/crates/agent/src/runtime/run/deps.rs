@@ -8,12 +8,13 @@ use crate::{
     runtime::{
         agent_api::ToolHook,
         control_plane::ControlPlane,
-        device::{embed_call, DeviceCalls, DeviceModels, DeviceRole, EmbedCall},
+        device::{DeviceCalls, DeviceModels, DeviceRole},
         device_hooks::DeviceHooks,
         device_models::DeviceModelStore,
         instance_model::{WatchedModel, STREAM_STALL_MS},
+        local_tools::LocalToolHost,
         logger::Logger,
-        mcp_runtime::McpGateway,
+        tool_gateway::ToolGateway,
         model_access::{Generated, ModelAccess},
         web_search::{
             provider::SearchProviderId,
@@ -26,10 +27,7 @@ use crate::{
 
 use super::store::RunStore;
 
-/// How long a memory search's query vector is, as the server expects.
-const QUERY_DIMENSIONS: u32 = 768;
-
-/// The device's choices and the calls a run makes on its fast and embedding models.
+/// The device's choices and the calls a run makes on its fast model.
 pub(crate) trait RunDevice: Send + Sync {
     fn model_id(&self, role: DeviceRole) -> Option<String>;
     fn reasoning(&self) -> String;
@@ -39,7 +37,6 @@ pub(crate) trait RunDevice: Send + Sync {
     }
     fn title_for<'a>(&'a self, message: &'a str, reply: &'a str) -> BoxFuture<'a, Result<String, String>>;
     fn summary_for<'a>(&'a self, previous: &'a str, turns: &'a str) -> BoxFuture<'a, Result<String, String>>;
-    fn embed_query<'a>(&'a self, query: &'a str) -> BoxFuture<'a, Option<(String, Vec<f64>)>>;
 }
 
 /// A run's main model call: on the device's key, with the SDK's retries around starting the stream.
@@ -128,22 +125,13 @@ impl RunDevice for DesktopDevice {
         Box::pin(async move { self.calls.summary_for(previous, turns).await.map_err(|_| String::new()) })
     }
 
-    fn embed_query<'a>(&'a self, query: &'a str) -> BoxFuture<'a, Option<(String, Vec<f64>)>> {
-        Box::pin(async move {
-            let (model, route) = self.calls.on_device(DeviceRole::Embedding).ok()?;
-            let values = [query.to_owned()];
-            let call = EmbedCall { route: &route, model: &model, values: &values, dimensions: Some(QUERY_DIMENSIONS), images: None };
-            let vector = embed_call(&self.calls.client, call).await.ok()?.into_iter().next()?;
-            (vector.len() == QUERY_DIMENSIONS as usize).then_some((model, vector))
-        })
-    }
 }
 
 pub(crate) type Clock = Arc<dyn Fn() -> i64 + Send + Sync>;
 
 pub(crate) struct RunDeps {
     pub(crate) control: Arc<dyn ControlPlane>,
-    pub(crate) gateway: Arc<dyn McpGateway>,
+    pub(crate) gateway: Arc<dyn ToolGateway>,
     pub(crate) models: Arc<dyn TurnModels>,
     pub(crate) access: Arc<dyn ModelAccess>,
     pub(crate) device: Arc<dyn RunDevice>,
@@ -154,6 +142,7 @@ pub(crate) struct RunDeps {
     pub(crate) search_cache: WebSearchCache,
     pub(crate) search_endpoints: SearchEndpoints,
     pub(crate) page_reader: Arc<dyn PageReader>,
+    pub(crate) local_tools: Option<Arc<dyn LocalToolHost>>,
     pub(crate) clock: Clock,
     pub(crate) before_tool: Option<ToolHook>,
 }

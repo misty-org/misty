@@ -1,4 +1,4 @@
-//! Misty's database: `~/.misty/.local/data/misty.db`, the one place structured data lives.
+//! Misty's database: `~/.misty/data/misty.db`, the one place structured data lives.
 //! Every store (settings, navigation names, shortcuts, approvals, device trust, ...) is a
 //! set of tables here, created by numbered migrations. The version is SQLite's own
 //! `user_version`; a database newer than this build is refused, never downgraded.
@@ -225,6 +225,133 @@ const MIGRATIONS: &[&str] = &[
          hosts TEXT NOT NULL,
          PRIMARY KEY (scope, extension)
      ) WITHOUT ROWID;",
+    // 22: agent chats live on this computer again: one JSON
+    // document per conversation, folder, lesson and course. The server keeps no transcript.
+    "CREATE TABLE agent_chats (
+         account TEXT NOT NULL,
+         kind TEXT NOT NULL,
+         id TEXT NOT NULL,
+         document TEXT NOT NULL,
+         updated_at INTEGER NOT NULL,
+         PRIMARY KEY (account, kind, id)
+     ) WITHOUT ROWID;",
+    // 23: what each of an agent's tool calls did, so a run that restarts never repeats a write it
+    // can't account for. A row with no outcome began and nobody saw it end.
+    "CREATE TABLE agent_tool_journal (
+         run_id TEXT NOT NULL,
+         call_id TEXT NOT NULL,
+         name TEXT NOT NULL,
+         outcome TEXT,
+         updated_at INTEGER NOT NULL,
+         PRIMARY KEY (run_id, call_id)
+     ) WITHOUT ROWID;",
+    // 24: Memory on this computer (infra/memory): moments, facts and summaries per account and Space,
+    // what waits for a vector, and the vectors themselves, apart so a search reads nothing else.
+    // `sent` says the vault's record store has a row, `changed` that it needs this version, and
+    // `memory_deleted` holds deletions the vault hasn't heard of.
+    "CREATE TABLE memory_events (
+         account TEXT NOT NULL,
+         id TEXT NOT NULL,
+         space_id TEXT NOT NULL,
+         kind TEXT NOT NULL,
+         device_id TEXT NOT NULL DEFAULT '',
+         url TEXT NOT NULL DEFAULT '',
+         site TEXT NOT NULL DEFAULT '',
+         title TEXT NOT NULL DEFAULT '',
+         simhash TEXT NOT NULL DEFAULT '',
+         same_as TEXT,
+         ref_id TEXT NOT NULL DEFAULT '',
+         dwell_ms INTEGER NOT NULL DEFAULT 0,
+         occurred_at INTEGER NOT NULL,
+         app TEXT NOT NULL DEFAULT '',
+         window_title TEXT NOT NULL DEFAULT '',
+         session_id TEXT NOT NULL DEFAULT '',
+         indexed INTEGER NOT NULL DEFAULT 0,
+         updated_at INTEGER NOT NULL,
+         sent INTEGER NOT NULL DEFAULT 0,
+         changed INTEGER NOT NULL DEFAULT 1,
+         body TEXT NOT NULL DEFAULT '',
+         PRIMARY KEY (account, id)
+     );
+     CREATE INDEX memory_events_time ON memory_events(account, space_id, occurred_at);
+     CREATE INDEX memory_events_url ON memory_events(account, space_id, url, occurred_at)
+         WHERE same_as IS NULL AND simhash <> '';
+     CREATE INDEX memory_events_same_as ON memory_events(account, same_as) WHERE same_as IS NOT NULL;
+     CREATE INDEX memory_events_changed ON memory_events(account) WHERE changed = 1;
+     CREATE TABLE memory_facts (
+         account TEXT NOT NULL,
+         id TEXT NOT NULL,
+         space_id TEXT NOT NULL,
+         agent_id TEXT NOT NULL DEFAULT '',
+         memory_key TEXT NOT NULL,
+         kind TEXT NOT NULL,
+         content TEXT NOT NULL,
+         reason TEXT NOT NULL DEFAULT '',
+         source_conversation_id TEXT NOT NULL DEFAULT '',
+         source_invocation_id TEXT NOT NULL DEFAULT '',
+         last_used_at INTEGER,
+         created_at INTEGER NOT NULL,
+         updated_at INTEGER NOT NULL,
+         sent INTEGER NOT NULL DEFAULT 0,
+         changed INTEGER NOT NULL DEFAULT 1,
+         PRIMARY KEY (account, id),
+         UNIQUE (account, space_id, agent_id, memory_key)
+     );
+     CREATE INDEX memory_facts_changed ON memory_facts(account) WHERE changed = 1;
+     CREATE TABLE memory_summaries (
+         account TEXT NOT NULL,
+         space_id TEXT NOT NULL,
+         surface_id TEXT NOT NULL,
+         title TEXT NOT NULL DEFAULT '',
+         text TEXT NOT NULL,
+         outline TEXT,
+         updated_at INTEGER NOT NULL,
+         sent INTEGER NOT NULL DEFAULT 0,
+         changed INTEGER NOT NULL DEFAULT 1,
+         PRIMARY KEY (account, space_id, surface_id)
+     );
+     CREATE TABLE memory_chunks (
+         id INTEGER PRIMARY KEY,
+         account TEXT NOT NULL,
+         space_id TEXT NOT NULL,
+         branch TEXT NOT NULL,
+         record_id TEXT NOT NULL,
+         content_hash TEXT NOT NULL,
+         embedded INTEGER NOT NULL DEFAULT 0,
+         attempts INTEGER NOT NULL DEFAULT 0,
+         lease_until INTEGER,
+         due_at INTEGER NOT NULL,
+         backfill INTEGER NOT NULL DEFAULT 0,
+         text TEXT NOT NULL,
+         UNIQUE (account, space_id, branch, record_id)
+     );
+     CREATE INDEX memory_chunks_pending ON memory_chunks(account, due_at) WHERE embedded = 0;
+     CREATE INDEX memory_chunks_same_text ON memory_chunks(account, space_id, content_hash)
+         WHERE embedded = 1;
+     CREATE TABLE memory_vectors (
+         chunk_id INTEGER PRIMARY KEY REFERENCES memory_chunks(id) ON DELETE CASCADE,
+         account TEXT NOT NULL,
+         space_id TEXT NOT NULL,
+         branch TEXT NOT NULL,
+         model TEXT NOT NULL,
+         embedding BLOB NOT NULL
+     );
+     CREATE INDEX memory_vectors_scope ON memory_vectors(account, space_id, model);
+     CREATE TABLE memory_deleted (
+         account TEXT NOT NULL,
+         record_id TEXT NOT NULL,
+         deleted_at INTEGER NOT NULL,
+         PRIMARY KEY (account, record_id)
+     ) WITHOUT ROWID;",
+    // 25: whose run each journal row belongs to, so one account never reads another's receipts, and what
+    // each run has read, which decides what it may send out (agent_runtime/run_taint.rs).
+    "ALTER TABLE agent_tool_journal ADD COLUMN account TEXT NOT NULL DEFAULT '';
+     CREATE TABLE agent_run_taint (
+         run_id TEXT NOT NULL,
+         kind TEXT NOT NULL,
+         updated_at INTEGER NOT NULL,
+         PRIMARY KEY (run_id, kind)
+     ) WITHOUT ROWID;",
 ];
 
 #[derive(Debug, Clone)]
@@ -235,6 +362,11 @@ pub struct Store {
 impl Store {
     pub fn at(path: impl Into<PathBuf>) -> Self {
         Self { path: path.into() }
+    }
+
+    /// The database of the Misty home at `home`.
+    pub fn in_home(home: &Path) -> Self {
+        Self::at(misty_credential_store::home_data_dir(home).join("misty.db"))
     }
 
     pub fn path(&self) -> &Path {

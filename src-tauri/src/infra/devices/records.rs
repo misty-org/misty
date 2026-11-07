@@ -1,5 +1,5 @@
 //! Signed device records as JSON arrays led by their domain string
-//! (docs/sync/devices.md). Records travel as their exact signed bytes;
+//! Records travel as their exact signed bytes;
 //! nothing here re-serializes a record it verifies.
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use serde::{Deserialize, Serialize};
@@ -42,8 +42,10 @@ impl SignedRecord {
     }
 }
 
+/// A server's id is a hyphenated UUID; this computer's own (`agents::storage::device_id`) is its
+/// simple form.
 pub fn valid_device_id(value: &str) -> bool {
-    value.len() == 43
+    matches!(value.len(), 39 | 43)
         && value.starts_with("device_")
         && value[7..]
             .bytes()

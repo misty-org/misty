@@ -11,8 +11,20 @@
   border-radius: 20px;
   background: #191919;
   color: #f1f1f1;
-  cursor: default;
+  /* The system's own hand cursors: the panel moves from anywhere that isn't a control. */
+  cursor: grab;
+  -webkit-user-select: none;
   user-select: none;
+}
+
+.subtitle-panel.is-dragging,
+.subtitle-panel.is-dragging * {
+  cursor: grabbing !important;
+}
+
+/* Its controls don't move it. A slider's parts would otherwise inherit the hand. */
+.subtitle-card {
+  cursor: default;
 }
 
 .subtitle-header {
@@ -326,4 +338,14 @@
   .subtitle-busy {
     animation: none;
   }
+}
+
+/* The corner that resizes the panel. It has no look of its own, like a window's edge. */
+.subtitle-resize {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 16px;
+  height: 16px;
+  cursor: nwse-resize;
 }

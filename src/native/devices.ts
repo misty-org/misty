@@ -56,15 +56,15 @@ export const devicesNative = {
     account: Account,
     request: { method: string; path: string; timestamp: string; nonce: string; bodyDigest: string },
   ) => invoke<string>("device_sign_request", { ...account, ...request }),
+  /** Grants from this computer to itself. They need no account. */
   signRunGrants: (
-    account: Account,
     grants: {
-      targetDeviceId: string;
       agentId?: string;
+      chatKey?: string;
       capabilities: string[];
       scopes: string[];
     }[],
-  ) => invoke<SignedRecord[]>("device_sign_run_grants", { ...account, grants }),
+  ) => invoke<SignedRecord[]>("device_sign_run_grants", { grants }),
   verifyJob: (operation: string, scopeId: string, config: unknown) =>
     invoke<void>("device_verify_job", { operation, scopeId, config }),
   /** A shared folder's file for a `folder.send` job, checked against the job's

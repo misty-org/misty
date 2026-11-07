@@ -1,5 +1,7 @@
-import { cachedRequest } from "@/api/cache/cached-request";
-import { apiRequest } from "@/api/client";
+import { hasTauriInternals } from "@/shared/platform/tauri";
+import { isLocalGrant, localAppsApi, localGrantHolder } from "../apps/localApi";
+import { personalAgentsApi } from "../personalAgentsApi";
+import { localSiteGrants, namedGrants, revokeAgentSiteGrants, revokeSiteGrant } from "./localSiteGrants";
 
 /** A remembered approval: this agent may take this action on this one resource in Auto. */
 export interface AgentGrant {
@@ -9,22 +11,39 @@ export interface AgentGrant {
   action: string;
   scope_kind: string;
   scope_id: string;
-  /** Plain words from the server, e.g. "Push to misty-org/misty". */
+  /** Plain words, e.g. "Push to misty-org/misty". */
   label: string;
   created_at: string;
   last_used_at?: string;
   use_count: number;
 }
 
+/** Approvals remembered for connected apps on this computer, none outside the app. */
+async function localGrants(): Promise<AgentGrant[]> {
+  if (!hasTauriInternals()) return [];
+  return (await localAppsApi.grants()).grants;
+}
+
 export const grantsApi = {
-  list: () => cachedRequest<{ grants: AgentGrant[] }>("/me/agent-grants"),
-  revoke: (id: string) =>
-    apiRequest<void>(`/me/agent-grants/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  /** Both lists. One that fails hides only itself unless there's nothing else to show. */
+  list: async () => {
+    const [sites, local, agents] = await Promise.allSettled([
+      localSiteGrants(),
+      localGrants(),
+      personalAgentsApi.list(),
+    ]);
+    const here = local.status === "fulfilled" ? local.value : [];
+    if (sites.status === "rejected" && !here.length) throw sites.reason;
+    const names = new Map(
+      agents.status === "fulfilled" ? agents.value.agents.map((agent) => [agent.id, agent.name]) : [],
+    );
+    return {
+      grants: [...namedGrants(sites.status === "fulfilled" ? sites.value : [], names), ...here],
+    };
+  },
+  revoke: (id: string) => (isLocalGrant(id) ? localAppsApi.revokeGrant(id) : revokeSiteGrant(id)),
   revokeAll: (agentId: string) =>
-    apiRequest<{ revoked: number }>(
-      `/me/agent-grants?${new URLSearchParams({ agent_id: agentId })}`,
-      { method: "DELETE" },
-    ),
+    agentId === localGrantHolder ? localAppsApi.revokeAllGrants() : revokeAgentSiteGrants(agentId),
 };
 
 /** Grants grouped by agent, agents in name order, newest grant first within each. */

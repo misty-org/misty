@@ -25,13 +25,12 @@ pub(crate) mod browser_macos;
 #[cfg(target_os = "macos")]
 mod browser_pointer_guard_macos;
 pub mod browser_process_ended;
-mod browser_profile;
-pub(crate) mod browser_profile_view;
 pub mod browser_provider;
 pub mod browser_shortcuts;
 #[cfg(any(target_os = "macos", windows))]
 pub(crate) mod builtin_workers;
 pub mod cloud_clipboard;
+pub mod composio;
 pub mod credential_store;
 #[cfg(desktop)]
 pub mod cursor_companion;
@@ -49,6 +48,7 @@ pub mod global_hotkey;
 #[cfg(target_os = "macos")]
 pub mod google_sign_in_sheet;
 pub mod link_preview;
+pub mod memory;
 pub mod misty;
 pub mod misty_context;
 #[cfg(windows)]
@@ -67,6 +67,8 @@ mod plugin_routes;
 pub mod power_keep_awake;
 #[cfg(desktop)]
 pub mod profile_data;
+mod profile_store;
+pub(crate) mod profile_store_view;
 #[cfg(desktop)]
 pub mod profile_windows;
 #[cfg(desktop)]

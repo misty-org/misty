@@ -2,8 +2,6 @@ import {
   BookOpenText,
   ChevronDown,
   Languages,
-  Mic,
-  Monitor,
   Timer,
   Volume2,
 } from "lucide-react";
@@ -12,10 +10,9 @@ import { Button } from "@/shared/ui";
 import { SubtitleControls } from "./SubtitleControls";
 import type { SubtitlesAction, SubtitlesView } from "./subtitlesView";
 
-export type ControlGroup = "input" | "languages" | "context" | "audio" | "silence";
+export type ControlGroup = "languages" | "context" | "audio" | "silence";
 
 const labels: Record<ControlGroup, string> = {
-  input: "Source",
   languages: "Languages",
   context: "Context",
   audio: "Volume",
@@ -32,7 +29,6 @@ export function SubtitleToolbar(props: {
   const { view, act, open, setOpen } = props;
   const root = useRef<HTMLElement>(null);
   const icons = {
-    input: view.prefs.input === "system" ? Monitor : Mic,
     languages: Languages,
     context: BookOpenText,
     audio: Volume2,

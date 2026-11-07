@@ -1,4 +1,4 @@
-//! Re-publishes this session's policy when shared folders change (docs/sync/devices.md).
+//! Re-publishes this session's policy when shared folders change.
 #![cfg(desktop)]
 
 use tauri::State;

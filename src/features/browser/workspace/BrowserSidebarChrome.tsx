@@ -5,8 +5,8 @@ import { browserToolbarStyles } from "./browserToolbarStyles";
 
 /**
  * The focused browser pane's toolbar, drawn into the tab sidebar's slots: back, forward and
- * reload beside the sidebar toggle, the pane layout button at its foot, and the address field
- * (with pinned extensions and the ⋯ menu) in its top slot.
+ * reload beside the sidebar toggle, the pinned extensions in the tools row above the address
+ * field, and the address field (with the ⋯ menu) in its top slot.
  */
 export function BrowserSidebarChrome(props: {
   nav: ReactNode;
@@ -14,9 +14,9 @@ export function BrowserSidebarChrome(props: {
   badges: ReactNode;
   address: ReactNode;
   addressRef: RefObject<HTMLDivElement | null>;
-  layout: ReactNode;
+  extensions: ReactNode;
 }) {
-  const { nav: navSlot, top: topSlot, foot: footSlot } = useBrowserToolbarSlot();
+  const { nav: navSlot, top: topSlot, tools: toolsSlot } = useBrowserToolbarSlot();
   return (
     <>
       {navSlot ? (
@@ -31,10 +31,10 @@ export function BrowserSidebarChrome(props: {
           </div>
         </Portal>
       ) : null}
-      {footSlot ? (
-        <Portal container={footSlot}>
+      {toolsSlot ? (
+        <Portal container={toolsSlot}>
           <div className={cn(browserToolbarStyles.group)} data-browser-toolbar data-sidebar>
-            {props.layout}
+            {props.extensions}
           </div>
         </Portal>
       ) : null}

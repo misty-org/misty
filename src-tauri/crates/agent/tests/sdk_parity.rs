@@ -1,6 +1,6 @@
 //! Replays what the Vercel AI SDK sent and parsed against these clients, so a request or a parsed
 //! stream that differs from the SDK fails here. Record new fixtures with
-//! `src-tauri/services/agent-runtime/test/sdk-parity.record.test.ts`.
+//! the recorder in the TypeScript runtime, in git history before it was removed.
 // Fixtures are read from this crate's own test folder.
 #![allow(clippy::disallowed_methods)]
 

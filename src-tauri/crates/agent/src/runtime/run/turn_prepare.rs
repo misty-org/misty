@@ -86,7 +86,7 @@ impl RunLoop {
             }
         }
         self.condense_transcript().await;
-        // Where a long run's context goes (docs/agents/harness.md, "Context"): the largest parts, every 5 turns.
+        // Where a long run's context goes: the largest parts, every 5 turns.
         if turn % 5 == 4 {
             let parts = context_parts(&self.state.messages);
             let number = |value: usize| JsValue::Number(value as f64);

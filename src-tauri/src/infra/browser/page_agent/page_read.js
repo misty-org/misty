@@ -98,7 +98,7 @@
   };
   const CLOSE = /^(close|dismiss|no,? thanks|not now|maybe later|skip|×|✕|x)( (banner|notice|dialog|cookie (banner|notice)))?$/i;
 
-  // Popups a person closes before reading (docs/agents/harness.md, Page layer): newsletter and
+  // Popups a person closes before reading: newsletter and
   // discount offers, app prompts, surveys, sign-up walls. The agent read pages as text and never
   // noticed them, so its proof tabs stayed covered. A popup is the box on top in the middle of the
   // view, fixed or a dialog, over a quarter of it or more. Its own close control closes it, never
@@ -191,6 +191,7 @@
     prepare: (args) => P.prepare(args), perform: (args) => P.perform(args), observe: () => P.observe(),
     waitCheck: (args) => P.waitCheck(args), settle: (args) => P.settle(args), mark: (args) => P.mark(args),
     skill: (args) => P.skill(args), locate: (args) => P.locate(args), declineConsent: () => P.declineConsent(), dismissPopup: () => P.dismissPopup(),
+    consequenceAt: (args) => P.consequenceAt(args), consequenceOfKey: (args) => P.consequenceOfKey(args), describeRef: (args) => P.describeRef(args),
     locatorFor: (args) => {
       const resolved = P.resolve(args.documentId, args.ref);
       return resolved.ok && resolved.el ? { ok: true, locator: P.locatorOf(resolved.el) } : resolved;

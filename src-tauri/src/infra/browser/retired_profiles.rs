@@ -38,7 +38,7 @@ pub async fn browser_retired_profiles_erase(
         return Ok(());
     }
     for id in profile_ids.into_iter().filter(|id| retired(id)) {
-        if let Err(error) = super::profile_cleanup::remove(app.clone(), id).await {
+        if let Err(error) = super::store_cleanup::remove(app.clone(), id).await {
             eprintln!("Could not erase a retired browser profile: {error}");
         }
     }

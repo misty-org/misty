@@ -46,9 +46,7 @@ export function useSpaceGallery(
       spacesApi.conversations(spaceId).then((r) =>
         r.conversations.map((conversation) => ({
           ...chatItem(spaceId, conversation, me),
-          ...(isSpaceOwner ||
-          conversation.created_by_user_id === me ||
-          conversation.kind === "direct"
+          ...(isSpaceOwner || conversation.created_by_user_id === me
             ? {
                 remove: () => spacesApi.deleteOrClearConversation(spaceId, conversation.id),
                 removeLabel: "Delete",

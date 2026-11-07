@@ -1,5 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
-import { emitTo, listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { emitTo, type UnlistenFn } from "@tauri-apps/api/event";
+import { getCurrentWebview } from "@tauri-apps/api/webview";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { create } from "zustand";
 import { useSettingsStore } from "@/features/settings";
 import { pickSaveFile } from "@/native/sandbox";
@@ -7,13 +9,13 @@ import { errorText } from "@/shared/lib/format";
 import { useCaptureStore } from "../capture/useCaptureStore";
 import { deleteSubtitleSession, subtitleHistory, subtitleSessionText } from "./savedSubtitles";
 import { savedSubtitlePrefs } from "./subtitlePrefs";
-import { SubtitleSession, type CaptureSources } from "./subtitleSession";
+import { SubtitleSession } from "./subtitleSession";
 import {
   noSubtitles,
   SUBTITLES_ACTION,
   SUBTITLES_READY,
   SUBTITLES_VIEW,
-  SUBTITLES_WINDOW,
+  subtitlesPanelLabel,
   type SubtitlePrefs,
   type SubtitlesAction,
   type SubtitlesView,
@@ -25,7 +27,7 @@ let stopWatching: (() => void) | undefined;
 
 function draw(next: Partial<SubtitlesView>) {
   view = { ...view, ...next };
-  void emitTo(SUBTITLES_WINDOW, SUBTITLES_VIEW, view).catch(() => undefined);
+  void emitTo(subtitlesPanelLabel(getCurrentWindow().label), SUBTITLES_VIEW, view).catch(() => undefined);
 }
 
 function setPrefs(patch: Partial<SubtitlePrefs>) {
@@ -36,12 +38,6 @@ function setPrefs(patch: Partial<SubtitlePrefs>) {
     .updateSetting("voice", "subtitle_preferences", JSON.stringify(prefs));
 }
 
-async function refreshApps() {
-  const sources = await invoke<CaptureSources>("voice_capture_sources").catch(() => undefined);
-  if (sources)
-    draw({ apps: sources.applications.map((app) => app.name), microphone: sources.microphone });
-}
-
 async function start() {
   if (session || view.status !== "idle") return;
   const listening = useCaptureStore.getState().phase;
@@ -49,7 +45,7 @@ async function start() {
     draw({ notice: "Misty is already listening. Stop that, then try again." });
     return;
   }
-  draw({ status: "connecting", source: "", translation: "", notice: undefined });
+  draw({ status: "connecting", source: "", translation: "", notice: undefined, pageTopic: undefined });
   // The relay refuses without a key, and a refused socket can't say why.
   const keys = await invoke<string[]>("model_keys_saved").catch(() => ["soniox"]);
   if (!useSubtitlesStore.getState().on) return;
@@ -92,8 +88,6 @@ function act(action: SubtitlesAction) {
       return void useSubtitlesStore.getState().close();
     case "dismiss":
       return draw({ notice: undefined });
-    case "refreshApps":
-      return void refreshApps();
     case "prefs":
       return setPrefs(action.patch);
     case "export":
@@ -125,9 +119,11 @@ export const useSubtitlesStore = create<SubtitlesStore>((set, get) => ({
       prefs: savedSubtitlePrefs(useSettingsStore.getState().settings?.document),
       history: subtitleHistory(),
     };
+    // Only this window's panel, not another window's that's open at the same time.
     const events: Promise<UnlistenFn>[] = [
-      listen(SUBTITLES_READY, () => draw({})),
-      listen<SubtitlesAction>(SUBTITLES_ACTION, ({ payload }) => act(payload)),
+      getCurrentWebview().listen(SUBTITLES_READY, () => draw({})),
+      getCurrentWebview().listen<SubtitlesAction>(SUBTITLES_ACTION, ({ payload }) => act(payload)),
+      getCurrentWindow().onResized(() => void invoke("voice_subtitles_fit").catch(() => undefined)),
     ];
     const stopCapture = useCaptureStore.subscribe((state, previous) => {
       if (state.phase === "starting" && previous.phase !== "starting")
@@ -148,7 +144,6 @@ export const useSubtitlesStore = create<SubtitlesStore>((set, get) => ({
       set({ on: false });
       throw error;
     }
-    void refreshApps();
   },
 
   async close() {

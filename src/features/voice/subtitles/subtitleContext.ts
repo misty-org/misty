@@ -30,6 +30,9 @@ export interface SubtitleContext {
   translationTerms: TranslationTerm[];
 }
 
+const MAX_TEXT = 10_000;
+const MAX_TERMS = 100;
+
 export const emptySubtitleContext = (): SubtitleContext => ({
   category: "general",
   customCategory: "",
@@ -46,7 +49,7 @@ export function parseTerms(value: string) {
         .map((term) => term.trim())
         .filter(Boolean),
     ),
-  ].slice(0, 100);
+  ].slice(0, MAX_TERMS);
 }
 
 export function parseTranslationTerms(value: string): TranslationTerm[] {
@@ -57,7 +60,7 @@ export function parseTranslationTerms(value: string): TranslationTerm[] {
       return { source: (parts.shift() || "").trim(), target: parts.join(" = ").trim() };
     })
     .filter((term) => term.source && term.target)
-    .slice(0, 100);
+    .slice(0, MAX_TERMS);
 }
 
 export function formatTranslationTerms(terms: TranslationTerm[]) {
@@ -67,6 +70,31 @@ export function formatTranslationTerms(terms: TranslationTerm[]) {
 export function categoryLabel(context: SubtitleContext) {
   if (context.category === "custom") return context.customCategory.trim() || "Custom";
   return subtitleCategories.find((item) => item.value === context.category)?.label ?? "General";
+}
+
+/** What the model made of a page. */
+export interface PageContext {
+  domain: string;
+  topic: string;
+  terms: string[];
+  translationTerms: TranslationTerm[];
+}
+
+/** The page fills in around what the person wrote, and what they wrote wins. */
+export function withPage(manual: SubtitleContext, page: PageContext | undefined): SubtitleContext {
+  if (!page) return manual;
+  const chosen = new Set(manual.translationTerms.map((term) => term.source.toLowerCase()));
+  const named = manual.category !== "general" || !page.domain;
+  return {
+    category: named ? manual.category : "custom",
+    customCategory: named ? manual.customCategory : page.domain,
+    text: [manual.text.trim(), page.topic].filter(Boolean).join("\n").slice(0, MAX_TEXT),
+    terms: [...new Set([...manual.terms, ...page.terms])].slice(0, MAX_TERMS),
+    translationTerms: [
+      ...manual.translationTerms,
+      ...page.translationTerms.filter((term) => !chosen.has(term.source.toLowerCase())),
+    ].slice(0, MAX_TERMS),
+  };
 }
 
 export function sonioxContext(context: SubtitleContext) {

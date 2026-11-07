@@ -1,5 +1,5 @@
 use crate::{
-    environment::{self, Target},
+    environment,
     process::{npm, CommandSpec},
     workspace::Workspace,
 };
@@ -24,17 +24,17 @@ pub fn run(workspace: &Workspace, options: Setup) -> Result<()> {
         Component::Cloudflare => crate::cloudflare::setup(workspace, options.cloudflare),
         Component::Desktop => desktop(workspace),
         Component::Server | Component::All => {
-            environment::init(workspace, Target::Dev)?;
+            environment::init(workspace)?;
             crate::server::initialize_development_secrets(workspace)?;
             println!("Server configuration prepared. Existing values and keys were preserved.");
-            if environment::validate(workspace, Target::Dev).is_err() {
+            if environment::validate(workspace).is_err() {
                 println!("Next: misty setup cloudflare --account ACCOUNT_ID --zone ZONE_ID --hostname api.example.com");
                 println!("Then: misty server up; misty doctor server; misty setup desktop");
                 return Ok(());
             }
             println!("Next: misty server up; misty doctor server");
             if matches!(options.component, Component::All) {
-                environment::apply(workspace, Target::Dev)?;
+                environment::apply(workspace)?;
                 crate::server::health(workspace)?;
                 desktop(workspace)?;
             }

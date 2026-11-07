@@ -1,5 +1,5 @@
 //! `shell.run`: a real shell for agents, inside `permission-agent-shell`
-//! (`docs/plans/app-permissions.md`). Each chat gets a private workspace in Misty's data folder.
+//! Each chat gets a private workspace in Misty's data folder.
 //! Commands get the same shell and tools on every computer, all one program Misty ships (`tools`), and
 //! their workspace and, when granted, one shared folder. They have no network, no environment beyond
 //! what's set here, and no way to reach tabs, keys or the rest of `.misty`.

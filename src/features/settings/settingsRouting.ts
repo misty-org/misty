@@ -58,6 +58,7 @@ export const preferencesWithoutRows: ReadonlySet<string> = new Set([
   "app.tabs.startPage",
   "app.layout.presets",
   "app.shortcuts.bindings",
+  "app.sidebar.tools",
   "browser.searchEngine",
   "browser.customBangs",
   "browser.siteStyles",

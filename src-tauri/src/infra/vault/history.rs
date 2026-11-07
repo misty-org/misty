@@ -13,7 +13,7 @@ use serde_json::{json, Value};
 use tokio::time::{sleep_until, Instant};
 
 use super::*;
-use crate::infra::browser_library::{self, history::profile_key};
+use crate::infra::browser_library::{self, history::store_key};
 
 mod batches;
 use batches::{batch_of, parts, visits_of, Visit};
@@ -110,7 +110,7 @@ async fn on_library<T: Send + 'static>(
 
 /// The library names a profile by the store its pages use.
 fn library_key(profile: &str) -> Result<String, String> {
-    profile_windows::store_for_profile(profile).map(profile_key)
+    profile_windows::store_for_profile(profile).map(store_key)
 }
 
 async fn pass(app: &AppHandle, profile: &str, writer: &str, merging: bool) -> Result<(), String> {

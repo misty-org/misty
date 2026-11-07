@@ -1,5 +1,5 @@
 //! Model calls the desktop makes outside agent runs, on the runtime on its own computer
-//! (docs/agents/runtime.md): the desktop has the input, so the server is never asked. Each call runs
+//! the desktop has the input, so the server is never asked. Each call runs
 //! on the device's model for its role and key for that model's provider.
 //!
 //! The `/v1/device/*` table in `src/index.ts` is one method here per route, and
@@ -12,6 +12,7 @@ pub(crate) mod model_calls;
 mod model_checks;
 mod models;
 mod screen_calls;
+mod subtitle_context;
 mod text_calls;
 mod transcribe_diarized;
 mod voice_notes;
@@ -33,11 +34,12 @@ use failure::answered;
 pub const MAX_DEVICE_BODY_BYTES: usize = 40 << 20;
 
 /// Every call [`DeviceCalls::device_call`] knows, by its route's name.
-pub const DEVICE_CALL_NAMES: [&str; 12] = [
+pub const DEVICE_CALL_NAMES: [&str; 13] = [
     "cleanup",
     "voice-transcription",
     "screen-model",
     "refine-point",
+    "subtitle-context",
     "extract",
     "embed",
     "day-summary",
@@ -90,6 +92,7 @@ impl DeviceCalls {
             "voice-transcription" => self.voice_transcription(body).await,
             "screen-model" => self.screen_model(body).await,
             "refine-point" => self.refine_point(body).await,
+            "subtitle-context" => self.subtitle_context(body).await,
             "extract" => self.extract(body).await,
             "embed" => self.embed(body).await,
             "day-summary" => self.day_summary(body).await,
@@ -132,6 +135,14 @@ impl DeviceCalls {
             Err(error) => Err(error),
         };
         answered("refine-point", result)
+    }
+
+    pub async fn subtitle_context(&self, body: &str) -> Result<Value, DeviceCallFailure> {
+        let result = match read_body(body) {
+            Ok(body) => subtitle_context::subtitle_context_call(self, &body).await,
+            Err(error) => Err(error),
+        };
+        answered("subtitle-context", result)
     }
 
     pub async fn extract(&self, body: &str) -> Result<Value, DeviceCallFailure> {

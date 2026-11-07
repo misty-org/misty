@@ -1,4 +1,4 @@
-import { apiBlobRequest } from "@/api/client";
+import { localAttachmentFile } from "@/features/misty/localAttachments";
 import { invoke } from "@tauri-apps/api/core";
 
 /** Browser node jobs: run-bound grants, requests and task files for the native browser. */
@@ -34,64 +34,11 @@ export interface ClaimedWorkflowNodeJob {
   leaseExpiresAt?: string | null;
 }
 
-/**
- * The account's sites agents may not act on, as the server put them in the
- * job. The native side enforces them; a job without them gets its safe default.
- */
-export function jobSiteBlocks(
-  config: unknown,
-): { sensitive: boolean; sites: string[] } | undefined {
+/** The tool call a job belongs to, which native code finds its run's policy by. */
+export function jobPolicyCall(config: unknown): string | undefined {
   const value =
-    config && typeof config === "object" ? (config as { siteBlocks?: unknown }).siteBlocks : null;
-  if (!value || typeof value !== "object") return undefined;
-  const { sensitive, sites } = value as { sensitive?: unknown; sites?: unknown };
-  return {
-    sensitive: sensitive !== false,
-    sites: Array.isArray(sites)
-      ? sites.filter((site): site is string => typeof site === "string")
-      : [],
-  };
-}
-
-/**
- * The page actions the account asks about first, as the server put them in
- * the job. A job without them gets the safe default: every kind asks.
- */
-export function jobConfirmKinds(config: unknown): string[] | undefined {
-  const value =
-    config && typeof config === "object"
-      ? (config as { confirmKinds?: unknown }).confirmKinds
-      : undefined;
-  return Array.isArray(value)
-    ? value.filter((kind): kind is string => typeof kind === "string")
-    : undefined;
-}
-
-/**
- * The run's Ask or Auto and the person's remembered page grants, as the server
- * put them in the job. Anything malformed reads as no grants: every kind asks.
- */
-function jobGrantSet(config: unknown) {
-  const value =
-    config && typeof config === "object" ? (config as { grantSet?: unknown }).grantSet : undefined;
-  if (!value || typeof value !== "object") return undefined;
-  const { mode, grants, version } = value as {
-    mode?: unknown;
-    grants?: unknown;
-    version?: unknown;
-  };
-  return {
-    mode: mode === "auto" ? "auto" : "ask",
-    version: typeof version === "number" ? version : 0,
-    grants: Array.isArray(grants)
-      ? grants.filter(
-          (grant): grant is { kind: string; origin: string } =>
-            !!grant &&
-            typeof (grant as { kind?: unknown }).kind === "string" &&
-            typeof (grant as { origin?: unknown }).origin === "string",
-        )
-      : [],
-  };
+    config && typeof config === "object" ? (config as { policyCall?: unknown }).policyCall : undefined;
+  return typeof value === "string" ? value : undefined;
 }
 
 export function browserAgentExecutionRequest(job: ClaimedWorkflowNodeJob["job"]) {
@@ -116,9 +63,7 @@ export function browserAgentExecutionRequest(job: ClaimedWorkflowNodeJob["job"])
           ? job.config.taskId
           : undefined,
     },
-    siteBlocks: jobSiteBlocks(job.config),
-    confirmKinds: jobConfirmKinds(job.config),
-    grantSet: jobGrantSet(job.config),
+    policyCall: jobPolicyCall(job.config),
   };
 }
 
@@ -189,7 +134,7 @@ export async function browserDeviceRequest(job: ClaimedWorkflowNodeJob["job"]) {
     file.byteSize > 10 * 1024 * 1024
   )
     throw new DeviceOperationNotAttempted("invalid_task_file");
-  const blob = await apiBlobRequest(`/misty/attachments/${encodeURIComponent(file.id)}/content`);
+  const blob = await localAttachmentFile(file.id);
   const bytes = new Uint8Array(await blob.arrayBuffer());
   const digest = await crypto.subtle.digest("SHA-256", bytes);
   const hash = Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, "0")).join("");

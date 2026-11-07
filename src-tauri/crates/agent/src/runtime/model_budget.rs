@@ -113,7 +113,7 @@ pub(crate) fn model_turn_limit(value: Option<&JsValue>) -> Result<i64, BudgetErr
 }
 
 fn turn_limit_number(value: f64) -> Result<i64, BudgetError> {
-    // 200 is a development eval's most (docs/agents/harness.md, Errors and budget); other runs stay below.
+    // 200 is a development eval's most; other runs stay below.
     if !is_safe_integer(value) || !(1.0..=200.0).contains(&value) {
         return Err(BudgetError::InvalidModelTurnLimit);
     }

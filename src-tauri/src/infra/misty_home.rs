@@ -51,6 +51,8 @@ fn ensure_at(root: &Path, trash: &Trash) -> io::Result<HomeReport> {
 
     if manifest_version(root) < layout.layout_version {
         retire(root, &layout.retired, trash, &mut report)?;
+        // Holds nothing once its old folders have gone; refused if it still holds anything.
+        let _ = fs::remove_dir(root.join(".local"));
     }
     for relative in &layout.directories {
         secure_dir(&root.join(relative), &mut report, relative)?;

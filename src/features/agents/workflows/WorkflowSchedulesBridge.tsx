@@ -1,22 +1,19 @@
-import { observeAccountChanges } from "@/api/account-events";
-import { useAuth } from "@/features/auth";
+import { useAgentAccountId } from "../agentAccount";
 import { useEffect } from "react";
 import { startWaitingScheduledRuns } from "./deviceScheduledRuns";
 import { useWorkflowSchedulesStore } from "./useWorkflowSchedulesStore";
+import { observeWorkflowChanges } from "./workflowChanges";
 
-/** How often this computer checks for scheduled runs waiting for it. */
+/** How often this computer checks for scheduled runs due on it. */
 const pickUpEveryMs = 60_000;
 
 /**
- * Keeps workflow schedules current while the app is open. The server publishes a
- * "workflows" account event whenever a schedule changes, so the list reloads on
- * change (and on stream reset). It also starts scheduled runs that wait for
- * this computer's Misty browser (roadmap C1), as they come due and when the
- * app opens after missing some.
+ * Keeps workflow schedules current while the app is open: the list reloads whenever one
+ * changes (and on stream reset). It also starts scheduled runs due on this computer, as
+ * they come due and when the app opens after missing some.
  */
 export function WorkflowSchedulesBridge() {
-  const { user } = useAuth();
-  const accountId = user?.id ?? "";
+  const accountId = useAgentAccountId();
 
   useEffect(() => {
     useWorkflowSchedulesStore.getState().setAccount(accountId);
@@ -24,7 +21,7 @@ export function WorkflowSchedulesBridge() {
     const pickUp = () => void startWaitingScheduledRuns(accountId).catch(() => {});
     pickUp();
     const timer = window.setInterval(pickUp, pickUpEveryMs);
-    const stop = observeAccountChanges(accountId, ["workflows"], async () => {
+    const stop = observeWorkflowChanges(accountId, async () => {
       pickUp();
       await useWorkflowSchedulesStore.getState().load();
     });

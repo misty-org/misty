@@ -8,7 +8,7 @@ import { BrowserRuntimeBridge } from "@/features/webviews/BrowserRuntimeBridge";
 import { DeferUntilIdle } from "./DeferUntilIdle";
 import { SettingsOverlay } from "./SettingsOverlays";
 
-/** Signed-in overlays and background bridges mounted beside the route shell. */
+/** Overlays and background bridges mounted beside the route shell. */
 export function DesktopShellOverlays(props: {
   settingsOpen: boolean;
   onCloseSettings: () => void;
@@ -22,7 +22,7 @@ export function DesktopShellOverlays(props: {
       <BrowserContextMenuBridge />
       <AutofillChooser />
       <DeferUntilIdle>
-        {props.userId ? <MistyContextBridgeHost /> : null}
+        <MistyContextBridgeHost />
         <WorkflowSchedulesBridge />
         <AgentJobWorker />
       </DeferUntilIdle>

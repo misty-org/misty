@@ -1,13 +1,13 @@
 //! The profiles this computer knows, per account, and what its windows showed at quit. Kept
-//! in `~/.misty/profiles.json`, with nothing secret in it.
+//! in `misty.db` (`saved`), with nothing secret in it.
 //!
 //! Each account (or nobody signed in, `local`) has its own list. The store a profile's pages
 //! open in comes from here and never from a vault, so creating or destroying a vault changes
 //! nothing about where someone's sign-ins are. The store this computer has always browsed in
 //! belongs to the first account to ask for it, so nobody is signed out by an upgrade or by
 //! signing in.
+use super::saved::{self, Saved};
 use super::*;
-use crate::infra::file_access::fs;
 use serde::Deserialize;
 use std::collections::BTreeSet;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -38,21 +38,6 @@ pub struct OpenWindow {
     pub window_id: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub space: Option<String>,
-}
-
-#[derive(Default, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct Saved {
-    #[serde(default)]
-    scope: Option<String>,
-    #[serde(default)]
-    legacy_owner: Option<String>,
-    #[serde(default)]
-    profiles: BTreeMap<String, BTreeMap<String, ProfileEntry>>,
-    #[serde(default)]
-    open: Vec<OpenWindow>,
-    #[serde(default)]
-    orphans: BTreeMap<String, Vec<String>>,
 }
 
 #[derive(Default)]
@@ -102,31 +87,21 @@ impl std::ops::DerefMut for RegistryGuard {
 pub(super) fn lock_registry() -> Result<RegistryGuard, ()> {
     let mut guard = REGISTRY.lock().map_err(|_| ())?;
     if guard.is_none() {
-        *guard = Some(load());
+        // A list that can't be read stays unloaded, so the next ask tries again and nothing is
+        // ever saved over it.
+        let loaded = load().map_err(|error| eprintln!("Could not read the profiles: {error}"))?;
+        *guard = Some(loaded);
     }
     Ok(RegistryGuard(guard))
-}
-
-pub(super) fn saved_path() -> Option<std::path::PathBuf> {
-    let home = crate::infra::paths::misty_home_dir()?;
-    // A development profile keeps its own list beside the others.
-    let name = match std::env::var("MISTY_PROFILE") {
-        Ok(dev) if !dev.is_empty() => format!("profiles-{dev}.json"),
-        _ => "profiles.json".into(),
-    };
-    Some(home.join(name))
 }
 
 fn valid_profile(profile: &ProfileEntry) -> bool {
     valid_key(&profile.id)
 }
 
-pub(super) fn load() -> Registry {
-    let saved: Saved = saved_path()
-        .and_then(|path| fs::read(path).ok())
-        .and_then(|bytes| serde_json::from_slice(&bytes).ok())
-        .unwrap_or_default();
-    Registry {
+pub(super) fn load() -> Result<Registry, String> {
+    let saved = saved::read()?;
+    Ok(Registry {
         scope: saved.scope.unwrap_or_else(|| LOCAL_SCOPE.to_owned()),
         legacy_owner: saved.legacy_owner,
         profiles: saved
@@ -148,11 +123,10 @@ pub(super) fn load() -> Registry {
         orphans: saved.orphans,
         last_focused: None,
         incognito: BTreeMap::new(),
-    }
+    })
 }
 
 pub(super) fn save(state: &Registry) {
-    let Some(path) = saved_path() else { return };
     let open: Vec<OpenWindow> = current_windows()
         .into_iter()
         .filter(|(label, _)| is_person_window(label))
@@ -162,7 +136,7 @@ pub(super) fn save(state: &Registry) {
             space: window.space,
         })
         .collect();
-    let saved = Saved {
+    saved::write(&Saved {
         scope: Some(state.scope.clone()),
         legacy_owner: state.legacy_owner.clone(),
         profiles: state.profiles.clone(),
@@ -173,13 +147,7 @@ pub(super) fn save(state: &Registry) {
             open
         },
         orphans: state.orphans.clone(),
-    };
-    if let Ok(bytes) = serde_json::to_vec_pretty(&saved) {
-        let temporary = path.with_extension("json.tmp");
-        if fs::write(&temporary, bytes).is_ok() {
-            let _ = fs::rename(&temporary, &path);
-        }
-    }
+    });
 }
 
 /// The palette names a profile color may use, or a custom `#rrggbb`.

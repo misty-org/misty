@@ -72,28 +72,15 @@ pub(super) enum HomeCommand {
 #[derive(Debug, Subcommand)]
 pub(super) enum EnvCommand {
     /// Save a setting in its registered file; read the value from stdin.
-    Set {
-        #[arg(value_enum)]
-        target: environment::Target,
-        name: String,
-    },
+    Set { name: String },
     /// List environment settings and the files that own them.
     Describe,
     /// Create missing private development files without overwriting configured values.
-    Init {
-        #[arg(value_enum)]
-        target: environment::Target,
-    },
+    Init,
     /// Validate ownership, duplicates, permissions, and required values.
-    Check {
-        #[arg(value_enum)]
-        target: environment::Target,
-    },
+    Check,
     /// Show configured counts and missing names without displaying values.
-    Status {
-        #[arg(value_enum)]
-        target: environment::Target,
-    },
+    Status,
 }
 
 #[derive(Debug, Clone, Copy, ValueEnum)]

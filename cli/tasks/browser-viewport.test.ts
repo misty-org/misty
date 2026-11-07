@@ -15,8 +15,8 @@ const context = readFileSync(
   new URL("../../src-tauri/src/infra/browser/scripts/context_menu.js", import.meta.url),
   "utf8",
 );
-// Kiri's host channel sender as WebKit renders it (kiri/src/channel/macos.rs).
-const sender = readFileSync(new URL("../../kiri/src/channel/macos.rs", import.meta.url), "utf8")
+// Kiri's host channel sender as WebKit renders it (src-tauri/crates/kiri/src/channel/macos.rs).
+const sender = readFileSync(new URL("../../src-tauri/crates/kiri/src/channel/macos.rs", import.meta.url), "utf8")
   .match(/SENDER_SCRIPT: &str = "(.*)";/)[1];
 const script = viewport
   // Native background reporting is exercised separately in browser-background.test.ts.

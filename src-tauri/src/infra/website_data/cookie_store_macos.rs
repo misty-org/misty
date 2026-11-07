@@ -40,17 +40,17 @@ pub(crate) enum CookieStoreError {
 }
 type Result<T> = std::result::Result<T, CookieStoreError>;
 
-fn expected_profile(label: &str, profile_id: &str) -> Result<[u8; 16]> {
+fn expected_store(label: &str, store_id: &str) -> Result<[u8; 16]> {
     if !label.starts_with("misty-browser-") {
         return Err(CookieStoreError::Profile);
     }
-    super::super::browser_profile::data_store_identifier(Some(profile_id))
+    super::super::profile_store::data_store_identifier(Some(store_id))
         .map_err(|_| CookieStoreError::Profile)
 }
 
 /// A store identifier, on systems that have per-identifier stores. Never falls back to Misty's
 /// default store or an ephemeral one.
-fn store_identifier(profile_id: &str) -> Result<[u8; 16]> {
+fn store_identifier(store_id: &str) -> Result<[u8; 16]> {
     if NSProcessInfo::processInfo()
         .operatingSystemVersion()
         .majorVersion
@@ -58,7 +58,7 @@ fn store_identifier(profile_id: &str) -> Result<[u8; 16]> {
     {
         return Err(CookieStoreError::Unsupported);
     }
-    super::super::browser_profile::data_store_identifier(Some(profile_id))
+    super::super::profile_store::data_store_identifier(Some(store_id))
         .map_err(|_| CookieStoreError::Profile)
 }
 
@@ -86,8 +86,8 @@ unsafe fn view_cookie_store(
 /// be represented exactly is skipped and reported, never broadened; partitioned cookies are
 /// never claimed. WebKit answers on the main thread, but only retains there: converting runs on
 /// a worker, since a large store takes long enough to be felt.
-pub(crate) async fn read(app: &AppHandle, profile_id: &str) -> Result<CookieRead> {
-    let identifier = store_identifier(profile_id)?;
+pub(crate) async fn read(app: &AppHandle, store_id: &str) -> Result<CookieRead> {
+    let identifier = store_identifier(store_id)?;
     let (sender, receiver) = tokio::sync::oneshot::channel();
     let sender = Mutex::new(Some(sender));
     app.run_on_main_thread(move || unsafe {
@@ -133,8 +133,8 @@ pub(crate) async fn read(app: &AppHandle, profile_id: &str) -> Result<CookieRead
 }
 
 /// Verify the native profile of a page or inert view that website storage runs in.
-pub(crate) async fn verify_storage_profile(webview: &Webview, profile_id: &str) -> Result<()> {
-    let expected = expected_profile(webview.label(), profile_id)?;
+pub(crate) async fn verify_store(webview: &Webview, store_id: &str) -> Result<()> {
+    let expected = expected_store(webview.label(), store_id)?;
     let (sender, receiver) = tokio::sync::oneshot::channel();
     webview
         .with_webview(move |platform| unsafe {
@@ -153,11 +153,11 @@ pub(crate) async fn verify_storage_profile(webview: &Webview, profile_id: &str) 
 /// the caller's thread. The engine may clamp a long expiry.
 pub(crate) async fn write(
     app: &AppHandle,
-    profile_id: &str,
+    store_id: &str,
     cookie: Cookie,
     delete: bool,
 ) -> Result<()> {
-    let identifier = store_identifier(profile_id)?;
+    let identifier = store_identifier(store_id)?;
     let native = objc2::rc::autoreleasepool(|_| clamped_cookie(&cookie))?;
     let (sender, receiver) = tokio::sync::oneshot::channel();
     let sender = Mutex::new(Some(sender));

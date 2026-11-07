@@ -60,6 +60,55 @@ async fn a_device_wait_holds_the_call_until_the_device_answers_with_the_same_ide
     assert!(executed.iter().all(|call| call.0 == "c1"));
 }
 
+#[tokio::test]
+async fn a_device_wait_survives_a_restart_on_the_same_token() {
+    let harness = Harness::new(&json!({ "model_id": "fixture/model", "system": "", "prompt": "Open it", "allowed_tools": ["browser.steps"] }).to_string());
+    *harness.gateway.catalog.lock().unwrap() = vec![tool("browser.steps")];
+    let asks = AtomicUsize::new(0);
+    *harness.gateway.answer.lock().unwrap() = Some(Box::new(move |_, _| {
+        if asks.fetch_add(1, Ordering::SeqCst) == 0 {
+            ToolExecutionResponse { device_wait: Some(JsValue::Bool(true)), ..ToolExecutionResponse::default() }
+        } else {
+            ToolExecutionResponse::result(json(r#"{"ok":true}"#))
+        }
+    }));
+    harness.script(vec![calling(vec![call("c1", "browser_steps", "{}")])]);
+    then_finish(&harness);
+    let token = "misty-device:run-fixture:c1:wait:0";
+
+    // The run reaches the wait, and its file says so.
+    let first = tokio::spawn(run_space_task_agent(harness.deps(), harness.stored()));
+    let mut stored = None;
+    for _ in 0..2000 {
+        stored = saved(&harness).filter(|run| run.state.as_ref().is_some_and(|state| serde_json::to_string(state).unwrap().contains("\"waits\":{\"c1\"")));
+        if stored.is_some() {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(5)).await;
+    }
+    let stored = stored.expect("the file says the call is waiting");
+    first.abort();
+    let _ = first.await;
+    harness.hooks.forget_run("run-fixture");
+
+    // Misty opens again. Only the run's own token wakes it, and it asks again as the wait's next attempt.
+    let hooks = harness.hooks.clone();
+    let resumed = tokio::spawn(run_space_task_agent(harness.deps(), stored));
+    assert!(!hooks.resume("misty-device:someone-else:c1:wait:0", true, |_| false));
+    let mut woken = false;
+    for _ in 0..2000 {
+        woken = hooks.resume(token, true, |_| false);
+        if woken {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(5)).await;
+    }
+    assert!(woken, "the resumed run waits on the same token");
+    resumed.await.unwrap().unwrap();
+    let tokens: Vec<String> = harness.gateway.executed.lock().unwrap().iter().map(|(.., token)| token.clone()).collect();
+    assert_eq!(tokens, [token.to_owned(), "misty-device:run-fixture:c1:wait:1".to_owned()], "no second request for the wait it was in");
+}
+
 #[tokio::test(start_paused = true)]
 async fn a_provider_outage_is_waited_out_without_spending_the_runs_time() {
     let harness = Harness::new(&plain_context("Say it"));

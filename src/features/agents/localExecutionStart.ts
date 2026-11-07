@@ -2,9 +2,9 @@ import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { isApiSessionTransitioning, readApiSessionGeneration } from "@/api/client/session";
-import { useUserStore } from "@/features/auth/core";
 import { visibleAutopilotAvailable } from "./betaModes";
-import { lease, releaseLease, remoteLease } from "./executionLease";
+import { agentAccountId } from "./agentAccount";
+import { lease, releaseLease } from "./executionLease";
 import {
   executionGeneration,
   finishLocalExecution,
@@ -45,7 +45,7 @@ export async function startLocalExecution(
     if (
       isApiSessionTransitioning() ||
       readApiSessionGeneration() !== accountGeneration ||
-      useUserStore.getState().me?.id !== accountId
+      agentAccountId() !== accountId
     )
       throw new Error("The active account changed.");
   };
@@ -110,8 +110,6 @@ export async function startLocalExecution(
         }
       }
     }
-    assertCurrent();
-    await remoteLease(execution);
     assertCurrent();
     await invoke("agent_workspace_acquire", { request: lease(execution) });
     assertCurrent();
@@ -193,10 +191,6 @@ function startHeartbeat(execution: Execution, assertCurrent: () => void) {
       }
       lastTick = now;
       void Promise.resolve()
-        .then(() => {
-          assertCurrent();
-          return remoteLease(execution, true);
-        })
         .then(() => {
           assertCurrent();
           return invoke("agent_workspace_acquire", {

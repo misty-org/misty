@@ -10,6 +10,7 @@ import { settleRun } from "./settleRun";
 import { startRunReconciler } from "./runReconciler";
 import { resetMistyDraftAttachments } from "./draftAttachments";
 import { createMistyConversationActions } from "./mistyConversationActions";
+import { persistLocalChats } from "./localChatSync";
 import { advanceSubmissionEpoch } from "./mistySubmissionEpoch";
 import { conversationInSpace } from "./conversationSpace";
 import { onSpaceWindowSwitch } from "@/features/workspace/spaceWindow";
@@ -68,6 +69,9 @@ export const useMistyStore = create<MistyState>((set, get) => ({
   submit: async () => get().submitAnswer(get().query),
   submitAnswer: createSubmitAnswer(set, get),
 }));
+
+// Every change to a chat is saved on this device.
+persistLocalChats((listener) => useMistyStore.subscribe(listener));
 
 // A window shows its current Space's conversations; choosing another Space closes one from the last.
 onSpaceWindowSwitch((space) => {

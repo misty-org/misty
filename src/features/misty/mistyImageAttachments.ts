@@ -1,26 +1,8 @@
-import { apiRequest, readApiSessionGeneration } from "@/api/client";
-import { transferLibraryObject } from "@/api/spaces/library-upload";
+import { dataUrl, deleteLocalAttachment, saveLocalAttachment } from "./localAttachments";
 import type { MistyImageAttachment } from "./types";
 
 import { validateMistyImage, maxMistyImageBytes } from "./mistyImageValues";
 export { validateMistyImage, maxMistyImageBytes };
-
-interface Transfer {
-  url: string;
-  method?: string;
-  headers: Record<string, string>;
-}
-
-interface AttachmentResponse {
-  id: string;
-  name: string;
-  mime_type: MistyImageAttachment["mimeType"];
-  byte_size: number;
-  width: number;
-  height: number;
-  state: string;
-  preview_url: string;
-}
 
 export async function uploadMistyImage(
   file: File,
@@ -31,7 +13,6 @@ export async function uploadMistyImage(
 ): Promise<MistyImageAttachment> {
   validateMistyImage(file);
   const originalBytes = await file.arrayBuffer();
-  const originalHash = await sha256(originalBytes);
   const decoded = file.type.startsWith("image/")
     ? await decodeImage(file)
     : { width: 1, height: 1 };
@@ -51,68 +32,38 @@ export async function uploadMistyImage(
     rendition = { file: renditionFile, width: 1, height: 1 };
   }
   const modelBytes = await rendition.file.arrayBuffer();
-  const modelHash = await sha256(modelBytes);
-  const initiated = await apiRequest<{
-    attachment: AttachmentResponse;
-    original_transfer: Transfer;
-    model_transfer: Transfer;
-  }>("/misty/attachments", {
-    method: "POST",
-    body: JSON.stringify({
-      conversation_id: input.conversationId,
-      scope: "conversation",
-      filename: file.name,
-      mime_type: file.type,
-      byte_size: file.size,
-      sha256: originalHash,
-      width: decoded.width,
-      height: decoded.height,
-      model_mime_type: rendition.file.type,
-      model_byte_size: rendition.file.size,
-      model_sha256: modelHash,
-      model_width: rendition.width,
-      model_height: rendition.height,
-    }),
+  const id = `attachment_${crypto.randomUUID()}`;
+  input.onProgress?.(0.5);
+  await saveLocalAttachment({
+    id,
+    name: file.name,
+    mime_type: rendition.file.type,
+    data_url: dataUrl(modelBytes, rendition.file.type),
+    width: rendition.width,
+    height: rendition.height,
+    content_hash: await sha256(modelBytes),
+    byte_size: file.size,
+    created_at: new Date().toISOString(),
+    original_mime_type: file.type,
+    original_data_url: dataUrl(originalBytes, file.type),
   });
-  const generation = readApiSessionGeneration();
-  try {
-    await transferLibraryObject(initiated.original_transfer, file, generation, {
-      onProgress: (value) => input.onProgress?.(value * 0.72),
-    });
-    await transferLibraryObject(initiated.model_transfer, rendition.file, generation, {
-      onProgress: (value) => input.onProgress?.(0.72 + value * 0.28),
-    });
-    const completed = await apiRequest<AttachmentResponse>(
-      `/misty/attachments/${encodeURIComponent(initiated.attachment.id)}/finalize`,
-      { method: "POST" },
-    );
-    input.onProgress?.(1);
-    return {
-      id: completed.id,
-      name: completed.name,
-      mimeType: completed.mime_type,
-      byteSize: completed.byte_size,
-      width: completed.width,
-      height: completed.height,
-      previewUrl: URL.createObjectURL(file),
-      progress: 1,
-      state: "ready",
-    };
-  } catch (error) {
-    await apiRequest(`/misty/attachments/${encodeURIComponent(initiated.attachment.id)}`, {
-      method: "DELETE",
-    }).catch(() => undefined);
-    throw error;
-  }
+  input.onProgress?.(1);
+  return {
+    id,
+    name: file.name,
+    mimeType: file.type as MistyImageAttachment["mimeType"],
+    byteSize: file.size,
+    width: decoded.width,
+    height: decoded.height,
+    previewUrl: URL.createObjectURL(file),
+    progress: 1,
+    state: "ready",
+  };
 }
 
 export async function deleteMistyImage(attachment: MistyImageAttachment) {
   if (attachment.previewUrl.startsWith("blob:")) URL.revokeObjectURL(attachment.previewUrl);
-  if (!attachment.id.startsWith("draft-")) {
-    await apiRequest(`/misty/attachments/${encodeURIComponent(attachment.id)}`, {
-      method: "DELETE",
-    });
-  }
+  if (!attachment.id.startsWith("draft-")) await deleteLocalAttachment(attachment);
 }
 
 async function decodeImage(

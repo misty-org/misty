@@ -127,6 +127,20 @@ export function applyGlobalInvocationEvent(
     useCollaborationStore.getState().applyEvent(conversationId, event as CollaborationEvent);
     return;
   }
+  if (event.type === "conversation.title") {
+    updateConversation(set, get, conversationId, (conversation) => ({
+      ...conversation,
+      title: event.text,
+    }));
+    return;
+  }
+  if (event.type === "conversation.notes") {
+    updateConversation(set, get, conversationId, (conversation) => ({
+      ...conversation,
+      historyNotes: event.data,
+    }));
+    return;
+  }
   if (event.type === "notebook.updated") {
     patchConversationMessage(set, get, conversationId, messageId, { notebook: event.notebook });
     return;

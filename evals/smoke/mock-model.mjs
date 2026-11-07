@@ -31,6 +31,17 @@ const readBody = (request) =>
     request.on("error", reject);
   });
 
+/** No model, but texts sharing words land near each other, so search by meaning has something to rank. */
+function wordVector(text) {
+  const vector = Array(768).fill(0.001);
+  for (const word of String(text).toLowerCase().match(/[a-z0-9]+/g) ?? []) {
+    let hash = 7;
+    for (const code of Buffer.from(word)) hash = (hash * 31 + code) % 768;
+    vector[hash] += 1;
+  }
+  return vector;
+}
+
 const toolNames = (body) => (body.tools ?? []).map((tool) => tool.function?.name ?? tool.name);
 const usage = { prompt_tokens: 100, completion_tokens: 10, total_tokens: 110 };
 
@@ -189,7 +200,7 @@ const server = createServer(async (request, response) => {
       return reply(response, 200, {
         object: "list",
         model: body.model,
-        data: inputs.map((_, index) => ({ object: "embedding", index, embedding: Array(768).fill(0.01) })),
+        data: inputs.map((text, index) => ({ object: "embedding", index, embedding: wordVector(text) })),
         usage: { prompt_tokens: 1, total_tokens: 1 },
       });
     }

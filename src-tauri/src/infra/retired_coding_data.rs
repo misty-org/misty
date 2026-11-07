@@ -78,12 +78,12 @@ mod tests {
     fn data_folder() -> (tempfile::TempDir, PathBuf) {
         let directory = tempfile::tempdir().unwrap();
         let misty_dir = directory.path().join(".misty");
-        fs::create_dir_all(misty_dir.join(".local/data")).unwrap();
+        fs::create_dir_all(misty_dir.join("data")).unwrap();
         fs::create_dir_all(misty_dir.join("profiles/checkpoints")).unwrap();
         fs::create_dir_all(misty_dir.join("checkpoints-old")).unwrap();
         fs::write(misty_dir.join("profiles/checkpoints/keep"), "keep").unwrap();
         fs::write(misty_dir.join("checkpoints-old/keep"), "keep").unwrap();
-        fs::write(misty_dir.join(".local/data/keep"), "keep").unwrap();
+        fs::write(misty_dir.join("data/keep"), "keep").unwrap();
         fs::write(misty_dir.join("checkpoints.json"), "keep").unwrap();
         (directory, misty_dir)
     }
@@ -92,7 +92,7 @@ mod tests {
         for kept in [
             "profiles/checkpoints/keep",
             "checkpoints-old/keep",
-            ".local/data/keep",
+            "data/keep",
             "checkpoints.json",
         ] {
             assert!(misty_dir.join(kept).is_file(), "{kept} is kept");
@@ -100,7 +100,7 @@ mod tests {
     }
 
     fn store_in(misty_dir: &Path) -> Store {
-        Store::at(misty_dir.join(".local/data/misty.db"))
+        Store::in_home(misty_dir)
     }
 
     fn fill_checkpoints(misty_dir: &Path) {

@@ -117,6 +117,9 @@ pub(super) async fn interact_browser(
             .to_owned());
     }
     if kind == "native" {
+        if let Some(stopped) = page_agent::judge_point(app, &webview, request, &action["input"]).await? {
+            return Ok(stopped);
+        }
         return native_input::dispatch(
             app,
             webview,

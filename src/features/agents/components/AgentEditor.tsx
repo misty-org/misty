@@ -1,4 +1,4 @@
-import { personalAgentsApi, type AgentMemory } from "@/api/agents/native";
+import { personalAgentsApi, type AgentMemory } from "@/features/agents/personalAgentsApi";
 import { AgentPermissionsField } from "./AgentPermissionsField";
 import { AgentSpaceField } from "./AgentSpaceField";
 import { openMisty } from "@/features/misty/handoff";

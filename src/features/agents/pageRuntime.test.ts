@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import core from "../../../src-tauri/src/infra/browser/page_agent/page_core.js?raw";
 import tree from "../../../src-tauri/src/infra/browser/page_agent/page_tree.js?raw";
 import actions from "../../../src-tauri/src/infra/browser/page_agent/page_actions.js?raw";
+import consequence from "../../../src-tauri/src/infra/browser/page_agent/page_consequence.js?raw";
 import read from "../../../src-tauri/src/infra/browser/page_agent/page_read.js?raw";
 import skills from "../../../src-tauri/src/infra/browser/page_agent/page_skills.js?raw";
 
@@ -13,7 +14,7 @@ const globals = globalThis as unknown as { __mistyAgentPageV1?: Page };
 function load(html: string): Page {
   document.body.innerHTML = html;
   delete globals.__mistyAgentPageV1;
-  new Function(`${core}\n${tree}\n${actions}\n${read}\n${skills}`)();
+  new Function(`${core}\n${tree}\n${actions}\n${consequence}\n${read}\n${skills}`)();
   return globals.__mistyAgentPageV1!;
 }
 
@@ -138,6 +139,85 @@ describe("agent page runtime", () => {
     expect(text).toContain("one-time code — only the person may enter it");
     expect(text).toContain("payment card — only the person may enter it");
     expect(documentId).toBe("doc-1");
+  });
+
+  describe("the stop before sending or paying", () => {
+    const kindOf = (html: string, selector: string, action = "click", modifiers: string[] = []) => {
+      const page = load(html);
+      snapshot(page);
+      const element = document.querySelector(selector) as HTMLElement;
+      element.focus();
+      document.elementFromPoint = vi.fn(() => element);
+      const judged =
+        action === "key"
+          ? page.call("consequenceOfKey", { key: "Enter", modifiers })
+          : page.call("consequenceAt", { x: 0.5, y: 0.5 });
+      return judged.consequenceKind;
+    };
+
+    it("judges what's under a click, whatever the model said about it", () => {
+      expect(kindOf("<button>Send</button>", "button")).toBe("send");
+      expect(kindOf("<button><span>Delete account</span></button>", "button")).toBe("delete");
+      expect(kindOf("<button>Next</button>", "button")).toBe("");
+    });
+
+    it("knows a Send button in other languages and scripts", () => {
+      for (const name of ["Enviar", "Envoyer", "Senden", "Invia", "Отправить", "送信", "发送", "보내기"])
+        expect(kindOf(`<button>${name}</button>`, "button"), name).toBe("send");
+      for (const name of ["Pagar", "Payer", "Bezahlen", "Jetzt kaufen", "Купить", "購入", "付款", "결제"])
+        expect(kindOf(`<button>${name}</button>`, "button"), name).toBe("payment");
+      for (const name of ["Eliminar", "Supprimer", "Löschen", "Удалить", "削除", "삭제"])
+        expect(kindOf(`<button>${name}</button>`, "button"), name).toBe("delete");
+      expect(kindOf("<button>Publicar</button>", "button")).toBe("publish");
+    });
+
+    it("goes by a payment form's fields and address, whatever its button says", () => {
+      const named = '<form><input autocomplete="billing cc-number"><button type="submit">Weiter</button></form>';
+      expect(kindOf(named, "button")).toBe("payment");
+      const cvc = '<form><input name="card_cvc"><input type="submit" value="Weiter"></form>';
+      expect(kindOf(cvc, "input[type=submit]")).toBe("payment");
+      const address = '<form action="/shop/checkout?x=1"><button type="submit">Weiter</button></form>';
+      expect(kindOf(address, "button")).toBe("payment");
+      const frame = '<form><iframe src="https://js.stripe.com/v3/x" title="f"></iframe><button>Weiter</button></form>';
+      expect(kindOf(frame, "button")).toBe("payment");
+      const plain = '<form action="/search?q=checkout"><button type="submit">Weiter</button></form>';
+      expect(kindOf(plain, "button")).toBe("");
+    });
+
+    it("stops Enter in a composer outside a form, and not in a search box or an editor", () => {
+      const composer = '<div><div contenteditable="true" aria-label="Message #general"></div></div>';
+      expect(kindOf(composer, "[contenteditable]", "key")).toBe("send");
+      const beside = "<div><textarea></textarea><button>Send</button></div>";
+      expect(kindOf(beside, "textarea", "key")).toBe("send");
+      const translated = '<div><textarea placeholder="メッセージを入力"></textarea></div>';
+      expect(kindOf(translated, "textarea", "key")).toBe("send");
+      expect(kindOf('<input type="search" aria-label="Search">', "input", "key")).toBe("");
+      expect(kindOf('<input aria-label="Search messages"><button>Send</button>', "input", "key")).toBe("");
+      expect(kindOf('<div contenteditable="true" aria-label="Document body"></div>', "[contenteditable]", "key")).toBe("");
+    });
+
+    it("takes Cmd or Ctrl+Enter in anything you can write in as sending", () => {
+      const editor = '<div contenteditable="true" aria-label="Document body"></div>';
+      expect(kindOf(editor, "[contenteditable]", "key", ["Meta"])).toBe("send");
+      expect(kindOf("<textarea></textarea>", "textarea", "key", ["Control"])).toBe("send");
+      expect(kindOf('<input type="search">', "input", "key", ["Meta"])).toBe("");
+    });
+
+    it("judges Enter on a focused button as pressing it", () => {
+      expect(kindOf("<button>Send</button>", "button", "key")).toBe("send");
+    });
+
+    it("names controls for a question, and says which take a password", () => {
+      const page = load('<form><button>Send</button><label>Password <input type="password"></label></form>');
+      const { tree: text } = snapshot(page);
+      const button = refFor(text, /button "Send"/);
+      expect(page.call("describeRef", { ref: button })).toEqual({ name: 'button "Send"', password: false });
+      const secret = (page as unknown as { register: (el: Element) => string }).register(
+        document.querySelector("input")!,
+      );
+      expect(page.call("describeRef", { ref: secret }).password).toBe(true);
+      expect(page.call("describeRef", { ref: "e9999" }).name).toBe("");
+    });
   });
 
   it("flags clicks that send, buy or delete", () => {

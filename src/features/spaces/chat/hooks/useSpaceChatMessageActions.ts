@@ -2,6 +2,7 @@ import type { SpaceConversation, SpaceMember, SpaceMessage } from "@/api/spaces/
 import type { SpaceChatDraft } from "@/features/chat-composer/useSpaceChatDraft";
 import { spacesApi } from "@/api/spaces/api";
 import { buildMessageSpans, type MentionableAgent } from "../store/useSpaceMessageSpansStore";
+import { runOwnMentions } from "../mentionRuns";
 import { useRef } from "react";
 import type { Dispatch, FormEvent, SetStateAction } from "react";
 import { mergeSpaceMessages } from "../store/useSpaceMessageSpansStore";
@@ -31,7 +32,7 @@ export interface SpaceChatMessageActionsOptions {
     libraryIds: string[],
     replyToMessageId: string,
     optimisticMessage?: SpaceMessage,
-  ) => Promise<unknown>;
+  ) => Promise<SpaceMessage | undefined | void>;
   storeUpdateMessage: (
     spaceId: string,
     messageId: string,
@@ -138,8 +139,9 @@ export function useSpaceChatMessageActions(options: SpaceChatMessageActionsOptio
         );
         response.message.client_nonce ||= nonce;
         setGroupMessages((current) => mergeSpaceMessages(current, [response.message]));
+        runOwnMentions(response.message, options.agents, options.currentUser?.id);
       } else {
-        await options.storeSendMessage(
+        const sent = await options.storeSendMessage(
           spaceId,
           value,
           message.file_node_ids,
@@ -148,6 +150,7 @@ export function useSpaceChatMessageActions(options: SpaceChatMessageActionsOptio
           message.reply_to_message_id ?? "",
           optimistic,
         );
+        if (sent) runOwnMentions(sent, options.agents, options.currentUser?.id);
       }
     } catch (error) {
       if (conversationId) {

@@ -2,7 +2,7 @@
 //! identifier, so on the Mac nothing has to exist to read one. WebView2 needs a page of the
 //! profile: one of its tabs when there is one, or else a hidden helper, which is checked on every
 //! use since the window holding it can close at any time.
-use crate::infra::browser_profile::legacy_profile_identity;
+use crate::infra::profile_store::original_store_identity;
 use crate::infra::profile_windows;
 use crate::infra::website_data::cookie_store::{self, CookieStoreError};
 use crate::infra::website_data::coverage::CookieRead;
@@ -25,7 +25,7 @@ impl Store {
     pub fn for_profile(profile: &str) -> Option<Self> {
         let store = profile_windows::store_for_profile(profile).ok()?;
         Some(Self {
-            identity: store.clone().unwrap_or_else(legacy_profile_identity),
+            identity: store.clone().unwrap_or_else(original_store_identity),
             #[cfg(windows)]
             store,
         })
@@ -72,13 +72,13 @@ pub(super) fn release_helpers() {}
 #[cfg(windows)]
 mod helper {
     use super::*;
-    use crate::infra::browser_profile_view::ProfileView;
+    use crate::infra::profile_store_view::StoreView;
     use std::collections::BTreeMap;
     use std::sync::Mutex;
     use tauri::Manager;
 
     /// Hidden helpers by store, closed when the account changes or their profile closes.
-    static HELPERS: Mutex<BTreeMap<String, ProfileView>> = Mutex::new(BTreeMap::new());
+    static HELPERS: Mutex<BTreeMap<String, StoreView>> = Mutex::new(BTreeMap::new());
 
     pub(super) fn view(app: &AppHandle, store: &Store) -> Result<Webview, CookieStoreError> {
         if let Some(view) = tabs(app, store).into_iter().next() {
@@ -92,7 +92,7 @@ mod helper {
             }
             helpers.remove(&store.identity);
         }
-        let opened = ProfileView::open(app, store.store.as_deref())
+        let opened = StoreView::open(app, store.store.as_deref())
             .map_err(|_| CookieStoreError::Unavailable)?;
         let view = (*opened).clone();
         helpers.insert(store.identity.clone(), opened);

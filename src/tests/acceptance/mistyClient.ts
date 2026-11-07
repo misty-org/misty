@@ -1,3 +1,4 @@
+import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
 import { randomBytes, randomUUID } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -79,6 +80,43 @@ export function verifyAcceptanceEmail(userId: string) {
   ]);
 }
 
+const repository = fileURLToPath(new URL("../../..", import.meta.url));
+
+async function bridgeCall<T>(path: string, body: unknown): Promise<T> {
+  const address = process.env.MISTY_BROWSER_EVAL_BRIDGE ?? "http://127.0.0.1:47123";
+  const response = await fetch(`${address}${path}`, {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${process.env.MISTY_BROWSER_EVAL_BRIDGE_TOKEN ?? ""}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+  const reply = (await response.json()) as { ok: boolean; result?: T; error?: string };
+  if (!reply.ok) throw new Error(reply.error ?? String(response.status));
+  return reply.result as T;
+}
+
+/** Runs the body of an async function in the app's window, with its modules and `request`. */
+function windowCall<T>(script: string, request?: unknown): Promise<T> {
+  const prelude = `const module = (path) => import("/@fs${repository}src/" + path);
+const request = ${JSON.stringify(request ?? null)};`;
+  return bridgeCall<T>("/window-eval", { script: `${prelude}\n${script}`, timeoutMs: 120_000 });
+}
+
+/** The app's default agent, which a run works as. */
+export async function defaultAgentId(): Promise<string> {
+  return windowCall<string>(
+    `const { personalAgentsApi } = await module("features/agents/personalAgentsApi.ts");
+     return (await personalAgentsApi.list()).agents[0]?.id ?? "";`,
+  );
+}
+
+/** A run's state, as the window that follows it reads it. */
+export async function runStateOf(runId: string): Promise<string> {
+  return (await bridgeCall<{ state: string }>("/run-follow", { runId })).state;
+}
+
 export interface InvocationEvent {
   id?: string;
   type: string;
@@ -155,32 +193,30 @@ export class MistyClient {
     return (text ? JSON.parse(text) : undefined) as T;
   }
 
-  /** Starts one invocation and reads its event stream to the end. */
+  /**
+   * Starts one run in the debug app through its eval bridge, and reads its events to the end. A run
+   * works on this computer, so it needs the app running with `MISTY_BROWSER_EVAL_BRIDGE` and its token.
+   */
   async invoke(
     prompt: string,
     options: Record<string, unknown> = {},
     timeoutMs = 240_000,
   ): Promise<InvocationRun> {
-    const idempotencyKey = `acceptance-${randomUUID()}`;
-    const created = await this.json<{
-      invocationId: string;
-      conversationId?: string;
-      eventsUrl: string;
-    }>("/ai/invocations", {
-      method: "POST",
-      headers: { "Idempotency-Key": idempotencyKey },
-      body: JSON.stringify({
+    const created = await windowCall<{ invocationId: string; conversationId?: string }>(
+      `const { aiSurfaceApi } = await module("features/ai-surface/api.ts");
+       return aiSurfaceApi.createInvocation(request);`,
+      {
         mode: "drawer",
-        surface_id: "global",
+        surfaceId: "global",
         trigger: "message",
         prompt,
         context: [],
-        execution_mode: "user",
-        idempotency_key: idempotencyKey,
+        executionMode: "user",
+        idempotencyKey: `acceptance-${randomUUID()}`,
         timezone: "America/Los_Angeles",
         ...options,
-      }),
-    });
+      },
+    );
     const run: InvocationRun = {
       invocationId: created.invocationId,
       conversationId: created.conversationId,
@@ -189,60 +225,39 @@ export class MistyClient {
       tools: [],
       terminal: "",
     };
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
-    try {
-      const response = await this.raw(created.eventsUrl, {
-        headers: { Accept: "text/event-stream" },
-        signal: controller.signal,
+    const deadline = Date.now() + timeoutMs;
+    let read = 0;
+    while (Date.now() < deadline) {
+      const follow = await bridgeCall<{ state: string; events: InvocationEvent[] }>("/run-follow", {
+        runId: run.invocationId,
       });
-      if (!response.ok || !response.body) throw new Error(`events: ${response.status}`);
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-      for (;;) {
-        const chunk = await reader.read();
-        if (chunk.done) break;
-        buffer += decoder.decode(chunk.value, { stream: true }).replace(/\r\n/g, "\n");
-        let boundary = buffer.indexOf("\n\n");
-        while (boundary >= 0) {
-          const block = buffer.slice(0, boundary);
-          buffer = buffer.slice(boundary + 2);
-          boundary = buffer.indexOf("\n\n");
-          const data = block
-            .split("\n")
-            .filter((line) => line.startsWith("data:"))
-            .map((line) => line.slice(5).trimStart())
-            .join("\n");
-          if (!data) continue;
-          const event = JSON.parse(data) as InvocationEvent;
-          run.events.push(event);
-          if (event.type === "response.delta") run.text += String(event.delta ?? "");
-          if (event.type === "assistant.message") run.text = String(event.text ?? run.text);
-          if (
-            event.type === "tool.started" ||
-            event.type === "tool.completed" ||
-            event.type === "tool.failed"
-          )
-            run.tools.push({
-              // Started events carry catalog names (note.search), others model names.
-              name: String(event.toolName).replace(/\./g, "_"),
-              outcome: event.type.slice(5) as "completed" | "failed" | "started",
-            });
-          if (/^invocation\.(completed|failed|canceled)$/.test(event.type)) {
-            run.terminal = event.type;
-            await reader.cancel();
-            return run;
-          }
+      for (const event of follow.events.slice(read)) {
+        read++;
+        run.events.push(event);
+        if (event.type === "response.delta") run.text += String(event.delta ?? "");
+        if (event.type === "assistant.message") run.text = String(event.text ?? run.text);
+        if (
+          event.type === "tool.started" ||
+          event.type === "tool.completed" ||
+          event.type === "tool.failed"
+        )
+          run.tools.push({
+            name: String(event.toolName).replace(/\./g, "_"),
+            outcome: event.type.slice(5) as "completed" | "failed" | "started",
+          });
+        if (/^invocation\.(completed|failed|canceled)$/.test(event.type)) {
+          run.terminal = event.type;
+          return run;
         }
       }
-      run.terminal = "stream.ended";
-      return run;
-    } catch (error) {
-      run.terminal = controller.signal.aborted ? "timeout" : `error: ${String(error)}`;
-      return run;
-    } finally {
-      clearTimeout(timer);
+      if (follow.state === "missing") {
+        run.terminal = "stream.ended";
+        return run;
+      }
+      await new Promise((done) => setTimeout(done, 300));
     }
+    run.terminal = "timeout";
+    await bridgeCall("/run-cancel", { runId: run.invocationId }).catch(() => undefined);
+    return run;
   }
 }

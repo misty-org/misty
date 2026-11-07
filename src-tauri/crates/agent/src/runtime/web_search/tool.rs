@@ -2,7 +2,7 @@
 use crate::{
     runtime::{
         js_json::{text_or_empty, JsValue},
-        model_tools::McpRemoteTool,
+        model_tools::CatalogTool,
         text::{js_len, js_prefix},
         tool_transport::{object, string},
         web_fetch::tool::{web_fetch_descriptor, WEB_FETCH_TOOL},
@@ -38,7 +38,7 @@ fn phrases(provider: SearchProviderId) -> String {
 }
 
 /// web.search as the model sees it, for the device's provider.
-pub(crate) fn web_search_descriptor(id: SearchProviderId) -> McpRemoteTool {
+pub(crate) fn web_search_descriptor(id: SearchProviderId) -> CatalogTool {
     let mut kinds = id.kinds().to_vec();
     kinds.sort_unstable();
     let kinds = JsValue::Array(kinds.into_iter().map(string).collect()).stringify();
@@ -55,7 +55,7 @@ pub(crate) fn web_search_descriptor(id: SearchProviderId) -> McpRemoteTool {
         ),
         kinds = kinds,
     );
-    McpRemoteTool {
+    CatalogTool {
         name: WEB_SEARCH_TOOL.to_owned(),
         description: format!(
             "Search the web for current or outside information: research, news, prices, documentation, or facts you are unsure of. Write the query as keywords someone would put in a title or page, not as a question to you. kind picks Google's tab: {}. Returns titles, links and short snippets; read a page with web.fetch when the snippets are not enough, and cite the links you use. Runs on this device's own search key, so it needs no app or sign-in. Use it for web research instead of search apps.",
@@ -71,8 +71,8 @@ pub(crate) fn web_search_descriptor(id: SearchProviderId) -> McpRemoteTool {
 
 /// The run's catalog with the tools this device runs itself: web.fetch, and web.search when the
 /// device has a search key. Without one that tool isn't offered, and the server's prompt doesn't name it.
-pub(crate) fn with_device_tools(descriptors: Vec<McpRemoteTool>, device_search: Option<SearchProviderId>) -> Vec<McpRemoteTool> {
-    let mut tools: Vec<McpRemoteTool> = device_search.map(web_search_descriptor).into_iter().collect();
+pub(crate) fn with_device_tools(descriptors: Vec<CatalogTool>, device_search: Option<SearchProviderId>) -> Vec<CatalogTool> {
+    let mut tools: Vec<CatalogTool> = device_search.map(web_search_descriptor).into_iter().collect();
     tools.push(web_fetch_descriptor());
     tools.extend(descriptors.into_iter().filter(|descriptor| descriptor.name != WEB_SEARCH_TOOL && descriptor.name != WEB_FETCH_TOOL));
     tools

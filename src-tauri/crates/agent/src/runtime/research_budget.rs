@@ -1,4 +1,4 @@
-//! Research budget (docs/agents/harness.md, Completion). Prompts say "be economical"; this layer
+//! Research budget. Prompts say "be economical"; this layer
 //! makes it true. It reads the run's own transcript before every model call, so a replayed run
 //! agrees, and moves through three stages: open, wrap-up (the model is told what it has spent and
 //! must name the fact still missing) and closed (search and fetch leave the tool list, so the next
@@ -107,7 +107,6 @@ fn stage_for(cost: usize, scale: usize) -> ResearchStage {
 /// checklist (log_work_checklist) or every requirement listed from the request, whichever is more,
 /// never less than one nor more than twenty. A quick question has no checklist and keeps the base
 /// budget; a six-part task gets about 36 lookups before the wrap-up note
-/// (docs/agents/evals/odysseys.md).
 pub(crate) fn budget_scale(messages: &[Message]) -> usize {
     let mut steps = HashSet::new();
     // The requirements Misty listed from a long request (`requirements_review.rs`) count too: a run

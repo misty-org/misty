@@ -1,5 +1,5 @@
 // Adapted from Clicky's CompanionScreenCaptureUtility.swift (MIT, Farza 2026).
-// Capture for the cursor companion; see src/features/agents/companion/DESIGN.md.
+// Capture for the cursor companion;
 /*
 MIT License
 

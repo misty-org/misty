@@ -53,7 +53,7 @@ export {
 
 /**
  * Sidebar pages. Each opens one scrolling page; the registry blocks of a page render on it in
- * order. Page names are one word that never echoes its group's name (docs/settings/README.md).
+ * order. Page names are one word that never echoes its group's name.
  */
 type SettingsArea =
   | "account"

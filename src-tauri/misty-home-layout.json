@@ -1,7 +1,7 @@
 {
-  "layoutVersion": 6,
+  "layoutVersion": 7,
   "directories": [
-    ".local/data",
+    "data",
     "profiles",
     "cache"
   ],
@@ -14,7 +14,6 @@
     ".keys",
     ".local/bin",
     ".local/bin/misty-proxy",
-    ".local/data/browser-sync",
     ".profiles",
     ".release",
     ".template",
@@ -22,6 +21,7 @@
     "assets",
     "cloud",
     "config",
+    "data/browser-sync",
     "db",
     "forms",
     "home.json",

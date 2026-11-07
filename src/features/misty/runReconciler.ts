@@ -10,11 +10,15 @@ type Terminal = (typeof TERMINAL)[number];
 const isTerminal = (state: string): state is Terminal =>
   (TERMINAL as readonly string[]).includes(state);
 
+/** Nothing knows of the run: the app closed after it ended, so it reads as not finished. */
+const settledAs = (state: string): Terminal | null =>
+  isTerminal(state) ? state : state === "missing" ? "failed" : null;
+
 /**
- * Events are the fast path, but a missed event, a stop from another surface or
- * device, or a stream that went quiet would leave the store working forever.
- * While a run is marked working, ask the server for its real state on a timer
- * and whenever the window returns, then settle the store if the run is over.
+ * Events are the fast path, but a missed event or a stop from another surface
+ * would leave the store working forever. While a run is marked working, ask the
+ * crate for its real state on a timer and whenever the window returns, then
+ * settle the store if the run is over.
  */
 export function startRunReconciler(store: typeof useMistyStore) {
   let timer: ReturnType<typeof setInterval> | undefined;
@@ -30,13 +34,13 @@ export function startRunReconciler(store: typeof useMistyStore) {
       const now = store.getState();
       // The run, account or submission changed while asking: this answer is stale.
       if (now.invocationId !== invocationId || now.accountId !== accountId) return;
-      if (epoch !== submissionEpoch() || !isTerminal(state)) return;
+      const settled = settledAs(state);
+      if (epoch !== submissionEpoch() || !settled) return;
       const conversationId = now.invocationConversationId ?? now.activeConversationId;
-      settleRun(store.setState, store.getState, { state, conversationId });
-      // The stored copy has the final text and tool results the stream missed.
-      void store.getState().loadConversations();
+      // Late events apply before this settles: a run that ended has said everything it will.
+      settleRun(store.setState, store.getState, { state: settled, conversationId });
     } catch {
-      // Offline or signed out: the next check tries again.
+      // Native code didn't answer: the next check tries again.
     } finally {
       checking = false;
     }

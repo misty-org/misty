@@ -3,16 +3,6 @@
   font-size: 14px;
   color: var(--color-cream);
 }
-.agent-companion-preview {
-  display: flex;
-  justify-content: center;
-  padding: 4px 0 24px;
-}
-.agent-companion-preview img {
-  width: 80px;
-  height: 80px;
-  object-fit: contain;
-}
 .agent-companion-status {
   display: flex;
   align-items: center;

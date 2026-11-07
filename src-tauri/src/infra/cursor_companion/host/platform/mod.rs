@@ -75,7 +75,6 @@ pub fn shortcut(tx: Sender<Shortcut>) {
         let shortcut = match event {
             HotkeyEvent::Down => Shortcut::Held(true),
             HotkeyEvent::Up => Shortcut::Held(false),
-            HotkeyEvent::KeyboardActivity => Shortcut::KeyboardActivity,
             HotkeyEvent::Click(x, y) => Shortcut::Click(x, y),
             HotkeyEvent::Error(message) => Shortcut::Error(message),
         };

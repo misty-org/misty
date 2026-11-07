@@ -1,7 +1,7 @@
 export { default as AgentsPage } from "./AgentsPage";
 export { agentsDeviceSnapshot, forgetFolder, shareFolder } from "./store/useAgentsStore";
 export { shareFolderWarning } from "./collaboration/AgentFolderMenu";
-export { ensureServerAgentDevice } from "./store/useAgentDeviceStore";
+export { ensureAgentDevice } from "./store/useAgentDeviceStore";
 
 export { CompanionAppearanceSettings } from "./companion/CompanionAppearanceSettings";
 export { CursorCompanionController } from "./companion/CursorCompanionController";

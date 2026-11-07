@@ -1,9 +1,8 @@
-//! The agent runtime on this computer (docs/agents/runtime.md).
+//! The agent runtime on this computer.
 //!
 //! Agents run here, not on the server, on the `misty-agent` crate inside this process. The app gives
-//! it this device's model keys and choices and hands it the runs the server queues for this device
-//! (`agent_runtime_deliver`). Its runs are kept under `~/.misty/runtime/runs`, so a run continues after
-//! Misty quits and opens again.
+//! it this device's model keys and choices and starts its runs (`local_runs`). Its runs are kept under
+//! `~/.misty/runtime/runs`, so a run continues after Misty quits and opens again.
 //!
 //! A run failing must never take down the browser. The crate runs each one as its own task, and
 //! everything called from here goes through [`contained`] or a session's task. That rests on panics
@@ -15,10 +14,18 @@ compile_error!(
 
 pub mod calls;
 pub mod live;
+pub mod host_lookup;
+pub mod local_runs;
+pub mod local_tools;
 mod log;
+pub(crate) mod run_taint;
 pub mod sessions;
-#[cfg(debug_assertions)]
-mod typescript_baseline;
+pub(crate) mod tool_gate;
+pub(crate) mod tool_journal;
+pub(crate) mod tool_policy;
+pub(crate) mod tool_question;
+mod untrusted;
+pub(crate) mod windows;
 
 use std::{
     future::Future,
@@ -53,10 +60,10 @@ static PUSHING: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 static STOPPED: AtomicBool = AtomicBool::new(false);
 static APP: OnceLock<tauri::AppHandle> = OnceLock::new();
 
-/// A Library recording may take minutes to transcribe. A call past this answers as one the Node
-/// process didn't answer.
+/// A Library recording may take minutes to transcribe. A call past this answers as one that wasn't
+/// answered.
 const CALL_LIMIT: Duration = Duration::from_secs(600);
-/// Node's own limit for opening a connection, which nothing in the runtime sets per call.
+/// The limit for opening a connection, which nothing in the runtime sets per call.
 const CONNECT_LIMIT: Duration = Duration::from_secs(10);
 const NOT_ANSWERED: &str = "Misty's agent runtime didn't answer.";
 
@@ -67,8 +74,7 @@ fn current() -> Option<Arc<Running>> {
         .clone()
 }
 
-/// Node's `fetch` used no proxy, and neither do the crate's page fetches. A proxy would also see every
-/// model key.
+/// No proxy, as with the crate's page fetches: a proxy would also see every model key.
 fn client() -> Result<reqwest::Client, String> {
     runtime_client_builder()
         .no_proxy()
@@ -104,8 +110,9 @@ async fn start(app: &tauri::AppHandle) -> Result<Running, String> {
         data_dir: home.clone(),
         client: client.clone(),
         logger: Logger::to(log::sink(home.join("runtime.log"))),
-        internal_api_base: None,
         page_reader: Arc::new(ConfinedPageReader),
+        local_tools: Some(Arc::new(local_tools::AppToolHost { app: app.clone() })),
+        run_host: Arc::new(local_runs::AppRunHost { app: app.clone() }),
         before_tool: None,
     })
     .map_err(|_| "Misty couldn't open the agent runtime's runs.")?;
@@ -144,14 +151,9 @@ pub(crate) async fn ensure(app: &tauri::AppHandle) -> Result<Arc<Running>, Strin
     Ok(running)
 }
 
-/// Runs left unfinished when Misty last closed go on as it opens, without waiting for the next
-/// delivery. With none on disk nothing starts, so someone who only browses never reaches the keychain
+/// Runs left unfinished when Misty last closed go on as it opens. With none on disk nothing starts, so someone who only browses never reaches the keychain
 /// for model keys.
 pub fn resume_at_launch(app: &tauri::AppHandle) {
-    #[cfg(debug_assertions)]
-    if typescript_baseline::selected() {
-        return;
-    }
     let app = app.clone();
     tauri::async_runtime::spawn(async move {
         let unfinished = data_dir()
@@ -202,8 +204,6 @@ async fn contained_within<T: Send + 'static>(
 pub fn models_changed() {
     let Some(app) = APP.get().cloned() else {
         // Nothing has started, and starting reads the models fresh.
-        #[cfg(debug_assertions)]
-        typescript_baseline::models_changed();
         return;
     };
     tauri::async_runtime::spawn(async move {
@@ -218,24 +218,11 @@ pub fn models_changed() {
     });
 }
 
-/// Which runtime this app uses, for the Odysseys report (debug builds only: the bridge that asks isn't
-/// in a release).
-#[cfg(debug_assertions)]
-pub(crate) fn runtime_name() -> &'static str {
-    if typescript_baseline::selected() {
-        "typescript"
-    } else {
-        "rust"
-    }
-}
-
 /// Stops the runtime with Misty. Its runs stop where they stand and wait in their files for the next
 /// launch.
 pub fn stop() {
     STOPPED.store(true, Ordering::SeqCst);
     sessions::stop_all();
-    #[cfg(debug_assertions)]
-    typescript_baseline::stop();
     let running = RUNNING
         .lock()
         .unwrap_or_else(PoisonError::into_inner)

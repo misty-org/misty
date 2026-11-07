@@ -47,9 +47,8 @@ pub(super) async fn dispatch_windows(
             grant_id: request.grant_id.clone(),
             operation: request.operation.clone(),
             input: request.input.clone(),
-            site_blocks: request.site_blocks.clone(),
-            confirm_kinds: request.confirm_kinds.clone(),
-            grant_set: request.grant_set.clone(),
+            policy_call: request.policy_call.clone(),
+            policy: request.policy.clone(),
         };
         std::sync::Arc::new(move || {
             authorize_native_input(&app, &view, &request, &expected_origin, generation)

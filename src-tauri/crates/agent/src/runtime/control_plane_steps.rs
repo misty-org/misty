@@ -9,7 +9,7 @@ use super::{
     tool_transport::{object, string, HarnessCheckpoint},
 };
 
-/// How a run ended, as the server records it (`HarnessCompletion`).
+/// How a run ended (`HarnessCompletion`).
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct HarnessCompletion {
     pub(crate) status: &'static str,

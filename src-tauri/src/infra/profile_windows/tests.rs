@@ -89,7 +89,7 @@ fn the_original_store_belongs_to_the_first_account_to_ask() {
     state.scope = "https://a|two".into();
     let second = state.store(PERSONAL).expect("a second account has its own");
     assert_eq!(second.len(), 64);
-    assert!(super::super::browser_profile::data_store_identifier(Some(&second)).is_ok());
+    assert!(super::super::profile_store::data_store_identifier(Some(&second)).is_ok());
     state.scope = "https://a|one".into();
     assert_eq!(state.store(PERSONAL), None);
 }

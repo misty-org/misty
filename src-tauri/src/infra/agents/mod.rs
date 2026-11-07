@@ -1,4 +1,5 @@
 use crate::infra::file_access::{self, fs};
+pub mod chats;
 pub mod folder_changes;
 mod shared_folders;
 mod storage;

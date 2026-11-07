@@ -8,7 +8,7 @@ import {
   DesktopSettingsRow as SettingsRow,
   DesktopSettingsSection as SettingsSectionBlock,
 } from "../components/DesktopSettingsUI";
-import { ChoiceControl, SwitchControl } from "../SettingsControls";
+import { SwitchControl } from "../SettingsControls";
 import type { SettingsContentProps } from "../settingsTypes";
 import { MistyRememberedSection } from "./MistyRememberedSection";
 
@@ -90,21 +90,6 @@ export function MistySection(_props: SettingsContentProps & { page?: "misty" | "
               checked={settings?.enabled ?? false}
               disabled={!settings || working}
               onChange={(value) => void updateSettings(value)}
-            />
-          </SettingsRow>
-          <SettingsRow
-            label="Conversation retention"
-            description="How long conversations are kept on the server."
-            muted={!settings || !settings.enabled}
-          >
-            <ChoiceControl
-              value={String(settings?.retention_days ?? 30)}
-              disabled={!settings || working || !settings.enabled}
-              onValueChange={(value) => void updateSettings(true, Number(value))}
-              options={[7, 30, 90, 365].map((days) => ({
-                value: String(days),
-                label: `${days} days`,
-              }))}
             />
           </SettingsRow>
         </SettingsSectionBlock>

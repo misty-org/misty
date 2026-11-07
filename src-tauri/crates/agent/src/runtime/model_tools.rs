@@ -10,9 +10,9 @@ use super::{js_json::JsValue, text::js_prefix};
 // Providers accept at most 128 tools per request and 64-character tool names.
 const MAX_MODEL_TOOLS: usize = 128;
 
-/// One tool as the server's catalog describes it (`MCPRemoteTool`).
+/// One tool as the run's catalog describes it (`local_prompt/catalog.json`).
 #[derive(Clone, Debug, Deserialize)]
-pub(crate) struct McpRemoteTool {
+pub(crate) struct CatalogTool {
     pub(crate) name: String,
     #[serde(default)]
     pub(crate) description: String,
@@ -25,7 +25,7 @@ pub(crate) struct McpRemoteTool {
     /// Misty's read-only annotation; a failed read is always safe to retry.
     #[serde(default, rename = "readOnly")]
     pub(crate) read_only: bool,
-    /// Runs in this runtime on the device (web.search), never through Misty's gateway.
+    /// Runs in this runtime (web.search), never through the tool host.
     #[serde(default)]
     pub(crate) local: bool,
 }
@@ -46,7 +46,7 @@ fn model_tool_name(name: &str) -> String {
 
 #[derive(Clone, Debug)]
 pub(crate) struct ModelTool {
-    pub(crate) descriptor: McpRemoteTool,
+    pub(crate) descriptor: CatalogTool,
     pub(crate) model_name: String,
 }
 
@@ -62,7 +62,7 @@ pub(crate) struct ModelCatalog {
 
 impl ModelCatalog {
     /// Names every catalog tool once, avoiding the runtime's own tool names.
-    pub(crate) fn new(descriptors: Vec<McpRemoteTool>, reserved: &[&str]) -> Self {
+    pub(crate) fn new(descriptors: Vec<CatalogTool>, reserved: &[&str]) -> Self {
         let mut taken: Vec<String> = reserved.iter().map(|name| (*name).to_owned()).collect();
         let visible = MAX_MODEL_TOOLS.saturating_sub(reserved.len()).min(descriptors.len());
         let omitted = descriptors[visible..].iter().map(|descriptor| descriptor.name.clone()).collect();
@@ -106,13 +106,13 @@ impl ModelCatalog {
         self.tool(model_name).is_some_and(|tool| tool.descriptor.concurrent)
     }
 
-    /// Tools this runtime runs itself, which Misty's gateway never sees.
+    /// Tools this runtime runs itself, which the tool host never sees.
     pub(crate) fn local(&self, model_name: &str) -> bool {
         self.tool(model_name).is_some_and(|tool| tool.descriptor.local)
     }
 }
 
-/// One definition per catalog entry. Every call but a local tool's runs through Misty's gateway, and
+/// One definition per catalog entry. Every call but a local tool's runs through the tool host, and
 /// `visual_tool_output` shapes what comes back.
 pub(crate) fn catalog_tools(catalog: &ModelCatalog) -> Vec<ToolDefinition> {
     catalog
@@ -197,8 +197,8 @@ fn image_output(output: Option<&JsValue>, fields: &[(String, JsValue)]) -> Optio
 mod tests {
     use super::*;
 
-    fn tool(name: &str) -> McpRemoteTool {
-        McpRemoteTool {
+    fn tool(name: &str) -> CatalogTool {
+        CatalogTool {
             name: name.to_owned(),
             description: String::new(),
             input_schema: RawJson::empty_object(),

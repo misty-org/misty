@@ -1,6 +1,6 @@
 //! Pushed page state (`opened_pages.rs`): the pages this turn opened, shown before the next turn, so
 //! the agent acts on them instead of spending a turn asking for each. A run with browser_run reads
-//! pages in its programs instead (docs/agents/harness.md, browser_run).
+//! pages in its programs instead.
 use crate::runtime::{
     js_json::JsValue,
     opened_pages::{opened_scopes, page_state_messages, TurnResult, PAGE_STATE_CHARS},

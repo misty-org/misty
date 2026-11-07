@@ -26,19 +26,6 @@ fn own_window(webview: &tauri::Webview) -> Result<&str, String> {
     }
 }
 
-#[cfg(debug_assertions)]
-fn on_the_rust_runtime() -> Result<(), String> {
-    if super::typescript_baseline::selected() {
-        return Err("Voice isn't available while benchmarking the TypeScript runtime.".to_owned());
-    }
-    Ok(())
-}
-
-#[cfg(not(debug_assertions))]
-fn on_the_rust_runtime() -> Result<(), String> {
-    Ok(())
-}
-
 /// The companion's spoken conversation.
 #[tauri::command]
 pub async fn agent_runtime_voice_open(
@@ -47,7 +34,6 @@ pub async fn agent_runtime_voice_open(
     on_message: Channel<SessionMessage>,
 ) -> Result<String, String> {
     let owner = own_window(&webview)?;
-    on_the_rust_runtime()?;
     let running = super::ensure(&app).await?;
     let models = Arc::new(DeviceVoiceModels::new(
         running.runtime.device_models(),
@@ -69,7 +55,6 @@ pub async fn agent_runtime_live_open(
     on_message: Channel<SessionMessage>,
 ) -> Result<String, String> {
     let owner = own_window(&webview)?;
-    on_the_rust_runtime()?;
     let spec = LiveSessionSpec::for_device(&channels, &language)?;
     let running = super::ensure(&app).await?;
     let models = running.runtime.device_models();

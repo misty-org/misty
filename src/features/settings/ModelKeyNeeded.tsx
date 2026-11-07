@@ -2,8 +2,7 @@ import { Button } from "@/shared/ui";
 import { openModelSettings } from "./models/modelKeys";
 
 /**
- * Whether an AI error is the server's `model_key_needed` answer: no agent model is set on
- * this device and the server has none of its own.
+ * Whether an AI error is a run's `model_key_needed` ending: no agent model is set on this device.
  */
 export function needsModelKey(message: string | null | undefined): boolean {
   return Boolean(message && /\bmodel key\b/i.test(message));

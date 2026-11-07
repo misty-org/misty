@@ -1,5 +1,3 @@
-import { cachedRequest } from "@/api/cache/cached-request";
-import { apiRequest } from "@/api/client";
 
 export type AgentMethodKind = "workflow" | "template" | "skill";
 export type AgentMethodInputs = Record<string, string | number | boolean>;
@@ -56,8 +54,11 @@ export interface WorkflowSchedule extends ScheduleTiming {
   conversation_id?: string;
   inputs: AgentMethodInputs;
   enabled: boolean;
-  /** awaiting_device: due, waiting for Misty on its computer (device_claimed: starting there). */
-  state: "idle" | "running" | "failed" | "awaiting_device" | "device_claimed";
+  /**
+   * awaiting_device: due, waiting for Misty on its computer (device_claimed: starting there).
+   * handed_off: kept on this computer, due and waiting for a window of its profile.
+   */
+  state: "idle" | "running" | "failed" | "awaiting_device" | "device_claimed" | "handed_off";
   /** The computer whose Misty browser runs it; absent runs without a browser. */
   device_id?: string;
   /** The profile whose sign-ins runs use, chosen when the schedule is made. */
@@ -77,6 +78,8 @@ export interface UpcomingWorkflowRun extends WorkflowSchedule {
 }
 export interface AgentMethod {
   id: string;
+  /** The Space whose memory holds it; empty is the personal Space. */
+  space_id?: string;
   agent_id: string;
   kind: AgentMethodKind;
   enabled: boolean;
@@ -97,66 +100,27 @@ export interface SaveAgentMethod {
   source_invocation_id?: string;
   definition: AgentMethodDefinition;
 }
-const base = "/ai/agent-methods";
-export const agentMethodsApi = {
-  list: (agentId: string, onCached?: (value: { methods: AgentMethod[] }) => void) =>
-    cachedRequest<{ methods: AgentMethod[] }>(`${base}?agent_id=${encodeURIComponent(agentId)}`, {
-      onCached,
-    }),
-  save: (input: SaveAgentMethod) =>
-    apiRequest<{ method: AgentMethod }>(
-      input.id ? `${base}/${encodeURIComponent(input.id)}` : base,
-      { method: input.id ? "PUT" : "POST", body: JSON.stringify(input) },
-    ),
-  /** Sets a workflow's schedule; every run uses the workflow's latest version. */
-  saveSchedule: (
-    methodId: string,
-    schedule: ScheduleTiming & {
-      inputs: AgentMethodInputs;
-      enabled: boolean;
-      /** "" runs without a browser; absent keeps the current computer. */
-      device_id?: string;
-      profile?: string;
-    },
-  ) =>
-    apiRequest<{ schedule: WorkflowSchedule }>(`${base}/${encodeURIComponent(methodId)}/schedule`, {
-      method: "PUT",
-      body: JSON.stringify(schedule),
-    }),
-  removeSchedule: (methodId: string) =>
-    apiRequest<void>(`${base}/${encodeURIComponent(methodId)}/schedule`, { method: "DELETE" }),
-  upcoming: () => cachedRequest<{ runs: UpcomingWorkflowRun[] }>("/ai/workflow-schedules"),
-  /** Runs waiting for this computer (roadmap C1). */
-  deviceRuns: (deviceId: string) =>
-    cachedRequest<{ runs: (WorkflowSchedule & { title: string; agent_id: string })[] }>(
-      `/ai/workflow-schedules/device-runs?device_id=${encodeURIComponent(deviceId)}`,
-    ),
-  /** Takes a waiting run for this computer; the run must then start with its grant. */
-  claimDeviceRun: (scheduleId: string, deviceId: string, profiles: string[]) =>
-    apiRequest<DeviceRunClaim>(
-      `/ai/workflow-schedules/${encodeURIComponent(scheduleId)}/device-claim`,
-      { method: "POST", body: JSON.stringify({ device_id: deviceId, profiles }) },
-    ),
-  instantiate: (versionId: string, inputs: AgentMethodInputs) =>
-    apiRequest<{ prompt: string; method: AgentMethod }>(`${base}/instantiate`, {
-      method: "POST",
-      body: JSON.stringify({ version_id: versionId, inputs }),
-    }),
-};
-
-/** What a computer needs to start a scheduled run it claimed. */
-interface DeviceRunClaim {
-  claim: string;
-  profile: string;
-  space_id: string;
-  schedule_id: string;
-  agent_id: string;
-  conversation_id: string;
-  method_version_id: string;
+export type SaveWorkflowSchedule = ScheduleTiming & {
   inputs: AgentMethodInputs;
-  timezone: string;
-  title: string;
-  due_at: string;
-  missed_count: number;
-  idempotency_key: string;
-}
+  enabled: boolean;
+  /** "" runs without a browser; absent keeps the current computer. */
+  device_id?: string;
+  profile?: string;
+};
+/** Workflows kept on this computer, in misty.db. */
+const local = () =>
+  import("@/features/agents/workflows/localAgentMethods").then(
+    (module) => module.localAgentMethods,
+  );
+export const agentMethodsApi = {
+  list: (agentId: string, _onCached?: (value: { methods: AgentMethod[] }) => void) =>
+    local().then((methods) => methods.list(agentId)),
+  save: (input: SaveAgentMethod) => local().then((methods) => methods.save(input)),
+  /** Sets a workflow's schedule; every run uses the workflow's latest version. */
+  saveSchedule: (methodId: string, schedule: SaveWorkflowSchedule) =>
+    local().then((methods) => methods.saveSchedule(methodId, schedule)),
+  removeSchedule: (methodId: string) => local().then((methods) => methods.removeSchedule(methodId)),
+  upcoming: () => local().then((methods) => methods.upcoming()),
+  instantiate: (versionId: string, inputs: AgentMethodInputs) =>
+    local().then((methods) => methods.instantiate(versionId, inputs)),
+};

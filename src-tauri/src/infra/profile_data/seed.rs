@@ -43,14 +43,13 @@ fn seed() -> Result<(), SeedError> {
     let store_key = profile_windows::store_for_profile(profile_windows::PERSONAL)
         .ok()
         .and_then(|store| {
-            crate::infra::site_settings::permissions::profile_key(store.as_deref()).ok()
+            crate::infra::site_settings::permissions::store_key(store.as_deref()).ok()
         })
         .ok_or(SeedError::Records)?;
     let session = session_id().ok_or(SeedError::Records)?;
     // Only a key storage that answers counts: a failed read tries again next launch.
     let records = local_store().map_err(|_| SeedError::Records)?;
-    let database =
-        super::super::store::Store::at(home.join(".local").join("data").join("misty.db"));
+    let database = super::super::store::Store::in_home(&home);
     let marker = format!("profile-collections:{}", account_identity(&scope));
     let mut connection = database.connect()?;
     let transaction =

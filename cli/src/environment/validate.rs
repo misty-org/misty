@@ -2,10 +2,10 @@
 
 use super::*;
 
-pub fn validate(workspace: &Workspace, target: Target) -> Result<()> {
+pub fn validate(workspace: &Workspace) -> Result<()> {
     read_cli_files(workspace)?;
-    let values = effective(workspace, target)?;
-    let missing = required(target)
+    let values = effective(workspace)?;
+    let missing = required()
         .iter()
         .filter(|name| {
             values
@@ -16,8 +16,7 @@ pub fn validate(workspace: &Workspace, target: Target) -> Result<()> {
         .collect::<Vec<_>>();
     if !missing.is_empty() {
         bail!(
-            "{} environment is missing required values: {}",
-            target.label(),
+            "server settings are missing required values: {}",
             missing.join(", ")
         );
     }
@@ -54,15 +53,15 @@ pub fn validate(workspace: &Workspace, target: Target) -> Result<()> {
     Ok(())
 }
 
-pub fn check(workspace: &Workspace, target: Target) -> Result<()> {
-    validate(workspace, target)?;
-    println!("{} environment is valid.", target.label());
+pub fn check(workspace: &Workspace) -> Result<()> {
+    validate(workspace)?;
+    println!("Server settings are valid.");
     Ok(())
 }
 
-pub fn status(workspace: &Workspace, target: Target) -> Result<()> {
-    let values = read(workspace, target)?;
-    println!("{} environment", target.label());
+pub fn status(workspace: &Workspace) -> Result<()> {
+    let values = read(workspace)?;
+    println!("Server settings");
     for spec in FILES {
         println!("  {}", spec.path);
         for name in spec.names {
@@ -74,7 +73,7 @@ pub fn status(workspace: &Workspace, target: Target) -> Result<()> {
             println!("    {name:<48} {state}");
         }
     }
-    let missing = required(target)
+    let missing = required()
         .iter()
         .filter(|name| {
             values

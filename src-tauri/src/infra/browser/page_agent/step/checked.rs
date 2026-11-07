@@ -27,8 +27,8 @@ pub(super) async fn run_step_checked(
             json!({"ok": waited["met"] == true, "attempted": false, "met": waited["met"], "waitedMs": waited["waitedMs"]}),
         );
     }
-    // A fill that submits is judged by the Enter that follows it.
-    let submits = step.action == "fill" && step.submit == Some(true);
+    // A fill or typing that submits is judged by the Enter that follows it.
+    let submits = matches!(step.action.as_str(), "fill" | "type") && step.submit == Some(true);
     // Typing is judged like filling: the same fields (payment, passwords) need the same care.
     let gate = if submits {
         "key"

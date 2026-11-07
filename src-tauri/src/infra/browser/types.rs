@@ -14,7 +14,7 @@ pub struct BrowserWebviewCreateRequest {
     #[serde(default)]
     pub profile_provider_id: Option<String>,
     #[serde(default)]
-    pub profile_id: Option<String>,
+    pub store_id: Option<String>,
     #[serde(default)]
     pub workspace_tab_id: Option<String>,
     pub id: String,
@@ -136,17 +136,25 @@ pub struct BrowserAgentExecuteRequest {
     pub operation: String,
     #[serde(default)]
     pub input: Value,
-    /// The account's sites agents may not act on, from the job's server config.
+    /// The tool call this work belongs to, which is how native code finds the run. A request with none
+    /// knows no run, and reads as Ask.
+    #[serde(default)]
+    pub policy_call: Option<String>,
+    /// Read natively as the request arrives, never taken from the window.
+    #[serde(skip)]
+    pub policy: PagePolicy,
+}
+
+/// What page work goes by for one request: the run's mode, the sites agents may not act on and what
+/// was remembered, all from `misty.db` and the run's saved request.
+#[derive(Debug, Clone, Default)]
+pub struct PagePolicy {
+    pub(crate) call: Option<crate::infra::agent_runtime::tool_gate::ActiveCall>,
     /// Absent means the safe default: sensitive categories blocked.
-    #[serde(default)]
     pub site_blocks: Option<page_agent::SiteBlocks>,
-    /// The page actions the account asks about first, from the job's server
-    /// config. Absent means the safe default: all of them.
-    #[serde(default)]
+    /// Absent or empty means the safe default: all of them.
     pub confirm_kinds: Option<Vec<String>>,
-    /// The run's Ask or Auto and the person's remembered page grants for this
-    /// agent, from the job's server config. Absent means nothing is remembered.
-    #[serde(default)]
+    /// Absent means nothing is remembered.
     pub grant_set: Option<action_confirm::GrantSet>,
 }
 

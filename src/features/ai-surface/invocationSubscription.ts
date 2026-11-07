@@ -1,51 +1,65 @@
-import { readInvocationStream } from "./invocationStream";
-import {
-  apiRequestCredentials,
-  httpRequest,
-  readApiAuthToken,
-  resolveRequiredApiBase,
-} from "@/api/client";
+import { invoke } from "@tauri-apps/api/core";
+import { followLocalRunEvents } from "./localRunEvents";
+import { runIdOfFollowAddress } from "./localRun/runIdentity";
 import type { AiInvocationEvent } from "./types";
 
+export interface RunFollow {
+  state: string;
+  events: AiInvocationEvent[];
+}
+
+export const readRunFollow = (runId: string) => invoke<RunFollow>("agent_run_follow", { runId });
+
+/** Only how a run stands, which a long run's whole event list needn't cross the bridge for. */
+export const readRunState = async (runId: string) =>
+  (await invoke<RunFollow>("agent_run_follow", { runId, stateOnly: true })).state;
+
+/**
+ * Follows a run: what it has said so far, then what it says next, each event once. Live events are held
+ * back while the kept ones are read, since one can be in both, and whichever comes first is the one
+ * delivered.
+ */
 export function subscribeToAiInvocation(
-  eventsUrl: string,
+  address: string,
   handlers: {
     onEvent: (event: AiInvocationEvent) => void;
     onError: (error: Error) => void;
   },
 ): () => void {
-  const controller = new AbortController();
-  void streamAiInvocation(eventsUrl, controller.signal, handlers).catch((error: unknown) => {
-    if (controller.signal.aborted) return;
-    handlers.onError(
-      error instanceof Error ? error : new Error("The Misty response stream disconnected."),
-    );
+  const runId = runIdOfFollowAddress(address);
+  const seen = new Set<string>();
+  let held: AiInvocationEvent[] | null = [];
+  let stopped = false;
+  const deliver = (event: AiInvocationEvent) => {
+    if (stopped) return;
+    const id = (event as { id?: string }).id;
+    if (id) {
+      if (seen.has(id)) return;
+      seen.add(id);
+    }
+    handlers.onEvent(event);
+  };
+  const stopLive = followLocalRunEvents(runId, (event) => {
+    if (held) held.push(event);
+    else deliver(event);
   });
-  return () => controller.abort();
-}
-
-async function streamAiInvocation(
-  eventsUrl: string,
-  signal: AbortSignal,
-  handlers: {
-    onEvent: (event: AiInvocationEvent) => void;
-    onError: (error: Error) => void;
-  },
-) {
-  const [base, token] = await Promise.all([resolveRequiredApiBase(), readApiAuthToken()]);
-  const headers = new Headers({ Accept: "text/event-stream" });
-  if (token) headers.set("Authorization", `Bearer ${token}`);
-  await readInvocationStream(
-    (lastEventId, connectionSignal) => {
-      if (lastEventId) headers.set("Last-Event-ID", lastEventId);
-      return httpRequest(`${base}${eventsUrl}`, {
-        method: "GET",
-        credentials: apiRequestCredentials(),
-        headers,
-        signal: connectionSignal,
-      });
-    },
-    signal,
-    handlers,
-  );
+  void readRunFollow(runId)
+    .then((follow) => {
+      for (const event of follow.events) deliver(event);
+      const waiting = held ?? [];
+      held = null;
+      for (const event of waiting) deliver(event);
+      // Native knows nothing of it and nothing else is coming: it ended before this launch.
+      if (follow.state === "missing" && !seen.size && !stopped)
+        handlers.onError(new Error("This run stopped before it finished."));
+    })
+    .catch((error: unknown) => {
+      if (stopped) return;
+      held = null;
+      handlers.onError(error instanceof Error ? error : new Error(String(error)));
+    });
+  return () => {
+    stopped = true;
+    stopLive();
+  };
 }

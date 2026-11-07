@@ -38,6 +38,8 @@ pub fn generate(destination: Option<&Path>) -> Result<()> {
     )?;
 
     secure_directory(&destination)?;
+    misty_credential_store::move_out_of_dot_local(&destination)
+        .with_context(|| format!("could not move the data in {}", destination.display()))?;
     for relative in &layout().directories {
         secure_directory(&destination.join(relative))?;
     }
@@ -186,7 +188,7 @@ mod tests {
         let destination = temporary.path().join("output/.misty");
         generate(Some(&destination)).unwrap();
         generate(Some(&destination)).unwrap();
-        assert!(destination.join(".local/data/misty.db").is_file());
+        assert!(destination.join("data/misty.db").is_file());
         assert!(destination.join("profiles").is_dir());
         assert!(!destination.join("plugins").exists());
         check(Some(&destination)).unwrap();

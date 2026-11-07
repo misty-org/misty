@@ -1,6 +1,5 @@
-//! The runtime's API, called directly by the app where `index.ts` had routes. Each method keeps the
-//! checks its route made and answers with the same codes. Runs are tokio tasks: a panic in one fails
-//! that run and reports it, and leaves the app and the other runs alone.
+//! The runtime's API, called directly by the app. Runs are tokio tasks: a panic in one fails that run
+//! and reports it, and leaves the app and the other runs alone.
 use std::{
     collections::HashMap,
     io,
@@ -12,15 +11,14 @@ use serde_json::Value;
 use tokio::task::{AbortHandle, JoinError};
 
 use super::{
-    agent_api::{AgentRuntimeOptions, ResumedRuns, RuntimeApiError, StartRequest, StartedRun},
-    control_plane::{control_plane_url, ControlPlane, HttpControlPlane, RunKey, RuntimeIdentity},
+    agent_api::{AgentRuntimeOptions, ResumedRuns, RuntimeApiError},
+    control_plane::RuntimeIdentity,
     control_plane_steps::{complete, HarnessCompletion},
     device::{DeviceCalls, DeviceModels},
     device_hooks::DeviceHooks,
     device_models::DeviceModelStore,
     js_regex::js_regex,
-    mcp_runtime::{HttpMcpGateway, McpGateway},
-    mcp_sessions::McpSessions,
+    local_run::{planner::PromptPlanner, LocalControlPlane, LocalGateway},
     run::{
         deps::{DesktopDevice, DeviceModelAccess, DeviceTurnModels, RunDeps},
         run_start::{identity_of, new_stored},
@@ -28,20 +26,14 @@ use super::{
         store::{LoadedRun, RunStore, StoredRun, UnreadableRun},
     },
     runtime_errors::RuntimeError,
-    start_receipt::{start_with_receipt, HARNESS_VERSION},
-    text::js_len,
     tool_transport::{object, string},
     web_search::search_step::{SearchEndpoints, WebSearchCache},
 };
 
-// The opaque prefix tells the server which authorization and data record owns the run; it doesn't
-// change execution.
 static RUN_ID: LazyLock<Regex> = LazyLock::new(|| js_regex(r"^(?:run|invocation)_[0-9a-f-]{36}$", false));
-static RUN_KEY: LazyLock<Regex> = LazyLock::new(|| js_regex(r"^[A-Za-z0-9+/]{43}=$", false));
 const FINISHED_KEPT: usize = 1024;
 
 struct RunEntry {
-    misty_run_id: String,
     status: &'static str,
     abort: Option<AbortHandle>,
 }
@@ -49,7 +41,8 @@ struct RunEntry {
 struct Inner {
     deps: Arc<RunDeps>,
     models: Arc<DeviceModelStore>,
-    internal_api_base: Option<String>,
+    local: Arc<LocalControlPlane>,
+    /// By the run's own ID.
     runs: Mutex<HashMap<String, RunEntry>>,
     finished_order: Mutex<Vec<String>>,
 }
@@ -64,20 +57,24 @@ fn locked<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
 
 impl Inner {
     fn live(&self, misty_run_id: &str) -> bool {
-        locked(&self.runs).values().any(|entry| entry.misty_run_id == misty_run_id && entry.abort.is_some())
+        locked(&self.runs).get(misty_run_id).is_some_and(|entry| entry.abort.is_some())
     }
 
-    fn settle(&self, runtime_run_id: &str, status: &'static str) {
-        if let Some(entry) = locked(&self.runs).get_mut(runtime_run_id) {
+    fn settle(&self, misty_run_id: &str, status: &'static str) {
+        if let Some(entry) = locked(&self.runs).get_mut(misty_run_id) {
             entry.status = status;
             entry.abort = None;
         }
         // Finished runs are remembered for `status` while the app stays open, up to a point.
         let mut order = locked(&self.finished_order);
-        order.push(runtime_run_id.to_owned());
+        order.push(misty_run_id.to_owned());
         if order.len() > FINISHED_KEPT {
             let oldest = order.remove(0);
-            locked(&self.runs).remove(&oldest);
+            let mut runs = locked(&self.runs);
+            // The same ID may be running again by now.
+            if runs.get(&oldest).is_some_and(|entry| entry.abort.is_none()) {
+                runs.remove(&oldest);
+            }
         }
     }
 
@@ -101,11 +98,6 @@ impl Inner {
         complete(self.deps.control.as_ref(), self.deps.device.as_ref(), identity, &failed, None, None).await
     }
 
-    fn forget_run(&self, identity: &RuntimeIdentity) {
-        self.deps.hooks.forget_run(&identity.misty_run_id);
-        self.deps.gateway.close(identity);
-    }
-
     async fn settle_task(self: Arc<Self>, identity: RuntimeIdentity, ended: Result<Result<RunResult, RuntimeError>, JoinError>) {
         let status = match ended {
             Ok(Ok(_)) => "completed",
@@ -125,14 +117,14 @@ impl Inner {
             Err(_) => return,
         };
         self.delete_file(&identity.misty_run_id);
-        self.forget_run(&identity);
-        self.settle(&identity.runtime_run_id, status);
+        self.deps.hooks.forget_run(&identity.misty_run_id);
+        self.settle(&identity.misty_run_id, status);
     }
 
     fn spawn_run(self: &Arc<Self>, stored: StoredRun) {
         let identity = identity_of(&stored);
         let task = tokio::spawn(run_space_task_agent(self.deps.clone(), stored));
-        locked(&self.runs).insert(identity.runtime_run_id.clone(), RunEntry { misty_run_id: identity.misty_run_id.clone(), status: "running", abort: Some(task.abort_handle()) });
+        locked(&self.runs).insert(identity.misty_run_id.clone(), RunEntry { status: "running", abort: Some(task.abort_handle()) });
         let inner = self.clone();
         tokio::spawn(async move {
             let ended = task.await;
@@ -150,22 +142,22 @@ impl Inner {
         }
     }
 
-    /// A file that doesn't read fails its run plainly and is reported when its identity can still be
-    /// read: the report is signed with the run's own key. A report that didn't arrive keeps the file,
-    /// to try again at the next start.
+    /// A file that doesn't read fails its run plainly, and whoever follows the run hears when its
+    /// identity can still be read. A report that didn't arrive keeps the file, to try again at the next
+    /// start.
     async fn fail_unreadable(&self, unreadable: UnreadableRun) {
-        let UnreadableRun { misty_run_id, runtime_run_id, control_plane_url, run_key } = unreadable;
+        let UnreadableRun { misty_run_id, runtime_run_id } = unreadable;
         self.deps.logger.line("run_store_unreadable", &object([("run", string(misty_run_id.as_str()))]));
-        let (Some(runtime_run_id), Some(control_plane_url), Some(run_key)) = (runtime_run_id, control_plane_url, run_key) else {
+        let Some(runtime_run_id) = runtime_run_id else {
             self.delete_file(&misty_run_id);
             return;
         };
-        let identity = RuntimeIdentity { misty_run_id: misty_run_id.clone(), runtime_run_id: runtime_run_id.clone(), control_plane_url, run_key: RunKey::new(run_key) };
+        let identity = RuntimeIdentity { misty_run_id: misty_run_id.clone(), runtime_run_id };
         match self.report_failed(&identity, "agent_runtime_failed", "Misty could not complete this request.").await {
             Ok(()) => {
                 self.delete_file(&misty_run_id);
-                locked(&self.runs).insert(runtime_run_id.clone(), RunEntry { misty_run_id, status: "failed", abort: None });
-                self.settle(&runtime_run_id, "failed");
+                locked(&self.runs).insert(misty_run_id.clone(), RunEntry { status: "failed", abort: None });
+                self.settle(&misty_run_id, "failed");
             }
             Err(error) => self.report_route_error("run store report", &error),
         }
@@ -174,15 +166,15 @@ impl Inner {
 
 impl AgentRuntime {
     pub fn new(options: AgentRuntimeOptions) -> io::Result<Self> {
-        let AgentRuntimeOptions { data_dir, client, logger, internal_api_base, page_reader, before_tool } = options;
+        let AgentRuntimeOptions { data_dir, client, logger, page_reader, local_tools, run_host, before_tool } = options;
         logger.use_for_process();
         let models = Arc::new(DeviceModelStore::default());
-        let control: Arc<dyn ControlPlane> = Arc::new(HttpControlPlane { client: client.clone() });
-        let gateway: Arc<dyn McpGateway> = Arc::new(HttpMcpGateway { http: client.clone(), sessions: McpSessions::default() });
+        let planner = Arc::new(PromptPlanner { models: models.clone() });
+        let local = Arc::new(LocalControlPlane::new(run_host, planner, &data_dir)?);
         let device = DesktopDevice { models: models.clone(), calls: DeviceCalls::new(models.clone() as Arc<dyn DeviceModels>, client.clone()) };
         let deps = RunDeps {
-            control,
-            gateway,
+            control: local.clone(),
+            gateway: Arc::new(LocalGateway { control: local.clone() }),
             models: Arc::new(DeviceTurnModels { models: models.clone(), http: client.clone() }),
             access: Arc::new(DeviceModelAccess { models: models.clone(), http: client.clone() }),
             device: Arc::new(device),
@@ -193,10 +185,11 @@ impl AgentRuntime {
             search_cache: WebSearchCache::default(),
             search_endpoints: SearchEndpoints::default(),
             page_reader,
+            local_tools,
             clock: Arc::new(super::clock::now_ms),
             before_tool,
         };
-        Ok(Self { inner: Arc::new(Inner { deps: Arc::new(deps), models, internal_api_base, runs: Mutex::default(), finished_order: Mutex::default() }) })
+        Ok(Self { inner: Arc::new(Inner { deps: Arc::new(deps), models, local, runs: Mutex::default(), finished_order: Mutex::default() }) })
     }
 
     /// The device's models, for the app's other model calls.
@@ -213,73 +206,90 @@ impl AgentRuntime {
         }
     }
 
-    pub async fn start(&self, request: StartRequest) -> Result<StartedRun, RuntimeApiError> {
-        let run_id = request.run_id.trim();
+    /// Starts a run on this computer from the app's request. `run_id` makes a repeat harmless: a run
+    /// already going keeps going, and nothing starts twice.
+    pub async fn start_local(&self, run_id: &str, body: Value) -> Result<(), RuntimeApiError> {
         if !RUN_ID.is_match(run_id) {
             return Err(RuntimeApiError::InvalidRunId);
         }
-        if request.adapter_version.as_deref().is_some_and(|version| version != HARNESS_VERSION) {
-            return Err(RuntimeApiError::HarnessVersionUnavailable);
+        if self.inner.live(run_id) {
+            return Ok(());
         }
-        // A start carries the run's own key and the receipt the server pinned for it.
-        let run_key = request.run_key.trim();
-        let receipt = request.receipt_callback.trim();
-        if !RUN_KEY.is_match(run_key) || receipt.is_empty() || js_len(receipt) > 512 {
-            return Err(RuntimeApiError::InvalidRunKey);
-        }
-        let started = self.start_checked(run_id, run_key, receipt, request.callback_url.as_deref()).await;
-        match started {
-            Ok(runtime_run_id) => Ok(StartedRun { runtime_run_id, adapter_version: HARNESS_VERSION }),
-            Err(error) => {
-                self.inner.report_route_error("workflow start", &error);
-                Err(if error.to_string().starts_with("workflow_start_unconfirmed:") { RuntimeApiError::WorkflowStartUnconfirmed } else { RuntimeApiError::WorkflowStartFailed })
-            }
-        }
+        self.inner.local.save_request(run_id, body).map_err(|_| RuntimeApiError::WorkflowStartFailed)?;
+        let identity = RuntimeIdentity {
+            misty_run_id: run_id.to_owned(),
+            runtime_run_id: format!("wrun_{}", hex::encode(rand::random::<[u8; 16]>())),
+        };
+        let stored = self.inner.save_new(new_stored(&identity)).await.map_err(|_| RuntimeApiError::WorkflowStartFailed)?;
+        self.inner.spawn_run(stored);
+        Ok(())
     }
 
-    async fn start_checked(&self, run_id: &str, run_key: &str, receipt: &str, callback: Option<&str>) -> Result<String, RuntimeError> {
-        let base = control_plane_url(callback, self.inner.internal_api_base.as_deref())?;
-        let identity = RuntimeIdentity { misty_run_id: run_id.to_owned(), runtime_run_id: String::new(), control_plane_url: base, run_key: RunKey::new(run_key.to_owned()) };
-        let inner = self.inner.clone();
-        start_with_receipt(inner.deps.control.as_ref(), &identity, receipt, || async {
-            let runtime_run_id = format!("wrun_{}", hex::encode(rand::random::<[u8; 16]>()));
-            let submitted = RuntimeIdentity { runtime_run_id: runtime_run_id.clone(), ..identity.clone() };
-            let stored = self.inner.save_new(new_stored(&submitted)).await?;
-            self.inner.spawn_run(stored);
-            Ok(runtime_run_id)
-        })
-        .await
+    /// The person wrote to a run in progress: the id its message goes by, or nothing when it has
+    /// stopped listening.
+    pub fn steer_local(&self, run_id: &str, text: &str) -> Option<String> {
+        if !self.inner.live(run_id) {
+            return None;
+        }
+        self.inner.local.steer(run_id, text)
     }
 
-    /// `pending`, `running`, `completed`, `failed`, `cancelled` or `missing`. A finished run's status
-    /// lasts while the app stays open; after a restart it reads as `missing`.
-    pub fn status(&self, runtime_run_id: &str) -> Result<String, RuntimeApiError> {
-        if runtime_run_id.is_empty() {
-            return Err(RuntimeApiError::InvalidRuntimeRunId);
+    /// The person took the run's window, or gave it back. The run waits at its next boundary.
+    pub fn pause_local(&self, run_id: &str, paused: bool) -> bool {
+        let live = self.inner.live(run_id);
+        if live {
+            self.inner.local.set_paused(run_id, paused);
         }
-        Ok(locked(&self.inner.runs).get(runtime_run_id).map_or("missing", |entry| entry.status).to_owned())
+        live
     }
 
     /// Stops a run and takes its file. Cancelling a run again, or one already over, changes nothing.
-    pub fn cancel(&self, runtime_run_id: &str) -> Result<(), RuntimeApiError> {
-        if runtime_run_id.is_empty() {
-            return Err(RuntimeApiError::InvalidRuntimeRunId);
-        }
+    pub fn cancel_local(&self, run_id: &str) -> Result<(), RuntimeApiError> {
         let mut runs = locked(&self.inner.runs);
-        let Some(entry) = runs.get_mut(runtime_run_id) else {
-            return Err(RuntimeApiError::WorkflowCancelFailed);
-        };
-        let Some(abort) = entry.abort.take() else {
+        let Some(abort) = runs.get_mut(run_id).and_then(|entry| entry.abort.take()) else {
             return Ok(());
         };
         abort.abort();
-        entry.status = "cancelled";
-        let misty_run_id = entry.misty_run_id.clone();
+        if let Some(entry) = runs.get_mut(run_id) {
+            entry.status = "cancelled";
+        }
         drop(runs);
-        self.inner.delete_file(&misty_run_id);
-        self.inner.deps.hooks.forget_run(&misty_run_id);
-        self.inner.settle(runtime_run_id, "cancelled");
+        self.inner.delete_file(run_id);
+        self.inner.deps.hooks.forget_run(run_id);
+        self.inner.settle(run_id, "cancelled");
+        self.inner.local.cancelled(run_id);
         Ok(())
+    }
+
+    /// Replaces a local run's contexts, for a tab that joined it. Its tools are listed from them.
+    pub fn update_local_contexts(&self, run_id: &str, contexts: Value) -> Result<(), RuntimeApiError> {
+        self.inner.local.update_contexts(run_id, contexts).map_err(|_| RuntimeApiError::WorkflowStatusUnavailable)
+    }
+
+    /// The request this run was started with, while it can still run.
+    pub fn local_request(&self, run_id: &str) -> Option<Value> {
+        self.inner.local.saved_body(run_id)
+    }
+
+    /// The runs that can still resume.
+    pub fn saved_local_runs(&self) -> Vec<String> {
+        self.inner.local.saved_runs()
+    }
+
+    /// The tools a run with this request would be offered.
+    pub fn local_tool_names(&self, body: &Value) -> Vec<String> {
+        self.inner.local.planner.catalog(body).into_iter().map(|tool| tool.name).collect()
+    }
+
+    /// Whether a run started on this computer is still going.
+    pub fn local_run_live(&self, run_id: &str) -> bool {
+        self.inner.live(run_id)
+    }
+
+    /// `running`, `completed`, `failed`, `cancelled` or `missing`. A finished run's status lasts while
+    /// the app stays open; after a restart it reads as `missing`.
+    pub fn status(&self, run_id: &str) -> String {
+        locked(&self.inner.runs).get(run_id).map_or("missing", |entry| entry.status).to_owned()
     }
 
     /// Answers a device or user-action wait. A token no live run can answer fails, as a hook gone does.

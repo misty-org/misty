@@ -9,8 +9,6 @@ use tauri::Manager;
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct RunGrants {
-    api_base: String,
-    account_id: String,
     grants: Vec<RunGrantRequest>,
 }
 
@@ -24,10 +22,69 @@ pub(super) async fn run_grants(
         Err(response) => return response,
     };
     let state = bridge.app.state::<MistyRuntime>();
-    let signed = sign_run_grants(&state, &body.api_base, &body.account_id, body.grants).await;
+    let signed = sign_run_grants(&state, body.grants).await;
     reply(
         signed.and_then(|records| serde_json::to_value(records).map_err(|error| error.to_string())),
     )
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RunRequest {
+    run_id: String,
+}
+
+/// What a run has said and how it stands, as a window following it reads it.
+pub(super) async fn run_follow(
+    AxumState(bridge): AxumState<Bridge>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Response {
+    let body = match request::<RunRequest>(&bridge, &headers, &body) {
+        Ok(body) => body,
+        Err(response) => return response,
+    };
+    reply(
+        crate::infra::agent_runtime::local_runs::read_follow(&bridge.app, &body.run_id)
+            .await
+            .and_then(|follow| serde_json::to_value(follow).map_err(|error| error.to_string())),
+    )
+}
+
+/// Every call a run made and what each answered, for the judge's action history.
+pub(super) async fn run_record(
+    AxumState(bridge): AxumState<Bridge>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Response {
+    let body = match request::<RunRequest>(&bridge, &headers, &body) {
+        Ok(body) => body,
+        Err(response) => return response,
+    };
+    let store = bridge
+        .app
+        .state::<MistyRuntime>()
+        .environment
+        .store();
+    let rows = tokio::task::spawn_blocking(move || {
+        crate::infra::agent_runtime::tool_journal::run_record(&store, &body.run_id)
+    })
+    .await
+    .map_err(|error| error.to_string());
+    reply(rows.map(Value::Array))
+}
+
+pub(super) async fn run_cancel(
+    AxumState(bridge): AxumState<Bridge>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Response {
+    let body = match request::<RunRequest>(&bridge, &headers, &body) {
+        Ok(body) => body,
+        Err(response) => return response,
+    };
+    let cancelled = crate::infra::agent_runtime::local_runs::cancel_run(&bridge.app, &body.run_id).await;
+    reply(cancelled.map(|()| json!({ "ok": true })))
 }
 
 #[derive(Deserialize)]

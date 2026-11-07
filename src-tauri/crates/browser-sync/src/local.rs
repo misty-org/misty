@@ -33,7 +33,17 @@ CREATE TABLE IF NOT EXISTS records (
 ) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS records_dirty ON records(dirty, edited_at);
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS inbox (
+    profile TEXT NOT NULL,
+    collection TEXT NOT NULL,
+    id TEXT NOT NULL,
+    PRIMARY KEY (profile, collection, id)
+) WITHOUT ROWID;
 ";
+
+/// Collections too large to read whole after every change: each record the server changes is listed in
+/// `inbox`, until what reads them says it has them.
+const INBOX_COLLECTIONS: &[&str] = &[crate::collections::MEMORY];
 
 /// The install's key for this database. It never leaves the machine.
 pub struct LocalKey(Zeroizing<[u8; 32]>);
@@ -350,12 +360,12 @@ impl LocalStore {
             .collect())
     }
 
-    /// What to send next: everything people notice first, history last. `with_history` holds
-    /// history back until its slower batch is due. A row set aside is left out.
+    /// What to send next: everything people notice first, history and memory last. `with_history`
+    /// holds them back until their slower batch is due. A row set aside is left out.
     pub fn dirty_for_push(&self, limit: usize, with_history: bool) -> Result<Vec<DirtyRow>> {
         let mut statement = self.connection.prepare_cached(
             "SELECT profile, collection, id, sealed, edited_at, version FROM records
-             WHERE dirty = 1 AND (?2 OR collection <> 'history')
+             WHERE dirty = 1 AND (?2 OR collection NOT IN ('history', 'memory'))
              ORDER BY CASE collection
                  WHEN 'profiles' THEN 0
                  WHEN 'tabs' THEN 1
@@ -365,6 +375,7 @@ impl LocalStore {
                  WHEN 'passwords' THEN 3
                  WHEN 'autofill' THEN 3
                  WHEN 'history' THEN 9
+                 WHEN 'memory' THEN 9
                  ELSE 5 END, edited_at
              LIMIT ?1",
         )?;
@@ -448,6 +459,14 @@ impl LocalStore {
     }
 
     pub fn finish_full_listing(&self) -> Result<()> {
+        self.connection.execute(
+            "INSERT OR IGNORE INTO inbox (profile, collection, id)
+             SELECT profile, collection, id FROM records
+             WHERE collection = ?1 AND dirty = 0 AND version > 0 AND NOT EXISTS (
+                 SELECT 1 FROM temp.listed l WHERE l.profile = records.profile
+                     AND l.collection = records.collection AND l.id = records.id)",
+            params![crate::collections::MEMORY],
+        )?;
         self.connection.execute(
             "DELETE FROM records WHERE dirty = 0 AND version > 0 AND NOT EXISTS (
                  SELECT 1 FROM temp.listed l WHERE l.profile = records.profile
@@ -538,7 +557,55 @@ impl LocalStore {
                version = excluded.version, dirty = 0",
             params![profile, collection, id, sealed, edited_at as i64, version as i64],
         )?;
+        if INBOX_COLLECTIONS.contains(&collection) {
+            self.connection.execute(
+                "INSERT OR IGNORE INTO inbox (profile, collection, id) VALUES (?1, ?2, ?3)",
+                params![profile, collection, id],
+            )?;
+        }
         Ok(Applied::Replaced)
+    }
+
+    /// Records the server changed that nobody has taken yet: the body, or `None` for a deletion. A row
+    /// that can't be opened is dropped from the list, since nobody here can ever read it.
+    pub fn inbox(
+        &self,
+        profile: &str,
+        collection: &str,
+        limit: usize,
+    ) -> Result<Vec<(String, Option<Zeroizing<Vec<u8>>>)>> {
+        let mut statement = self.connection.prepare_cached(
+            "SELECT i.id, r.sealed FROM inbox i LEFT JOIN records r
+                 ON r.profile = i.profile AND r.collection = i.collection AND r.id = i.id
+             WHERE i.profile = ?1 AND i.collection = ?2 LIMIT ?3",
+        )?;
+        let rows = statement
+            .query_map(params![profile, collection, limit as i64], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, Option<Vec<u8>>>(1)?))
+            })?
+            .collect::<std::result::Result<Vec<_>, _>>()?;
+        let mut out = Vec::with_capacity(rows.len());
+        for (id, sealed) in rows {
+            match sealed {
+                None => out.push((id, None)),
+                Some(sealed) => match self.open_row(profile, collection, &id, &sealed) {
+                    Ok(plain) => out.push((id, Some(plain))),
+                    Err(_) => self.inbox_done(profile, collection, std::slice::from_ref(&id))?,
+                },
+            }
+        }
+        Ok(out)
+    }
+
+    /// These records have been taken. A record changed again meanwhile is listed again by that change.
+    pub fn inbox_done(&self, profile: &str, collection: &str, ids: &[String]) -> Result<()> {
+        let mut statement = self.connection.prepare_cached(
+            "DELETE FROM inbox WHERE profile = ?1 AND collection = ?2 AND id = ?3",
+        )?;
+        for id in ids {
+            statement.execute(params![profile, collection, id])?;
+        }
+        Ok(())
     }
 
     /// Leaves the vault behind: every live record is local again and would upload to a new

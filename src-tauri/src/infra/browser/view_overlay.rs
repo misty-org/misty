@@ -25,6 +25,7 @@ pub fn browser_webviews_set_overlay_active(
                 }
             }
         }
+        stack_subtitles_panel(&app, caller.window().label());
         return if errors.is_empty() {
             Ok(())
         } else {
@@ -55,6 +56,7 @@ pub fn browser_webviews_set_overlay_active(
                 }
             }
         }
+        stack_subtitles_panel(&app, caller.window().label());
         return if errors.is_empty() {
             Ok(())
         } else {

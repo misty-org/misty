@@ -18,10 +18,6 @@ export type CompanionControl =
       size: number;
     }
   | {
-      kind: "visibility";
-      visible: boolean;
-    }
-  | {
       kind: "ask";
       ask: boolean;
     }
@@ -39,7 +35,6 @@ export const initialCompanionPresentation: Presentation = {
   generation: 0,
   phase: "idle",
   visible: false,
-  showCompanion: true,
   size: 100,
   enabled: false,
   mode: "auto", // Historical wire value; there is one interaction policy now.

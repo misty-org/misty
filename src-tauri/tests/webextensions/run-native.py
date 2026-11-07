@@ -110,12 +110,12 @@ with tempfile.TemporaryDirectory(prefix="misty-extension-tests-") as temporary:
         # compat::apply writes them; the runner installs the real assets.
         fixture = root / "compat"
         shutil.copytree(HERE / "fixtures/compat", fixture)
-        shutil.copytree(TAURI.parent / "kiri/src/extensions/compat", fixture / "__misty_compat__")
+        shutil.copytree(TAURI / "crates/kiri/src/extensions/compat", fixture / "__misty_compat__")
         run(compat, fixture, page)
         # An extension asking for far more than it's granted, trying to use all of it.
         fixture = root / "permissions"
         shutil.copytree(HERE / "fixtures/permissions", fixture)
-        shutil.copytree(TAURI.parent / "kiri/src/extensions/compat", fixture / "__misty_compat__")
+        shutil.copytree(TAURI / "crates/kiri/src/extensions/compat", fixture / "__misty_compat__")
         run(permissions, fixture, page)
         # Two Spaces' controllers at once: storage stays in its Space, survives a
         # restart (a second process) and goes with the Space.

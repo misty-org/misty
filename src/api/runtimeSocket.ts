@@ -12,7 +12,7 @@ const CLOSING = 2;
 const CLOSED = 3;
 
 /**
- * A voice or live transcription session with the agent runtime in this app (docs/agents/runtime.md),
+ * A voice or live transcription session with the agent runtime in this app,
  * shaped like the WebSocket it replaces, so its users read the same way. Its messages arrive on a
  * Tauri channel and go out through a command. Each is numbered, because IPC calls don't promise to
  * arrive in the order they were made.

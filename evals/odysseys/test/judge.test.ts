@@ -1,9 +1,9 @@
 import { createHash } from "node:crypto";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import type { JudgeConfig } from "../judge-config.ts";
+import { withAgentsEnv, type JudgeConfig } from "../judge-config.ts";
 import { buildJudgeRequest, parseJudgeReply, withoutKey } from "../judge-request.ts";
 import { actionHistory, judgeTask, parseVerdict, rubricMessage, system } from "../judge.ts";
 import type { Step } from "../recorder.ts";
@@ -207,5 +207,33 @@ describe("judging a task against a local mock", () => {
     expect((await judgeTask(config("anthropic", mock.url), one, steps, [], options)).perfect).toBe(true);
     expect((await judgeTask(config("google", mock.url), one, steps, [], options)).perfect).toBe(true);
     expect(mock.seen.map((item) => item.path)).toEqual(["/v1/messages", "/v1beta/models/m:generateContent"]);
+  });
+});
+
+describe("agents.env", () => {
+  const file = (contents: string, mode = 0o600) => {
+    const path = join(mkdtempSync(join(tmpdir(), "misty-agents-env-")), "agents.env");
+    writeFileSync(path, contents);
+    chmodSync(path, mode);
+    return path;
+  };
+
+  it("gives the judge its settings, and the process's own win", () => {
+    const path = file("# a comment\nMISTY_ODYSSEYS_JUDGE_MODEL=google/a\nMISTY_ODYSSEYS_JUDGE_KEY='from-file'\nNVIDIA_API_KEY=not-for-the-judge\n");
+    const env = withAgentsEnv({ MISTY_ODYSSEYS_JUDGE_KEY: "from-process" }, path);
+    expect(env.MISTY_ODYSSEYS_JUDGE_MODEL).toBe("google/a");
+    expect(env.MISTY_ODYSSEYS_JUDGE_KEY).toBe("from-process");
+    expect(env.NVIDIA_API_KEY).toBeUndefined();
+    expect(withAgentsEnv({}, path).MISTY_ODYSSEYS_JUDGE_KEY).toBe("from-file");
+  });
+
+  it("is optional", () => {
+    expect(withAgentsEnv({ A: "b" }, "/no/such/agents.env")).toEqual({ A: "b" });
+  });
+
+  it("refuses a file others can read, without showing what's in it", () => {
+    const path = file("MISTY_ODYSSEYS_JUDGE_KEY=private-fixture-key\n", 0o644);
+    expect(() => withAgentsEnv({}, path)).toThrow(/chmod 600/);
+    expect(() => withAgentsEnv({}, path)).not.toThrow(/private-fixture-key/);
   });
 });

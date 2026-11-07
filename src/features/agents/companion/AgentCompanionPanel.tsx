@@ -1,6 +1,5 @@
 import { useMistyStore } from "@/features/misty/useMistyStore";
 import { DesktopSettingsRow, DesktopSettingsSection } from "@/features/settings";
-import sprite from "@/shared/assets/misty-cloud-expression-cycle.webp?inline";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { Button, ErrorNotification, IconButton, Switch, Slider } from "@/shared/ui";
 import { RotateCcw, Square, VolumeX } from "lucide-react";
@@ -34,9 +33,6 @@ export function AgentCompanionPanel() {
         : "Working";
   return (
     <div className="agent-companion-panel" aria-label="Companion">
-      <div className="agent-companion-preview">
-        <img src={sprite} width={80} height={80} alt="" />
-      </div>
       {active && (
         <div className="agent-companion-status">
           <span role="status" className="misty-shimmer">
@@ -70,14 +66,6 @@ export function AgentCompanionPanel() {
         </p>
       )}
       <DesktopSettingsSection title="Behavior">
-        <DesktopSettingsRow label="Show companion">
-          <Switch
-            aria-label="Show companion"
-            checked={state.showCompanion ?? true}
-            disabled={!control}
-            onCheckedChange={(visible) => act({ kind: "visibility", visible })}
-          />
-        </DesktopSettingsRow>
         <DesktopSettingsRow
           label="Teach mode"
           description="Misty teaches one step at a time and checks your work when you ask, instead of doing it for you. Each topic becomes its own lesson."

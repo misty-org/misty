@@ -1,5 +1,4 @@
-//! Readable text from a fetched page, for `web.fetch` (docs/agents/harness.md, Reading without a
-//! screen). Navigation, scripts and page chrome are dropped; every other visible text becomes one
+//! Readable text from a fetched page, for `web.fetch`. Navigation, scripts and page chrome are dropped; every other visible text becomes one
 //! plain line per block (headings and list items keep their Markdown marks, table rows join their
 //! cells with "|"), so prices that sit in plain divs and spans, as on most pricing pages, are kept. A
 //! long page returns the parts that best match what the agent asked for, in page order.
@@ -45,7 +44,7 @@ pub fn billing_note(text: &str) -> Option<&'static str> {
 }
 
 /// A page a fetch can't read: an error, a sign-in wall or a script-only shell with little text. The
-/// agent's own browser tab can (docs/agents/evals/odysseys.md).
+/// agent's own browser tab can.
 pub fn browser_note(status: u16, text: &str) -> Option<&'static str> {
     if status < 400 && js_len(&SPACES.replace_all(text, " ")) >= 600 && !SCRIPT_SHELL.is_match(text) {
         return None;

@@ -1,5 +1,5 @@
 # Permissions: who may use an action and how far. Misty's defaults, and the person can add on
-# (docs/plans/app-permissions.md). Processes are held to theirs by the OS, in the .sb profile beside
+# Processes are held to theirs by the OS, in the .sb profile beside
 # this file or in the code named below. Nothing here allows a command by itself.
 
 [[permission]]

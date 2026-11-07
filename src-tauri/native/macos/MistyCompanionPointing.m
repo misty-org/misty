@@ -1,5 +1,4 @@
-// Precise pointing for the cursor companion; see
-// src/features/agents/companion/DESIGN.md. A model's point comes from a
+// Precise pointing for the cursor companion. A model's point comes from a
 // downscaled screenshot. Accessibility can name the real control near it, and
 // a full-resolution crop lets the model place it again when Accessibility
 // cannot. Both read the screen only; neither presses or focuses anything.

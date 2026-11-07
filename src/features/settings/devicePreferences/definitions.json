@@ -525,17 +525,6 @@
     "format": "json"
   },
   {
-    "id": "agents.companion.visible",
-    "label": "Show cursor companion",
-    "page": "agents-companion",
-    "section": "companion",
-    "key": "visible",
-    "default": true,
-    "type": "boolean",
-    "owner": "device",
-    "platforms": ["desktop"]
-  },
-  {
     "id": "agents.companion.size",
     "label": "Companion size",
     "page": "agents-companion",
@@ -607,6 +596,19 @@
     "type": "string",
     "format": "json",
     "maxLength": 4096,
+    "platforms": ["desktop"]
+  },
+  {
+    "id": "app.sidebar.tools",
+    "label": "Sidebar tools",
+    "page": "appearance",
+    "section": "general",
+    "key": "sidebar_tools",
+    "default": "[\"pane-layout\",\"agents\"]",
+    "owner": "device",
+    "type": "string",
+    "format": "json",
+    "maxLength": 256,
     "platforms": ["desktop"]
   },
   {
@@ -973,12 +975,25 @@
     "maxLength": 200
   },
   {
+    "id": "models.speech_voice",
+    "label": "ElevenLabs voice ID",
+    "page": "models",
+    "section": "models",
+    "key": "speech_voice",
+    "default": "",
+    "owner": "device",
+    "type": "string",
+    "platforms": ["desktop"],
+    "keywords": ["voice", "read aloud", "ElevenLabs"],
+    "maxLength": 64
+  },
+  {
     "id": "models.transcription_model",
     "label": "Transcription model",
     "page": "models",
     "section": "models",
     "key": "transcription_model",
-    "default": "soniox/stt-rt-preview",
+    "default": "soniox/stt-async-v5",
     "owner": "device",
     "type": "string",
     "platforms": ["desktop"],

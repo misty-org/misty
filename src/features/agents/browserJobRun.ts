@@ -69,7 +69,7 @@ export async function executeBrowserJob(
 
 /**
  * `browser.extract` reads the page, then the extraction runs on this computer's agent model; the
- * server checks the links against the page it is sent with (docs/agents/runtime.md).
+ * server checks the links against the page it is sent with.
  */
 async function withExtraction(
   job: ClaimedWorkflowNodeJob["job"],

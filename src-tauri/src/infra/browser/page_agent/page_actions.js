@@ -14,6 +14,7 @@
     }
     return hit;
   };
+  P.deepHit = deepHit;
   const composedContains = (el, node) => {
     for (let current = node; current; current = current.parentNode || current.host) if (current === el) return true;
     return false;
@@ -37,9 +38,10 @@
     if (!el) {
       // A key with no ref goes to whatever has focus; Enter there may submit.
       const active = document.activeElement;
-      const enter = args.action === "key" && args.key === "Enter";
-      const consequence = enter ? P.consequence(active, "key") : "";
-      const consequenceKind = enter ? P.consequenceKind(active, "key") : "";
+      const enter = args.action === "key" && P.isCommitKey(args.key);
+      const commit = P.isCommit(args.modifiers);
+      const consequence = enter ? P.consequence(active, "key", commit) : "";
+      const consequenceKind = enter ? P.consequenceKind(active, "key", commit) : "";
       return { ok: true, point: null, viewport: { width: innerWidth, height: innerHeight }, editable: P.editable(active), consequence, consequenceKind, describe: P.describe(active) };
     }
     if (el.disabled || el.getAttribute("aria-disabled") === "true") return fail(`${P.describe(el)} is disabled.`, { errorCode: "browser_target_disabled" });
@@ -51,9 +53,10 @@
       rect = el.getBoundingClientRect();
       scrolled = true;
     }
-    const judged = ["click", "check", "uncheck"].includes(args.action) || (args.action === "key" && args.key === "Enter");
-    const consequence = judged ? P.consequence(el, args.action) : "";
-    const consequenceKind = judged ? P.consequenceKind(el, args.action) : "";
+    const judged = ["click", "check", "uncheck"].includes(args.action) || (args.action === "key" && P.isCommitKey(args.key));
+    const commit = P.isCommit(args.modifiers);
+    const consequence = judged ? P.consequence(el, args.action, commit) : "";
+    const consequenceKind = judged ? P.consequenceKind(el, args.action, commit) : "";
     if (!["click", "check", "uncheck", "hover"].includes(args.action)) {
       return { ok: true, point: null, viewport: { width: innerWidth, height: innerHeight }, editable: P.editable(el), consequence, consequenceKind, describe: P.describe(el), scrolled, locator: P.locatorOf(el) };
     }

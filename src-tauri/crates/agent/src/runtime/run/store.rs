@@ -1,7 +1,6 @@
 //! A run's place on disk, so a run continues after Misty quits and opens again: one JSON file per run
-//! under `<data>/runs/`, replaced atomically, readable only by the person's account. The file holds the
-//! run's key, needed to sign its calls when it resumes, and goes when the run ends. Model keys are
-//! never in it.
+//! under `<data>/runs/`, replaced atomically, readable only by the person's account. The file goes when
+//! the run ends. Model keys are never in it.
 //!
 //! This is the one place in the crate that touches files directly. The app passes a folder inside
 //! `.misty`, which isn't a grant-checked location, so the file gate has nothing to add here.
@@ -22,14 +21,13 @@ use serde::{Deserialize, Serialize};
 use super::state::LoopState;
 
 /// A saved run. The identity comes first, so a file that can't be read whole still says whose it is.
+/// A file written before runs left the server also names a server and a key, and those are ignored.
 #[derive(Clone, Deserialize, Serialize)]
 pub(crate) struct StoredRun {
     pub(crate) version: u32,
     pub(crate) misty_run_id: String,
     pub(crate) runtime_run_id: String,
-    pub(crate) control_plane_url: String,
-    pub(crate) run_key: String,
-    /// The context the server sent, as text, with the device's choices it started on.
+    /// The context the run started from, as text, with the device's choices it started on.
     #[serde(default)]
     pub(crate) context: Option<String>,
     #[serde(default)]
@@ -38,14 +36,11 @@ pub(crate) struct StoredRun {
 
 pub(crate) const STORE_VERSION: u32 = 1;
 
-/// What can be told of a file that didn't read: who it belongs to, for reporting the failure. No
-/// `Debug`, which could print the key.
+/// What can be told of a file that didn't read: who it belongs to, for reporting the failure.
 #[derive(Default)]
 pub(crate) struct UnreadableRun {
     pub(crate) misty_run_id: String,
     pub(crate) runtime_run_id: Option<String>,
-    pub(crate) control_plane_url: Option<String>,
-    pub(crate) run_key: Option<String>,
 }
 
 pub(crate) enum LoadedRun {
@@ -58,8 +53,7 @@ pub(crate) struct RunStore {
     temp: AtomicU64,
     // Once the runtime closes nothing is written, so a late save can't undo a newer runtime's.
     closed: AtomicBool,
-    // Held for each write. Runs whose files went: a save still under way can't bring one back, with
-    // its key in it.
+    // Held for each write. Runs whose files went: a save still under way can't bring one back.
     gone: Mutex<HashSet<String>>,
 }
 
@@ -157,8 +151,6 @@ impl RunStore {
         LoadedRun::Unreadable(UnreadableRun {
             misty_run_id: run_id,
             runtime_run_id: head_field(&text, "runtime_run_id"),
-            control_plane_url: head_field(&text, "control_plane_url"),
-            run_key: head_field(&text, "run_key"),
         })
     }
 }
@@ -194,7 +186,7 @@ mod tests {
     }
 
     fn run(id: &str) -> StoredRun {
-        StoredRun { version: STORE_VERSION, misty_run_id: id.into(), runtime_run_id: "wrun_1".into(), control_plane_url: "http://localhost:1".into(), run_key: "key".into(), context: None, state: None }
+        StoredRun { version: STORE_VERSION, misty_run_id: id.into(), runtime_run_id: "wrun_1".into(), context: None, state: None }
     }
 
     #[test]
@@ -229,6 +221,16 @@ mod tests {
     }
 
     #[test]
+    fn a_file_from_when_runs_had_a_server_still_reads() {
+        let data = folder("older");
+        let store = RunStore::open(&data).unwrap();
+        fs::write(data.join("runs/run_e.json"), r#"{"version":1,"misty_run_id":"run_e","runtime_run_id":"wrun_1","control_plane_url":"https://misty.example.com","run_key":"key","context":null,"state":null}"#).unwrap();
+        let loaded = store.load_all().unwrap();
+        assert!(matches!(&loaded[0], LoadedRun::Ready(found) if found.runtime_run_id == "wrun_1"));
+        fs::remove_dir_all(data).unwrap();
+    }
+
+    #[test]
     fn a_broken_file_still_says_whose_it_is() {
         let data = folder("broken");
         let store = RunStore::open(&data).unwrap();
@@ -246,9 +248,8 @@ mod tests {
         let [LoadedRun::Unreadable(cut), LoadedRun::Unreadable(garbled)] = loaded.as_slice() else {
             panic!("both files are unreadable");
         };
-        assert_eq!(cut.run_key.as_deref(), Some("key"));
         assert_eq!(cut.runtime_run_id.as_deref(), Some("wrun_1"));
-        assert_eq!(garbled.run_key, None);
+        assert_eq!(garbled.runtime_run_id, None);
         assert!(!data.join("runs/.run_d.0.tmp").exists());
         fs::remove_dir_all(data).unwrap();
     }

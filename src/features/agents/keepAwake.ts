@@ -2,9 +2,9 @@ import { invoke } from "@tauri-apps/api/core";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 
 /**
- * While an agent works on this computer it stays awake, unless the account
+ * While an agent works on this computer it stays awake, unless the person
  * turned that off in Settings › Agents › Screens
- * (docs/sync/devices.md). Each kind of work holds a reason;
+ * Each kind of work holds a reason;
  * the computer is held while any reason remains.
  */
 const reasons = new Set<string>();

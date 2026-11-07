@@ -23,7 +23,7 @@ pub async fn write(
     {
         return Err("Importing sign-ins needs macOS 14 or later.".into());
     }
-    let identifier = super::super::browser_profile::data_store_identifier(profile)?;
+    let identifier = super::super::profile_store::data_store_identifier(profile)?;
     let (sender, receiver) = tokio::sync::oneshot::channel::<usize>();
     app.run_on_main_thread(move || {
         let mtm = MainThreadMarker::new().expect("main thread");
@@ -76,11 +76,11 @@ pub async fn write(
     profile: Option<&str>,
     cookies: Vec<Cookie>,
 ) -> Result<usize, String> {
-    use super::super::{browser_profile_view::ProfileView, website_data::cookie_store as store};
+    use super::super::{profile_store_view::StoreView, website_data::cookie_store as store};
     let identity = profile
         .map(str::to_owned)
-        .unwrap_or_else(super::super::browser_profile::legacy_profile_identity);
-    let view = ProfileView::open(app, profile)?;
+        .unwrap_or_else(super::super::profile_store::original_store_identity);
+    let view = StoreView::open(app, profile)?;
     let total = cookies.len();
     let mut written = 0;
     for cookie in cookies {

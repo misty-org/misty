@@ -35,7 +35,7 @@ export type AiInvocationEvent =
   | {
       id: string;
       type: "steering.received" | "steering.closed";
-      messages: Array<{ sequence: number; text: string }>;
+      messages: Array<{ sequence: string | number; text: string }>;
       closed: boolean;
     }
   | {
@@ -77,6 +77,24 @@ export type AiInvocationEvent =
       id: string;
       type: "screen.request";
       screenRequest: ScreenRequest;
+    }
+  | {
+      id: string;
+      /** The chat's name, which a run sets as it ends if the chat has none yet. */
+      type: "conversation.title";
+      text: string;
+    }
+  | {
+      id: string;
+      /** A run's answer that becomes a proposal; `localRun/artifacts.ts` ends the run from here. */
+      type: "local.artifact_answer";
+      text: string;
+    }
+  | {
+      id: string;
+      /** New running notes on the chat's older turns; this device keeps them, the server doesn't. */
+      type: "conversation.notes";
+      data: unknown;
     }
   | {
       id: string;

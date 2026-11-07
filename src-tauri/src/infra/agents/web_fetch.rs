@@ -2,7 +2,7 @@
 //! is checked before connecting: http or https, no credentials in the address, and a host that
 //! resolves only to public addresses. The connection is pinned to the checked address so the
 //! name can't be re-resolved somewhere private. An agent's `web.fetch` applies the same rules in
-//! the agent runtime (services/agent-runtime/src/web-fetch/public-fetch.ts).
+//! the agent runtime (crates/agent/src/runtime/web_fetch/public_fetch.rs).
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::time::Duration;
 

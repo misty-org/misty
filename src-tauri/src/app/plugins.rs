@@ -26,7 +26,7 @@ pub fn register(builder: Builder<Wry>) -> Builder<Wry> {
         }
     }));
 
-    // Web APIs that website tabs reach natively; see kiri/README.md.
+    // Web APIs that website tabs reach natively; see crates/kiri/README.md.
     #[cfg(desktop)]
     let builder = builder.plugin(infra::browser::kiri_host::plugin());
 

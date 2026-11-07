@@ -27,7 +27,7 @@ bool misty_extensions_compat_requires(const char *method, const char *permission
     return [CompatPermission([NSString stringWithUTF8String:method]) isEqual:[NSString stringWithUTF8String:permission]];
 }
 
-/// Kiri's extension transport installer (kiri/src/extensions/bridge.rs).
+/// Kiri's extension transport installer (crates/kiri/src/extensions/bridge.rs).
 static MistyCompatChannelInstaller installCompatChannel;
 void misty_extensions_set_compat_channel(MistyCompatChannelInstaller install) { installCompatChannel = install; }
 

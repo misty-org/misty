@@ -1,6 +1,13 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 
+const agents = vi.hoisted(() => ({ showAgentsPanel: vi.fn(), openSignInSheet: vi.fn() }));
+
+vi.mock("@/features/agents", () => ({
+  showAgentsPanel: agents.showAgentsPanel,
+  useMistyPanelStore: (select: (state: { open: boolean }) => boolean) => select({ open: false }),
+}));
+vi.mock("@/features/auth", () => ({ openSignInSheet: agents.openSignInSheet }));
 vi.mock("@/features/settings", () => ({ preloadSettingsWorkspace: () => Promise.resolve() }));
 vi.mock("./NavRail", () => ({
   AccountNavButton: (props: object) => (
@@ -13,7 +20,10 @@ vi.mock("./AccountMenu", () => ({ AccountMenu: () => null }));
 
 import { AccountIsland } from "./AccountIsland";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.clearAllMocks();
+});
 
 function renderRow(props: { signedOut?: boolean; sessionExpired?: boolean }) {
   const onSignIn = vi.fn();

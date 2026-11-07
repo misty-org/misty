@@ -1,5 +1,5 @@
 //! macOS's quarantine flag, which makes Gatekeeper check a file from the web before it first runs.
-//! WebKit adds it to what a WKDownload saves (checked on macOS 26.5, docs/browser/security.md). This
+//! WebKit adds it to what a WKDownload saves. This
 //! is for the files Misty writes itself from something it received, like a saved page.
 use std::path::Path;
 

@@ -111,6 +111,16 @@ async fn elevenlabs_speech_asks_for_pcm_and_carries_the_sentences_around_it() {
 }
 
 #[tokio::test]
+async fn elevenlabs_speech_uses_the_persons_own_voice() {
+    let server = provider(|_| Answer { status: 200, content_type: "audio/pcm".to_owned(), body: vec![1] }).await;
+    let origin = server.base_url.trim_end_matches("/v1");
+    let model = testing::elevenlabs_speech_model(&client(), origin, "eleven-key", "eleven_v3");
+    let call = SpeechCall { model: "elevenlabs/eleven_v3", text: "Hello.", voice: Some("my-own-voice"), previous_text: None, next_text: None };
+    speech_call(model.as_ref(), call).await.unwrap();
+    assert!(server.requests()[0].path.contains("/v1/text-to-speech/my-own-voice?"), "{}", server.requests()[0].path);
+}
+
+#[tokio::test]
 async fn openai_speech_asks_for_pcm_in_the_default_voice() {
     let server = provider(|_| Answer { status: 200, content_type: "audio/pcm".to_owned(), body: vec![5, 6] }).await;
     let device = route(ProviderId::Openai, "k", Some(&server.base_url));

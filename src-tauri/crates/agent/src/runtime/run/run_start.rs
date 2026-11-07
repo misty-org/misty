@@ -2,7 +2,7 @@
 use std::sync::{atomic::AtomicI64, Arc, Mutex};
 
 use crate::runtime::{
-    control_plane::{RunKey, RuntimeIdentity},
+    control_plane::RuntimeIdentity,
     control_plane_steps::{activate_runtime, fetch_context, HarnessCompletion},
     document_ids::DocumentIds,
     js_json::JsValue,
@@ -29,8 +29,6 @@ pub(crate) fn identity_of(stored: &StoredRun) -> RuntimeIdentity {
     RuntimeIdentity {
         misty_run_id: stored.misty_run_id.clone(),
         runtime_run_id: stored.runtime_run_id.clone(),
-        control_plane_url: stored.control_plane_url.clone(),
-        run_key: RunKey::new(stored.run_key.clone()),
     }
 }
 
@@ -39,8 +37,6 @@ pub(crate) fn new_stored(identity: &RuntimeIdentity) -> StoredRun {
         version: STORE_VERSION,
         misty_run_id: identity.misty_run_id.clone(),
         runtime_run_id: identity.runtime_run_id.clone(),
-        control_plane_url: identity.control_plane_url.clone(),
-        run_key: identity.run_key.expose().to_owned(),
         context: None,
         state: None,
     }

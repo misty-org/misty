@@ -5,14 +5,9 @@ const mocks = vi.hoisted(() => ({
   invoke: vi.fn(),
   script: undefined as unknown as Script,
   options: undefined as unknown,
-  askPerson: vi.fn(async () => true),
 }));
 vi.mock("@tauri-apps/api/core", () => ({ invoke: mocks.invoke }));
 vi.mock("@/api/client", () => ({ apiRequest: vi.fn() }));
-vi.mock("../actionQuestions", () => ({
-  askPerson: mocks.askPerson,
-  kindOf: (description: string) => (/\b(pay|buy)\b/i.test(description) ? "payment" : "send"),
-}));
 // Midscene's Agent plans; these tests script its plans against the real device.
 vi.mock("@midscene/core/agent", () => ({
   Agent: class {
@@ -60,7 +55,6 @@ beforeEach(() => {
   frames = 0;
   changing = true;
   mocks.invoke.mockReset();
-  mocks.askPerson.mockClear();
   mocks.invoke.mockImplementation(
     async (name: string, args: { request: { operation: string } }) => {
       if (name === "browser_runtime_for_scope") return "runtime";
@@ -120,42 +114,27 @@ it("stops before a consequential action unless the user allowed it", async () =>
     new AbortController().signal,
   );
   expect(allowed.status).toBe("done");
-  expect(mocks.askPerson).toHaveBeenCalledWith(expect.objectContaining({ description: "Send" }));
+  // Native code judges and asks before the input lands, with what the model said as one signal.
   expect(calls("browser.interact")[0][1].request.input.consequential).toBe(true);
 });
 
-it("acts without asking when the account doesn't ask first", async () => {
-  const send = { x: 0.9, y: 0.9, consequential: true, description: "Send" };
+it("ends the goal when native code says the person refused", async () => {
+  const send = { x: 0.9, y: 0.9, consequential: false, description: "Next" };
   mocks.script = async (device) => {
     await act(device, "click", send);
-    return "Sent.";
+    return "Clicked.";
   };
-  const result = await runScreenAct(
-    {
-      ...job,
-      config: { ...job.config, confirmKinds: ["payment"] },
-      input: { goal: "Send it", allowConsequential: true },
-    },
-    new AbortController().signal,
-  );
-  expect(result.status).toBe("done");
-  expect(mocks.askPerson).not.toHaveBeenCalled();
-  expect(calls("browser.interact")).toHaveLength(1);
-});
-
-it("does nothing when the person refuses the action in the island", async () => {
-  const send = { x: 0.9, y: 0.9, consequential: true, description: "Send" };
-  mocks.script = async (device) => {
-    await act(device, "click", send);
-    return "Sent.";
-  };
-  mocks.askPerson.mockResolvedValueOnce(false);
-  const result = await runScreenAct(
-    { ...job, input: { goal: "Send it", allowConsequential: true } },
-    new AbortController().signal,
-  );
+  mocks.invoke.mockImplementation(async (name: string, args: { request: { operation: string } }) => {
+    if (name === "browser_runtime_for_scope") return "runtime";
+    if (name !== "browser_agent_execute") return undefined;
+    if (args.request.operation === "browser.interact")
+      throw new Error("browser_action_declined: The person said no to Send, which would send a message.");
+    return frame();
+  });
+  const result = await runScreenAct(job, new AbortController().signal);
   expect(result.status).toBe("needs_confirmation");
-  expect(calls("browser.interact")).toHaveLength(0);
+  expect(result.summary).toContain("The person said no to Send");
+  expect(result.actions).toBe(0);
 });
 
 it("reports a failure before any input as not attempted", async () => {

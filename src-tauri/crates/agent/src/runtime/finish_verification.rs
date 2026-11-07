@@ -1,4 +1,4 @@
-//! One verification turn before a finish stands (docs/agents/harness.md, Completion). Until October
+//! One verification turn before a finish stands. Until October
 //! 20 each guard sent a finish back on its own: unread citations, unbacked claims, proof tabs, the
 //! requirements review, a plain answer that skipped the last refusal, and early give-ups up to eight
 //! times. Stacked, they kept short questions working after their answer was written: an answer that
@@ -71,7 +71,7 @@ pub(crate) fn finish_findings(check: &FinishCheck) -> (Vec<String>, bool) {
             issues.push(proof);
         }
     }
-    // Checked on evidence, without a model call (docs/agents/harness.md, Completion).
+    // Checked on evidence, without a model call.
     let broken = broken_proof_tabs(check.messages);
     if !broken.is_empty() {
         issues.push(format!("Pages you kept as proof show an error or nothing: {}. Open each page again from a search or the site's own links, keep() the working page, and close or replace the broken one.", broken.join("; ")));

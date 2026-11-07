@@ -20,19 +20,15 @@ pub(crate) mod device_models;
 #[allow(dead_code)]
 pub(crate) mod instance_model;
 #[allow(dead_code)]
+pub mod local_run;
+pub(crate) mod local_prompt;
+pub mod local_tools;
+#[allow(dead_code)]
 pub(crate) mod logger;
 #[allow(dead_code)]
-pub(crate) mod mcp_client;
-#[allow(dead_code)]
-pub(crate) mod mcp_endpoint;
-#[allow(dead_code)]
-pub(crate) mod mcp_runtime;
-#[allow(dead_code)]
-pub(crate) mod mcp_sessions;
+pub(crate) mod tool_gateway;
 #[allow(dead_code)]
 pub(crate) mod run;
-#[allow(dead_code)]
-pub(crate) mod start_receipt;
 #[allow(dead_code)]
 pub(crate) mod teach_turn;
 #[allow(dead_code)]
@@ -98,7 +94,7 @@ pub(crate) mod browser_replay;
 #[allow(dead_code)]
 pub(crate) mod companion_images;
 #[allow(dead_code)]
-pub(crate) mod mcp_errors;
+pub(crate) mod tool_errors;
 #[allow(dead_code)]
 pub(crate) mod model_input;
 #[allow(dead_code)]
@@ -127,12 +123,14 @@ pub(crate) mod tool_transport;
 pub(crate) mod toolsets;
 #[allow(dead_code)]
 pub(crate) mod web_fetch;
+/// Whether an address is on the public internet, the one check agents' pages and web.fetch share.
+pub use web_fetch::public_fetch::is_public_ip;
 #[allow(dead_code)]
 pub(crate) mod web_search;
 #[cfg(test)]
 pub(crate) mod tools_parity_tests;
 
-pub use agent_api::{runtime_client_builder, AgentRuntimeOptions, ResumedRuns, RuntimeApiError, StartRequest, StartedRun, ToolHook};
+pub use agent_api::{runtime_client_builder, AgentRuntimeOptions, ResumedRuns, RuntimeApiError, ToolHook};
 pub use agent_runtime::AgentRuntime;
 pub use logger::{LogSink, Logger};
 pub use misty_page_reader::readable::ReadablePage;

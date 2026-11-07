@@ -1,26 +1,9 @@
-import { apiRequest } from "@/api/client";
-import { queryEmbeddingHeaders } from "@/api/device-embeddings";
-import { deviceModelCall } from "@/api/device-models";
-import { windowSpaceId } from "./windowSpace";
+import type { DeviceMemoryEvent } from "@/api/device-memory";
+import { localMemory } from "./localMemory";
 
 export type MemoryKind = "page" | "voice" | "recording" | "note" | "screen";
 
-export interface MemoryEvent {
-  id: string;
-  space_id: string;
-  kind: MemoryKind;
-  url?: string;
-  site?: string;
-  title: string;
-  body?: string;
-  same_as?: string;
-  dwell_ms: number;
-  occurred_at: string;
-  /** What was in front, and the capture session that read it (screen moments). */
-  app?: string;
-  window_title?: string;
-  session_id?: string;
-}
+export type MemoryEvent = DeviceMemoryEvent;
 
 export interface MemoryStatus {
   waiting: number;
@@ -29,19 +12,11 @@ export interface MemoryStatus {
   message?: string;
 }
 
-interface DaySummary {
+export interface DaySummary {
   markdown: string;
   topics: string[];
   count: number;
 }
-
-const post = (body: unknown) => ({ method: "POST", body: JSON.stringify(body) });
-
-/**
- * Every call names the window's Space: memory is one tree per Space on the
- * server. Without one the server uses the personal Space.
- */
-const inSpace = <T extends object>(body: T) => ({ ...body, space_id: windowSpaceId() });
 
 export const memoryApi = {
   record: (event: {
@@ -58,11 +33,7 @@ export const memoryApi = {
     session_id?: string;
     /** The Space of the window the page was in; incognito windows record nothing. */
     space_id?: string;
-  }) =>
-    apiRequest<{ id: string; same_as: string }>(
-      "/me/memory/events",
-      post({ ...event, space_id: event.space_id ?? windowSpaceId() }),
-    ),
+  }) => localMemory.record(event),
   events: async (query: {
     from?: string;
     to?: string;
@@ -72,63 +43,19 @@ export const memoryApi = {
     limit?: number;
     /** The Space to read; without one, the window's. */
     space_id?: string;
-  }) => {
-    const params = new URLSearchParams();
-    for (const [key, value] of Object.entries({
-      ...query,
-      space_id: query.space_id ?? windowSpaceId(),
-    }))
-      if (value !== undefined && value !== "") params.set(key, String(value));
-    // Search by meaning carries its vector from this computer's embedding model.
-    const headers = query.q ? await queryEmbeddingHeaders(query.q) : {};
-    return apiRequest<{ events: MemoryEvent[] }>(`/me/memory/events?${params}`, { headers });
-  },
+  }): Promise<{ events: MemoryEvent[] }> => localMemory.events(query),
   forget: (scope: { all?: boolean; site?: string; from?: string; to?: string }) =>
-    apiRequest<{ forgotten: number }>("/me/memory/forget", post(inSpace(scope))),
-  status: () => apiRequest<MemoryStatus>("/me/memory/status"),
+    localMemory.forget(scope),
+  status: (): Promise<MemoryStatus> => localMemory.status(),
   /** Whether a day already has its recap in the tree's Summaries. */
-  hasRecap: async (date: string) => {
-    const params = new URLSearchParams({ parent: "summaries" });
-    const space = windowSpaceId();
-    if (space) params.set("space_id", space);
-    const { nodes } = await apiRequest<{ nodes: { id: string }[] }>(`/me/memory/tree?${params}`);
-    return nodes.some((node) => node.id === `summary:recap-${date}`);
-  },
-  /**
-   * One day's recap: the server gathers the day's moments, this computer's fast model writes it,
-   * and the server keeps it in the tree's Summaries. A recap that can't be kept is still shown.
-   */
-  daySummary: async (body: {
+  hasRecap: (date: string) => localMemory.hasRecap(date),
+  /** One day's recap, written on this computer's fast model and kept in the tree's Summaries. */
+  daySummary: (body: {
     date: string;
     time_zone: string;
     language?: string;
     space_id?: string;
-  }) => {
-    const request = { ...body, space_id: body.space_id ?? windowSpaceId() };
-    const day = await apiRequest<DaySummary & { on_device?: boolean; items?: unknown[] }>(
-      "/me/memory/day-summary",
-      post(request),
-    );
-    if (!day.on_device) return day;
-    const written = await deviceModelCall<{
-      markdown: string;
-      topics: string[];
-      threads: { title: string; from: string; to: string }[];
-      next: string[];
-    }>("day-summary", {
-      date: body.date,
-      items: day.items,
-      language: body.language || undefined,
-    });
-    await apiRequest<{ id: string }>(
-      "/me/memory/day-summary",
-      post({
-        ...request,
-        markdown: written.markdown,
-        outline: { threads: written.threads, next: written.next },
-      }),
-    ).catch(() => undefined);
-    return { markdown: written.markdown, topics: written.topics, count: day.count };
-  },
-  exportPath: "/me/memory/export",
+  }): Promise<DaySummary> => localMemory.daySummary(body),
+  /** Everything Memory kept, as a zip. */
+  exportZip: () => localMemory.exportZip(),
 };

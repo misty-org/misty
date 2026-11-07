@@ -143,7 +143,7 @@ const verbs: Record<string, [running: string, done: string]> = {
 
 /**
  * The app's words for what a tool acts on. Tools carry the agent's own names
- * (docs/agents/harness.md, Agent vocabulary); people see the UI's labels.
+ * people see the UI's labels.
  */
 const uiSubjects: Record<string, string> = {
   "memory.history": "history",

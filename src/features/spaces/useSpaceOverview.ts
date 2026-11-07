@@ -184,13 +184,12 @@ function useSpaceOverviewData(
               updatedAt: c.updated_at,
               route: conversationPath(space.id, c),
               rename:
-                c.created_by_user_id === accountId && c.kind !== "direct" && c.kind !== "dm"
+                c.created_by_user_id === accountId && c.kind !== "dm"
                   ? (title: string) => spacesApi.updateConversation(space.id, c.id, title)
                   : undefined,
               remove:
                 space.role === "owner" ||
                 c.created_by_user_id === accountId ||
-                c.kind === "direct" ||
                 c.kind === "dm"
                   ? () => spacesApi.deleteOrClearConversation(space.id, c.id)
                   : undefined,

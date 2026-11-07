@@ -37,8 +37,6 @@ export interface ScreenControl {
   reveal?: "hover";
 }
 export interface CursorSample {
-  /** Activity sequence only; no key identities or typed text leave the native hook. */
-  keyboardActivity?: number;
   x: number;
   y: number;
   displays: DisplayFrame[];
@@ -48,7 +46,6 @@ export interface Presentation {
   phase: CompanionPhase;
   visible: boolean;
   enabled?: boolean;
-  showCompanion?: boolean;
   /** Percentage of the default 32px companion. */
   size?: number;
   mode: CompanionMode;

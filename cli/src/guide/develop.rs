@@ -48,7 +48,7 @@ pub(super) fn server(workspace: &Workspace) -> Result<()> {
         .item(ServerAction::Console, "Open the operator console", "")
         .item(ServerAction::Stop, "Stop, keeping its data", "")
         .interact()?;
-    environment::apply(workspace, environment::Target::Dev)?;
+    environment::apply(workspace)?;
     match action {
         ServerAction::Start => server::up(workspace, true, false)?,
         ServerAction::Status => server::status(workspace)?,

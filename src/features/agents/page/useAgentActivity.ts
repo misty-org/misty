@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { observeAccountChanges } from "@/api/account-events";
 import type { MistyActivityEntry } from "@/features/misty/activity";
 import { runtimeAiApi } from "../AgentsRuntime";
 
@@ -29,10 +28,9 @@ export function useAgentActivity(accountId: string, agentId?: string) {
           }));
       }
     };
-    const stop = observeAccountChanges(accountId, ["runs", "invocations"], refresh);
+    void refresh();
     return () => {
       live = false;
-      stop();
     };
   }, [accountId, agentId, key]);
   return state.key === key

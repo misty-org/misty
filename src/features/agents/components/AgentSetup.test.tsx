@@ -2,7 +2,7 @@ import "./agentCloudAvatars.testFixtures";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 const save = vi.hoisted(() => vi.fn());
-vi.mock("@/api/agents/native", () => ({ personalAgentsApi: { save } }));
+vi.mock("@/features/agents/personalAgentsApi", () => ({ personalAgentsApi: { save } }));
 import { AgentSetup } from "./AgentSetup";
 const access = {
   accountId: "owner",

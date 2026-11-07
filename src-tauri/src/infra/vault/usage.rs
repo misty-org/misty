@@ -14,6 +14,7 @@ const KNOWN: &[&str] = &[
     collections::BOOKMARKS,
     collections::TAB_GROUPS,
     collections::HISTORY,
+    collections::MEMORY,
     collections::EXTENSION_SYNC,
     collections::PASSWORDS,
     collections::AUTOFILL,

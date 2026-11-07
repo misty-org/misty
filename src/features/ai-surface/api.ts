@@ -1,5 +1,6 @@
-import { withDeviceRunGrants } from "./deviceRunGrants";
-import { apiRequest } from "@/api/client";
+import { deviceMemory } from "@/api/device-memory";
+import { localRunActivity } from "@/features/agents/localRun";
+import { invoke } from "@/native/invoke";
 import type {
   AgentNotebook,
   AgentSubagent,
@@ -11,129 +12,79 @@ import type {
 } from "./types";
 import type { MistyActivityEntry } from "@/features/misty/activity";
 
-import { toServerInvocation } from "./serverInvocation";
 export * from "./aiSettingsTypes";
 export { subscribeToAiInvocation } from "./invocationSubscription";
-import type {
-  AiMemoryRecord,
-  AiSurfacePreferenceRecord,
-  AiUserSettings,
-  ScreenLocation,
-} from "./aiSettingsTypes";
+import type { AiMemoryRecord, ScreenLocation } from "./aiSettingsTypes";
+import { changeAgentSettings, readAgentSettings } from "./localAiSettings";
+import { completeLocalArtifact, decideLocalArtifact } from "./localRun/artifacts";
+import { localRunProgress, localRunState } from "./localRun/runState";
+import { startLocalRun } from "./localRun/startRun";
+
 export const aiSurfaceApi = {
-  settings: () =>
-    apiRequest<{ settings: AiUserSettings; preferences: AiSurfacePreferenceRecord[] }>(
-      "/ai/settings",
-    ),
+  settings: async () => ({ settings: await readAgentSettings() }),
   updateSettings: (enabled: boolean, retentionDays: number, memoryEnabled?: boolean) =>
-    apiRequest<{ settings: AiUserSettings }>("/ai/settings", {
-      method: "PUT",
-      body: JSON.stringify({
-        enabled,
-        retention_days: retentionDays,
-        ...(memoryEnabled === undefined ? {} : { memory_enabled: memoryEnabled }),
-      }),
+    changeAgentSettings({
+      enabled,
+      retention_days: retentionDays,
+      ...(memoryEnabled === undefined ? {} : { memory_enabled: memoryEnabled }),
     }),
   updateScreenLocation: (location: ScreenLocation) =>
-    apiRequest<{ settings: AiUserSettings }>("/ai/settings/screen-location", {
-      method: "PUT",
-      body: JSON.stringify({ location }),
-    }),
+    changeAgentSettings({ screen_location: location }),
   updateAgentSites: (change: { block_sensitive?: boolean; blocked_sites?: string[] }) =>
-    apiRequest<{ settings: AiUserSettings }>("/ai/settings/agent-sites", {
-      method: "PUT",
-      body: JSON.stringify(change),
+    changeAgentSettings({
+      ...(change.block_sensitive === undefined
+        ? {}
+        : { agent_block_sensitive: change.block_sensitive }),
+      ...(change.blocked_sites === undefined ? {} : { agent_blocked_sites: change.blocked_sites }),
     }),
   /** Whether agents stop to ask before paying or buying (`payments_ask`). */
-  updatePaymentsAsk: (paymentsAsk: boolean) =>
-    apiRequest<{ settings: AiUserSettings }>("/ai/settings/app-actions", {
-      method: "PUT",
-      body: JSON.stringify({ payments: paymentsAsk }),
-    }),
+  updatePaymentsAsk: (paymentsAsk: boolean) => changeAgentSettings({ payments_ask: paymentsAsk }),
   updateKeepAwake: (keepAwake: boolean) =>
-    apiRequest<{ settings: AiUserSettings }>("/ai/settings/keep-awake", {
-      method: "PUT",
-      body: JSON.stringify({ keep_awake_for_agents: keepAwake }),
-    }),
-  memories: () => apiRequest<{ memories: AiMemoryRecord[] }>("/ai/memories"),
+    changeAgentSettings({ keep_awake_for_agents: keepAwake }),
+  memories: async (): Promise<{ memories: AiMemoryRecord[] }> => ({
+    memories: await deviceMemory.prefs({ space_id: "", agent_id: "" }),
+  }),
   forgetMemory: (memoryId: string) =>
-    apiRequest<void>(`/ai/memories/${encodeURIComponent(memoryId)}`, { method: "DELETE" }),
-  activity: (spaceId: string, agentId?: string) =>
-    apiRequest<{ entries: MistyActivityEntry[] }>(
-      `/ai/activity?${new URLSearchParams({ space_id: spaceId, ...(agentId ? { agent_id: agentId } : {}) })}`,
-    ),
-  updatePreference: (
-    surfaceId: string,
-    input: Pick<AiSurfacePreferenceRecord, "proactive_enabled" | "saved_actions">,
-  ) =>
-    apiRequest<{ preference: AiSurfacePreferenceRecord }>(
-      `/ai/preferences/${encodeURIComponent(surfaceId)}`,
-      { method: "PUT", body: JSON.stringify(input) },
-    ),
-  feedback: (invocationId: string, rating: -1 | 1, reason = "", comment = "") =>
-    apiRequest<void>(`/ai/invocations/${encodeURIComponent(invocationId)}/feedback`, {
-      method: "POST",
-      body: JSON.stringify({ rating, reason, comment }),
-    }),
-  createInvocation: async (input: AiInvocationRequest) => {
-    const deviceContexts = await withDeviceRunGrants(
-      input.deviceContexts,
-      input.agentId,
-      input.conversationId ?? input.idempotencyKey,
-    );
-    return apiRequest<AiInvocationCreated>("/ai/invocations", {
-      method: "POST",
-      headers: { "Idempotency-Key": input.idempotencyKey },
-      body: JSON.stringify(toServerInvocation({ ...input, deviceContexts })),
-    });
+    deviceMemory.forgetPref({ space_id: "", agent_id: "", id: memoryId }),
+  activity: async (_spaceId: string, agentId?: string): Promise<{ entries: MistyActivityEntry[] }> => ({
+    entries: await localRunActivity(agentId),
+  }),
+  createInvocation: (input: AiInvocationRequest): Promise<AiInvocationCreated> =>
+    startLocalRun(input),
+  /** How a reply got its answer: notes and tool runs, rebuilt from what its run kept. */
+  invocationProgress: (
+    invocationId: string,
+  ): Promise<{
+    items: AiProgressItem[];
+    citations?: AiCitation[];
+    notebook?: AgentNotebook;
+    subagents?: AgentSubagent[];
+  }> => localRunProgress(invocationId),
+  /** The run's state: running, completed, failed, canceled, or missing when nothing knows of it. */
+  invocationState: (invocationId: string) => localRunState(invocationId),
+  cancelInvocation: async (invocationId: string) => {
+    await invoke("agent_run_cancel", { runId: invocationId });
+    const { cancelSubAgentsOf } = await import("@/features/agents/localTools/delegationTools");
+    await cancelSubAgentsOf(invocationId).catch(() => undefined);
+    return { state: "canceled" };
   },
-  /** How a reply got its answer: notes and tool runs, rebuilt from its stored events. */
-  invocationProgress: (invocationId: string) =>
-    apiRequest<{
-      items: AiProgressItem[];
-      citations?: AiCitation[];
-      notebook?: AgentNotebook;
-      subagents?: AgentSubagent[];
-    }>(`/ai/invocations/${encodeURIComponent(invocationId)}/progress`),
-  /** The run's stored state: queued, running, awaiting_*, completed, failed or canceled. */
-  invocationState: (invocationId: string) =>
-    apiRequest<{ state: string }>(`/ai/invocations/${encodeURIComponent(invocationId)}/state`),
-  cancelInvocation: (invocationId: string) =>
-    apiRequest<{ state: string }>(`/ai/invocations/${encodeURIComponent(invocationId)}/cancel`, {
-      method: "POST",
-    }),
   /** Take over: the run waits at its next step until resumed (an agent's window). */
-  pauseInvocation: (invocationId: string) =>
-    apiRequest<{ state: string }>(`/ai/invocations/${encodeURIComponent(invocationId)}/pause`, {
-      method: "POST",
-      body: JSON.stringify({ idempotencyKey: crypto.randomUUID() }),
-    }),
-  resumeInvocation: (invocationId: string) =>
-    apiRequest<{ state: string }>(`/ai/invocations/${encodeURIComponent(invocationId)}/resume`, {
-      method: "POST",
-      body: JSON.stringify({ idempotencyKey: crypto.randomUUID() }),
-    }),
+  pauseInvocation: async (invocationId: string) => {
+    await invoke("agent_run_pause", { runId: invocationId, paused: true });
+    return { state: "paused" };
+  },
+  resumeInvocation: async (invocationId: string) => {
+    await invoke("agent_run_pause", { runId: invocationId, paused: false });
+    return { state: "running" };
+  },
   decideArtifact: (
     artifactId: string,
     decision: "accept" | "reject" | "refine",
-    idempotencyKey: string,
-    operations?: unknown,
-    refinement?: string,
-  ) =>
-    apiRequest<{ artifact: AiArtifact; applyMode?: "server" | "client"; result?: unknown }>(
-      `/ai/artifacts/${encodeURIComponent(artifactId)}/decision`,
-      {
-        method: "POST",
-        headers: { "Idempotency-Key": idempotencyKey },
-        body: JSON.stringify({ decision, operations, refinement }),
-      },
-    ),
+    _idempotencyKey: string,
+    _operations?: unknown,
+    _refinement?: string,
+  ): Promise<{ artifact: AiArtifact; applyMode?: "server" | "client"; result?: unknown }> =>
+    decideLocalArtifact(artifactId, decision),
   completeArtifact: (artifactId: string, state: "applied" | "failed", error?: string) =>
-    apiRequest<{ artifact: AiArtifact }>(
-      `/ai/artifacts/${encodeURIComponent(artifactId)}/completion`,
-      {
-        method: "POST",
-        body: JSON.stringify({ state, error: error ?? "" }),
-      },
-    ),
+    completeLocalArtifact(artifactId, state, error),
 };

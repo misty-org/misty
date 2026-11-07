@@ -30,7 +30,6 @@ import {
 } from "./components/ConversationStates";
 import { useSpaceAgentMembers } from "../members/agents/useSpaceAgentMembers";
 import { ChatThreadColumn } from "./components/ChatThreadColumn";
-import { AgentTranscriptCard } from "./components/AgentTranscriptButton";
 import { useChatSidePanel } from "./store/chatSidePanelStore";
 export function SpaceChat({
   spaceId,
@@ -58,7 +57,6 @@ export function SpaceChat({
   const conversationId = openConversationId ?? searchParams.get("conversation") ?? "";
   const chatRootRef = useRef<HTMLDivElement>(null);
   const threadRootId = useChatSidePanel((panel) => panel.threadRootId);
-  const transcriptRequestId = useChatSidePanel((panel) => panel.transcriptRequestId);
   // Panels belong to the chat they were opened in.
   useEffect(() => useChatSidePanel.getState().reset(), [spaceId, conversationId]);
   const endRef = useRef<HTMLDivElement | null>(null);
@@ -290,7 +288,6 @@ export function SpaceChat({
           onSend={actions.sendReply}
         />
       ) : null}
-      {transcriptRequestId ? <AgentTranscriptCard requestId={transcriptRequestId} /> : null}
     </div>
   );
 }

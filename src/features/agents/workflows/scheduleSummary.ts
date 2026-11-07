@@ -136,12 +136,23 @@ export function describeNextRun(schedule: WorkflowSchedule) {
   // A run that came due while its computer was away waits for it (roadmap C1).
   if (schedule.state === "awaiting_device") return "Waiting for its computer";
   if (schedule.state === "device_claimed") return "Starting on its computer";
+  if (schedule.state === "handed_off") return "Starting in its profile";
   if (!schedule.next_run_at) return "No upcoming runs";
   const next = new Date(schedule.next_run_at);
+  // Waits for the current task, or for a profile this computer doesn't have.
+  if (next.getTime() <= Date.now()) return "Due now";
   const soon = next.getTime() - Date.now() < 6 * 24 * 60 * 60 * 1000;
   return `Next ${next.toLocaleString(undefined, {
     ...(soon ? { weekday: "short" } : { month: "short", day: "numeric" }),
     hour: "numeric",
     minute: "2-digit",
   })}`;
+}
+
+/** Why a schedule can't run or what its last run did wrong, in its own words; empty when neither. */
+export function scheduleProblem(schedule: WorkflowSchedule) {
+  if (schedule.last_error?.startsWith("This schedule uses a profile")) return schedule.last_error;
+  return schedule.state === "failed" && schedule.last_error
+    ? `Last scheduled run failed: ${schedule.last_error}`
+    : "";
 }

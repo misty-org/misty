@@ -1,4 +1,4 @@
-//! One condenser interface (docs/agents/harness.md, Context): every way the runtime keeps a
+//! One condenser interface: every way the runtime keeps a
 //! transcript inside the model's window is a step with the same shape, run in order from the
 //! cheapest and most cache-friendly to the most lossy. Adding a step means adding it here, not in the
 //! agent loop.
@@ -113,7 +113,7 @@ impl Condenser for OldToolResults {
 pub(crate) const SUMMARY_EVERY_TURNS: u32 = 20;
 
 /// A summary of older steps every [`SUMMARY_EVERY_TURNS`] turns once the transcript is past the
-/// working budget (docs/agents/harness.md, Context): one rewrite on a schedule, then twenty turns
+/// working budget: one rewrite on a schedule, then twenty turns
 /// that only append, so the prompt cache holds between summaries.
 pub(crate) struct PeriodicSummary<'s> {
     pub(crate) summarize: Summarize<'s>,

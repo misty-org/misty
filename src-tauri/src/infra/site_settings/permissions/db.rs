@@ -8,7 +8,7 @@ type PermissionStore = BTreeMap<String, BTreeMap<String, Permissions>>;
 
 fn store() -> Option<Store> {
     crate::infra::paths::misty_home_dir()
-        .map(|home| Store::at(home.join(".local").join("data").join("misty.db")))
+        .map(|home| Store::in_home(&home))
 }
 
 pub(super) fn read_all_from(store: &Store) -> PermissionStore {

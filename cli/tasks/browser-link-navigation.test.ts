@@ -46,8 +46,8 @@ test('explicit new-tab gestures still work', () => {
   }
 });
 
-// Kiri's host channel sender as WebKit renders it (kiri/src/channel/macos.rs).
-const sender = readFileSync(new URL('../../kiri/src/channel/macos.rs', import.meta.url), 'utf8')
+// Kiri's host channel sender as WebKit renders it (src-tauri/crates/kiri/src/channel/macos.rs).
+const sender = readFileSync(new URL('../../src-tauri/crates/kiri/src/channel/macos.rs', import.meta.url), 'utf8')
   .match(/SENDER_SCRIPT: &str = "(.*)";/)[1];
 
 // The script as WebKit renders it: host messages use Kiri's captured native channel.

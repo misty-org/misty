@@ -72,6 +72,7 @@ export function createSpaceContentActions(
             [spaceId]: mergeSpaceMessages(state.messagesBySpace[spaceId] ?? [], [response.message]),
           },
         }));
+        return response.message;
       } catch (error) {
         set((state) => ({
           sending: false,

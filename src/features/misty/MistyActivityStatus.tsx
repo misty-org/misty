@@ -3,7 +3,6 @@ function taskAwarePhrase(value?: string) {
   const status = value?.trim();
   if (!status || status === "On it." || status === "thinking") return "Thinking";
   const lower = status.toLocaleLowerCase();
-  if (lower.includes("weather")) return "Checking the weather";
   if (lower.includes("file") || lower.includes("library")) return "Searching your files";
   if (lower.includes("message")) return "Searching your messages";
   if (lower.includes("calendar")) return "Checking your calendar";

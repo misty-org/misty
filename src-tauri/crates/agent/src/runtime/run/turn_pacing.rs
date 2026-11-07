@@ -125,7 +125,7 @@ impl RunLoop {
         tool_key
     }
 
-    /// What the first turn carries (docs/agents/harness.md, Context): the fixed cost of every turn.
+    /// What the first turn carries: the fixed cost of every turn.
     pub(super) fn log_context_breakdown(&self) {
         let catalog = &self.tools.catalog;
         // The tools this turn sends, not the whole catalog: the rest wait behind agent_tool_use and loads.

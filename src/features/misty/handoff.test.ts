@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { globalMistyApi } from "./globalMistyApi";
+import { localChats } from "./localChats";
 import type { AiArtifact } from "@/features/ai-surface/types";
 import { useMistyStore } from "./useMistyStore";
 import { usePersonalAgentsStore } from "@/features/agents/personalAgentsStore";
@@ -193,7 +193,7 @@ it("restores a pending review and keeps it bound to its saved conversation", asy
     },
     { ...base, id: "other", messages: [] },
   ] as GlobalAiConversation[];
-  const request = vi.spyOn(globalMistyApi, "conversations").mockResolvedValue({ conversations });
+  const request = vi.spyOn(localChats, "conversations").mockResolvedValue(conversations);
   useMistyStore.setState({
     accountId: "owner",
     activeConversationId: "files",

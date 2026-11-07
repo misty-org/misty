@@ -18,9 +18,6 @@ const conversation = (patch: Partial<SpaceConversation>) =>
 
 describe("one chat system", () => {
   it("opens every chat in Space chat", () => {
-    expect(
-      conversationPath("home", conversation({ id: "conversation_1", direct_agent_id: "agent_1" })),
-    ).toBe("/spaces/home/social/misty?conversation=conversation_1");
     expect(conversationPath("home", conversation({ id: "c1" }))).toBe(
       "/spaces/home/social/misty?conversation=c1",
     );

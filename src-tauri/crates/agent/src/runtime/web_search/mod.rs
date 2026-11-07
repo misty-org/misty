@@ -1,4 +1,4 @@
-//! web.search, on the person's device and their own search key (docs/agents/runtime.md).
+//! web.search, on the person's device and their own search key.
 pub(crate) mod decodo;
 pub(crate) mod provider;
 pub(crate) mod search_step;

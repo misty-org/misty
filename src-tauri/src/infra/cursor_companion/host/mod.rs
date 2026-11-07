@@ -45,13 +45,11 @@ pub struct CursorCompanionState {
     turn: AtomicU64,
     started: AtomicBool,
     capture: AtomicBool,
-    keyboard_activity: AtomicU64,
     /// Click positions leave the native hook only while a walkthrough step waits.
     watch_clicks: AtomicBool,
     click_turn: AtomicU64,
 }
 pub enum Shortcut {
-    KeyboardActivity,
     Held(bool),
     Click(f64, f64),
     Error(String),

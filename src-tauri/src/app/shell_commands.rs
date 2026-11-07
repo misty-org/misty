@@ -19,10 +19,16 @@ use serde_json::Value;
 use tauri::State;
 
 use crate::{
-    app::{device_commands::require_device_window, runtime::MistyRuntime},
+    app::{
+        device_commands::{local_device_id, require_device_window},
+        runtime::MistyRuntime,
+    },
     infra::{
         agent_shell::{self, ShellOutcome, ShellRequest, SharedFolder},
-        devices::{records::SignedRecord, trust},
+        devices::{
+            agent_grants::{self, AGENT_SCOPE},
+            records::SignedRecord,
+        },
     },
 };
 
@@ -57,7 +63,7 @@ impl Drop for RunningJob {
     }
 }
 
-/// Each account's chats are kept apart on a computer that several accounts use.
+/// A chat's workspace goes by the chat, which stays the same when its account signs in or out.
 fn workspace_key(account_id: &str, chat_key: &str) -> String {
     format!("{account_id}\n{chat_key}")
 }
@@ -75,8 +81,8 @@ pub async fn device_shell_job(
     require_device_window(&webview)?;
     let grant: SignedRecord = serde_json::from_value(config["runGrant"].clone())
         .map_err(|_| "device_grant_invalid".to_owned())?;
-    let verified = trust::verify_job_grant(&grant, &scope_id, SHELL_CAPABILITY)
-        .map_err(|_| "device_grant_invalid".to_owned())?;
+    let device = local_device_id(&state).await.map_err(|_| "device_grant_invalid".to_owned())?;
+    let verified = agent_grants::verify(&device, &grant, &scope_id, SHELL_CAPABILITY)?;
     if verified.chat_key.is_empty() {
         return Err("device_grant_invalid".to_owned());
     }
@@ -85,9 +91,8 @@ pub async fn device_shell_job(
     let folder = match input.folder_scope_id {
         None => None,
         Some(folder_scope) => {
-            trust::verify_job_grant(&grant, &folder_scope, FOLDER_READ_CAPABILITY)
-                .map_err(|_| "device_grant_invalid".to_owned())?;
-            let writable = trust::verify_job_grant(&grant, &folder_scope, FOLDER_WRITE_CAPABILITY).is_ok()
+            agent_grants::verify(&device, &grant, &folder_scope, FOLDER_READ_CAPABILITY)?;
+            let writable = agent_grants::verify(&device, &grant, &folder_scope, FOLDER_WRITE_CAPABILITY).is_ok()
                 && state
                     .agents
                     .folder_changes_allowed(verified.chat_key.clone(), folder_scope.clone())
@@ -139,10 +144,7 @@ pub async fn agents_forget_workspace(
     require_device_window(&webview)?;
     let misty_dir = state.environment.misty_dir();
     let _ = state.agents.stop_folder_changes(conversation_id.clone(), None).await;
-    let Some(account_id) = trust::account_id() else {
-        return Err("shell_workspace_unavailable".to_owned());
-    };
-    let key = workspace_key(&account_id, &conversation_id);
+    let key = workspace_key(AGENT_SCOPE, &conversation_id);
     tauri::async_runtime::spawn_blocking(move || agent_shell::forget_workspace(&misty_dir, &key))
         .await
         .map_err(|error| error.to_string())?

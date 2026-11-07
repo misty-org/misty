@@ -52,7 +52,7 @@ pub fn run(workspace: &Workspace, options: Doctor) -> Result<()> {
         if !matches!(options.target, Target::All | Target::Server) {
             bail!("--fix supports server environment repairs only");
         }
-        environment::init(workspace, environment::Target::Dev)?;
+        environment::init(workspace)?;
         crate::server::initialize_development_secrets(workspace)?;
     }
     let mut findings = Vec::new();
@@ -89,8 +89,7 @@ pub fn run(workspace: &Workspace, options: Doctor) -> Result<()> {
         record(
             &mut findings,
             "server environment",
-            environment::validate(workspace, environment::Target::Dev)
-                .and_then(|_| environment::apply(workspace, environment::Target::Dev)),
+            environment::validate(workspace).and_then(|_| environment::apply(workspace)),
             "misty setup server; misty setup cloudflare",
         );
         record(
@@ -103,7 +102,7 @@ pub fn run(workspace: &Workspace, options: Doctor) -> Result<()> {
             &mut findings,
             "host ports",
             crate::server::ports(workspace),
-            "Use misty env set dev MISTY_HOST_PORT to change the API port",
+            "Use misty env set MISTY_HOST_PORT to change the API port",
         );
         record(
             &mut findings,

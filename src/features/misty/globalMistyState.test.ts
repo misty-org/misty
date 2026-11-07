@@ -5,7 +5,7 @@ import { requestHostContext } from "./contextBridge";
 import { useMistyStore } from "./useMistyStore";
 import { useSpacesStore } from "@/features/spaces";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { globalMistyApi } from "./globalMistyApi";
+import { localChats } from "./localChats";
 describe("Global Misty state", () => {
   beforeEach(() => {
     window.localStorage.clear();
@@ -97,12 +97,9 @@ describe("Global Misty state", () => {
     );
   });
   it("does not overwrite a new response with a late history refresh", async () => {
-    let finish!: (value: { conversations: never[] }) => void;
-    vi.spyOn(globalMistyApi, "conversations").mockImplementationOnce(
-      () =>
-        new Promise((resolve) => {
-          finish = resolve;
-        }),
+    let finish!: (value: never[]) => void;
+    vi.spyOn(localChats, "conversations").mockImplementationOnce(
+      () => new Promise((resolve) => (finish = resolve)),
     );
     useMistyStore.setState({
       accountId: "account-a",
@@ -114,9 +111,8 @@ describe("Global Misty state", () => {
       activeConversationId: "new-response",
     });
     const messages = useMistyStore.getState().conversations;
-    finish({
-      conversations: [],
-    });
+    await vi.waitFor(() => expect(finish).toBeTypeOf("function"));
+    finish([]);
     await loading;
     expect(useMistyStore.getState().conversations).toBe(messages);
     expect(useMistyStore.getState().activeConversationId).toBe("new-response");
@@ -198,17 +194,6 @@ describe("Global Misty state", () => {
     });
   });
   it("keeps Deep thinking when creating the first conversation", async () => {
-    vi.spyOn(globalMistyApi, "createConversation").mockResolvedValueOnce({
-      id: "conversation-deep",
-      agentId: "default-misty",
-      title: "New conversation",
-      spaceId: "work",
-      createdAt: "2026-09-22",
-      updatedAt: "2026-09-22",
-      messages: [],
-      remote: true,
-      reasoningEffort: "high",
-    });
     const create = vi
       .spyOn(aiSurfaceApi, "createInvocation")
       .mockRejectedValueOnce(new Error("stop after admission"));
@@ -312,9 +297,7 @@ describe("Global Misty state", () => {
       messages: [],
       remote: true,
     };
-    vi.spyOn(globalMistyApi, "conversations").mockResolvedValue({
-      conversations: [conversation],
-    });
+    vi.spyOn(localChats, "conversations").mockResolvedValue([conversation]);
     useMistyStore.setState({
       accountId: "account-a",
       activeConversationId: "",
@@ -334,34 +317,6 @@ describe("Global Misty state", () => {
       activeConversationId: "",
       selectedAgentId: "default-misty",
     });
-  });
-  it("does not install a pending browser conversation into a different account", async () => {
-    let finish!: (value: Awaited<ReturnType<typeof globalMistyApi.createConversation>>) => void;
-    const create = vi.spyOn(globalMistyApi, "createConversation").mockImplementationOnce(
-      () =>
-        new Promise((resolve) => {
-          finish = resolve;
-        }),
-    );
-    useMistyStore.getState().setAccount("account-a");
-    const pending = useMistyStore.getState().newConversation("family");
-    // The device id resolves before the request is sent.
-    await vi.waitFor(() => expect(create).toHaveBeenCalled());
-    useMistyStore.getState().setAccount("account-b");
-    const current = useMistyStore.getState();
-    finish({
-      id: "old-account-conversation",
-      title: "Ask",
-      spaceId: "family",
-      createdAt: "2026-09-08T00:00:00Z",
-      updatedAt: "2026-09-08T00:00:00Z",
-      messages: [],
-      remote: true,
-    });
-    await pending;
-    expect(useMistyStore.getState().conversations).toEqual(current.conversations);
-    expect(useMistyStore.getState().activeConversationId).toBe(current.activeConversationId);
-    create.mockRestore();
   });
   it("keeps Agent workspace answers out of the global Search panel", async () => {
     const createInvocation = vi

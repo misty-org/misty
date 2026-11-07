@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { apiBlobRequest } from "@/api/client";
 import {
   memoryApi,
   PAUSED_UNTIL_RESUMED,
@@ -51,7 +50,7 @@ export function MemorySection(props: SettingsContentProps) {
   };
   const exportAll = async () => {
     try {
-      const blob = await apiBlobRequest(memoryApi.exportPath);
+      const blob = await memoryApi.exportZip();
       const link = document.createElement("a");
       link.href = URL.createObjectURL(blob);
       link.download = `misty-memory-${new Date().toISOString().slice(0, 10)}.zip`;

@@ -1,17 +1,17 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   invoke: vi.fn(async (_command: string, _args?: unknown) => undefined as unknown),
-  sign: vi.fn(async (_account: unknown, grants: unknown[]) =>
+  sign: vi.fn(async (grants: unknown[]) =>
     grants.map((_, index) => ({ payload: `p${index}`, signature: `s${index}` })),
   ),
   request: vi.fn(async (_path: string, _init?: unknown) => ({ state: "running" }) as unknown),
-  events: undefined as undefined | ((event: { topic: string; id?: string }) => void),
+  events: undefined as undefined | ((runId: string, event: { type: string }) => void),
 }));
 vi.mock("@tauri-apps/api/core", () => ({ invoke: mocks.invoke }));
 vi.mock("@/api/deployment/api", () => ({ resolveApiBase: async () => "https://api.example" }));
 vi.mock("@/api/client", () => ({ apiRequest: mocks.request }));
-vi.mock("@/api/account-events", () => ({
-  subscribeAccountEvents: (_account: string, listener: typeof mocks.events) => {
+vi.mock("@/features/ai-surface/localRunEvents", () => ({
+  watchAllRunEvents: (listener: typeof mocks.events) => {
     mocks.events = listener;
     return () => {
       mocks.events = undefined;
@@ -37,7 +37,7 @@ vi.mock("./store/useAgentsStore", () => ({
   }),
 }));
 vi.mock("./store/useAgentDeviceStore", () => ({
-  ensureServerAgentDevice: async () => ({ id: "device-b" }),
+  ensureAgentDevice: async () => ({ id: "device-b" }),
 }));
 import { endAllHostedSessions, endHostedSession, startHostedSession } from "./hostedSessions";
 import { useHostedSessions } from "./hostedSessionsState";
@@ -88,9 +88,8 @@ it("opens a session under its own lease and returns a tab this device signed", a
   expect((create?.[1] as { request: { url: string } }).request.url).toBe(
     "https://forms.example/apply",
   );
-  expect(mocks.sign).toHaveBeenCalledWith(expect.anything(), [
+  expect(mocks.sign).toHaveBeenCalledWith([
     expect.objectContaining({
-      targetDeviceId: "device-b",
       agentId: "agent-1",
       scopes: [session!.scopeId],
     }),
@@ -159,12 +158,11 @@ it("ends with its lease, tabs and keep-awake released", async () => {
   );
 });
 
-it("ends when the request that uses it is stopped on the other device", async () => {
+it("ends when the run that uses it stops", async () => {
   await startHostedSession(job(), new AbortController().signal);
-  mocks.request.mockResolvedValueOnce({ state: "canceled" });
-  mocks.events?.({ topic: "invocations", id: "invocation-1" });
+  mocks.events?.("another-run", { type: "invocation.canceled" });
+  mocks.events?.("invocation-1", { type: "tool.started" });
+  expect(useHostedSessions.getState().sessions).toHaveLength(1);
+  mocks.events?.("invocation-1", { type: "invocation.canceled" });
   await vi.waitFor(() => expect(useHostedSessions.getState().sessions).toHaveLength(0));
-  expect(mocks.request).toHaveBeenCalledWith("/ai/invocations/invocation-1/state", {
-    cache: "no-store",
-  });
 });

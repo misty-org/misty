@@ -1,7 +1,6 @@
 import { emit } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import type { RefObject } from "react";
-import { CompanionActivity } from "./companionActivity";
 import { companionFollowPoint, normalizeCompanionSize } from "./companionSize";
 import { listenToCursorInputs, type CursorInputs } from "./cursorOverlayInputs";
 import {
@@ -59,7 +58,6 @@ export function startCursorOverlayLoop({
       x: 0,
       y: 0,
     };
-  const activity = new CompanionActivity();
   let position: Point | undefined;
   const velocity = {
     x: 0,
@@ -83,7 +81,7 @@ export function startCursorOverlayLoop({
     typed = 0,
     nextChar = 0;
   const id = Number(getCurrentWindow().label.replace("misty-cursor-", ""));
-  const removers = listenToCursorInputs(id, activity, latest, inputs);
+  const removers = listenToCursorInputs(latest, inputs);
   const finish = () => {
     navigation = "follow";
     void emit("misty://cursor-point-finished", {
@@ -165,8 +163,6 @@ export function startCursorOverlayLoop({
         nextChar = now;
       }
     }
-    let scale = 1,
-      rotation = 0;
     if (navigation === "out" || navigation === "return") {
       if (
         navigation === "return" &&
@@ -179,8 +175,6 @@ export function startCursorOverlayLoop({
           x: f.x,
           y: f.y,
         };
-        scale = f.scale;
-        rotation = f.rotation;
         if (f.done) {
           if (navigation === "return") finish();
           else {
@@ -202,16 +196,7 @@ export function startCursorOverlayLoop({
       }
     } else spring(position, velocity, follow, dt);
     const onScreen = mouse.x >= 0 && mouse.y >= 0 && mouse.x < width && mouse.y < height;
-    const presence = activity.presentation(
-      now,
-      state.phase !== "idle" ||
-        navigation !== "follow" ||
-        Boolean(state.point) ||
-        Boolean(state.error),
-    );
-    const visible =
-      state.visible && presence.visible && (navigation !== "follow" || (!state.point && onScreen));
-    group.current.style.transitionDuration = `${presence.fadeMs}ms`;
+    const visible = state.visible && (navigation !== "follow" || (!state.point && onScreen));
     group.current.style.opacity = visible ? "1" : "0";
     group.current.style.transform = `translate(${position.x}px, ${position.y}px)`;
     const errorBubble = group.current.querySelector<HTMLElement>(".cursor-error-bubble");
@@ -219,9 +204,6 @@ export function startCursorOverlayLoop({
       errorBubble.style.left = `${Math.max(8 - position.x, Math.min(10, width - position.x - errorBubble.offsetWidth - 8))}px`;
       errorBubble.style.top = `${Math.max(8 - position.y, Math.min(26, height - position.y - errorBubble.offsetHeight - 8))}px`;
     }
-    const image = group.current.querySelector<HTMLImageElement>(".cursor-sprite");
-    if (image)
-      image.style.transform = `translate(-50%,-50%) rotate(${rotation}deg) scale(${scale})`;
     if (marker.current) {
       const shown =
         markerBox && (navigation === "out" || navigation === "hold") && now <= holdUntil;

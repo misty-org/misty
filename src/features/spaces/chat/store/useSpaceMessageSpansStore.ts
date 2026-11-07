@@ -41,6 +41,8 @@ export function messageFromSpaceEvent(event: SpaceEvent): SpaceMessage | undefin
 export interface MentionableAgent {
   agent_id: string;
   agent_name: string;
+  /** Who it belongs to: a mention runs only on its owner's computer. */
+  owner_user_id?: string;
 }
 
 export function buildMessageSpans(

@@ -108,8 +108,12 @@ export interface GlobalAiConversation {
   personalSpace?: boolean;
   createdAt: string;
   updatedAt: string;
-  /** When the user last saw it; runs newer than this are unread. */
+  /** When the user last saw it on this device; runs newer than this are unread. */
   lastReadAt?: string;
+  /** The device that keeps this chat; absent while it waits in the server's inbox. */
+  keptOnDeviceId?: string;
+  /** Running notes on turns too old to send, written by this device's model; opaque here. */
+  historyNotes?: unknown;
   modelId?: string;
   /** The model picked for this conversation; empty follows the account's Thinking choice. */
   modelOverride?: string;

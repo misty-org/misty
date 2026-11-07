@@ -116,7 +116,6 @@ it("saves a schedule on the workflow with its rules and inputs without starting 
       expect.objectContaining({
         inputs: { topic: "Weekly research" },
         enabled: true,
-        device_id: "this-computer",
         rules: [expect.objectContaining({ frequency: "weekly", times: ["09:00"] })],
       }),
     ),

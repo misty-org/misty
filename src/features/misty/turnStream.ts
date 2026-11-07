@@ -67,11 +67,20 @@ export function turnStreamHandlers(
             turn.executionTaskId,
           );
         void usePersonalAgentsStore.getState().load(turn.accountId);
-        // A pursued goal continues on the server; attach to its next run.
+        // A pursued goal's next turn starts here.
         useCollaborationStore.getState().afterRunSettled(
           turn.conversationId,
           () => void get().loadConversations(true),
           () => get().working,
+          {
+            runId: turn.invocationId,
+            completed: event.type === "invocation.completed",
+            waitingOnPerson:
+              get()
+                .conversations.find((c) => c.id === turn.conversationId)
+                ?.messages.find((m) => m.id === turn.assistantMessageId)?.appRequest?.state ===
+              "pending",
+          },
         );
       }
       if (event.type === "artifact.proposed" || event.type === "approval.required") {
@@ -111,8 +120,7 @@ export function turnStreamHandlers(
       const current = get()
         .conversations.find((conversation) => conversation.id === turn.conversationId)
         ?.messages.find((message) => message.id === turn.assistantMessageId);
-      // Never leave the spinner on for a stream that is gone. Reloading
-      // from the server re-attaches if the task is still running.
+      // Never leave the spinner on for a run that can't be followed.
       settleRun(set, get, {
         state: "failed",
         conversationId: turn.conversationId,

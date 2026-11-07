@@ -1,8 +1,6 @@
 import { create } from "zustand";
-import {
-  conversationFoldersApi,
-  type AgentConversationFolder,
-} from "@/api/assistant/conversation-folders";
+import type { AgentConversationFolder } from "@/api/assistant/conversation-folders";
+import { localChats } from "@/features/misty/localChats";
 import { useMistyStore } from "@/features/misty/useMistyStore";
 
 export type { AgentConversationFolder };
@@ -18,6 +16,7 @@ interface AgentFoldersStore {
   file(conversationId: string, folderId: string): Promise<void>;
 }
 
+/** Files conversations; the chat saves itself on this device with its new folder. */
 const setConversationFolder = (
   match: (folderId?: string, id?: string) => boolean,
   folderId: string,
@@ -30,43 +29,57 @@ const setConversationFolder = (
     ),
   }));
 
-const byName = (folders: AgentConversationFolder[]) =>
-  [...folders].sort((a, b) => a.name.localeCompare(b.name));
-
-/** The person's agent folders, on the server like the conversations they group. */
+/**
+ * The agent folders on this device. Folders group chats, and chats live on the device
+ * that keeps them, so folders do too.
+ */
 export const useAgentFoldersStore = create<AgentFoldersStore>((set, get) => ({
   accountId: "",
   folders: [],
   load: async (accountId) => {
     if (accountId !== get().accountId) set({ accountId, folders: [] });
     if (!accountId) return;
-    const { folders } = await conversationFoldersApi.list();
-    if (get().accountId === accountId) set({ folders: byName(folders) });
+    const folders = await localChats.folders(accountId);
+    if (get().accountId === accountId)
+      set({ folders: folders.sort((a, b) => a.name.localeCompare(b.name)) });
   },
   create: async (agentId, name) => {
     const accountId = get().accountId;
-    const folder = await conversationFoldersApi.create(agentId, name.trim().slice(0, 80));
+    const now = new Date().toISOString();
+    const folder: AgentConversationFolder = {
+      id: `folder_${crypto.randomUUID()}`,
+      agentId,
+      name: name.trim().slice(0, 80),
+      createdAt: now,
+      updatedAt: now,
+    };
+    await localChats.saveFolder(accountId, folder);
     if (get().accountId === accountId)
-      set({ folders: byName([...get().folders.filter((item) => item.id !== folder.id), folder]) });
+      set({ folders: [...get().folders.filter((item) => item.id !== folder.id), folder] });
     return folder;
   },
   rename: async (id, name) => {
     const accountId = get().accountId;
-    if (!get().folders.some((item) => item.id === id)) return;
-    const folder = await conversationFoldersApi.rename(id, name.trim().slice(0, 80));
+    const current = get().folders.find((item) => item.id === id);
+    if (!current) return;
+    const folder = {
+      ...current,
+      name: name.trim().slice(0, 80),
+      updatedAt: new Date().toISOString(),
+    };
+    await localChats.saveFolder(accountId, folder);
     if (get().accountId === accountId)
-      set({ folders: byName(get().folders.map((item) => (item.id === id ? folder : item))) });
+      set({ folders: get().folders.map((item) => (item.id === id ? folder : item)) });
   },
   remove: async (id) => {
     const accountId = get().accountId;
-    await conversationFoldersApi.remove(id);
+    await localChats.deleteFolder(accountId, id);
     if (get().accountId !== accountId) return;
     set({ folders: get().folders.filter((item) => item.id !== id) });
     // Its conversations go back to Recents.
     setConversationFolder((folderId) => folderId === id, "");
   },
   file: async (conversationId, folderId) => {
-    await conversationFoldersApi.file(conversationId, folderId);
     setConversationFolder((_, id) => id === conversationId, folderId);
   },
 }));

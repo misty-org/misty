@@ -42,7 +42,7 @@ pub(super) async fn begin_if_due(sync: &mut StorageSync, name: &str) -> Stored<(
         .map(|url| url.origin().ascii_serialization())
         .collect();
     let app = sync.app.clone();
-    let key = crate::infra::browser_library::history::profile_key(
+    let key = crate::infra::browser_library::history::store_key(
         crate::infra::profile_windows::store_for_profile(name).map_err(|_| Unavailable)?,
     );
     let visited = tokio::task::spawn_blocking(move || recent_origins(&app, &key))

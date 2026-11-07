@@ -1,4 +1,4 @@
-//! Two small decisions the desktop makes on its own fast model (docs/agents/runtime.md): where a
+//! Two small decisions the desktop makes on its own fast model: where a
 //! message sent to a busy agent goes, and the next step of a page-state restore.
 use serde_json::{json, Value};
 

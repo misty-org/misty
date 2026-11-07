@@ -1,5 +1,5 @@
-//! What this device's agents run on, for the Odysseys benchmark's report (debug builds only;
-//! docs/agents/evals/odysseys.md): the same document the agent runtime gets, without its keys.
+//! What this device's agents run on, for the Odysseys benchmark's report (debug builds only):
+//! the same document the agent runtime gets, without its keys.
 use super::*;
 
 /// The model of each role, the reasoning and the web search provider.
@@ -12,10 +12,7 @@ pub(super) async fn models(
         return response;
     }
     let document = crate::infra::models::current_document(&bridge.app).await;
-    let mut answer = without_keys(document.as_ref());
-    // A report says which runtime it measured, and this is what checks the person's word for it.
-    answer["runtime"] = json!(crate::infra::agent_runtime::runtime_name());
-    reply(Ok(answer))
+    reply(Ok(without_keys(document.as_ref())))
 }
 
 /// Only names known to carry no secret are copied; providers and their keys never are.

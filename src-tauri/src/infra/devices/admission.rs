@@ -1,17 +1,17 @@
 //! Registering this session with the server, and the changes it signs
-//! (docs/sync/devices.md). Registering with proof of its key makes it trusted at once.
+//! Registering with proof of its key makes it trusted at once.
 use serde::Deserialize;
 use serde_json::{json, Value};
 
 use super::{
     http::DeviceHttp,
     identity::DeviceIdentity,
-    records::{DevicePolicy, RunGrant, SharedFolder, SignedRecord},
+    records::{DevicePolicy, SharedFolder, SignedRecord},
     trust,
 };
 
 mod changes;
-pub use changes::{publish_policy, sign_run_grant};
+pub use changes::publish_policy;
 
 pub(crate) fn now() -> i64 {
     std::time::SystemTime::now()

@@ -133,8 +133,8 @@ export interface ConversationCollaboration {
   mode: ConversationMode;
   /** The chat's own Ask or Auto; empty follows the agent. */
   permissionMode: PermissionMode | "";
-  /** The agent's default, used while the chat has none of its own. */
-  agentPermissionMode: PermissionMode;
+  /** The agent's default, used while the chat has none of its own. Empty: read it from the agent. */
+  agentPermissionMode: PermissionMode | "";
   /** The latest run's live checklist and those of the runs it delegated to. */
   checklists: AgentChecklist[];
   plan: AgentPlan | null;

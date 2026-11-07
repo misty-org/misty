@@ -17,12 +17,7 @@ use rand::{rngs::OsRng, RngCore};
 use serde_json::json;
 use url::Url;
 
-use crate::{
-    artifacts::write_private,
-    environment::{self, Target},
-    process::CommandSpec,
-    workspace::Workspace,
-};
+use crate::{artifacts::write_private, environment, process::CommandSpec, workspace::Workspace};
 
 mod dev;
 pub use dev::*;

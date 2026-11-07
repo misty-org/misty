@@ -1,10 +1,7 @@
 import { deviceModelCall } from "@/api/device-models";
 
-export function createAgentsApi(
-  apiRequest: <T = void>(path: string, init?: RequestInit) => Promise<T>,
-) {
+export function createAgentsApi() {
   return {
-    run: <T>(runId: string) => apiRequest<T>(`/agent-runs/${encodeURIComponent(runId)}`),
     /** Transcribes a spoken request on this computer's transcription model. */
     transcribeVoice: async (audio: Blob, durationMs: number, signal?: AbortSignal) =>
       deviceModelCall<{ transcript: string; detected_language: string; duration_ms: number }>(

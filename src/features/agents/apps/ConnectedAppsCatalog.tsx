@@ -12,6 +12,7 @@ import {
   PopoverTrigger,
   Skeleton,
 } from "@/shared/ui";
+import { modelKeysChangedEvent, openModelSettings } from "@/features/settings/modelKeysPublic";
 import { appsApi, type CatalogApp, type ConnectedApp } from "./api";
 import { AppAccountsCard, AppLogo, accountSummary, groupApps } from "./ConnectedAppRows";
 
@@ -85,6 +86,12 @@ export function ConnectedAppsCatalog() {
       window.clearTimeout(timer);
     };
   }, [query, available, catalogVersion]);
+  // A Composio key saved in Settings takes effect here at once.
+  useEffect(() => {
+    const check = () => void refresh().catch(() => undefined);
+    window.addEventListener(modelKeysChangedEvent, check);
+    return () => window.removeEventListener(modelKeysChangedEvent, check);
+  }, [refresh]);
   // While a sign-in is open in the browser, check once each time Misty regains focus.
   useEffect(() => {
     if (!signingIn) return;
@@ -170,6 +177,13 @@ export function ConnectedAppsCatalog() {
     <>
       <ErrorNotification message={error} />
       {!available ? (
+        <div className="agent-integrations-description grid justify-items-start gap-2">
+          <p>Add a Composio key to connect apps. Without one, agents use each app’s web page.</p>
+          <Button variant="outline" size="sm" onClick={openModelSettings}>
+            Open Models
+          </Button>
+        </div>
+      ) : !available ? (
         <p className="agent-integrations-description">
           Connected apps are not set up on this Misty server.
         </p>

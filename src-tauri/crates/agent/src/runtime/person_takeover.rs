@@ -1,4 +1,4 @@
-//! Take over (docs/agents/cursor-companion.md, "Agent windows"): the person pauses the agent to use
+//! Take over: the person pauses the agent to use
 //! its window themselves. The run waits at its boundary, polling every [`TAKEOVER_POLL_SECONDS`]
 //! without model turns, for at most [`TAKEOVER_LIMIT`] polls; on resume its next turn starts from
 //! what the window shows now, not from snapshots taken before.

@@ -18,12 +18,66 @@ pub struct CaptureRequest {
     pub mic: bool,
     /// Everything the computer plays, except Misty.
     pub system: bool,
-    /// System audio with Misty in it: subtitles follow what's playing in a tab too.
+    /// System audio with Misty in it.
     #[serde(default)]
     pub include_misty: bool,
+    /// Only what Misty's own tabs play: live subtitles hear nothing else on the computer.
+    #[serde(default)]
+    pub misty_only: bool,
     /// Only these processes (an app, or a tab's web content process).
     #[serde(default)]
     pub pids: Vec<u32>,
+}
+
+/// Misty's tabs have no audio process yet, which is normal before anything plays.
+const MISTY_TABS_SILENT: &str = "misty_tabs_silent";
+
+/// The processes playing Misty's tabs, asked of each page itself. macOS can't say which WebKit
+/// processes are Misty's by owner, since a dev build's are counted to whatever launched it. Pages
+/// play through a GPU process they share, and a page process can hold audio too.
+#[cfg(target_os = "macos")]
+fn misty_tab_processes(app: &AppHandle) -> Vec<u32> {
+    use objc2::{msg_send, runtime::AnyObject, sel};
+    use tauri::Manager;
+    let (send, receive) = std::sync::mpsc::channel::<u32>();
+    let mut asked = 0;
+    for (label, page) in app.webviews() {
+        if !label.starts_with("misty-browser-") {
+            continue;
+        }
+        let send = send.clone();
+        let answered = page.with_webview(move |platform| unsafe {
+            let view: &AnyObject = &*platform.inner().cast();
+            // Private to WebKit, so the GPU process is asked for only where it's still there.
+            let has_gpu: bool = msg_send![view, respondsToSelector: sel!(_gpuProcessIdentifier)];
+            let gpu: i32 = if has_gpu { msg_send![view, _gpuProcessIdentifier] } else { 0 };
+            let page: i32 = msg_send![view, _webProcessIdentifier];
+            let _ = send.send(gpu.max(0) as u32);
+            let _ = send.send(page.max(0) as u32);
+        });
+        if answered.is_ok() {
+            asked += 2;
+        }
+    }
+    drop(send);
+    let mut pids: Vec<u32> = (0..asked)
+        .filter_map(|_| receive.recv_timeout(std::time::Duration::from_secs(2)).ok())
+        .filter(|pid| *pid > 1)
+        .collect();
+    pids.sort_unstable();
+    pids.dedup();
+    pids
+}
+
+/// WebView2 runs under this process, and a loopback capture of it takes its whole process tree.
+#[cfg(windows)]
+fn misty_tab_processes(_app: &AppHandle) -> Vec<u32> {
+    vec![std::process::id()]
+}
+
+#[cfg(not(any(target_os = "macos", windows)))]
+fn misty_tab_processes(_app: &AppHandle) -> Vec<u32> {
+    Vec::new()
 }
 
 #[derive(Default)]
@@ -102,6 +156,16 @@ pub fn voice_capture_start(
     request: CaptureRequest,
 ) -> Result<u64, String> {
     require_main(&webview)?;
+    let mut request = request;
+    if request.misty_only {
+        request.mic = false;
+        request.system = false;
+        request.pids = misty_tab_processes(&app);
+        // Nothing has played yet, so there's no audio process to listen to. The caller retries.
+        if request.pids.is_empty() {
+            return Err(MISTY_TABS_SILENT.into());
+        }
+    }
     if !request.mic && !request.system && request.pids.is_empty() {
         return Err("Choose at least one sound to capture.".into());
     }
@@ -122,7 +186,16 @@ pub fn voice_capture_start(
         } else {
             AudioSource::Processes(request.pids.clone())
         };
-        Some(open(&app, &owner, session, source, router.clone())?)
+        let opened = open(&app, &owner, session, source, router.clone());
+        // These processes exist but none has made a sound yet, which is the same as no process.
+        let silent = misty_audio_capture::CaptureError::NoSuchProcess.to_string();
+        Some(opened.map_err(|error| {
+            if request.misty_only && error == silent {
+                MISTY_TABS_SILENT.to_owned()
+            } else {
+                error
+            }
+        })?)
     } else {
         None
     };

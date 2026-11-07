@@ -43,7 +43,7 @@ pub(super) async fn open(bridge: &Bridge, body: OpenTab) -> Result<Value, String
             scope.clone(),
             None,
         )?;
-        browser_agent_grant_register(
+        register_agent_grant(
             app.clone(),
             app.state::<BrowserSessionState>(),
             serde_json::from_value(json!({

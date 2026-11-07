@@ -1,5 +1,4 @@
-//! One public page, fetched without cookies or saved sign-ins (docs/agents/harness.md, Reading
-//! without a screen). This runs on the person's computer on behalf of a model reading untrusted
+//! One public page, fetched without cookies or saved sign-ins. This runs on the person's computer on behalf of a model reading untrusted
 //! pages, so nothing may reach their own network. Every hop is checked before connecting: http or
 //! https, no credentials in the address, and a host that resolves only to public addresses.
 //!
@@ -117,7 +116,7 @@ fn in_v6(address: Ipv6Addr, network: Ipv6Addr, prefix: u32) -> bool {
 }
 
 /// Whether an address is on the public internet. IPv4-mapped IPv6 addresses count as their IPv4 address.
-pub(crate) fn is_public_ip(address: IpAddr) -> bool {
+pub fn is_public_ip(address: IpAddr) -> bool {
     let v4 = |address: Ipv4Addr| !REFUSED_V4.iter().any(|(network, prefix)| in_v4(address, *network, *prefix));
     match address {
         IpAddr::V4(address) => v4(address),

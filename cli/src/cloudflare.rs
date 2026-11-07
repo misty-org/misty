@@ -1,10 +1,7 @@
 mod provisioning;
 pub use provisioning::{setup, Options};
 
-use crate::{
-    environment::{self, Target},
-    workspace::Workspace,
-};
+use crate::{environment, workspace::Workspace};
 use anyhow::{bail, Context, Result};
 use serde_json::Value;
 use std::{
@@ -81,7 +78,7 @@ fn value(values: &BTreeMap<String, String>, name: &str) -> Result<String> {
         .ok()
         .filter(|v| !v.is_empty())
         .or_else(|| values.get(name).filter(|v| !v.is_empty()).cloned())
-        .with_context(|| format!("{name} is missing; set it in your environment or save it using misty env set dev {name} (value from stdin)"))
+        .with_context(|| format!("{name} is missing; set it in your environment or save it using misty env set {name} (value from stdin)"))
 }
 fn id(value: &str) -> Result<()> {
     if value.len() != 32 || !value.chars().all(|c| c.is_ascii_hexdigit()) {
@@ -105,7 +102,7 @@ fn hostname(value: &str) -> Result<()> {
     Ok(())
 }
 pub fn check(workspace: &Workspace) -> Result<()> {
-    let values = environment::read(workspace, Target::Dev)?;
+    let values = environment::read(workspace)?;
     let token = value(&values, "CLOUDFLARE_API_TOKEN")?;
     let account = value(&values, "CLOUDFLARE_ACCOUNT_ID")?;
     id(&account)?;
@@ -120,7 +117,7 @@ pub fn check(workspace: &Workspace) -> Result<()> {
     Ok(())
 }
 pub fn worker_health(workspace: &Workspace) -> Result<()> {
-    let values = environment::read(workspace, Target::Dev)?;
+    let values = environment::read(workspace)?;
     let token = value(&values, "CLOUDFLARE_API_TOKEN")?;
     let account = value(&values, "CLOUDFLARE_ACCOUNT_ID")?;
     id(&account)?;
@@ -141,7 +138,7 @@ pub fn worker_health(workspace: &Workspace) -> Result<()> {
 }
 
 pub fn public_health(workspace: &Workspace) -> Result<()> {
-    let values = environment::read(workspace, Target::Dev)?;
+    let values = environment::read(workspace)?;
     let origin = value(&values, "MISTY_DEV_API_ORIGIN")?;
     let parsed = url::Url::parse(&origin)?;
     if parsed.scheme() != "https"

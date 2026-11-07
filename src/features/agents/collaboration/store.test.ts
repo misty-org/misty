@@ -143,24 +143,3 @@ it("drops another account's state and answers", async () => {
   expect(useCollaborationStore.getState().byConversation).toEqual({});
 });
 
-it("attaches to a goal continuation once it starts, and stops looking without a goal", async () => {
-  const reconnect = vi.fn();
-  api.get
-    .mockResolvedValueOnce(loaded({ goal: { status: "pursuing" } as never }))
-    .mockResolvedValueOnce(
-      loaded({ goal: { status: "pursuing" } as never, runningInvocationId: "invocation_2" }),
-    );
-  useCollaborationStore.getState().afterRunSettled("c1", reconnect, () => false);
-  await vi.advanceTimersByTimeAsync(1_600);
-  expect(reconnect).not.toHaveBeenCalled();
-  await vi.advanceTimersByTimeAsync(2_500);
-  expect(reconnect).toHaveBeenCalledTimes(1);
-  await vi.advanceTimersByTimeAsync(6_000);
-  expect(reconnect).toHaveBeenCalledTimes(1);
-
-  api.get.mockReset();
-  api.get.mockResolvedValue(loaded());
-  useCollaborationStore.getState().afterRunSettled("c2", reconnect, () => false);
-  await vi.advanceTimersByTimeAsync(10_000);
-  expect(api.get).toHaveBeenCalledTimes(1);
-});

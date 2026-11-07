@@ -1,8 +1,9 @@
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow, UserAttentionType } from "@tauri-apps/api/window";
 import { create } from "zustand";
-import { apiRequest } from "@/api/client";
+import { rememberSiteGrant } from "./grants/localSiteGrants";
 import { hasTauriInternals } from "@/shared/platform/tauri";
+import { startTellingNativeTheAccount } from "./agentAccount";
 
 /**
  * Stop before paying, sending, deleting or posting (roadmap C2). The desktop
@@ -11,7 +12,8 @@ import { hasTauriInternals } from "@/shared/platform/tauri";
  */
 interface ActionQuestion {
   id: string;
-  kind: "payment" | "send" | "delete" | "publish";
+  /** "action": any other step, which Ask mode stops before. */
+  kind: "payment" | "send" | "delete" | "publish" | "action";
   control: string;
   reason: string;
   site: string;
@@ -29,6 +31,7 @@ let listening = false;
 export function listenForActionQuestions() {
   if (listening || !hasTauriInternals()) return;
   listening = true;
+  startTellingNativeTheAccount();
   const window = getCurrentWindow();
   void window.listen<ActionQuestion>("misty://agent-action-confirm", ({ payload }) => {
     useActionQuestions.setState((state) => ({
@@ -44,76 +47,18 @@ export function listenForActionQuestions() {
   });
 }
 
-// Questions asked from this window (desktop control) rather than natively.
-const local = new Map<string, (allow: boolean) => void>();
-const localWaitMs = 180_000;
-
-export function kindOf(description: string): ActionQuestion["kind"] {
-  if (
-    /\b(pay|buy|purchase|order|checkout|check out|donate|transfer|subscribe)\b/i.test(description)
-  )
-    return "payment";
-  if (/\b(delete|remove|erase|discard|trash|cancel)\b/i.test(description)) return "delete";
-  if (/\b(publish|post|tweet|share|make public)\b/i.test(description)) return "publish";
-  return "send";
-}
-
-/**
- * Asks the person before a consequential desktop-control action. Resolves
- * false when they refuse or don't answer within three minutes.
- */
-export function askPerson(input: {
-  description: string;
-  agentId: string;
-  taskId: string;
-  site?: string;
-}): Promise<boolean> {
-  const id = crypto.randomUUID();
-  return new Promise((resolve) => {
-    const finish = (allow: boolean) => {
-      clearTimeout(timer);
-      local.delete(id);
-      useActionQuestions.setState((state) => ({
-        items: state.items.filter((item) => item.id !== id),
-      }));
-      resolve(allow);
-    };
-    const timer = setTimeout(() => finish(false), localWaitMs);
-    local.set(id, finish);
-    useActionQuestions.setState((state) => ({
-      items: [
-        ...state.items,
-        {
-          id,
-          kind: kindOf(input.description),
-          control: input.description,
-          reason: "",
-          site: input.site ?? "",
-          agentId: input.agentId,
-          taskId: input.taskId,
-        },
-      ],
-    }));
-  });
-}
-
 /**
  * Answers a question. "remember" also stores the grant for this agent, kind and
  * site first, so the next step on the same site continues while the chat is in Auto.
  */
 export async function answerActionQuestion(id: string, allow: boolean, remember = false) {
-  const finish = local.get(id);
-  if (finish) return finish(allow);
   const question = useActionQuestions.getState().items.find((item) => item.id === id);
   try {
     if (allow && remember && question?.rememberable && question.origin)
-      await apiRequest("/me/agent-grants/site", {
-        method: "POST",
-        body: JSON.stringify({
-          agent_id: question.agentId,
-          kind: question.kind,
-          origin: question.origin,
-        }),
+      await rememberSiteGrant({
+        agentId: question.agentId,
+        kind: question.kind,
+        origin: question.origin,
       });
     await invoke("agent_action_confirm", { id, allow });
   } finally {
@@ -129,7 +74,13 @@ export function actionQuestionVerb(question: Pick<ActionQuestion, "kind">) {
     send: "send messages",
     delete: "delete things",
     publish: "post or publish",
+    action: "take this step",
   }[question.kind];
+}
+
+/** A question about a whole call is shown in full below its sentence, however long it is. */
+export function actionQuestionHasDetails(question: Pick<ActionQuestion, "control">) {
+  return question.control.includes("\n") || question.control.length > 120;
 }
 
 export function actionQuestionText(question: ActionQuestion, agentName: string) {
@@ -138,7 +89,9 @@ export function actionQuestionText(question: ActionQuestion, agentName: string) 
     send: "send a message",
     delete: "delete something",
     publish: "post or publish",
+    action: "take this step",
   }[question.kind];
   const where = question.site ? ` on ${question.site}` : "";
+  if (actionQuestionHasDetails(question)) return `${agentName} wants to ${verb}${where}:`;
   return `${agentName} wants to ${verb}${where}: ${question.control}.`;
 }

@@ -76,7 +76,7 @@ pub fn queue_removal(
     let account = &journal_scope(account, profile);
     let home =
         crate::infra::paths::misty_home_dir().ok_or("Misty's data folder is unavailable.")?;
-    crate::infra::store::Store::at(home.join(".local").join("data").join("misty.db"))
+    crate::infra::store::Store::in_home(&home)
         .connect()
         .and_then(|connection| {
             connection.execute(
@@ -246,7 +246,7 @@ mod tests;
 
 fn removals_db() -> Option<rusqlite::Connection> {
     let home = crate::infra::paths::misty_home_dir()?;
-    crate::infra::store::Store::at(home.join(".local").join("data").join("misty.db"))
+    crate::infra::store::Store::in_home(&home)
         .connect()
         .ok()
 }

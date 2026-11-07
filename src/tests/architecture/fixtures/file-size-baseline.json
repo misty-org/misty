@@ -1,6 +1,4 @@
 {
-  "src/features/agents/companion/CursorCompanionController.test.tsx": 562,
   "src/features/auth/AuthContext.test.tsx": 715,
-  "src/features/misty/globalMistyState.test.ts": 543,
   "src/features/workspace/useWorkspaceStore.test.ts": 619
 }

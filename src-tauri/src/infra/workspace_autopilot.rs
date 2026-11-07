@@ -136,6 +136,11 @@ pub async fn execute(
             )
         }
         "browser.workspace.interact" => {
+            // Misty's own Allow and Approve controls are on this screen, and only the person presses them.
+            let store = app.state::<crate::app::runtime::MistyRuntime>().environment.store();
+            if super::browser::action_confirm::question_open() || super::composio::requests::any_pending(&store) {
+                return Err("workspace_question_open: Misty is waiting for the person to answer a question, so agents can't act on Misty or the desktop until they have. Nothing was done.".into());
+            }
             let action = request.input.get("action").ok_or("Missing action")?.clone();
             validate_action(&action)?;
             let document = request.input["documentId"]

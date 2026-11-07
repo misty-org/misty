@@ -29,7 +29,7 @@ afterEach(() => {
   mocks.emit.mockReset();
 });
 
-it("renders activity fades while preserving explicit visibility and active feedback", async () => {
+it("shows the cursor exactly while the presentation says so", async () => {
   let now = 0;
   let frame: FrameRequestCallback = () => {};
   vi.spyOn(performance, "now").mockImplementation(() => now);
@@ -60,14 +60,13 @@ it("renders activity fades while preserving explicit visibility and active feedb
       }),
     );
   };
-  const sample = (time: number, x: number, keyboardActivity = 0) => {
+  const sample = (time: number, x: number) => {
     now = time;
     act(() => {
       mocks.listeners.get(cursorEvent)!({
         payload: {
           x,
           y: 100,
-          keyboardActivity,
           displays: [{ id: 1, x: 0, y: 0, width: 1000, height: 800, scale: 1 }],
         },
       });
@@ -78,27 +77,22 @@ it("renders activity fades while preserving explicit visibility and active feedb
   // Startup must work without a subsequent presentation broadcast.
   sample(0, 100);
   expect(group.style.opacity).toBe("1");
+  // A still pointer doesn't hide it; the turn decides.
   sample(3000, 100);
-  expect(group.style.opacity).toBe("0");
-  expect(group.style.transitionDuration).toBe("400ms");
-  sample(3100, 120);
   expect(group.style.opacity).toBe("1");
-  sample(3200, 120, 1);
-  expect(group.style.opacity).toBe("0");
-  expect(group.style.transitionDuration).toBe("150ms");
   for (const phase of ["listening", "processing", "responding"] as const) {
     present(true, phase);
-    sample(3300, 120, 1);
+    sample(3300, 120);
     expect(group.style.opacity).toBe("1");
   }
   present(true, "idle", "Request failed");
-  sample(10_000, 120, 2);
+  sample(10_000, 120);
   expect(group.style.opacity).toBe("1");
   expect(container.querySelector(".cursor-error-bubble")?.textContent).toContain(
     "Open Agents to retry",
   );
   present(false, "idle", "Request failed");
-  sample(11_000, 140, 2);
+  sample(11_000, 140);
   expect(group.style.opacity).toBe("0");
 });
 
@@ -171,7 +165,7 @@ it("marks the exact spot, says the step, and holds a walkthrough step until it i
   expect(container.querySelector(".cursor-point-bubble")?.textContent).toBe(
     "1 of 2 · click Commit",
   );
-  // The character parks beside the ring instead of covering it.
+  // The bubble sits beside the ring instead of covering it.
   const group = container.querySelector<HTMLElement>(".cursor-group")!;
   const [x] = /translate\(([\d.]+)px/.exec(group.style.transform)!.slice(1).map(Number);
   expect(x - 16).toBeGreaterThan(411);

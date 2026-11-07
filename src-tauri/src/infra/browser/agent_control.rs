@@ -1,7 +1,7 @@
 //! Per-device-job execution controls. Dropping a dispatched webview operation
 //! cannot undo a website effect; interruption therefore reports uncertainty.
 use super::{
-    browser_agent_execute, revoke_execution_grant, BrowserAgentExecuteRequest, BrowserSessionState,
+    execute_agent_request, revoke_execution_grant, BrowserAgentExecuteRequest, BrowserSessionState,
 };
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
@@ -137,10 +137,14 @@ pub fn browser_agent_execution_renew(
 }
 #[tauri::command]
 pub async fn browser_agent_execute_bounded(
+    caller: tauri::Webview,
     app: AppHandle,
     state: State<'_, BrowserExecutionState>,
     request: BoundedBrowserRequest,
 ) -> Result<Value, String> {
+    if !crate::infra::profile_windows::is_person_window(caller.label()) {
+        return Err("Only a profile's window can run agents.".into());
+    }
     if request.operation.scope_id != request.control.scope_id
         || request.operation.grant_id != request.control.grant_id
     {
@@ -158,7 +162,7 @@ pub async fn browser_agent_execute_bounded(
         inner.started = true;
     }
     let browser = app.state::<BrowserSessionState>();
-    let operation = browser_agent_execute(app.clone(), browser.clone(), request.operation);
+    let operation = execute_agent_request(app.clone(), browser.clone(), request.operation);
     tokio::pin!(operation);
     let result = loop {
         let expiry = {

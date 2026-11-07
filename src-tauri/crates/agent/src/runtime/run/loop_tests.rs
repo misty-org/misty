@@ -1,4 +1,4 @@
-//! A run with everything outside the loop faked: the server, the tool service and the model, each
+//! A run with everything outside the loop faked: whoever follows the run, its tools and the model, each
 //! answering from a script and keeping what it was asked.
 use std::{
     collections::VecDeque,
@@ -14,15 +14,14 @@ use serde_json::json;
 
 use crate::{
     runtime::{
-        control_plane::{ControlPlane, RunKey, RuntimeIdentity},
+        control_plane::{ControlPlane, RuntimeIdentity},
         device::DeviceRole,
         device_hooks::DeviceHooks,
         js_json::JsValue,
         logger::Logger,
-        mcp_runtime::{McpCall, McpGateway},
-        mcp_sessions::McpRunAccess,
+        tool_gateway::{GatewayCall, ToolGateway},
         model_access::{fixtures::FakeModel, ModelAccess},
-        model_tools::McpRemoteTool,
+        model_tools::CatalogTool,
         runtime_errors::RuntimeError,
         tool_execution::ToolExecutionResponse,
         web_search::search_step::{DeviceSearch, SearchEndpoints, WebSearchCache},
@@ -92,7 +91,6 @@ impl ControlPlane for FakeControl {
                     next.unwrap_or_else(|| json(r#"{"messages":[],"closed":true}"#))
                 }
                 "budget" => budget_json(self.clock.load(Ordering::SeqCst), *self.budget_ms.lock().unwrap()),
-                "mcp-token" => json(r#"{"access_token":"t","token_type":"Bearer","expires_in":300,"mcp_path":"/mcp","protocol":"2026-07-28"}"#),
                 _ => json(r#"{"accepted":true}"#),
             })
         })
@@ -101,7 +99,7 @@ impl ControlPlane for FakeControl {
 
 #[derive(Default)]
 pub(super) struct FakeGateway {
-    pub(super) catalog: Mutex<Vec<McpRemoteTool>>,
+    pub(super) catalog: Mutex<Vec<CatalogTool>>,
     pub(super) executed: Mutex<Vec<(String, String, String, String)>>,
     /// Calls that never come back, the first time they're made.
     pub(super) hang_on: Mutex<Vec<String>>,
@@ -109,12 +107,12 @@ pub(super) struct FakeGateway {
     pub(super) answer: Mutex<Option<Box<dyn Fn(&str, &str) -> ToolExecutionResponse + Send + Sync>>>,
 }
 
-impl McpGateway for FakeGateway {
-    fn discover<'a>(&'a self, _: &'a RuntimeIdentity, _: &'a dyn ControlPlane) -> BoxFuture<'a, Result<Vec<McpRemoteTool>, RuntimeError>> {
+impl ToolGateway for FakeGateway {
+    fn discover<'a>(&'a self, _: &'a RuntimeIdentity) -> BoxFuture<'a, Result<Vec<CatalogTool>, RuntimeError>> {
         Box::pin(async move { Ok(self.catalog.lock().unwrap().clone()) })
     }
 
-    fn call<'a>(&'a self, call: McpCall<'a>) -> BoxFuture<'a, Result<ToolExecutionResponse, RuntimeError>> {
+    fn call<'a>(&'a self, call: GatewayCall<'a>) -> BoxFuture<'a, Result<ToolExecutionResponse, RuntimeError>> {
         Box::pin(async move {
             self.executed.lock().unwrap().push((call.call_id.to_owned(), call.name.to_owned(), call.input.stringify(), call.device_hook_token.to_owned()));
             let hang = {
@@ -130,12 +128,6 @@ impl McpGateway for FakeGateway {
             Ok(answer(call.call_id, call.name))
         })
     }
-
-    fn cached_access(&self, _: &RuntimeIdentity) -> Option<McpRunAccess> {
-        None
-    }
-
-    fn close(&self, _: &RuntimeIdentity) {}
 }
 
 pub(super) struct FakeDevice;
@@ -159,10 +151,6 @@ impl RunDevice for FakeDevice {
 
     fn summary_for<'a>(&'a self, _: &'a str, _: &'a str) -> BoxFuture<'a, Result<String, String>> {
         Box::pin(async { Ok(String::new()) })
-    }
-
-    fn embed_query<'a>(&'a self, _: &'a str) -> BoxFuture<'a, Option<(String, Vec<f64>)>> {
-        Box::pin(async { None })
     }
 }
 
@@ -237,8 +225,8 @@ pub(super) fn calling(calls: Vec<StreamPart>) -> Turn {
     Turn::Parts(parts)
 }
 
-pub(super) fn tool(name: &str) -> McpRemoteTool {
-    McpRemoteTool { name: name.to_owned(), description: name.to_owned(), input_schema: RawJson::from_text(r#"{"type":"object","properties":{}}"#.to_owned()).unwrap(), concurrent: false, read_only: false, local: false }
+pub(super) fn tool(name: &str) -> CatalogTool {
+    CatalogTool { name: name.to_owned(), description: name.to_owned(), input_schema: RawJson::from_text(r#"{"type":"object","properties":{}}"#.to_owned()).unwrap(), concurrent: false, read_only: false, local: false }
 }
 
 pub(super) struct Harness {
@@ -287,13 +275,14 @@ impl Harness {
             search_cache: WebSearchCache::default(),
             search_endpoints: SearchEndpoints::default(),
             page_reader: Arc::new(crate::runtime::web_fetch::reader::InProcessPageReader),
+            local_tools: None,
             clock: Arc::new(move || clock.load(Ordering::SeqCst)),
             before_tool: None,
         })
     }
 
     pub(super) fn stored(&self) -> StoredRun {
-        new_stored(&RuntimeIdentity { misty_run_id: "run-fixture".to_owned(), runtime_run_id: "pinned-runtime".to_owned(), control_plane_url: "https://control.invalid".to_owned(), run_key: RunKey::new("key".to_owned()) })
+        new_stored(&RuntimeIdentity { misty_run_id: "run-fixture".to_owned(), runtime_run_id: "pinned-runtime".to_owned() })
     }
 
     pub(super) async fn run(&self) -> Result<RunResult, RuntimeError> {

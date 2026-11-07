@@ -44,15 +44,15 @@ pub async fn browser_webview_create(
     // Holds the account steady until the view has finished opening.
     let page_store = super::super::profile_data::page_store(&profile).await?;
     trace_create("lease acquired");
-    // On Windows each profile keeps its pages' data in its own folder, incognito included.
-    let profile_data = page_store.store.clone();
+    // On Windows each store keeps its pages' data in its own folder, incognito included.
+    let window_store = page_store.store.clone();
     // Incognito pages never bind a persistent store.
-    request.profile_id = if request.private {
+    request.store_id = if request.private {
         None
     } else {
         page_store.store.clone()
     };
-    let profile_identifier = browser_profile_identifier(request.profile_id.as_deref())?;
+    let store_identifier = data_store_identifier(request.store_id.as_deref())?;
     // Integrations use Browser's navigation rules. Provider metadata identifies
     // the account and automation permissions, not where a person may browse.
     external_url(&request.url)?;
@@ -77,7 +77,7 @@ pub async fn browser_webview_create(
             .lock()
             .map_err(|_| "Browser state is unavailable.")?;
         if let Some(session) = sessions.get(&request.id) {
-            if request.profile_id.is_some() && session.profile_id != request.profile_id {
+            if request.store_id.is_some() && session.store_id != request.store_id {
                 return Err(
                     "browser_profile_changed: reopen the target in its intended profile".into(),
                 );
@@ -110,14 +110,14 @@ pub async fn browser_webview_create(
     } else {
         external_url(&request.url)?
     };
-    let builder = with_browser_data(
+    let builder = with_store_data(
         WebviewBuilder::new(label, WebviewUrl::External(initial_url))
             .background_throttling(BackgroundThrottlingPolicy::Disabled),
         &app,
         if request.private {
-            profile_data.as_deref()
+            window_store.as_deref()
         } else {
-            request.profile_id.as_deref()
+            request.store_id.as_deref()
         },
     )?;
     // WebView2 already supplies the browser's default canvas. A Misty-themed
@@ -133,7 +133,7 @@ pub async fn browser_webview_create(
     // MISTY-PATCH.md): the identifier names the session, never a persistent store.
     let builder = match incognito {
         Some(session) => builder.incognito(true).data_store_identifier(session),
-        None => builder.data_store_identifier(profile_identifier),
+        None => builder.data_store_identifier(store_identifier),
     };
     // Incognito windows have no extension host.
     #[cfg(target_os = "macos")]
@@ -143,7 +143,7 @@ pub async fn browser_webview_create(
         let pointer = super::super::extensions::native::configuration(
             &app,
             &profile,
-            profile_identifier,
+            store_identifier,
             request.private,
             request.url.clone(),
         )

@@ -12,13 +12,7 @@ import { nativeConfiguration } from "./nativeConfiguration";
 export function createCompanionControl(s: CursorCompanionSession, voice: CursorCompanionVoice) {
   return async (control: CompanionControl) => {
     if (s.disposed || useMistyStore.getState().accountId !== s.accountId) return;
-    if (control.kind === "visibility") {
-      await writeDevicePreference("agents.companion.visible", control.visible);
-      s.show = control.visible;
-      s.change({
-        visible: s.show || s.state.phase !== "idle" || s.pointPending,
-      });
-    } else if (control.kind === "size") {
+    if (control.kind === "size") {
       await writeDevicePreference("agents.companion.size", normalizeCompanionSize(control.size));
       s.change({
         size: normalizeCompanionSize(control.size),
@@ -42,11 +36,11 @@ export function createCompanionControl(s: CursorCompanionSession, voice: CursorC
       if (!s.active(previous)) return;
       s.turn = next;
       await s.interrupt(false);
-      s.change({ visible: s.show });
+      s.change({ visible: false });
     } else if (control.kind === "stop") {
       if (await s.interruptNative())
         s.change({
-          visible: s.show,
+          visible: false,
         });
     } else if (control.kind === "retry") {
       if (s.speechRetry && s.nativeReady) {
@@ -61,7 +55,7 @@ export function createCompanionControl(s: CursorCompanionSession, voice: CursorC
       s.nativeReady = true;
       s.change({
         error: undefined,
-        visible: s.show,
+        visible: false,
       });
     }
   };

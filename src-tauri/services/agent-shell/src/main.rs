@@ -1,5 +1,5 @@
 //! One program that is a whole set of shell tools: the same shell and the same commands on every
-//! computer, written in Rust, with nothing for a person to install (docs/plans/app-permissions.md).
+//! computer, written in Rust, with nothing for a person to install.
 //!
 //! It's called by many names. Misty puts links to it on `PATH`, so `rm` starts this program under the
 //! name `rm`, and the shell treats each tool as an ordinary command, with pipes and redirects working

@@ -11,15 +11,9 @@ const ROTATE_MS = 6000;
 const percent = (value: number, muted: boolean) =>
   `${Math.round(value * 100)}%${muted ? " (muted)" : ""}`;
 
-function fields({ prefs, microphone }: SubtitlesView): Field[] {
-  const mic = prefs.input === "mic";
+function fields({ prefs, pageTopic }: SubtitlesView): Field[] {
   const { context } = prefs;
   return [
-    {
-      group: "input",
-      label: "Source",
-      value: mic ? microphone || "Microphone" : prefs.app || "Desktop",
-    },
     prefs.mode === "translate"
       ? {
           group: "languages",
@@ -28,23 +22,14 @@ function fields({ prefs, microphone }: SubtitlesView): Field[] {
         }
       : { group: "languages", label: "Subtitles", value: languageName(prefs.source) },
     { group: "context", label: "Context", value: categoryLabel(context) },
+    ...(pageTopic ? [{ group: "context" as const, label: "Page", value: pageTopic }] : []),
     ...(context.text.trim()
       ? [{ group: "context" as const, label: "Notes", value: context.text.trim() }]
       : []),
     ...(context.terms.length
       ? [{ group: "context" as const, label: "Terms", value: context.terms.join(", ") }]
       : []),
-    mic
-      ? {
-          group: "audio",
-          label: "Mic volume",
-          value: percent(prefs.micGain, prefs.micMuted),
-        }
-      : {
-          group: "audio",
-          label: "Desktop volume",
-          value: percent(prefs.desktopGain, prefs.desktopMuted),
-        },
+    { group: "audio", label: "Volume", value: percent(prefs.gain, prefs.muted) },
     { group: "silence", label: "Auto-stop", value: `${prefs.silenceSeconds}s of silence` },
   ];
 }

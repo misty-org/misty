@@ -6,7 +6,7 @@ vi.mock("@/shared/platform/tauri", () => ({
   hasTauriInternals: () => true,
 }));
 afterEach(cleanup);
-it("offers immediate size and visibility controls in agent settings", () => {
+it("offers immediate size controls and no way to keep the cursor on screen", () => {
   Object.defineProperty(navigator, "platform", {
     configurable: true,
     value: "MacIntel",
@@ -16,7 +16,6 @@ it("offers immediate size and visibility controls in agent settings", () => {
     presentation: {
       ...initialCompanionPresentation,
       size: 150,
-      showCompanion: false,
     },
     control,
   });
@@ -35,13 +34,5 @@ it("offers immediate size and visibility controls in agent settings", () => {
     kind: "size",
     size: 100,
   });
-  fireEvent.click(
-    screen.getByRole("switch", {
-      name: "Show cursor companion",
-    }),
-  );
-  expect(control).toHaveBeenCalledWith({
-    kind: "visibility",
-    visible: true,
-  });
+  expect(screen.queryByRole("switch")).toBeNull();
 });

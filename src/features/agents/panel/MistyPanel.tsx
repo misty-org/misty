@@ -1,5 +1,4 @@
-import { observeAccountChanges } from "@/api/account-events";
-import { useAuth } from "@/features/auth";
+import { useAgentAccountId } from "../agentAccount";
 import { openMistyConversationInNewTab } from "@/features/misty/handoff";
 import { useMistyStore } from "@/features/misty/useMistyStore";
 import { useSettingsStore } from "@/features/settings";
@@ -27,8 +26,7 @@ export function MistyPanel({ side: propSide }: { side?: MistyPanelSide } = {}) {
   const settingsAgent = useSettingsStore((s) => s.settings?.document.agent) as
     { panel_side?: string } | undefined;
   const side = propSide ?? (settingsAgent?.panel_side === "left" ? "left" : "right");
-  const { user } = useAuth();
-  const accountId = user?.id ?? "";
+  const accountId = useAgentAccountId();
   const { agents, load } = usePersonalAgentsStore();
   const [selected, setSelected] = useState<string>();
   const [chatRevision, setChatRevision] = useState(0);
@@ -39,11 +37,7 @@ export function MistyPanel({ side: propSide }: { side?: MistyPanelSide } = {}) {
   const conversations = useMistyStore((s) => s.conversations);
   const activeConversationId = useMistyStore((s) => s.activeConversationId);
   useEffect(() => {
-    if (!accountId) {
-      void load("");
-      return;
-    }
-    return observeAccountChanges(accountId, ["agents"], () => load(accountId));
+    void load(accountId);
   }, [accountId, load]);
   useEffect(() => {
     const store = useMistyStore.getState();

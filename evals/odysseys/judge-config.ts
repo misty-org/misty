@@ -1,5 +1,9 @@
 // The judge's own model and key, from variables set for the eval process only. The judge
 // never goes through Misty, so the same judge can grade any runtime.
+import { existsSync, readFileSync, statSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
+
 import { isLocalUrl } from "./local.ts";
 
 export type JudgeProvider = "anthropic" | "google" | "openai" | "openai-compatible";
@@ -19,6 +23,22 @@ const hosted: Record<string, { provider: JudgeProvider; baseUrl: string }> = {
   google: { provider: "google", baseUrl: "https://generativelanguage.googleapis.com" },
   openai: { provider: "openai", baseUrl: "https://api.openai.com/v1" },
 };
+
+/** The judge's settings from `~/.misty/.env/client/agents.env`, under what the process was given. A file others can read is refused, since it holds a key. */
+export function withAgentsEnv(
+  env: Record<string, string | undefined>,
+  path = join(homedir(), ".misty/.env/client/agents.env"),
+): Record<string, string | undefined> {
+  if (!existsSync(path)) return env;
+  if (process.platform !== "win32" && (statSync(path).mode & 0o077) !== 0)
+    throw new Error(`${path} holds keys and others can read it: run chmod 600 on it.`);
+  const fromFile: Record<string, string> = {};
+  for (const line of readFileSync(path, "utf8").split("\n")) {
+    const match = /^(?:export\s+)?(MISTY_ODYSSEYS_[A-Z0-9_]+)=(.*)$/.exec(line.trim());
+    if (match?.[2]) fromFile[match[1]!] = match[2].replace(/^(['"])(.*)\1$/, "$2");
+  }
+  return { ...fromFile, ...env };
+}
 
 export function judgeFromEnv(env: Record<string, string | undefined>): JudgeConfig {
   const model = env.MISTY_ODYSSEYS_JUDGE_MODEL?.trim() ?? "";

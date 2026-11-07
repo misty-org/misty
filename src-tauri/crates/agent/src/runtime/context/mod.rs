@@ -1,4 +1,4 @@
-//! Keeps a run's transcript inside the model's window (docs/agents/harness.md, Context).
+//! Keeps a run's transcript inside the model's window.
 
 pub(crate) mod compaction_step;
 pub(crate) mod condenser;

@@ -1,9 +1,8 @@
-import { cachedRequest } from "@/api/cache/cached-request";
 import { invoke } from "@tauri-apps/api/core";
-import { subscribeAccountEvents } from "@/api/account-events";
-import { useUserStore } from "@/features/auth/core";
+import { watchAllRunEvents } from "@/features/ai-surface/localRunEvents";
+import { agentAccountId } from "./agentAccount";
 import { holdAwake, releaseAwake } from "./keepAwake";
-import { ensureServerAgentDevice } from "./store/useAgentDeviceStore";
+import { ensureAgentDevice } from "./store/useAgentDeviceStore";
 import { agentsDeviceSnapshot } from "./store/useAgentsStore";
 import { DeviceOperationNotAttempted, type ClaimedWorkflowNodeJob } from "./workerBrowserJobs";
 import {
@@ -67,23 +66,15 @@ export async function endAllHostedSessions(): Promise<void> {
   await Promise.allSettled(sessions().map((session) => endHostedSession(session.taskId)));
 }
 
-// A request that stopped or finished ends its session at once rather than after the idle limit:
-// its tabs sleep, so nothing it opened keeps a page alive.
-function watchRequests(accountId: string) {
+// A run that stopped or finished ends its session at once rather than after the idle limit: its tabs
+// sleep, so nothing it opened keeps a page alive.
+function watchRequests(_accountId: string) {
   if (unsubscribe) return;
-  unsubscribe = subscribeAccountEvents(accountId, (event) => {
-    if (event.topic !== "invocations" && event.topic !== "reset") return;
-    for (const session of sessions()) {
-      if (event.topic === "invocations" && event.id && event.id !== session.runId) continue;
-      void cachedRequest<{ state: string }>(
-        `/ai/invocations/${encodeURIComponent(session.runId)}/state`,
-      )
-        .then(({ state }) => {
-          if (state === "canceled" || state === "completed" || state === "failed")
-            void endHostedSession(session.taskId);
-        })
-        .catch(() => undefined);
-    }
+  unsubscribe = watchAllRunEvents((runId, event) => {
+    if (!["invocation.completed", "invocation.failed", "invocation.canceled"].includes(event.type))
+      return;
+    for (const session of sessions())
+      if (session.runId === runId) void endHostedSession(session.taskId);
   });
 }
 
@@ -96,7 +87,7 @@ function keepAlive(session: HostedSession) {
       if (!current) return;
       if (
         Date.now() - current.lastUsed > idleMs ||
-        useUserStore.getState().me?.id !== current.accountId
+        agentAccountId() !== current.accountId
       ) {
         void endHostedSession(current.taskId);
         return;
@@ -116,7 +107,7 @@ export async function startHostedSession(
   job: ClaimedWorkflowNodeJob["job"],
   signal: AbortSignal,
 ): Promise<Record<string, unknown>> {
-  // An agent's tabs live in the person's window (docs/agents/browser.md).
+  // An agent's tabs live in the person's window.
   const config = (job.config ?? {}) as { agentId?: unknown };
   const input = (job.input ?? {}) as {
     url?: unknown;
@@ -130,13 +121,13 @@ export async function startHostedSession(
   if (input.appCommand) throw new DeviceOperationNotAttempted(new Error("app_window_unavailable"));
   const agentId = typeof config.agentId === "string" ? config.agentId : "";
   const conversationId = typeof input.conversationId === "string" ? input.conversationId : "";
-  const accountId = useUserStore.getState().me?.id ?? "";
+  const accountId = agentAccountId();
   if (!agentId || !accountId || input.scopeId !== job.scopeId)
     throw new DeviceOperationNotAttempted(new Error("invalid_browser_grant"));
   const snapshot = await agentsDeviceSnapshot();
   if (!snapshot.device || snapshot.device.status === "revoked")
     throw new DeviceOperationNotAttempted(new Error("device_unavailable"));
-  const device = await ensureServerAgentDevice(snapshot.device);
+  const device = await ensureAgentDevice(snapshot.device);
   if (job.scopeId !== `workspace:${device.id}`)
     throw new DeviceOperationNotAttempted(new Error("invalid_browser_grant"));
 

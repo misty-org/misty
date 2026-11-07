@@ -45,7 +45,6 @@ pub fn invoke_handler() -> impl Fn(Invoke<Wry>) -> bool + Send + Sync + 'static 
             crate::infra::models::chatgpt::model_keys_chatgpt_status,
             crate::infra::models::chatgpt::model_keys_chatgpt_sign_in,
             crate::infra::models::chatgpt::model_keys_chatgpt_sign_out,
-            crate::infra::agent_runtime::calls::agent_runtime_deliver,
             crate::infra::agent_runtime::calls::agent_runtime_call,
             crate::infra::agent_runtime::live::agent_runtime_voice_open,
             crate::infra::agent_runtime::live::agent_runtime_live_open,
@@ -129,8 +128,9 @@ pub fn invoke_handler() -> impl Fn(Invoke<Wry>) -> bool + Send + Sync + 'static 
             crate::voice::voice_subtitles_hide,
             #[cfg(any(target_os = "macos", windows))]
             crate::voice::voice_subtitles_export,
+            crate::voice::voice_subtitles_frame,
+            crate::voice::voice_subtitles_fit,
             #[cfg(any(target_os = "macos", windows))]
-            crate::voice::voice_capture_sources,
             #[cfg(any(target_os = "macos", windows))]
             crate::voice::voice_capture_start,
             #[cfg(any(target_os = "macos", windows))]
@@ -163,7 +163,10 @@ pub fn invoke_handler() -> impl Fn(Invoke<Wry>) -> bool + Send + Sync + 'static 
             crate::infra::agents::workspace::agent_workspace_bind_scope,
         ));
     move |invoke: Invoke<Wry>| {
-        if !crate::platform::app_command_policy::allows(invoke.message.webview_ref().label()) {
+        if !crate::platform::app_command_policy::allows_command(
+            invoke.message.webview_ref().label(),
+            invoke.message.command(),
+        ) {
             invoke
                 .resolver
                 .reject("This view cannot invoke Host commands.");

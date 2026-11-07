@@ -10,6 +10,7 @@ use crate::infra::{
 };
 
 pub struct MistyRuntime {
+    pub agent_chats: crate::infra::agents::chats::AgentChatsService,
     pub navigation_names: crate::infra::navigation_names::NavigationNamesService,
     pub environment: AppEnvironmentService,
     pub clipboard: Arc<ClipboardService>,
@@ -50,6 +51,7 @@ impl MistyRuntime {
         let agents = AgentService::new(environment.clone());
 
         Self {
+            agent_chats: crate::infra::agents::chats::AgentChatsService::new(environment.store()),
             navigation_names: crate::infra::navigation_names::NavigationNamesService::new(
                 environment.store(),
             ),

@@ -38,6 +38,7 @@ import type { BrowserPageCommands } from "./useBrowserPageCommands";
 import { BrowserHistoryMenu } from "./BrowserHistoryMenu";
 import { pictureInPictureSupported } from "@/features/webviews/pictureInPictureSettings";
 import { SiteAppsMenu } from "./SiteAppsMenu";
+import { SidebarToolsPinMenu } from "./SidebarTools";
 import { LiveSubtitlesMenuItem } from "@/features/voice";
 
 interface BrowserMenuViewProps {
@@ -138,6 +139,7 @@ export function BrowserMenuView(props: BrowserMenuViewProps) {
               onSelect={commands.newIncognitoWindow}
             />
             {props.layout}
+            {props.toolsIcon ? <SidebarToolsPinMenu /> : null}
             <DropdownMenuSeparator />
             <BrowserHistoryMenu
               openHistory={() => commands.openPage("history")}

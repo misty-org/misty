@@ -8,7 +8,6 @@
 //!   temporary session, erased when the last closes.
 //!
 //! Agents have no windows of their own; their tabs live in the person's window
-//! (docs/agents/browser.md, "What goes away").
 //!
 //! A window's profile is kept here, natively, and is never taken from anything a renderer
 //! sends. Which Space a window shows is the renderer's: Spaces are shared content and own no
@@ -25,6 +24,7 @@ mod lifecycle;
 mod links;
 mod registry;
 mod routing;
+mod saved;
 pub use commands::*;
 pub use diagnostics::*;
 pub use lifecycle::*;

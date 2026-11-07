@@ -122,10 +122,12 @@ impl VoiceModels for DeviceVoiceModels {
         Box::pin(async move {
             let (model, route) = self.on_device(DeviceRole::Speech, "speech")?;
             let resolved = resolve_speech_model(&model, &route, &self.client)?;
+            // A voice ID only means anything to ElevenLabs, whichever provider is chosen.
+            let voice = self.models.speech_voice().filter(|_| model.starts_with("elevenlabs/"));
             let call = SpeechCall {
                 model: &model,
                 text,
-                voice: None,
+                voice: voice.as_deref(),
                 previous_text: (!previous.is_empty()).then(|| js_suffix(previous, 4000)),
                 next_text: (!next.is_empty()).then(|| js_prefix(next, 4000)),
             };

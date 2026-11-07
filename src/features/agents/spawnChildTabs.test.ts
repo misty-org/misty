@@ -1,7 +1,7 @@
 import { beforeEach, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   invoke: vi.fn(async (_command: string, _args?: unknown) => undefined as unknown),
-  sign: vi.fn(async (_account: unknown, grants: unknown[]) =>
+  sign: vi.fn(async (grants: unknown[]) =>
     grants.map((_, index) => ({ payload: `p${index}`, signature: `s${index}` })),
   ),
 }));
@@ -17,7 +17,7 @@ vi.mock("./store/useAgentsStore", () => ({
   agentsDeviceSnapshot: async () => ({ device: { id: "local-1", status: "active" } }),
 }));
 vi.mock("./store/useAgentDeviceStore", () => ({
-  ensureServerAgentDevice: async () => ({ id: "device-1" }),
+  ensureAgentDevice: async () => ({ id: "device-1" }),
 }));
 import { useHostedSessions } from "./hostedSessionsState";
 import { useLocalExecution, type Execution } from "./localExecution";
@@ -73,7 +73,7 @@ it("opens one bound tab per sub-agent and signs each grant on this device", asyn
     kind: "browser_tab",
     run_grant: { payload: "p0", signature: "s0" },
   });
-  const grants = mocks.sign.mock.calls[0]![1] as Array<{
+  const grants = mocks.sign.mock.calls[0]![0] as Array<{
     scopes: string[];
     capabilities: string[];
   }>;

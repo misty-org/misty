@@ -1,24 +1,14 @@
-// The pass's settings, from MISTY_ODYSSEYS_* variables (docs/agents/evals/odysseys.md). Anything
+// The pass's settings, from MISTY_ODYSSEYS_* variables. Anything
 // that would make the pass meaningless or unsafe is refused here, before anything runs.
-import { homedir } from "node:os";
 import { join, resolve } from "node:path";
-import { judgeFromEnv, type JudgeConfig } from "./judge-config.ts";
+import { judgeFromEnv, withAgentsEnv, type JudgeConfig } from "./judge-config.ts";
 import { assertLocalUrl } from "./local.ts";
 
 export const here = resolve(import.meta.dirname);
 
-export type RuntimeName = "typescript" | "rust";
 
 export interface Config {
-  /** The local stack's address, without a path. */
-  api: string;
-  /** The address the desktop signed in with, where its session is kept. */
-  deviceApiBase: string;
-  signInFile: string;
   bridge: { url: string; token: string };
-  /** Empty: use the account's only device. */
-  deviceId: string;
-  runtime: RuntimeName;
   judge: JudgeConfig;
   judgeImages: number;
   judgeLanes: number;
@@ -61,30 +51,16 @@ export function judgeLanesFrom(env: Record<string, string | undefined>): number 
 
 export function loadConfig(env: Record<string, string | undefined>): Config {
   const get = (name: string, fallback = "") => env[name]?.trim() || fallback;
-  const api = get("MISTY_ODYSSEYS_API", "http://127.0.0.1:8081").replace(/\/$/, "");
-  assertLocalUrl("MISTY_ODYSSEYS_API", api);
-  const deviceApiBase = get("MISTY_ODYSSEYS_DEVICE_API_BASE", `${api}/v1`).replace(/\/$/, "");
-  assertLocalUrl("MISTY_ODYSSEYS_DEVICE_API_BASE", deviceApiBase);
-
   const bridgeUrl = get("MISTY_BROWSER_EVAL_BRIDGE").replace(/\/$/, "");
   const bridgeToken = get("MISTY_BROWSER_EVAL_BRIDGE_TOKEN");
   if (!bridgeUrl || !bridgeToken)
     throw new Error("Odysseys needs the desktop's eval bridge: set MISTY_BROWSER_EVAL_BRIDGE and MISTY_BROWSER_EVAL_BRIDGE_TOKEN.");
   assertLocalUrl("MISTY_BROWSER_EVAL_BRIDGE", bridgeUrl);
 
-  const runtime = get("MISTY_ODYSSEYS_RUNTIME");
-  if (runtime !== "typescript" && runtime !== "rust")
-    throw new Error("Set MISTY_ODYSSEYS_RUNTIME to typescript or rust: each report says which runtime it measured.");
-
   const taskMinutes = get("MISTY_ODYSSEYS_TASK_MINUTES");
   return {
-    api,
-    deviceApiBase,
-    signInFile: get("MISTY_ODYSSEYS_SIGNIN", join(homedir(), ".misty", "odysseys", "signin.json")),
     bridge: { url: bridgeUrl, token: bridgeToken },
-    deviceId: get("MISTY_ODYSSEYS_DEVICE"),
-    runtime,
-    judge: judgeFromEnv(env),
+    judge: judgeFromEnv(withAgentsEnv(env)),
     judgeImages: judgeImagesFrom(env),
     judgeLanes: judgeLanesFrom(env),
     turns: whole("MISTY_ODYSSEYS_TURNS", get("MISTY_ODYSSEYS_TURNS", "100"), minTurns, maxTurns),

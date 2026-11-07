@@ -3,18 +3,12 @@ import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { EvalClient, EvalRun } from "./client.ts";
 import type { Config } from "./config.ts";
-import { deviceContexts } from "./device.ts";
+import { deviceContexts, type Identity } from "./device.ts";
 import { judgeTask } from "./judge.ts";
 import { Recorder } from "./recorder.ts";
 import type { OdysseysRun } from "./results.ts";
 import type { OdysseysTask } from "./tasks.ts";
 import { ProgressWatch } from "./watchdog.ts";
-
-export interface Identity {
-  userId: string;
-  agentId: string;
-  deviceId: string;
-}
 
 export interface Performed {
   task: OdysseysTask;
@@ -27,15 +21,15 @@ export interface Performed {
 /** A composer request, as the app sends one. The model is never named: the device's settings choose it. */
 export const composerRequest = (task: OdysseysTask, identity: Identity, contexts: unknown[]) => ({
   prompt: task.prompt,
-  agent_id: identity.agentId,
-  window_label: "main",
+  agentId: identity.agentId,
+  windowLabel: "main",
   mode: "drawer",
-  surface_id: "global",
-  origin_device_id: identity.deviceId,
-  device_contexts: contexts,
+  surfaceId: "global",
+  originDeviceId: identity.deviceId,
+  deviceContexts: contexts,
   // Without pauses: nobody is there to answer. Paying and the like still ask, and stop the run.
-  permission_mode: "auto",
-  collaboration_mode: "act",
+  permissionMode: "auto",
+  collaborationMode: "act",
 });
 
 /** A run that made no call and wrote no answer (cancelled, or refused at the start) did no work. */
@@ -61,7 +55,7 @@ export async function perform(config: Config, client: EvalClient, task: Odysseys
       },
     },
   };
-  const contexts = () => deviceContexts(config.bridge, config.deviceApiBase, identity.deviceId, identity.userId, identity.agentId);
+  const contexts = () => deviceContexts(config.bridge);
   const started = performance.now();
   let result = await client.run(composerRequest(task, identity, await contexts()), options);
   // A run that failed before its first tool call with no answer never reached the agent (the
@@ -71,7 +65,7 @@ export async function perform(config: Config, client: EvalClient, task: Odysseys
     result = await client.run(composerRequest(task, identity, await contexts()), options);
   }
   const seconds = (performance.now() - started) / 1000;
-  // Outputs are stored just after each call ends, so the last ones may trail the run by a moment.
+  // A call's outcome is journaled as it ends, so the last one may trail the run by a moment.
   await new Promise((done) => setTimeout(done, 2_000));
   recorder.applyOutputs(await client.toolOutputs(result.invocationId).catch(() => []));
   await recorder.finish(result.answer);

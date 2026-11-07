@@ -8,9 +8,7 @@ import { usePersonalAgentsStore } from "../personalAgentsStore";
 import { MistyPanel } from "./MistyPanel";
 import { useMistyPanelStore } from "./mistyPanelStore";
 
-vi.mock("@/features/auth", () => ({
-  useAuth: vi.fn(() => ({ user: { id: "test-user-id" } })),
-}));
+vi.mock("../agentAccount", () => ({ useAgentAccountId: () => "test-user-id" }));
 
 vi.mock("@/api/account-events", () => ({
   observeAccountChanges: vi.fn((_id, _topics, callback) => {

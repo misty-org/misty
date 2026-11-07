@@ -26,7 +26,7 @@ const SECRET_FILES: &str = r#"
   (regex #"/\.env(\.[^/]*)?$")
   (regex #"/\.(ssh|aws|gnupg|kube|docker)(/|$)")
   (regex #"/(id_rsa|id_dsa|id_ecdsa|id_ed25519|credentials|\.netrc|\.npmrc|\.pypirc)$")
-  (regex #"\.(pem|key|p12|pfx|keystore)$"))
+  (regex #"\.(pem|key|p12|pfx|keystore|env)$"))
 "#;
 
 /// A shared folder's rules. The refusals come after the write rule, so they win:

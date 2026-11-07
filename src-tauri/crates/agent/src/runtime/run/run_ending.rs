@@ -98,7 +98,7 @@ impl RunLoop {
         .await
     }
 
-    /// How runs end (docs/agents/harness.md, Completion): most Odysseys runs ended as partial or unreported.
+    /// How runs end: most Odysseys runs ended as partial or unreported.
     fn log_run_finish(&self, report: Option<&crate::runtime::task_completion::TaskCompletion>, acted: bool, text: &str) {
         let mut fields = vec![
             ("run".to_owned(), string(self.shared.identity.misty_run_id.as_str())),

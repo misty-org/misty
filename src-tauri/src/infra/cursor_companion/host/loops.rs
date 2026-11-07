@@ -23,11 +23,6 @@ pub(super) fn start(app: AppHandle, state: Arc<CursorCompanionState>) {
                 continue;
             }
             match event {
-                Shortcut::KeyboardActivity => {
-                    events_state
-                        .keyboard_activity
-                        .fetch_add(1, Ordering::Relaxed);
-                }
                 Shortcut::Click(x, y) => forward_click(&events_app, &events_state, x, y),
                 Shortcut::Held(held) => {
                     if events_state.held.swap(held, Ordering::SeqCst) == held {
@@ -165,7 +160,7 @@ pub(super) fn start(app: AppHandle, state: Arc<CursorCompanionState>) {
             if state.enabled.load(Ordering::SeqCst) {
                 if let Some((x, y)) = platform::cursor() {
                     let displays = state.data.lock().unwrap().displays.clone();
-                    let payload = json!({"x":x,"y":y,"displays":displays,"keyboardActivity":state.keyboard_activity.load(Ordering::Relaxed)});
+                    let payload = json!({"x":x,"y":y,"displays":displays});
                     for (label, w) in app.webview_windows() {
                         if label.starts_with(PREFIX) && label != "misty-cursor-controls" {
                             let _ = w.emit("misty://cursor-sample", &payload);

@@ -9,7 +9,7 @@ import { useChatgptAccount, useProviderModels, type AddedKey } from "./modelAcco
 import { useSavedModelKeys } from "./modelKeys";
 import { ModelSignInRows } from "./ModelSignInRows";
 import { ModelTestRow } from "./ModelTestRow";
-import { WebSearchSection } from "./WebSearchSection";
+import { ConnectedAppsKeySection, WebSearchSection } from "./WebSearchSection";
 import {
   defaultAgentModel,
   modelProviders,
@@ -143,6 +143,7 @@ export function ModelsSection() {
         />
       </Section>
       <WebSearchSection keys={keys} />
+      <ConnectedAppsKeySection keys={keys} />
       <Section
         title="Voice keys"
         description="Optional keys for reading answers aloud and for dictation."
@@ -167,6 +168,14 @@ export function ModelsSection() {
               description={`Used when the ${voice.label} key is saved, or another provider you name here has one.`}
               normalize={(value) => qualifiedModel(value, voice.id)}
             />
+            {voice.role === "speech" ? (
+              <ModelTextRow
+                id="models.speech_voice"
+                label="ElevenLabs voice ID"
+                description="The voice that reads answers aloud. Free plans need one of your own."
+                normalize={(value) => value.trim()}
+              />
+            ) : null}
           </div>
         ))}
       </Section>

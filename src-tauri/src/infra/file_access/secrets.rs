@@ -7,6 +7,7 @@ pub fn is_secret_file(name: &str) -> bool {
     let lower = name.to_ascii_lowercase();
     lower == ".env"
         || lower.starts_with(".env.")
+        || lower.ends_with(".env")
         || matches!(
             lower.as_str(),
             "id_rsa" | "id_dsa" | "id_ecdsa" | "id_ed25519" | "credentials" | ".netrc" | ".npmrc" | ".pypirc"
@@ -60,6 +61,8 @@ mod tests {
             "a/.Aws/credentials",
             ".git/config",
             "repo/.git/hooks/pre-commit",
+            "agents.env",
+            "copies/PROD.ENV",
         ] {
             assert!(closed_to_agents(Path::new(path)), "{path}");
         }

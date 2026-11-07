@@ -1,7 +1,23 @@
 import { create } from "zustand";
-import { agentInterventionsApi, type AgentInterventionWait } from "./api";
+import type { AgentInterventionWait } from "./api";
+import {
+  decideLocalWait,
+  listenForLocalWaits,
+  localWaits,
+  onLocalWaitsChanged,
+} from "./localWaits";
 
 type ObservedWait = AgentInterventionWait & { observedAt: string };
+
+/** The waits held on this computer, each keeping when it was first seen. */
+function currentWaits(items: ObservedWait[]): ObservedWait[] {
+  const observedAt = new Date().toISOString();
+  return localWaits().map((wait) => ({
+    ...wait,
+    observedAt: items.find((item) => item.id === wait.id)?.observedAt ?? observedAt,
+  }));
+}
+
 interface InterventionStore {
   accountId: string;
   items: ObservedWait[];
@@ -13,9 +29,7 @@ interface InterventionStore {
   refresh(): Promise<void>;
   decide(accountId: string, id: string, ready: boolean): Promise<boolean>;
 }
-let generation = 0;
-let read: AbortController | undefined;
-let decision: AbortController | undefined;
+
 export const useAgentInterventions = create<InterventionStore>((set, get) => ({
   accountId: "",
   items: [],
@@ -25,67 +39,21 @@ export const useAgentInterventions = create<InterventionStore>((set, get) => ({
   error: "",
   setAccount(accountId) {
     if (accountId === get().accountId) return;
-    generation++;
-    read?.abort();
-    decision?.abort();
-    set({ accountId, items: [], loading: false, loaded: false, busy: "", error: "" });
+    set({ accountId, items: currentWaits([]), loading: false, loaded: false, busy: "", error: "" });
   },
   async refresh() {
-    const state = get();
-    if (!state.accountId || state.loading || state.busy) return;
-    const current = generation;
-    const controller = new AbortController();
-    read = controller;
-    set({ loading: true });
-    try {
-      const page = await agentInterventionsApi.list(controller.signal);
-      if (current !== generation || controller.signal.aborted) return;
-      const observedAt = new Date().toISOString();
-      const items = page.waits.map((wait) => ({
-        ...wait,
-        observedAt: state.items.find((item) => item.id === wait.id)?.observedAt ?? observedAt,
-      }));
-      set({ items, loaded: true, error: "" });
-    } catch {
-      if (current === generation && !controller.signal.aborted)
-        set({
-          error:
-            "Misty couldn't check what it is waiting for. Check your connection and try again.",
-        });
-    } finally {
-      if (current === generation && !controller.signal.aborted) set({ loading: false });
-    }
+    set({ items: currentWaits(get().items), loaded: true, error: "" });
   },
   async decide(accountId, id, ready) {
     const state = get();
-    if (
-      !accountId ||
-      accountId !== state.accountId ||
-      state.busy ||
-      !state.items.some((item) => item.id === id)
-    )
+    if (!accountId || accountId !== state.accountId || !state.items.some((item) => item.id === id))
       return false;
-    const current = generation;
-    // An old GET must not reinsert a wait after its decision has been saved.
-    read?.abort();
-    const controller = new AbortController();
-    decision = controller;
-    set({ busy: id, loading: false, error: "" });
-    let saved = false;
-    try {
-      await agentInterventionsApi.decide(id, ready, controller.signal);
-      if (current !== generation || controller.signal.aborted) return false;
-      set({ items: get().items.filter((item) => item.id !== id) });
-      saved = true;
-    } catch {
-      if (current === generation && !controller.signal.aborted)
-        set({
-          error: "Your response could not be confirmed. Refresh this request before trying again.",
-        });
-    } finally {
-      if (current === generation && !controller.signal.aborted) set({ busy: "" });
-    }
-    if (saved) await get().refresh();
-    return saved && current === generation;
+    decideLocalWait(id, ready);
+    set({ items: get().items.filter((item) => item.id !== id) });
+    return true;
   },
 }));
+listenForLocalWaits();
+onLocalWaitsChanged(() =>
+  useAgentInterventions.setState((state) => ({ items: currentWaits(state.items) })),
+);

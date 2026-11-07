@@ -3,7 +3,7 @@ import { useWorkspaceStore } from "@/features/workspace/useWorkspaceStore";
 import { activeLayoutView, allLayoutViews } from "@/features/workspace/layoutTabs";
 import type { WorkspaceView } from "@/features/workspace";
 import { browserRuntimeCreated, browserScopeId } from "@/features/webviews/browserRuntime";
-import { ensureServerAgentDevice } from "../store/useAgentDeviceStore";
+import { ensureAgentDevice } from "../store/useAgentDeviceStore";
 import { agentsDeviceSnapshot } from "../store/useAgentsStore";
 import type { Execution } from "../localExecution";
 import { browserTabAgentFileCapabilities } from "../browserTabCapabilities";
@@ -137,7 +137,7 @@ export async function companionBrowserContext(
   assertCurrent();
   if (!snapshot.device || snapshot.device.status === "revoked")
     throw new Error("This signed-in session is unavailable.");
-  const device = await ensureServerAgentDevice(snapshot.device);
+  const device = await ensureAgentDevice(snapshot.device);
   assertCurrent();
   const scopeId = browserScopeId(tab);
   return {

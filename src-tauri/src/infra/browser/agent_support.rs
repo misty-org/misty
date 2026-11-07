@@ -163,9 +163,8 @@ pub(crate) fn authorize_workspace_dispatch(
         grant_id: grant.into(),
         operation: "browser.workspace.interact".into(),
         input: json!({}),
-        site_blocks: None,
-        confirm_kinds: None,
-        grant_set: None,
+        policy_call: None,
+        policy: PagePolicy::default(),
     };
     validate_browser_grant(session, &request)?;
     Ok(())
@@ -182,10 +181,10 @@ pub(crate) fn sync_storage_views(
         .sessions
         .lock()
         .map_err(|_| "Browser state is unavailable")?;
-    let legacy = super::super::browser_profile::legacy_profile_identity();
+    let original = super::super::profile_store::original_store_identity();
     Ok(sessions
         .iter()
-        .filter(|(_, session)| session.profile_id.as_deref().unwrap_or(&legacy) == physical)
+        .filter(|(_, session)| session.store_id.as_deref().unwrap_or(&original) == physical)
         .filter_map(|(id, session)| {
             webview_label(id)
                 .ok()

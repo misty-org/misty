@@ -11,7 +11,7 @@ use super::super::{
     tool::{device_tool_activity, web_search_descriptor, with_device_tools},
 };
 use super::*;
-use crate::runtime::{model_tools::McpRemoteTool, tool_execution::normalize_tool_outcome};
+use crate::runtime::{model_tools::CatalogTool, tool_execution::normalize_tool_outcome};
 use crate::sdk::RawJson;
 
 #[derive(Clone, Debug)]
@@ -101,13 +101,13 @@ fn error_code(response: &ToolExecutionResponse) -> &str {
     response.tool_error.as_ref().unwrap().get("code").unwrap().as_str().unwrap()
 }
 
-fn remote(name: &str) -> McpRemoteTool {
-    McpRemoteTool { name: name.to_owned(), description: String::new(), input_schema: RawJson::empty_object(), concurrent: false, read_only: false, local: false }
+fn remote(name: &str) -> CatalogTool {
+    CatalogTool { name: name.to_owned(), description: String::new(), input_schema: RawJson::empty_object(), concurrent: false, read_only: false, local: false }
 }
 
 #[test]
 fn is_offered_only_when_the_device_has_a_search_key_with_that_providers_kinds() {
-    let names = |tools: Vec<McpRemoteTool>| tools.into_iter().map(|tool| tool.name).collect::<Vec<_>>();
+    let names = |tools: Vec<CatalogTool>| tools.into_iter().map(|tool| tool.name).collect::<Vec<_>>();
     assert_eq!(names(with_device_tools(vec![remote("apps.search")], None)), ["web.fetch", "apps.search"]);
     assert_eq!(names(with_device_tools(vec![remote("apps.search")], Some(SearchProviderId::Decodo))), ["web.search", "web.fetch", "apps.search"]);
     let decodo = web_search_descriptor(SearchProviderId::Decodo);

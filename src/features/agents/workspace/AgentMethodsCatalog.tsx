@@ -7,10 +7,10 @@ import {
   type AgentMethodKind,
   type SaveAgentMethod,
 } from "@/api/ai/agent-methods";
-import { observeAccountChanges } from "@/api/account-events";
 import { useMistyStore } from "@/features/misty/useMistyStore";
 import { Button, ErrorNotification, Input, SkeletonList } from "@/shared/ui";
-import { describeNextRun, describeSchedule } from "../workflows/scheduleSummary";
+import { describeNextRun, describeSchedule, scheduleProblem } from "../workflows/scheduleSummary";
+import { observeWorkflowChanges } from "../workflows/workflowChanges";
 import { WorkflowScheduleDialog } from "../workflows/WorkflowScheduleDialog";
 import { AgentMethodEditor } from "./AgentMethodEditor";
 import { blankDefinition, methodError, methodTargetLabel } from "./agentMethodDefinition";
@@ -101,7 +101,7 @@ export function AgentMethodsCatalog({
   // Scheduled runs change a workflow's next and last run while the page is open.
   useEffect(() => {
     if (kind !== "workflow" || !accountId) return;
-    return observeAccountChanges(accountId, ["workflows"], refresh);
+    return observeWorkflowChanges(accountId, refresh);
   }, [kind, accountId, refresh]);
   const replace = (method: AgentMethod) =>
     setMethods((all = []) =>
@@ -201,8 +201,8 @@ export function AgentMethodsCatalog({
                   Version {method.version} · {method.enabled ? "On" : "Off"} ·{" "}
                   {methodTargetLabel(method.definition)}
                 </span>
-                {method.schedule?.state === "failed" && method.schedule.last_error && (
-                  <p role="status">Last scheduled run failed: {method.schedule.last_error}</p>
+                {method.schedule && scheduleProblem(method.schedule) && (
+                  <p role="status">{scheduleProblem(method.schedule)}</p>
                 )}
               </div>
               <div className="agent-method-actions">

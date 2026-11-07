@@ -1,10 +1,10 @@
 use futures_util::future::BoxFuture;
 
 use super::*;
-use crate::{runtime::model_tools::McpRemoteTool, runtime::web_search::{provider::SearchProviderId, tool::web_search_descriptor}, sdk::RawJson};
+use crate::{runtime::model_tools::CatalogTool, runtime::web_search::{provider::SearchProviderId, tool::web_search_descriptor}, sdk::RawJson};
 
-fn tool(name: &str, read_only: bool) -> McpRemoteTool {
-    McpRemoteTool {
+fn tool(name: &str, read_only: bool) -> CatalogTool {
+    CatalogTool {
         name: name.to_owned(),
         description: String::new(),
         input_schema: RawJson::from_text(r#"{"type":"object","properties":{}}"#.to_owned()).unwrap(),

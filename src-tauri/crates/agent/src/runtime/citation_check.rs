@@ -1,4 +1,4 @@
-//! Citation grounding (docs/agents/harness.md, Completion). A search result is a lead, not a source:
+//! Citation grounding. A search result is a lead, not a source:
 //! its snippet can be stale or cut off. A final answer may cite a page only if the run read it, with
 //! web_fetch or in a browser. The first agent_finish that cites an unread page is refused once with
 //! the list (a plain-text final answer is checked the same way), so the model reads those pages,

@@ -18,9 +18,10 @@ use crate::runtime::{
     js_json::JsValue,
     ledger::Ledger,
     runtime_errors::RuntimeError,
+    local_tools::check_crate_tool,
     serial_tool_lifecycle::SerialToolLifecycle,
     tool_calls::{execute_tool, CallEnvironment, SavedWait, ToolCallDeps},
-    tool_execution::rejected_without_effect,
+    tool_execution::{rejected_without_effect, settle_device_call},
     tool_monitor::RejectedCalls,
     tool_transport::{HarnessCheckpoint, ToolCheckpoints, ToolTransport},
     web_fetch::{
@@ -75,9 +76,6 @@ impl CallEnvironment for NoSavedWaits<'_> {
         Box::pin(async { Ok(()) })
     }
 
-    fn embed_query<'a>(&'a self, query: &'a str) -> BoxFuture<'a, Option<(String, Vec<f64>)>> {
-        self.0.deps.device.embed_query(query)
-    }
 }
 
 impl RunShared {
@@ -92,8 +90,9 @@ impl RunShared {
     pub(crate) fn tool_deps<'a>(&'a self, environment: &'a dyn CallEnvironment) -> ToolCallDeps<'a> {
         ToolCallDeps {
             identity: &self.identity,
-            control: self.deps.control.as_ref(),
             gateway: self.deps.gateway.as_ref(),
+            local: self.deps.local_tools.as_deref(),
+            turn: self.model_turn(),
             hooks: &self.deps.hooks,
             environment,
             logger: &self.deps.logger,
@@ -113,6 +112,13 @@ impl RunShared {
 
     async fn dispatch(&self, environment: &dyn CallEnvironment, call_id: &str, name: &str, value: &JsValue, resumed: Option<SavedWait>) -> Result<JsValue, RuntimeError> {
         let deps = &self.deps;
+        if name == WEB_SEARCH_TOOL || name == WEB_FETCH_TOOL {
+            if let Some(host) = deps.local_tools.as_deref() {
+                if let Some(refused) = check_crate_tool(host, &self.identity.misty_run_id, call_id, self.model_turn(), name, value).await {
+                    return settle_device_call(refused).await;
+                }
+            }
+        }
         if name == WEB_SEARCH_TOOL && self.context.device_search.is_some() {
             let saved = deps.device.search();
             let context = SearchContext { client: &deps.http, saved: saved.as_ref(), cache: &deps.search_cache, endpoints: &deps.search_endpoints, now_ms: (deps.clock)().max(0) as u64 };

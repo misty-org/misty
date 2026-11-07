@@ -9,7 +9,7 @@
 .wrangler/
 
 # No env file is ever committed, not even an example: the docs list every
-# value (docs/self-hosting.md). A server's files live in ~/.misty/server/, outside the repository.
+# value. A server's files live in ~/.misty/.env/server/, outside the repository.
 
 **/.venv
 .windows-test/
@@ -160,7 +160,6 @@ artifacts/
 midscene_run/
 
 # The agent runtime's Node sidecar, copied in by the release build.
-src-tauri/services/agent-runtime/.output/
 
 # Tauri generates one permission file per app command at build.
 src-tauri/permissions/

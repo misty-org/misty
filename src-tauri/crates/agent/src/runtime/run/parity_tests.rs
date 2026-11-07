@@ -3,7 +3,7 @@
 use serde_json::Value;
 
 use crate::{
-    runtime::{js_json::JsValue, model_tools::McpRemoteTool, tool_execution::ToolExecutionResponse},
+    runtime::{js_json::JsValue, model_tools::CatalogTool, tool_execution::ToolExecutionResponse},
     sdk::{AssistantPart, Message, StreamPart},
 };
 
@@ -19,7 +19,7 @@ fn fixture() -> Value {
 }
 
 /// The catalog with its schemas' key order as recorded.
-fn catalog() -> Vec<McpRemoteTool> {
+fn catalog() -> Vec<CatalogTool> {
     let whole = JsValue::parse(&fixture_text()).unwrap();
     serde_json::from_str(&whole.get("case").unwrap().get("catalog").unwrap().stringify()).unwrap()
 }
@@ -119,13 +119,16 @@ async fn the_rust_loop_sends_what_the_typescript_loop_sent() {
         assert_eq!(got.3, want["token"].as_str().unwrap());
     }
 
-    // The server saw the same lifecycle calls, in the same order, under the same idempotency keys.
+    // Whoever follows the run saw the same lifecycle calls, in the same order, under the same
+    // idempotency keys. The recording is from when a run had a server: it also has the bearer exchange,
+    // which is gone, and no tool's arguments or result, which now stay on the computer for its timeline.
+    let recorded_events = || recorded["events"].as_array().unwrap().iter().filter(|event| !matches!(event["action"].as_str(), Some("activate" | "context" | "mcp-token")));
     let control = harness.control.calls.lock().unwrap();
     let got_events: Vec<(String, String)> = control.iter().filter(|(action, ..)| action != "budget").map(|(action, _, key)| (action.clone(), key.clone())).collect();
-    let want_events: Vec<(String, String)> = recorded["events"].as_array().unwrap().iter().filter(|event| !matches!(event["action"].as_str(), Some("activate" | "context"))).map(|event| (event["action"].as_str().unwrap().to_owned(), event["key"].as_str().unwrap().to_owned())).collect();
+    let want_events: Vec<(String, String)> = recorded_events().map(|event| (event["action"].as_str().unwrap().to_owned(), event["key"].as_str().unwrap().to_owned())).collect();
     assert_eq!(got_events, want_events);
     let bodies: Vec<&JsValue> = control.iter().filter(|(action, ..)| action != "budget").map(|(_, body, _)| body).collect();
-    let want_bodies: Vec<&Value> = recorded["events"].as_array().unwrap().iter().filter(|event| !matches!(event["action"].as_str(), Some("activate" | "context"))).map(|event| &event["body"]).collect();
+    let want_bodies: Vec<&Value> = recorded_events().map(|event| &event["body"]).collect();
     for (got, want) in bodies.iter().zip(want_bodies) {
         let got: Value = serde_json::from_str(&got.stringify()).unwrap();
         let mut got = got;
@@ -134,6 +137,8 @@ async fn the_rust_loop_sends_what_the_typescript_loop_sent() {
         for side in [&mut got, &mut want] {
             if let Some(output) = side.get_mut("output").and_then(Value::as_object_mut) {
                 output.remove("duration_ms");
+                output.remove("device_arguments");
+                output.remove("device_result");
             }
         }
         assert_eq!(got, want);

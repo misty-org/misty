@@ -5,6 +5,7 @@ import { currentWindows } from "@/features/workspace/windows";
 import { layoutTabs } from "@/features/workspace/layoutTabs";
 import { dockLeaves } from "@/features/workspace/dockTree";
 import { useUserStore } from "@/features/auth/core";
+import { agentAccountId } from "./agentAccount";
 import { isApiSessionTransitioning } from "@/api/client/session";
 import { desktopOs } from "@/shared/platform/desktopOs";
 import { useCompanionState } from "./companion/companionState";
@@ -25,7 +26,7 @@ export function workspaceAutopilotContext(
 ) {
   const spaceId = "";
   const state = useWorkspaceStore.getState();
-  if (!accountId || isApiSessionTransitioning() || useUserStore.getState().me?.id !== accountId)
+  if (!accountId || isApiSessionTransitioning() || agentAccountId() !== accountId)
     throw new Error("The account changed. Start a new task in the current workspace.");
   return {
     accountId,

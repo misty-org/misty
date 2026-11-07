@@ -1,15 +1,15 @@
 import { z } from "zod";
 import { apiRequest } from "@/api/client";
 
-/** An agent's membership in a Space, under the person who owns it. */
+/**
+ * An agent listed in a Space, under the person who owns it. The agent lives on that person's
+ * computer: the Space keeps its id and name, and nothing else.
+ */
 const spaceAgentSchema = z.object({
   space_id: z.string(),
   space_name: z.string(),
   agent_id: z.string(),
   agent_name: z.string(),
-  agent_role: z.string().default(""),
-  agent_avatar: z.record(z.string(), z.json()).nullish(),
-  system_managed: z.boolean().default(false),
   owner_user_id: z.string(),
   owner_name: z.string(),
   added_at: z.string(),
@@ -31,10 +31,13 @@ export const spaceAgentsApi = {
   async mine(signal?: AbortSignal) {
     return agentsSchema.parse(await apiRequest<unknown>("/me/space-agents", { signal }));
   },
-  /** Brings one of the person's agents into a Space they belong to. */
-  async add(spaceId: string, agentId: string) {
+  /** Lists one of the person's agents in a Space they belong to, by its name alone. */
+  async add(spaceId: string, agentId: string, name: string) {
     return spaceAgentSchema.parse(
-      await apiRequest<unknown>(spacePath(spaceId, agentId), { method: "PUT" }),
+      await apiRequest<unknown>(spacePath(spaceId, agentId), {
+        method: "PUT",
+        body: JSON.stringify({ name }),
+      }),
     );
   },
   /** Takes an agent out; its owner or the Space's owner may. */

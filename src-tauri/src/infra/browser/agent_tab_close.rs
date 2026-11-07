@@ -1,7 +1,7 @@
 //! Agent tabs: sleeping one, waiting for its first load and a small picture of its page.
 use super::*;
 
-/// Puts an agent's tab to sleep (docs/agents/browser.md, "Memory"): reads where its
+/// Puts an agent's tab to sleep: reads where its
 /// page is, then closes the page through the one close path, so its page process goes too. The
 /// tab wakes later from what this returns.
 #[tauri::command]
@@ -29,13 +29,28 @@ pub async fn browser_webview_await_load(
     Ok(super::page_agent::first_load(&app, &request.id).await)
 }
 
-/// A small picture of an agent's page (docs/agents/browser.md): the PiP and the view
-/// switcher show it instead of a second live page.
+#[derive(serde::Deserialize)]
+pub struct BrowserWebviewPictureRequest {
+    id: String,
+    /// How wide to make it, for a reader who needs the page's words. Small otherwise.
+    #[serde(default)]
+    width: Option<f64>,
+}
+
+const PICTURE_WIDTH: f64 = 480.0;
+const LARGEST_PICTURE_WIDTH: f64 = 1280.0;
+
+/// A picture of a page. Small for an agent's tab, which the PiP and the view
+/// switcher show instead of a second live page; live subtitles ask for one they can read.
 #[tauri::command]
 pub async fn browser_webview_picture(
     app: AppHandle,
-    request: BrowserWebviewIdRequest,
+    request: BrowserWebviewPictureRequest,
 ) -> Result<Value, String> {
+    let width = request
+        .width
+        .filter(|width| width.is_finite())
+        .map_or(PICTURE_WIDTH, |width| width.clamp(PICTURE_WIDTH, LARGEST_PICTURE_WIDTH));
     let webview = app
         .get_webview(&webview_label(&request.id)?)
         .ok_or_else(|| "Browser page is unavailable.".to_owned())?;
@@ -55,13 +70,13 @@ pub async fn browser_webview_picture(
             0.0,
             size.width,
             size.height,
-            480.0,
+            width,
         )
         .await
     }
     #[cfg(not(target_os = "macos"))]
     {
-        let _ = webview;
+        let _ = (webview, width);
         Err("Pictures of pages are not available here yet.".into())
     }
 }

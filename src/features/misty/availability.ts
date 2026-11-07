@@ -1,19 +1,17 @@
-import { apiRequest } from "@/api/client";
 import { isApiSessionTransitioning, readApiSessionGeneration } from "@/api/client/session";
-import { useUserStore } from "@/features/auth/core";
+import { agentAccountId } from "@/features/agents/agentAccount";
 
-/** Agent admission follows the verified account, independently of website groups. */
+/**
+ * A turn belongs to whoever this window is working for. It needs no account and asks nothing of the
+ * server: agents run on this computer, signed in or not.
+ */
 export async function assertMistyAvailable(
   accountId: string,
   _legacySpaceId?: string,
 ): Promise<void> {
-  if (!accountId) throw new Error("Sign in to use Misty.");
   const generation = readApiSessionGeneration();
-  const sameAccount = () =>
-    !isApiSessionTransitioning() &&
-    readApiSessionGeneration() === generation &&
-    useUserStore.getState().me?.id === accountId;
-  if (!sameAccount()) throw new Error("The Misty account changed. Open Misty again.");
-  const me = await apiRequest<{ id: string }>("/me");
-  if (!sameAccount() || me.id !== accountId) throw new Error("The Misty account changed.");
+  if (isApiSessionTransitioning() || readApiSessionGeneration() !== generation)
+    throw new Error("The Misty account changed. Open Misty again.");
+  if (agentAccountId() !== accountId)
+    throw new Error("The Misty account changed. Open Misty again.");
 }

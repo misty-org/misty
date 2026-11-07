@@ -1,9 +1,9 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { liveAcceptanceEnabled } from "@/tests/acceptance/liveEnv";
-import { MistyClient, type InvocationRun } from "@/tests/acceptance/mistyClient";
+import { defaultAgentId, MistyClient, type InvocationRun } from "@/tests/acceptance/mistyClient";
 import { writeAcceptanceReport } from "@/tests/acceptance/report";
 
-// docs/agents/harness.md (Sub-agents and the notebook), live on the local server: a run
+// Sub-agents and the notebook, live on the local server: a run
 // splits research across sub-agents with agent_delegate, keeps a notebook,
 // and merges what they found. No browser is attached, so the sub-agents
 // research with web search. The account's first Space is its personal one,
@@ -19,8 +19,7 @@ const ran = (run: InvocationRun, name: string) =>
 describe.skipIf(!liveAcceptanceEnabled)("sub-agents and the notebook on the local server", () => {
   beforeAll(async () => {
     client = await MistyClient.register();
-    const agents = await client.json<{ agents: Array<{ id: string }> }>("/misty/agents");
-    agentId = agents.agents[0]?.id ?? "";
+    agentId = await defaultAgentId();
     const created = await client.json<{ space: { id: string } }>("/spaces", {
       method: "POST",
       headers: { "Idempotency-Key": crypto.randomUUID() },
@@ -34,7 +33,7 @@ describe.skipIf(!liveAcceptanceEnabled)("sub-agents and the notebook on the loca
       "Use sub-agents for this, one per country, working at the same time: find the capital " +
       "city and the official currency of France, Japan and Kenya. Keep a plan in the notebook, " +
       "then give me one table.";
-    const run = await client.invoke(prompt, { agent_id: agentId }, 600_000);
+    const run = await client.invoke(prompt, { agentId }, 600_000);
     const delegations = run.events.filter((event) => event.type === "delegation.updated") as Array<{
       delegation?: { children?: Array<{ state: string; goal: string; summary?: string }> };
     }>;

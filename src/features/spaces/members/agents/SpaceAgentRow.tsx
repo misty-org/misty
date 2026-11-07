@@ -2,9 +2,11 @@ import type { SpaceAgent } from "@/api/spaces/space-agents";
 import type { ItemVisibility } from "@/api/spaces/visibility";
 import { PrivateLabel, VisibilityMenu } from "../../components/VisibilityMenu";
 import { AgentAvatar } from "@/features/agents";
+import { useAuth } from "@/features/auth";
 import type { AgentProfile } from "@/shared/schemas";
 import { IconButton, cn } from "@/shared/ui";
 import { X } from "lucide-react";
+import { agentOwnerLabel } from "./useSpaceAgentMembers";
 
 /** One agent, shown under the person who brought it. */
 export function SpaceAgentRow({
@@ -20,6 +22,7 @@ export function SpaceAgentRow({
   /** Offered to the agent's owner only. */
   onVisibilityChange?: (visibility: ItemVisibility) => void;
 }) {
+  const { user } = useAuth();
   return (
     <div
       className={cn(
@@ -33,8 +36,8 @@ export function SpaceAgentRow({
             {
               id: agent.agent_id,
               name: agent.agent_name,
-              avatar: agent.agent_avatar ?? {},
-              system_managed: agent.system_managed,
+              avatar: {},
+              system_managed: false,
             } as AgentProfile
           }
           compact={compact}
@@ -43,10 +46,8 @@ export function SpaceAgentRow({
       <div className="min-w-0 flex-1">
         <p className={cn("m-0 truncate font-medium text-cream", compact ? "text-xs" : "text-sm")}>
           {agent.agent_name}
+          <span className="font-normal text-cream-muted"> · {agentOwnerLabel(agent, user?.id)}</span>
         </p>
-        {agent.agent_role && !compact ? (
-          <p className="m-0 truncate text-xs text-cream-muted">{agent.agent_role}</p>
-        ) : null}
       </div>
       {agent.visibility === "private" ? <PrivateLabel /> : null}
       {onVisibilityChange ? (

@@ -71,7 +71,7 @@ async fn evaluate(
         return Err(StorageError::Unavailable);
     }
     // Verify the real store, never just what the view says about itself.
-    super::super::cookie_store::verify_storage_profile(view, physical)
+    super::super::cookie_store::verify_store(view, physical)
         .await
         .map_err(|_| StorageError::Profile)?;
     // A JSON string parsed in the page: as object source, a `__proto__` key would be lost.

@@ -14,7 +14,7 @@ pub(in crate::infra) fn session_permission_scope(
     if session.private {
         return Some(kiri::engine::StoreScope::Temporary(0));
     }
-    crate::infra::site_settings::permissions::profile_key(session.profile_id.as_deref())
+    crate::infra::site_settings::permissions::store_key(session.store_id.as_deref())
         .ok()
         .map(kiri::engine::StoreScope::Persistent)
 }
@@ -47,17 +47,17 @@ impl Default for BrowserSessionState {
 pub(super) struct BrowserSession {
     pub(super) agent_input_locked: bool,
     // An agent's tab while its run goes on: the ring stays even when the person has taken it
-    // over and the lock is off (docs/agents/browser.md).
+    // over and the lock is off.
     pub(super) agent_ring: bool,
     pub(super) workspace_tab_id: Option<String>,
     // Native auxiliary windows stay attached to this live integration view.
     pub(super) popup_parent: Option<String>,
     pub(super) origin_space_id: Option<String>,
     pub(super) zoom_factor: Option<f64>,
-    pub(super) profile_id: Option<String>,
+    pub(super) store_id: Option<String>,
     // The page's Misty profile. Only this, never the store above, is included in renderer and
     // agent observations.
-    pub(super) logical_profile_id: Option<String>,
+    pub(super) profile: Option<String>,
     pub(super) profile_provider: Option<String>,
     pub(super) provider_id: Option<String>,
     pub(super) oauth_callback: Option<(
@@ -74,13 +74,13 @@ pub(super) struct BrowserSession {
     /// Private tabs keep no download list and share one throwaway data store.
     pub(super) private: bool,
     /// The agent run a tab works for, when an agent opened it in the person's window
-    /// (docs/agents/browser.md): the benchmark pictures each run's own tabs.
+    /// the benchmark pictures each run's own tabs.
     pub(super) agent_run_id: Option<String>,
 }
 
 impl BrowserSession {
     pub(super) fn context_profile_id(&self) -> Option<&str> {
-        self.logical_profile_id.as_deref()
+        self.profile.as_deref()
     }
 }
 

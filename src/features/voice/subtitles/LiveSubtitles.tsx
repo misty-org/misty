@@ -1,10 +1,12 @@
-import { emit } from "@tauri-apps/api/event";
+import { emitTo } from "@tauri-apps/api/event";
+import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { AudioLines, History, LoaderCircle, Play, Square, X } from "lucide-react";
-import { useEffect, useState, type MouseEvent } from "react";
+import { useEffect, useState, type PointerEvent } from "react";
 import { Button, IconButton } from "@/shared/ui";
 import { LiveCaptions } from "./LiveCaptions";
 import { SubtitleHistory } from "./SubtitleHistory";
+import { dragPanel } from "./subtitlePanelDrag";
 import { SubtitleSetup } from "./SubtitleSetup";
 import { SubtitleToolbar, type ControlGroup } from "./SubtitleToolbar";
 import {
@@ -17,15 +19,21 @@ import {
 } from "./subtitlesView";
 import "./liveSubtitles.css";
 
-const act = (action: SubtitlesAction) => void emit(SUBTITLES_ACTION, action);
+/** This view's window is the one that opened it, and the only one that should hear it. */
+const opener = () => getCurrentWindow().label;
+const act = (action: SubtitlesAction) => void emitTo(opener(), SUBTITLES_ACTION, action);
 
-/** Everything but what you click or type in moves the window. */
-function drag(event: MouseEvent) {
+/** Everything but what you click or type in moves the panel. */
+function drag(event: PointerEvent<HTMLElement>) {
   const interactive = "button, input, textarea, [role='dialog'], [role='listbox'], [role='slider']";
   if (event.button !== 0 || (event.target as Element).closest(interactive)) return;
-  void getCurrentWindow()
-    .startDragging()
-    .catch(() => undefined);
+  dragPanel(event, false);
+}
+
+function resize(event: PointerEvent<HTMLElement>) {
+  if (event.button !== 0) return;
+  event.stopPropagation();
+  dragPanel(event, true);
 }
 
 /** In the middle of the panel until it's listening; then Stop sits in the header. */
@@ -47,26 +55,26 @@ function SessionToggle({ view }: { view: SubtitlesView }) {
 }
 
 /**
- * The floating subtitles panel (window misty-live-subtitles), from Audeeo. It only draws what the
- * window that opened it sends, and asks that window for every change.
+ * The subtitles panel, from Audeeo: a view above the tabs of the Misty window that opened it. It
+ * only draws what that window sends, and asks that window for every change.
  */
 export function LiveSubtitles() {
   const [view, setView] = useState(noSubtitles);
   const [page, setPage] = useState<"captions" | "history">("captions");
   const [open, setOpen] = useState<ControlGroup | null>(null);
   useEffect(() => {
-    const remove = getCurrentWindow().listen<SubtitlesView>(SUBTITLES_VIEW, ({ payload }) =>
+    const remove = getCurrentWebview().listen<SubtitlesView>(SUBTITLES_VIEW, ({ payload }) =>
       setView(payload),
     );
     // This page loads after the first view may have been sent.
-    void remove.then(() => emit(SUBTITLES_READY, {})).catch(() => undefined);
+    void remove.then(() => emitTo(opener(), SUBTITLES_READY, {})).catch(() => undefined);
     return () => void remove.then((fn) => fn());
   }, []);
   const { prefs } = view;
   const showSource = !!view.source;
   const translation = prefs.mode === "translate" ? view.translation : "";
   return (
-    <main className="subtitle-panel" onMouseDown={drag}>
+    <main className="subtitle-panel" onPointerDown={drag}>
       <header className="subtitle-header">
         <div className="subtitle-header-leading">
           {page === "history" ? (
@@ -127,6 +135,7 @@ export function LiveSubtitles() {
       {page === "captions" && (
         <SubtitleToolbar view={view} act={act} open={open} setOpen={setOpen} />
       )}
+      <div className="subtitle-resize" aria-hidden onPointerDown={resize} />
     </main>
   );
 }

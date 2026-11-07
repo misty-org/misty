@@ -1,4 +1,4 @@
-//! The runtime on the person's desktop (docs/agents/runtime.md) works on that device's model keys and
+//! The runtime on the person's desktop works on that device's model keys and
 //! choices, and on its web search key. The app sets them whenever they change; they live only in this
 //! process's memory and reach only their provider. Ported from `device-models.ts`.
 use std::sync::{Mutex, MutexGuard, PoisonError};
@@ -55,6 +55,7 @@ struct Saved {
     models: Vec<(String, String)>,
     reasoning: Option<String>,
     search: Option<DeviceSearch>,
+    speech_voice: Option<String>,
 }
 
 /// The device's models, keys and search key.
@@ -114,7 +115,17 @@ fn parse_saved(value: &Value) -> Option<Saved> {
         None => None,
         Some(value) => Some(parse_search(value)?),
     };
-    Some(Saved { providers, models, reasoning, search })
+    // A voice ID goes into a request's address, so anything else refuses the whole document.
+    let speech_voice = match fields.get("speechVoice") {
+        None => None,
+        Some(value) => Some(
+            value
+                .as_str()
+                .filter(|voice| voice.len() <= 64 && voice.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_')))?
+                .to_owned(),
+        ),
+    };
+    Some(Saved { providers, models, reasoning, search, speech_voice })
 }
 
 impl DeviceModels for DeviceModelStore {
@@ -124,6 +135,10 @@ impl DeviceModels for DeviceModelStore {
         let saved = saved.as_ref()?;
         let find = |name: &str| saved.models.iter().find(|(role, model)| role == name && !model.is_empty()).map(|(_, model)| model.clone());
         find(role_name(role)).or_else(|| if role == DeviceRole::Fast { find("agent") } else { None })
+    }
+
+    fn speech_voice(&self) -> Option<String> {
+        self.saved().as_ref().and_then(|saved| saved.speech_voice.clone())
     }
 
     /// The route a model runs on with this device's key for its provider.
@@ -258,5 +273,19 @@ mod tests {
         let device = DeviceModelStore::default();
         device.set(&models());
         assert_eq!(device.scrubbed("bad sk-or-device-key!"), "bad [redacted]!");
+    }
+
+    #[test]
+    fn a_voice_id_is_kept_and_anything_that_could_change_an_address_is_refused() {
+        let store = DeviceModelStore::default();
+        let document = |voice: &str| json!({ "version": 1, "providers": {}, "models": {}, "speechVoice": voice });
+        assert!(store.set(&document("AbC-12_x")));
+        assert_eq!(store.speech_voice().as_deref(), Some("AbC-12_x"));
+        for hostile in ["../../v1/user", "a/b", "a?b=c", "a b", &"x".repeat(65)] {
+            assert!(!store.set(&document(hostile)), "{hostile}");
+        }
+        assert_eq!(store.speech_voice().as_deref(), Some("AbC-12_x"), "a refused document changes nothing");
+        assert!(store.set(&json!({ "version": 1, "providers": {}, "models": {} })));
+        assert_eq!(store.speech_voice(), None);
     }
 }

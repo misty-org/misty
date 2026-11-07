@@ -1,7 +1,7 @@
 // A whole pass through the real entry point, with the stack, the bridge and the judge all local
 // mocks. It proves the runner's wiring, not that Misty's agent works.
 import { execFile } from "node:child_process";
-import { existsSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { promisify } from "node:util";
@@ -22,44 +22,40 @@ afterEach(async () => {
 });
 
 interface Options {
-  turns?: number;
   models?: () => Record<string, string> | null;
 }
 
-async function world({ turns = 100, models = () => ({ agent: "anthropic/agent-model", fast: "anthropic/fast-model" }) }: Options = {}) {
-  const app = { runtime: "typescript" };
+async function world({ models = () => ({ agent: "anthropic/agent-model", fast: "anthropic/fast-model" }) }: Options = {}) {
   let invocations = 0;
-  const stack = await startMock((request, response) => {
-    if (request.path === "/login") return sendJson(response, 200, {}, { "set-cookie": "misty_session=abc; Path=/" });
-    if (request.path === "/me") return sendJson(response, 200, { id: "user_1" });
-    if (request.path === "/misty/agents") return sendJson(response, 200, { agents: [{ id: "agent_1" }] });
-    if (request.path === "/devices") return sendJson(response, 200, { devices: [{ id: "device_1" }] });
-    if (request.path === "/ai/invocations") {
-      const id = `invocation_${++invocations}`;
-      return sendJson(response, 202, { invocationId: id, conversationId: `conversation_${invocations}`, eventsUrl: `/ai/invocations/${id}/events`, modelTurnLimit: turns });
-    }
-    if (request.path.endsWith("/events")) {
-      const id = request.path.split("/").at(-2)!;
-      response.writeHead(200, { "content-type": "text/event-stream" });
-      for (const event of [
-        { type: "eval.ignored" },
-        { type: "tool.started", toolCallId: `${id}-call`, toolName: "browser.run" },
-        { type: "tool.completed", toolCallId: `${id}-call`, toolName: "browser_run" },
-        { type: "response.delta", delta: "My answer." },
-        { type: "invocation.completed" },
-      ]) response.write(`data: ${JSON.stringify(event)}\n\n`);
-      return void response.end();
-    }
-    if (request.path.endsWith("/tool-output")) {
-      const id = request.path.split("/").at(-2)!;
-      return sendJson(response, 200, { items: [{ tool_call_id: `${id}-call`, tool_name: "browser.run", output: { url: "https://shop.test", title: "Shop" } }] });
-    }
-    sendJson(response, 404, {});
-  });
   const bridge = await startMock((request, response) => {
     if (request.headers.authorization !== `Bearer ${token}`) return sendJson(response, 401, {});
-    if (request.path === "/models") return sendJson(response, 200, { ok: true, result: { models: models(), reasoning: "low", search: "serper", runtime: app.runtime } });
-    if (request.path === "/run-grants") return sendJson(response, 200, { ok: true, result: [{ signed: true }] });
+    if (request.path === "/models") return sendJson(response, 200, { ok: true, result: { models: models(), reasoning: "low", search: "serper" } });
+    if (request.path === "/window-eval") {
+      const { script: code } = JSON.parse(request.body) as { script: string };
+      if (code.includes("createInvocation")) {
+        const id = `invocation_${++invocations}`;
+        return sendJson(response, 200, { ok: true, result: { invocationId: id, conversationId: `conversation_${invocations}` } });
+      }
+      if (code.includes("desktopDeviceGrants")) return sendJson(response, 200, { ok: true, result: [{ runGrant: { signed: true } }] });
+      return sendJson(response, 200, { ok: true, result: { agentId: "agent_1", deviceId: "device_1" } });
+    }
+    const { runId } = (request.body ? JSON.parse(request.body) : {}) as { runId?: string };
+    if (request.path === "/run-follow")
+      return sendJson(response, 200, {
+        ok: true,
+        result: {
+          state: "completed",
+          events: [
+            { type: "eval.ignored" },
+            { type: "tool.started", toolCallId: `${runId}-call`, toolName: "browser.run" },
+            { type: "tool.completed", toolCallId: `${runId}-call`, toolName: "browser_run" },
+            { type: "response.delta", delta: "My answer." },
+            { type: "invocation.completed" },
+          ],
+        },
+      });
+    if (request.path === "/run-record")
+      return sendJson(response, 200, { ok: true, result: [{ tool_call_id: `${runId}-call`, tool_name: "browser.run", output: { url: "https://shop.test", title: "Shop" } }] });
     if (request.path === "/pages") return sendJson(response, 200, { ok: true, result: { pages: [{ label: "misty-browser-a", url: "https://shop.test", runId: `invocation_${invocations}` }] } });
     if (request.path === "/capture") return sendJson(response, 200, { ok: true, result: { dataUrl: image } });
     if (request.path === "/processes") return sendJson(response, 200, { ok: true, result: { webProcesses: [1], views: [] } });
@@ -67,24 +63,19 @@ async function world({ turns = 100, models = () => ({ agent: "anthropic/agent-mo
   });
   const judge = await startMock((_request, response) =>
     sendJson(response, 200, { choices: [{ message: { content: 'Thoughts: fine\nStatus: "success"' } }], usage: { prompt_tokens: 3, completion_tokens: 1 } }));
-  mocks = [stack, bridge, judge];
+  mocks = [bridge, judge];
   const dir = mkdtempSync(join(tmpdir(), "odysseys-pass-"));
-  const signIn = join(dir, "signin.json");
-  writeFileSync(signIn, JSON.stringify({ email: "test@example.test", password: "not-real" }));
   const env = {
     PATH: process.env.PATH,
-    MISTY_ODYSSEYS_API: stack.url,
-    MISTY_ODYSSEYS_SIGNIN: signIn,
     MISTY_BROWSER_EVAL_BRIDGE: bridge.url,
     MISTY_BROWSER_EVAL_BRIDGE_TOKEN: token,
-    MISTY_ODYSSEYS_RUNTIME: "typescript",
     MISTY_ODYSSEYS_JUDGE_MODEL: "vendor/judge",
     MISTY_ODYSSEYS_JUDGE_KEY: key,
     MISTY_ODYSSEYS_JUDGE_BASE_URL: `${judge.url}/v1`,
     MISTY_ODYSSEYS_TASKS: "46ecc9a5dc,8f005e9f09",
     MISTY_ODYSSEYS_REPORTS: join(dir, "reports"),
   };
-  return { stack, bridge, judge, dir, env, app };
+  return { bridge, judge, dir, env };
 }
 
 const pass = async (env: Record<string, string | undefined>) => {
@@ -96,15 +87,14 @@ const reportOf = (folder: string) => JSON.parse(readFileSync(join(folder, "repor
 
 describe("a whole pass", () => {
   it("runs the tasks, records the pass, and two passes compare", async () => {
-    const { dir, env, stack, judge, app } = await world();
+    const { dir, env, bridge, judge } = await world();
     await pass(env);
-    app.runtime = "rust";
-    await pass({ ...env, MISTY_ODYSSEYS_RUNTIME: "rust" });
+    await pass(env);
 
     const [first, second] = folders(dir);
     const report = reportOf(first!);
     expect(report.stopped).toBe("");
-    expect(report.runtime).toBe("typescript");
+    expect(report.runtime).toBe("rust");
     expect(report.device).toEqual({ models: { agent: "anthropic/agent-model", fast: "anthropic/fast-model" }, reasoning: "low", search: "serper" });
     expect(report.turnLimit).toBe(100);
     expect(report.taskIds.map((id) => id.slice(0, 10)).sort()).toEqual(["46ecc9a5dc", "8f005e9f09"]);
@@ -116,9 +106,10 @@ describe("a whole pass", () => {
     expect(report.runs[0]!.conversationId).toMatch(/^conversation_/);
 
     // The product path: a composer request naming the turn limit and no model.
-    const body = JSON.parse(stack.seen.find((item) => item.path === "/ai/invocations")!.body) as Record<string, unknown>;
-    expect(body.eval_turn_limit).toBe(100);
-    expect(Object.keys(body).filter((name) => /model/.test(name))).toEqual([]);
+    const started = bridge.seen.find((item) => item.path === "/window-eval" && item.body.includes("createInvocation"))!;
+    const { script: code } = JSON.parse(started.body) as { script: string };
+    expect(code).toContain('"evalTurnLimit":100');
+    expect(code).not.toMatch(/"(modelId|model_id)"/);
 
     // The judge saw the recorded step and picture.
     expect(judge.seen[0]!.body).toContain("Response: https://shop.test | Shop");
@@ -137,24 +128,10 @@ describe("a whole pass", () => {
     expect(compared.stdout).toContain("Same or better: yes");
   }, 60_000);
 
-  it("stops at once when the server didn't honor the turn limit, and the report says so", async () => {
-    const { dir, env } = await world({ turns: 20 });
-    const stderr = await pass(env);
-    expect(stderr).toContain("gave this run 20 turns, not 100");
-    expect(reportOf(folders(dir)[0]!).stopped).toContain("gave this run 20 turns");
-    expect(reportOf(folders(dir)[0]!).runs).toEqual([]);
-  }, 60_000);
-
-  it("refuses a pass labelled with a runtime the app isn't on", async () => {
-    const { env, app } = await world();
-    app.runtime = "rust";
-    await expect(pass(env)).rejects.toMatchObject({ code: 2, stderr: expect.stringContaining("the app is on rust") });
-  }, 60_000);
-
   it("refuses to start with no agent model on the device", async () => {
-    const { env, stack } = await world({ models: () => null });
+    const { env, bridge } = await world({ models: () => null });
     await expect(pass(env)).rejects.toMatchObject({ code: 2, stderr: expect.stringContaining("no usable agent model") });
-    expect(stack.seen.some((item) => item.path === "/ai/invocations")).toBe(false);
+    expect(bridge.seen.some((item) => item.body.includes("createInvocation"))).toBe(false);
   }, 60_000);
 
   it("marks a pass whose model changed on the device, so it can't be compared", async () => {

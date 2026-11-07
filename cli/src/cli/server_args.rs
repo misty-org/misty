@@ -1,5 +1,5 @@
 //! Arguments for `misty server`, which runs the development stack. A server
-//! is deployed with misty-server/compose.yml instead (docs/self-hosting.md).
+//! is deployed with misty-server/compose.yml instead.
 
 use super::*;
 

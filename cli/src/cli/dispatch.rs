@@ -27,23 +27,22 @@ pub fn dispatch(arguments: Cli, settings: Settings) -> Result<()> {
         }
         Command::Env(command) => match command.command {
             EnvCommand::Describe => environment::describe(),
-            EnvCommand::Set { target, name } => {
+            EnvCommand::Set { name } => {
                 use std::io::Read;
                 let mut value = String::new();
                 std::io::stdin().read_to_string(&mut value)?;
                 environment::set(
                     &settings.workspace,
-                    target,
                     &name,
                     value.trim_end_matches(['\r', '\n']),
                 )
             }
-            EnvCommand::Init { target } => {
-                environment::init(&settings.workspace, target)?;
+            EnvCommand::Init => {
+                environment::init(&settings.workspace)?;
                 server::initialize_development_secrets(&settings.workspace)
             }
-            EnvCommand::Check { target } => environment::check(&settings.workspace, target),
-            EnvCommand::Status { target } => environment::status(&settings.workspace, target),
+            EnvCommand::Check => environment::check(&settings.workspace),
+            EnvCommand::Status => environment::status(&settings.workspace),
         },
         Command::Home(command) => match command.command {
             HomeCommand::Generate { destination } => home::generate(destination.as_deref()),
@@ -156,7 +155,7 @@ pub(super) fn load_command_environment(command: &Command, settings: &Settings) -
     };
     crate::config::load_cli_environment(&settings.workspace, files)?;
     if let Command::Server(_) = command {
-        environment::apply(&settings.workspace, environment::Target::Dev)?;
+        environment::apply(&settings.workspace)?;
     }
     Ok(())
 }

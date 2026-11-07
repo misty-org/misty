@@ -62,6 +62,20 @@ const LOGIN_PATHS: [&str; 4] = [
     "/auth/confirm-email/sign-in",
 ];
 
+/// When a fetch to the IPC protocol fails once, say as a page reloads, Tauri sends that page's later
+/// calls as JSON messages, where a request's bytes arrive as an array or as an object keyed by index.
+fn body_from_json(value: &serde_json::Value) -> Result<Vec<u8>, String> {
+    use serde_json::Value;
+    let byte = |item: &Value| item.as_u64().and_then(|byte| u8::try_from(byte).ok());
+    let bytes: Option<Vec<u8>> = match value {
+        Value::Null => Some(Vec::new()),
+        Value::Array(items) => items.iter().map(byte).collect(),
+        Value::Object(fields) => (0..fields.len()).map(|index| fields.get(&index.to_string()).and_then(byte)).collect(),
+        _ => None,
+    };
+    bytes.ok_or_else(|| "Expected binary request body".to_owned())
+}
+
 /// Headers only native code decides. Tokens and model keys never come from the renderer, and an
 /// `Origin` would make the server treat this as a page and answer in cookies nobody would keep.
 fn renderer_may_set(name: &str) -> bool {
@@ -119,7 +133,7 @@ pub async fn auth_http_start(
     } = serde_json::from_str(&meta).map_err(|_| "Invalid request metadata")?;
     let body = match request.body() {
         tauri::ipc::InvokeBody::Raw(bytes) => bytes.clone(),
-        _ => return Err("Expected binary request body".into()),
+        tauri::ipc::InvokeBody::Json(value) => body_from_json(value)?,
     };
     let progress: tauri::ipc::Channel<[u64; 2]> = progress.channel_on(webview);
     uuid::Uuid::parse_str(&request_id).map_err(|_| "Invalid request ID")?;
@@ -287,6 +301,17 @@ pub async fn auth_http_cancel(request_id: String) -> Result<(), String> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn a_body_sent_as_json_reads_as_its_bytes() {
+        use super::body_from_json;
+        assert_eq!(body_from_json(&serde_json::json!([1, 2, 255])).unwrap(), [1, 2, 255]);
+        assert_eq!(body_from_json(&serde_json::json!({ "1": 7, "0": 6 })).unwrap(), [6, 7]);
+        assert!(body_from_json(&serde_json::json!({})).unwrap().is_empty());
+        assert!(body_from_json(&serde_json::Value::Null).unwrap().is_empty());
+        assert!(body_from_json(&serde_json::json!("text")).is_err());
+        assert!(body_from_json(&serde_json::json!([256])).is_err());
+    }
+
     use super::renderer_may_set;
 
     #[test]

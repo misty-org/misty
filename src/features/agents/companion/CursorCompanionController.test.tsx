@@ -51,7 +51,7 @@ describe("native companion lifecycle", () => {
     view.unmount();
   });
 
-  it("restores visibility and size, resizes without interrupting, and persists across remounts", async () => {
+  it("starts hidden whatever was saved, resizes without interrupting, and persists across remounts", async () => {
     localStorage.setItem(
       "misty.cursor-companion:account",
       JSON.stringify({
@@ -61,8 +61,7 @@ describe("native companion lifecycle", () => {
     );
     let view = await mounted();
     expect(presentations().slice(-1)[0]).toMatchObject({
-      visible: true,
-      showCompanion: true,
+      visible: false,
       size: 150,
     });
     await act(async () => {
@@ -73,7 +72,7 @@ describe("native companion lifecycle", () => {
     });
     expect(presentations().slice(-1)[0]).toMatchObject({
       size: 200,
-      visible: true,
+      visible: false,
     });
     expect(mocks.invoke.mock.calls.some(([name]) => name === "cursor_companion_interrupt")).toBe(
       false,
@@ -86,17 +85,94 @@ describe("native companion lifecycle", () => {
       ),
     ).toMatchObject({
       size: 200,
-      visible: true,
     });
     view.unmount();
     view = await mounted();
     await waitFor(() =>
       expect(useCompanionState.getState().presentation).toMatchObject({
         size: 200,
-        visible: true,
+        visible: false,
         enabled: true,
       }),
     );
+    view.unmount();
+  });
+  it("shows the cursor for a talk turn and hides it when the turn ends", async () => {
+    const view = await mounted();
+    vi.useFakeTimers();
+    emit("shortcut", { turn: 2, held: true });
+    expect(presentations().slice(-1)[0]).toMatchObject({ visible: true, phase: "listening" });
+    emit("shortcut", { turn: 2, held: false });
+    emit("recorded", { turn: 2, audio: "", durationMs: 0 });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000);
+    });
+    expect(presentations().slice(-1)[0]).toMatchObject({ visible: false, phase: "idle" });
+    view.unmount();
+  });
+  it("never shows the cursor or a point for a request that was not spoken", async () => {
+    mocks.submit.mockImplementation(async () => {
+      mocks.state.invocationId = "typed-task";
+      mocks.state.working = true;
+    });
+    const view = await mounted();
+    await act(async () =>
+      useCompanionState.getState().submit!({
+        prompt: "Where is the button?",
+        conversationId: "conversation",
+      }),
+    );
+    await act(async () => {
+      mocks.state.working = false;
+      mocks.state.conversations = [
+        {
+          id: "conversation",
+          messages: [
+            {
+              role: "assistant",
+              state: "completed",
+              content: "There. [POINT:100,200:the button:screen1]",
+            },
+          ],
+        },
+      ];
+      mocks.subscribers.forEach((notify) => notify());
+    });
+    expect(presentations().every((presented) => !presented.visible && !presented.point)).toBe(true);
+    expect(presentations().slice(-1)[0].phase).toBe("idle");
+    view.unmount();
+  });
+  it("stays up for the next step of what the talk shortcut started", async () => {
+    mocks.submit.mockImplementation(async () => {
+      mocks.state.invocationId = "spoken-task";
+      mocks.state.working = true;
+    });
+    const view = await mounted();
+    await act(async () =>
+      useCompanionState.getState().submit!({
+        prompt: "Where is the button?",
+        conversationId: "conversation",
+        voice: true,
+      }),
+    );
+    expect(presentations().slice(-1)[0]).toMatchObject({ visible: true, phase: "processing" });
+    view.unmount();
+  });
+  it("hides the overlay when sending a talk turn's recording fails", async () => {
+    mocks.conversationCommit.mockRejectedValue(new Error("No voice model"));
+    const view = await mounted();
+    vi.useFakeTimers();
+    emit("shortcut", { turn: 2, held: true });
+    emit("shortcut", { turn: 2, held: false });
+    emit("recorded", { turn: 2, audio: "", durationMs: 1000 });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10_000);
+    });
+    expect(presentations().slice(-1)[0]).toMatchObject({
+      visible: false,
+      phase: "idle",
+      error: "No voice model",
+    });
     view.unmount();
   });
   it("rapid release returns to idle without a provider request", async () => {
@@ -142,8 +218,7 @@ describe("native companion lifecycle", () => {
     });
     view.unmount();
   });
-  it("keeps a summoned companion visible after failure until explicitly hidden or retried", async () => {
-    localStorage.setItem("misty.cursor-companion:account", JSON.stringify({ visible: false }));
+  it("shows a failed talk turn for a moment, then hides and keeps the error for Agents", async () => {
     const view = await mounted();
     vi.useFakeTimers();
     emit("shortcut", { turn: 2, held: true });
@@ -153,14 +228,16 @@ describe("native companion lifecycle", () => {
     });
     expect(presentations().slice(-1)[0]).toMatchObject({
       visible: true,
-      showCompanion: false,
       phase: "idle",
       error: "Request failed",
     });
     await act(async () => {
-      await companionControl({ kind: "visibility", visible: false });
+      await vi.advanceTimersByTimeAsync(5000);
     });
-    expect(presentations().slice(-1)[0].visible).toBe(false);
+    expect(presentations().slice(-1)[0]).toMatchObject({
+      visible: false,
+      error: "Request failed",
+    });
     emit("shortcut", { turn: 4, held: true });
     expect(presentations().slice(-1)[0]).toMatchObject({
       visible: true,
@@ -392,171 +469,4 @@ describe("Clicky capture ordering and shared entry points", () => {
     expect(useCompanionState.getState().presentation.phase).toBe("processing");
     view.unmount();
   });
-});
-
-it("ignores a stale native Stop and stops only the matching task", async () => {
-  const view = await mounted();
-  await act(async () => {
-    mocks.listeners.get("misty://desktop-control-stopped")?.({
-      payload: { taskId: "old-task", reason: "Old stop" },
-    });
-  });
-  expect(mocks.pause).not.toHaveBeenCalled();
-  expect(useCompanionState.getState().presentation.error).not.toBe("Old stop");
-  await act(async () => {
-    mocks.listeners.get("misty://desktop-control-stopped")?.({
-      payload: { taskId: "desktop-task", reason: "Stopped with Escape" },
-    });
-  });
-  expect(mocks.pause).toHaveBeenCalledWith("desktop-task");
-  expect(useCompanionState.getState().presentation.error).toBe("Stopped with Escape");
-  view.unmount();
-});
-it("restores Ask only when explicitly enabled for this account", async () => {
-  localStorage.setItem("misty.cursor-companion:account", JSON.stringify({ ask: true }));
-  const view = await mounted();
-  expect(useCompanionState.getState().presentation.ask).toBe(true);
-  view.unmount();
-});
-
-it("sends and completes plain text while the realtime provider is unavailable", async () => {
-  mocks.conversationCommit.mockRejectedValue(
-    new Error("The realtime voice provider is unavailable"),
-  );
-  mocks.speech.mockRejectedValue(new Error("The realtime voice provider is unavailable"));
-  mocks.submit.mockImplementation(async () => {
-    mocks.state.invocationId = "text-task";
-    mocks.state.working = true;
-  });
-  const view = await mounted();
-  await act(async () =>
-    useCompanionState.getState().submit!({
-      prompt: "How are you?",
-      conversationId: "conversation",
-    }),
-  );
-  expect(mocks.submit).toHaveBeenCalledWith(
-    "How are you?",
-    [],
-    undefined,
-    "workspace",
-    [],
-    { conversationId: "conversation", context: [] },
-    expect.objectContaining({ executionMode: "user" }),
-  );
-  expect(mocks.conversationOpen).not.toHaveBeenCalled();
-  expect(mocks.conversationCommit).not.toHaveBeenCalled();
-  expect(mocks.invoke.mock.calls.some(([name]) => name === "cursor_companion_capture")).toBe(true);
-  await act(async () => {
-    mocks.state.working = false;
-    mocks.state.conversations = [
-      {
-        id: "conversation",
-        messages: [{ role: "assistant", state: "completed", content: "Ready to help." }],
-      },
-    ];
-    mocks.subscribers.forEach((notify) => notify());
-  });
-  expect(useCompanionState.getState().presentation).toMatchObject({
-    phase: "idle",
-    error: undefined,
-  });
-  expect(mocks.state.error).toBeNull();
-  expect(mocks.state.conversations).toEqual([
-    expect.objectContaining({ messages: [expect.objectContaining({ content: "Ready to help." })] }),
-  ]);
-  expect(mocks.speech).not.toHaveBeenCalled();
-  expect(mocks.conversationOpen).not.toHaveBeenCalled();
-  view.unmount();
-});
-
-it.each(["user", "agent"] as const)(
-  "sends typed web work unchanged in user mode after a %s task",
-  async (previous) => {
-    mocks.state.executionMode = previous;
-    mocks.submit.mockImplementation(async () => {
-      mocks.state.invocationId = "browser-task";
-      mocks.state.working = true;
-    });
-    const view = await mounted();
-    await act(async () =>
-      useCompanionState.getState().submit!({
-        prompt: "can you open instagram on the browser, find a person called Stone",
-        conversationId: "conversation",
-      }),
-    );
-    // The screens go with the request; the task opens a browser only if it must act.
-    expect(mocks.submit).toHaveBeenCalledWith(
-      expect.stringContaining("open instagram"),
-      [],
-      undefined,
-      "workspace",
-      [],
-      { conversationId: "conversation", context: [] },
-      expect.objectContaining({ executionMode: "user" }),
-    );
-    expect(mocks.conversationOpen).not.toHaveBeenCalled();
-    expect(mocks.invoke.mock.calls.some(([name]) => name === "cursor_companion_capture")).toBe(
-      true,
-    );
-    view.unmount();
-  },
-);
-
-it("sends a typed screen question with the screens", async () => {
-  mocks.submit.mockImplementation(async () => {
-    mocks.state.invocationId = "screen-task";
-    mocks.state.working = true;
-  });
-  const view = await mounted();
-  await act(async () =>
-    useCompanionState.getState().submit!({
-      prompt: "Explain my screen",
-      conversationId: "conversation",
-    }),
-  );
-  expect(mocks.invoke).toHaveBeenCalledWith("cursor_companion_capture", expect.anything());
-  expect(mocks.submit).toHaveBeenCalledOnce();
-  expect(mocks.conversationOpen).not.toHaveBeenCalled();
-  view.unmount();
-});
-
-it("admits ordinary text even when the native companion fails to start", async () => {
-  const native = mocks.invoke.getMockImplementation()!;
-  mocks.invoke.mockImplementation((name, args) =>
-    name === "cursor_companion_configure"
-      ? Promise.reject(new Error("Native overlay failed"))
-      : native(name, args),
-  );
-  mocks.submit.mockImplementation(async () => {
-    mocks.state.invocationId = "text-task";
-    mocks.state.working = true;
-  });
-  const view = render(<CursorCompanionController accountId="account" />);
-  await waitFor(() =>
-    expect(useCompanionState.getState().presentation.error).toBe("Native overlay failed"),
-  );
-  await act(async () =>
-    useCompanionState.getState().submit!({
-      prompt: "Hello",
-      conversationId: "conversation",
-    }),
-  );
-  expect(mocks.submit).toHaveBeenCalledOnce();
-  expect(mocks.conversationOpen).not.toHaveBeenCalled();
-  view.unmount();
-});
-
-it("rejects a stale typed conversation before capturing or admitting work", async () => {
-  const view = await mounted();
-  await expect(
-    useCompanionState.getState().submit!({
-      prompt: "Hello",
-      conversationId: "previous-conversation",
-    }),
-  ).rejects.toThrow("conversation changed");
-  expect(mocks.submit).not.toHaveBeenCalled();
-  expect(mocks.conversationOpen).not.toHaveBeenCalled();
-  expect(mocks.invoke.mock.calls.some(([name]) => name === "cursor_companion_capture")).toBe(false);
-  view.unmount();
 });

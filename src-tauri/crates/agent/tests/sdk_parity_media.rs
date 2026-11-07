@@ -1,6 +1,6 @@
 //! Replays what the Vercel AI SDK's `embedMany`, `generateSpeech` and `transcribe` sent and gave back
 //! against these clients. Record new fixtures with
-//! `src-tauri/services/agent-runtime/test/sdk-parity.record.test.ts`.
+//! the recorder in the TypeScript runtime, in git history before it was removed.
 // Fixtures are read from this crate's own test folder.
 #![allow(clippy::disallowed_methods)]
 

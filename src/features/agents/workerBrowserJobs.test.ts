@@ -1,14 +1,10 @@
 import { expect, it } from "vitest";
-import { browserAgentExecutionRequest, jobSiteBlocks } from "./workerBrowserJobs";
+import { browserAgentExecutionRequest, jobPolicyCall } from "./workerBrowserJobs";
 
-it("passes the account's blocked sites from the job to the native request", () => {
-  expect(jobSiteBlocks({ siteBlocks: { sensitive: false, sites: ["example.com", 3] } })).toEqual({
-    sensitive: false,
-    sites: ["example.com"],
-  });
-  // Missing or malformed blocks leave the native default: sensitive sites blocked.
-  expect(jobSiteBlocks({})).toBeUndefined();
-  expect(jobSiteBlocks({ siteBlocks: { sites: "x" } })).toEqual({ sensitive: true, sites: [] });
+it("passes the tool call to native code, and no policy of its own", () => {
+  expect(jobPolicyCall({ policyCall: "call-1" })).toBe("call-1");
+  expect(jobPolicyCall({ policyCall: 3 })).toBeUndefined();
+  expect(jobPolicyCall(null)).toBeUndefined();
   const request = browserAgentExecutionRequest({
     id: "job-1",
     runId: "run",
@@ -21,10 +17,16 @@ it("passes the account's blocked sites from the job to the native request", () =
     config: {
       agentId: "agent",
       taskId: "task",
-      siteBlocks: { sensitive: true, sites: ["bank.example"] },
+      policyCall: "call-1",
+      // What an old job might still carry reaches nothing.
+      siteBlocks: { sensitive: false, sites: [] },
+      confirmKinds: [],
+      grantSet: { mode: "auto", grants: [] },
     },
   });
-  expect(request.siteBlocks).toEqual({ sensitive: true, sites: ["bank.example"] });
-  // The model's own arguments never carry blocks.
-  expect(request.input).not.toHaveProperty("siteBlocks");
+  expect(request.policyCall).toBe("call-1");
+  for (const field of ["siteBlocks", "confirmKinds", "grantSet"]) {
+    expect(request).not.toHaveProperty(field);
+    expect(request.input).not.toHaveProperty(field);
+  }
 });

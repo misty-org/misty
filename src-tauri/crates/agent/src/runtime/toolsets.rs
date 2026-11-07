@@ -1,4 +1,4 @@
-//! agent.tool (docs/agents/harness.md, Tool surface). A run starts in answer: everything that reads,
+//! agent.tool. A run starts in answer: everything that reads,
 //! searches, fetches pages or works with the person's own data. browse and desktop add the tools
 //! that act on a screen; agent.tool.load adds connected apps or sub-agents. The model sees only what
 //! its current agent.tool allows, so a quick answer never wades through browser and desktop tools.
@@ -72,7 +72,7 @@ impl Family {
         match self {
             Self::Integration => "integration: the person's connected apps (Gmail, Calendar, Slack, GitHub and others)",
             Self::Agent => "agent: sub-agents that work on independent parts of a large task at the same time",
-            Self::Misty => "misty: the person's own Misty notes, drawings, files, chats, Spaces, memory, saved workflows, bookmarks and weather",
+            Self::Misty => "misty: the person's own Misty notes, drawings, files, chats, Spaces, memory, saved workflows and bookmarks",
         }
     }
 }
@@ -84,11 +84,11 @@ enum Group {
 }
 
 // The person's Misty data and its social and workflow tools: about 50 of a run's 65 tools and
-// 9,000 tokens on every turn of a web task that never uses them (docs/agents/harness.md, Tool surface).
+// 9,000 tokens on every turn of a web task that never uses them.
 // They load up front when the request is about Misty's own things, and otherwise on request.
-const MISTY_DATA: [&str; 17] = [
+const MISTY_DATA: [&str; 16] = [
     "memory.workflow.", "memory.pref.", "drawing.", "note.", "thread.", "file.", "voice.", "message.", "space.",
-    "bookmark.", "item.", "weather.", "search.all", "agent.configure", "agent.request", "agent.directory", "agent.list",
+    "bookmark.", "item.", "search.all", "agent.configure", "agent.request", "agent.directory", "agent.list",
 ];
 
 static MISTY_REQUEST: LazyLock<Regex> = LazyLock::new(|| {
@@ -98,7 +98,7 @@ static MISTY_REQUEST: LazyLock<Regex> = LazyLock::new(|| {
     )
 });
 
-// A request that names an app people connect (docs/agents/harness.md, Tool surface): the
+// A request that names an app people connect: the
 // app tools load up front, so the first action comes a turn after the request, not three.
 static APP_REQUEST: LazyLock<Regex> = LazyLock::new(|| {
     js_regex(
@@ -110,7 +110,7 @@ static APP_REQUEST: LazyLock<Regex> = LazyLock::new(|| {
 /// Which agent.tool a catalog tool (Misty name) belongs to; `None` is answer.
 fn toolset_of(name: &str) -> Option<Group> {
     // Opening the agent's own tab is how a run reads what a fetch can't, so it stays in answer, and
-    // so does a program against those tabs (docs/agents/harness.md, browser_run). Checked
+    // so does a program against those tabs. Checked
     // before the browser prefix, which would put browser.run behind browse with the step tools.
     if name == "screen.open" || name == "browser.run" {
         return None;
@@ -228,7 +228,7 @@ pub(crate) fn agent_tools<'a>(catalog: &'a ModelCatalog, request: &str) -> Agent
     // Browser tools exist only once a browser is attached (a screen the agent
     // opened, or a tab the person shared), so such a run starts in browse, unless it
     // has browser_run: then pages are worked with programs, and the 17 single-step
-    // tools wait behind browse (docs/agents/harness.md, Tool surface).
+    // tools wait behind browse.
     let programs = has_tool("browser.run");
     let attached = catalog.tools.iter().any(|tool| {
         let name = tool.descriptor.name.as_str();
@@ -248,8 +248,7 @@ pub(crate) fn agent_tools<'a>(catalog: &'a ModelCatalog, request: &str) -> Agent
     if offered(Family::Integration) && APP_REQUEST.is_match(request) {
         preloaded.push(Family::Integration);
     }
-    // A run with its own tabs splits a broad task across sub-agents (docs/agents/harness.md,
-    // Sub-agents and the notebook); behind agent_tool_load they were never used, and 10-to-20-item tasks ran one by one.
+    // A run with its own tabs splits a broad task across sub-agents; behind agent_tool_load they were never used, and 10-to-20-item tasks ran one by one.
     if offered(Family::Agent) && has_tool("screen.open") {
         preloaded.push(Family::Agent);
     }

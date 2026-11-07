@@ -43,7 +43,7 @@ pub(super) fn container_status(workspace: &Workspace) -> Result<Vec<serde_json::
 }
 
 pub fn ports(workspace: &Workspace) -> Result<()> {
-    let values = environment::effective(workspace, Target::Dev)?;
+    let values = environment::effective(workspace)?;
     let rows = container_status(workspace).unwrap_or_default();
     for (key, fallback, service) in [
         ("MISTY_HOST_PORT", "8081", "misty-api"),

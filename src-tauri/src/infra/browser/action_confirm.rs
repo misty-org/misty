@@ -2,30 +2,38 @@
 //! page step waits here, natively, until the person allows or refuses it in
 //! the control island. In Auto, a send, delete or publish on a site the person
 //! remembered for this agent continues; payments always ask, since the device
-//! cannot check a payment's cap. The model's flags can't skip this, a malformed
-//! grant set counts as no grants, and nobody answering means no.
+//! cannot check a payment's cap. What's asked and what's remembered are read
+//! here from `misty.db`, so neither the model nor a window can skip this, and
+//! nobody answering means no.
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
     sync::{Mutex, OnceLock},
     time::Duration,
 };
-use tauri::{AppHandle, Emitter, Webview};
+use tauri::{AppHandle, Webview};
 use tokio::sync::oneshot;
 
 use super::BrowserAgentExecuteRequest;
+use crate::infra::agent_runtime::windows::emit_to_account;
 
 /// Kinds of page action the person can be asked about.
 pub(super) const KINDS: [&str; 4] = ["payment", "send", "delete", "publish"];
 
-/// Whether this kind of step waits for the person. A job without the
-/// account's choice asks about every kind.
+/// Whether this kind of step waits for the person. Settings can name fewer kinds, but an empty or
+/// missing list can't turn the stop off, and payments always stop.
 pub(super) fn asks(request: &BrowserAgentExecuteRequest, kind: &str) -> bool {
-    KINDS.contains(&kind)
-        && request
-            .confirm_kinds
-            .as_ref()
-            .is_none_or(|kinds| kinds.iter().any(|asked| asked == kind))
+    kinds_ask(request.policy.confirm_kinds.as_deref(), kind)
+}
+
+fn kinds_ask(chosen: Option<&[String]>, kind: &str) -> bool {
+    if !KINDS.contains(&kind) {
+        return false;
+    }
+    match chosen {
+        Some(kinds) if !kinds.is_empty() && kind != "payment" => kinds.iter().any(|asked| asked == kind),
+        _ => true,
+    }
 }
 
 /// The run's mode and the person's remembered page grants for this agent.
@@ -50,7 +58,7 @@ pub struct SiteGrant {
 /// Whether a remembered grant lets this step continue without asking: only in
 /// Auto, never for payments, and only for the exact origin the person named.
 pub(super) fn covered(request: &BrowserAgentExecuteRequest, origin: &str, kind: &str) -> bool {
-    granted(request.grant_set.as_ref(), origin, kind)
+    granted(request.policy.grant_set.as_ref(), origin, kind)
 }
 
 fn granted(set: Option<&GrantSet>, origin: &str, kind: &str) -> bool {
@@ -81,7 +89,7 @@ fn origin_of(url: &url::Url) -> String {
 /// computer stops here and says so.
 const WAIT: Duration = Duration::from_secs(180);
 
-pub(super) enum Answer {
+pub(crate) enum Answer {
     Allowed,
     Refused,
     Unanswered,
@@ -101,6 +109,33 @@ struct Question<'a> {
     rememberable: bool,
     agent_id: &'a str,
     task_id: &'a str,
+}
+
+/// A question that closes however its wait ends: a run that stops waiting withdraws it.
+struct Open<'a> {
+    id: &'a str,
+    app: &'a AppHandle,
+    account: &'a str,
+}
+
+impl Drop for Open<'_> {
+    fn drop(&mut self) {
+        if let Ok(mut map) = pending().lock() {
+            map.remove(self.id);
+        }
+        emit_to_account(
+            self.app,
+            self.account,
+            "misty://agent-action-confirm-closed",
+            serde_json::json!({ "id": self.id }),
+        );
+    }
+}
+
+/// Whether anyone is being asked right now. Agents acting on Misty's own window wait for that: its
+/// Allow button is the one control they must never reach.
+pub(crate) fn question_open() -> bool {
+    pending().lock().map_or(true, |map| !map.is_empty())
 }
 
 fn pending() -> &'static Mutex<HashMap<String, oneshot::Sender<bool>>> {
@@ -124,35 +159,112 @@ pub(super) async fn ask(
         .and_then(|url| url.host_str().map(str::to_owned))
         .unwrap_or_default();
     let origin = page_origin(view);
+    let account = request.policy.call.as_ref().map_or("", |call| call.facts.account.as_str());
+    wait_for_answer(
+        app,
+        account,
+        Question {
+            id: &id,
+            kind,
+            control,
+            reason,
+            site: &site,
+            origin: &origin,
+            rememberable: kind != "payment" && origin.starts_with("https://"),
+            agent_id: &request.agent_id,
+            task_id: request.input["__mistyTaskId"].as_str().unwrap_or(""),
+        },
+    )
+    .await
+}
+
+/// Shows the question in the account's windows and holds until it's answered or the wait ends. An
+/// empty account is a run nobody can place, which every window hears rather than stop for nothing.
+async fn wait_for_answer(app: &AppHandle, account: &str, question: Question<'_>) -> Answer {
+    let id = question.id.to_owned();
     let (send, receive) = oneshot::channel();
     if let Ok(mut map) = pending().lock() {
         map.insert(id.clone(), send);
     }
-    let question = Question {
-        id: &id,
-        kind,
-        control,
-        reason,
-        site: &site,
-        origin: &origin,
-        rememberable: kind != "payment" && origin.starts_with("https://"),
-        agent_id: &request.agent_id,
-        task_id: request.input["__mistyTaskId"].as_str().unwrap_or(""),
-    };
-    let _ = app.emit("misty://agent-action-confirm", question);
-    let answer = match tokio::time::timeout(WAIT, receive).await {
+    let _open = Open { id: &id, app, account };
+    emit_to_account(app, account, "misty://agent-action-confirm", question);
+    match tokio::time::timeout(WAIT, receive).await {
         Ok(Ok(true)) => Answer::Allowed,
         Ok(Ok(false)) => Answer::Refused,
         _ => Answer::Unanswered,
-    };
-    if let Ok(mut map) = pending().lock() {
-        map.remove(&id);
     }
-    let _ = app.emit(
-        "misty://agent-action-confirm-closed",
-        serde_json::json!({ "id": id }),
-    );
-    answer
+}
+
+/// A question about a tool, before anything reaches a window. Nothing here can be remembered.
+pub(crate) struct ToolAsk<'a> {
+    pub(crate) account: &'a str,
+    pub(crate) kind: &'a str,
+    pub(crate) control: &'a str,
+    pub(crate) reason: &'a str,
+    pub(crate) site: &'a str,
+    pub(crate) agent_id: &'a str,
+    pub(crate) task_id: &'a str,
+}
+
+pub(crate) async fn ask_tool(app: &AppHandle, ask: ToolAsk<'_>) -> Answer {
+    let id = uuid::Uuid::new_v4().to_string();
+    wait_for_answer(
+        app,
+        ask.account,
+        Question {
+            id: &id,
+            kind: ask.kind,
+            control: ask.control,
+            reason: ask.reason,
+            site: ask.site,
+            origin: "",
+            rememberable: false,
+            agent_id: ask.agent_id,
+            task_id: ask.task_id,
+        },
+    )
+    .await
+}
+
+/// Accounts that said no to taking over what was kept signed out, until Misty next opens.
+fn declined_adoption() -> &'static Mutex<std::collections::HashSet<String>> {
+    static DECLINED: OnceLock<Mutex<std::collections::HashSet<String>>> = OnceLock::new();
+    DECLINED.get_or_init(Default::default)
+}
+
+/// Asks this window's person before an account takes over what was kept signed out, which on a shared
+/// computer may be someone else's. Saying no leaves it where it is and doesn't ask again this launch.
+pub(crate) async fn ask_to_adopt(app: &AppHandle, window: &str, account: &str) -> bool {
+    if declined_adoption().lock().is_ok_and(|declined| declined.contains(account)) {
+        return false;
+    }
+    crate::infra::agent_runtime::windows::note_window(window, account);
+    let id = uuid::Uuid::new_v4().to_string();
+    let answer = wait_for_answer(
+        app,
+        account,
+        Question {
+            id: &id,
+            kind: "action",
+            control: "Move the chats and workflows kept signed out on this computer to this account. Schedules arrive turned off.",
+            reason: "",
+            site: "",
+            origin: "",
+            rememberable: false,
+            agent_id: "",
+            task_id: "",
+        },
+    )
+    .await;
+    match answer {
+        Answer::Allowed => true,
+        Answer::Refused | Answer::Unanswered => {
+            if let Ok(mut declined) = declined_adoption().lock() {
+                declined.insert(account.to_owned());
+            }
+            false
+        }
+    }
 }
 
 /// The person's answer from the control island. Only Misty's main window can
@@ -236,6 +348,20 @@ mod tests {
         assert_eq!(origin_of(&url), "https://mail.example.com:8443");
         let url = url::Url::parse("https://mail.example.com/inbox").unwrap();
         assert_eq!(origin_of(&url), "https://mail.example.com");
+    }
+
+    #[test]
+    fn an_empty_or_missing_list_cannot_turn_the_stop_off() {
+        for kind in KINDS {
+            assert!(kinds_ask(None, kind));
+            assert!(kinds_ask(Some(&[]), kind));
+        }
+        let only_send = ["send".to_owned()];
+        assert!(kinds_ask(Some(&only_send), "send"));
+        assert!(!kinds_ask(Some(&only_send), "delete"));
+        // Payments stop whatever the list says.
+        assert!(kinds_ask(Some(&only_send), "payment"));
+        assert!(!kinds_ask(None, "anything"));
     }
 
     #[test]

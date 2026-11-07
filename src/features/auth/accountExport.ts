@@ -1,4 +1,5 @@
 import { apiRequest } from "@/api/client/request";
+import { memoryApi } from "@/features/recall/api";
 import { ApiRequestError } from "@/api/client/errors";
 
 /** How the person proves it is them: their Misty password, or a fresh Google sign-in. */
@@ -64,6 +65,21 @@ export function saveAccountExport(data: unknown, now = new Date()): string {
   const url = URL.createObjectURL(
     new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }),
   );
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = name;
+  link.click();
+  URL.revokeObjectURL(url);
+  return name;
+}
+
+/**
+ * Memory lives on this computer, so the server's export can't hold it: it is saved as a second file.
+ * Answers with that file's name.
+ */
+export async function saveMemoryExport(now = new Date()): Promise<string> {
+  const name = `misty-memory-${now.toISOString().slice(0, 10)}.zip`;
+  const url = URL.createObjectURL(await memoryApi.exportZip());
   const link = document.createElement("a");
   link.href = url;
   link.download = name;

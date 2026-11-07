@@ -1,34 +1,13 @@
 import type { ReactNode } from "react";
-import { Bot, MessagesSquare } from "lucide-react";
-import { showAgentsPanel, useMistyPanelStore, type MistyPanelView } from "@/features/agents";
+import { Bot } from "lucide-react";
+import { showAgentsPanel, useMistyPanelStore } from "@/features/agents";
 import { appIcon, IconButton } from "@/shared/ui";
-
-/** Whether the side panel is open on `view`, for the buttons' pressed state. */
-function usePanelShows(view: MistyPanelView) {
-  return useMistyPanelStore((s) => (view === "agents" ? s.open : s.chatOpen));
-}
-
-/** The toolbar's Chat button: your Space's chat in a side panel (below the agent panel when
- * that is open); again closes it. */
-export function BrowserMistyButton() {
-  const shown = usePanelShows("chat");
-  return (
-    <IconButton
-      label="Chat"
-      aria-pressed={shown}
-      onClick={() => useMistyPanelStore.getState().show("chat")}
-    >
-      {/* Fills its box, so toolbars draw it at the round glyphs' size. */}
-      <MessagesSquare aria-hidden className="size-4" />
-    </IconButton>
-  );
-}
 
 const AgentsIcon = appIcon("agents") ?? Bot;
 
-/** The toolbar's Agents button, beside Chat: an agent conversation in the side panel. */
+/** The toolbar's Agents button, an agent conversation in the side panel. */
 export function BrowserAgentsButton() {
-  const shown = usePanelShows("agents");
+  const shown = useMistyPanelStore((s) => s.open);
   return (
     <IconButton label="Agents" aria-pressed={shown} onClick={showAgentsPanel}>
       {/* Fills its box like the round glyphs, so the toolbar draws it a size down. */}

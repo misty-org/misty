@@ -11,7 +11,7 @@ use crate::{
         js_json::JsValue,
         ledger::{ledger_input_schema, parse_ledger_input, record_rows, with_ledger, RowState, LEDGER_INSTRUCTIONS, LEDGER_TOOL},
         model_family::model_family_note,
-        model_tools::{catalog_tools, visual_tool_output, McpRemoteTool, ModelCatalog},
+        model_tools::{catalog_tools, visual_tool_output, CatalogTool, ModelCatalog},
         research_budget::ResearchTools,
         runtime_errors::RuntimeError,
         serial_tool_lifecycle::SerialToolLifecycle,
@@ -59,7 +59,7 @@ fn definition(name: &str, description: &str, input_schema: RawJson) -> ToolDefin
     ToolDefinition { kind: "function".to_owned(), name: name.to_owned(), description: Some(description.to_owned()), input_schema, strict: None }
 }
 
-pub(crate) fn assemble_tools(shared: &Arc<RunShared>, order: &SerialToolLifecycle, remote: Vec<McpRemoteTool>) -> RunTools {
+pub(crate) fn assemble_tools(shared: &Arc<RunShared>, order: &SerialToolLifecycle, remote: Vec<CatalogTool>) -> RunTools {
     let context = &shared.context;
     // Misty's catalog plus the tools this device runs itself (web.fetch, and web.search on its own search key).
     let descriptors = with_device_tools(remote, context.device_search);

@@ -1,4 +1,4 @@
-//! Reads one untrusted page and exits (docs/plans/app-permissions.md, `permission-page-reader`). The
+//! Reads one untrusted page and exits. The
 //! page comes in on standard input and the answer goes out on standard output, under an OS profile
 //! with no network and no files, so a bug a page finds in the parser has nothing to reach. A failure
 //! is a non-zero exit, and the app fails that fetch.

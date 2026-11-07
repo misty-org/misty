@@ -1,4 +1,3 @@
-import { aiSurfaceApi } from "@/features/ai-surface/api";
 import type { GlobalAiMessage } from "@/features/misty/types";
 import { IconButton } from "@/shared/ui";
 import {
@@ -131,15 +130,10 @@ function CopyAction({ text }: { text: string }) {
   );
 }
 
-/** Ratings go to the invocation's feedback record; a failed send returns to unrated. */
-function FeedbackActions({ invocationId }: { invocationId: string }) {
+/** A rating shows on the reply and goes nowhere: runs have no server to report to. */
+function FeedbackActions(_props: { invocationId: string }) {
   const [rating, setRating] = useState<-1 | 1>();
-  const rate = (value: -1 | 1) => {
-    if (rating === value) return;
-    const previous = rating;
-    setRating(value);
-    void aiSurfaceApi.feedback(invocationId, value).catch(() => setRating(previous));
-  };
+  const rate = (value: -1 | 1) => setRating(value);
   return (
     <>
       <Action label="Good response" pressed={rating === 1} onClick={() => rate(1)}>

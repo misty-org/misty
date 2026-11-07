@@ -58,6 +58,18 @@ pub(super) fn draw_agent_ring(webview: &Webview, active: bool) {
 
 #[tauri::command]
 pub fn browser_agent_grant_register(
+    caller: Webview,
+    app: AppHandle,
+    state: State<'_, BrowserSessionState>,
+    request: BrowserAgentGrantRequest,
+) -> Result<(), String> {
+    if !crate::infra::profile_windows::is_person_window(caller.label()) {
+        return Err("Only a profile's window can run agents.".to_owned());
+    }
+    register_agent_grant(app, state, request)
+}
+
+pub(crate) fn register_agent_grant(
     app: AppHandle,
     state: State<'_, BrowserSessionState>,
     request: BrowserAgentGrantRequest,

@@ -11,6 +11,20 @@ fn keys(provider: &str) -> Option<String> {
 }
 
 #[test]
+fn the_composio_key_never_goes_in_the_runtimes_document() {
+    let settings = json!({
+        "agent_model": "anthropic/claude-sonnet-5-5",
+        "search_provider": "composio",
+    });
+    let with_composio = |provider: &str| match provider {
+        super::header::COMPOSIO_KEY => Some("ak_composio_test".to_owned()),
+        other => keys(other),
+    };
+    let decoded = document(&settings, &with_composio).unwrap();
+    assert!(!decoded.to_string().contains("ak_composio_test"));
+}
+
+#[test]
 fn carries_each_role_with_only_the_providers_it_names() {
     let settings = json!({
         "agent_model": "anthropic/claude-sonnet-5-5",
@@ -147,4 +161,20 @@ fn carries_the_web_search_key_of_the_chosen_provider() {
     let unknown =
         json!({ "agent_model": "anthropic/claude-sonnet-5-5", "search_provider": "bing" });
     assert!(document(&unknown, &keys).unwrap().get("search").is_none());
+}
+
+#[test]
+fn a_voice_id_reaches_the_runtime_only_in_a_safe_form() {
+    let key = |_: &str| Some("key".to_owned());
+    let settings = |voice: &str| {
+        serde_json::json!({ "agent_model": "elevenlabs/x", "speech_voice": voice })
+    };
+    let decoded = document(&settings("AbC-12_x"), &key).unwrap();
+    assert_eq!(decoded["speechVoice"], "AbC-12_x");
+    for hostile in ["../../v1/user", "a/b", "a?b=c", "a b", &"x".repeat(65)] {
+        let decoded = document(&settings(hostile), &key).unwrap();
+        assert!(decoded.get("speechVoice").is_none(), "{hostile}");
+    }
+    let decoded = document(&serde_json::json!({ "agent_model": "elevenlabs/x" }), &key).unwrap();
+    assert!(decoded.get("speechVoice").is_none());
 }

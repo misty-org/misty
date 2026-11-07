@@ -194,7 +194,7 @@ fn webview2_frames_read_and_type_across_origins() {
             Ok(())
         })
         .build(tauri::generate_context!(
-            "examples/cookie-store-probe/tauri.conf.json"
+            "tests/frames-probe/tauri.conf.json"
         ))
         .expect("build the frames probe")
         .run_return(|_, _| {});

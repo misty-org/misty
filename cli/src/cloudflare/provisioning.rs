@@ -1,8 +1,5 @@
 use super::{hostname, id, request};
-use crate::{
-    environment::{self, Target},
-    workspace::Workspace,
-};
+use crate::{environment, workspace::Workspace};
 use anyhow::{bail, Context, Result};
 use serde_json::{json, Value};
 use std::collections::BTreeMap;
@@ -27,9 +24,9 @@ pub struct Options {
 }
 
 pub fn setup(workspace: &Workspace, options: Options) -> Result<()> {
-    environment::init(workspace, Target::Dev)?;
+    environment::init(workspace)?;
     crate::server::initialize_development_secrets(workspace)?;
-    let values = environment::read(workspace, Target::Dev)?;
+    let values = environment::read(workspace)?;
     let mut credentials = values.clone();
     // Only credentials inherit the CLI/shell environment. Routing stays target-scoped.
     for key in [
@@ -49,7 +46,7 @@ pub fn setup(workspace: &Workspace, options: Options) -> Result<()> {
             .filter(|v| !v.is_empty())
             .cloned()
             .with_context(|| {
-                format!("{key} is missing; use misty env set dev {key} (value from stdin)")
+                format!("{key} is missing; use misty env set {key} (value from stdin)")
             })
     };
     let token = required("CLOUDFLARE_API_TOKEN")?;
@@ -83,7 +80,6 @@ fn provision(
     zone: String,
     mut request: impl FnMut(&str, &str, Option<Value>) -> Result<Value>,
 ) -> Result<()> {
-    let target = Target::Dev;
     let host = selected_hostname(&options, &values)?;
     let service = service();
     id(&account)?;
@@ -184,7 +180,7 @@ fn provision(
         let worker_host = format!("{worker_name}.{subdomain}.workers.dev");
         (worker_name, worker_host)
     };
-    println!("Cloudflare {} plan: account {account}, zone {zone_name}\nTunnel: {name}\nRoute: https://{host} → {service}\nDNS: proxied CNAME to the tunnel", target.label());
+    println!("Cloudflare server plan: account {account}, zone {zone_name}\nTunnel: {name}\nRoute: https://{host} → {service}\nDNS: proxied CNAME to the tunnel");
     println!("Worker: deploy separately with misty server deploy");
     if !options.apply {
         println!(
@@ -243,7 +239,7 @@ fn provision(
         ("MISTY_DEV_API_TUNNEL_HOSTNAME", host),
     ];
     for (key, val) in settings {
-        environment::set(workspace, target, key, &val)?;
+        environment::set(workspace, key, &val)?;
     }
     println!("Cloudflare configured. Next: misty server up; misty server deploy; misty doctor cloudflare");
     Ok(())

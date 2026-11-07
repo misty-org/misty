@@ -54,7 +54,6 @@ export function WorkflowScheduleDialog({
   const [skipDates, setSkipDates] = useState<string[]>(existing?.skip_dates ?? []);
   const [inputs, setInputs] = useState<AgentMethodInputs>(existing?.inputs ?? {});
   const [enabled, setEnabled] = useState(existing?.enabled ?? true);
-  const [deviceId, setDeviceId] = useState(existing?.device_id ?? "");
   const [profile, setProfile] = useState(existing?.profile ?? currentProfile().id);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -79,10 +78,6 @@ export function WorkflowScheduleDialog({
       setError(`Answer “${missing.label}” so scheduled runs have it.`);
       return;
     }
-    if (!deviceId) {
-      setError("Schedules run on the computer they’re made on. Make this one in the Misty app.");
-      return;
-    }
     void run(async () => {
       const { schedule } = await agentMethodsApi.saveSchedule(method.id, {
         timezone,
@@ -90,7 +85,6 @@ export function WorkflowScheduleDialog({
         skip_dates: skipDates.filter(Boolean),
         inputs,
         enabled,
-        device_id: deviceId,
         profile,
       });
       onSaved(schedule);
@@ -180,7 +174,7 @@ export function WorkflowScheduleDialog({
             )}
             <ScheduleProfileField value={profile} onChange={setProfile} />
             <ScheduleFolderField workflowId={method.id} />
-            <ScheduleComputerField value={deviceId} onChange={setDeviceId} />
+            <ScheduleComputerField />
             {existing?.last_error?.startsWith("This schedule uses a profile") ? (
               <p className="agent-method-hint" role="status">
                 {existing.last_error}

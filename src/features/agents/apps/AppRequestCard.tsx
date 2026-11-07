@@ -126,7 +126,11 @@ export function AppRequestCard({
           sub={
             (pending && current.kind === "connect" && opened
               ? "Finish signing in in your browser. Misty continues when you’re done."
-              : current.summary) || undefined
+              : current.summary && (
+                  <span className="agent-question-details" tabIndex={0}>
+                    {current.summary}
+                  </span>
+                )) || undefined
           }
         >
           {logo}

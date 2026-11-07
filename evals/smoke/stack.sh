@@ -6,8 +6,9 @@
 #   evals/smoke/stack.sh down <scratch folder>   Removes the container, the scratch folder and the
 #                                                smoke profile's WebKit data
 #
-# It reads ~/.misty/server/dev for the server's keys and overrides the database, port and addresses.
-# Object storage stays unset, so a development server keeps objects in memory.
+# It reads ~/.misty/.env/server for the server's keys and overrides the database, port and addresses.
+# Object storage stays unset, so a development server keeps objects in memory. Its address is the
+# request log (server-log.mjs), which writes <scratch folder>/server-requests.jsonl.
 set -euo pipefail
 
 command="${1:?up or down}"
@@ -17,7 +18,9 @@ server_repo="$(cd "${MISTY_SMOKE_SERVER_REPO:-$(dirname "${BASH_SOURCE[0]}")/../
 container="misty-smoke-postgres"
 db_port="${MISTY_SMOKE_DB_PORT:-55439}"
 api_port="${MISTY_SMOKE_API_PORT:-18099}"
-env_home="$HOME/.misty/server/dev"
+server_port="$((api_port + 1))"
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+env_home="$HOME/.misty/.env/server"
 
 case "$command" in
   down)
@@ -57,7 +60,7 @@ admin_sql "GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO smoke_app"
 go build -o "$scratch/bin/misty-server" ./cmd/misty-server
 
 set -a
-for file in "$env_home/runtime.env" "$env_home/observability.env" "$env_home"/integrations/{ai,cloudflare,composio,google}.env "$env_home"/crypto/*.env; do
+for file in "$env_home/runtime.env" "$env_home/observability.env" "$env_home"/{cloudflare,google}.env "$env_home"/crypto/*.env; do
   # shellcheck disable=SC1090
   [ -f "$file" ] && source "$file"
 done
@@ -65,11 +68,22 @@ set +a
 unset R2_ENDPOINT R2_BUCKET R2_ACCESS_KEY R2_SECRET_KEY MISTY_HOST_PORT \
   CLOUDFLARE_API_TOKEN CLOUDFLARE_TUNNEL_TOKEN CLOUDFLARE_ACCOUNT_ID CLOUDFLARE_ZONE_ID MISTY_DEV_API_TUNNEL_HOSTNAME
 address="http://127.0.0.1:$api_port"
-export MISTY_ENVIRONMENT=development PORT="$api_port" MISTY_DEVICE_JOBS_ENABLED=true
+export MISTY_ENVIRONMENT=development PORT="$api_port"
 export DB_HOST=127.0.0.1 DB_PORT="$db_port" DB_USER=smoke_app DB_PASSWORD=smoke_app DB_NAME=misty_smoke DB_SSLMODE=disable
 export DB_MIGRATION_USER='' DB_MIGRATION_PASSWORD=''
 export MISTY_PUBLIC_API_URL="$address/v1" MISTY_DEV_API_ORIGIN="$address" MISTY_PUBLIC_URL="$address" MISTY_WEBSITE_URL="$address"
 export MISTY_ALLOWED_ORIGINS="tauri://localhost,http://tauri.localhost,https://tauri.localhost,http://localhost:5199,http://127.0.0.1:5199"
-export MISTY_COMPOSIO_API_KEY='' GOOGLE_CLIENT_ID='' GOOGLE_CLIENT_SECRET=''
+export GOOGLE_CLIENT_ID='' GOOGLE_CLIENT_SECRET=''
+export PORT="$server_port"
+# The app talks to the request log, which passes everything on to the server behind it.
+"$scratch/bin/misty-server" &
+server=$!
+until (exec 3<>"/dev/tcp/127.0.0.1/$server_port") 2>/dev/null; do sleep 0.2; done
+node "$here/server-log.mjs" "$api_port" "$server_port" "$scratch/server-requests.jsonl" &
+recorder=$!
+stop() { kill "$server" "$recorder" 2>/dev/null || true; }
+trap stop EXIT
+trap 'stop; exit 0' INT TERM
+until (exec 3<>"/dev/tcp/127.0.0.1/$api_port") 2>/dev/null; do sleep 0.2; done
 echo "Throwaway server on $address"
-exec "$scratch/bin/misty-server"
+wait

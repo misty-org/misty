@@ -3,6 +3,9 @@ pub const BOOKMARKS: &str = "bookmarks";
 pub const TAB_GROUPS: &str = "tab_groups";
 /// Browsing history, in hourly batches written by the computer that browsed.
 pub const HISTORY: &str = "history";
+/// The account's Memory: moments, facts and summaries, whichever Space they belong to. Native-only,
+/// and never projected to a renderer as records.
+pub const MEMORY: &str = "memory";
 /// Extension-owned declared sync settings. Native-only, never projected to a renderer.
 pub const EXTENSION_SYNC: &str = "extension_sync";
 /// Saved website sign-ins. Native-only, never projected to a renderer; the

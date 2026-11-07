@@ -61,7 +61,7 @@ pub fn app(workspace: &Workspace) -> Result<()> {
         .args([
             "fmt",
             "--manifest-path",
-            "kiri/Cargo.toml",
+            "src-tauri/crates/kiri/Cargo.toml",
             "--all",
             "--",
             "--check",
@@ -73,7 +73,7 @@ pub fn app(workspace: &Workspace) -> Result<()> {
             "--locked",
             "--no-default-features",
             "--manifest-path",
-            "kiri/Cargo.toml",
+            "src-tauri/crates/kiri/Cargo.toml",
         ])
         .run(&workspace.misty)?;
     CommandSpec::new(npm())
@@ -128,13 +128,6 @@ pub fn server(workspace: &Workspace) -> Result<()> {
     CommandSpec::new(npm()).args(["ci"]).run(&worker)?;
     for script in ["typecheck", "test", "test:runtime", "audit:production"] {
         CommandSpec::new(npm()).args(["run", script]).run(&worker)?;
-    }
-    let runtime = workspace.misty.join("src-tauri/services/agent-runtime");
-    CommandSpec::new(npm()).args(["ci"]).run(&runtime)?;
-    for script in ["typecheck", "test", "build"] {
-        CommandSpec::new(npm())
-            .args(["run", script])
-            .run(&runtime)?;
     }
     Ok(())
 }

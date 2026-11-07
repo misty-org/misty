@@ -17,7 +17,9 @@ it("resolves current and fellow members without guessing missing or agent identi
   expect(result.current("sam")).toBe("Sam");
   expect(result.current("removed")).toBe("Unknown member");
   expect(result.current()).toBe("Unknown");
-  expect(result.current("me", "agent")).toBe("Agent");
+  // An agent's name is free text, so its owner always shows beside it.
+  expect(result.current("me", "agent")).toBe("Agent · Alex");
+  expect(result.current(undefined, "agent")).toBe("Agent");
   rerender({ spaceId: "other" });
   expect(result.current("sam")).toBe("Unknown member");
 });

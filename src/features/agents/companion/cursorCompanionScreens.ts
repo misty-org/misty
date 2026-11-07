@@ -9,13 +9,11 @@ import type { DisplayCapture, Presentation, PresentedFocus } from "./protocol";
 
 /** The companion as this account last left it on this device; defaults when nothing is saved. */
 export function savedPresentation(accountId: string): Presentation {
-  let show = true,
-    ask = false,
+  let ask = false,
     teach = false,
     size = companionSizeDefault;
   try {
     const saved = JSON.parse(localStorage.getItem(`misty.cursor-companion:${accountId}`) || "{}");
-    show = saved.visible !== false;
     ask = saved.ask === true;
     teach = saved.teach === true;
     size = normalizeCompanionSize(saved.size);
@@ -25,8 +23,7 @@ export function savedPresentation(accountId: string): Presentation {
   return {
     generation: 0,
     phase: "idle",
-    visible: show,
-    showCompanion: show,
+    visible: false,
     mode: "auto",
     ask,
     teach,

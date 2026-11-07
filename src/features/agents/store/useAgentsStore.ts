@@ -40,7 +40,10 @@ export async function forgetFolder(scopeId: string): Promise<void> {
 export async function republishDeviceFolders(): Promise<void> {
   const { deviceAccount } = await import("./useAgentDeviceStore");
   const { devicesNative } = await import("@/native/devices");
-  await devicesNative.publishFolders(await deviceAccount()).catch(() => {});
+  // Signed out or offline there's nobody to tell, and the folder is shared here all the same.
+  await deviceAccount()
+    .then((account) => devicesNative.publishFolders(account))
+    .catch(() => {});
 }
 
 export async function agentsPrepareScopedDocument(

@@ -1,4 +1,4 @@
-//! What this session keeps about itself (docs/sync/devices.md): its id on the
+//! What this session keeps about itself: its id on the
 //! server and its own signed policy.
 use std::{
     path::PathBuf,
@@ -12,13 +12,12 @@ use sha2::{Digest, Sha256};
 
 use crate::{
     error::{ApiError, ApiResult},
-    infra::devices::records::{DevicePolicy, RunGrant, SignedRecord},
+    infra::devices::records::{DevicePolicy, SignedRecord},
 };
 
 mod policy;
 pub use policy::{
     effective_policy, forget_after_removal, own_policy, self_admitted, store_own_policy,
-    verify_job_grant,
 };
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -49,13 +48,6 @@ fn state() -> &'static Mutex<Option<TrustState>> {
 /// The folder that holds `misty.db`, where trust records live; set once at startup.
 pub fn set_storage_root(path: PathBuf) {
     let _ = ROOT.set(path);
-}
-
-fn now() -> i64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|elapsed| elapsed.as_secs() as i64)
-        .unwrap_or_default()
 }
 
 fn lock_error<T>(_: std::sync::PoisonError<T>) -> ApiError {
@@ -152,10 +144,6 @@ pub fn set_server_device_id(device_id: &str) -> ApiResult<()> {
         }
         Ok(())
     })
-}
-
-pub fn account_id() -> Option<String> {
-    Some(state().lock().ok()?.as_ref()?.file.account_id.clone())
 }
 
 pub fn server_device_id() -> Option<String> {

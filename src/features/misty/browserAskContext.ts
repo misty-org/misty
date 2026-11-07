@@ -1,9 +1,9 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { useUserStore } from "@/features/auth/core";
+import { agentAccountId } from "@/features/agents/agentAccount";
 import { isApiSessionTransitioning, readApiSessionGeneration } from "@/api/client/session";
 import type { AiInvocationDeviceContext, AiSelectionSnapshot } from "@/features/ai-surface";
-import { ensureServerAgentDevice, agentsDeviceSnapshot } from "@/features/agents";
+import { ensureAgentDevice, agentsDeviceSnapshot } from "@/features/agents";
 import { useMistyStore } from "./useMistyStore";
 import type { GlobalAiContextRef } from "./types";
 import { browserTabAgentCapabilities } from "@/features/agents/browserTabCapabilities";
@@ -72,14 +72,14 @@ export async function openBrowserAsk(snapshot: BrowserAskSnapshot): Promise<void
   const state = useMistyStore.getState();
   if (state.working)
     throw new Error("Wait for the current Ask request or cancel it before starting another.");
-  const accountId = useUserStore.getState().me?.id;
+  const accountId = agentAccountId();
   if (!accountId || state.accountId !== accountId || isApiSessionTransitioning())
     throw new Error("Sign in to the current Misty account before using Ask.");
   const generation = readApiSessionGeneration();
   const stillCurrent = () =>
     !isApiSessionTransitioning() &&
     readApiSessionGeneration() === generation &&
-    useUserStore.getState().me?.id === accountId &&
+    agentAccountId() === accountId &&
     useMistyStore.getState().accountId === accountId;
   const source = browserAskSource(snapshot);
   source.metadata = { ...source.metadata, app_id: "browser" };
@@ -91,7 +91,7 @@ export async function openBrowserAsk(snapshot: BrowserAskSnapshot): Promise<void
     if (!local.device || local.device.status === "revoked")
       notice = "Sign in to let an agent interact with the page.";
     else {
-      const device = await ensureServerAgentDevice(local.device);
+      const device = await ensureAgentDevice(local.device);
       if (!stillCurrent()) return;
       deviceContexts.push({
         deviceId: device.id,

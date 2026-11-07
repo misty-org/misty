@@ -1,4 +1,4 @@
-// Decision rules are tested in Kiri (kiri/src/permissions.rs); these cover
+// Decision rules are tested in Kiri (crates/kiri/src/permissions.rs); these cover
 // Misty's stores and profile keys.
 use super::store::{read_store, sites_for_scope, update_scope};
 use super::*;
@@ -85,8 +85,8 @@ fn private_session_permissions_end_with_the_session() {
 
 #[test]
 fn profile_keys_match_webkit_store_identifiers() {
-    let key = profile_key(Some(&"ab".repeat(32))).unwrap();
+    let key = store_key(Some(&"ab".repeat(32))).unwrap();
     assert_eq!(key, key.to_uppercase());
     assert_eq!(key.len(), 36);
-    assert!(profile_key(Some("not-a-profile")).is_err());
+    assert!(store_key(Some("not-a-profile")).is_err());
 }

@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import {
   BrowserOmnibox,
+  SidebarToolsPinMenu,
   browserToolbarStyles,
   useBrowserToolbarSlot,
 } from "@/features/browser/workspace";
@@ -75,6 +76,7 @@ function SidebarTrailingFallback() {
             "New private window",
             () => void invokeShortcutCommand("workspace.new_incognito_window"),
           )}
+          <SidebarToolsPinMenu />
           <DropdownMenuSeparator />
           {row(<History />, "History", () => open("history"))}
           {row(<Download />, "Downloads", () => open("downloads"))}

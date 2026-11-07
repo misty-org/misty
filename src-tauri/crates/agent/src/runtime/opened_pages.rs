@@ -1,4 +1,4 @@
-//! Pushed page state (docs/agents/harness.md, Context). After screen_open the agent spent a whole
+//! Pushed page state. After screen_open the agent spent a whole
 //! turn asking for the new page with browser_snapshot: 39 of 157 calls in one run. browser-use shows
 //! the page with every step instead. So after a turn that opened tabs, the runtime takes the newest
 //! ones' snapshots itself and adds them to the transcript, as if the agent had asked, and the next

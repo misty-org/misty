@@ -1,7 +1,6 @@
-import { cachedRequest } from "@/api/cache/cached-request";
-import { apiRequest } from "@/api/client";
+import { localAppsApi } from "./localApi";
 
-/** An app account connected once to the Misty account; agents use it in every Space. */
+/** An app account connected once; agents use it in every Space. */
 export interface ConnectedApp {
   id: string;
   app: string;
@@ -31,7 +30,7 @@ export interface AppRequest {
   summary: string;
   state: "pending" | "connected" | "approved" | "used" | "declined" | "expired";
   expiresAt: string;
-  /** "Accept and remember" is offered; the label names the exact scope, written by the server. */
+  /** "Accept and remember" is offered; the label names the exact scope. */
   rememberable?: boolean;
   rememberLabel?: string;
   /** The run's Ask or Auto when it paused. */
@@ -43,37 +42,18 @@ export interface AppRequest {
 /** The answer to an approval card: this time only, this time and from now on, or no. */
 export type AppRequestDecision = "continue" | "remember" | "deny";
 
-const requestPath = (id: string) => `/me/app-requests/${encodeURIComponent(id)}`;
-
+/** Connected apps run on this computer's Composio key. */
 export const appsApi = {
-  list: (onCached?: (value: { available: boolean; apps: ConnectedApp[] }) => void) =>
-    cachedRequest<{ available: boolean; apps: ConnectedApp[] }>("/integrations/apps", {
-      onCached,
-    }),
+  list: (_onCached?: (value: { available: boolean; apps: ConnectedApp[] }) => void) =>
+    localAppsApi.list(),
   catalog: (
     search: string,
     cursor = "",
-    onCached?: (value: { apps: CatalogApp[]; next_cursor: string }) => void,
-  ) =>
-    cachedRequest<{ apps: CatalogApp[]; next_cursor: string }>(
-      `/integrations/apps/catalog?${new URLSearchParams({ search, cursor })}`,
-      { onCached },
-    ),
-  connect: (app: string) =>
-    apiRequest<{ url: string }>("/integrations/apps/connect", {
-      method: "POST",
-      body: JSON.stringify({ app }),
-    }),
-  disconnect: (id: string) =>
-    apiRequest<void>(`/integrations/apps/connections/${encodeURIComponent(id)}`, {
-      method: "DELETE",
-    }),
-  request: (id: string) => apiRequest<{ request: AppRequest }>(requestPath(id)),
-  requestLink: (id: string) =>
-    apiRequest<{ url: string }>(`${requestPath(id)}/link`, { method: "POST" }),
-  decide: (id: string, decision: AppRequestDecision) =>
-    apiRequest<{ request: AppRequest }>(requestPath(id), {
-      method: "POST",
-      body: JSON.stringify({ decision }),
-    }),
+    _onCached?: (value: { apps: CatalogApp[]; next_cursor: string }) => void,
+  ) => localAppsApi.catalog(search, cursor),
+  connect: (app: string) => localAppsApi.connect(app),
+  disconnect: (id: string) => localAppsApi.disconnect(id),
+  request: (id: string) => localAppsApi.request(id),
+  requestLink: (id: string) => localAppsApi.requestLink(id),
+  decide: (id: string, decision: AppRequestDecision) => localAppsApi.decide(id, decision),
 };

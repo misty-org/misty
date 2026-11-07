@@ -25,8 +25,16 @@ export function startCursorCompanion(accountId: string) {
   const stopPreferences = useDevicePreferences.subscribe(s.applyPreferences);
   s.applyPreferences();
   const unsubscribe = useMistyStore.subscribe(() => {
-    if (s.conversationScope && !s.creatingConversation && !s.originIsCurrent(s.conversationScope))
+    if (
+      s.conversationScope &&
+      !s.creatingConversation &&
+      !s.originIsCurrent(s.conversationScope)
+    ) {
       s.closeConversationVoice();
+      // No voice session will ever finish this turn. A task it started still lands in its chat.
+      if (!s.owned && s.state.phase !== "idle" && s.state.phase !== "listening")
+        s.change({ phase: "idle" });
+    }
     s.settle();
     voice.settleDelegatedTask();
   });

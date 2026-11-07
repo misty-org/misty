@@ -102,6 +102,7 @@ pub(crate) mod kiri_probe;
 pub mod action_confirm;
 mod interact;
 mod page_agent;
+pub(crate) use page_agent::{page_controls, scope_site, SiteBlocks};
 use interact::interact_browser;
 pub(crate) mod page_tools;
 
@@ -141,8 +142,8 @@ mod agent_support;
 pub(crate) use agent_support::*;
 mod menu_commands;
 pub use menu_commands::*;
-mod profile_data;
-pub(super) use profile_data::*;
+mod store_data;
+pub(super) use store_data::*;
 mod session;
 pub use session::*;
 
@@ -173,7 +174,7 @@ const MAX_SNAPSHOT_CHARS: usize = 256 * 1024;
 const MAX_INTERACTIVE_ELEMENTS: usize = 500;
 const MAX_DOWNLOAD_HISTORY: usize = 100;
 const AGENT_DOWNLOAD_WINDOW_SECONDS: i64 = 30;
-use super::browser_profile::data_store_identifier as browser_profile_identifier;
+use super::profile_store::data_store_identifier;
 #[derive(Clone, Default)]
 struct RendererState {
     native: usize,
@@ -286,5 +287,5 @@ fn apply_browser_pointer_tracking(webview: &Webview, enabled: bool) -> Result<()
 #[allow(clippy::disallowed_methods, clippy::disallowed_types)]
 mod tests;
 
-pub(crate) mod profile_cleanup;
+pub(crate) mod store_cleanup;
 pub(crate) mod retired_profiles;

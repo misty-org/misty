@@ -1,7 +1,7 @@
 import type { AiInvocationDeviceContext } from "@/features/ai-surface/types";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { adoptFolderChanges, agentsDeviceSnapshot } from "./store/useAgentsStore";
-import { ensureServerAgentDevice } from "./store/useAgentDeviceStore";
+import { ensureAgentDevice } from "./store/useAgentDeviceStore";
 import { useConversationFolder } from "./store/useConversationFolder";
 
 /** The Misty browser's grant reference on this computer. */
@@ -9,16 +9,16 @@ const workspaceGrantRef = (deviceId: string) => `workspace:${deviceId}`;
 
 const folderCapabilities = ["folder.list", "folder.read", "folder.send"];
 /** The agent may open its own browser session on this computer: a hidden tab of its
- * own that joins the run (docs/agents/evals/odysseys.md). */
+ * own that joins the run. */
 const workspaceCapabilities = [
   "browser.tab.list",
   "browser.tab.open",
   "bookmark.list",
   "bookmark.add",
   "browser.session",
-  // Programs against the agent's own tabs (docs/agents/harness.md, browser_run).
+  // Programs against the agent's own tabs.
   "browser.run",
-  // Commands in the chat's private workspace (docs/plans/app-permissions.md).
+  // Commands in the chat's private workspace.
   "shell.run",
 ];
 
@@ -35,7 +35,7 @@ export async function desktopDeviceGrants(
   if (!hasTauriInternals()) return [];
   const local = await agentsDeviceSnapshot().catch(() => null);
   if (!local?.device || local.device.status === "revoked") return [];
-  const device = await ensureServerAgentDevice(local.device).catch(() => null);
+  const device = await ensureAgentDevice(local.device).catch(() => null);
   if (!device) return [];
   // Only the chat's own folder travels.
   const folders = local.scopes

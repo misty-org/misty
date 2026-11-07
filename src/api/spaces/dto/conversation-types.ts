@@ -21,12 +21,10 @@ export interface SpaceMessageSender {
 export interface SpaceConversation {
   id: string;
   /** standard is a group chat, public to the Space; dm is seen only by the people in it. */
-  kind?: "standard" | "direct" | "dm";
+  kind?: "standard" | "dm";
   space_id: string;
   title: string;
   created_by_user_id: string;
-  direct_user_id?: string;
-  direct_agent_id?: string;
   participants: SpaceParticipant[];
   created_at: string;
   updated_at: string;

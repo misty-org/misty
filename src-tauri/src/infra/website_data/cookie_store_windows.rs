@@ -75,13 +75,13 @@ unsafe fn verify_profile(view: &ICoreWebView2, expected: &Path) -> Result<()> {
 }
 
 /// A view may only be used on the profile it really belongs to.
-pub(crate) async fn verify_storage_profile(view: &Webview, profile: &str) -> Result<()> {
+pub(crate) async fn verify_store(view: &Webview, profile: &str) -> Result<()> {
     if !view.label().starts_with("misty-browser-") {
         return Err(wrong_store("not a browser view"));
     }
-    super::super::browser_profile::data_store_identifier(Some(profile))
+    super::super::profile_store::data_store_identifier(Some(profile))
         .map_err(|_| wrong_store("not a store identity"))?;
-    let expected = super::super::browser::browser_data_directory(view.app_handle(), Some(profile))
+    let expected = super::super::browser::store_data_directory(view.app_handle(), Some(profile))
         .map_err(|_| wrong_store("no folder for this store"))?;
     // SAFETY: runs on the view's UI thread with its live WebView2 object.
     webview2::with_core(view, move |core, _| {
@@ -97,7 +97,7 @@ async fn call(
     method: &'static str,
     parameters: Value,
 ) -> Result<Value> {
-    verify_storage_profile(view, profile).await?;
+    verify_store(view, profile).await?;
     Ok(webview2::cdp(view, method, &parameters).await?)
 }
 

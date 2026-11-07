@@ -4,7 +4,7 @@ import { browserHomeUrl } from "@/features/workspace/browserHome";
 import { browserTabAgentFileCapabilities } from "./browserTabCapabilities";
 import type { Execution } from "./localExecutionState";
 import { agentsDeviceSnapshot } from "./store/useAgentsStore";
-import { ensureServerAgentDevice } from "./store/useAgentDeviceStore";
+import { ensureAgentDevice } from "./store/useAgentDeviceStore";
 
 /** Opens the task's own hidden browser view and attaches it as the task's screen. */
 export async function createWorkspaceView(
@@ -15,7 +15,7 @@ export async function createWorkspaceView(
   const snapshot = await agentsDeviceSnapshot();
   assertCurrent();
   if (!snapshot.device) throw new Error("This signed-in session is unavailable for agents.");
-  const device = await ensureServerAgentDevice(snapshot.device);
+  const device = await ensureAgentDevice(snapshot.device);
   assertCurrent();
   const id = `agent-${crypto.randomUUID()}`;
   const scopeId = `agent-scope-${crypto.randomUUID()}`;

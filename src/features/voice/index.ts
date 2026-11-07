@@ -3,4 +3,5 @@ export { voiceSettings,  } from "./voiceSettings";
 export { DictationPill } from "./pill/DictationPill";
 export { CaptureMenu, CapturePanel, captureTab, transcribeLibraryFile } from "./capture";
 export { LiveSubtitles } from "./subtitles/LiveSubtitles";
+export { isSubtitlesPanel } from "./subtitles/subtitlesView";
 export { LiveSubtitlesMenuItem } from "./subtitles/LiveSubtitlesMenuItem";

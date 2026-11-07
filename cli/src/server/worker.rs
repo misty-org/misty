@@ -38,7 +38,7 @@ pub(super) fn ensure_worker_secrets(workspace: &Workspace) -> Result<()> {
 }
 
 fn journal_environment(workspace: &Workspace) -> std::path::PathBuf {
-    environment::root(workspace, Target::Dev).join("crypto/journal.env")
+    environment::root(workspace).join("crypto/journal.env")
 }
 
 fn read_journal_environment(path: &Path) -> Result<String> {

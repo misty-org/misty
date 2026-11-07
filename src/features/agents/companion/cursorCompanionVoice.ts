@@ -83,7 +83,7 @@ export class CursorCompanionVoice {
       if (current.working) throw new Error("A task is already running; use steering.");
       const generation = s.turn;
       // Every spoken request carries every display, the cursor's first; the
-      // run decides what matters (docs/agents/harness.md, Tool surface).
+      // run decides what matters.
       s.captures = [];
       // Looked up when the shortcut went down; a turn without one reads it now.
       const media =
@@ -263,6 +263,8 @@ export class CursorCompanionVoice {
     }
     s.delegatedTask = undefined;
     if (reply?.state === "completed") {
+      // Stop audio may have hidden the cursor while the task kept running.
+      s.change({ visible: true });
       s.pointer.present(reply.content, task.id, true);
       void this.speak(task.id, s.turn);
       return;

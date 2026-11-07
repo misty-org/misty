@@ -1,11 +1,17 @@
 //! What's left after the sandbox's actions. `src-tauri/sandbox/` decides which window can call which
-//! command, and Tauri refuses anything no capability allows (docs/plans/app-permissions.md). Tauri's
+//! command, and Tauri refuses anything no capability allows. Tauri's
 //! window patterns are prefixes, though, so this also holds each kind of window to its exact label:
 //! `window-1-spoof` or a cursor window with a name instead of a number gets nothing.
 use crate::infra::profile_windows;
 
 pub fn allows(label: &str) -> bool {
     profile_windows::is_app_window(label) || is_cursor_overlay(label)
+}
+
+/// The live subtitles panel is a view inside a person's window, so Tauri grants it what that window
+/// has. It only draws, and only ever needs to move itself.
+pub fn allows_command(label: &str, command: &str) -> bool {
+    allows(label) || (crate::voice::is_subtitles_panel(label) && command == "voice_subtitles_frame")
 }
 
 fn is_cursor_overlay(label: &str) -> bool {
@@ -133,6 +139,20 @@ mod tests {
         ] {
             assert!(!allows(label), "{label}");
         }
+    }
+
+    #[test]
+    fn the_subtitles_panel_can_only_move_itself() {
+        let panel = "misty-live-subtitles-window-1";
+        assert!(allows_command(panel, "voice_subtitles_frame"));
+        for command in ["voice_capture_start", "voice_subtitles_export", "agent_runtime_call"] {
+            assert!(!allows_command(panel, command), "{command}");
+        }
+        assert!(!allows_command("misty-live-subtitles-spoof", "voice_subtitles_frame"));
+        assert!(!allows_command("misty-browser-a", "voice_subtitles_frame"));
+        assert!(allows_command("window-1", "voice_capture_start"));
+        let permissions = capability("live-subtitles")["permissions"].clone();
+        assert_eq!(permissions, serde_json::json!(["core:event:default", "allow-voice-subtitles-frame"]));
     }
 
     #[test]

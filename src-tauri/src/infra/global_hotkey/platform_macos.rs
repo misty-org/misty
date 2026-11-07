@@ -75,14 +75,9 @@ pub(crate) fn run(dispatch: fn(Input)) {
             CGEventTapLocation::Session,
             CGEventTapPlacement::HeadInsertEventTap,
             CGEventTapOptions::ListenOnly,
-            vec![
-                CGEventType::FlagsChanged,
-                CGEventType::KeyDown,
-                CGEventType::LeftMouseDown,
-            ],
+            vec![CGEventType::FlagsChanged, CGEventType::LeftMouseDown],
             move |_, kind, event| {
                 match kind {
-                    CGEventType::KeyDown => dispatch(Input::KeyboardActivity),
                     CGEventType::LeftMouseDown => {
                         let p = event.location();
                         dispatch(Input::Click(p.x, p.y));

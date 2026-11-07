@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-//! The WebExtension compatibility layer lives in Kiri (kiri/src/extensions).
+//! The WebExtension compatibility layer lives in Kiri (crates/kiri/src/extensions).
 //! Misty's extension host answers its requests (native/macos/MistyExtensionCompat.m).
 //!
 //! WebView2 is Chromium, which gives extensions the APIs the layer stands in

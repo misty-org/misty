@@ -1,5 +1,4 @@
-//! Replays a workflow's saved browser actions before any model call (docs/agents/harness.md,
-//! Workflows as memory). Each saved step names its control by locator; the device finds it on the
+//! Replays a workflow's saved browser actions before any model call. Each saved step names its control by locator; the device finds it on the
 //! current page. Calls run through the same gateway as the model's: authorized, journaled and
 //! approval-gated. The first step the page no longer matches hands the task to the agent.
 use super::{

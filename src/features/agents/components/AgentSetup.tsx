@@ -1,4 +1,4 @@
-import { personalAgentsApi } from "@/api/agents/native";
+import { personalAgentsApi } from "@/features/agents/personalAgentsApi";
 import type { AgentProfile, AgentProfileInput } from "@/shared/schemas";
 import {
   BackButton,

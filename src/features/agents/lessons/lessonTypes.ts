@@ -1,5 +1,5 @@
 /**
- * Teach mode's lessons (docs/agents/cursor-companion.md, revision 4). A lesson is
+ * Teach mode's lessons. A lesson is
  * one Teach-mode conversation's progress, on the server beside its chat. Its id
  * is the conversation's id.
  */

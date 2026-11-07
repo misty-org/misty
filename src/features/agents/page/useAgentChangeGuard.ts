@@ -6,7 +6,6 @@ const idle = { dirty: false, busy: false };
  * Holds back navigation while the agent editor or the composer is busy (recording, uploading),
  * and asks before a change would discard unsaved edits or an unsent message. A running agent
  * does not hold it: runs keep working in their own chats while the person moves between them
- * (docs/agents/browser.md).
  */
 export function useAgentChangeGuard() {
   const [editorStatus, setEditorStatus] = useState(idle);

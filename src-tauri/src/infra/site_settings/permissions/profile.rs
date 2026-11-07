@@ -154,7 +154,7 @@ pub(crate) fn follow_remote_changes(app: AppHandle) {
                 Ok(change) if change.remote && change.collection == SITE_PERMISSIONS => {
                     let store_key =
                         crate::infra::profile_windows::store_for_profile(&change.profile)
-                            .and_then(|store| super::profile_key(store.as_deref()));
+                            .and_then(|store| super::store_key(store.as_deref()));
                     if let (Ok(store_key), Some(profile)) =
                         (store_key, profile_data::profile_records(&change.profile))
                     {

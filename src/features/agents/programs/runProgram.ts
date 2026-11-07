@@ -1,7 +1,12 @@
+import { invoke } from "@/native/invoke";
 import { startHostedSession } from "../hostedSessions";
 import { sessions } from "../hostedSessionsState";
 import { agentTabsForTask } from "../agentTabs";
-import { DeviceOperationNotAttempted, type ClaimedWorkflowNodeJob } from "../workerBrowserJobs";
+import {
+  DeviceOperationNotAttempted,
+  jobPolicyCall,
+  type ClaimedWorkflowNodeJob,
+} from "../workerBrowserJobs";
 import { pageHost, type ProgramState } from "./pageHost";
 import { programPrelude } from "./prelude";
 import { runInSandbox } from "./sandbox";
@@ -12,7 +17,7 @@ const MAX_CODE = 20_000;
 const MAX_VALUE = 20_000;
 
 /**
- * browser.run (docs/agents/harness.md, browser_run): runs the agent's program in a sandbox on
+ * browser.run: runs the agent's program in a sandbox on
  * this computer against its own tabs. The job comes at the run's browser workspace scope, as
  * browser.session does; tabs the program opens come back with the grants this device signed, so
  * the server attaches them to the run as screen_open's are.
@@ -50,6 +55,9 @@ export async function runProgram(
     kept: new Set(),
     documents: new Map(),
     openTab: async (url) => {
+      // An address the program built as it ran: native code judges it, as it does a tab's navigation.
+      const policyCall = jobPolicyCall(job.config);
+      if (policyCall) await invoke("agent_program_opens", { policyCall, url });
       const result = await startHostedSession(
         {
           ...job,

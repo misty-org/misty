@@ -1,11 +1,24 @@
 import { beforeEach, expect, it, vi } from "vitest";
-import { agentInterventionsApi, type AgentInterventionWait } from "./api";
-import { useAgentInterventions } from "./store";
-import type * as ApiModule from "./api";
-vi.mock("./api", async (importOriginal) => ({
-  ...(await importOriginal<typeof ApiModule>()),
-  agentInterventionsApi: { list: vi.fn(), decide: vi.fn() },
+import type { AgentInterventionWait } from "./api";
+
+const waits = vi.hoisted(() => ({
+  held: [] as AgentInterventionWait[],
+  decided: [] as [string, boolean][],
+  changed: undefined as undefined | (() => void),
 }));
+
+vi.mock("./localWaits", () => ({
+  listenForLocalWaits: () => undefined,
+  localWaits: () => waits.held,
+  decideLocalWait: (id: string, ready: boolean) => waits.decided.push([id, ready]),
+  onLocalWaitsChanged: (listener: () => void) => {
+    waits.changed = listener;
+    return () => undefined;
+  },
+}));
+
+import { useAgentInterventions } from "./store";
+
 const wait = (): AgentInterventionWait => ({
   id: crypto.randomUUID(),
   runId: "invocation_test",
@@ -17,67 +30,32 @@ const wait = (): AgentInterventionWait => ({
   state: "pending",
   expiresAt: "2099-01-01T00:00:00Z",
 });
+
 beforeEach(() => {
+  waits.held = [];
+  waits.decided = [];
   useAgentInterventions.getState().setAccount("");
-  vi.resetAllMocks();
 });
-it("does not expose a delayed response to another account", async () => {
-  let finish!: (value: { waits: AgentInterventionWait[] }) => void;
-  vi.mocked(agentInterventionsApi.list).mockImplementationOnce(
-    () =>
-      new Promise((resolve) => {
-        finish = resolve;
-      }),
-  );
-  useAgentInterventions.getState().setAccount("first");
-  const pending = useAgentInterventions.getState().refresh();
-  useAgentInterventions.getState().setAccount("second");
-  finish({ waits: [wait()] });
-  await pending;
-  expect(useAgentInterventions.getState().items).toEqual([]);
-  expect(useAgentInterventions.getState().accountId).toBe("second");
-});
-it("does not restore a decided wait when an older GET returns late", async () => {
-  const item = wait();
-  let finish!: (value: { waits: AgentInterventionWait[] }) => void;
-  vi.mocked(agentInterventionsApi.list)
-    .mockResolvedValueOnce({ waits: [item] })
-    .mockImplementationOnce(
-      () =>
-        new Promise((resolve) => {
-          finish = resolve;
-        }),
-    )
-    .mockResolvedValueOnce({ waits: [] });
-  vi.mocked(agentInterventionsApi.decide).mockResolvedValue({ queued: true });
-  useAgentInterventions.getState().setAccount("owner");
+
+it("shows what this computer is holding and follows changes to it", async () => {
+  useAgentInterventions.getState().setAccount("me");
+  const first = wait();
+  waits.held = [first];
+  waits.changed?.();
+  expect(useAgentInterventions.getState().items.map((item) => item.id)).toEqual([first.id]);
+  const seenAt = useAgentInterventions.getState().items[0]?.observedAt;
   await useAgentInterventions.getState().refresh();
-  const older = useAgentInterventions.getState().refresh();
-  expect(await useAgentInterventions.getState().decide("owner", item.id, true)).toBe(true);
-  finish({ waits: [item] });
-  await older;
-  expect(useAgentInterventions.getState().items).toEqual([]);
-  expect(useAgentInterventions.getState().loading).toBe(false);
+  expect(useAgentInterventions.getState().items[0]?.observedAt).toBe(seenAt);
 });
-it("does not let a stale account submit a decision or publish its late confirmation", async () => {
-  const item = wait();
-  let finish!: (value: { queued: true }) => void;
-  vi.mocked(agentInterventionsApi.list).mockResolvedValue({ waits: [item] });
-  vi.mocked(agentInterventionsApi.decide).mockImplementationOnce(
-    () =>
-      new Promise((resolve) => {
-        finish = resolve;
-      }),
-  );
-  useAgentInterventions.getState().setAccount("owner");
+
+it("answers a wait once, for the account that holds it", async () => {
+  useAgentInterventions.getState().setAccount("me");
+  const held = wait();
+  waits.held = [held];
   await useAgentInterventions.getState().refresh();
-  expect(await useAgentInterventions.getState().decide("old-account", item.id, true)).toBe(false);
-  expect(agentInterventionsApi.decide).not.toHaveBeenCalled();
-  const pending = useAgentInterventions.getState().decide("owner", item.id, true);
-  expect(await useAgentInterventions.getState().decide("owner", item.id, true)).toBe(false);
-  useAgentInterventions.getState().setAccount("second");
-  finish({ queued: true });
-  expect(await pending).toBe(false);
+  await expect(useAgentInterventions.getState().decide("other", held.id, true)).resolves.toBe(false);
+  await expect(useAgentInterventions.getState().decide("me", held.id, true)).resolves.toBe(true);
+  expect(waits.decided).toEqual([[held.id, true]]);
   expect(useAgentInterventions.getState().items).toEqual([]);
-  expect(agentInterventionsApi.decide).toHaveBeenCalledTimes(1);
+  await expect(useAgentInterventions.getState().decide("me", held.id, true)).resolves.toBe(false);
 });

@@ -1,4 +1,4 @@
-// The leak check (docs/browser). Closed agent tabs and windows once left their WebKit page
+// The leak check. Closed agent tabs and windows once left their WebKit page
 // processes running, and a day of runs reached 250 processes for 54 open pages. Every pass lists
 // the computer's page processes before it starts and again after its runs end, once their tabs
 // have slept: a new one that no open view uses was left behind. It's reported, and stops nothing.

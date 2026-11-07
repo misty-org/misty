@@ -4,12 +4,11 @@ import { parseSubtitlePrefs, scalePcm } from "./subtitlePrefs";
 describe("subtitle preferences", () => {
   it("falls back one control at a time", () => {
     const prefs = parseSubtitlePrefs(
-      JSON.stringify({ input: "mic", target: "ja", micGain: 9, silenceSeconds: "soon", source: "xx" }),
+      JSON.stringify({ target: "ja", gain: 9, silenceSeconds: "soon", source: "xx" }),
     );
     expect(prefs).toMatchObject({
-      input: "mic",
       target: "ja",
-      micGain: 1,
+      gain: 1,
       silenceSeconds: 30,
       source: "auto",
       mode: "translate",
@@ -18,7 +17,7 @@ describe("subtitle preferences", () => {
   });
 
   it("starts over from something unreadable", () => {
-    expect(parseSubtitlePrefs("not json").input).toBe("system");
+    expect(parseSubtitlePrefs("not json").mode).toBe("translate");
   });
 });
 

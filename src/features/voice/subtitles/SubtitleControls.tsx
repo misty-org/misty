@@ -1,5 +1,5 @@
 import { Volume2, VolumeX } from "lucide-react";
-import { useEffect, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { IconButton, Input, OptionSelect, Slider, Textarea } from "@/shared/ui";
 import {
   formatTranslationTerms,
@@ -65,42 +65,6 @@ export function SubtitleControls(props: {
   const set = (patch: Partial<SubtitlePrefs>) => act({ type: "prefs", patch });
   const setContext = (patch: Partial<SubtitlePrefs["context"]>) =>
     set({ context: { ...prefs.context, ...patch } });
-  useEffect(() => {
-    if (group === "input") act({ type: "refreshApps" });
-  }, [group, act]);
-  if (group === "input") {
-    const apps = [...view.apps, ...(prefs.app && !view.apps.includes(prefs.app) ? [prefs.app] : [])];
-    return (
-      <div className="subtitle-fields">
-        <Field label="Input source">
-          <OptionSelect
-            aria-label="Input source"
-            value={prefs.input}
-            disabled={active}
-            options={[
-              { value: "mic", label: "Microphone" },
-              { value: "system", label: "Desktop audio" },
-            ]}
-            onValueChange={(input) => set({ input: input as SubtitlePrefs["input"] })}
-          />
-        </Field>
-        {prefs.input === "system" && (
-          <Field label="Playback source">
-            <OptionSelect
-              aria-label="Playback source"
-              value={prefs.app}
-              disabled={active}
-              options={[
-                { value: "", label: "All desktop audio" },
-                ...apps.map((app) => ({ value: app, label: app })),
-              ]}
-              onValueChange={(app) => set({ app })}
-            />
-          </Field>
-        )}
-      </div>
-    );
-  }
   if (group === "languages") {
     return (
       <div className="subtitle-fields">
@@ -199,23 +163,13 @@ export function SubtitleControls(props: {
   if (group === "audio") {
     return (
       <div className="subtitle-fields">
-        {prefs.input === "mic" ? (
-          <VolumeRow
-            label="Microphone input"
-            gain={prefs.micGain}
-            muted={prefs.micMuted}
-            onGain={(micGain) => set({ micGain })}
-            onMuted={(micMuted) => set({ micMuted })}
-          />
-        ) : (
-          <VolumeRow
-            label="Desktop audio input"
-            gain={prefs.desktopGain}
-            muted={prefs.desktopMuted}
-            onGain={(desktopGain) => set({ desktopGain })}
-            onMuted={(desktopMuted) => set({ desktopMuted })}
-          />
-        )}
+        <VolumeRow
+          label="Tab audio input"
+          gain={prefs.gain}
+          muted={prefs.muted}
+          onGain={(gain) => set({ gain })}
+          onMuted={(muted) => set({ muted })}
+        />
       </div>
     );
   }

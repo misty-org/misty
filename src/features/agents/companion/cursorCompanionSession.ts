@@ -13,9 +13,13 @@ import type { DisplayCapture, Presentation, PresentedFocus } from "./protocol";
 
 export type CompanionOrigin = { conversationId: string; agentId?: string };
 
+/** How long a failure stays at the cursor; Agents keeps it, with Retry. */
+const ERROR_HOLD_MS = 8000;
+
 /**
  * One signed-in account's cursor companion: its presentation, turn ownership,
  * interruption and pointing. Voice, typed turns and native events share it.
+ * The overlay shows only for what the talk shortcut started; otherwise it stays hidden.
  */
 export class CursorCompanionSession {
   disposed = false;
@@ -49,7 +53,6 @@ export class CursorCompanionSession {
   lastFocus: PresentedFocus | undefined;
   speechRetry: string | undefined;
   recordingOrigin: CompanionOrigin | undefined;
-  show = true;
   state: Presentation;
   captures: DisplayCapture[] = [];
   recordedTurn = -1;
@@ -59,7 +62,6 @@ export class CursorCompanionSession {
 
   constructor(readonly accountId: string) {
     this.state = savedPresentation(accountId);
-    this.show = this.state.visible;
   }
 
   originIsCurrent = (origin: CompanionOrigin) => {
@@ -104,18 +106,17 @@ export class CursorCompanionSession {
       ...patch,
       generation: this.turn,
       enabled: this.nativeReady,
-      showCompanion: this.show,
     };
     this.publish();
+    // Every way a turn ends comes through here, so none of them can leave the overlay up.
+    if (this.state.visible) this.maybeHide();
   };
 
   applyPreferences = () => {
     const settings = useDevicePreferences.getState();
     if (!settings.state) return;
     const values = effectiveValues(settings.state);
-    this.show = values["agents.companion.visible"] !== false;
     this.change({
-      visible: this.show || this.state.phase !== "idle" || this.pointPending,
       size: normalizeCompanionSize(values["agents.companion.size"]),
       ask: values["agents.companion.ask"] === true,
       teach: values["agents.companion.teach"] === true,
@@ -143,23 +144,24 @@ export class CursorCompanionSession {
     if (this.state.focus) this.change({ focus: undefined });
   };
 
+  /** Something is still on screen for this turn: hiding the overlay would cut it off. */
+  private presenting = () =>
+    this.voicePending ||
+    this.pointPending ||
+    this.state.phase !== "idle" ||
+    Boolean(this.state.focus || this.state.sketch);
+
+  /** Hides the cursor once the turn has nothing left to show. */
   maybeHide = () => {
-    if (
-      this.state.error ||
-      this.voicePending ||
-      this.pointPending ||
-      this.state.phase === "listening" ||
-      this.state.phase === "processing"
-    )
-      return;
+    if (this.presenting()) return;
     const expected = this.turn;
     clearTimeout(this.hideTimer);
-    this.hideTimer = setTimeout(() => {
-      if (this.active(expected) && !this.show && !this.state.error)
-        this.change({
-          visible: false,
-        });
-    }, 1000);
+    this.hideTimer = setTimeout(
+      () => {
+        if (this.active(expected) && !this.presenting()) this.change({ visible: false });
+      },
+      this.state.error ? ERROR_HOLD_MS : 1000,
+    );
   };
 
   stopAudio = () => {
@@ -267,8 +269,8 @@ export class CursorCompanionSession {
       );
       return;
     }
-    this.pointer.present(reply.content, this.invocationId);
-    this.maybeHide();
+    // A typed turn's answer is in its chat; only a spoken one points at the screen.
+    this.change({ phase: "idle" });
   };
 
   /**

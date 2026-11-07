@@ -5,7 +5,6 @@ use std::{
 };
 
 use anyhow::{bail, Context, Result};
-use clap::ValueEnum;
 use rand::{rngs::OsRng, RngCore};
 use walkdir::WalkDir;
 
@@ -20,65 +19,46 @@ pub use validate::*;
 #[cfg(test)]
 mod tests;
 
-/// The CLI configures development only. A server is deployed with
-/// misty-server/compose.yml and its setup container (docs/self-hosting.md).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
-pub enum Target {
-    Dev,
-}
-
-impl Target {
-    pub fn label(self) -> &'static str {
-        match self {
-            Self::Dev => "dev",
-        }
-    }
-}
-
-/// Server settings live with the rest of Misty in ~/.misty, outside any checkout.
-/// `MISTY_ENV_DIR` names another folder, as it does for Compose.
-pub fn root(workspace: &Workspace, target: Target) -> PathBuf {
-    let in_workspace = || workspace.server.join(".env").join(target.label());
+/// Server settings live with the rest of Misty in ~/.misty, outside any checkout, with one folder for
+/// whichever server runs here. `MISTY_ENV_DIR` names another folder, as it does for Compose.
+pub fn root(workspace: &Workspace) -> PathBuf {
+    let in_workspace = || workspace.server.join(".env");
     if cfg!(test) {
         return in_workspace();
     }
     env::var_os("MISTY_ENV_DIR")
         .map(PathBuf::from)
-        .or_else(|| dirs::home_dir().map(|home| home.join(".misty/server").join(target.label())))
+        .or_else(|| dirs::home_dir().map(|home| home.join(".misty/.env/server")))
         .unwrap_or_else(in_workspace)
 }
 
-pub fn init(workspace: &Workspace, target: Target) -> Result<()> {
+pub fn init(workspace: &Workspace) -> Result<()> {
     let mut created = 0;
     for spec in FILES {
-        let path = root(workspace, target).join(spec.path);
+        let path = root(workspace).join(spec.path);
         if path.exists() {
             require_private_file(&path)?;
             continue;
         }
-        let contents = initial_file_contents(*spec, target);
+        let contents = initial_file_contents(*spec);
         if contents.is_empty() {
             continue;
         }
         write_private(&path, contents.as_bytes())?;
         created += 1;
     }
-    fs::create_dir_all(root(workspace, target))?;
-    secure_directories(&root(workspace, target))?;
+    fs::create_dir_all(root(workspace))?;
+    secure_directories(&root(workspace))?;
     init_cli_files(workspace)?;
-    println!(
-        "Initialized {} environment ({} new files).",
-        target.label(),
-        created
-    );
+    println!("Initialized server settings ({created} new files).");
     Ok(())
 }
 
-fn initial_file_contents(spec: FileSpec, target: Target) -> String {
-    if target == Target::Dev {
+fn initial_file_contents(spec: FileSpec) -> String {
+    {
         match spec.path {
             "runtime.env" => return "# Container development defaults.\nMISTY_ENVIRONMENT=development\nMISTY_HOST_PORT=8081\n".into(),
-            "crypto/services.env" => { use base64::Engine; return format!("# Generated once; preserve across restarts.\nMISTY_AUTH_SIGNING_KEY={}\nMISTY_AGENT_RUNTIME_CONTROL_SECRET={}\n", base64::engine::general_purpose::STANDARD.encode(random_hex(32)), base64::engine::general_purpose::STANDARD.encode(random_hex(32))); },
+            "crypto/services.env" => { use base64::Engine; return format!("# Generated once; preserve across restarts.\nMISTY_AUTH_SIGNING_KEY={}\n", base64::engine::general_purpose::STANDARD.encode(random_hex(32))); }
             "database.env" => return format!("# Generated once; preserve these with the database volume.\nDB_USER=misty_app\nDB_NAME=misty_server\nDB_MIGRATION_USER=misty\nDB_PASSWORD={}\nDB_MIGRATION_PASSWORD={}\n", random_hex(32), random_hex(32)),
             _ => {}
         }
@@ -92,11 +72,13 @@ fn random_hex(byte_count: usize) -> String {
     bytes.iter().map(|byte| format!("{byte:02x}")).collect()
 }
 
-pub fn read(workspace: &Workspace, target: Target) -> Result<BTreeMap<String, String>> {
-    let base = root(workspace, target);
+pub fn read(workspace: &Workspace) -> Result<BTreeMap<String, String>> {
+    let base = root(workspace);
     let known_files = FILES
         .iter()
         .map(|spec| base.join(spec.path))
+        .chain(DEPLOYED_SERVER_FILES.iter().map(|file| base.join(file)))
+        .chain(RETIRED_FILES.iter().map(|file| base.join(file)))
         .collect::<BTreeSet<_>>();
     if base.exists() {
         for entry in WalkDir::new(&base).follow_links(false) {
@@ -137,10 +119,7 @@ pub fn read(workspace: &Workspace, target: Target) -> Result<BTreeMap<String, St
                 );
             }
             if values.insert(name.clone(), value).is_some() {
-                bail!(
-                    "{name} is defined more than once in the {} environment",
-                    target.label()
-                );
+                bail!("{name} is defined more than once in the server settings");
             }
         }
     }
@@ -148,8 +127,8 @@ pub fn read(workspace: &Workspace, target: Target) -> Result<BTreeMap<String, St
 }
 
 /// Values used by CLI validation and Compose interpolation; shell overrides files.
-pub fn effective(workspace: &Workspace, target: Target) -> Result<BTreeMap<String, String>> {
-    let mut values = read(workspace, target)?;
+pub fn effective(workspace: &Workspace) -> Result<BTreeMap<String, String>> {
+    let mut values = read(workspace)?;
     for name in ownership()?.keys() {
         if let Ok(value) = env::var(name) {
             values.insert((*name).to_owned(), value);
@@ -158,8 +137,8 @@ pub fn effective(workspace: &Workspace, target: Target) -> Result<BTreeMap<Strin
     Ok(values)
 }
 
-pub fn apply(workspace: &Workspace, target: Target) -> Result<()> {
-    for (name, value) in read(workspace, target)? {
+pub fn apply(workspace: &Workspace) -> Result<()> {
+    for (name, value) in read(workspace)? {
         if env::var_os(&name).is_none() {
             env::set_var(name, value);
         }
@@ -212,10 +191,8 @@ fn ownership() -> Result<BTreeMap<&'static str, &'static str>> {
     Ok(result)
 }
 
-fn required(target: Target) -> &'static [&'static str] {
-    match target {
-        Target::Dev => DEV_REQUIRED,
-    }
+fn required() -> &'static [&'static str] {
+    DEV_REQUIRED
 }
 
 /// The environment registry is shared by init, validation, setup and Compose.

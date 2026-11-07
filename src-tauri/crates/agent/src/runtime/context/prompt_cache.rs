@@ -1,4 +1,4 @@
-//! Keeps long browser runs cheap and fast (docs/agents/harness.md, Context).
+//! Keeps long browser runs cheap and fast.
 //!
 //! Providers cache the unchanged start of a request. The transcript only grows at its end, so every
 //! turn reuses the turn before it, as long as older messages stay byte-identical. Page snapshots are

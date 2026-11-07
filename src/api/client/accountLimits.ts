@@ -2,7 +2,7 @@ import { create } from "zustand";
 
 /**
  * What a person sees when their server holds their account to a limit, or suspends it
- * (docs/cloud/README.md#limits), with what to do next. The codes are the server's.
+ * with what to do next. The codes are the server's.
  */
 const storageFull =
   "Your storage is full. Free some space in your Library, or ask whoever runs your Misty server for more. Nothing already stored is lost.";

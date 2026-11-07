@@ -24,7 +24,7 @@ export function effectivePermissionMode(
   draft: PermissionMode | "",
   agentDefault?: PermissionMode,
 ): PermissionMode {
-  if (state) return state.permissionMode || state.agentPermissionMode || "ask";
+  if (state) return state.permissionMode || state.agentPermissionMode || agentDefault || "ask";
   return draft || agentDefault || "ask";
 }
 
@@ -74,7 +74,10 @@ export function usePermissionMode(conversationId?: string, agentDefault?: Permis
  */
 export function turnModes(conversationId: string, startsConversation: boolean) {
   const collaboration = useCollaborationStore.getState();
-  const loaded = Boolean(collaboration.byConversation[conversationId]);
+  const current = collaboration.byConversation[conversationId];
+  const loaded = Boolean(current);
+  // With the chat's state on this computer, the server only hears its Ask or Auto through the turn.
+  const own = current?.permissionMode || undefined;
   return {
     collaborationMode: loaded
       ? collaboration.modeFor(conversationId)
@@ -82,6 +85,7 @@ export function turnModes(conversationId: string, startsConversation: boolean) {
         ? collaboration.draftMode
         : undefined,
     permissionMode:
-      !loaded && startsConversation ? collaboration.draftPermissionMode || undefined : undefined,
+      own ??
+      (!loaded && startsConversation ? collaboration.draftPermissionMode || undefined : undefined),
   };
 }

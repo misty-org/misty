@@ -2,7 +2,7 @@
 # Local checks for every commit and push (there is no GitHub CI).
 #   .githooks/checks.sh commit   suites touched by the staged changes, at most 5 minutes
 #   .githooks/checks.sh push     every suite, on a clean tree
-#   .githooks/checks.sh all|frontend|scripts|agent-runtime|rust-cli|rust-desktop|secrets|plan
+#   .githooks/checks.sh all|frontend|scripts|rust-cli|rust-desktop|secrets|plan
 #   .githooks/checks.sh release  also compiles for Windows; run it when cutting a release
 # Skip once with git commit/push --no-verify.
 set -euo pipefail
@@ -23,7 +23,6 @@ frontend_dev_navigation() { npm run test:dev-navigation; }
 scripts() { npm run test:scripts; }
 # Reinstalling takes longer than the tests, so only when the lockfile moved.
 packages() { [ node_modules/.package-lock.json -nt package-lock.json ] || npm ci --no-audit --no-fund --silent; }
-agent_runtime() { (cd src-tauri/services/agent-runtime && packages && npm run typecheck && npm test); }
 rust_cli() { cargo test --locked --quiet --tests --manifest-path cli/Cargo.toml; }
 # Tests only: compiling for other platforms and building examples wait for a release.
 rust_desktop() { parallel desktop-crate browser-sync-crate agent-crate kiri-crate desktop-services; }
@@ -46,7 +45,7 @@ agent_crate() {
   cargo test --locked --quiet --tests --manifest-path src-tauri/crates/agent/Cargo.toml
 }
 # Kiri's core tests need no Tauri; the desktop crate builds its native side.
-kiri_crate() { cargo test --locked --quiet --tests --no-default-features --manifest-path kiri/Cargo.toml; }
+kiri_crate() { cargo test --locked --quiet --tests --no-default-features --manifest-path src-tauri/crates/kiri/Cargo.toml; }
 desktop_services() {
   local manifest
   for manifest in src-tauri/services/*/Cargo.toml; do
@@ -207,27 +206,25 @@ sequence() { # seconds (0 for no limit), then suite names
 }
 
 suites_for() { # paths on stdin -> suite names
-  local frontend=0 runtime=0 cli=0 desktop=0 scripts=0 path
+  local frontend=0 cli=0 desktop=0 scripts=0 path
   while IFS= read -r path; do
     case "$path" in
       src/* | package.json | package-lock.json | tsconfig*.json | vite*.ts | vitest*.ts | .config/*) frontend=1; scripts=1 ;;
       cli/tasks/*) scripts=1 ;;
       cli/*) cli=1 ;;
-      .githooks/*) frontend=1; runtime=1; cli=1; desktop=1; scripts=1 ;;
-      src-tauri/services/agent-runtime/*) desktop=1; runtime=1 ;;
-      src-tauri/* | kiri/*) desktop=1 ;;
+      .githooks/*) frontend=1; cli=1; desktop=1; scripts=1 ;;
+      src-tauri/*) desktop=1 ;;
       rust-toolchain.toml) cli=1; desktop=1 ;;
     esac
   done
   ((scripts)) && echo scripts
   ((cli)) && echo rust-cli
   ((desktop)) && echo rust-desktop
-  ((runtime)) && echo agent-runtime
   ((frontend)) && echo frontend
   return 0
 }
 
-all=(scripts rust-cli rust-desktop agent-runtime frontend)
+all=(scripts rust-cli rust-desktop frontend)
 # A commit takes at most 5 minutes, secret scan and all, leaving a little for git itself.
 commit_seconds=${MISTY_COMMIT_SECONDS:-285}
 case "${1:-}" in
@@ -258,6 +255,6 @@ case "${1:-}" in
     ;;
   all) sequence 0 secrets "${all[@]}" ;;
   release) sequence 0 secrets "${all[@]}" desktop-windows ;;
-  frontend | scripts | agent-runtime | rust-cli | rust-desktop | desktop-windows | secrets) run "$1" ;;
-  *) echo "Usage: .githooks/checks.sh commit|push|all|release|frontend|scripts|agent-runtime|rust-cli|rust-desktop|desktop-windows|secrets|plan" >&2; exit 2 ;;
+  frontend | scripts | rust-cli | rust-desktop | desktop-windows | secrets) run "$1" ;;
+  *) echo "Usage: .githooks/checks.sh commit|push|all|release|frontend|scripts|rust-cli|rust-desktop|desktop-windows|secrets|plan" >&2; exit 2 ;;
 esac

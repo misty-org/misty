@@ -69,7 +69,7 @@ async fn prepare(
     action: &str,
     key: Option<&str>,
 ) -> Result<Value, String> {
-    let args = json!({"documentId": document, "ref": step.reference, "action": action, "key": key});
+    let args = json!({"documentId": document, "ref": step.reference, "action": action, "key": key, "modifiers": step.modifiers});
     let mut prepared = call_at(view, frame, "prepare", args.clone(), false).await?;
     // A popup over the control is closed first, as a person would (page_read.js), then the
     // control is measured again; anything else covering it still fails back to the agent.

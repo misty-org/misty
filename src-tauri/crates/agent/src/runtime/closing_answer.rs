@@ -1,6 +1,6 @@
 //! A run whose tool sequence stopped (an effect it could not confirm, a step the person must take)
 //! used to end with only the failure, though it had found most of what was asked
-//! (docs/agents/evals/odysseys.md). One durable call writes the answer from the transcript first; the
+//! One durable call writes the answer from the transcript first; the
 //! stop reason follows it. It spends no model turn, and a failure leaves the plain stop message.
 use serde_json::json;
 

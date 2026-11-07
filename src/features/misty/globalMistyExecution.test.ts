@@ -2,7 +2,7 @@ import "./globalMistyState.testFixtures";
 import { aiSurfaceApi } from "@/features/ai-surface";
 import { useMistyStore } from "./useMistyStore";
 import { expect, it, vi } from "vitest";
-import { globalMistyApi } from "./globalMistyApi";
+import { localChats } from "./localChats";
 
 it("authenticates worker resume hints against canonical history without admitting work", async () => {
   const create = vi.spyOn(aiSurfaceApi, "createInvocation");
@@ -20,8 +20,7 @@ it("authenticates worker resume hints against canonical history without admittin
     invocationId: "old",
     error: null,
   });
-  const history = vi.spyOn(globalMistyApi, "conversations").mockResolvedValue({
-    conversations: [
+  const history = vi.spyOn(localChats, "conversations").mockResolvedValue([
       {
         id: "research-chat",
         agentId: "research",
@@ -42,8 +41,7 @@ it("authenticates worker resume hints against canonical history without admittin
           },
         ],
       },
-    ],
-  });
+  ]);
   await useMistyStore.getState().loadConversations(true, { ...expected, invocationId: "forged" });
   expect(useMistyStore.getState().invocationId).toBe("old");
   await useMistyStore.getState().loadConversations(true, expected);

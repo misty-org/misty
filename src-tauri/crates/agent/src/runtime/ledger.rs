@@ -1,4 +1,4 @@
-//! The requirements ledger (docs/agents/checkpoints.md). A run with several parts keeps one row per
+//! The requirements ledger. A run with several parts keeps one row per
 //! part. A part is done only with evidence that outlives the model's say-so: a page it kept, a note
 //! or file it wrote, or a receipt a tool returned. A resume carries the ledger, so the parts that
 //! passed are not done again.

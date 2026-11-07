@@ -1,5 +1,6 @@
 import { chatDeviceGrants } from "@/features/agents/deviceGrants";
 import { useCollaborationStore } from "@/features/agents/agentCollaboration";
+import { admitLocalTurn } from "@/features/agents/localRun";
 import { lessonTurnPayload, useLessonStore } from "@/features/agents";
 import {
   runtimeAiApi as aiSurfaceApi,
@@ -14,9 +15,12 @@ import type {
 } from "@/features/ai-surface/types";
 import { planDeepThinking } from "./conversationTurn";
 import { globalMistyError, globalMistyId } from "./globalMistyActions";
-import { turnChangesSettled } from "./mistyConversationActions";
+import { historyTurns } from "./localChats";
 import type { MistyState } from "./mistyState";
-import { patchConversationMessage, replaceActiveGlobalInvocationStream } from "./mistyStoreHelpers";
+import {
+  patchConversationMessage,
+  replaceActiveGlobalInvocationStream,
+} from "./mistyStoreHelpers";
 import type { MistyGet, MistySet } from "./mistyStoreHelpers";
 import { submissionEpoch } from "./mistySubmissionEpoch";
 import { finishNeverStarted } from "./turnExecution";
@@ -25,14 +29,14 @@ import type { GlobalAiMessage } from "./types";
 
 type SubmitArgs = Parameters<MistyState["submitAnswer"]>;
 
-// Admissions the server may have taken without answering; a retry reuses their key.
+// Starts that may have gone through without answering; a retry reuses their key.
 const uncertainAdmissions = new Map<string, string>();
 
 export function clearUncertainAdmissions() {
   uncertainAdmissions.clear();
 }
 
-/** One turn, ready to send: everything submitAnswer gathered before the server takes it. */
+/** One turn, ready to send: everything submitAnswer gathered before its run starts. */
 interface PreparedTurn {
   accountId: string;
   epoch: number;
@@ -60,8 +64,8 @@ interface PreparedTurn {
 }
 
 /**
- * Hands a prepared turn to the server and follows its answer stream. A start the server
- * refuses marks the answer failed and ends the turn's local task.
+ * Starts a prepared turn's run on this computer and follows it. A start that's refused marks the
+ * answer failed and ends the turn's local task.
  */
 export async function startInvocation(set: MistySet, get: MistyGet, turn: PreparedTurn) {
   const {
@@ -89,8 +93,6 @@ export async function startInvocation(set: MistySet, get: MistyGet, turn: Prepar
     markPreparation,
   } = turn;
   try {
-    // The run's history comes from the server, so what was just taken out has to be out first.
-    await turnChangesSettled(conversationId);
     const admission = JSON.stringify([
       accountId,
       conversationId,
@@ -104,6 +106,11 @@ export async function startInvocation(set: MistySet, get: MistyGet, turn: Prepar
     uncertainAdmissions.set(admission, idempotencyKey);
     // The chat's folder and this computer's Misty browser travel with a desktop chat.
     const grants = await chatDeviceGrants(conversationId, startsConversation);
+    await admitLocalTurn(accountId, conversationId, {
+      mode: collaborationMode,
+      permissionMode,
+      scheduled: Boolean(companion?.schedule),
+    }).catch(() => undefined);
     const created = await aiSurfaceApi.createInvocation({
       agentId: get().conversations.find((c) => c.id === conversationId)?.agentId || requestAgentId,
       taskId: executionTaskId,
@@ -116,11 +123,13 @@ export async function startInvocation(set: MistySet, get: MistyGet, turn: Prepar
       currentTab: (await import("@/shared/platform/tauri")).hasTauriInternals()
         ? (await import("@/features/agents/companion/normalTabs")).currentTabSummary()
         : undefined,
-      mode: companion ? "companion" : "drawer",
+      // A scheduled turn has this argument too, but nobody is at the cursor: the crate words it as a report.
+      mode: companion && !companion.schedule ? "companion" : "drawer",
       companionMode: companion?.interactionMode,
       displayCaptures: companion?.displayCaptures,
       methodVersionId: companion?.methodVersionId,
       methodInputs: companion?.methodInputs,
+      ...(companion?.spaceId !== undefined && { spaceId: companion.spaceId }),
       ...(companion?.schedule && {
         scheduleId: companion.schedule.id,
         scheduleClaim: companion.schedule.claim,
@@ -137,13 +146,17 @@ export async function startInvocation(set: MistySet, get: MistyGet, turn: Prepar
             : "message",
       requestedArtifactKind: handoff?.requestedArtifactKind,
       prompt: normalized,
-      // The run works on this computer; continuing from another computer runs there.
+      // Earlier turns from this device's copy of the chat.
+      historyTurns: historyTurns(get().conversations.find((c) => c.id === conversationId)),
+      historyNotes: get().conversations.find((c) => c.id === conversationId)?.historyNotes,
+      // The run works on this computer.
       originDeviceId: await import("@/features/agents/workflows/deviceScheduledRuns")
         .then(({ thisComputerDeviceId }) => thisComputerDeviceId())
         .then((id) => id ?? undefined)
         .catch(() => undefined),
       context: invocationContext,
       attachmentIds: attachments.map((attachment) => attachment.id),
+      attachmentNames: Object.fromEntries(attachments.map((item) => [item.id, item.name])),
       deviceContexts: [
         ...deviceContexts,
         ...grants.filter((grant) => !deviceContexts.some((c) => c.opaqueRef === grant.opaqueRef)),
@@ -198,7 +211,8 @@ export async function startInvocation(set: MistySet, get: MistyGet, turn: Prepar
     patchConversationMessage(set, get, conversationId, assistantMessage.id, {
       invocationId: created.invocationId,
     });
-    if (startsConversation) {
+    // A scheduled run has its own modes, and leaves what the person chose in the composer for them.
+    if (startsConversation && !companion?.schedule) {
       useCollaborationStore.getState().adoptDraftMode(conversationId);
     }
     set({
@@ -232,7 +246,7 @@ export async function startInvocation(set: MistySet, get: MistyGet, turn: Prepar
       working: false,
       error: globalMistyError(error),
     });
-    // A start the server refused ends its local task and closes its windows: left paused, the task
+    // A refused start ends its local task and closes its windows: left paused, the task
     // looked as if it were still running next to "Misty could not start this answer".
     if (executionTaskId) void finishNeverStarted(executionTaskId);
   }

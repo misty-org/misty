@@ -9,7 +9,7 @@ use crate::{
         js_json::JsValue,
         ledger::{parse_carried_rows, Ledger, LedgerRow, RowField},
         model_budget::{ExecutionBudget, ModelUsage},
-        model_tools::McpRemoteTool,
+        model_tools::CatalogTool,
         tool_calls::SavedWait,
         tool_monitor::MonitorState,
         toolsets::{Family, ToolState, Toolset},
@@ -134,7 +134,7 @@ impl SavedBudget {
     }
 }
 
-/// `McpRemoteTool`, for the file.
+/// `CatalogTool`, for the file.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub(crate) struct SavedTool {
     pub(crate) name: String,
@@ -145,13 +145,13 @@ pub(crate) struct SavedTool {
     pub(crate) local: bool,
 }
 
-impl From<&McpRemoteTool> for SavedTool {
-    fn from(tool: &McpRemoteTool) -> Self {
+impl From<&CatalogTool> for SavedTool {
+    fn from(tool: &CatalogTool) -> Self {
         Self { name: tool.name.clone(), description: tool.description.clone(), input_schema: tool.input_schema.clone(), concurrent: tool.concurrent, read_only: tool.read_only, local: tool.local }
     }
 }
 
-impl From<SavedTool> for McpRemoteTool {
+impl From<SavedTool> for CatalogTool {
     fn from(tool: SavedTool) -> Self {
         Self { name: tool.name, description: tool.description, input_schema: tool.input_schema, concurrent: tool.concurrent, read_only: tool.read_only, local: tool.local }
     }

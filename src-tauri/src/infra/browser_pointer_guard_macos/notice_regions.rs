@@ -163,7 +163,7 @@ pub(super) unsafe fn notice_hides_event_from_renderer(event: &NSEvent) -> bool {
 }
 
 /// Puts the arrow back and shows the cursor; the renderer then sets its own on the next move.
-unsafe fn restore_arrow_cursor() {
+pub(super) unsafe fn restore_arrow_cursor() {
     let arrow: *mut AnyObject = objc2::msg_send![objc2::class!(NSCursor), arrowCursor];
     let _: () = objc2::msg_send![arrow, set];
     let _: () = objc2::msg_send![objc2::class!(NSCursor), unhide];

@@ -7,7 +7,7 @@ use std::sync::{
 use serde_json::json;
 
 use crate::{
-    runtime::{js_json::JsValue, model_tools::McpRemoteTool, task_completion::TASK_COMPLETION_TOOL, tool_execution::ToolExecutionResponse},
+    runtime::{js_json::JsValue, model_tools::CatalogTool, task_completion::TASK_COMPLETION_TOOL, tool_execution::ToolExecutionResponse},
     sdk::Message,
 };
 
@@ -50,7 +50,7 @@ fn compaction_context() -> String {
 }
 
 fn read_pages(harness: &Harness, input_tokens: u64) {
-    *harness.gateway.catalog.lock().unwrap() = vec![McpRemoteTool { read_only: true, ..tool("browser.read") }];
+    *harness.gateway.catalog.lock().unwrap() = vec![CatalogTool { read_only: true, ..tool("browser.read") }];
     let page = "page text ".repeat(200);
     *harness.gateway.answer.lock().unwrap() = Some(Box::new(move |_, _| ToolExecutionResponse::result(JsValue::String(page.clone()))));
     let mut turns: Vec<Turn> = (1..8)
@@ -149,7 +149,7 @@ async fn a_long_requests_give_up_goes_back_and_a_next_finish_that_found_nothing_
 async fn preserves_a_visual_tool_image_when_the_next_model_turn_starts() {
     let png = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aOZkAAAAASUVORK5CYII=";
     let harness = Harness::new(&json!({ "model_id": "fixture/model", "system": "", "prompt": "Inspect the screenshot", "allowed_tools": ["browser.visual"] }).to_string());
-    *harness.gateway.catalog.lock().unwrap() = vec![McpRemoteTool { read_only: true, ..tool("browser.visual") }];
+    *harness.gateway.catalog.lock().unwrap() = vec![CatalogTool { read_only: true, ..tool("browser.visual") }];
     let output = format!(r#"{{"documentId":"visual-document","image":{{"dataUrl":"data:image/png;base64,{png}"}}}}"#);
     *harness.gateway.answer.lock().unwrap() = Some(Box::new(move |_, _| ToolExecutionResponse::result(json(&output))));
     harness.script(vec![calling(vec![call("visual-1", "browser_visual", "{}")])]);

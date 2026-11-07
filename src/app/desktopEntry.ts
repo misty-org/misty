@@ -4,9 +4,9 @@ import { requireDesktopHost } from "./requireDesktopHost";
 // subtitles panel. Only the island and the panel use the app's controls and theme; the mist
 // stays bare so nothing opaque ever covers the screen.
 const island = async () => {
-  const { getCurrentWindow } = await import("@tauri-apps/api/window");
-  const { label } = getCurrentWindow();
-  if (label === "misty-desktop-island" || label === "misty-live-subtitles")
+  const { getCurrentWebview } = await import("@tauri-apps/api/webview");
+  const { label } = getCurrentWebview();
+  if (label === "misty-desktop-island" || label.startsWith("misty-live-subtitles-"))
     await import("@/styles/styles.css");
 };
 

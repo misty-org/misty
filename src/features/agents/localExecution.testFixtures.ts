@@ -47,7 +47,7 @@ vi.mock("@/api/device-models", () => ({ deviceModelCall: mocks.deviceCall }));
 vi.mock("./taskArtifacts", () => ({ trackTaskArtifacts: async () => {} }));
 vi.mock("./store/useAgentsStore", () => ({ agentsDeviceSnapshot: mocks.deviceSnapshot }));
 vi.mock("./store/useAgentDeviceStore", () => ({
-  ensureServerAgentDevice: async () => ({ id: "server-device" }),
+  ensureAgentDevice: async () => ({ id: "server-device" }),
 }));
 vi.mock("@/features/misty/useMistyStore", () => ({
   useMistyStore: {

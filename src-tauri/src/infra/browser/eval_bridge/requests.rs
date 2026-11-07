@@ -29,7 +29,7 @@ pub(super) async fn execute(
     }));
     reply(match call {
         Ok(call) => {
-            browser_agent_execute(
+            execute_agent_request(
                 bridge.app.clone(),
                 bridge.app.state::<BrowserSessionState>(),
                 call,

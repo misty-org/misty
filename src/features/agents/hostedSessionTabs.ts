@@ -1,13 +1,11 @@
 import { invoke } from "@tauri-apps/api/core";
-import { resolveApiBase } from "@/api/deployment/api";
-import { useUserStore } from "@/features/auth/core";
 import { browserHomeUrl } from "@/features/workspace/browserHome";
 import { devicesNative } from "@/native/devices";
 import { agentPageBounds, agentTabsForTask, trackAgentTab } from "./agentTabs";
 import { browserTabAgentFileCapabilities } from "./browserTabCapabilities";
 import { addHostedChildViews, type HostedSession } from "./hostedSessionsState";
 import { unwrapSearchRedirect } from "./programs/searchRedirect";
-import { ensureServerAgentDevice } from "./store/useAgentDeviceStore";
+import { ensureAgentDevice } from "./store/useAgentDeviceStore";
 import { agentsDeviceSnapshot } from "./store/useAgentsStore";
 import { DeviceOperationNotAttempted, type ClaimedWorkflowNodeJob } from "./workerBrowserJobs";
 
@@ -89,21 +87,16 @@ export async function signedSessionTab(
   taskId: string,
 ): Promise<Record<string, unknown>> {
   const agentId = String((job.config as { agentId?: unknown } | undefined)?.agentId ?? "");
-  const accountId = useUserStore.getState().me?.id ?? "";
   const snapshot = await agentsDeviceSnapshot();
   if (!snapshot.device) throw new DeviceOperationNotAttempted(new Error("device_unavailable"));
-  const device = await ensureServerAgentDevice(snapshot.device);
-  const [grant] = await devicesNative.signRunGrants(
-    { apiBase: await resolveApiBase(), accountId },
-    [
-      {
-        targetDeviceId: device.id,
-        agentId,
-        capabilities: [...browserTabAgentFileCapabilities].sort(),
-        scopes: [tabScope],
-      },
-    ],
-  );
+  const device = await ensureAgentDevice(snapshot.device);
+  const [grant] = await devicesNative.signRunGrants([
+    {
+      agentId,
+      capabilities: [...browserTabAgentFileCapabilities].sort(),
+      scopes: [tabScope],
+    },
+  ]);
   return {
     tabs: [
       {

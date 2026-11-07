@@ -80,8 +80,8 @@ fn browser_page_and_renderer_swap_sibling_order_for_overlays() {
 #[test]
 fn managed_profile_observations_expose_only_logical_identity() {
     let session = BrowserSession {
-        profile_id: Some("b".repeat(64)),
-        logical_profile_id: Some("a".repeat(64)),
+        store_id: Some("b".repeat(64)),
+        profile: Some("a".repeat(64)),
         ..Default::default()
     };
     let target =
@@ -221,9 +221,8 @@ fn grants_are_agent_capability_and_expiry_scoped() {
         agent_id: "agent-a".to_owned(),
         operation: "browser.inspect".to_owned(),
         input: Value::Null,
-        site_blocks: None,
-        confirm_kinds: None,
-        grant_set: None,
+        policy_call: None,
+        policy: PagePolicy::default(),
     };
     assert!(validate_browser_grant(&mut session, &request).is_ok());
     request.agent_id = "agent-b".to_owned();

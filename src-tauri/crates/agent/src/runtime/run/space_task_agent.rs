@@ -14,7 +14,7 @@ use crate::{
         js_json::JsValue,
         model_budget::model_turn_limit,
         model_input::initial_messages,
-        model_tools::McpRemoteTool,
+        model_tools::CatalogTool,
         requirements_review::{ledger_note, requirements_ledger, worth_ledger},
         runtime_errors::{classify_runtime_error, RuntimeError},
         serial_tool_lifecycle::SerialToolLifecycle,
@@ -147,7 +147,7 @@ impl RunLoop {
 
     pub(super) async fn rebuild_tools(&mut self) -> Result<(), RuntimeError> {
         let deps = self.shared.deps.clone();
-        let remote = deps.gateway.discover(&self.shared.identity, deps.control.as_ref()).await?;
+        let remote = deps.gateway.discover(&self.shared.identity).await?;
         self.state.catalog = remote.iter().map(Into::into).collect();
         self.tools = assemble_tools(&self.shared, &self.order, remote);
         Ok(())
@@ -251,9 +251,9 @@ pub(crate) async fn run_space_task_agent(deps: Arc<super::deps::RunDeps>, mut st
     };
     let saved = stored.state.take();
     let fresh = saved.is_none();
-    let remote: Vec<McpRemoteTool> = match &saved {
+    let remote: Vec<CatalogTool> = match &saved {
         Some(state) => state.catalog.iter().cloned().map(Into::into).collect(),
-        None => deps.gateway.discover(&shared.identity, deps.control.as_ref()).await?,
+        None => deps.gateway.discover(&shared.identity).await?,
     };
     let order = match &saved {
         Some(state) => SerialToolLifecycle::restored(state.stopped_reason.clone(), state.paused_reason.clone(), state.declined.clone()),

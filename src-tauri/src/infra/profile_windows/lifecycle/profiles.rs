@@ -151,13 +151,13 @@ fn delete_profile_here(app: &AppHandle, key: &str, everywhere: bool) -> Result<(
         } else {
             crate::infra::profile_data::remove_profile(&key).await;
         }
-        let library_key = crate::infra::browser_library::history::profile_key(store.clone());
+        let library_key = crate::infra::browser_library::history::store_key(store.clone());
         if let Ok(library) = crate::infra::browser_library::library(&app) {
             let _ = crate::infra::vault::history::forget_profile(&library, &library_key);
         }
         if let Some(store) = store {
             if let Err(error) =
-                crate::infra::browser::profile_cleanup::remove_profile_data(app, key, store).await
+                crate::infra::browser::store_cleanup::remove_store_data(app, key, store).await
             {
                 eprintln!("Could not remove a profile's website data: {error}");
             }

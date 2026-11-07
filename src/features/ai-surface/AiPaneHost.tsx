@@ -1,4 +1,4 @@
-import { useAuth } from "@/features/auth";
+import { useAgentAccountId } from "@/features/agents/agentAccount";
 import {
   createContext,
   useCallback,
@@ -44,8 +44,7 @@ export function AiPaneHost({
   active?: boolean;
   children: ReactNode;
 }) {
-  const { user } = useAuth();
-  const accountId = user?.id ?? "";
+  const accountId = useAgentAccountId();
   const hostRef = useRef<HTMLDivElement | null>(null);
   const [registeredAdapter, setRegisteredAdapter] = useState<AiSurfaceAdapter | null>(null);
   const adapter = registeredAdapter ?? defaultAdapter;

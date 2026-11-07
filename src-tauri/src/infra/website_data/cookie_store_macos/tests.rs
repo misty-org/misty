@@ -26,15 +26,15 @@ fn tomorrow() -> i64 {
 #[test]
 fn refuses_host_authentication_views_and_invalid_profile_handles() {
     assert_eq!(
-        expected_profile("space-personal", &"a".repeat(64)),
+        expected_store("space-personal", &"a".repeat(64)),
         Err(CookieStoreError::Profile)
     );
     assert_eq!(
-        expected_profile("misty-browser-test", "../profile"),
+        expected_store("misty-browser-test", "../profile"),
         Err(CookieStoreError::Profile)
     );
     assert_eq!(
-        expected_profile("misty-browser-test", &"a".repeat(64)),
+        expected_store("misty-browser-test", &"a".repeat(64)),
         Ok([0xaa; 16])
     );
 }

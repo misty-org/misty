@@ -16,6 +16,7 @@ import { SidebarToggleButton } from "@/features/app-shell/SidebarToggleButton";
 import { useBrowserToolbarSlot } from "@/features/browser/workspace";
 import { ProfileSwitcher } from "@/features/profiles/ProfileSwitcher";
 import { SidebarAddressFallback, SidebarNavFallback } from "./SidebarFallbacks";
+import { SidebarToolsRow } from "./SidebarToolsRow";
 import { SidebarNowPlaying } from "./SidebarNowPlaying";
 import { WorkspaceTabStripTab } from "./WorkspaceTabStripTab";
 import { windowsCaptionSlotId } from "./WindowsTitlebarControls";
@@ -24,8 +25,6 @@ const setNavSlot = (element: HTMLDivElement | null) =>
   useBrowserToolbarSlot.getState().setNav(element);
 const setTopSlot = (element: HTMLDivElement | null) =>
   useBrowserToolbarSlot.getState().setTop(element);
-const setFootSlot = (element: HTMLDivElement | null) =>
-  useBrowserToolbarSlot.getState().setFoot(element);
 
 export function WorkspaceTabStrip(
   props: Omit<WorkspaceDockTreeProps, "node"> & {
@@ -104,8 +103,11 @@ export function WorkspaceTabStrip(
   const cardBody = (
     <>
       <div className="misty-sidebar-address">
-        <div ref={setTopSlot} className="misty-workspace-toolbar-slot" />
-        <SidebarAddressFallback />
+        <div className="misty-sidebar-omnibox">
+          <SidebarToolsRow />
+          <div ref={setTopSlot} className="misty-workspace-toolbar-slot" />
+          <SidebarAddressFallback />
+        </div>
       </div>
       <FavoritesStrip onOpen={props.onOpen} />
       <div
@@ -184,7 +186,6 @@ export function WorkspaceTabStrip(
             <div className="flex min-w-0 flex-1 justify-center" data-browser-toolbar data-sidebar>
               <ProfileSwitcher />
             </div>
-            <div ref={setFootSlot} className="ml-auto flex items-center" />
           </div>
         </div>
         {props.account}

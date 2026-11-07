@@ -19,7 +19,7 @@ export function findVocative(transcript: string): Vocative | null {
 /**
  * Sends the message to the named agent instead of typing it: as a follow-up
  * when that agent is already working on screen, otherwise as a new request
- * through the agent at your cursor.
+ * that answers in its chat. Nothing shows at the cursor: only the talk shortcut does that.
  */
 export async function routeToAgent({ agent, message }: Vocative) {
   if (useLocalExecution.getState().execution?.agentId === agent.id) {

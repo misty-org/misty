@@ -6,7 +6,7 @@ import {
   type MistyContextSnapshot,
   type MistyContextTarget,
 } from "./context";
-import { useUserStore } from "@/features/auth/core";
+import { agentAccountId } from "@/features/agents/agentAccount";
 import { useAiSurfaceStore } from "@/features/ai-surface/store";
 import type { AiInvocationEvent } from "@/features/ai-surface/types";
 import { consumeInvocationEvent } from "@/features/ai-surface/storeRuntime";
@@ -25,7 +25,7 @@ type Request = {
   decision?: "accept" | "reject" | "refine";
 };
 async function handleContextRequest(request: Omit<Request, "id">): Promise<unknown> {
-  if (request.accountId !== useUserStore.getState().me?.id)
+  if (request.accountId !== agentAccountId())
     throw new Error("The Misty account changed.");
   if (!request.event && !request.decision && !request.undoId)
     return request.options
@@ -35,6 +35,9 @@ async function handleContextRequest(request: Omit<Request, "id">): Promise<unkno
   const registration = store.getState().registrations[`${request.accountId}:${request.paneId}`];
   if (!registration) throw new Error("The source pane is no longer available.");
   if (
+    // A turn needn't belong to a Space: agents are the person's, so only one that names a Space can
+    // disagree with the pane.
+    request.spaceId &&
     registration.adapter.getContext().some((ref) => ref.spaceId && ref.spaceId !== request.spaceId)
   )
     throw new Error("The source pane moved to another Space.");

@@ -18,14 +18,14 @@ const POINTER_PHRASES = [
 export interface PointLayout {
   /** The marker's box in overlay pixels: a ring, or the control's outline. */
   marker: { x: number; y: number; width: number; height: number; ring: boolean };
-  /** Where the companion's center parks, beside the marker rather than on it. */
+  /** Where the bubble's anchor parks, beside the marker rather than on it. */
   companion: Point;
 }
 
 /**
- * Places a point's marker on the exact spot and parks the companion beside
- * it, down and to the right like beside the cursor, flipping to the other
- * side at a display edge so the character never covers what it points at.
+ * Places a point's marker on the exact spot and parks the bubble's anchor beside
+ * it, down and to the right, flipping to the other side at a display edge so the
+ * bubble never covers what it points at.
  * `factor` converts the display's global units to overlay pixels.
  */
 export function pointLayout(

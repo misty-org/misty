@@ -1,5 +1,5 @@
 //! One key for this session's signed requests, policies and agent run grants
-//! (docs/sync/devices.md), kept in the credential store. The private
+//! kept in the credential store. The private
 //! key never leaves native code: every signature here prefixes an allow-listed
 //! domain, so one made for one purpose is never valid for another.
 use base64::{engine::general_purpose::STANDARD, Engine as _};
@@ -30,6 +30,13 @@ impl DeviceIdentity {
         Ok(Self {
             signing: SigningKey::from_bytes(&seed),
         })
+    }
+
+    #[cfg(test)]
+    pub fn from_bytes(seed: [u8; 32]) -> Self {
+        Self {
+            signing: SigningKey::from_bytes(&seed),
+        }
     }
 
     pub fn public_key(&self) -> String {

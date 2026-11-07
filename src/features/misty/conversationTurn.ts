@@ -23,6 +23,8 @@ export function openTurn(
     isEcho: (message: GlobalAiMessage) => boolean;
     echoed: boolean;
     continuation: boolean;
+    /** A scheduled run's chat is named after its workflow, not its long first prompt. */
+    keepTitle?: boolean;
     reasoningEffort: GlobalAiConversation["reasoningEffort"];
   },
 ): GlobalAiConversation {
@@ -30,7 +32,7 @@ export function openTurn(
   return {
     ...conversation,
     reasoningEffort: turn.reasoningEffort,
-    title: messages.length ? conversation.title : turn.prompt.slice(0, 56),
+    title: messages.length || turn.keepTitle ? conversation.title : turn.prompt.slice(0, 56),
     updatedAt: turn.userMessage.createdAt,
     messages: [
       ...messages,

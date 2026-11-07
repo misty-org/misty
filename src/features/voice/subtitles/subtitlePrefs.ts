@@ -45,16 +45,12 @@ export function parseSubtitlePrefs(saved: string): SubtitlePrefs {
   }
   const fallback = defaultSubtitlePrefs;
   return {
-    input: raw.input === "mic" ? "mic" : "system",
-    app: text(raw.app).slice(0, 200),
     mode: raw.mode === "subtitles" ? "subtitles" : "translate",
     source: raw.source === "auto" || isLanguage(raw.source) ? (raw.source as string) : "auto",
     target: isLanguage(raw.target) ? (raw.target as string) : computerLanguage(),
     context: readContext(raw.context),
-    micGain: bounded(raw.micGain, 0, 1, fallback.micGain),
-    micMuted: raw.micMuted === true,
-    desktopGain: bounded(raw.desktopGain, 0, 1, fallback.desktopGain),
-    desktopMuted: raw.desktopMuted === true,
+    gain: bounded(raw.gain, 0, 1, fallback.gain),
+    muted: raw.muted === true,
     silenceSeconds: bounded(raw.silenceSeconds, 10, 300, fallback.silenceSeconds),
     silenceDbfs: bounded(raw.silenceDbfs, -80, -30, fallback.silenceDbfs),
     save: raw.save === true,

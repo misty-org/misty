@@ -1,178 +1,20 @@
-import { agentMethodsApi, type AgentMethod } from "@/api/ai/agent-methods";
-import { aiSurfaceApi } from "@/features/ai-surface/api";
-import { useMistyStore } from "@/features/misty/useMistyStore";
-import {
-  currentProfile,
-  firstProfileId,
-  isHostWindow,
-  listProfiles,
-  openProfile,
-} from "@/features/workspace/profileWindow";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { useConversationFolder } from "../store/useConversationFolder";
-import { desktopDeviceGrants } from "../deviceGrants";
-import { adoptFolderChanges } from "../store/useAgentsStore";
-import { useScheduleFolders } from "./useScheduleFolders";
-import { holdAwake, releaseAwake } from "../keepAwake";
-import { useWorkflowSchedulesStore } from "./useWorkflowSchedulesStore";
 import { agentsDeviceSnapshot } from "../store/useAgentsStore";
-import { ensureServerAgentDevice } from "../store/useAgentDeviceStore";
+import { runLocalSchedules } from "./localScheduler";
 
-/**
- * Scheduled tasks that drive the browser (roadmap C1). A schedule that names
- * this computer waits on the server until Misty is open here; this picks those
- * runs up and starts them with this computer's signed browser grant. A run
- * that came due while the computer was away starts late, and its conversation
- * says so. Nothing here runs in the cloud.
- */
-
-/** This computer's id on the account, or null outside the desktop app. */
+/** This computer's id for its agents, or null outside the desktop app. */
 export async function thisComputerDeviceId(): Promise<string | null> {
   if (!hasTauriInternals()) return null;
   const local = await agentsDeviceSnapshot().catch(() => null);
-  if (!local?.device || local.device.status === "revoked") return null;
-  const device = await ensureServerAgentDevice(local.device).catch(() => null);
-  return device?.id ?? null;
-}
-
-/** How long before a run this computer stays awake for it. */
-const awakeAheadMs = 15 * 60_000;
-
-/**
- * Keeps this computer awake when one of its scheduled runs is due soon or
- * waiting, under the Settings › Agents keep-awake switch.
- */
-async function holdAwakeForSchedules(deviceId: string) {
-  const now = Date.now();
-  const soon = useWorkflowSchedulesStore
-    .getState()
-    .runs.some(
-      (run) =>
-        run.enabled &&
-        run.device_id === deviceId &&
-        (run.state === "awaiting_device" ||
-          run.state === "device_claimed" ||
-          (run.next_run_at !== undefined && Date.parse(run.next_run_at) - now < awakeAheadMs)),
-    );
-  await (soon ? holdAwake("schedule") : releaseAwake("schedule"));
+  return local?.device && local.device.status !== "revoked" ? local.device.id : null;
 }
 
 let running: Promise<void> | null = null;
 
-/** Starts every scheduled run waiting for this computer. Safe to call often. */
+/** Starts every scheduled run due on this computer. Safe to call often. */
 export function startWaitingScheduledRuns(accountId: string): Promise<void> {
-  running ??= pickUp(accountId).finally(() => {
+  running ??= runLocalSchedules(accountId).finally(() => {
     running = null;
   });
   return running;
-}
-
-/** Waiting runs a profile's window was already asked to pick up, so it comes forward once. */
-const openedFor = new Set<string>();
-
-/**
- * Whether this window starts a run: it works in a window of the schedule's profile, with that
- * profile's sign-ins. Another profile's window starts it, and one opens if none is. A computer
- * without the profile can't run it: the server hears why, and the schedule says so.
- */
-async function runsHere(run: { id: string; profile?: string; due_at?: string }, deviceId: string) {
-  const profile = run.profile ?? firstProfileId;
-  if (profile === currentProfile().id) return true;
-  if (!(await isHostWindow())) return false;
-  const profiles = (await listProfiles().catch(() => [])).map((item) => item.id);
-  if (!profiles.length) return false;
-  if (!profiles.includes(profile)) {
-    await agentMethodsApi.claimDeviceRun(run.id, deviceId, profiles).catch(() => null);
-    return false;
-  }
-  const key = `${run.id}:${run.due_at ?? ""}`;
-  if (!openedFor.has(key)) {
-    openedFor.add(key);
-    await Promise.resolve(openProfile(profile)).catch(() => undefined);
-  }
-  return false;
-}
-
-async function pickUp(accountId: string) {
-  const deviceId = await thisComputerDeviceId();
-  if (!deviceId || useMistyStore.getState().accountId !== accountId) return;
-  await holdAwakeForSchedules(deviceId).catch(() => {});
-  const { runs } = await agentMethodsApi.deviceRuns(deviceId).catch(() => ({ runs: [] }));
-  const methods = new Map<string, AgentMethod[]>();
-  for (const run of runs) {
-    if (useMistyStore.getState().accountId !== accountId) return;
-    if (!(await runsHere(run, deviceId))) continue;
-    if (!methods.has(run.agent_id))
-      methods.set(
-        run.agent_id,
-        (await agentMethodsApi.list(run.agent_id).catch(() => ({ methods: [] }))).methods,
-      );
-    const method = methods.get(run.agent_id)?.find((item) => item.id === run.method_id);
-    if (!method) continue;
-    const target = method.definition.target;
-    // A workflow that needs a Misty window waits for the current task to end.
-    if (target !== "cloud" && useMistyStore.getState().working) continue;
-    const claim = await agentMethodsApi
-      .claimDeviceRun(run.id, deviceId, [currentProfile().id])
-      .catch(() => null);
-    if (!claim) continue;
-    // A folder only if the person turned one on for this workflow, on this computer.
-    const folder = useScheduleFolders.getState().byWorkflow[run.method_id];
-    try {
-      if (target === "cloud") {
-        await aiSurfaceApi.createInvocation({
-          mode: "drawer",
-          surfaceId: "global",
-          trigger: "scheduled_task",
-          prompt: claim.title || method.definition.title,
-          context: [],
-          agentId: claim.agent_id,
-          conversationId: claim.conversation_id,
-          profile: claim.profile,
-          originDeviceId: deviceId,
-          methodVersionId: claim.method_version_id,
-          methodInputs: claim.inputs,
-          scheduleId: claim.schedule_id,
-          scheduleClaim: claim.claim,
-          deviceContexts: await (async () => {
-            await adoptFolderChanges(
-              `workflow:${run.method_id}`,
-              claim.conversation_id ?? claim.idempotency_key,
-            ).catch(() => undefined);
-            return desktopDeviceGrants(folder?.folderId ?? null, folder?.writable);
-          })(),
-          executionMode: "user",
-          idempotencyKey: claim.idempotency_key,
-          timezone: claim.timezone,
-        });
-      } else {
-        useMistyStore.setState({ selectedAgentId: claim.agent_id });
-        if (folder && claim.conversation_id) {
-          const folders = useConversationFolder.getState();
-          folders.setFolder(claim.conversation_id, folder.folderId);
-          folders.setWritable(claim.conversation_id, folder.folderId, folder.writable);
-          await adoptFolderChanges(`workflow:${run.method_id}`, claim.conversation_id).catch(
-            () => undefined,
-          );
-        }
-        await useMistyStore.getState().submitAnswer(
-          claim.title || method.definition.title,
-          [],
-          undefined,
-          "workspace",
-          [],
-          { conversationId: claim.conversation_id, context: [] },
-          {
-            executionMode: "agent",
-            methodVersionId: claim.method_version_id,
-            methodInputs: claim.inputs,
-            idempotencyKey: claim.idempotency_key,
-            schedule: { id: claim.schedule_id, claim: claim.claim },
-          },
-        );
-      }
-    } catch {
-      // The claim lapses in ten minutes and the run is offered again.
-    }
-  }
 }

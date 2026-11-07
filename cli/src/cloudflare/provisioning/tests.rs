@@ -75,7 +75,7 @@ impl Cloudflare {
         }
     }
     fn run(&mut self, workspace: &Workspace, options: Options) -> Result<()> {
-        let values = environment::read(workspace, Target::Dev)?;
+        let values = environment::read(workspace)?;
         provision(
             workspace,
             options,
@@ -97,7 +97,7 @@ fn development_still_provisions_worker_configuration_and_container_origin() {
     let workspace = Workspace::from_root(temporary.path().to_owned()).unwrap();
     let mut cloudflare = Cloudflare::default();
     cloudflare.run(&workspace, options(true)).unwrap();
-    let values = environment::read(&workspace, Target::Dev).unwrap();
+    let values = environment::read(&workspace).unwrap();
     assert_eq!(
         values["MISTY_CLOUDFLARE_WORKER_HOST"],
         "misty-api-example-com.fixture.workers.dev"

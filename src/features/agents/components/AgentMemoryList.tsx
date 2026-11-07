@@ -1,5 +1,5 @@
 import type { Dispatch, SetStateAction } from "react";
-import { personalAgentsApi, type AgentMemory } from "@/api/agents/native";
+import { personalAgentsApi, type AgentMemory } from "@/features/agents/personalAgentsApi";
 import { Button, Textarea } from "@/shared/ui";
 
 /** The preferences an agent remembered, each editable or forgettable. */

@@ -1,4 +1,4 @@
-//! The device control channel (docs/sync/devices.md): one socket per
+//! The device control channel: one socket per
 //! session carrying presence, job hints and removal. It never carries file
 //! data, and sessions never connect to each other directly.
 use std::{

@@ -1,13 +1,11 @@
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { resolveApiBase } from "@/api/deployment/api";
-import { useUserStore } from "@/features/auth/core";
 import { browserHomeUrl } from "@/features/workspace/browserHome";
 import { devicesNative } from "@/native/devices";
 import { browserTabAgentFileCapabilities } from "./browserTabCapabilities";
 import { addHostedChildViews, hostedSessionForTask } from "./hostedSessionsState";
 import { useLocalExecution } from "./localExecution";
-import { ensureServerAgentDevice } from "./store/useAgentDeviceStore";
+import { ensureAgentDevice } from "./store/useAgentDeviceStore";
 import { agentsDeviceSnapshot } from "./store/useAgentsStore";
 import { DeviceOperationNotAttempted, type ClaimedWorkflowNodeJob } from "./workerBrowserJobs";
 import { agentPageBounds, trackAgentTab } from "./agentTabs";
@@ -21,9 +19,9 @@ const maxChildTabs = 4;
 
 /**
  * browser.spawn_tabs: opens one browser tab per sub-agent for the running task
- * (docs/agents/harness.md, Sub-agents and the notebook). Each tab is bound to the task's
+ * Each tab is bound to the task's
  * lease, so Stop and takeover end the sub-agents too, and this device signs
- * each sub-agent's grant itself: the server only carries it.
+ * each sub-agent's grant itself.
  */
 export async function spawnChildTabs(
   job: ClaimedWorkflowNodeJob["job"],
@@ -50,11 +48,10 @@ export async function spawnChildTabs(
       ? Boolean(hostedSessionForTask(execution.taskId))
       : useLocalExecution.getState().execution?.taskId === execution.taskId &&
         useLocalExecution.getState().execution?.state === "running";
-  const accountId = useUserStore.getState().me?.id;
   const snapshot = await agentsDeviceSnapshot();
-  if (!accountId || !snapshot.device || snapshot.device.status === "revoked")
+  if (!snapshot.device || snapshot.device.status === "revoked")
     throw new DeviceOperationNotAttempted(new Error("device_unavailable"));
-  const device = await ensureServerAgentDevice(snapshot.device);
+  const device = await ensureAgentDevice(snapshot.device);
   const windowLabel = getCurrentWindow().label;
   const created: Array<{ id: string; scopeId: string }> = [];
   try {
@@ -91,9 +88,7 @@ export async function spawnChildTabs(
     // The task may have stopped while the tabs opened.
     if (!running()) throw new Error("agent_task_paused");
     const grants = await devicesNative.signRunGrants(
-      { apiBase: await resolveApiBase(), accountId },
       created.map(({ scopeId }) => ({
-        targetDeviceId: device.id,
         agentId: config.agentId ?? "",
         capabilities: [...childTabCapabilities].sort(),
         scopes: [scopeId],

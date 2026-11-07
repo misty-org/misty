@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: mocks.invoke }));
+vi.mock("@tauri-apps/api/webview", () => ({ getCurrentWebview: () => ({ label: mocks.label }) }));
 vi.mock("@tauri-apps/api/window", () => ({
   getCurrentWindow: () => ({
     label: mocks.label,

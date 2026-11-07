@@ -25,7 +25,7 @@ impl std::fmt::Display for DeviceHttpError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Status(401, _) => write!(f, "Sign in again to manage devices."),
-            // The account limits a server sets (docs/cloud/README.md), worded as the app's
+            // The account limits a server sets, worded as the app's
             // `src/api/client/accountLimits.ts` words them.
             Self::Status(403, code) if code == "account_suspended" => write!(
                 f,

@@ -1,4 +1,4 @@
-//! Text-first page layer for agents (docs/agents/harness.md, Page layer):
+//! Text-first page layer for agents:
 //! accessibility snapshots with refs that survive actions, batches of actions
 //! by ref, waiting without model calls, and page text for extraction.
 //!
@@ -18,6 +18,8 @@ mod consent;
 pub(crate) use consent::answer_consent_after_load;
 use consent::decline_consent;
 mod execute;
+mod judge;
+pub(crate) use judge::{judge_point, page_controls, scope_site};
 #[cfg(any(target_os = "macos", windows))]
 mod frames;
 #[cfg(all(test, windows))]
@@ -32,7 +34,8 @@ pub(crate) use step::CURSOR_GLIDE_MS;
 mod steps;
 pub(super) use batch::upload;
 use batch::{run_skill, run_steps};
-pub(super) use site_blocks::{blocked as site_blocked, SiteBlocks};
+pub(super) use site_blocks::blocked as site_blocked;
+pub(crate) use site_blocks::SiteBlocks;
 use steps::Step;
 
 const RUNTIME: &str = concat!(
@@ -41,6 +44,8 @@ const RUNTIME: &str = concat!(
     include_str!("page_tree.js"),
     "\n",
     include_str!("page_actions.js"),
+    "\n",
+    include_str!("page_consequence.js"),
     "\n",
     include_str!("page_read.js"),
     "\n",

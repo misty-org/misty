@@ -39,13 +39,13 @@ pub(super) fn secure_directories(root: &Path) -> Result<()> {
 }
 
 /// Update one registered setting without printing its value or replacing other settings.
-pub fn set(workspace: &Workspace, target: Target, name: &str, value: &str) -> Result<()> {
+pub fn set(workspace: &Workspace, name: &str, value: &str) -> Result<()> {
     if value.contains(['\n', '\r', '\0']) {
         bail!("environment values must be single-line");
     }
     let owners = ownership()?;
     let relative = owners.get(name).context("unknown environment setting")?;
-    let path = root(workspace, target).join(relative);
+    let path = root(workspace).join(relative);
     let contents = match fs::read_to_string(&path) {
         Ok(contents) => {
             require_private_file(&path)?;
@@ -73,7 +73,7 @@ pub fn set(workspace: &Workspace, target: Target, name: &str, value: &str) -> Re
     }
     lines.push(format!("{name}='{value}'"));
     fs::create_dir_all(path.parent().context("environment path has no parent")?)?;
-    secure_directories(&root(workspace, target))?;
+    secure_directories(&root(workspace))?;
     use std::io::Write;
     let mut temporary =
         tempfile::NamedTempFile::new_in(path.parent().context("environment path has no parent")?)?;

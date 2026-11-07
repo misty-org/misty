@@ -26,7 +26,7 @@ impl ToolExecutionResponse {
         Self { tool_error: Some(object([("code", string(code)), ("message", string(message))])), ..Self::default() }
     }
 
-    /// Reads the envelope the server sent, refusing anything but an object.
+    /// Reads a tool's envelope, refusing anything but an object.
     pub(crate) fn from_json(value: &JsValue) -> Result<Self, RuntimeError> {
         if !value.is_object() {
             return Err(RuntimeError::error("invalid_tool_outcome"));

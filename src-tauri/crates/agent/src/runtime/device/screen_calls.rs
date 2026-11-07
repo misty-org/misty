@@ -15,14 +15,14 @@ use super::{
 };
 use crate::sdk::{AssistantPart, FileData, Message, UserPart};
 
-struct DataImage {
+pub(super) struct DataImage {
     media_type: &'static str,
     data: String,
 }
 
 /// `/^data:(image\/(?:jpeg|png|webp|gif));base64,([A-Za-z0-9+/]*={0,2})$/`, for a string that can be
 /// megabytes long. Its bytes are decoded and written again, as the SDK does with a buffer.
-fn data_image(url: &str) -> Result<DataImage, CallError> {
+pub(super) fn data_image(url: &str) -> Result<DataImage, CallError> {
     let invalid = || CallError::call(400, "screen_model_invalid", "Invalid screen model request.");
     let (head, data) = url.strip_prefix("data:").and_then(|rest| rest.split_once(";base64,")).ok_or_else(invalid)?;
     let media_type = ["image/jpeg", "image/png", "image/webp", "image/gif"]
@@ -136,7 +136,7 @@ pub(super) async fn screen_model_call(calls: &DeviceCalls, body: &JsValue) -> Re
     }))
 }
 
-fn image_part(image: DataImage) -> UserPart {
+pub(super) fn image_part(image: DataImage) -> UserPart {
     UserPart::File { data: FileData::Data { data: image.data }, media_type: image.media_type.to_owned() }
 }
 

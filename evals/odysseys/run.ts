@@ -1,15 +1,14 @@
-// The Odysseys benchmark through Misty's product path (docs/agents/evals/odysseys.md): each task
+// The Odysseys benchmark through Misty's product path: each task
 // is a composer request on the local stack, with this computer as the device, so the agent does
-// what it does for a person, on the device's own models. It knows nothing of how the runtime is
-// built, so the same pass measures the TypeScript runtime and the Rust one.
+// what it does for a person, on the device's own models.
 //
 //   npm run pass
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { assertRuntime, deviceModels, deviceState } from "./bridge.ts";
+import { deviceModels } from "./bridge.ts";
 import { EvalClient, FatalPassError } from "./client.ts";
 import { loadConfig } from "./config.ts";
-import { chooseDevice, deviceContexts, type AccountDevice } from "./device.ts";
+import { deviceContexts, identityOf } from "./device.ts";
 import { leakedProcesses, pageProcesses } from "./leak-check.ts";
 import { didNoWork, grade, perform } from "./perform.ts";
 import { commits, judgeRecord, reportSchema, type PassReport } from "./report.ts";
@@ -26,20 +25,14 @@ const config = loadConfig(process.env);
 const tasks = selectTasks(loadTasks(), config.split, config.ids).slice(config.offset, config.offset + config.limit);
 if (!tasks.length) throw new Error("That selection has no tasks.");
 
-const client = await EvalClient.open(config.api, config.signInFile);
-const me = await client.json<{ id: string }>("/me");
-const agentId = (await client.json<{ agents: Array<{ id: string }> }>("/misty/agents")).agents[0]?.id ?? "";
-if (!agentId) throw new Error("This account has no agent.");
-const { devices } = await client.json<{ devices: AccountDevice[] }>("/devices");
-const identity = { userId: me.id, agentId, deviceId: chooseDevice(devices, config.deviceId) };
+const client = new EvalClient(config.bridge);
+const identity = await identityOf(config.bridge);
+if (!identity.agentId || !identity.deviceId) throw new Error("The app has no agent or device yet. Open it once and try again.");
 
-const { device, runtime: appRuntime } = await deviceState(config.bridge);
-// The report's label comes from the person, so the app has to agree with it.
-assertRuntime(config.runtime, appRuntime);
+const device = await deviceModels(config.bridge);
 // The run's model comes from the device. A pass with none would measure nothing.
 if (!device.models.agent) throw new Error("This device has no usable agent model. Save a model key and choose an agent model in the dev app's Settings › Models.");
-// The desktop must be signed in to this account on this server, or nothing it signs will count.
-await deviceContexts(config.bridge, config.deviceApiBase, identity.deviceId, identity.userId, identity.agentId);
+await deviceContexts(config.bridge);
 
 // Stopping the pass (Ctrl-C) cancels the runs in progress instead of leaving them spending.
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
@@ -49,7 +42,7 @@ for (const signal of ["SIGINT", "SIGTERM"] as const) {
 }
 
 const startedAt = new Date().toISOString();
-const root = join(config.reportsDir, `${startedAt.replace(/[:.]/g, "-")}-${config.runtime}`);
+const root = join(config.reportsDir, `${startedAt.replace(/[:.]/g, "-")}-rust`);
 mkdirSync(root, { recursive: true });
 const processesBefore = await pageProcesses(config.bridge);
 const commit = commits();
@@ -63,7 +56,8 @@ let leaked = 0;
 const save = (reason: string) => {
   const report: PassReport = {
     schema: reportSchema,
-    runtime: config.runtime,
+    // Older reports may name another runtime, and still compare against this one.
+    runtime: "rust",
     startedAt,
     finishedAt: new Date().toISOString(),
     device,

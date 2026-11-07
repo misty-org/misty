@@ -1,27 +1,31 @@
 // Runs a real agent through the real desktop app, against a scripted local model and a throwaway
-// server (README.md). It starts and stops the app itself, because one check is killing it mid-run.
+// server. It starts and stops the app itself, because one check is killing it mid-run.
 //
-//   node evals/smoke/smoke.mjs [--runtime rust|typescript] [--only boot,signin,...] [--keep-app]
+//   node evals/smoke/smoke.mjs [--only boot,signin,...] [--keep-app]
 import { spawn, execSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { createWriteStream, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { waitForWindow } from "./bridge.mjs";
+import { localSteps } from "./steps-local.mjs";
+import { mentionSteps } from "./steps-mentions.mjs";
+import { proposalSteps } from "./steps-proposals.mjs";
 import { runSteps } from "./steps-run.mjs";
+import { scheduleSteps } from "./steps-schedules.mjs";
+import { subagentSteps } from "./steps-subagents.mjs";
 import { firstSteps } from "./steps.mjs";
 import { windowErrors } from "./run.mjs";
 
 const repo = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const scratch = process.env.MISTY_SMOKE_DIR;
 const server = process.env.MISTY_SMOKE_SERVER;
-if (!scratch || !server) throw new Error("Set MISTY_SMOKE_DIR and MISTY_SMOKE_SERVER (README.md).");
+if (!scratch || !server) throw new Error("Set MISTY_SMOKE_DIR and MISTY_SMOKE_SERVER.");
 
 const option = (name) => {
   const at = process.argv.indexOf(`--${name}`);
   return at < 0 ? undefined : process.argv[at + 1];
 };
-const runtime = option("runtime") ?? "rust";
 const only = option("only")?.split(",");
 const keepApp = process.argv.includes("--keep-app");
 
@@ -75,7 +79,6 @@ const app = {
         // Until a server is chosen, a dev build talks to this one, never the shared dev stack.
         MISTY_PUBLIC_API_URL: `${server}/v1`,
         MISTY_PUBLIC_URL: server,
-        ...(runtime === "typescript" ? { MISTY_AGENT_RUNTIME: "typescript" } : {}),
       },
     });
     child.stdout.pipe(log);
@@ -84,8 +87,7 @@ const app = {
   },
   /** Kills the app the way a crash would, and waits for its dev server to go too. */
   async kill(signal = "SIGKILL") {
-    // The baseline's Node process isn't tied to the app, so it would outlive a crash.
-    for (const pid of [...pids(appPattern), ...pids("services/agent-runtime/.output")]) process.kill(pid, signal);
+    for (const pid of pids(appPattern)) process.kill(pid, signal);
     const deadline = Date.now() + 15_000;
     while (Date.now() < deadline && (pids(appPattern).length || execSync("lsof -nP -iTCP:5199 -sTCP:LISTEN -t || true").toString().trim()))
       await new Promise((done) => setTimeout(done, 200));
@@ -96,13 +98,14 @@ const seenErrors = new Map();
 async function keepWindowErrors() {
   for (const entry of await windowErrors().catch(() => [])) seenErrors.set(`${entry.at}:${entry.text}`, entry);
 }
-const context = { check, app, residentMB, runtime, scratch, server, dataRoot, results, seenErrors };
+const context = { check, app, residentMB, scratch, server, dataRoot, results, seenErrors };
 
 async function main() {
   startMock();
   await new Promise((done) => setTimeout(done, 400));
   await app.start();
-  for (const [name, step] of Object.entries({ ...firstSteps, ...runSteps })) {
+  const steps = { ...firstSteps, ...subagentSteps, ...scheduleSteps, ...proposalSteps, ...mentionSteps, ...localSteps, ...runSteps };
+  for (const [name, step] of Object.entries(steps)) {
     if (only && !only.includes(name)) continue;
     console.log(`\n== ${name}`);
     try {
@@ -119,8 +122,8 @@ try {
 } finally {
   if (!keepApp) await app.kill("SIGTERM");
   mock?.kill();
-  writeFileSync(resolve(scratch, `report-${runtime}.json`), JSON.stringify(results, null, 2));
+  writeFileSync(resolve(scratch, "report.json"), JSON.stringify(results, null, 2));
 }
 const failed = results.filter((result) => !result.ok);
-console.log(`\n${results.length - failed.length} of ${results.length} checks passed. Report: ${resolve(scratch, `report-${runtime}.json`)}`);
+console.log(`\n${results.length - failed.length} of ${results.length} checks passed. Report: ${resolve(scratch, "report.json")}`);
 process.exit(failed.length ? 1 : 0);

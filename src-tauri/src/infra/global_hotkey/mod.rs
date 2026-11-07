@@ -116,8 +116,6 @@ impl Chord {
 pub enum HotkeyEvent {
     Down,
     Up,
-    /// A non-modifier key went down (the companion uses it to notice typing).
-    KeyboardActivity,
     Click(f64, f64),
     Error(String),
 }
@@ -196,8 +194,8 @@ impl Drop for Subscription {
     }
 }
 
-/// Registers a chord and starts the shared hook on first use. Keyboard
-/// activity, clicks and hook errors reach every subscriber.
+/// Registers a chord and starts the shared hook on first use. Clicks and hook
+/// errors reach every subscriber.
 pub fn subscribe(chord: Chord) -> Subscription {
     let (tx, events) = mpsc::channel();
     let mut state = hub()
@@ -221,7 +219,6 @@ pub fn subscribe(chord: Chord) -> Subscription {
 /// Input from the platform hook.
 pub(crate) enum Input {
     Modifiers(Modifiers),
-    KeyboardActivity,
     Click(f64, f64),
     Error(String),
 }
@@ -242,7 +239,6 @@ fn dispatch(input: Input) {
                 }
             }
         }
-        Input::KeyboardActivity => broadcast(&state, HotkeyEvent::KeyboardActivity),
         Input::Click(x, y) => broadcast(&state, HotkeyEvent::Click(x, y)),
         Input::Error(message) => broadcast(&state, HotkeyEvent::Error(message)),
     }

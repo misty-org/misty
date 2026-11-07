@@ -17,4 +17,8 @@ pub trait DeviceModels: Send + Sync {
     fn model_id(&self, role: DeviceRole) -> Option<String>;
     /// The route a model runs on with this device's key for its provider.
     fn route(&self, model_id: &str) -> Result<ModelRoute, ModelError>;
+    /// The person's own ElevenLabs voice, when they named one.
+    fn speech_voice(&self) -> Option<String> {
+        None
+    }
 }

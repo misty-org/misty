@@ -8,7 +8,6 @@ import { MessageAttachments } from "./MessageAttachments";
 import { MessageContent, MessageHeader, messageText } from "./MessageContent";
 import { LinkPreviews } from "@/features/link-preview/LinkPreviews";
 import { useChatSidePanel } from "../store/chatSidePanelStore";
-import { AgentTranscriptButton } from "./AgentTranscriptButton";
 import { MessageEditForm } from "./MessageEditForm";
 import { MessageHoverActions } from "./MessageHoverActions";
 import { MessageReactions } from "./MessageReactions";
@@ -94,14 +93,6 @@ function ChatMessageRowView({
 }: ChatMessageRowProps) {
   const rowClass = message.reply_to_message_id ? "row-start-2" : "row-start-1";
   const agentAuthored = isAgentAuthoredMessage(message);
-  // The reply to your own mention carries how it was made; nobody else gets the button.
-  const requestId = message.origin?.agent_request_id;
-  const transcriptRequestId =
-    message.origin?.kind === "agent_member_reply" &&
-    typeof requestId === "string" &&
-    repliedToMessage?.sender_user_id === props.currentUserId
-      ? requestId
-      : undefined;
 
   return (
     <Fragment>
@@ -190,7 +181,6 @@ function ChatMessageRowView({
               Show replies ({replyCount})
             </Button>
           ) : null}
-          {transcriptRequestId ? <AgentTranscriptButton requestId={transcriptRequestId} /> : null}
 
           {message.local_delivery_state === "failed" ? (
             <ErrorNotification message="Message couldn’t be sent.">

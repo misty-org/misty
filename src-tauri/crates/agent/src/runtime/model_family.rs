@@ -1,4 +1,4 @@
-//! A short note for one model family (docs/agents/harness.md, Tool surface). Every model gets the
+//! A short note for one model family. Every model gets the
 //! same harness; this line only corrects a habit the family showed in the evals. It names the run it
 //! came from, so it can be dropped once the evals no longer need it.
 use std::sync::LazyLock;

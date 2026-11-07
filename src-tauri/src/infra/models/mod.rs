@@ -1,10 +1,11 @@
 //! Bring-your-own-key models. Provider keys live in Misty's credential store (sealed rows
 //! whose master key is in the OS keychain), one entry per provider under
-//! `com.misty.models`, and so do the web search keys (Decodo, Serper); the model choices are device settings (section `models` of
+//! `com.misty.models`, and so do the web search keys (Decodo, Serper) and the Composio key; the model choices are device settings (section `models` of
 //! `misty.db`). The renderer can save, replace or remove a key and learn which providers
 //! have one; it can never read a key back. Only the agent runtime on this computer gets
 //! them (`agent_runtime`), as a model document with a fresh ChatGPT access token when the
 //! person signed in with ChatGPT (`chatgpt`); no server ever does.
+pub mod benchmark_env;
 pub mod catalog;
 pub mod chatgpt;
 pub mod header;
@@ -35,6 +36,7 @@ fn saved_providers() -> Vec<String> {
     header::PROVIDERS
         .iter()
         .chain(header::SEARCH_PROVIDERS.iter())
+        .chain(std::iter::once(&header::COMPOSIO_KEY))
         .filter(|provider| load_key(provider).is_some_and(|key| !key.is_empty()))
         .map(|provider| (*provider).to_owned())
         .collect()
@@ -55,6 +57,7 @@ pub async fn device_document(app: &tauri::AppHandle) -> Result<Option<Value>, St
     let runtime = app.try_state::<MistyRuntime>().ok_or(UNREADABLE)?;
     let document = runtime.settings.document().await.map_err(|_| UNREADABLE)?;
     let section = document.get("models").cloned().unwrap_or(Value::Null);
+    let section = benchmark_env::settings(section);
     let uses_chatgpt = header::ROLES.iter().any(|(_, setting)| {
         section
             .get(*setting)
@@ -75,9 +78,11 @@ pub async fn device_document(app: &tauri::AppHandle) -> Result<Option<Value>, St
         let unreadable = std::cell::Cell::new(false);
         let document = header::document(&section, &|provider| match provider {
             "chatgpt" => token.clone(),
-            _ => crate::infra::credential_store::load(KEY_SERVICE, provider).unwrap_or_else(|_| {
-                unreadable.set(true);
-                None
+            _ => benchmark_env::key(provider).or_else(|| {
+                crate::infra::credential_store::load(KEY_SERVICE, provider).unwrap_or_else(|_| {
+                    unreadable.set(true);
+                    None
+                })
             }),
         });
         if unreadable.get() {
@@ -91,7 +96,8 @@ pub async fn device_document(app: &tauri::AppHandle) -> Result<Option<Value>, St
 }
 
 fn provider(id: &str) -> Result<&str, String> {
-    if header::is_provider(id) || header::SEARCH_PROVIDERS.contains(&id) {
+    if header::is_provider(id) || header::SEARCH_PROVIDERS.contains(&id) || id == header::COMPOSIO_KEY
+    {
         Ok(id)
     } else {
         Err("That model provider isn't supported.".into())

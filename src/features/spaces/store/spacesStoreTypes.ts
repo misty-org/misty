@@ -46,7 +46,7 @@ export interface SpacesStore {
     libraryItemIds?: string[],
     replyToMessageId?: string,
     optimisticMessage?: SpaceMessage,
-  ) => Promise<void>;
+  ) => Promise<SpaceMessage | undefined>;
   updateMessage: (
     spaceId: string,
     messageId: string,

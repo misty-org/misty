@@ -1,5 +1,5 @@
 //! The file gate: every file Misty's Rust code touches goes through here, and anything without a
-//! grant is refused with `io::ErrorKind::PermissionDenied` (docs/plans/app-permissions.md).
+//! grant is refused with `io::ErrorKind::PermissionDenied`.
 //!
 //! Everything Misty can reach is named by [`Reach`]. It starts with `.misty` and its own app
 //! folders, and the rest arrives one click at a time. Clippy's `disallowed-methods` and
@@ -64,6 +64,8 @@ pub enum Reach {
     SharedFolder,
     /// One file the person picked in a native dialog (`grant-picked-file`), until Misty quits.
     PickedFile,
+    /// `agents.env`, read-only, on a debug build's benchmark run (`models/benchmark_env.rs`).
+    BenchmarkKeys,
     /// Other browsers' profile folders, read-only, while `permission-browser-import` is on.
     BrowserImportFolders,
     /// Unit tests build their fixtures anywhere in the temp folder.
@@ -189,6 +191,11 @@ pub fn is_picked_file(path: &Path) -> bool {
 /// with the path the dialog returned, never a path that came through a window.
 pub fn allow_picked_file(path: &Path, access: Access) {
     with_policy(|policy| policy.add(Reach::PickedFile, path, Shape::Exact, access));
+}
+
+/// Only a debug build's benchmark run calls this, for the one file it reads its keys from.
+pub fn allow_benchmark_keys(path: &Path) {
+    with_policy(|policy| policy.add(Reach::BenchmarkKeys, path, Shape::Exact, Access::Read));
 }
 
 pub fn allow_downloads_folder(folder: &Path) {

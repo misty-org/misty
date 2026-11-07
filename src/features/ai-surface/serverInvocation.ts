@@ -2,7 +2,7 @@ import { currentProfile } from "@/features/workspace/profileWindow";
 import { spaceWindow } from "@/features/workspace/spaceWindow";
 import type { AiInvocationRequest, AiContextReference } from "./types";
 
-/** The invocation request as the server reads it: snake_case, captures flattened. */
+/** The run's request as the crate reads it (`local_prompt/request.rs`): snake_case, captures flattened. */
 export function toServerInvocation(input: AiInvocationRequest) {
   return {
     mode: input.mode,
@@ -57,6 +57,8 @@ export function toServerInvocation(input: AiInvocationRequest) {
     space_id: input.spaceId ?? spaceWindow().spaceId ?? undefined,
     profile: input.profile ?? currentProfile().id,
     origin_device_id: input.originDeviceId,
+    history_turns: input.historyTurns?.length ? input.historyTurns : undefined,
+    history_notes: input.historyNotes,
     device_contexts: input.deviceContexts?.map((context) => ({
       device_id: context.deviceId,
       kind: context.kind,
@@ -72,6 +74,7 @@ export function toServerInvocation(input: AiInvocationRequest) {
     requested_artifact_kind: input.requestedArtifactKind,
     conversation_id: input.conversationId,
     idempotency_key: input.idempotencyKey,
+    delegated_from: input.delegatedFrom,
     timezone: input.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone ?? "UTC",
   };
 }

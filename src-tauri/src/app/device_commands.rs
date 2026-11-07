@@ -1,4 +1,4 @@
-//! Device commands (docs/sync/devices.md). The webview drives the UI;
+//! Device commands. The webview drives the UI;
 //! identity, trust, signatures and the control channel stay native. Commands
 //! that change trust run only in the main window.
 #![cfg(desktop)]
@@ -29,7 +29,7 @@ pub(crate) fn require_device_window(webview: &tauri::Webview) -> Result<(), Stri
     Ok(())
 }
 
-pub(super) async fn local_device_id(state: &MistyRuntime) -> Result<String, String> {
+pub(crate) async fn local_device_id(state: &MistyRuntime) -> Result<String, String> {
     let snapshot = state
         .agents
         .device_snapshot()

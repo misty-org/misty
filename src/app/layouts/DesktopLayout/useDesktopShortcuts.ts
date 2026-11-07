@@ -29,8 +29,8 @@ export function useDesktopShortcuts(options: {
   useShortcutHandler(
     "misty.contextual_companion",
     useCallback(
-      () => (signedIn ? useMistyPanelStore.getState().toggle() : openSignInSheet("agents")),
-      [signedIn],
+      () => useMistyPanelStore.getState().toggle(),
+      [],
     ),
   );
   useShortcutHandler(

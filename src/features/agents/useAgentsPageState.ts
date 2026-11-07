@@ -1,5 +1,4 @@
-import { observeAccountChanges } from "@/api/account-events";
-import { useAuth } from "@/features/auth";
+import { useAgentAccountId } from "./agentAccount";
 import { conversationInSpace } from "@/features/misty/conversationSpace";
 import { useMistyStore } from "@/features/misty/useMistyStore";
 import { useSpaceWindowStore } from "@/features/workspace/spaceWindow";
@@ -19,7 +18,7 @@ import type { AgentWorkspacePage } from "./workspace/AgentWorkspaceFrame";
  * effects that keep them in step with the URL, the account and the active conversation.
  */
 export function useAgentsPageState() {
-  const { user } = useAuth();
+  const accountId = useAgentAccountId();
   const spaceId = "";
   const voiceRef = useRef<AgentVoiceControl>(null);
   const [, setVoiceState] = useState({ recording: false, busy: false });
@@ -52,18 +51,14 @@ export function useAgentsPageState() {
   useEffect(() => {
     setSelected(undefined);
     setSettingsModalOpen(false);
-    if (!user?.id) {
-      void load("");
-      return;
-    }
-    return observeAccountChanges(user.id, ["agents"], () => load(user.id));
-  }, [user?.id, load]);
+    void load(accountId);
+  }, [accountId, load]);
   useEffect(() => {
     const store = useMistyStore.getState();
-    store.setAccount(user?.id ?? "");
-    if (user?.id) void store.loadConversations();
-  }, [user?.id]);
-  useAgentFolderSync(user?.id ?? "");
+    store.setAccount(accountId);
+    void store.loadConversations();
+  }, [accountId]);
+  useAgentFolderSync(accountId);
   const linkedAgentId = params.get("agent");
   const linkedConversationId = params.get("conversation");
   useEffect(() => {
@@ -98,7 +93,7 @@ export function useAgentsPageState() {
     agents.find((a) => a.system_managed) ??
     agents[0];
   const access = useAgentAccess(
-    user?.id ?? "",
+    accountId,
     settingsModalOpen && settingsModalMode === "create" ? undefined : profile?.id,
   );
   const accessRetry = access.retry;
@@ -115,9 +110,9 @@ export function useAgentsPageState() {
   );
   const conversation = agentConversations.find((c) => c.id === activeConversationId);
   // Feeds the Recents status dots.
-  const activity = useAgentActivity(user?.id ?? "", profile?.id);
+  const activity = useAgentActivity(accountId, profile?.id);
   return {
-    user,
+    user: { id: accountId },
     spaceId,
     voiceRef,
     setVoiceState,

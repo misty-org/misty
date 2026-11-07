@@ -1,5 +1,5 @@
 import { deviceModelCall } from "@/api/device-models";
-import { agentsDeviceSnapshot, ensureServerAgentDevice } from "@/features/agents";
+import { agentsDeviceSnapshot, ensureAgentDevice } from "@/features/agents";
 
 export const voiceApi = {
   /** Tidies one dictation on this computer's fast model. */
@@ -17,7 +17,7 @@ export function voiceDeviceId(): Promise<string> {
     const snapshot = await agentsDeviceSnapshot();
     if (!snapshot.device || snapshot.device.status === "revoked")
       throw new Error("Sign in on this computer to use voice.");
-    return (await ensureServerAgentDevice(snapshot.device)).id;
+    return (await ensureAgentDevice(snapshot.device)).id;
   })().catch((error) => {
     device = undefined;
     throw error;

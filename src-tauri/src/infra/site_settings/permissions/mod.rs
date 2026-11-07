@@ -208,9 +208,9 @@ pub async fn browser_site_info(
     inspect(&app, target(&app, &id)?, None, None).await
 }
 
-/// The store key for a Misty browser profile, as WebKit's `UUIDString` writes it.
-pub(in crate::infra) fn profile_key(profile: Option<&str>) -> Result<String, String> {
-    let identifier = super::super::browser_profile::data_store_identifier(profile)?;
+/// The key a website data store is filed under, as WebKit's `UUIDString` writes it.
+pub(in crate::infra) fn store_key(store: Option<&str>) -> Result<String, String> {
+    let identifier = super::super::profile_store::data_store_identifier(store)?;
     Ok(uuid::Uuid::from_bytes(identifier)
         .hyphenated()
         .to_string()
@@ -224,7 +224,7 @@ pub(crate) fn import_decisions(
     profile: Option<&str>,
     decisions: &[(String, &str, bool)],
 ) -> Result<usize, String> {
-    let key = profile_key(profile)?;
+    let key = store_key(profile)?;
     let mut store = read_store();
     let sites = store.entry(key.clone()).or_default();
     let mut added = 0;

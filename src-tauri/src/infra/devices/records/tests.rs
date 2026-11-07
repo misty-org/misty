@@ -30,5 +30,4 @@ fn run_grants_verify_their_signer_and_expire() {
     assert!(!verified.allows("scope-2", "folder.read"));
     assert!(RunGrant::verify(&record, &identity.public_key(), 2_000).is_none());
     assert!(RunGrant::verify(&record, &STANDARD.encode([9u8; 32]), 1_500).is_none());
-    assert_eq!(RunGrant::claimed_requester(&record), Some(device('a')));
 }

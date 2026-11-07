@@ -1,4 +1,4 @@
-use super::super::mcp_errors::classify_mcp_transport_error;
+use super::super::tool_errors::classify_tool_transport_error;
 use super::super::tool_outcomes::{classify_tool_outcome, incomplete_tool_result_text, stopped_at_model_turn_limit, tool_failure_signature, OutcomeInput, ToolFailure};
 use super::*;
 use crate::runtime::js_json::JsValue;
@@ -149,15 +149,15 @@ fn returns_correctable_validation_errors_to_the_model_without_workflow_internals
 
 #[test]
 fn never_retries_permanent_mcp_protocol_or_authorization_failures() {
-    let unknown = classify_mcp_transport_error(&RuntimeError::named("ProtocolError", "MCP error -32601: unknown tool \"weather.current\""));
+    let unknown = classify_tool_transport_error(&RuntimeError::named("ProtocolError", "MCP error -32601: unknown tool \"note.read\""));
     assert_eq!((unknown.code, unknown.transient, unknown.recognized), ("tool_unavailable", false, true));
-    let forbidden = classify_mcp_transport_error(&RuntimeError::named("SdkHttpError", "forbidden").with_status(403));
+    let forbidden = classify_tool_transport_error(&RuntimeError::named("SdkHttpError", "forbidden").with_status(403));
     assert_eq!((forbidden.code, forbidden.transient), ("permission_denied", false));
 }
 
 #[test]
 fn retries_only_transient_mcp_http_failures_with_a_bounded_delay() {
-    let limited = classify_mcp_transport_error(&RuntimeError::named("SdkHttpError", "limited").with_status(429));
+    let limited = classify_tool_transport_error(&RuntimeError::named("SdkHttpError", "limited").with_status(429));
     assert_eq!((limited.code, limited.transient, limited.retry_after_ms), ("rate_limited", true, 5_000));
 }
 
@@ -173,7 +173,7 @@ fn names_the_failed_action_without_claiming_success() {
 fn uses_stable_call_signatures() {
     let first = JsValue::parse(r#"{"b":2,"a":1}"#).unwrap();
     let second = JsValue::parse(r#"{"a":1,"b":2}"#).unwrap();
-    assert_eq!(tool_failure_signature("weather.current", &first), tool_failure_signature("weather.current", &second));
+    assert_eq!(tool_failure_signature("note.read", &first), tool_failure_signature("note.read", &second));
 }
 
 #[test]

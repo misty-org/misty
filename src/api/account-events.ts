@@ -21,7 +21,8 @@ const subscriptions = new Map<string, Subscription>();
  * Without those APIs there is still only one connection per renderer.
  */
 export function subscribeAccountEvents(accountId: string, listener: Subscriber): () => void {
-  if (!accountId) return () => {};
+  // "local" is agents with nobody signed in (`agentAccount.ts`): no server has anything to say.
+  if (!accountId || accountId === "local") return () => {};
   const generation = readApiSessionGeneration();
   const channelKey = JSON.stringify([readDeploymentScope(), accountId]);
   const key = JSON.stringify([channelKey, generation]);
@@ -86,7 +87,7 @@ async function stream(signal: AbortSignal, generation: number, deliver: Subscrib
       if (!base || signal.aborted || generation !== readApiSessionGeneration()) return;
       const headers = new Headers({ Accept: "text/event-stream" });
       if (token) headers.set("Authorization", `Bearer ${token}`);
-      const response = await httpRequest(`${base}/misty/events`, {
+      const response = await httpRequest(`${base}/me/events`, {
         headers,
         signal,
         credentials: apiRequestCredentials(),

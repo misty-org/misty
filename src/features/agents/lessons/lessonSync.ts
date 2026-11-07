@@ -1,5 +1,4 @@
 import type { GlobalAiConversation, GlobalAiMessage } from "@/features/misty/types";
-import { globalMistyApi } from "@/features/misty/globalMistyApi";
 import { useMistyStore } from "@/features/misty/useMistyStore";
 import { useCollaborationStore } from "../collaboration/store";
 import { companionReply } from "../companion/companionReply";
@@ -9,7 +8,7 @@ import { useLessonStore } from "./lessonStore";
 /**
  * Keeps lessons in step with their chats: each finished Teach reply updates its
  * lesson, and a reply that starts or resumes a different lesson moves its turn
- * into that lesson's chat (docs/agents/cursor-companion.md, revision 4).
+ * into that lesson's chat.
  */
 export function followLessons(accountId: string): () => void {
   void useLessonStore.getState().load(accountId);
@@ -118,11 +117,5 @@ function moveTurn(fromId: string, toId: string, runId: string) {
     ),
   });
   useMistyStore.getState().selectConversation(toId);
-  // The server moves the turn first: deleting the emptied chat would take it along otherwise.
-  void globalMistyApi
-    .moveTurn(fromId, runId, toId)
-    .then(() => {
-      if (!rest.length) return useMistyStore.getState().deleteConversation(fromId);
-    })
-    .catch(() => undefined);
+  if (!rest.length) void useMistyStore.getState().deleteConversation(fromId).catch(() => undefined);
 }

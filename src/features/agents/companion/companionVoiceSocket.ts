@@ -28,7 +28,7 @@ export function deferred() {
 
 /**
  * Opens the voice conversation on the agent runtime on this computer, which hears, answers and
- * speaks on this device's own models (docs/agents/runtime.md). `current` throws once the session it
+ * speaks on this device's own models. `current` throws once the session it
  * was opened for has gone.
  */
 export async function openVoiceSocket(current: () => void) {

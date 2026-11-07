@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Button, ErrorNotification } from "@/shared/ui";
 import {
+  actionQuestionHasDetails,
   actionQuestionText,
   actionQuestionVerb,
   answerActionQuestion,
@@ -88,6 +89,11 @@ export function AgentActionQuestions() {
               }
             >
               {actionQuestionText(question, name)}
+              {actionQuestionHasDetails(question) ? (
+                <span className="agent-question-details" tabIndex={0}>
+                  {question.control}
+                </span>
+              ) : null}
             </StatusRow>
           </StatusTable>
         );

@@ -6,6 +6,7 @@ type DeviceModelCall =
   | "voice-transcription"
   | "screen-model"
   | "refine-point"
+  | "subtitle-context"
   | "extract"
   | "embed"
   | "day-summary"
@@ -16,7 +17,7 @@ type DeviceModelCall =
 
 /**
  * One model call on the agent runtime on this computer, with this device's own models and keys
- * (docs/agents/runtime.md). The server is never asked. Failures carry the runtime's code,
+ * The server is never asked. Failures carry the runtime's code,
  * such as `model_key_needed`, like a server error would.
  */
 export async function deviceModelCall<T>(

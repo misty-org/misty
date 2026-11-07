@@ -30,14 +30,6 @@ body,
   opacity: 0;
   transition: opacity 0.4s ease;
 }
-.cursor-sprite {
-  position: absolute;
-  width: calc(32px * var(--companion-scale, 1));
-  height: calc(32px * var(--companion-scale, 1));
-  object-fit: contain;
-  opacity: 1;
-  transition: opacity 0.25s ease;
-}
 .cursor-waveform,
 .cursor-spinner {
   position: absolute;
@@ -73,10 +65,6 @@ body,
   height: 100%;
   background: conic-gradient(from 90deg, transparent, var(--companion-mark));
 }
-.cursor-group[data-phase="listening"] .cursor-sprite,
-.cursor-group[data-phase="processing"] .cursor-sprite {
-  opacity: 0;
-}
 .cursor-group[data-phase="listening"] .cursor-waveform,
 .cursor-group[data-phase="processing"] .cursor-spinner {
   opacity: 1;
@@ -103,8 +91,6 @@ body,
   transform: none;
   left: 0;
 }
-/* The exact spot a point names: a ring, or the real control's outline. The
-   character parks beside it so it never covers what it points at. */
 /* Teach mode: where to look while Misty explains a step. Monochrome: a soft white
    outline with a faint dim around it, so the region reads on light and dark screens. */
 .cursor-focus-layer {
@@ -180,6 +166,7 @@ body,
     opacity: 0;
   }
 }
+/* The exact spot a point names: a ring, or the real control's outline. */
 .cursor-point-marker {
   position: absolute;
   top: 0;
