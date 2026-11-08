@@ -1,14 +1,14 @@
 import { useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import type { SpaceConversation } from "@/api/spaces/dto/entities";
-import { useAuth } from "@/features/auth";
-import { useSpacesStore } from "../store/useSpacesStore";
+import type { SpaceConversation } from "../api/dto/entities";
+import { useAuth } from "@/features/account";
+import { useSpacesStore } from "../list/useSpacesStore";
 import { spaceChatConversationPath, spaceChatPath } from "./chatRoute";
 import { ChatSidebar } from "./sidebar/ChatSidebar";
 import { CreateEditConversationDialog } from "./sidebar/CreateEditConversationDialog";
 import { NewDirectMessageDialog } from "./sidebar/NewDirectMessageDialog";
 import { useSpaceChatAccess } from "./hooks/useSpaceChatAccess";
-import { spacesApi } from "@/api/spaces/api";
+import { spacesApi } from "../api/api";
 import {
   AlertDialog,
   AlertDialogAction,

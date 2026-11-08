@@ -1,18 +1,18 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-import { repositoryPath, walk } from "./repositoryPolicy";
+import { repositoryPath, walkAppCrate } from "./repositoryPolicy";
 
 /**
- * Every Misty window belongs to a profile, and only `infra/profile_windows` names window
+ * Every Misty window belongs to a profile, and only `browser/app_windows` names window
  * labels. A leftover `"main"` would aim an event or a trust check at a window that no
  * longer exists, and fail silently.
  */
-const helper = /^src-tauri\/src\/infra\/profile_windows(\.rs|\/)/;
+const helper = /^src-tauri\/features\/browser\/app_windows(\.rs|\/)/;
 
 describe("Profile window labels contract", () => {
   it('names no window "main" outside the profile windows helper', () => {
-    const failures = walk("src-tauri/src", new Set([".rs"]))
+    const failures = walkAppCrate("src-tauri/features", new Set([".rs"]))
       .map((path) => [repositoryPath(path), readFileSync(path, "utf8")] as const)
       .filter(([path]) => !helper.test(path))
       .flatMap(([path, text]) =>
@@ -26,7 +26,9 @@ describe("Profile window labels contract", () => {
   });
 
   it("gives app windows window labels in the capabilities, never main", () => {
-    const capability = JSON.parse(readFileSync("src-tauri/sandbox/capabilities/default.json", "utf8")) as {
+    const capability = JSON.parse(
+      readFileSync("src-tauri/tauri-permissions/capabilities/default.json", "utf8"),
+    ) as {
       webviews: string[];
     };
     expect(capability.webviews).toContain("window-*");

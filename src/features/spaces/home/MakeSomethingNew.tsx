@@ -1,6 +1,6 @@
 import { useRef, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import { spacesApi } from "@/api/spaces/api";
+import { spacesApi } from "../api/api";
 import { ErrorNotification, FileInput, Pressable, cn } from "@/shared/ui";
 import { createSpaceItem, type SpaceCreateKind } from "./createSpaceItem";
 import { MakeArt } from "./MakeArt";

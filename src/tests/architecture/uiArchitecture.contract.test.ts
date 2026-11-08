@@ -18,17 +18,17 @@ const customPropertyDefinitionOwners = new Set([
   "src/app/layouts/DesktopLayout/dockingGeometry.ts",
   "src/app/layouts/DesktopLayout/MistyTabGroups.tsx",
   // The theme store writes the palette every surface reads.
-  "src/features/settings/store/appTheme.ts",
+  "src/features/settings/preferences/appTheme.ts",
   // The companion's runtime size feeds four rules in cursorCompanion.css.
-  "src/features/agents/companion/CursorOverlayMarkup.tsx",
+  "src/features/agents/cursor/CursorOverlayMarkup.tsx",
   // Dragged widths: the Misty panel and the agent sidebar restyle only their column.
   "src/features/agents/panel/MistyPanelDock.tsx",
-  "src/features/agents/workspace/AgentWorkspaceFrame.tsx",
+  "src/features/agents/methods/AgentWorkspaceFrame.tsx",
 ]);
 /** The cursor companion rides the pointer and rotates every frame; it is never pixel-aligned. */
 const pointerFollowingFiles = new Set([
-  "src/features/agents/companion/cursorOverlayLoop.ts",
-  "src/features/agents/companion/cursorCompanion.css",
+  "src/features/agents/cursor/cursorOverlayLoop.ts",
+  "src/features/agents/cursor/cursorCompanion.css",
 ]);
 const allowedSourceRoots = new Set([
   "api",

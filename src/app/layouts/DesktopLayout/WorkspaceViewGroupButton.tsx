@@ -1,17 +1,17 @@
-import { useBrowserRuntimeStore } from "@/features/webviews/browserRuntime";
+import { useBrowserRuntimeStore } from "@/features/app-windows";
 import {
   parseBrowserViewState,
   spaceWorkspaceToolFromRoute,
   type WorkspaceView,
-} from "@/features/workspace";
-import { workspaceAppIcon } from "@/features/workspace/WorkspaceAppIcon";
+} from "@/features/app-windows";
+import { workspaceAppIcon } from "@/features/app-windows";
 import { appIconStrokeWidth, BrandIcon, brandIconAsset, cn, Spinner } from "@/shared/ui";
 import { type LucideIcon } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
-import { providerFromRoute } from "@/features/webviews/providers";
-import { websiteIntegrations } from "@/features/webviews/websiteIntegrations";
+import { providerFromRoute } from "@/features/browser";
+import { websiteIntegrations } from "@/features/browser";
 import { DestinationIcon } from "./NavigatorDestinationIcon";
-import { SiteIcon } from "@/features/webviews/SiteIcon";
+import { SiteIcon } from "@/features/browser";
 function getViewAppId(tab: WorkspaceView | undefined): string {
   if (!tab) return "";
   if (tab.surfaceId === "space") {

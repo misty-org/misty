@@ -1,7 +1,11 @@
 import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
-import { useWorkspaceStore, workspaceSurfaceFromRoute, dockTreeViews } from "@/features/workspace";
+import {
+  useWorkspaceStore,
+  workspaceSurfaceFromRoute,
+  dockTreeViews,
+} from "@/features/app-windows";
 import { useSpacesStore } from "@/features/spaces";
 import { WorkspaceCanvas } from "./WorkspaceCanvas";
 

@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import type { Space } from "@/api/spaces/dto/entities";
+import type { Space } from "../api/dto/entities";
 import { useShortcutHandler } from "@/features/shortcuts";
-import { useWorkspaceViewFocused } from "@/features/workspace/WorkspaceViewRouteScope";
-import { preloadSpaceSection } from "../SpaceSectionView";
+import { useWorkspaceViewFocused } from "@/features/app-windows";
+import { preloadSpaceSection } from "../overview/SpaceSectionView";
 
 /** ⌘1 to ⌘5 open these Space home tabs. */
 const shortcutFilters = ["", "notes", "drawings", "files"] as const;

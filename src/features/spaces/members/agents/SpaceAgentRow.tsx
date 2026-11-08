@@ -1,8 +1,8 @@
-import type { SpaceAgent } from "@/api/spaces/space-agents";
-import type { ItemVisibility } from "@/api/spaces/visibility";
+import type { SpaceAgent } from "@/features/agents";
+import type { ItemVisibility } from "../../api/visibility";
 import { PrivateLabel, VisibilityMenu } from "../../components/VisibilityMenu";
 import { AgentAvatar } from "@/features/agents";
-import { useAuth } from "@/features/auth";
+import { useAuth } from "@/features/account";
 import type { AgentProfile } from "@/shared/schemas";
 import { IconButton, cn } from "@/shared/ui";
 import { X } from "lucide-react";
@@ -46,7 +46,10 @@ export function SpaceAgentRow({
       <div className="min-w-0 flex-1">
         <p className={cn("m-0 truncate font-medium text-cream", compact ? "text-xs" : "text-sm")}>
           {agent.agent_name}
-          <span className="font-normal text-cream-muted"> · {agentOwnerLabel(agent, user?.id)}</span>
+          <span className="font-normal text-cream-muted">
+            {" "}
+            · {agentOwnerLabel(agent, user?.id)}
+          </span>
         </p>
       </div>
       {agent.visibility === "private" ? <PrivateLabel /> : null}

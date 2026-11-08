@@ -1,7 +1,5 @@
-// eslint-disable-next-line no-restricted-imports -- these transport types are owned by the shortcut registry
-import type { ShortcutCommandDefinition, ShortcutPlatform } from "@/features/shortcuts/registry";
-// eslint-disable-next-line no-restricted-imports -- shortcut slots are shared with native persistence
-import type { ShortcutSlot } from "@/features/shortcuts/bindings";
+import type { ShortcutCommandDefinition, ShortcutPlatform } from "@/shared/shortcuts/registry";
+import type { ShortcutSlot } from "@/shared/shortcuts/bindings";
 
 export interface SettingsSnapshot {
   path: string;

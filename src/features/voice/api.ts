@@ -1,5 +1,8 @@
-import { deviceModelCall } from "@/api/device-models";
-import { agentsDeviceSnapshot, ensureAgentDevice } from "@/features/agents";
+import { deviceModelCall } from "@/api/runtime/device-models";
+import { createPort } from "@/shared/lib/seams";
+
+/** The id of this computer's agent device; agents own the device, so they fill this in. */
+export const voiceDevice = createPort<() => Promise<string>>("this computer's device id");
 
 export const voiceApi = {
   /** Tidies one dictation on this computer's fast model. */
@@ -14,10 +17,7 @@ let device: Promise<string> | undefined;
 /** This device's server id. Voice needs a signed-in device. */
 export function voiceDeviceId(): Promise<string> {
   device ??= (async () => {
-    const snapshot = await agentsDeviceSnapshot();
-    if (!snapshot.device || snapshot.device.status === "revoked")
-      throw new Error("Sign in on this computer to use voice.");
-    return (await ensureAgentDevice(snapshot.device)).id;
+    return voiceDevice.get()();
   })().catch((error) => {
     device = undefined;
     throw error;

@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Maximize2, X } from "lucide-react";
-import { tabLabel } from "@/features/workspace/layoutTabs";
-import type { WorkspaceTab } from "@/features/workspace/model";
+import { tabLabel } from "@/features/app-windows";
+import type { WorkspaceTab } from "@/features/app-windows";
 import { Button, IconButton } from "@/shared/ui";
 
 /** A peeked link floating over the page it came from, with its own header. */

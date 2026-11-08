@@ -1,11 +1,11 @@
-import type { SpaceConversation, SpaceMember, SpaceMessage } from "@/api/spaces/dto/entities";
-import type { SpaceChatDraft } from "@/features/chat-composer/useSpaceChatDraft";
-import { spacesApi } from "@/api/spaces/api";
-import { buildMessageSpans, type MentionableAgent } from "../store/useSpaceMessageSpansStore";
+import type { SpaceConversation, SpaceMember, SpaceMessage } from "../../api/dto/entities";
+import type { SpaceChatDraft } from "../composer/useSpaceChatDraft";
+import { spacesApi } from "../../api/api";
+import { buildMessageSpans, type MentionableAgent } from "../useSpaceMessageSpansStore";
 import { runOwnMentions } from "../mentionRuns";
 import { useRef } from "react";
 import type { Dispatch, FormEvent, SetStateAction } from "react";
-import { mergeSpaceMessages } from "../store/useSpaceMessageSpansStore";
+import { mergeSpaceMessages } from "../useSpaceMessageSpansStore";
 import type { MessageEditingState } from "./useMessageEditing";
 export interface SpaceChatMessageActionsOptions {
   spaceId: string;

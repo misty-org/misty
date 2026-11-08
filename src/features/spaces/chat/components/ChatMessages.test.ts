@@ -9,7 +9,7 @@ import {
   messageReplyPreviewText,
 } from "@/features/spaces/chat";
 import { SpaceChatMessages } from "@/features/spaces/chat/components/ChatMessages";
-import type { SpaceMessage } from "@/api/spaces/dto/entities";
+import type { SpaceMessage } from "@/features/spaces/api/dto/entities";
 
 function message(id: string, sender: string, createdAt: string): SpaceMessage {
   return {

@@ -1,4 +1,4 @@
-import type { FramePacingState } from "@/app/layouts/model";
+import type { FramePacingState } from "@/app/layouts/desktop-state";
 
 // The drawer, tab inset, and titlebar controls must move on the same timeline.
 export const navigatorMotionClass = "misty-shell-motion motion-reduce:transition-none";

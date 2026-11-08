@@ -1,4 +1,4 @@
-import { useSpacesStore as spacesStore } from "./store/useSpacesStore";
+import { useSpacesStore as spacesStore } from "./list/useSpacesStore";
 
 // Keep this as an owned public binding instead of a transitive re-export.
 // The store is shared by lazy route chunks; Rollup otherwise creates a

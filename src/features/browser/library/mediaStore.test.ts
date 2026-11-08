@@ -1,7 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { WorkspaceView } from "@/features/workspace";
+import type { WorkspaceView } from "@/features/app-windows";
 import { useBrowserMediaStore } from "./mediaStore";
-import { closeBrowserRuntime, syncBrowserWebview } from "@/features/webviews/browserRuntime";
+import {
+  closeBrowserRuntime,
+  syncBrowserWebview,
+} from "@/features/browser/webviews/browserRuntime";
 
 const invoke = vi.hoisted(() => vi.fn(() => Promise.resolve(true)));
 vi.mock("@tauri-apps/api/core", () => ({ invoke }));

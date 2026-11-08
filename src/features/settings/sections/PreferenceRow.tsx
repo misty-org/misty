@@ -1,8 +1,8 @@
 import { DesktopSettingsRow as Row } from "../components/DesktopSettingsUI";
-import { definitionById, fromLegacy } from "../devicePreferences/registry";
-import { useDevicePreferences } from "../devicePreferences/store";
+import { definitionById, fromLegacy } from "../device-preferences/registry";
+import { useDevicePreferences } from "../device-preferences/store";
 import { ChoiceControl, SwitchControl, TextControl } from "../SettingsControls";
-import { useSettingsStore } from "../store/useSettingsStore";
+import { useSettingsStore } from "../preferences/useSettingsStore";
 
 /** One preference from the settings registry, with its matching control. */
 export function PreferenceRow({ id, description }: { id: string; description?: string }) {

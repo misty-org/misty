@@ -1,7 +1,7 @@
 import { useMemo, type FormEvent } from "react";
-import { SpaceChatPicker } from "@/features/chat-composer/SpaceChatPicker";
-import type { SpaceChatDraft } from "@/features/chat-composer/useSpaceChatDraft";
-import type { MistyPickerSource } from "@/features/picker";
+import { SpaceChatPicker } from "../composer/SpaceChatPicker";
+import type { SpaceChatDraft } from "../composer/useSpaceChatDraft";
+import type { MistyPickerSource } from "@/features/files";
 import type { useSpaceAgentMembers } from "../../members/agents/useSpaceAgentMembers";
 import type { ChatSuggestionsState } from "../hooks/useChatSuggestions";
 import type { useComposerInput } from "../hooks/useComposerInput";

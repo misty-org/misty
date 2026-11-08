@@ -1,7 +1,7 @@
 import { ChevronDown, Hash, MoreHorizontal, Pencil, Plus, Trash2, User } from "lucide-react";
 import type { MouseEvent } from "react";
 import { useState, type ReactNode } from "react";
-import type { SpaceConversation } from "@/api/spaces/dto/entities";
+import type { SpaceConversation } from "../../api/dto/entities";
 import {
   Button,
   DropdownMenu,

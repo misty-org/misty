@@ -1,5 +1,5 @@
-import { spacesApi } from "@/api/spaces/api";
-import type { SpaceInvitation } from "@/api/spaces/dto/entities";
+import { spacesApi } from "../../api/api";
+import type { SpaceInvitation } from "../../api/dto/entities";
 import { Button, Card, IconButton } from "@/shared/ui";
 import { Link2, XCircle } from "lucide-react";
 import { useState } from "react";

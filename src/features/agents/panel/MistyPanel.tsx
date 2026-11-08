@@ -1,20 +1,20 @@
-import { useAgentAccountId } from "../agentAccount";
-import { openMistyConversationInNewTab } from "@/features/misty/handoff";
-import { useMistyStore } from "@/features/misty/useMistyStore";
+import { useAgentAccountId } from "../personal/agentAccount";
+import { openMistyConversationInNewTab } from "../conversations/ask/handoff";
+import { useMistyStore } from "../conversations/state/useMistyStore";
 import { useSettingsStore } from "@/features/settings";
 import { IconButton } from "@/shared/ui";
 import { ArrowUpRight, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import "../agentsWorkspace.css";
-import "../workspace/agentWorkspaceFrame.css";
+import "../page/agentsWorkspace.css";
+import "../methods/agentWorkspaceFrame.css";
 import "./mistyPanel.css";
-import { AgentWorkspaceConversation } from "../components/AgentWorkspaceConversation";
+import { AgentWorkspaceConversation } from "../conversations/view/AgentWorkspaceConversation";
 import { AgentConversationHeading } from "../page/AgentConversationHeading";
 import { PanelConversationPicker } from "./PanelConversationPicker";
-import { usePersonalAgentsStore } from "../personalAgentsStore";
+import { usePersonalAgentsStore } from "../personal/personalAgentsStore";
 import { MISTY_PANEL_WIDTH, useMistyPanelStore } from "./mistyPanelStore";
-import { AgentBrowserPip } from "../agentBrowser/AgentBrowserPip";
-import { setBrowserExpanded } from "../agentBrowser/agentBrowserStore";
+import { AgentBrowserPip } from "../agent-browser/AgentBrowserPip";
+import { setBrowserExpanded } from "../agent-browser/agentBrowserStore";
 
 export type MistyPanelSide = "left" | "right";
 

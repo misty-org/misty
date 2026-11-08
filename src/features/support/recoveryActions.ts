@@ -1,5 +1,5 @@
-import { useAppRouteMemoryStore } from "@/features/app-shell";
-import { useWorkspaceStore } from "@/features/workspace";
+import { useAppRouteMemoryStore } from "@/app/shell";
+import { useWorkspaceStore } from "@/features/app-windows";
 
 export function recoverLastClosedWorkspaceTab(): boolean {
   return Boolean(useWorkspaceStore.getState().reopenClosedView());

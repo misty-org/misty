@@ -1,7 +1,7 @@
 import { useState, type ComponentProps } from "react";
 import { CollectionFilters, ErrorNotification } from "@/shared/ui";
-import { useDevicePreferences } from "./devicePreferences/store";
-import { resolveSetting } from "./devicePreferences/model";
+import { useDevicePreferences } from "./device-preferences/store";
+import { resolveSetting } from "./device-preferences/settingResolution";
 
 type CollectionTabs = "space" | "journal" | "library";
 

@@ -7,7 +7,7 @@ import {
   type DockDropZone,
   type WorkspacePane,
   type WorkspaceView,
-} from "@/features/workspace";
+} from "@/features/app-windows";
 
 export function dropZoneAt(rect: DOMRect, x: number, y: number): DockDropZone {
   const localX = (x - rect.left) / Math.max(1, rect.width);

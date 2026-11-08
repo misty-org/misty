@@ -1,10 +1,10 @@
-import { readRunState } from "@/features/ai-surface/invocationSubscription";
-import { localDocuments } from "@/features/misty/localChats";
-import { newLocalConversation } from "@/features/misty/localConversation";
-import type { GlobalAiMessage } from "@/features/misty/types";
-import { useMistyStore } from "@/features/misty/useMistyStore";
-import { adoptFolderChanges } from "../store/useAgentsStore";
-import { useConversationFolder } from "../store/useConversationFolder";
+import { readRunState } from "../runs/invocations/invocationSubscription";
+import { localDocuments } from "../conversations/state/localChats";
+import { newLocalConversation } from "../conversations/state/localConversation";
+import type { GlobalAiMessage } from "../conversations/state/conversationTypes";
+import { useMistyStore } from "../conversations/state/useMistyStore";
+import { adoptFolderChanges } from "../personal/useAgentsStore";
+import { useConversationFolder } from "../shared-folders/useConversationFolder";
 import {
   completeScheduleRun,
   bindScheduleRun,
@@ -76,7 +76,11 @@ async function scheduleConversation(
     await useMistyStore.getState().loadConversations();
     if (held()) return known;
   }
-  const conversation = newLocalConversation(method.definition.title, method.space_id, method.agent_id);
+  const conversation = newLocalConversation(
+    method.definition.title,
+    method.space_id,
+    method.agent_id,
+  );
   useMistyStore.setState((state) => ({
     conversations: [
       conversation,
@@ -184,10 +188,14 @@ type RunOutcome = { live: true } | { live: false; error: string };
 const closedEarly = "Misty closed before this run finished.";
 
 /** The run's reply as this window holds it, or as it was last saved: a window just opened may not have it yet. */
-async function replyOf(account: string, schedule: LocalSchedule): Promise<GlobalAiMessage | undefined> {
+async function replyOf(
+  account: string,
+  schedule: LocalSchedule,
+): Promise<GlobalAiMessage | undefined> {
   const of = (messages: GlobalAiMessage[] | undefined) =>
     messages?.find(
-      (message) => message.role === "assistant" && message.invocationId === schedule.last_invocation_id,
+      (message) =>
+        message.role === "assistant" && message.invocationId === schedule.last_invocation_id,
     );
   const chatId = schedule.conversation_id ?? "";
   const held = useMistyStore.getState().conversations.find((item) => item.id === chatId);

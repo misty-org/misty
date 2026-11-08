@@ -1,4 +1,4 @@
-import { useAppStore } from "@/features/app-shell";
+import { useAppStore } from "@/app/shell";
 import { Button, Input } from "@/shared/ui";
 import { memo, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -11,12 +11,12 @@ import {
   SettingsSearchResults,
   type SettingsSearchResult,
 } from "./components/SettingsSearchResults";
-import { SettingsPageScope } from "./devicePreferences/SettingScope";
+import { SettingsPageScope } from "./device-preferences/SettingScope";
 import {
   blockIfUnsaved,
   setSettingsStaging,
   useDevicePreferences,
-} from "./devicePreferences/store";
+} from "./device-preferences/store";
 import { settingsErrorMessage } from "./settingsErrors";
 import {
   canonicalSettingsSection,
@@ -26,21 +26,20 @@ import {
   settingsRegistry,
 } from "./settingsRegistry";
 import type { SettingsContentProps, SettingsSection } from "./settingsTypes";
-import { useSettingsStore } from "./store/useSettingsStore";
+import { useSettingsStore } from "./preferences/useSettingsStore";
 import { useFocusSettingRow } from "./useFocusSettingRow";
 
-;
-;
-
-const navGroups: DesktopSettingsNavGroup<SettingsSection>[] = settingsGroups.map((group) => ({
-  label: group.label,
-  items: group.areas.flatMap((area) => {
-    const first = settingsAreaEntry(area);
-    return first
-      ? [{ id: first.id, label: settingsAreas[area].label, icon: settingsAreas[area].icon }]
-      : [];
-  }),
-}));
+// Read when the page renders, after the app has registered the feature sections.
+const navGroups = (): DesktopSettingsNavGroup<SettingsSection>[] =>
+  settingsGroups.map((group) => ({
+    label: group.label,
+    items: group.areas.flatMap((area) => {
+      const first = settingsAreaEntry(area);
+      return first
+        ? [{ id: first.id, label: settingsAreas[area].label, icon: settingsAreas[area].icon }]
+        : [];
+    }),
+  }));
 
 interface SettingsWorkspaceProps {
   presentation?: "page" | "overlay";
@@ -116,7 +115,7 @@ export const SettingsWorkspace = memo(function SettingsWorkspace(props: Settings
     <DesktopSettingsFrame
       activeId={pageEntries[0].id}
       ariaLabel="Settings"
-      groups={navGroups}
+      groups={navGroups()}
       navigationLabel="Settings sections"
       onClose={() => {
         if (!blockIfUnsaved()) props.onClose?.();
@@ -188,4 +187,3 @@ export const SettingsWorkspace = memo(function SettingsWorkspace(props: Settings
 });
 
 export default SettingsWorkspace;
-;

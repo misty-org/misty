@@ -1,14 +1,20 @@
 import { cleanup, fireEvent, render } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, expect, it, vi } from "vitest";
-import { spacesApi } from "@/api/spaces/api";
-import type { SpacesStore } from "../store/spacesStoreTypes";
-import { useSpacesStore } from "../store/useSpacesStore";
+import { spacesApi } from "@/features/spaces/api/api";
+import type { SpacesStore } from "../list/spacesStoreTypes";
+import { useSpacesStore } from "../list/useSpacesStore";
 import { SpaceChat } from "./SpaceChat";
 import type { SpaceChatThreadProps } from "./components/SpaceChatThread";
 
-vi.mock("@/features/auth", () => ({ useAuth: () => ({ user: { id: "viewer" } }) }));
-vi.mock("@/features/ai-surface/AiPaneHost", () => ({ useAiSurfaceAdapter: vi.fn() }));
+vi.mock("@/features/account", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useAuth: () => ({ user: { id: "viewer" } }),
+}));
+vi.mock("@/features/agents/runs/markdown/AiPaneHost", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useAiSurfaceAdapter: vi.fn(),
+}));
 
 // Exercise the real landing branch and message scope without the message editor.
 vi.mock("./components/SpaceChatThread", () => ({

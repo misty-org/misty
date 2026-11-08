@@ -14,7 +14,7 @@ import { Input } from "../../controls/Input";
 import { NavIsland, NavIslandItem } from "../../navigation/NavIsland";
 import { Toolbar, ToolbarGroup } from "../../layout/Toolbar";
 import { Separator } from "../../layout/Separator";
-import { cn } from "../../utils";
+import { cn } from "../../classNames";
 import { CollectionColumnChooser, CollectionColumnsContext } from "./CollectionColumns";
 
 export function CollectionHeading({ title, actions }: { title: string; actions?: ReactNode }) {

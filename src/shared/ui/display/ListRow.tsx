@@ -1,5 +1,5 @@
 import * as React from "react";
-import { cn } from "../utils";
+import { cn } from "../classNames";
 
 /** A hoverable list row: leading icon, a primary ListRowButton, then trailing actions. */
 const ListRow = React.forwardRef<HTMLLIElement, React.ComponentPropsWithoutRef<"li">>(

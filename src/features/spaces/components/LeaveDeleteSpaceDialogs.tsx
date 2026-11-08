@@ -1,4 +1,4 @@
-import { SystemErrorNotice } from "@/features/support/systemErrors";
+import { SystemErrorNotice } from "@/shared/platform/systemErrors";
 import {
   AlertDialog,
   AlertDialogAction,

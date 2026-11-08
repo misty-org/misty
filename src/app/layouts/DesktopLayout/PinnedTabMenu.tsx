@@ -1,19 +1,14 @@
 import { AudioLines, Pin, PinOff, RotateCcw, Star, StarOff } from "lucide-react";
 import { captureTab } from "@/features/voice";
-import { browserRuntimeId } from "@/features/browser";
-import {
-  addFavorite,
-  isFavorite,
-  removeFavorite,
-  useFavorites,
-} from "@/features/bookmarks/favorites";
-import { dockTreeViews } from "@/features/workspace/dockTree";
-import { activeLayoutView } from "@/features/workspace/layoutTabs";
-import { parseBrowserViewState, type WorkspaceTab } from "@/features/workspace/model";
-import { pinnableTabUrl } from "@/features/workspace/pinnedTabs";
-import { useWorkspaceStore } from "@/features/workspace/useWorkspaceStore";
+import { browserRuntimeId } from "@/features/app-windows";
+import { addFavorite, isFavorite, removeFavorite, useFavorites } from "@/features/browser";
+import { dockTreeViews } from "@/features/app-windows";
+import { activeLayoutView } from "@/features/app-windows";
+import { parseBrowserViewState, type WorkspaceTab } from "@/features/app-windows";
+import { pinnableTabUrl } from "@/features/app-windows";
+import { useWorkspaceStore } from "@/features/app-windows";
 import { ContextMenuAction } from "@/shared/ui";
-import { isIncognitoWindow } from "@/features/workspace/profileWindow";
+import { isIncognitoWindow } from "@/features/app-windows";
 
 /** Pin and favorite actions for the page in a tab's right-click menu. */
 export function TabPageMenu({ tab }: { tab: WorkspaceTab }) {

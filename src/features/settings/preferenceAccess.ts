@@ -1,4 +1,4 @@
 /** A light entry for other features to read and write this device's preferences. */
-export { writeDevicePreference } from "./devicePreferences/bridge";
-export { effectiveValues } from "./devicePreferences/model";
-export { useDevicePreferences } from "./devicePreferences/store";
+export { writeDevicePreference } from "./device-preferences/bridge";
+export { effectiveValues } from "./device-preferences/settingResolution";
+export { useDevicePreferences } from "./device-preferences/store";

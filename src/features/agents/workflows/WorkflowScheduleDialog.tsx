@@ -6,7 +6,7 @@ import {
   type AgentMethodInputs,
   type ScheduleRule,
   type WorkflowSchedule,
-} from "@/api/ai/agent-methods";
+} from "../api/agent-methods";
 import {
   Button,
   Dialog,
@@ -18,9 +18,9 @@ import {
   OptionSelect,
   Switch,
 } from "@/shared/ui";
-import { currentProfile } from "@/features/workspace/profileWindow";
-import { methodError } from "../workspace/agentMethodDefinition";
-import { AgentMethodInputFields } from "../workspace/AgentMethodInputFields";
+import { currentProfile } from "@/features/app-windows";
+import { methodError } from "../methods/agentMethodDefinition";
+import { AgentMethodInputFields } from "../methods/AgentMethodInputFields";
 import { ScheduleRuleEditor } from "./ScheduleRuleEditor";
 import { ruleFor } from "./scheduleRules";
 import { ScheduleComputerField } from "./ScheduleComputerField";

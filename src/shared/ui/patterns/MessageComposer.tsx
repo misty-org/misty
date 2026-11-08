@@ -11,7 +11,7 @@ import { ArrowUp } from "lucide-react";
 import { Textarea } from "../controls/Textarea";
 import { IconButton, type IconButtonProps } from "../controls/IconButton";
 import { Spinner } from "../feedback/Spinner";
-import { cn } from "../utils";
+import { cn } from "../classNames";
 
 /** Shared by the input and mention overlay so wrapping stays aligned. */
 export const messageComposerTextClass =

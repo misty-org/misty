@@ -1,3 +1,4 @@
+import "@/app/featureSeams";
 import type * as DeploymentApi from "@/api/deployment/api";
 import type * as AgentsModule from "@/features/agents";
 import { act } from "react";
@@ -11,7 +12,8 @@ const mocks = vi.hoisted(() => ({
   titlebarPointerDown: vi.fn(),
 }));
 
-vi.mock("@/features/auth", () => ({
+vi.mock("@/features/account", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   useAuth: () => ({
     user: mocks.user,
     refreshUser: vi.fn().mockResolvedValue(mocks.user),
@@ -24,7 +26,8 @@ vi.mock("@/features/auth", () => ({
   AccountSuspendedNotice: () => null,
 }));
 
-vi.mock("@/features/workspace", () => ({
+vi.mock("@/features/app-windows", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   useWindowDockingLayout: () => ({ navigation: "right", tabs: "left" }),
   useWorkspaceStore: (selector: (state: { openSurface: () => void }) => unknown) =>
     selector({
@@ -83,7 +86,8 @@ vi.mock("./useDesktopFrameStyle", () => ({
   useDesktopFrameStyle: () => ({ app: null }),
 }));
 
-vi.mock("@/features/shortcuts", () => ({
+vi.mock("@/features/shortcuts", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   useShortcutHandler: vi.fn(),
   registerShortcutHandler: vi.fn(() => () => undefined),
 }));
@@ -93,7 +97,8 @@ vi.mock("@/api/deployment/api", async (importOriginal) => ({
   resolveApiBase: async () => "https://api.example.test/v1",
 }));
 
-vi.mock("@/features/auth/AuthContext", () => ({
+vi.mock("@/features/account/AuthContext", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   useAuth: () => ({
     user: mocks.user,
     accounts: [{ id: "saved-account", name: "Test Account", email: "test@example.test" }],
@@ -102,35 +107,54 @@ vi.mock("@/features/auth/AuthContext", () => ({
   }),
 }));
 
-vi.mock("@/features/setup", () => ({
+vi.mock("@/features/onboarding/setup", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   useSetupStore: { getState: () => ({ finishWelcome: vi.fn() }) },
 }));
 
 vi.mock("./AccountMenu", () => ({ AccountMenu: () => null }));
 vi.mock("./SettingsOverlays", () => ({ RemotesOverlay: () => null, SettingsOverlay: () => null }));
 vi.mock("./FramePacingOverlay", () => ({ FramePacingOverlay: () => null }));
-vi.mock("@/features/browser/workspace", () => ({
+vi.mock("@/features/browser/pages", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   BrowserRuntimeBridge: () => null,
   setBrowserWebviewsSuspended: vi.fn(),
 }));
-vi.mock("@/features/webviews/BrowserRuntimeBridge", () => ({ BrowserRuntimeBridge: () => null }));
-vi.mock("@/features/browser-search/BrowserSearchDialog", () => ({
+vi.mock("@/features/browser/webviews/BrowserRuntimeBridge", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  BrowserRuntimeBridge: () => null,
+}));
+vi.mock("@/features/browser/search/BrowserSearchDialog", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   BrowserSearchDialog: () => null,
 }));
-vi.mock("@/features/webviews/browserRuntime", () => ({
+vi.mock("@/features/browser/webviews/browserRuntime", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   setBrowserWebviewsSuspended: vi.fn(),
   setBrowserPointerTrackingEnabled: vi.fn(),
   isBrowserRuntimeCreated: vi.fn(() => false),
   onBrowserRuntimeClose: vi.fn(() => () => {}),
   windowChromeChangedEvent: "misty:window-chrome-changed",
 }));
-vi.mock("@/features/misty/BrowserContextMenuBridge", () => ({
-  BrowserContextMenuBridge: () => null,
+vi.mock("@/features/app-windows/page-runtime/browserOverlayRuntime", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  setBrowserWebviewsSuspended: vi.fn(),
 }));
-vi.mock("@/features/agents/workflows/WorkflowSchedulesBridge", () => ({
+vi.mock(
+  "@/features/agents/conversations/context/BrowserContextMenuBridge",
+  async (importOriginal) => ({
+    ...(await importOriginal<Record<string, unknown>>()),
+    BrowserContextMenuBridge: () => null,
+  }),
+);
+vi.mock("@/features/agents/workflows/WorkflowSchedulesBridge", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   WorkflowSchedulesBridge: () => null,
 }));
-vi.mock("@/features/agents/AgentJobWorker", () => ({ AgentJobWorker: () => null }));
+vi.mock("@/features/agents/runs/jobs/AgentJobWorker", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  AgentJobWorker: () => null,
+}));
 vi.mock("@/features/agents", async (importOriginal) => {
   const actual = await importOriginal<typeof AgentsModule>();
   return {
@@ -139,10 +163,10 @@ vi.mock("@/features/agents", async (importOriginal) => {
   };
 });
 
-import { SavedAccountSessionUnavailableError } from "@/features/auth/sessionErrors";
-import SignIn from "@/features/auth/SignInPage";
-import { notifyAccountScopeReset } from "@/features/auth/store/accountEvents";
-import { useNavigationNames } from "@/features/navigation-names/store";
+import { SavedAccountSessionUnavailableError } from "@/features/account/sessions/sessionErrors";
+import SignIn from "@/features/account/pages/SignInPage";
+import { notifyAccountScopeReset } from "@/features/account/sessions/accountEvents";
+import { useNavigationNames } from "@/features/app-windows/navigation-names/store";
 import { useSettingsStore } from "@/features/settings";
 import { useMistyPanelStore } from "@/features/agents";
 import { DesktopLayout } from "./index";

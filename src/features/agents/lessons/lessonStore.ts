@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { localChats } from "@/features/misty/localChats";
+import { localChats } from "../conversations/state/localChats";
 import { applyLessonReply } from "./lessonRouter";
 import type { Course, CoursePlan, Lesson, LessonPatch, LessonRoute } from "./lessonTypes";
 

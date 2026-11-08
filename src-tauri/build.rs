@@ -10,87 +10,6 @@ fn main() {
     expose_public_app_configuration();
     build_builtin_workers();
     if env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("macos") {
-        // Objective-C availability checks need Clang's runtime when targeting
-        // older macOS versions. Rust links with -nodefaultlibs, so the driver
-        // does not add it automatically (debug builds on newer SDKs can hide this).
-        let runtime = cc::Build::new()
-            .get_compiler()
-            .to_command()
-            .arg("--print-runtime-dir")
-            .output()
-            .expect("could not locate the macOS Clang runtime");
-        assert!(
-            runtime.status.success(),
-            "could not locate the macOS Clang runtime"
-        );
-        let runtime_dir = String::from_utf8(runtime.stdout).expect("invalid Clang runtime path");
-        println!("cargo:rustc-link-search=native={}", runtime_dir.trim());
-        println!("cargo:rustc-link-lib=static=clang_rt.osx");
-        println!("cargo:rerun-if-changed=native/macos/MistyContext.m");
-        println!("cargo:rerun-if-changed=native/macos/MistyLocalAuth.m");
-        println!("cargo:rerun-if-changed=native/macos/MistyExtensions.m");
-        println!("cargo:rerun-if-changed=native/macos/MistyExtensionRequests.m");
-        println!("cargo:rerun-if-changed=native/macos/MistyExtensionDelegate.m");
-        println!("cargo:rerun-if-changed=native/macos/MistyExtensionsBridge.m");
-        println!("cargo:rerun-if-changed=native/macos/MistyExtensionsInternal.h");
-        println!("cargo:rerun-if-changed=native/macos/MistyExtensionTabs.m");
-        println!("cargo:rerun-if-changed=native/macos/MistyExtensionPopupWindows.m");
-        println!("cargo:rerun-if-changed=native/macos/MistyExtensionCompat.m");
-        println!("cargo:rerun-if-changed=native/macos/MistyExtensionCompatActions.m");
-        println!("cargo:rerun-if-changed=native/macos/MistyExtensionNotifications.m");
-        println!("cargo:rerun-if-changed=native/macos/MistyExtensions.h");
-        println!("cargo:rerun-if-changed=native/macos/MistyExtensionNativeMessaging.m");
-        println!("cargo:rerun-if-changed=native/macos/MistyExtensionNativeMessaging.h");
-        println!("cargo:rerun-if-changed=native/macos/MistyCompanionCapture.m");
-        println!("cargo:rerun-if-changed=native/macos/MistyCompanionPointing.m");
-        println!("cargo:rerun-if-changed=native/macos/MistyAutopilot.m");
-        println!("cargo:rerun-if-changed=native/macos/MistyBrowserInput.m");
-        println!("cargo:rerun-if-changed=native/macos/MistyDesktopControl.m");
-        println!("cargo:rerun-if-changed=native/macos/MistyDesktopControlInternal.h");
-        println!("cargo:rerun-if-changed=native/macos/MistyDesktopIsland.m");
-        println!("cargo:rerun-if-changed=native/macos/MistyAgentPointer.m");
-        println!("cargo:rerun-if-changed=native/macos/MistyAgentPointer.h");
-        println!("cargo:rerun-if-changed=native/macos/MistyAgentRing.m");
-        println!("cargo:rerun-if-changed=native/macos/MistyAgentRing.h");
-        println!("cargo:rerun-if-changed=native/macos/MistyAgentRingInternal.h");
-        println!("cargo:rerun-if-changed=native/macos/MistyAgentWindowRing.m");
-        println!("cargo:rerun-if-changed=native/macos/MistyDesktopCapture.m");
-        println!("cargo:rerun-if-changed=native/macos/MistyDesktopCapture.h");
-        println!("cargo:rerun-if-changed=native/macos/MistyDefaultBrowser.m");
-        println!("cargo:rerun-if-changed=native/macos/MistyDictationInsert.m");
-        println!("cargo:rerun-if-changed=native/macos/MistySpaceDock.m");
-        cc::Build::new()
-            .file("native/macos/MistyContext.m")
-            .file("native/macos/MistyExtensions.m")
-            .file("native/macos/MistyExtensionRequests.m")
-            .file("native/macos/MistyExtensionDelegate.m")
-            .file("native/macos/MistyExtensionsBridge.m")
-            .file("native/macos/MistyExtensionTabs.m")
-            .file("native/macos/MistyExtensionPopupWindows.m")
-            .file("native/macos/MistyExtensionCompat.m")
-            .file("native/macos/MistyExtensionCompatActions.m")
-            .file("native/macos/MistyExtensionNotifications.m")
-            .file("native/macos/MistyExtensionNativeMessaging.m")
-            .file("native/macos/MistyCompanionCapture.m")
-            .file("native/macos/MistyCompanionPointing.m")
-            .file("native/macos/MistyAutopilot.m")
-            .file("native/macos/MistyBrowserInput.m")
-            .file("native/macos/MistyDesktopControl.m")
-            .file("native/macos/MistyDesktopIsland.m")
-            .file("native/macos/MistyAgentPointer.m")
-            .file("native/macos/MistyAgentRing.m")
-            .file("native/macos/MistyAgentWindowRing.m")
-            .file("native/macos/MistyDesktopCapture.m")
-            .file("native/macos/MistyDefaultBrowser.m")
-            .file("native/macos/MistyLocalAuth.m")
-            .file("native/macos/MistyDictationInsert.m")
-            .file("native/macos/MistySpaceDock.m")
-            .flag("-fobjc-arc")
-            .flag("-fblocks")
-            .compile("misty_context");
-        // Category-only objects (MistyExtensionCompat*.m, MistyExtensionNotifications.m)
-        // export no symbols, so ld drops them from the static archive without -ObjC.
-        println!("cargo:rustc-link-arg=-Wl,-ObjC");
         println!("cargo:rustc-link-arg=-Wl,-weak_framework,ScreenCaptureKit");
         for framework in [
             "AppKit",
@@ -123,13 +42,13 @@ fn main() {
 /// The sandbox's actions, grants and permissions. Listing the app's
 /// commands makes Tauri refuse any command no capability allows, for every window.
 fn sandbox_attributes() -> tauri_build::Attributes {
-    const APP_COMMANDS: &[&str] = include!("sandbox/app_commands.in");
+    const APP_COMMANDS: &[&str] = include!("tauri-permissions/app_commands.in");
     tauri_build::Attributes::new()
-        .capabilities_path_pattern("./sandbox/capabilities/*.json")
+        .capabilities_path_pattern("./tauri-permissions/capabilities/*.json")
         .app_manifest(
             tauri_build::AppManifest::new()
                 .commands(APP_COMMANDS)
-                .permissions_path_pattern("./sandbox/*/*.toml"),
+                .permissions_path_pattern("./tauri-permissions/*/*.toml"),
         )
 }
 
@@ -137,10 +56,11 @@ fn sandbox_attributes() -> tauri_build::Attributes {
 /// gets it. Every binary that links this crate imports comctl32 v6 entry
 /// points, so unit tests and examples need it too or they fail to start with
 /// STATUS_ENTRYPOINT_NOT_FOUND. The linker embeds it everywhere instead,
-/// with the Windows versions Misty supports (`windows/compatibility.manifest`).
+/// with the Windows versions Misty supports (`packaging/windows/compatibility.manifest`).
 fn embed_common_controls_manifest() {
     let compatibility =
         PathBuf::from(env::var_os("CARGO_MANIFEST_DIR").expect("Cargo manifest directory"))
+            .join("packaging")
             .join("windows")
             .join("compatibility.manifest");
     println!("cargo:rerun-if-changed={}", compatibility.display());
@@ -199,22 +119,22 @@ fn build_builtin_workers() {
     let root = env::var_os("CARGO_MANIFEST_DIR")
         .map(PathBuf::from)
         .unwrap_or_else(|| PathBuf::from("."))
-        .join("services");
+        .join("features");
     let target = env::var("TARGET").expect("Cargo target");
     let profile = env::var("PROFILE").expect("Cargo profile");
     let out_dir = PathBuf::from(env::var_os("OUT_DIR").expect("Cargo output directory"));
     let mut source = String::from("match (service, protocol) {\n");
-    // The page reader's code is in a crate the agent runtime shares, outside its service's folder.
-    let shared = root.with_file_name("crates").join("page-reader");
+    // The page reader's code is in a crate the agent runtime shares, outside its worker's folder.
+    let shared = root.join("browser").join("page_text");
     for input in ["src", "Cargo.toml"] {
         println!("cargo:rerun-if-changed={}", shared.join(input).display());
     }
-    for (service, protocol) in [
-        ("document-processing", 6),
-        ("page-reader", 1),
-        ("agent-shell", 1),
+    for (service, protocol, folder) in [
+        ("document-processing", 6, "documents/worker"),
+        ("page-reader", 1, "browser/page_text/worker"),
+        ("agent-shell", 1, "agents/shell/worker"),
     ] {
-        let directory = root.join(service);
+        let directory = root.join(folder);
         for input in ["src", "Cargo.toml", "Cargo.lock"] {
             println!("cargo:rerun-if-changed={}", directory.join(input).display());
         }

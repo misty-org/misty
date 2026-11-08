@@ -1,7 +1,7 @@
-import type { AgentMethodInputs, ScheduleTiming } from "@/api/ai/agent-methods";
-import { localDocuments } from "@/features/misty/localChats";
-import { firstProfileId } from "@/features/workspace/profileWindow";
-import { changeDocument, RunStateError } from "../localTools/runState/documents";
+import type { AgentMethodInputs, ScheduleTiming } from "../api/agent-methods";
+import { localDocuments } from "../conversations/state/localChats";
+import { firstProfileId } from "@/features/app-windows";
+import { changeDocument, RunStateError } from "../tools/run-state/documents";
 import { allMethods, methodById } from "./localMethods";
 import {
   iso,

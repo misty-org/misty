@@ -1,4 +1,4 @@
-import { useNavigationNames } from "@/features/navigation-names/store";
+import { useNavigationNames } from "@/features/app-windows";
 import { registerShortcutHandler, useShortcutHandler } from "@/features/shortcuts";
 import {
   canCloseWorkspaceView,
@@ -6,9 +6,9 @@ import {
   findDockLeaf,
   useWorkspaceStore,
   type WorkspaceView,
-} from "@/features/workspace";
-import { layoutTabs } from "@/features/workspace/layoutTabs";
-import { closePeek, usePeekStore } from "@/features/workspace/peek";
+} from "@/features/app-windows";
+import { layoutTabs } from "@/features/app-windows";
+import { closePeek, usePeekStore } from "@/features/app-windows";
 import { useCallback, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 

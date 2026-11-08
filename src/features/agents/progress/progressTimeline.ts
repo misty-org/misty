@@ -1,5 +1,5 @@
-import type { AiInvocationEvent, AiProgressItem } from "@/features/ai-surface/types";
-import { companionReply } from "../companion/companionReply";
+import type { AiInvocationEvent, AiProgressItem } from "../runs/invocations/invocationTypes";
+import { companionReply } from "../cursor/companionReply";
 
 export type ProgressTool = Extract<AiProgressItem, { type: "tool" }>;
 type ProgressGroup =

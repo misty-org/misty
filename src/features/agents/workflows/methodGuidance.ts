@@ -1,4 +1,4 @@
-import { RunStateError } from "../localTools/runState/documents";
+import { RunStateError } from "../tools/run-state/documents";
 import { allMethods, methodAtVersion, methodsOf } from "./localMethods";
 
 /**

@@ -1,12 +1,12 @@
-import { useMistyStore } from "@/features/misty/useMistyStore";
+import { useMistyStore } from "../conversations/state/useMistyStore";
 import {
   currentProfile,
   currentWindowId,
   isHostWindow,
   listProfiles,
   openProfile,
-} from "@/features/workspace/profileWindow";
-import { holdAwake, releaseAwake } from "../keepAwake";
+} from "@/features/app-windows";
+import { holdAwake, releaseAwake } from "../runs/jobs/keepAwake";
 import { allMethods, methodById, type LocalMethod } from "./localMethods";
 import { scheduledRunOutcome, startScheduledRun } from "./localScheduledRun";
 import {

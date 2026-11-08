@@ -1,8 +1,8 @@
 import { useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import type { Space } from "@/api/spaces/dto/entities";
-import { setItemVisibility, type ItemVisibility } from "@/api/spaces/visibility";
-import { useAuth } from "@/features/auth";
+import type { Space } from "../api/dto/entities";
+import { setItemVisibility, type ItemVisibility } from "../api/visibility";
+import { useAuth } from "@/features/account";
 import { OrderedCollectionFilters } from "@/features/settings/OrderedCollectionFilters";
 import {
   Button,
@@ -19,9 +19,9 @@ import {
 import { useRangeSelection } from "@/shared/hooks/useRangeSelection";
 import { confirmAction } from "@/shared/lib/confirmAction";
 import { useSpacesStore } from "@/features/spaces/core";
-import { closeDrawingCollaborationSession, notifyDrawingListChanged } from "@/features/journal";
-import { preloadSpaceSection } from "../SpaceSectionView";
-import { useSpaceItemCreator } from "../useSpaceItemCreator";
+import { closeDrawingCollaborationSession, notifyDrawingListChanged } from "../journal";
+import { preloadSpaceSection } from "../overview/SpaceSectionView";
+import { useSpaceItemCreator } from "../overview/useSpaceItemCreator";
 import { editedLabel, galleryFilters, type GalleryItem, isGalleryFilter } from "./galleryItems";
 import { GalleryPreview, kindIcon } from "./GalleryPreview";
 import { readHomePreference, writeHomePreference } from "./homePreferences";

@@ -39,8 +39,6 @@ export * from "./overlays/SuggestionList";
 export * from "./overlays/Tooltip";
 export * from "./overlays/ViewportLayer";
 export * from "./overlays/WorkspaceOverlay";
-;
-
 // layout
 export * from "./layout/Collapsible";
 export * from "./layout/MarqueeGroup";
@@ -84,7 +82,7 @@ export * from "./patterns/CollectionFilterMenu";
 export * from "./patterns/CollectionItemDialog";
 export * from "./patterns/CollectionSelectionBar";
 
-export * from "./utils";
+export * from "./classNames";
 
 export {
   MessageComposer,

@@ -1,5 +1,5 @@
 import { apiRequest } from "@/api/client";
-import { deviceModelCall } from "@/api/device-models";
+import { deviceModelCall } from "@/api/runtime/device-models";
 
 /** One speaker's continuous speech, in seconds from the start. */
 export interface VoiceTurn {

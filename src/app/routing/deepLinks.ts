@@ -1,8 +1,8 @@
 import { invoke } from "@tauri-apps/api/core";
-import { deliverGoogleSignInCode } from "@/features/auth/googleSignInCode";
-import { openSetupDeepLink } from "@/features/auth/setupLinks";
-import { openExternalLink } from "@/features/workspace/externalLinks";
-import { isLinkTargetWindow } from "@/features/workspace/profileWindow";
+import { deliverGoogleSignInCode } from "@/features/account";
+import { openSetupDeepLink } from "@/features/account";
+import { openExternalLink } from "@/features/browser";
+import { isLinkTargetWindow } from "@/features/app-windows";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { getCurrent, onOpenUrl } from "@tauri-apps/plugin-deep-link";

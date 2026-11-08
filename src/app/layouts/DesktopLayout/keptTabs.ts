@@ -1,6 +1,6 @@
-import { dockTreeViews } from "@/features/workspace/dockTree";
-import type { WorkspaceDockNode, WorkspaceView } from "@/features/workspace/model";
-import { migrateRetiredWorkspaceView } from "@/features/workspace/workspaceMigrations";
+import { dockTreeViews } from "@/features/app-windows";
+import type { WorkspaceDockNode, WorkspaceView } from "@/features/app-windows";
+import { migrateRetiredWorkspaceView } from "@/features/app-windows";
 
 /**
  * Whether a hidden tab keeps its layout instead of leaving the page (`[data-tab-kept]`, which

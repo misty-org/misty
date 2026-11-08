@@ -13,9 +13,13 @@ vi.mock("./MistyPanel", () => ({
 }));
 
 const suspend = vi.hoisted(() => vi.fn());
-vi.mock("@/features/webviews/browserRuntime", () => ({
+vi.mock("@/features/browser/webviews/browserRuntime", () => ({
   setBrowserWebviewsSuspended: suspend,
   onBrowserRuntimeClose: () => () => undefined,
+}));
+vi.mock("@/features/app-windows/page-runtime/browserOverlayRuntime", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  setBrowserWebviewsSuspended: suspend,
 }));
 
 afterEach(() => {

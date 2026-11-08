@@ -1,11 +1,11 @@
-import type { DesktopPlatform } from "@/app/layouts/model";
+import type { DesktopPlatform } from "@/app/layouts/desktop-state";
 import {
   enableModernWindowStyle,
   sideTabTrafficLightNudgeX,
   trafficLightOffsetDefault,
   trafficLightRestY,
 } from "@/native";
-import { useWindowDockingLayout } from "@/features/workspace";
+import { useWindowDockingLayout } from "@/features/app-windows";
 import { dockingMetrics } from "./dockingGeometry";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { getCurrentWebview } from "@tauri-apps/api/webview";

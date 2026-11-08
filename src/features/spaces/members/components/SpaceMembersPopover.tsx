@@ -1,8 +1,8 @@
-import { useAuth } from "@/features/auth";
+import { useAuth } from "@/features/account";
 import { personInitials } from "@/shared/lib/personInitials";
-import type { SpacePresenceViewer } from "@/features/spaces";
-import { useSpacesStore } from "@/features/spaces";
-import type { Space, SpaceMember } from "@/api/spaces/dto/entities";
+import type { SpacePresenceViewer } from "../../list/realtimeTypes";
+import { useSpacesStore } from "../../list/useSpacesStore";
+import type { Space, SpaceMember } from "../../api/dto/entities";
 import { avatarColorClass, avatarInkClass } from "@/shared/lib/avatarPalette";
 import {
   Avatar,
@@ -20,7 +20,7 @@ import { useEffect, useMemo, useState, type ReactElement } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { SpaceAgentRow } from "../agents/SpaceAgentRow";
 import { agentsByOwner, useSpaceAgentMembers } from "../agents/useSpaceAgentMembers";
-import type { SpaceAgent } from "@/api/spaces/space-agents";
+import type { SpaceAgent } from "@/features/agents";
 
 const emptyMembers: SpaceMember[] = [];
 const emptyViewers: SpacePresenceViewer[] = [];

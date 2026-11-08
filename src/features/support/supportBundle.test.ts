@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { buildSupportBundle } from "./supportBundle";
-import { clearSystemErrors, reportSystemError } from "./systemErrors";
+import { clearSystemErrors, reportSystemError } from "../../shared/platform/systemErrors";
 
 describe("support bundle", () => {
   beforeEach(() => {

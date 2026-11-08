@@ -1,11 +1,11 @@
-import type { DesktopPlatform, WindowBounds, WindowRect } from "@/app/layouts/model";
+import type { DesktopPlatform, WindowBounds, WindowRect } from "@/app/layouts/desktop-state";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { PhysicalPosition, PhysicalSize } from "@tauri-apps/api/dpi";
 import { currentMonitor, getCurrentWindow, primaryMonitor } from "@tauri-apps/api/window";
 import type { Dispatch, SetStateAction } from "react";
 import { useCallback, useRef } from "react";
 import { isSignedOutWindowLocked } from "./useSignedOutWindow";
-import { windowRectsMatch } from "./windowChromeHelpers";
+import { windowRectsMatch } from "./windowChromeDrag";
 
 export function useTitlebarZoom(
   desktopPlatform: DesktopPlatform,

@@ -5,7 +5,7 @@ import {
   type MistyPanelView,
 } from "@/features/agents";
 import { SpaceChatPanel } from "@/features/spaces";
-import { dockLeaves, spaceWorkspaceToolFromRoute, useWorkspaceStore } from "@/features/workspace";
+import { dockLeaves, spaceWorkspaceToolFromRoute, useWorkspaceStore } from "@/features/app-windows";
 import { useMemo } from "react";
 
 /**

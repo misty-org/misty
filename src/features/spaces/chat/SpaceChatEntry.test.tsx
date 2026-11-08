@@ -1,9 +1,9 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { afterEach, expect, it, vi } from "vitest";
-import { useSpacesStore } from "../store/useSpacesStore";
+import { useSpacesStore } from "../list/useSpacesStore";
 import { SpaceChatEntry } from "./SpaceChatEntry";
-vi.mock("@/features/auth", () => ({ useAuth: () => ({ user: { id: "owner" } }) }));
+vi.mock("@/features/account", () => ({ useAuth: () => ({ user: { id: "owner" } }) }));
 vi.mock("./hooks/useSpaceChatAccess", () => ({
   useSpaceChatAccess: () => ({ isOwner: false, canWriteMessages: true }),
 }));

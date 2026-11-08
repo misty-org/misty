@@ -1,4 +1,4 @@
-import { cn } from "../utils";
+import { cn } from "../classNames";
 /**
  * One popup language for every dropdown, context menu, select, and popover.
  * Primitives compose these; call sites should only set width/height/layout,

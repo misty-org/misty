@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import { sidebarWidthMin, useSidebarWidthStore } from "@/features/app-shell/sidebarWidth";
+import { sidebarWidthMin, useSidebarWidthStore } from "@/app/shell/sidebarWidth";
 import { useSitePermissionAsks } from "@/features/browser/sitePermissionAsks";
-import { useSidebarCollapsedStore } from "@/features/app-shell/sidebarCollapsed";
+import { useSidebarCollapsedStore } from "@/app/shell/sidebarCollapsed";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
@@ -13,7 +13,7 @@ import {
 import {
   setBrowserPointerTrackingEnabled,
   setBrowserWebviewsSuspended,
-} from "@/features/webviews/browserRuntime";
+} from "@/features/app-windows";
 import { dockingMetrics } from "./dockingGeometry";
 
 /** The sidebar header shares the Space bar's centerline, so the window buttons that sit on it drop

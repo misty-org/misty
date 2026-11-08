@@ -1,5 +1,5 @@
-import type { SpaceChatDraft } from "@/features/chat-composer/useSpaceChatDraft";
-import type { MistyPickerSource } from "@/features/picker";
+import type { SpaceChatDraft } from "../composer/useSpaceChatDraft";
+import type { MistyPickerSource } from "@/features/files";
 import {
   cn,
   IconButton,

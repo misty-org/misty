@@ -9,20 +9,32 @@ default-run = "misty-desktop"
 
 [lib]
 name = "misty_native"
+path = "features/lib.rs"
 crate-type = ["lib"]
 
 [[bin]]
 name = "misty-desktop"
-path = "src/main.rs"
+path = "features/main.rs"
 
 [[test]]
 name = "webview_url"
-path = "tests/webview_url.rs"
+path = "features/browser/pages/tests/webview_url.rs"
 # AppKit and WKWebView must be exercised on the process's main thread.
 harness = false
 
+[[test]]
+name = "extension_native"
+path = "features/browser/extensions/tests/native.rs"
+# Drives real WebKit extensions on the main thread; runs only with `-- --ignored`.
+harness = false
+
+[[test]]
+name = "browser_native_input"
+path = "features/browser/input/tests/browser_native_input.rs"
+# Real WKWebView events need the main thread and a window server.
+harness = false
+
 [build-dependencies]
-cc = "1"
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
@@ -42,10 +54,15 @@ chrono = { version = "0.4", default-features = false, features = ["clock"] }
 dirs = "6.0.0"
 hex = "0.4"
 misty-credential-store = { path = "vendor/misty-credential-store" }
-misty-browser-sync = { path = "crates/browser-sync" }
-misty-agent = { path = "crates/agent" }
-misty-page-reader = { path = "crates/page-reader" }
-kiri = { path = "crates/kiri" }
+browser_data = { path = "features/sync/browser_data" }
+agent-runs = { path = "features/agents/runs" }
+page_text = { path = "features/browser/page_text" }
+kiri = { path = "features/kiri" }
+file_access = { path = "features/file_access" }
+database = { path = "features/database" }
+settings = { path = "features/settings" }
+permissions = { path = "features/permissions" }
+documents = { path = "features/documents" }
 libc = "0.2"
 rand = "0.8"
 serde = { version = "1", features = ["derive"] }
@@ -83,8 +100,10 @@ tauri-plugin-deep-link = "2"
 percent-encoding = "2"
 
 [target.'cfg(any(target_os = "macos", windows))'.dependencies]
+# Confined helpers: Seatbelt on macOS, an AppContainer and Job object on Windows.
+sandbox = { path = "features/sandbox" }
 # Microphone, system and per-process capture for dictation, live transcription and recording.
-misty-audio-capture = { path = "crates/audio-capture" }
+voice_capture = { path = "features/voice/capture" }
 xcap = "0.9"
 
 [target.'cfg(not(target_os = "macos"))'.dependencies]
@@ -99,11 +118,23 @@ core-graphics = "0.24"
 core-foundation = "0.10"
 objc = "0.2.7"
 objc2 = "0.6.4"
+objc2-local-authentication = { version = "0.3.2", default-features = false, features = ["std", "LAContext", "LAError", "block2"] }
+objc2-user-notifications = { version = "0.3.2", default-features = false, features = ["std", "UNNotification", "UNNotificationAction", "UNNotificationAttachment", "UNNotificationCategory", "UNNotificationContent", "UNNotificationRequest", "UNNotificationResponse", "UNNotificationSettings", "UNNotificationSound", "UNNotificationTrigger", "UNNotificationSettings", "UNUserNotificationCenter", "block2"] }
+dispatch2 = "0.3.1"
 # Reads another browser's cookie key from its own Keychain item on import.
 security-framework = "3.7"
-objc2-app-kit = { version = "0.3.2", default-features = false, features = ["std", "NSAppearance", "NSApplication", "NSBitmapImageRep", "NSImageRep", "NSEvent", "NSPasteboard", "NSResponder", "NSScrollView", "NSTrackingArea", "NSView", "NSWindow"] }
-objc2-foundation = { version = "0.3.2", default-features = false, features = ["std", "NSArray", "NSData", "NSBundle", "NSDictionary", "NSError", "NSObject", "NSProcessInfo", "NSUserDefaults", "NSUUID", "NSString", "NSURL", "NSURLResponse", "NSHTTPCookie", "NSDate"] }
-objc2-web-kit = { version = "0.3.2", default-features = false, features = ["WKSecurityOrigin", "WKSnapshotConfiguration", "objc2-core-foundation", "WKContentWorld", "WKFrameInfo", "WKScriptMessage", "WKScriptMessageHandler", "objc2-app-kit", "WKWebView", "WKWebViewConfiguration", "WKUserContentController", "WKUserScript", "WKNavigationResponse", "WKNavigationDelegate", "WKHTTPCookieStore", "WKWebsiteDataStore", "block2"] }
+objc2-app-kit = { version = "0.3.2", default-features = false, features = ["std", "NSAppearance", "NSApplication", "NSBitmapImageRep", "NSImageRep", "NSEvent", "NSPasteboard", "NSResponder", "NSScrollView", "NSTrackingArea", "NSView", "NSWindow", "NSPopover", "NSScreen", "NSMenu", "NSMenuItem", "NSImage", "NSGraphics", "NSControl", "NSWindowController", "NSPanel", "NSTextField", "NSTextFieldCell", "NSButton", "NSButtonCell", "NSBezierPath", "NSColor", "NSAnimationContext", "NSWorkspace", "NSRunningApplication", "NSFont", "NSText", "NSCell", "NSTextInputClient", "NSAnimation", "block2", "objc2-core-graphics", "objc2-core-image", "objc2-core-foundation", "NSAccessibility", "NSPasteboardItem", "NSParagraphStyle", "NSFontDescriptor", "NSLayoutConstraint", "NSGraphicsContext"] }
+objc2-foundation = { version = "0.3.2", default-features = false, features = ["std", "NSArray", "NSData", "NSBundle", "NSDictionary", "NSError", "NSObject", "NSProcessInfo", "NSUserDefaults", "NSUUID", "NSString", "NSURL", "NSURLResponse", "NSHTTPCookie", "NSDate", "NSSet", "NSJSONSerialization", "NSNotification", "NSNull", "NSFileHandle", "NSFileManager", "NSPathUtilities", "NSRegularExpression", "NSLocale", "NSCharacterSet", "NSRange", "NSValue", "NSOrderedSet", "NSTask", "NSURLRequest", "NSThread", "NSRunLoop", "NSGeometry", "NSEnumerator", "NSTimer", "NSOperation", "block2", "NSObjCRuntime"] }
+objc2-web-kit = { version = "0.3.2", default-features = false, features = ["WKSecurityOrigin", "WKSnapshotConfiguration", "objc2-core-foundation", "WKContentWorld", "WKFrameInfo", "WKScriptMessage", "WKScriptMessageHandler", "objc2-app-kit", "WKWebView", "WKWebViewConfiguration", "WKUserContentController", "WKUserScript", "WKNavigationResponse", "WKNavigationDelegate", "WKHTTPCookieStore", "WKWebsiteDataStore", "block2", "WKWebExtension", "WKWebExtensionAction", "WKWebExtensionContext", "WKWebExtensionController", "WKWebExtensionControllerConfiguration", "WKWebExtensionControllerDelegate", "WKWebExtensionDataRecord", "WKWebExtensionDataType", "WKWebExtensionMatchPattern", "WKWebExtensionMessagePort", "WKWebExtensionPermission", "WKWebExtensionTab", "WKWebExtensionTabConfiguration", "WKWebExtensionWindow", "WKWebExtensionWindowConfiguration", "WKNavigationAction", "WKNavigation", "WKWebsiteDataRecord", "WKDownload", "WKUIDelegate", "WKWindowFeatures", "WKError"] }
+# Agent pointer, mist, desktop control and capture (features/agents/*/macos).
+objc2-screen-capture-kit = "0.3.2"
+objc2-quartz-core = "0.3.2"
+objc2-core-graphics = "0.3.2"
+objc2-core-image = "0.3.2"
+objc2-core-media = "0.3.2"
+objc2-core-video = "0.3.2"
+objc2-core-foundation = "0.3.2"
+objc2-application-services = "0.3.2"
 
 [target.'cfg(any(target_os = "macos", windows, target_os = "linux"))'.dependencies]
 tauri-plugin-single-instance = { version = "2.4.3", features = ["deep-link"] }
@@ -113,7 +144,6 @@ tauri-plugin-updater = "2.10.1"
 [target.'cfg(windows)'.dependencies]
 rfd = { version = "0.16", default-features = false }
 # Confined helpers and agent commands (AppContainer and Job objects).
-misty-windows-confine = { path = "crates/windows-confine" }
 webview2-com = "0.38.2"
 # Awaiting the Windows Hello prompt before a saved card fills.
 windows-future = "0.2"
@@ -138,7 +168,7 @@ debug = false
 
 # Optimize the shipped host independently of its optional app packages.
 # Keep unwinding: a failed agent run has to end its own task and leave the browser running, and
-# document processing still uses catch_unwind for recovery. infra/agent_runtime refuses to build
+# document processing still uses catch_unwind for recovery. agents/run_control refuses to build
 # with panic=abort.
 [profile.release]
 codegen-units = 1
@@ -152,6 +182,7 @@ strip = false
 
 [dev-dependencies]
 ctor = "0.8"
+file_access = { path = "features/file_access", features = ["test-fixtures"] }
 # Build fixtures/reference decoders without shipping these codecs in the macOS host.
 image = { version = "0.25.10", default-features = false, features = ["bmp", "gif", "jpeg", "tga", "webp"] }
 

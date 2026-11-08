@@ -1,5 +1,5 @@
 import { Plus, X } from "lucide-react";
-import type { ScheduleRule } from "@/api/ai/agent-methods";
+import type { ScheduleRule } from "../api/agent-methods";
 import { Button, IconButton, Input, OptionSelect, ToggleGroup, ToggleGroupItem } from "@/shared/ui";
 import { nthNames, weekdayLongNames, weekdayNames } from "./scheduleSummary";
 

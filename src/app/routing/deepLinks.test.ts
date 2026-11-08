@@ -5,10 +5,10 @@ import {
   beginGoogleSignInCodeWait,
   deliveredGoogleSignInCode,
   endGoogleSignInCodeWait,
-} from "@/features/auth/googleSignInCode";
+} from "@/features/account/google/googleSignInCode";
 import { isDeepLinkRouteAllowed, resolveAuthDeepLinkRoute } from "@/app/routing/navigation";
-import { useSignInSheetStore } from "@/features/auth/signInSheet/signInSheetStore";
-import { takeSetupLink, useSetupLinkStore } from "@/features/auth/setup/setupLinkStore";
+import { useSignInSheetStore } from "@/features/account/sign-in-sheet/signInSheetStore";
+import { takeSetupLink, useSetupLinkStore } from "@/features/account/setup/setupLinkStore";
 
 describe("Misty deep links", () => {
   it("preserves query state for open-form Space links", () => {

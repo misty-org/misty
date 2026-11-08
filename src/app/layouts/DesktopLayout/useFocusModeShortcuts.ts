@@ -1,8 +1,8 @@
 import { useCallback } from "react";
-import { useFocusModeStore } from "@/features/app-shell";
-import { useBrowserSearchStore } from "@/features/browser-search/search";
+import { useFocusModeStore } from "@/app/shell";
+import { useBrowserSearchStore } from "@/features/browser";
 import { useShortcutHandler } from "@/features/shortcuts";
-import { setBrowserWebviewsSuspended } from "@/features/webviews/browserRuntime";
+import { setBrowserWebviewsSuspended } from "@/features/app-windows";
 
 /** Focus mode and tab search shortcuts; returns whether focus mode is on. */
 export function useFocusModeShortcuts() {

@@ -1,6 +1,7 @@
+import "@/app/SettingsSections";
 import { describe, expect, it } from "vitest";
-import { settingsRedirects } from "@/features/browser/internal/SettingsRedirectPage";
-import { settingDefinitions } from "./devicePreferences/registry";
+import { settingsRedirects } from "@/features/browser/internal-pages/SettingsRedirectPage";
+import { settingDefinitions } from "./device-preferences/registry";
 import {
   canonicalSettingsSection,
   preferenceSection,
@@ -98,7 +99,15 @@ describe("settings routing", () => {
 describe("settings titles", () => {
   it("never repeats a group, page or section title anywhere in settings", async () => {
     const files = import.meta.glob(
-      ["./sections/**/*.tsx", "./models/*.tsx", "../extensions/ExtensionsSettings.tsx"],
+      [
+        "./sections/**/*.tsx",
+        "../*/settings/**/*.tsx",
+        "../agents/models/*.tsx",
+        "../updater/UpdatesSection.tsx",
+        "../browser/extensions/ExtensionsSettings.tsx",
+        "../browser/autofill/AutofillSettings.tsx",
+        "../browser/passwords/PasswordsSettings.tsx",
+      ],
       { query: "?raw", import: "default", eager: true },
     ) as Record<string, string>;
     const seen = new Map<string, string>();

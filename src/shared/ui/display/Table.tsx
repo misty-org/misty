@@ -1,6 +1,6 @@
 import * as React from "react";
 
-import { cn } from "../utils";
+import { cn } from "../classNames";
 
 const Table = React.forwardRef<HTMLTableElement, TableProps>(
   ({ className, unwrapped = false, ...props }, ref) => {

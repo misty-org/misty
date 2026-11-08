@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import type { WorkspaceView } from "@/features/workspace/model";
+import type { WorkspaceView } from "@/features/app-windows";
 import { cn, IconButton, Pressable } from "@/shared/ui";
 
 /**

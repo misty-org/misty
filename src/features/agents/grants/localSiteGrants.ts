@@ -1,6 +1,6 @@
 import { invoke } from "@/native/invoke";
-import { agentAccountId } from "../agentAccount";
-import { localDocuments } from "@/features/misty/localChats";
+import { agentAccountId } from "../personal/agentAccount";
+import { localDocuments } from "../conversations/state/localChats";
 import type { AgentGrant } from "./api";
 
 /**
@@ -61,10 +61,15 @@ export const revokeSiteGrant = (id: string) => localDocuments.remove(agentAccoun
 
 export async function revokeAgentSiteGrants(agentId: string) {
   const grants = await rows();
-  await Promise.all(grants.filter((grant) => grant.agent_id === agentId).map((grant) => revokeSiteGrant(grant.id)));
+  await Promise.all(
+    grants.filter((grant) => grant.agent_id === agentId).map((grant) => revokeSiteGrant(grant.id)),
+  );
 }
 
 /** The grants with their agents' names, which can change after a grant is made. */
 export function namedGrants(grants: AgentGrant[], names: Map<string, string>) {
-  return grants.map((grant) => ({ ...grant, agent_name: agentName(grant.agent_id, names) || grant.agent_name }));
+  return grants.map((grant) => ({
+    ...grant,
+    agent_name: agentName(grant.agent_id, names) || grant.agent_name,
+  }));
 }

@@ -30,7 +30,7 @@ vi.mock("./recoveryActions", () => ({
   resetWorkspaceLayout: mocks.resetLayout,
 }));
 
-import { useSignInSheetStore } from "@/features/auth/signInSheet/signInSheetStore";
+import { useSignInSheetStore } from "@/features/account/sign-in-sheet/signInSheetStore";
 import { SupportRecoverySection } from "./SupportRecoverySection";
 
 describe("SupportRecoverySection", () => {

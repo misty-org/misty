@@ -9,10 +9,10 @@ import {
   PopoverAnchor,
   PopoverContent,
 } from "@/shared/ui";
-import { useWorkspaceStore } from "@/features/workspace/useWorkspaceStore";
-import type { WorkspaceView } from "@/features/workspace/model";
-import { tabGroupColors, type TabGroupColor } from "@/features/workspace/tabGroups";
-import { setBrowserWebviewsSuspended } from "@/features/webviews/browserRuntime";
+import { useWorkspaceStore } from "@/features/app-windows";
+import type { WorkspaceView } from "@/features/app-windows";
+import { tabGroupColors, type TabGroupColor } from "@/features/app-windows";
+import { setBrowserWebviewsSuspended } from "@/features/app-windows";
 
 export function TabGroupEditor({
   id,

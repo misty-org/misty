@@ -8,7 +8,7 @@ interface ApiCacheHit {
 }
 
 // Copies of account data fetched from the server, kept so pages can paint from them at once.
-// On desktop they live encrypted under ~/.misty/cache/api (src-tauri/src/infra/account/api_cache.rs);
+// On desktop they live encrypted under ~/.misty/cache/api (src-tauri/features/account/api_cache.rs);
 // this in-process layer sits in front so a repeat read costs no round trip, and is all there
 // is where there is no desktop shell. Every call is best effort: a cache that fails is a miss.
 const memory = new Map<string, ApiCacheHit>();

@@ -1,4 +1,4 @@
-import type { ScheduleRule } from "@/api/ai/agent-methods";
+import type { ScheduleRule } from "../api/agent-methods";
 import { parseDate } from "./scheduleTiming";
 
 /** Whether one rule can be stored and worked out, as `ScheduleRule.validate` on the server. */

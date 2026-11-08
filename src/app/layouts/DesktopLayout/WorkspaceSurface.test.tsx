@@ -1,17 +1,20 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
-import type { WorkspaceView } from "@/features/workspace/model";
+import type { WorkspaceView } from "@/features/app-windows/tabs/workspaceViews";
 import { RenderErrorBoundary } from "../RenderErrorBoundary";
 import { WorkspaceSurface } from "./WorkspaceSurface";
 
-vi.mock("@/features/workspace", () => ({
+vi.mock("@/features/app-windows", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   WorkspaceViewRouteScope: ({ children }: { children: ReactNode }) => children,
 }));
-vi.mock("@/features/spaces/SpaceWorkspaceSurface", () => ({
+vi.mock("@/features/spaces/overview/SpaceWorkspaceSurface", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   SpaceWorkspaceSurface: () => <div>Space content</div>,
 }));
-vi.mock("@/features/browser/workspace/BrowserWorkspace", () => ({
+vi.mock("@/features/browser/pages/BrowserWorkspace", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   BrowserWorkspace: () => <input aria-label="Browser draft" defaultValue="Keep my work" />,
 }));
 vi.mock("@/features/agents", async () => {

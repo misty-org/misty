@@ -1,9 +1,8 @@
 import { Button, cn, IconButton, Notification } from "@/shared/ui";
 import { X } from "lucide-react";
 import { createContext, type ReactNode } from "react";
-import { useSettingReset } from "../devicePreferences/SettingScope";
+import { useSettingReset } from "../device-preferences/SettingScope";
 import { type DesktopSettingsNavGroup, SettingsNavigation } from "./SettingsNavigation";
-;
 export const SettingsControlLabelContext = createContext<string | undefined>(undefined);
 export function DesktopSettingsFrame<Id extends string>(props: DesktopSettingsFrameProps<Id>) {
   const overlay = props.presentation === "overlay";

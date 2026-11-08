@@ -1,4 +1,4 @@
-import { createDockLeaf, insertDockSplit, type WorkspaceView } from "@/features/workspace";
+import { createDockLeaf, insertDockSplit, type WorkspaceView } from "@/features/app-windows";
 import { act, cleanup, render } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -11,7 +11,7 @@ vi.mock("./WorkspaceSurface", () => ({
   ),
 }));
 
-vi.mock("@/features/ai-surface/AiPaneHost", () => ({
+vi.mock("@/features/agents/runs/markdown/AiPaneHost", () => ({
   AiPaneHost: (props: { children: ReactNode }) => props.children,
 }));
 

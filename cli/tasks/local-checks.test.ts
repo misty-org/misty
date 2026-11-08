@@ -14,7 +14,7 @@ function plan(paths: string[]) {
 test("change selection covers configuration, helper crates, and release tooling", () => {
   assert.deepEqual(plan(["README.md"]), []);
   assert.deepEqual(plan(["src/features/example.ts"]), ["scripts", "frontend"]);
-  assert.deepEqual(plan(["src-tauri/services/peer-transport/Cargo.toml"]), ["rust-desktop"]);
+  assert.deepEqual(plan(["src-tauri/features/documents/worker/Cargo.toml"]), ["rust-desktop"]);
   assert.deepEqual(plan(["cli/tasks/release/setup-keys.ts"]), ["scripts"]);
   assert.deepEqual(plan([".githooks/checks.sh"]), ["scripts", "rust-cli", "rust-desktop", "frontend"]);
 });

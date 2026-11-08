@@ -9,7 +9,7 @@ import {
   type PointerEvent,
   type ReactNode,
 } from "react";
-import { setBrowserWebviewsSuspended } from "@/features/webviews/browserRuntime";
+import { setBrowserWebviewsSuspended } from "@/features/app-windows";
 import { cn } from "@/shared/ui";
 import { MistyPanel, type MistyPanelSide } from "./MistyPanel";
 import {

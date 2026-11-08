@@ -1,9 +1,9 @@
-import type { SpaceDrawing } from "@/api/drawings/types";
-import type { ServerSpaceNote } from "@/api/notes/api";
-import type { SpaceConversation } from "@/api/spaces/dto/conversation-types";
-import type { SpaceLibraryItem } from "@/api/spaces/dto/entities";
-import type { ItemVisibility, VisibilityItemKind } from "@/api/spaces/visibility";
-import { libraryItemMIME } from "@/features/library";
+import type { SpaceDrawing } from "../journal/drawings/api/drawingApiTypes";
+import type { ServerSpaceNote } from "../journal/notes/api/api";
+import type { SpaceConversation } from "../api/dto/conversation-types";
+import type { SpaceLibraryItem } from "../api/dto/entities";
+import type { ItemVisibility, VisibilityItemKind } from "../api/visibility";
+import { libraryItemMIME } from "../library";
 import { conversationPath } from "../chat/chatRoute";
 
 /** One thing made in a Space, as the Space home shows it. */

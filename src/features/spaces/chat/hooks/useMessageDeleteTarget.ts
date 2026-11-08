@@ -1,5 +1,5 @@
 import { readApiSessionGeneration } from "@/api/client/session";
-import type { SpaceMessage } from "@/api/spaces/dto/entities";
+import type { SpaceMessage } from "../../api/dto/entities";
 import { useCallback, useState } from "react";
 
 /** The message waiting on delete confirmation; it is dropped when the chat or account changes. */

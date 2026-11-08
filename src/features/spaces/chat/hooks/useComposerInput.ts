@@ -1,7 +1,7 @@
-import type { MistyPickerSource } from "@/features/picker";
-import type { ChatComposerSuggestion } from "@/api/spaces/dto/space-chat";
+import type { MistyPickerSource } from "@/features/files";
+import type { ChatComposerSuggestion } from "../../api/dto/space-chat";
 import type { ChatSuggestionsState } from "./useChatSuggestions";
-import type { SpaceChatDraft } from "@/features/chat-composer/useSpaceChatDraft";
+import type { SpaceChatDraft } from "../composer/useSpaceChatDraft";
 
 const FILES_SHORTCUT = /(^|\s)@files\s*$/i;
 const LIBRARY_SHORTCUT = /(^|\s)@library\s*$/i;

@@ -13,9 +13,9 @@ import {
   Popover,
   PopoverContent,
 } from "@/shared/ui";
-import { conversationInSpace } from "@/features/misty/conversationSpace";
-import { useMistyStore } from "@/features/misty/useMistyStore";
-import { useSpaceWindowStore } from "@/features/workspace/spaceWindow";
+import { conversationInSpace } from "../conversations/state/conversationSpace";
+import { useMistyStore } from "../conversations/state/useMistyStore";
+import { useSpaceWindowStore } from "@/features/app-windows";
 import {
   activityStateLabels,
   formatActivityTime,
@@ -77,58 +77,56 @@ export function PanelConversationPicker({
   };
   return (
     <>
-    <Popover open={open} onOpenChange={setOpen}>
-      <MenuTrigger
-        kind="popover"
-        label="Conversations"
-        value={title || "New task"}
-        disabled={disabled}
-        className="min-w-0 max-w-56 font-medium"
-      />
-      <PopoverContent align="start" className="w-72 p-0" aria-label="Conversations">
-        <Command label="Conversations">
-          <CommandInput aria-label="Search conversations" placeholder="Search conversations" />
-          <CommandList>
-            <CommandEmpty>
-              No conversations yet.
-            </CommandEmpty>
-            <CommandGroup>
-              {recent.map((conversation) => {
-                const run = states.get(conversation.id);
-                const time = formatActivityTime(conversation.updatedAt);
-                return (
-                  <CommandItem
-                    key={conversation.id}
-                    value={`${conversation.id}:${conversation.title}`}
-                    onSelect={() => choose(() => onSelect(conversation.id))}
-                  >
-                    <span className="min-w-0 flex-1 truncate">
-                      {conversation.title || "Untitled conversation"}
-                    </span>
-                    <span className="shrink-0 text-xs text-cream-muted">
-                      {!run || run.state === "completed"
-                        ? time
-                        : `${activityStateLabels[run.state] ?? run.state.replace(/_/g, " ")} · ${time}`}
-                    </span>
-                  </CommandItem>
-                );
-              })}
-            </CommandGroup>
-            <CommandGroup>
-              <CommandItem onSelect={() => choose(onViewAll)}>View all</CommandItem>
-            </CommandGroup>
-            <CommandSeparator />
-            <CommandGroup>
-              <CommandItem onSelect={() => choose(onNew)}>
-                <Plus aria-hidden="true" />
-                New conversation
-              </CommandItem>
-            </CommandGroup>
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
-    <ErrorNotification message={activity.failed ? "Conversations couldn’t load." : ""} />
+      <Popover open={open} onOpenChange={setOpen}>
+        <MenuTrigger
+          kind="popover"
+          label="Conversations"
+          value={title || "New task"}
+          disabled={disabled}
+          className="min-w-0 max-w-56 font-medium"
+        />
+        <PopoverContent align="start" className="w-72 p-0" aria-label="Conversations">
+          <Command label="Conversations">
+            <CommandInput aria-label="Search conversations" placeholder="Search conversations" />
+            <CommandList>
+              <CommandEmpty>No conversations yet.</CommandEmpty>
+              <CommandGroup>
+                {recent.map((conversation) => {
+                  const run = states.get(conversation.id);
+                  const time = formatActivityTime(conversation.updatedAt);
+                  return (
+                    <CommandItem
+                      key={conversation.id}
+                      value={`${conversation.id}:${conversation.title}`}
+                      onSelect={() => choose(() => onSelect(conversation.id))}
+                    >
+                      <span className="min-w-0 flex-1 truncate">
+                        {conversation.title || "Untitled conversation"}
+                      </span>
+                      <span className="shrink-0 text-xs text-cream-muted">
+                        {!run || run.state === "completed"
+                          ? time
+                          : `${activityStateLabels[run.state] ?? run.state.replace(/_/g, " ")} · ${time}`}
+                      </span>
+                    </CommandItem>
+                  );
+                })}
+              </CommandGroup>
+              <CommandGroup>
+                <CommandItem onSelect={() => choose(onViewAll)}>View all</CommandItem>
+              </CommandGroup>
+              <CommandSeparator />
+              <CommandGroup>
+                <CommandItem onSelect={() => choose(onNew)}>
+                  <Plus aria-hidden="true" />
+                  New conversation
+                </CommandItem>
+              </CommandGroup>
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
+      <ErrorNotification message={activity.failed ? "Conversations couldn’t load." : ""} />
     </>
   );
 }

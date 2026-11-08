@@ -1,34 +1,25 @@
 import { PanelTop } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { setSpaceBarAutoHide } from "@/features/app-shell/barsAutoHide";
-import { openSignInSheet, useAuth } from "@/features/auth";
+import { setSpaceBarAutoHide } from "@/features/browser";
+import { openSignInSheet, useAuth } from "@/features/account";
 import { SpaceRow, SpaceRowPreview } from "@/features/spaces";
 import {
   browserRuntimeResumeEvent,
   setBrowserPointerTrackingEnabled,
-} from "@/features/webviews/browserRuntime";
-import { beginBrowserSlide, endBrowserSlide } from "@/features/webviews/browserSlide";
-import { setTrafficLightsVisible } from "@/native/runtime";
-import { hasTauriInternals } from "@/shared/platform/tauri";
+} from "@/features/app-windows";
+import { beginBrowserSlide, endBrowserSlide } from "@/features/browser";
 import { IconButton, toolbarIconProps } from "@/shared/ui";
-import { dockingMetrics } from "./dockingGeometry";
+import {
+  barHeight,
+  closedHeight,
+  edgeZone,
+  hideDelay,
+  openHeight,
+  revealDelay,
+  slideMs,
+} from "./spaceBarTiming";
+import { useWindowButtonsOnBar } from "./useWindowButtonsOnBar";
 import { useSpaceBarAlignment, useSpaceBarAutoHide } from "./useSpaceBarAutoHide";
-
-/** How long the bar waits after the pointer leaves before it tucks away again. */
-const hideDelay = 500;
-/** How long the pointer rests on the top edge before the bar comes out, so a pointer passing
- * over the edge on its way out of the window does not push the page down and back. */
-const revealDelay = 80;
-/** The strip along the top edge that brings the bar out. */
-const edgeZone = 6;
-/** The bar's own height; the page's top margin below it is the gap to the page. */
-const barHeight = dockingMetrics.spaceBar;
-/** The slide's length. The page below keeps its full size and moves its top edge with it. */
-const slideMs = 150;
-const openHeight = `calc(var(--shell-edge, 6px) + ${barHeight}px)`;
-/** Tucked away it keeps the edge less the page's gap, so the page still sits the window edge
- * below the top. */
-const closedHeight = "calc(var(--shell-edge, 6px) - var(--shell-gap, 4px))";
 
 /**
  * The Space bar above the browser area in vertical layouts: the Space with its menu, and its
@@ -220,24 +211,7 @@ export function SpaceBar(props: { gridColumn: number; side?: "left" | "right" })
   }, [open]);
   useEffect(() => endBrowserSlide, []);
 
-  // The window buttons ride the bar: they start with the slide above, at its speed, and travel as
-  // far as the bar does. The first state is applied without motion.
-  const lightsSettled = useRef(false);
-  useLayoutEffect(() => {
-    if (!holdsWindowButtons || !hasTauriInternals()) return;
-    const duration = lightsSettled.current ? slideMs : 0;
-    lightsSettled.current = true;
-    void setTrafficLightsVisible(open, 0, duration, barHeight + dockingMetrics.gap).catch(
-      () => undefined,
-    );
-  }, [holdsWindowButtons, open]);
-  useEffect(() => {
-    if (!holdsWindowButtons || !hasTauriInternals()) return;
-    return () => {
-      lightsSettled.current = false;
-      void setTrafficLightsVisible(true).catch(() => undefined);
-    };
-  }, [holdsWindowButtons]);
+  useWindowButtonsOnBar(holdsWindowButtons, open);
 
   return (
     <div

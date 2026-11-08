@@ -1,5 +1,5 @@
-import { spacesApi } from "@/api/spaces/api";
-import type { SpaceMessage } from "@/api/spaces/dto/entities";
+import { spacesApi } from "../../api/api";
+import type { SpaceMessage } from "../../api/dto/entities";
 import { useEffect, useRef } from "react";
 
 /** Marks the open chat read up to its newest message, once per message. */

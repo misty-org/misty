@@ -1,12 +1,12 @@
-import { SpaceWorkspaceSurface } from "@/features/spaces/SpaceWorkspaceSurface";
-import { BrowserWorkspace } from "@/features/browser/workspace";
+import { SpaceWorkspaceSurface } from "@/features/spaces";
+import { BrowserWorkspace } from "@/features/browser";
 import { AgentsPage } from "@/features/agents";
 import {
   WorkspaceViewRouteScope,
   useWorkspaceStore,
   type WorkspaceView,
-} from "@/features/workspace";
-import { migrateRetiredWorkspaceView } from "@/features/workspace/workspaceMigrations";
+} from "@/features/app-windows";
+import { migrateRetiredWorkspaceView } from "@/features/app-windows";
 import { RenderErrorBoundary } from "../RenderErrorBoundary";
 import { FlyingMisty } from "@/shared/ui";
 

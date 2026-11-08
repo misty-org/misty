@@ -1,6 +1,6 @@
-import { spaceAgentsApi, type SpaceAgent } from "@/api/spaces/space-agents";
-import { usePersonalAgentsStore } from "@/features/agents/personalAgentsStore";
-import { setItemVisibility, type ItemVisibility } from "@/api/spaces/visibility";
+import { spaceAgentsApi, type SpaceAgent } from "@/features/agents";
+import { usePersonalAgentsStore } from "@/features/agents";
+import { setItemVisibility, type ItemVisibility } from "../../api/visibility";
 import { useCallback, useEffect, useState } from "react";
 
 /** The agents in a Space, each under the person who owns it. */

@@ -1,9 +1,9 @@
 import { useMistyPanelStore } from "@/features/agents";
-import { useAppStore } from "@/features/app-shell";
-import { openSignInSheet, openSignOutSheet } from "@/features/auth";
-import { useBrowserSearchStore } from "@/features/browser-search/search";
+import { useAppStore } from "@/app/shell";
+import { openSignInSheet, openSignOutSheet } from "@/features/account";
+import { useBrowserSearchStore } from "@/features/browser";
 import { registerShortcutHandler, useShortcutHandler } from "@/features/shortcuts";
-import { useWorkspaceStore, workspaceSurfaceFromRoute } from "@/features/workspace";
+import { useWorkspaceStore, workspaceSurfaceFromRoute } from "@/features/app-windows";
 import { useCallback, useEffect } from "react";
 import type { NavigateFunction } from "react-router-dom";
 
@@ -28,10 +28,7 @@ export function useDesktopShortcuts(options: {
   useShortcutHandler("app.open_settings", openSettingsOverlay);
   useShortcutHandler(
     "misty.contextual_companion",
-    useCallback(
-      () => useMistyPanelStore.getState().toggle(),
-      [],
-    ),
+    useCallback(() => useMistyPanelStore.getState().toggle(), []),
   );
   useShortcutHandler(
     "navigation.refresh",

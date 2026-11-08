@@ -1,0 +1,28 @@
+[package]
+name = "page_text_worker"
+version = "0.1.0"
+edition = "2021"
+license = "AGPL-3.0-or-later"
+publish = false
+
+[[bin]]
+name = "misty-page-reader"
+path = "src/main.rs"
+
+[dependencies]
+page_text = { path = ".." }
+
+# This helper is a separate Cargo project and does not inherit the desktop profile. It runs on every
+# web fetch, so it stays small: a smaller binary starts and is checked faster.
+[profile.dev]
+debug = 1
+incremental = false
+
+[profile.release]
+codegen-units = 1
+lto = "fat"
+opt-level = "s"
+strip = "symbols"
+
+[profile.release.build-override]
+strip = false

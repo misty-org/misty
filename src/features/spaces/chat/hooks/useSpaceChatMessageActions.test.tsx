@@ -1,13 +1,13 @@
-import type * as SpacesApiModule from "@/api/spaces/api";
+import type * as SpacesApiModule from "@/features/spaces/api/api";
 import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
-import type { SpaceMessage } from "@/api/spaces/dto/entities";
+import type { SpaceMessage } from "@/features/spaces/api/dto/entities";
 import {
   useSpaceChatMessageActions,
   type SpaceChatMessageActionsOptions,
 } from "./useSpaceChatMessageActions";
 const api = vi.hoisted(() => ({ sendConversationMessage: vi.fn() }));
-vi.mock("@/api/spaces/api", async (importOriginal) => ({
+vi.mock("@/features/spaces/api/api", async (importOriginal) => ({
   ...(await importOriginal<typeof SpacesApiModule>()),
   spacesApi: api,
 }));

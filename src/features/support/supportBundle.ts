@@ -1,8 +1,8 @@
 import { clientMetadata } from "./clientMetadata";
-import { redactRecord } from "./redaction";
+import { redactRecord } from "../../shared/platform/redaction";
 import { readClientDebugEvents } from "@/shared/platform/clientDebug";
 
-import { readSystemErrors } from "./systemErrors";
+import { readSystemErrors } from "../../shared/platform/systemErrors";
 
 interface SupportBundle {
   schema_version: 1;

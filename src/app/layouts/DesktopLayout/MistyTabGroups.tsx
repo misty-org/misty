@@ -8,10 +8,10 @@ import {
   ContextMenuSubTrigger,
   Pressable,
 } from "@/shared/ui";
-import { useWorkspaceStore } from "@/features/workspace/useWorkspaceStore";
-import { layoutTabs } from "@/features/workspace/layoutTabs";
-import type { WorkspaceTab, WorkspaceView } from "@/features/workspace/model";
-import { tabGroupColors, type MistyTabGroup } from "@/features/workspace/tabGroups";
+import { useWorkspaceStore } from "@/features/app-windows";
+import { layoutTabs } from "@/features/app-windows";
+import type { WorkspaceTab, WorkspaceView } from "@/features/app-windows";
+import { tabGroupColors, type MistyTabGroup } from "@/features/app-windows";
 import "./tabGroups.css";
 
 export const groupName = (group: MistyTabGroup) => group.name || "Unnamed group";

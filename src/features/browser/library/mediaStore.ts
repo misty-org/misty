@@ -1,10 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { create } from "zustand";
 import type { BrowserMediaInfo } from "./native";
-import {
-  browserRuntimeIdForTabId,
-  onBrowserRuntimeClose,
-} from "@/features/webviews/browserRuntime";
+import { browserRuntimeIdForTabId, onBrowserRuntimeClose } from "../webviews/browserRuntime";
 
 interface BrowserMediaStore {
   /** Tabs whose page is audibly playing media. */

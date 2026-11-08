@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
-import { dockLeaves, useWorkspaceStore, type WorkspacePane } from "@/features/workspace";
-import { liftPanePresentation } from "@/features/workspace/paneDragPresentation";
+import { dockLeaves, useWorkspaceStore, type WorkspacePane } from "@/features/app-windows";
+import { liftPanePresentation } from "@/features/app-windows";
 import { usePointerDrag } from "@/shared/hooks/usePointerReorder";
-import { paneViewLabel } from "@/features/workspace/layoutTabs";
-import { usePaneSwapMode, type PaneSwapDirection } from "@/features/workspace/paneSwapMode";
-import { setBrowserWebviewsSuspended } from "@/features/webviews/browserRuntime";
+import { paneViewLabel } from "@/features/app-windows";
+import { usePaneSwapMode, type PaneSwapDirection } from "@/features/app-windows";
+import { setBrowserWebviewsSuspended } from "@/features/app-windows";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { cn, Portal } from "@/shared/ui";
 

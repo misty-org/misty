@@ -1,4 +1,4 @@
-import { useAgentAccountId } from "../agentAccount";
+import { useAgentAccountId } from "../personal/agentAccount";
 import { useEffect } from "react";
 import { startWaitingScheduledRuns } from "./deviceScheduledRuns";
 import { useWorkflowSchedulesStore } from "./useWorkflowSchedulesStore";

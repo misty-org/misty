@@ -4,9 +4,9 @@ import type {
   AgentMethodInputs,
   SaveAgentMethod,
   SaveWorkflowSchedule,
-} from "@/api/ai/agent-methods";
-import { useMistyStore } from "@/features/misty/useMistyStore";
-import { RunStateError } from "../localTools/runState/documents";
+} from "../api/agent-methods";
+import { useMistyStore } from "../conversations/state/useMistyStore";
+import { RunStateError } from "../tools/run-state/documents";
 import { allMethods, methodAtVersion, methodsOf, publicMethod, saveMethod } from "./localMethods";
 import { listSchedules, type LocalSchedule } from "./localSchedules";
 import { removeSchedule, saveSchedule, upcomingSchedules } from "./scheduleEdits";

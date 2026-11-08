@@ -1,8 +1,12 @@
 import { useEffect, useState } from "react";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { OptionSelect, Switch } from "@/shared/ui";
-import type { AgentScope } from "../model/types";
-import { agentsDeviceSnapshot, allowFolderChanges, stopFolderChanges } from "../store/useAgentsStore";
+import type { AgentScope } from "../personal/agentScope";
+import {
+  agentsDeviceSnapshot,
+  allowFolderChanges,
+  stopFolderChanges,
+} from "../personal/useAgentsStore";
 import { useScheduleFolders } from "./useScheduleFolders";
 
 const none = "none";

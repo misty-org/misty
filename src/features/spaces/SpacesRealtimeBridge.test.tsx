@@ -19,11 +19,11 @@ const mocks = vi.hoisted(() => ({
   },
 }));
 
-vi.mock("@/features/auth", () => ({
+vi.mock("@/features/account", () => ({
   useAuth: () => mocks.auth,
 }));
 
-vi.mock("./store/useSpacesStore", () => ({
+vi.mock("./list/useSpacesStore", () => ({
   useSpacesStore: Object.assign(
     (selector: (state: typeof mocks.spaces) => unknown) => selector(mocks.spaces),
     { getState: () => mocks.spaces },

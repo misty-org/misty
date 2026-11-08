@@ -1,10 +1,6 @@
-import type { SpaceMessage } from "@/api/spaces/dto/entities";
-import {
-  useAiSurfaceAdapter,
-  type AiArtifact,
-  type AiSurfaceAdapter,
-} from "@/features/ai-surface/AiPaneHost";
-import type { SpaceChatDraft } from "@/features/chat-composer/useSpaceChatDraft";
+import type { SpaceMessage } from "../../api/dto/entities";
+import { useAiSurfaceAdapter, type AiArtifact, type AiSurfaceAdapter } from "@/features/agents";
+import type { SpaceChatDraft } from "../composer/useSpaceChatDraft";
 import { useMemo } from "react";
 import { spaceChatConversationPath, spaceChatPath } from "../chatRoute";
 import { spaceChatSuggestedActions } from "../spaceChatAiActions";

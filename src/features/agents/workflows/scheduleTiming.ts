@@ -1,4 +1,4 @@
-import type { ScheduleRule, ScheduleTiming } from "@/api/ai/agent-methods";
+import type { ScheduleRule, ScheduleTiming } from "../api/agent-methods";
 import { validRule } from "./scheduleRuleValidation";
 
 /**

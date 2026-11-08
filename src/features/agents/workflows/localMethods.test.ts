@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { AgentMethodDefinition } from "@/api/ai/agent-methods";
+import type { AgentMethodDefinition } from "@/features/agents/api/agent-methods";
 
 vi.mock("@tauri-apps/api/core", async () => {
   const { fakeDocuments } = await import("./fakeDocuments");

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { SpaceConversation } from "@/api/spaces/dto/entities";
+import type { SpaceConversation } from "@/features/spaces/api/dto/entities";
 import { conversationPath } from "./chatRoute";
 import { conversationName, groupConversations } from "./sidebar/conversationGroups";
 

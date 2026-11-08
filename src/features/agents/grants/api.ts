@@ -1,7 +1,12 @@
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { isLocalGrant, localAppsApi, localGrantHolder } from "../apps/localApi";
-import { personalAgentsApi } from "../personalAgentsApi";
-import { localSiteGrants, namedGrants, revokeAgentSiteGrants, revokeSiteGrant } from "./localSiteGrants";
+import { isLocalGrant, localAppsApi, localGrantHolder } from "../connected-apps/localApi";
+import { personalAgentsApi } from "../personal/personalAgentsApi";
+import {
+  localSiteGrants,
+  namedGrants,
+  revokeAgentSiteGrants,
+  revokeSiteGrant,
+} from "./localSiteGrants";
 
 /** A remembered approval: this agent may take this action on this one resource in Auto. */
 export interface AgentGrant {
@@ -35,7 +40,9 @@ export const grantsApi = {
     const here = local.status === "fulfilled" ? local.value : [];
     if (sites.status === "rejected" && !here.length) throw sites.reason;
     const names = new Map(
-      agents.status === "fulfilled" ? agents.value.agents.map((agent) => [agent.id, agent.name]) : [],
+      agents.status === "fulfilled"
+        ? agents.value.agents.map((agent) => [agent.id, agent.name])
+        : [],
     );
     return {
       grants: [...namedGrants(sites.status === "fulfilled" ? sites.value : [], names), ...here],

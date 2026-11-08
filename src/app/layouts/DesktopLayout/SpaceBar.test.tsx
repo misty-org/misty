@@ -1,11 +1,12 @@
 import { act, cleanup, fireEvent, render } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { browserSlideExtra, endBrowserSlide } from "@/features/webviews/browserSlide";
+import { browserSlideExtra, endBrowserSlide } from "@/features/browser/webviews/browserSlide";
 import { SpaceBar } from "./SpaceBar";
 
 const runtime = vi.hoisted(() => ({
   browserRuntimeResumeEvent: "misty:browser-runtime-resume",
   setBrowserPointerTrackingEnabled: vi.fn(),
+  onBrowserRuntimeClose: () => () => undefined,
 }));
 const settings = vi.hoisted(() => ({ autoHide: true }));
 const account = vi.hoisted(() => ({
@@ -13,8 +14,9 @@ const account = vi.hoisted(() => ({
   openSignInSheet: vi.fn(),
   setSpaceBarAutoHide: vi.fn(),
 }));
-vi.mock("@/features/webviews/browserRuntime", () => runtime);
-vi.mock("@/features/spaces", () => ({
+vi.mock("@/features/browser/webviews/browserRuntime", () => runtime);
+vi.mock("@/features/spaces", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   SpaceRow: () => <button type="button">Space</button>,
   SpaceRowPreview: (props: { onSignIn(): void }) => (
     <button type="button" onClick={props.onSignIn}>
@@ -22,11 +24,13 @@ vi.mock("@/features/spaces", () => ({
     </button>
   ),
 }));
-vi.mock("@/features/auth", () => ({
+vi.mock("@/features/account", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   useAuth: () => ({ user: account.user }),
   openSignInSheet: account.openSignInSheet,
 }));
-vi.mock("@/features/app-shell/barsAutoHide", () => ({
+vi.mock("@/features/browser/bars-auto-hide/barsAutoHide", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   setSpaceBarAutoHide: account.setSpaceBarAutoHide,
 }));
 vi.mock("./useSpaceBarAutoHide", () => ({

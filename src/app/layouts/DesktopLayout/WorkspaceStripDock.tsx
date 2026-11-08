@@ -1,5 +1,6 @@
-import { BrowserDownloadsButton } from "@/features/browser/workspace";
-import { browserInternalUrl, useWorkspaceStore } from "@/features/workspace";
+import { BrowserDownloadsButton } from "@/features/browser";
+import { browserInternalUrl } from "@/features/app-windows";
+import { useWorkspaceStore } from "@/features/app-windows";
 
 /** Downloads, at a sidebar's bottom-right: a progress ring while something downloads. */
 export function StripDownloads() {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { ScheduleRule, ScheduleTiming } from "@/api/ai/agent-methods";
+import type { ScheduleRule, ScheduleTiming } from "@/features/agents/api/agent-methods";
 import { nextRun, normalizeTiming, runsBetween, validTiming } from "./scheduleTiming";
 
 // Friday 2026-09-25 10:00 in Los Angeles: the server's own test cases.

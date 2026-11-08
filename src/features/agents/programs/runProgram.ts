@@ -1,12 +1,12 @@
 import { invoke } from "@/native/invoke";
-import { startHostedSession } from "../hostedSessions";
-import { sessions } from "../hostedSessionsState";
-import { agentTabsForTask } from "../agentTabs";
+import { startHostedSession } from "../runs/hosted-sessions/hostedSessions";
+import { sessions } from "../runs/hosted-sessions/hostedSessionsState";
+import { agentTabsForTask } from "../tabs/agentTabs";
 import {
   DeviceOperationNotAttempted,
   jobPolicyCall,
   type ClaimedWorkflowNodeJob,
-} from "../workerBrowserJobs";
+} from "../runs/jobs/workerBrowserJobs";
 import { pageHost, type ProgramState } from "./pageHost";
 import { programPrelude } from "./prelude";
 import { runInSandbox } from "./sandbox";

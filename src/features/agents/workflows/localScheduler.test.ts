@@ -11,12 +11,14 @@ vi.mock("@tauri-apps/api/event", () => ({
   listen: async () => () => undefined,
 }));
 vi.mock("@/shared/platform/tauri", () => ({ hasTauriInternals: () => true }));
-vi.mock("@/features/misty/useMistyStore", () => ({ useMistyStore: { getState: () => ({}) } }));
+vi.mock("@/features/agents/conversations/state/useMistyStore", () => ({
+  useMistyStore: { getState: () => ({}) },
+}));
 vi.mock("./localScheduledRun", () => ({
   scheduledRunOutcome: vi.fn(),
   startScheduledRun: vi.fn(),
 }));
-vi.mock("../keepAwake", () => ({ holdAwake: vi.fn(), releaseAwake: vi.fn() }));
+vi.mock("../runs/jobs/keepAwake", () => ({ holdAwake: vi.fn(), releaseAwake: vi.fn() }));
 
 const { fakeDocuments } = await import("./fakeDocuments");
 const { saveMethod } = await import("./localMethods");

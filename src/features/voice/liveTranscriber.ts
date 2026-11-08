@@ -1,4 +1,4 @@
-import { RuntimeSocket } from "@/api/runtimeSocket";
+import { RuntimeSocket } from "@/api/runtime/runtimeSocket";
 import { Transcript } from "./transcript/transcript";
 import type { Segment } from "./transcript/segment";
 

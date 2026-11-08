@@ -10,7 +10,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "../../overlays/DropdownMenu";
-import { cn } from "../../utils";
+import { cn } from "../../classNames";
 
 type ColumnSchema = { id: string; columns: { key: string; label: string }[] };
 export const CollectionColumnsContext = createContext<{

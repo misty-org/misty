@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
-import { lineCount, repositoryPath, repositoryRoot, walk } from "./repositoryPolicy";
+import { lineCount, repositoryPath, repositoryRoot, walk, walkAppCrate } from "./repositoryPolicy";
 
 const defaultLimit = 500;
 const extensions = new Set([".js", ".jsx", ".rs", ".sh", ".ts", ".tsx"]);
@@ -17,9 +17,10 @@ const baseline = JSON.parse(
 
 describe("source-size architecture contract", () => {
   const measured = new Map(
-    ["src", "src-tauri/src"]
-      .flatMap((root) => walk(root, extensions))
-      .map((path) => [repositoryPath(path), lineCount(path)]),
+    [...walk("src", extensions), ...walkAppCrate("src-tauri/features", extensions)].map((path) => [
+      repositoryPath(path),
+      lineCount(path),
+    ]),
   );
 
   it("does not introduce or grow handwritten files above 500 lines", () => {

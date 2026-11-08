@@ -1,10 +1,7 @@
 import { useEffect } from "react";
-import {
-  closeOrphanBrowserPages,
-  scheduleStrayPageSweep,
-} from "@/features/webviews/browserRuntime";
-import { useWorkspaceStore } from "@/features/workspace";
-import { allLayoutViews } from "@/features/workspace/layoutTabs";
+import { closeOrphanBrowserPages, scheduleStrayPageSweep } from "@/features/browser";
+import { useWorkspaceStore } from "@/features/app-windows";
+import { allLayoutViews } from "@/features/app-windows";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 
 /** Long enough for the window's recovered tabs to settle after a load. */

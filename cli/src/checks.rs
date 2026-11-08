@@ -61,7 +61,7 @@ pub fn app(workspace: &Workspace) -> Result<()> {
         .args([
             "fmt",
             "--manifest-path",
-            "src-tauri/crates/kiri/Cargo.toml",
+            "src-tauri/features/kiri/Cargo.toml",
             "--all",
             "--",
             "--check",
@@ -73,26 +73,25 @@ pub fn app(workspace: &Workspace) -> Result<()> {
             "--locked",
             "--no-default-features",
             "--manifest-path",
-            "src-tauri/crates/kiri/Cargo.toml",
+            "src-tauri/features/kiri/Cargo.toml",
         ])
         .run(&workspace.misty)?;
     CommandSpec::new(npm())
         .args(["run", "test:scripts"])
         .run(&workspace.misty)?;
-    let mut manifests = vec![workspace
-        .misty
-        .join("src-tauri/crates/browser-sync/Cargo.toml")];
-    for entry in std::fs::read_dir(workspace.misty.join("src-tauri/services"))? {
-        let manifest = entry?.path().join("Cargo.toml");
-        if manifest.is_file() {
-            manifests.push(manifest);
-        }
-    }
-    manifests.sort();
-    for manifest in manifests {
+    // The browser data crate and the workers the app embeds, each its own Cargo project.
+    for manifest in [
+        "src-tauri/features/file_access/Cargo.toml",
+        "src-tauri/features/database/Cargo.toml",
+        "src-tauri/features/documents/Cargo.toml",
+        "src-tauri/features/sync/browser_data/Cargo.toml",
+        "src-tauri/features/agents/shell/worker/Cargo.toml",
+        "src-tauri/features/browser/page_text/worker/Cargo.toml",
+        "src-tauri/features/documents/worker/Cargo.toml",
+    ] {
         CommandSpec::new("cargo")
             .args(["test", "--locked", "--manifest-path"])
-            .arg(manifest.as_os_str())
+            .arg(workspace.misty.join(manifest).as_os_str())
             .run(&workspace.misty)?;
     }
     Ok(())

@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { emitTo, listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { voiceApi, voiceDeviceId } from "./api";
-import { rememberDictation } from "@/features/recall";
+import { rememberDictation } from "@/features/memory";
 import { insertIntoFocusedField } from "./insertText";
 import { LiveTranscriber } from "./liveTranscriber";
 import type { VoiceSettings } from "./voiceSettings";

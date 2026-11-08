@@ -46,7 +46,7 @@ fn no_release_ships_node() {
         assert!(build["bundle"].get("resources").is_none());
     }
     let manifest = env!("CARGO_MANIFEST_DIR");
-    let entitlements = std::path::Path::new(manifest).join("../src-tauri/Entitlements.plist");
+    let entitlements = std::path::Path::new(manifest).join("../src-tauri/packaging/Entitlements.plist");
     let entitlements = std::fs::read_to_string(entitlements).unwrap();
     assert!(!entitlements.contains("allow-jit"));
     assert!(!entitlements.contains("allow-unsigned-executable-memory"));

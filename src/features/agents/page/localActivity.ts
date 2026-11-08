@@ -1,6 +1,6 @@
-import { localChats } from "@/features/misty/localChats";
-import type { MistyActivityEntry } from "@/features/misty/activity";
-import { agentAccountId } from "../agentAccount";
+import { localChats } from "../conversations/state/localChats";
+import type { MistyActivityEntry } from "../conversations/state/activity";
+import { agentAccountId } from "../personal/agentAccount";
 
 const maxEntries = 100;
 

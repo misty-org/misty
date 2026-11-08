@@ -1,5 +1,5 @@
-import { spacesApi } from "@/api/spaces/api";
-import type { SpaceConversation, SpaceEvent, SpaceMessage } from "@/api/spaces/dto/entities";
+import { spacesApi } from "../../api/api";
+import type { SpaceConversation, SpaceEvent, SpaceMessage } from "../../api/dto/entities";
 import { readApiSessionGeneration } from "@/api/client/session";
 import {
   useCallback,
@@ -9,7 +9,7 @@ import {
   type Dispatch,
   type SetStateAction,
 } from "react";
-import { mergeSpaceMessages, messageFromSpaceEvent } from "../store/useSpaceMessageSpansStore";
+import { mergeSpaceMessages, messageFromSpaceEvent } from "../useSpaceMessageSpansStore";
 
 const pendingByConversation = new Map<string, SpaceMessage[]>();
 let pendingGeneration = -1;

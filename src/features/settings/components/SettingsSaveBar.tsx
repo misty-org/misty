@@ -1,6 +1,6 @@
 import { Button, cn } from "@/shared/ui";
 import { useEffect, useState } from "react";
-import { useDevicePreferences } from "../devicePreferences/store";
+import { useDevicePreferences } from "../device-preferences/store";
 
 /**
  * Appears at the bottom right while settings have unsaved changes. Trying to leave with

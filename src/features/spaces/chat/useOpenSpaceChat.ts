@@ -1,8 +1,8 @@
 import { useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { useWorkspaceStore, workspaceSurfaceFromRoute } from "@/features/workspace";
-import type { Space } from "@/api/spaces/dto/entities";
-import { useSpacesStore } from "../store/useSpacesStore";
+import { useWorkspaceStore, workspaceSurfaceFromRoute } from "@/features/app-windows";
+import type { Space } from "../api/dto/entities";
+import { useSpacesStore } from "../list/useSpacesStore";
 import { spaceChatConversationPath, spaceChatPath } from "./chatRoute";
 
 /** Your own Space, whose chat the Chat buttons and the chat panel show. */

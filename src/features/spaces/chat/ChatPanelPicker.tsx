@@ -1,6 +1,6 @@
 import { Check } from "lucide-react";
 import { useState } from "react";
-import type { SpaceConversation } from "@/api/spaces/dto/entities";
+import type { SpaceConversation } from "../api/dto/entities";
 import {
   Command,
   CommandEmpty,

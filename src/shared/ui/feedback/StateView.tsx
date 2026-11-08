@@ -1,5 +1,5 @@
 import { LoadingScreen } from "./LoadingScreen";
-import { cn } from "../utils";
+import { cn } from "../classNames";
 import * as React from "react";
 
 const toneClasses: Record<StateTone, string> = {

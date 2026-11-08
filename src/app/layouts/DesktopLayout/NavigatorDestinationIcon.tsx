@@ -1,6 +1,6 @@
 import { BrandIcon } from "@/shared/ui";
-import { websiteIntegrations } from "@/features/webviews/websiteIntegrations";
-import { providerFromRoute } from "@/features/webviews/providers";
+import { websiteIntegrations } from "@/features/browser";
+import { providerFromRoute } from "@/features/browser";
 import {
   NotesDestinationIcon,
   DrawingsDestinationIcon,
@@ -10,10 +10,10 @@ import {
   AlbumsDestinationIcon,
   DeletedDestinationIcon,
 } from "./NavigatorDestinationIcons";
-import { MistyBrandIcon } from "@/features/workspace/MistyBrandIcon";
+import { MistyBrandIcon } from "@/features/app-windows";
 import { Link2, Plug } from "lucide-react";
 import { BotMessageSquare, Workflow } from "lucide-react";
-import type { NavigationItem as MistyNavigationItem } from "@/shared/navigation/NavigationItem";
+import type { NavigationItem as MistyNavigationItem } from "@/app/layouts/DesktopLayout/NavigationItem";
 import { FileText } from "lucide-react";
 
 function isPinnedDestination(item: MistyNavigationItem) {

@@ -1,22 +1,19 @@
 import { settingsBoolean, useSettingsStore } from "@/features/settings";
-import { dockLeaves, useWorkspaceStore } from "@/features/workspace";
-import { browserTabIdForRuntime } from "@/features/webviews/browserRuntime";
-import { hasTauriInternals } from "@/shared/platform/tauri";
-import { listen } from "@tauri-apps/api/event";
+import { createPort } from "@/shared/lib/seams";
 import { useEffect, useRef } from "react";
 import {
   bindingPairMatchesEvent,
   detectShortcutPlatform,
   formatShortcutLabel,
   isEditableShortcutTarget,
-} from "./bindings";
+} from "../../shared/shortcuts/bindings";
 import {
   defaultBindingsFor,
   shortcutCommandsById,
   shortcutCommandRegistry,
   type ShortcutCommandDefinition,
   type ShortcutScope,
-} from "./registry";
+} from "../../shared/shortcuts/registry";
 
 interface ShortcutInvocation {
   command: ShortcutCommandDefinition;
@@ -34,20 +31,12 @@ interface HandlerRegistration {
   order: number;
 }
 
-interface ForwardedShortcutEvent {
-  id: string;
-  key: string;
-  code: string;
-  altKey: boolean;
-  ctrlKey: boolean;
-  metaKey: boolean;
-  shiftKey: boolean;
-  repeat: boolean;
-  editable: boolean;
-}
-
 const handlers = new Map<string, HandlerRegistration[]>();
 let nextHandlerOrder = 0;
+/** Which scope the focused pane is in; the app knows the layout and fills this in at startup. */
+export const shortcutScope = createPort<() => ShortcutScope>("the focused shortcut scope");
+const defaultScope = (): ShortcutScope => "workspace";
+
 export function registerShortcutHandler(
   commandId: string,
   handler: ShortcutHandler,
@@ -96,55 +85,6 @@ export function useShortcutHandler(
   );
 }
 
-export function ShortcutRuntime(): null {
-  useEffect(() => {
-    const dispatch = (event: KeyboardEvent) => dispatchShortcutEvent(event);
-    window.addEventListener("keydown", dispatch, true);
-    return () => window.removeEventListener("keydown", dispatch, true);
-  }, []);
-
-  useEffect(() => {
-    if (!hasTauriInternals()) return;
-    let disposed = false;
-    const unlisten: Array<() => void> = [];
-    void Promise.all([
-      listen("misty://shortcuts-changed", () => {
-        void useSettingsStore.getState().load();
-      }),
-      listen<string>("misty://shortcut-command", (event) => {
-        invokeShortcutCommand(event.payload);
-      }),
-      listen<ForwardedShortcutEvent>("misty://browser-shortcut", (event) => {
-        const forwarded = event.payload;
-        const tabId = browserTabIdForRuntime(forwarded.id);
-        if (tabId) useWorkspaceStore.getState().focusView(tabId);
-        dispatchShortcutEvent(
-          new KeyboardEvent("keydown", {
-            key: forwarded.key,
-            code: forwarded.code,
-            altKey: forwarded.altKey,
-            ctrlKey: forwarded.ctrlKey,
-            metaKey: forwarded.metaKey,
-            shiftKey: forwarded.shiftKey,
-            repeat: forwarded.repeat,
-            cancelable: true,
-          }),
-          forwarded.editable,
-        );
-      }),
-    ]).then((next) => {
-      if (disposed) next.forEach((remove) => remove());
-      else unlisten.push(...next);
-    });
-    return () => {
-      disposed = true;
-      unlisten.forEach((remove) => remove());
-    };
-  }, []);
-
-  return null;
-}
-
 export function dispatchShortcutEvent(event: KeyboardEvent, editableOverride?: boolean): boolean {
   if (event.defaultPrevented || document.documentElement.dataset.shortcutCapture === "true")
     return false;
@@ -152,7 +92,7 @@ export function dispatchShortcutEvent(event: KeyboardEvent, editableOverride?: b
   // Plain typing in a field: every command allowed in one needs Cmd, Ctrl or Option,
   // so skip the registry scan below rather than run it on each keystroke.
   if (editable && !event.metaKey && !event.ctrlKey && !event.altKey) return false;
-  const activeScope = focusedShortcutScope();
+  const activeScope = (shortcutScope.maybe() ?? defaultScope)();
   const snapshot = useSettingsStore.getState().shortcuts;
   const platform = snapshot?.detectedPlatform ?? detectShortcutPlatform();
   const effectiveById = new Map(
@@ -196,7 +136,7 @@ export function dispatchShortcutEvent(event: KeyboardEvent, editableOverride?: b
 export function invokeShortcutCommand(commandId: string): boolean {
   const definition = shortcutCommandsById.get(commandId);
   if (!definition) return false;
-  const activeScope = focusedShortcutScope();
+  const activeScope = (shortcutScope.maybe() ?? defaultScope)();
   if (!scopeIsActive(definition.scope, activeScope)) return false;
   const target = document.activeElement;
   const editable = isEditableShortcutTarget(target);
@@ -246,20 +186,6 @@ export function ShortcutText(props: { commandId: string; className?: string }) {
   const label = formatShortcutLabel(binding.primary, platform);
   if (!hintsEnabled || !label) return null;
   return <span className={props.className}>{label}</span>;
-}
-
-function focusedShortcutScope(): ShortcutScope {
-  const { layout } = useWorkspaceStore.getState();
-  const pane = dockLeaves(layout.root).find((candidate) => candidate.id === layout.focusedPaneId);
-  const tab = pane?.views.find((candidate) => candidate.id === pane.activeViewId);
-  switch (tab?.surfaceId) {
-    case "browser":
-      return "tool:browser";
-    case "space":
-      return tab.route.toLowerCase().includes("/library") ? "tool:library" : "tool:space";
-    default:
-      return "workspace";
-  }
 }
 
 /** Files is a Space page too, so Space shortcuts stay on there. */

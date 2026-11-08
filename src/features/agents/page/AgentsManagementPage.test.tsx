@@ -1,12 +1,13 @@
+import "@/app/featureSeams";
 import type * as AgentsRuntimeModule from "../AgentsRuntime";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
-import DesktopAgentsPage from "../AgentsPage";
+import DesktopAgentsPage from "./AgentsPage";
 
 // Agents opens straight into an agent's workspace, so the store needs one.
-vi.mock("../personalAgentsStore", () => ({
+vi.mock("../personal/personalAgentsStore", () => ({
   usePersonalAgentsStore: () => ({
     agents: [
       {

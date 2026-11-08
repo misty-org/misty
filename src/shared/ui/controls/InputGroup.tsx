@@ -1,7 +1,7 @@
 import * as React from "react";
 
 import { Button, type ButtonProps } from "./Button";
-import { cn } from "../utils";
+import { cn } from "../classNames";
 
 const InputGroup = React.forwardRef<HTMLDivElement, React.ComponentProps<"div">>(
   ({ className, ...props }, ref) => (

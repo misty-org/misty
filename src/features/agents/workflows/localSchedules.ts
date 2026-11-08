@@ -1,6 +1,6 @@
-import type { WorkflowSchedule } from "@/api/ai/agent-methods";
-import { localDocuments } from "@/features/misty/localChats";
-import { changeDocument } from "../localTools/runState/documents";
+import type { WorkflowSchedule } from "../api/agent-methods";
+import { localDocuments } from "../conversations/state/localChats";
+import { changeDocument } from "../tools/run-state/documents";
 import type { LocalMethod } from "./localMethods";
 import { nextRun, runsBetween } from "./scheduleTiming";
 import { announceWorkflowChange } from "./workflowChanges";

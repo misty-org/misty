@@ -1,18 +1,18 @@
 import type { SpaceChatMessagesProps } from "./ChatMessages";
-import type { SpaceMessage } from "@/api/spaces/dto/entities";
+import type { SpaceMessage } from "../../api/dto/entities";
 import { Avatar, AvatarFallback, AvatarImage, Button, ErrorNotification } from "@/shared/ui";
 import { Bot } from "lucide-react";
 import { Fragment, memo, type FormEvent } from "react";
 import { ChatDateDivider, formatChatMessageTime } from "./ChatDisplay";
 import { MessageAttachments } from "./MessageAttachments";
 import { MessageContent, MessageHeader, messageText } from "./MessageContent";
-import { LinkPreviews } from "@/features/link-preview/LinkPreviews";
-import { useChatSidePanel } from "../store/chatSidePanelStore";
+import { LinkPreviews } from "@/features/files";
+import { useChatSidePanel } from "../chatSidePanelStore";
 import { MessageEditForm } from "./MessageEditForm";
 import { MessageHoverActions } from "./MessageHoverActions";
 import { MessageReactions } from "./MessageReactions";
 import { MessageReplyPreview } from "./MessageReplyPreview";
-import { initials, isAgentAuthoredMessage } from "./messageHelpers";
+import { initials, isAgentAuthoredMessage } from "./messageText";
 
 interface ChatMessageRowProps {
   message: SpaceMessage;
@@ -185,7 +185,12 @@ function ChatMessageRowView({
           {message.local_delivery_state === "failed" ? (
             <ErrorNotification message="Message couldn’t be sent.">
               {props.onRetry && (
-                <Button type="button" variant="ghost" size="sm" onClick={() => props.onRetry?.(message)}>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => props.onRetry?.(message)}
+                >
                   Retry
                 </Button>
               )}

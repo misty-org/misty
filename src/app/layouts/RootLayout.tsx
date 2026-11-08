@@ -1,9 +1,11 @@
 import { cn } from "@/shared/ui";
 import { RenderErrorBoundary } from "@/app/layouts/RenderErrorBoundary";
-import { AuthProvider, useAuth } from "@/features/auth";
-import { useNativeSessionStore } from "@/features/native-session";
-import { DevicePreferencesBridge, useDocumentAppAppearance } from "@/features/settings";
-import { ShortcutRuntime, useShortcutHandler } from "@/features/shortcuts";
+import { AuthProvider, useAuth } from "@/features/account";
+import { useNativeSessionStore } from "@/features/account";
+import { DevicePreferencesBridge } from "@/features/account";
+import { useDocumentAppAppearance } from "@/features/settings";
+import { useShortcutHandler } from "@/features/shortcuts";
+import { ShortcutRuntime } from "../ShortcutRuntime";
 import { useAppZoom } from "@/shared/hooks/useAppZoom";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { platform as osPlatform } from "@tauri-apps/plugin-os";

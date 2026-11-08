@@ -1,7 +1,10 @@
-import type { GlobalAiConversation, GlobalAiMessage } from "@/features/misty/types";
-import { useMistyStore } from "@/features/misty/useMistyStore";
-import { useCollaborationStore } from "../collaboration/store";
-import { companionReply } from "../companion/companionReply";
+import type {
+  GlobalAiConversation,
+  GlobalAiMessage,
+} from "../conversations/state/conversationTypes";
+import { useMistyStore } from "../conversations/state/useMistyStore";
+import { useCollaborationStore } from "../plans/store";
+import { companionReply } from "../cursor/companionReply";
 import { routeTarget } from "./lessonRouter";
 import { useLessonStore } from "./lessonStore";
 
@@ -117,5 +120,9 @@ function moveTurn(fromId: string, toId: string, runId: string) {
     ),
   });
   useMistyStore.getState().selectConversation(toId);
-  if (!rest.length) void useMistyStore.getState().deleteConversation(fromId).catch(() => undefined);
+  if (!rest.length)
+    void useMistyStore
+      .getState()
+      .deleteConversation(fromId)
+      .catch(() => undefined);
 }

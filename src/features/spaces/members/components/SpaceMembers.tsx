@@ -1,9 +1,9 @@
-import type { SpaceMember } from "@/api/spaces/dto/entities";
+import type { SpaceMember } from "../../api/dto/entities";
 
 export type MemberAction = { kind: "transfer" | "remove"; member: SpaceMember };
 
-import { SystemErrorNotice } from "@/features/support/systemErrors";
-import { useAuth } from "@/features/auth";
+import { SystemErrorNotice } from "@/shared/platform/systemErrors";
+import { useAuth } from "@/features/account";
 import { Button } from "@/shared/ui";
 import { UserPlus } from "lucide-react";
 import { BringAgentMenu } from "../agents/BringAgentMenu";

@@ -1,7 +1,7 @@
-import { resolveStartupRoute, routes, useAppRouteMemoryStore } from "@/features/app-shell";
-import { RegisterPage, SignInPage, useAuth } from "@/features/auth";
-import { useSetupStore } from "@/features/setup/useSetupStore";
-import { WelcomePage } from "@/features/welcome";
+import { resolveStartupRoute, routes, useAppRouteMemoryStore } from "@/app/shell";
+import { RegisterPage, SignInPage, useAuth } from "@/features/account";
+import { useSetupStore } from "@/features/account";
+import { WelcomePage } from "@/features/onboarding";
 import { SpaceInvitationRedemption } from "@/features/spaces";
 import { createBrowserRouter, Navigate } from "react-router";
 import { AppFrameLayout } from "../layouts/AppFrameLayout";

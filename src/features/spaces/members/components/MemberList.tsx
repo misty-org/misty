@@ -1,7 +1,7 @@
 import { personInitials } from "@/shared/lib/personInitials";
-import type { SpaceMember } from "@/api/spaces/dto/entities";
-import type { SpaceAgent } from "@/api/spaces/space-agents";
-import type { ItemVisibility } from "@/api/spaces/visibility";
+import type { SpaceMember } from "../../api/dto/entities";
+import type { SpaceAgent } from "@/features/agents";
+import type { ItemVisibility } from "../../api/visibility";
 import { SpaceAgentRow } from "../agents/SpaceAgentRow";
 import { agentsByOwner } from "../agents/useSpaceAgentMembers";
 import type { MemberAction } from "./SpaceMembers";

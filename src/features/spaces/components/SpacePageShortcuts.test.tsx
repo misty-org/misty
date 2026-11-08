@@ -1,16 +1,16 @@
 import { act, cleanup, render, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import type { Space } from "@/api/spaces/dto/entities";
+import type { Space } from "@/features/spaces/api/dto/entities";
 import {
   activeLayoutView,
   useWorkspaceStore,
   workspaceSurfaceFromRoute,
-} from "@/features/workspace";
-import { useSpacesStore } from "../store/useSpacesStore";
+} from "@/features/app-windows";
+import { useSpacesStore } from "../list/useSpacesStore";
 import { SpacePageShortcuts } from "./SpacePageShortcuts";
-import { WorkspaceViewRouteScope } from "@/features/workspace/WorkspaceViewRouteScope";
-import { useSpaceRoute } from "../spaceRoute";
+import { WorkspaceViewRouteScope } from "@/features/app-windows/tabs/WorkspaceViewRouteScope";
+import { useSpaceRoute } from "../routes/spaceRoute";
 
 const { preload, shortcuts } = vi.hoisted(() => ({
   preload: vi.fn(async () => {}),
@@ -19,8 +19,8 @@ const { preload, shortcuts } = vi.hoisted(() => ({
 vi.mock("@/features/shortcuts", () => ({
   useShortcutHandler: (id: string, handler: () => void) => shortcuts.set(id, handler),
 }));
-vi.mock("@/features/auth", () => ({ useAuth: () => ({ user: { id: "one" } }) }));
-vi.mock("../SpaceSectionView", () => ({ preloadSpaceSection: preload }));
+vi.mock("@/features/account", () => ({ useAuth: () => ({ user: { id: "one" } }) }));
+vi.mock("../overview/SpaceSectionView", () => ({ preloadSpaceSection: preload }));
 const space = (id: string, name: string): Space => ({
   id,
   name,

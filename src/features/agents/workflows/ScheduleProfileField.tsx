@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { listProfiles, type ProfileEntry } from "@/features/workspace/profileWindow";
+import { listProfiles, type ProfileEntry } from "@/features/app-windows";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { OptionSelect } from "@/shared/ui";
 

@@ -1,6 +1,6 @@
 import * as React from "react";
 import { Button, type ButtonProps } from "./Button";
-import { cn } from "../utils";
+import { cn } from "../classNames";
 
 const iconButtonSizes = {
   // Inline closers inside tabs and menu rows.

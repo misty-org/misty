@@ -1,6 +1,6 @@
 import { Trash2 } from "lucide-react";
 import { useState } from "react";
-import type { ScheduleFrequency, ScheduleRule } from "@/api/ai/agent-methods";
+import type { ScheduleFrequency, ScheduleRule } from "../api/agent-methods";
 import { IconButton, Input, OptionSelect, ToggleGroup, ToggleGroupItem } from "@/shared/ui";
 import { scheduleFrequencies as frequencies, parseDays, ruleFor } from "./scheduleRules";
 import { Days, List, NthWeekdays } from "./ScheduleRuleInputs";

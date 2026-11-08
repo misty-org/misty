@@ -1,6 +1,6 @@
 import { runtimeProperty } from "@/shared/lib/runtimeProperty";
-import type { agentsApi } from "@/api/agents/api";
-import type { aiSurfaceApi, subscribeToAiInvocation } from "@/features/ai-surface/api";
+import type { agentsApi } from "./api/api";
+import type { aiSurfaceApi, subscribeToAiInvocation } from "./runs/invocations/api";
 interface AgentsRuntime {
   agentsApi: typeof agentsApi;
   aiSurfaceApi: typeof aiSurfaceApi;

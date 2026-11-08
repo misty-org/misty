@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { SaveAgentMethod } from "@/api/ai/agent-methods";
+import type { SaveAgentMethod } from "@/features/agents/api/agent-methods";
 
 const mocks = vi.hoisted(() => ({ request: vi.fn(), cached: vi.fn() }));
 
@@ -15,12 +15,12 @@ vi.mock("@/shared/platform/tauri", () => ({ hasTauriInternals: () => true }));
 vi.mock("@/api/ai/workflows-location", () => ({ workflowsOnThisComputer: () => true }));
 vi.mock("@/api/client", () => ({ apiRequest: mocks.request }));
 vi.mock("@/api/cache/cached-request", () => ({ cachedRequest: mocks.cached }));
-vi.mock("@/features/misty/useMistyStore", () => ({
+vi.mock("@/features/agents/conversations/state/useMistyStore", () => ({
   useMistyStore: { getState: () => ({ accountId: "account" }) },
 }));
 
 const { fakeDocuments } = await import("./fakeDocuments");
-const { agentMethodsApi } = await import("@/api/ai/agent-methods");
+const { agentMethodsApi } = await import("@/features/agents/api/agent-methods");
 
 const input: SaveAgentMethod = {
   agent_id: "agent",

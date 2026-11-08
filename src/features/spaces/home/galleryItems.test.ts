@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { SpaceLibraryItem } from "@/api/spaces/dto/entities";
+import type { SpaceLibraryItem } from "@/features/spaces/api/dto/entities";
 import { chatItem, editedLabel, libraryKind } from "./galleryItems";
 
 describe("Space home gallery", () => {

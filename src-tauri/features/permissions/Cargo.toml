@@ -1,0 +1,24 @@
+[package]
+name = "permissions"
+version = "0.1.0"
+description = "What Misty may do with the rest of the computer, off until the person says yes"
+edition = "2021"
+license = "AGPL-3.0-or-later"
+publish = false
+
+[lib]
+name = "permissions"
+path = "lib.rs"
+
+[dependencies]
+database = { path = "../database" }
+file_access = { path = "../file_access" }
+rusqlite = { version = "0.32", features = ["bundled"] }
+tauri = { version = "2", features = ["protocol-asset", "macos-private-api", "tray-icon", "image-png", "unstable"] }
+dirs = "6.0.0"
+tauri-plugin-dialog = "2"
+
+[dev-dependencies]
+ctor = "0.8"
+file_access = { path = "../file_access", features = ["test-fixtures"] }
+settings = { path = "../settings" }

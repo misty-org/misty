@@ -1,9 +1,9 @@
 import { ArrowUpRight, X } from "lucide-react";
 import { lazy, Suspense, useState } from "react";
-import { useAuth } from "@/features/auth";
+import { useAuth } from "@/features/account";
 import { IconButton, SkeletonList } from "@/shared/ui";
-import { spaceNavigationName } from "../defaultSpace";
-import { useSpacesStore } from "../store/useSpacesStore";
+import { spaceNavigationName } from "../routes/defaultSpace";
+import { useSpacesStore } from "../list/useSpacesStore";
 import { ChatPanelPicker } from "./ChatPanelPicker";
 import { useSpaceConversations } from "./sidebar/useSpaceConversations";
 import { homeChatSpace, useOpenSpaceChat } from "./useOpenSpaceChat";

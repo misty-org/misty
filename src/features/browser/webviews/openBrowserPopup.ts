@@ -1,0 +1,25 @@
+import { MistyBrowserUrlSchema } from "@/shared/schemas";
+import { allLayoutPanes } from "@/features/app-windows";
+import { useWorkspaceStore } from "@/features/app-windows";
+import { browserRuntimeIdForTabId, browserTabIdForRuntime } from "./browserRuntime";
+
+/** Native popups belong beside a live source in the current workspace. */
+export function openBrowserPopup(payload: {
+  sourceId: string;
+  url: string;
+  popupInstanceKey?: string;
+}) {
+  const url = MistyBrowserUrlSchema.safeParse(payload.url);
+  const sourceTabId = browserTabIdForRuntime(payload.sourceId);
+  if (!url.success || !sourceTabId || browserRuntimeIdForTabId(sourceTabId) !== payload.sourceId)
+    return null;
+  const store = useWorkspaceStore.getState();
+  const source = allLayoutPanes(store.layout)
+    .flatMap((pane) => pane.views)
+    .find((tab) => tab.id === sourceTabId);
+  if (!source) return null;
+  // A live, registered browser owns this popup regardless of its App's type.
+  // Adopt the original native window to retain its opener.
+  if (url.data === "about:blank" && !payload.popupInstanceKey) return null;
+  return store.openBrowserView({ url: url.data, sourceViewId: sourceTabId });
+}

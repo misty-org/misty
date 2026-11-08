@@ -1,8 +1,8 @@
 import { act, cleanup, fireEvent, render, screen, within, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { OrderedCollectionFilters, orderedTabs, mergeTabOrder } from "./OrderedCollectionFilters";
-import { useDevicePreferences } from "./devicePreferences/store";
-import { initialPreferencesState, editPreference } from "./devicePreferences/model";
+import { useDevicePreferences } from "./device-preferences/store";
+import { initialPreferencesState, editPreference } from "./device-preferences/settingResolution";
 const initial = useDevicePreferences.getState();
 const options = [
   { value: "all", label: "All" },

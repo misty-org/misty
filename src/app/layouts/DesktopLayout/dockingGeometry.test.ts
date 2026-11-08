@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { dockingGeometry, dockingMetrics } from "./dockingGeometry";
-import { tabSides } from "@/features/app-shell/dockingLayout";
+import { tabSides } from "@/app/shell/dockingLayout";
 
 describe.each(tabSides)("tabs on the %s", (tabs) => {
   const layout = { tabs, navigation: tabs === "left" ? ("right" as const) : ("left" as const) };

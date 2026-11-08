@@ -1,9 +1,9 @@
-import type { DesktopPlatform } from "@/app/layouts/model";
+import type { DesktopPlatform } from "@/app/layouts/desktop-state";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import type { PointerEvent as ReactPointerEvent } from "react";
 import { useCallback, useRef } from "react";
-import { shouldSuppressWindowDrag } from "./windowChromeHelpers";
+import { shouldSuppressWindowDrag } from "./windowChromeDrag";
 
 export function useTitlebarPointerHandlers(
   desktopPlatform: DesktopPlatform,

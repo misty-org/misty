@@ -1,0 +1,16 @@
+;; permission-page-reader: what the worker that reads an untrusted page may reach. The page comes in
+;; on standard input and the answer goes out on standard output, both already open, so it needs
+;; nothing beyond the binary, the folder that holds it and the system libraries every program loads.
+;; No network, no process or Mach service, and nothing it can write. See src-tauri/features/browser/page_text/host.
+(version 1)
+(deny default)
+(allow process-exec (literal (param "TOOL")))
+(allow file-read* (literal (param "TOOL")) (subpath (param "WORK"))
+  (subpath "/System/Library") (subpath "/usr/lib")
+  (subpath "/System/Volumes/Preboot/Cryptexes/OS/System/Library")
+  (subpath "/System/Volumes/Preboot/Cryptexes/OS/usr/lib")
+  ;; The loader opens the root folder as it starts, and the program aborts without it. It shows only
+  ;; the names of the top-level folders, none of what's in them.
+  (literal "/"))
+;; The system's libraries ask how big memory pages are as the program starts.
+(allow sysctl-read)

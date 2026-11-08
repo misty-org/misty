@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { create } from "zustand";
-import { rememberCapture } from "@/features/recall";
+import { rememberCapture } from "@/features/memory";
 import { voiceDeviceId } from "../api";
 import { LiveTranscriber, type LiveChannel } from "../liveTranscriber";
 import { captureApi, type VoiceNoteMode, type VoiceSourceKind, type VoiceTurn } from "./captureApi";
@@ -197,7 +197,9 @@ export const useCaptureStore = create<CaptureStore>((set, get) => ({
         id: saved.id,
         title,
         url: source.url,
-        text: turns.map((turn) => `${speakers[turn.speaker] ?? turn.speaker}: ${turn.text}`).join("\n"),
+        text: turns
+          .map((turn) => `${speakers[turn.speaker] ?? turn.speaker}: ${turn.text}`)
+          .join("\n"),
       });
     } catch (error) {
       set({ phase: "done", turns, notice: message(error, "The transcript couldn't be saved.") });

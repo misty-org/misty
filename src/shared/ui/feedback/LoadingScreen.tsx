@@ -1,4 +1,4 @@
-import { cn } from "../utils";
+import { cn } from "../classNames";
 import { FlyingMisty } from "./FlyingMisty";
 import { Skeleton, SkeletonList } from "./Skeleton";
 

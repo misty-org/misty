@@ -1,5 +1,5 @@
 import * as React from "react";
-import { cn } from "../utils";
+import { cn } from "../classNames";
 import { ErrorNotification } from "../feedback/Notification";
 import { Label } from "./Label";
 
@@ -61,4 +61,3 @@ function FieldNote(props: { id: string; note: React.ReactNode }) {
 }
 
 export { Field };
-;

@@ -10,16 +10,12 @@ import {
   paneIdInDirection,
   useWorkspaceStore,
   type WorkspaceView,
-} from "@/features/workspace";
-import { usePaneSwapMode } from "@/features/workspace/paneSwapMode";
-import type { DockSplitDirection } from "@/features/workspace/model";
+} from "@/features/app-windows";
+import { usePaneSwapMode } from "@/features/app-windows";
+import type { DockSplitDirection } from "@/features/app-windows";
 import { minimumForWorkspaceViews } from "./dockSplitFit";
-import {
-  closeWindow,
-  openIncognitoWindow,
-  openNewWindow,
-} from "@/features/workspace/profileWindow";
-import { flushWorkspaceRecovery } from "@/features/workspace/recoveryStorage";
+import { closeWindow, openIncognitoWindow, openNewWindow } from "@/features/app-windows";
+import { flushWorkspaceRecovery } from "@/features/app-windows";
 
 /** Pane and window keyboard shortcuts for the workspace. */
 export function useWorkspaceCanvasShortcuts(actions: {

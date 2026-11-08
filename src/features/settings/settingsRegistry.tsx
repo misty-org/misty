@@ -1,4 +1,3 @@
-import { ExtensionsSettings } from "@/features/extensions/ExtensionsSettings";
 import {
   Brain,
   Cloud,
@@ -18,30 +17,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import type { ComponentType } from "react";
-import type { SettingOwnership } from "./devicePreferences/registry";
-import { AdvancedSection } from "./sections/AdvancedSection";
-import { AppearanceSection } from "./sections/AppearanceSection";
-import { AutofillSettings } from "./sections/AutofillSettings";
-import { BrowserPermissionSettings } from "./sections/BrowserPermissionSettings";
-import { BrowserLinksSettings, DownloadsSettings } from "./sections/BrowserSection";
-import { ModelsSection } from "./models/ModelsSection";
-import {
-  AgentDefaultsSection,
-  AgentPermissionsSection,
-  CompanionSection,
-} from "./sections/FeatureSections";
-import { GeneralSection } from "./sections/GeneralSection";
-import { MemorySection } from "./sections/MemorySection";
-import { MistySection } from "./sections/MistySection";
-import { PasswordsSettings } from "./sections/PasswordsSettings";
-import { PrivacySection } from "./sections/PrivacySection";
-import { AccountSection } from "./sections/account/AccountSection";
-import { ServerSection } from "./sections/ServerSection";
-import { ShortcutsSection } from "./sections/ShortcutsSection";
-import { SyncSection } from "./sections/SyncSection";
-import { TabsSettings } from "./sections/TabsSettings";
-import { UpdatesSection } from "./sections/UpdatesSection";
-import { VoiceSection } from "./sections/VoiceSection";
+import type { SettingOwnership } from "./device-preferences/registry";
 import { canonicalSettingsSection } from "./settingsRouting";
 import type { SettingsContentProps, SettingsSection } from "./settingsTypes";
 
@@ -106,53 +82,68 @@ export const settingsGroups: readonly { label: string; areas: readonly SettingsA
   { label: "Agents", areas: ["models", "conversations", "access", "memory"] },
 ];
 
-interface SettingsRegistryEntry {
+interface SettingsBlock {
   id: SettingsSection;
   label: string;
   area: SettingsArea;
-  Component: ComponentType<SettingsContentProps>;
   owner: SettingOwnership;
+}
+
+interface SettingsRegistryEntry extends SettingsBlock {
+  Component: ComponentType<SettingsContentProps>;
 }
 
 const block = (
   area: SettingsArea,
   id: SettingsSection,
   label: string,
-  Component: ComponentType<SettingsContentProps>,
   owner: SettingOwnership = "device",
-): SettingsRegistryEntry => ({ area, id, label, Component, owner });
-
-function MistyMemorySection(props: SettingsContentProps) {
-  return <MistySection {...props} page="memory" />;
-}
+): SettingsBlock => ({ area, id, label, owner });
 
 /** The blocks of each page, in page order; blocks of one page are adjacent. */
-export const settingsRegistry: readonly SettingsRegistryEntry[] = [
-  block("general", "general", "Startup", GeneralSection),
-  block("general", "browser-links", "Browsing", BrowserLinksSettings),
-  block("general", "browser-tabs", "Tabs", TabsSettings),
-  block("general", "browser-downloads", "Downloads", DownloadsSettings),
-  block("general", "updates", "Updates", UpdatesSection),
-  block("account", "account", "Profile", AccountSection, "resource"),
-  block("server", "server", "Server", ServerSection),
-  block("appearance", "appearance", "Appearance", AppearanceSection),
-  block("shortcuts", "shortcuts", "Shortcuts", ShortcutsSection),
-  block("voice", "voice", "Voice", VoiceSection),
-  block("privacy", "privacy", "Privacy", PrivacySection),
-  block("privacy", "browser-permissions", "Websites", BrowserPermissionSettings, "resource"),
-  block("advanced", "advanced", "Advanced", AdvancedSection),
-  block("passwords", "passwords", "Passwords", PasswordsSettings, "resource"),
-  block("passwords", "autofill", "Autofill", AutofillSettings),
-  block("extensions", "browser-extensions", "Extensions", ExtensionsSettings, "resource"),
-  block("sync", "sync", "Sync", SyncSection),
-  block("models", "models", "Models", ModelsSection),
-  block("conversations", "agents-defaults", "Conversations", AgentDefaultsSection),
-  block("conversations", "misty", "Misty", MistySection, "resource"),
-  block("conversations", "agents-companion", "Cursor", CompanionSection),
-  block("access", "agents-permissions", "Access", AgentPermissionsSection, "resource"),
-  block("memory", "recall", "Memory", MemorySection),
-  block("memory", "agents-memory", "Remembered", MistyMemorySection, "resource"),
+const settingsBlocks: readonly SettingsBlock[] = [
+  block("general", "general", "Startup"),
+  block("general", "browser-links", "Browsing"),
+  block("general", "browser-tabs", "Tabs"),
+  block("general", "browser-downloads", "Downloads"),
+  block("general", "updates", "Updates"),
+  block("account", "account", "Profile", "resource"),
+  block("server", "server", "Server"),
+  block("appearance", "appearance", "Appearance"),
+  block("shortcuts", "shortcuts", "Shortcuts"),
+  block("voice", "voice", "Voice"),
+  block("privacy", "privacy", "Privacy"),
+  block("privacy", "browser-permissions", "Websites", "resource"),
+  block("advanced", "advanced", "Advanced"),
+  block("passwords", "passwords", "Passwords", "resource"),
+  block("passwords", "autofill", "Autofill"),
+  block("extensions", "browser-extensions", "Extensions", "resource"),
+  block("sync", "sync", "Sync"),
+  block("models", "models", "Models"),
+  block("conversations", "agents-defaults", "Conversations"),
+  block("conversations", "misty", "Misty", "resource"),
+  block("conversations", "agents-companion", "Cursor"),
+  block("access", "agents-permissions", "Access", "resource"),
+  block("memory", "recall", "Memory"),
+  block("memory", "agents-memory", "Remembered", "resource"),
 ];
+
+/**
+ * The blocks that have a component, in page order. Each feature owns the component of its
+ * blocks; the app hands them over once at startup with `registerSettingsSections`, so settings
+ * never imports a feature.
+ */
+export const settingsRegistry: SettingsRegistryEntry[] = [];
+
+export function registerSettingsSections(
+  components: Partial<Record<SettingsSection, ComponentType<SettingsContentProps>>>,
+): void {
+  settingsRegistry.length = 0;
+  for (const entry of settingsBlocks) {
+    const Component = components[entry.id];
+    if (Component) settingsRegistry.push({ ...entry, Component });
+  }
+}
 
 export function settingsPage(section: SettingsSection): SettingsRegistryEntry | undefined {
   const id = canonicalSettingsSection(section);

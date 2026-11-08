@@ -1,4 +1,4 @@
-import type { SpaceMessage } from "@/api/spaces/dto/entities";
+import type { SpaceMessage } from "../../api/dto/entities";
 import { Button, Textarea } from "@/shared/ui";
 import type { FormEvent } from "react";
 

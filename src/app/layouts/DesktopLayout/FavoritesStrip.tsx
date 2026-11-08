@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { StarOff } from "lucide-react";
-import { removeFavorite, useFavorites } from "@/features/bookmarks/favorites";
-import type { Bookmark } from "@/features/bookmarks/tree";
+import { removeFavorite, useFavorites } from "@/features/browser";
+import type { Bookmark } from "@/features/browser";
 import { SavedWebsiteIcon } from "@/features/browser/SavedWebsiteIcon";
-import { setBrowserWebviewsSuspended } from "@/features/webviews/browserRuntime";
-import { activeLayoutView } from "@/features/workspace/layoutTabs";
-import { parseBrowserViewState, type WorkspaceView } from "@/features/workspace/model";
-import { useWorkspaceStore } from "@/features/workspace/useWorkspaceStore";
+import { setBrowserWebviewsSuspended } from "@/features/app-windows";
+import { activeLayoutView } from "@/features/app-windows";
+import { parseBrowserViewState, type WorkspaceView } from "@/features/app-windows";
+import { useWorkspaceStore } from "@/features/app-windows";
 import {
   ContextMenu,
   ContextMenuAction,

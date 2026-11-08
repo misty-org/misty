@@ -1,8 +1,9 @@
-import { browserTabAgentFileCapabilities } from "../browserTabCapabilities";
-import { executeBrowserJob } from "../browserJobRun";
-import { agentTab, agentTabsForTask, closeAgentTab, keepAgentTab } from "../agentTabs";
-import { removeHostedChildTab } from "../hostedSessionsState";
-import type { ClaimedWorkflowNodeJob } from "../workerBrowserJobs";
+import { browserTabAgentFileCapabilities } from "../tabs/browserTabCapabilities";
+import { executeBrowserJob } from "../runs/jobs/browserJobRun";
+import { agentTab, agentTabsForTask, closeAgentTab, keepAgentTab } from "../tabs/agentTabs";
+import { removeHostedChildTab } from "../runs/hosted-sessions/hostedSessionsState";
+import type { ClaimedWorkflowNodeJob } from "../runs/jobs/workerBrowserJobs";
+import { pageTarget } from "./pageTarget";
 import { unwrapSearchRedirect } from "./searchRedirect";
 
 /**
@@ -117,48 +118,6 @@ export function pageHost(state: ProgramState) {
   const document = async (scopeId: string) =>
     state.documents.get(scopeId) ??
     (await read(scopeId, 1_500), state.documents.get(scopeId) ?? "");
-  /** A step's target: a ref, a locator, or words looked up with find. */
-  const targetOf = async (scopeId: string, target: unknown): Promise<Record<string, unknown>> => {
-    if (target === undefined || target === null) return {};
-    if (typeof target === "string" && /^e\d+$/.test(target)) return { ref: target };
-    // A whole line copied from read() or find() ('button "Search" [ref=e8]') names its ref.
-    const copied = typeof target === "string" ? ref.exec(target)?.[1] : undefined;
-    if (copied) return { ref: copied };
-    if (typeof target === "object" && typeof (target as { role?: unknown }).role === "string") {
-      const { role, name, index } = target as { role: string; name?: unknown; index?: unknown };
-      return {
-        locator: {
-          role,
-          name: String(name ?? ""),
-          ...(typeof index === "number" ? { index } : {}),
-        },
-      };
-    }
-    // The object forms a model writes: { ref: "e12" }, or words under text, query, words, name or label.
-    const given = target as {
-      ref?: unknown;
-      text?: unknown;
-      query?: unknown;
-      words?: unknown;
-      name?: unknown;
-      label?: unknown;
-    };
-    if (typeof target === "object" && typeof given.ref === "string" && /^e\d+$/.test(given.ref))
-      return { ref: given.ref };
-    const query =
-      typeof target === "string"
-        ? target
-        : String(given.text ?? given.query ?? given.words ?? given.name ?? given.label ?? "");
-    const found = await operate("browser.find", scopeId, { query, limit: 3 });
-    const first = (found.matches as string[] | undefined)
-      ?.map((line) => ref.exec(line)?.[1])
-      .find(Boolean);
-    if (!first)
-      throw new Error(
-        `Nothing on ${String(found.url ?? "the page")} matches "${query}". Read the page (tab.read()) and use a ref.`,
-      );
-    return { ref: first };
-  };
   const act = async (args: Record<string, unknown>) => {
     const scopeId = ownTab(args.tab);
     const step: Record<string, unknown> = { action: args.action };
@@ -173,7 +132,7 @@ export function pageHost(state: ProgramState) {
     ] as const)
       if (args[field] !== undefined) step[field] = args[field];
     const attempt = async () => {
-      const target = await targetOf(scopeId, args.target);
+      const target = await pageTarget(operate, scopeId, args.target);
       const result = await operate("browser.steps", scopeId, {
         documentId: await document(scopeId),
         steps: [{ ...step, ...target }],

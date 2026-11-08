@@ -1,5 +1,5 @@
 import { Lock, MoreHorizontal } from "lucide-react";
-import type { ItemVisibility } from "@/api/spaces/visibility";
+import type { ItemVisibility } from "../api/visibility";
 import {
   cn,
   DropdownMenu,

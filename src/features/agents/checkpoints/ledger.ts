@@ -1,6 +1,6 @@
 /**
  * The requirements ledger a run ends with (the crate's
- * src-tauri/crates/agent/src/runtime/ledger.rs writes it). It rides at the end of the run's final
+ * src-tauri/features/agents/runs/ledger.rs writes it). It rides at the end of the run's final
  * text as a comment, so each assistant message carries the ledger as it stood at that turn.
  */
 type LedgerState = "pending" | "done" | "failed" | "blocked" | "skipped";

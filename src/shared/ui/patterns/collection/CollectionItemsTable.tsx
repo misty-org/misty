@@ -2,7 +2,7 @@ import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 import type { MouseEvent } from "react";
 import { Button } from "../../controls/Button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../display/Table";
-import { cn } from "../../utils";
+import { cn } from "../../classNames";
 import { CollectionItemSurface } from "./CollectionCards";
 import {
   collectionIconTone,

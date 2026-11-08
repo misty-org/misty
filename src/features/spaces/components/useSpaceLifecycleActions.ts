@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
-import { canManageSpaceLifecycle, preferredDefaultSpace } from "../defaultSpace";
-import { useSpacesStore } from "../store/useSpacesStore";
-import { defaultSpaceRoute } from "../defaultSpaceRoute";
+import { canManageSpaceLifecycle, preferredDefaultSpace } from "../routes/defaultSpace";
+import { useSpacesStore } from "../list/useSpacesStore";
+import { defaultSpaceRoute } from "../routes/defaultSpaceRoute";
 
 /* The state and permissions behind leaving and deleting a Space (its menu's confirmations). */
 export function useSpaceLifecycleActions(spaceId: string) {

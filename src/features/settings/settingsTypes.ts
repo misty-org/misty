@@ -1,4 +1,4 @@
-import type { useAppStore } from "@/features/app-shell";
+import type { useAppStore } from "@/app/shell";
 import type {
   LaunchOnLoginSnapshot,
   ReassignShortcutRequest,

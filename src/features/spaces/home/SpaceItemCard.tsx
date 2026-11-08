@@ -1,6 +1,6 @@
 import { Lock, Users } from "lucide-react";
 import { Pressable, TooltipHint, cn, itemToneClass } from "@/shared/ui";
-import type { ItemVisibility } from "@/api/spaces/visibility";
+import type { ItemVisibility } from "../api/visibility";
 import { VisibilityMenu } from "../components/VisibilityMenu";
 import { editedLabel, type GalleryItem } from "./galleryItems";
 import { GalleryPreview, kindIcon } from "./GalleryPreview";

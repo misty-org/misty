@@ -1,5 +1,5 @@
 import type { FormEvent, RefObject, UIEventHandler } from "react";
-import type { SpaceLibraryItem, SpaceMessage, SpaceNode } from "@/api/spaces/dto/entities";
+import type { SpaceLibraryItem, SpaceMessage, SpaceNode } from "../../api/dto/entities";
 
 export type SpaceChatStarter = "mention" | "files" | "library";
 
@@ -36,11 +36,11 @@ export interface SpaceChatMessagesProps {
 }
 
 export { DeleteMessageDialog } from "./DeleteMessageDialog";
-import { SystemErrorNotice } from "@/features/support/systemErrors";
+import { SystemErrorNotice } from "@/shared/platform/systemErrors";
 import { useLayoutEffect, useMemo, useRef } from "react";
 import { buildChatDisplayRows, useMemberAvatarUrls } from "./ChatDisplay";
 import { ChatMessageRow } from "./ChatMessageRow";
-import { threadRootOf } from "./messageHelpers";
+import { threadRootOf } from "./messageText";
 import { ChatMessagesSkeleton } from "./ChatMessagesSkeleton";
 import { ChatStarters } from "./ChatStarters";
 import { DirectMessageIntro } from "./DirectMessageIntro";

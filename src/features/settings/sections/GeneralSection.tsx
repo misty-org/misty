@@ -1,8 +1,4 @@
-import {
-  startupViewOption,
-  startupViewOptions,
-  startupViewStoredIndex,
-} from "@/features/app-shell";
+import { startupViewOption, startupViewOptions, startupViewStoredIndex } from "@/app/shell";
 import {
   DesktopSettingsRow as SettingsRow,
   DesktopSettingsSection as SettingsSectionBlock,

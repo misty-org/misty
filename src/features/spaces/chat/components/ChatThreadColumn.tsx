@@ -1,10 +1,10 @@
 import { useState, type FormEvent } from "react";
 import { X } from "lucide-react";
-import type { SpaceMessage } from "@/api/spaces/dto/entities";
+import type { SpaceMessage } from "../../api/dto/entities";
 import { IconButton, Textarea } from "@/shared/ui";
 import { formatChatMessageTime } from "./ChatDisplay";
-import { threadRootOf } from "./messageHelpers";
-import { useChatSidePanel } from "../store/chatSidePanelStore";
+import { threadRootOf } from "./messageText";
+import { useChatSidePanel } from "../chatSidePanelStore";
 
 const plain = (message: SpaceMessage) =>
   message.content

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { GlobalAiMessage } from "@/features/misty/types";
+import type { GlobalAiMessage } from "@/features/agents/conversations/state/conversationTypes";
 import type { LocalMethod } from "./localMethods";
 import type { LocalSchedule } from "./localSchedules";
 
@@ -27,11 +27,17 @@ vi.mock("@tauri-apps/api/event", () => ({
   listen: async () => () => undefined,
 }));
 vi.mock("@/shared/platform/tauri", () => ({ hasTauriInternals: () => true }));
-vi.mock("@/features/misty/useMistyStore", () => ({ useMistyStore: mocks.store }));
-vi.mock("@/features/misty/localConversation", () => ({ newLocalConversation: mocks.create }));
-vi.mock("@/features/ai-surface/invocationSubscription", () => ({ readRunState: mocks.runState }));
-vi.mock("../store/useAgentsStore", () => ({ adoptFolderChanges: async () => undefined }));
-vi.mock("../store/useConversationFolder", () => ({
+vi.mock("@/features/agents/conversations/state/useMistyStore", () => ({
+  useMistyStore: mocks.store,
+}));
+vi.mock("@/features/agents/conversations/state/localConversation", () => ({
+  newLocalConversation: mocks.create,
+}));
+vi.mock("@/features/agents/runs/invocations/invocationSubscription", () => ({
+  readRunState: mocks.runState,
+}));
+vi.mock("../personal/useAgentsStore", () => ({ adoptFolderChanges: async () => undefined }));
+vi.mock("../shared-folders/useConversationFolder", () => ({
   useConversationFolder: { getState: () => ({ setFolder: vi.fn(), setWritable: vi.fn() }) },
 }));
 

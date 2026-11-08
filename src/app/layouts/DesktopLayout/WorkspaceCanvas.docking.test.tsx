@@ -1,8 +1,8 @@
 import { cleanup, render } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, expect, it, vi } from "vitest";
-import { useWorkspaceStore } from "@/features/workspace/useWorkspaceStore";
-import { tabSides } from "@/features/app-shell/dockingLayout";
+import { useWorkspaceStore } from "@/features/app-windows/tabs/useWorkspaceStore";
+import { tabSides } from "@/app/shell/dockingLayout";
 import { dockingGeometry } from "./dockingGeometry";
 import { WorkspaceCanvas } from "./WorkspaceCanvas";
 

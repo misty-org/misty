@@ -5,7 +5,7 @@ import * as PopoverPrimitive from "@radix-ui/react-popover";
 import * as React from "react";
 
 import { popoverContentClass } from "./popupStyles";
-import { cn } from "../utils";
+import { cn } from "../classNames";
 
 const Popover = PopoverPrimitive.Root;
 

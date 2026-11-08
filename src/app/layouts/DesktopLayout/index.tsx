@@ -1,7 +1,7 @@
 import { CursorCompanionController } from "@/features/agents";
 import { CapturePanel, DictationController } from "@/features/voice";
-import { MorningBriefMount, RecallRecorderMount } from "@/features/recall";
-import { type AppTab } from "@/features/app-shell";
+import { MorningBriefMount, RecallRecorderMount } from "@/features/memory";
+import { type AppTab } from "@/app/shell";
 import {
   AccountClosingNotice,
   AccountSuspendedNotice,
@@ -10,27 +10,25 @@ import {
   SignInSheet,
   SignOutSheet,
   useAuth,
-} from "@/features/auth";
-import { useExtensionsRuntime } from "@/features/extensions/useExtensionsRuntime";
-import { ExtensionPermissionRequest } from "@/features/extensions/ExtensionPermissionRequest";
-import { ExtensionInstallRequest } from "@/features/extensions/ExtensionInstallRequest";
-import { ProfileImportRequest } from "@/features/browser-import/ProfileImportRequest";
-import { NavigationNamesBoundary } from "@/features/navigation-names/NavigationNamesBoundary";
+} from "@/features/account";
+import { useExtensionsRuntime } from "@/features/browser";
+import { ExtensionPermissionRequest } from "@/features/browser";
+import { ExtensionInstallRequest } from "@/features/browser";
+import { ProfileImportRequest } from "@/features/browser";
+import { NavigationNamesBoundary } from "@/features/app-windows";
 import { blockIfUnsaved } from "@/features/settings";
-import {
-  setBrowserWebviewsSuspended,
-  windowChromeChangedEvent,
-} from "@/features/webviews/browserRuntime";
-import { useWindowDockingLayout } from "@/features/workspace";
-import { windowChromeBackground } from "@/features/workspace/windowColors";
-import { useProfileWindowStore } from "@/features/workspace/profileWindow";
-import { ProfileDialogs } from "@/features/profiles/ProfileDialogs";
+import { setBrowserWebviewsSuspended } from "@/features/app-windows";
+import { windowChromeChangedEvent } from "@/features/browser";
+import { useWindowDockingLayout } from "@/features/app-windows";
+import { windowChromeBackground } from "@/features/app-windows";
+import { useProfileWindowStore } from "@/features/app-windows";
+import { ProfileDialogs } from "@/features/app-windows";
 import { appZoomRenderScale, useAppZoomValue } from "@/shared/hooks/useAppZoom";
 import { cn } from "@/shared/ui";
 import { useEffect, useRef, useState } from "react";
 import { Outlet } from "react-router-dom";
 import "./docking.css";
-import { isTopEdgeDragPress } from "./windowChromeHelpers";
+import { isTopEdgeDragPress } from "./windowChromeDrag";
 import { useDockingTransition } from "./useDockingTransition";
 import { DeferUntilIdle } from "./DeferUntilIdle";
 import { DesktopShellOverlays } from "./DesktopShellOverlays";
@@ -44,7 +42,7 @@ import { useDesktopBootstrap } from "./useDesktopBootstrap";
 import { useDesktopFrameStyle } from "./useDesktopFrameStyle";
 import { useDesktopRouteEffects } from "./useDesktopRouteEffects";
 import { useDesktopShellStatus } from "./useDesktopShellStatus";
-import { VaultStartup } from "@/features/vault";
+import { VaultStartup } from "@/features/sync";
 import { useDesktopShortcuts } from "./useDesktopShortcuts";
 import { useDesktopTitlebarGeometry } from "./useDesktopTitlebarGeometry";
 import { useDesktopWindowChrome } from "./useDesktopWindowChrome";
@@ -55,10 +53,8 @@ import { useFocusModeShortcuts } from "./useFocusModeShortcuts";
 import { useSettingsOverlay } from "./useSettingsOverlay";
 import { WindowsTitlebarControls } from "./WindowsTitlebarControls";
 import { useCaptionSlot } from "./useCaptionSlot";
-import { useSidebarCollapsedStore } from "@/features/app-shell/sidebarCollapsed";
+import { useSidebarCollapsedStore } from "@/app/shell/sidebarCollapsed";
 import { WorkspaceCanvas } from "./WorkspaceCanvas";
-;
-
 export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab }) {
   useExtensionsRuntime();
   useStrayBrowserPages();

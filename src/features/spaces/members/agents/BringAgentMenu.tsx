@@ -1,6 +1,6 @@
-import type { SpaceAgent } from "@/api/spaces/space-agents";
-import { useAuth } from "@/features/auth";
-import { usePersonalAgentsStore } from "@/features/agents/personalAgentsStore";
+import type { SpaceAgent } from "@/features/agents";
+import { useAuth } from "@/features/account";
+import { usePersonalAgentsStore } from "@/features/agents";
 import {
   Button,
   DropdownMenu,

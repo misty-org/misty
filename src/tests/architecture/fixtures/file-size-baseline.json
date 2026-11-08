@@ -1,4 +1,4 @@
 {
-  "src/features/auth/AuthContext.test.tsx": 715,
-  "src/features/workspace/useWorkspaceStore.test.ts": 619
+  "src/features/account/AuthContext.test.tsx": 715,
+  "src/features/app-windows/tabs/useWorkspaceStore.test.ts": 619
 }

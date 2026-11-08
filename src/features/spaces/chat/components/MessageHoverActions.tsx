@@ -1,4 +1,4 @@
-import type { SpaceMessage } from "@/api/spaces/dto/entities";
+import type { SpaceMessage } from "../../api/dto/entities";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -9,7 +9,7 @@ import {
 import { Copy, MoreHorizontal, Pencil, Reply, SmilePlus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { ChatEmojiPicker } from "./ChatEmojiPicker";
-import { quickReactionEmojis } from "./messageHelpers";
+import { quickReactionEmojis } from "./messageText";
 
 interface MessageHoverActionsProps {
   message: SpaceMessage;

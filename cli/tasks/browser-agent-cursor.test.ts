@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import { JSDOM } from "jsdom";
 
-const read = (name: string) => readFileSync(new URL(`../../src-tauri/src/infra/browser/scripts/${name}.js`, import.meta.url), "utf8");
+const read = (name: string) => readFileSync(new URL(`../../src-tauri/features/browser/kiri_link/scripts/${name}.js`, import.meta.url), "utf8");
 
 test("cursor follows dispatched actions, never stale targets, and does not intercept input", () => {
   const dom = new JSDOM('<button>Generate</button>', { url: "https://example.test", runScripts: "outside-only" });

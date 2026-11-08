@@ -1,22 +1,22 @@
-import { nativeWorkspaceRecoveryEnabled } from "@/features/workspace/workspaceRecoveryPlatform";
-import { useWorkspaceRecoveryState } from "@/features/workspace/nativeWorkspaceRecovery";
-import { useWorkspaceRecoveryRetry } from "@/features/workspace/useWorkspaceRecoveryRetry";
-import { PageStateBridge } from "@/features/page-state/PageStateBridge";
+import { nativeWorkspaceRecoveryEnabled } from "@/features/app-windows";
+import { useWorkspaceRecoveryState } from "@/features/app-windows";
+import { useWorkspaceRecoveryRetry } from "@/features/app-windows";
+import { PageStateBridge } from "@/features/browser";
 import { SpacesRealtimeBridge } from "@/features/spaces/SpacesRealtimeBridge";
 import { LoadingScreen } from "@/shared/ui";
-import { AgentExecutionSurface } from "@/features/agents/AgentExecutionSurface";
+import { AgentExecutionSurface } from "@/features/agents";
 import { UpdateNotices } from "@/features/updater/UpdateNotices";
 import { lazy, Suspense, useEffect, useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
-import { useAuth } from "@/features/auth";
-import { isAuthPath, routes } from "@/features/app-shell";
-import { useSetupStore } from "@/features/setup/useSetupStore";
+import { useAuth } from "@/features/account";
+import { isAuthPath, routes } from "@/app/shell";
+import { useSetupStore } from "@/features/account";
 import { desktopRouteIdFromPath } from "../routing/navigation";
-import { DeviceSessionBridge } from "@/features/connected-devices";
-import { UnsavedQuitGuard } from "@/features/workspace/UnsavedQuitGuard";
-import { useProfileWindowStore } from "@/features/workspace/profileWindow";
-import { SpaceWindowBridge } from "@/features/workspace/SpaceWindowBridge";
-import { accountScopeFor } from "@/features/workspace/accountScope";
+import { DeviceSessionBridge } from "@/features/agents";
+import { UnsavedQuitGuard } from "@/features/app-windows";
+import { useProfileWindowStore } from "@/features/app-windows";
+import { SpaceWindowBridge } from "@/features/spaces";
+import { accountScopeFor } from "@/features/app-windows";
 
 // Let the initial Misty flight finish before revealing the app, even when its
 // code is already cached. Load the layout alongside account/workspace restore so

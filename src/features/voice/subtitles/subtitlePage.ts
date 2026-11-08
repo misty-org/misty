@@ -1,8 +1,8 @@
 import { invoke } from "@tauri-apps/api/core";
-import { deviceModelCall } from "@/api/device-models";
-import { browserRuntimeIdForTabId } from "@/features/webviews/browserRuntime";
-import { activeLayoutView } from "@/features/workspace/layoutTabs";
-import { useWorkspaceStore } from "@/features/workspace/useWorkspaceStore";
+import { deviceModelCall } from "@/api/runtime/device-models";
+import { browserRuntimeIdForTabId } from "@/features/browser";
+import { activeLayoutView } from "@/features/app-windows";
+import { useWorkspaceStore } from "@/features/app-windows";
 import type { PageContext } from "./subtitleContext";
 
 /** Wide enough for the model to read the names on the page. */

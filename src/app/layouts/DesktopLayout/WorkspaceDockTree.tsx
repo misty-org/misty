@@ -1,4 +1,4 @@
-import { StablePaneLayout } from "@/features/workspace/StablePaneLayout";
+import { StablePaneLayout } from "@/features/app-windows";
 import {
   dockLeaves,
   type DockSplitDirection,
@@ -6,7 +6,7 @@ import {
   type WorkspaceDockNode,
   type WorkspaceGroupKey,
   type WorkspaceView,
-} from "@/features/workspace";
+} from "@/features/app-windows";
 import { cn } from "@/shared/ui";
 import { useEffect, useRef } from "react";
 import {

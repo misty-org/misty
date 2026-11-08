@@ -11,7 +11,7 @@ import {
   popupMotionClass,
   popupSurfaceClass,
 } from "../overlays/popupStyles";
-import { cn } from "../utils";
+import { cn } from "../classNames";
 
 const Select = SelectPrimitive.Root;
 

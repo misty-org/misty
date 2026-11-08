@@ -1,5 +1,5 @@
-import { routes } from "@/features/app-shell";
-import { useNativeSessionStore } from "@/features/native-session";
+import { routes } from "@/app/shell";
+import { useNativeSessionStore } from "@/features/account";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { useEffect } from "react";
 import { Outlet, useLocation } from "react-router";

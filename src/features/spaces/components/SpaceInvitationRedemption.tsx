@@ -2,11 +2,11 @@ import { Users } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
-import { openSignInSheet, useAuth } from "@/features/auth";
-import { spacesApi } from "@/api/spaces/api";
-import type { SpaceInvitationPreview } from "@/api/spaces/dto/entities";
+import { openSignInSheet, useAuth } from "@/features/account";
+import { spacesApi } from "../api/api";
+import type { SpaceInvitationPreview } from "../api/dto/entities";
 import { Button, Card, ErrorNotification, Spinner } from "@/shared/ui";
-import { useSpacesStore } from "../store/useSpacesStore";
+import { useSpacesStore } from "../list/useSpacesStore";
 
 export function SpaceInvitationRedemption() {
   const { token = "" } = useParams();

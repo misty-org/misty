@@ -1,4 +1,4 @@
-import { localDocuments } from "@/features/misty/localChats";
+import { localDocuments } from "../conversations/state/localChats";
 
 /**
  * Saved browser replays. A workflow run whose

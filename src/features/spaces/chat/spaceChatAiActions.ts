@@ -1,4 +1,4 @@
-import type { AiSuggestedAction } from "@/features/ai-surface/types";
+import type { AiSuggestedAction } from "@/features/agents";
 
 /** Actions the AI pane offers for an open Space conversation. */
 export const spaceChatSuggestedActions: AiSuggestedAction[] = [

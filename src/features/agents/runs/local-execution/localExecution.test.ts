@@ -1,0 +1,419 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { mocks } from "./localExecution.testFixtures";
+import {
+  startLocalExecution,
+  routeLocalFollowup,
+  steerLocalExecution,
+  pauseLocalExecution,
+  settleLocalExecution,
+  finishLocalExecution,
+  useLocalExecution,
+} from "./localExecution";
+import { useCompanionState } from "../../cursor/companionState";
+beforeEach(async () => {
+  await finishLocalExecution();
+  vi.clearAllMocks();
+  mocks.autopilot = false;
+  mocks.account = "owner";
+  mocks.sessionGeneration = 0;
+  mocks.transitioning = false;
+  Object.defineProperty(navigator, "platform", { configurable: true, value: "MacIntel" });
+  mocks.invoke.mockResolvedValue(undefined);
+  mocks.request.mockResolvedValue(undefined);
+  mocks.deviceCall.mockReset();
+  mocks.deviceCall.mockResolvedValue(undefined);
+  mocks.deviceSnapshot.mockResolvedValue({ device: { id: "device" } });
+  mocks.cancel.mockResolvedValue(undefined);
+  mocks.state.invocationId = undefined;
+  mocks.state.accountId = "owner";
+  mocks.state.activeConversationId = "conversation";
+  mocks.state.submitAnswer.mockResolvedValue(undefined);
+  useCompanionState.setState({ accountId: "", submit: undefined });
+});
+describe("native task authority", () => {
+  it("uses an ordinary companion tab without a worker view or closing the user's tab", async () => {
+    mocks.autopilot = true;
+    mocks.normalContext.mockResolvedValueOnce({
+      context: [{ id: "normal-tab", kind: "browser-tab", opaqueScopeId: "normal-scope" }],
+      deviceContexts: [
+        {
+          deviceId: "server-device",
+          kind: "browser_tab",
+          opaqueRef: "normal-scope",
+          capabilities: ["browser.navigate"],
+          metadata: { normal_tab: true },
+        },
+      ],
+    });
+    const execution = await startLocalExecution("owner", "agent", {
+      normalTabs: true,
+      openWhenMissing: true,
+    });
+    expect(execution.normalTabs).toBe(true);
+    expect(execution.views).toEqual([]);
+    expect(mocks.startAutopilot).not.toHaveBeenCalled();
+    expect(mocks.invoke).not.toHaveBeenCalledWith("browser_webview_create", expect.anything());
+    expect(mocks.invoke).toHaveBeenCalledWith(
+      "agent_workspace_bind_scope",
+      expect.objectContaining({ scopeId: "normal-scope" }),
+    );
+    await finishLocalExecution();
+    expect(mocks.invoke).not.toHaveBeenCalledWith("browser_webview_close", expect.anything());
+  });
+  it("opens the built-in browser without installations, using the workspace native profile", async () => {
+    const execution = await startLocalExecution("owner", "agent");
+    const create = mocks.invoke.mock.calls.find(([name]) => name === "browser_webview_create")![1]
+      .request;
+    expect(create.url).toBe("https://www.google.com");
+    expect(create).not.toHaveProperty("profileId");
+    expect(create).not.toHaveProperty("providerId");
+    expect(mocks.request.mock.calls.every(([path]) => !path.includes("/apps"))).toBe(true);
+    expect(mocks.invoke).toHaveBeenCalledWith("agent_workspace_acquire", {
+      request: expect.objectContaining({ spaceId: "", accountId: "owner" }),
+    });
+    expect(execution.deviceContexts).toEqual([
+      expect.objectContaining({
+        capabilities: expect.arrayContaining([
+          "browser.navigate",
+          "browser.upload",
+          "browser.downloads.list",
+        ]),
+        metadata: expect.objectContaining({ app_id: "browser", window_label: "space-personal" }),
+      }),
+    ]);
+  });
+  it("rejects an account transition before acquiring authority", async () => {
+    mocks.transitioning = true;
+    await expect(startLocalExecution("owner", "agent")).rejects.toThrow("account changed");
+    expect(mocks.invoke).not.toHaveBeenCalled();
+    expect(mocks.request).not.toHaveBeenCalled();
+  });
+  it("rejects an account switch away and back during device discovery", async () => {
+    let resolve!: (value: object) => void;
+    mocks.deviceSnapshot.mockImplementationOnce(
+      () =>
+        new Promise((done) => {
+          resolve = done;
+        }),
+    );
+    const pending = startLocalExecution("owner", "agent");
+    await vi.waitFor(() => expect(resolve).toBeTypeOf("function"));
+    mocks.sessionGeneration += 2;
+    resolve({ device: { id: "device" } });
+    await expect(pending).rejects.toThrow("account changed");
+    expect(mocks.invoke).not.toHaveBeenCalledWith("browser_webview_create", expect.anything());
+  });
+  it("closes a view created after startup was canceled", async () => {
+    let resolve!: () => void;
+    mocks.invoke.mockImplementation(async (command: string) => {
+      if (command === "browser_webview_create")
+        await new Promise<void>((done) => {
+          resolve = done;
+        });
+    });
+    const pending = startLocalExecution("owner", "agent");
+    await vi.waitFor(() => expect(resolve).toBeTypeOf("function"));
+    await pauseLocalExecution();
+    resolve();
+    await expect(pending).rejects.toThrow("Task paused");
+    const create = mocks.invoke.mock.calls.find(([name]) => name === "browser_webview_create")![1]
+      .request;
+    expect(mocks.invoke).toHaveBeenCalledWith("browser_webview_close", {
+      request: { id: create.id },
+    });
+    expect(mocks.invoke).not.toHaveBeenCalledWith("agent_workspace_bind_scope", expect.anything());
+  });
+  it("replaces retired app/provider profiles when resuming", async () => {
+    const first = await startLocalExecution("owner", "agent");
+    const oldView = first.views[0];
+    useLocalExecution.setState({
+      execution: {
+        ...first,
+        deviceContexts: first.deviceContexts.map((ref) => ({
+          ...ref,
+          metadata: { ...ref.metadata, profile_id: "old-installed-browser-profile" },
+        })),
+      },
+    });
+    await pauseLocalExecution();
+    mocks.invoke.mockClear();
+    const resumed = await startLocalExecution("owner", "agent");
+    expect(mocks.invoke).toHaveBeenCalledWith("browser_webview_close", {
+      request: { id: oldView },
+    });
+    expect(resumed.views).toHaveLength(1);
+    expect(resumed.views[0]).not.toBe(oldView);
+    expect(resumed.deviceContexts[0].metadata).not.toHaveProperty("profile_id");
+  });
+  it("cleans a partial startup before retrying scope binding", async () => {
+    mocks.invoke.mockImplementation(async (command: string) => {
+      if (command === "agent_workspace_bind_scope") throw new Error("binding failed");
+    });
+    await expect(startLocalExecution("owner", "agent")).rejects.toThrow("binding failed");
+    expect(useLocalExecution.getState().execution?.state).toBe("paused");
+    expect(useLocalExecution.getState().execution?.views).toEqual([]);
+    expect(mocks.invoke).toHaveBeenCalledWith("browser_webview_close", expect.anything());
+    mocks.invoke.mockResolvedValue(undefined);
+    const resumed = await startLocalExecution("owner", "agent");
+    expect(resumed.views).toHaveLength(1);
+    expect(resumed.ready).toBe(true);
+  });
+  it("does not let a late startup failure pause its replacement task", async () => {
+    let resolve!: () => void;
+    let firstBinding = true;
+    mocks.invoke.mockImplementation(async (command: string) => {
+      if (command === "agent_workspace_bind_scope" && firstBinding) {
+        firstBinding = false;
+        await new Promise<void>((done) => {
+          resolve = done;
+        });
+      }
+    });
+    const pending = startLocalExecution("owner", "agent");
+    await vi.waitFor(() => expect(resolve).toBeTypeOf("function"));
+    const abandonedView = useLocalExecution.getState().execution!.views[0];
+    await pauseLocalExecution();
+    const replacement = await startLocalExecution("owner", "agent");
+    resolve();
+    await expect(pending).rejects.toThrow("Task paused");
+    expect(replacement.views).toHaveLength(1);
+    expect(replacement.views[0]).not.toBe(abandonedView);
+    expect(replacement.deviceContexts).toHaveLength(1);
+    expect(useLocalExecution.getState().execution).toMatchObject({
+      taskId: replacement.taskId,
+      state: "running",
+      ready: true,
+    });
+  });
+  it("rotates authority on resume and ignores stale completion", async () => {
+    const first = await startLocalExecution("owner", "agent");
+    mocks.state.invocationId = "invocation-first";
+    await pauseLocalExecution(first.taskId);
+    expect(mocks.cancel).toHaveBeenCalledWith("invocation-first");
+    expect(mocks.state.invocationId).toBeUndefined();
+    const resumed = await startLocalExecution("owner", "agent");
+    expect(resumed.taskId).not.toBe(first.taskId);
+    await settleLocalExecution("finished", first.taskId);
+    expect(useLocalExecution.getState().execution?.state).toBe("running");
+    await finishLocalExecution();
+  });
+  it("rejects another agent but keeps execution independent of Space changes", async () => {
+    await startLocalExecution("owner", "agent");
+    await pauseLocalExecution();
+    await expect(startLocalExecution("owner", "other")).rejects.toThrow("Stop the current task");
+    const resumed = await startLocalExecution("owner", "agent");
+    expect(resumed.spaceId).toBe("");
+    expect(resumed.state).toBe("running");
+  });
+  it("explicitly carries task downloads only across a paused task's scope rebinding", async () => {
+    const first = await startLocalExecution("owner", "agent");
+    useLocalExecution.setState({
+      execution: {
+        ...first,
+        views: ["view"],
+        deviceContexts: [
+          {
+            deviceId: "device",
+            kind: "browser_tab",
+            opaqueRef: "source-scope",
+            displayName: "Source",
+            capabilities: ["browser.upload"],
+            metadata: { app_id: "browser" },
+          },
+        ],
+      },
+    });
+    await pauseLocalExecution();
+    const resumed = await startLocalExecution("owner", "agent");
+    expect(mocks.invoke).toHaveBeenCalledWith("agent_workspace_bind_scope", {
+      taskId: resumed.taskId,
+      scopeId: "source-scope",
+      previousTaskId: first.taskId,
+    });
+    await settleLocalExecution("finished");
+    mocks.invoke.mockClear();
+    const next = await startLocalExecution("owner", "agent");
+    expect(mocks.invoke).toHaveBeenCalledWith("agent_workspace_bind_scope", {
+      taskId: next.taskId,
+      scopeId: "source-scope",
+      previousTaskId: undefined,
+    });
+  });
+  it("does not resurrect work canceled during device discovery", async () => {
+    let resolve!: (value: object) => void;
+    mocks.deviceSnapshot.mockImplementationOnce(() => new Promise((done) => (resolve = done)));
+    const pending = startLocalExecution("owner", "agent");
+    await vi.waitFor(() => expect(resolve).toBeTypeOf("function"));
+    await pauseLocalExecution();
+    resolve({ device: { id: "device" } });
+    await expect(pending).rejects.toThrow("Task paused");
+    expect(useLocalExecution.getState().execution?.state).toBe("paused");
+  });
+  it("still cancels the invocation when either lease release fails", async () => {
+    await startLocalExecution("owner", "agent");
+    mocks.state.invocationId = "invocation-lost";
+    mocks.invoke.mockRejectedValue(new Error("native window lost"));
+    mocks.request.mockRejectedValue(new Error("offline"));
+    await pauseLocalExecution();
+    expect(mocks.cancel).toHaveBeenCalledWith("invocation-lost");
+    expect(useLocalExecution.getState().execution?.state).toBe("paused");
+  });
+});
+
+describe("model-led follow-ups", () => {
+  it("sends a screen follow-up to the task, which looks at the screen if it needs to", async () => {
+    await startLocalExecution("owner", "agent");
+    const submit = vi.fn();
+    useCompanionState.setState({ accountId: "owner", submit });
+    mocks.deviceCall.mockImplementation(async (name: string) =>
+      name === "follow-up" ? { route: "steer" } : undefined,
+    );
+    await routeLocalFollowup("Explain this problem on my screen");
+    expect(submit).not.toHaveBeenCalled();
+    expect(mocks.state.submitAnswer).toHaveBeenCalledWith("Explain this problem on my screen");
+    expect(useLocalExecution.getState().execution?.state).toBe("paused");
+  });
+  it("quiesces execution before interpreting a correction", async () => {
+    await startLocalExecution("owner", "agent");
+    mocks.deviceCall.mockImplementation(async (name: string) => {
+      if (name === "follow-up") {
+        expect(useLocalExecution.getState().execution?.state).toBe("paused");
+        return { route: "steer" };
+      }
+    });
+    await routeLocalFollowup("Use Friday instead");
+    expect(mocks.deviceCall).toHaveBeenCalledWith("follow-up", {
+      conversation: [],
+      new_message: "Use Friday instead",
+    });
+    expect(mocks.state.submitAnswer).toHaveBeenCalledWith("Use Friday instead");
+  });
+  it("queues an independent outcome and resumes the existing task", async () => {
+    await startLocalExecution("owner", "agent");
+    mocks.deviceCall.mockImplementation(async (name: string) =>
+      name === "follow-up" ? { route: "queue" } : undefined,
+    );
+    await routeLocalFollowup("Then organize a separate event");
+    expect(mocks.invoke).toHaveBeenCalledWith("agent_foreground_queue", {
+      task: expect.objectContaining({
+        accountId: "owner",
+        agentId: "agent",
+        spaceId: "",
+        prompt: "Then organize a separate event",
+      }),
+    });
+    expect(mocks.state.submitAnswer).not.toHaveBeenCalledWith("Then organize a separate event");
+  });
+  it("leaves an explicit stop paused without submitting more work", async () => {
+    await startLocalExecution("owner", "agent");
+    mocks.deviceCall.mockImplementation(async (name: string) =>
+      name === "follow-up" ? { route: "stop" } : undefined,
+    );
+    await expect(routeLocalFollowup("Cancel this task")).resolves.toContain("not been undone");
+    expect(mocks.state.submitAnswer).not.toHaveBeenCalled();
+    expect(useLocalExecution.getState().execution?.state).toBe("paused");
+  });
+  it("does not apply a late interpretation after the user stops again", async () => {
+    await startLocalExecution("owner", "agent");
+    let resolve!: (value: { route: string }) => void;
+    mocks.deviceCall.mockImplementation(async (name: string) =>
+      name === "follow-up"
+        ? new Promise((done) => {
+            resolve = done;
+          })
+        : undefined,
+    );
+    const pending = routeLocalFollowup("Use Friday");
+    await vi.waitFor(() => expect(resolve).toBeTypeOf("function"));
+    await pauseLocalExecution();
+    resolve({ route: "steer" });
+    await expect(pending).rejects.toThrow("active task changed");
+    expect(mocks.state.submitAnswer).not.toHaveBeenCalled();
+  });
+  it("does not continue when the routing service is unavailable", async () => {
+    await startLocalExecution("owner", "agent");
+    mocks.deviceCall.mockRejectedValue(new Error("offline"));
+    await expect(routeLocalFollowup("Use Friday")).rejects.toThrow("offline");
+    expect(mocks.state.submitAnswer).not.toHaveBeenCalled();
+    expect(useLocalExecution.getState().execution?.state).toBe("paused");
+  });
+});
+
+it("foreground control gets visual control of the workspace", async () => {
+  mocks.autopilot = true;
+  const execution = await startLocalExecution("owner", "agent");
+  expect(execution.autopilot).toBe(true);
+  expect(mocks.startAutopilot).toHaveBeenCalledWith(execution.taskId, "owner", "", undefined);
+  expect(execution.deviceContexts[0].capabilities).toEqual([
+    "browser.workspace.visual",
+    "browser.act",
+  ]);
+  expect(execution.deviceContexts[0].metadata?.workspace_control).toBe(true);
+  await finishLocalExecution();
+});
+
+it("binds desktop control without moving focus or substituting an ordinary browser tab", async () => {
+  mocks.autopilot = true;
+  const execution = await startLocalExecution("owner", "agent", {
+    normalTabs: false,
+    desktopControl: true,
+  });
+  expect(mocks.focus).not.toHaveBeenCalled();
+  expect(mocks.normalContext).not.toHaveBeenCalled();
+  expect(mocks.startAutopilot).toHaveBeenCalledWith(execution.taskId, "owner", "", true);
+  expect(mocks.invoke).toHaveBeenCalledWith("browser_webview_create", {
+    request: expect.objectContaining({ url: "about:blank" }),
+  });
+  expect(execution.deviceContexts[0]).toMatchObject({
+    capabilities: ["browser.workspace.visual", "browser.act"],
+    metadata: { desktop_control: true },
+  });
+  await settleLocalExecution("finished", execution.taskId);
+  expect(mocks.invoke).toHaveBeenCalledWith("agent_workspace_release", {
+    taskId: execution.taskId,
+  });
+});
+
+it("does not cancel a successor invocation while an older pause is awaiting modules", async () => {
+  const old = await startLocalExecution("owner", "agent");
+  const pending = pauseLocalExecution(old.taskId);
+  useLocalExecution.setState({ execution: { ...old, taskId: "successor", state: "running" } });
+  mocks.state.invocationId = "new-invocation";
+  mocks.state.working = true;
+  await pending;
+  expect(mocks.state.invocationId).toBe("new-invocation");
+  expect(mocks.state.working).toBe(true);
+  expect(mocks.cancel).not.toHaveBeenCalled();
+  expect(mocks.invoke).toHaveBeenCalledWith("agent_workspace_release", { taskId: old.taskId });
+});
+
+it("retains workflow pins but blocks automatic resume after takeover", async () => {
+  const inputs = { subject: "research" };
+  const execution = await startLocalExecution("owner", "agent", {
+    normalTabs: false,
+    method: {
+      versionId: "immutable-v1",
+      inputs,
+      invocationId: "parent-run",
+      skillVersionIds: ["skill-v2"],
+    },
+  });
+  inputs.subject = "mutated draft";
+  useLocalExecution.setState({
+    execution: { ...execution, conversationId: "original-conversation" },
+  });
+  mocks.state.activeConversationId = "different-conversation";
+  await expect(steerLocalExecution("Continue after inspecting prior effects")).rejects.toThrow(
+    "Automatic workflow resume is not available",
+  );
+  expect(mocks.state.submitAnswer).not.toHaveBeenCalled();
+  expect(useLocalExecution.getState().execution).toMatchObject({
+    state: "paused",
+    conversationId: "original-conversation",
+    method: {
+      versionId: "immutable-v1",
+      inputs: { subject: "research" },
+      invocationId: "parent-run",
+    },
+  });
+});

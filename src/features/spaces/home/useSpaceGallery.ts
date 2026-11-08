@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { drawingsApi } from "@/api/drawings/api";
-import { notesApi } from "@/api/notes/api";
-import { spacesApi } from "@/api/spaces/api";
+import { drawingsApi } from "../journal/drawings/api/api";
+import { notesApi } from "../journal/notes/api/api";
+import { spacesApi } from "../api/api";
 import {
   chatItem,
   drawingItem,

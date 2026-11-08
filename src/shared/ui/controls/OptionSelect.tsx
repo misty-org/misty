@@ -1,5 +1,5 @@
 import * as React from "react";
-import { cn } from "../utils";
+import { cn } from "../classNames";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./Select";
 
 type SelectOption = { value: string; label: React.ReactNode; disabled?: boolean };

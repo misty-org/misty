@@ -1,5 +1,5 @@
-import { MistyMarkdown } from "@/features/ai-surface/MistyMarkdown";
-import type { AiProgressItem } from "@/features/ai-surface/types";
+import { MistyMarkdown } from "../runs/markdown/MistyMarkdown";
+import type { AiProgressItem } from "../runs/invocations/invocationTypes";
 import { Pressable } from "@/shared/ui";
 import { useId, useState, type ReactNode } from "react";
 import { Chevron, Fold, WorkGroup } from "./WorkGroup";

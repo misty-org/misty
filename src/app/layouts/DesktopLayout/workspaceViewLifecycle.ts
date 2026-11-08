@@ -1,5 +1,5 @@
-import { dockWidgetRegistry, workspaceTabsById, type WorkspaceView } from "@/features/workspace";
-import { releaseWorkspaceViewRouteHistory } from "@/features/workspace/WorkspaceViewRouteScope";
+import { dockWidgetRegistry, workspaceTabsById, type WorkspaceView } from "@/features/app-windows";
+import { releaseWorkspaceViewRouteHistory } from "@/features/app-windows";
 
 export { workspaceTabsById };
 

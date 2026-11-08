@@ -5,9 +5,9 @@ import {
   useBrowserToolbarSlot,
   useSidebarTools,
   type SidebarToolId,
-} from "@/features/browser/workspace";
-import { activeLayoutView, useWorkspaceStore } from "@/features/workspace";
-import { browserInternalUrl } from "@/features/workspace/browserInternalUrl";
+} from "@/features/browser";
+import { activeLayoutView, useWorkspaceStore } from "@/features/app-windows";
+import { browserInternalUrl } from "@/features/app-windows";
 import { IconButton, toolbarIconProps } from "@/shared/ui";
 
 const setToolsSlot = (element: HTMLDivElement | null) =>

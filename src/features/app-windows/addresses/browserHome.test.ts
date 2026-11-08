@@ -1,0 +1,58 @@
+import { afterEach, describe, expect, it } from "vitest";
+import {
+  browserHomeUrl,
+  configureBrowserHomeUrl,
+  defaultBrowserHomeUrl,
+  normalizeBrowserHomeUrl,
+} from "./browserHome";
+import { blankBrowserUrl } from "./browserUrl";
+import { createBrowserViewState, parseBrowserViewState } from "../tabs/workspaceViews";
+
+afterEach(() => configureBrowserHomeUrl(""));
+
+describe("browser homepage", () => {
+  it("defaults to Google when nothing is configured", () => {
+    expect(browserHomeUrl()).toBe(defaultBrowserHomeUrl);
+    expect(createBrowserViewState().url).toBe(defaultBrowserHomeUrl);
+  });
+
+  it("completes a bare host to HTTPS", () => {
+    expect(normalizeBrowserHomeUrl("example.com")).toBe("https://example.com/");
+    expect(normalizeBrowserHomeUrl("  duckduckgo.com/?q=misty  ")).toBe(
+      "https://duckduckgo.com/?q=misty",
+    );
+  });
+
+  it("completes bare local addresses to HTTP", () => {
+    expect(normalizeBrowserHomeUrl("localhost:3000")).toBe("http://localhost:3000/");
+    expect(normalizeBrowserHomeUrl("127.0.0.1:8080")).toBe("http://127.0.0.1:8080/");
+  });
+
+  it("keeps an explicit http or https address", () => {
+    expect(normalizeBrowserHomeUrl("http://localhost:3000/")).toBe("http://localhost:3000/");
+    expect(normalizeBrowserHomeUrl("https://example.com/start")).toBe("https://example.com/start");
+  });
+
+  it("honours a deliberately blank homepage", () => {
+    expect(normalizeBrowserHomeUrl(blankBrowserUrl)).toBe(blankBrowserUrl);
+  });
+
+  it("falls back to the default for empty or unusable input", () => {
+    expect(normalizeBrowserHomeUrl("")).toBe(defaultBrowserHomeUrl);
+    expect(normalizeBrowserHomeUrl("   ")).toBe(defaultBrowserHomeUrl);
+    expect(normalizeBrowserHomeUrl("javascript:alert(1)")).toBe(defaultBrowserHomeUrl);
+    expect(normalizeBrowserHomeUrl("file:///etc/passwd")).toBe(defaultBrowserHomeUrl);
+    expect(normalizeBrowserHomeUrl("https://")).toBe(defaultBrowserHomeUrl);
+  });
+
+  it("feeds new tabs once configured", () => {
+    configureBrowserHomeUrl("example.com/start");
+    expect(browserHomeUrl()).toBe("https://example.com/start");
+    expect(createBrowserViewState().url).toBe("https://example.com/start");
+  });
+
+  it("preserves the agent-owned tab marker", () => {
+    const state = parseBrowserViewState({ ...createBrowserViewState(), agentOwned: true });
+    expect(state.agentOwned).toBe(true);
+  });
+});

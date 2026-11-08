@@ -1,6 +1,6 @@
 import * as React from "react";
 
-import { cn } from "../utils";
+import { cn } from "../classNames";
 
 const Card = React.forwardRef<HTMLDivElement, CardProps>(
   ({ className, size = "default", ...props }, ref) => (
@@ -60,7 +60,7 @@ const CardContent = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDi
 );
 CardContent.displayName = "CardContent";
 
-export { Card,    };
+export { Card };
 
 type CardProps = React.HTMLAttributes<HTMLDivElement> & {
   size?: "default" | "sm";

@@ -1,6 +1,6 @@
 import { Palette } from "lucide-react";
 import * as React from "react";
-import { cn } from "../utils";
+import { cn } from "../classNames";
 
 type SwatchShape = "circle" | "square";
 

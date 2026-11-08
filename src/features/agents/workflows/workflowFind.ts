@@ -1,5 +1,5 @@
-import { embedOnDevice } from "@/api/device-embeddings";
-import { localDocuments } from "@/features/misty/localChats";
+import { embedOnDevice } from "@/api/runtime/device-embeddings";
+import { localDocuments } from "../conversations/state/localChats";
 import type { LocalMethod } from "./localMethods";
 
 /**

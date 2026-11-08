@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useMistyStore } from "@/features/misty/useMistyStore";
+import { useMistyStore } from "../conversations/state/useMistyStore";
 import { Button, TreeBranch } from "@/shared/ui";
 import { lessonProgress } from "./lessonRouter";
 import { useLessonStore } from "./lessonStore";

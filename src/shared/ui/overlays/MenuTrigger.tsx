@@ -1,7 +1,7 @@
 import * as React from "react";
 import { Button, type ButtonProps } from "../controls/Button";
 import { IconButton, type IconButtonProps } from "../controls/IconButton";
-import { cn } from "../utils";
+import { cn } from "../classNames";
 import { MenuChevron } from "./MenuChevron";
 import { DropdownMenuTrigger } from "./DropdownMenu";
 import { PopoverTrigger } from "./Popover";
@@ -89,4 +89,3 @@ const MenuTrigger = React.forwardRef<HTMLButtonElement, MenuTriggerProps>(
 MenuTrigger.displayName = "MenuTrigger";
 
 export { MenuTrigger };
-;

@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { spacesApi } from "@/api/spaces/api";
-import type { SpaceMessage } from "@/api/spaces/dto/entities";
-import { isAgentAuthoredMessage } from "./messageHelpers";
+import { spacesApi } from "../../api/api";
+import type { SpaceMessage } from "../../api/dto/entities";
+import { isAgentAuthoredMessage } from "./messageText";
 
 interface ChatDisplayRow {
   message: SpaceMessage;

@@ -1,5 +1,5 @@
-import { useMistyStore } from "@/features/misty/useMistyStore";
-import { useCollaborationStore } from "../collaboration/store";
+import { useMistyStore } from "../conversations/state/useMistyStore";
+import { useCollaborationStore } from "../plans/store";
 import { activeLesson } from "./lessonStore";
 
 /**

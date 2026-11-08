@@ -3,8 +3,8 @@ import type {
   AiSuggestedAction,
   AiSurfaceAdapter,
   AiSurfaceId,
-} from "@/features/ai-surface/AiPaneHost";
-import type { WorkspaceSurfaceId, WorkspaceView } from "@/features/workspace";
+} from "@/features/agents";
+import type { WorkspaceSurfaceId, WorkspaceView } from "@/features/app-windows";
 
 const surfaceLabels: Record<WorkspaceSurfaceId, string> = {
   extensions: "Extensions",

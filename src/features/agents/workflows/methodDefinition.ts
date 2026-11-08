@@ -1,4 +1,4 @@
-import type { AgentMethodDefinition } from "@/api/ai/agent-methods";
+import type { AgentMethodDefinition } from "../api/agent-methods";
 
 /**
  * What makes a saved method valid and how its instructions fill in, as the server's

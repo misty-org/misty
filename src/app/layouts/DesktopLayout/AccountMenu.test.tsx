@@ -1,3 +1,4 @@
+import "@/app/featureSeams";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -11,7 +12,8 @@ let mockUser: { id: string; email: string; username: string } | null = {
 };
 let mockAccounts: Array<{ id: string; email: string; username: string }> = [];
 
-vi.mock("@/features/auth", () => ({
+vi.mock("@/features/account", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   SavedAccountSessionUnavailableError: class extends Error {},
   useAuth: () => ({
     user: mockUser,
@@ -23,7 +25,8 @@ vi.mock("@/features/auth", () => ({
   useUserStore: (selector: (state: { me: null }) => unknown) => selector({ me: null }),
 }));
 
-vi.mock("@/features/native-session", () => ({
+vi.mock("@/features/account/native-session", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   useNativeSessionStore: (selector: (state: { status: null }) => unknown) =>
     selector({ status: null }),
 }));

@@ -1,8 +1,5 @@
 import { useLayoutEffect, useRef, type RefObject } from "react";
-import {
-  browserRuntimeResumeEvent,
-  setBrowserWebviewsSuspended,
-} from "@/features/webviews/browserRuntime";
+import { browserRuntimeResumeEvent, setBrowserWebviewsSuspended } from "@/features/app-windows";
 import { dockingMotion } from "./dockingGeometry";
 
 const surfaces = ".misty-workspace-tabs, [data-workspace-panes] > [role='tabpanel']:not([hidden])";

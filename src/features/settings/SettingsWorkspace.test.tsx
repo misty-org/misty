@@ -1,13 +1,14 @@
-import { useVaultState } from "@/features/vault";
+import "@/app/SettingsSections";
+import { useVaultState } from "@/features/sync/vault";
 import { initializeHostAgentsRuntime } from "@/features/agents/hostAgentsRuntime";
-import type * as AppShell from "@/features/app-shell";
+import type * as AppShell from "@/app/shell";
 import type { SettingsSection } from "@/features/settings";
 import { fireEvent } from "@testing-library/react";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type * as SettingsStoreModule from "./store/useSettingsStore";
+import type * as SettingsStoreModule from "./preferences/useSettingsStore";
 
 /**
  * A structural safety net for the settings surface.
@@ -63,7 +64,7 @@ const mocks = vi.hoisted(() => {
     searchState,
   };
 });
-vi.mock("@/features/app-shell", async (importOriginal) => {
+vi.mock("@/app/shell", async (importOriginal) => {
   const actual = await importOriginal<typeof AppShell>();
   const appState = {
     app: null,
@@ -78,7 +79,7 @@ vi.mock("@/features/app-shell", async (importOriginal) => {
     useAppStore,
   };
 });
-vi.mock("./store/useSettingsStore", async (importOriginal) => {
+vi.mock("./preferences/useSettingsStore", async (importOriginal) => {
   const actual = await importOriginal<typeof SettingsStoreModule>();
   const useSettingsStore = (selector?: (state: unknown) => unknown) =>
     selector ? selector(mocks.settingsState) : mocks.settingsState;
@@ -88,7 +89,7 @@ vi.mock("./store/useSettingsStore", async (importOriginal) => {
     useSettingsStore,
   };
 });
-vi.mock("@/features/native-session", () => ({
+vi.mock("@/features/account/native-session", () => ({
   InstallerCard: () => <div data-testid="installer-card" />,
 }));
 vi.mock("@/api/assistant/api", () => ({

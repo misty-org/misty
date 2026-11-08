@@ -1,11 +1,11 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { useEffect, useMemo } from "react";
-import { browserPageTools, useBrowserMediaStore } from "@/features/browser/library";
-import { browserRuntimeIdForTabId } from "@/features/webviews/browserRuntime";
-import { workspaceTabsById } from "@/features/workspace/layoutTabs";
-import type { WorkspaceView } from "@/features/workspace/model";
-import { useWorkspaceStore } from "@/features/workspace/useWorkspaceStore";
+import { browserPageTools, useBrowserMediaStore } from "@/features/browser";
+import { browserRuntimeIdForTabId } from "@/features/browser";
+import { workspaceTabsById } from "@/features/app-windows";
+import type { WorkspaceView } from "@/features/app-windows";
+import { useWorkspaceStore } from "@/features/app-windows";
 
 /**
  * Browser tabs with a player: those playing sound, and those that have played sound and still hold

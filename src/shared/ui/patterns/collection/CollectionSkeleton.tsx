@@ -1,5 +1,5 @@
 import { Skeleton } from "../../feedback/Skeleton";
-import { cn } from "../../utils";
+import { cn } from "../../classNames";
 
 /** Fill the available collection pane while its first set of items loads. */
 export function CollectionSkeleton({

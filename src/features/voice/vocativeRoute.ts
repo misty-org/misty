@@ -1,33 +1,14 @@
-import {
-  routeLocalFollowup,
-  useCompanionState,
-  useLocalExecution,
-  usePersonalAgentsStore,
-} from "@/features/agents";
-import { useMistyStore } from "@/features/misty/useMistyStore";
-import { matchVocative, type Vocative } from "./vocative";
+import { createPort } from "@/shared/lib/seams";
+import type { Vocative } from "./vocative";
 
-/** "Hey <agent>, …" against the person's agents, or null. */
-export function findVocative(transcript: string): Vocative | null {
-  const agents = usePersonalAgentsStore
-    .getState()
-    .agents.filter((agent) => agent.enabled !== false)
-    .map((agent) => ({ id: agent.id, name: agent.name }));
-  return matchVocative(transcript, agents);
-}
+/** Handing "Hey <agent>, …" to an agent is agents' job; agents sit above voice and fill this in. */
+export const vocativeRouting = createPort<{
+  findVocative(transcript: string): Vocative | null;
+  routeToAgent(vocative: Vocative): Promise<void>;
+}>("routing dictation to agents");
 
-/**
- * Sends the message to the named agent instead of typing it: as a follow-up
- * when that agent is already working on screen, otherwise as a new request
- * that answers in its chat. Nothing shows at the cursor: only the talk shortcut does that.
- */
-export async function routeToAgent({ agent, message }: Vocative) {
-  if (useLocalExecution.getState().execution?.agentId === agent.id) {
-    await routeLocalFollowup(message);
-    return;
-  }
-  const submit = useCompanionState.getState().submit;
-  if (!submit) throw new Error("Agents are starting. Try again in a moment.");
-  useMistyStore.setState({ selectedAgentId: agent.id });
-  await submit({ prompt: message, conversationId: "" });
-}
+export const findVocative = (transcript: string): Vocative | null =>
+  vocativeRouting.get().findVocative(transcript);
+
+export const routeToAgent = (vocative: Vocative): Promise<void> =>
+  vocativeRouting.get().routeToAgent(vocative);

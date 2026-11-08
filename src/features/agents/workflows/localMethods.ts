@@ -1,6 +1,6 @@
-import type { AgentMethod, AgentMethodDefinition, SaveAgentMethod } from "@/api/ai/agent-methods";
-import { localDocuments } from "@/features/misty/localChats";
-import { changeDocument, RunStateError } from "../localTools/runState/documents";
+import type { AgentMethod, AgentMethodDefinition, SaveAgentMethod } from "../api/agent-methods";
+import { localDocuments } from "../conversations/state/localChats";
+import { changeDocument, RunStateError } from "../tools/run-state/documents";
 import { validMethodDefinition } from "./methodDefinition";
 import { announceWorkflowChange } from "./workflowChanges";
 

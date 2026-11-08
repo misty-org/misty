@@ -1,6 +1,6 @@
-import type { SpaceMember } from "@/api/spaces/dto/entities";
-import { useSpacesStore } from "../../store/useSpacesStore";
-import { spaceTypingScopeKey } from "../../store/realtimeTypes";
+import type { SpaceMember } from "../../api/dto/entities";
+import { useSpacesStore } from "../../list/useSpacesStore";
+import { spaceTypingScopeKey } from "../../list/realtimeTypes";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 const typingTimeoutMs = 1_800;

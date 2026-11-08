@@ -1,6 +1,6 @@
 import { requireDesktopHost } from "./requireDesktopHost";
 
-// The desktop control island and mist on Windows (desktop_overlays_windows.rs), and the live
+// The desktop control island and mist on Windows (agents/desktop_control/windows/overlays.rs), and the live
 // subtitles panel. Only the island and the panel use the app's controls and theme; the mist
 // stays bare so nothing opaque ever covers the screen.
 const island = async () => {
@@ -14,7 +14,7 @@ export const desktopStartup = requireDesktopHost()
   ? Promise.all([
       import("react-dom/client"),
       import("react"),
-      import("@/features/agents/desktop/DesktopOverlayRoot"),
+      import("@/features/agents/desktop-control/DesktopOverlayRoot"),
       island(),
     ]).then(([{ createRoot }, { createElement }, { DesktopOverlayRoot }]) => {
       createRoot(document.getElementById("root")!).render(createElement(DesktopOverlayRoot));

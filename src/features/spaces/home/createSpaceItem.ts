@@ -1,7 +1,7 @@
 import type { NavigateFunction } from "react-router-dom";
-import { drawingsApi } from "@/api/drawings/api";
-import { notesApi } from "@/api/notes/api";
-import { preloadSpaceSection } from "../SpaceSectionView";
+import { drawingsApi } from "../journal/drawings/api/api";
+import { notesApi } from "../journal/notes/api/api";
+import { preloadSpaceSection } from "../overview/SpaceSectionView";
 import { spaceChatPath } from "../chat/chatRoute";
 
 export type SpaceCreateKind = "chat" | "note" | "drawing" | "file";

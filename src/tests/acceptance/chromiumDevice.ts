@@ -21,7 +21,7 @@ export interface ChromiumDevice {
 
 const viewport = { width: 1280, height: 800 };
 const cursorScript = readFileSync(
-  new URL("../../../src-tauri/src/infra/browser/scripts/agent_cursor.js", import.meta.url),
+  new URL("../../../src-tauri/features/browser/kiri_link/scripts/agent_cursor.js", import.meta.url),
   "utf8",
 );
 

@@ -4,11 +4,11 @@ import {
   SavedAccountSessionUnavailableError,
   useAuth,
   useUserStore,
-} from "@/features/auth";
-import { reportSystemError } from "@/features/support/systemErrors";
-import { routes } from "@/features/app-shell";
-import { useNativeSessionStore } from "@/features/native-session";
-import { ProfileMenuItems } from "@/features/profiles/ProfileMenuItems";
+} from "@/features/account";
+import { reportSystemError } from "@/shared/platform/systemErrors";
+import { routes } from "@/app/shell";
+import { useNativeSessionStore } from "@/features/account";
+import { ProfileMenuItems } from "@/features/app-windows";
 import {
   DropdownMenuContent,
   DropdownMenuLabel,
@@ -21,7 +21,7 @@ import { Check, LogIn, LogOut, Plus, Repeat2, Settings, UserCircle } from "lucid
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
-import { initialsForProfile } from "./helpers";
+import { initialsForProfile } from "./accountMenuText";
 
 function Initials(props: { children: string }) {
   return (

@@ -3,7 +3,7 @@ import type { MouseEvent } from "react";
 import { Button } from "../../controls/Button";
 import { Card } from "../../display/Card";
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from "../../overlays/ContextMenu";
-import { cn } from "../../utils";
+import { cn } from "../../classNames";
 import {
   collectionIconTone,
   collectionUtilityReveal,

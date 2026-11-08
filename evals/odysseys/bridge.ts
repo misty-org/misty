@@ -1,4 +1,4 @@
-// The desktop's debug bridge (src-tauri/src/infra/browser/eval_bridge), which exists only in
+// The desktop's debug bridge (src-tauri/features/browser/agent_pages/eval_bridge), which exists only in
 // a debug build and only listens on this computer.
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";

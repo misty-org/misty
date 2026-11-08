@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { spacesApi } from "@/api/spaces/api";
-import type { SpaceConversation, SpaceMember } from "@/api/spaces/dto/entities";
-import { SystemErrorNotice } from "@/features/support/systemErrors";
+import { spacesApi } from "../../api/api";
+import type { SpaceConversation, SpaceMember } from "../../api/dto/entities";
+import { SystemErrorNotice } from "@/shared/platform/systemErrors";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, Pressable } from "@/shared/ui";
 
 /** Opens the DM with another person in the Space, starting it if there isn't one yet. */

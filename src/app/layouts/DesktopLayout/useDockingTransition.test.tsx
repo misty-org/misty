@@ -4,7 +4,13 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { useDockingTransition } from "./useDockingTransition";
 
 const suspend = vi.hoisted(() => vi.fn());
-vi.mock("@/features/webviews/browserRuntime", () => ({ setBrowserWebviewsSuspended: suspend }));
+vi.mock("@/features/browser/webviews/browserRuntime", () => ({
+  setBrowserWebviewsSuspended: suspend,
+}));
+vi.mock("@/features/app-windows/page-runtime/browserOverlayRuntime", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  setBrowserWebviewsSuspended: suspend,
+}));
 let finish: () => void;
 let animation: { finished: Promise<void>; cancel: ReturnType<typeof vi.fn> };
 const animate = vi.fn();

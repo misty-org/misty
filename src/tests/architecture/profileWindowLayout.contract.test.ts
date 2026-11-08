@@ -24,8 +24,8 @@ const scopeMap = new RegExp(
 );
 /** Only what reads records saved by older versions may name their fields. */
 const readsOldRecords = new Set([
-  "src/features/workspace/workspaceStorePersistence.ts",
-  "src/features/workspace/workspaceShapeUpgrade.ts",
+  "src/features/app-windows/tabs/workspaceStorePersistence.ts",
+  "src/features/app-windows/recovery/workspaceShapeUpgrade.ts",
 ]);
 const isTest = (path: string) => /\.(test|contract\.test|testFixtures)\.tsx?$/.test(path);
 const sources = () =>
@@ -48,16 +48,16 @@ describe("one layout per window", () => {
   });
 
   it("takes the window's profile from the native window", () => {
-    const window = readFileSync("src/features/workspace/profileWindow.ts", "utf8");
+    const window = readFileSync("src/features/app-windows/profiles/profileWindow.ts", "utf8");
     expect(window).toContain("__MISTY_WINDOW__");
     expect(window).toContain('"profile_window_info"');
-    const space = readFileSync("src/features/workspace/spaceWindow.ts", "utf8");
+    const space = readFileSync("src/features/app-windows/tabs/spaceWindow.ts", "utf8");
     expect(space).not.toContain("useWorkspaceStore");
     expect(space).toContain('"profile_window_set_space"');
   });
 
   it("never lets switching Space touch tabs", () => {
-    const bridge = readFileSync("src/features/workspace/SpaceWindowBridge.tsx", "utf8");
+    const bridge = readFileSync("src/features/spaces/SpaceWindowBridge.tsx", "utf8");
     expect(bridge).not.toContain("useWorkspaceStore");
     expect(bridge).not.toContain("onSpaceWindowSwitch");
   });

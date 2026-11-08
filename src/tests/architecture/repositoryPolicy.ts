@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
-import { extname, relative, resolve } from "node:path";
+import { dirname, extname, join, relative, resolve } from "node:path";
 
 export const repositoryRoot = process.cwd();
 
@@ -34,4 +34,22 @@ export function walk(
     else if (entry.isFile() && extensions.has(extname(entry.name))) paths.push(path);
   }
   return paths;
+}
+
+/**
+ * The app crate's sources under `src-tauri/features`, leaving out the crates and workers that sit
+ * in feature folders beside its modules (any folder with a Cargo.toml): they are their own packages.
+ */
+export function walkAppCrate(root: string, extensions: ReadonlySet<string>): string[] {
+  const insideOtherPackage = (path: string) => {
+    for (
+      let folder = dirname(path);
+      folder.startsWith(sourcePath(root));
+      folder = dirname(folder)
+    ) {
+      if (existsSync(join(folder, "Cargo.toml"))) return true;
+    }
+    return false;
+  };
+  return walk(root, extensions).filter((path) => !insideOtherPackage(path));
 }

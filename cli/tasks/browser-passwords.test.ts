@@ -4,11 +4,11 @@ import test from "node:test";
 import { JSDOM } from "jsdom";
 
 const script = readFileSync(
-  new URL("../../src-tauri/src/infra/browser/scripts/passwords.js", import.meta.url),
+  new URL("../../src-tauri/features/browser/kiri_link/scripts/passwords.js", import.meta.url),
   "utf8",
 );
 const host = readFileSync(
-  new URL("../../src-tauri/src/infra/browser/host_messages/passwords.rs", import.meta.url),
+  new URL("../../src-tauri/features/browser/kiri_link/host_messages/passwords.rs", import.meta.url),
   "utf8",
 );
 

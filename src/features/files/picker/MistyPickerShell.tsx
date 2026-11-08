@@ -1,0 +1,130 @@
+import { FolderOpen, LibraryBig } from "lucide-react";
+import { useState, type ComponentType } from "react";
+import type { MistyPickerProps, MistyPickerSource } from "./mistyPickerOptions";
+import { LibraryPickerPanel } from "./LibraryPickerSeam";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  ToggleGroup,
+  ToggleGroupItem,
+} from "@/shared/ui";
+import type { MistyFilePickerProps } from "./FilePicker";
+
+const sharedPickerDialogClassName = [
+  "grid h-[min(720px,calc(100vh-48px))] w-[min(1060px,calc(100vw-32px))] max-w-none",
+  "grid-rows-[auto_minmax(0,1fr)] gap-0 overflow-hidden p-0",
+  "rounded-xl bg-charcoal-workspace border border-charcoal-border shadow-2xl",
+  "max-[560px]:size-full max-[560px]:rounded-none",
+].join(" ");
+
+/**
+ * One picker for both sources. Callers open this rather than choosing between a file
+ * picker and a Library picker up front — the person picking decides where to look.
+ */
+export function MistyPickerShell({
+  FilePickerComponent: MistyFilePicker,
+  spaceId,
+  initialSource = "files",
+  fileMode = "file",
+  multiple = false,
+  title,
+  allowedExtensions,
+  librarySelectedIds = [],
+  libraryMaximum = 5,
+  onCancel,
+  onChooseFiles,
+  onChooseLibraryItems,
+}: MistyPickerProps & { FilePickerComponent: ComponentType<MistyFilePickerProps> }) {
+  const libraryAvailable = Boolean(spaceId && onChooseLibraryItems);
+  const [source, setSource] = useState<MistyPickerSource>(
+    libraryAvailable ? initialSource : "files",
+  );
+
+  // With nothing else to offer, there's no reason to show a dialog before the system's own.
+  if (!libraryAvailable) {
+    return (
+      <MistyFilePicker
+        mode={fileMode}
+        multiple={multiple}
+        title={title}
+        allowedExtensions={allowedExtensions}
+        onCancel={onCancel}
+        onSelect={(path) => onChooseFiles([path])}
+        onSelectMany={(paths) => onChooseFiles(paths)}
+      />
+    );
+  }
+
+  const sourceToggle = (
+    <ToggleGroup
+      className="shrink-0 rounded-md bg-charcoal-card p-0.5"
+      type="single"
+      value={source}
+      onValueChange={(value) => {
+        if (value === "files" || value === "library") setSource(value);
+      }}
+      aria-label="Pick from"
+    >
+      <ToggleGroupItem className="h-7 gap-1.5 border-0 px-2.5 text-xs" value="files">
+        <FolderOpen size={14} />
+        Files
+      </ToggleGroupItem>
+      <ToggleGroupItem className="h-7 gap-1.5 border-0 px-2.5 text-xs" value="library">
+        <LibraryBig size={14} />
+        Library
+      </ToggleGroupItem>
+    </ToggleGroup>
+  );
+
+  return (
+    <Dialog
+      open
+      onOpenChange={(open) => {
+        if (!open) onCancel();
+      }}
+    >
+      <DialogContent aria-describedby={undefined} className={sharedPickerDialogClassName}>
+        <DialogHeader className="flex-row items-center justify-between gap-4 border-b border-charcoal-border px-5 py-3 pr-14 text-left">
+          <div className="min-w-0">
+            <DialogTitle className="text-base">
+              {source === "library"
+                ? "Choose from Library"
+                : title || (fileMode === "folder" ? "Choose a folder" : "Choose a file")}
+            </DialogTitle>
+          </div>
+          {sourceToggle}
+        </DialogHeader>
+
+        <div style={{ display: source === "files" ? "contents" : "none" }}>
+          <MistyFilePicker
+            embedded
+            active={source === "files"}
+            mode={fileMode}
+            multiple={multiple}
+            title={title}
+            allowedExtensions={allowedExtensions}
+            onCancel={onCancel}
+            onSelect={(path) => onChooseFiles([path])}
+            onSelectMany={(paths) => onChooseFiles(paths)}
+          />
+        </div>
+
+        {spaceId && onChooseLibraryItems ? (
+          <div style={{ display: source === "library" ? "contents" : "none" }}>
+            <LibraryPickerPanel
+              embedded
+              active={source === "library"}
+              spaceId={spaceId}
+              selectedIds={librarySelectedIds}
+              maximumSelected={libraryMaximum}
+              onCancel={onCancel}
+              onChoose={onChooseLibraryItems}
+            />
+          </div>
+        ) : null}
+      </DialogContent>
+    </Dialog>
+  );
+}

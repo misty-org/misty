@@ -1,7 +1,7 @@
-import type { AppNoticeEntry, AppNoticeSource } from "@/app/layouts/model";
-import { reportSystemError } from "@/features/support/systemErrors";
-import type { AppTab } from "@/features/app-shell";
-import { useAppStore } from "@/features/app-shell";
+import type { AppNoticeEntry, AppNoticeSource } from "@/app/layouts/desktop-state";
+import { reportSystemError } from "@/shared/platform/systemErrors";
+import type { AppTab } from "@/app/shell";
+import { useAppStore } from "@/app/shell";
 import { useSettingsStore } from "@/features/settings";
 import { Notification } from "@/shared/ui";
 import { memo, useEffect, useRef } from "react";

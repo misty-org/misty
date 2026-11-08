@@ -1,6 +1,6 @@
-import { agentsApi } from "@/api/agents/api";
-import { aiSurfaceApi, subscribeToAiInvocation } from "@/features/ai-surface/api";
-import { localAttachmentImage } from "@/features/misty/localAttachments";
+import { agentsApi } from "./api/api";
+import { aiSurfaceApi, subscribeToAiInvocation } from "./runs/invocations/api";
+import { localAttachmentImage } from "./conversations/composer/localAttachments";
 import { configureAgentsRuntime } from "./AgentsRuntime";
 export function initializeHostAgentsRuntime() {
   configureAgentsRuntime({

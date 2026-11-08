@@ -1,4 +1,4 @@
-import { cn } from "../utils";
+import { cn } from "../classNames";
 
 /**
  * The branch beside a nested row (from the old navbar's app tree): a thin trunk that runs

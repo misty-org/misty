@@ -1,7 +1,7 @@
 import { useEffect, type ReactNode } from "react";
-import { layoutTabs, tabLabel } from "@/features/workspace/layoutTabs";
-import type { WorkspaceLayout, WorkspaceTab } from "@/features/workspace/model";
-import { keepPeek, usePeekStore } from "@/features/workspace/peek";
+import { layoutTabs, tabLabel } from "@/features/app-windows";
+import type { WorkspaceLayout, WorkspaceTab } from "@/features/app-windows";
+import { keepPeek, usePeekStore } from "@/features/app-windows";
 import { useMistyPanelSide } from "@/features/agents";
 import { cn } from "@/shared/ui";
 import { PeekOverlay } from "./PeekOverlay";

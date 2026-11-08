@@ -1,9 +1,14 @@
 import { expect, it, vi } from "vitest";
 
-vi.mock("@/api/spaces/api", () => ({ spacesApi: {} }));
-vi.mock("@/features/agents/deviceGrants", () => ({ desktopDeviceGrants: async () => [] }));
-vi.mock("@/features/agents/personalAgentsApi", () => ({ listPersonalAgents: async () => [] }));
-vi.mock("@/features/ai-surface/api", () => ({ aiSurfaceApi: {}, subscribeToAiInvocation: vi.fn() }));
+vi.mock("@/features/spaces/api/api", () => ({ spacesApi: {} }));
+vi.mock("@/features/agents/personal/deviceGrants", () => ({ desktopDeviceGrants: async () => [] }));
+vi.mock("@/features/agents/personal/personalAgentsApi", () => ({
+  listPersonalAgents: async () => [],
+}));
+vi.mock("@/features/agents/runs/invocations/api", () => ({
+  aiSurfaceApi: {},
+  subscribeToAiInvocation: vi.fn(),
+}));
 
 import { ownMentions } from "./mentionRuns";
 
@@ -17,7 +22,9 @@ const mention = (agent_id: string) => ({ type: "mention", agent_id, label: agent
 it("runs only the sender's own agents, each once, at most three", () => {
   const agents = ["a", "b", "c", "d"].map((id) => agent(id, "me"));
   expect(
-    ownMentions([mention("a"), mention("a"), mention("b")], agents, "me").map((item) => item.agent_id),
+    ownMentions([mention("a"), mention("a"), mention("b")], agents, "me").map(
+      (item) => item.agent_id,
+    ),
   ).toEqual(["a", "b"]);
   expect(
     ownMentions(["a", "b", "c", "d"].map(mention), agents, "me").map((item) => item.agent_id),
@@ -26,5 +33,7 @@ it("runs only the sender's own agents, each once, at most three", () => {
 
 it("treats someone else's agent as text", () => {
   expect(ownMentions([mention("theirs")], [agent("theirs", "bob")], "me")).toEqual([]);
-  expect(ownMentions([{ type: "text", text: "hi" } as never], [agent("a", "me")], "me")).toEqual([]);
+  expect(ownMentions([{ type: "text", text: "hi" } as never], [agent("a", "me")], "me")).toEqual(
+    [],
+  );
 });

@@ -1,9 +1,9 @@
-import type { AppTab } from "@/features/app-shell";
-import { isRememberableAppRoute, useAppRouteMemoryStore, useAppStore } from "@/features/app-shell";
+import type { AppTab } from "@/app/shell";
+import { isRememberableAppRoute, useAppRouteMemoryStore, useAppStore } from "@/app/shell";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { settingsFallbackRoute } from "./helpers";
+import { settingsFallbackRoute } from "./accountMenuText";
 
 export function useDesktopBootstrap(params: { getRouteId: (pathname: string) => AppTab }) {
   const location = useLocation();

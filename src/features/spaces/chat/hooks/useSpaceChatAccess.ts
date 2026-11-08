@@ -1,5 +1,5 @@
-import { useSpacesStore } from "../../store/useSpacesStore";
-import type { Space } from "@/api/spaces/dto/entities";
+import { useSpacesStore } from "../../list/useSpacesStore";
+import type { Space } from "../../api/dto/entities";
 
 export interface SpaceChatAccess {
   activeSpace: Space | undefined;

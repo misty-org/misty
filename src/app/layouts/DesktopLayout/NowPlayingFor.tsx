@@ -1,10 +1,10 @@
 import type { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import { useBrowserMediaStore, type BrowserMediaInfo } from "@/features/browser/library";
-import type { WorkspaceView } from "@/features/workspace/model";
-import { useWorkspaceStore } from "@/features/workspace/useWorkspaceStore";
+import { useBrowserMediaStore, type BrowserMediaInfo } from "@/features/browser";
+import type { WorkspaceView } from "@/features/app-windows";
+import { useWorkspaceStore } from "@/features/app-windows";
 import { NowPlayingCard } from "./NowPlayingCard";
-import { pictureInPictureSupported } from "@/features/webviews/pictureInPictureSettings";
+import { pictureInPictureSupported } from "@/features/browser";
 import { actOnMedia, closeMedia, togglePictureInPicture } from "./useNowPlaying";
 import "./nowPlaying.css";
 

@@ -1,5 +1,5 @@
-import type { ChatComposerSuggestion } from "@/api/spaces/dto/space-chat";
-import { SystemErrorNotice } from "@/features/support/systemErrors";
+import type { ChatComposerSuggestion } from "../../api/dto/space-chat";
+import { SystemErrorNotice } from "@/shared/platform/systemErrors";
 import {
   Command,
   CommandEmpty,

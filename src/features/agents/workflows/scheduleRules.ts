@@ -1,4 +1,4 @@
-import type { ScheduleFrequency, ScheduleRule } from "@/api/ai/agent-methods";
+import type { ScheduleFrequency, ScheduleRule } from "../api/agent-methods";
 
 export const scheduleFrequencies: { value: ScheduleFrequency; label: string; unit: string }[] = [
   { value: "once", label: "On specific dates", unit: "" },

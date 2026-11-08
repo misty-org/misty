@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ComponentPropsWithoutRef } from "react";
-import { cn } from "../utils";
+import { cn } from "../classNames";
 import { useMarqueeGroup } from "./MarqueeGroup";
 
 const overflowFadeClass = [

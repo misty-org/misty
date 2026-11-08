@@ -1,9 +1,9 @@
 import type { ComponentProps, ReactNode } from "react";
 import { Skeleton, Spinner } from "@/shared/ui";
-import { useTitlePending } from "@/features/misty/conversationTitles";
-import { AgentConversationActions } from "../components/AgentConversationActions";
-import { AgentAvatar } from "../components/AgentAvatar";
-import { AgentSwitcher } from "../components/AgentSwitcher";
+import { useTitlePending } from "../conversations/state/conversationTitles";
+import { AgentConversationActions } from "../conversations/view/AgentConversationActions";
+import { AgentAvatar } from "../personal/AgentAvatar";
+import { AgentSwitcher } from "../personal/AgentSwitcher";
 
 type SwitcherProps = ComponentProps<typeof AgentSwitcher>;
 

@@ -1,5 +1,5 @@
 import * as React from "react";
-import { cn } from "../utils";
+import { cn } from "../classNames";
 
 const layerClass = {
   "agent-surface": "layer-agent-surface",

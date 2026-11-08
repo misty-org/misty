@@ -1,21 +1,21 @@
-import { useBrowserSearchStore } from "@/features/browser-search/search";
+import { useBrowserSearchStore } from "@/features/browser";
 import { PaneSwapMode } from "./PaneSwapMode";
-import { routes } from "@/features/app-shell";
-import type { TabSide } from "@/features/app-shell/dockingLayout";
+import { routes } from "@/app/shell";
+import type { TabSide } from "@/app/shell/dockingLayout";
 import {
   dockLeaves,
   findDockLeaf,
   useWorkspaceStore,
   type WorkspaceView,
-} from "@/features/workspace";
-import { allLayoutViews, layoutTabs } from "@/features/workspace/layoutTabs";
-import type { DockSplitDirection } from "@/features/workspace/model";
+} from "@/features/app-windows";
+import { allLayoutViews, layoutTabs } from "@/features/app-windows";
+import type { DockSplitDirection } from "@/features/app-windows";
 import { useCallback, useEffect, useMemo, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { WorkspaceDockTree } from "./WorkspaceDockTree";
 import { SidebarDrawer } from "./SidebarDrawer";
 import { WorkspaceTabStrip } from "./WorkspaceTabStrip";
-import { closePeek } from "@/features/workspace/peek";
+import { closePeek } from "@/features/app-windows";
 import {
   resetPinnedTabForView,
   useClearTabsShortcut,
@@ -23,7 +23,7 @@ import {
 } from "./usePinTabShortcut";
 import { WorkspaceTabPanels } from "./WorkspaceTabPanels";
 import { SpaceBar } from "./SpaceBar";
-import type { WorkspaceTab } from "@/features/workspace/model";
+import type { WorkspaceTab } from "@/features/app-windows";
 import { useWorkspaceCanvasShortcuts } from "./useWorkspaceCanvasShortcuts";
 import { useLegacyTabTitles, useWorkspaceTabShortcuts } from "./useWorkspaceTabShortcuts";
 import { disposeWorkspaceTab, workspaceTabsById } from "./workspaceViewLifecycle";

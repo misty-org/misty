@@ -19,8 +19,8 @@ Misty is free and open source under the AGPL-3.0. Browse with no account at all,
 | Path | What lives there |
 | --- | --- |
 | `src/` | The React and TypeScript app, organized by feature under `src/features/`. |
-| `src-tauri/` | The Tauri desktop shell in Rust, its native macOS and Windows code, and the services the desktop runs under `src-tauri/services/`, such as the agent runtime. |
-| `src-tauri/crates/kiri/` | Kiri, the native web platform layer that supplies web APIs the system webviews leave out. |
+| `src-tauri/` | The Tauri desktop shell in Rust. Everything for one feature, with its native macOS and Windows code, its tests and its worker programs, is in `src-tauri/features/<feature>/`. |
+| `src-tauri/features/kiri/` | Kiri, the native web platform layer that supplies web APIs the system webviews leave out. |
 | `cli/` | The `misty` CLI for setup, the local server stack, checks and releases, plus the TypeScript build tasks in `cli/tasks/`. |
 | `.githooks/` | The commit and push checks. There is no hosted CI. |
 

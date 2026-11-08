@@ -1,5 +1,5 @@
 import { ChevronDown } from "lucide-react";
-import { cn } from "../utils";
+import { cn } from "../classNames";
 
 /**
  * The chevron on anything that opens a menu or popover. It turns over while its trigger is open

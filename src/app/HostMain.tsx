@@ -1,3 +1,6 @@
+import "./featureSeams";
+import "./settingsEffects";
+import "./SettingsSections";
 import { initializeHostAgentsRuntime } from "@/features/agents/hostAgentsRuntime";
 import {
   configureMistyBrowserLinkOpener,
@@ -9,7 +12,7 @@ import { AppErrorBoundary } from "./AppErrorBoundary";
 configureMistyBrowserLinkOpener(async (url) => {
   if (!hasTauriInternals())
     throw new Error("Misty Browser is unavailable outside the desktop app.");
-  const { useWorkspaceStore } = await import("@/features/workspace");
+  const { useWorkspaceStore } = await import("@/features/app-windows");
   if (
     !useWorkspaceStore.getState().openBrowserView({
       url,
@@ -51,7 +54,7 @@ async function bootstrap() {
   void import("./layouts/DesktopLayout").catch(() => undefined);
   // Every request goes to the server this device chose, so the choice is read first.
   await (await import("@/api/deployment/serverChoice")).loadServerChoice();
-  const { bootstrapDemoSession } = await import("@/features/auth");
+  const { bootstrapDemoSession } = await import("@/features/account");
   await bootstrapDemoSession();
   const [{ App }] = await appModules;
   root.render(

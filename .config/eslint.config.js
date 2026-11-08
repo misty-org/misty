@@ -163,7 +163,10 @@ export default tseslint.config(
     files: ["src/features/**/*.{ts,tsx}"],
     rules: {
       "no-restricted-imports": restrict([
-        [["@/app/*"], "features/ must not import from app/."],
+        [
+          ["@/app/*", "!@/app/shell", "!@/app/shell/*"],
+          "features/ must not import from app/ (except the shell state in app/shell).",
+        ],
         FEATURE_INTERNALS,
       ]),
     },
@@ -178,13 +181,20 @@ export default tseslint.config(
   // Network access belongs to the API boundary.
   {
     files: ["src/**/*.{ts,tsx}"],
-    ignores: ["src/api/**", "src/tests/**", "src/**/*.test.{ts,tsx}"],
+    ignores: [
+      "src/api/**",
+      "src/features/*/api/**",
+      "src/features/*/*/api/**",
+      "src/features/*/*/*/api/**",
+      "src/tests/**",
+      "src/**/*.test.{ts,tsx}",
+    ],
     rules: {
       "no-restricted-globals": [
         REFACTOR,
         {
           name: "fetch",
-          message: "Network access belongs in src/api/. Stores hold state, not HTTP.",
+          message: "Network access belongs in src/api/ or a feature's api/ folder. Stores hold state, not HTTP.",
         },
       ],
     },

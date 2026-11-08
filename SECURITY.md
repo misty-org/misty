@@ -11,7 +11,7 @@ impact you expect. We will acknowledge the report and keep you informed until it
 
 ## Scope
 
-In scope: the desktop app (`src/`, `src-tauri/`, `kiri/`), the `misty` CLI (`cli/`) and the server
+In scope: the desktop app (`src/`, `src-tauri/`), the `misty` CLI (`cli/`) and the server
 ([misty-server](https://github.com/misty-org/misty-server)), including sync encryption, device admission, agent permissions and the browser's
 handling of untrusted pages.
 

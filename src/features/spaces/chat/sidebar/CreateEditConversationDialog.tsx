@@ -1,6 +1,6 @@
-import { spacesApi } from "@/api/spaces/api";
-import { SystemErrorNotice } from "@/features/support/systemErrors";
-import type { SpaceConversation } from "@/api/spaces/dto/entities";
+import { spacesApi } from "../../api/api";
+import { SystemErrorNotice } from "@/shared/platform/systemErrors";
+import type { SpaceConversation } from "../../api/dto/entities";
 import {
   Button,
   Dialog,

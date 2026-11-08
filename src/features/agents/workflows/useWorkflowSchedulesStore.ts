@@ -1,4 +1,4 @@
-import { agentMethodsApi, type UpcomingWorkflowRun } from "@/api/ai/agent-methods";
+import { agentMethodsApi, type UpcomingWorkflowRun } from "../api/agent-methods";
 import { create } from "zustand";
 
 interface WorkflowSchedulesState {

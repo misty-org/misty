@@ -1,9 +1,9 @@
 import { useCallback } from "react";
 import { useShortcutHandler } from "@/features/shortcuts";
-import { useWorkspaceStore } from "@/features/workspace";
-import { dockTreeViews } from "@/features/workspace/dockTree";
-import { layoutTabs } from "@/features/workspace/layoutTabs";
-import { pinnableTabUrl } from "@/features/workspace/pinnedTabs";
+import { useWorkspaceStore } from "@/features/app-windows";
+import { dockTreeViews } from "@/features/app-windows";
+import { layoutTabs } from "@/features/app-windows";
+import { pinnableTabUrl } from "@/features/app-windows";
 
 /** Pins or unpins the active tab from the keyboard or command palette. */
 export function usePinTabShortcut() {

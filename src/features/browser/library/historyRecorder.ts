@@ -1,13 +1,13 @@
+import { isBrowserInternalUrl } from "@/features/app-windows";
 import {
-  isBrowserInternalUrl,
   isUnseenPreload,
   parseBrowserViewState,
   useWorkspaceStore,
   type WorkspaceView,
-} from "@/features/workspace";
-import { allLayoutViews } from "@/features/workspace/layoutTabs";
+} from "@/features/app-windows";
+import { allLayoutViews } from "@/features/app-windows";
 import { browserLibrary } from "./native";
-import { isIncognitoWindow } from "@/features/workspace/profileWindow";
+import { isIncognitoWindow } from "@/features/app-windows";
 
 /** Finds a tab of this window, active or not. */
 function findWorkspaceView(tabId: string): WorkspaceView | null {

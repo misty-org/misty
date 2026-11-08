@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { AiProgressItem } from "@/features/ai-surface/types";
+import type { AiProgressItem } from "@/features/agents/runs/invocations/invocationTypes";
 import {
   groupProgress,
   stepMeta,

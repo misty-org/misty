@@ -1,5 +1,5 @@
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { agentsDeviceSnapshot } from "../store/useAgentsStore";
+import { agentsDeviceSnapshot } from "../personal/useAgentsStore";
 import { runLocalSchedules } from "./localScheduler";
 
 /** This computer's id for its agents, or null outside the desktop app. */

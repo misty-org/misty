@@ -1,5 +1,5 @@
 // Drives a run in the debug app for the Odysseys eval: a run starts, works and ends on this computer, so
-// this goes through the app's debug bridge (src-tauri/src/infra/browser/eval_bridge), with no server.
+// this goes through the app's debug bridge (src-tauri/features/browser/agent_pages/eval_bridge), with no server.
 import { randomUUID } from "node:crypto";
 import { bridgeCall, windowCall, type Bridge } from "./bridge.ts";
 

@@ -1,3 +1,3 @@
 export { buildChatDisplayRows, formatChatMessageTime } from "./components/ChatDisplay";
-export { messageReplyPreviewText } from "./components/messageHelpers";
-export * from "./store/useSpaceMessageSpansStore";
+export { messageReplyPreviewText } from "./components/messageText";
+export * from "./useSpaceMessageSpansStore";

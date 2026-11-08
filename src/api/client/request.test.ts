@@ -1,4 +1,4 @@
-import { setSpaceReferenceOnly } from "@/api/spaces/connectivity";
+import { setSpaceReferenceOnly } from "@/features/spaces/api/connectivity";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const session = vi.hoisted(() => ({ transitioning: false, generation: 0 }));

@@ -1,13 +1,13 @@
 import { setAppZoom } from "@/shared/hooks/useAppZoom";
-import { applyAppTheme } from "../store/appTheme";
+import { applyAppTheme } from "../preferences/appTheme";
 import {
   applyNightLight,
   msUntilNextNightLightSwitch,
   nightLightActive,
   nightLightTint,
-} from "../store/nightLight";
-import { selectAppearancePreferences } from "../store/preferences";
-import { useSettingsStore } from "../store/useSettingsStore";
+} from "../preferences/nightLight";
+import { selectAppearancePreferences } from "../preferences/preferences";
+import { useSettingsStore } from "../preferences/useSettingsStore";
 import { useEffect } from "react";
 import { useShallow } from "zustand/react/shallow";
 

@@ -1,4 +1,4 @@
-import type { SpaceMessage } from "@/api/spaces/dto/entities";
+import type { SpaceMessage } from "../../api/dto/entities";
 import { Avatar, AvatarFallback, AvatarImage, Pressable } from "@/shared/ui";
 import { ImageIcon } from "lucide-react";
 import {
@@ -6,7 +6,7 @@ import {
   initials,
   isAgentAuthoredMessage,
   messageReplyPreviewText,
-} from "./messageHelpers";
+} from "./messageText";
 
 /**
  * The quoted line above a reply, with the elbow connector to its parent.

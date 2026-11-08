@@ -5,13 +5,13 @@
       "hash": "07c67054587410af"
     }
   ],
-  "src/features/library/SpaceLibraryViewer.tsx": [
+  "src/features/spaces/library/SpaceLibraryViewer.tsx": [
     {
       "length": 291,
       "hash": "03af4067d4776828"
     }
   ],
-  "src/features/library/SpaceLibraryViewerUtils.tsx": [
+  "src/features/spaces/library/SpaceLibraryViewerUtils.tsx": [
     {
       "length": 642,
       "hash": "54a785654ae45689"

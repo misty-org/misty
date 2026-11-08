@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import type { DockingLayout } from "@/features/app-shell/dockingLayout";
+import type { DockingLayout } from "@/app/shell/dockingLayout";
 
 export const dockingMetrics = {
   titlebar: 38,

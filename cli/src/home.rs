@@ -7,7 +7,7 @@ use anyhow::{bail, Context, Result};
 use serde::Deserialize;
 
 /// Shared with the desktop app, which applies the same layout on every launch.
-const LAYOUT_JSON: &str = include_str!("../../src-tauri/misty-home-layout.json");
+const LAYOUT_JSON: &str = include_str!("../../src-tauri/features/database/misty-home-layout.json");
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]

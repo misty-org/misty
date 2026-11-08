@@ -13,7 +13,7 @@ import * as DropdownMenuPrimitive from "@radix-ui/react-dropdown-menu";
 import { Check, ChevronRight } from "lucide-react";
 import * as React from "react";
 
-import { cn } from "../utils";
+import { cn } from "../classNames";
 
 const dropdownViewportClass =
   "max-h-[min(24rem,var(--radix-dropdown-menu-content-available-height))] max-w-[var(--radix-dropdown-menu-content-available-width)]";

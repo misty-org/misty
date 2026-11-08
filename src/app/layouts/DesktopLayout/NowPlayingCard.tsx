@@ -16,10 +16,10 @@ import {
   VolumeX,
   X,
 } from "lucide-react";
-import type { BrowserMediaInfo } from "@/features/browser/library";
-import { parseBrowserViewState, type WorkspaceView } from "@/features/workspace/model";
+import type { BrowserMediaInfo } from "@/features/browser";
+import { parseBrowserViewState, type WorkspaceView } from "@/features/app-windows";
 import { IconButton, MarqueeGroup, OverflowFadeText, PlaybackClock, Pressable } from "@/shared/ui";
-import { SiteIcon } from "@/features/webviews/SiteIcon";
+import { SiteIcon } from "@/features/browser";
 
 type Action = "play" | "pause" | "previoustrack" | "nexttrack";
 

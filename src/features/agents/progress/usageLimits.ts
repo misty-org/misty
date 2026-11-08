@@ -1,4 +1,4 @@
-import type { AiProgressItem } from "@/features/ai-surface/types";
+import type { AiProgressItem } from "../runs/invocations/invocationTypes";
 
 /**
  * A tool refused because the account used its monthly allowance.

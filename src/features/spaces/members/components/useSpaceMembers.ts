@@ -1,10 +1,10 @@
-import { useSpacesStore } from "@/features/spaces";
-import { spacesApi } from "@/api/spaces/api";
-import type { SpaceInvitation } from "@/api/spaces/dto/entities";
+import { useSpacesStore } from "../../list/useSpacesStore";
+import { spacesApi } from "../../api/api";
+import type { SpaceInvitation } from "../../api/dto/entities";
 import { useMinimumSpin } from "@/shared/hooks/useMinimumSpin";
 import { useCallback, useEffect, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { canManageSpaceLifecycle } from "../../defaultSpace";
+import { canManageSpaceLifecycle } from "../../routes/defaultSpace";
 
 const emptyMembers: never[] = [];
 

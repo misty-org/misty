@@ -1,4 +1,4 @@
-import { useBarsAutoHide } from "@/features/app-shell/barsAutoHide";
+import { useBarsAutoHide } from "@/features/browser";
 import { useSettingsStore } from "@/features/settings";
 import { stringSetting } from "@/features/settings/SettingsControls";
 

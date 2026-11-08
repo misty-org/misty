@@ -1,14 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
 import { disposeWorkspaceTab } from "./workspaceViewLifecycle";
-import type { WorkspaceView } from "@/features/workspace";
+import type { WorkspaceView } from "@/features/app-windows";
 
 const surfaces = vi.hoisted(() => ({ dispose: vi.fn(), get: vi.fn() }));
 const routes = vi.hoisted(() => ({ release: vi.fn() }));
-vi.mock("@/features/workspace", () => ({
+vi.mock("@/features/app-windows", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   dockWidgetRegistry: { get: surfaces.get },
   workspaceTabsById: vi.fn(),
 }));
-vi.mock("@/features/workspace/WorkspaceViewRouteScope", () => ({
+vi.mock("@/features/app-windows/tabs/WorkspaceViewRouteScope", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   releaseWorkspaceViewRouteHistory: routes.release,
 }));
 

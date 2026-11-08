@@ -1,0 +1,28 @@
+[package]
+name = "database"
+version = "0.1.0"
+description = "Misty's data folder on this computer and the database in it"
+edition = "2021"
+license = "AGPL-3.0-or-later"
+publish = false
+
+[lib]
+name = "database"
+path = "lib.rs"
+
+[dependencies]
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+file_access = { path = "../file_access" }
+misty-credential-store = { path = "../../vendor/misty-credential-store" }
+rusqlite = { version = "0.32", features = ["bundled"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tauri = { version = "2", features = ["protocol-asset", "macos-private-api", "tray-icon", "image-png", "unstable"] }
+tempfile = "3"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_UI_Shell"] }
+
+[dev-dependencies]
+ctor = "0.8"
+file_access = { path = "../file_access", features = ["test-fixtures"] }

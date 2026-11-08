@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { MistyActivityEntry } from "@/features/misty/activity";
+import type { MistyActivityEntry } from "../conversations/state/activity";
 import { runtimeAiApi } from "../AgentsRuntime";
 
 /** One agent's account activity, refreshed whenever runs or invocations change. */

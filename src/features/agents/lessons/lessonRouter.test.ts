@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { companionReply, resolveFocus } from "../companion/companionReply";
-import type { DisplayCapture } from "../companion/protocol";
+import { companionReply, resolveFocus } from "../cursor/companionReply";
+import type { DisplayCapture } from "../cursor/protocol";
 import { applyLessonReply, lessonProgress, lessonTurnPayload, routeTarget } from "./lessonRouter";
 import type { Lesson } from "./lessonTypes";
 

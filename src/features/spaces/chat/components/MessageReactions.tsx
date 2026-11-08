@@ -1,4 +1,4 @@
-import type { SpaceMessage } from "@/api/spaces/dto/entities";
+import type { SpaceMessage } from "../../api/dto/entities";
 import { Button } from "@/shared/ui";
 
 /** The reaction pills under a message. Read-only members see counts but cannot toggle. */

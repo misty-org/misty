@@ -1,6 +1,6 @@
 import * as React from "react";
 
-import { cn } from "../utils";
+import { cn } from "../classNames";
 
 const Toolbar = React.forwardRef<HTMLDivElement, ToolbarProps>(
   ({ className, label, variant = "default", wrap = false, ...props }, ref) => (

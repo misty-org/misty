@@ -1,4 +1,4 @@
-import type { ScheduleRule, ScheduleTiming, WorkflowSchedule } from "@/api/ai/agent-methods";
+import type { ScheduleRule, ScheduleTiming, WorkflowSchedule } from "../api/agent-methods";
 
 export const weekdayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 export const weekdayLongNames = [

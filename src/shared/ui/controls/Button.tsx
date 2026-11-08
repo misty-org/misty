@@ -7,7 +7,7 @@ export interface ButtonProps
   asChild?: boolean;
 }
 
-import { cn } from "../utils";
+import { cn } from "../classNames";
 
 const buttonVariants = cva(
   [

@@ -46,7 +46,7 @@ export function prepareDevelopmentBundle(binary: string, profile?: string) {
   const source = fileURLToPath(new URL("../../src-tauri/", import.meta.url));
   copyFileSync(join(source, "icons", "icon.icns"), join(resources, "icon.icns"));
   const info = JSON.parse(
-    execFileSync("/usr/bin/plutil", ["-convert", "json", "-o", "-", join(source, "Info.plist")], {
+    execFileSync("/usr/bin/plutil", ["-convert", "json", "-o", "-", join(source, "packaging", "Info.plist")], {
       encoding: "utf8",
     }),
   );

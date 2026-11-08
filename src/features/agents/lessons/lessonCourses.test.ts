@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { companionReply } from "../companion/companionReply";
+import { companionReply } from "../cursor/companionReply";
 import { lessonTurnPayload } from "./lessonRouter";
 import { nextCourseLesson, useLessonStore } from "./lessonStore";
 

@@ -1,11 +1,11 @@
-import type { MessageSpan } from "@/api/spaces/dto/common";
-import type { SpaceMessage } from "@/api/spaces/dto/entities";
+import type { MessageSpan } from "../../api/dto/common";
+import type { SpaceMessage } from "../../api/dto/entities";
 import { Badge } from "@/shared/ui";
 import { Bot } from "lucide-react";
 import { Fragment } from "react";
 import { Link } from "react-router-dom";
 import { formatChatMessageTime } from "./ChatDisplay";
-import { isAgentAuthoredMessage } from "./messageHelpers";
+import { isAgentAuthoredMessage } from "./messageText";
 
 /** The sender, an Agent badge when an agent wrote it, and the time. */
 export function MessageHeader({ message }: { message: SpaceMessage }) {

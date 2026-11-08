@@ -11,7 +11,7 @@ import {
   RotateCcw,
   ShieldCheck,
 } from "lucide-react";
-import { openSignInSheet } from "@/features/auth/serverSetup";
+import { openSignInSheet } from "@/features/account";
 import { useState } from "react";
 import { buildPublicFeedbackIssueUrl, type FeedbackDraft } from "./feedbackIssue";
 import { downloadSupportBundle } from "./supportBundle";

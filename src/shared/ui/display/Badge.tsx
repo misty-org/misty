@@ -5,7 +5,7 @@ import type * as React from "react";
 type BadgeProps = React.ComponentProps<"span"> &
   VariantProps<typeof badgeVariants> & { asChild?: boolean };
 
-import { cn } from "../utils";
+import { cn } from "../classNames";
 
 const badgeVariants = cva(
   "group/badge inline-flex h-5 w-fit shrink-0 items-center justify-center gap-1 overflow-hidden whitespace-nowrap rounded-full border border-transparent px-2 py-0.5 text-xs font-medium transition-all focus-visible:border-charcoal-active focus-visible:ring-[3px] focus-visible:ring-charcoal-active/40 [&>svg]:pointer-events-none [&>svg]:size-3",

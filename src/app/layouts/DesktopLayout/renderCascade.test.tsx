@@ -1,7 +1,7 @@
 import { act, cleanup, render } from "@testing-library/react";
 import { MemoryRouter, useNavigate } from "react-router-dom";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { dockTreeViews, useWorkspaceStore } from "@/features/workspace";
+import { dockTreeViews, useWorkspaceStore } from "@/features/app-windows";
 import { WorkspaceCanvas } from "./WorkspaceCanvas";
 
 // Open tabs stay mounted, so a change that concerns one tab, or only the app

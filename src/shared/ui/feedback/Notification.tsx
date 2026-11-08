@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Check, Info, TriangleAlert, X } from "lucide-react";
-import { cn } from "../utils";
+import { cn } from "../classNames";
 
 /** Shared by the shell and component Apps; one viewport also survives separate bundles. */
 export function Notification({

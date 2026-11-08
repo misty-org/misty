@@ -1,10 +1,10 @@
-import { useSpacesStore } from "../../store/useSpacesStore";
+import { useSpacesStore } from "../../list/useSpacesStore";
 import type {
   SpaceConversation,
   SpaceMember,
   SpaceMessage,
   SpaceNode,
-} from "@/api/spaces/dto/entities";
+} from "../../api/dto/entities";
 import { useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
 

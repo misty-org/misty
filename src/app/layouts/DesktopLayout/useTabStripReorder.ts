@@ -1,7 +1,7 @@
-import { useWorkspaceStore } from "@/features/workspace";
-import type { WorkspaceTab } from "@/features/workspace/model";
-import type { MistyTabGroup } from "@/features/workspace/tabGroups";
-import { tabLabel } from "@/features/workspace/layoutTabs";
+import { useWorkspaceStore } from "@/features/app-windows";
+import type { WorkspaceTab } from "@/features/app-windows";
+import type { MistyTabGroup } from "@/features/app-windows";
+import { tabLabel } from "@/features/app-windows";
 import { usePointerReorder } from "@/shared/hooks/usePointerReorder";
 import { useCallback, type RefObject } from "react";
 import { groupName } from "./MistyTabGroups";

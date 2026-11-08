@@ -1,12 +1,6 @@
-import {
-  FileText,
-  Image as ImageIcon,
-  MessagesSquare,
-  NotebookText,
-  PenLine,
-} from "lucide-react";
+import { FileText, Image as ImageIcon, MessagesSquare, NotebookText, PenLine } from "lucide-react";
 import type { ComponentType, ReactNode } from "react";
-import { LibraryItemThumbnail } from "@/features/library";
+import { LibraryItemThumbnail } from "../library";
 import { itemTones, type ItemTone } from "@/shared/ui";
 import type { GalleryItem, GalleryKind } from "./galleryItems";
 

@@ -1,5 +1,5 @@
-import type { AppTab } from "@/features/app-shell";
-import { routes } from "@/features/app-shell";
+import type { AppTab } from "@/app/shell";
+import { routes } from "@/app/shell";
 
 const deepLinkPrefixes = [
   routes.browser,

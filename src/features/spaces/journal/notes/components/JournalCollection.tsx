@@ -1,0 +1,231 @@
+import { OrderedCollectionFilters as CollectionFilters } from "@/features/settings/OrderedCollectionFilters";
+import { useState, type ComponentProps } from "react";
+import { JournalAllCollection, journalSections } from "../../JournalAllCollection";
+import { JournalDay } from "../../day/JournalDay";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { FileText, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
+import {
+  Button,
+  CollectionPage,
+  CollectionHeading,
+  CollectionSearch,
+  useCollectionRefinement,
+  CollectionItems,
+  CollectionViewToggle,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+  MenuItem,
+  ContextMenuAction,
+  ErrorNotification,
+  IconButton,
+  CollectionSkeleton,
+  itemTones,
+  CollectionSelectionBar,
+} from "@/shared/ui";
+import { useRangeSelection } from "@/shared/hooks/useRangeSelection";
+import type { UnifiedNote } from "../noteTypes";
+import { useSpaceItemCreator } from "../../../overview/useSpaceItemCreator";
+
+export function JournalCollection(props: {
+  spaceId: string;
+  notes: UnifiedNote[];
+  loading: boolean;
+  error: boolean;
+  onRetry: () => void;
+  query: string;
+  onQueryChange: (query: string) => void;
+  readOnly: boolean;
+  onCreate: () => void;
+  onOpen: (note: UnifiedNote) => void;
+  onRename: (note: UnifiedNote) => void;
+  onDelete: (note: UnifiedNote) => void;
+  onDeleteMany?: (ids: string[]) => void;
+  bulkError?: string;
+}) {
+  const navigate = useNavigate();
+  const creatorName = useSpaceItemCreator(props.spaceId);
+  const [params, setParams] = useSearchParams();
+  const section = params.get("section");
+  const filter =
+    section === "notes" || (section === "day" && journalSections.some((s) => s.value === "day"))
+      ? section
+      : "all";
+  const selectSection = (value: string) => {
+    if (value === "drawings") navigate(`/spaces/${encodeURIComponent(props.spaceId)}/drawings`);
+    else {
+      const next = new URLSearchParams(params);
+      next.delete("note");
+      next.delete("view");
+      if (value === "all") next.delete("section");
+      else next.set("section", value);
+      setParams(next);
+    }
+  };
+  const [view, setView] = useState<"list" | "grid">("list");
+  const refinement = useCollectionRefinement(props.notes, {
+    label: "Filter notes",
+    title: (note) => note.title || "Untitled note",
+    date: (note) => note.updatedAt,
+    facet: {
+      label: "Access",
+      options: [
+        { value: "all", label: "All notes" },
+        { value: "editable", label: "Can edit" },
+        { value: "viewer", label: "View only" },
+      ],
+      value: (note) => (props.readOnly || note.role === "viewer" ? "viewer" : "editable"),
+    },
+  });
+  const notes = refinement.items;
+  const selectableIds = notes
+    .filter((note) => !props.readOnly && note.canDelete)
+    .map((note) => note.id);
+  const selection = useRangeSelection(selectableIds);
+  if (filter === "day")
+    return (
+      <JournalDay
+        filters={
+          <CollectionFilters
+            collectionId="journal"
+            options={journalSections}
+            value="day"
+            onChange={selectSection}
+          />
+        }
+      />
+    );
+  if (filter === "all")
+    return <JournalAllCollection {...props} section={filter} onSection={selectSection} />;
+  return (
+    <CollectionPage>
+      <CollectionHeading
+        title="Journal"
+        actions={
+          <>
+            <CollectionSearch
+              aria-label="Search notes"
+              placeholder="Search journal"
+              value={props.query}
+              onChange={(event) => props.onQueryChange(event.target.value)}
+            />
+            {!props.readOnly && (
+              <Button variant="primary" className="px-4" onClick={props.onCreate}>
+                <Plus />
+                New note
+              </Button>
+            )}
+          </>
+        }
+      />
+      <CollectionFilters
+        collectionId="journal"
+        options={journalSections}
+        value={filter}
+        onChange={selectSection}
+        filterControl={refinement.control}
+        actions={<CollectionViewToggle value={view} onChange={setView} disabled={!notes.length} />}
+      />
+      <CollectionSelectionBar
+        count={selection.selectedIds.length}
+        onClear={selection.clear}
+        onDelete={() => props.onDeleteMany?.(selection.selectedIds)}
+      />
+      <ErrorNotification message={props.bulkError} />
+      <ErrorNotification message={props.error ? "Notes couldn’t load." : ""}>
+        <Button type="button" variant="ghost" size="sm" onClick={props.onRetry}>
+          Retry
+        </Button>
+      </ErrorNotification>
+      {props.loading ? (
+        <CollectionSkeleton label="Loading notes" view={view} />
+      ) : (
+        <CollectionItems
+          columnSetId="notes"
+          fields={["Access", "Tags", "Links", "Created"]}
+          sortResetKey={refinement.sortKey}
+          categoryLabel="Type"
+          view={view}
+          items={notes.map((note) => ({
+            id: note.id,
+            title: note.title || "Untitled note",
+            icon: <FileText size={18} />,
+            tone: itemTones.note,
+            category: "Note",
+            creator: creatorName(note.creatorUserId),
+            metadata: {
+              Access: props.readOnly || note.role === "viewer" ? "View only" : "Can edit",
+              Tags: note.tags?.join(", ") || "—",
+              Links: note.backlinkCount ?? note.backlinks?.length ?? 0,
+              Created: note.createdAt ? new Date(note.createdAt).toLocaleDateString() : "—",
+            },
+            sortValues: { Created: Date.parse(note.createdAt) },
+            updatedAt: note.updatedAt,
+            updated: new Date(note.updatedAt).toLocaleDateString(undefined, {
+              month: "short",
+              day: "numeric",
+            }),
+            onOpen: () => props.onOpen(note),
+            selectable: !props.readOnly && note.canDelete,
+            contextMenu: <NoteActions note={note} props={props} context />,
+            actions: (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <IconButton label={`More actions for ${note.title || "Untitled note"}`}>
+                    <MoreHorizontal />
+                  </IconButton>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <NoteActions note={note} props={props} />
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ),
+          }))}
+          selectedIds={selection.selectedIds}
+          onSelect={selection.select}
+        />
+      )}
+    </CollectionPage>
+  );
+}
+
+function NoteActions({
+  note,
+  props,
+  context = false,
+}: {
+  note: UnifiedNote;
+  props: ComponentProps<typeof JournalCollection>;
+  context?: boolean;
+}) {
+  const Action = context ? ContextMenuAction : MenuItem;
+  return (
+    <>
+      <Action
+        icon={<Pencil />}
+        label="Rename"
+        disabled={props.readOnly || note.role === "viewer"}
+        title={
+          props.readOnly || note.role === "viewer"
+            ? "You have view-only access to this note."
+            : undefined
+        }
+        onSelect={() => props.onRename(note)}
+      />
+      <Action
+        icon={<Trash2 />}
+        label="Delete"
+        destructive
+        disabled={props.readOnly || !note.canDelete}
+        title={
+          props.readOnly
+            ? "This Space is read-only."
+            : !note.canDelete
+              ? "Only the creator or Space owner can delete this note."
+              : undefined
+        }
+        onSelect={() => props.onDelete(note)}
+      />
+    </>
+  );
+}

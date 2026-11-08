@@ -1,4 +1,6 @@
-import { invokeShortcutCommand, ShortcutRuntime } from "@/features/shortcuts";
+import { invokeShortcutCommand } from "@/features/shortcuts";
+import { ShortcutRuntime } from "@/app/ShortcutRuntime";
+import "@/app/featureSeams";
 import {
   allLayoutViews,
   configureWorkspaceDefaultView,
@@ -6,7 +8,7 @@ import {
   dockTreeViews,
   useWorkspaceStore,
   workspaceSurfaceFromRoute,
-} from "@/features/workspace";
+} from "@/features/app-windows";
 import { act, cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter, useLocation, useNavigate } from "react-router-dom";

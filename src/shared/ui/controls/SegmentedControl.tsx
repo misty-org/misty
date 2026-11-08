@@ -1,6 +1,6 @@
 import * as RadioGroupPrimitive from "@radix-ui/react-radio-group";
 import * as React from "react";
-import { cn } from "../utils";
+import { cn } from "../classNames";
 
 type SegmentedOption<T extends string> = {
   value: T;
@@ -96,4 +96,3 @@ function SegmentedControl<T extends string>({
 }
 
 export { SegmentedControl };
-;

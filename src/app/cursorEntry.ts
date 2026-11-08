@@ -5,7 +5,7 @@ export const cursorStartup = requireDesktopHost()
   ? Promise.all([
       import("react-dom/client"),
       import("react"),
-      import("@/features/agents/companion/CursorCompanionRoot"),
+      import("@/features/agents/cursor/CursorCompanionRoot"),
     ])
       .then(([{ createRoot }, { createElement }, { CursorCompanionRoot }]) => {
         createRoot(document.getElementById("root")!).render(createElement(CursorCompanionRoot));

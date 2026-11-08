@@ -1,5 +1,5 @@
 import { ArrowLeft } from "lucide-react";
-import { cn } from "../utils";
+import { cn } from "../classNames";
 import { Button, type ButtonProps } from "./Button";
 
 /** Going back to the previous page or step: the arrow and the word, as one button. */

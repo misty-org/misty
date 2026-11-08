@@ -2,13 +2,13 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AgentProfile } from "@/shared/schemas";
-import { useMistyStore } from "@/features/misty/useMistyStore";
+import { useMistyStore } from "@/features/agents/conversations/state/useMistyStore";
 import { useSettingsStore } from "@/features/settings";
-import { usePersonalAgentsStore } from "../personalAgentsStore";
+import { usePersonalAgentsStore } from "../personal/personalAgentsStore";
 import { MistyPanel } from "./MistyPanel";
 import { useMistyPanelStore } from "./mistyPanelStore";
 
-vi.mock("../agentAccount", () => ({ useAgentAccountId: () => "test-user-id" }));
+vi.mock("../personal/agentAccount", () => ({ useAgentAccountId: () => "test-user-id" }));
 
 vi.mock("@/api/account-events", () => ({
   observeAccountChanges: vi.fn((_id, _topics, callback) => {
@@ -17,7 +17,7 @@ vi.mock("@/api/account-events", () => ({
   }),
 }));
 
-vi.mock("@/features/ai-surface/useAiVoiceRecorder", () => ({
+vi.mock("@/features/agents/runs/markdown/useAiVoiceRecorder", () => ({
   useAiVoiceRecorder: () => ({
     recording: false,
     requesting: false,
@@ -27,7 +27,7 @@ vi.mock("@/features/ai-surface/useAiVoiceRecorder", () => ({
   }),
 }));
 
-vi.mock("@/features/misty/handoff", () => ({
+vi.mock("@/features/agents/conversations/ask/handoff", () => ({
   openMistyConversationInNewTab: vi.fn(),
 }));
 

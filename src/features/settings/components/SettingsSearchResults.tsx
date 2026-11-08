@@ -1,5 +1,5 @@
 import { Pressable } from "@/shared/ui";
-import { settingSearchEntries } from "../devicePreferences/registry";
+import { settingSearchEntries } from "../device-preferences/registry";
 import {
   preferenceSection,
   preferencesWithoutRows,

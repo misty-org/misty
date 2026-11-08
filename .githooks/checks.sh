@@ -25,7 +25,7 @@ scripts() { npm run test:scripts; }
 packages() { [ node_modules/.package-lock.json -nt package-lock.json ] || npm ci --no-audit --no-fund --silent; }
 rust_cli() { cargo test --locked --quiet --tests --manifest-path cli/Cargo.toml; }
 # Tests only: compiling for other platforms and building examples wait for a release.
-rust_desktop() { parallel desktop-crate browser-sync-crate agent-crate kiri-crate desktop-services; }
+rust_desktop() { parallel desktop-crate base-crates browser-data-crate agent-crate kiri-crate desktop-workers; }
 desktop_crate() { cargo test --locked --quiet --tests --manifest-path src-tauri/Cargo.toml; }
 # The desktop crate compiles for Windows too, and every example with it. Not part of a
 # commit or push: compiling is for cutting a release, which runs this through `release`.
@@ -39,16 +39,24 @@ desktop_windows() {
   cargo xwin check --locked --quiet --all-targets --target x86_64-pc-windows-msvc --manifest-path src-tauri/Cargo.toml
   cargo xwin check --locked --quiet --all-targets --target x86_64-pc-windows-msvc --manifest-path cli/Cargo.toml
 }
-browser_sync_crate() { cargo test --locked --quiet --tests --manifest-path src-tauri/crates/browser-sync/Cargo.toml; }
+# The crates the app builds on: the file gate, the database and documents. Each is its own Cargo project.
+base_crates() {
+  local crate
+  for crate in file_access database documents; do
+    cargo test --locked --quiet --tests --manifest-path "src-tauri/features/$crate/Cargo.toml"
+  done
+}
+browser_data_crate() { cargo test --locked --quiet --tests --manifest-path src-tauri/features/sync/browser_data/Cargo.toml; }
 agent_crate() {
-  cargo test --locked --quiet --tests --manifest-path src-tauri/crates/page-reader/Cargo.toml
-  cargo test --locked --quiet --tests --manifest-path src-tauri/crates/agent/Cargo.toml
+  cargo test --locked --quiet --tests --manifest-path src-tauri/features/browser/page_text/Cargo.toml
+  cargo test --locked --quiet --tests --manifest-path src-tauri/features/agents/runs/Cargo.toml
 }
 # Kiri's core tests need no Tauri; the desktop crate builds its native side.
-kiri_crate() { cargo test --locked --quiet --tests --no-default-features --manifest-path src-tauri/crates/kiri/Cargo.toml; }
-desktop_services() {
+kiri_crate() { cargo test --locked --quiet --tests --no-default-features --manifest-path src-tauri/features/kiri/Cargo.toml; }
+# The workers the app embeds: each is its own Cargo project, because it runs in an OS sandbox and can't link Tauri.
+desktop_workers() {
   local manifest
-  for manifest in src-tauri/services/*/Cargo.toml; do
+  for manifest in src-tauri/features/documents/worker/Cargo.toml src-tauri/features/browser/page_text/worker/Cargo.toml src-tauri/features/agents/shell/worker/Cargo.toml; do
     cargo test --locked --quiet --tests --manifest-path "$manifest"
   done
 }

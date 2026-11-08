@@ -1,14 +1,14 @@
-import { isAuthPath, routes } from "@/features/app-shell";
-import { useSetupStore } from "@/features/setup";
+import { isAuthPath, routes } from "@/app/shell";
+import { useSetupStore } from "@/features/account";
 import {
   activeLayoutView,
   allLayoutViews,
   useWorkspaceStore,
   workspaceSurfaceFromRoute,
-} from "@/features/workspace";
+} from "@/features/app-windows";
 import { useEffect, type MutableRefObject } from "react";
 import type { Location, NavigateFunction } from "react-router-dom";
-import { settingsFallbackRoute } from "./helpers";
+import { settingsFallbackRoute } from "./accountMenuText";
 
 /** Route-driven side effects: first-run setup, settings redirects and workspace sync. */
 export function useDesktopRouteEffects(options: {

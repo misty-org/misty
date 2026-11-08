@@ -1,11 +1,11 @@
-import { reserveMistyUpdate } from "@/features/workspace/unsavedChanges";
+import { reserveMistyUpdate } from "@/features/app-windows";
 import { getVersion } from "@tauri-apps/api/app";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { check, type Update } from "@tauri-apps/plugin-updater";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { DesktopSettingsRow } from "@/features/settings/desktop";
-import { SystemErrorNotice } from "@/features/support/systemErrors";
+import { SystemErrorNotice } from "@/shared/platform/systemErrors";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { Button, Progress } from "@/shared/ui";
 import {

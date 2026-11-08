@@ -1,12 +1,12 @@
 import { DockDropPreview } from "./DockDropPreview";
-import { useWorkspacePagePreview } from "@/features/workspace/useWorkspacePagePreview";
-import { panePlacement } from "@/features/workspace/panePlacement";
+import { useWorkspacePagePreview } from "@/features/app-windows";
+import { panePlacement } from "@/features/app-windows";
 import { keepsLayoutWhileHidden } from "./keptTabs";
-import { selectPaneFocusPreferences } from "@/features/workspace/paneFocus";
-import { browserRuntimeId } from "@/features/webviews/browserRuntime";
-import { useBrowserPaneDim } from "@/features/webviews/useBrowserPaneDim";
+import { selectPaneFocusPreferences } from "@/features/app-windows";
+import { browserRuntimeId } from "@/features/app-windows";
+import { useBrowserPaneDim } from "@/features/browser";
 import { useSettingsStore } from "@/features/settings";
-import { allLayoutViews } from "@/features/workspace/layoutTabs";
+import { allLayoutViews } from "@/features/app-windows";
 import { usePointerDropTarget } from "@/shared/hooks/usePointerReorder";
 import {
   dockLeaves,
@@ -15,11 +15,11 @@ import {
   type DockDropZone,
   type WorkspacePane,
   type WorkspaceView,
-} from "@/features/workspace";
+} from "@/features/app-windows";
 import { cn } from "@/shared/ui";
 import { memo, useMemo, useRef, useState, type DragEvent } from "react";
 import { EmptyWorkspacePane, WorkspaceSurface } from "./WorkspaceSurface";
-import { AiPaneHost } from "@/features/ai-surface/AiPaneHost";
+import { AiPaneHost } from "@/features/agents";
 import { dockSplitFits, dropZoneAt } from "./dockSplitFit";
 import { workspaceAiAdapter } from "./workspaceAi";
 import type { WorkspaceDockTreeProps } from "./WorkspaceDockTree";

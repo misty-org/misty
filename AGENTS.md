@@ -1,7 +1,7 @@
 # Misty
 
 Misty is a desktop browser with agents built in: a Tauri app in `src/` and `src-tauri/`, with its native web
-platform layer in `src-tauri/crates/kiri`. The server is the sibling repository
+platform layer in `src-tauri/features/kiri`. The server is the sibling repository
 [misty-server](https://github.com/misty-org/misty-server). The code is the source of truth, so read it before
 changing a feature. There are no feature docs to keep current, and none should be added unless asked.
 
@@ -24,7 +24,7 @@ changing a feature. There are no feature docs to keep current, and none should b
   person's computer, on that computer's own keys. Keys reach only their provider: model keys, the search key (Decodo
   or Serper) and the Composio key. Never send a key, prompt, tool result or model output to the server, store or log
   them. `misty-server` has a contract test that enforces this.
-- What agents may do is decided in native code (`src-tauri/src/infra/agent_runtime/tool_policy.rs`), from the mode
+- What agents may do is decided in native code (`src-tauri/features/agents/run_control/tool_policy.rs`), from the mode
   the run started with, never from the renderer at call time, the model or a page. Agents are autonomous: Auto doesn't
   pause for ordinary work.
 - Agent chats and memory live in `misty.db`. Chats never sync, and memory syncs only through the encrypted vault, so

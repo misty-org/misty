@@ -7,7 +7,7 @@ vi.mock("@/features/agents", () => ({
   showAgentsPanel: agents.showAgentsPanel,
   useMistyPanelStore: (select: (state: { open: boolean }) => boolean) => select({ open: false }),
 }));
-vi.mock("@/features/auth", () => ({ openSignInSheet: agents.openSignInSheet }));
+vi.mock("@/features/account", () => ({ openSignInSheet: agents.openSignInSheet }));
 vi.mock("@/features/settings", () => ({ preloadSettingsWorkspace: () => Promise.resolve() }));
 vi.mock("./NavRail", () => ({
   AccountNavButton: (props: object) => (

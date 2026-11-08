@@ -1,8 +1,8 @@
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { useWorkspaceStore } from "@/features/workspace/useWorkspaceStore";
-import { dockLeaves } from "@/features/workspace/dockTree";
-import { paneViewLabel } from "@/features/workspace/layoutTabs";
+import { useWorkspaceStore } from "@/features/app-windows/tabs/useWorkspaceStore";
+import { dockLeaves } from "@/features/app-windows/panes/dockTree";
+import { paneViewLabel } from "@/features/app-windows/panes/layoutTabs";
 import { WorkspaceTabStrip } from "./WorkspaceTabStrip";
 vi.mock("./dockSplitFit", () => ({
   minimumForWorkspaceViews: () => ({ width: 280, height: 180 }),

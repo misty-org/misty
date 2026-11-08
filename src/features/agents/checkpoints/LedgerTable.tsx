@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Button, Input } from "@/shared/ui";
-import { setBrowserExpanded } from "../agentBrowser/agentBrowserStore";
+import { setBrowserExpanded } from "../agent-browser/agentBrowserStore";
 import { StatusRow, StatusTable, type StatusState } from "../progress/StatusTable";
 import { isOpen, type LedgerRow } from "./ledger";
 

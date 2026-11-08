@@ -1,11 +1,11 @@
-import { useAccountAvatarUrl, useAuth, useUserStore } from "@/features/auth";
-import { useNativeSessionStore } from "@/features/native-session";
+import { useAccountAvatarUrl, useAuth, useUserStore } from "@/features/account";
+import { useNativeSessionStore } from "@/features/account";
 import { avatarColorClass, avatarInkClass } from "@/shared/lib/avatarPalette";
 import { Avatar, AvatarFallback, AvatarImage, Button, cn } from "@/shared/ui";
 import { UserCircle } from "lucide-react";
 import { forwardRef, memo, type ButtonHTMLAttributes } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { emailName, initialsForProfile } from "./helpers";
+import { emailName, initialsForProfile } from "./accountMenuText";
 import { profileDockClass } from "./styles";
 
 export const AccountNavButton = memo(

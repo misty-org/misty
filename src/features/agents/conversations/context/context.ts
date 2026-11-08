@@ -1,0 +1,157 @@
+import { useWorkspaceStore } from "@/features/app-windows";
+import { currentWindows } from "@/features/app-windows";
+import { layoutTabs } from "@/features/app-windows";
+import { dockLeaves } from "@/features/app-windows";
+import { useAiSurfaceStore } from "../../runs/invocations/store";
+import type {
+  AiContextReference,
+  AiSelectionSnapshot,
+} from "../../runs/invocations/invocationTypes";
+import type { GlobalAiContextRef } from "../state/conversationTypes";
+
+export interface MistyContextTarget {
+  kind: "workspace" | "window" | "tab" | "pane" | "view";
+  spaceId: string;
+  windowId?: string;
+  tabId?: string;
+  paneId?: string;
+  viewId?: string;
+}
+export interface MistyContextSnapshot {
+  context: GlobalAiContextRef[];
+  selection?: AiSelectionSnapshot;
+  paneId?: string;
+}
+export function mistyContextRef(ref: AiContextReference): GlobalAiContextRef {
+  return { ...ref, source: "current", attached: true };
+}
+export function contextOptions(
+  _legacySpaceId: string,
+): Array<{ label: string; target: MistyContextTarget }> {
+  const spaceId = "";
+  const state = useWorkspaceStore.getState();
+  const result: Array<{ label: string; target: MistyContextTarget }> = [
+    { label: "Entire workspace", target: { kind: "workspace", spaceId: "" } },
+  ];
+  for (const window of currentWindows(state)) {
+    const base = { spaceId, windowId: window.id };
+    result.push({ label: window.title, target: { ...base, kind: "window" } });
+    for (const tab of layoutTabs(window.layout)) {
+      result.push({
+        label: `${window.title} / ${tab.title || "Tab"}`,
+        target: { ...base, kind: "tab", tabId: tab.id },
+      });
+      for (const pane of dockLeaves(tab.root)) {
+        const view = pane.views.find((view) => view.id === pane.activeViewId) ?? pane.views[0];
+        if (view)
+          result.push({
+            label: `${window.title} / ${tab.title || "Tab"} / ${view.title}`,
+            target: { ...base, kind: "pane", tabId: tab.id, paneId: pane.id },
+          });
+      }
+    }
+  }
+  return result;
+}
+export function resolveMistyContext(
+  accountId: string,
+  _legacySpaceId: string,
+  targets: MistyContextTarget[] = [],
+): MistyContextSnapshot {
+  const spaceId = "";
+  const state = useWorkspaceStore.getState();
+  if (
+    targets.some((target) => !["workspace", "window", "tab", "pane", "view"].includes(target.kind))
+  )
+    throw new Error("Attach context from the current browser workspace.");
+  const windows = currentWindows(state);
+  const requested = targets.length
+    ? targets
+    : [
+        {
+          kind: "pane" as const,
+          spaceId,
+          windowId: state.activeWindowId,
+          paneId: state.layout.focusedPaneId,
+        },
+      ];
+  const context: GlobalAiContextRef[] = [];
+  let selection: AiSelectionSnapshot | undefined;
+  let paneId: string | undefined;
+  const visited = new Set<string>();
+  for (const target of requested) {
+    const scopeStart = context.length;
+    let found = false;
+    for (const window of windows) {
+      if (target.kind === "window" && target.windowId && target.windowId !== window.id) continue;
+      for (const tab of layoutTabs(window.layout)) {
+        if (target.kind === "tab" && target.tabId && target.tabId !== tab.id) continue;
+        for (const pane of dockLeaves(tab.root)) {
+          const view = pane.views.find((view) => view.id === pane.activeViewId) ?? pane.views[0]; // History snapshots are deliberately excluded.
+          if (
+            !view ||
+            (target.paneId && target.paneId !== pane.id) ||
+            (target.viewId && target.viewId !== view.id)
+          )
+            continue;
+          found = true;
+          if (visited.has(view.id)) continue;
+          visited.add(view.id);
+          const registration =
+            useAiSurfaceStore.getState().registrations[`${accountId}:${pane.id}`];
+          if (!registration || registration.accountId !== accountId) {
+            context.push(
+              mistyContextRef({
+                kind: "workspace-view",
+                id: view.id,
+                title: view.title,
+                spaceId,
+                privacy: "device",
+                metadata: {
+                  availability: "Open this pane to access its content",
+                  windowId: window.id,
+                  tabId: tab.id,
+                  paneId: pane.id,
+                },
+              }),
+            );
+            continue;
+          }
+          const refs = registration.adapter.getContext();
+          context.push(...refs.map(mistyContextRef));
+          if (requested.length === 1 && ["pane", "view"].includes(target.kind)) {
+            selection = registration.adapter.getSelection?.() ?? undefined;
+            paneId = pane.id;
+          }
+        }
+      }
+    }
+    if (found && ["workspace", "window", "tab"].includes(target.kind)) {
+      const members = context.splice(scopeStart);
+      context.push(
+        mistyContextRef({
+          kind: "workspace.scope",
+          id: target.tabId || target.windowId || "browser-workspace",
+          title:
+            target.kind === "workspace"
+              ? "Attached workspace"
+              : target.kind === "tab"
+                ? "Attached tab"
+                : "Attached window",
+          spaceId,
+          privacy: "device",
+          metadata: {
+            members: JSON.stringify(members),
+            ...(target.windowId ? { windowId: target.windowId } : {}),
+            ...(target.tabId ? { tabId: target.tabId } : {}),
+          },
+        }),
+      );
+    }
+    if (!found && targets.length)
+      throw new Error("An attached context is closed. Remove it or reopen its source.");
+  }
+  if (context.length > 11)
+    throw new Error("Attach at most 11 sources, or choose their containing tab or window.");
+  return structuredClone({ context, selection, paneId });
+}

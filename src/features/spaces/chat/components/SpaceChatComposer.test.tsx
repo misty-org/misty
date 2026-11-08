@@ -1,5 +1,5 @@
-import type { SpaceMember } from "@/api/spaces/dto/entities";
-import { useSpaceChatDraft } from "@/features/chat-composer/useSpaceChatDraft";
+import type { SpaceMember } from "@/features/spaces/api/dto/entities";
+import { useSpaceChatDraft } from "@/features/spaces/chat/composer/useSpaceChatDraft";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

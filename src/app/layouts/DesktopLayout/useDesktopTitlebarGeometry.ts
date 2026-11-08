@@ -1,7 +1,7 @@
-import { isAuthPath } from "@/features/app-shell";
-import type { useWindowDockingLayout } from "@/features/workspace";
+import { isAuthPath } from "@/app/shell";
+import type { useWindowDockingLayout } from "@/features/app-windows";
 import { useLayoutEffect, useRef, useState, type RefObject } from "react";
-import { useSidebarWidthStore } from "@/features/app-shell/sidebarWidth";
+import { useSidebarWidthStore } from "@/app/shell/sidebarWidth";
 import { dockingGeometry } from "./dockingGeometry";
 import { standaloneWorkspaceRouteTitle } from "./StandaloneRouteSurface";
 import * as styles from "./styles";

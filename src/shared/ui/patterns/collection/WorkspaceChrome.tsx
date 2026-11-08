@@ -1,5 +1,5 @@
 import type { ComponentProps, ReactNode } from "react";
-import { cn } from "../../utils";
+import { cn } from "../../classNames";
 
 /** Shared geometry for tool navigation and collection workspaces. */
 export function WorkspaceSidebar({ className, ...props }: ComponentProps<"aside">) {

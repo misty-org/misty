@@ -1,4 +1,4 @@
-import type { DockDropZone } from "@/features/workspace";
+import type { DockDropZone } from "@/features/app-windows";
 export function DockDropPreview({ zone }: { zone: DockDropZone }) {
   const position =
     zone === "center"

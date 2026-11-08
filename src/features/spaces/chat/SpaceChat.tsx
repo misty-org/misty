@@ -1,8 +1,8 @@
-import type { MistyPickerSource } from "@/features/picker";
-import { useAuth } from "@/features/auth";
-import { useNativeSessionStore } from "@/features/native-session";
-import { useSpaceChatDraft } from "@/features/chat-composer/useSpaceChatDraft";
-import { useWorkspaceViewTitle } from "@/features/workspace";
+import type { MistyPickerSource } from "@/features/files";
+import { useAuth } from "@/features/account";
+import { useNativeSessionStore } from "@/features/account";
+import { useSpaceChatDraft } from "./composer/useSpaceChatDraft";
+import { useWorkspaceViewTitle } from "@/features/app-windows";
 import { SpaceSetupCards } from "../components/SpaceSetupCards";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -30,7 +30,7 @@ import {
 } from "./components/ConversationStates";
 import { useSpaceAgentMembers } from "../members/agents/useSpaceAgentMembers";
 import { ChatThreadColumn } from "./components/ChatThreadColumn";
-import { useChatSidePanel } from "./store/chatSidePanelStore";
+import { useChatSidePanel } from "./chatSidePanelStore";
 export function SpaceChat({
   spaceId,
   spaceName,

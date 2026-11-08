@@ -1,7 +1,7 @@
-import { reportSystemError } from "@/features/support/systemErrors";
-import { useAuth } from "@/features/auth";
+import { reportSystemError } from "@/shared/platform/systemErrors";
+import { useAuth } from "@/features/account";
 import { useEffect, useRef } from "react";
-import { useSpacesStore } from "./store/useSpacesStore";
+import { useSpacesStore } from "./list/useSpacesStore";
 
 let pendingRealtimeDisconnectTimer: number | null = null;
 

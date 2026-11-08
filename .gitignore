@@ -154,7 +154,7 @@ artifacts/
 !src/features/**/*.svg
 !src/features/**/*.png
 !src/features/**/*.webp
-/src-tauri/services/*/target/
+/src-tauri/features/**/worker/target/
 
 # Midscene run logs.
 midscene_run/

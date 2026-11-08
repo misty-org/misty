@@ -8,29 +8,20 @@ import { sonioxContext, withPage, type PageContext } from "./subtitleContext";
 import { currentPage, pageKey, readPage, type CurrentPage } from "./subtitlePage";
 import { saveSubtitleSession } from "./savedSubtitles";
 import { scalePcm } from "./subtitlePrefs";
-import type { SubtitlePrefs, SubtitlesView } from "./subtitlesView";
-
-/** More than the window can show, so the words always fill it. */
-const SEGMENTS_SHOWN = 12;
-const FINISH_TIMEOUT_MS = 3000;
-/** Subtitles don't wait longer than this for the model; its answer is used when it comes. */
-const CONTEXT_WAIT_MS = 6000;
-const AUDIO_RETRY_MS = 1000;
-const PAGE_CHECK_MS = 3000;
-/** A page that redirects twice shouldn't restart the stream twice. */
-const PAGE_CHANGE_GAP_MS = 15_000;
-const CHANNEL: LiveChannel = "system";
-/** `voice_capture_start`'s answer when no tab has made a sound yet. */
-const TABS_SILENT = "misty_tabs_silent";
-
-const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
-interface Host {
-  prefs(): SubtitlePrefs;
-  draw(next: Partial<SubtitlesView>): void;
-  /** The session finished or failed, with what to tell the person. */
-  ended(notice?: string): void;
-}
+import {
+  AUDIO_RETRY_MS,
+  CHANNEL,
+  CONTEXT_WAIT_MS,
+  FINISH_TIMEOUT_MS,
+  PAGE_CHANGE_GAP_MS,
+  PAGE_CHECK_MS,
+  SEGMENTS_SHOWN,
+  TABS_SILENT,
+  heardText,
+  pause,
+  savedLines,
+  type Host,
+} from "./subtitleSessionHost";
 
 /**
  * One listening session: Misty's tabs through the live relay, with the panel's volume and auto-stop
@@ -267,19 +258,7 @@ export class SubtitleSession {
   }
 
   private heard() {
-    const segments = this.segments(SEGMENTS_SHOWN);
-    // These languages don't put spaces between sentences.
-    const gap = /^(zh|ja)/i.test(this.host.prefs().target) ? "" : " ";
-    return {
-      source: segments
-        .map((segment) => segment.sourceText.trim())
-        .filter(Boolean)
-        .join(" "),
-      translation: segments
-        .map((segment) => segment.translatedText.trim())
-        .filter(Boolean)
-        .join(gap),
-    };
+    return heardText(this.segments(SEGMENTS_SHOWN), this.host.prefs().target);
   }
 
   private async closeAudio() {
@@ -290,12 +269,7 @@ export class SubtitleSession {
 
   private keep() {
     if (!this.host.prefs().save || !this.live) return;
-    const lines = this.segments(Number.MAX_SAFE_INTEGER)
-      .map((segment) => ({
-        source: segment.sourceText.trim(),
-        translation: segment.translatedText.trim(),
-      }))
-      .filter((line) => line.source || line.translation);
+    const lines = savedLines(this.segments(Number.MAX_SAFE_INTEGER));
     const last = lines[lines.length - 1];
     saveSubtitleSession({
       id: `${this.startedAt}-${Math.random().toString(36).slice(2, 8)}`,

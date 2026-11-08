@@ -1,12 +1,12 @@
-import { spacesApi } from "@/api/spaces/api";
-import type { SpaceMessage } from "@/api/spaces/dto/entities";
-import { desktopDeviceGrants } from "@/features/agents/deviceGrants";
-import { listPersonalAgents } from "@/features/agents/personalAgentsApi";
-import { agentAccountId } from "@/features/agents/agentAccount";
-import { aiSurfaceApi, subscribeToAiInvocation } from "@/features/ai-surface/api";
-import { followAddress } from "@/features/ai-surface/localRunParts";
+import { spacesApi } from "../api/api";
+import type { SpaceMessage } from "../api/dto/entities";
+import { desktopDeviceGrants } from "@/features/agents";
+import { listPersonalAgents } from "@/features/agents";
+import { agentAccountId } from "@/features/agents";
+import { aiSurfaceApi, subscribeToAiInvocation } from "@/features/agents";
+import { followAddress } from "@/features/agents";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import type { MentionableAgent } from "./store/useSpaceMessageSpansStore";
+import type { MentionableAgent } from "./useSpaceMessageSpansStore";
 
 /**
  * An `@mention` of your own agent runs on your computer,

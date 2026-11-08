@@ -17,11 +17,11 @@ import {
   SidebarToolsPinMenu,
   browserToolbarStyles,
   useBrowserToolbarSlot,
-} from "@/features/browser/workspace";
+} from "@/features/browser";
 import { invokeShortcutCommand, ShortcutText, useShortcutHandler } from "@/features/shortcuts";
-import { useFocusedPaneHistory, useWorkspaceStore } from "@/features/workspace";
-import { browserInternalUrl } from "@/features/workspace/browserInternalUrl";
-import { blankBrowserUrl } from "@/features/workspace/model";
+import { useFocusedPaneHistory, useWorkspaceStore } from "@/features/app-windows";
+import { browserInternalUrl } from "@/features/app-windows";
+import { blankBrowserUrl } from "@/features/app-windows";
 import {
   DropdownMenu,
   DropdownMenuContent,

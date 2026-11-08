@@ -1,3 +1,4 @@
+import "@/app/featureSeams";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
@@ -11,12 +12,13 @@ const mocks = vi.hoisted(() => ({
   transitioning: false,
   nativeRecovery: false,
 }));
-vi.mock("@/features/workspace/workspaceRecoveryPlatform", async (original) => ({
+vi.mock("@/features/app-windows/recovery/workspaceRecoveryPlatform", async (original) => ({
   ...(await original<object>()),
   nativeWorkspaceRecoveryEnabled: () => mocks.nativeRecovery,
 }));
 
-vi.mock("@/features/auth", () => ({
+vi.mock("@/features/account", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   useAuth: () => ({
     user: mocks.user,
     transitioning: mocks.transitioning,
@@ -24,28 +26,39 @@ vi.mock("@/features/auth", () => ({
   }),
 }));
 
-vi.mock("@/features/spaces", () => ({
+vi.mock("@/features/spaces", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   useSpacesStore: (selector: (state: { spaces: unknown[]; snapshotReady: boolean }) => unknown) =>
     selector({ spaces: [], snapshotReady: true }),
 }));
 
-vi.mock("@/features/spaces/defaultSpace", () => ({
+vi.mock("@/features/spaces/routes/defaultSpace", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   preferredDefaultSpace: () => null,
 }));
 
-vi.mock("@/app/layouts/DesktopLayout", () => ({
+vi.mock("@/app/layouts/DesktopLayout", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   DesktopLayout: () => <div data-testid="desktop-layout">Desktop Layout Content</div>,
 }));
 
-vi.mock("@/features/agents/AgentExecutionSurface", () => ({ AgentExecutionSurface: () => null }));
+vi.mock("@/features/agents/island/AgentExecutionSurface", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  AgentExecutionSurface: () => null,
+}));
 
-vi.mock("@/features/spaces/SpacesRealtimeBridge", () => ({ SpacesRealtimeBridge: () => null }));
+vi.mock("@/features/spaces/SpacesRealtimeBridge", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  SpacesRealtimeBridge: () => null,
+}));
 
-vi.mock("@/features/updater/UpdateNotices", () => ({
+vi.mock("@/features/updater/UpdateNotices", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   UpdateNotices: () => <div data-testid="update-notices" />,
 }));
 
-vi.mock("@/features/connected-devices", () => ({
+vi.mock("@/features/devices", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   DeviceSessionBridge: () => null,
 }));
 
@@ -55,8 +68,8 @@ beforeAll(async () => {
   await vi.advanceTimersByTimeAsync(2_000);
   vi.useRealTimers();
 });
-import { useWorkspaceRecoveryState } from "@/features/workspace/nativeWorkspaceRecovery";
-import { useSetupStore } from "@/features/setup/useSetupStore";
+import { useWorkspaceRecoveryState } from "@/features/app-windows/recovery/nativeWorkspaceRecovery";
+import { useSetupStore } from "@/features/account/setup/useSetupStore";
 
 function LocationProbe() {
   const location = useLocation();

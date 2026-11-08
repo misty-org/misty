@@ -8,7 +8,7 @@ import { useTitlebarZoom } from "./useTitlebarZoom";
 import { useWindowMaximizedState } from "./useWindowMaximizedState";
 import { useWindowsSnapLayouts } from "./useWindowsSnapLayouts";
 
-export { shouldSuppressWindowDrag, windowRectsMatch } from "./windowChromeHelpers";
+export { shouldSuppressWindowDrag, windowRectsMatch } from "./windowChromeDrag";
 
 export function useDesktopWindowChrome() {
   const desktopPlatform = useDesktopPlatform();

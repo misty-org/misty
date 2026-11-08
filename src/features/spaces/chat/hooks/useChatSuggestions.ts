@@ -1,7 +1,7 @@
-import { spacesApi } from "@/api/spaces/api";
-import type { SpaceLibraryItem, SpaceMember } from "@/api/spaces/dto/entities";
-import type { ChatComposerSuggestion } from "@/api/spaces/dto/space-chat";
-import type { SpaceAgent } from "@/api/spaces/space-agents";
+import { spacesApi } from "../../api/api";
+import type { SpaceLibraryItem, SpaceMember } from "../../api/dto/entities";
+import type { ChatComposerSuggestion } from "../../api/dto/space-chat";
+import type { SpaceAgent } from "@/features/agents";
 import { agentOwnerLabel } from "../../members/agents/useSpaceAgentMembers";
 import { useEffect, useMemo, useState } from "react";
 

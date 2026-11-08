@@ -1,0 +1,6 @@
+# Every crate under this folder builds into the one `target/` here. Without this, each of the
+# nested crates (settings, database, documents, ...) built into its own `target/` and recompiled
+# tauri and the other shared dependencies, which cost tens of gigabytes. The environment variable
+# CARGO_TARGET_DIR still wins, which the dev profiles and the worker builds in `build.rs` rely on.
+[build]
+target-dir = "target"

@@ -1,7 +1,7 @@
-import { aiSurfaceApi } from "@/features/ai-surface/api";
-import type { AiProgressItem } from "@/features/ai-surface/types";
-import type { GlobalAiMessage } from "@/features/misty/types";
-import { useMistyStore } from "@/features/misty/useMistyStore";
+import { aiSurfaceApi } from "../runs/invocations/api";
+import type { AiProgressItem } from "../runs/invocations/invocationTypes";
+import type { GlobalAiMessage } from "../conversations/state/conversationTypes";
+import { useMistyStore } from "../conversations/state/useMistyStore";
 import { useEffect, useState } from "react";
 
 type StoredHistory = Awaited<ReturnType<typeof aiSurfaceApi.invocationProgress>>;

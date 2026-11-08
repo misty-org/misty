@@ -1,8 +1,9 @@
-import { useSettingsStore } from "@/features/settings/store/useSettingsStore";
-import { useWorkspaceStore } from "@/features/workspace/useWorkspaceStore";
+import "@/app/featureSeams";
+import { useSettingsStore } from "@/features/settings/preferences/useSettingsStore";
+import { useWorkspaceStore } from "@/features/app-windows/tabs/useWorkspaceStore";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { dispatchShortcutEvent, invokeShortcutCommand, registerShortcutHandler } from "./runtime";
-import { detectShortcutPlatform } from "./bindings";
+import { detectShortcutPlatform } from "../../shared/shortcuts/bindings";
 
 describe("shortcut dispatcher", () => {
   beforeEach(() => {

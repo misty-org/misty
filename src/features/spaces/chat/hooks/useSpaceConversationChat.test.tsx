@@ -1,5 +1,5 @@
-import type * as SpacesApiModule from "@/api/spaces/api";
-import type { SpaceEvent, SpaceMessage } from "@/api/spaces/dto/entities";
+import type * as SpacesApiModule from "@/features/spaces/api/api";
+import type { SpaceEvent, SpaceMessage } from "@/features/spaces/api/dto/entities";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -9,7 +9,7 @@ const apiMocks = vi.hoisted(() => ({
   conversationMessages: vi.fn(),
 }));
 
-vi.mock("@/api/spaces/api", async (importOriginal) => ({
+vi.mock("@/features/spaces/api/api", async (importOriginal) => ({
   ...(await importOriginal<typeof SpacesApiModule>()),
   spacesApi: apiMocks,
 }));

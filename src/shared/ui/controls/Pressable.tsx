@@ -1,5 +1,5 @@
 import * as React from "react";
-import { cn } from "../utils";
+import { cn } from "../classNames";
 
 /**
  * A clickable surface whose content is its look: a card, a calendar event, a tab, a canvas
