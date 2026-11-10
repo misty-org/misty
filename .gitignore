@@ -38,6 +38,9 @@ artifacts/
 **/config/
 **/bin/
 **/sessions
+# Source folders whose names match the rules above.
+!src/features/account/sessions/
+!src/features/agents/artifacts/
 .demo/
 
 # Images and large binary artifacts
