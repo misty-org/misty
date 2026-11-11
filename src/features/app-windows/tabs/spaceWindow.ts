@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { invoke } from "@tauri-apps/api/core";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { isIncognitoWindow, openingSpaceKey } from "../profiles/profileWindow";
+import { openingSpaceKey } from "../profiles/profileWindow";
 
 /**
  * Which Space a window shows. A Space is shared content and owns no tabs, so this belongs to the
@@ -16,7 +16,6 @@ export interface SpaceWindowIdentity {
   /** The Space's id; unknown for the personal Space until the account's Spaces load. */
   spaceId: string | null;
   personal: boolean;
-  incognito: boolean;
 }
 
 function validKey(key: unknown): key is string {
@@ -26,7 +25,7 @@ function validKey(key: unknown): key is string {
 function identityFor(key: string): SpaceWindowIdentity {
   const valid = validKey(key) ? key : personalSpaceKey;
   const personal = valid === personalSpaceKey;
-  return { key: valid, spaceId: personal ? null : valid, personal, incognito: isIncognitoWindow() };
+  return { key: valid, spaceId: personal ? null : valid, personal };
 }
 
 /** The current Space of this window, and a store for surfaces that follow it. */

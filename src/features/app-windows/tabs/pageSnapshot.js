@@ -40,7 +40,8 @@ export function snapshotPage(root) {
   function copy(source) {
     if (source.nodeType === 3) return doc.createTextNode(source.textContent || "");
     if (source.nodeType !== 1) return null;
-    if (source.tagName === "IFRAME" && source.getBoundingClientRect().height > 0) unsupported = true;
+    if (source.tagName === "IFRAME" && source.getBoundingClientRect().height > 0)
+      unsupported = true;
     if (excluded.has(source.tagName)) return null;
     if (++count > 1800) throw new Error("Page too complex");
     const style = win.getComputedStyle(source);

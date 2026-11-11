@@ -9,7 +9,6 @@ pub struct ProfileWindowInfo {
     label: String,
     window_id: String,
     profile: ProfileEntry,
-    incognito: bool,
     space: Option<String>,
 }
 
@@ -20,7 +19,6 @@ pub fn profile_window_info(webview: tauri::Webview) -> Result<ProfileWindowInfo,
     let state = window_state(&label).ok_or("This window doesn't belong to a profile.")?;
     let profile = entry(&window.profile).ok_or("Profiles are unavailable.")?;
     Ok(ProfileWindowInfo {
-        incognito: window.incognito,
         label,
         window_id: state.window_id,
         profile,
@@ -130,13 +128,6 @@ pub fn profile_open(webview: tauri::Webview, app: AppHandle, id: String) -> Resu
 pub fn profile_window_new(webview: tauri::Webview, app: AppHandle) -> Result<(), String> {
     let key = profile_for_window(webview.label()).ok_or("This window has no profile.")?;
     open_profile_window(&app, &key)
-}
-
-/// Opens an incognito window of the calling window's profile.
-#[tauri::command]
-pub fn profile_incognito_open(webview: tauri::Webview, app: AppHandle) -> Result<(), String> {
-    let key = profile_for_window(webview.label()).ok_or("This window has no profile.")?;
-    open_incognito(&app, &key)
 }
 
 /// Closes the calling window. Its tabs stay in the profile.

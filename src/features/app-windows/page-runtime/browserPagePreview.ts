@@ -1,6 +1,5 @@
 import type { WorkspaceView } from "../tabs/workspaceViews";
 import { parseBrowserViewState } from "../tabs/workspaceViews";
-import { isIncognitoWindow } from "../profiles/profileWindow";
 import { invoke } from "@tauri-apps/api/core";
 import { useBrowserRuntimeStore } from "./browserRuntimeStore";
 import type { PagePreview } from "./browserRuntimeTypes";
@@ -48,7 +47,6 @@ export async function captureBrowserPagePreview(
   const state = parseBrowserViewState(tab.state);
   const id = previewRuntimeId ?? browserRuntimeId(tab);
   if (
-    isIncognitoWindow() ||
     !/^https?:\/\//i.test(state.url) ||
     (!background && (!visibleRuntimeIds.has(id) || browserWebviewSuspensions.size > 0)) ||
     useBrowserRuntimeStore.getState().loading[tab.id] ||
@@ -87,7 +85,7 @@ export async function captureBrowserPagePreview(
 /** Prepare every browser card without focusing, navigating, or resizing its real tab. */
 export async function prepareBrowserPagePreview(tab: WorkspaceView, stillCurrent: () => boolean) {
   const state = parseBrowserViewState(tab.state);
-  if (isIncognitoWindow() || !/^https?:\/\//i.test(state.url) || !stillCurrent()) return;
+  if (!/^https?:\/\//i.test(state.url) || !stillCurrent()) return;
   const existing = browserRuntimeCreated(tab);
   const id = existing ? browserRuntimeId(tab) : `preview-${crypto.randomUUID()}`;
   const generation = previewGeneration;

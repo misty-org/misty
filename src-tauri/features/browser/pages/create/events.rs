@@ -26,15 +26,6 @@ pub(super) fn new_window(
         }
         return NewWindowResponse::Deny;
     }
-    // A new tab loads as Misty's own request, which skips the engine's check on extension
-    // pages, so a page's `window.open` meets the same rule its navigations do.
-    let opener = webview_label(popup_id)
-        .ok()
-        .and_then(|label| popup_app.get_webview(&label))
-        .and_then(|view| view.url().ok());
-    if !crate::browser::extensions::page_may_open(&url, opener.as_ref()) {
-        return NewWindowResponse::Deny;
-    }
     if external_url(url.as_str()).is_ok() {
         let _ = popup_app.emit_to(
             browser_owner_label(popup_app, popup_id).as_str(),
@@ -53,16 +44,10 @@ pub(super) fn new_window(
 /// the events the workspace shows.
 pub(super) fn page_load(
     page_app: &AppHandle,
-    page_profile: &str,
     page_id: &str,
-    replacing_extension_view: bool,
     webview: Webview,
     payload: tauri::webview::PageLoadPayload<'_>,
 ) {
-    crate::browser::extensions::native::tab_event(page_app, Some(page_profile), page_id, "updated");
-    if replacing_extension_view && payload.url().as_str() == "about:blank" {
-        return;
-    }
     let locked = page_app
         .state::<BrowserSessionState>()
         .sessions

@@ -14,6 +14,7 @@ export {
   type AgentArtifactProvenance,
 } from "./api/library-upload";
 
+export { handoffGateway } from "./handoffs/handoffGateway";
 export { drawingsApi } from "./journal/drawings/api/api";
 export { resetNotesAccountState } from "./journal/notes";
 export { MistyLibraryPicker } from "./library";

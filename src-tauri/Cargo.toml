@@ -23,12 +23,6 @@ path = "features/browser/pages/tests/webview_url.rs"
 harness = false
 
 [[test]]
-name = "extension_native"
-path = "features/browser/extensions/tests/native.rs"
-# Drives real WebKit extensions on the main thread; runs only with `-- --ignored`.
-harness = false
-
-[[test]]
 name = "browser_native_input"
 path = "features/browser/input/tests/browser_native_input.rs"
 # Real WKWebView events need the main thread and a window server.
@@ -68,8 +62,6 @@ rand = "0.8"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sha2 = "0.10"
-# Chrome Web Store package signatures (RSA and P-256); rustls already builds it.
-ring = "0.17"
 tempfile = "3"
 tauri = { version = "2", features = ["protocol-asset", "macos-private-api", "tray-icon", "image-png", "unstable"] }
 tauri-plugin-dialog = "2"
@@ -120,13 +112,12 @@ core-graphics = "0.24"
 core-foundation = "0.10"
 objc = "0.2.7"
 objc2 = "0.6.4"
-objc2-user-notifications = { version = "0.3.2", default-features = false, features = ["std", "UNNotification", "UNNotificationAction", "UNNotificationAttachment", "UNNotificationCategory", "UNNotificationContent", "UNNotificationRequest", "UNNotificationResponse", "UNNotificationSettings", "UNNotificationSound", "UNNotificationTrigger", "UNNotificationSettings", "UNUserNotificationCenter", "block2"] }
 dispatch2 = "0.3.1"
 # Reads another browser's cookie key from its own Keychain item on import.
 security-framework = "3.7"
 objc2-app-kit = { version = "0.3.2", default-features = false, features = ["std", "NSAppearance", "NSApplication", "NSBitmapImageRep", "NSImageRep", "NSEvent", "NSPasteboard", "NSResponder", "NSScrollView", "NSTrackingArea", "NSView", "NSWindow", "NSPopover", "NSScreen", "NSMenu", "NSMenuItem", "NSImage", "NSGraphics", "NSControl", "NSWindowController", "NSPanel", "NSTextField", "NSTextFieldCell", "NSButton", "NSButtonCell", "NSBezierPath", "NSColor", "NSAnimationContext", "NSWorkspace", "NSRunningApplication", "NSFont", "NSText", "NSCell", "NSTextInputClient", "NSAnimation", "block2", "objc2-core-graphics", "objc2-core-image", "objc2-core-foundation", "NSAccessibility", "NSPasteboardItem", "NSParagraphStyle", "NSFontDescriptor", "NSLayoutConstraint", "NSGraphicsContext"] }
 objc2-foundation = { version = "0.3.2", default-features = false, features = ["std", "NSArray", "NSData", "NSBundle", "NSDictionary", "NSError", "NSObject", "NSProcessInfo", "NSUserDefaults", "NSUUID", "NSString", "NSURL", "NSURLResponse", "NSHTTPCookie", "NSDate", "NSSet", "NSJSONSerialization", "NSNotification", "NSNull", "NSFileHandle", "NSFileManager", "NSPathUtilities", "NSRegularExpression", "NSLocale", "NSCharacterSet", "NSRange", "NSValue", "NSOrderedSet", "NSTask", "NSURLRequest", "NSThread", "NSRunLoop", "NSGeometry", "NSEnumerator", "NSTimer", "NSOperation", "block2", "NSObjCRuntime"] }
-objc2-web-kit = { version = "0.3.2", default-features = false, features = ["WKSecurityOrigin", "WKSnapshotConfiguration", "objc2-core-foundation", "WKContentWorld", "WKFrameInfo", "WKScriptMessage", "WKScriptMessageHandler", "objc2-app-kit", "WKWebView", "WKWebViewConfiguration", "WKUserContentController", "WKUserScript", "WKNavigationResponse", "WKNavigationDelegate", "WKHTTPCookieStore", "WKWebsiteDataStore", "block2", "WKWebExtension", "WKWebExtensionAction", "WKWebExtensionContext", "WKWebExtensionController", "WKWebExtensionControllerConfiguration", "WKWebExtensionControllerDelegate", "WKWebExtensionDataRecord", "WKWebExtensionDataType", "WKWebExtensionMatchPattern", "WKWebExtensionMessagePort", "WKWebExtensionPermission", "WKWebExtensionTab", "WKWebExtensionTabConfiguration", "WKWebExtensionWindow", "WKWebExtensionWindowConfiguration", "WKNavigationAction", "WKNavigation", "WKWebsiteDataRecord", "WKDownload", "WKUIDelegate", "WKWindowFeatures", "WKError"] }
+objc2-web-kit = { version = "0.3.2", default-features = false, features = ["WKSecurityOrigin", "WKSnapshotConfiguration", "objc2-core-foundation", "WKContentWorld", "WKFrameInfo", "WKScriptMessage", "WKScriptMessageHandler", "objc2-app-kit", "WKWebView", "WKWebViewConfiguration", "WKUserContentController", "WKUserScript", "WKNavigationResponse", "WKNavigationDelegate", "WKHTTPCookieStore", "WKWebsiteDataStore", "block2", "WKNavigationAction", "WKNavigation", "WKWebsiteDataRecord", "WKDownload", "WKUIDelegate", "WKWindowFeatures", "WKError"] }
 # Agent pointer, mist, desktop control and capture (features/agents/*/macos).
 objc2-screen-capture-kit = "0.3.2"
 objc2-quartz-core = "0.3.2"

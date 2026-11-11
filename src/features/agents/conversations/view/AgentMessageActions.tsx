@@ -3,6 +3,7 @@ import { IconButton } from "@/shared/ui";
 import {
   Check,
   Copy,
+  Forward,
   PencilLine,
   RefreshCw,
   Reply,
@@ -13,6 +14,9 @@ import {
   Volume2,
 } from "lucide-react";
 import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
+import { useSpaceWindowStore } from "@/features/app-windows";
+import { spacesGateway } from "../../spaces-gateway/spacesGateway";
+import { HandOffDialog } from "./HandOffDialog";
 
 const timeFormat = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" });
 const fullFormat = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" });
@@ -65,6 +69,7 @@ export function AgentMessageActions(props: {
           <Reply />
         </Action>
       ) : null}
+      {!user && props.text ? <HandOffAction text={props.text} /> : null}
       {!user && message.invocationId ? (
         <FeedbackActions invocationId={message.invocationId} />
       ) : null}
@@ -127,6 +132,26 @@ function CopyAction({ text }: { text: string }) {
     >
       {copied ? <Check /> : <Copy />}
     </Action>
+  );
+}
+
+/**
+ * Hands the reply to another member of a shared Space. It opens a draft the person edits and
+ * sends themselves; in a Space of one there is nobody to hand to, so it isn't offered.
+ */
+function HandOffAction({ text }: { text: string }) {
+  const [open, setOpen] = useState(false);
+  // Re-read when the window shows another Space.
+  useSpaceWindowStore((state) => state.identity.key);
+  const space = spacesGateway.maybe()?.sharedWindowSpace();
+  if (!space) return null;
+  return (
+    <>
+      <Action label="Hand off" onClick={() => setOpen(true)}>
+        <Forward />
+      </Action>
+      {open ? <HandOffDialog space={space} draft={text} onClose={() => setOpen(false)} /> : null}
+    </>
   );
 }
 

@@ -32,13 +32,12 @@ impl Store {
     }
 }
 
-/// The profile's open pages. Incognito's are never among them, whatever its session says.
+/// The profile's open pages.
 pub(super) fn tabs(app: &AppHandle, store: &Store) -> Vec<Webview> {
     crate::browser::sync_storage_views(app, &store.identity)
         .unwrap_or_default()
         .into_iter()
         .map(|(_, view)| view)
-        .filter(|view| !app_windows::is_incognito_window(view.window().label()))
         .collect()
 }
 

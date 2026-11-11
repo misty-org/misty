@@ -1,12 +1,11 @@
 import { useEffect, useRef, type RefObject } from "react";
-import { parseBrowserViewState, type WorkspaceView } from "./workspaceViews";
+import type { WorkspaceView } from "./workspaceViews";
 import { snapshotPage } from "./pageSnapshot";
 import { pagePreviewGeneration, savePagePreview } from "../page-runtime/browserPagePreview";
 import { invoke } from "@tauri-apps/api/core";
 import { getAppliedAppRenderScale } from "@/shared/hooks/useAppZoom";
-import { isIncognitoWindow } from "../profiles/profileWindow";
 
-/** All host-rendered tools, including misty:// pages, get a real content preview. */
+/** Every page the window draws itself gets a real content preview. */
 export function useWorkspacePagePreview(
   tab: WorkspaceView | undefined,
   host: RefObject<HTMLElement | null>,
@@ -14,19 +13,10 @@ export function useWorkspacePagePreview(
 ) {
   const latest = useRef(tab);
   latest.current = tab;
-  const url = tab?.surfaceId === "browser" ? parseBrowserViewState(tab.state).url : tab?.route;
-  const privateTab = tab?.surfaceId === "browser" && isIncognitoWindow();
+  const url = tab?.route;
   const tabId = tab?.id;
-  const surfaceId = tab?.surfaceId;
   useEffect(() => {
-    if (
-      !tabId ||
-      !url ||
-      !active ||
-      privateTab ||
-      (surfaceId === "browser" && /^https?:/i.test(url))
-    )
-      return;
+    if (!tabId || !url || !active) return;
     let disposed = false;
     let capturing = false;
     const capture = async () => {
@@ -77,5 +67,5 @@ export function useWorkspacePagePreview(
       window.clearTimeout(initial);
       window.clearInterval(refresh);
     };
-  }, [active, host, privateTab, tabId, surfaceId, url]);
+  }, [active, host, tabId, url]);
 }

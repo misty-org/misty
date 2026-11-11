@@ -232,13 +232,6 @@ fn build_menu<R: Runtime>(
             &command_item(
                 manager,
                 snapshot,
-                "workspace.new_incognito_window",
-                "New Incognito Window",
-                "Cmd+Option+N",
-            )?,
-            &command_item(
-                manager,
-                snapshot,
                 "workspace.close_window",
                 "Close Window",
                 "Cmd+Shift+W",
@@ -300,7 +293,7 @@ pub fn handle_menu_event(app: &AppHandle, id: &str) -> bool {
         let _ = app_windows::restore(app);
         return true;
     }
-    // A menu choice acts in the window the person used last, incognito included.
+    // A menu choice acts in the window the person used last.
     app_windows::emit_to_focused(app, SHORTCUT_MENU_EVENT, command_id);
     true
 }

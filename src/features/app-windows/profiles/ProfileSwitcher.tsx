@@ -82,8 +82,7 @@ function ProfileButton({ profile, current }: { profile: ProfileEntry; current: b
 export function ProfileSwitcher() {
   const profiles = useProfileWindowStore((state) => state.profiles);
   const currentId = useProfileWindowStore((state) => state.profile.id);
-  const incognito = useProfileWindowStore((state) => state.incognito);
-  if (incognito || profiles.length < 2) return null;
+  if (profiles.length < 2) return null;
   const { shown, more } = splitProfiles(profiles, currentId);
   return (
     <div className="flex min-w-0 items-center gap-0.5" role="group" aria-label="Profiles">

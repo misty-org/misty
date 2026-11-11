@@ -21,6 +21,7 @@ import { noteAsk, vocativeRouting, voiceDevice } from "@/features/voice";
 import { SetupStepBody, setupStepCopy, useSetupSteps } from "@/features/onboarding";
 import {
   drawingsApi,
+  handoffGateway,
   MistyLibraryPicker,
   resetNotesAccountState,
   resetSpacesAccountState,
@@ -69,6 +70,7 @@ setupFlow.provide({
 spacesDirectory.provide(useSpacesStore);
 
 spacesGateway.provide({
+  ...handoffGateway,
   uploadLibraryPath,
   uploadLibraryBlob,
   async createDrawing(spaceId, title, elements) {
@@ -94,8 +96,6 @@ function focusedShortcutScope(): ShortcutScope {
   const pane = dockLeaves(layout.root).find((candidate) => candidate.id === layout.focusedPaneId);
   const tab = pane?.views.find((candidate) => candidate.id === pane.activeViewId);
   switch (tab?.surfaceId) {
-    case "browser":
-      return "tool:browser";
     case "space":
       return tab.route.toLowerCase().includes("/library") ? "tool:library" : "tool:space";
     default:

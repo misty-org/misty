@@ -1,15 +1,4 @@
-import {
-  initialTabGroups,
-  tabGroupActions,
-  type TabGroupActions,
-  type TabGroupState,
-} from "../tab-groups/tabGroups";
-import { pinnedTabActions, type PinnedTabActions } from "./pinnedTabs";
 import { type DockingLayout } from "@/app/shell/dockingLayout";
-import {
-  initialBookmarkNavigation,
-  type BookmarkNavigationState,
-} from "../profiles/navigationDefaults";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import {
@@ -22,7 +11,6 @@ import {
   workspaceRecoveryStorage,
 } from "../recovery/workspaceRecoveryStorage";
 import type {
-  BrowserViewState,
   DockDropZone,
   DockSplitDirection,
   OpenWorkspaceSurfaceRequest,
@@ -38,13 +26,7 @@ import { workspacePaneActions } from "../panes/workspacePaneActions";
 import { workspaceTabActions } from "./workspaceTabActions";
 import { workspaceViewActions } from "./workspaceViewActions";
 
-export interface WorkspaceStore
-  extends
-    WorkspaceWindowsState,
-    BookmarkNavigationState,
-    TabGroupState,
-    TabGroupActions,
-    PinnedTabActions {
+export interface WorkspaceStore extends WorkspaceWindowsState {
   lastUsedViewByGroup: Partial<Record<WorkspaceGroupKey, string>>;
   closedItems: ClosedWorkspaceItem[];
   newTab: () => WorkspaceView;
@@ -58,13 +40,6 @@ export interface WorkspaceStore
   openDestination: (request: OpenWorkspaceSurfaceRequest) => WorkspaceView;
   commitPlaceholder: (tabId: string) => void;
   addSurface: (request: OpenWorkspaceSurfaceRequest) => WorkspaceView;
-  openBrowserView: (request?: {
-    url?: string;
-    paneId?: string;
-    sourceViewId?: string;
-    bookmarkId?: string;
-  }) => WorkspaceView;
-  updateBrowserView: (tabId: string, patch: Partial<BrowserViewState> & { title?: string }) => void;
   renameView: (tabId: string, title: string) => void;
   updateViewRoute: (tabId: string, route: string, replace?: boolean) => void;
   updateViewState: (tabId: string, state: unknown, title?: string) => void;
@@ -100,21 +75,15 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
   persist(
     (set, get) => ({
       ...initialWorkspaceWindow(),
-      ...initialBookmarkNavigation(),
-      ...initialTabGroups(),
       lastUsedViewByGroup: {},
       closedItems: [],
-      ...tabGroupActions(set, get),
-      ...pinnedTabActions(set, get),
       ...workspaceOpenActions(set, get),
       ...workspaceViewActions(set, get),
       ...workspaceTabActions(set, get),
       ...workspacePaneActions(set, get),
       reset: () => {
-        set(initialTabGroups());
         set({
           ...initialWorkspaceWindow(),
-          ...initialBookmarkNavigation(),
           lastUsedViewByGroup: {},
           closedItems: [],
           dockingLayout: undefined,

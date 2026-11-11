@@ -31,7 +31,6 @@ pub(crate) async fn change_account_if<T>(
         return action();
     }
     ACCOUNT_EPOCH.fetch_add(1, Ordering::AcqRel);
-    super::super::extensions::close_account().await;
     crate::browser::app_windows::workspace_recovery::close_account()?;
     #[cfg(desktop)]
     if let Some(app) = app {

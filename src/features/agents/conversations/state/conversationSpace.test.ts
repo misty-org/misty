@@ -1,8 +1,8 @@
 import { expect, it } from "vitest";
 import { conversationInSpace } from "./conversationSpace";
 
-const personal = { key: "personal", spaceId: null, personal: true, incognito: false };
-const team = { key: "team", spaceId: "team", personal: false, incognito: false };
+const personal = { key: "personal", spaceId: null, personal: true };
+const team = { key: "team", spaceId: "team", personal: false };
 
 it("shows a conversation only in the Space it belongs to", () => {
   const home = { spaceId: "home", personalSpace: true };

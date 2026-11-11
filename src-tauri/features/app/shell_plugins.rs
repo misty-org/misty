@@ -32,7 +32,7 @@ impl<R: Runtime, P: Plugin<R>> Plugin<R> for ShellScriptPlugin<P> {
             // This is DOM scoping; command authorization still comes from the ACL.
             format!(
                 r#"(() => {{
-  if (window !== window.top || !/^(space|incognito)-/.test(window.__TAURI_INTERNALS__?.metadata?.currentWebview?.label ?? '')) return;
+  if (window !== window.top || !/^space-/.test(window.__TAURI_INTERNALS__?.metadata?.currentWebview?.label ?? '')) return;
   {}
 }})();"#,
                 script.script

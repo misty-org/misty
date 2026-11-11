@@ -1,4 +1,5 @@
 import { engineFolder, mistyEngine } from "../../engines/enginesApi";
+import { multirunFolderOf } from "../../multirun/multirunFolders";
 import { agentAccountId, isSignedIn } from "../../personal/agentAccount";
 import { memoryPromptContext } from "@/features/agents/localRun";
 import {
@@ -132,7 +133,8 @@ export async function buildRunBody(
         ? {
             id: agent.engine,
             model: agent.engine_model ?? "",
-            folder: await engineFolder(spaceId),
+            // A multi-run lane's chat works in the lane's own worktree, not the linked folder.
+            folder: (await multirunFolderOf(conversationId)) ?? (await engineFolder(spaceId)),
           }
         : undefined,
     resolved_context: sources.map(({ kind, title, content }) => ({ kind, title, content })),

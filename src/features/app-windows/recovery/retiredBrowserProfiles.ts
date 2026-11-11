@@ -1,13 +1,12 @@
 import { invoke } from "@tauri-apps/api/core";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { isIncognitoWindow } from "../profiles/profileWindow";
 
 /**
  * Device browser profiles became Spaces. Saved state from before still lists them;
  * their website data stores are erased once, natively, and the list is dropped.
  */
 export function eraseRetiredBrowserProfiles(saved: unknown): void {
-  if (!Array.isArray(saved) || !hasTauriInternals() || isIncognitoWindow()) return;
+  if (!Array.isArray(saved) || !hasTauriInternals()) return;
   const stores = saved
     .map((profile: { dataId?: unknown } | null) => profile?.dataId)
     .filter((id): id is string => typeof id === "string" && /^[a-f0-9]{64}$/.test(id))

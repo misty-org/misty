@@ -20,28 +20,35 @@ describe("shortcut dispatcher", () => {
       route: "/agents",
       instancePolicy: "single",
     });
-    const browserHandler = vi.fn();
-    const remove = registerShortcutHandler("browser.edit_address", browserHandler);
-    const editAddress = () =>
+    const spaceHandler = vi.fn();
+    const remove = registerShortcutHandler("space.section_1", spaceHandler);
+    const mac = detectShortcutPlatform() === "macos";
+    const openSection = () =>
       dispatchShortcutEvent(
-        new KeyboardEvent("keydown", { key: "l", code: "KeyL", ctrlKey: true }),
+        new KeyboardEvent("keydown", { key: "1", code: "Digit1", ctrlKey: !mac, metaKey: mac }),
       );
-    editAddress();
-    expect(browserHandler).not.toHaveBeenCalled();
-    useWorkspaceStore.getState().openBrowserView({ url: "https://example.com" });
-    editAddress();
-    expect(browserHandler).toHaveBeenCalledOnce();
+    openSection();
+    expect(spaceHandler).not.toHaveBeenCalled();
+    const space = useWorkspaceStore.getState().addSurface({
+      surfaceId: "space",
+      groupKey: "space:family:space",
+      title: "Home",
+      route: "/spaces/family/home",
+    });
+    useWorkspaceStore.getState().focusView(space.id);
+    openSection();
+    expect(spaceHandler).toHaveBeenCalledOnce();
     remove();
   });
 
   it("uses explicit handler priority and falls through when a handler declines", () => {
     const calls: string[] = [];
-    const removeFallback = registerShortcutHandler("search.toggle", () => {
+    const removeFallback = registerShortcutHandler("app.open_settings", () => {
       calls.push("fallback");
       return true;
     });
     const removeFocused = registerShortcutHandler(
-      "search.toggle",
+      "app.open_settings",
       () => {
         calls.push("focused");
         return false;
@@ -52,7 +59,7 @@ describe("shortcut dispatcher", () => {
 
     expect(
       dispatchShortcutEvent(
-        new KeyboardEvent("keydown", { key: "t", code: "KeyT", ctrlKey: true }),
+        new KeyboardEvent("keydown", { key: ",", code: "Comma", ctrlKey: true }),
       ),
     ).toBe(true);
     expect(calls).toEqual(["focused", "fallback"]);
@@ -77,7 +84,7 @@ describe("shortcut dispatcher", () => {
     remove();
   });
 
-  it("opens global browser search from Agent chat", () => {
+  it("runs a global command typed in Agent chat", () => {
     const agentChat = document.createElement("main");
     agentChat.dataset.mistyAgentChat = "";
     const textarea = document.createElement("textarea");
@@ -85,16 +92,16 @@ describe("shortcut dispatcher", () => {
     document.body.appendChild(agentChat);
     textarea.focus();
     const handler = vi.fn();
-    const remove = registerShortcutHandler("search.toggle", handler);
+    const remove = registerShortcutHandler("app.open_settings", handler);
     const event = new KeyboardEvent("keydown", {
-      key: "t",
-      code: "KeyT",
+      key: ",",
+      code: "Comma",
       ctrlKey: true,
     });
     Object.defineProperty(event, "target", { value: textarea });
 
     expect(dispatchShortcutEvent(event)).toBe(true);
-    expect(invokeShortcutCommand("search.toggle")).toBe(true);
+    expect(invokeShortcutCommand("app.open_settings")).toBe(true);
     expect(handler).toHaveBeenCalledTimes(2);
 
     remove();
@@ -103,12 +110,12 @@ describe("shortcut dispatcher", () => {
 
   it("ignores repeat events for non-repeatable commands", () => {
     const handler = vi.fn();
-    const remove = registerShortcutHandler("search.toggle", handler);
+    const remove = registerShortcutHandler("app.open_settings", handler);
     expect(
       dispatchShortcutEvent(
         new KeyboardEvent("keydown", {
-          key: "t",
-          code: "KeyT",
+          key: ",",
+          code: "Comma",
           ctrlKey: true,
           repeat: true,
         }),
@@ -187,10 +194,10 @@ describe("shortcut dispatcher", () => {
     expect(tabHandler).not.toHaveBeenCalled();
 
     store.openSurface({
-      surfaceId: "browser",
-      groupKey: "tool:browser",
-      title: "Browser",
-      route: "/browser",
+      surfaceId: "agents",
+      groupKey: "tool:agents",
+      title: "Agents",
+      route: "/agents",
       instancePolicy: "multiple",
     });
     expect(dispatchShortcutEvent(two())).toBe(true);
@@ -200,54 +207,21 @@ describe("shortcut dispatcher", () => {
     removeTab();
   });
 
-  it("opens a new tab with Cmd+T only; Cmd+K is not bound", () => {
-    const handler = vi.fn();
-    const remove = registerShortcutHandler("search.toggle", handler);
-    // Primary: Cmd+T / Ctrl+T
-    const primaryEvent = new KeyboardEvent("keydown", {
-      key: "t",
-      code: "KeyT",
-      ctrlKey: true,
-      metaKey: false,
-    });
-    expect(dispatchShortcutEvent(primaryEvent)).toBe(true);
-
-    const retired = new KeyboardEvent("keydown", {
-      key: "k",
-      code: "KeyK",
-      ctrlKey: true,
-      metaKey: false,
-    });
-    expect(dispatchShortcutEvent(retired)).toBe(false);
-    expect(handler).toHaveBeenCalledTimes(1);
-    remove();
-  });
-
-  it("handles forwarded browser-scoped shortcut events when browser surface is active", () => {
-    const store = useWorkspaceStore.getState();
-    const browserTab = store.openSurface({
-      surfaceId: "browser",
-      groupKey: "tool:browser",
-      title: "Browser",
-      route: "/browser",
-      instancePolicy: "multiple",
-    });
-    store.focusView(browserTab.id);
-    const editAddressHandler = vi.fn();
-    const remove = registerShortcutHandler("browser.edit_address", editAddressHandler);
+  it("handles a shortcut forwarded from a page an agent has open", () => {
+    const settingsHandler = vi.fn();
+    const remove = registerShortcutHandler("app.open_settings", settingsHandler);
 
     const platform = detectShortcutPlatform();
     const event = new KeyboardEvent("keydown", {
-      key: "l",
-      code: "KeyL",
+      key: ",",
+      code: "Comma",
       metaKey: platform === "macos",
       ctrlKey: platform !== "macos",
     });
-    // Simulating forwarded event from embedded browser with editable=false
+    // A page forwards the keys it doesn't take itself, saying whether a field had focus.
     expect(dispatchShortcutEvent(event, false)).toBe(true);
-    expect(editAddressHandler).toHaveBeenCalledOnce();
+    expect(settingsHandler).toHaveBeenCalledOnce();
 
     remove();
-    store.closeView(browserTab.id);
   });
 });

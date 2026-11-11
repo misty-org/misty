@@ -50,18 +50,6 @@ pub(crate) async fn execute_agent_request(
     if request.operation.starts_with("browser.workspace.") {
         return crate::agents::window_control::execute(&app, &request).await;
     }
-    if let Some(view) = app.get_webview(&webview_label(&id)?) {
-        super::super::extensions::authorize_agent_url(&view.url().map_err(|e| e.to_string())?)
-            .await?;
-    }
-    if let Some(url) = request
-        .input
-        .get("url")
-        .and_then(Value::as_str)
-        .and_then(|value| Url::parse(value).ok())
-    {
-        super::super::extensions::authorize_agent_url(&url).await?;
-    }
     if matches!(
         request.operation.as_str(),
         "browser.click"
@@ -142,7 +130,6 @@ pub(crate) async fn execute_agent_request(
             } else {
                 None
             };
-            crate::browser::extensions::trust_navigation(&id, &target);
             view.navigate(target.clone())
                 .map_err(|error| error.to_string())?;
             let mut landed = json!({"ok": true, "url": url});

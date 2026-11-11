@@ -89,6 +89,7 @@ export { findVocative, routeToAgent } from "./cursor/vocativeRoute";
 // Public surface used by other features (generated from their imports).
 export { DeviceSessionBridge } from "./personal/DeviceSessionBridge";
 export { openMisty } from "./conversations/ask/handoff";
+export { draftRequestForAgent } from "./conversations/ask/draftRequest";
 export { conversationInSpace } from "./conversations/state/conversationSpace";
 export { useAgentAccountId } from "./personal/agentAccount";
 export { AgentsNow } from "./virtual/AgentsNow";
@@ -97,3 +98,14 @@ export { useOfficeAgents } from "./virtual/useOfficeAgents";
 export { useTeammateAgents, type TeammateAgent } from "./virtual/teammates";
 export { shortAgo, useChatStatuses, type ChatStatus } from "./page/useChatStatuses";
 export { EngineMark, hasEngineMark } from "./engines/EngineMark";
+// The Space home's overview reads runs, linked folders and schedules.
+export { runtimeAiApi } from "./AgentsRuntime";
+export type { MistyActivityEntry } from "./conversations/state/activity";
+export type { GlobalAiConversation } from "./conversations/state/conversationTypes";
+export { watchAllRunEvents } from "./runs/local-run/localRunEvents";
+export { currentSpaceKey, folderName, useSpaceFolders } from "./engines/enginesApi";
+export { projectApi, type GitStatus } from "./context-panel/projectApi";
+export { useContextPanel } from "./context-panel/contextPanelStore";
+export { useWorkflowSchedulesStore } from "./workflows/useWorkflowSchedulesStore";
+export { describeNextRun } from "./workflows/scheduleSummary";
+export type { UpcomingWorkflowRun } from "./api/agent-methods";

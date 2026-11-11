@@ -5,9 +5,10 @@ import { useWorkspaceStore } from "../tabs/useWorkspaceStore";
 import { migrateWorkspaceStore, partialWorkspaceStore } from "../tabs/workspaceStorePersistence";
 import { normalizeWorkspaceLayout } from "../profiles/windows";
 import type { WorkspaceView } from "../tabs/workspaceViews";
+import { openPage } from "@/tests/workspacePage";
 
 const state = () => useWorkspaceStore.getState();
-const browser = (url: string) => state().openBrowserView({ url });
+const browser = (url: string) => openPage(state(), { url });
 const owner = (viewId: string) =>
   layoutTabs(state().layout).find((tab) =>
     dockTreeViews(tab.root).some((view) => view.id === viewId),
@@ -34,13 +35,13 @@ describe("window → tabs → panes", () => {
     const first = browser("https://one.example");
     const firstTab = owner(first.id).id;
     const pane = state().splitPane(state().layout.focusedPaneId, "right")!;
-    const beside = state().openBrowserView({ url: "https://beside.example", paneId: pane });
+    const beside = openPage(state(), { url: "https://beside.example", paneId: pane });
     const root = state().layout.root;
     if (root.type !== "split") throw new Error("Expected split");
     state().updateSplitRatio(root.id, 0.63);
     const second = browser("https://two.example");
     expect(dockLeaves(state().layout.root)).toHaveLength(1);
-    state().updateBrowserView(beside.id, { title: "Background title" });
+    state().renameView(beside.id, "Background title");
     state().selectTab(firstTab);
     expect(dockLeaves(state().layout.root)).toHaveLength(2);
     expect(state().layout.root).toMatchObject({ id: root.id, ratio: 0.63 });
@@ -70,7 +71,7 @@ describe("window → tabs → panes", () => {
     const first = browser("https://one.example"),
       id = owner(first.id).id;
     const pane = state().splitPane(state().layout.focusedPaneId, "down")!;
-    const second = state().openBrowserView({ url: "https://two.example", paneId: pane });
+    const second = openPage(state(), { url: "https://two.example", paneId: pane });
     state().renameTab(id, "Research");
     const saved = owner(first.id);
     expect(state().closeTab(id)).toBe(true);
@@ -85,7 +86,7 @@ describe("window → tabs → panes", () => {
   it("closes a pane without hiding its contents in another pane and can reopen it", () => {
     const first = browser("https://one.example");
     const pane = state().splitPane(state().layout.focusedPaneId, "right")!;
-    const second = state().openBrowserView({ url: "https://two.example", paneId: pane });
+    const second = openPage(state(), { url: "https://two.example", paneId: pane });
     state().closePane(pane);
     expect(dockTreeViews(state().layout.root).map((view) => view.id)).toEqual([first.id]);
     state().reopenClosedView();
@@ -112,7 +113,7 @@ describe("window → tabs → panes", () => {
   it("exchanges views on a center drop rather than creating nested tabs", () => {
     const first = browser("https://one.example");
     const pane = state().splitPane(state().layout.focusedPaneId, "right")!;
-    const second = state().openBrowserView({ url: "https://two.example", paneId: pane });
+    const second = openPage(state(), { url: "https://two.example", paneId: pane });
     expect(state().dockView(first.id, pane, "center")).toBe(true);
     expect(dockTreeViews(state().layout.root).map((view) => view.id)).toEqual([
       second.id,
@@ -140,11 +141,11 @@ describe("window → tabs → panes", () => {
   it("migrates old splits without losing hidden tabs, view identities, state, or proportions", () => {
     const view = (id: string): WorkspaceView => ({
       id,
-      surfaceId: "browser",
-      groupKey: "tool:browser",
+      surfaceId: "agents",
+      groupKey: "tool:agents",
       instanceKey: id,
       title: id,
-      route: "/browser",
+      route: "/agents",
       state: { text: id },
       sidebarVisible: true,
       createdAt: 1,
@@ -182,7 +183,7 @@ it("opens replaceable Agents in new tabs and splits and navigates inside the sel
     surfaceId: "agents",
     placeholder: true,
   });
-  const view = state().openBrowserView({ url: "https://example.com", paneId });
+  const view = openPage(state(), { url: "https://example.com", paneId });
   expect(state().layout.activeTabId).toBe(tabId);
   expect(dockTreeViews(state().layout.root)).toHaveLength(2);
   expect(activeLayoutView(state().layout)?.id).toBe(view.id);

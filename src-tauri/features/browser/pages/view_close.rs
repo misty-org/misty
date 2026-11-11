@@ -68,8 +68,6 @@ pub fn close_browser_webview(
 ) -> Result<(), String> {
     #[cfg(windows)]
     let _ = unstack(&request.id);
-    let space = super::super::extensions::native::page_profile(&app, &request.id);
-    super::super::extensions::native::tab_event(&app, space.as_deref(), &request.id, "close");
     let children = {
         let mut sessions = state
             .sessions
@@ -141,16 +139,6 @@ pub fn close_browser_webview(
     });
     webview.close().map_err(|error| error.to_string())?;
     Ok(())
-}
-
-/// The last incognito window of a profile closed: its session goes, so the next
-/// incognito window starts signed out with no site data or permission choices.
-pub(crate) fn end_incognito_session(app: &AppHandle, session: &str) {
-    let id = crate::browser::app_windows::incognito_store_id(session);
-    #[cfg(target_os = "macos")]
-    let _ = app.run_on_main_thread(move || wry::end_private_session(id));
-    let _ = (app, id);
-    super::super::site_settings::permissions::forget_private_session();
 }
 
 /// A window closed with its pages: forget the pages its renderer can no longer close.

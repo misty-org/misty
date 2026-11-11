@@ -27,7 +27,6 @@ export interface ProfileEntry {
 interface WindowIdentity {
   windowId: string;
   profile: ProfileEntry;
-  incognito: boolean;
 }
 
 interface OpeningWindow {
@@ -46,13 +45,9 @@ function currentLabel(): string | null {
   return internals?.metadata?.currentWindow?.label ?? null;
 }
 
-/** An app window that isn't incognito (not an overlay). */
+/** An app window (not an overlay). */
 export function isProfileWindowLabel(label: string): boolean {
   return /^window-[1-9][0-9]*$/.test(label);
-}
-
-function isIncognitoWindowLabel(label: string | null): boolean {
-  return Boolean(label && /^incognito-[1-9][0-9]*$/.test(label));
 }
 
 /** A profile as the native side sends it; `null` for anything else. */
@@ -92,7 +87,6 @@ function openingIdentity(): WindowIdentity {
       order: 0,
       sites: [],
     },
-    incognito: isIncognitoWindowLabel(currentLabel()),
   };
 }
 
@@ -112,11 +106,6 @@ export function currentWindowId(): string {
   return useProfileWindowStore.getState().windowId;
 }
 
-/** An incognito window keeps nothing: no recovery, sync, history, memory or agents. */
-export function isIncognitoWindow(): boolean {
-  return useProfileWindowStore.getState().incognito;
-}
-
 /** This window's native label, as agent device contexts name it. */
 export function currentWindowLabel(): string {
   return currentLabel() ?? "window-1";
@@ -128,14 +117,12 @@ export async function refreshProfileWindow(): Promise<void> {
   const info = await invoke<{
     windowId: string;
     profile: unknown;
-    incognito: boolean;
   }>("profile_window_info").catch(() => null);
   const profile = parseProfileEntry(info?.profile);
   if (!info || !profile) return;
   useProfileWindowStore.setState({
     windowId: info.windowId,
     profile,
-    incognito: info.incognito,
   });
 }
 
@@ -200,11 +187,6 @@ export async function isLinkTargetWindow(): Promise<boolean> {
 /** Opens another window of this window's profile. */
 export function openNewWindow() {
   return invoke("profile_window_new");
-}
-
-/** Opens an incognito window of this window's profile. */
-export function openIncognitoWindow() {
-  return invoke("profile_incognito_open");
 }
 
 /** Closes this window. Its tabs stay in the profile. */

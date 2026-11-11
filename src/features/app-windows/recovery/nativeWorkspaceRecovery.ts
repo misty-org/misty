@@ -17,13 +17,6 @@ import {
   firstProfileId,
   refreshProfileWindow,
 } from "../profiles/profileWindow";
-import {
-  recordSeed,
-  startProfileRecords,
-  type ProfileRecordCollection,
-  type ProfileRecordsHandle,
-} from "../profiles/profileRecords";
-import type { SharedRecord } from "../profiles/profileRecordModel";
 import { legacyBrowserSources } from "./legacyBrowserSources";
 import { startProfileTabs } from "../tabs/profileTabs";
 import { startWindowOrphans } from "./windowOrphans";
@@ -50,13 +43,6 @@ let owner:
     }
   | undefined;
 let opening: { accountId: string; generation: number; task: Promise<void> } | undefined;
-let records: ProfileRecordsHandle | undefined;
-
-function openProfileRecords(seed?: Partial<Record<ProfileRecordCollection, SharedRecord[]>>) {
-  records?.stop();
-  records = startProfileRecords(seed);
-  return records;
-}
 
 export function closeNativeWorkspaceRecovery() {
   epoch++;
@@ -65,8 +51,6 @@ export function closeNativeWorkspaceRecovery() {
   opening = undefined;
   temporary?.unregister();
   temporary = undefined;
-  records?.stop();
-  records = undefined;
   useWorkspaceRecoveryState.setState({ ...closedRecoveryState });
 }
 export async function flushNativeWorkspace(accountId: string) {
@@ -102,8 +86,6 @@ export function continueWithTemporaryWorkspace(accountId: string, error: unknown
       baseline: partialWorkspaceStore(useWorkspaceStore.getState()),
       unregister: registerRecoveryFlush(async () => assertTemporarySaved()),
     };
-    // Bookmarks are the profile's and don't wait on this window's own saved tabs.
-    openProfileRecords();
   }
   useWorkspaceRecoveryState.setState({ accountId, usable: true, issue: failure(error) });
 }
@@ -200,9 +182,7 @@ async function restore(accountId: string, generation: number, keepLive: boolean)
       const changed =
         JSON.stringify(partialWorkspaceStore(live)) !== JSON.stringify(temporary.baseline);
       if (restored)
-        useWorkspaceStore.setState(
-          changed ? mergeRecoveredWorkspace(restored, live, temporary.baseline) : restored,
-        );
+        useWorkspaceStore.setState(changed ? mergeRecoveredWorkspace(restored, live) : restored);
       temporary.unregister();
       temporary = undefined;
     } else if (restored) {
@@ -210,17 +190,14 @@ async function restore(accountId: string, generation: number, keepLive: boolean)
     } else {
       useWorkspaceStore.getState().reset();
     }
-    // What this window held from before records were the profile's. A legacy record kept from
-    // an earlier start that couldn't write them gets another try.
-    let seedState: Parameters<typeof recordSeed>[0] = useWorkspaceStore.getState();
-    if (legacyRecord && legacyRecord !== persisted && !keepLive) {
-      try {
-        seedState = parseWorkspaceRecord(legacyRecord);
-      } catch {
-        // Nothing readable to bring over; its archived copy stays.
-      }
+    // A record from before windows had ids that this window's own record replaced: it held the
+    // first profile's bookmarks, which nothing reads now. Its exact text is kept too.
+    if (legacyRecord && legacyRecord !== persisted) {
+      const archive = await recoveryKey("archive", [legacyWorkspaceRecoveryKey, legacyRecord]);
+      await storage.load(archive);
+      storage.setItem(archive, legacyRecord);
+      if (!valid()) return;
     }
-    const handle = openProfileRecords(recordSeed(seedState));
     const writer = new WorkspaceRecoveryWriter(
       storage,
       key,
@@ -244,8 +221,8 @@ async function restore(accountId: string, generation: number, keepLive: boolean)
         for (const [source, raw] of sources) {
           if (localStorage.getItem(source) === raw) localStorage.removeItem(source);
         }
-        // The old record goes once its tabs are saved here and its bookmarks are the profile's.
-        if (legacyRecord && handle.seeded()) {
+        // The old record goes once its tabs are saved here.
+        if (legacyRecord) {
           legacyRecord = null;
           storage.setItem(legacyWorkspaceRecoveryKey, "");
           await storage.flush();
@@ -262,8 +239,6 @@ async function restore(accountId: string, generation: number, keepLive: boolean)
     const release = recovery.release;
     const stopOrphans = startWindowOrphans(storage, () => writer.flush(true));
     const stopTabs = startProfileTabs();
-    if (legacyRecord)
-      void handle.whenSeeded.then(() => (valid() ? flush().catch(() => undefined) : undefined));
     owner = {
       accountId,
       storage,

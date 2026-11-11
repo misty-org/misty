@@ -46,20 +46,14 @@ pub(in crate::browser) async fn inspect_browser(
         include_str!("../kiri_link/scripts/inspection_snapshot.js"),
         include_str!("../kiri_link/scripts/semantic_snapshot.js")
     );
-    let extension_id = request
+    if request
         .input
         .get("extensionId")
-        .and_then(super::super::extensions::agent_extension_id);
-    let raw = if let Some(extension) = extension_id.clone() {
-        super::super::extensions::agent_action("popup-evaluate", Some(extension), id, Some(script))
-            .await?["result"]
-            .clone()
-    } else {
-        eval_json(webview.clone(), script).await?
-    };
-    let extension_actions = super::super::extensions::agent_action("actions", None, id, None)
-        .await
-        .unwrap_or_else(|_| json!({"actions":[]}));
+        .is_some_and(|id| !id.is_null())
+    {
+        return Err("Extensions are not available.".into());
+    }
+    let raw = eval_json(webview.clone(), script).await?;
     if webview.url().map_err(|error| error.to_string())? != observed_url {
         return Err("browser_document_changed: inspect the current page again".into());
     }
@@ -85,13 +79,12 @@ pub(in crate::browser) async fn inspect_browser(
     {
         return Err("Browser inspection is not granted.".to_owned());
     }
-    session.snapshot_extension = extension_id.clone();
     let interactive = replace_snapshot_targets(session, snapshot.interactive);
     Ok(json!({
         "documentId": document_id,
         "url": observed_url.to_string(), "title": snapshot.title, "text": snapshot.text,
         "truncated": snapshot.truncated, "interactive": interactive, "semantic": snapshot.semantic,
-        "contentTrust": "untrusted-web-page", "target":target,"extensionId":extension_id,"extensions":extension_actions["actions"]
+        "contentTrust": "untrusted-web-page", "target":target
     }))
 }
 

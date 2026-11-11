@@ -1,5 +1,4 @@
 import { useSettingsStore } from "@/features/settings";
-import { isIncognitoWindow } from "@/features/app-windows";
 import { memoryApi } from "./api";
 import { recallSettings } from "./recallSettings";
 import { windowSpaceId } from "./windowSpace";
@@ -56,7 +55,6 @@ export async function writeMorningBrief(): Promise<string | null> {
     !settings.enabled ||
     !settings.morningBrief ||
     settings.pausedUntil > now.getTime() ||
-    isIncognitoWindow() ||
     now.getHours() < MORNING_STARTS
   )
     return null;

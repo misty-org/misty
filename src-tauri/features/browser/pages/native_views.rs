@@ -164,20 +164,19 @@ pub(in crate::browser) fn present_macos_webview(webview: &Webview) -> Result<(),
 /// it stopped. The page keeps its own caret while it is unfocused.
 #[tauri::command]
 pub fn browser_webview_restore_focus(
-    caller: Webview,
     app: AppHandle,
     request: BrowserWebviewIdRequest,
 ) -> Result<(), String> {
     let Some(webview) = app.get_webview(&webview_label(&request.id)?) else {
         return Ok(());
     };
-    if detached_from(&caller, &webview) {
-        return Ok(());
-    }
     #[cfg(windows)]
     return crate::browser::app_windows::windows::focus::restore_page(&webview);
     #[cfg(not(windows))]
-    Ok(())
+    {
+        let _ = webview;
+        Ok(())
+    }
 }
 
 /// Whether the page exists but is still parked for its first paint. The

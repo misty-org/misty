@@ -1,4 +1,3 @@
-//! Address bar search: a profile's search engines and suggestions.
+//! What is left of address bar search: the records the first profile is seeded with.
 
 pub mod profile;
-pub mod suggest;

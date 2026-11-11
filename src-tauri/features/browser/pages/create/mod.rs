@@ -33,10 +33,10 @@ pub async fn browser_webview_create(
     let owner = caller.window().label().to_owned();
     let profile =
         app_windows::profile_for_owner(&owner).ok_or("Only a profile's window can open pages.")?;
-    let incognito = app_windows::incognito_session(&owner)
-        .or_else(eval_ephemeral_session)
-        .map(|session| app_windows::incognito_store_id(&session));
-    request.private = incognito.is_some();
+    // No window is private. Only the eval bridge's test pages open in a temporary session.
+    let temporary =
+        eval_ephemeral_session().map(|session| app_windows::temporary_store_id(&session));
+    request.private = temporary.is_some();
     #[cfg(any(target_os = "macos", windows))]
     if !request.private {
         crate::sync::vault::site_data::prepare_page(&profile, &request.url).await;
@@ -44,9 +44,9 @@ pub async fn browser_webview_create(
     // Holds the account steady until the view has finished opening.
     let page_store = crate::browser::profiles::page_store(&profile).await?;
     trace_create("lease acquired");
-    // On Windows each store keeps its pages' data in its own folder, incognito included.
+    // On Windows each store keeps its pages' data in its own folder, temporary pages included.
     let window_store = page_store.store.clone();
-    // Incognito pages never bind a persistent store.
+    // Temporary pages never bind a persistent store.
     request.store_id = if request.private {
         None
     } else {
@@ -88,28 +88,19 @@ pub async fn browser_webview_create(
     record_request(&state, &request, &profile)?;
     let shortcut_token = shortcut_token_for(&state, &request.id)?;
     if let Some(webview) = app.get_webview(&label) {
-        return adopt_existing(
-            &app, &state, &window, webview, &request, &profile, position, size,
-        );
+        return adopt_existing(&app, &state, &window, webview, &request, position, size);
     }
 
     let page_app = app.clone();
     let page_id = request.id.clone();
-    let page_profile = profile.clone();
     let title_app = app.clone();
     let title_id = request.id.clone();
     let popup_app = app.clone();
     let popup_id = request.id.clone();
     let download_app = app.clone();
     let download_id = request.id.clone();
-    let replacing_extension_view =
-        super::super::extensions::pending_navigation(&profile, &request.id).await;
     let preview_only = request.preview_only;
-    let initial_url = if replacing_extension_view {
-        "about:blank".parse().map_err(|_| "Invalid bootstrap URL")?
-    } else {
-        external_url(&request.url)?
-    };
+    let initial_url = external_url(&request.url)?;
     let builder = with_store_data(
         WebviewBuilder::new(label, WebviewUrl::External(initial_url))
             .background_throttling(BackgroundThrottlingPolicy::Disabled),
@@ -129,34 +120,11 @@ pub async fn browser_webview_create(
     // page draws, so it would cover Misty's saved sign-ins (`PasswordFillMenu`).
     #[cfg(windows)]
     let builder = builder.general_autofill_enabled(false);
-    // An incognito view joins its profile's incognito session (see vendor/wry's
-    // MISTY-PATCH.md): the identifier names the session, never a persistent store.
-    let builder = match incognito {
+    // A temporary view joins the temporary session (see vendor/wry's MISTY-PATCH.md): the
+    // identifier names the session, never a persistent store.
+    let builder = match temporary {
         Some(session) => builder.incognito(true).data_store_identifier(session),
         None => builder.data_store_identifier(store_identifier),
-    };
-    // Incognito windows have no extension host.
-    #[cfg(target_os = "macos")]
-    let builder = if request.private {
-        builder
-    } else {
-        let pointer = super::super::extensions::native::configuration(
-            &app,
-            &profile,
-            store_identifier,
-            request.private,
-            request.url.clone(),
-        )
-        .await?;
-        if let Some(pointer) = pointer {
-            let configuration = unsafe {
-                objc2::rc::Retained::from_raw(pointer as *mut objc2_web_kit::WKWebViewConfiguration)
-            }
-            .ok_or("Could not create extension-aware browser configuration.")?;
-            builder.with_webview_configuration(configuration)
-        } else {
-            builder
-        }
     };
     // Bare WKWebView omits Safari's Version/Safari tokens, which makes sites
     // such as Google serve their legacy compatibility UI. Derive the desktop
@@ -202,7 +170,6 @@ pub async fn browser_webview_create(
         .initialization_script(kiri::page_script())
         .initialization_script(crate::browser::agent_pages::page_tools::media_tools::session::MEDIA_SESSION_PAGE_SCRIPT)
         .on_navigation(move |url| {
-            if replacing_extension_view && url.as_str() == "about:blank" { return true; }
             // Misty's page scripts report over Kiri's host channel, never by
             // navigating, so every non-web scheme is refused here. This
             // callback includes frames, redirects and POST submissions.
@@ -215,7 +182,7 @@ pub async fn browser_webview_create(
         })
         .on_page_load(move |webview, payload| {
             if preview_only { return; }
-            page_load(&page_app, &page_profile, &page_id, replacing_extension_view, webview, payload);
+            page_load(&page_app, &page_id, webview, payload);
         })
         .on_document_title_changed(move |webview, title| {
             if preview_only { return; }
@@ -258,15 +225,6 @@ pub async fn browser_webview_create(
             return Err(error.to_string());
         }
     };
-    if !preview_only {
-        super::super::extensions::native::register(
-            &webview,
-            &profile,
-            &request.id,
-            request.private,
-            &request.url,
-        );
-    }
     crate::browser::kiri_link::host_messages::install(&webview)?;
     if !preview_only {
         crate::browser::agent_pages::frames::install(&webview)?;

@@ -148,17 +148,12 @@ permissions = [
   "allow-browser-context-menu-select",
   "allow-browser-tab-download-open",
   "allow-browser-downloads-remove",
-  "allow-browser-page-state-capture",
-  "allow-browser-page-state-restore",
-  "allow-browser-profile-search",
   "allow-browser-retired-profiles-erase",
   "allow-browser-runtime-for-scope",
-  "allow-browser-search-suggest",
   "allow-browser-choose-download-directory",
   "allow-browser-set-download-directory",
   "allow-browser-set-download-prompt",
   "allow-browser-set-hidden-tab-sleep",
-  "allow-browser-set-mouse-gestures",
   "allow-browser-set-night-light",
   "allow-browser-set-site-styles",
   "allow-browser-set-site-zoom-levels",
@@ -169,33 +164,22 @@ permissions = [
   "allow-browser-site-permissions-list",
   "allow-browser-site-permissions-reset",
   "allow-browser-site-permissions-set",
-  "allow-browser-view-history-load",
-  "allow-browser-view-history-save",
   "allow-browser-webview-await-load",
   "allow-browser-webview-back",
   "allow-browser-webview-close",
   "allow-browser-webview-context-menu-at",
   "allow-browser-webview-create",
-  "allow-browser-webview-developer-tools",
-  "allow-browser-webview-find",
   "allow-browser-webview-forward",
   "allow-browser-webview-held",
   "allow-browser-webview-hide",
-  "allow-browser-webview-media-action",
-  "allow-browser-webview-media-context",
-  "allow-browser-webview-media-info",
-  "allow-browser-webview-media-playback",
   "allow-browser-webview-navigate",
   "allow-browser-webview-pick-element",
   "allow-browser-webview-picture",
-  "allow-browser-webview-picture-in-picture",
   "allow-browser-webview-preview-document",
-  "allow-browser-webview-print",
   "allow-browser-webview-reader-article",
   "allow-browser-webview-reconcile",
   "allow-browser-webview-reload",
   "allow-browser-webview-restore-focus",
-  "allow-browser-webview-save-page",
   "allow-browser-webview-set-bounds",
   "allow-browser-webview-set-media-hold",
   "allow-browser-webview-set-muted",
@@ -276,29 +260,6 @@ permissions = [
 ]
 
 [[set]]
-identifier = "action-extension-popup"
-description = "Open an extension's popup"
-permissions = [
-  "allow-extension-popup-close",
-  "allow-extension-popup-open",
-]
-
-[[set]]
-identifier = "action-extensions"
-description = "Install and manage extensions"
-permissions = [
-  "allow-extensions-action",
-  "allow-extensions-check-updates",
-  "allow-extensions-commit",
-  "allow-extensions-compat",
-  "allow-extensions-layout",
-  "allow-extensions-prepare",
-  "allow-extensions-reconcile",
-  "allow-extensions-respond",
-  "allow-extensions-tab-created",
-]
-
-[[set]]
 identifier = "action-misty-screen"
 description = "The agent's view of the screen"
 permissions = [
@@ -327,7 +288,6 @@ description = "Browser profiles"
 permissions = [
   "allow-profile-create",
   "allow-profile-delete",
-  "allow-profile-incognito-open",
   "allow-profile-open",
   "allow-profile-rename",
   "allow-profile-set-color",
@@ -340,21 +300,6 @@ permissions = [
   "allow-profile-window-new",
   "allow-profile-window-set-space",
   "allow-profile-window-take-orphans",
-]
-
-[[set]]
-identifier = "action-profile-extensions"
-description = "A profile's extensions"
-permissions = [
-  "allow-profile-extensions-list",
-]
-
-[[set]]
-identifier = "action-profile-records"
-description = "A profile's synced records"
-permissions = [
-  "allow-profile-records-list",
-  "allow-profile-records-write",
 ]
 
 [[set]]
@@ -442,11 +387,21 @@ description = "Agent engines, a Space's linked project folders, and the files, c
 permissions = [
   "allow-engine-models",
   "allow-engines-list",
+  "allow-multirun-changes",
+  "allow-multirun-check",
+  "allow-multirun-discard",
+  "allow-multirun-keep",
+  "allow-multirun-list",
+  "allow-multirun-start",
   "allow-project-git-commit",
   "allow-project-git-diff",
   "allow-project-git-stage",
   "allow-project-git-status",
   "allow-project-list-dir",
+  "allow-project-preview-cancel-pick",
+  "allow-project-preview-pick",
+  "allow-project-preview-reachable",
+  "allow-project-preview-watch",
   "allow-project-read-file",
   "allow-project-terminal-close",
   "allow-project-terminal-open",

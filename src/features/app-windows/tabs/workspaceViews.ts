@@ -1,12 +1,8 @@
 import type { WindowColor } from "../profiles/windowColors";
 import type { DockingLayout } from "@/app/shell/dockingLayout";
 import { browserHomeUrl } from "../addresses/browserHome";
-export * from "../addresses/browserSearchEngine";
-import { blankBrowserUrl } from "../addresses/browserUrl";
 
 export { blankBrowserUrl } from "../addresses/browserUrl";
-export * from "../addresses/browserInternalUrl";
-import { browserInternalPage, browserInternalPages } from "../addresses/browserInternalUrl";
 export {
   browserHomeUrl,
   defaultBrowserHomeUrl,
@@ -57,47 +53,6 @@ export function parseBrowserViewState(value: unknown): BrowserViewState {
         ? bookmarkId
         : undefined,
   };
-}
-
-function isPlaceholderBrowserTitle(title?: string): boolean {
-  if (!title) return true;
-  const normalized = title.trim().toLowerCase();
-  if (!normalized) return true;
-  return (
-    normalized === "loading" ||
-    normalized.startsWith("loading...") ||
-    normalized.startsWith("loading…") ||
-    normalized.startsWith("loading -") ||
-    normalized.startsWith("loading —") ||
-    normalized === "please wait" ||
-    normalized.startsWith("please wait...") ||
-    normalized.startsWith("please wait…") ||
-    normalized === "untitled" ||
-    normalized === "untitled document" ||
-    normalized === "about:blank"
-  );
-}
-
-export function sanitizeBrowserTitle(title?: string, url?: string): string {
-  const trimmed = title?.trim();
-  if (trimmed && !isPlaceholderBrowserTitle(trimmed)) {
-    return trimmed;
-  }
-  return url ? browserViewTitle(url) : "New Tab";
-}
-
-export function browserViewTitle(url: string): string {
-  if (url === blankBrowserUrl) return "New Tab";
-  const internal = browserInternalPage(url);
-  if (internal) return browserInternalPages[internal].title;
-  try {
-    const parsed = new URL(url);
-    const query = parsed.searchParams.get("q");
-    if (query) return query;
-    return parsed.hostname.replace(/^www\./, "") || "New Tab";
-  } catch {
-    return "New Tab";
-  }
 }
 
 function browserFaviconUrl(value: string): string | null {
@@ -168,10 +123,6 @@ export interface WorkspaceLayout {
 
 /** A window tab owns a split tree; each leaf contains one app view. */
 export interface WorkspaceTab {
-  /** Chrome-style grouping of visible layout tabs, independent of pane identities. */
-  tabGroupId?: string;
-  /** Pinned tabs sit first and return to this page when closed. */
-  pinnedUrl?: string;
   id: string;
   /** Legacy native aliases are resolved after account preferences load. */
   legacyNameKeys?: string[];

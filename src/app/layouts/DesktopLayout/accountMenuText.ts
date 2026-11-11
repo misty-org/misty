@@ -17,12 +17,12 @@ export function emailName(email: string): string | null {
 }
 
 export function settingsFallbackRoute(previousRoute: string, rememberedRoute: string): string {
-  const candidates = [previousRoute, rememberedRoute, "/browser"];
+  const candidates = [previousRoute, rememberedRoute, "/agents"];
   return (
     candidates.find((route) => {
       if (!route || route.startsWith("/settings")) return false;
       if (route === "/account") return false;
       return isRememberableAppRoute(route);
-    }) ?? "/browser"
+    }) ?? "/agents"
   );
 }

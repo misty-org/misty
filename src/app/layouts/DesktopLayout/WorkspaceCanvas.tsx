@@ -14,13 +14,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { WorkspaceDockTree } from "./WorkspaceDockTree";
 import { SidebarDrawer } from "./SidebarDrawer";
 import { WorkspaceSidebar } from "./WorkspaceSidebar";
-import { closeSavedWebPages, watchForWebPages } from "./spaceNavigation";
-import { openUrl } from "@tauri-apps/plugin-opener";
-import {
-  resetPinnedTabForView,
-  useClearTabsShortcut,
-  usePinTabShortcut,
-} from "./usePinTabShortcut";
+import { useClearTabsShortcut } from "./useClearTabsShortcut";
 import { WorkspaceTabPanels } from "./WorkspaceTabPanels";
 import { TopEdge } from "./TopEdge";
 import { LayoutPopup } from "./LayoutPopup";
@@ -77,32 +71,17 @@ export function WorkspaceCanvas(props: {
       navigate(route, { replace: true });
   }, [location.pathname, location.search, navigate]);
 
-  // Once per window: the web pages saved from before the sidebar stopped listing tabs go.
-  const clearedSavedPages = useRef(false);
+  // Once per window: a saved window loads without the web pages it held, so the address may
+  // name one. With pages left, the address follows the one now in front. With none, a window
+  // that was on a web page opens Agents; any other address opens its own page.
+  const followedSavedPages = useRef(false);
   useEffect(() => {
-    if (clearedSavedPages.current) return;
-    clearedSavedPages.current = true;
-    closeSavedWebPages();
-    // With pages left, the address follows the one now in front. With none, a window that
-    // was on a web page opens Agents; any other address opens its own page.
+    if (followedSavedPages.current) return;
+    followedSavedPages.current = true;
     if (allLayoutViews(useWorkspaceStore.getState().layout).length) navigateToActiveLayoutTab();
     else if ([routes.browser, routes.newTab].includes(location.pathname as never))
       navigate(routes.agents, { replace: true });
   }, [location.pathname, navigate, navigateToActiveLayoutTab]);
-
-  // While the window is open, a web page that lands in a pane leaves for the person's browser.
-  const showActive = useRef(navigateToActiveLayoutTab);
-  useEffect(() => {
-    showActive.current = navigateToActiveLayoutTab;
-  }, [navigateToActiveLayoutTab]);
-  useEffect(
-    () =>
-      watchForWebPages(
-        () => window.setTimeout(() => showActive.current(), 0),
-        (url) => void openUrl(url).catch(() => undefined),
-      ),
-    [],
-  );
 
   useEffect(() => {
     window.addEventListener("misty:workspace-projection-applied", navigateToActiveLayoutTab);
@@ -130,14 +109,12 @@ export function WorkspaceCanvas(props: {
 
   const closeWorkspaceTab = useCallback(
     (tab: WorkspaceView) => {
-      if (resetPinnedTabForView(tab.id)) return;
       if (closeTab(tab.id)) navigateToActiveLayoutTab();
     },
     [closeTab, navigateToActiveLayoutTab],
   );
 
   useWorkspaceTabShortcuts(navigateToActiveLayoutTab);
-  usePinTabShortcut();
   useClearTabsShortcut();
   useWorkspaceCanvasShortcuts({ openTab, splitWorkspacePane });
 

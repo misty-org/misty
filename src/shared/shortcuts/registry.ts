@@ -4,31 +4,11 @@ import type {
   ShortcutPlatform,
 } from "./shortcutTypes";
 import { command } from "./factory";
-import { focusModeCommands } from "./browserFeatureCommands";
-import { browserCommands } from "./browserCommands";
+import { focusModeCommands } from "./viewAndTabCommands";
+import { libraryCommands } from "./libraryCommands";
 import { workspaceCommands } from "./workspaceCommands";
 export type * from "./shortcutTypes";
 const shellCommands: ShortcutCommandDefinition[] = [
-  command("search.toggle", "New tab", {
-    description:
-      "Open a new tab: open an address, search the web, ask an agent or jump to any page. Type @ to pick an agent.",
-    category: "Navigation",
-    aliases: ["new tab", "search", "url", "website", "google", "ask", "agent"],
-    mac: "Cmd+T",
-    windows: "Ctrl+T",
-    allowInEditable: true,
-    nativeMenu: true,
-    allowShadowing: true,
-  }),
-  command("browser.edit_address", "Edit current address", {
-    description: "Reveal the focused website’s address for navigation.",
-    category: "Navigation",
-    scope: "tool:browser",
-    mac: "Cmd+L",
-    windows: "Ctrl+L",
-    allowInEditable: true,
-    allowShadowing: true,
-  }),
   command("misty.contextual_companion", "Toggle chat panel", {
     description: "Open or close the chat panel beside the page.",
     category: "Misty",
@@ -49,23 +29,22 @@ const shellCommands: ShortcutCommandDefinition[] = [
     nativeMenu: true,
   }),
   command("account.sign_in", "Sign in", {
-    description: "Sign in to sync, share Spaces and use agents. Browsing works without an account.",
+    description: "Sign in to sync, share Spaces and use agents.",
     category: "Misty",
     aliases: ["log in", "account", "create account"],
     allowInEditable: true,
     nativeMenu: true,
   }),
   command("account.sign_out", "Sign out", {
-    description: "Sign out of Misty and keep browsing on this computer.",
+    description: "Sign out of Misty on this computer.",
     category: "Misty",
     aliases: ["log out", "account"],
     allowInEditable: true,
     nativeMenu: true,
   }),
   ...focusModeCommands,
-  // Cmd/Ctrl with +, - and 0 zooms the page (browser.zoom_*); the app's own scale adds Shift.
   command("app.zoom_in", "Scale app up", {
-    description: "Make Misty's own interface larger. Pages zoom with Cmd/Ctrl + without Shift.",
+    description: "Make Misty's own interface larger.",
     category: "View",
     mac: "Cmd+Shift+Plus",
     macAlternate: "Ctrl+Shift+Plus",
@@ -95,10 +74,7 @@ const shellCommands: ShortcutCommandDefinition[] = [
   }),
 ];
 
-// Each tool keeps its Cmd/Ctrl+Shift number from when there were more tools.
-const toolSlots = [["browser", "Browser", 6]] as const;
-
-/** The Space home's tabs, on ⌘1 to ⌘4 while a Space is focused (browser tabs elsewhere). */
+/** The Space home's tabs, on ⌘1 to ⌘4 while a Space is focused (window tabs elsewhere). */
 const spaceSections = ["Home", "Notes", "Drawings", "Files"] as const;
 
 const tabAndToolCommands = [
@@ -131,24 +107,13 @@ const tabAndToolCommands = [
       },
     ),
   ),
-  ...toolSlots.map(([id, label, slot]) =>
-    command(`tool.${id}`, `Open or focus ${label}`, {
-      description: `Focus the last ${label} tab or open one in the focused pane.`,
-      category: "Tools",
-      scope: "workspace",
-      aliases: ["jump", "switch tool", label.toLowerCase()],
-      mac: `Cmd+Shift+${slot}`,
-      windows: `Ctrl+Shift+${slot}`,
-      allowInEditable: true,
-    }),
-  ),
 ];
 
 export const shortcutCommandRegistry: ShortcutCommandDefinition[] = [
   ...shellCommands,
   ...workspaceCommands,
   ...tabAndToolCommands,
-  ...browserCommands,
+  ...libraryCommands,
 ];
 
 export const shortcutCommandsById = new Map(

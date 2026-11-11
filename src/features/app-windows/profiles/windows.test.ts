@@ -7,6 +7,7 @@ import { followSpaceWindow, spaceWindow } from "../tabs/spaceWindow";
 import { parseWorkspaceRecord } from "../tabs/workspaceRecord";
 import { migrateWorkspaceStore, partialWorkspaceStore } from "../tabs/workspaceStorePersistence";
 import { allLayoutViews } from "../panes/layoutTabs";
+import { openPage } from "@/tests/workspacePage";
 
 describe("a window of one profile", () => {
   beforeEach(() => {
@@ -23,7 +24,7 @@ describe("a window of one profile", () => {
 
   it("keeps the window's identity through a save and restore", () => {
     const id = useWorkspaceStore.getState().activeWindowId;
-    const tab = useWorkspaceStore.getState().openBrowserView({ url: "https://example.com" });
+    const tab = openPage(useWorkspaceStore.getState(), { url: "https://example.com" });
     const saved = JSON.stringify(partialWorkspaceStore(useWorkspaceStore.getState()));
     useWorkspaceStore.getState().reset();
     useWorkspaceStore.setState(parseWorkspaceRecord(saved));
@@ -150,7 +151,7 @@ describe("switching a window's Space", () => {
   });
 
   it("never touches tabs", () => {
-    const tab = useWorkspaceStore.getState().openBrowserView({ url: "https://personal.example" });
+    const tab = openPage(useWorkspaceStore.getState(), { url: "https://personal.example" });
     const before = useWorkspaceStore.getState().layout;
     const windowId = useWorkspaceStore.getState().activeWindowId;
     followSpaceWindow(workKey);
@@ -163,7 +164,7 @@ describe("switching a window's Space", () => {
   });
 
   it("saves one layout, with nothing per Space", () => {
-    const tab = useWorkspaceStore.getState().openBrowserView({ url: "https://personal.example" });
+    const tab = openPage(useWorkspaceStore.getState(), { url: "https://personal.example" });
     const saved = JSON.parse(JSON.stringify(partialWorkspaceStore(useWorkspaceStore.getState())));
     expect("layoutsByScope" in saved).toBe(false);
     const restored = migrateWorkspaceStore(saved, 0);
@@ -201,7 +202,6 @@ describe("switching a window's Space", () => {
       17,
     );
     expect(allLayoutViews(migrated.layout).map((view) => view.id)).toEqual(["own-tab"]);
-    expect(migrated.tabGroups.map((group) => group.id)).toEqual(["own"]);
-    expect("scopeKey" in migrated.tabGroups[0]).toBe(false);
+    expect("tabGroups" in migrated).toBe(false);
   });
 });

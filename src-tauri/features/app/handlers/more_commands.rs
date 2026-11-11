@@ -99,7 +99,6 @@ macro_rules! with_more_commands {
             #[cfg(desktop)]
             crate::browser::commands::browser_set_site_styles,
             #[cfg(desktop)]
-            #[cfg(desktop)]
             crate::browser::commands::browser_webview_pick_element,
             #[cfg(desktop)]
             crate::browser::commands::browser_set_night_light,
@@ -124,14 +123,6 @@ macro_rules! with_more_commands {
             #[cfg(desktop)]
             crate::browser::commands::browser_webview_stop,
             #[cfg(desktop)]
-            crate::browser::commands::browser_webview_find,
-            #[cfg(desktop)]
-            crate::browser::commands::browser_webview_print,
-            #[cfg(desktop)]
-            crate::browser::commands::browser_webview_save_page,
-            #[cfg(desktop)]
-            crate::browser::commands::browser_webview_developer_tools,
-            #[cfg(desktop)]
             crate::browser::commands::browser_clear_website_data,
             #[cfg(desktop)]
             crate::browser::commands::browser_choose_download_directory,
@@ -142,13 +133,6 @@ macro_rules! with_more_commands {
             crate::browser::commands::browser_webview_set_muted,
             #[cfg(desktop)]
             crate::browser::commands::browser_webview_set_media_hold,
-            #[cfg(desktop)]
-            crate::browser::commands::browser_webview_picture_in_picture,
-            #[cfg(desktop)]
-            crate::browser::commands::browser_webview_media_playback,
-            crate::browser::commands::browser_webview_media_action,
-            crate::browser::commands::browser_webview_media_info,
-            crate::browser::commands::browser_webview_media_context,
             #[cfg(desktop)]
             crate::browser::commands::browser_webview_reader_article,
             #[cfg(desktop)]
@@ -161,7 +145,6 @@ macro_rules! with_more_commands {
             crate::browser::commands::profile_delete,
             crate::browser::commands::profile_open,
             crate::browser::commands::profile_window_new,
-            crate::browser::commands::profile_incognito_open,
             crate::browser::commands::profile_window_close,
             crate::browser::commands::profile_window_take_orphans,
             crate::browser::commands::profile_window_set_space,
@@ -169,9 +152,6 @@ macro_rules! with_more_commands {
             crate::browser::commands::profile_window_link_target,
             crate::browser::commands::profile_sites,
             crate::browser::commands::profile_set_sites,
-            crate::browser::commands::profile_records_list,
-            crate::browser::commands::profile_records_write,
-            crate::browser::commands::profile_extensions_list,
             crate::browser::commands::profile_tabs_sync,
             crate::browser::commands::profile_tabs_publish,
             crate::sync::commands::vault_state,
@@ -188,13 +168,9 @@ macro_rules! with_more_commands {
             crate::sync::commands::vault_remove_session,
             crate::sync::commands::vault_usage,
             #[cfg(desktop)]
-            crate::browser::commands::browser_set_mouse_gestures,
-            #[cfg(desktop)]
             crate::voice::commands::global_hotkey_signed_out,
             #[cfg(desktop)]
             crate::browser::commands::browser_history_clear,
-            crate::browser::commands::browser_search_suggest,
-            crate::browser::commands::browser_profile_search,
             crate::browser::commands::browser_tab_download_open,
             #[cfg(desktop)]
             crate::browser::commands::browser_downloads_remove,
@@ -271,6 +247,12 @@ macro_rules! with_more_commands {
             crate::engines::connections::space_connection_list,
             crate::engines::connections::space_connection_create,
             crate::engines::connections::space_connection_revoke,
+            crate::engines::multirun::multirun_check,
+            crate::engines::multirun::multirun_start,
+            crate::engines::multirun::multirun_list,
+            crate::engines::multirun::multirun_changes,
+            crate::engines::multirun::multirun_keep,
+            crate::engines::multirun::multirun_discard,
             crate::project::files::project_list_dir,
             crate::project::files::project_read_file,
             crate::project::files::project_write_file,
@@ -282,6 +264,10 @@ macro_rules! with_more_commands {
             crate::project::terminal::project_terminal_write,
             crate::project::terminal::project_terminal_resize,
             crate::project::terminal::project_terminal_close,
+            crate::project::preview::project_preview_reachable,
+            crate::project::preview::project_preview_watch,
+            crate::project::preview::project_preview_pick,
+            crate::project::preview::project_preview_cancel_pick,
         ]
     };
 }

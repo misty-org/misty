@@ -62,21 +62,6 @@ pub(crate) async fn evaluate_browser_async_javascript(
         .map_err(|_| "Browser capture was canceled.".to_owned())?
 }
 
-/// Runs `function_body` in Misty's page-state content world: it shares the
-/// DOM with the page but not its JavaScript, so page scripts cannot observe
-/// or tamper with it. The world is retained so its globals persist per page.
-#[cfg(any(target_os = "macos", windows))]
-pub(crate) async fn evaluate_isolated_javascript(
-    webview: Webview,
-    function_body: String,
-) -> Result<String, String> {
-    crate::browser::pages::content_world::evaluate_in_content_world(
-        webview,
-        "misty-page-state",
-        function_body,
-    )
-    .await
-}
 /// Runs `function_body` as an async function in the page's own world and
 /// returns the string it resolves to, as WebKit's callAsyncJavaScript does.
 #[cfg(windows)]

@@ -19,38 +19,20 @@ pub async fn browser_webview_reload(
 
 #[tauri::command]
 pub fn browser_webview_show(
-    caller: Webview,
     app: AppHandle,
     request: BrowserWebviewIdRequest,
 ) -> Result<(), String> {
-    let space = super::super::super::extensions::native::page_profile(&app, &request.id);
-    super::super::super::extensions::native::tab_event(
-        &app,
-        space.as_deref(),
-        &request.id,
-        "activate",
-    );
-    with_webview(&app, &request.id, |webview| {
-        if detached_from(&caller, &webview) {
-            return Ok(());
-        }
-        present_macos_webview(&webview)
-    })
+    with_webview(&app, &request.id, |webview| present_macos_webview(&webview))
 }
 
 #[tauri::command]
 pub fn browser_webview_hide(
-    caller: Webview,
     app: AppHandle,
     request: BrowserWebviewHideRequest,
 ) -> Result<(), String> {
     let Some(webview) = app.get_webview(&webview_label(&request.id)?) else {
         return Ok(());
     };
-    // A hidden page stops painting; the agent's own window keeps it shown.
-    if detached_from(&caller, &webview) {
-        return Ok(());
-    }
     // Switching tabs on Windows keeps the page in place beneath the renderer
     // (see `stacked_pages`). WebView2 drops its render surface when hidden and
     // paints its default color until the first new frame, and a page moved

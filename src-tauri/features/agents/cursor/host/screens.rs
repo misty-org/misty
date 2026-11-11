@@ -5,11 +5,10 @@ use super::{platform, Display};
 fn contains(d: &Display, p: (f64, f64)) -> bool {
     p.0 >= d.x && p.0 < d.x + d.width && p.1 >= d.y && p.1 < d.y + d.height
 }
-/// Misty windows a person works in: app windows and extension popups. The
-/// companion, its overlays and other panels are never "in front".
+/// Misty windows a person works in: app windows. The companion, its overlays
+/// and other panels are never "in front".
 pub(super) fn person_works_in(label: &str) -> bool {
     crate::browser::app_windows::is_app_window(label)
-        || label.starts_with(crate::browser::extensions::popup::POPUP_PREFIX)
 }
 #[cfg(windows)]
 pub(super) fn native_handle(window: &tauri::WebviewWindow) -> Option<isize> {

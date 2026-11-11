@@ -1,7 +1,6 @@
 import { dockTreeViews } from "../panes/dockTree";
 import { activateTab, isEmptyTab, layoutTabs } from "../panes/layoutTabs";
 import type { WorkspaceLayout, WorkspaceTab } from "./workspaceViews";
-import { contiguousTabs } from "../tab-groups/tabGroups";
 import type { WorkspaceStore } from "./useWorkspaceStore";
 import { normalizeWorkspaceLayout } from "../profiles/windows";
 
@@ -20,8 +19,8 @@ export function isUntouched(layout: WorkspaceLayout): boolean {
  * one was instead. Nothing a closed window held is dropped except its unused new tabs.
  */
 export function adoptWindowTabs(
-  current: Pick<WorkspaceStore, "layout" | "tabGroups" | "closedItems">,
-  closed: Partial<Pick<WorkspaceStore, "layout" | "tabGroups" | "closedItems">>,
+  current: Pick<WorkspaceStore, "layout" | "closedItems">,
+  closed: Partial<Pick<WorkspaceStore, "layout" | "closedItems">>,
 ): Partial<WorkspaceStore> {
   const held = new Set(layoutTabs(current.layout).map((tab) => tab.id));
   const incoming = closed.layout
@@ -36,18 +35,8 @@ export function adoptWindowTabs(
   const active = replace
     ? (incoming.find((tab) => tab.id === closed.layout?.activeTabId) ?? incoming[0]).id
     : (current.layout.activeTabId ?? tabs[0].id);
-  const groups = new Set(incoming.flatMap((tab) => (tab.tabGroupId ? [tab.tabGroupId] : [])));
-  const known = new Set(current.tabGroups.map((group) => group.id));
   return {
-    layout: normalizeWorkspaceLayout(
-      activateTab({ ...current.layout, tabs: contiguousTabs(tabs) }, active),
-    ),
+    layout: normalizeWorkspaceLayout(activateTab({ ...current.layout, tabs }, active)),
     closedItems,
-    tabGroups: [
-      ...current.tabGroups,
-      ...(closed.tabGroups ?? []).filter(
-        (group) => groups.has(group.id) && !group.savedTabs && !known.has(group.id),
-      ),
-    ],
   };
 }

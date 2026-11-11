@@ -12,9 +12,8 @@ fn window(profile: &str) -> WindowState {
 
 #[test]
 fn labels_name_a_window_and_its_profile_is_kept_natively() {
-    let label = new_label(false);
+    let label = new_label();
     assert!(is_person_window(&label));
-    assert!(!is_incognito_window(&label));
     // A window has no profile until it is given one.
     assert_eq!(profile_for_window(&label), None);
     set_current(&label, window(PERSONAL));
@@ -39,39 +38,6 @@ fn labels_name_a_window_and_its_profile_is_kept_natively() {
         assert_eq!(profile_for_window(unknown), None, "{unknown}");
         assert!(!is_app_window(unknown), "{unknown}");
     }
-}
-
-#[test]
-fn incognito_windows_belong_to_a_profile_without_its_trust() {
-    let label = new_label(true);
-    assert!(label.starts_with("incognito-"));
-    set_current(&label, window(PERSONAL));
-    assert_eq!(
-        parse(&label),
-        Some(ProfileWindow {
-            profile: PERSONAL.into(),
-            incognito: true
-        })
-    );
-    assert!(is_app_window(&label));
-    assert!(is_incognito_window(&label));
-    assert!(!is_person_window(&label));
-    forget_current(&label);
-}
-
-#[test]
-fn a_profiles_incognito_windows_share_a_session_until_the_last_closes() {
-    let mut state = Registry::default();
-    join_incognito(&mut state, PERSONAL, "incognito-1");
-    join_incognito(&mut state, PERSONAL, "incognito-2");
-    let personal = state.incognito[PERSONAL].session.clone();
-    assert_eq!(leave_incognito(&mut state, PERSONAL, "incognito-1"), None);
-    join_incognito(&mut state, ID, "incognito-1");
-    assert_ne!(state.incognito[ID].session, personal);
-    assert_eq!(
-        leave_incognito(&mut state, PERSONAL, "incognito-2"),
-        Some(personal)
-    );
 }
 
 #[test]

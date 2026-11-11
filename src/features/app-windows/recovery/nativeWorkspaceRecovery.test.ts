@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { openPage } from "@/tests/workspacePage";
 const native = vi.hoisted(() => ({
   invoke: vi.fn(),
   generation: 1,
@@ -66,8 +67,6 @@ beforeEach(() => {
       },
     ) => {
       if (command === "profile_window_take_orphans") return [];
-      if (command === "profile_records_list") return [];
-      if (command === "profile_records_write") return [];
       if (command === "profile_window_info") return null;
       if (command === "browser_recovery_open") {
         if (native.failRead) throw new Error("Keychain unavailable");
@@ -151,7 +150,7 @@ it("migrates the owned latest global layout, archives account/legacy copies, the
   const h = await context();
   const browserWrite = vi.spyOn(localStorage, "setItem");
   await h.restoreNativeWorkspace("a");
-  expect(h.workspace.getState().bookmarkFolders[0].fields.label).toBe("Latest");
+  expect("bookmarkFolders" in h.workspace.getState()).toBe(false);
   expect(h.useWorkspaceRecoveryState.getState()).toMatchObject({
     accountId: "a",
     ready: true,
@@ -176,22 +175,16 @@ it("preserves browser originals on failed native writes and can retry without re
   expect(localStorage.getItem("misty:workspace-account:a")).toBe(raw);
   expect(h.useWorkspaceRecoveryState.getState().ready).toBe(false);
   expect(h.useWorkspaceRecoveryState.getState().usable).toBe(true);
-  expect(h.workspace.getState().bookmarkFolders[0].fields.label).toBe("Recover me");
-  const tab = h.workspace.getState().openBrowserView({
-    url: "https://new.example",
-  });
+  const tab = openPage(h.workspace.getState(), { url: "https://new.example" });
   native.fail = false;
   await h.restoreNativeWorkspace("a");
-  expect(h.workspace.getState().bookmarkFolders[0].fields.label).toBe("Recover me");
   expect(localStorage.getItem("misty:workspace-account:a")).toBeNull();
   expect(JSON.stringify(h.workspace.getState().layout)).toContain(tab.id);
 });
 it("keeps temporary tabs selected while restoring old windows after an unreadable store recovers", async () => {
   const h = await context();
   await h.restoreNativeWorkspace("a");
-  const saved = h.workspace.getState().openBrowserView({
-    url: "https://saved.example",
-  });
+  const saved = openPage(h.workspace.getState(), { url: "https://saved.example" });
   await h.flushNativeWorkspace("a");
   h.closeNativeWorkspaceRecovery();
   native.failRead = true;
@@ -200,9 +193,7 @@ it("keeps temporary tabs selected while restoring old windows after an unreadabl
     usable: true,
     ready: false,
   });
-  const added = h.workspace.getState().openBrowserView({
-    url: "https://temporary.example",
-  });
+  const added = openPage(h.workspace.getState(), { url: "https://temporary.example" });
   const active = h.workspace.getState().activeWindowId;
   await expect(h.flushNativeWorkspace("a")).rejects.toThrow("unsaved changes");
   await h.restoreNativeWorkspace("a");
@@ -221,9 +212,7 @@ it("keeps temporary tabs selected while restoring old windows after an unreadabl
 it("does not expose a previous account when recovery fails for the next account", async () => {
   const h = await context();
   await h.restoreNativeWorkspace("a");
-  h.workspace.getState().openBrowserView({
-    url: "https://private.example",
-  });
+  openPage(h.workspace.getState(), { url: "https://private.example" });
   await h.flushNativeWorkspace("a");
   h.closeNativeWorkspaceRecovery();
   native.generation++;
@@ -254,11 +243,7 @@ it("does not import an unowned global layout into a newly signed-in account", as
   );
   localStorage.setItem("misty:active-account-id", "b");
   await h.restoreNativeWorkspace("b");
-  expect(
-    h.workspace
-      .getState()
-      .bookmarkFolders.some((group) => group.fields.label === "Private old layout"),
-  ).toBe(false);
+  expect(JSON.stringify(h.workspace.getState())).not.toContain("Private old layout");
   expect(localStorage.getItem("misty:desktop-dock:space-apps-v1")).toBe(raw);
 });
 it("discards a late hydration from the previous account without clearing the new one", async () => {
@@ -291,22 +276,14 @@ it("coalesces resize bursts and persists a continuous burst within two seconds",
   vi.useFakeTimers();
   native.invoke.mockClear();
   for (let i = 0; i < 50; i++)
-    h.workspace.setState({
-      selectedBookmarkByFolder: {
-        saved: `site-${i}`,
-      },
-    });
+    h.workspace.setState({ lastUsedViewByGroup: { "tool:agents": `view-${i}` } });
   await vi.advanceTimersByTimeAsync(400);
   expect(
     native.invoke.mock.calls.filter(([command]) => command === "browser_recovery_write"),
   ).toHaveLength(1);
   native.invoke.mockClear();
   for (let i = 0; i < 10; i++) {
-    h.workspace.setState({
-      selectedBookmarkByFolder: {
-        saved: `later-${i}`,
-      },
-    });
+    h.workspace.setState({ lastUsedViewByGroup: { "tool:agents": `later-${i}` } });
     await vi.advanceTimersByTimeAsync(200);
   }
   expect(
@@ -331,7 +308,7 @@ it("restores what it can from an unreadable save and lists the rest, keeping the
   const archived = [...native.values].filter(([id]) => id.startsWith("a:archive:"));
   expect(archived.map(([, record]) => record.value)).toContain("{not a workspace");
   // The fresh workspace saves normally over the unreadable copy.
-  const tab = h.workspace.getState().openBrowserView({ url: "https://after.example" });
+  const tab = openPage(h.workspace.getState(), { url: "https://after.example" });
   await h.flushNativeWorkspace("a");
   expect(native.values.get(`a:${ownKey}`)?.value).toContain(tab.id);
 });
@@ -339,8 +316,8 @@ it("restores what it can from an unreadable save and lists the rest, keeping the
 it("keeps other tabs when one saved view cannot be restored", async () => {
   const h = await context();
   await h.restoreNativeWorkspace("a");
-  const damaged = h.workspace.getState().openBrowserView({ url: "https://damaged.example" });
-  const kept = h.workspace.getState().openBrowserView({ url: "https://kept.example" });
+  const damaged = openPage(h.workspace.getState(), { url: "https://damaged.example" });
+  const kept = openPage(h.workspace.getState(), { url: "https://kept.example" });
   await h.flushNativeWorkspace("a");
   h.closeNativeWorkspaceRecovery();
   const record = native.values.get(`a:${ownKey}`)!;

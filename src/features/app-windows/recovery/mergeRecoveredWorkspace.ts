@@ -7,7 +7,6 @@ import { partialWorkspaceStore } from "../tabs/workspaceStorePersistence";
 export function mergeRecoveredWorkspace(
   recovered: Partial<WorkspaceStore>,
   current: WorkspaceStore,
-  baseline: Partial<WorkspaceStore>,
 ): Partial<WorkspaceStore> {
   const live = partialWorkspaceStore(current);
   const liveTabs = layoutTabs(current.layout);
@@ -16,46 +15,11 @@ export function mergeRecoveredWorkspace(
     ? layoutTabs(recovered.layout).filter((tab) => !ids.has(tab.id))
     : [];
   const layout = { ...current.layout, tabs: [...restoredTabs, ...liveTabs] };
-  const records = <T extends { id: string }>(saved: T[], live: T[], initial: T[]) => {
-    const result = new Map(saved.map((record) => [record.id, record]));
-    for (const record of live) {
-      const before = initial.find((item) => item.id === record.id);
-      if (!result.has(record.id) || JSON.stringify(before) !== JSON.stringify(record))
-        result.set(record.id, record);
-    }
-    return [...result.values()];
-  };
   return {
     ...recovered,
     ...live,
     layout,
     activeWindowId: current.activeWindowId,
-    tabGroups: records(
-      recovered.tabGroups ?? [],
-      current.tabGroups,
-      baseline.tabGroups ?? [],
-    ).filter(
-      (group) =>
-        !baseline.tabGroups?.some((old) => old.id === group.id) ||
-        current.tabGroups.some((live) => live.id === group.id),
-    ),
-    migratedTabGroupIds: [
-      ...new Set([...(recovered.migratedTabGroupIds ?? []), ...current.migratedTabGroupIds]),
-    ],
-    bookmarkFolders: records(
-      recovered.bookmarkFolders ?? [],
-      current.bookmarkFolders,
-      baseline.bookmarkFolders ?? [],
-    ),
-    bookmarks: records(recovered.bookmarks ?? [], current.bookmarks, baseline.bookmarks ?? []),
-    expandedBookmarkFolders: {
-      ...recovered.expandedBookmarkFolders,
-      ...current.expandedBookmarkFolders,
-    },
-    selectedBookmarkByFolder: {
-      ...recovered.selectedBookmarkByFolder,
-      ...current.selectedBookmarkByFolder,
-    },
     closedItems: [...(recovered.closedItems ?? []), ...current.closedItems],
   };
 }

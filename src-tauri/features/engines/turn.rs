@@ -35,6 +35,34 @@ pub struct TurnRequest {
     pub effort: Option<String>,
     /// Extra MCP servers handed to the engine, as its own config object (`{"name": {...}}`).
     pub mcp_servers: Option<Value>,
+    /// Pictures the person attached to the message.
+    pub images: Vec<Image>,
+}
+
+/// A picture attached to a message, as base64 with its type.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Image {
+    pub mime: String,
+    pub data: String,
+}
+
+/// The pictures among a request's attachments. Anything that isn't an inline image is left out:
+/// an engine reads files from its folder with its own tools.
+pub fn images_of(attachments: &Value) -> Vec<Image> {
+    attachments
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|attachment| {
+            let mime = attachment["mime_type"].as_str()?;
+            let (head, data) = attachment["data_url"].as_str()?.split_once(";base64,")?;
+            (mime.starts_with("image/") && head == format!("data:{mime}")).then(|| Image {
+                mime: mime.to_string(),
+                data: data.to_string(),
+            })
+        })
+        .take(8)
+        .collect()
 }
 
 /// What an engine reports while it works, already in one shape for every engine.
@@ -174,6 +202,34 @@ impl TurnControl {
     }
 }
 
+/// Writes the pictures to a folder of Misty's own in the system's temp folder, for an engine that
+/// takes pictures as files. Returns the folder, to remove once the turn ends, and each file.
+pub fn write_images(images: &[Image]) -> Option<(PathBuf, Vec<PathBuf>)> {
+    use base64::Engine as _;
+    if images.is_empty() {
+        return None;
+    }
+    let folder =
+        std::env::temp_dir().join(format!("misty-engine-{}", uuid::Uuid::new_v4().simple()));
+    file_access::fs::create_dir_all(&folder).ok()?;
+    let mut files = Vec::new();
+    for (index, image) in images.iter().enumerate() {
+        let ending = match image.mime.as_str() {
+            "image/jpeg" => "jpg",
+            "image/gif" => "gif",
+            "image/webp" => "webp",
+            _ => "png",
+        };
+        let bytes = base64::engine::general_purpose::STANDARD
+            .decode(&image.data)
+            .ok()?;
+        let file = folder.join(format!("{}.{ending}", index + 1));
+        file_access::fs::write(&file, bytes).ok()?;
+        files.push(file);
+    }
+    Some((folder, files))
+}
+
 /// Ends a process and everything it started. Engines start their own helpers (node, shells), and
 /// stopping only the parent would leave those running.
 pub fn kill_tree(pid: u32) {
@@ -206,4 +262,28 @@ pub fn own_group(command: &mut tokio::process::Command) {
     }
     #[cfg(not(any(unix, windows)))]
     let _ = command;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn takes_inline_pictures_and_leaves_other_attachments_out() {
+        let attachments = json!([
+            { "mime_type": "image/png", "data_url": "data:image/png;base64,AAAA" },
+            { "mime_type": "application/pdf", "data_url": "data:application/pdf;base64,BBBB" },
+            { "mime_type": "image/png", "data_url": "https://example.com/a.png" },
+            { "mime_type": "image/jpeg", "data_url": "data:image/png;base64,CCCC" },
+        ]);
+        assert_eq!(
+            images_of(&attachments),
+            vec![Image {
+                mime: "image/png".into(),
+                data: "AAAA".into()
+            }]
+        );
+        assert!(images_of(&json!(null)).is_empty());
+    }
 }

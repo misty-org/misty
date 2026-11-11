@@ -182,47 +182,6 @@
     "platforms": ["desktop"]
   },
   {
-    "id": "browser.searchEngine",
-    "label": "Search engine",
-    "page": "search",
-    "section": "general",
-    "key": "browser_search_engine_index",
-    "default": "google",
-    "owner": "device",
-    "type": "string",
-    "platforms": ["desktop"],
-    "enum": ["google", "duckduckgo", "bing", "brave", "startpage"],
-    "legacyValues": ["google", "duckduckgo", "bing", "brave", "startpage"]
-  },
-  {
-    "id": "browser.customBangs",
-    "label": "Search shortcuts",
-    "keywords": ["bangs", "shortcuts", "search", "custom"],
-    "page": "search",
-    "section": "general",
-    "key": "browser_custom_bangs_json",
-    "default": "[]",
-    "owner": "device",
-    "type": "string",
-    "format": "json",
-    "maxLength": 16384,
-    "platforms": ["desktop"]
-  },
-  {
-    "id": "browser.autoArchiveHours",
-    "label": "Archive idle tabs",
-    "keywords": ["archive", "auto close", "clean up", "tabs"],
-    "page": "browser-tabs",
-    "section": "general",
-    "key": "browser_auto_archive_hours",
-    "default": 0,
-    "owner": "device",
-    "type": "number",
-    "min": 0,
-    "max": 720,
-    "platforms": ["desktop"]
-  },
-  {
     "id": "browser.hiddenTabSleep",
     "label": "Sleep hidden tabs",
     "keywords": ["performance", "memory", "battery", "background", "tabs", "sleep"],
@@ -490,19 +449,6 @@
     "type": "string",
     "format": "json",
     "maxLength": 4096,
-    "platforms": ["desktop"]
-  },
-  {
-    "id": "app.sidebar.tools",
-    "label": "Sidebar tools",
-    "page": "appearance",
-    "section": "general",
-    "key": "sidebar_tools",
-    "default": "[\"pane-layout\",\"agents\"]",
-    "owner": "device",
-    "type": "string",
-    "format": "json",
-    "maxLength": 512,
     "platforms": ["desktop"]
   },
   {

@@ -26,7 +26,7 @@ pub(super) fn record_request(
         if request.store_id.is_some() {
             session.store_id = request.store_id.clone();
         }
-        // Incognito pages keep no profile in what the renderer and agents observe.
+        // Temporary pages keep no profile in what the renderer and agents observe.
         session.profile = (!request.private).then(|| profile.to_owned());
         if request.profile_provider_id.is_some() || request.provider_id.is_some() {
             session.profile_provider = request
@@ -40,14 +40,12 @@ pub(super) fn record_request(
 
 /// A page whose webview already exists (a popup waiting for its tab, or the
 /// same tab reopened) is moved into the window and brought up to date.
-#[allow(clippy::too_many_arguments)]
 pub(super) fn adopt_existing(
     app: &AppHandle,
     state: &BrowserSessionState,
     window: &tauri::Window,
     webview: Webview,
     request: &BrowserWebviewCreateRequest,
-    profile: &str,
     position: LogicalPosition<f64>,
     size: LogicalSize<f64>,
 ) -> Result<(), String> {
@@ -81,13 +79,6 @@ pub(super) fn adopt_existing(
     apply_shortcuts(&webview, state)?;
     apply_browser_pointer_tracking(&webview, renderer(webview.window().label()).tracking)?;
     set_webview_bounds_if_changed(app, &webview, position, size)?;
-    crate::browser::extensions::native::register(
-        &webview,
-        profile,
-        &request.id,
-        request.private,
-        &request.url,
-    );
     present_macos_webview(&webview)
 }
 

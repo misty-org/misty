@@ -68,7 +68,6 @@ pub(super) struct BrowserSession {
     pub(super) scope_id: String,
     pub(super) grants: HashMap<String, BrowserGrant>,
     pub(super) snapshot_generation: u64,
-    pub(super) snapshot_extension: Option<String>,
     pub(super) element_targets: HashMap<String, String>,
     pub(super) downloads: Vec<BrowserDownload>,
     pub(super) pending_agent_download: Option<PendingAgentDownload>,

@@ -9,8 +9,7 @@
 use super::saved::{self, Saved};
 use super::*;
 use serde::Deserialize;
-use std::collections::BTreeSet;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::AtomicBool;
 
 /// Who is browsing when nobody is signed in.
 pub const LOCAL_SCOPE: &str = "local";
@@ -53,23 +52,13 @@ pub(super) struct Registry {
     /// window changes nothing about what is in its profile.
     pub(super) orphans: BTreeMap<String, Vec<String>>,
     pub(super) last_focused: Option<String>,
-    /// Incognito windows per profile, and the session their pages share.
-    pub(super) incognito: BTreeMap<String, IncognitoSession>,
-}
-
-pub(super) struct IncognitoSession {
-    /// The incognito windows of this profile, by label.
-    pub(super) windows: BTreeSet<String>,
-    pub(super) session: String,
 }
 
 static REGISTRY: Mutex<Option<Registry>> = Mutex::new(None);
 /// Set once quitting starts: windows closing then are remembered as open.
 pub(super) static QUITTING: AtomicBool = AtomicBool::new(false);
-/// The last focused app window, incognito included; never saved.
+/// The last focused app window; never saved.
 pub(super) static LAST_FOCUSED: Mutex<Option<String>> = Mutex::new(None);
-pub(super) static INCOGNITO_GENERATION: std::sync::atomic::AtomicU64 =
-    std::sync::atomic::AtomicU64::new(0);
 
 pub(super) struct RegistryGuard(std::sync::MutexGuard<'static, Option<Registry>>);
 impl std::ops::Deref for RegistryGuard {
@@ -122,7 +111,6 @@ pub(super) fn load() -> Result<Registry, String> {
             .collect(),
         orphans: saved.orphans,
         last_focused: None,
-        incognito: BTreeMap::new(),
     })
 }
 
@@ -269,52 +257,6 @@ pub fn current_scope() -> String {
         .unwrap_or_else(|_| LOCAL_SCOPE.to_owned())
 }
 
-/// The temporary session an incognito window's pages share. `None` for other windows.
-pub fn incognito_session(label: &str) -> Option<String> {
-    let window = parse(label).filter(|window| window.incognito)?;
-    let state = lock_registry().ok()?;
-    state
-        .incognito
-        .get(&window.profile)
-        .filter(|session| session.windows.contains(label))
-        .map(|session| session.session.clone())
-}
-
-/// Adds an incognito window to its profile's temporary session, starting a fresh session
-/// when the profile has no incognito window open.
-pub(super) fn join_incognito(state: &mut Registry, key: &str, label: &str) {
-    state
-        .incognito
-        .entry(key.into())
-        .or_insert_with(|| IncognitoSession {
-            windows: BTreeSet::new(),
-            session: format!(
-                "{key}#{}",
-                INCOGNITO_GENERATION.fetch_add(1, Ordering::Relaxed) + 1
-            ),
-        })
-        .windows
-        .insert(label.into());
-}
-
-/// Takes an incognito window out of its profile's session. Returns the session to erase
-/// when it was the profile's last incognito window.
-pub(super) fn leave_incognito(state: &mut Registry, key: &str, label: &str) -> Option<String> {
-    let session = state.incognito.get_mut(key)?;
-    session.windows.remove(label);
-    if session.windows.is_empty() {
-        return state.incognito.remove(key).map(|ended| ended.session);
-    }
-    None
-}
-
-/// Forgets a closed incognito window. Returns the session to erase when it was the
-/// profile's last incognito window.
-pub(super) fn forget_incognito(label: &str, key: &str) -> Option<String> {
-    let mut state = lock_registry().ok()?;
-    leave_incognito(&mut state, key, label)
-}
-
 /// The app window used last in this launch.
 pub(super) fn last_focused_person() -> Option<String> {
     lock_registry()
@@ -322,7 +264,7 @@ pub(super) fn last_focused_person() -> Option<String> {
         .and_then(|state| state.last_focused.clone())
 }
 
-/// The app window used last, incognito included.
+/// The app window used last, even one that has closed since.
 pub(super) fn last_focused_any() -> Option<String> {
     LAST_FOCUSED.lock().ok().and_then(|last| last.clone())
 }

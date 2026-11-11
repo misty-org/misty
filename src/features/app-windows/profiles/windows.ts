@@ -5,7 +5,7 @@ import {
   migrateTabs,
   activateTab,
 } from "../panes/layoutTabs";
-import { reconcileGroupIdentities } from "../tab-groups/groupIdentity";
+import { reconcileGroupIdentities } from "../panes/groupIdentity";
 import {
   capDockLeaves,
   createDockLeaf,

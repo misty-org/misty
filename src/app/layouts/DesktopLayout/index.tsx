@@ -38,6 +38,7 @@ import { useDesktopFrameStyle } from "./useDesktopFrameStyle";
 import { useDesktopRouteEffects } from "./useDesktopRouteEffects";
 import { useDesktopShellStatus } from "./useDesktopShellStatus";
 import { VaultStartup } from "@/features/sync";
+import { HelpDialog } from "./HelpDialog";
 import { useDesktopShortcuts } from "./useDesktopShortcuts";
 import { useDesktopTitlebarGeometry } from "./useDesktopTitlebarGeometry";
 import { useDesktopWindowChrome } from "./useDesktopWindowChrome";
@@ -90,7 +91,7 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
     lastNonSettingsRouteRef,
     openSettingsOverlay,
   });
-  useDesktopShortcuts({ navigate, openSettingsOverlay, signedIn: Boolean(user) });
+  useDesktopShortcuts({ openSettingsOverlay, signedIn: Boolean(user) });
 
   useEffect(() => {
     setBrowserWebviewsSuspended(accountMenuOpen || settingsOpen, "shell-overlay");
@@ -260,6 +261,7 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
         <AccountClosingNotice />
         {!isAuthRoute && user ? <ServerAlertsNotice /> : null}
         {!isAuthRoute ? <ProfileDialogs /> : null}
+        {!isAuthRoute ? <HelpDialog /> : null}
         {!isAuthRoute && user ? <VaultStartup key={user.id} /> : null}
         {!isAuthRoute ? (
           <DesktopShellOverlays

@@ -73,12 +73,7 @@ export function hydrateShortcutsSnapshot(snapshot: NativeShortcutsSnapshot): Sho
     overrides: snapshot.overrides,
   };
   const forwarded = hydrated.commandDefinitions
-    .filter(
-      (definition) =>
-        definition.scope === "global" ||
-        definition.scope === "workspace" ||
-        definition.scope === "tool:browser",
-    )
+    .filter((definition) => definition.scope === "global" || definition.scope === "workspace")
     .flatMap((definition) => {
       const binding = hydrated.effectiveBindings.find(
         (candidate) => candidate.commandId === definition.id,

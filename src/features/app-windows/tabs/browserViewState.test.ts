@@ -1,34 +1,7 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { parseBrowserViewState } from "@/features/app-windows/tabs/workspaceViews";
-import { allLayoutViews } from "@/features/app-windows/panes/layoutTabs";
-import { useWorkspaceStore } from "@/features/app-windows/tabs/useWorkspaceStore";
 
 describe("browser profile identity", () => {
-  beforeEach(() => {
-    useWorkspaceStore.persist.clearStorage();
-    useWorkspaceStore.getState().reset();
-  });
-
-  it("keeps the launch website when the webview navigates", () => {
-    const tab = useWorkspaceStore.getState().openBrowserView({ url: "https://example.test" });
-    useWorkspaceStore.getState().updateBrowserView(tab.id, {
-      bookmarkId: "website:one",
-      agentOwned: true,
-    });
-    useWorkspaceStore.getState().updateBrowserView(tab.id, {
-      url: "https://example.test/next",
-      title: "Next page",
-    });
-    const current = allLayoutViews(useWorkspaceStore.getState().layout).find(
-      (view) => view.id === tab.id,
-    )!;
-    expect(parseBrowserViewState(current.state)).toMatchObject({
-      url: "https://example.test/next",
-      bookmarkId: "website:one",
-      agentOwned: true,
-    });
-  });
-
   it("does not accept malformed bookmark identities from old persisted tab state", () => {
     expect(parseBrowserViewState({ bookmarkId: "../website" }).bookmarkId).toBeUndefined();
   });

@@ -21,7 +21,7 @@ describe("device settings", () => {
     expect(
       portableValues({
         general: {
-          browser_search_engine_index: 2,
+          startup_view_index: 2,
           browser_download_directory: "/private",
           launch_on_login: true,
         },
@@ -29,7 +29,7 @@ describe("device settings", () => {
         custom: { value: true },
       }),
     ).toEqual({
-      "browser.searchEngine": "bing",
+      "app.startup.view": "agents",
       "browser.downloads.directory": "/private",
       "app.startup.login": true,
     });
@@ -37,10 +37,10 @@ describe("device settings", () => {
   it("projects shared settings and preserves unknown namespaces", () => {
     const next = projectPreferences(
       { general: { browser_download_directory: "/old" }, plugin: { future: true } },
-      { "browser.searchEngine": "brave", "app.zoom": 2 },
+      { "app.startup.view": "agents", "app.zoom": 2 },
     );
     expect(next.general).toMatchObject({
-      browser_search_engine_index: 3,
+      startup_view_index: 2,
       browser_download_directory: "",
     });
     expect(next.plugin).toEqual({ future: true });
@@ -51,13 +51,13 @@ describe("device settings", () => {
       {
         version: 1,
         selectedProfileId: "work",
-        profiles: { work: { values: { "browser.searchEngine": "bing" } } },
+        profiles: { work: { values: { "app.startup.view": "files" } } },
         overrides: { work: { "app.startup.login": true } },
       },
       { appearance: { app_zoom: 1.25 } },
     );
     expect(migrated.values).toMatchObject({
-      "browser.searchEngine": "bing",
+      "app.startup.view": "files",
       "app.startup.login": true,
       "app.zoom": 1.25,
     });
@@ -85,7 +85,7 @@ describe("device settings", () => {
       migratePreferencesState(
         {
           version: 3,
-          values: { "app.zoom": 1.5, "app.zoom.future": 1, "browser.searchEngine": "x" },
+          values: { "app.zoom": 1.5, "app.zoom.future": 1, "app.startup.view": "x" },
         },
         {},
       ),

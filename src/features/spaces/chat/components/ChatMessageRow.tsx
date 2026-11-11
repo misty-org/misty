@@ -13,6 +13,8 @@ import { MessageHoverActions } from "./MessageHoverActions";
 import { MessageReactions } from "./MessageReactions";
 import { MessageReplyPreview } from "./MessageReplyPreview";
 import { initials, isAgentAuthoredMessage } from "./messageText";
+import { SpacePostCard } from "../../handoffs/SpacePostCard";
+import { readSpacePost } from "../../handoffs/spacePosts";
 
 interface ChatMessageRowProps {
   message: SpaceMessage;
@@ -52,6 +54,7 @@ const rowFields = [
   "onError",
   "onLibraryItem",
   "onReload",
+  "directRecipient",
 ] as const satisfies readonly (keyof SpaceChatMessagesProps)[];
 
 /**
@@ -93,6 +96,8 @@ function ChatMessageRowView({
 }: ChatMessageRowProps) {
   const rowClass = message.reply_to_message_id ? "row-start-2" : "row-start-1";
   const agentAuthored = isAgentAuthoredMessage(message);
+  // A handoff or a claim a person posted is drawn as a card.
+  const post = readSpacePost(message);
 
   return (
     <Fragment>
@@ -156,6 +161,14 @@ function ChatMessageRowView({
               onText={props.onEditingText}
               onCancel={props.onCancelEditing}
               onSubmit={(event: FormEvent, target) => props.onSaveEdited(event, target)}
+            />
+          ) : post ? (
+            <SpacePostCard
+              message={message}
+              post={post}
+              spaceId={props.spaceId}
+              direct={Boolean(props.directRecipient)}
+              onError={props.onError}
             />
           ) : (
             <p className="whitespace-pre-wrap [overflow-wrap:anywhere] text-md leading-6 text-cream/90">

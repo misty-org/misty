@@ -13,7 +13,6 @@ pub(crate) mod load_watch;
 pub(crate) mod macos;
 pub(crate) mod native_views;
 pub mod night_light;
-pub mod page_state;
 pub(crate) mod pane_dim;
 pub mod process_ended;
 pub(crate) mod renderer_reload;

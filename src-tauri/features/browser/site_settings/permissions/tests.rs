@@ -61,28 +61,6 @@ fn a_new_temporary_session_does_not_inherit_closed_session_permissions() {
     }
 }
 
-#[cfg(not(target_os = "macos"))]
-#[test]
-fn private_session_permissions_end_with_the_session() {
-    let scope = StoreScope::Temporary(0);
-    let allowed = Permissions {
-        camera: Decision::Allow,
-        microphone: Decision::Ask,
-        location: Decision::Ask,
-    };
-    unsafe {
-        let persisted_before = read_store();
-        update_scope(&scope, "https://example.com", allowed.clone()).unwrap();
-        assert_eq!(
-            sites_for_scope(&scope).get("https://example.com"),
-            Some(&allowed)
-        );
-        assert_eq!(read_store(), persisted_before);
-        forget_private_session();
-        assert!(sites_for_scope(&scope).is_empty());
-    }
-}
-
 #[test]
 fn profile_keys_match_webkit_store_identifiers() {
     let key = store_key(Some(&"ab".repeat(32))).unwrap();

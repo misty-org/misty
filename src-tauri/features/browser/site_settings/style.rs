@@ -59,7 +59,8 @@ fn style_script(css: Option<&str>) -> String {
 
 static GESTURES: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
-/// Mouse gestures (Settings › Browsing), checked again when a page reports one.
+/// Mouse gestures, checked again when a page reports one. Nothing turns them on: they were a
+/// person's own browsing.
 pub(crate) fn gestures_enabled() -> bool {
     GESTURES.load(std::sync::atomic::Ordering::Relaxed)
 }
@@ -74,17 +75,6 @@ pub(crate) fn apply(webview: &Webview) {
     let Ok(url) = webview.url() else { return };
     let css = style_for(&url);
     let _ = webview.eval(style_script(css.as_deref()));
-}
-
-/// Mouse gestures, from the account setting. Applies to open pages at once.
-#[tauri::command]
-pub fn browser_set_mouse_gestures(app: tauri::AppHandle, enabled: bool) {
-    GESTURES.store(enabled, std::sync::atomic::Ordering::Relaxed);
-    for (label, webview) in app.webviews() {
-        if label.starts_with("misty-browser-") {
-            let _ = webview.eval(format!("window.__MISTY_SET_GESTURES__?.({enabled});"));
-        }
-    }
 }
 
 #[tauri::command]

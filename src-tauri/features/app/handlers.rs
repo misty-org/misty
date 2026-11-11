@@ -8,15 +8,6 @@ mod more_commands;
 pub fn invoke_handler() -> impl Fn(Invoke<Wry>) -> bool + Send + Sync + 'static {
     let dispatch: Box<dyn Fn(Invoke<Wry>) -> bool + Send + Sync> =
         Box::new(more_commands::with_more_commands!(
-            crate::browser::commands::extensions_prepare,
-            crate::browser::commands::extensions_commit,
-            crate::browser::commands::extensions_reconcile,
-            crate::browser::commands::extensions_action,
-            crate::browser::commands::extensions_respond,
-            crate::browser::commands::extensions_tab_created,
-            crate::browser::commands::extensions_layout,
-            crate::browser::commands::extensions_compat,
-            crate::browser::commands::extensions_check_updates,
             crate::account::commands::api_cache_get,
             crate::account::commands::api_cache_put,
             crate::account::commands::api_cache_delete_prefix,
@@ -26,10 +17,6 @@ pub fn invoke_handler() -> impl Fn(Invoke<Wry>) -> bool + Send + Sync + 'static 
             crate::browser::commands::browser_recovery_write,
             crate::browser::commands::browser_recovery_forget,
             crate::app::lifecycle::app_quit_confirmed,
-            crate::browser::commands::browser_page_state_capture,
-            crate::browser::commands::browser_page_state_restore,
-            crate::browser::commands::browser_view_history_save,
-            crate::browser::commands::browser_view_history_load,
             crate::account::commands::auth_session_capture,
             crate::account::commands::auth_session_restore,
             crate::account::commands::auth_session_forget,
@@ -109,8 +96,6 @@ pub fn invoke_handler() -> impl Fn(Invoke<Wry>) -> bool + Send + Sync + 'static 
             #[cfg(desktop)]
             crate::browser::commands::browser_webview_create,
             crate::browser::commands::diagnostic_log,
-            crate::browser::commands::extension_popup_open,
-            crate::browser::commands::extension_popup_close,
             #[cfg(any(target_os = "macos", windows))]
             crate::agents::commands::cursor_companion_configure,
             #[cfg(any(target_os = "macos", windows))]

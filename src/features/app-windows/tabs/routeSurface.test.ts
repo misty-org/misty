@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { workspaceSurfaceFromRoute } from "./routeSurface";
+import { isRetiredWebRoute, workspaceSurfaceFromRoute } from "./routeSurface";
 
 describe("browser workspace deep links", () => {
   it.each(["/settings", "/account", "/signin", "/register"])(
@@ -8,29 +8,25 @@ describe("browser workspace deep links", () => {
       expect(workspaceSurfaceFromRoute(route)).toBeNull();
     },
   );
-  it.each(["/new", "/browser", "/apps/journal", "/discover"])(
-    "opens %s as a global browser tab",
-    (route) => {
-      expect(workspaceSurfaceFromRoute(route)).toMatchObject({
-        surfaceId: "browser",
-        groupKey: "tool:browser",
-        route: "/browser",
-        instancePolicy: "multiple",
-        state: { url: "https://www.google.com" },
-      });
-    },
-  );
-  it("preserves browser deep-link addresses", () => {
-    expect(
-      workspaceSurfaceFromRoute("/browser?url=https%3A%2F%2Fexample.com%2Freport")?.state,
-    ).toMatchObject({ url: "https://example.com/report" });
+  it.each([
+    "/",
+    "/new",
+    "/browser",
+    "/browser?url=https%3A%2F%2Fexample.com",
+    "/apps/journal",
+    "/discover",
+  ])("opens nothing for %s, which once opened a web page for the person", (route) => {
+    expect(workspaceSurfaceFromRoute(route)).toBeNull();
+    expect(isRetiredWebRoute(route)).toBe(true);
   });
+  it.each(["/agents", "/apps/agents", "/spaces/family/chat", "/settings", "/scheduled"])(
+    "doesn't take %s for a web page's route",
+    (route) => expect(isRetiredWebRoute(route)).toBe(false),
+  );
   it.each(["/files", "/apps/files"])(
     "no longer opens %s as a tool; Files moved to Kura",
     (route) => {
-      expect(
-        workspaceSurfaceFromRoute(`${route}?path=%2FUsers%2Fada&select=notes.txt`)?.surfaceId,
-      ).not.toBe("files");
+      expect(workspaceSurfaceFromRoute(`${route}?path=%2FUsers%2Fada&select=notes.txt`)).toBeNull();
     },
   );
   it("keeps agent run links intact", () => {

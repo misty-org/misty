@@ -10,11 +10,7 @@ describe("shortcut platform defaults", () => {
   });
 
   it("uses native primary modifiers for shell navigation", () => {
-    const launcher = shortcutCommandsById.get("search.toggle")!;
     const nextTab = shortcutCommandsById.get("workspace.next_tab")!;
-    expect(launcher.defaults.macos.primary).toBe("Cmd+T");
-    expect(launcher.defaults.windows.primary).toBe("Ctrl+T");
-    expect(launcher.defaults.linux.primary).toBe("Ctrl+T");
     const companion = shortcutCommandsById.get("misty.contextual_companion")!;
     expect(companion.defaults.macos.primary).toBe("Cmd+Shift+K");
     expect(companion.defaults.windows.primary).toBe("Ctrl+Shift+K");
@@ -28,10 +24,12 @@ describe("shortcut platform defaults", () => {
     });
   });
 
-  it("zooms the page with Cmd +, - and 0 and scales the app with Shift added", () => {
-    expect(shortcutCommandsById.get("browser.zoom_in")?.defaults.macos.primary).toBe("Cmd+Plus");
-    expect(shortcutCommandsById.get("browser.zoom_out")?.defaults.macos.primary).toBe("Cmd+Minus");
-    expect(shortcutCommandsById.get("browser.zoom_reset")?.defaults.macos.primary).toBe("Cmd+0");
+  it("scales the app with Cmd+Shift and +, - or 0, and keeps no shortcut for a person's pages", () => {
+    expect(shortcutCommandRegistry.filter((command) => command.id.startsWith("browser."))).toEqual(
+      [],
+    );
+    for (const id of ["search.toggle", "tool.browser", "workspace.search_tabs"])
+      expect(shortcutCommandsById.get(id)).toBeUndefined();
     expect(shortcutCommandsById.get("app.zoom_in")?.defaults.macos).toEqual({
       primary: "Cmd+Shift+Plus",
       alternate: "Ctrl+Shift+Plus",
@@ -55,13 +53,11 @@ describe("shortcut platform defaults", () => {
     );
   });
 
-  it("opens new and incognito windows as Chrome does", () => {
+  it("opens and closes windows as Chrome does", () => {
     expect(shortcutCommandsById.get("workspace.new_window")?.defaults.macos.primary).toBe(
       "Cmd+Shift+N",
     );
-    expect(shortcutCommandsById.get("workspace.new_incognito_window")?.defaults.macos.primary).toBe(
-      "Cmd+Option+N",
-    );
+    expect(shortcutCommandsById.get("workspace.new_incognito_window")).toBeUndefined();
     expect(shortcutCommandsById.get("workspace.close_window")?.defaults.windows.primary).toBe(
       "Ctrl+Shift+W",
     );

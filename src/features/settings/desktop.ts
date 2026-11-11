@@ -1,7 +1,1 @@
-export {
-  
-  DesktopSettingsRow,
-  
-  
-} from "./components/DesktopSettingsUI";
-;
+export { DesktopSettingsRow } from "./components/DesktopSettingsUI";

@@ -1,5 +1,5 @@
-/** 18: one layout per window; bookmarks and saved tab groups live in the profile's records. */
-export const browserWorkspaceStoreVersion = 18;
+/** 18: one layout per window. 19: no tab groups, pinned tabs or bookmarks; a load drops them. */
+export const browserWorkspaceStoreVersion = 19;
 export const workspaceRecoveryKey = (name: string) => `${name}:before-browser-workspace:v14`;
 
 /** Preserve the exact pre-migration record before Zustand can replace retired views. */

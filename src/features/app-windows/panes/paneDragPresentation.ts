@@ -1,8 +1,6 @@
 import { dockLeaves, dockPaneBounds, removeDockLeaf } from "./dockTree";
 import type { WorkspaceDockNode } from "../tabs/workspaceViews";
-import { browserTabShowsInternalPage } from "../page-runtime/browserHostSettings";
 import { useBrowserRuntimeStore } from "../page-runtime/browserRuntimeStore";
-import { hasTauriInternals } from "@/shared/platform/tauri";
 
 /** A reversible visual lift; no store updates or app remounts during the gesture. */
 export function liftPanePresentation(root: WorkspaceDockNode, paneId: string): () => void {
@@ -71,13 +69,7 @@ export function liftPanePresentation(root: WorkspaceDockNode, paneId: string): (
       zIndex: "100",
       overflow: "hidden",
     });
-    // A pane showing a live page stays transparent: the page itself is resized to the pane's new
-    // rectangle as the layout reflows, so it shows through at its real size. Any other pane is
-    // painted opaque so no page beneath it shows.
-    const view = pane.views.find((item) => item.id === pane.activeViewId);
-    const livePage =
-      hasTauriInternals() && view?.surfaceId === "browser" && !browserTabShowsInternalPage(view.id);
-    if (livePage) return;
+    // Painted opaque so no page beneath it shows.
     element.style.setProperty("background-color", "var(--color-charcoal-bg)", "important");
     // The native page can't move with the pane, so its last preview stands in for it and
     // the panes visibly rearrange with their content.

@@ -8,8 +8,7 @@
     "linux"
   ],
   "webviews": [
-    "window-*",
-    "incognito-*"
+    "window-*"
   ],
   "permissions": [
     "core:default",

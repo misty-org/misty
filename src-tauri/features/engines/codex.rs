@@ -258,7 +258,15 @@ pub async fn run(program: &Path, request: TurnRequest, link: TurnLink) -> Result
         next: 0,
     };
     let mut state = Turn::default();
-    let outcome = converse(&mut wire, &request, &link, &mut state).await;
+    // Codex takes pictures as files, kept only for this turn.
+    let pictures = super::turn::write_images(&request.images);
+    let files = pictures
+        .as_ref()
+        .map_or(&[][..], |(_, files)| files.as_slice());
+    let outcome = converse(&mut wire, &request, files, &link, &mut state).await;
+    if let Some((folder, _)) = &pictures {
+        let _ = file_access::fs::remove_dir_all(folder);
+    }
     drop(wire);
     if let Some(pid) = pid {
         kill_tree(pid);
@@ -284,6 +292,7 @@ pub async fn run(program: &Path, request: TurnRequest, link: TurnLink) -> Result
 async fn converse(
     wire: &mut Wire,
     request: &TurnRequest,
+    pictures: &[std::path::PathBuf],
     link: &TurnLink,
     state: &mut Turn,
 ) -> Result<(), String> {
@@ -317,10 +326,13 @@ async fn converse(
         .ok_or("Codex did not open a session.")?
         .to_string();
     link.report(EngineEvent::Session(thread_id.clone()));
-    let mut turn = json!({
-        "threadId": thread_id,
-        "input": [{ "type": "text", "text": request.prompt }],
-    });
+    let mut input = vec![json!({ "type": "text", "text": request.prompt })];
+    input.extend(
+        pictures
+            .iter()
+            .map(|path| json!({ "type": "localImage", "path": path })),
+    );
+    let mut turn = json!({ "threadId": thread_id, "input": input });
     if let Some(model) = request.model.as_deref().filter(|model| !model.is_empty()) {
         turn["model"] = json!(model);
     }

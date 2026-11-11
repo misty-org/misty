@@ -12,7 +12,7 @@ import { migrateRetiredWorkspaceView } from "@/features/app-windows";
  * native page follows the host's size, which must drop to nothing when the tab is hidden.
  */
 export function keepsLayoutWhileHidden(view: WorkspaceView): boolean {
-  const surfaceId = migrateRetiredWorkspaceView(view).surfaceId;
+  const surfaceId = migrateRetiredWorkspaceView(view)?.surfaceId;
   return surfaceId === "space" || surfaceId === "agents" || surfaceId === "scheduled";
 }
 

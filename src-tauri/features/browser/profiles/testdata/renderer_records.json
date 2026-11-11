@@ -1,63 +1,10 @@
 {
-  "bookmarks": [
-    {
-      "kind": "folder",
-      "id": "folder-root",
-      "fields": {
-        "label": "Bookmarks bar",
-        "icon": "folder",
-        "order": 0,
-        "hidden": false
-      }
-    },
-    {
-      "kind": "folder",
-      "id": "folder-child",
-      "fields": {
-        "label": "Reading",
-        "icon": "folder",
-        "order": 1,
-        "hidden": false,
-        "parent_id": "folder-root",
-        "added_at": 1700000000000
-      }
-    },
-    {
-      "kind": "bookmark",
-      "id": "bookmark-one",
-      "fields": {
-        "folder_id": "folder-child",
-        "title": "Example",
-        "url": "https://example.com/",
-        "order": 0,
-        "pinned": true,
-        "added_at": 1700000000000
-      }
-    }
-  ],
-  "tab_groups": [
-    {
-      "kind": "saved_tab_group",
-      "id": "group-saved",
-      "fields": {
-        "name": "Saved group",
-        "color": "purple",
-        "order": 0,
-        "tabs": "[{\"id\":\"layout:saved\",\"root\":{\"type\":\"leaf\",\"id\":\"pane-layout:saved\",\"views\":[{\"id\":\"view-layout:saved\",\"surfaceId\":\"browser\",\"groupKey\":\"tool:browser\",\"instanceKey\":\"view-layout:saved\",\"title\":\"Example\",\"route\":\"/browser\",\"sidebarVisible\":true,\"state\":{\"version\":1,\"url\":\"https://saved.example/\",\"faviconUrl\":\"https://saved.example/favicon.ico\"},\"createdAt\":1700000000000,\"lastFocusedAt\":1700000000000}],\"activeViewId\":\"view-layout:saved\"},\"focusedPaneId\":\"pane-layout:saved\"}]"
-      }
-    }
-  ],
   "tabs": [
     {
       "id": "layout:one",
       "fields": {
         "order": 0,
-        "pinned_url": "https://example.com/",
-        "group": {
-          "id": "group-open",
-          "name": "Open group",
-          "color": "blue"
-        },
+        "title": "Named",
         "tree": {
           "type": "leaf",
           "id": "pane-layout:one",
@@ -65,16 +12,13 @@
           "views": [
             {
               "id": "view-layout:one",
-              "surface": "browser",
-              "group_key": "tool:browser",
+              "surface": "agents",
+              "group_key": "tool:agents",
               "instance_key": "view-layout:one",
-              "title": "Example",
-              "route": "/browser",
+              "title": "Agents",
+              "route": "/agents?chat=one",
               "sidebar": true,
-              "state": {
-                "url": "https://example.com/page",
-                "favicon": "https://example.com/favicon.ico"
-              },
+              "state": null,
               "created_at": 1700000000000
             }
           ]

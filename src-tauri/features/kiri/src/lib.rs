@@ -2,7 +2,7 @@
 //!
 //! OS webviews (WKWebView, WebView2, WebKitGTK) supply an engine, but not the
 //! browser layer Chromium and Gecko build above theirs: permissions, WebAuthn,
-//! device APIs, extension APIs. Kiri supplies that layer from Rust. Each
+//! device APIs. Kiri supplies that layer from Rust. Each
 //! capability presents a web API to the page through a thin shim and does the
 //! real work natively, behind one envelope check and one gate.
 
@@ -16,7 +16,6 @@ pub mod capabilities;
 pub mod channel;
 #[cfg(feature = "tauri")]
 pub mod engine;
-pub mod extensions;
 pub mod permissions;
 #[cfg(feature = "tauri")]
 mod plugin;

@@ -8,7 +8,6 @@ import { memoryApi } from "./api";
 import { recallSettings } from "./recallSettings";
 import { RecallRecorder, type ActivePage } from "./recorder/recorder";
 import { useRecallStore } from "./useRecallStore";
-import { isIncognitoWindow } from "@/features/app-windows";
 import { windowSpaceId } from "./windowSpace";
 
 /** The browser page in the focused pane of the focused window. */
@@ -24,9 +23,8 @@ function activePage(): ActivePage | null {
     runtimeId: browserRuntimeId(view),
     url: state.url,
     title: view.title ?? "",
-    private: isIncognitoWindow(),
+    private: false,
     agentOwned: state.agentOwned,
-    // Private (incognito) pages are skipped before anything is sent.
     spaceId: windowSpaceId(),
   };
 }
@@ -44,7 +42,7 @@ function openTabs(): ActivePage[] {
           runtimeId: browserRuntimeId(view),
           url: state.url,
           title: view.title ?? "",
-          private: isIncognitoWindow(),
+          private: false,
           agentOwned: state.agentOwned,
           spaceId: windowSpaceId(),
         },

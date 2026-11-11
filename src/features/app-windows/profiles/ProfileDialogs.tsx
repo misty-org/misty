@@ -1,13 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { useShortcutHandler } from "@/features/shortcuts";
 import { setBrowserWebviewsSuspended } from "../page-runtime/browserOverlayRuntime";
-import {
-  createProfile,
-  deleteProfile,
-  firstProfileId,
-  renameProfile,
-  useProfileWindowStore,
-} from "./profileWindow";
+import { createProfile, deleteProfile, firstProfileId, renameProfile } from "./profileWindow";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -125,12 +119,10 @@ export function ProfileDialogs() {
   const open = useProfileDialogs((state) => state.open);
   const show = useProfileDialogs((state) => state.show);
   const close = useProfileDialogs((state) => state.close);
-  const incognito = useProfileWindowStore((state) => state.incognito);
   const profileId = useDialogProfile().id;
   useShortcutHandler(
     "workspace.new_profile",
     useCallback(() => show("create"), [show]),
-    !incognito,
   );
   // Native page views draw above the app, so hide them while a dialog is up.
   useEffect(() => {

@@ -179,29 +179,17 @@ fn webview_label(id: &str) -> Result<String, String> {
 }
 
 fn browser_page_origin(url: &Url) -> String {
-    if crate::browser::extensions::is_extension_url(url) {
-        format!(
-            "{}://{}",
-            crate::browser::extensions::EXTENSION_SCHEME,
-            url.host_str().unwrap_or_default()
-        )
-    } else {
-        url.origin().ascii_serialization()
-    }
+    url.origin().ascii_serialization()
 }
 
 fn external_url(raw: &str) -> Result<Url, String> {
     let url = Url::parse(raw).map_err(|_| "Enter a valid web address or search.".to_owned())?;
     if url.as_str() == "about:blank"
-        || crate::browser::extensions::is_extension_url(&url)
         || (matches!(url.scheme(), "http" | "https")
             && url.username().is_empty()
             && url.password().is_none())
     {
         return Ok(url);
-    }
-    if url.scheme() == crate::browser::extensions::EXTENSION_SCHEME {
-        return Err("This extension is not running. Enable it in Extensions.".into());
     }
     Err("Misty Browser supports only http and https pages.".to_owned())
 }
@@ -221,7 +209,6 @@ fn apply_browser_pointer_tracking(webview: &Webview, enabled: bool) -> Result<()
 pub mod agent_pages;
 #[cfg(desktop)]
 pub mod app_windows;
-pub mod extensions;
 pub mod history_downloads;
 pub mod input;
 pub mod kiri_link;

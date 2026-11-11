@@ -57,12 +57,6 @@ pub(in crate::browser) fn select(
     view.set_focus().map_err(|e| e.to_string())?;
     match action {
         "dismiss" => {}
-        "extensions" => {
-            let id = context.id.clone();
-            tauri::async_runtime::spawn(async move {
-                let _ = super::super::super::extensions::context_menu(&id).await;
-            });
-        }
         #[cfg(debug_assertions)]
         "inspect" => view.open_devtools(),
         "ask" => {

@@ -105,22 +105,38 @@ peek, reader and find, passwords and card and address autofill, import from othe
 default-browser registration, the extensions interface, the history and downloads pages, and the
 agent tools that listed or opened a person's tabs and bookmarks.
 
-Phase 6, left:
+Since then (uncommitted, checked together: type check, lint, 2,088 interface tests, 533 native
+tests, and an agent page and a Codex turn retried in the running app):
 
-- **Native extensions** (`src-tauri/features/browser/extensions`, about 15,500 lines, and
-  `kiri/src/extensions`). It builds every page's configuration on macOS and has large
-  Windows-only parts, so it needs its own careful pass.
-- **Pinned tabs, tab groups, bookmarks and incognito** in the workspace store. Removing them
-  needs a store migration and about twenty test files rewritten.
-- **Leftovers**: about twenty browser shortcuts that now do nothing, 21 native commands with no
-  caller, `app-windows/addresses/*`, Memory Recall (it records only a person's pages, so it
-  records nothing now), help and feedback and the cloud clipboard (no way in), and vault records
-  for passwords, cards and bookmarks that have no interface to view or delete them.
-- **Windows**: the Windows-only parts of what was deleted were not compiled.
-- **`misty-server`** still lists the four removed agent tools in its fixtures.
+- **Phase 6, finished on macOS**: the native extensions module and kiri's extension code, tab
+  groups, pinned tabs, bookmarks and incognito in the workspace store (saved windows migrate),
+  the person's web view in the store, the browser shortcuts, and 16 native commands with no
+  caller. Help is in the account menu.
+- **Space home** is a dashboard: agents now, waiting for you, recent chats, project folders,
+  scheduled work.
+- **Handoffs and claims**, carried over the Space's own chat as the person's messages, marked by
+  their first words ("Handoff:", "Working on:"). No server change.
+- **Multi-run**: one task on several engine agents, each in its own Git worktree, compared side
+  by side, with "Keep this one" merging into the linked folder staged and uncommitted.
+- **Preview with element picking**: a Preview tab for a local dev server; the picked element's
+  details go to the composer.
 
-Still not built: handoffs and claims, multi-run, preview with element picking, the rest of the
-Space home dashboard, member limits, images for engines, and the engines' own chat history.
+Left:
+
+- **Windows**: none of what was deleted or edited in Windows-only code has been compiled. The
+  files are listed in the session's reports; build on Windows before releasing.
+- **Not seen working**: handoffs between two accounts, multi-run in the app (it needs a linked
+  folder that is a Git repository), a real pointer pick in Preview, teammates' agent status
+  between two accounts, Claude Code (its sign-in had expired) and OpenCode (not installed).
+- **Also built**: attached pictures go to all three engines, and `misty-server` has two more
+  per-account limits (shared Spaces, people per Space), unlimited unless `misty-cloud` sets them.
+  The server's whole suite passes against its test database.
+- **Left out on purpose**: reading each engine's own chat history, since Misty keeps every chat's
+  transcript itself.
+- **Stale leftovers**: `companion_misty_guide.md` still describes the browser menu; dead
+  `surfaceId === "browser"` branches in Memory Recall, subtitles and a few shell files; the cloud
+  clipboard has no way in; `misty-server` fixtures still list the four removed agent tools; vault
+  records for passwords, cards and bookmarks have no interface.
 
 ## Where it stands
 

@@ -1,4 +1,3 @@
-import { contiguousTabs } from "../tab-groups/tabGroups";
 import {
   activeLayoutView,
   appendTab,
@@ -67,14 +66,6 @@ export function workspaceTabActions(
         dockTreeViews(tab.root).some((view) => view.id === tabId),
       );
       if (!ownerTab) return false;
-      if (ownerTab.tabGroupId) {
-        set({
-          tabGroups: get().tabGroups.map((g) =>
-            g.id === ownerTab.tabGroupId && g.collapsed ? { ...g, collapsed: false } : g,
-          ),
-        });
-        current = get();
-      }
       const switched = ownerTab.id !== current.layout.activeTabId;
       if (ownerTab.id !== current.layout.activeTabId) {
         set(withLayout(current, activateTab(current.layout, ownerTab.id)));
@@ -118,12 +109,6 @@ export function workspaceTabActions(
       const current = get();
       const selected = layoutTabs(current.layout).find((tab) => tab.id === id);
       if (!selected) return null;
-      if (selected.tabGroupId)
-        set({
-          tabGroups: current.tabGroups.map((g) =>
-            g.id === selected.tabGroupId ? { ...g, collapsed: false } : g,
-          ),
-        });
       const view = activeLayoutView(selected);
       if (view) get().focusView(view.id);
       else set(withLayout(current, activateTab(current.layout, id)));
@@ -152,7 +137,7 @@ export function workspaceTabActions(
       set(
         withLayout(current, {
           ...current.layout,
-          tabs: contiguousTabs(ids.map((id) => tabs.find((tab) => tab.id === id)!)),
+          tabs: ids.map((id) => tabs.find((tab) => tab.id === id)!),
         }),
       );
     },

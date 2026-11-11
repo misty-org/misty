@@ -66,7 +66,6 @@ describe("a window's native identity", () => {
           label: "window-3",
           windowId: "w-3",
           profile: { id: "work", name: "Work", order: 1 },
-          incognito: false,
           space: null,
         };
       if (command === "profiles_list")
@@ -99,7 +98,6 @@ describe("a window's native identity", () => {
     native.invoke.mockResolvedValue({ id: "new", name: "New", order: 1 });
     const window = await import("./profileWindow");
     await window.openNewWindow();
-    await window.openIncognitoWindow();
     await window.closeWindow();
     await window.openProfile("work");
     await window.createProfile("New", "blue");
@@ -108,7 +106,6 @@ describe("a window's native identity", () => {
     await window.deleteProfile("new");
     expect(native.invoke.mock.calls).toEqual([
       ["profile_window_new"],
-      ["profile_incognito_open"],
       ["profile_window_close"],
       ["profile_open", { id: "work" }],
       ["profile_create", { name: "New", color: "blue" }],

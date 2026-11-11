@@ -7,31 +7,23 @@ import {
 } from "../panes/layoutTabs";
 import { createDockId, dockLeaves, findDockLeaf, mapDockLeaf } from "../panes/dockTree";
 import type { WorkspaceView } from "./workspaceViews";
-import { isIncognitoWindow } from "../profiles/profileWindow";
 import {
   compareViewRecency,
   lastUsedUpdatesForView,
   nextWorkspaceFocusTimestamp,
 } from "./workspaceViewOperations";
-import { browserNewTabUrl } from "../addresses/browserHome";
-import { browserViewTitle, createBrowserViewState } from "./workspaceViews";
 import { createBlankWorkspaceView } from "./workspaceDefaultView";
 import type { StoreApi } from "zustand";
 import type { WorkspaceStore } from "./useWorkspaceStore";
 import { withLayout } from "./workspaceLayoutUpdate";
 
-/** Opening tools, destinations and browser pages as views. */
+/** Opening tools and destinations as views. */
 export function workspaceOpenActions(
   set: StoreApi<WorkspaceStore>["setState"],
   get: () => WorkspaceStore,
 ): Pick<
   WorkspaceStore,
-  | "openSurface"
-  | "openDestination"
-  | "commitPlaceholder"
-  | "addSurface"
-  | "newTab"
-  | "openBrowserView"
+  "openSurface" | "openDestination" | "commitPlaceholder" | "addSurface" | "newTab"
 > {
   return {
     openSurface: (request) => {
@@ -129,24 +121,6 @@ export function workspaceOpenActions(
         view = createBlankWorkspaceView();
       set(withLayout(current, appendTab(current.layout, singleViewTab(view))));
       return view;
-    },
-    openBrowserView: (request = {}) => {
-      const url = request.url?.trim() || browserNewTabUrl(isIncognitoWindow());
-      const tab = get().openSurface({
-        surfaceId: "browser",
-        groupKey: "tool:browser",
-        title: browserViewTitle(url),
-        route: "/browser",
-        state: {
-          ...createBrowserViewState(url),
-          bookmarkId: request.bookmarkId,
-        },
-        instancePolicy: "multiple",
-        forceNew: true,
-        paneId: request.paneId,
-      });
-      get().focusView(tab.id);
-      return tab;
     },
   };
 }

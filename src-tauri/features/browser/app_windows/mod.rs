@@ -1,13 +1,11 @@
 //! Every Misty window belongs to one profile for its whole life, as in Chrome: its tabs, the
-//! store its pages open in, its extensions and its saved data are that profile's. A profile can
+//! store its pages open in and its saved data are that profile's. A profile can
 //! have several windows. This module owns the window labels and each window's profile; it is
 //! the only place that names a window, and no other native code may spell a label.
 //!
 //! - `window-<n>`: an app window, with the full workspace.
-//! - `incognito-<n>`: an incognito window. All of a profile's incognito windows share one
-//!   temporary session, erased when the last closes.
 //!
-//! Agents have no windows of their own; their tabs live in the person's window
+//! Agents have no windows of their own; their tabs live in the person's window.
 //!
 //! A window's profile is kept here, natively, and is never taken from anything a renderer
 //! sends. Which Space a window shows is the renderer's: Spaces are shared content and own no
@@ -44,7 +42,6 @@ pub mod workspace_recovery;
 /// start with the same profile and there is nothing to reconcile.
 pub const PERSONAL: &str = "personal";
 const WINDOW_PREFIX: &str = "window-";
-const INCOGNITO_PREFIX: &str = "incognito-";
 /// Emitted to a window's app when its profile's name or color changes.
 pub const PROFILE_CHANGED_EVENT: &str = "misty://profile-window";
 /// Emitted to every window when the list of profiles changes.
@@ -56,8 +53,6 @@ pub const ORPHANS_EVENT: &str = "misty://profile-window-orphans";
 pub struct ProfileWindow {
     /// The profile this window belongs to.
     pub profile: String,
-    /// Whether this is an incognito window.
-    pub incognito: bool,
 }
 
 /// What this process knows about an open window.
@@ -91,15 +86,10 @@ fn label_number(label: &str, prefix: &str) -> Option<u32> {
     number.parse::<u32>().ok().filter(|n| *n > 0)
 }
 
-/// A new label for an app window or an incognito window.
-pub(crate) fn new_label(incognito: bool) -> String {
+/// A new label for an app window.
+pub(crate) fn new_label() -> String {
     let number = NEXT_WINDOW.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-    let prefix = if incognito {
-        INCOGNITO_PREFIX
-    } else {
-        WINDOW_PREFIX
-    };
-    format!("{prefix}{number}")
+    format!("{WINDOW_PREFIX}{number}")
 }
 
 /// Records a window when it opens. Only window creation and an account change call this.
@@ -125,11 +115,7 @@ pub(crate) fn current_windows() -> Vec<(String, WindowState)> {
                 .collect()
         })
         .unwrap_or_default();
-    windows.sort_by_key(|(label, _)| {
-        label_number(label, WINDOW_PREFIX)
-            .or_else(|| label_number(label, INCOGNITO_PREFIX))
-            .unwrap_or(u32::MAX)
-    });
+    windows.sort_by_key(|(label, _)| label_number(label, WINDOW_PREFIX).unwrap_or(u32::MAX));
     windows
 }
 
@@ -137,18 +123,11 @@ pub(crate) fn window_state(label: &str) -> Option<WindowState> {
     CURRENT.lock().ok()?.get(label).cloned()
 }
 
-/// The app window or incognito window a label names, with its profile; `None` for every
-/// other label.
+/// The app window a label names, with its profile; `None` for every other label.
 pub fn parse(label: &str) -> Option<ProfileWindow> {
-    let incognito = if label_number(label, WINDOW_PREFIX).is_some() {
-        false
-    } else if label_number(label, INCOGNITO_PREFIX).is_some() {
-        true
-    } else {
-        return None;
-    };
+    label_number(label, WINDOW_PREFIX)?;
     let profile = window_state(label)?.profile;
-    Some(ProfileWindow { profile, incognito })
+    Some(ProfileWindow { profile })
 }
 
 /// The profile a window belongs to. Unknown labels have none.
@@ -156,19 +135,15 @@ pub fn profile_for_window(label: &str) -> Option<String> {
     parse(label).map(|window| window.profile)
 }
 
-/// A window the person works in: not incognito. Menus, quitting, session recovery, voice
-/// and the machine's background work belong to these alone.
+/// A window the person works in. Menus, quitting, session recovery, voice and the machine's
+/// background work belong to these alone.
 pub fn is_person_window(label: &str) -> bool {
     label_number(label, WINDOW_PREFIX).is_some()
 }
 
-pub fn is_incognito_window(label: &str) -> bool {
-    label_number(label, INCOGNITO_PREFIX).is_some()
-}
-
-/// Any Misty app window, incognito included: the bundled app runs in it.
+/// A window the bundled app runs in. Every one is a person's window.
 pub fn is_app_window(label: &str) -> bool {
-    is_person_window(label) || is_incognito_window(label)
+    is_person_window(label)
 }
 
 /// A store identity for a profile of this account, the same every launch.
@@ -177,8 +152,9 @@ pub(crate) fn derived_store(scope: &str, profile: &str) -> Option<String> {
     Some(hex::encode(Sha256::digest(bytes)))
 }
 
-/// The 128-bit id the engine knows an incognito session by.
-pub fn incognito_store_id(session: &str) -> [u8; 16] {
+/// The 128-bit id the engine knows a temporary session by: pages opened in one keep nothing
+/// once it ends. Only the eval bridge's test pages use one.
+pub fn temporary_store_id(session: &str) -> [u8; 16] {
     let digest = Sha256::digest(format!("misty.incognito-session.v1:{session}").as_bytes());
     let mut id = [0; 16];
     id.copy_from_slice(&digest[..16]);

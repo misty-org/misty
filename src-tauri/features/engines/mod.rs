@@ -10,6 +10,7 @@ mod codex;
 pub mod commands;
 pub mod connections;
 pub(crate) mod mcp;
+pub mod multirun;
 mod opencode;
 pub mod resolve;
 pub mod runs;

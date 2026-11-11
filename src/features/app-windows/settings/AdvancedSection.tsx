@@ -36,12 +36,6 @@ export function AdvancedSection(props: SettingsContentProps) {
         <SettingsRow label="Link and loading status" description="Shown in the page's corner.">
           <SwitchControl {...toggle("general", "browser_status_bubble", true)} />
         </SettingsRow>
-        <SettingsRow
-          label="Mouse gestures"
-          description="Hold the right button and drag to go back, forward or reload."
-        >
-          <SwitchControl {...toggle("general", "browser_mouse_gestures", false)} />
-        </SettingsRow>
         <SettingsRow label="Sleep hidden tabs" description="Tabs playing sound keep running.">
           <ChoiceControl
             value={String(

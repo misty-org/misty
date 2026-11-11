@@ -1,10 +1,11 @@
-import { mapLayoutViews } from "../panes/layoutTabs";
-import {
-  browserViewTitle,
-  createBrowserViewState,
-  parseBrowserViewState,
-  type WorkspaceLayout,
-  type WorkspaceView,
+import { createDockLeaf } from "../panes/dockTree";
+import { activateTab, emptyTab } from "../panes/layoutTabs";
+import type {
+  WorkspaceDockNode,
+  WorkspaceLayout,
+  WorkspacePane,
+  WorkspaceTab,
+  WorkspaceView,
 } from "../tabs/workspaceViews";
 /** Saved views synced from records without a route; restore them at their tool's root. */
 const missingRouteFallback: Partial<Record<string, string>> = {
@@ -12,9 +13,6 @@ const missingRouteFallback: Partial<Record<string, string>> = {
   agents: "/agents",
   scheduled: "/scheduled",
 };
-/** Extensions are added from their stores' own sites now; a saved Extensions
- * page reopens as the Chrome Web Store. */
-const extensionsMovedUrl = "https://chromewebstore.google.com/";
 /** A saved view restore could not carry forward. Its original stays in the
  * archived copy of the saved workspace. */
 export interface UnrestoredView {
@@ -38,9 +36,15 @@ export function collectUnrestoredViews<T>(restore: () => T): {
   }
 }
 
-/** Never throws: one damaged view becomes an empty placeholder in its place
- * instead of stopping the rest of the workspace from restoring. */
-export function migrateRetiredWorkspaceView(view: WorkspaceView): WorkspaceView {
+/**
+ * What a saved view is now: itself, the page that took over from its tool, or `null` when it
+ * was a web page or a tool that is gone. A window shows web pages only to agents, beside their
+ * chat, so a person's saved pages aren't brought back.
+ *
+ * Never throws: one damaged view becomes an empty placeholder in its place instead of stopping
+ * the rest of the workspace from restoring.
+ */
+export function migrateRetiredWorkspaceView(view: WorkspaceView): WorkspaceView | null {
   try {
     return migrateView(view);
   } catch (error) {
@@ -50,19 +54,19 @@ export function migrateRetiredWorkspaceView(view: WorkspaceView): WorkspaceView 
     return {
       id,
       instanceKey: id,
-      surfaceId: "browser",
-      groupKey: "tool:browser",
-      title,
-      route: "/browser",
-      sidebarVisible: false,
-      state: createBrowserViewState(),
+      surfaceId: "agents",
+      groupKey: "tool:agents",
+      title: title || "Agents",
+      route: "/agents",
+      sidebarVisible: true,
+      state: {},
       placeholder: true,
       createdAt: typeof view?.createdAt === "number" ? view.createdAt : 0,
       lastFocusedAt: typeof view?.lastFocusedAt === "number" ? view.lastFocusedAt : 0,
     };
   }
 }
-function migrateView(view: WorkspaceView): WorkspaceView {
+function migrateView(view: WorkspaceView): WorkspaceView | null {
   const tab =
     typeof view.route === "string"
       ? view
@@ -80,8 +84,6 @@ function migrateView(view: WorkspaceView): WorkspaceView {
     };
   }
   if (tab.surfaceId === "space" && /^\/spaces(?:\/|$)/.test(tab.route)) return tab;
-  // Files and Transfers moved to Kura, a separate app; their saved views
-  // become new browser tabs below.
   const agents = tab.surfaceId === "agents" || tab.groupKey === "app:agents";
   if (agents) {
     // Legacy Scheduled routes keep their section inside Agents.
@@ -94,21 +96,52 @@ function migrateView(view: WorkspaceView): WorkspaceView {
       placeholder: tab.placeholder,
     };
   }
-  const wasBrowser = tab.surfaceId === "browser" || tab.groupKey === "app:browser";
-  const state = wasBrowser
-    ? parseBrowserViewState(tab.state)
-    : createBrowserViewState(tab.surfaceId === "extensions" ? extensionsMovedUrl : undefined);
+  // A web page, or a tool that is gone (Home, Files, Transfers, Extensions and the like).
+  return null;
+}
+
+/** A pane tree without the views that are gone; `null` when none of its views is left. */
+function migrateNode(node: WorkspaceDockNode): WorkspaceDockNode | null {
+  if (node.type === "split") {
+    const first = migrateNode(node.first);
+    const second = migrateNode(node.second);
+    if (!first || !second) return first ?? second;
+    return { ...node, first, second };
+  }
+  const views = (node.views ?? []).flatMap((view) => migrateRetiredWorkspaceView(view) ?? []);
+  if (!views.length) return null;
+  const entries = node.history?.entries?.flatMap((view) => migrateRetiredWorkspaceView(view) ?? []);
+  const at = Number.isFinite(node.history?.index) ? node.history!.index : 0;
   return {
-    ...tab,
-    surfaceId: "browser",
-    groupKey: "tool:browser",
-    route: "/browser",
-    instanceKey: tab.instanceKey || tab.id,
-    state,
-    placeholder: tab.placeholder,
-    title: wasBrowser && tab.title ? tab.title : browserViewTitle(state.url),
+    ...node,
+    views,
+    activeViewId: views.some((view) => view.id === node.activeViewId)
+      ? node.activeViewId
+      : views[0].id,
+    history: entries?.length
+      ? { entries, index: Math.max(0, Math.min(at, entries.length - 1)) }
+      : undefined,
   };
 }
+
+/** A pane as it was when one of its views closed, without the views that are gone. */
+export function migrateRetiredWorkspacePane(pane: WorkspacePane): WorkspacePane | undefined {
+  const migrated = migrateNode(pane);
+  return migrated?.type === "leaf" ? migrated : undefined;
+}
+
+/** A tab without the views that are gone; `null` when it held nothing else. */
+export function migrateRetiredWorkspaceTab(tab: WorkspaceTab): WorkspaceTab | null {
+  const root = migrateNode(tab.root);
+  return root ? { ...tab, root } : null;
+}
+
+/** A window's tabs without the views that are gone. A window left with none has no tabs. */
 export function migrateRetiredWorkspaceViews(layout: WorkspaceLayout): WorkspaceLayout {
-  return mapLayoutViews(layout, migrateRetiredWorkspaceView);
+  if (!layout.tabs?.length)
+    return { ...layout, root: migrateNode(layout.root) ?? createDockLeaf() };
+  const kept = layout.tabs.flatMap((tab) => migrateRetiredWorkspaceTab(tab) ?? []);
+  const tabs = kept.length ? kept : [emptyTab()];
+  const active = tabs.find((tab) => tab.id === layout.activeTabId) ?? tabs[0];
+  return activateTab({ ...layout, tabs }, active.id);
 }

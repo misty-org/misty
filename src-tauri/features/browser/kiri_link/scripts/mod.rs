@@ -48,11 +48,7 @@ pub(in crate::browser) fn browser_viewport_script(
         )
         .replace(
             "__MISTY_CONTEXT_MENU_PLACEHOLDER__",
-            concat!(
-                include_str!("context_menu.js"),
-                "\n",
-                include_str!("extension_store.js")
-            ),
+            include_str!("context_menu.js"),
         )
         .replace(
             "__MISTY_SHORTCUT_TOKEN_PLACEHOLDER__",

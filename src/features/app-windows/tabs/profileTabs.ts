@@ -9,12 +9,10 @@ import {
 } from "../page-runtime/browserRuntimeSets";
 import { holdMedia, keepMediaHolds, releaseMedia } from "../page-runtime/mediaHold";
 import { isUntouched } from "./adoptWindowTabs";
-import { browserInternalPage } from "../addresses/browserInternalUrl";
 import { dockTreeViews } from "../panes/dockTree";
 import { activateTab, emptyTab, layoutTabs } from "../panes/layoutTabs";
 import type { WorkspaceTab } from "./workspaceViews";
 import {
-  browserUrls,
   encodedFields,
   tabFields,
   tabFromFields,
@@ -23,20 +21,22 @@ import {
   type TabFields,
 } from "./profileTabRecord";
 import { currentProfile } from "../profiles/profileWindow";
-import { contiguousTabs, type MistyTabGroup } from "../tab-groups/tabGroups";
 import { keepPreloads, preloadArrived, preloadSeen, preloadsToReload } from "./tabPreload";
 import { keepFromElsewhere, markFromElsewhere } from "./tabsFromElsewhere";
 import { useWorkspaceStore } from "./useWorkspaceStore";
 import { normalizeWorkspaceLayout } from "../profiles/windows";
+import { migrateRetiredWorkspaceTab } from "../recovery/workspaceMigrations";
 
 /**
  * Keeps this window's tabs and the profile's in step. A tab closed here is closed everywhere, a
  * tab from elsewhere arrives without a page until `tabPreload` lets it load, and a window closing
  * says nothing: its tabs stay in the profile. The native side knows which window holds which tab.
+ *
+ * A tab from a computer on an older version can hold a person's web pages. Those don't open
+ * here: the tab arrives without them, and one that held nothing else isn't taken, which closes
+ * it for the profile the way closing it here would.
  */
 const publishDelayMs = 1_000;
-/** A page moved because of another computer settles here without moving that one back. */
-const settlingMs = 5_000;
 /** Sign-ins for a site come in several records; a page loads again once for all of them. */
 const signInReloadDelayMs = 2_000;
 
@@ -46,24 +46,10 @@ interface TabsForWindow {
 }
 
 function ownTabs(): { tab: WorkspaceTab; fields: TabFields }[] {
-  const { layout, tabGroups } = useWorkspaceStore.getState();
+  const { layout } = useWorkspaceStore.getState();
   return layoutTabs(layout)
     .filter((tab) => !tabStaysHere(tab))
-    .map((tab, order) => ({ tab, fields: tabFields(tab, order, tabGroups) }));
-}
-
-/** `quiet`: nobody here is looking at it, so what the new page plays waits until someone does. */
-function navigate(tab: WorkspaceTab, before: Map<string, string>, quiet: boolean) {
-  for (const view of dockTreeViews(tab.root)) {
-    const url = browserUrls(tab).get(view.id);
-    const previous = before.get(view.id);
-    if (!url || !previous || url === previous) continue;
-    if (browserInternalPage(url) || !browserRuntimeCreated(view)) continue;
-    const id = browserRuntimeId(view);
-    void (quiet ? holdMedia(view.id, id) : Promise.resolve())
-      .then(() => invoke("browser_webview_navigate", { request: { id, url } }))
-      .catch(() => undefined);
-  }
+    .map((tab, order) => ({ tab, fields: tabFields(tab, order) }));
 }
 
 export function startProfileTabs(): () => void {
@@ -126,7 +112,6 @@ export function startProfileTabs(): () => void {
     for (const id of removed) baseline.delete(id);
     if (!incoming.length && !removed.size) return;
     const state = useWorkspaceStore.getState();
-    const groups: MistyTabGroup[] = [...state.tabGroups];
     const order = new Map<string, number>();
     let tabs = layoutTabs(state.layout).filter((tab) => !removed.has(tab.id));
     tabs.forEach((tab, index) => order.set(tab.id, index));
@@ -135,21 +120,13 @@ export function startProfileTabs(): () => void {
       baseline.set(id, encodedFields(fields));
       order.set(id, fields.order);
       const previous = tabs.find((tab) => tab.id === id);
-      const next = tabFromFields(id, fields, previous);
-      if (fields.group) {
-        const { group } = fields;
-        const known = groups.findIndex((item) => item.id === group.id);
-        if (known < 0) groups.push({ ...group, collapsed: false });
-        else groups[known] = { ...groups[known], name: group.name, color: group.color };
+      const next = migrateRetiredWorkspaceTab(tabFromFields(id, fields, previous));
+      if (!next) {
+        tabs = tabs.filter((tab) => tab.id !== id);
+        continue;
       }
       if (previous) {
-        const before = browserUrls(previous);
         tabs = tabs.map((tab) => (tab.id === id ? next : tab));
-        const moved = [...browserUrls(next)].some(([view, url]) => before.get(view) !== url);
-        if (moved) {
-          settling.set(id, Date.now() + settlingMs);
-          navigate(next, before, !focused || id !== state.layout.activeTabId);
-        }
       } else {
         tabs.push(next);
         arrived.push(id);
@@ -164,9 +141,8 @@ export function startProfileTabs(): () => void {
     const untouched = arrived.length > 0 && isUntouched(state.layout);
     if (untouched) tabs = tabs.filter((tab) => !tabStaysHere(tab));
     if (!tabs.length) tabs = [emptyTab()];
-    tabs = contiguousTabs(
-      [...tabs].sort((a, b) => (order.get(a.id) ?? tabs.length) - (order.get(b.id) ?? tabs.length)),
-    );
+    const end = tabs.length;
+    tabs = [...tabs].sort((a, b) => (order.get(a.id) ?? end) - (order.get(b.id) ?? end));
     const held = tabs.find((tab) => tab.id === state.layout.activeTabId);
     const first = untouched ? tabs.find((tab) => arrived.includes(tab.id)) : undefined;
     const active = held ?? first ?? tabs[0];
@@ -183,7 +159,6 @@ export function startProfileTabs(): () => void {
     );
     useWorkspaceStore.setState({
       layout: normalizeWorkspaceLayout(activateTab({ ...state.layout, tabs }, active.id)),
-      tabGroups: groups,
     });
   };
 
@@ -213,7 +188,7 @@ export function startProfileTabs(): () => void {
   };
 
   const unsubscribe = useWorkspaceStore.subscribe((state, previous) => {
-    if (state.layout === previous.layout && state.tabGroups === previous.tabGroups) return;
+    if (state.layout === previous.layout) return;
     const opened = layoutTabs(state.layout).find((tab) => tab.id === state.layout.activeTabId);
     if (opened) {
       if (settling.get(opened.id) === Number.POSITIVE_INFINITY) settling.delete(opened.id);

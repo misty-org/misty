@@ -323,7 +323,15 @@ pub async fn run(program: &Path, request: TurnRequest, link: TurnLink) -> Result
         .send()
         .await
         .map_err(|error| format!("OpenCode's events could not be read: {error}"))?;
-    let mut prompt = json!({ "parts": [{ "type": "text", "text": request.prompt }] });
+    let mut parts = vec![json!({ "type": "text", "text": request.prompt })];
+    for image in &request.images {
+        parts.push(json!({
+            "type": "file",
+            "mime": image.mime,
+            "url": format!("data:{};base64,{}", image.mime, image.data),
+        }));
+    }
+    let mut prompt = json!({ "parts": parts });
     if let Some((provider, model)) = request
         .model
         .as_deref()

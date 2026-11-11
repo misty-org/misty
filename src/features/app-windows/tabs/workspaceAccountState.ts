@@ -12,7 +12,6 @@ import {
   workspaceRecoveryStorage,
 } from "../recovery/workspaceRecoveryStorage";
 import { useWorkspaceStore } from "./useWorkspaceStore";
-import { isIncognitoWindow } from "../profiles/profileWindow";
 import { migrateWorkspaceStore, partialWorkspaceStore } from "./workspaceStorePersistence";
 
 function workspaceAccountStorageKey(accountId: string): string {
@@ -20,8 +19,6 @@ function workspaceAccountStorageKey(accountId: string): string {
 }
 
 export function saveAccountWorkspace(accountId: string): void | Promise<void> {
-  // An incognito window keeps nothing.
-  if (isIncognitoWindow()) return;
   if (nativeWorkspaceRecoveryEnabled()) return flushNativeWorkspace(accountId);
   const normalized = accountId.trim();
   if (!normalized) return;
@@ -37,10 +34,6 @@ export function saveAccountWorkspace(accountId: string): void | Promise<void> {
 }
 
 export function restoreAccountWorkspace(accountId: string): void | Promise<void> {
-  if (isIncognitoWindow()) {
-    useWorkspaceStore.getState().reset();
-    return;
-  }
   if (nativeWorkspaceRecoveryEnabled()) return restoreNativeWorkspace(accountId);
   const normalized = accountId.trim();
   if (!normalized) {
@@ -77,7 +70,6 @@ export function adoptAccountWorkspace(
   accountId: string,
   live: ReturnType<typeof partialWorkspaceStore>,
 ): void | Promise<void> {
-  if (isIncognitoWindow()) return;
   useWorkspaceStore.setState(live);
   if (nativeWorkspaceRecoveryEnabled()) return restoreNativeWorkspace(accountId, true);
   saveAccountWorkspace(accountId);
@@ -85,18 +77,10 @@ export function adoptAccountWorkspace(
 
 /** The windows and tabs on screen, to carry across an identity change. */
 export function liveWorkspace(): ReturnType<typeof partialWorkspaceStore> {
-  const state = useWorkspaceStore.getState();
-  // Bookmarks and saved groups aren't in a window's own record; they carry across too.
-  return {
-    ...partialWorkspaceStore(state),
-    tabGroups: state.tabGroups,
-    bookmarkFolders: state.bookmarkFolders,
-    bookmarks: state.bookmarks,
-  };
+  return partialWorkspaceStore(useWorkspaceStore.getState());
 }
 
 export function removeAccountWorkspace(accountId: string): void | Promise<void> {
-  if (isIncognitoWindow()) return;
   if (nativeWorkspaceRecoveryEnabled()) return removeNativeAccountWorkspace(accountId);
   const normalized = accountId.trim();
   if (!normalized) return;

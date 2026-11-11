@@ -31,7 +31,7 @@ export const memoryApi = {
     app?: string;
     window_title?: string;
     session_id?: string;
-    /** The Space of the window the page was in; incognito windows record nothing. */
+    /** The Space of the window the page was in. */
     space_id?: string;
   }) => localMemory.record(event),
   events: async (query: {

@@ -104,11 +104,7 @@ pub(super) fn navigate_message(raw: &str) -> Option<Url> {
     }
     let message: NavigateMessage = serde_json::from_str(raw).ok()?;
     let url = Url::parse(&message.navigate).ok()?;
-    matches!(
-        url.scheme(),
-        "misty-shortcut" | "misty-context-menu" | "misty-extension-store"
-    )
-    .then_some(url)
+    matches!(url.scheme(), "misty-shortcut" | "misty-context-menu").then_some(url)
 }
 
 #[derive(serde::Deserialize)]

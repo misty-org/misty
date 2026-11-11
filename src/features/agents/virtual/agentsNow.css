@@ -8,26 +8,61 @@
   min-width: 0;
   align-items: center;
   gap: 12px;
-  padding: 12px;
+  padding: 12px 14px;
   border: 1px solid var(--color-charcoal-border);
-  border-radius: 12px;
+  border-radius: 16px;
   background: color-mix(in srgb, var(--misty-theme-text) 3%, transparent);
   color: var(--color-cream-muted);
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease;
 }
 .agents-now-card:is(button):hover {
+  border-color: var(--color-charcoal-border-strong);
   background: color-mix(in srgb, var(--misty-theme-text) 6%, transparent);
 }
-.agents-now-card:focus-visible {
-  outline: 1px solid var(--color-cream-muted);
+.agents-now-card .agent-avatar {
+  width: 36px;
+  height: 36px;
 }
-/* One that needs its person stands out by weight and a stronger edge, not by color. */
+.agents-now-doing {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+.agents-now-dot {
+  width: 6px;
+  height: 6px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: currentColor;
+}
+/* Color says the state and nothing else: blue while it works, amber when it waits for its person. */
+.agents-now-card[data-state="working"] .agents-now-doing {
+  color: var(--color-tone-blue);
+}
+.agents-now-card[data-state="working"] .agents-now-dot {
+  animation: agents-now-pulse 1.6s ease-in-out infinite;
+}
 .agents-now-card[data-state="needs-you"] {
-  border-color: color-mix(in srgb, var(--misty-theme-text) 45%, transparent);
+  border-color: color-mix(in srgb, var(--color-tone-amber) 40%, var(--color-charcoal-border));
 }
 .agents-now-card[data-state="needs-you"] .agents-now-doing {
-  color: var(--color-cream);
-  font-weight: 600;
+  color: var(--color-tone-amber);
+  font-weight: 500;
 }
 .agents-now-card[data-state="resting"] .agent-avatar {
-  opacity: 0.7;
+  opacity: 0.8;
+}
+@keyframes agents-now-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .agents-now-card[data-state="working"] .agents-now-dot {
+    animation: none;
+  }
 }

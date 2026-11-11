@@ -10,7 +10,7 @@ import { RenderErrorBoundary } from "../RenderErrorBoundary";
 import { FlyingMisty } from "@/shared/ui";
 
 export function WorkspaceSurface({ tab }: { tab: WorkspaceView }) {
-  const current = migrateRetiredWorkspaceView(tab);
+  const current = migrateRetiredWorkspaceView(tab) ?? tab;
   return (
     <RenderErrorBoundary key={`${current.id}:${current.surfaceId}`} scope="tab">
       <div
@@ -24,7 +24,7 @@ export function WorkspaceSurface({ tab }: { tab: WorkspaceView }) {
           ) : current.surfaceId === "agents" || current.surfaceId === "scheduled" ? (
             <AgentsPage />
           ) : (
-            // A web page saved from before pages belonged to agents; it closes as the window opens.
+            // A view this build has no page for. Saved ones are dropped as a window loads.
             <EmptyWorkspacePane />
           )}
         </WorkspaceViewRouteScope>

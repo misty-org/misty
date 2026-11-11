@@ -1,6 +1,6 @@
 import type { ShortcutCommandDefinition } from "./shortcutTypes";
 import { command } from "./factory";
-import { tabFeatureCommands } from "./browserFeatureCommands";
+import { tabFeatureCommands } from "./viewAndTabCommands";
 
 /** Window, tab and pane commands. */
 export const workspaceCommands: ShortcutCommandDefinition[] = [
@@ -16,21 +16,10 @@ export const workspaceCommands: ShortcutCommandDefinition[] = [
     nativeMenu: true,
   }),
   command("workspace.new_profile", "New profile", {
-    description: "Add a profile, with its own tabs, sign-ins, bookmarks and extensions.",
+    description: "Add a profile, with its own tabs and website sign-ins.",
     category: "Windows",
     scope: "workspace",
     aliases: ["add profile", "create profile"],
-    allowInEditable: true,
-    nativeMenu: true,
-  }),
-  command("workspace.new_incognito_window", "New incognito window", {
-    description:
-      "Browse in this profile without saving history, cookies or site data. Its incognito windows share one session until the last one closes.",
-    category: "Windows",
-    scope: "workspace",
-    aliases: ["incognito", "private window", "private browsing"],
-    mac: "Cmd+Option+N",
-    windows: "Ctrl+Alt+N",
     allowInEditable: true,
     nativeMenu: true,
   }),

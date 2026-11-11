@@ -3,8 +3,6 @@ import { useWorkspacePagePreview } from "@/features/app-windows";
 import { panePlacement } from "@/features/app-windows";
 import { keepsLayoutWhileHidden } from "./keptTabs";
 import { selectPaneFocusPreferences } from "@/features/app-windows";
-import { browserRuntimeId } from "@/features/app-windows";
-import { useBrowserPaneDim } from "@/features/browser";
 import { useSettingsStore } from "@/features/settings";
 import { allLayoutViews } from "@/features/app-windows";
 import { usePointerDropTarget } from "@/shared/hooks/usePointerReorder";
@@ -165,9 +163,6 @@ export function DockLeafView(props: WorkspaceDockTreeProps & { pane: WorkspacePa
     props.workspaceActive !== false && multiPane && !focused && focusPreferences.dim
       ? focusPreferences.strength
       : 0;
-  // A browser page draws above the pane, so the host dims it natively.
-  const activeView = pane.views.find((view) => view.id === pane.activeViewId);
-  useBrowserPaneDim(activeView?.surfaceId === "browser" ? browserRuntimeId(activeView) : null, dim);
 
   const dragOver = (event: DragEvent<HTMLElement>) => {
     if (!event.dataTransfer.types.includes(viewDragType)) return;

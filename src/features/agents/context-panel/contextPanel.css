@@ -164,3 +164,164 @@
   padding: 8px 4px 4px 10px;
   background: var(--color-charcoal-bg);
 }
+
+/* The preview tab: an address row, the person's running app, and the element they picked. */
+.preview-panel {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+}
+.preview-bar {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 8px;
+  border-bottom: 1px solid color-mix(in srgb, var(--misty-theme-text) 8%, transparent);
+}
+.preview-bar .preview-address {
+  flex: 1;
+  font-family: var(--font-mono, ui-monospace, Menlo, monospace);
+  font-size: 12px;
+}
+.preview-refused {
+  flex: none;
+  margin: 0;
+  padding: 8px 12px;
+  border-bottom: 1px solid color-mix(in srgb, var(--misty-theme-text) 8%, transparent);
+  font-size: 12px;
+  color: var(--context-changed);
+}
+.preview-stage {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  padding: 8px;
+}
+.preview-host {
+  position: relative;
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  border-radius: 10px;
+  outline: 1px solid color-mix(in srgb, var(--misty-theme-text) 10%, transparent);
+}
+/* While an element is being picked the page's frame says so; neutral, like every focus ring. */
+.preview-host[data-picking] {
+  outline: 2px solid var(--color-cream-muted);
+}
+.preview-skeleton {
+  position: absolute;
+  inset: 0;
+}
+.preview-note {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  padding: 24px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--color-cream-muted);
+}
+/* The native page sits beneath the renderer while a menu or dialog is open, so the panel around
+   its frame keeps its color and the part over the frame lets the page show through. */
+.agent-studio-context:has(.preview-host[data-browser-page-presented]) {
+  background: transparent;
+}
+.agent-studio-context:has(.preview-host[data-browser-page-presented]) > .context-head,
+.agent-studio-context:has(.preview-host[data-browser-page-presented]) .preview-bar,
+.agent-studio-context:has(.preview-host[data-browser-page-presented]) .preview-refused,
+.agent-studio-context:has(.preview-host[data-browser-page-presented]) .preview-card {
+  background: var(--color-charcoal-card);
+}
+.agent-studio-context:has(.preview-host[data-browser-page-presented]) .preview-stage {
+  box-shadow: inset 0 0 0 8px var(--color-charcoal-card);
+}
+.preview-card {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 46%;
+  padding: 12px;
+  overflow-y: auto;
+  border-top: 1px solid color-mix(in srgb, var(--misty-theme-text) 8%, transparent);
+}
+.preview-card-head {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+}
+.preview-card-picture {
+  width: 56px;
+  height: 40px;
+  flex: none;
+  border-radius: 6px;
+  object-fit: contain;
+  background: color-mix(in srgb, var(--misty-theme-text) 6%, transparent);
+}
+.preview-card-selector {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono, ui-monospace, Menlo, monospace);
+  font-size: 12.5px;
+  color: var(--color-cream);
+}
+.preview-card-size {
+  display: flex;
+  gap: 10px;
+  margin-top: 2px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-cream-muted);
+}
+.preview-card-size [data-errors] {
+  color: var(--context-removed);
+}
+.preview-card-styles {
+  display: grid;
+  gap: 3px;
+  margin: 0;
+  font-size: 12px;
+}
+.preview-card-styles > div {
+  display: flex;
+  min-width: 0;
+  gap: 8px;
+}
+.preview-card-styles dt {
+  flex: none;
+  width: 68px;
+  color: var(--color-cream-muted);
+}
+.preview-card-styles dd {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 5px;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono, ui-monospace, Menlo, monospace);
+  font-size: 11.5px;
+  color: var(--color-cream);
+}
+.preview-swatch {
+  width: 10px;
+  height: 10px;
+  flex: none;
+  border-radius: 3px;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--misty-theme-text) 25%, transparent);
+}
+.preview-card-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}

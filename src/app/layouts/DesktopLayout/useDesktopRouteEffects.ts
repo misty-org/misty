@@ -3,6 +3,7 @@ import { useSetupStore } from "@/features/account";
 import {
   activeLayoutView,
   allLayoutViews,
+  isRetiredWebRoute,
   useWorkspaceStore,
   workspaceSurfaceFromRoute,
 } from "@/features/app-windows";
@@ -57,14 +58,12 @@ export function useDesktopRouteEffects(options: {
       }
       return;
     }
-    const surface = workspaceSurfaceFromRoute(currentRoute);
-    // Web pages belong to agents. A route only shows one an agent already opened; it never
-    // opens one for the person, who lands on Agents.
-    if (surface?.surfaceId === "browser") {
-      if (activeLayoutView(useWorkspaceStore.getState().layout)?.route !== currentRoute)
-        navigate(routes.agents, { replace: true });
+    // Web pages belong to agents. A route that once opened one for the person lands on Agents.
+    if (isRetiredWebRoute(currentRoute)) {
+      navigate(routes.agents, { replace: true });
       return;
     }
+    const surface = workspaceSurfaceFromRoute(currentRoute);
     if (surface) {
       if (
         surface.route === currentRoute &&

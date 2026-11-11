@@ -101,8 +101,7 @@ impl Senders {
     }
 }
 
-/// The site a page in a persistent store belongs to. Misty's helper pages and anything in an
-/// incognito window have none.
+/// The site a page in a persistent store belongs to. Misty's helper pages have none.
 pub(super) fn page_of(webview: &Webview, url: &Url) -> Option<(String, Option<String>)> {
     let label = webview.label();
     if !label.starts_with("misty-browser-")
@@ -112,9 +111,6 @@ pub(super) fn page_of(webview: &Webview, url: &Url) -> Option<(String, Option<St
         return None;
     }
     let window = webview.window();
-    if app_windows::is_incognito_window(window.label()) {
-        return None;
-    }
     let profile = app_windows::profile_for_owner(window.label())?;
     let origin =
         matches!(url.scheme(), "http" | "https").then(|| url.origin().ascii_serialization());

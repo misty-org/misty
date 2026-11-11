@@ -105,13 +105,6 @@ fn session_scope(app: &AppHandle, label: &str) -> Option<StoreScope> {
     crate::browser::session_permission_scope(app, label.strip_prefix("misty-browser-")?)
 }
 
-/// The last private tab closed: its choices go with it. WebKit's private
-/// store carries them itself, so this applies to the other engines.
-pub(crate) fn forget_private_session() {
-    #[cfg(not(target_os = "macos"))]
-    store::forget_temporary();
-}
-
 fn require_host(caller: &Webview) -> Result<(), String> {
     if !crate::browser::app_windows::is_person_window(caller.label())
         && !caller.label().starts_with("misty-agent-")

@@ -17,11 +17,12 @@ import {
   MenuSubmenu,
 } from "@/shared/ui";
 import { ShortcutText } from "@/features/shortcuts/runtime";
-import { Check, LogIn, LogOut, Plus, Repeat2, Settings, UserCircle } from "lucide-react";
+import { Check, LifeBuoy, LogIn, LogOut, Plus, Repeat2, Settings, UserCircle } from "lucide-react";
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
 import { initialsForProfile } from "./accountMenuText";
+import { useHelpDialog } from "./HelpDialog";
 
 function Initials(props: { children: string }) {
   return (
@@ -32,7 +33,7 @@ function Initials(props: { children: string }) {
 }
 
 /** The account menu's rows: Settings, this window's profile and the account's other profiles,
- * account actions, and a submenu to switch saved accounts. */
+ * account actions, a submenu to switch saved accounts, and Help. */
 function AccountMenuItems(props: {
   onClose: () => void;
   onOpenAccountSettings: () => void;
@@ -79,7 +80,13 @@ function AccountMenuItems(props: {
     }
   };
 
-  // Signing out asks first: it keeps browsing, with an option to remove what's on this computer.
+  // The menu hands focus back as it closes, so the dialog opens after it.
+  const openHelp = () => {
+    props.onClose();
+    window.setTimeout(() => useHelpDialog.getState().setOpen(true), 0);
+  };
+
+  // Signing out asks first, with an option to remove what's on this computer.
   const signOut = () => {
     props.onClose();
     openSignOutSheet();
@@ -154,6 +161,7 @@ function AccountMenuItems(props: {
               }
             />
           </MenuSubmenu>
+          <MenuItem icon={<LifeBuoy />} label="Help" onSelect={openHelp} />
           <MenuItem
             icon={<LogOut />}
             label="Sign out…"

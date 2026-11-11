@@ -7,9 +7,9 @@ beforeEach(() => {
   useWorkspaceStore.persist.clearStorage();
   useWorkspaceStore.getState().reset();
 });
-it("opens Spaces beside a browser and keeps both pane identities while changing tools", () => {
+it("opens a Space beside Agents and keeps both pane identities while changing tools", () => {
   const store = useWorkspaceStore.getState();
-  const browser = store.openSurface(workspaceSurfaceFromRoute("/browser")!);
+  const browser = store.openSurface(workspaceSurfaceFromRoute("/agents")!);
   const browserPane = useWorkspaceStore.getState().layout.focusedPaneId;
   const spacePane = store.splitPane(browserPane, "right");
   expect(spacePane).toBeTruthy();

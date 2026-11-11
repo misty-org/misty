@@ -64,7 +64,6 @@ pub(super) async fn open(bridge: &Bridge, body: OpenTab) -> Result<Value, String
         // Agents' own tabs are parked out of sight, still rendering, as in production.
         if !body.visible {
             browser_webview_hide(
-                main_view(app)?,
                 app.clone(),
                 serde_json::from_value(json!({ "id": id, "keepLive": true }))
                     .map_err(|e| e.to_string())?,

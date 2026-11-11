@@ -8,16 +8,19 @@ import { FolderPicker, useProjectFolder } from "./FolderPicker";
 import "./contextPanel.css";
 
 const TerminalPanel = lazy(() => import("./TerminalPanel"));
+const PreviewPanel = lazy(() => import("../preview/PreviewPanel"));
 
 const titles: Record<ContextPanelTab, string> = {
   files: "Files",
   changes: "Changes",
   terminal: "Terminal",
+  preview: "Preview",
 };
 
 /**
  * The panel beside a chat: the Space's linked project folder as files, as Git changes, or as a
  * terminal. Agents on outside engines work in the same folder, so this is where their work shows.
+ * The preview tab shows the person's running app instead, and needs no folder.
  */
 export function AgentContextPanel(props: {
   tab: ContextPanelTab;
@@ -29,9 +32,13 @@ export function AgentContextPanel(props: {
     <>
       <header className="context-head">
         <h2 className="text-sm font-medium text-cream">{titles[props.tab]}</h2>
-        <FolderPicker />
+        {props.tab === "preview" ? null : <FolderPicker />}
       </header>
-      {!loaded ? (
+      {props.tab === "preview" ? (
+        <Suspense fallback={<div className="min-h-0 flex-1" />}>
+          <PreviewPanel />
+        </Suspense>
+      ) : !loaded ? (
         <div className="grid gap-2 p-3" aria-hidden="true">
           <Skeleton className="h-4 w-40" />
           <Skeleton className="h-4 w-56" />

@@ -8,8 +8,6 @@ import {
 import { configureTabHistoryBudget } from "@/features/browser";
 import { configureStartupPreference } from "@/app/shell";
 import { configureBrowserHomeUrl } from "@/features/app-windows";
-import { configureBrowserSearchSuggestions } from "@/features/app-windows";
-import { configureDeviceBangs } from "@/features/app-windows";
 import { configureWorkspaceDefaultView } from "@/features/app-windows";
 import { workspaceDefaultViewIndex } from "@/features/settings";
 import {
@@ -20,7 +18,6 @@ import {
 import { configureBrowserSiteZoom } from "@/features/browser";
 import { configureBrowserSiteStyles } from "@/features/browser";
 import { configureHiddenTabSleep } from "@/features/browser";
-import { configureTabArchive } from "@/features/app-windows";
 import { configureLinkPreviews } from "@/features/files";
 import {
   onSettingsApplied,
@@ -55,14 +52,8 @@ function applyFeatureSettings(
   }
   configureTabHistoryBudget(settingsNumber(document, "general", "browser_tab_history_kb", 256));
   configureBrowserHomeUrl(settingsString(document, "general", "browser_homepage", ""));
-  configureBrowserSearchSuggestions(
-    settingsBoolean(document, "general", "browser_search_suggestions", false),
-  );
-  // Bangs are the profile's; this computer's own list applies while those can't be read.
-  configureDeviceBangs(settingsString(document, "general", "browser_custom_bangs_json", "[]"));
   configureBrowserSiteZoom(settingsString(document, "general", "browser_site_zoom_json", "[]"));
   configureBrowserSiteStyles(settingsString(document, "general", "browser_site_styles_json", "[]"));
-  configureTabArchive(settingsNumber(document, "general", "browser_auto_archive_hours", 0));
   configureHiddenTabSleep(
     settingsNumber(document, "general", "browser_hidden_tab_sleep_seconds", 0),
   );

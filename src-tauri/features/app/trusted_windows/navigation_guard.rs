@@ -61,7 +61,6 @@ mod tests {
     fn privileged_views_load_only_the_bundled_app() {
         for label in [
             "space-personal",
-            "incognito-personal-1",
             "misty-agent-01951d32-40ac-7000-8000-000000000001",
             "misty-cursor-1",
             "misty-bot-pet",

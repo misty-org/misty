@@ -27,9 +27,7 @@ export function useFocusSettingRow(focus: { label: string; request: number }) {
       else if (scroller) {
         const offset = element.getBoundingClientRect().top - scroller.getBoundingClientRect().top;
         scroller.scrollTop =
-          scroller.scrollTop +
-          offset -
-          (scroller.clientHeight - element.offsetHeight) / 2;
+          scroller.scrollTop + offset - (scroller.clientHeight - element.offsetHeight) / 2;
       }
       const target = wholeBlock
         ? element

@@ -13,7 +13,6 @@ import { useSetupStore } from "@/features/account";
 import { desktopRouteIdFromPath } from "../routing/navigation";
 import { DeviceSessionBridge } from "@/features/agents";
 import { UnsavedQuitGuard } from "@/features/app-windows";
-import { useProfileWindowStore } from "@/features/app-windows";
 import { SpaceWindowBridge } from "@/features/spaces";
 import { accountScopeFor } from "@/features/app-windows";
 
@@ -48,7 +47,6 @@ export function AppFrameLayout() {
   // Browsing data belongs to the signed-in account, or to the local profile with none.
   const accountScope = accountScopeFor(user?.id);
   useWorkspaceRecoveryRetry(!isAuthRoute && !transitioning ? accountScope : "");
-  const incognito = useProfileWindowStore((state) => state.incognito);
 
   // First run shows the welcome once, before the shell mounts: the shell sends a bare "/"
   // straight to the active tab, which would skip it. Invite links go through.
@@ -62,7 +60,6 @@ export function AppFrameLayout() {
       : showWelcome
         ? null
         : !isAuthRoute &&
-            !incognito &&
             nativeWorkspaceRecoveryEnabled() &&
             (recovery.accountId !== accountScope || (!recovery.ready && !recovery.usable))
           ? "Restoring workspace"
@@ -99,7 +96,7 @@ export function AppFrameLayout() {
       <DeviceSessionBridge />
       <SpacesRealtimeBridge />
       <SpaceWindowBridge />
-      {incognito ? null : <AgentExecutionSurface />}
+      <AgentExecutionSurface />
       <UpdateNotices accountScope={accountScope} />
       <UnsavedQuitGuard />
       {leavingScreen}

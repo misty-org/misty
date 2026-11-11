@@ -56,9 +56,8 @@ export function useSignedOutWindow(signedOut: boolean) {
   }, [signedOut]);
 }
 
-/** Misty's own app windows (any profile's, and incognito ones), not its overlays and docks. */
-const isAppWindow = (label: string) =>
-  label.startsWith("window-") || label.startsWith("incognito-");
+/** Misty's own app windows (any profile's), not its overlays and docks. */
+const isAppWindow = (label: string) => label.startsWith("window-");
 
 /**
  * Adding (or re-entering) an account turns this window into the small sign-in window and hides

@@ -1,18 +1,19 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { adoptWindowTabs } from "./adoptWindowTabs";
-import { allLayoutViews, layoutTabs, singleViewTab } from "../panes/layoutTabs";
+import { allLayoutViews, singleViewTab } from "../panes/layoutTabs";
 import type { WorkspaceLayout, WorkspaceTab, WorkspaceView } from "./workspaceViews";
 import { useWorkspaceStore } from "./useWorkspaceStore";
+import { openPage } from "@/tests/workspacePage";
 
 const view = (id: string, placeholder = false): WorkspaceView => ({
   id,
-  surfaceId: "browser",
-  groupKey: "tool:browser",
+  surfaceId: "agents",
+  groupKey: "tool:agents",
   instanceKey: id,
   title: id,
-  route: "/browser",
+  route: "/agents",
   sidebarVisible: false,
-  state: { version: 1, url: `https://${id}.test/`, faviconUrl: null },
+  state: {},
   createdAt: 1,
   lastFocusedAt: 1,
   placeholder,
@@ -37,7 +38,7 @@ describe("adopting a closed window's tabs", () => {
   });
 
   it("adds to the end of a window in use and keeps the tab on screen, asleep", () => {
-    const mine = state().openBrowserView({ url: "https://mine.test" });
+    const mine = openPage(state(), { url: "https://mine.test" });
     const active = state().layout.activeTabId;
     const patch = adoptWindowTabs(state(), { layout: layoutOf([singleViewTab(view("late"))]) });
     expect(patch.layout!.activeTabId).toBe(active);
@@ -46,7 +47,7 @@ describe("adopting a closed window's tabs", () => {
   });
 
   it("drops a closed window's unused new tabs", () => {
-    const mine = state().openBrowserView({ url: "https://mine.test" });
+    const mine = openPage(state(), { url: "https://mine.test" });
     const patch = adoptWindowTabs(state(), {
       layout: layoutOf([singleViewTab(view("blank", true))]),
     });
@@ -54,21 +55,8 @@ describe("adopting a closed window's tabs", () => {
     expect(ids(state().layout)).toContain(mine.id);
   });
 
-  it("brings the open tab groups its tabs are in, and no others", () => {
-    const grouped = { ...singleViewTab(view("a")), tabGroupId: "group-a" };
-    const patch = adoptWindowTabs(state(), {
-      layout: layoutOf([grouped]),
-      tabGroups: [
-        { id: "group-a", name: "A", color: "blue", collapsed: false },
-        { id: "group-b", name: "B", color: "red", collapsed: false },
-      ],
-    });
-    expect(patch.tabGroups!.map((group) => group.id)).toEqual(["group-a"]);
-    expect(layoutTabs(patch.layout!)[0].tabGroupId).toBe("group-a");
-  });
-
   it("doesn't take a tab it already holds", () => {
-    const mine = state().openBrowserView({ url: "https://mine.test" });
+    const mine = openPage(state(), { url: "https://mine.test" });
     const patch = adoptWindowTabs(state(), { layout: state().layout });
     expect(patch.layout).toBeUndefined();
     expect(ids(state().layout)).toContain(mine.id);

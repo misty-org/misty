@@ -1,4 +1,4 @@
-import { reconcileGroupIdentities } from "../tab-groups/groupIdentity";
+import { reconcileGroupIdentities } from "../panes/groupIdentity";
 import type { WorkspaceLayout } from "./workspaceViews";
 import type { WorkspaceStore } from "./useWorkspaceStore";
 import { withActiveWindowLayout } from "../profiles/windows";

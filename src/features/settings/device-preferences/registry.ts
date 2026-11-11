@@ -93,12 +93,6 @@ export function validPreference(d: SettingDefinition, value: unknown): value is 
           new Set(parsed).size === parsed.length &&
           parsed.every((id) => typeof id === "string" && /^[a-z][a-z0-9-]{0,63}$/.test(id))
         );
-      if (d.id === "app.sidebar.tools")
-        return (
-          parsed.length <= 16 &&
-          new Set(parsed).size === parsed.length &&
-          parsed.every((id) => typeof id === "string" && /^[a-z][a-z-]{0,31}$/.test(id))
-        );
       if (d.id === "app.shortcuts.bindings")
         return parsed.every(
           (entry) =>

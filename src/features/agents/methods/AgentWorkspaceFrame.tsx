@@ -4,6 +4,7 @@ import {
   FolderTree,
   GitCompareArrows,
   MessageSquare,
+  MonitorPlay,
   Repeat2,
   SquarePen,
   SquareTerminal,
@@ -15,6 +16,7 @@ import type { MistyActivityEntry } from "../conversations/state/activity";
 import type { AgentProfile } from "@/shared/schemas";
 import { Button, IconButton, Skeleton } from "@/shared/ui";
 import { ConnectAgentButton } from "../engines/ConnectAgentDialog";
+import { MultirunButton } from "../multirun/MultirunButton";
 import { SessionGoalButton } from "../goals/SessionGoalButton";
 import { useSessionGoalRunner } from "../goals/sessionGoals";
 import { VirtualOffice } from "../virtual/VirtualOffice";
@@ -49,6 +51,7 @@ const panels: [ContextPanelTab, string, LucideIcon][] = [
   ["files", "Files", FolderTree],
   ["changes", "Changes", GitCompareArrows],
   ["terminal", "Terminal", SquareTerminal],
+  ["preview", "Preview", MonitorPlay],
 ];
 
 /**
@@ -137,6 +140,7 @@ export function AgentWorkspaceFrame({
             <SquarePen size={16} />
           </IconButton>
           <ConnectAgentButton />
+          <MultirunButton agentId={agent.id} onPage={onPageChange} onChat={onConversation} />
           <SessionGoalButton conversationId={page === "task" ? conversationId : ""} />
           {panels.map(([id, label, Icon]) => (
             <IconButton

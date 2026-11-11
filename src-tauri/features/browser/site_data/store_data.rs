@@ -32,14 +32,12 @@ pub(crate) fn store_data_directory(
 
 /// Points a view at its store's data directory. WebView2 needs every view
 /// of one directory to create its environment with the same options, so
-/// extension support is switched on here, for all of them.
+/// every view of a store is built through here.
 pub(crate) fn with_store_data(
     builder: tauri::WebviewBuilder<tauri::Wry>,
     app: &AppHandle,
     store: Option<&str>,
 ) -> Result<tauri::WebviewBuilder<tauri::Wry>, String> {
     let builder = builder.data_directory(store_data_directory(app, store)?);
-    #[cfg(windows)]
-    let builder = builder.browser_extensions_enabled(true);
     Ok(builder)
 }

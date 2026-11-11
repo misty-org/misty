@@ -1,8 +1,14 @@
-import {
-  createBrowserViewState,
-  type OpenWorkspaceSurfaceRequest,
-  type WorkspaceSurfaceId,
-} from "./workspaceViews";
+import type { OpenWorkspaceSurfaceRequest, WorkspaceSurfaceId } from "./workspaceViews";
+
+/** A route that once opened a web page for the person. Web pages are only for agents now, so it
+ * opens nothing. */
+export function isRetiredWebRoute(pathname: string): boolean {
+  const path = pathname.split(/[?#]/)[0];
+  return (
+    ["/", "/new", "/browser", "/discover"].includes(path) ||
+    (path.startsWith("/apps") && path !== "/apps/agents")
+  );
+}
 
 export function workspaceSurfaceFromRoute(pathname: string): OpenWorkspaceSurfaceRequest | null {
   const path = pathname.split(/[?#]/)[0];
@@ -67,17 +73,6 @@ export function workspaceSurfaceFromRoute(pathname: string): OpenWorkspaceSurfac
       "agents",
       "single",
     );
-  if (
-    ["/", "/new", "/browser", "/apps/browser"].includes(path) ||
-    path.startsWith("/apps") ||
-    path === "/discover"
-  ) {
-    const url = new URL(pathname, "https://misty.local").searchParams.get("url");
-    return {
-      ...request("browser", "tool:browser", "Browser", "/browser", undefined, "multiple"),
-      state: createBrowserViewState(url ?? undefined),
-    };
-  }
   return null;
 }
 

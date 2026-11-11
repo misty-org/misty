@@ -12,6 +12,7 @@ import {
   removeAccountWorkspace,
   resetWorkspaceAccountState,
 } from "./workspaceAccountState";
+import { openPage } from "@/tests/workspacePage";
 
 describe("workspaceAccountState per-account isolation", () => {
   beforeEach(() => {
@@ -25,10 +26,10 @@ describe("workspaceAccountState per-account isolation", () => {
       allLayoutViews(useWorkspaceStore.getState().layout).map((view) => view.title);
     // User A sets up their workspace
     useWorkspaceStore.getState().openSurface({
-      surfaceId: "browser",
-      groupKey: "tool:browser",
+      surfaceId: "agents",
+      groupKey: "tool:agents",
       title: "Code Editor",
-      route: "/code",
+      route: "/agents?conversation=code",
       forceNew: true,
     });
 
@@ -53,7 +54,7 @@ describe("workspaceAccountState per-account isolation", () => {
   });
 
   it("removeAccountWorkspace purges persisted state for deleted account", () => {
-    const tab = useWorkspaceStore.getState().openBrowserView({ url: "https://deleted.example" });
+    const tab = openPage(useWorkspaceStore.getState(), { url: "https://deleted.example" });
     saveAccountWorkspace("deleted-user");
     removeAccountWorkspace("deleted-user");
 
@@ -75,7 +76,7 @@ it("backs up each legacy account before migration and removes its backup on acco
   saveAccountWorkspace("legacy-owner");
   expect(localStorage.getItem(workspaceRecoveryKey(key))).toBe(raw);
   expect(JSON.parse(localStorage.getItem(key)!)).toMatchObject({
-    version: 18,
+    version: 19,
     state: { activeWindowId: useWorkspaceStore.getState().activeWindowId },
   });
   removeAccountWorkspace("legacy-owner");
@@ -94,10 +95,10 @@ describe("workspace adoption across sign-in", () => {
     const titles = () =>
       allLayoutViews(useWorkspaceStore.getState().layout).map((view) => view.title);
     useWorkspaceStore.getState().openSurface({
-      surfaceId: "browser",
-      groupKey: "tool:browser",
+      surfaceId: "agents",
+      groupKey: "tool:agents",
       title: "Browsed signed out",
-      route: "/browser",
+      route: "/agents?conversation=signed-out",
       forceNew: true,
     });
     // Signing in: the live windows are captured, account state resets, the account adopts them.

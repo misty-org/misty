@@ -42,7 +42,6 @@ export function useWorkspaceTabShortcuts(navigateToActiveLayoutTab: () => void) 
     const state = useWorkspaceStore.getState();
     const id = state.layout.activeTabId;
     const pane = findDockLeaf(state.layout.root, state.layout.focusedPaneId);
-    if (dockLeaves(state.layout.root).length === 1 && id && state.resetPinnedTab(id)) return;
     const closed =
       dockLeaves(state.layout.root).length > 1
         ? pane?.views[0] && state.closeView(pane.views[0].id)

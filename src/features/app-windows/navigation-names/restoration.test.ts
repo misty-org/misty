@@ -22,10 +22,10 @@ beforeEach(() => {
 it("retains names through automatic updates, navigation, Spaces, restoration and migration; fresh tabs are independent", () => {
   const store = useWorkspaceStore.getState();
   const tab = store.addSurface({
-    surfaceId: "browser",
-    groupKey: "tool:browser",
+    surfaceId: "agents",
+    groupKey: "tool:agents",
     title: "Browser",
-    route: "/browser",
+    route: "/agents",
     instancePolicy: "multiple",
   });
   const persisted = allLayoutViews(useWorkspaceStore.getState().layout).find(
@@ -50,10 +50,10 @@ it("retains names through automatic updates, navigation, Spaces, restoration and
   expect(store.reopenClosedView()?.id).toBe(tab.id);
   expect(navigationName(tabNameKey(tab.id), "Latest page")).toBe("School");
   const fresh = store.addSurface({
-    surfaceId: "browser",
-    groupKey: "tool:browser",
+    surfaceId: "agents",
+    groupKey: "tool:agents",
     title: "Browser",
-    route: "/browser",
+    route: "/agents",
     instancePolicy: "multiple",
   });
   expect(navigationName(tabNameKey(fresh.id), "Browser")).toBe("Browser");

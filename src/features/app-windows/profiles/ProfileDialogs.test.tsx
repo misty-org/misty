@@ -37,7 +37,7 @@ function renderMenu() {
 
 beforeEach(() => {
   mocks.invoke.mockReset().mockResolvedValue(undefined);
-  useProfileWindowStore.setState({ profile: first, profiles: [first], incognito: false });
+  useProfileWindowStore.setState({ profile: first, profiles: [first] });
   useProfileDialogs.setState({ open: null });
 });
 afterEach(cleanup);
@@ -58,13 +58,6 @@ describe("the profiles in the account menu", () => {
     expect(mocks.invoke).not.toHaveBeenCalled();
     fireEvent.click(items[1]);
     expect(mocks.invoke).toHaveBeenCalledWith("profile_open", { id: "work" });
-  });
-
-  it("offers nothing in an incognito window", () => {
-    useProfileWindowStore.setState({ profiles: [first, work], incognito: true });
-    renderMenu();
-    expect(screen.queryByRole("menuitem", { name: /Add profile…/ })).toBeNull();
-    expect(screen.queryByRole("menuitemcheckbox")).toBeNull();
   });
 });
 

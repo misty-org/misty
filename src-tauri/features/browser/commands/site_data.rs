@@ -5,19 +5,9 @@ pub(crate) use crate::browser::link_previews::{
     __cmd__link_preview_fetch, __tauri_command_name_link_preview_fetch, link_preview_fetch,
 };
 pub(crate) use crate::browser::profiles::{
-    __cmd__profile_records_list, __cmd__profile_records_write, __cmd__profile_tabs_publish,
-    __cmd__profile_tabs_sync, __tauri_command_name_profile_records_list,
-    __tauri_command_name_profile_records_write, __tauri_command_name_profile_tabs_publish,
-    __tauri_command_name_profile_tabs_sync, profile_records_list, profile_records_write,
+    __cmd__profile_tabs_publish, __cmd__profile_tabs_sync,
+    __tauri_command_name_profile_tabs_publish, __tauri_command_name_profile_tabs_sync,
     profile_tabs_publish, profile_tabs_sync,
-};
-pub(crate) use crate::browser::search::profile::{
-    __cmd__browser_profile_search, __tauri_command_name_browser_profile_search,
-    browser_profile_search,
-};
-pub(crate) use crate::browser::search::suggest::{
-    __cmd__browser_search_suggest, __tauri_command_name_browser_search_suggest,
-    browser_search_suggest,
 };
 #[cfg(desktop)]
 pub(crate) use crate::browser::site_data::retired_profiles::{
@@ -41,11 +31,10 @@ pub(crate) use crate::browser::site_settings::permissions::{
 };
 #[cfg(any(all(desktop, desktop), desktop))]
 pub(crate) use crate::browser::site_settings::style::{
-    __cmd__browser_set_mouse_gestures, __cmd__browser_set_site_styles,
-    __cmd__browser_webview_pick_element, __tauri_command_name_browser_set_mouse_gestures,
+    __cmd__browser_set_site_styles, __cmd__browser_webview_pick_element,
     __tauri_command_name_browser_set_site_styles,
-    __tauri_command_name_browser_webview_pick_element, browser_set_mouse_gestures,
-    browser_set_site_styles, browser_webview_pick_element,
+    __tauri_command_name_browser_webview_pick_element, browser_set_site_styles,
+    browser_webview_pick_element,
 };
 #[cfg(desktop)]
 pub(crate) use crate::browser::site_settings::zoom::{

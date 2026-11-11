@@ -14,7 +14,7 @@ import {
 import { usePaneSwapMode } from "@/features/app-windows";
 import type { DockSplitDirection } from "@/features/app-windows";
 import { minimumForWorkspaceViews } from "./dockSplitFit";
-import { closeWindow, openIncognitoWindow, openNewWindow } from "@/features/app-windows";
+import { closeWindow, openNewWindow } from "@/features/app-windows";
 import { flushWorkspaceRecovery } from "@/features/app-windows";
 
 /** Pane and window keyboard shortcuts for the workspace. */
@@ -105,7 +105,6 @@ export function useWorkspaceCanvasShortcuts(actions: {
     // A window belongs to one profile; these open another of its windows or close this one.
     const unregister = [
       registerShortcutHandler("workspace.new_window", () => void openNewWindow()),
-      registerShortcutHandler("workspace.new_incognito_window", () => void openIncognitoWindow()),
       registerShortcutHandler(
         "workspace.close_window",
         // Save first: the window's tabs move to another window of its profile.

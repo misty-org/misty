@@ -1,4 +1,4 @@
-//! Opening, restoring and closing profile windows and incognito windows.
+//! Opening, restoring and closing profile windows.
 use super::*;
 use std::sync::atomic::Ordering;
 
@@ -70,12 +70,8 @@ fn focus<R: Runtime>(window: &Window<R>) {
     let _ = window.set_focus();
 }
 
-pub(super) fn window_title(entry: &ProfileEntry, incognito: bool) -> String {
-    if incognito {
-        format!("{} (Incognito)", entry.name)
-    } else {
-        entry.name.clone()
-    }
+pub(super) fn window_title(entry: &ProfileEntry) -> String {
+    entry.name.clone()
 }
 
 fn new_window_id() -> String {
@@ -89,7 +85,7 @@ fn open_window<R: Runtime>(app: &AppHandle<R>, window: OpenWindow) -> Result<(),
         state.current().get(&key).cloned()
     }
     .ok_or("Unknown profile.")?;
-    let label = new_label(false);
+    let label = new_label();
     set_current(
         &label,
         WindowState {
@@ -98,7 +94,7 @@ fn open_window<R: Runtime>(app: &AppHandle<R>, window: OpenWindow) -> Result<(),
             space: window.space,
         },
     );
-    if let Err(error) = build_window(app, &label, &window_title(&entry, false), &entry) {
+    if let Err(error) = build_window(app, &label, &window_title(&entry), &entry) {
         forget_current(&label);
         return Err(error);
     }
@@ -154,39 +150,6 @@ pub fn open_profile<R: Runtime>(app: &AppHandle<R>, key: &str) -> Result<(), Str
     open_profile_window(app, key)
 }
 
-/// Opens a new incognito window of a profile. It joins the profile's temporary session,
-/// starting a fresh one when the profile has no incognito window open.
-pub fn open_incognito<R: Runtime>(app: &AppHandle<R>, key: &str) -> Result<(), String> {
-    if !valid_key(key) {
-        return Err("Unknown profile.".into());
-    }
-    let label = new_label(true);
-    let entry = {
-        let mut state = lock_registry().map_err(|_| "Profiles are unavailable.")?;
-        let entry = state
-            .current()
-            .get(key)
-            .cloned()
-            .ok_or("Unknown profile.")?;
-        join_incognito(&mut state, key, &label);
-        entry
-    };
-    set_current(
-        &label,
-        WindowState {
-            profile: key.to_owned(),
-            window_id: new_window_id(),
-            space: None,
-        },
-    );
-    if let Err(error) = build_window(app, &label, &window_title(&entry, true), &entry) {
-        forget_current(&label);
-        forget_incognito(&label, key);
-        return Err(error);
-    }
-    Ok(())
-}
-
 /// Opens the windows the last launch left open, or the first profile's.
 pub fn restore<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
     let open = lock_registry()
@@ -206,9 +169,8 @@ pub fn restore<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
     Ok(())
 }
 
-/// Window lifecycle: remembers focus, leaves a closed window's tabs in its profile, erases an
-/// incognito session with its last window and frees the extension host of a profile with no
-/// window any more. Closing a window never tells the vault anything: only closing a tab does.
+/// Window lifecycle: remembers focus and leaves a closed window's tabs in its profile. Closing a
+/// window never tells the vault anything: only closing a tab does.
 pub fn window_event(window: &Window, event: &tauri::WindowEvent) {
     let label = window.label();
     let Some(parsed) = parse(label) else { return };
@@ -225,7 +187,7 @@ pub fn window_event(window: &Window, event: &tauri::WindowEvent) {
         crate::browser::app_windows::windows::focus::forget(label);
     }
     match event {
-        tauri::WindowEvent::Focused(true) if !parsed.incognito => {
+        tauri::WindowEvent::Focused(true) => {
             if let Ok(mut state) = lock_registry() {
                 state.last_focused = Some(label.into());
             }
@@ -233,13 +195,6 @@ pub fn window_event(window: &Window, event: &tauri::WindowEvent) {
         tauri::WindowEvent::Destroyed => {
             crate::app::macos_window_effects::mac_rounded_corners::forget_window(label);
             crate::browser::forget_closed_pages(window.app_handle());
-            if parsed.incognito {
-                forget_current(label);
-                if let Some(session) = forget_incognito(label, &parsed.profile) {
-                    crate::browser::end_incognito_session(window.app_handle(), &session);
-                }
-                return;
-            }
             if QUITTING.load(Ordering::SeqCst) {
                 return;
             }
@@ -249,10 +204,6 @@ pub fn window_event(window: &Window, event: &tauri::WindowEvent) {
                 if let Some(next) = host_window() {
                     let _ = window.app_handle().emit_to(next.as_str(), HOST_EVENT, ());
                 }
-            }
-            // A profile with no window any more lets its extension host go.
-            if !profile_is_open(&parsed.profile) {
-                crate::browser::extensions::release_profile(&parsed.profile);
             }
             if let Ok(mut state) = lock_registry() {
                 if state.last_focused.as_deref() == Some(label) {

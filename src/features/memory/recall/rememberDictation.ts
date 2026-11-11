@@ -1,5 +1,4 @@
 import { useSettingsStore } from "@/features/settings";
-import { isIncognitoWindow } from "@/features/app-windows";
 import { memoryApi } from "./api";
 import { recallSettings, type RecallSettings } from "./recallSettings";
 import { redactSecrets, rememberedUrl, skipReason } from "./recorder/privacy";
@@ -32,7 +31,7 @@ export function rememberCapture(capture: {
   url?: string;
 }) {
   const settings = recallSettings(useSettingsStore.getState().settings?.document);
-  if (!allowed(settings) || isIncognitoWindow()) return;
+  if (!allowed(settings)) return;
   if (capture.url && skipReason({ url: capture.url, private: false }, settings)) return;
   const body = redactSecrets(capture.text.trim()).slice(0, CAPTURE_BODY_LIMIT);
   if (!body) return;

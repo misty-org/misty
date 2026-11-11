@@ -1,8 +1,0 @@
-[
-  {
-    "id": "google",
-    "name": "Google",
-    "search": "https://www.google.com/search?q=%s",
-    "suggest": "https://suggestqueries.google.com/complete/search?client=chrome&ie=utf-8&oe=utf-8&q=%s"
-  }
-]

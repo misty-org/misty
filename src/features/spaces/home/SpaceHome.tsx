@@ -3,7 +3,6 @@ import { useLocation, useNavigate } from "react-router-dom";
 import type { Space } from "../api/dto/entities";
 import { setItemVisibility, type ItemVisibility } from "../api/visibility";
 import { useAuth } from "@/features/account";
-import { AgentsNow } from "@/features/agents";
 import { OrderedCollectionFilters } from "@/features/settings/OrderedCollectionFilters";
 import {
   Button,
@@ -29,6 +28,8 @@ import { readHomePreference, writeHomePreference } from "./homePreferences";
 import { MakeSomethingNew } from "./MakeSomethingNew";
 import { SpaceActivityLog } from "./SpaceActivityLog";
 import { SpaceItemCard } from "./SpaceItemCard";
+import { SpaceOverview } from "./SpaceOverview";
+import { SpaceTeamwork } from "./SpaceTeamwork";
 import { useSpaceGallery } from "./useSpaceGallery";
 
 const scopes = [
@@ -168,15 +169,8 @@ export function SpaceHome({ space }: { space: Space }) {
           </>
         }
       />
-      {!query && (
-        <AgentsNow
-          onOpenChat={(agentId, conversationId) => {
-            const chat = new URLSearchParams({ agent: agentId });
-            if (conversationId) chat.set("conversation", conversationId);
-            navigate(`/agents?${chat}`);
-          }}
-        />
-      )}
+      {!query && <SpaceOverview spaceId={space.id} />}
+      {!query && space.is_shared && <SpaceTeamwork spaceId={space.id} />}
       {!query && space.is_shared && <SpaceActivityLog spaceId={space.id} />}
       {!query && <MakeSomethingNew spaceId={space.id} onCreated={gallery.reload} />}
       <OrderedCollectionFilters

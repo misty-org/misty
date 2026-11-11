@@ -33,10 +33,9 @@ mod tests {
         include_str!("../handlers.rs"),
         include_str!("../handlers/more_commands.rs"),
     ];
-    const CAPABILITIES: [&str; 8] = [
+    const CAPABILITIES: [&str; 7] = [
         include_str!("../../../tauri-permissions/capabilities/default.json"),
         include_str!("../../../tauri-permissions/capabilities/person-window-actions.json"),
-        include_str!("../../../tauri-permissions/capabilities/incognito-window-actions.json"),
         include_str!("../../../tauri-permissions/capabilities/cursor-companion.json"),
         include_str!("../../../tauri-permissions/capabilities/desktop-control.json"),
         include_str!("../../../tauri-permissions/capabilities/dictation-pill.json"),
@@ -135,16 +134,12 @@ mod tests {
 
     #[test]
     fn labels_must_be_exact() {
-        for label in [
-            "window-1",
-            "incognito-1",
-            "misty-cursor-1",
-            "misty-cursor-4294967295",
-        ] {
+        for label in ["window-1", "misty-cursor-1", "misty-cursor-4294967295"] {
             assert!(allows(label), "{label}");
         }
         for label in [
             "window-1-spoof",
+            "incognito-1",
             "misty-cursor-controls",
             "misty-cursor-",
             "misty-cursor-spoof",
@@ -199,40 +194,8 @@ mod tests {
         assert_eq!(app_commands, ["allow-cursor-companion-snapshot"]);
     }
 
-    /// Incognito is entirely local and Misty does nothing with it.
-    #[test]
-    fn incognito_reaches_no_account_data() {
-        let allowed = commands_for("incognito-window-actions");
-        for prefix in [
-            "agent",
-            "auth_",
-            "profile_records_",
-            "profile_tabs_",
-            "profile_extensions_",
-            "vault_",
-            "browser_history",
-            "browser_library",
-            "cursor_companion_",
-            "misty_screen",
-            "browser_site_data",
-            "voice_",
-            "dictation_",
-            "capture_",
-            "extensions_",
-            "browser_recovery_",
-            "api_cache_",
-            "model_keys_",
-        ] {
-            let leaked: Vec<_> = allowed
-                .iter()
-                .filter(|command| command.starts_with(prefix))
-                .collect();
-            assert!(leaked.is_empty(), "incognito can call {leaked:?}");
-        }
-    }
-
     /// Voice and live transcription are a person's own: the commands behind them belong to the voice
-    /// set, which an incognito window doesn't have, and each one checks the window again.
+    /// set, which only a person's window has, and each one checks the window again.
     #[test]
     fn voice_sessions_open_only_in_a_persons_window() {
         let sets = action_sets();
@@ -245,7 +208,6 @@ mod tests {
         ] {
             assert!(voice.iter().any(|name| name == command), "{command}");
             assert!(commands_for("person-window-actions").contains(command));
-            assert!(!commands_for("incognito-window-actions").contains(command));
         }
         assert!(app_windows::is_person_window("window-1"));
         assert!(!app_windows::is_person_window("incognito-1"));

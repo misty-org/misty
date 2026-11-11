@@ -60,9 +60,9 @@ pub(super) async fn window_eval(
     reply(run(&view, &body.script, wait).await)
 }
 
-/// Windows with the full interface, and incognito ones so a test can show what they're refused.
+/// Windows with the full interface.
 fn is_person_window(label: &str) -> bool {
-    label.starts_with("window-") || label.starts_with("incognito-")
+    label.starts_with("window-")
 }
 
 fn person_window(app: &AppHandle, named: Option<&str>) -> Result<Webview, String> {
@@ -172,7 +172,7 @@ mod tests {
     #[test]
     fn only_a_persons_windows_can_be_reached() {
         assert!(is_person_window("window-0"));
-        assert!(is_person_window("incognito-3"));
+        assert!(!is_person_window("incognito-3"));
         assert!(!is_person_window("misty-browser-abc"));
         assert!(!is_person_window("misty-cursor-0"));
     }

@@ -16,7 +16,7 @@ fn person_window(webview: &tauri::Webview) -> Result<(), String> {
 }
 
 /// A Space's key in the folder table: its id, or `personal` for the person's own Space.
-fn space_key(space: &str) -> Result<String, String> {
+pub(super) fn space_key(space: &str) -> Result<String, String> {
     let key = space.trim();
     if key.len() > 200 || key.chars().any(char::is_control) {
         return Err("That Space can't have folders.".into());
@@ -129,6 +129,10 @@ pub async fn space_folder_unlink(
 /// Lets the file gate reach every folder linked on this computer. Runs once as the app starts.
 pub fn allow_linked_folders(db: &database::store::Store) {
     for folder in store::all_folders(db).unwrap_or_default() {
+        file_access::allow_linked_folder(&folder);
+    }
+    // Multi-run: the worktrees it made are reached the same way (multirun.rs).
+    for folder in super::multirun::worktree_folders(db) {
         file_access::allow_linked_folder(&folder);
     }
 }

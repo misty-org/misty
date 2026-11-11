@@ -184,10 +184,7 @@ fn menu_actions(context: &AskContext) -> Vec<String> {
 
 fn show(app: &AppHandle, context: AskContext) -> Result<(), String> {
     let key = uuid::Uuid::new_v4().to_string();
-    let mut actions = menu_actions(&context);
-    if super::super::extensions::has_extensions() {
-        actions.extend(["separator".into(), "extensions".into()]);
-    }
+    let actions = menu_actions(&context);
     let owner = browser_owner_label(app, &context.id);
     let window = app
         .get_window(&owner)

@@ -4,6 +4,16 @@ import { useTeammateAgents } from "./teammates";
 import { useOfficeAgents } from "./useOfficeAgents";
 import "./agentsNow.css";
 
+/** What a card says under the name: what the agent is on, or that it is free. */
+function Doing({ state, doing }: { state: string; doing: string }) {
+  return (
+    <span className="agents-now-doing">
+      {state !== "resting" && <span className="agents-now-dot" aria-hidden="true" />}
+      <span className="truncate">{doing || "Idle"}</span>
+    </span>
+  );
+}
+
 /**
  * The person's agents and what each is doing now, as a row of cards: one that needs its person
  * comes first and says so, a working one names what it is on, and a resting one only shows it is
@@ -20,10 +30,10 @@ export function AgentsNow(props: { onOpenChat(agentId: string, conversationId: s
       {loading
         ? Array.from({ length: 3 }, (_, index) => (
             <div key={index} className="agents-now-card" aria-hidden="true">
-              <Skeleton className="size-10 rounded-full" />
-              <div className="grid gap-1.5">
+              <Skeleton className="size-9 rounded-full" />
+              <div className="grid gap-2">
                 <Skeleton className="h-3 w-24" />
-                <Skeleton className="h-3 w-32" />
+                <Skeleton className="h-2.5 w-16" />
               </div>
             </div>
           ))
@@ -36,11 +46,9 @@ export function AgentsNow(props: { onOpenChat(agentId: string, conversationId: s
               onClick={() => props.onOpenChat(agent.id, conversationId)}
             >
               <AgentAvatar agent={agent} />
-              <span className="grid min-w-0 text-left">
+              <span className="grid min-w-0 gap-0.5 text-left">
                 <span className="truncate text-sm font-medium text-cream">{agent.name}</span>
-                <span className="agents-now-doing truncate text-xs">
-                  {doing || "Nothing running"}
-                </span>
+                <Doing state={state} doing={doing} />
               </span>
             </Pressable>
           ))}
@@ -48,13 +56,11 @@ export function AgentsNow(props: { onOpenChat(agentId: string, conversationId: s
       {teammates.map((mate) => (
         <div key={mate.key} className="agents-now-card" data-state={mate.state}>
           <AgentAvatar />
-          <span className="grid min-w-0 text-left">
+          <span className="grid min-w-0 gap-0.5 text-left">
             <span className="truncate text-sm font-medium text-cream">
               {mate.name} · {mate.owner}
             </span>
-            <span className="agents-now-doing truncate text-xs">
-              {mate.doing || "Nothing running"}
-            </span>
+            <Doing state={mate.state} doing={mate.doing} />
           </span>
         </div>
       ))}

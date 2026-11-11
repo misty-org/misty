@@ -29,7 +29,6 @@ export function selectGeneralPreferences(
   return {
     preferredWorkspaceRoot: settingsString(source, "general", "preferred_workspace_root", ""),
     reopenLastSession: settingsBoolean(source, "general", "reopen_last_session", true),
-    searchEngineIndex: settingsNumber(source, "general", "browser_search_engine_index", 0),
     startupViewIndex: settingsNumber(source, "general", "startup_view_index", 0),
     workspaceDefaultTabIndex: settingsNumber(
       source,
@@ -57,7 +56,6 @@ interface AppearancePreferences {
 interface GeneralPreferences {
   preferredWorkspaceRoot: string;
   reopenLastSession: boolean;
-  searchEngineIndex: number;
   startupViewIndex: number;
   workspaceDefaultTabIndex: number;
 }

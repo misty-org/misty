@@ -6,6 +6,7 @@
 
 pub mod files;
 pub mod git;
+pub mod preview;
 pub mod terminal;
 
 use std::path::PathBuf;

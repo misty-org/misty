@@ -6,20 +6,15 @@ import { useWorkspaceStore } from "../tabs/useWorkspaceStore";
 
 /**
  * Back and forward for the focused pane. Every pane keeps its own history of the pages it showed,
- * so one tab or split pane never goes back into another's. A browser page travels through its own
- * web history instead, and reports `browser` so callers leave it to that.
+ * so one tab or split pane never goes back into another's.
  */
 export function useFocusedPaneHistory() {
   const state = useWorkspaceStore(
     useShallow((store) => {
       const pane = findDockLeaf(store.layout.root, store.layout.focusedPaneId ?? "");
-      if (!pane) return { canBack: false, canForward: false, browser: false };
+      if (!pane) return { canBack: false, canForward: false };
       const { index, length } = paneHistoryPosition(pane);
-      return {
-        canBack: index > 0,
-        canForward: index < length - 1,
-        browser: pane.views[0]?.surfaceId === "browser",
-      };
+      return { canBack: index > 0, canForward: index < length - 1 };
     }),
   );
   /** Moves the focused pane through its history; the page it lands on, or null at an end. */

@@ -14,21 +14,20 @@ vi.mock("@/features/app-windows/tabs/WorkspaceViewRouteScope", async (importOrig
   releaseWorkspaceViewRouteHistory: routes.release,
 }));
 
-// Closing a browser tab's native page is the runtime bridge's job; disposing
-// a view releases its route history and its surface's own state.
+// Disposing a view releases its route history and its surface's own state.
 describe("workspaceViewLifecycle", () => {
   it("releases route history and disposes the surface state", () => {
     surfaces.get.mockReturnValue({ dispose: surfaces.dispose });
     const tab = {
       id: "tab-1",
       instanceKey: "key-1",
-      surfaceId: "browser",
-      title: "Browser Tab",
-      state: { url: "https://example.com/" },
+      surfaceId: "agents",
+      title: "Agents",
+      state: { draft: "one" },
     } as unknown as WorkspaceView;
     disposeWorkspaceTab(tab);
     expect(routes.release).toHaveBeenCalledWith("tab-1");
-    expect(surfaces.get).toHaveBeenCalledWith("browser");
+    expect(surfaces.get).toHaveBeenCalledWith("agents");
     expect(surfaces.dispose).toHaveBeenCalledWith(tab.state);
   });
 

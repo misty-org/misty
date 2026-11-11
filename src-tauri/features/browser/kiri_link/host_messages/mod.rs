@@ -5,8 +5,6 @@
 use crate::browser::*;
 use kiri::channel::{HostChannel, HostMessage};
 
-// "Add to Misty" on the Chrome Web Store and Firefox Add-ons.
-mod extension_store;
 mod messages;
 use messages::*;
 mod page_background;
@@ -37,10 +35,7 @@ impl HostChannel for Channel {
         };
         let raw = message.body;
         if let Some(url) = navigate_message(raw) {
-            if message.main_frame
-                && !crate::browser::forward_navigation(app, id, &url)
-                && !extension_store::forward(app, id, &url)
-            {
+            if message.main_frame && !crate::browser::forward_navigation(app, id, &url) {
                 crate::browser::menus::context_menu::forward(app, id, &url);
             }
             return;

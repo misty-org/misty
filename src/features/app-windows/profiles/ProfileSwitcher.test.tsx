@@ -9,20 +9,16 @@ import { useProfileWindowStore } from "@/features/app-windows/profiles/profileWi
 import { ProfileSwitcher, splitProfiles } from "./ProfileSwitcher";
 
 const entry = (id: string, name = id): ProfileEntry => ({ id, name, order: 0 }) as ProfileEntry;
-const seed = (profiles: ProfileEntry[], current = profiles[0], incognito = false) =>
-  useProfileWindowStore.setState({ profiles, profile: current, incognito });
+const seed = (profiles: ProfileEntry[], current = profiles[0]) =>
+  useProfileWindowStore.setState({ profiles, profile: current });
 
 describe("ProfileSwitcher", () => {
   beforeEach(() => invoke.mockClear());
   afterEach(cleanup);
 
-  it("is hidden with one profile, and in incognito", () => {
+  it("is hidden with one profile", () => {
     seed([entry("personal", "Personal")]);
-    const { container, rerender } = render(<ProfileSwitcher />);
-    expect(container.firstChild).toBeNull();
-    const two = [entry("personal", "Personal"), entry("work", "Work")];
-    seed(two, two[0], true);
-    rerender(<ProfileSwitcher />);
+    const { container } = render(<ProfileSwitcher />);
     expect(container.firstChild).toBeNull();
   });
 

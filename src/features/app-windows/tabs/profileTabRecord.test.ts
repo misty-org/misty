@@ -1,26 +1,24 @@
 import { describe, expect, it } from "vitest";
-import { createDockLeaf } from "../panes/dockTree";
-import { createBrowserViewState, type WorkspaceTab, type WorkspaceView } from "./workspaceViews";
+import { createDockLeaf, dockTreeViews } from "../panes/dockTree";
+import type { WorkspaceTab, WorkspaceView } from "./workspaceViews";
 import {
-  browserUrls,
   encodedFields,
   tabFields,
   tabFromFields,
   tabStaysHere,
   usableFields,
 } from "./profileTabRecord";
-import type { MistyTabGroup } from "../tab-groups/tabGroups";
 
-function view(id: string, url: string, extra: Partial<WorkspaceView> = {}): WorkspaceView {
+function view(id: string, chat: string, extra: Partial<WorkspaceView> = {}): WorkspaceView {
   return {
     id,
-    surfaceId: "browser",
-    groupKey: "tool:browser",
+    surfaceId: "agents",
+    groupKey: "tool:agents",
     instanceKey: id,
-    title: "Example",
-    route: "/browser",
+    title: "Agents",
+    route: `/agents?conversation=${chat}`,
     sidebarVisible: true,
-    state: createBrowserViewState(url),
+    state: { draft: chat },
     createdAt: 5,
     lastFocusedAt: 9,
     ...extra,
@@ -32,54 +30,50 @@ function tab(views: WorkspaceView[], extra: Partial<WorkspaceTab> = {}): Workspa
   return { id: "layout:one", root: pane, focusedPaneId: pane.id, ...extra };
 }
 
-const group: MistyTabGroup = { id: "g", name: "Work", color: "purple", collapsed: true };
-
 describe("a tab as the profile keeps it", () => {
   it("reads back as the same record", () => {
-    const original = tab([view("v", "https://example.test/")], {
-      pinnedUrl: "https://example.test/",
-      tabGroupId: "g",
-    });
-    const fields = tabFields(original, 3, [group]);
+    const original = tab([view("v", "one")], { title: "Named" });
+    const fields = tabFields(original, 3);
     expect(fields.order).toBe(3);
-    expect(fields.group).toEqual({ id: "g", name: "Work", color: "purple" });
     const decoded = tabFromFields(original.id, JSON.parse(JSON.stringify(fields)));
-    expect(encodedFields(tabFields(decoded, 3, [group]))).toBe(encodedFields(fields));
+    expect(encodedFields(tabFields(decoded, 3))).toBe(encodedFields(fields));
+  });
+
+  it("reads a record an older version pinned or grouped as a plain tab", () => {
+    const fields = {
+      ...tabFields(tab([view("v", "one")]), 0),
+      pinned_url: "https://example.test/",
+      group: { id: "g", name: "Work", color: "purple" },
+    };
+    expect(usableFields(fields)).toBe(true);
+    const decoded = tabFromFields("layout:one", fields);
+    expect(Object.keys(decoded).sort()).toEqual(["focusedPaneId", "id", "root"]);
   });
 
   it("doesn't change when only focus does", () => {
-    const original = tab([view("v", "https://example.test/")]);
+    const original = tab([view("v", "one")]);
     const root = {
       ...original.root,
-      views: [view("v", "https://example.test/", { lastFocusedAt: 100 })],
+      views: [view("v", "one", { lastFocusedAt: 100 })],
     } as WorkspaceTab["root"];
     const refocused = { ...original, root, focusedPaneId: "elsewhere" };
-    expect(encodedFields(tabFields(refocused, 0, []))).toBe(
-      encodedFields(tabFields(original, 0, [])),
-    );
-  });
-
-  it("leaves out which store and which window a page was in", () => {
-    const state = { ...createBrowserViewState("https://example.test/"), profileId: "a".repeat(64) };
-    const fields = tabFields(tab([view("v", "https://example.test/", { state })]), 0, []);
-    expect(JSON.stringify(fields)).not.toContain("a".repeat(64));
+    expect(encodedFields(tabFields(refocused, 0))).toBe(encodedFields(tabFields(original, 0)));
   });
 
   it("keeps this window's focus and timestamps when an update arrives", () => {
-    const here = tab([view("v", "https://example.test/")]);
-    const fields = tabFields(tab([view("v", "https://example.test/next")]), 0, []);
+    const here = tab([view("v", "one")]);
+    const fields = tabFields(tab([view("v", "two")]), 0);
     const updated = tabFromFields(here.id, fields, here);
-    expect(browserUrls(updated).get("v")).toBe("https://example.test/next");
-    const first = updated.root.type === "leaf" ? updated.root.views[0] : undefined;
-    expect(first?.lastFocusedAt).toBe(9);
+    const first = dockTreeViews(updated.root)[0];
+    expect(first.route).toBe("/agents?conversation=two");
+    expect(first.state).toEqual({ draft: "two" });
+    expect(first.lastFocusedAt).toBe(9);
   });
 
-  it("keeps agents' tabs and untouched new tabs to itself", () => {
-    const agents = { ...createBrowserViewState("https://example.test/"), agentOwned: true };
-    expect(tabStaysHere(tab([view("v", "https://example.test/", { state: agents })]))).toBe(true);
-    expect(tabStaysHere(tab([view("v", "about:blank", { placeholder: true })]))).toBe(true);
+  it("keeps untouched new tabs to itself", () => {
+    expect(tabStaysHere(tab([view("v", "new", { placeholder: true })]))).toBe(true);
     expect(tabStaysHere(tab([]))).toBe(true);
-    expect(tabStaysHere(tab([view("v", "https://example.test/")]))).toBe(false);
+    expect(tabStaysHere(tab([view("v", "one")]))).toBe(false);
   });
 
   it("leaves alone a record it can't use", () => {
@@ -89,6 +83,6 @@ describe("a tab as the profile keeps it", () => {
       false,
     );
     expect(usableFields({ order: 0, tree: { type: "future", id: "p" } })).toBe(false);
-    expect(usableFields(tabFields(tab([view("v", "https://example.test/")]), 0, []))).toBe(true);
+    expect(usableFields(tabFields(tab([view("v", "one")]), 0))).toBe(true);
   });
 });

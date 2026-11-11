@@ -6,6 +6,7 @@ import { dockLeaves, findDockLeaf } from "../panes/dockTree";
 import { configureWorkspaceDefaultView } from "./workspaceDefaultView";
 import { partialWorkspaceStore, migrateWorkspaceStore } from "./workspaceStorePersistence";
 import { normalizeWorkspaceLayout } from "../profiles/windows";
+import { openPage } from "@/tests/workspacePage";
 
 const store = () => useWorkspaceStore.getState();
 const go = (route: string) => store().openDestination(workspaceSurfaceFromRoute(route)!);
@@ -15,22 +16,22 @@ beforeEach(() => {
 });
 afterEach(() => configureWorkspaceDefaultView(1));
 
-it("returns to the most recently used browser without losing either URL or runtime identity", () => {
-  const one = store().openBrowserView({ url: "https://one.example" });
-  const two = store().openBrowserView({ url: "https://two.example" });
+it("returns to the most recently used page of a destination, keeping each one's route", () => {
+  const one = openPage(store(), { url: "https://one.example" });
+  const two = openPage(store(), { url: "https://two.example" });
   store().focusView(one.id);
-  go("/agents");
-  const resumed = go("/browser");
+  go("/spaces/family/chat");
+  const resumed = go("/agents");
   expect(resumed).toMatchObject({
     id: one.id,
     instanceKey: one.instanceKey,
-    state: { url: "https://one.example" },
+    route: "/agents?conversation=one.example",
   });
-  expect(allLayoutViews(store().layout).find((view) => view.id === two.id)?.state).toMatchObject({
-    url: "https://two.example",
-  });
+  expect(allLayoutViews(store().layout).find((view) => view.id === two.id)?.route).toBe(
+    "/agents?conversation=two.example",
+  );
   const before = store();
-  expect(go("/browser").id).toBe(one.id);
+  expect(go("/agents").id).toBe(one.id);
   expect(store()).toBe(before);
 });
 
@@ -46,16 +47,16 @@ it("fills a fresh tab even when the selected destination is already open", () =>
 });
 
 it("fills a fresh split and later restores the whole split without replacing occupied panes", () => {
-  const first = go("/browser");
+  const first = go("/spaces/family/chat");
   const splitTabId = store().layout.activeTabId;
   const pane = store().splitPane(store().layout.focusedPaneId, "right")!;
-  const second = go("/browser");
+  const second = go("/spaces/family/chat");
   expect(second.id).not.toBe(first.id);
   expect(store().layout.focusedPaneId).toBe(pane);
   expect(store().layout.activeTabId).toBe(splitTabId);
   go("/agents");
   expect(dockLeaves(store().layout.root)).toHaveLength(1);
-  expect(go("/browser").id).toBe(second.id);
+  expect(go("/spaces/family/chat").id).toBe(second.id);
   expect(store().layout.activeTabId).toBe(splitTabId);
   expect(dockLeaves(store().layout.root)).toHaveLength(2);
   expect(findDockLeaf(store().layout.root, pane)?.views[0].id).toBe(second.id);
@@ -72,8 +73,8 @@ it("treats each Space as one destination and resumes its last section", () => {
 });
 
 it("keeps destination reuse inside the current window", () => {
-  const first = go("/browser");
-  expect(go("/browser").id).toBe(first.id);
+  const first = go("/spaces/family/chat");
+  expect(go("/spaces/family/chat").id).toBe(first.id);
 });
 
 it("starts configured fresh tabs and stops replacing them after interaction", () => {
@@ -104,11 +105,11 @@ it("preserves established and fresh tabs across persistence", () => {
 });
 
 it("recovers views hidden by old cross-app history as visible tabs", () => {
-  const browser = go("/browser");
+  const space = go("/spaces/family/chat");
   const files = go("/agents");
   const current = store().layout;
   const pane = dockLeaves(current.root)[0];
-  const root = { ...pane, history: { entries: [browser, files], index: 1 } };
+  const root = { ...pane, history: { entries: [space, files], index: 1 } };
   const migrated = normalizeWorkspaceLayout({
     ...current,
     root,
@@ -119,18 +120,18 @@ it("recovers views hidden by old cross-app history as visible tabs", () => {
     allLayoutViews(migrated)
       .map((view) => view.id)
       .sort(),
-  ).toEqual([browser.id, files.id].sort());
+  ).toEqual([space.id, files.id].sort());
   expect(dockLeaves(migrated.root)[0].history?.entries.map((view) => view.id)).toEqual([files.id]);
   expect(normalizeWorkspaceLayout(migrated)).toEqual(migrated);
 });
 
-it("preserves an occupied split when an explicit browser open targets it", () => {
-  const browser = go("/browser");
+it("preserves an occupied split when an explicit open targets it", () => {
+  const space = go("/spaces/family/chat");
   const paneId = store().layout.focusedPaneId;
-  const opened = store().openBrowserView({ paneId, url: "https://new.example" });
-  expect(opened.id).not.toBe(browser.id);
+  const opened = openPage(store(), { paneId, url: "https://new.example" });
+  expect(opened.id).not.toBe(space.id);
   expect(allLayoutViews(store().layout).map((view) => view.id)).toEqual(
-    expect.arrayContaining([browser.id, opened.id]),
+    expect.arrayContaining([space.id, opened.id]),
   );
   expect(store().layout.focusedPaneId).not.toBe(paneId);
 });

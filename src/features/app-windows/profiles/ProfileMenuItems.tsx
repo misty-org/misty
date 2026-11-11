@@ -17,9 +17,7 @@ import { useProfileDialogs, type ProfileDialog } from "./profileDialogStore";
 export function ProfileMenuItems() {
   const current = useProfileWindowStore((state) => state.profile);
   const profiles = useProfileWindowStore((state) => state.profiles);
-  const incognito = useProfileWindowStore((state) => state.incognito);
   const show = useProfileDialogs((state) => state.show);
-  if (incognito) return null;
   // The menu hands focus back as it closes, so a dialog opens after it.
   const later = (dialog: ProfileDialog) => () => window.setTimeout(() => show(dialog), 0);
   return (

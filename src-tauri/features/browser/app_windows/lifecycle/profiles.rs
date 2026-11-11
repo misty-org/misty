@@ -73,8 +73,7 @@ pub fn update_profile<R: Runtime>(
     crate::sync::vault::profile_changed(key, Some(&entry));
     emit_to_profile(app, key, PROFILE_CHANGED_EVENT, &entry);
     for window in windows_for_profile(app, key) {
-        let incognito = is_incognito_window(window.label());
-        let _ = window.set_title(&window_title(&entry, incognito));
+        let _ = window.set_title(&window_title(&entry));
     }
     profiles_changed(app);
     Ok(entry)
@@ -133,7 +132,6 @@ fn delete_profile_here(app: &AppHandle, key: &str, everywhere: bool) -> Result<(
     for window in windows_for_profile(app, key) {
         let _ = window.close();
     }
-    crate::browser::extensions::release_profile(key);
     if let Ok(mut state) = lock_registry() {
         state.current().remove(key);
         state.open.retain(|open| open.profile != key);
@@ -143,9 +141,6 @@ fn delete_profile_here(app: &AppHandle, key: &str, everywhere: bool) -> Result<(
     profiles_changed(app);
     let (app, key) = (app.clone(), key.to_owned());
     tauri::async_runtime::spawn(async move {
-        if let Err(error) = crate::browser::extensions::remove_profile(&app, &key).await {
-            eprintln!("Could not remove a profile's extension data: {error}");
-        }
         if everywhere {
             crate::browser::profiles::erase_profile(&key).await;
         } else {
@@ -190,7 +185,7 @@ pub fn set_scope(scope: &str) {
 
 /// Windows that closed and left tabs behind, for a window of the same profile to take.
 pub fn take_orphans(label: &str) -> Vec<String> {
-    let Some(window) = parse(label).filter(|window| !window.incognito) else {
+    let Some(window) = parse(label) else {
         return Vec::new();
     };
     let Ok(mut state) = lock_registry() else {
@@ -241,8 +236,7 @@ pub fn apply_remote_profiles(app: &AppHandle, incoming: Vec<ProfileEntry>) {
     for entry in &changed {
         emit_to_profile(app, &entry.id, PROFILE_CHANGED_EVENT, entry);
         for window in windows_for_profile(app, &entry.id) {
-            let incognito = is_incognito_window(window.label());
-            let _ = window.set_title(&window_title(entry, incognito));
+            let _ = window.set_title(&window_title(entry));
         }
     }
     for id in removed {

@@ -19,8 +19,8 @@ describe("workspace shortcut actions", () => {
       instancePolicy: "single",
     });
     store.addSurface({
-      surfaceId: "browser",
-      groupKey: "tool:browser",
+      surfaceId: "agents",
+      groupKey: "tool:agents",
       title: "Code",
       route: "/code",
       instancePolicy: "multiple",
@@ -41,10 +41,10 @@ describe("workspace shortcut actions", () => {
       instancePolicy: "single",
     });
     const last = store.addSurface({
-      surfaceId: "browser",
-      groupKey: "tool:browser",
-      title: "Browser",
-      route: "/browser",
+      surfaceId: "agents",
+      groupKey: "tool:agents",
+      title: "Agents",
+      route: "/agents",
       forceNew: true,
     });
     expect(useWorkspaceStore.getState().selectView("last")?.id).toBe(last.id);
@@ -53,18 +53,18 @@ describe("workspace shortcut actions", () => {
   it("reopens the most recently closed tab in the focused pane", () => {
     const store = useWorkspaceStore.getState();
     const tab = store.addSurface({
-      surfaceId: "browser",
-      groupKey: "tool:browser",
+      surfaceId: "agents",
+      groupKey: "tool:agents",
       title: "Code",
       route: "/code",
       forceNew: true,
       state: { rootPath: "/project" },
     });
     store.addSurface({
-      surfaceId: "browser",
-      groupKey: "tool:browser",
-      title: "Browser",
-      route: "/browser",
+      surfaceId: "agents",
+      groupKey: "tool:agents",
+      title: "Agents",
+      route: "/agents",
       forceNew: true,
     });
     store.closeView(tab.id);
@@ -85,10 +85,10 @@ describe("workspace shortcut actions", () => {
     });
     const sourcePaneId = useWorkspaceStore.getState().layout.focusedPaneId;
     const browser = store.addSurface({
-      surfaceId: "browser",
-      groupKey: "tool:browser",
-      title: "Browser",
-      route: "/browser",
+      surfaceId: "agents",
+      groupKey: "tool:agents",
+      title: "Agents",
+      route: "/agents",
       forceNew: true,
     });
     const firstPane = { id: sourcePaneId };
@@ -121,10 +121,10 @@ describe("workspace shortcut actions", () => {
     });
     const sourcePaneId = useWorkspaceStore.getState().layout.focusedPaneId;
     const browser = store.addSurface({
-      surfaceId: "browser",
-      groupKey: "tool:browser",
-      title: "Browser",
-      route: "/browser",
+      surfaceId: "agents",
+      groupKey: "tool:agents",
+      title: "Agents",
+      route: "/agents",
       forceNew: true,
     });
     const firstPane = { id: sourcePaneId };
@@ -133,8 +133,8 @@ describe("workspace shortcut actions", () => {
       pane.views.some((tab) => tab.id === browser.id),
     )!;
     store.addSurface({
-      surfaceId: "browser",
-      groupKey: "tool:browser",
+      surfaceId: "agents",
+      groupKey: "tool:agents",
       title: "Code",
       route: "/code",
       forceNew: true,

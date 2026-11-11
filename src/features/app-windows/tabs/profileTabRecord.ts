@@ -1,12 +1,6 @@
 import { dockTreeViews } from "../panes/dockTree";
 import { isEmptyTab } from "../panes/layoutTabs";
-import {
-  parseBrowserViewState,
-  type WorkspaceDockNode,
-  type WorkspaceTab,
-  type WorkspaceView,
-} from "./workspaceViews";
-import type { MistyTabGroup } from "../tab-groups/tabGroups";
+import type { WorkspaceDockNode, WorkspaceTab, WorkspaceView } from "./workspaceViews";
 
 /**
  * A tab as a profile keeps it: what's in it and where it sits, never which tab has focus or which
@@ -38,27 +32,12 @@ type StoredNode =
 export interface TabFields {
   order: number;
   title?: string;
-  pinned_url?: string;
-  group?: { id: string; name: string; color: MistyTabGroup["color"] };
   tree: StoredNode;
 }
 
-/** A tab that isn't the profile's to share: an agent's own, or a new tab nobody has used. */
+/** A tab that isn't the profile's to share: a new tab nobody has used. */
 export function tabStaysHere(tab: WorkspaceTab): boolean {
-  const views = dockTreeViews(tab.root);
-  return (
-    isEmptyTab(tab) ||
-    views.every((view) => view.placeholder) ||
-    views.some(
-      (view) => view.surfaceId === "browser" && parseBrowserViewState(view.state).agentOwned,
-    )
-  );
-}
-
-function storedState(view: WorkspaceView): unknown {
-  if (view.surfaceId !== "browser") return view.state ?? null;
-  const { url, faviconUrl, bookmarkId } = parseBrowserViewState(view.state);
-  return { url, favicon: faviconUrl, ...(bookmarkId ? { bookmark: bookmarkId } : {}) };
+  return isEmptyTab(tab) || dockTreeViews(tab.root).every((view) => view.placeholder);
 }
 
 function storedView(view: WorkspaceView): StoredView {
@@ -71,7 +50,7 @@ function storedView(view: WorkspaceView): StoredView {
     title: view.title,
     route: view.route,
     sidebar: view.sidebarVisible,
-    state: storedState(view),
+    state: view.state ?? null,
     created_at: view.createdAt,
     ...(view.placeholder ? { placeholder: true } : {}),
   };
@@ -95,17 +74,10 @@ function storedNode(node: WorkspaceDockNode): StoredNode {
   };
 }
 
-export function tabFields(
-  tab: WorkspaceTab,
-  order: number,
-  groups: readonly MistyTabGroup[],
-): TabFields {
-  const group = tab.tabGroupId ? groups.find((item) => item.id === tab.tabGroupId) : undefined;
+export function tabFields(tab: WorkspaceTab, order: number): TabFields {
   return {
     order,
     ...(tab.title ? { title: tab.title } : {}),
-    ...(tab.pinnedUrl ? { pinned_url: tab.pinnedUrl } : {}),
-    ...(group ? { group: { id: group.id, name: group.name, color: group.color } } : {}),
     tree: storedNode(tab.root),
   };
 }
@@ -119,17 +91,6 @@ export function encodedFields(value: unknown): string {
         )
       : item,
   );
-}
-
-function viewState(view: StoredView, previous?: WorkspaceView): unknown {
-  if (view.surface !== "browser") return view.state;
-  const state = view.state as { url?: unknown; favicon?: unknown; bookmark?: unknown } | null;
-  return parseBrowserViewState({
-    ...(previous ? parseBrowserViewState(previous.state) : {}),
-    url: state?.url,
-    faviconUrl: state?.favicon,
-    bookmarkId: state?.bookmark,
-  });
 }
 
 function liveNode(
@@ -160,7 +121,7 @@ function liveNode(
         title: view.title,
         route: view.route,
         sidebarVisible: view.sidebar,
-        state: viewState(view, known),
+        state: view.state,
         createdAt: view.created_at,
         lastFocusedAt: known?.lastFocusedAt ?? 0,
         ...(view.placeholder ? { placeholder: true } : {}),
@@ -179,7 +140,8 @@ function nodeHasLeaf(node: WorkspaceDockNode, id: string): boolean {
     : nodeHasLeaf(node.first, id) || nodeHasLeaf(node.second, id);
 }
 
-/** The tab a record describes, keeping what's only this window's: which pane has focus. */
+/** The tab a record describes, keeping what's only this window's: which pane has focus. A record
+ * from an older version may also say `pinned_url` and `group`, which are left unread. */
 export function tabFromFields(
   id: string,
   fields: TabFields,
@@ -197,8 +159,6 @@ export function tabFromFields(
         ? previous.focusedPaneId
         : firstLeafId(fields.tree),
     ...(fields.title ? { title: fields.title } : {}),
-    ...(fields.pinned_url ? { pinnedUrl: fields.pinned_url } : {}),
-    ...(fields.group ? { tabGroupId: fields.group.id } : {}),
   };
 }
 
@@ -226,13 +186,4 @@ export function usableFields(value: unknown): value is TabFields {
     return usableNode(split.first) && usableNode(split.second);
   };
   return !!fields && typeof fields.order === "number" && usableNode(fields.tree);
-}
-
-/** Each view's page address, for finding the ones that moved elsewhere. */
-export function browserUrls(tab: WorkspaceTab): Map<string, string> {
-  return new Map(
-    dockTreeViews(tab.root)
-      .filter((view) => view.surfaceId === "browser")
-      .map((view) => [view.id, parseBrowserViewState(view.state).url]),
-  );
 }

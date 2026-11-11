@@ -3,6 +3,7 @@ import { MemoryRouter, useNavigate } from "react-router-dom";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { dockTreeViews, useWorkspaceStore } from "@/features/app-windows";
 import { WorkspaceCanvas } from "./WorkspaceCanvas";
+import { openPage } from "@/tests/workspacePage";
 
 // Open tabs stay mounted, so a change that concerns one tab, or only the app
 // route, must not re-render every other tab's page. Pages here are stand-ins
@@ -28,11 +29,8 @@ beforeEach(() => {
   useWorkspaceStore.persist.clearStorage();
   useWorkspaceStore.getState().reset();
   const initial = dockTreeViews(useWorkspaceStore.getState().layout.root);
-  // An agent's own pages: a window keeps those, and closes a person's saved ones as it opens.
-  for (let i = 0; i < 8; i += 1) {
-    const view = useWorkspaceStore.getState().openBrowserView({ url: `https://site${i}.example/` });
-    useWorkspaceStore.getState().updateBrowserView(view.id, { agentOwned: true });
-  }
+  for (let i = 0; i < 8; i += 1)
+    openPage(useWorkspaceStore.getState(), { url: `https://site${i}.example/` });
   for (const tab of initial) useWorkspaceStore.getState().closeView(tab.id);
   renders.clear();
 });
@@ -42,7 +40,7 @@ const total = () => [...renders.values()].reduce((sum, count) => sum + count, 0)
 
 it("re-renders only the page whose tab changed, and none for a route change", () => {
   render(
-    <MemoryRouter initialEntries={["/browser"]}>
+    <MemoryRouter initialEntries={["/agents"]}>
       <RouteDriver />
       <WorkspaceCanvas />
     </MemoryRouter>,
@@ -51,11 +49,11 @@ it("re-renders only the page whose tab changed, and none for a route change", ()
   expect(renders.size).toBe(8);
 
   renders.clear();
-  act(() => useWorkspaceStore.getState().updateBrowserView(views[0].id, { title: "New title" }));
+  act(() => useWorkspaceStore.getState().renameView(views[0].id, "New title"));
   expect([...renders.keys()]).toEqual([views[0].id]);
   expect(total()).toBe(1);
 
   renders.clear();
-  act(() => go("/browser?changed=1"));
+  act(() => go("/agents?changed=1"));
   expect(total()).toBe(0);
 });

@@ -263,15 +263,21 @@ pub async fn run(program: &Path, request: TurnRequest, link: TurnLink) -> Result
         let from = text.len().saturating_sub(2000);
         text.get(from..).unwrap_or(&text).trim().to_string()
     });
+    // Pictures come first, then the words, as Claude Code's own input takes them.
+    let mut content: Vec<Value> = request
+        .images
+        .iter()
+        .map(|image| {
+            json!({
+                "type": "image",
+                "source": { "type": "base64", "media_type": image.mime, "data": image.data },
+            })
+        })
+        .collect();
+    content.push(json!({ "type": "text", "text": request.prompt }));
     let said = write_line(
         &mut stdin,
-        &json!({
-            "type": "user",
-            "message": {
-                "role": "user",
-                "content": [{ "type": "text", "text": request.prompt }],
-            },
-        }),
+        &json!({ "type": "user", "message": { "role": "user", "content": content } }),
     )
     .await;
     if !said {

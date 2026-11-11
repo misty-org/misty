@@ -44,8 +44,6 @@ export { draftAdd, draftPlace, draftRemove } from "./panes/layoutDraft";
 export { ProfileDialogs } from "./profiles/ProfileDialogs";
 export { ProfileMenuItems } from "./profiles/ProfileMenuItems";
 export { ProfileSwitcher } from "./profiles/ProfileSwitcher";
-export { type SharedRecord } from "./profiles/profileRecordModel";
-export { configureDeviceBangs } from "./profiles/profileSearch";
 export {
   closeWindow,
   createProfile,
@@ -54,12 +52,10 @@ export {
   currentWindowLabel,
   firstProfileId,
   isHostWindow,
-  isIncognitoWindow,
   isLinkTargetWindow,
   isProfileWindowLabel,
   listProfiles,
   onHostWindow,
-  openIncognitoWindow,
   openNewWindow,
   openProfile,
   useProfileWindowStore,
@@ -77,7 +73,6 @@ export { reserveMistyUpdate } from "./recovery/unsavedChanges";
 export { useWorkspaceRecoveryRetry } from "./recovery/useWorkspaceRecoveryRetry";
 export { migrateRetiredWorkspaceView } from "./recovery/workspaceMigrations";
 export { nativeWorkspaceRecoveryEnabled } from "./recovery/workspaceRecoveryPlatform";
-export { tabGroupColors, type MistyTabGroup, type TabGroupColor } from "./tab-groups/tabGroups";
 export { MistyBrandIcon } from "./tabs/MistyBrandIcon";
 
 export { workspaceAppIcon } from "./tabs/WorkspaceAppIcon";
@@ -86,12 +81,8 @@ export {
   useWorkspaceViewFocused,
 } from "./tabs/WorkspaceViewRouteScope";
 export { accountScopeFor, localAccountScope } from "./tabs/accountScope";
-export { activeBrowserTabContext, openBrowserTabs } from "./tabs/browserTabs";
 export {
   blankBrowserUrl,
-  browserInternalPage,
-  browserInternalUrl,
-  browserSearchUrl,
   parseBrowserViewState,
   type DockSplitDirection,
   type WorkspaceDockNode,
@@ -100,8 +91,7 @@ export {
   type WorkspaceView,
 } from "./tabs/workspaceViews";
 export { type PageDocument } from "./tabs/pageSnapshot";
-export { pinnableTabUrl } from "./tabs/pinnedTabs";
-export { workspaceSurfaceFromRoute } from "./tabs/routeSurface";
+export { isRetiredWebRoute, workspaceSurfaceFromRoute } from "./tabs/routeSurface";
 export {
   onSpaceWindowSwitch,
   spaceWindow,
@@ -109,8 +99,6 @@ export {
   useSpaceWindowStore,
   type SpaceWindowIdentity,
 } from "./tabs/spaceWindow";
-export { startTabArchive, useTabArchiveStore } from "./tabs/tabArchive";
-export { configureTabArchive } from "./tabs/tabArchiveSettings";
 export { useWorkspacePagePreview } from "./tabs/useWorkspacePagePreview";
 export { useWorkspaceStore } from "./tabs/useWorkspaceStore";
 export {
@@ -199,37 +187,12 @@ export { type BrowserBounds, type BrowserTheme } from "./page-runtime/pageRuntim
 export { startProfileWindow } from "./profiles/profileWindow";
 
 // Public surface used by other features (generated from their imports).
-export { normalizeBrowserAddress, resolveDirectAddress } from "./addresses/address";
 export {
   browserHomeUrl,
-  browserNewTabUrl,
   configureBrowserHomeUrl,
-  configureNewTabOverride,
   defaultBrowserHomeUrl,
-  isNewTabOverrideUrl,
   normalizeBrowserHomeUrl,
 } from "./addresses/browserHome";
-export {
-  browserInternalPages,
-  isBrowserInternalUrl,
-  type BrowserInternalPage,
-} from "./addresses/browserInternalUrl";
-export {
-  browserSearchEngine,
-  browserSearchEngines,
-  browserSearchSuggestionsEnabled,
-  configureBrowserCustomBangs,
-  configureBrowserSearchEngine,
-  configureBrowserSearchSuggestions,
-  sanitizeBrowserCustomBangs,
-  setBrowserCustomBangs,
-  type BrowserCustomBang,
-} from "./addresses/browserSearchEngine";
-export {
-  initialBookmarkNavigation,
-  userBookmarkFolders,
-  type BookmarkNavigationState,
-} from "./profiles/navigationDefaults";
 export {
   preferredDefaultSpace,
   spacesDirectory,

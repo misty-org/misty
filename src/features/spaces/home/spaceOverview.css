@@ -1,0 +1,158 @@
+/* The Space overview: cards that sit two across once the pane has room for them. */
+.space-overview {
+  container-type: inline-size;
+  display: grid;
+  gap: 16px;
+}
+.space-overview-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  gap: 16px;
+}
+@container (min-width: 680px) {
+  .space-overview-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  /* An odd card out takes the whole row instead of leaving a hole beside it. */
+  .space-overview-grid > :last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
+}
+
+.overview-card {
+  display: grid;
+  align-content: start;
+  min-width: 0;
+  padding: 6px;
+  border: 1px solid var(--color-charcoal-border);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--misty-theme-text) 3%, transparent);
+}
+.overview-card[data-tone="attention"] {
+  border-color: color-mix(in srgb, var(--color-tone-amber) 32%, var(--color-charcoal-border));
+}
+.overview-card-head {
+  display: flex;
+  min-height: 40px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 2px 4px 2px 10px;
+}
+.overview-card-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--color-cream);
+  font-size: 13px;
+  font-weight: 600;
+}
+.overview-card-count {
+  color: var(--color-cream-muted);
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+.overview-card-empty {
+  display: flex;
+  padding: 2px 4px 6px;
+}
+
+.overview-row {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  color: var(--color-cream-muted);
+}
+.overview-row:is(button):hover {
+  background: var(--color-control-hover);
+}
+.overview-row-mark {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  place-items: center;
+}
+.overview-row-mark[data-kind="folder"] {
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--color-tone-blue) 14%, transparent);
+  color: var(--color-tone-blue);
+}
+.overview-row-mark[data-kind="schedule"] {
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--misty-theme-text) 7%, transparent);
+}
+.overview-row-detail {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.overview-row-end {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.overview-status {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 6px;
+}
+.overview-status[data-status="working"] {
+  color: var(--color-tone-blue);
+}
+.overview-status[data-status="needs-you"] {
+  color: var(--color-tone-amber);
+}
+.overview-status[data-status="failed"] {
+  color: var(--color-tone-red);
+}
+.overview-dot {
+  width: 6px;
+  height: 6px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: currentColor;
+}
+.overview-dot[data-status="needs-you"] {
+  background: var(--color-tone-amber);
+}
+.overview-dot[data-status="working"] {
+  background: var(--color-tone-blue);
+  animation: overview-pulse 1.6s ease-in-out infinite;
+}
+@keyframes overview-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .overview-dot[data-status="working"] {
+    animation: none;
+  }
+}
+
+.overview-git {
+  display: inline-flex;
+  max-width: 160px;
+  align-items: center;
+  gap: 4px;
+  overflow: hidden;
+}
+.overview-git-changed {
+  color: var(--color-tone-amber);
+}

@@ -74,6 +74,21 @@ pub(crate) fn cancel(run_id: &str) -> bool {
     }
 }
 
+/// Multi-run: the live runs working in exactly this folder (multirun.rs).
+pub(crate) fn live_in(folder: &std::path::Path) -> Vec<String> {
+    REQUESTS
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .iter()
+        .filter(|(_, body)| {
+            body["engine"]["folder"]
+                .as_str()
+                .is_some_and(|named| std::path::Path::new(named) == folder)
+        })
+        .map(|(run, _)| run.clone())
+        .collect()
+}
+
 pub fn stop_all() {
     for control in running().values() {
         control.stop();
@@ -315,7 +330,10 @@ pub(crate) async fn start(app: &AppHandle, run_id: String, body: Value) -> Resul
             folder_text.clone(),
         );
         tokio::task::spawn_blocking(move || {
-            let linked = store::is_linked(&db, &account, &folder).unwrap_or(false);
+            // Multi-run: a worktree it made for this account counts too (multirun.rs). That
+            // record is written only by native code, so a page still can't name a folder.
+            let linked = store::is_linked(&db, &account, &folder).unwrap_or(false)
+                || super::multirun::is_worktree(&db, &account, &folder);
             let session = store::session(&db, &account, &conversation, engine.id(), &folder_text);
             (linked, session)
         })
@@ -348,6 +366,7 @@ pub(crate) async fn start(app: &AppHandle, run_id: String, body: Value) -> Resul
         effort: pick("effort"),
         // The Space's tools, for an engine that takes MCP servers on its command line.
         mcp_servers: super::mcp::servers_for(app, &run_id).await,
+        images: turn::images_of(&body["attachments"]),
     };
     let (link, control, mut events) = turn::link();
     running().insert(run_id.clone(), control.clone());

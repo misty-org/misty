@@ -32,7 +32,7 @@ describe("Profile window labels contract", () => {
       webviews: string[];
     };
     expect(capability.webviews).toContain("window-*");
-    expect(capability.webviews).toContain("incognito-*");
+    expect(capability.webviews).not.toContain("incognito-*");
     expect(capability.webviews).not.toContain("main");
   });
 });

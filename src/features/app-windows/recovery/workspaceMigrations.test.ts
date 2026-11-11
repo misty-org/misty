@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { createDockLeaf, dockTreeViews } from "../panes/dockTree";
 import { createBrowserViewState, type WorkspaceView } from "../tabs/workspaceViews";
-import { migrateRetiredWorkspaceView, migrateRetiredWorkspaceViews } from "./workspaceMigrations";
+import {
+  collectUnrestoredViews,
+  migrateRetiredWorkspaceView,
+  migrateRetiredWorkspaceViews,
+} from "./workspaceMigrations";
+import { allLayoutViews } from "../panes/layoutTabs";
 import { migrateWorkspaceStore } from "../tabs/workspaceStorePersistence";
 
 /** Saved views may still carry surfaces this build no longer renders. */
@@ -24,61 +29,27 @@ function legacyTab(overrides: LegacyViewOverrides = {}): WorkspaceView {
 }
 
 describe("browser workspace migration", () => {
-  it.each(["home", "space", "code", "terminal", "marketplace"] as const)(
-    "replaces retired %s views without changing tab identity",
+  it.each(["home", "code", "terminal", "marketplace", "files", "official-app", "transfers"])(
+    "drops a saved %s view, whose tool is gone",
     (surfaceId) => {
       const tab = legacyTab({ surfaceId, state: { savedDocument: "recovery-data" } });
-      expect(migrateRetiredWorkspaceView(tab)).toMatchObject({
-        id: tab.id,
-        surfaceId: "browser",
-        route: "/browser",
-        groupKey: "tool:browser",
-        state: { url: "https://www.google.com" },
-        createdAt: 1,
-        lastFocusedAt: 2,
-      });
+      expect(migrateRetiredWorkspaceView(tab)).toBeNull();
       expect(tab.state).toEqual({ savedDocument: "recovery-data" });
     },
   );
-  it.each(["files", "official-app"] as const)(
-    "replaces retired %s Files views with a browser tab without changing identity",
-    (surfaceId) => {
-      const tab = legacyTab({
-        surfaceId,
-        groupKey: "app:files",
-        route: "/apps/files?path=%2FUsers%2Fada&select=notes.txt",
-        title: "Documents",
-        state: { directory: "/Users/ada", selected: ["notes.txt"] },
-      });
-      // Files moved to Kura, a separate app.
-      const migrated = migrateRetiredWorkspaceView(tab);
-      expect(migrated).toMatchObject({
-        id: tab.id,
-        surfaceId: "browser",
-        groupKey: "tool:browser",
-        route: "/browser",
-      });
-      expect(migrateRetiredWorkspaceView(migrated)).toEqual(migrated);
-    },
-  );
-  it("preserves browser URLs and website identity", () => {
-    const tab = legacyTab({
-      surfaceId: "browser",
-      groupKey: "app:browser",
-      state: {
-        ...createBrowserViewState("https://example.com/report"),
-        websiteId: "saved-website",
-      },
-      title: "Report",
-    });
-    expect(migrateRetiredWorkspaceView(tab)).toMatchObject({
-      id: tab.id,
-      state: {
-        ...createBrowserViewState("https://example.com/report"),
-        bookmarkId: "saved-website",
-      },
-      title: "Report",
-    });
+  it("drops a person's saved web page, however old its shape", () => {
+    for (const groupKey of ["tool:browser", "app:browser"] as const)
+      expect(
+        migrateRetiredWorkspaceView(
+          legacyTab({
+            surfaceId: "browser",
+            groupKey,
+            route: "/browser",
+            state: { ...createBrowserViewState("https://example.com/report"), agentOwned: true },
+            title: "Report",
+          }),
+        ),
+      ).toBeNull();
   });
   it("preserves saved agent run links", () => {
     expect(
@@ -91,14 +62,78 @@ describe("browser workspace migration", () => {
       ),
     ).toMatchObject({ surfaceId: "agents", route: "/agents?run=run-1" });
   });
-  it("upgrades persisted layout contents while preserving focus", () => {
-    const tab = legacyTab({
+  it("loads a layout without its retired views, keeping the rest and its focus", () => {
+    const files = legacyTab({
+      id: "files",
       surfaceId: "files",
       groupKey: "app:files",
       state: { path: "/Users/ada" },
       route: "/apps/files",
     });
-    const pane = createDockLeaf([tab]);
+    const web = legacyTab({
+      id: "web",
+      surfaceId: "browser",
+      groupKey: "tool:browser",
+      route: "/browser",
+      state: createBrowserViewState("https://example.com/"),
+    });
+    const agents = legacyTab({
+      id: "agents",
+      surfaceId: "agents",
+      groupKey: "tool:agents",
+      route: "/agents?run=run-1",
+    });
+    const kept = { ...createDockLeaf([agents]), id: "pane:kept" };
+    const gone = { ...createDockLeaf([web]), id: "pane:gone" };
+    const split = {
+      type: "split" as const,
+      id: "split",
+      direction: "horizontal" as const,
+      ratio: 0.5,
+      first: gone,
+      second: { ...kept, history: { entries: [web, agents], index: 1 } },
+    };
+    const layout = {
+      root: split,
+      focusedPaneId: gone.id,
+      tabs: [
+        { id: "layout:files", root: createDockLeaf([files]), focusedPaneId: "x" },
+        { id: "layout:split", root: split, focusedPaneId: gone.id },
+      ],
+      activeTabId: "layout:files",
+    };
+    const migrated = migrateWorkspaceStore(
+      {
+        layout,
+        closedItems: [
+          { view: web, windowId: "w", paneId: "p" },
+          { view: agents, windowId: "w", paneId: "p", tab: layout.tabs[0] },
+          { view: agents, windowId: "w", paneId: "pane:kept", tab: layout.tabs[1] },
+        ],
+      },
+      18,
+    );
+    // The tab that held only Files is gone, so the one left is in front, as one pane.
+    expect(migrated.layout.tabs!.map((tab) => tab.id)).toEqual(["layout:split"]);
+    expect(migrated.layout.activeTabId).toBe("layout:split");
+    expect(migrated.layout.root).toMatchObject({ type: "leaf", id: "pane:kept" });
+    expect(migrated.layout.focusedPaneId).toBe("pane:kept");
+    expect(allLayoutViews(migrated.layout).map((view) => view.id)).toEqual(["agents"]);
+    expect(JSON.stringify(migrated.layout)).not.toContain("example.com");
+    // Only what can still be reopened stays in the closed list.
+    expect(migrated.closedItems).toHaveLength(1);
+    expect(dockTreeViews(migrated.closedItems[0].tab!.root).map((view) => view.id)).toEqual([
+      "agents",
+    ]);
+  });
+  it("leaves a window that held only web pages with no tabs", () => {
+    const web = legacyTab({
+      surfaceId: "browser",
+      groupKey: "tool:browser",
+      route: "/browser",
+      state: createBrowserViewState("https://example.com/"),
+    });
+    const pane = createDockLeaf([web]);
     const layout = { root: pane, focusedPaneId: pane.id };
     const migrated = migrateWorkspaceStore(
       {
@@ -106,17 +141,19 @@ describe("browser workspace migration", () => {
         layout,
         layoutsByScope: { global: layout },
         virtualWindowsByScope: {},
-        closedTabs: [],
+        closedTabs: [web],
         closedVirtualWindowsByScope: {},
       },
       6,
     );
-    expect(dockTreeViews(migrated.layout.root)[0]).toMatchObject({
-      id: tab.id,
-      surfaceId: "browser",
-    });
-    expect(migrated.layout.focusedPaneId).toBe(pane.id);
-    expect(dockTreeViews(migrateRetiredWorkspaceViews(layout).root)[0].surfaceId).toBe("browser");
+    expect(allLayoutViews(migrated.layout)).toEqual([]);
+    expect(migrated.layout.tabs).toHaveLength(1);
+    expect(migrated.closedItems).toEqual([]);
+    expect(allLayoutViews(migrateRetiredWorkspaceViews(layout))).toEqual([]);
+    // What it saves next loads the same way.
+    expect(allLayoutViews(migrateWorkspaceStore({ layout: migrated.layout }, 19).layout)).toEqual(
+      [],
+    );
   });
 });
 
@@ -130,18 +167,13 @@ it("preserves restored Space tabs during persistence migration", () => {
 });
 
 it.each(["/extensions", "/extensions/installed", "/extensions/addon/607454"])(
-  "reopens a saved Extensions page at %s as the Chrome Web Store",
+  "drops a saved Extensions page at %s",
   (route) => {
-    const migrated = migrateRetiredWorkspaceView(
-      legacyTab({
-        surfaceId: "extensions",
-        groupKey: "tool:extensions",
-        title: "Extensions",
-        route,
-      }),
-    );
-    expect(migrated).toMatchObject({ surfaceId: "browser", route: "/browser" });
-    expect(migrated.state).toMatchObject({ url: "https://chromewebstore.google.com/" });
+    expect(
+      migrateRetiredWorkspaceView(
+        legacyTab({ surfaceId: "extensions", groupKey: "tool:extensions", title: "Ext", route }),
+      ),
+    ).toBeNull();
   },
 );
 
@@ -161,23 +193,36 @@ it("migrates a saved Scheduled tab into Agents without losing its selected task"
   });
 });
 
-it("restores saved views that lost their route instead of failing the whole workspace", () => {
-  const home = legacyTab({ route: undefined as unknown as string });
-  expect(migrateRetiredWorkspaceView(home)).toMatchObject({
-    surfaceId: "browser",
-    route: "/browser",
-  });
-  const files = legacyTab({
-    surfaceId: "files" as WorkspaceView["surfaceId"],
-    groupKey: "tool:files" as WorkspaceView["groupKey"],
-    title: "Files",
+it("drops retired views that lost their route instead of failing the whole workspace", () => {
+  expect(
+    migrateRetiredWorkspaceView(legacyTab({ route: undefined as unknown as string })),
+  ).toBeNull();
+  const agents = legacyTab({
+    surfaceId: "agents",
+    groupKey: "tool:agents",
     route: undefined as unknown as string,
   });
-  // Files moved to Kura; a saved Files view becomes a new browser tab.
-  expect(migrateRetiredWorkspaceView(files)).toMatchObject({
-    surfaceId: "browser",
-    route: "/browser",
+  expect(migrateRetiredWorkspaceView(agents)).toMatchObject({
+    surfaceId: "agents",
+    route: "/agents",
   });
+});
+
+it("puts an Agents placeholder where a damaged view was, and reports it", () => {
+  const damaged = legacyTab({
+    id: "damaged",
+    title: "Broken",
+    surfaceId: "agents",
+    route: "http://[",
+  });
+  const { result, skipped } = collectUnrestoredViews(() => migrateRetiredWorkspaceView(damaged));
+  expect(result).toMatchObject({
+    id: "damaged",
+    surfaceId: "agents",
+    route: "/agents",
+    placeholder: true,
+  });
+  expect(skipped).toMatchObject([{ id: "damaged", title: "Broken" }]);
 });
 
 it("restores a route-less Scheduled view into the current Agents collection", () => {
@@ -196,14 +241,106 @@ it("restores a route-less Scheduled view into the current Agents collection", ()
   });
 });
 
-it("restores retired Transfers views as browser tabs without losing their identity", () => {
-  const tab = legacyTab({
-    surfaceId: "transfers",
-    groupKey: "tool:transfers" as WorkspaceView["groupKey"],
-    route: "/transfers",
-    title: "Transfers",
+it("loads a window saved with tab groups, pinned tabs and bookmarks, without them", () => {
+  const agents = (id: string) =>
+    legacyTab({
+      id,
+      instanceKey: id,
+      surfaceId: "agents",
+      groupKey: "tool:agents",
+      route: "/agents",
+    });
+  const pane = (id: string) => ({ ...createDockLeaf([agents(id)]), id: `pane:${id}` });
+  const tab = (id: string, extra: object) => ({
+    id: `layout:${id}`,
+    root: pane(id),
+    focusedPaneId: `pane:${id}`,
+    ...extra,
   });
-  const restored = migrateRetiredWorkspaceView(tab);
-  expect(restored).toMatchObject({ id: tab.id, surfaceId: "browser", route: "/browser" });
-  expect(migrateRetiredWorkspaceView(restored)).toEqual(restored);
+  const tabs = [
+    tab("pinned", { pinnedUrl: "https://example.com/" }),
+    tab("grouped", { tabGroupId: "tabgroup:work", title: "Kept name" }),
+    tab("plain", {}),
+  ];
+  const saved = {
+    layout: {
+      root: tabs[1].root,
+      focusedPaneId: "pane:grouped",
+      tabs,
+      activeTabId: "layout:grouped",
+    },
+    activeWindowId: "w1",
+    tabGroups: [
+      { id: "tabgroup:work", name: "Work", color: "blue", collapsed: true },
+      {
+        id: "tabgroup:closed",
+        name: "Closed",
+        color: "red",
+        collapsed: false,
+        savedTabs: [tabs[2]],
+      },
+    ],
+    migratedTabGroupIds: ["group:bookmarks"],
+    bookmarkFolders: [
+      {
+        kind: "folder",
+        id: "f",
+        fields: { label: "Reading", icon: "folder", order: 0, hidden: false },
+      },
+    ],
+    bookmarks: [
+      {
+        kind: "bookmark",
+        id: "b",
+        fields: {
+          folder_id: "f",
+          title: "Example",
+          url: "https://example.com/",
+          order: 0,
+          pinned: true,
+        },
+      },
+    ],
+    expandedBookmarkFolders: { f: true },
+    selectedBookmarkByFolder: { f: "b" },
+    lastUsedViewByGroup: { "tool:agents": "grouped" },
+    closedItems: [
+      {
+        view: agents("closed"),
+        windowId: "w1",
+        paneId: "pane:closed",
+        tab: tab("closed", { pinnedUrl: "https://example.com/", tabGroupId: "tabgroup:work" }),
+      },
+    ],
+  };
+  const migrated = migrateWorkspaceStore(JSON.parse(JSON.stringify(saved)), 18);
+  for (const retired of [
+    "tabGroups",
+    "migratedTabGroupIds",
+    "bookmarkFolders",
+    "bookmarks",
+    "expandedBookmarkFolders",
+    "selectedBookmarkByFolder",
+  ])
+    expect(retired in migrated).toBe(false);
+  const loaded = migrated.layout.tabs!;
+  expect(loaded.map((item) => item.id)).toEqual([
+    "layout:pinned",
+    "layout:grouped",
+    "layout:plain",
+  ]);
+  expect(loaded.map((item) => dockTreeViews(item.root).map((view) => view.id))).toEqual([
+    ["pinned"],
+    ["grouped"],
+    ["plain"],
+  ]);
+  expect(loaded[1].title).toBe("Kept name");
+  expect(migrated.layout.activeTabId).toBe("layout:grouped");
+  expect(migrated.lastUsedViewByGroup).toEqual({ "tool:agents": "grouped" });
+  expect(migrated.closedItems).toHaveLength(1);
+  const text = JSON.stringify(migrated);
+  expect(text).not.toContain("pinnedUrl");
+  expect(text).not.toContain("tabGroupId");
+  // Loading what it saved again changes nothing.
+  expect(migrateWorkspaceStore(JSON.parse(text), 19)).toEqual(JSON.parse(text));
 });

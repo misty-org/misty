@@ -7,16 +7,12 @@ pub use visibility::*;
 
 #[tauri::command]
 pub fn browser_webview_set_bounds(
-    caller: Webview,
     app: AppHandle,
     request: BrowserWebviewBoundsRequest,
 ) -> Result<(), String> {
     let webview = app
         .get_webview(&webview_label(&request.id)?)
         .ok_or_else(|| "Browser tab is not running.".to_owned())?;
-    if detached_from(&caller, &webview) {
-        return Ok(());
-    }
     let (position, size) = logical_bounds(request.x, request.y, request.width, request.height);
     configure_browser_webview(&webview, request.native_live_resize)?;
     set_webview_bounds_if_changed(&app, &webview, position, size)?;
@@ -96,17 +92,12 @@ fn hex_color(value: &str) -> Option<[u8; 3]> {
 
 #[tauri::command]
 pub fn browser_webview_reconcile(
-    caller: Webview,
     app: AppHandle,
     request: BrowserWebviewBoundsRequest,
 ) -> Result<bool, String> {
     let Some(webview) = app.get_webview(&webview_label(&request.id)?) else {
         return Ok(false);
     };
-    // Still running, in the agent's own window; never recreate it here.
-    if detached_from(&caller, &webview) {
-        return Ok(true);
-    }
     let (position, size) = logical_bounds(request.x, request.y, request.width, request.height);
     configure_browser_webview(&webview, request.native_live_resize)?;
     // A tab loaded in the background drops beneath the renderer before it
@@ -160,8 +151,6 @@ pub async fn browser_webview_navigate(
             .oauth_callback
             .map(|callback| (callback, std::time::Instant::now()));
     }
-    // Misty's own request, unlike anything a page starts itself.
-    crate::browser::extensions::trust_navigation(&request.id, &url);
     with_webview(&app, &request.id, |webview| {
         webview.navigate(url).map_err(|e| e.to_string())
     })
@@ -207,15 +196,6 @@ pub fn browser_webview_set_theme(
         }
     }
     Ok(())
-}
-
-/// The tab is in an extension popup, not the caller's window: the window it
-/// came from must leave its geometry and visibility alone until it returns.
-pub(in crate::browser) fn detached_from(caller: &Webview, webview: &Webview) -> bool {
-    super::super::extensions::popup::hosted_elsewhere(
-        caller.window().label(),
-        webview.window().label(),
-    )
 }
 
 pub(in crate::browser) fn with_webview(

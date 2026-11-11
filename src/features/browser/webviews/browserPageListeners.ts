@@ -1,6 +1,5 @@
 import type { UnlistenFn } from "@tauri-apps/api/event";
 import { listen } from "@tauri-apps/api/event";
-import { useWorkspaceStore } from "@/features/app-windows";
 import {
   browserTabIdForRuntime,
   browserTabShowsInternalPage,
@@ -14,14 +13,6 @@ interface BrowserPageEvent {
   url: string;
   /** `navigated`: the page changed its URL in place (History API or hash), loading nothing. */
   phase: "started" | "finished" | "navigated";
-}
-interface BrowserTitleEvent {
-  id: string;
-  title: string;
-}
-interface BrowserFaviconEvent {
-  id: string;
-  url: string;
 }
 interface BrowserCompatibilityEvent {
   id: string;
@@ -80,9 +71,6 @@ export function listenBrowserPageEvents({
         useBrowserRuntimeStore.getState().setCompatibilityIssue(tabId, null);
         useBrowserRuntimeStore.getState().setLoading(tabId, true);
       }
-      useWorkspaceStore.getState().updateBrowserView(tabId, {
-        url: payload.url,
-      });
       if (payload.phase === "navigated") {
         useBrowserRuntimeStore.getState().pushHistory(tabId, payload.url);
       }
@@ -100,24 +88,6 @@ export function listenBrowserPageEvents({
       if (isDisposed()) return;
       const tabId = browserTabIdForRuntime(payload.id);
       if (tabId) useBrowserRuntimeStore.getState().setLoading(tabId, false);
-    }),
-    listen<BrowserTitleEvent>("misty://browser-title", ({ payload }) => {
-      if (isDisposed() || !payload.title.trim()) return;
-      const tabId = browserTabIdForRuntime(payload.id);
-      if (tabId && !browserTabShowsInternalPage(tabId)) {
-        useWorkspaceStore.getState().updateBrowserView(tabId, {
-          title: payload.title.trim(),
-        });
-      }
-    }),
-    listen<BrowserFaviconEvent>("misty://browser-favicon", ({ payload }) => {
-      if (isDisposed() || !/^https?:\/\//i.test(payload.url)) return;
-      const tabId = browserTabIdForRuntime(payload.id);
-      if (tabId && !browserTabShowsInternalPage(tabId)) {
-        useWorkspaceStore.getState().updateBrowserView(tabId, {
-          faviconUrl: payload.url,
-        });
-      }
     }),
     listen<BrowserCompatibilityEvent>("misty://browser-compatibility", ({ payload }) => {
       if (

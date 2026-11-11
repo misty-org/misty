@@ -4,6 +4,7 @@ import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { DropdownMenu, DropdownMenuTrigger } from "@/shared/ui";
 import { AccountMenu } from "./AccountMenu";
+import { useHelpDialog } from "./HelpDialog";
 
 let mockUser: { id: string; email: string; username: string } | null = {
   id: "account-1",
@@ -53,10 +54,30 @@ describe("AccountMenu", () => {
     renderMenu();
     const menu = screen.getByRole("menu", { name: "Account" });
     expect(menu.textContent).toContain("owner@example.com");
-    for (const label of [/Account settings/, /Switch accounts/, /Sign out/]) {
+    for (const label of [/Account settings/, /Switch accounts/, /Help/, /Sign out/]) {
       expect(screen.getByRole("menuitem", { name: label })).toBeTruthy();
     }
     expect(menu.textContent).not.toContain("Report a problem");
+  });
+
+  it("opens Help once the menu has closed", () => {
+    vi.useFakeTimers();
+    const onClose = vi.fn();
+    render(
+      <MemoryRouter>
+        <DropdownMenu open modal={false}>
+          <DropdownMenuTrigger>Account</DropdownMenuTrigger>
+          <AccountMenu onClose={onClose} onOpenAccountSettings={vi.fn()} />
+        </DropdownMenu>
+      </MemoryRouter>,
+    );
+    fireEvent.click(screen.getByRole("menuitem", { name: /Help/ }));
+    expect(onClose).toHaveBeenCalled();
+    expect(useHelpDialog.getState().open).toBe(false);
+    vi.runAllTimers();
+    expect(useHelpDialog.getState().open).toBe(true);
+    useHelpDialog.getState().setOpen(false);
+    vi.useRealTimers();
   });
 
   it("offers only Sign in when no account is signed in", () => {
