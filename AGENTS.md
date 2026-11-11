@@ -1,7 +1,9 @@
 # Misty
 
-Misty is a desktop browser with agents built in: a Tauri app in `src/` and `src-tauri/`, with its native web
-platform layer in `src-tauri/features/kiri`. The server is the sibling repository
+Misty is a workspace for a person's agents, organized into Spaces: a Tauri app in `src/` and `src-tauri/`, with its
+native web platform layer in `src-tauri/features/kiri`. It began as a desktop browser with agents built in and is
+being moved over; `docs/plans/agent-workspace.md` says what is left. The built-in browser is for agents, and a person
+only watches a page or takes it over. The server is the sibling repository
 [misty-server](https://github.com/misty-org/misty-server). The code is the source of truth, so read it before
 changing a feature. There are no feature docs to keep current, and none should be added unless asked.
 
@@ -14,6 +16,8 @@ changing a feature. There are no feature docs to keep current, and none should b
 - Labels, buttons and headings use sentence case. No subtext under titles, buttons or forms.
 - Settings belong to the device (`misty.db`) and never sync.
 - Tabs live only in the tab sidebar.
+- An agent belongs to the person who made it, is saved on their computer, and takes requests only from them.
+- Code copied from another project keeps its license header and is credited in `NOTICE`.
 - Misty is open source under the AGPL-3.0-or-later (copyleft), with the attribution term in `NOTICE`. Add
   dependencies only under AGPL-compatible licenses (MIT, BSD, Apache-2.0, MPL-2.0, LGPL), never proprietary or
   non-commercial ones.
@@ -25,7 +29,9 @@ changing a feature. There are no feature docs to keep current, and none should b
   or Serper) and the Composio key. Never send a key, prompt, tool result or model output to the server, store or log
   them. `misty-server` has a contract test that enforces this.
 - What agents may do is decided in native code (`src-tauri/features/agents/run_control/tool_policy.rs`), from the mode
-  the run started with, never from the renderer at call time, the model or a page. Agents are autonomous: Auto doesn't
+  the run started with, never from the renderer at call time, the model or a page. An outside engine (Claude Code,
+  Codex and the like) gets its permission flags the same way, and its calls into a Space or the browser pass the same
+  gate. Agents are autonomous: Auto doesn't
   pause for ordinary work.
 - Agent chats and memory live in `misty.db`. Chats never sync, and memory syncs only through the encrypted vault, so
   the server can't read it. Only the vault is protected from the server: Space notes, chats and files are readable there.
@@ -35,9 +41,9 @@ changing a feature. There are no feature docs to keep current, and none should b
 
 # Decided, not built
 
-Everyone will share one hosted server, so friends can share Spaces. The code stays AGPL, and self-hosting stops being
-a product. Free returns on that server with every feature and small limits, and $10 Misty Pro is the cheapest paid
-plan. When Pro ends or a payment fails, the account moves to Free. Inactive free accounts are never deleted.
+Misty's hosted server is where friends share Spaces, and self-hosting stays for people who want their own. The code
+stays AGPL. Free returns on the hosted server with every feature and small limits, and $10 Misty Pro is the cheapest
+paid plan. When Pro ends or a payment fails, the account moves to Free. Inactive free accounts are never deleted.
 
 # Commits
 
