@@ -113,9 +113,9 @@ export async function runDeviceAgentOperation(
       return { tabs: tabs.slice(0, 200) };
     }
     case "browser.tab.open": {
-      const url = webAddress(input.url);
-      const view = useWorkspaceStore.getState().openBrowserView({ url });
-      return { opened: url, tabId: view.id };
+      // A person has no tabs here; an agent opens pages in its own browser.
+      webAddress(input.url);
+      throw new Error("no_person_tabs");
     }
     case "bookmark.list": {
       const query = typeof input.query === "string" ? input.query.trim().toLowerCase() : "";

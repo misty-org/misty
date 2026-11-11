@@ -61,6 +61,8 @@ export function useAgentsPageState() {
   useAgentFolderSync(accountId);
   const linkedAgentId = params.get("agent");
   const linkedConversationId = params.get("conversation");
+  // A link that asks for a new chat; its value only tells one ask from the next.
+  const linkedNew = params.get("new");
   useEffect(() => {
     if (!linkedAgentId) return;
     setSelected(linkedAgentId);
@@ -77,6 +79,7 @@ export function useAgentsPageState() {
     }
     const resume =
       linkedConversationId ??
+      (linkedNew && !current.working ? "" : undefined) ??
       (sameAgent
         ? current.activeConversationId
         : ([...current.conversations]
@@ -85,7 +88,7 @@ export function useAgentsPageState() {
     useMistyStore.setState({ selectedAgentId: linkedAgentId, activeConversationId: resume });
     if (needsLoad && !current.working)
       void useMistyStore.getState().selectConversation(linkedConversationId);
-  }, [linkedAgentId, linkedConversationId]);
+  }, [linkedAgentId, linkedConversationId, linkedNew]);
   // With no agent in the URL, reopen the last-used agent, then Misty, then the first agent.
   const profile =
     agents.find((a) => a.id === selected) ??

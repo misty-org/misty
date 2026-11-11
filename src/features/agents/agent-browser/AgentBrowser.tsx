@@ -3,7 +3,6 @@ import { Hand, PictureInPicture2, Play } from "lucide-react";
 import { useState } from "react";
 import { aiSurfaceApi } from "../runs/invocations/api";
 import { BrowserNavigationButtons, hostAddress } from "@/features/browser";
-import { useWorkspaceStore } from "@/features/app-windows";
 import { Button, IconButton, Input } from "@/shared/ui";
 import "./agentBrowser.css";
 import { AgentBrowserStage } from "./AgentBrowserStage";
@@ -105,17 +104,7 @@ export function AgentBrowser({ conversationId }: { conversationId?: string }) {
   );
   const foot = (
     <>
-      {shown?.url ? (
-        <Button
-          size="sm"
-          variant="ghost"
-          onClick={() => useWorkspaceStore.getState().openBrowserView({ url: shown.url })}
-        >
-          Move to my tabs
-        </Button>
-      ) : (
-        <span />
-      )}
+      <span />
       <IconButton
         label="Shrink to a picture"
         onClick={() => setBrowserExpanded(chat.conversationId, false)}

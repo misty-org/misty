@@ -24,6 +24,12 @@ async function loadChat() {
   return { default: SpaceChatEntry };
 }
 const Chat = lazy(loadChat);
+const Planner = lazy(() =>
+  import("@/features/spaces/planner/SpacePlanner").then((m) => ({ default: m.SpacePlanner })),
+);
+const Calendar = lazy(() =>
+  import("@/features/spaces/calendar/SpaceCalendar").then((m) => ({ default: m.SpaceCalendar })),
+);
 const MemoryTree = lazy(() =>
   import("@/features/memory/tree").then((m) => ({ default: m.MemoryTreePage })),
 );
@@ -51,6 +57,12 @@ export async function preloadSpaceSection(section: string) {
     case "library":
       await loadLibrary();
       break;
+      break;
+    case "planner":
+      await import("@/features/spaces/planner/SpacePlanner");
+      break;
+    case "calendar":
+      await import("@/features/spaces/calendar/SpaceCalendar");
       break;
     case "memory":
       await import("@/features/memory/tree");
@@ -164,6 +176,10 @@ export function SpaceSectionView(props: {
           />
         ) : section === "library" ? (
           <Library spaceId={spaceId} workspaceTabId={props.workspaceTabId} />
+        ) : section === "planner" ? (
+          <Planner spaceId={spaceId} />
+        ) : section === "calendar" ? (
+          <Calendar spaceId={spaceId} />
         ) : section === "memory" ? (
           <MemoryTree spaceId={spaceId} spaceName={space.name} />
         ) : section === "social" || section === "chat" ? (

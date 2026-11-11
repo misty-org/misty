@@ -10,15 +10,24 @@ inside Spaces. The interface and the attention change; almost all the code stays
 - **Any engine.** The main chat runs outside agent engines (Claude Code, Codex and others), ported
   from [desktop-cc-gui](https://github.com/zhukunpenglinyutong/desktop-cc-gui) (MIT). Its code is
   copied in and credited, not added as a dependency.
+- **Everything is an adapter.** Misty doesn't compete with OpenCode, ccgui, Hermes3D or
+  OpenChamber; it takes in what they have. Each engine comes in the same way, as an adapter, and a
+  person picks the adapter they want. OpenCode is ported from ccgui's adapter like the others,
+  not run through its own server.
+- **OpenChamber is the model for the chat view** and its side tools
+  ([openchamber/openchamber](https://github.com/openchamber/openchamber), MIT, checked
+  2026-11-10): its layout and how it works, drawn in black, white and gray. The sidebar stays as
+  built. The separate OpenChamber Launcher is reported to be GPL-3.0; take no code from it.
 - **Misty's own runtime stays** for browser work and Space work. Nobody has to use it.
 - **The built-in browser is for agents.** A person can watch a page an agent is using and take it
   over (to sign in, pass a check, or steer). There is no tab list of web pages, address bar,
   favorites or history as the main interface.
-- **The sidebar is a Space navigator**: the Space's sections, the person's agents and their chats.
-  Tabs and split panes stay as the container for views.
+- **The sidebar is a Space navigator**: the Space's pages at the top, then the person's chats under
+  each agent. It lists no tabs. Split panes stay as the container for views.
 - **Views over one Space**: home, chat, and later virtual (2D and 3D), all showing the same agents.
 - **Agents belong to the person.** They are saved on the computer, placed into Spaces, and take
-  requests only from their owner. Sharing or calling someone else's agent is not part of this plan.
+  requests only from their owner. In a shared Space they see each other's status and hand work
+  over through people (phase 1b); nobody calls someone else's agent.
 - **Folders are linked to a Space** on each computer. Engines run in those folders. The link is a
   device setting and never syncs.
 - **Engines reach a Space two ways**: direct tools for notes, files and threads, and one "ask
@@ -26,6 +35,80 @@ inside Spaces. The interface and the attention change; almost all the code stays
 - **Coding panels that come across**: file tree and editor, terminal, Git panel. Not ccgui's plugin
   system.
 - **Self-hosting stays** next to Misty's hosted server.
+
+## The Space is the universal adapter
+
+Added 2026-11-11. The platform isn't the problem; what is missing is one place every agent can
+work from. A person should be free to use whatever AI they want, and context belongs to the
+Space, not to a vendor: someone using Codex and Claude has both in the same Space, with nothing
+to import.
+
+Decided:
+
+- **Spaces live only on a server**, never in the desktop app.
+- **Misty Cloud** is where most people start and share Spaces: Free with small limits, with Pro
+  as the upgrade. **Self-hosting is free and complete**, mostly for developers. Only
+  `misty-cloud` (billing) stays private.
+
+Proposed, not yet confirmed:
+
+- **Agents share artifacts, not transcripts.** Each engine's chat history stays in its own files.
+  Agents save files, notes, decisions and where they left off to the Space with provenance
+  (`agents/artifacts/agentArtifacts.ts`), and whoever picks up next, on any engine, starts there.
+- **Memory is shared across engines** through the existing encrypted vault.
+- **The Space MCP server becomes an open, documented interface**, so agents Misty doesn't start
+  (Cursor, the Claude desktop app) can join a Space too. Today `engines/mcp.rs` gives a token
+  only to a run Misty started.
+- **End-to-end encryption for Space content** may need to move up: only the vault is protected
+  from the server today.
+
+Work this creates:
+
+- **Several servers in one app.** `src/api/deployment/serverChoice.ts` keeps one server per
+  device, so a self-hosted server and friends' Spaces on Misty Cloud can't be used together. It
+  also still names the address `mistyProServer()`.
+- **Moving a Space between servers** (notes, files, library, history). Without it "portable"
+  isn't true.
+- **A plain local mode for `misty-server`**, lower priority: files on disk, no tunnel, and
+  `docker compose up` working first time.
+- **Free limits** on what costs money: storage, shared Spaces, members and history kept, with
+  per-file and per-account caps. Inactive free accounts are never deleted, so the caps matter.
+- **A mismatch in `misty-cloud`**: it closes and deletes a cancelled account after 30 days, while
+  `AGENTS.md` says the account moves to Free.
+
+## Decisions of 2026-11-11 (night)
+
+- **Interface quality comes first.** The interface today is unpolished. Model it on OpenChamber
+  (and OpenHands): floating bars and panels, generous spacing, rounded cards. A little color is
+  welcome where it carries meaning (Git changes, file and folder icons); the virtual office may
+  use full color. `AGENTS.md` still states the old gray-only rule and must be brought in line.
+- **The office is a Sims-like world**, built ourselves after Hermes3D in Misty's look: characters
+  that walk around, furnished rooms, a card for the picked agent with actions, and a build mode.
+  The first 2D/3D office is far below this and is to be replaced.
+- **Phase 6 is confirmed**: delete everything listed there, checking first what agents share.
+- **Handoffs**: the agent drafts on the person's computer and the person sends it, so nothing a
+  model wrote reaches the server unapproved.
+- **The Space MCP server opens** to agents Misty doesn't start.
+- **Order**: prove what exists (look at the app, real Codex and Claude Code turns), then the
+  missing features. At most three large commits, not pushed.
+
+## Where it stands
+
+Written 2026-11-11, after the first pass through every phase on `redesign/workspace`. The type
+check, lint and tests pass in the app (`npm run check` parts, `cargo test`, `cargo clippy`) and in
+`misty-server` (`go build`, `go vet`, the new tests). None of it has been watched working in the
+running app yet, and nothing is committed.
+
+| Phase | Built | Left |
+|---|---|---|
+| 1 Shell | Sidebar of Space pages and chats; no tabs, no address field; web pages only for agents | Tabs still exist underneath; README |
+| 1b Together | Live status of teammates' agents (sidebar, Space home, office) and a stored activity log, as fixed codes only; server relay and log in `misty-server` | Handoffs and claims (they wait on who writes their text); member limits; `AGENTS.md` and the server contract test don't yet state the rule for the log |
+| 2 Engines | Adapters for Claude Code, Codex and OpenCode in `src-tauri/features/engines`; engine choice per agent; linked folders; sessions resumed; modes mapped natively and Ask goes to the person; session goals | A real turn was not sent (Codex's handshake was checked, OpenCode isn't installed here); images; multi-run; engine history isn't read from the CLIs' own files |
+| 3 Panels | Files with an editor, changes with step-by-step diffs and commit, terminal, in a panel beside the chat (`agents/context-panel`, `src-tauri/features/project`) | Preview with element picking; branches and history in the changes panel |
+| 4 Space for engines | Local MCP server (`engines/mcp.rs`) offering the Space's tools and `ask_misty`, through the same journal and gate as Misty's own agent; handed to all three engines | Unverified end to end; a "save to Space" tool for a file in the folder |
+| 5 Space home | Agents and what each is doing at the top of home; activity log on a shared Space | Waiting-for-you items, recent chats, linked folders, cost and schedules on home |
+| 6 Human browsing | Nothing deleted | Every deletion, each to be confirmed |
+| 7 Virtual view | Office in 2D and 3D on the Agents page, with teammates' agents | Not a Space page of its own |
 
 ## What already exists
 
@@ -51,30 +134,79 @@ Most of the product is built; the plan mainly re-points the shell at it.
 
 Not there at all: MCP, ACP, any outside engine, a terminal, a Git panel, a code editor.
 
-## Phase 0: land the layout branch
-
-`refactor/layout` has 74 uncommitted files (the Space bar removed, tools row moved to the sidebar
-foot, layout mode). Commit or drop that work first, so the shell change starts from a clean tree.
-
 ## Phase 1: the shell becomes a Space navigator
 
-Nothing is deleted in this phase; browser pieces are unmounted, not removed.
+Built on `redesign/workspace`: `WorkspaceSidebar.tsx` replaces the tab strip. It holds New chat and
+the Space's pages, then every chat in the Space under its agent (`SpaceNavigator.tsx`), with no tab
+list, address field, favorites or now-playing card. Launch opens the Space home (Agents when signed
+out), new views open Agents, the tools row keeps only the window's tools, and the welcome page
+says what Misty is. `WorkspaceTabStrip.tsx` and its parts are unmounted, not deleted.
 
-- `WorkspaceTabStrip.tsx`: replace the address slot, `FavoritesStrip` and `SidebarNowPlaying` with a
-  Space switcher, the Space's sections, the person's agents, and recent chats for that Space
-  (`AgentRecentConversations.tsx`, `AgentSwitcher.tsx`). Open tabs stay listed.
-- `settingsConstants.ts` (`workspaceDefaultViewIndex`) and `src/app/shell/startupRoute.ts`: start
-  in the last Space's home instead of `/browser`. Unknown routes go there too
-  (`routing/RouteConfig.tsx`).
-- `workspaceViews.ts`: the `browser` surface stays, but only an agent's page opens in it. The
-  new-tab button opens a new chat, not the browser search dialog.
-- `SidebarToolsRow` / `browser/pages/SidebarTools.tsx`: drop history, downloads, passwords, find,
-  reader and picture-in-picture from the row.
-- Remove dead leftovers found on the way: `NavigationItem.ts`, `NavigatorDestinationIcons.tsx`.
-- Onboarding (`src/features/onboarding`) and the README say what Misty now is.
+Left:
 
-Done when: a fresh launch opens a Space home, the sidebar shows sections, agents and chats, and
-no address bar is visible anywhere.
+- Look at it in the running app. It passed the type check and the tests but was not seen on
+  screen.
+- A person's saved web pages are closed as a window opens, and a route never opens one. Three
+  ways to a web page in a pane are left: the search dialog (and the shortcut that opens it), a
+  link clicked in a chat or in Memory, and a link another app hands to Misty while it is the
+  default browser.
+- Agents open ordinary web pages too (`browser.tab.open`, `agents/cursor/normalTabs.ts`), not only
+  their own hidden ones, and those show in the pane with the full browser toolbar. Decide where
+  such a page is shown before closing the three ways above for good.
+- Tabs still exist underneath: each page opened from the sidebar is a hidden tab.
+- The downloads button left the sidebar foot with the tab strip.
+- The "New tabs and splits" setting still offers Browser, and the new-tab shortcut still opens the
+  browser search dialog.
+- The README still describes a browser.
+
+## Phase 1b: agents working together in a shared Space
+
+Friends work on a project in one Space, each with their own agents, and every agent knows what
+the others are doing. Built now on Misty's own runtime, which already has Space tools; outside
+engines get the same tools from the phase 4 MCP server with no change to the Space side.
+
+Decided:
+
+- **Status is automatic.** Native code builds "doing now" from the run's events
+  (`run_control/local_runs.rs`): the agent's name, its state (working, waiting for its person,
+  done), the kind of tool in use, and the folder and files it touches. The model writes none of
+  it, and it never carries the person's prompt, a tool's result or the model's answer.
+- **Members see status and saved work.** Which agents each person has in the Space, what each is
+  doing, and whatever was saved into the Space (files, notes, artifacts). Chats stay on their
+  owner's computer.
+- **Live, and an activity log.** Status travels over the Space's presence channel
+  (`spaces/list/realtimeTypes.ts`) as it changes, and the Space keeps a readable log of the same
+  entries to catch up from. The user named BrowserOS's live activity log as the model; look at it
+  before designing the view.
+- **Handoffs go through people.** An agent posts a request to another member. It shows under
+  "waiting for you" (`interventions/WaitingForYouCard.tsx`), and accepting it makes it that
+  person's own request to their own agent. An agent still takes requests only from its owner.
+- **Claims warn, they don't block.** "I'm on the login page" is shown to other agents before they
+  touch the same thing. A stale claim stops nobody.
+- **Another member's posts are data, never instructions.** Enforced in
+  `run_control/tool_policy.rs` and `untrusted.rs`, not in the prompt.
+- **Free gets one shared Space with a few members** on Misty's hosted server; Pro lifts the
+  limits. The server enforces generic per-account limits and `misty-cloud` sets the numbers.
+
+To build:
+
+- **Native**: a status reducer over run events, and three tools for Misty's runtime: read the
+  Space's activity, post a claim, post a handoff. All three pass the tool gate.
+- **Server** (`misty-server`): status on the presence channel, the activity log, claims and
+  handoffs as Space posts, and member limits. This is new server work in the other repository.
+- **Interface**: other members' agents and their status in the sidebar and on Space home, the
+  activity log as a Space page, handoffs in "waiting for you".
+
+Open:
+
+- The activity log is stored on the server, where it is readable, and `AGENTS.md` says no prompt,
+  tool result or model output goes there (`misty-server` has a contract test for it). A status
+  built only from native facts fits the rule, but a chat's title is written by the model and
+  file names can say a lot. Decide exactly which fields the log may hold, then state it in
+  `AGENTS.md` and extend the contract test.
+- Whether a claim names a file, a folder, or free text, and when it expires.
+- How a handoff's text is written: by the sending agent (model output on the server, which the
+  rule forbids today) or by its person.
 
 ## Phase 2: outside engines (the ccgui port)
 
@@ -98,7 +230,11 @@ no address bar is visible anywhere.
 - **Keys**: engines use their own sign-in and config files. Misty doesn't read or store their keys
   in this phase; ccgui's provider presets can come later.
 - **Credit**: add desktop-cc-gui's copyright and MIT text to `NOTICE`, and keep a header on copied
-  files.
+  files. The same for anything copied from OpenChamber.
+- **Chat view after OpenChamber**: when the engines land, the chat and its side tools are
+  reworked to OpenChamber's layout. Two of its features belong here: **session goals** (the agent
+  keeps working until a stated goal is met) and **multi-run** (one task on several models, each
+  in its own worktree, then the best parts merged).
 
 Done when: a person picks Claude Code or Codex for an agent, chats in a linked folder inside a
 Space, sees streaming, tool calls and approvals in Misty's chat, and can resume after a restart.
@@ -110,6 +246,10 @@ Each is a pane view in the existing dock tree, so it can sit beside a chat.
 - **File tree and editor** for the linked folder (ccgui: virtualized tree, CodeMirror).
 - **Terminal** (ccgui: `terminal.rs` on `portable-pty`, xterm in the renderer).
 - **Git panel** (ccgui: `git.rs` on `git2`): stage, commit, branches, diffs, history.
+- **Changes walkthrough** (OpenChamber): a large diff shown as ordered steps.
+- **Preview with element picking** (OpenChamber): the running app beside the chat; pick an
+  element and its screenshot, styles and errors go to the agent. It uses the agent's own page
+  beside the chat (`agent-browser/`), never a web page in a pane for the person.
 - New surface ids in `workspaceViews.ts` and policies in `panes/dockRegistry.ts`.
 - All of it in black, white and gray: ccgui's Git status colors and engine brand colors become
   gray marks. New dependencies are MIT or Apache-2.0.
@@ -142,6 +282,9 @@ ask Misty to do something on a web page.
 
 The gallery stays as the library's view. First load uses skeletons shaped like these rows.
 
+OpenChamber's dashboard is the model: status, approvals and cost across the Space's work, with
+scheduling. Cost is shown only for engines that report it.
+
 ## Phase 6: retire human browsing
 
 Only after phases 1 to 5 are in use.
@@ -170,7 +313,6 @@ agents, their status from run events, and who is waiting on the person.
 
 `AGENTS.md` was updated with the direction. Still to change when the code does:
 
-- "Tabs live only in the tab sidebar" stays true; the sidebar gains the Space navigator above them.
 - The tool-policy rule gains: outside engines get their permission flags from native code, and
   their Space and browser calls pass the same gate.
 - The chats rule gains: an outside engine's history stays in that engine's own files; Misty keeps
@@ -178,7 +320,8 @@ agents, their status from run events, and who is waiting on the person.
 
 ## Later, not in this plan
 
-- Other people's agents acting in a shared Space, or agents taking requests from anyone but their
-  owner.
+- Agents taking requests from anyone but their owner, including handoffs that start without the
+  person accepting them.
+- Other members reading each other's agent chats.
 - ccgui's plugin system, provider presets, and serving the interface to other devices.
 - Showing other members' agents in the virtual view.

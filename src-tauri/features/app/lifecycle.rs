@@ -68,6 +68,9 @@ pub fn run_event(app: &AppHandle, event: RunEvent) {
     if matches!(event, RunEvent::Exit) {
         // Its runs wait in their files for the next launch.
         crate::agents::run_control::stop();
+        // Outside engines and terminals are this app's own processes and end with it.
+        crate::project::terminal::close_all();
+        tauri::async_runtime::block_on(crate::engines::shutdown());
     }
 }
 

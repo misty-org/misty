@@ -63,6 +63,12 @@ pub(crate) fn active_call(id: &str) -> Option<ActiveCall> {
 
 /// The run as it was started, or Ask with nothing known when nobody can say.
 pub(crate) async fn facts_of_run(app: &AppHandle, run_id: &str) -> RunFacts {
+    // A run on an outside engine is known to its adapter, not to Misty's runtime.
+    if let Some(body) = crate::engines::runs::request_of(run_id)
+        .or_else(|| crate::engines::connections::request_of(run_id))
+    {
+        return RunFacts::of_request(run_id, &body);
+    }
     let body = super::ensure(app)
         .await
         .ok()

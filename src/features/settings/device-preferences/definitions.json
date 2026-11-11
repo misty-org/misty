@@ -29,7 +29,7 @@
     "page": "browser-tabs",
     "section": "general",
     "key": "workspace_default_tab_index",
-    "default": "browser",
+    "default": "agents",
     "owner": "device",
     "type": "string",
     "platforms": ["desktop"],

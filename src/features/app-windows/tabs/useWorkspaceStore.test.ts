@@ -42,7 +42,7 @@ describe("desktop dock store", () => {
     expect(findDockLeaf(empty.root, empty.focusedPaneId)?.activeViewId).toBeNull();
     const next = store.newTab();
     expect(allLayoutViews(useWorkspaceStore.getState().layout)).toMatchObject([
-      { id: next.id, surfaceId: "browser", title: "google.com", placeholder: true },
+      { id: next.id, surfaceId: "agents", title: "Agents", placeholder: true },
     ]);
   });
 
@@ -104,9 +104,9 @@ describe("desktop dock store", () => {
     expect(useWorkspaceStore.getState().layout.focusedPaneId).toBe(firstPane.id);
   });
 
-  it("starts the global workspace in Browser", () => {
+  it("starts the global workspace in Agents", () => {
     expect(dockTreeViews(useWorkspaceStore.getState().layout.root)).toMatchObject([
-      { surfaceId: "browser", title: "google.com", route: "/browser", placeholder: true },
+      { surfaceId: "agents", title: "Agents", route: "/agents", placeholder: true },
     ]);
   });
 
@@ -142,8 +142,9 @@ describe("desktop dock store", () => {
 
     const first = useWorkspaceStore.getState().addSurface(files);
     const second = useWorkspaceStore.getState().addSurface(files);
+    // The window's own first tab is an Agents placeholder, so only launched ones are counted.
     const fileTabs = allLayoutViews(useWorkspaceStore.getState().layout).filter(
-      (tab) => tab.groupKey === "tool:agents",
+      (tab) => tab.groupKey === "tool:agents" && !tab.placeholder,
     );
 
     expect(second.id).not.toBe(first.id);
@@ -416,7 +417,7 @@ describe("desktop dock store", () => {
     expect(splitId).toBeTruthy();
     expect(leaves).toHaveLength(2);
     expect(leaves[0].views.map((tab) => tab.surfaceId)).toEqual([browser.surfaceId]);
-    expect(leaves[1].views).toMatchObject([{ placeholder: true, title: "google.com" }]);
+    expect(leaves[1].views).toMatchObject([{ placeholder: true, title: "Agents" }]);
   });
 
   it("opens a tool tab into an empty split pane", () => {
@@ -476,7 +477,7 @@ describe("desktop dock store", () => {
     expect(leaves.flatMap((leaf) => leaf.views).map((tab) => tab.id)).toContain(browser.id);
     expect(leaves.every((leaf) => leaf.views.length > 0)).toBe(true);
     expect(findDockLeaf(useWorkspaceStore.getState().layout.root, empty.id)?.views).toMatchObject([
-      { surfaceId: "browser", route: "/browser", placeholder: true },
+      { surfaceId: "agents", route: "/agents", placeholder: true },
     ]);
   });
 

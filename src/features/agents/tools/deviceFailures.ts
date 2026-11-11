@@ -118,6 +118,7 @@ const computerMessages: Record<string, string> = {
   device_unavailable: "the user's computer is offline",
   device_timeout: "the user's computer did not answer in time",
   invalid_url: "use an http or https address",
+  no_person_tabs: "the user has no tabs to open it in; open the page in your own browser",
   workspace_unavailable: "the Misty browser is not open on the user's computer",
   device_grant_invalid: "the user's computer could not confirm this request",
 };

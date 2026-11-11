@@ -7,6 +7,8 @@ const validSections = new Set([
   "chat",
   "notes",
   "drawings",
+  "planner",
+  "calendar",
   "library",
   "memory",
   "members",

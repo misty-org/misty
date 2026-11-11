@@ -86,8 +86,10 @@ it("lists only shared browser tabs once each", async () => {
 });
 
 it("opens and bookmarks only web addresses", async () => {
-  await runDeviceAgentOperation(job("browser.tab.open", { url: "https://misty.app" }), signal);
-  expect(openBrowserView).toHaveBeenCalledWith({ url: "https://misty.app" });
+  await expect(
+    runDeviceAgentOperation(job("browser.tab.open", { url: "https://misty.app" }), signal),
+  ).rejects.toThrow("no_person_tabs");
+  expect(openBrowserView).not.toHaveBeenCalled();
   await expect(
     runDeviceAgentOperation(job("browser.tab.open", { url: "file:///etc/passwd" }), signal),
   ).rejects.toThrow("invalid_url");

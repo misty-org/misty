@@ -1,0 +1,166 @@
+/* The panel beside a chat: a head with its title and folder, then one of the tabs. */
+.context-head {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 40px;
+  padding: 4px 8px 4px 12px;
+  border-bottom: 1px solid var(--color-charcoal-border);
+}
+.context-subhead {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 2px 8px;
+  border-bottom: 1px solid var(--color-charcoal-border);
+  font-size: 12px;
+  color: var(--color-cream-muted);
+}
+.context-foot {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border-top: 1px solid var(--color-charcoal-border);
+}
+.context-foot--stack {
+  flex-direction: column;
+  align-items: stretch;
+}
+.context-label {
+  padding: 10px 12px 4px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--color-cream-muted);
+}
+.context-row {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  font-size: 13px;
+  color: var(--color-cream);
+  text-align: left;
+}
+.context-row:hover {
+  background: color-mix(in srgb, var(--misty-theme-text) 5%, transparent);
+}
+.context-row:focus-visible {
+  outline: 1px solid var(--color-cream-muted);
+  outline-offset: -1px;
+}
+.context-row [data-muted] {
+  color: var(--color-cream-muted);
+}
+.context-row-with-action {
+  display: flex;
+  align-items: center;
+  padding-right: 6px;
+}
+.context-row-with-action > .context-row {
+  flex: 1;
+}
+/* Color carries meaning here: green for what was added, red for what was removed, amber for a
+   changed file. Each still has its sign or word, so none depends on color alone. */
+.context-panel {
+  --context-added: #4cc38a;
+  --context-removed: #ec6a5e;
+  --context-changed: #e2a03f;
+  --context-folder: #6ea8fe;
+}
+.context-diff {
+  font-family: var(--font-mono, ui-monospace, Menlo, monospace);
+  font-size: 12px;
+  line-height: 1.55;
+  padding-bottom: 8px;
+}
+.context-diff-heading {
+  padding: 6px 12px;
+  color: var(--color-cream-muted);
+  background: color-mix(in srgb, var(--misty-theme-text) 4%, transparent);
+}
+.context-diff-line {
+  display: flex;
+  gap: 8px;
+  padding: 0 12px;
+  color: var(--color-cream-muted);
+}
+.context-diff-sign {
+  flex: none;
+  width: 10px;
+  user-select: none;
+}
+.context-diff-line[data-kind="added"] {
+  color: var(--color-cream-bright);
+  background: color-mix(in srgb, var(--context-added) 14%, transparent);
+}
+.context-diff-line[data-kind="added"] .context-diff-sign {
+  color: var(--context-added);
+}
+.context-diff-line[data-kind="removed"] {
+  background: color-mix(in srgb, var(--context-removed) 13%, transparent);
+}
+.context-diff-line[data-kind="removed"] .context-diff-sign {
+  color: var(--context-removed);
+}
+.context-diff-line[data-kind="note"] {
+  font-style: italic;
+}
+.context-status {
+  flex: none;
+  font-size: 11px;
+  font-weight: 500;
+}
+.context-status[data-status="added"],
+.context-status[data-status="untracked"] {
+  color: var(--context-added);
+}
+.context-status[data-status="deleted"] {
+  color: var(--context-removed);
+}
+.context-status[data-status="modified"],
+.context-status[data-status="renamed"] {
+  color: var(--context-changed);
+}
+.context-row .context-folder-icon {
+  color: var(--context-folder);
+}
+.context-row .context-file-icon {
+  color: var(--color-cream-muted);
+}
+.context-row .context-file-icon[data-kind="code"] {
+  color: #e6b450;
+}
+.context-row .context-file-icon[data-kind="style"] {
+  color: #c594c5;
+}
+.context-row .context-file-icon[data-kind="data"] {
+  color: #7fd1b9;
+}
+.context-row .context-file-icon[data-kind="doc"] {
+  color: #8fb7ff;
+}
+.context-row .context-file-icon[data-kind="image"] {
+  color: #f29e74;
+}
+.context-editor .cm-editor {
+  height: 100%;
+  font-size: 12.5px;
+  background: var(--color-charcoal-bg);
+}
+.context-editor .cm-gutters {
+  background: var(--color-charcoal-bg);
+  border-right: 1px solid var(--color-charcoal-border);
+}
+.context-terminal {
+  padding: 8px 4px 4px 10px;
+  background: var(--color-charcoal-bg);
+}

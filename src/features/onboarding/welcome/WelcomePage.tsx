@@ -15,7 +15,7 @@ const legalLinks = [
 ].flatMap(({ label, href }) => (href ? [{ label, href }] : []));
 
 /** The first-run welcome: a floating bar with the logo and socials, then what Misty is, with
- * Start browsing ahead of Sign in. Start browsing opens the browser; Sign in goes to its page,
+ * Get started ahead of Sign in. Get started opens the agents; Sign in goes to its page,
  * and the wizard follows once signed in. It shows once per device; anything that later
  * asks for an account comes back here, with Sign in and Create account. */
 export function WelcomePage() {
@@ -23,14 +23,13 @@ export function WelcomePage() {
   const location = useLocation();
   const routeState = location.state as { from?: string; addingAccount?: boolean } | null;
   const addingAccount = Boolean(routeState?.addingAccount);
-  // Misty is a full browser without an account; signing in waits until sync, a Space or an
-  // agent asks for it. Only the tab side is asked, once the tabs can be seen moving, and only on
+  // Agents work without an account; signing in waits until sync or a Space asks for it. Only the tab side is asked, once the tabs can be seen moving, and only on
   // the first run: backing out of sign-in comes here again on a device that has answered.
-  const startBrowsing = () => {
+  const getStarted = () => {
     const setup = useSetupStore.getState();
     if (!setup.welcomed) setup.askTabSide();
     setup.finishWelcome();
-    navigate(routes.browser, { replace: true });
+    navigate(routes.agents, { replace: true });
   };
   // The sign-in pages ask for a server if this device has none; the wizard comes after.
   const signIn = () => navigate(routes.signIn, { state: location.state });
@@ -44,13 +43,13 @@ export function WelcomePage() {
         // This page has no panel, so it sits at the top-left corner of the page, under the bar.
         <BackButton
           className="absolute left-4 top-[68px] z-10 sm:left-8"
-          onClick={() => navigate(routeState?.from ?? routes.browser, { replace: true })}
+          onClick={() => navigate(routeState?.from ?? routes.agents, { replace: true })}
         />
       ) : null}
       <div className="misty-page-in relative z-10 flex flex-col items-center gap-[0.85em] text-[clamp(2.25rem,4.5vw,3.5rem)]">
         <h1 className="text-[1em] font-medium leading-[1.25] tracking-[-0.035em] text-cream-bright">
           Welcome to Misty
-          <span className="block font-normal text-cream-muted">The agentic browser workspace</span>
+          <span className="block font-normal text-cream-muted">The workspace for your agents</span>
         </h1>
         {addingAccount ? (
           <div className="flex flex-wrap items-center justify-center gap-3">
@@ -63,8 +62,8 @@ export function WelcomePage() {
           </div>
         ) : (
           <div className="flex flex-wrap items-center justify-center gap-3">
-            <Button variant="primary" className={authButtonClass} size="lg" onClick={startBrowsing}>
-              Start browsing
+            <Button variant="primary" className={authButtonClass} size="lg" onClick={getStarted}>
+              Get started
             </Button>
             <Button variant="outline" className={authButtonClass} size="lg" onClick={signIn}>
               Sign in

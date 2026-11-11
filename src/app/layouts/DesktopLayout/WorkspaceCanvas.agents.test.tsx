@@ -15,8 +15,8 @@ vi.mock("./WorkspaceDockTree", () => ({
 vi.mock("./dockSplitFit", () => ({
   minimumForWorkspaceViews: () => ({ width: 280, height: 180 }),
 }));
-vi.mock("./WorkspaceTabStrip", () => ({
-  WorkspaceTabStrip: () => <nav aria-label="Window tabs" />,
+vi.mock("./WorkspaceSidebar", () => ({
+  WorkspaceSidebar: () => <nav aria-label="Sidebar" />,
 }));
 
 beforeEach(() => {
@@ -29,17 +29,17 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
-it("keeps the tab sidebar for a lone Agents view", () => {
+it("keeps the sidebar for a lone Agents view", () => {
   render(
     <MemoryRouter initialEntries={["/apps/agents"]}>
       <WorkspaceCanvas />
     </MemoryRouter>,
   );
-  expect(screen.getByRole("navigation", { name: "Window tabs" })).toBeTruthy();
+  expect(screen.getByRole("navigation", { name: "Sidebar" })).toBeTruthy();
   act(() => {
     useWorkspaceStore.getState().openSurface(workspaceSurfaceFromRoute("/spaces/family/notes")!);
   });
-  expect(screen.getByRole("navigation", { name: "Window tabs" })).toBeTruthy();
+  expect(screen.getByRole("navigation", { name: "Sidebar" })).toBeTruthy();
 });
 
 it("preserves Windows caption controls even for a lone Agents view", () => {
@@ -48,5 +48,5 @@ it("preserves Windows caption controls even for a lone Agents view", () => {
       <WorkspaceCanvas windowsTitlebarControls />
     </MemoryRouter>,
   );
-  expect(screen.getByRole("navigation", { name: "Window tabs" })).toBeTruthy();
+  expect(screen.getByRole("navigation", { name: "Sidebar" })).toBeTruthy();
 });

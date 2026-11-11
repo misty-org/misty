@@ -1,7 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { deliverGoogleSignInCode } from "@/features/account";
 import { openSetupDeepLink } from "@/features/account";
-import { openExternalLink } from "@/features/browser";
 import { isLinkTargetWindow } from "@/features/app-windows";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
@@ -21,20 +20,11 @@ export function installMistyDeepLinkHandler(
   let lastCurrentSignature: string | null = null;
   let lastHandledAt = 0;
   const currentUrlPoll: number | null = null;
-  // Web links from other apps (Misty as the default browser) are routed natively to
-  // the profile that claims their site, else to the window used last; each window
-  // takes its own, one tab each.
+  // Web links from other apps (Misty left as the default browser) are taken so they don't pile
+  // up, and dropped: Misty shows web pages only to agents, never in a pane for a person.
   const takeWebLinks = async () => {
     if (!active) return;
-    const webUrls = await invoke<string[]>("app_take_launch_urls").catch(() => []);
-    for (const url of webUrls) {
-      if (!active || !isWebUrl(url)) continue;
-      try {
-        navigate(openExternalLink(url).route);
-      } catch {
-        // An address the browser can't open is ignored, as it would be from the omnibox.
-      }
-    }
+    await invoke<string[]>("app_take_launch_urls").catch(() => []);
   };
   const handleUrls = async (urls: string[] | null, source: "current" | "event") => {
     if (!active || !urls) return;

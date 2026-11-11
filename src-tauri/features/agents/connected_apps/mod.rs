@@ -6,6 +6,7 @@
 //! about the account.
 pub mod api;
 pub mod apps;
+pub mod calendar;
 pub mod client;
 pub mod commands;
 pub mod execute;
@@ -19,6 +20,8 @@ mod types;
 
 #[cfg(test)]
 mod apps_tests;
+#[cfg(test)]
+mod calendar_tests;
 #[cfg(test)]
 mod execute_tests;
 #[cfg(test)]

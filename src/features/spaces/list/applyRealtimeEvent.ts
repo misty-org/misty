@@ -4,6 +4,7 @@ import { writeRealtimeCursor } from "../api/realtime-cursor";
 import { errorText } from "@/shared/lib/format";
 import { mergeSpaceMessages, messageFromSpaceEvent } from "../chat/useSpaceMessageSpansStore";
 import { coalescedReload } from "./coalescedReload";
+import { realtimePlannerEvent } from "../planner/plannerEvents";
 import type { SpacesStore } from "./spacesStoreTypes";
 
 type SpacesSet = (
@@ -74,6 +75,8 @@ async function applyRealtimeEvent(
     window.dispatchEvent(new CustomEvent("misty:space-note-event", { detail: event }));
   else if (event.type.startsWith("drawing."))
     window.dispatchEvent(new CustomEvent("misty:space-drawing-event", { detail: event }));
+  else if (event.type.startsWith("task.") || event.type.startsWith("calendar."))
+    window.dispatchEvent(new CustomEvent(realtimePlannerEvent, { detail: event }));
 }
 
 /** Applies one realtime event; failures surface as the store error unless the Space is gone. */

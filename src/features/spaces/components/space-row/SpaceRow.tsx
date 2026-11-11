@@ -9,6 +9,7 @@ import {
   ErrorNotification,
   IconButton,
   MenuItem,
+  MenuTrigger,
   Popover,
   PopoverAnchor,
   Skeleton,
@@ -45,33 +46,57 @@ export function SpaceRowPreview({ onSignIn }: { onSignIn: () => void }) {
  * Space's pages (Home, Chat, Library, Memory and People), then the Spaces to switch to and the
  * Space's own actions, so Spaces take no room in the sidebar until they are asked for.
  */
-export function SpaceRow() {
+export function SpaceRow({ labeled = false }: { labeled?: boolean }) {
   const space = useWindowSpace();
   const [dialog, setDialog] = useState<SpaceDialog>(null);
   const [error, setError] = useState("");
   const close = useCallback(() => setDialog(null), []);
-  if (!space) return <Skeleton className="mx-1 size-5 rounded-md" aria-hidden />;
+  if (!space)
+    return labeled ? (
+      <div className="flex h-9 items-center gap-2 px-2" aria-hidden>
+        <Skeleton className="size-5 rounded-md" />
+        <Skeleton className="h-3 w-28" />
+      </div>
+    ) : (
+      <Skeleton className="mx-1 size-5 rounded-md" aria-hidden />
+    );
   const base = `/spaces/${encodeURIComponent(space.id)}`;
   const name = spaceNavigationName(space);
   const later = (run: () => void) => () => window.setTimeout(run, 0);
   return (
     <Popover open={isSpacePanel(dialog)} onOpenChange={(next) => !next && close()}>
       <PopoverAnchor asChild>
-        <div className="flex items-center">
+        <div className={labeled ? "flex min-w-0 flex-1 items-center" : "flex items-center"}>
           <GlobalCreateSpaceDialog>
             {(create) => (
               <DropdownMenu onOpenChange={() => setError("")}>
-                <DropdownMenuTrigger asChild>
-                  <IconButton label={`${name}, Space menu`}>
-                    <SpaceAvatar
-                      space={space}
-                      className="size-4.5 rounded-[5px]"
-                      fallbackClassName="text-3xs font-semibold"
-                    />
-                  </IconButton>
-                </DropdownMenuTrigger>
+                {labeled ? (
+                  // The sidebar's first row: which Space this is, by its avatar and name.
+                  <MenuTrigger
+                    label={`${name}, Space menu`}
+                    value={name}
+                    className="h-9 w-full justify-start px-2 text-sm font-medium text-cream"
+                    icon={
+                      <SpaceAvatar
+                        space={space}
+                        className="size-5 rounded-[5px]"
+                        fallbackClassName="text-3xs font-semibold"
+                      />
+                    }
+                  />
+                ) : (
+                  <DropdownMenuTrigger asChild>
+                    <IconButton label={`${name}, Space menu`}>
+                      <SpaceAvatar
+                        space={space}
+                        className="size-4.5 rounded-[5px]"
+                        fallbackClassName="text-3xs font-semibold"
+                      />
+                    </IconButton>
+                  </DropdownMenuTrigger>
+                )}
                 <DropdownMenuContent
-                  side="top"
+                  side={labeled ? "bottom" : "top"}
                   align="start"
                   className="w-56 max-w-[calc(100vw-16px)]"
                 >

@@ -48,6 +48,7 @@ permissions = [
   "allow-composio-apps-connect",
   "allow-composio-apps-disconnect",
   "allow-composio-apps-list",
+  "allow-composio-calendar-events",
   "allow-composio-grants-list",
   "allow-composio-grants-revoke",
   "allow-composio-request-decide",
@@ -487,4 +488,29 @@ permissions = [
   "allow-voice-subtitles-show",
   "allow-voice-tab-capture-start",
   "allow-voice-tab-capture-stop",
+]
+
+[[set]]
+identifier = "action-workspace"
+description = "Agent engines, a Space's linked project folders, and the files, changes and terminal panels beside a chat"
+permissions = [
+  "allow-engine-models",
+  "allow-engines-list",
+  "allow-project-git-commit",
+  "allow-project-git-diff",
+  "allow-project-git-stage",
+  "allow-project-git-status",
+  "allow-project-list-dir",
+  "allow-project-read-file",
+  "allow-project-terminal-close",
+  "allow-project-terminal-open",
+  "allow-project-terminal-resize",
+  "allow-project-terminal-write",
+  "allow-project-write-file",
+  "allow-space-connection-create",
+  "allow-space-connection-list",
+  "allow-space-connection-revoke",
+  "allow-space-folder-link",
+  "allow-space-folder-list",
+  "allow-space-folder-unlink",
 ]

@@ -93,3 +93,11 @@ export { findVocative, routeToAgent } from "./cursor/vocativeRoute";
 // Public surface used by other features (generated from their imports).
 export { DeviceSessionBridge } from "./personal/DeviceSessionBridge";
 export { openMisty } from "./conversations/ask/handoff";
+export { conversationInSpace } from "./conversations/state/conversationSpace";
+export { useAgentAccountId } from "./personal/agentAccount";
+export { AgentsNow } from "./virtual/AgentsNow";
+export { VirtualOffice } from "./virtual/VirtualOffice";
+export { useOfficeAgents } from "./virtual/useOfficeAgents";
+export { useTeammateAgents, type TeammateAgent } from "./virtual/teammates";
+export { shortAgo, useChatStatuses, type ChatStatus } from "./page/useChatStatuses";
+export { EngineMark, hasEngineMark } from "./engines/EngineMark";

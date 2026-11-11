@@ -38,11 +38,9 @@ it("shows the conversations of the window's Space and starts new work in it", as
       { ...conversation("shared", "Team draft"), spaceId: "team" },
     ],
   });
+  // The window's sidebar lists the Space's chats now; a chat is opened by its address.
+  useMistyStore.setState({ activeConversationId: "private" });
   renderAgentsPage();
-  const recents = screen.getByRole("region", { name: "Recent conversations" });
-  expect(within(recents).getByRole("button", { name: "Launch draft" })).toBeTruthy();
-  expect(within(recents).queryByRole("button", { name: "Team draft" })).toBeNull();
-  fireEvent.click(within(recents).getByRole("button", { name: "Other draft" }));
   typeDraft("Continue this conversation");
   await act(async () => {
     fireEvent.click(screen.getByRole("button", { name: "Send to Misty" }));
@@ -108,18 +106,6 @@ it("previews and saves a cloud avatar while preserving unrelated avatar metadata
       "communications",
     ),
   );
-});
-
-it("keeps recent conversations beside a draft and guards opening one", () => {
-  useMistyStore.setState({ conversations: [conversation("draft", "Launch draft")] });
-  renderAgentsPage();
-  typeDraft("Keep my draft");
-  const recents = screen.getByRole("region", { name: "Recent conversations" });
-  expect(screen.queryByRole("alertdialog")).toBeNull();
-  fireEvent.click(within(recents).getByRole("button", { name: "Launch draft" }));
-  expect(screen.getByRole("button", { name: "Keep editing" })).toBeTruthy();
-  fireEvent.click(screen.getByRole("button", { name: "Keep editing" }));
-  expect(composer().value).toBe("Keep my draft");
 });
 
 it("switches agents in place, guarding drafts and leaving the current agent untouched", async () => {

@@ -1,5 +1,6 @@
 import { personalAgentsApi, type AgentMemory } from "./personalAgentsApi";
 import { AgentPermissionsField } from "./AgentPermissionsField";
+import { AgentEngineField } from "../engines/AgentEngineField";
 import { AgentSpaceField } from "./AgentSpaceField";
 import { openMisty } from "../conversations/ask/handoff";
 import type { AgentProfile, AgentProfileInput } from "@/shared/schemas";
@@ -100,6 +101,8 @@ export function AgentEditor({
         reasoning_effort,
         enabled,
         default_run_mode,
+        engine,
+        engine_model,
       } = draft;
       const saved = await personalAgentsApi.save(
         {
@@ -114,6 +117,8 @@ export function AgentEditor({
           reasoning_effort,
           enabled,
           default_run_mode,
+          engine,
+          engine_model,
           version: profile?.version,
         },
         profile?.id,
@@ -174,6 +179,13 @@ export function AgentEditor({
           onChange={(e) => update("description", e.target.value)}
         />
       </Field>
+      <AgentEngineField
+        engine={draft.engine ?? ""}
+        model={draft.engine_model ?? ""}
+        locked={profile?.system_managed}
+        onEngine={(engine) => update("engine", engine)}
+        onModel={(model) => update("engine_model", model)}
+      />
       <AgentPermissionsField
         value={draft.default_run_mode ?? "ask"}
         onChange={(mode) => update("default_run_mode", mode)}

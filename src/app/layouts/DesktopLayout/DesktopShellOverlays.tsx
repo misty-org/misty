@@ -1,7 +1,6 @@
 import { AgentJobWorker } from "@/features/agents";
 import { WorkflowSchedulesBridge } from "@/features/agents";
 import { AutofillChooser } from "@/features/browser";
-import { BrowserSearchDialog } from "@/features/browser";
 import { MistyContextBridgeHost } from "@/features/agents";
 import { BrowserContextMenuBridge } from "@/features/agents";
 import { BrowserRuntimeBridge } from "@/features/browser";
@@ -17,7 +16,6 @@ export function DesktopShellOverlays(props: {
   return (
     <>
       <SettingsOverlay open={props.settingsOpen} onClose={props.onCloseSettings} />
-      <BrowserSearchDialog />
       <BrowserRuntimeBridge />
       <BrowserContextMenuBridge />
       <AutofillChooser />

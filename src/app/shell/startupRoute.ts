@@ -11,10 +11,11 @@ import { routes } from "./routes";
  */
 const startupPreferenceKey = "misty:startup-preference:v1";
 
-export const startupViewOptions = ["Browser", "Agents"];
+export const startupViewOptions = ["Space", "Agents"];
 
-/** Stored indexes keep their old meaning; 1 was the retired Files view. */
-const startupViewRoutes = ["/browser", "/browser", routes.agents];
+/** Stored indexes keep their old meaning: 0 was Browser and 1 the retired Files view, and both
+ * now open the Space. */
+const startupViewRoutes = [routes.spaces, routes.spaces, routes.agents];
 const startupViewStoredIndexes = [0, 2];
 
 /** The option shown for a stored index, and the index stored for an option. */
@@ -53,13 +54,17 @@ function readStartupPreference(): StartupPreference {
  * Resolves the route the index should redirect to.
  *
  * `lastRoute` comes from the route-memory store, which already persists and
- * validates the last rememberable route.
+ * validates the last rememberable route. A Space needs an account, so signed out the window
+ * opens on Agents, which need none.
  */
-export function resolveStartupRoute(lastRoute: string): string {
+export function resolveStartupRoute(lastRoute: string, signedIn: boolean): string {
+  const home = signedIn ? routes.spaces : routes.agents;
   const preference = readStartupPreference();
   if (preference.reopenLastSession) {
     const path = lastRoute.split(/[?#]/)[0];
-    return /^\/(browser|agents)(\/|$)/.test(path) ? lastRoute : "/browser";
+    const reopens = signedIn ? /^\/(spaces|agents)(\/|$)/ : /^\/agents(\/|$)/;
+    return reopens.test(path) ? lastRoute : home;
   }
-  return startupViewRoutes[preference.startupViewIndex] ?? "/browser";
+  const chosen = startupViewRoutes[preference.startupViewIndex] ?? home;
+  return chosen === routes.spaces ? home : chosen;
 }

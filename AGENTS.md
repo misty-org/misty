@@ -9,13 +9,14 @@ changing a feature. There are no feature docs to keep current, and none should b
 
 # Rules that apply everywhere
 
-- Interface is black, white and gray. No green, sage, colored status dots, tinted selections or accent focus rings
-  unless the user asks for color on that surface. Don't spread an existing color exception.
+- The interface is quiet and mostly neutral, and it has to look finished: floating rounded panels, generous spacing,
+  modelled on OpenChamber. Color is used where it carries meaning: Git changes, file and folder icons, an agent's
+  state, an engine's own mark. The virtual office uses full color. Selections and focus rings stay neutral.
 - Dropdowns and context menus mark the selection with a checkmark, never a dot.
 - Never show "Loading…" text; first loads use skeletons shaped like the content.
 - Labels, buttons and headings use sentence case. No subtext under titles, buttons or forms.
 - Settings belong to the device (`misty.db`) and never sync.
-- Tabs live only in the tab sidebar.
+- The sidebar holds the Space's pages and the person's chats. It lists no tabs and has no address field.
 - An agent belongs to the person who made it, is saved on their computer, and takes requests only from them.
 - Code copied from another project keeps its license header and is credited in `NOTICE`.
 - Misty is open source under the AGPL-3.0-or-later (copyleft), with the attribution term in `NOTICE`. Add
@@ -28,6 +29,9 @@ changing a feature. There are no feature docs to keep current, and none should b
   person's computer, on that computer's own keys. Keys reach only their provider: model keys, the search key (Decodo
   or Serper) and the Composio key. Never send a key, prompt, tool result or model output to the server, store or log
   them. `misty-server` has a contract test that enforces this.
+  What a shared Space's members see of each other's agents is the one thing that leaves: the agent's name, a fixed
+  code for its state and one for the kind of work, built in code from the run and never written by a model. The
+  server drops anything else (`realtime_agents.go`).
 - What agents may do is decided in native code (`src-tauri/features/agents/run_control/tool_policy.rs`), from the mode
   the run started with, never from the renderer at call time, the model or a page. An outside engine (Claude Code,
   Codex and the like) gets its permission flags the same way, and its calls into a Space or the browser pass the same
@@ -36,13 +40,14 @@ changing a feature. There are no feature docs to keep current, and none should b
 - Agent chats and memory live in `misty.db`. Chats never sync, and memory syncs only through the encrypted vault, so
   the server can't read it. Only the vault is protected from the server: Space notes, chats and files are readable there.
 - No `*.env` file is ever committed, not even an example. Every server address in the app comes from the person's
-  choice, never a built-in default; the one address the app knows is Misty's own, used only when someone chooses
-  Misty Pro (`src/api/deployment/`).
+  choice, never a built-in default; the one address the app knows is Misty Cloud's, used only when someone chooses
+  Misty Cloud, Free or Pro (`src/api/deployment/`).
 
 # Decided, not built
 
-Misty's hosted server is where friends share Spaces, and self-hosting stays for people who want their own. The code
-stays AGPL. Free returns on the hosted server with every feature and small limits, and $10 Misty Pro is the cheapest
+Misty Cloud, the hosted server, is where most people keep and share Spaces; self-hosting stays free and complete, mostly
+for developers and people who want their own. Spaces live only on a server, never in the desktop app. The code stays
+AGPL. Free returns on the hosted server with every feature and small limits, and $10 Misty Pro is the cheapest
 paid plan. When Pro ends or a payment fails, the account moves to Free. Inactive free accounts are never deleted.
 
 # Commits

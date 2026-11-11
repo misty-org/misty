@@ -1,5 +1,6 @@
 import type { AgentProfile } from "@/shared/schemas";
 import "./AgentAvatar.css";
+import { EngineMark, hasEngineMark } from "../engines/EngineMark";
 import { agentCloudAvatar, type agentCloudVariants } from "./agentCloudAvatars";
 
 export function AgentAvatar({
@@ -16,7 +17,10 @@ export function AgentAvatar({
       className={`agent-avatar${large ? " agent-avatar--large" : ""}${compact ? " agent-avatar--compact" : ""}`}
       aria-hidden="true"
     >
-      {typeof agent?.avatar?.emoji === "string" && agent.avatar.emoji ? (
+      {hasEngineMark(agent?.engine) ? (
+        // An agent on an outside engine wears that engine's own mark; the cloud is Misty's.
+        <EngineMark engine={agent.engine} size={large ? 34 : compact ? 16 : 22} />
+      ) : typeof agent?.avatar?.emoji === "string" && agent.avatar.emoji ? (
         agent.avatar.emoji
       ) : (
         <AgentCloudImage variant={agentCloudAvatar(agent)} />

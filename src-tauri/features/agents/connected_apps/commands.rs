@@ -7,6 +7,7 @@ use super::{
     account_client,
     api::valid_toolkit,
     apps::{self, on_store},
+    calendar,
     client::{Client, Error},
     execute, grants, requests,
     tools::{self, failure, rejected, Failure},
@@ -94,6 +95,21 @@ pub async fn composio_apps_catalog(
         .await
         .map_err(|error| failure(error, false))?;
     Ok(json!({ "apps": apps, "next_cursor": next }))
+}
+
+/// The person's connected Google Calendar events in a time range, for their own Calendar page.
+/// With no Composio key there is nothing connected, which is an empty calendar and not a failure.
+#[tauri::command]
+pub async fn composio_calendar_events(
+    webview: tauri::Webview,
+    from: String,
+    to: String,
+) -> Result<Vec<calendar::CalendarEvent>, Failure> {
+    let account = person(&webview)?;
+    let Some(client) = optional_client(&account).await? else {
+        return Ok(Vec::new());
+    };
+    calendar::events(&client, &from, &to).await
 }
 
 #[derive(Serialize)]

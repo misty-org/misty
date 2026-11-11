@@ -81,7 +81,7 @@ it("preserves one conversation draft across catalogs", () => {
   expect(screen.queryByRole("alertdialog")).toBeNull();
   expect(composer()).toBe(draft);
   expect(draft.value).toBe("Keep this while I browse");
-  fireEvent.click(screen.getByRole("button", { name: "Launch plan" }));
+  fireEvent.click(screen.getByRole("button", { name: "Chat" }));
   expect(composer()).toBe(draft);
   expect(draft.value).toBe("Keep this while I browse");
   expect(fixture.submit).not.toHaveBeenCalled();

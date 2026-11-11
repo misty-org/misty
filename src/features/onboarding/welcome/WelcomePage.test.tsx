@@ -35,11 +35,11 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
-it("starts browsing straight in the browser, asking only for the tab side", () => {
+it("gets started straight in the agents, asking only for the tab side", () => {
   renderAt();
-  fireEvent.click(screen.getByRole("button", { name: "Start browsing" }));
+  fireEvent.click(screen.getByRole("button", { name: "Get started" }));
   expect(useSignInSheetStore.getState().reason).toBeNull();
-  expect(screen.getByTestId("where").textContent).toBe("/browser");
+  expect(screen.getByTestId("where").textContent).toBe("/agents");
   expect(useSetupStore.getState().welcomed).toBe(true);
   expect(useSetupStore.getState().tabSidePending).toBe(true);
 });
@@ -47,12 +47,12 @@ it("starts browsing straight in the browser, asking only for the tab side", () =
 it("does not ask for the tab side again after the first run", () => {
   useSetupStore.setState({ welcomed: true });
   renderAt();
-  fireEvent.click(screen.getByRole("button", { name: "Start browsing" }));
-  expect(screen.getByTestId("where").textContent).toBe("/browser");
+  fireEvent.click(screen.getByRole("button", { name: "Get started" }));
+  expect(screen.getByTestId("where").textContent).toBe("/agents");
   expect(useSetupStore.getState().tabSidePending).toBe(false);
 });
 
-it("offers Sign in beside Start browsing", () => {
+it("offers Sign in beside Get started", () => {
   renderAt();
   fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
   expect(screen.getByTestId("where").textContent).toBe("/signin");
@@ -72,7 +72,7 @@ it.each([null, { mode: "none" as const }])(
 
 it("keeps Sign in and Create account when adding an account", () => {
   renderAt({ addingAccount: true });
-  expect(screen.queryByRole("button", { name: "Start browsing" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Get started" })).toBeNull();
   expect(screen.getByRole("button", { name: "Create account" })).toBeTruthy();
 });
 

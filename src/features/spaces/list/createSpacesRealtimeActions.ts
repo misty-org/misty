@@ -1,3 +1,4 @@
+import { useMemberAgents, type MemberAgentStatus } from "./memberAgents";
 import { httpOutageRemainingMs } from "@/api/client/http";
 import { applyRealtimeEventSafely } from "./applyRealtimeEvent";
 import { coalescedReload, resetCoalescedReloads } from "./coalescedReload";
@@ -125,6 +126,10 @@ export function createSpacesRealtimeActions(
                     [envelope.space_id]: envelope.viewers,
                   },
                 }));
+              } else if (envelope.type === "agents") {
+                useMemberAgents
+                  .getState()
+                  .receive(envelope.space_id, envelope.user_id, envelope.agents);
               } else if (envelope.type === "typing") {
                 set((state) => {
                   const key = spaceTypingScopeKey(envelope.space_id, envelope.conversation_id);
@@ -261,6 +266,16 @@ function stopRealtimeConnection() {
   const socket = realtimeSocket;
   realtimeSocket = null;
   socket?.close();
+}
+
+/** Tells the Space's other members what this person's agents are doing now. */
+export function sendAgentStatuses(spaceId: string, agents: MemberAgentStatus[]): void {
+  if (realtimeSocket?.readyState !== WebSocket.OPEN) return;
+  try {
+    realtimeSocket.send(JSON.stringify({ type: "agents", space_id: spaceId, agents }));
+  } catch {
+    /* the next change or the next repeat sends it again */
+  }
 }
 
 function sendViewingMessage(spaceId: string, active: boolean): void {

@@ -5,7 +5,9 @@ mod app;
 #[cfg(desktop)]
 pub mod browser;
 pub mod devices;
+pub mod engines;
 pub mod memory;
+pub mod project;
 #[cfg(desktop)]
 pub mod sync;
 mod voice;

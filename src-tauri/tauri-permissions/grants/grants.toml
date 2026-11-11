@@ -17,3 +17,7 @@ description = "Add and edit files in a shared folder, per folder and per chat. N
 [[permission]]
 identifier = "grant-picked-file"
 description = "One file the person picks in the system file picker."
+
+[[permission]]
+identifier = "grant-linked-folder"
+description = "Work in a project folder the person links to a Space: the agent engines they chose run there, and the file panel reads and edits it."

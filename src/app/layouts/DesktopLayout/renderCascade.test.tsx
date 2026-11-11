@@ -15,7 +15,7 @@ vi.mock("./WorkspaceSurface", () => ({
   },
   EmptyWorkspacePane: () => null,
 }));
-vi.mock("./WorkspaceTabStrip", () => ({ WorkspaceTabStrip: () => <nav /> }));
+vi.mock("./WorkspaceSidebar", () => ({ WorkspaceSidebar: () => <nav /> }));
 
 let go: (to: string) => void = () => undefined;
 function RouteDriver() {
@@ -28,8 +28,11 @@ beforeEach(() => {
   useWorkspaceStore.persist.clearStorage();
   useWorkspaceStore.getState().reset();
   const initial = dockTreeViews(useWorkspaceStore.getState().layout.root);
-  for (let i = 0; i < 8; i += 1)
-    useWorkspaceStore.getState().openBrowserView({ url: `https://site${i}.example/` });
+  // An agent's own pages: a window keeps those, and closes a person's saved ones as it opens.
+  for (let i = 0; i < 8; i += 1) {
+    const view = useWorkspaceStore.getState().openBrowserView({ url: `https://site${i}.example/` });
+    useWorkspaceStore.getState().updateBrowserView(view.id, { agentOwned: true });
+  }
   for (const tab of initial) useWorkspaceStore.getState().closeView(tab.id);
   renders.clear();
 });

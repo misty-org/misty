@@ -1,0 +1,33 @@
+.agents-now {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+}
+.agents-now-card {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--color-charcoal-border);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--misty-theme-text) 3%, transparent);
+  color: var(--color-cream-muted);
+}
+.agents-now-card:is(button):hover {
+  background: color-mix(in srgb, var(--misty-theme-text) 6%, transparent);
+}
+.agents-now-card:focus-visible {
+  outline: 1px solid var(--color-cream-muted);
+}
+/* One that needs its person stands out by weight and a stronger edge, not by color. */
+.agents-now-card[data-state="needs-you"] {
+  border-color: color-mix(in srgb, var(--misty-theme-text) 45%, transparent);
+}
+.agents-now-card[data-state="needs-you"] .agents-now-doing {
+  color: var(--color-cream);
+  font-weight: 600;
+}
+.agents-now-card[data-state="resting"] .agent-avatar {
+  opacity: 0.7;
+}

@@ -64,25 +64,24 @@ describe("WorkspaceCanvas virtual window shortcuts", () => {
     Object.defineProperty(navigator, "platform", { configurable: true, value: "Linux x86_64" });
   });
 
-  it.each(["close", "select"])("does not add shell history when tabs %s", (action) => {
-    const store = useWorkspaceStore.getState();
-    store.addSurface(workspaceSurfaceFromRoute("/agents")!);
+  it("does not add shell history when the sidebar opens a chat", () => {
     const ui = render(
-      <MemoryRouter initialEntries={["/before", "/agents"]} initialIndex={1}>
+      <MemoryRouter initialEntries={["/before", "/browser"]} initialIndex={1}>
         <WorkspaceCanvas />
         <LocationProbe />
       </MemoryRouter>,
     );
-    if (action === "close") fireEvent.click(ui.getByRole("button", { name: "Close tab Agents" }));
-    else fireEvent.click(ui.getByRole("tab", { name: "New Tab" }));
-    expect(ui.getByTestId("location").textContent).toBe("/browser");
+    fireEvent.click(ui.getByRole("button", { name: "New chat" }));
+    expect(ui.getByTestId("location").textContent).toBe("/agents");
     fireEvent.click(ui.getByRole("button", { name: "Go back in shell" }));
     expect(ui.getByTestId("location").textContent).toBe("/before");
   });
 
   it("leaves the final tab closed until the new-tab command runs", async () => {
+    configureWorkspaceDefaultView(3);
+    useWorkspaceStore.getState().reset();
     render(
-      <MemoryRouter initialEntries={["/browser"]}>
+      <MemoryRouter initialEntries={["/agents"]}>
         <ShortcutRuntime />
         <WorkspaceCanvas />
       </MemoryRouter>,
@@ -94,13 +93,15 @@ describe("WorkspaceCanvas virtual window shortcuts", () => {
     await waitFor(() => expect(allLayoutViews(useWorkspaceStore.getState().layout)).toEqual([]));
     act(() => void invokeShortcutCommand("workspace.new_tab"));
     const reopened = allLayoutViews(useWorkspaceStore.getState().layout);
-    expect(reopened).toMatchObject([{ surfaceId: "browser", route: "/browser" }]);
+    expect(reopened).toMatchObject([{ surfaceId: "agents", route: "/agents" }]);
     expect(reopened[0].id).not.toBe(initial.id);
   });
 
-  it("creates an independent Google tab and lets the previous tab close", () => {
+  it("creates an independent new tab and lets the previous tab close", () => {
+    configureWorkspaceDefaultView(3);
+    useWorkspaceStore.getState().reset();
     render(
-      <MemoryRouter initialEntries={["/browser"]}>
+      <MemoryRouter initialEntries={["/agents"]}>
         <ShortcutRuntime />
         <WorkspaceCanvas />
       </MemoryRouter>,
@@ -110,7 +111,7 @@ describe("WorkspaceCanvas virtual window shortcuts", () => {
     const views = allLayoutViews(useWorkspaceStore.getState().layout);
     expect(views).toHaveLength(2);
     expect(new Set(views.map((tab) => tab.instanceKey)).size).toBe(2);
-    expect(views.every((tab) => tab.surfaceId === "browser")).toBe(true);
+    expect(views.every((tab) => tab.surfaceId === "agents")).toBe(true);
     act(() => {
       expect(useWorkspaceStore.getState().closeView(initial.id)).toBe(true);
     });
@@ -119,7 +120,7 @@ describe("WorkspaceCanvas virtual window shortcuts", () => {
     expect(remaining[0].id).not.toBe(initial.id);
   });
 
-  it("opens Google in a new split while preserving the Agents panel", async () => {
+  it("opens a new Agents page in a split while preserving the Agents panel", async () => {
     const initial = dockTreeViews(useWorkspaceStore.getState().layout.root)[0];
     const request = workspaceSurfaceFromRoute("/agents");
     if (!request) throw new Error("Expected Agents surface");
@@ -138,14 +139,15 @@ describe("WorkspaceCanvas virtual window shortcuts", () => {
       expect(panes).toHaveLength(2);
       const focused = panes.find((pane) => pane.id === layout.focusedPaneId);
       expect(focused?.views.find((tab) => tab.id === focused.activeViewId)).toMatchObject({
-        title: "google.com",
-        route: "/browser",
-        surfaceId: "browser",
+        title: "Agents",
+        route: "/agents",
+        surfaceId: "agents",
+        placeholder: true,
       });
       expect(dockTreeViews(layout.root)).toContainEqual(
         expect.objectContaining({ id: agents.id, surfaceId: "agents" }),
       );
-      expect(view.getByTestId("location").textContent).toBe("/browser");
+      expect(view.getByTestId("location").textContent).toBe("/agents");
     });
   });
 });

@@ -236,6 +236,7 @@ fn grants_for(reach: Reach) -> &'static [&'static str] {
     match reach {
         Reach::DownloadsFolder => &["grant-downloads"],
         Reach::SharedFolder => &["grant-shared-folder", "grant-shared-folder-write"],
+        Reach::LinkedFolder => &["grant-linked-folder"],
         Reach::PickedFile => &["grant-picked-file"],
         Reach::MistyHome
         | Reach::AppFolders
@@ -267,6 +268,7 @@ fn the_list_matches_grants_toml() {
         Reach::ChosenDownloadFolder,
         Reach::RecordedDownload,
         Reach::SharedFolder,
+        Reach::LinkedFolder,
         Reach::PickedFile,
         Reach::BrowserImportFolders,
         Reach::BenchmarkKeys,

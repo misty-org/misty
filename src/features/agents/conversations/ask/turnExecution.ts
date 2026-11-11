@@ -40,18 +40,11 @@ export async function startTurnExecution(
   const { accountId, epoch, requestAgentId, companion, requestContext } = input;
   try {
     const execution = await startLocalExecution(accountId, requestAgentId, {
-      ...(companion?.openScreen
-        ? {
-            normalTabs: true,
-            openWhenMissing: true,
-            url: companion.openScreen.url,
-            hint: companion.openScreen.hint,
-            tabId: companion.openScreen.tabId,
-            place: companion.openScreen.place,
-          }
-        : visibleAutopilotAvailable()
-          ? { normalTabs: false, desktopControl: true }
-          : { normalTabs: false }),
+      // A run always works in a page of its own, shown as the picture beside its chat. There
+      // are no tabs of the person's to work in.
+      ...(visibleAutopilotAvailable() && !companion?.openScreen
+        ? { normalTabs: false, desktopControl: true }
+        : { normalTabs: false }),
       method: companion?.methodVersionId
         ? {
             versionId: companion.methodVersionId,

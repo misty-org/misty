@@ -1,4 +1,5 @@
 import type { SpaceEvent } from "../api/dto/entities";
+import type { MemberAgentStatus } from "./memberAgents";
 
 export type SpacePresenceViewer = { user_id: string; active: boolean };
 
@@ -11,6 +12,7 @@ export type RealtimeEnvelope =
       space_id: string;
     }
   | { type: "presence"; space_id: string; viewers: SpacePresenceViewer[] }
+  | { type: "agents"; space_id: string; user_id: string; agents: MemberAgentStatus[] }
   | SpaceTypingEnvelope;
 
 export type SpaceTypingEnvelope = {

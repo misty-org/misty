@@ -18,11 +18,11 @@ function StartupRedirect() {
   const { user } = useAuth();
   const welcomed = useSetupStore((state) => state.welcomed);
   const lastAppRoute = useAppRouteMemoryStore((state) => state.lastAppRoute);
-  // Misty is a full browser without an account: the welcome shows once, on first run.
+  // Agents work without an account: the welcome shows once, on first run.
   if (!user && !welcomed) {
     return <Navigate to={routes.welcome} replace />;
   }
-  return <Navigate to={resolveStartupRoute(lastAppRoute)} replace />;
+  return <Navigate to={resolveStartupRoute(lastAppRoute, Boolean(user))} replace />;
 }
 export const router = createBrowserRouter([
   {
@@ -96,7 +96,7 @@ export const router = createBrowserRouter([
           },
           {
             path: "*",
-            element: <Navigate to={routes.browser} replace />,
+            element: <StartupRedirect />,
           },
         ],
       },

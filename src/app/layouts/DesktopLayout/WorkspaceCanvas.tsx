@@ -1,4 +1,3 @@
-import { useBrowserSearchStore } from "@/features/browser";
 import { PaneSwapMode } from "./PaneSwapMode";
 import { routes } from "@/app/shell";
 import type { TabSide } from "@/app/shell/dockingLayout";
@@ -8,13 +7,15 @@ import {
   useWorkspaceStore,
   type WorkspaceView,
 } from "@/features/app-windows";
-import { allLayoutViews, layoutTabs } from "@/features/app-windows";
+import { allLayoutViews } from "@/features/app-windows";
 import type { DockSplitDirection } from "@/features/app-windows";
-import { useCallback, useEffect, useMemo, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { WorkspaceDockTree } from "./WorkspaceDockTree";
 import { SidebarDrawer } from "./SidebarDrawer";
-import { WorkspaceTabStrip } from "./WorkspaceTabStrip";
+import { WorkspaceSidebar } from "./WorkspaceSidebar";
+import { closeSavedWebPages, watchForWebPages } from "./spaceNavigation";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import { closePeek } from "@/features/app-windows";
 import {
   resetPinnedTabForView,
@@ -78,6 +79,33 @@ export function WorkspaceCanvas(props: {
       navigate(route, { replace: true });
   }, [location.pathname, location.search, navigate]);
 
+  // Once per window: the web pages saved from before the sidebar stopped listing tabs go.
+  const clearedSavedPages = useRef(false);
+  useEffect(() => {
+    if (clearedSavedPages.current) return;
+    clearedSavedPages.current = true;
+    closeSavedWebPages();
+    // With pages left, the address follows the one now in front. With none, a window that
+    // was on a web page opens Agents; any other address opens its own page.
+    if (allLayoutViews(useWorkspaceStore.getState().layout).length) navigateToActiveLayoutTab();
+    else if ([routes.browser, routes.newTab].includes(location.pathname as never))
+      navigate(routes.agents, { replace: true });
+  }, [location.pathname, navigate, navigateToActiveLayoutTab]);
+
+  // While the window is open, a web page that lands in a pane leaves for the person's browser.
+  const showActive = useRef(navigateToActiveLayoutTab);
+  useEffect(() => {
+    showActive.current = navigateToActiveLayoutTab;
+  }, [navigateToActiveLayoutTab]);
+  useEffect(
+    () =>
+      watchForWebPages(
+        () => window.setTimeout(() => showActive.current(), 0),
+        (url) => void openUrl(url).catch(() => undefined),
+      ),
+    [],
+  );
+
   useEffect(() => {
     window.addEventListener("misty:workspace-projection-applied", navigateToActiveLayoutTab);
     return () =>
@@ -108,25 +136,6 @@ export function WorkspaceCanvas(props: {
       if (closeTab(tab.id)) navigateToActiveLayoutTab();
     },
     [closeTab, navigateToActiveLayoutTab],
-  );
-
-  // A tab split into panes closes one pane at a time, like stepping on to the next with the pane
-  // chips; only its last pane takes the tab with it.
-  const closeLayoutTab = useCallback(
-    (id: string) => {
-      const state = useWorkspaceStore.getState();
-      if (state.resetPinnedTab(id)) return;
-      const tab = layoutTabs(state.layout).find((candidate) => candidate.id === id);
-      const panes = tab ? dockLeaves(tab.root) : [];
-      if (tab && panes.length > 1) {
-        const pane = panes.find((candidate) => candidate.id === tab.focusedPaneId) ?? panes[0]!;
-        const view = pane.views.find((item) => item.id === pane.activeViewId) ?? pane.views[0];
-        if (view && state.closeView(view.id, pane.id)) navigateToActiveLayoutTab();
-        return;
-      }
-      if (state.closeTab(id)) navigateToActiveLayoutTab();
-    },
-    [navigateToActiveLayoutTab],
   );
 
   useWorkspaceTabShortcuts(navigateToActiveLayoutTab);
@@ -169,25 +178,11 @@ export function WorkspaceCanvas(props: {
         {!props.hideTabStrip ? (
           <>
             <SidebarDrawer side={side}>
-              <WorkspaceTabStrip
+              <WorkspaceSidebar
                 position={side}
                 windowsTitlebarControls={props.windowsTitlebarControls}
-                focusedPaneId={layout.focusedPaneId}
-                lastUsedViewByGroup={lastUsedTabByGroup}
                 onOpen={openTab}
-                onClose={closeWorkspaceTab}
-                onNewTab={() => useBrowserSearchStore.getState().show()}
-                onCloseLayoutTab={closeLayoutTab}
-                onMoveView={moveTab}
-                onDockView={dockTab}
-                onSplitPane={splitWorkspacePane}
-                onClosePane={(paneId) => {
-                  closePane(paneId);
-                  navigateToActiveLayoutTab();
-                }}
-                onResizeSplit={updateSplitRatio}
                 account={props.stripAccount}
-                footEnd={props.stripFootEnd}
               />
             </SidebarDrawer>
             <TopEdge gridColumn={contentColumn} side={side} />

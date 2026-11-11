@@ -1,8 +1,8 @@
 import { expect, it } from "vitest";
 import { selectAppearancePreferences, selectGeneralPreferences } from "./preferences";
 
-it("defaults new tabs to Browser and keeps the stored index", () => {
-  expect(selectGeneralPreferences({}).workspaceDefaultTabIndex).toBe(1);
+it("defaults new tabs to Agents and keeps the stored index", () => {
+  expect(selectGeneralPreferences({}).workspaceDefaultTabIndex).toBe(3);
   expect(
     selectGeneralPreferences({ general: { workspace_default_tab_index: 0 } })
       .workspaceDefaultTabIndex,

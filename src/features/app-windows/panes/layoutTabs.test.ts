@@ -169,17 +169,17 @@ describe("window → tabs → panes", () => {
   });
 });
 
-it("opens replaceable Browser in new tabs and splits and navigates inside the selected split", () => {
+it("opens replaceable Agents in new tabs and splits and navigates inside the selected split", () => {
   expect(state().newTab()).toMatchObject({
-    route: "/browser",
-    surfaceId: "browser",
+    route: "/agents",
+    surfaceId: "agents",
     placeholder: true,
   });
   const tabId = state().layout.activeTabId;
   const paneId = state().splitPane(state().layout.focusedPaneId, "right")!;
   expect(activeLayoutView(state().layout)).toMatchObject({
-    route: "/browser",
-    surfaceId: "browser",
+    route: "/agents",
+    surfaceId: "agents",
     placeholder: true,
   });
   const view = state().openBrowserView({ url: "https://example.com", paneId });

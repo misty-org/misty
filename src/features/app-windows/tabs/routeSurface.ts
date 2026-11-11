@@ -42,13 +42,17 @@ export function workspaceSurfaceFromRoute(pathname: string): OpenWorkspaceSurfac
         ? "Chat"
         : tool === "journal"
           ? "Journal"
-          : tool === "library"
-            ? "Library"
-            : tool === "memory"
-              ? "Memory"
-              : spaceId
-                ? "Home"
-                : "Spaces",
+          : tool === "planner"
+            ? "Planner"
+            : tool === "calendar"
+              ? "Calendar"
+              : tool === "library"
+                ? "Library"
+                : tool === "memory"
+                  ? "Memory"
+                  : spaceId
+                    ? "Home"
+                    : "Spaces",
       pathname,
       spaceId ? `${spaceId}:${tool}` : "spaces",
       "single",
@@ -77,7 +81,8 @@ export function workspaceSurfaceFromRoute(pathname: string): OpenWorkspaceSurfac
   return null;
 }
 
-type SpaceWorkspaceTool = "journal" | "social" | "library" | "memory" | "space";
+type SpaceWorkspaceTool =
+  "journal" | "social" | "planner" | "calendar" | "library" | "memory" | "space";
 
 export function spaceWorkspaceToolFromRoute(pathname: string): SpaceWorkspaceTool {
   return spaceToolFromSection(pathname.split(/[?#]/)[0].split("/").filter(Boolean)[2]);
@@ -107,6 +112,12 @@ function request(
 function spaceToolFromSection(section: string | undefined): SpaceWorkspaceTool {
   if (section === "notes" || section === "drawings") return "journal";
   if (section === "chat" || section === "social") return "social";
-  if (section === "library" || section === "memory") return section;
+  if (
+    section === "planner" ||
+    section === "calendar" ||
+    section === "library" ||
+    section === "memory"
+  )
+    return section;
   return "space";
 }

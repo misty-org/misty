@@ -135,17 +135,6 @@ it("preserves an occupied split when an explicit browser open targets it", () =>
   expect(store().layout.focusedPaneId).not.toBe(paneId);
 });
 
-it("keeps a default browser replaceable through metadata updates, then commits navigation", () => {
-  configureWorkspaceDefaultView(1);
-  const fresh = store().newTab();
-  store().updateBrowserView(fresh.id, { title: "Loaded default" });
-  expect(activeLayoutView(store().layout)?.placeholder).toBe(true);
-  store().updateBrowserView(fresh.id, { url: "https://work.example" });
-  expect(activeLayoutView(store().layout)?.placeholder).toBe(false);
-  go("/agents");
-  expect(allLayoutViews(store().layout).some((view) => view.id === fresh.id)).toBe(true);
-});
-
 it("opens Scheduled inside Agents and persists the selected task", () => {
   const agents = go("/agents");
   const scheduled = go("/scheduled");

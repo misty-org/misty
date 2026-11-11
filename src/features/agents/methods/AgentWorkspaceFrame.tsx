@@ -1,32 +1,35 @@
+import { lazy, Suspense, useEffect, type ReactNode } from "react";
 import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-  type CSSProperties,
-  type ReactNode,
-} from "react";
-import { Menu, Repeat2, Waypoints, X, SquarePen } from "lucide-react";
+  Armchair,
+  FolderTree,
+  GitCompareArrows,
+  MessageSquare,
+  Repeat2,
+  SquarePen,
+  SquareTerminal,
+  Waypoints,
+  type LucideIcon,
+} from "lucide-react";
+import { useSearchParams } from "react-router-dom";
 import type { MistyActivityEntry } from "../conversations/state/activity";
 import type { AgentProfile } from "@/shared/schemas";
-import { useStableCallback } from "@/shared/hooks/useStableCallback";
-import { Button, IconButton } from "@/shared/ui";
-import { useAgentFoldersStore } from "../shared-folders/agentFoldersStore";
-import { FolderNameDialog } from "../shared-folders/FolderNameDialog";
-import {
-  AgentRecentConversations,
-  type RecentFolder,
-  type RecentStatus,
-} from "./AgentRecentConversations";
-import { AgentGetStarted } from "./AgentGetStarted";
-import { AgentSidebarResizer, useAgentSidebarWidth } from "./AgentSidebarResizer";
+import { Button, IconButton, Skeleton } from "@/shared/ui";
+import { ConnectAgentButton } from "../engines/ConnectAgentDialog";
+import { SessionGoalButton } from "../goals/SessionGoalButton";
+import { useSessionGoalRunner } from "../goals/sessionGoals";
+import { VirtualOffice } from "../virtual/VirtualOffice";
+import { useContextPanel, type ContextPanelTab } from "../context-panel/contextPanelStore";
 import { isUnread, markConversationRead } from "./conversationReads";
 import { isRunInProgress } from "./RecentStatusBadge";
 import { AgentWorkspaceCatalog } from "./AgentWorkspaceCatalog";
 import "./agentWorkspaceCatalog.css";
 import "./agentWorkspaceFrame.css";
 
-export type AgentWorkspacePage = "task" | "workflows" | "integrations";
+const AgentContextPanel = lazy(async () => ({
+  default: (await import("../context-panel/AgentContextPanel")).AgentContextPanel,
+}));
+
+export type AgentWorkspacePage = "task" | "workflows" | "integrations" | "office";
 type RecentConversation = {
   id: string;
   title?: string;
@@ -35,7 +38,26 @@ type RecentConversation = {
   lastReadAt?: string;
 };
 
-/** Presentation only. Existing conversation and account actions remain owned by AgentsPage. */
+const pages: [AgentWorkspacePage, string, LucideIcon][] = [
+  ["task", "Chat", MessageSquare],
+  ["office", "Office", Armchair],
+  ["workflows", "Workflows", Repeat2],
+  ["integrations", "Integrations", Waypoints],
+];
+
+const panels: [ContextPanelTab, string, LucideIcon][] = [
+  ["files", "Files", FolderTree],
+  ["changes", "Changes", GitCompareArrows],
+  ["terminal", "Terminal", SquareTerminal],
+];
+
+/**
+ * The Agents page around a chat: a bar with the agent and the page's views (chat, office,
+ * workflows, integrations), the chat in the middle, and a context panel on the right for the
+ * folder's files, changes and a terminal. The chats themselves are listed in the window's
+ * sidebar, so this page has no list of its own. Presentation only: conversation and account
+ * actions remain owned by AgentsPage.
+ */
 export function AgentWorkspaceFrame({
   agent,
   page,
@@ -54,7 +76,7 @@ export function AgentWorkspaceFrame({
   agent: AgentProfile;
   page: AgentWorkspacePage;
   conversations: RecentConversation[];
-  /** This agent's runs; Recents shows each conversation's latest one. */
+  /** This agent's runs, to mark the open conversation read once its run settles. */
   activity: MistyActivityEntry[];
   conversationId: string;
   disabled: boolean;
@@ -67,53 +89,17 @@ export function AgentWorkspaceFrame({
   onUseTemplate(prompt: string): void;
   onStartWork(action: () => void): void;
 }) {
-  const allFolders = useAgentFoldersStore((state) => state.folders);
-  const sorted = [...conversations].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
-  // Rows only show ids, titles and filing; a streaming answer rewrites its conversation on
-  // every token, so key the lists on what the rows show to keep the memoized list still.
-  const listKey = sorted
-    .map((c) => `${c.id}\u0000${c.title ?? ""}\u0000${c.folderId ?? ""}`)
-    .join("\u0001");
-  const folderKey = allFolders
-    .filter((folder) => folder.agentId === agent.id)
-    .map((folder) => `${folder.id}\u0000${folder.name}`)
-    .join("\u0001");
-  const { folders, recent } = useMemo(() => {
-    const own = allFolders.filter((folder) => folder.agentId === agent.id);
-    const filed = new Set(own.map((folder) => folder.id));
-    const row = ({ id, title, folderId }: RecentConversation) => ({ id, title, folderId });
-    const groups: RecentFolder[] = own.map((folder) => ({
-      folder,
-      conversations: sorted.filter((c) => c.folderId === folder.id).map(row),
-    }));
-    // A chat whose folder is gone or not loaded yet stays visible in Recents.
-    const unfiled = sorted.filter((c) => !c.folderId || !filed.has(c.folderId));
-    return { folders: groups, recent: unfiled.slice(0, 12).map(row) };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- the keys capture the shown fields
-  }, [listKey, folderKey, agent.id]);
-  // Latest top-level run per conversation, and whether it changed since the conversation
-  // was last read, keyed on what the dots show so the memoized list stays still while a
-  // run streams.
-  const latestRuns = new Map<string, RecentStatus>();
-  for (const entry of activity) {
-    if (entry.parent_run_id || !entry.conversation_id) continue;
-    const known = latestRuns.get(entry.conversation_id);
-    if (!known || entry.updated_at > known.updatedAt)
-      latestRuns.set(entry.conversation_id, { state: entry.state, updatedAt: entry.updated_at });
-  }
-  const lastRead = new Map(conversations.map((c) => [c.id, c.lastReadAt]));
-  for (const [id, run] of latestRuns) run.unread = isUnread(run.updatedAt, lastRead.get(id));
-  const statusKey = [...latestRuns]
-    .map(([id, run]) => `${id}\u0000${run.state}\u0000${run.updatedAt}\u0000${run.unread}`)
-    .join("\u0001");
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- statusKey captures the shown fields
-  const statuses = useMemo(() => Object.fromEntries(latestRuns), [statusKey]);
-  const openConversation = useStableCallback(onConversation);
-  // The open conversation is read once its run settles while the window is in view, so
-  // only conversations the user hasn't seen keep a filled dot.
+  // The open conversation is read once its run settles while the window is in view.
   const activeId = page === "task" ? conversationId : undefined;
-  const activeRun = activeId ? latestRuns.get(activeId) : undefined;
-  const readable = Boolean(activeRun?.unread && !isRunInProgress(activeRun.state));
+  let latest: MistyActivityEntry | undefined;
+  for (const entry of activity) {
+    if (entry.parent_run_id || entry.conversation_id !== activeId) continue;
+    if (!latest || entry.updated_at > latest.updated_at) latest = entry;
+  }
+  const lastReadAt = conversations.find((item) => item.id === activeId)?.lastReadAt;
+  const readable = Boolean(
+    latest && isUnread(latest.updated_at, lastReadAt) && !isRunInProgress(latest.state),
+  );
   useEffect(() => {
     if (!activeId || !readable) return;
     const read = () => {
@@ -123,116 +109,91 @@ export function AgentWorkspaceFrame({
     document.addEventListener("visibilitychange", read);
     return () => document.removeEventListener("visibilitychange", read);
   }, [activeId, readable]);
-  const [sidebarWidth, setSidebarWidth] = useAgentSidebarWidth();
-  const [creatingProject, setCreatingProject] = useState(false);
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const newProject = useCallback(() => setCreatingProject(true), []);
+  const [, setParams] = useSearchParams();
+  useSessionGoalRunner(activeId ?? "");
+  const panel = useContextPanel((state) => state.tab);
+  const togglePanel = useContextPanel((state) => state.toggle);
   return (
-    <div className="agent-studio" data-page={page} data-drawer={drawerOpen ? "open" : "closed"}>
-      <aside
-        className="agent-studio-sidebar"
-        aria-label={`${agent.name} workspace`}
-        style={{ "--agent-studio-sidebar-width": `${sidebarWidth}px` } as CSSProperties}
-      >
-        {/* A window toolbar, so the shared titlebar code notices when the sidebar
-            meets the native window buttons and the identity drops below them. */}
-        <header data-window-toolbar>
-          {identity}
-          <IconButton
-            className="agent-studio-drawer-close"
-            label="Close menu"
-            tooltip={false}
-            onClick={() => setDrawerOpen(false)}
-          >
-            <X size={18} />
-          </IconButton>
-        </header>
-        <nav aria-label="Agent workspace pages">
-          <Button
-            data-agent-navigation-control
-            variant="ghost"
-            justify="start"
-            disabled={disabled}
-            aria-current={page === "task" && !conversationId ? "page" : undefined}
-            aria-label="New task"
-            onClick={onNewTask}
-          >
-            <SquarePen size={16} />
-            <span>New task</span>
-          </Button>
-          {(
-            [
-              ["workflows", "Workflows", Repeat2],
-              ["integrations", "Integrations", Waypoints],
-            ] as const
-          ).map(([id, label, Icon]) => (
+    <div className="agent-studio" data-page={page}>
+      <header className="agent-studio-bar" data-window-toolbar>
+        {identity}
+        <nav className="agent-studio-views" aria-label="Agent workspace pages">
+          {pages.map(([id, label, Icon]) => (
             <Button
-              data-agent-navigation-control
               key={id}
-              aria-label={label}
+              data-agent-navigation-control
               variant="ghost"
-              justify="start"
+              size="sm"
               aria-current={page === id ? "page" : undefined}
               onClick={() => onPageChange(id)}
             >
-              <Icon size={16} />
+              <Icon size={15} />
               <span>{label}</span>
             </Button>
           ))}
         </nav>
-        <AgentRecentConversations
-          agentId={agent.id}
-          folders={folders}
-          recent={recent}
-          statuses={statuses}
-          activeId={activeId}
-          disabled={disabled}
-          onConversation={openConversation}
-          onNewProject={newProject}
-        />
-        <AgentGetStarted
-          hasTask={conversations.length > 0}
-          disabled={disabled}
-          onNewTask={onNewTask}
-          onIntegrations={() => onPageChange("integrations")}
-          onWorkflows={() => onPageChange("workflows")}
-        />
-        <FolderNameDialog
-          open={creatingProject}
-          title="New project"
-          submitLabel="Create"
-          onOpenChange={setCreatingProject}
-          onSubmit={async (name) => {
-            await useAgentFoldersStore.getState().create(agent.id, name);
-          }}
-        />
-        <AgentSidebarResizer width={sidebarWidth} onWidthChange={setSidebarWidth} />
-      </aside>
-      <div className="agent-studio-canvas">
-        <IconButton
-          className="agent-studio-drawer-toggle"
-          label="Open menu"
-          tooltip={false}
-          aria-expanded={drawerOpen}
-          onClick={() => setDrawerOpen(true)}
-        >
-          <Menu size={18} />
-        </IconButton>
-        <div className="agent-studio-drawer-scrim" onClick={() => setDrawerOpen(false)} />
-        {/* Keep the live conversation mounted while browsing catalogs; its draft and voice state belong to it. */}
-        <div className="agent-studio-task" hidden={page !== "task"}>
-          {children}
+        <div className="agent-studio-panels">
+          <IconButton label="New task" disabled={disabled} onClick={onNewTask}>
+            <SquarePen size={16} />
+          </IconButton>
+          <ConnectAgentButton />
+          <SessionGoalButton conversationId={page === "task" ? conversationId : ""} />
+          {panels.map(([id, label, Icon]) => (
+            <IconButton
+              key={id}
+              label={label}
+              aria-pressed={panel === id}
+              onClick={() => togglePanel(id)}
+            >
+              <Icon size={16} />
+            </IconButton>
+          ))}
         </div>
-        <div className="agent-studio-catalog-host" hidden={page === "task"}>
-          <AgentWorkspaceCatalog
-            agentId={agent.id}
-            agentName={agent.name}
-            page={page === "task" ? "workflows" : page}
-            onUse={onUseTemplate}
-            onConversation={onConversation}
-            onStartWork={onStartWork}
-          />
+      </header>
+      <div className="agent-studio-body">
+        <div className="agent-studio-canvas">
+          {/* Keep the live conversation mounted while browsing other views; its draft and voice state belong to it. */}
+          <div className="agent-studio-task" hidden={page !== "task"}>
+            {children}
+          </div>
+          {page === "office" ? (
+            <VirtualOffice
+              onOpenChat={(agentId, chat) => {
+                onPageChange("task");
+                if (agentId === agent.id && chat) onConversation(chat);
+                else setParams(chat ? { agent: agentId, conversation: chat } : { agent: agentId });
+              }}
+            />
+          ) : null}
+          <div
+            className="agent-studio-catalog-host"
+            hidden={page !== "workflows" && page !== "integrations"}
+          >
+            <AgentWorkspaceCatalog
+              agentId={agent.id}
+              agentName={agent.name}
+              page={page === "integrations" ? "integrations" : "workflows"}
+              onUse={onUseTemplate}
+              onConversation={onConversation}
+              onStartWork={onStartWork}
+            />
+          </div>
         </div>
+        {panel ? (
+          <aside className="agent-studio-context context-panel" aria-label="Context">
+            <Suspense
+              fallback={
+                <div className="grid gap-2 p-3" aria-hidden="true">
+                  <Skeleton className="h-4 w-32" />
+                  <Skeleton className="h-4 w-48" />
+                  <Skeleton className="h-4 w-40" />
+                </div>
+              }
+            >
+              <AgentContextPanel tab={panel} conversationId={conversationId} agent={agent} />
+            </Suspense>
+          </aside>
+        ) : null}
       </div>
     </div>
   );

@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import type { Space } from "../api/dto/entities";
 import { setItemVisibility, type ItemVisibility } from "../api/visibility";
 import { useAuth } from "@/features/account";
+import { AgentsNow } from "@/features/agents";
 import { OrderedCollectionFilters } from "@/features/settings/OrderedCollectionFilters";
 import {
   Button,
@@ -26,6 +27,7 @@ import { editedLabel, galleryFilters, type GalleryItem, isGalleryFilter } from "
 import { GalleryPreview, kindIcon } from "./GalleryPreview";
 import { readHomePreference, writeHomePreference } from "./homePreferences";
 import { MakeSomethingNew } from "./MakeSomethingNew";
+import { SpaceActivityLog } from "./SpaceActivityLog";
 import { SpaceItemCard } from "./SpaceItemCard";
 import { useSpaceGallery } from "./useSpaceGallery";
 
@@ -166,6 +168,16 @@ export function SpaceHome({ space }: { space: Space }) {
           </>
         }
       />
+      {!query && (
+        <AgentsNow
+          onOpenChat={(agentId, conversationId) => {
+            const chat = new URLSearchParams({ agent: agentId });
+            if (conversationId) chat.set("conversation", conversationId);
+            navigate(`/agents?${chat}`);
+          }}
+        />
+      )}
+      {!query && space.is_shared && <SpaceActivityLog spaceId={space.id} />}
       {!query && <MakeSomethingNew spaceId={space.id} onCreated={gallery.reload} />}
       <OrderedCollectionFilters
         collectionId="space"

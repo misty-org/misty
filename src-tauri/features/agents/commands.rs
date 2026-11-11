@@ -59,22 +59,23 @@ pub(crate) use crate::agents::chats::commands::{
 };
 pub(crate) use crate::agents::connected_apps::commands::{
     __cmd__composio_apps_catalog, __cmd__composio_apps_connect, __cmd__composio_apps_disconnect,
-    __cmd__composio_apps_list, __cmd__composio_grants_list, __cmd__composio_grants_revoke,
-    __cmd__composio_request_decide, __cmd__composio_request_get, __cmd__composio_request_link,
-    __cmd__composio_request_show, __cmd__composio_tool_connect, __cmd__composio_tool_connected,
-    __cmd__composio_tool_execute, __cmd__composio_tool_schemas, __cmd__composio_tool_search,
-    __tauri_command_name_composio_apps_catalog, __tauri_command_name_composio_apps_connect,
-    __tauri_command_name_composio_apps_disconnect, __tauri_command_name_composio_apps_list,
+    __cmd__composio_apps_list, __cmd__composio_calendar_events, __cmd__composio_grants_list,
+    __cmd__composio_grants_revoke, __cmd__composio_request_decide, __cmd__composio_request_get,
+    __cmd__composio_request_link, __cmd__composio_request_show, __cmd__composio_tool_connect,
+    __cmd__composio_tool_connected, __cmd__composio_tool_execute, __cmd__composio_tool_schemas,
+    __cmd__composio_tool_search, __tauri_command_name_composio_apps_catalog,
+    __tauri_command_name_composio_apps_connect, __tauri_command_name_composio_apps_disconnect,
+    __tauri_command_name_composio_apps_list, __tauri_command_name_composio_calendar_events,
     __tauri_command_name_composio_grants_list, __tauri_command_name_composio_grants_revoke,
     __tauri_command_name_composio_request_decide, __tauri_command_name_composio_request_get,
     __tauri_command_name_composio_request_link, __tauri_command_name_composio_request_show,
     __tauri_command_name_composio_tool_connect, __tauri_command_name_composio_tool_connected,
     __tauri_command_name_composio_tool_execute, __tauri_command_name_composio_tool_schemas,
     __tauri_command_name_composio_tool_search, composio_apps_catalog, composio_apps_connect,
-    composio_apps_disconnect, composio_apps_list, composio_grants_list, composio_grants_revoke,
-    composio_request_decide, composio_request_get, composio_request_link, composio_request_show,
-    composio_tool_connect, composio_tool_connected, composio_tool_execute, composio_tool_schemas,
-    composio_tool_search,
+    composio_apps_disconnect, composio_apps_list, composio_calendar_events, composio_grants_list,
+    composio_grants_revoke, composio_request_decide, composio_request_get, composio_request_link,
+    composio_request_show, composio_tool_connect, composio_tool_connected, composio_tool_execute,
+    composio_tool_schemas, composio_tool_search,
 };
 #[cfg(any(target_os = "macos", windows))]
 pub(crate) use crate::agents::cursor::{

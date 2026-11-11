@@ -9,16 +9,10 @@ import {
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import ReactDOM from "react-dom/client";
 import { AppErrorBoundary } from "./AppErrorBoundary";
+// A link a person clicks opens in their own browser: Misty shows web pages only to agents.
 configureMistyBrowserLinkOpener(async (url) => {
-  if (!hasTauriInternals())
-    throw new Error("Misty Browser is unavailable outside the desktop app.");
-  const { useWorkspaceStore } = await import("@/features/app-windows");
-  if (
-    !useWorkspaceStore.getState().openBrowserView({
-      url,
-    })
-  )
-    throw new Error("Misty Browser could not open this link.");
+  if (!hasTauriInternals()) throw new Error("Links open only from the desktop app.");
+  await (await import("@tauri-apps/plugin-opener")).openUrl(url);
 });
 installExternalLinkRouting();
 initializeHostAgentsRuntime();

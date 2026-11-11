@@ -13,6 +13,10 @@ export const AgentProfileInputSchema = z.strictObject({
   enabled: z.boolean().default(true),
   /** How new chats with this agent start: Ask pauses before every change, Auto continues on remembered approvals. */
   default_run_mode: z.enum(["ask", "auto"]).default("ask"),
+  /** The engine this agent runs on: Misty's own when absent, or an outside engine's adapter id. */
+  engine: z.string().max(40).optional(),
+  /** The model an outside engine is asked for; empty takes the engine's own default. */
+  engine_model: z.string().max(200).optional(),
 });
 
 export const AgentProfileSchema = AgentProfileInputSchema.extend({

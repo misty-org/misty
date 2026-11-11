@@ -1,3 +1,4 @@
+import { engineFolder, mistyEngine } from "../../engines/enginesApi";
 import { agentAccountId, isSignedIn } from "../../personal/agentAccount";
 import { memoryPromptContext } from "@/features/agents/localRun";
 import {
@@ -125,6 +126,15 @@ export async function buildRunBody(
     agent: agent
       ? { name: agent.name, role: agent.role, instructions: agent.instructions }
       : undefined,
+    // An agent on an outside engine runs in the Space's linked folder; native code starts it there.
+    engine:
+      agent?.engine && agent.engine !== mistyEngine
+        ? {
+            id: agent.engine,
+            model: agent.engine_model ?? "",
+            folder: await engineFolder(spaceId),
+          }
+        : undefined,
     resolved_context: sources.map(({ kind, title, content }) => ({ kind, title, content })),
     prior_write_receipts: await priorWriteReceipts(chat.priorRuns, input.agentId),
     attachments,

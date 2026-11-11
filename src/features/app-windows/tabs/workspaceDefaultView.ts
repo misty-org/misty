@@ -1,14 +1,10 @@
 import { workspaceDefaultViewIndex } from "@/features/settings";
-import { browserNewTabUrl } from "../addresses/browserHome";
 import { browserViewTitle, createBrowserViewState, type WorkspaceView } from "./workspaceViews";
 
-/** Settings store the view's index in the setting's legacy values, where 0 was
- * the retired Home page and 2 the retired Files tool; both now open the default. */
-const defaultViewSurfaces = [null, "browser", null, "agents"] as const;
-const defaultViewChoices = [
-  { label: "Browser", storedIndex: 1 },
-  { label: "Agents", storedIndex: 3 },
-] as const;
+/** Settings store the view's index in the setting's legacy values, where 0 was the retired Home
+ * page, 1 the browser and 2 the retired Files tool; all now open Agents. */
+const defaultViewSurfaces = [null, "agents", null, "agents"] as const;
+const defaultViewChoices = [{ label: "Agents", storedIndex: 3 }] as const;
 export const workspaceDefaultViewOptions = defaultViewChoices.map((choice) => choice.label);
 export { workspaceDefaultViewIndex };
 let defaultIndex = workspaceDefaultViewIndex;
@@ -30,20 +26,16 @@ export const workspaceDefaultViewStoredIndex = (option: number) =>
 function createTab(index: number, placeholder: boolean): WorkspaceView {
   const now = Date.now();
   const id = `tab:${crypto.randomUUID()}`;
-  const surfaceId = defaultViewSurfaces[index] ?? "browser";
-  const state = surfaceId === "browser" ? createBrowserViewState(browserNewTabUrl()) : {};
+  const surfaceId = defaultViewSurfaces[index] ?? "agents";
   return {
     id,
     surfaceId,
     groupKey: `tool:${surfaceId}`,
     instanceKey: id,
-    title:
-      surfaceId === "browser"
-        ? browserViewTitle((state as { url: string }).url)
-        : (defaultViewChoices.find((choice) => choice.storedIndex === index)?.label ?? "Agents"),
+    title: defaultViewChoices.find((choice) => choice.storedIndex === index)?.label ?? "Agents",
     route: `/${surfaceId}`,
-    sidebarVisible: surfaceId !== "browser",
-    state,
+    sidebarVisible: true,
+    state: {},
     createdAt: now,
     lastFocusedAt: now,
     placeholder,

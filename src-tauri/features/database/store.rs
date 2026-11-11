@@ -352,6 +352,34 @@ const MIGRATIONS: &[&str] = &[
          updated_at INTEGER NOT NULL,
          PRIMARY KEY (run_id, kind)
      ) WITHOUT ROWID;",
+    // 26: the project folders the person linked to each Space on this computer, where outside agent
+    // engines work, and each chat's session in its engine, to continue it (engines/store.rs).
+    "CREATE TABLE space_folders (
+         account TEXT NOT NULL,
+         space TEXT NOT NULL,
+         path TEXT NOT NULL,
+         added_at INTEGER NOT NULL,
+         PRIMARY KEY (account, space, path)
+     ) WITHOUT ROWID;
+     CREATE TABLE engine_sessions (
+         account TEXT NOT NULL,
+         conversation_id TEXT NOT NULL,
+         engine TEXT NOT NULL,
+         session_id TEXT NOT NULL,
+         folder TEXT NOT NULL,
+         updated_at INTEGER NOT NULL,
+         PRIMARY KEY (account, conversation_id, engine)
+     ) WITHOUT ROWID;",
+    // 27: the connections a person made so an agent Misty doesn't start (Cursor, the Claude app) can
+    // use one of their Spaces. Only the token's hash is kept (engines/connections.rs).
+    "CREATE TABLE space_connections (
+         id TEXT PRIMARY KEY,
+         account TEXT NOT NULL,
+         space TEXT NOT NULL,
+         name TEXT NOT NULL,
+         token_hash TEXT NOT NULL UNIQUE,
+         created_at INTEGER NOT NULL
+     ) WITHOUT ROWID;",
 ];
 
 #[derive(Debug, Clone)]

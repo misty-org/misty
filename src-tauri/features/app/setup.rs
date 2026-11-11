@@ -59,10 +59,13 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     database::retired_coding_data::remove_once_in_background(&runtime.environment);
     #[cfg(desktop)]
     runtime.agents.restore_folder_grants();
+    crate::engines::commands::allow_linked_folders(&runtime.environment.store());
     app.manage(permissions::Backing(runtime.environment.store()));
     permissions::provide_import_folders(crate::browser::import::import_folders);
     app.manage(runtime);
     crate::agents::run_control::resume_at_launch(app.handle());
+    // Agents the person connected to a Space can reach it as soon as Misty is open.
+    tauri::async_runtime::spawn(crate::engines::connections::start(app.handle().clone()));
     #[cfg(desktop)]
     permissions::restore(app.handle());
     #[cfg(desktop)]

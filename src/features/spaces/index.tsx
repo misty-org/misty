@@ -20,3 +20,5 @@ export { MistyLibraryPicker } from "./library";
 export { SpaceWorkspaceSurface } from "./overview/SpaceWorkspaceSurface";
 export { preferredDefaultSpace, windowSpace } from "./routes/defaultSpace";
 export { SpaceWindowBridge } from "./SpaceWindowBridge";
+export { useWindowSpace } from "./components/space-row/useWindowSpace";
+export { spaceNavigationName } from "./routes/defaultSpace";

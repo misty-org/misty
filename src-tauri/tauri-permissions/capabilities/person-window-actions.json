@@ -37,6 +37,7 @@
     "action-settings",
     "action-shortcuts",
     "action-vault",
-    "action-voice"
+    "action-voice",
+    "action-workspace"
   ]
 }

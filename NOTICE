@@ -12,3 +12,31 @@ any later version (see LICENSE), with this additional term under section 7(b):
 
 This term is a requirement to preserve reasonable author attributions, as section 7(b) allows.
 It adds no other restriction, and it does not limit any right the license grants.
+
+Third-party code
+
+Parts of Misty are adapted from other open-source projects. Each adapted file names its source in
+a header, and the notices below are preserved as their licenses require.
+
+desktop-cc-gui (https://github.com/zhukunpenglinyutong/desktop-cc-gui)
+  Adapted in src-tauri/features/engines and src-tauri/features/project: the agent engine adapters
+  (Claude Code, Codex, OpenCode), program discovery, and the files, Git and terminal backends.
+
+  MIT License
+
+  Copyright (c) 2026 zhukunpenglinyutong（朱昆鹏）
+
+  Permission is hereby granted, free of charge, to any person obtaining a copy of this software
+  and associated documentation files (the "Software"), to deal in the Software without
+  restriction, including without limitation the rights to use, copy, modify, merge, publish,
+  distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the
+  Software is furnished to do so, subject to the following conditions:
+
+  The above copyright notice and this permission notice shall be included in all copies or
+  substantial portions of the Software.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING
+  BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+  NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+  DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.

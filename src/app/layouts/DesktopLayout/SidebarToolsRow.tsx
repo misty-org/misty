@@ -18,7 +18,7 @@ const setToolsSlot = (element: HTMLDivElement | null) =>
   useBrowserToolbarSlot.getState().setTools(element);
 
 /** Turns layout mode on or off: split and join the window's tabs over the live page. */
-function LayoutButton() {
+export function LayoutButton() {
   const active = useLayoutEditor((state) => state.active);
   return (
     <IconButton
@@ -30,6 +30,10 @@ function LayoutButton() {
     </IconButton>
   );
 }
+
+/** The tools that belong to the window. Those that act on a web page for a person (history,
+ * downloads, passwords, find, reader, picture in picture, print) are no longer offered here. */
+const windowTools = new Set<SidebarToolId>(["pane-layout", "agents", "new-window"]);
 
 const openPage = (page: "downloads" | "history" | "passwords") =>
   useWorkspaceStore.getState().openBrowserView({ url: browserInternalUrl(page) });
@@ -45,7 +49,7 @@ export function SidebarToolsRow() {
   const signedIn = Boolean(user) && !sessionExpired;
   const { pinned } = useSidebarTools();
   const tool = (id: SidebarToolId) => {
-    if (!pinned.includes(id)) return null;
+    if (!pinned.includes(id) || !windowTools.has(id)) return null;
     if (id === "pane-layout") return <LayoutButton key={id} />;
     if (id === "agents") return <BrowserAgentsButton key={id} />;
     const definition: SidebarToolDefinition | undefined = sidebarTools.find(

@@ -63,6 +63,9 @@ pub enum Reach {
     /// A folder the person shared with agents (`grant-shared-folder`). Read-only here: writes come
     /// only from the shell, whose OS profile holds it to `grant-shared-folder-write` per chat.
     SharedFolder,
+    /// A project folder the person linked to a Space (`grant-linked-folder`). The agent engines
+    /// they chose work there, and the file panel beside a chat reads and writes it.
+    LinkedFolder,
     /// One file the person picked in a native dialog (`grant-picked-file`), until Misty quits.
     PickedFile,
     /// `agents.env`, read-only, on a debug build's benchmark run (`models/benchmark_env.rs`).
@@ -236,6 +239,14 @@ pub fn allow_shared_folder(folder: &Path, access: Access) {
 
 pub fn revoke_shared_folder(folder: &Path) {
     with_policy(|policy| policy.remove(Reach::SharedFolder, folder));
+}
+
+pub fn allow_linked_folder(folder: &Path) {
+    with_policy(|policy| policy.add(Reach::LinkedFolder, folder, Shape::Folder, Access::Write));
+}
+
+pub fn revoke_linked_folder(folder: &Path) {
+    with_policy(|policy| policy.remove(Reach::LinkedFolder, folder));
 }
 
 pub fn allow_browser_import_folders(folders: Vec<ImportFolder>) {

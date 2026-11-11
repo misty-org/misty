@@ -4,4 +4,4 @@ export const settingsDisabledControlClass =
 export const settingsControlButtonCompactClass = `min-w-24 gap-1.5 ${settingsDisabledControlClass}`;
 
 /** The stored index of the view a new window opens with: 1 is the browser. */
-export const workspaceDefaultViewIndex = 1;
+export const workspaceDefaultViewIndex = 3;

@@ -58,6 +58,13 @@ export function useDesktopRouteEffects(options: {
       return;
     }
     const surface = workspaceSurfaceFromRoute(currentRoute);
+    // Web pages belong to agents. A route only shows one an agent already opened; it never
+    // opens one for the person, who lands on Agents.
+    if (surface?.surfaceId === "browser") {
+      if (activeLayoutView(useWorkspaceStore.getState().layout)?.route !== currentRoute)
+        navigate(routes.agents, { replace: true });
+      return;
+    }
     if (surface) {
       if (
         surface.route === currentRoute &&
