@@ -1,6 +1,5 @@
 import "@/app/SettingsSections";
 import { describe, expect, it } from "vitest";
-import { settingsRedirects } from "@/features/browser/internal-pages/SettingsRedirectPage";
 import { settingDefinitions } from "./device-preferences/registry";
 import {
   canonicalSettingsSection,
@@ -29,12 +28,7 @@ describe("settings registry", () => {
   });
 
   it("names groups by feature and never echoes a group in its pages", () => {
-    expect(settingsGroups.map((group) => group.label)).toEqual([
-      "Account",
-      "App",
-      "Browser",
-      "Agents",
-    ]);
+    expect(settingsGroups.map((group) => group.label)).toEqual(["Account", "App", "Agents"]);
     for (const group of settingsGroups)
       for (const area of group.areas)
         expect(settingsAreas[area].label.toLowerCase()).not.toContain(group.label.toLowerCase());
@@ -65,21 +59,16 @@ describe("settings routing", () => {
   it("sends retired pages to where their settings live now", () => {
     expect(settingsPage("diagnostics")?.area).toBe("advanced");
     expect(settingsPage("browser")?.area).toBe("general");
-    expect(settingsPage("search")?.id).toBe("browser-links");
+    expect(settingsPage("search")?.id).toBe("general");
     expect(settingsPage("browser-handoff")?.id).toBe("sync");
     expect(settingsPage("about")?.id).toBe("account");
   });
 
   it("lands every “manage it in Settings” link on the page that holds it", () => {
     const links: Record<string, [SettingsSection, string]> = {
-      "misty://extensions": [settingsRedirects.extensions.section, "extensions"],
-      "misty://passwords": [settingsRedirects.passwords.section, "passwords"],
-      "misty://settings": [settingsRedirects.settings.section, "general"],
-      "browser menu": ["general", "general"],
       "update notice": ["updates", "general"],
       "clipboard devices": ["devices", "sync"],
-      "extensions toolbar": ["browser-extensions", "extensions"],
-      "passwords sync": ["sync", "sync"],
+      "vault sync": ["sync", "sync"],
     };
     for (const [link, [section, area]] of Object.entries(links))
       expect(settingsPage(section)?.area, link).toBe(area);
@@ -92,7 +81,9 @@ describe("settings routing", () => {
       expect(blockIds.has(section), `${definition.id} → ${section}`).toBe(true);
     }
     expect(preferenceSection("app.diagnostics.framePacing", "about")).toBe("advanced");
-    expect(preferenceSection("browser.searchSuggestions", "search")).toBe("browser-links");
+    expect(preferenceSection("browser.downloads.prompt", "browser-downloads")).toBe(
+      "browser-downloads",
+    );
   });
 });
 
@@ -104,9 +95,6 @@ describe("settings titles", () => {
         "../*/settings/**/*.tsx",
         "../agents/models/*.tsx",
         "../updater/UpdatesSection.tsx",
-        "../browser/extensions/ExtensionsSettings.tsx",
-        "../browser/autofill/AutofillSettings.tsx",
-        "../browser/passwords/PasswordsSettings.tsx",
       ],
       { query: "?raw", import: "default", eager: true },
     ) as Record<string, string>;

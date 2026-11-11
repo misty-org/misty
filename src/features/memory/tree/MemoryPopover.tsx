@@ -1,6 +1,6 @@
 import { Check, Copy, ExternalLink, Trash2 } from "lucide-react";
 import { useState } from "react";
-import { useWorkspaceStore } from "@/features/app-windows";
+import { openExternalLink } from "@/shared/platform/openExternalLink";
 import { Badge, Button, cn, ErrorNotification } from "@/shared/ui";
 import { formatWhen } from "./format";
 import { type MemoryNode, sourceLabels } from "./memoryNodes";
@@ -77,11 +77,7 @@ export function MemoryPopover({ node }: { node: MemoryNode }) {
       ) : (
         <div className="flex items-center gap-1.5">
           {node.url && (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => useWorkspaceStore.getState().openBrowserView({ url: node.url! })}
-            >
+            <Button size="sm" variant="outline" onClick={() => void openExternalLink(node.url!)}>
               <ExternalLink aria-hidden="true" />
               Open
             </Button>

@@ -68,7 +68,6 @@ pub(super) async fn verify_finish(shared: &RunShared, tools: &RunTools, report: 
         limit,
         long,
         research,
-        tab_list: catalog.model_name("browser.tab.list"),
         program: catalog.model_name("browser.run"),
         read_only: &read_only,
         unbacked_rows: &unbacked,

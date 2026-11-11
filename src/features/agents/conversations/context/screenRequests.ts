@@ -32,8 +32,7 @@ function patchRequest(
 
 /**
  * Runs once a response that asked for a screen finishes. Misty opens it where
- * the account setting says and continues; "ask each time" waits for the card,
- * unless an open tab already matches what the agent needs.
+ * the account setting says and continues; "ask each time" waits for the card.
  */
 export async function continueAfterScreenRequest(
   set: MistySet,
@@ -43,16 +42,7 @@ export async function continueAfterScreenRequest(
 ) {
   const request = findRequest(get, conversationId, messageId);
   if (request?.state !== "pending") return;
-  if (request.kind === "open" && request.location === "ask") {
-    // Without the matcher, the card still lets the person choose.
-    const tabs = await import("@/features/agents/cursor/normalTabs").catch(() => null);
-    if (
-      !tabs ||
-      request.chosen ||
-      !tabs.matchingBrowserTab(`${request.reason} ${request.url ?? ""}`)
-    )
-      return;
-  }
+  if (request.kind === "open" && request.location === "ask") return;
   void openScreenAndContinue(set, get, conversationId, messageId, screenChoice(request.location));
 }
 
@@ -97,24 +87,14 @@ export async function openScreenAndContinue(
     const capture = look
       ? (await (await import("./screenContext")).captureMistyScreen()).capture
       : undefined;
-    // Unless the user named a place, a site they already have open ("my Gmail
-    // tab") is worked on where it is rather than opened again.
-    const reused =
-      !look && !desktop && !request.chosen
-        ? (await import("@/features/agents/cursor/normalTabs")).matchingBrowserTab(
-            `${request.reason} ${request.url ?? ""}`,
-          )
-        : undefined;
     const where = look
       ? "The user's screen is attached as an image."
       : desktop
         ? "Misty can now use the user's desktop apps with its own cursor."
-        : reused
-          ? `The user's open tab "${reused.title.slice(0, 120)}" is now attached. Work in it; do not open another.`
-          : choice === "current"
-            ? "The user's current Misty tab is now attached."
-            : "A new browser tab in the user's Misty window is now attached.";
-    const start = request.url && !look && !desktop && !reused ? ` Start at ${request.url}.` : "";
+        : choice === "current"
+          ? "The user's current Misty tab is now attached."
+          : "A new browser tab in the user's Misty window is now attached.";
+    const start = request.url && !look && !desktop ? ` Start at ${request.url}.` : "";
     await get().submitAnswer(
       `Continue the request above. ${where}${start}`,
       [],
@@ -127,9 +107,8 @@ export async function openScreenAndContinue(
         executionMode: look ? "user" : "agent",
         continuation: true,
         capture,
-        openScreen: reused
-          ? { url: request.url, hint: request.reason, tabId: reused.id, place: "current" }
-          : !look && !desktop
+        openScreen:
+          !look && !desktop
             ? {
                 url: request.url,
                 hint: request.reason,

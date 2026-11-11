@@ -13,7 +13,7 @@ type SignInReason = "account" | "sync" | "space" | "invite" | "agents" | "expire
 export const setupReasonTitle: Record<SetupReason, string> = {
   setup: "Set up Misty",
   device: "Set up this computer",
-  tabs: "Where do you want your tabs?",
+  tabs: "Where do you want the sidebar?",
   wizard: "Choose a model",
   rerun: "Run setup again?",
 };

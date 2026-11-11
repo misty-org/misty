@@ -41,7 +41,6 @@ export { panePlacement } from "./panes/panePlacement";
 export { usePaneSwapMode, type PaneSwapDirection } from "./panes/paneSwapMode";
 export { useLayoutEditor } from "./panes/layoutEditor";
 export { draftAdd, draftPlace, draftRemove } from "./panes/layoutDraft";
-export { closePeek, keepPeek, openPeek, usePeekStore } from "./panes/peek";
 export { ProfileDialogs } from "./profiles/ProfileDialogs";
 export { ProfileMenuItems } from "./profiles/ProfileMenuItems";
 export { ProfileSwitcher } from "./profiles/ProfileSwitcher";

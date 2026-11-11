@@ -217,45 +217,6 @@ pub(crate) fn store_key(store: Option<&str>) -> Result<String, String> {
         .to_uppercase())
 }
 
-/// Camera, microphone and location decisions imported from another browser, for one
-/// Misty browser profile. Only sites still set to Ask change, so a choice
-/// already made in Misty always wins. Returns how many decisions were added.
-pub(crate) fn import_decisions(
-    profile: Option<&str>,
-    decisions: &[(String, &str, bool)],
-) -> Result<usize, String> {
-    let key = store_key(profile)?;
-    let mut store = read_store();
-    let sites = store.entry(key.clone()).or_default();
-    let mut added = 0;
-    let mut changed = std::collections::BTreeMap::new();
-    for (origin, kind, allow) in decisions {
-        let Ok(origin) = canonical_origin(origin) else {
-            continue;
-        };
-        let entry = sites.entry(origin.clone()).or_default();
-        let slot = match *kind {
-            "camera" => &mut entry.camera,
-            "microphone" => &mut entry.microphone,
-            "location" => &mut entry.location,
-            _ => continue,
-        };
-        if *slot == Decision::Ask {
-            *slot = if *allow {
-                Decision::Allow
-            } else {
-                Decision::Block
-            };
-            added += 1;
-            changed.insert(origin, entry.clone());
-        }
-    }
-    sites.retain(|_, permissions| *permissions != Permissions::default());
-    write_store(&store)?;
-    profile::publish(key, changed);
-    Ok(added)
-}
-
 mod db;
 mod profile;
 #[cfg(target_os = "macos")]

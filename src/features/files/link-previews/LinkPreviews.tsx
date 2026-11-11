@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { openExternalLink } from "@/features/browser";
+import { openExternalLink } from "@/shared/platform/openExternalLink";
 import { Pressable, Skeleton } from "@/shared/ui";
 import { knownLinkPreview, loadLinkPreview, type LinkPreview } from "./api";
 import { extractLinks } from "./links";
@@ -55,7 +55,7 @@ function LinkPreviewCard({ url }: { url: string }) {
           "border-charcoal-border bg-charcoal-card/40 text-left transition-colors " +
           "hover:bg-charcoal-card"
         }
-        onClick={() => openExternalLink(url)}
+        onClick={() => void openExternalLink(url)}
         title={url}
       >
         {preview.image ? (

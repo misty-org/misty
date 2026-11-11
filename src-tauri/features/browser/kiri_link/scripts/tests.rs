@@ -15,26 +15,6 @@ fn viewport() -> String {
 }
 
 #[test]
-fn autofill_runs_in_the_top_page_and_draws_nothing_there() {
-    let page = browser_viewport_script("token", false, &[]);
-    assert!(page.contains("'__MISTY_AUTOFILL__'"));
-    // The field helpers have to exist before the script that uses them.
-    let helpers = page
-        .find("const autofillFields")
-        .expect("helpers are included");
-    let script = page
-        .find("const fields = autofillFields")
-        .expect("script is included");
-    assert!(helpers < script);
-    let source = include_str!("autofill.js");
-    assert!(source.contains("if (window.top !== window) return;"));
-    // Misty draws the chip. The page can't open the list or tell whether anything is saved.
-    assert!(!source.contains("createElement"));
-    assert!(!source.contains("send('choose'"));
-    assert!(!source.contains("offer("));
-}
-
-#[test]
 fn captions_run_in_every_frame_without_the_tab_token() {
     let captions = browser_captions_script();
     assert!(captions.starts_with("(() => {"));

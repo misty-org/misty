@@ -3,9 +3,41 @@ import { beforeEach, expect, it } from "vitest";
 import { useWorkspaceStore } from "../tabs/useWorkspaceStore";
 import { activeLayoutView, allLayoutViews, layoutTabs } from "../panes/layoutTabs";
 import { migrateSavedLinkGroups } from "./tabGroups";
-import { createBookmarkFolder, saveBookmark } from "@/features/browser/bookmarks/library";
 import { partialWorkspaceStore, migrateWorkspaceStore } from "../tabs/workspaceStorePersistence";
 const state = () => useWorkspaceStore.getState();
+/** A saved folder holding one link, as the store kept them: under the default folder, and marked
+ * as already seen by the saved-link migration. */
+const saveFolderWithLink = (label: string) => {
+  const root = "group:bookmarks";
+  const folder = `folder:${crypto.randomUUID()}`;
+  const current = state();
+  useWorkspaceStore.setState({
+    migratedTabGroupIds: [...current.migratedTabGroupIds, root, folder],
+    bookmarkFolders: [
+      ...current.bookmarkFolders,
+      {
+        kind: "folder",
+        id: root,
+        fields: { label: "Bookmarks", icon: "folder", hidden: false, order: 1 },
+      },
+      { kind: "folder", id: folder, fields: { label, icon: "folder", hidden: false, order: 0 } },
+    ],
+    bookmarks: [
+      ...current.bookmarks,
+      {
+        kind: "bookmark",
+        id: `bookmark:${crypto.randomUUID()}`,
+        fields: {
+          folder_id: folder,
+          title: "Example",
+          url: "https://example.com/",
+          pinned: true,
+          order: 0,
+        },
+      },
+    ],
+  });
+};
 const tabs = () => layoutTabs(state().layout);
 const add = (title: string) => {
   const view = state().newTab();
@@ -61,8 +93,7 @@ it("saves and restores mixed surfaces and split trees with fresh identities only
   expect(tabs()).toHaveLength(count);
 });
 it("migrates old Groups once without opening or losing saved links, and survives restart", () => {
-  const folder = createBookmarkFolder("Old reading");
-  saveBookmark({ title: "Example", url: "example.com", folderId: folder });
+  saveFolderWithLink("Old reading");
   useWorkspaceStore.setState({ migratedTabGroupIds: [] });
   const before = state().layout,
     migration = migrateSavedLinkGroups(state());
@@ -79,8 +110,7 @@ it("migrates old Groups once without opening or losing saved links, and survives
   expect(layoutTabs(restored.layout)[0].tabGroupId).toBe(id);
 });
 it("does not reinterpret new bookmark folders as tab groups on restart", () => {
-  const folder = createBookmarkFolder("Bookmarks only");
-  saveBookmark({ title: "Example", url: "https://example.com", folderId: folder });
+  saveFolderWithLink("Bookmarks only");
   const migrated = migrateWorkspaceStore(partialWorkspaceStore(state()), 16);
   expect(migrated.tabGroups).toEqual([]);
   expect(migrated.bookmarks).toHaveLength(1);

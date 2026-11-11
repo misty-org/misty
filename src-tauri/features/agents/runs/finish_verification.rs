@@ -31,8 +31,6 @@ pub(crate) struct FinishCheck<'a> {
     /// A long request (`requirements_review::worth_ledger`): many parts, worth persisting on.
     pub(crate) long: bool,
     pub(crate) research: &'a ResearchTools,
-    /// browser.tab.list's model name, when the run has tabs of its own.
-    pub(crate) tab_list: Option<&'a str>,
     /// browser_run's model name, when the run has programs: the run checks its tabs with one.
     pub(crate) program: Option<&'a str>,
     pub(crate) read_only: ReadOnly<'a>,
@@ -64,12 +62,9 @@ pub(crate) fn finish_findings(check: &FinishCheck) -> (Vec<String>, bool) {
     if let Some(unbacked) = unbacked_completion(check.report, check.messages, check.read_only) {
         issues.push(unbacked);
     }
-    let tab_list = check.tab_list.filter(|name| !name.is_empty());
     let program = check.program.filter(|name| !name.is_empty());
-    if tab_list.is_some() || program.is_some() {
-        if let Some(proof) = proof_tabs_refusal(check.request, check.messages, tab_list, program) {
-            issues.push(proof);
-        }
+    if let Some(proof) = proof_tabs_refusal(check.request, program) {
+        issues.push(proof);
     }
     // Checked on evidence, without a model call.
     let broken = broken_proof_tabs(check.messages);
@@ -149,7 +144,6 @@ mod tests {
             limit: 90,
             long,
             research,
-            tab_list: None,
             program: None,
             read_only: &|_| true,
             unbacked_rows: &[],
@@ -178,7 +172,7 @@ mod tests {
         let report = TaskCompletion { outcome: Outcome::Completed, summary: "I've drafted the email.".to_owned(), remaining: Vec::new() };
         let research = research();
         let request = "Draft an email in Gmail to my team with this week's drops, and keep each source open in its own tab.";
-        let issues = finish_issues(&FinishCheck { tab_list: Some("browser_tab_list"), ..check(request, &report, &research, true) });
+        let issues = finish_issues(&FinishCheck { program: Some("browser_run"), ..check(request, &report, &research, true) });
         assert_eq!(issues.len(), 2);
         let note = verification_note(&issues, false).unwrap();
         assert!(note.starts_with("Before your answer goes out"));

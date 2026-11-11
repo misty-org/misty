@@ -6,7 +6,6 @@ import {
   type StoredDockingLayout,
 } from "@/app/shell/dockingLayout";
 import { configureTabHistoryBudget } from "@/features/browser";
-import { configureExcludedSites } from "@/features/browser";
 import { configureStartupPreference } from "@/app/shell";
 import { configureBrowserHomeUrl } from "@/features/app-windows";
 import { configureBrowserSearchSuggestions } from "@/features/app-windows";
@@ -20,10 +19,8 @@ import {
 } from "@/features/app-windows";
 import { configureBrowserSiteZoom } from "@/features/browser";
 import { configureBrowserSiteStyles } from "@/features/browser";
-import { configureBrowserMouseGestures } from "@/features/browser";
 import { configureHiddenTabSleep } from "@/features/browser";
 import { configureTabArchive } from "@/features/app-windows";
-import { configureExternalLinks } from "@/features/browser";
 import { configureLinkPreviews } from "@/features/files";
 import {
   onSettingsApplied,
@@ -56,7 +53,6 @@ function applyFeatureSettings(
   } catch {
     /* Invalid legacy data uses the last applied presets. */
   }
-  configureExcludedSites(settingsString(document, "privacy", "page_state_excluded_sites", ""));
   configureTabHistoryBudget(settingsNumber(document, "general", "browser_tab_history_kb", 256));
   configureBrowserHomeUrl(settingsString(document, "general", "browser_homepage", ""));
   configureBrowserSearchSuggestions(
@@ -66,14 +62,10 @@ function applyFeatureSettings(
   configureDeviceBangs(settingsString(document, "general", "browser_custom_bangs_json", "[]"));
   configureBrowserSiteZoom(settingsString(document, "general", "browser_site_zoom_json", "[]"));
   configureBrowserSiteStyles(settingsString(document, "general", "browser_site_styles_json", "[]"));
-  configureBrowserMouseGestures(
-    settingsBoolean(document, "general", "browser_mouse_gestures", false),
-  );
   configureTabArchive(settingsNumber(document, "general", "browser_auto_archive_hours", 0));
   configureHiddenTabSleep(
     settingsNumber(document, "general", "browser_hidden_tab_sleep_seconds", 0),
   );
-  configureExternalLinks(settingsString(document, "general", "browser_external_links", "tab"));
   configureLinkPreviews(settingsBoolean(document, "general", "browser_link_previews", true));
   configureWorkspaceDefaultView(
     settingsNumber(document, "general", "workspace_default_tab_index", workspaceDefaultViewIndex),

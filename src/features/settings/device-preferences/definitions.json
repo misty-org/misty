@@ -195,17 +195,6 @@
     "legacyValues": ["google", "duckduckgo", "bing", "brave", "startpage"]
   },
   {
-    "id": "browser.searchSuggestions",
-    "label": "Show search suggestions",
-    "page": "search",
-    "section": "general",
-    "key": "browser_search_suggestions",
-    "default": false,
-    "owner": "device",
-    "type": "boolean",
-    "platforms": ["desktop"]
-  },
-  {
     "id": "browser.customBangs",
     "label": "Search shortcuts",
     "keywords": ["bangs", "shortcuts", "search", "custom"],
@@ -248,19 +237,6 @@
     "platforms": ["desktop"]
   },
   {
-    "id": "browser.externalLinks",
-    "label": "Links from other apps",
-    "keywords": ["default browser", "peek", "open links", "little arc"],
-    "page": "browser-links",
-    "section": "general",
-    "key": "browser_external_links",
-    "default": "tab",
-    "owner": "device",
-    "type": "string",
-    "enum": ["tab", "peek"],
-    "platforms": ["desktop"]
-  },
-  {
     "id": "browser.siteStyles",
     "label": "Customized sites",
     "keywords": ["boost", "css", "dark mode", "hide element", "zap", "style"],
@@ -272,54 +248,6 @@
     "type": "string",
     "format": "json",
     "maxLength": 65536,
-    "platforms": ["desktop"]
-  },
-  {
-    "id": "autofill.addresses",
-    "label": "Fill addresses",
-    "keywords": ["autofill", "address", "shipping", "forms"],
-    "page": "autofill",
-    "section": "autofill",
-    "key": "addresses_enabled",
-    "default": true,
-    "owner": "device",
-    "type": "boolean",
-    "platforms": ["desktop"]
-  },
-  {
-    "id": "autofill.cards",
-    "label": "Fill cards",
-    "keywords": ["autofill", "credit card", "debit card", "payment", "checkout"],
-    "page": "autofill",
-    "section": "autofill",
-    "key": "cards_enabled",
-    "default": true,
-    "owner": "device",
-    "type": "boolean",
-    "platforms": ["desktop"]
-  },
-  {
-    "id": "autofill.offerToSave",
-    "label": "Offer to save",
-    "keywords": ["autofill", "save address", "save card", "forms"],
-    "page": "autofill",
-    "section": "autofill",
-    "key": "offer_to_save",
-    "default": true,
-    "owner": "device",
-    "type": "boolean",
-    "platforms": ["desktop"]
-  },
-  {
-    "id": "browser.mouseGestures",
-    "label": "Mouse gestures",
-    "keywords": ["gesture", "right drag", "mouse", "back", "forward"],
-    "page": "browser-appearance",
-    "section": "general",
-    "key": "browser_mouse_gestures",
-    "default": false,
-    "owner": "device",
-    "type": "boolean",
     "platforms": ["desktop"]
   },
   {
@@ -390,17 +318,6 @@
     "default": false,
     "owner": "device",
     "type": "boolean",
-    "platforms": ["desktop"]
-  },
-  {
-    "id": "browser.privacy.page_state_excluded_sites",
-    "label": "Don't capture page state on these sites",
-    "page": "privacy",
-    "section": "privacy",
-    "key": "page_state_excluded_sites",
-    "default": "",
-    "owner": "device",
-    "type": "string",
     "platforms": ["desktop"]
   },
   {
@@ -586,43 +503,6 @@
     "type": "string",
     "format": "json",
     "maxLength": 512,
-    "platforms": ["desktop"]
-  },
-  {
-    "id": "extensions.installations",
-    "label": "Installed extensions",
-    "page": "browser-extensions",
-    "section": "extensions",
-    "key": "installations",
-    "default": "[]",
-    "owner": "device",
-    "type": "string",
-    "platforms": ["desktop"],
-    "format": "json",
-    "maxLength": 524288
-  },
-  {
-    "id": "extensions.space_installations",
-    "label": "Installed extensions in other profiles",
-    "page": "browser-extensions",
-    "section": "extensions",
-    "key": "space_installations",
-    "default": "[]",
-    "owner": "device",
-    "type": "string",
-    "platforms": ["desktop"],
-    "format": "json",
-    "maxLength": 4194304
-  },
-  {
-    "id": "extensions.agent_access",
-    "label": "Allow agents to use extensions",
-    "page": "browser-extensions",
-    "section": "extensions",
-    "key": "agent_access",
-    "default": true,
-    "owner": "device",
-    "type": "boolean",
     "platforms": ["desktop"]
   },
   {

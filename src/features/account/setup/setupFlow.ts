@@ -1,7 +1,7 @@
 import type { ComponentType } from "react";
 import { createPort } from "@/shared/lib/seams";
 
-export type SetupStep = "import" | "extensions" | "tabs";
+export type SetupStep = "tabs";
 
 /** The first-run steps shown inside the sign-in sheet; onboarding fills them in. */
 export const setupFlow = createPort<{

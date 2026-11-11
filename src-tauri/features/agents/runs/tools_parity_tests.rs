@@ -61,8 +61,7 @@ fn tool_descriptors() {
 fn execution_instructions_and_proof_tab_refusals() {
     let recorded = recorded();
     assert_eq!(EXECUTION_INSTRUCTIONS, text(recorded.get("executionInstructions")));
-    assert_eq!(proof_tabs_refusal("keep it open", &[], Some("browser_tab_list"), None).unwrap(), text(recorded.get("proofTabsList")));
-    assert_eq!(proof_tabs_refusal("keep it open", &[], None, Some("browser_run")).unwrap(), text(recorded.get("proofTabsProgram")));
+    assert_eq!(proof_tabs_refusal("keep it open", Some("browser_run")).unwrap(), text(recorded.get("proofTabsProgram")));
 }
 
 fn descriptor(name: &str) -> CatalogTool {

@@ -67,7 +67,6 @@ pub(crate) fn reads_page(name: &str) -> bool {
             | "browser.skill"
             | "browser.act"
             | "browser.run"
-            | "browser.tab.open"
             | "browser.workspace.visual"
             | "screen.open"
             | "web.fetch"

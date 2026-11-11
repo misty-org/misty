@@ -12,8 +12,7 @@ const browserBlockingOverlaySelector = [
   '[role="menu"][data-state="open"]',
   '[role="dialog"][data-state="open"]',
   '[role="listbox"][data-state="open"]',
-  // These have no open state: being on the page means they are open. Peek isn't one of them:
-  // the page it shows has to stay live.
+  // These have no open state: being on the page means they are open.
   '[data-slot="workspace-overlay"]',
   '[data-slot="suggestion-list"]',
   '[data-slot="viewport-layer"][role="dialog"]',

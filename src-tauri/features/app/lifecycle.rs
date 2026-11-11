@@ -47,15 +47,6 @@ pub fn run_event(app: &AppHandle, event: RunEvent) {
             eprintln!("Could not reopen Misty: {error}");
         }
     }
-    // Links other apps open with Misty go to the Space that claims their site; this
-    // also covers the time no window is open to hear them.
-    #[cfg(target_os = "macos")]
-    if let RunEvent::Opened { urls } = &event {
-        crate::browser::app_windows::route_app_links(
-            app,
-            urls.iter().map(|url| url.to_string()).collect(),
-        );
-    }
     if let RunEvent::ExitRequested { api, .. } = &event {
         if must_ask() && crate::browser::app_windows::primary(app).is_some() {
             api.prevent_exit();

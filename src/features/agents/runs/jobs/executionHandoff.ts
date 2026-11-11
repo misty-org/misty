@@ -6,9 +6,7 @@ import { useLocalExecution } from "../local-execution/localExecution";
  * A follow-up to a run that handed off (its question or app card was answered
  * after it ended) continues on the screen that run held, not a fresh one.
  */
-export function continuationScreen(
-  conversationId: string,
-): { executionMode: "agent"; openScreen?: { tabId: string } } | undefined {
+export function continuationScreen(conversationId: string): { executionMode: "agent" } | undefined {
   const execution = useLocalExecution.getState().execution;
   if (
     !conversationId ||
@@ -18,10 +16,6 @@ export function continuationScreen(
     execution.state === "waiting"
   )
     return undefined;
-  if (execution.normalTabs) {
-    const tabId = execution.context.find((ref) => ref.kind === "browser-tab")?.id;
-    return tabId ? { executionMode: "agent", openScreen: { tabId } } : undefined;
-  }
   if (execution.desktopControl) return { executionMode: "agent" };
   return undefined;
 }

@@ -1,11 +1,5 @@
 import { runBrowserTool } from "./browserTools";
-import {
-  runDeviceList,
-  runFolderRead,
-  runFolderSend,
-  runShellTool,
-  runWorkspaceTool,
-} from "./computerTools";
+import { runDeviceList, runFolderRead, runFolderSend, runShellTool } from "./computerTools";
 import { deviceToolSchemas, matchesSchema } from "./deviceToolSchemas";
 import {
   LocalToolRejected,
@@ -39,8 +33,6 @@ const writes = new Set([
   "browser.skill",
   "browser.fill_form",
   "browser.run",
-  "browser.tab.open",
-  "bookmark.add",
   "folder.send",
   "shell.run",
 ]);
@@ -81,7 +73,6 @@ function tool(name: string, run: ToolRun): LocalToolHandler {
 }
 
 const browser = (name: string) => tool(name, runBrowserTool);
-const workspace = (name: string) => tool(name, runWorkspaceTool);
 
 export const deviceTools: Record<string, LocalToolHandler> = {
   "browser.request_user_action": tool("browser.request_user_action", requestUserAction),
@@ -100,10 +91,6 @@ export const deviceTools: Record<string, LocalToolHandler> = {
   "browser.skill": browser("browser.skill"),
   "browser.fill_form": browser("browser.fill_form"),
   "browser.run": tool("browser.run", runProgramTool),
-  "browser.tab.list": workspace("browser.tab.list"),
-  "browser.tab.open": workspace("browser.tab.open"),
-  "bookmark.list": workspace("bookmark.list"),
-  "bookmark.add": workspace("bookmark.add"),
   "folder.list": tool("folder.list", runFolderRead),
   "folder.read": tool("folder.read", runFolderRead),
   "folder.send": tool("folder.send", runFolderSend),

@@ -1,6 +1,5 @@
 import { useMistyStore } from "../conversations/state/useMistyStore";
 import { lessonConversation } from "../lessons/lessonEntry";
-import { frontMediaContext, withinBudget, type MediaContext } from "./mediaContext";
 import { nextStepPrompt, type CompanionGuideStep } from "./companionGuide";
 import { companionStage } from "./companionStage";
 import type { CompanionSubmission } from "./companionState";
@@ -72,8 +71,6 @@ export class CursorCompanionTypedTurns {
       // Every request at the cursor carries every display, the cursor's first
       // the model judges what matters.
       // Without screen access the request still goes, with no screenshots.
-      // The video in front, read alongside the screens; it never holds the turn up.
-      const media = frontMediaContext();
       const screens = s.nativeReady
         ? await s.capture(generation, controller.signal).catch((error: unknown) => {
             if (request.look || controller.signal.aborted) throw error;
@@ -90,7 +87,6 @@ export class CursorCompanionTypedTurns {
         await s.withFocusCapture(screens, generation),
         controller.signal,
         voiceOwned,
-        await withinBudget(media),
       );
     } catch (error) {
       if (!controller.signal.aborted) s.fail(generation, error);
@@ -104,7 +100,6 @@ export class CursorCompanionTypedTurns {
     screens: DisplayCapture[],
     signal: AbortSignal,
     voiceOwned: boolean,
-    mediaContext?: MediaContext,
   ) {
     const s = this.s;
     if (!s.active(generation)) return;
@@ -126,7 +121,6 @@ export class CursorCompanionTypedTurns {
           ...(screens.length ? { displayCaptures: screens } : {}),
           continuation: request.continuation,
           ...(s.state.teach ? { collaborationMode: "teach" as const } : {}),
-          ...(mediaContext ? { mediaContext } : {}),
         },
       ),
       signal,

@@ -141,7 +141,6 @@ describe("SettingsWorkspace", () => {
     expect(groups.map((group) => group.getAttribute("aria-label"))).toEqual([
       "Account",
       "App",
-      "Browser",
       "Agents",
     ]);
     const entries = [...container.querySelectorAll("[data-settings-nav-entry]")];
@@ -160,7 +159,7 @@ describe("SettingsWorkspace", () => {
 
   it("renders every block of a page together", async () => {
     await render("general");
-    for (const id of ["general", "browser-links", "browser-tabs", "updates"])
+    for (const id of ["general", "browser-tabs", "updates"])
       expect(container.querySelector(`[data-settings-page="${id}"]`)).not.toBeNull();
     expect(container.querySelector('[data-settings-nav-entry="updates"]')).toBeNull();
   });

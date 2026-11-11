@@ -1,7 +1,6 @@
 import { useMistyPanelStore } from "@/features/agents";
 import { useAppStore } from "@/app/shell";
 import { openSignInSheet, openSignOutSheet } from "@/features/account";
-import { useBrowserSearchStore } from "@/features/browser";
 import { registerShortcutHandler, useShortcutHandler } from "@/features/shortcuts";
 import { useWorkspaceStore, workspaceSurfaceFromRoute } from "@/features/app-windows";
 import { useCallback, useEffect } from "react";
@@ -21,10 +20,6 @@ export function useDesktopShortcuts(options: {
     !signedIn,
   );
   useShortcutHandler("account.sign_out", openSignOutSheet, signedIn);
-  useShortcutHandler(
-    "search.toggle",
-    useCallback(() => useBrowserSearchStore.getState().toggle(), []),
-  );
   useShortcutHandler("app.open_settings", openSettingsOverlay);
   useShortcutHandler(
     "misty.contextual_companion",

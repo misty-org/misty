@@ -5,10 +5,6 @@
 use crate::browser::*;
 use kiri::channel::{HostChannel, HostMessage};
 
-// Saved passwords answer the page script's sign-in messages, which arrive here.
-pub(crate) mod passwords;
-// Saved addresses and cards answer the page script's form messages the same way.
-pub(crate) mod autofill;
 // "Add to Misty" on the Chrome Web Store and Firefox Add-ons.
 mod extension_store;
 mod messages;
@@ -43,8 +39,6 @@ impl HostChannel for Channel {
         if let Some(url) = navigate_message(raw) {
             if message.main_frame
                 && !crate::browser::forward_navigation(app, id, &url)
-                && !passwords::forward(app, id, &url)
-                && !autofill::forward(app, id, &url)
                 && !extension_store::forward(app, id, &url)
             {
                 crate::browser::menus::context_menu::forward(app, id, &url);

@@ -18,10 +18,9 @@ use std::{sync::Mutex, time::Duration};
 use tauri::{AppHandle, Webview};
 
 mod convert;
-#[cfg(test)]
-use convert::equal;
-pub(crate) use convert::import_cookie;
 use convert::{clamped_cookie, export_cookie, skip};
+#[cfg(test)]
+use convert::{equal, import_cookie};
 
 const COOKIE_LIMIT: usize = 20_000;
 /// Foundation drops an explicit SameSite=None and reports nil, which WebKit

@@ -4,7 +4,6 @@
 
 mod agent_pages;
 mod app_windows;
-mod autofill;
 mod extensions;
 mod history_downloads;
 mod pages;
@@ -12,7 +11,6 @@ mod site_data;
 
 pub(crate) use agent_pages::*;
 pub(crate) use app_windows::*;
-pub(crate) use autofill::*;
 pub(crate) use extensions::*;
 pub(crate) use history_downloads::*;
 pub(crate) use pages::*;

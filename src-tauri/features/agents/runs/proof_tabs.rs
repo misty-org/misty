@@ -8,7 +8,7 @@ use std::{collections::HashMap, sync::LazyLock};
 use regex::Regex;
 use url::Url;
 
-use crate::model_calls::{AssistantPart, Message, ToolOutput};
+use crate::model_calls::{Message, ToolOutput};
 
 use super::{
     js_json::{text_or_empty, JsValue},
@@ -43,48 +43,15 @@ pub(crate) fn asks_for_open_pages(request: &str) -> bool {
     KEPT_OPEN.is_match(&in_utf16_units(request))
 }
 
-/// Whether one of the last `within` tool calls was `tool`.
-fn called_recently(messages: &[Message], tool: &str, within: usize) -> bool {
-    let mut seen = 0;
-    for message in messages.iter().rev() {
-        if seen >= within {
-            break;
-        }
-        let Message::Assistant { content, .. } = message else {
-            continue;
-        };
-        for part in content.iter().rev() {
-            let AssistantPart::ToolCall { tool_name, .. } = part else {
-                continue;
-            };
-            if tool_name == tool {
-                return true;
-            }
-            seen += 1;
-            if seen >= within {
-                break;
-            }
-        }
-    }
-    false
-}
-
 /// The reason to send a finish back to check its tabs, or `None`.
-pub(crate) fn proof_tabs_refusal(request: &str, messages: &[Message], tab_list: Option<&str>, program: Option<&str>) -> Option<String> {
-    let program = program.filter(|program| !program.is_empty());
-    let tab_list = tab_list.filter(|list| !list.is_empty());
+pub(crate) fn proof_tabs_refusal(request: &str, program: Option<&str>) -> Option<String> {
+    let program = program.filter(|program| !program.is_empty())?;
     if !asks_for_open_pages(request) {
         return None;
     }
-    if program.is_none() && tab_list.map_or(true, |list| called_recently(messages, list, 4)) {
-        return None;
-    }
-    // A run with programs checks its own tabs with one (the person's tab list is not its to use),
-    // and brings what it reports into view: each kept tab is pictured as it stands at the end.
-    let how = match program {
-        Some(program) => format!("call {program} with `return listTabs()` (every tab's address and title) and, for each page the request names, `await t.keep(\"the text that shows what you report\")`, which brings that text on screen and keeps the tab awake so it is pictured when you finish (a tab you do not keep() sleeps)"),
-        None => format!("call {}", tab_list.unwrap_or_default()),
-    };
+    // A run checks its own tabs with a program, and brings what it reports into view: each kept
+    // tab is pictured as it stands at the end.
+    let how = format!("call {program} with `return listTabs()` (every tab's address and title) and, for each page the request names, `await t.keep(\"the text that shows what you report\")`, which brings that text on screen and keeps the tab awake so it is pictured when you finish (a tab you do not keep() sleeps)");
     Some(format!(
         "The person asked for pages to be left open, and those tabs are part of the answer. Before finishing, {how}, and check each page the request names against your tabs: it is open in its own tab, on the right page (the item, not a search or home page), in the state asked for (the search run, the option or size chosen, scrolled to the evidence) and not covered by a dialog or banner. Open or fix any that are missing, then call agent_finish again."
     ))

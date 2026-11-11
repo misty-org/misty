@@ -16,7 +16,6 @@ import { SidebarDrawer } from "./SidebarDrawer";
 import { WorkspaceSidebar } from "./WorkspaceSidebar";
 import { closeSavedWebPages, watchForWebPages } from "./spaceNavigation";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { closePeek } from "@/features/app-windows";
 import {
   resetPinnedTabForView,
   useClearTabsShortcut,
@@ -36,7 +35,6 @@ export function WorkspaceCanvas(props: {
   windowsTitlebarControls?: boolean;
   /** Focus mode: pages fill the window without the tab strip. */
   hideTabStrip?: boolean;
-  stripFootEnd?: ReactNode;
   /** The vertical sidebar's closing row: the account and settings, inside its panel. */
   stripAccount?: ReactNode;
 }) {
@@ -188,14 +186,7 @@ export function WorkspaceCanvas(props: {
             <TopEdge gridColumn={contentColumn} side={side} />
           </>
         ) : null}
-        <WorkspaceTabPanels
-          gridColumn={contentColumn}
-          layout={layout}
-          renderTree={dockTree}
-          onClosePeek={() => {
-            if (closePeek()) navigateToActiveLayoutTab();
-          }}
-        />
+        <WorkspaceTabPanels gridColumn={contentColumn} layout={layout} renderTree={dockTree} />
         <PaneSwapMode />
         <LayoutPopup onApplied={navigateToActiveLayoutTab} />
       </div>

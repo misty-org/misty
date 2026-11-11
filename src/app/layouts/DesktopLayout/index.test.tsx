@@ -39,10 +39,6 @@ vi.mock("@/features/app-windows", async (importOriginal) => ({
 }));
 
 vi.mock("./AccountIsland", () => ({ AccountIsland: () => null, AccountTab: () => null }));
-vi.mock("./WorkspaceStripDock", () => ({
-  BrowserProfileButton: () => null,
-  StripDownloads: () => null,
-}));
 vi.mock("./WorkspaceCanvas", () => ({
   WorkspaceCanvas: (props: { titlebarInsets?: { left: number } }) => (
     <div data-testid="workspace-canvas" data-tab-inset={props.titlebarInsets?.left}>
@@ -115,18 +111,9 @@ vi.mock("@/features/onboarding/setup", async (importOriginal) => ({
 vi.mock("./AccountMenu", () => ({ AccountMenu: () => null }));
 vi.mock("./SettingsOverlays", () => ({ RemotesOverlay: () => null, SettingsOverlay: () => null }));
 vi.mock("./FramePacingOverlay", () => ({ FramePacingOverlay: () => null }));
-vi.mock("@/features/browser/pages", async (importOriginal) => ({
-  ...(await importOriginal<Record<string, unknown>>()),
-  BrowserRuntimeBridge: () => null,
-  setBrowserWebviewsSuspended: vi.fn(),
-}));
 vi.mock("@/features/browser/webviews/BrowserRuntimeBridge", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   BrowserRuntimeBridge: () => null,
-}));
-vi.mock("@/features/browser/search/BrowserSearchDialog", async (importOriginal) => ({
-  ...(await importOriginal<Record<string, unknown>>()),
-  BrowserSearchDialog: () => null,
 }));
 vi.mock("@/features/browser/webviews/browserRuntime", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),

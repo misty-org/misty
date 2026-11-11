@@ -8,7 +8,6 @@ import { useCompanionState } from "./companionState";
 import { captureScreens, savedPresentation, withLessonCloseUp } from "./cursorCompanionScreens";
 import { CursorCompanionPointer } from "./cursorCompanionPointer";
 import { CursorCompanionSketch } from "./cursorCompanionSketch";
-import type { MediaContext } from "./mediaContext";
 import type { DisplayCapture, Presentation, PresentedFocus } from "./protocol";
 
 export type CompanionOrigin = { conversationId: string; agentId?: string };
@@ -47,8 +46,6 @@ export class CursorCompanionSession {
   hideTimer: ReturnType<typeof setTimeout> | undefined;
   pointTimer: ReturnType<typeof setTimeout> | undefined;
   focusTimer: ReturnType<typeof setTimeout> | undefined;
-  /** What the video in front was saying, looked up the moment the talk shortcut went down. */
-  pendingMedia: { turn: number; lookup: Promise<MediaContext | undefined> } | undefined;
   /** The region the last lesson step pointed at; the next check captures it close up. */
   lastFocus: PresentedFocus | undefined;
   speechRetry: string | undefined;

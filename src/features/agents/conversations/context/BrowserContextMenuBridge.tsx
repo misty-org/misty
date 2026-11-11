@@ -12,11 +12,9 @@ import {
   Columns2,
   Copy,
   ExternalLink,
-  Eye,
   Highlighter,
   Image,
   Link,
-  Puzzle,
   QrCode,
   RotateCw,
   Scissors,
@@ -54,7 +52,6 @@ const entries = {
   "search-web": { label: "Search web for selection", icon: Search },
   "open-link": { label: "Open link in new tab", icon: ExternalLink },
   "open-link-split": { label: "Open link in split view", icon: Columns2 },
-  "peek-link": { label: "Peek link", icon: Eye },
   "copy-link": { label: "Copy link address", icon: Link },
   "open-image": { label: "Open image in new tab", icon: Image },
   "copy-image-link": { label: "Copy image address", icon: Link },
@@ -65,11 +62,10 @@ const entries = {
   "copy-page-link": { label: "Copy link", icon: Link },
   "qr-code": { label: "QR code", icon: QrCode },
   annotate: { label: "Annotate", icon: Highlighter },
-  extensions: { label: "Extensions", icon: Puzzle },
   inspect: { label: "Inspect", icon: Code },
 };
 /** Actions the native menu may still send that this menu no longer shows. */
-const hiddenActions = new Set(["ask"]);
+const hiddenActions = new Set(["ask", "peek-link", "extensions"]);
 const suspensionReason = "browser-context-menu";
 
 /**

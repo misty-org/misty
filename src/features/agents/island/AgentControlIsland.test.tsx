@@ -189,7 +189,7 @@ it("shows what the run is doing and how many sub-agents work for it", () => {
 });
 
 it("sends a message to steer the task, or queues it as a new task", async () => {
-  show({ autopilot: false, normalTabs: true });
+  show({ autopilot: false });
   render(<AgentControlIsland />);
   const field = screen.getByRole("textbox", { name: "Message Misty" });
   fireEvent.change(field, { target: { value: "Use the second sheet" } });

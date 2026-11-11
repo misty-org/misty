@@ -8,8 +8,8 @@ import { useAgentBrowser } from "./agentBrowserStore";
 import { agentPageKey, useAgentPageGeometry } from "./useAgentPageGeometry";
 
 /**
- * The agent browser's page area, the small counterpart of a tab's page host (BrowserPageStage):
- * the agent's live page is placed over it by the same runtime, and until that page is on screen
+ * The agent browser's page area: the agent's live page is placed over it by the page runtime,
+ * and until that page is on screen
  * the host paints the page color instead of showing through. Showing a tab wakes it (a tab in
  * view never sleeps, agentTabs.ts); a tab that cannot open again shows its last picture.
  */
@@ -28,8 +28,8 @@ export function AgentBrowserStage({
   const presented = useBrowserRuntimeStore((state) =>
     Boolean(viewId && state.presented[agentPageKey(viewId)]),
   );
-  // The same transparent path a browser tab's page host turns on while its page is on screen
-  // (theme.css): the page shows through a popup or menu, and never flashes an opaque host.
+  // The window's transparent path is on while the page is on screen (theme.css): the page shows
+  // through a popup or menu, and never flashes an opaque host.
   usePresentedPageHost(agentPageKey(viewId), Boolean(viewId) && presented);
   const [closed, setClosed] = useState(false);
   // A tab the person just added waits for an address; nothing opens until they give one.

@@ -18,9 +18,7 @@ vi.mock("@/features/memory/recall", () => ({
 vi.mock("@/features/settings", () => ({
   useSettingsStore: (select: (state: unknown) => unknown) => select({ settings: { document: {} } }),
 }));
-vi.mock("@/features/app-windows", () => ({
-  useWorkspaceStore: { getState: () => ({ openBrowserView: fixture.open }) },
-}));
+vi.mock("@/shared/platform/openExternalLink", () => ({ openExternalLink: fixture.open }));
 vi.mock("./api", () => ({ treeApi: { children: fixture.children } }));
 vi.mock("./useMemoryTreeStore", () => ({
   useMemoryTreeStore: Object.assign(
@@ -71,7 +69,7 @@ it("reads a day: its text, where you left off, what you did and what's next", as
   expect(screen.getByRole("button", { name: "Next day" }).hasAttribute("disabled")).toBe(true);
 
   fireEvent.click(screen.getByRole("button", { name: "Open" }));
-  expect(fixture.open).toHaveBeenCalledWith({ url: page.url });
+  expect(fixture.open).toHaveBeenCalledWith(page.url);
   fireEvent.click(screen.getByRole("button", { name: /Traced the sync bug/ }));
   expect(fixture.search).toHaveBeenCalledWith("Traced the sync bug");
 });

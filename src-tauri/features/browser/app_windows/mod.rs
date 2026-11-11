@@ -30,7 +30,7 @@ mod saved;
 pub use commands::*;
 pub use diagnostics::*;
 pub use lifecycle::*;
-pub use links::*;
+pub(crate) use links::*;
 pub use registry::*;
 pub use routing::*;
 pub mod navigation_names;

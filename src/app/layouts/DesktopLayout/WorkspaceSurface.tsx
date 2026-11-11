@@ -1,5 +1,4 @@
 import { SpaceWorkspaceSurface } from "@/features/spaces";
-import { BrowserWorkspace } from "@/features/browser";
 import { AgentsPage } from "@/features/agents";
 import {
   WorkspaceViewRouteScope,
@@ -25,7 +24,8 @@ export function WorkspaceSurface({ tab }: { tab: WorkspaceView }) {
           ) : current.surfaceId === "agents" || current.surfaceId === "scheduled" ? (
             <AgentsPage />
           ) : (
-            <BrowserWorkspace tab={current} />
+            // A web page saved from before pages belonged to agents; it closes as the window opens.
+            <EmptyWorkspacePane />
           )}
         </WorkspaceViewRouteScope>
       </div>

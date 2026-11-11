@@ -13,46 +13,6 @@
   "model_turn_limit": 120,
   "prompt": "User request:\nCompare these two laptops and leave the pages open",
   "schemas": {
-   "bookmark.add": {
-    "additionalProperties": false,
-    "properties": {
-     "device": {
-      "description": "Which computer's Misty browser: Mac Studio, Windows PC",
-      "maxLength": 100,
-      "type": "string"
-     },
-     "title": {
-      "maxLength": 160,
-      "type": "string"
-     },
-     "url": {
-      "description": "An http or https address.",
-      "maxLength": 2000,
-      "minLength": 1,
-      "type": "string"
-     }
-    },
-    "required": [
-     "url"
-    ],
-    "type": "object"
-   },
-   "bookmark.list": {
-    "additionalProperties": false,
-    "properties": {
-     "device": {
-      "description": "Which computer's Misty browser: Mac Studio, Windows PC",
-      "maxLength": 100,
-      "type": "string"
-     },
-     "query": {
-      "maxLength": 200,
-      "type": "string"
-     }
-    },
-    "required": [],
-    "type": "object"
-   },
    "folder.list": {
     "additionalProperties": false,
     "properties": {
@@ -485,18 +445,6 @@
     "readOnly": false
    },
    {
-    "description": "Search the user's Misty browser bookmarks by title or address. Omit query to list them.",
-    "locality": "device",
-    "name": "bookmark.list",
-    "readOnly": true
-   },
-   {
-    "description": "Save a website to the user's Misty browser bookmarks. Use only when the user asked to bookmark it.",
-    "locality": "device",
-    "name": "bookmark.add",
-    "readOnly": false
-   },
-   {
     "description": "Run a shell command on the user's computer, in this chat's private workspace folder, which keeps its files between commands. Use it for scripts, data and file work, and to do many things in one call instead of one call each. It's a bash-compatible shell with the same tools on every computer: base64, cat, cp, cut, date, du, env, find, fold, grep, gzip, gunzip, head, join, ln, ls, mkdir, mktemp, mv, od, paste, realpath, rm, sed, seq, sort, split, tac, tail, tar, tee, touch, tr, uniq, unzip, wc, xargs and zip. Nothing else can run, including awk, Python, Perl, git and curl: use the shell's own loops and arithmetic instead, and run a script as sh script.sh rather than ./script.sh. There's no network, so nothing can be installed or downloaded: get what you need with your web tools and write it to a file here. The chat's shared folder, if it has one, is at ./shared-folder. If it allows changes you can add and edit files there, but deleting, renaming and moving are refused, so tools that save by renaming, such as sed -i, fail: write the new content to the file instead. Commands can't reach browser tabs: use browser_run for those.",
     "locality": "device",
     "name": "shell.run",
@@ -564,8 +512,7 @@
     "display_name": "Misty browser",
     "capabilities": [
      "browser.session",
-     "browser.run",
-     "browser.tab.list"
+     "browser.run"
     ],
     "metadata": {
      "source": "desktop"
@@ -575,9 +522,7 @@
     "device_id": "device_b",
     "kind": "workspace",
     "opaque_ref": "scope_b",
-    "capabilities": [
-     "browser.tab.list"
-    ],
+    "capabilities": [],
     "metadata": {}
    },
    {

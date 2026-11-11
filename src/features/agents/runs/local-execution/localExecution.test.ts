@@ -31,35 +31,6 @@ beforeEach(async () => {
   useCompanionState.setState({ accountId: "", submit: undefined });
 });
 describe("native task authority", () => {
-  it("uses an ordinary companion tab without a worker view or closing the user's tab", async () => {
-    mocks.autopilot = true;
-    mocks.normalContext.mockResolvedValueOnce({
-      context: [{ id: "normal-tab", kind: "browser-tab", opaqueScopeId: "normal-scope" }],
-      deviceContexts: [
-        {
-          deviceId: "server-device",
-          kind: "browser_tab",
-          opaqueRef: "normal-scope",
-          capabilities: ["browser.navigate"],
-          metadata: { normal_tab: true },
-        },
-      ],
-    });
-    const execution = await startLocalExecution("owner", "agent", {
-      normalTabs: true,
-      openWhenMissing: true,
-    });
-    expect(execution.normalTabs).toBe(true);
-    expect(execution.views).toEqual([]);
-    expect(mocks.startAutopilot).not.toHaveBeenCalled();
-    expect(mocks.invoke).not.toHaveBeenCalledWith("browser_webview_create", expect.anything());
-    expect(mocks.invoke).toHaveBeenCalledWith(
-      "agent_workspace_bind_scope",
-      expect.objectContaining({ scopeId: "normal-scope" }),
-    );
-    await finishLocalExecution();
-    expect(mocks.invoke).not.toHaveBeenCalledWith("browser_webview_close", expect.anything());
-  });
   it("opens the built-in browser without installations, using the workspace native profile", async () => {
     const execution = await startLocalExecution("owner", "agent");
     const create = mocks.invoke.mock.calls.find(([name]) => name === "browser_webview_create")![1]
@@ -352,14 +323,12 @@ it("foreground control gets visual control of the workspace", async () => {
   await finishLocalExecution();
 });
 
-it("binds desktop control without moving focus or substituting an ordinary browser tab", async () => {
+it("binds desktop control without moving focus", async () => {
   mocks.autopilot = true;
   const execution = await startLocalExecution("owner", "agent", {
-    normalTabs: false,
     desktopControl: true,
   });
   expect(mocks.focus).not.toHaveBeenCalled();
-  expect(mocks.normalContext).not.toHaveBeenCalled();
   expect(mocks.startAutopilot).toHaveBeenCalledWith(execution.taskId, "owner", "", true);
   expect(mocks.invoke).toHaveBeenCalledWith("browser_webview_create", {
     request: expect.objectContaining({ url: "about:blank" }),
@@ -390,7 +359,6 @@ it("does not cancel a successor invocation while an older pause is awaiting modu
 it("retains workflow pins but blocks automatic resume after takeover", async () => {
   const inputs = { subject: "research" };
   const execution = await startLocalExecution("owner", "agent", {
-    normalTabs: false,
     method: {
       versionId: "immutable-v1",
       inputs,

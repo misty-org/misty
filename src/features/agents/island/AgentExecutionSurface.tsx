@@ -19,10 +19,9 @@ export function AgentExecutionSurface() {
   const [active, setActive] = useState(0),
     [error, setError] = useState("");
   useEffect(() => {
-    if (execution?.state === "finished" && !execution.normalTabs)
+    if (execution?.state === "finished")
       void continueQueuedLocalWork(execution.taskId).catch((e) => setError(String(e)));
     // Continue queued work once per finish, not whenever the execution object is replaced.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [execution?.taskId, execution?.state]);
   const viewport = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -42,7 +41,7 @@ export function AgentExecutionSurface() {
     };
   }, [execution]);
   useEffect(() => {
-    if (!execution || execution.autopilot || execution.normalTabs) return;
+    if (!execution || execution.autopilot) return;
     let disposed = false;
     const layout = async () => {
       const rect = viewport.current?.getBoundingClientRect();
@@ -80,7 +79,7 @@ export function AgentExecutionSurface() {
     return () => window.removeEventListener("pagehide", close);
   }, [executionTaskId]);
   // The island is the task's controls in every window, with or without this surface.
-  if (!execution || execution.autopilot || execution.normalTabs) return <AgentControlIsland />;
+  if (!execution || execution.autopilot) return <AgentControlIsland />;
   return (
     <>
       <ViewportLayer

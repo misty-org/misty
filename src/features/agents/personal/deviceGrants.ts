@@ -11,10 +11,6 @@ const folderCapabilities = ["folder.list", "folder.read", "folder.send"];
 /** The agent may open its own browser session on this computer: a hidden tab of its
  * own that joins the run. */
 const workspaceCapabilities = [
-  "browser.tab.list",
-  "browser.tab.open",
-  "bookmark.list",
-  "bookmark.add",
   "browser.session",
   // Programs against the agent's own tabs.
   "browser.run",

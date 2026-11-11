@@ -221,13 +221,8 @@ fn apply_browser_pointer_tracking(webview: &Webview, enabled: bool) -> Result<()
 pub mod agent_pages;
 #[cfg(desktop)]
 pub mod app_windows;
-#[cfg(desktop)]
-pub mod autofill;
-pub mod default_browser;
 pub mod extensions;
 pub mod history_downloads;
-#[cfg(desktop)]
-pub mod import;
 pub mod input;
 pub mod kiri_link;
 pub mod link_previews;

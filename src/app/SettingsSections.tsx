@@ -8,15 +8,7 @@ import {
   ModelsSection,
 } from "@/features/agents";
 import { AdvancedSection, AppearanceSection, TabsSettings } from "@/features/app-windows";
-import {
-  AutofillSettings,
-  BrowserLinksSettings,
-  BrowserPermissionSettings,
-  DownloadsSettings,
-  ExtensionsSettings,
-  PasswordsSettings,
-  PrivacySection,
-} from "@/features/browser";
+import { BrowserPermissionSettings, DownloadsSettings, PrivacySection } from "@/features/browser";
 import { MemorySection } from "@/features/memory";
 import {
   GeneralSection,
@@ -39,7 +31,6 @@ function MistyMemorySection(props: SettingsContentProps) {
  */
 const sections: Partial<Record<SettingsSection, ComponentType<SettingsContentProps>>> = {
   general: GeneralSection,
-  "browser-links": BrowserLinksSettings,
   "browser-tabs": TabsSettings,
   "browser-downloads": DownloadsSettings,
   updates: UpdatesSection,
@@ -51,9 +42,6 @@ const sections: Partial<Record<SettingsSection, ComponentType<SettingsContentPro
   privacy: PrivacySection,
   "browser-permissions": BrowserPermissionSettings,
   advanced: AdvancedSection,
-  passwords: PasswordsSettings,
-  autofill: AutofillSettings,
-  "browser-extensions": ExtensionsSettings,
   sync: SyncSection,
   models: ModelsSection,
   "agents-defaults": AgentDefaultsSection,

@@ -119,11 +119,6 @@ export async function startInvocation(set: MistySet, get: MistyGet, turn: Prepar
       windowLabel: (await import("@/shared/platform/tauri")).hasTauriInternals()
         ? (await import("@tauri-apps/api/window")).getCurrentWindow().label
         : undefined,
-      // The tab in front of the user, so "this page" means it. Only the
-      // main window has one; private tabs never count.
-      currentTab: (await import("@/shared/platform/tauri")).hasTauriInternals()
-        ? (await import("@/features/agents/cursor/normalTabs")).currentTabSummary()
-        : undefined,
       // A scheduled turn has this argument too, but nobody is at the cursor: the crate words it as a report.
       mode: companion && !companion.schedule ? "companion" : "drawer",
       companionMode: companion?.interactionMode,

@@ -1,7 +1,7 @@
 //! The downloads list as profile data: a finished download is recorded in the `downloads`
 //! collection of the profile whose pages downloaded it. The file stays on the computer that
 //! downloaded it; other signed-in sessions list it as "On another computer".
-use super::{BrowserDownloadEntry, MAX_DOWNLOADS};
+use super::MAX_DOWNLOADS;
 use crate::browser::profiles::{self, hashed_id, ProfileRecords};
 use browser_data::{
     collections::{self, DOWNLOADS},
@@ -121,36 +121,6 @@ async fn cap(profile: &ProfileRecords) {
         .map(|(_, id)| (id, None))
         .collect();
     let _ = profile.records_write(DOWNLOADS, removed).await;
-}
-
-/// The profile's downloads that another signed-in session holds.
-pub(super) async fn remote_entries(window_label: &str) -> Vec<BrowserDownloadEntry> {
-    let Some(profile) = profiles::window_records(window_label) else {
-        return Vec::new();
-    };
-    let session = profiles::session_id();
-    let Ok(records) = profile.records_list(DOWNLOADS).await else {
-        return Vec::new();
-    };
-    records
-        .iter()
-        .filter_map(|record| Some((record.id.clone(), parse(record)?)))
-        .filter(|(_, download)| Some(&download.device_id) != session.as_ref())
-        .map(|(id, download)| BrowserDownloadEntry {
-            id: format!("{REMOTE}{id}"),
-            url: download.url,
-            path: String::new(),
-            file_name: download.file_name,
-            state: "finished".into(),
-            error: None,
-            received: download.size.map_or(0, |size| size as i64),
-            total: download.size.map_or(-1, |size| size as i64),
-            started_at: download.finished_at,
-            finished_at: Some(download.finished_at),
-            exists: false,
-            device: Some("another computer".into()),
-        })
-        .collect()
 }
 
 /// Removes entries from the profile's list: remote ones by their record, local

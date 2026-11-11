@@ -1,4 +1,4 @@
-import { Blocks, Check, Plus, X } from "lucide-react";
+import { Blocks, Check, X } from "lucide-react";
 import {
   useEffect,
   useMemo,
@@ -10,7 +10,6 @@ import {
 import {
   allLayoutPanes,
   allLayoutViews,
-  createBrowserWorkspaceView,
   createDockLeaf,
   dockLeaves,
   draftAdd,
@@ -34,7 +33,6 @@ import {
   DialogTitle,
   IconButton,
 } from "@/shared/ui";
-import { useBrowserSearchStore } from "@/features/browser";
 import { DockDropPreview } from "./DockDropPreview";
 import { dropZoneAt } from "./dockSplitFit";
 import { ViewIcon } from "./WorkspaceViewGroupButton";
@@ -137,7 +135,6 @@ export function LayoutPopup(props: { onApplied: () => void }) {
   const [dragging, setDragging] = useState<Dragging | null>(null);
   const [hover, setHover] = useState<Hover | null>(null);
   // Tabs made in the popup exist only in the draft until Apply, so Cancel leaves no trace of them.
-  const [fresh, setFresh] = useState<WorkspaceView[]>([]);
   const letGo = useRef<(() => void) | null>(null);
   const frame = useRef<HTMLDivElement>(null);
 
@@ -149,7 +146,6 @@ export function LayoutPopup(props: { onApplied: () => void }) {
     setOriginal(state.root);
     setDraft(state.root);
     setNotice("");
-    setFresh([]);
   }, [active]);
 
   useEffect(() => {
@@ -160,7 +156,7 @@ export function LayoutPopup(props: { onApplied: () => void }) {
   // Closing in the middle of a drag drops it.
   useEffect(() => () => letGo.current?.(), []);
 
-  const views = useMemo(() => [...allLayoutViews(layout), ...fresh], [layout, fresh]);
+  const views = useMemo(() => allLayoutViews(layout), [layout]);
   const placed = new Set(
     draft ? dockLeaves(draft).flatMap((pane) => pane.views.map((view) => view.id)) : [],
   );
@@ -169,7 +165,6 @@ export function LayoutPopup(props: { onApplied: () => void }) {
     const view = views.find((item) => item.id === viewId);
     if (!view) return;
     const source = allLayoutPanes(layout).find((pane) => pane.views[0]?.id === viewId);
-    // A tab made here has no pane yet, so it gets one the draft can place.
     const next = draft && paneId ? draftPlace(draft, view, paneId, zone, source) : null;
     if (draft && paneId && !next) {
       if (zone !== "center") setNotice("The window fits at most a 2 by 2 grid");
@@ -177,7 +172,7 @@ export function LayoutPopup(props: { onApplied: () => void }) {
     }
     setNotice("");
     if (next) setDraft(next);
-    // On an empty canvas the tab becomes the first pane, whether it came from a window tab or is queued.
+    // On an empty canvas the page becomes the first pane.
     else if (!draft)
       setDraft(
         source ? { ...source, views: [view], activeViewId: view.id } : createDockLeaf([view]),
@@ -253,30 +248,6 @@ export function LayoutPopup(props: { onApplied: () => void }) {
     window.addEventListener("blur", cancel);
   };
 
-  /** Queues a tab for an address in the draft: it joins the layout, and the window gets it on Apply. */
-  const queueTab = (url: string) => {
-    const view = createBrowserWorkspaceView(url);
-    const next = draft ? draftAdd(draft, view) : createDockLeaf([view]);
-    if (!next) {
-      setNotice("The window fits at most a 2 by 2 grid");
-      return;
-    }
-    setNotice("");
-    setFresh((current) => [...current, view]);
-    setDraft(next);
-  };
-
-  /** New tab asks what to open, as it does anywhere, but only queues the answer. */
-  const addNewTab = (event: SyntheticEvent) => {
-    const rect = event.currentTarget.getBoundingClientRect();
-    useBrowserSearchStore.getState().show({
-      left: rect.left,
-      top: rect.top,
-      width: rect.width,
-      openUrl: queueTab,
-    });
-  };
-
   const apply = () => {
     if (!baseTabId || !draft) return;
     if (useWorkspaceStore.getState().applyLayoutRoot(baseTabId, draft)) props.onApplied();
@@ -288,9 +259,6 @@ export function LayoutPopup(props: { onApplied: () => void }) {
     <Dialog open={active} onOpenChange={(next) => !next && useLayoutEditor.getState().stop()}>
       <DialogContent
         placement="top"
-        onInteractOutside={(event) => {
-          if (useBrowserSearchStore.getState().open) event.preventDefault();
-        }}
         onPointerDown={contained}
         onPointerMove={contained}
         onPointerUp={contained}
@@ -310,15 +278,6 @@ export function LayoutPopup(props: { onApplied: () => void }) {
         </DialogDescription>
         <div ref={frame} className="relative grid h-full min-h-0 grid-cols-[240px_minmax(0,1fr)]">
           <div className="flex min-h-0 flex-col gap-2 border-r border-charcoal-border p-3">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="justify-start gap-2 px-2 text-cream-muted"
-              onClick={addNewTab}
-            >
-              <Plus size={16} aria-hidden="true" />
-              New tab
-            </Button>
             <ul className="-mx-1 flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-1">
               {views.map((view) => (
                 <li key={view.id}>

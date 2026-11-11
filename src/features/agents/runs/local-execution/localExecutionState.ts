@@ -18,7 +18,6 @@ export interface Execution {
   childViews?: string[];
   autopilot?: boolean;
   desktopControl?: boolean;
-  normalTabs?: boolean;
   ready?: boolean;
   context: GlobalAiContextRef[];
   deviceContexts: AiInvocationDeviceContext[];

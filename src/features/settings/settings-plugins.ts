@@ -1,5 +1,4 @@
 import type {
-  DefaultBrowserSnapshot,
   LaunchOnLoginSnapshot,
   NativeShortcutsSnapshot,
   SaveSettingsRequest,
@@ -24,15 +23,6 @@ export function settingsLaunchOnLoginSnapshot(): Promise<LaunchOnLoginSnapshot> 
 
 export function settingsApplyLaunchOnLogin(enabled: boolean): Promise<LaunchOnLoginSnapshot> {
   return invoke("settings_apply_launch_on_login", { enabled });
-}
-
-export function settingsDefaultBrowserSnapshot(): Promise<DefaultBrowserSnapshot> {
-  return invoke("settings_default_browser_snapshot");
-}
-
-/** macOS confirms the change itself; re-read the snapshot when the window regains focus. */
-export function settingsRequestDefaultBrowser(): Promise<DefaultBrowserSnapshot> {
-  return invoke("settings_request_default_browser");
 }
 
 export async function shortcutsSnapshot(): Promise<ShortcutsSnapshot> {

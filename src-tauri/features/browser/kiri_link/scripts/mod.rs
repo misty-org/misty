@@ -51,12 +51,6 @@ pub(in crate::browser) fn browser_viewport_script(
             concat!(
                 include_str!("context_menu.js"),
                 "\n",
-                include_str!("passwords.js"),
-                "\n",
-                include_str!("autofill_fields.js"),
-                "\n",
-                include_str!("autofill.js"),
-                "\n",
                 include_str!("extension_store.js")
             ),
         )

@@ -11,11 +11,7 @@ vi.mock("@/features/app-windows", async (importOriginal) => ({
 }));
 vi.mock("@/features/spaces/overview/SpaceWorkspaceSurface", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  SpaceWorkspaceSurface: () => <div>Space content</div>,
-}));
-vi.mock("@/features/browser/pages/BrowserWorkspace", async (importOriginal) => ({
-  ...(await importOriginal<Record<string, unknown>>()),
-  BrowserWorkspace: () => <input aria-label="Browser draft" defaultValue="Keep my work" />,
+  SpaceWorkspaceSurface: () => <input aria-label="Space draft" defaultValue="Keep my work" />,
 }));
 vi.mock("@/features/agents", async () => {
   const { lazy, Suspense } = await import("react");
@@ -43,12 +39,12 @@ const agentsTab: WorkspaceView = {
   createdAt: 1,
   lastFocusedAt: 1,
 };
-const browserTab: WorkspaceView = {
+const spaceTab: WorkspaceView = {
   ...agentsTab,
-  id: "browser",
-  surfaceId: "browser",
-  groupKey: "tool:browser",
-  route: "/browser",
+  id: "space",
+  surfaceId: "space",
+  groupKey: "space:one",
+  route: "/spaces/one",
 };
 
 beforeEach(() => {
@@ -57,28 +53,28 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
-it("contains a rejected lazy module without unmounting the browser or navigation", async () => {
+it("contains a rejected lazy module without unmounting another page or navigation", async () => {
   render(
     <RenderErrorBoundary>
-      <nav>Browser navigation</nav>
-      <WorkspaceSurface tab={browserTab} />
+      <nav>Window navigation</nav>
+      <WorkspaceSurface tab={spaceTab} />
       <WorkspaceSurface tab={agentsTab} />
     </RenderErrorBoundary>,
   );
-  const draft = screen.getByLabelText("Browser draft");
+  const draft = screen.getByLabelText("Space draft");
   fireEvent.change(draft, { target: { value: "Unsaved work" } });
   await screen.findByText("This tab could not be loaded");
-  expect(screen.getByLabelText("Browser draft")).toBe(draft);
+  expect(screen.getByLabelText("Space draft")).toBe(draft);
   expect((draft as HTMLInputElement).value).toBe("Unsaved work");
-  expect(screen.getByText("Browser navigation")).toBeTruthy();
+  expect(screen.getByText("Window navigation")).toBeTruthy();
   expect(screen.queryByText("Workspace render failed")).toBeNull();
 });
 
 it("can navigate to another surface after a tab failed", async () => {
   const { rerender } = render(<WorkspaceSurface tab={agentsTab} />);
   await screen.findByText("This tab could not be loaded");
-  rerender(<WorkspaceSurface tab={browserTab} />);
-  expect(screen.getByLabelText("Browser draft")).toBeTruthy();
+  rerender(<WorkspaceSurface tab={spaceTab} />);
+  expect(screen.getByLabelText("Space draft")).toBeTruthy();
   expect(screen.queryByText("This tab could not be loaded")).toBeNull();
 });
 

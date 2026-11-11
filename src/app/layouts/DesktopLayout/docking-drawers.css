@@ -1,32 +1,4 @@
-/* The focused browser pane's toolbar (nav, address field, tools) sits at the top of a vertical
-   strip. Empty, as on a non-browser page, it takes no room. */
-.misty-workspace-toolbar-slot {
-  flex-shrink: 0;
-}
-.misty-sidebar-address {
-  margin-bottom: 8px;
-}
-/* The address field is a filled pill. The field inside is clear, so the pill carries the fill and
-   its hover and focus lift. The tools sit centered above it with no container of their own. */
-.misty-sidebar-omnibox {
-  border-radius: 10px;
-  background: color-mix(in srgb, var(--misty-theme-text) 7%, transparent);
-}
-.misty-sidebar-omnibox:hover {
-  background: color-mix(in srgb, var(--misty-theme-text) 9%, transparent);
-}
-.misty-sidebar-omnibox:focus-within {
-  background: color-mix(in srgb, var(--misty-theme-text) 11%, transparent);
-}
-/* The toolbar's own rules fill the field (browserToolbar.css), so these name the same attributes
-   to outrank them. */
-.misty-sidebar-omnibox [data-browser-toolbar][data-sidebar] input,
-.misty-sidebar-omnibox [data-browser-toolbar][data-sidebar] input:hover,
-.misty-sidebar-omnibox [data-browser-toolbar][data-sidebar] input:focus {
-  border-color: transparent;
-  background: transparent;
-}
-/* The sidebar toggle and back/forward/reload share the traffic lights' band, so the sidebar
+/* The sidebar toggle and back/forward share the traffic lights' band, so the sidebar
    has no header row of its own: the head row rises into the strip's titlebar padding and
    starts where the native buttons end. */
 .misty-sidebar-head {
@@ -122,13 +94,6 @@
   --misty-tab-well: var(--misty-window-chrome, var(--misty-theme-workspace));
 }
 
-/* Stand-ins for the focused browser page's address field and nav buttons, shown on any other
-   page and hidden while a browser page fills their slots. */
-.misty-sidebar-address:has(.misty-workspace-toolbar-slot:not(:empty))
-  .misty-sidebar-address-fallback,
-.misty-sidebar-nav:has(> div:first-child:not(:empty)) .misty-sidebar-nav-fallback {
-  display: none;
-}
 /* The strip above the page, across the whole window, moves the window. It is as tall as the
    page's top margin and painted in the chrome color, and it sits under the revealed drawer. */
 .misty-sidebar-drag-band {
@@ -182,7 +147,7 @@
   width: 18px;
   height: 18px;
 }
-/* Back, forward and reload close the row on its right edge, opposite the sidebar toggle. */
+/* Back and forward close the row on its right edge, opposite the sidebar toggle. */
 .misty-sidebar-card .misty-sidebar-head .misty-sidebar-nav {
   margin-left: auto;
 }
@@ -191,14 +156,7 @@
 .misty-sidebar-nav [data-browser-toolbar] > div {
   gap: 6px;
 }
-/* The pinned tools sit together at the sidebar's foot. */
-.misty-sidebar-head-tools {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-}
-/* The sidebar's bottom edge, above the account row: Downloads on the left, chat on
-   the right. */
+/* The sidebar's bottom edge, above the account row. */
 .misty-sidebar-foot {
   display: flex;
   flex-shrink: 0;
@@ -233,7 +191,4 @@
   min-height: 32px;
   padding: 4px 2px 0 0;
   border-top: 1px solid color-mix(in srgb, var(--misty-theme-text) 10%, transparent);
-}
-.misty-sidebar-card .misty-sidebar-address {
-  margin-bottom: 12px;
 }

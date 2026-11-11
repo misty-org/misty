@@ -97,7 +97,6 @@ description = "The app's own basics: its window, system info and links"
 permissions = [
   "allow-app-quit-confirmed",
   "allow-app-snapshot",
-  "allow-app-take-launch-urls",
   "allow-check-system",
   "allow-diagnostic-log",
   "allow-enable-modern-window-style",
@@ -147,17 +146,10 @@ permissions = [
   "allow-browser-agent-set-locked",
   "allow-browser-clear-website-data",
   "allow-browser-context-menu-select",
-  "allow-browser-download-cancel",
-  "allow-browser-download-open",
   "allow-browser-tab-download-open",
-  "allow-browser-download-reveal",
-  "allow-browser-downloads-list",
-  "allow-browser-downloads-progress",
   "allow-browser-downloads-remove",
-  "allow-browser-page-password-fill",
   "allow-browser-page-state-capture",
   "allow-browser-page-state-restore",
-  "allow-browser-password-offer-respond",
   "allow-browser-profile-search",
   "allow-browser-retired-profiles-erase",
   "allow-browser-runtime-for-scope",
@@ -225,54 +217,10 @@ permissions = [
 ]
 
 [[set]]
-identifier = "action-browser-autofill"
-description = "Saved addresses and cards, and filling them into pages"
-permissions = [
-  "allow-browser-autofill-address-save",
-  "allow-browser-autofill-addresses-list",
-  "allow-browser-autofill-card-save",
-  "allow-browser-autofill-cards-list",
-  "allow-browser-autofill-choose",
-  "allow-browser-autofill-delete",
-  "allow-browser-autofill-offer-respond",
-  "allow-browser-autofill-open",
-]
-
-[[set]]
 identifier = "action-browser-history"
 description = "Read and change browsing history"
 permissions = [
   "allow-browser-history-clear",
-  "allow-browser-history-delete",
-  "allow-browser-history-forget",
-  "allow-browser-history-query",
-  "allow-browser-history-record",
-  "allow-browser-history-set-title",
-  "allow-browser-history-suggest",
-]
-
-[[set]]
-identifier = "action-browser-import"
-description = "Read other browsers' profiles, after the person asks"
-permissions = [
-  "allow-browser-import-bookmarks",
-  "allow-browser-import-bookmarks-file",
-  "allow-browser-import-discover",
-  "allow-browser-import-history",
-  "allow-browser-import-preview",
-  "allow-browser-import-save-bookmarks",
-  "allow-browser-import-settings",
-  "allow-browser-import-signins",
-]
-
-[[set]]
-identifier = "action-browser-passwords"
-description = "Use saved sign-ins"
-permissions = [
-  "allow-browser-passwords-delete",
-  "allow-browser-passwords-list",
-  "allow-browser-passwords-reveal",
-  "allow-browser-passwords-save",
 ]
 
 [[set]]
@@ -430,9 +378,7 @@ identifier = "action-settings"
 description = "Device settings"
 permissions = [
   "allow-settings-apply-launch-on-login",
-  "allow-settings-default-browser-snapshot",
   "allow-settings-launch-on-login-snapshot",
-  "allow-settings-request-default-browser",
   "allow-settings-save",
   "allow-settings-session-commit",
   "allow-settings-session-state",

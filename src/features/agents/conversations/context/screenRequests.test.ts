@@ -8,10 +8,6 @@ const mocks = vi.hoisted(() => ({
     accountId: "",
     submit: undefined as undefined | ((request: unknown) => Promise<void>),
   },
-  openTab: undefined as undefined | { id: string; title: string },
-}));
-vi.mock("@/features/agents/cursor/normalTabs", () => ({
-  matchingBrowserTab: () => mocks.openTab,
 }));
 vi.mock("./screenContext", () => ({ captureMistyScreen: mocks.capture }));
 vi.mock("@/features/agents/runs/jobs/workspaceAutopilot", () => ({
@@ -65,30 +61,9 @@ beforeEach(() => {
   submitAnswer.mockClear();
   mocks.capture.mockClear();
   mocks.companion = { accountId: "", submit: undefined };
-  mocks.openTab = undefined;
 });
 
-it("works in a matching open tab instead of opening another", async () => {
-  mocks.openTab = { id: "gmail-tab", title: "Inbox - Gmail" };
-  withRequest({
-    kind: "open",
-    reason: "Open the latest email from David in Gmail",
-    location: "window",
-    url: "https://mail.google.com",
-    state: "pending",
-  });
-  continueAfterScreenRequest(set, get, "chat", "reply");
-  await vi.waitFor(() => expect(submitAnswer).toHaveBeenCalled());
-  expect(submitAnswer.mock.calls[0][0]).toContain('open tab "Inbox - Gmail"');
-  expect(submitAnswer.mock.calls[0][0]).not.toContain("Start at");
-  expect(submitAnswer.mock.calls[0][6]).toMatchObject({
-    executionMode: "agent",
-    openScreen: { tabId: "gmail-tab", place: "current" },
-  });
-});
-
-it("follows the place the user named even when a tab matches", async () => {
-  mocks.openTab = { id: "gmail-tab", title: "Inbox - Gmail" };
+it("follows the place the user named", async () => {
   withRequest({
     kind: "open",
     reason: "Open Gmail in a new tab",

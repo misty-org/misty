@@ -1,12 +1,9 @@
-import { invoke } from "@tauri-apps/api/core";
 import { deliverGoogleSignInCode } from "@/features/account";
 import { openSetupDeepLink } from "@/features/account";
 import { isLinkTargetWindow } from "@/features/app-windows";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import type { UnlistenFn } from "@tauri-apps/api/event";
 import { getCurrent, onOpenUrl } from "@tauri-apps/plugin-deep-link";
-/** Native routes web links to the profile that claims their site, then says so here. */
-const profileLinksEvent = "misty://profile-links";
 const mistyDeepLinkScheme = "misty:";
 const ignoredMistyHosts = new Set(["recent", "starred", "trash"]);
 export function installMistyDeepLinkHandler(
@@ -16,16 +13,9 @@ export function installMistyDeepLinkHandler(
 ): () => void {
   let active = true;
   let unlisten: UnlistenFn | null = null;
-  let unlistenLinks: UnlistenFn | null = null;
   let lastCurrentSignature: string | null = null;
   let lastHandledAt = 0;
   const currentUrlPoll: number | null = null;
-  // Web links from other apps (Misty left as the default browser) are taken so they don't pile
-  // up, and dropped: Misty shows web pages only to agents, never in a pane for a person.
-  const takeWebLinks = async () => {
-    if (!active) return;
-    await invoke<string[]>("app_take_launch_urls").catch(() => []);
-  };
   const handleUrls = async (urls: string[] | null, source: "current" | "event") => {
     if (!active || !urls) return;
     const mistyUrls = urls.filter((url) => !isWebUrl(url));
@@ -60,8 +50,6 @@ export function installMistyDeepLinkHandler(
     try {
       if (!hasTauriInternals()) return;
       await handleCurrentUrls();
-      unlistenLinks = await listen(profileLinksEvent, () => void takeWebLinks());
-      await takeWebLinks();
       unlisten = await onOpenUrl((urls) => void handleUrls(urls, "event"));
     } catch {}
   })();
@@ -73,7 +61,6 @@ export function installMistyDeepLinkHandler(
     document.removeEventListener("visibilitychange", handleVisibleCurrentUrls);
     if (currentUrlPoll !== null) window.clearInterval(currentUrlPoll);
     if (unlisten) void unlisten();
-    if (unlistenLinks) void unlistenLinks();
   };
 }
 export function routeForMistyDeepLink(

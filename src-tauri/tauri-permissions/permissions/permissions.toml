@@ -15,10 +15,6 @@ identifier = "permission-page-reader"
 description = "The page it's handed, with no network or files. See page-reader.sb."
 
 [[permission]]
-identifier = "permission-browser-import"
-description = "Read another browser's profile. Off until the person's first import."
-
-[[permission]]
 identifier = "permission-screen-capture"
 description = "Capture the screen for the cursor companion. Off until first use."
 

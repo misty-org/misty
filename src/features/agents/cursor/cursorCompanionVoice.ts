@@ -1,6 +1,5 @@
 import { conversationForGlobalPrompt } from "../conversations/state/globalMistyConversationScope";
 import { useCollaborationStore } from "../plans/store";
-import { frontMediaContext, withinBudget } from "./mediaContext";
 import { useMistyStore } from "../conversations/state/useMistyStore";
 import {
   CompanionConversation,
@@ -85,9 +84,6 @@ export class CursorCompanionVoice {
       // Every spoken request carries every display, the cursor's first; the
       // run decides what matters.
       s.captures = [];
-      // Looked up when the shortcut went down; a turn without one reads it now.
-      const media =
-        s.pendingMedia?.turn === generation ? s.pendingMedia.lookup : frontMediaContext();
       const screens = s.nativeReady
         ? await s
             .capture(generation, new AbortController().signal)
@@ -98,7 +94,6 @@ export class CursorCompanionVoice {
       if (useMistyStore.getState().working)
         throw new Error("A task is already running; use steering.");
       s.captures = screens;
-      const mediaContext = await withinBudget(media);
       await useMistyStore.getState().submitAnswer(
         tool.instruction,
         [],
@@ -112,7 +107,6 @@ export class CursorCompanionVoice {
           interactionMode: s.state.mode,
           idempotencyKey: tool.key,
           ...(screens.length ? { displayCaptures: screens } : {}),
-          ...(mediaContext ? { mediaContext } : {}),
           // Teach mode steps go only to lesson chats (the shortcut opened one).
           ...(s.state.teach && useCollaborationStore.getState().modeFor(conversationId) === "teach"
             ? { collaborationMode: "teach" as const }

@@ -2,8 +2,8 @@
 #![cfg_attr(windows, allow(unused_imports))]
 use std::{fs as std_fs, io::ErrorKind, path::PathBuf};
 
-use super::{check, fs};
-use super::{policy::Policy, policy::Shape, Access, ImportFolder, Reach};
+use super::fs;
+use super::{policy::Policy, policy::Shape, Access, Reach};
 
 /// A policy with `.misty` under a scratch folder as its only rule. The process-wide policy allows
 /// the whole temp folder in tests, for fixtures, so refusals are tested on this one.
@@ -217,17 +217,6 @@ fn the_wrappers_work_inside() {
     assert!(!fs::exists(&file));
 }
 
-#[cfg(unix)]
-#[test]
-fn import_folders_grant_reading_only_until_revoked() {
-    let library = PathBuf::from("/etc/misty-gate-import-test");
-    super::allow_browser_import_folders(vec![ImportFolder::Whole(library.clone())]);
-    assert!(check(&library.join("Bookmarks"), Access::Read).is_ok());
-    assert!(check(&library.join("Bookmarks"), Access::Write).is_err());
-    super::revoke_browser_import_folders();
-    assert!(check(&library.join("Bookmarks"), Access::Read).is_err());
-}
-
 const GRANTS: &str = include_str!("../../tauri-permissions/grants/grants.toml");
 
 /// The grant behind each place Misty can reach. It's an exhaustive match, so a new place has to say
@@ -245,7 +234,6 @@ fn grants_for(reach: Reach) -> &'static [&'static str] {
         | Reach::HostnameFile
         | Reach::ChosenDownloadFolder
         | Reach::RecordedDownload
-        | Reach::BrowserImportFolders
         | Reach::BenchmarkKeys
         | Reach::TestFixtures => &[],
     }
@@ -270,7 +258,6 @@ fn the_list_matches_grants_toml() {
         Reach::SharedFolder,
         Reach::LinkedFolder,
         Reach::PickedFile,
-        Reach::BrowserImportFolders,
         Reach::BenchmarkKeys,
         Reach::TestFixtures,
     ]

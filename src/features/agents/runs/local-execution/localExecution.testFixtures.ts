@@ -22,9 +22,7 @@ const mocks = vi.hoisted(() => ({
     submitAnswer: vi.fn(),
   },
   deviceSnapshot: vi.fn(),
-  normalContext: vi.fn(),
 }));
-vi.mock("../../cursor/normalTabs", () => ({ companionBrowserContext: mocks.normalContext }));
 vi.mock("../../page/betaModes", () => ({ visibleAutopilotAvailable: () => mocks.autopilot }));
 vi.mock("../jobs/workspaceAutopilot", () => ({ startWorkspaceAutopilot: mocks.startAutopilot }));
 vi.mock("@tauri-apps/api/core", () => ({ invoke: mocks.invoke }));

@@ -23,7 +23,7 @@ mod real_path;
 
 use std::{
     io,
-    path::{Path, PathBuf},
+    path::Path,
     sync::{LazyLock, RwLock},
 };
 
@@ -70,21 +70,9 @@ pub enum Reach {
     PickedFile,
     /// `agents.env`, read-only, on a debug build's benchmark run (`models/benchmark_env.rs`).
     BenchmarkKeys,
-    /// Other browsers' profile folders, read-only, while `permission-browser-import` is on.
-    BrowserImportFolders,
     /// Unit tests build their fixtures anywhere in the temp folder.
     #[cfg(any(test, feature = "test-fixtures"))]
     TestFixtures,
-}
-
-/// One of another browser's folders: all of it, just its listing, or the entries in it whose names
-/// start a certain way (packaged apps on Windows carry a version in their folder name).
-#[derive(Clone, Debug)]
-#[cfg_attr(not(windows), allow(dead_code))]
-pub enum ImportFolder {
-    Whole(PathBuf),
-    ListingOnly(PathBuf),
-    NamesStarting(PathBuf, &'static str),
 }
 
 static POLICY: LazyLock<RwLock<Policy>> = LazyLock::new(|| RwLock::new(always_allowed()));
@@ -247,24 +235,6 @@ pub fn allow_linked_folder(folder: &Path) {
 
 pub fn revoke_linked_folder(folder: &Path) {
     with_policy(|policy| policy.remove(Reach::LinkedFolder, folder));
-}
-
-pub fn allow_browser_import_folders(folders: Vec<ImportFolder>) {
-    with_policy(|policy| {
-        policy.remove_all(Reach::BrowserImportFolders);
-        for folder in folders {
-            let (path, shape) = match &folder {
-                ImportFolder::Whole(path) => (path, Shape::Folder),
-                ImportFolder::ListingOnly(path) => (path, Shape::Exact),
-                ImportFolder::NamesStarting(path, start) => (path, Shape::NamesStarting(start)),
-            };
-            policy.add(Reach::BrowserImportFolders, path, shape, Access::Read);
-        }
-    });
-}
-
-pub fn revoke_browser_import_folders() {
-    with_policy(|policy| policy.remove_all(Reach::BrowserImportFolders));
 }
 
 #[cfg(test)]

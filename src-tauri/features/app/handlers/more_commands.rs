@@ -190,78 +190,12 @@ macro_rules! with_more_commands {
             #[cfg(desktop)]
             crate::browser::commands::browser_set_mouse_gestures,
             #[cfg(desktop)]
-            crate::browser::commands::browser_password_offer_respond,
-            #[cfg(desktop)]
-            crate::browser::commands::browser_page_password_fill,
-            #[cfg(desktop)]
-            crate::browser::commands::browser_passwords_list,
-            #[cfg(desktop)]
-            crate::browser::commands::browser_passwords_reveal,
-            #[cfg(desktop)]
-            crate::browser::commands::browser_passwords_delete,
-            #[cfg(desktop)]
-            crate::browser::commands::browser_passwords_save,
-            #[cfg(desktop)]
-            crate::browser::commands::browser_autofill_offer_respond,
-            #[cfg(desktop)]
-            crate::browser::commands::browser_autofill_open,
-            #[cfg(desktop)]
-            crate::browser::commands::browser_autofill_choose,
-            #[cfg(desktop)]
-            crate::browser::commands::browser_autofill_addresses_list,
-            #[cfg(desktop)]
-            crate::browser::commands::browser_autofill_address_save,
-            #[cfg(desktop)]
-            crate::browser::commands::browser_autofill_cards_list,
-            #[cfg(desktop)]
-            crate::browser::commands::browser_autofill_card_save,
-            #[cfg(desktop)]
-            crate::browser::commands::browser_autofill_delete,
-            #[cfg(desktop)]
             crate::voice::commands::global_hotkey_signed_out,
             #[cfg(desktop)]
             crate::browser::commands::browser_history_clear,
-            #[cfg(desktop)]
-            crate::browser::commands::browser_history_delete,
-            #[cfg(desktop)]
-            crate::browser::commands::browser_history_query,
-            #[cfg(desktop)]
-            crate::browser::commands::browser_history_record,
-            #[cfg(desktop)]
-            crate::browser::commands::browser_history_set_title,
-            #[cfg(desktop)]
-            crate::browser::commands::browser_history_suggest,
-            #[cfg(desktop)]
-            crate::browser::commands::browser_history_forget,
-            #[cfg(desktop)]
-            crate::browser::commands::browser_import_discover,
-            #[cfg(desktop)]
-            crate::browser::commands::browser_import_bookmarks,
-            #[cfg(desktop)]
-            crate::browser::commands::browser_import_bookmarks_file,
-            #[cfg(desktop)]
-            crate::browser::commands::browser_import_save_bookmarks,
-            #[cfg(desktop)]
-            crate::browser::commands::browser_import_preview,
-            #[cfg(desktop)]
-            crate::browser::commands::browser_import_history,
-            #[cfg(desktop)]
-            crate::browser::commands::browser_import_settings,
-            #[cfg(desktop)]
-            crate::browser::commands::browser_import_signins,
             crate::browser::commands::browser_search_suggest,
             crate::browser::commands::browser_profile_search,
-            #[cfg(desktop)]
-            crate::browser::commands::browser_download_cancel,
-            #[cfg(desktop)]
-            crate::browser::commands::browser_download_open,
             crate::browser::commands::browser_tab_download_open,
-            #[cfg(desktop)]
-            crate::browser::commands::browser_download_reveal,
-            #[cfg(desktop)]
-            crate::browser::commands::browser_downloads_list,
-            #[cfg(desktop)]
-            crate::browser::commands::browser_downloads_progress,
             #[cfg(desktop)]
             crate::browser::commands::browser_downloads_remove,
             #[cfg(desktop)]
@@ -323,8 +257,6 @@ macro_rules! with_more_commands {
             crate::app::settings_commands::settings_save,
             crate::app::settings_commands::settings_launch_on_login_snapshot,
             crate::app::settings_commands::settings_apply_launch_on_login,
-            crate::app::settings_commands::settings_default_browser_snapshot,
-            crate::app::settings_commands::settings_request_default_browser,
             crate::app::settings_commands::shortcuts_snapshot,
             crate::sync::commands::clipboard_cloud_view,
             crate::sync::commands::clipboard_cloud_copy,

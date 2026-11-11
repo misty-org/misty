@@ -1,18 +1,6 @@
 use super::*;
 use crate::model_calls::{RawJson, ToolResultPart};
 
-fn call(tool: &str) -> Message {
-    Message::Assistant {
-        content: vec![AssistantPart::ToolCall {
-            tool_call_id: tool.to_owned(),
-            tool_name: tool.to_owned(),
-            input: RawJson::empty_object(),
-            provider_options: None,
-        }],
-        provider_options: None,
-    }
-}
-
 fn result(tool: &str, output: ToolOutput) -> Message {
     Message::Tool {
         content: vec![ToolResultPart { kind: "tool-result".to_owned(), tool_call_id: tool.to_owned(), tool_name: tool.to_owned(), output }],
@@ -47,21 +35,11 @@ fn the_gap_before_open_counts_as_javascript_counts_it() {
 }
 
 #[test]
-fn sends_a_finish_back_once_to_list_tabs_not_when_they_were_just_listed() {
-    let request = "Keep the PIPS scholarship page open in another tab.";
-    assert!(proof_tabs_refusal(request, &[], Some("browser_tab_list"), None).unwrap().contains("call browser_tab_list"));
-    assert_eq!(proof_tabs_refusal(request, &[call("browser_tab_list")], Some("browser_tab_list"), None), None);
-}
-
-#[test]
-fn looks_only_at_the_last_four_calls_and_programs_always_check() {
+fn sends_a_finish_back_to_check_its_tabs_with_a_program() {
     let request = "keep that product page open too";
-    let long_ago = [call("browser_tab_list"), call("a"), call("b"), call("c"), call("d")];
-    assert!(proof_tabs_refusal(request, &long_ago, Some("browser_tab_list"), None).is_some());
-    assert_eq!(proof_tabs_refusal("What time is it?", &[], Some("browser_tab_list"), None), None);
-    assert_eq!(proof_tabs_refusal(request, &[], None, None), None);
-    let with_program = proof_tabs_refusal(request, &[call("browser_tab_list")], Some("browser_tab_list"), Some("browser_run")).unwrap();
-    assert!(with_program.contains("call browser_run with `return listTabs()`"));
+    assert_eq!(proof_tabs_refusal("What time is it?", Some("browser_run")), None);
+    assert_eq!(proof_tabs_refusal(request, None), None);
+    assert!(proof_tabs_refusal(request, Some("browser_run")).unwrap().contains("call browser_run with `return listTabs()`"));
 }
 
 #[test]

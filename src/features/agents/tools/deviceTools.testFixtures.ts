@@ -75,7 +75,7 @@ export const workspace: AiInvocationDeviceContext = {
   kind: "workspace",
   opaqueRef: "workspace:device",
   displayName: "Misty browser",
-  capabilities: ["browser.session", "browser.run", "shell.run", "bookmark.add"],
+  capabilities: ["browser.session", "browser.run", "shell.run"],
   metadata: { source: "desktop" },
   runGrant: grant,
 };

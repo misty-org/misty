@@ -40,8 +40,7 @@ const screenTitle: Partial<Record<Screen, string>> = {
 };
 
 /**
- * The setup wizard: the model step, then this computer's import and extensions, and last the tab
- * side, once the browser is on screen and the tabs can be seen moving. It follows a first sign-in
+ * The setup wizard: the model step, then the side the sidebar sits on. It follows a first sign-in
  * on this device, and any later sign-in offers it again. Help › Run setup again runs only the
  * computer's part. Settings opens it on choosing a server, and a setup link on the sign-in link
  * step. Not now goes back to the page.
@@ -239,8 +238,7 @@ export function SignInSheet() {
             <ErrorNotification message={error} onDismiss={() => setError("")} />
           ) : null}
         </div>
-        {setupStep === "import" ? null : setupStep ? (
-          // Importing has its own Skip; the other steps go Back and Continue.
+        {setupStep ? (
           <footer className="flex items-center justify-between gap-3 border-t border-charcoal-border py-3 pl-3.5 pr-6">
             {setupIndex > 0 ? (
               <BackButton onClick={() => setScreen(setupSteps[setupIndex - 1])} />

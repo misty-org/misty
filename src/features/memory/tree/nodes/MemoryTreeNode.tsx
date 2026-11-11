@@ -1,7 +1,7 @@
 import { Handle, type Node, type NodeProps, Position } from "@xyflow/react";
 import { ChevronRight, Copy, ExternalLink, Plus, Trash2 } from "lucide-react";
 import { useRef } from "react";
-import { useWorkspaceStore } from "@/features/app-windows";
+import { openExternalLink } from "@/shared/platform/openExternalLink";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -142,9 +142,7 @@ export function MemoryTreeNode({ data }: NodeProps<MemoryFlowNode>) {
               </ContextMenuItem>
             )}
             {node.url && (
-              <ContextMenuItem
-                onSelect={() => useWorkspaceStore.getState().openBrowserView({ url: node.url! })}
-              >
+              <ContextMenuItem onSelect={() => void openExternalLink(node.url!)}>
                 <ExternalLink aria-hidden="true" />
                 Open page
               </ContextMenuItem>

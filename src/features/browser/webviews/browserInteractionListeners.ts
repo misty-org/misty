@@ -4,20 +4,10 @@ import {
 } from "@/features/browser/sitePermissionAsks";
 import type { UnlistenFn } from "@tauri-apps/api/event";
 import { listen } from "@tauri-apps/api/event";
-import type { NavigateFunction } from "react-router-dom";
-import type { BrowserAskSnapshot } from "./browserAsk";
-import { browserAgents } from "../pages/AgentSeams";
-import { useBrowserDownloadsStore } from "../library";
 import { dockLeaves, useWorkspaceStore } from "@/features/app-windows";
 import { getAppliedAppRenderScale } from "@/shared/hooks/useAppZoom";
-import { browserTabIdForRuntime, useBrowserRuntimeStore } from "./browserRuntime";
-import { openBrowserPopup } from "./openBrowserPopup";
+import { browserTabIdForRuntime } from "./browserRuntime";
 
-interface BrowserPopupEvent {
-  sourceId: string;
-  url: string;
-  popupInstanceKey?: string;
-}
 interface BrowserPointerEvent {
   id: string;
   x: number;
@@ -27,17 +17,8 @@ interface BrowserPointerEvent {
 interface BrowserFocusEvent {
   id: string;
 }
-interface BrowserDownloadEvent {
-  downloadId: string;
-  tabId: string;
-  path: string;
-  state: "requested" | "finished" | "failed";
-  success: boolean;
-  error?: string;
-}
-
 /** A native page took keyboard focus, which the renderer's DOM never hears about. Drop the DOM's
- * focus too, so a field that kept it (the address bar shows its draft while focused) lets go. */
+ * focus too, so a field that kept it lets go. */
 function releaseRendererFocus() {
   const active = document.activeElement;
   if (active instanceof HTMLElement && active !== document.body) active.blur();
@@ -75,13 +56,11 @@ function focusBrowserTab(tabId: string): boolean {
 
 interface BrowserInteractionListenerOptions {
   isDisposed: () => boolean;
-  navigate: NavigateFunction;
 }
 
-/** Pointer, focus, popup, download, open-URL and ask-context events from native pages. */
+/** Pointer, focus and permission events from native pages. */
 export function listenBrowserInteractionEvents({
   isDisposed,
-  navigate,
 }: BrowserInteractionListenerOptions): Promise<UnlistenFn>[] {
   return [
     listen<BrowserPointerEvent>("misty://browser-pointer", ({ payload }) => {
@@ -139,59 +118,8 @@ export function listenBrowserInteractionEvents({
         }
       },
     ),
-    listen<BrowserAskSnapshot>("misty://browser-ask-context", ({ payload }) => {
-      if (isDisposed()) return;
-      focusBrowserRuntimeTab(payload.id);
-      void Promise.resolve()
-        .then(() => browserAgents.get().openBrowserAsk(payload))
-        .catch((error: unknown) => {
-          const tabId = browserTabIdForRuntime(payload.id);
-          if (tabId)
-            useBrowserRuntimeStore
-              .getState()
-              .setError(
-                tabId,
-                error instanceof Error ? error.message : "Misty could not open this context.",
-              );
-        });
-    }),
-    listen<string>("misty://open-web-url", ({ payload }) => {
-      if (isDisposed() || !/^https?:\/\//i.test(payload)) return;
-      const tab = useWorkspaceStore.getState().openBrowserView({
-        url: payload,
-      });
-      if (tab) navigate(tab.route);
-    }),
     listen<SitePermissionAsk>("misty://browser-permission-ask", ({ payload }) => {
       if (!isDisposed()) addSitePermissionAsk(payload);
-    }),
-    listen<BrowserPopupEvent>("misty://browser-popup", ({ payload }) => {
-      if (isDisposed()) return;
-      const tab = openBrowserPopup(payload);
-      if (!tab) return;
-      navigate(tab.route);
-    }),
-    listen<BrowserDownloadEvent>("misty://browser-download", ({ payload }) => {
-      if (isDisposed()) return;
-      const downloads = useBrowserDownloadsStore.getState();
-      if (payload.state === "requested") {
-        void downloads.refresh();
-        return;
-      }
-      const tabId = browserTabIdForRuntime(payload.tabId);
-      void downloads.refresh().then(() => {
-        if (payload.success) {
-          useBrowserDownloadsStore.getState().markFinished();
-
-          return;
-        }
-        // Cancelling is the user's choice, not a failure worth reporting.
-        const entry = useBrowserDownloadsStore
-          .getState()
-          .entries.find((item) => item.id === payload.downloadId);
-        if (entry?.state === "cancelled" || !tabId) return;
-        useBrowserRuntimeStore.getState().setError(tabId, payload.error || "The download failed.");
-      });
     }),
   ];
 }

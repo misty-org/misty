@@ -2,12 +2,10 @@ import {
   Brain,
   Cloud,
   EyeOff,
-  KeyRound,
   Keyboard,
   MessagesSquare,
   Mic,
   Palette,
-  Puzzle,
   Server,
   ShieldCheck,
   Sparkles,
@@ -40,8 +38,6 @@ type SettingsArea =
   | "voice"
   | "privacy"
   | "advanced"
-  | "passwords"
-  | "extensions"
   | "sync"
   | "models"
   | "conversations"
@@ -62,8 +58,6 @@ export const settingsAreas: Record<SettingsArea, SettingsAreaInfo> = {
   voice: { label: "Voice", icon: Mic },
   privacy: { label: "Privacy", icon: EyeOff },
   advanced: { label: "Advanced", icon: Wrench },
-  passwords: { label: "Passwords", icon: KeyRound },
-  extensions: { label: "Extensions", icon: Puzzle },
   sync: { label: "Sync", icon: Cloud },
   models: { label: "Models", icon: Sparkles },
   conversations: { label: "Behavior", icon: MessagesSquare },
@@ -73,12 +67,11 @@ export const settingsAreas: Record<SettingsArea, SettingsAreaInfo> = {
 
 /** Sidebar groups, named by feature, in sidebar order. */
 export const settingsGroups: readonly { label: string; areas: readonly SettingsArea[] }[] = [
-  { label: "Account", areas: ["account", "server"] },
+  { label: "Account", areas: ["account", "server", "sync"] },
   {
     label: "App",
     areas: ["general", "appearance", "shortcuts", "voice", "privacy", "advanced"],
   },
-  { label: "Browser", areas: ["passwords", "extensions", "sync"] },
   { label: "Agents", areas: ["models", "conversations", "access", "memory"] },
 ];
 
@@ -103,7 +96,6 @@ const block = (
 /** The blocks of each page, in page order; blocks of one page are adjacent. */
 const settingsBlocks: readonly SettingsBlock[] = [
   block("general", "general", "Startup"),
-  block("general", "browser-links", "Browsing"),
   block("general", "browser-tabs", "Tabs"),
   block("general", "browser-downloads", "Downloads"),
   block("general", "updates", "Updates"),
@@ -115,9 +107,6 @@ const settingsBlocks: readonly SettingsBlock[] = [
   block("privacy", "privacy", "Privacy"),
   block("privacy", "browser-permissions", "Websites", "resource"),
   block("advanced", "advanced", "Advanced"),
-  block("passwords", "passwords", "Passwords", "resource"),
-  block("passwords", "autofill", "Autofill"),
-  block("extensions", "browser-extensions", "Extensions", "resource"),
   block("sync", "sync", "Sync"),
   block("models", "models", "Models"),
   block("conversations", "agents-defaults", "Conversations"),

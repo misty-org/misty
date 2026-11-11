@@ -90,7 +90,6 @@ const fieldValue: Schema = {
   ],
 };
 
-const url = text(1, 2000);
 const folder = text(1, 300);
 const path = text(0, 1000);
 const device = text(0, 100);
@@ -171,10 +170,6 @@ export const deviceToolSchemas: Record<string, Schema> = {
     ["documentId", "fields"],
   ),
   "browser.run": object({ code: text(1, 20000) }, ["code"]),
-  "browser.tab.list": object({ device }),
-  "browser.tab.open": object({ url, device }, ["url"]),
-  "bookmark.list": object({ query: text(0, 200), device }),
-  "bookmark.add": object({ url, title: text(0, 160), device }, ["url"]),
   "folder.list": object({ folder, path }, ["folder"]),
   "folder.read": object({ folder, path }, ["folder", "path"]),
   "folder.send": object({ folder, path }, ["folder", "path"]),

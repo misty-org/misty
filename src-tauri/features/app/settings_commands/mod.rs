@@ -1,10 +1,9 @@
-//! Settings, launch on login and the default browser.
+//! Settings and launch on login.
 use tauri::State;
 
 use crate::app::autostart::LaunchOnLoginSnapshot;
 use crate::app::error::{ApiError, ApiResult};
 use crate::app::runtime::MistyRuntime;
-use crate::browser::default_browser::DefaultBrowserSnapshot;
 use settings::{SaveSettingsRequest, SettingsSnapshot};
 
 mod shortcuts;
@@ -37,16 +36,6 @@ pub fn settings_launch_on_login_snapshot() -> ApiResult<LaunchOnLoginSnapshot> {
 #[tauri::command]
 pub fn settings_apply_launch_on_login(enabled: bool) -> ApiResult<LaunchOnLoginSnapshot> {
     crate::app::autostart::apply(enabled).map_err(ApiError::Message)
-}
-
-#[tauri::command]
-pub fn settings_default_browser_snapshot() -> ApiResult<DefaultBrowserSnapshot> {
-    Ok(crate::browser::default_browser::snapshot())
-}
-
-#[tauri::command]
-pub fn settings_request_default_browser() -> ApiResult<DefaultBrowserSnapshot> {
-    Ok(crate::browser::default_browser::request())
 }
 
 #[tauri::command]

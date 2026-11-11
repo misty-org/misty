@@ -52,13 +52,13 @@ describe("device settings", () => {
         version: 1,
         selectedProfileId: "work",
         profiles: { work: { values: { "browser.searchEngine": "bing" } } },
-        overrides: { work: { "browser.searchSuggestions": true } },
+        overrides: { work: { "app.startup.login": true } },
       },
       { appearance: { app_zoom: 1.25 } },
     );
     expect(migrated.values).toMatchObject({
       "browser.searchEngine": "bing",
-      "browser.searchSuggestions": true,
+      "app.startup.login": true,
       "app.zoom": 1.25,
     });
     expect(migrated).not.toHaveProperty("overrides");
@@ -97,20 +97,20 @@ describe("device settings", () => {
     });
   });
   it("edits and resets a value locally", () => {
-    const state = editPreference(initialPreferencesState({}), "browser.searchSuggestions", true);
-    expect(effectiveValues(state)).toEqual({ "browser.searchSuggestions": true });
-    expect(resolveSetting(state, "browser.searchSuggestions")).toEqual({
+    const state = editPreference(initialPreferencesState({}), "app.startup.login", true);
+    expect(effectiveValues(state)).toEqual({ "app.startup.login": true });
+    expect(resolveSetting(state, "app.startup.login")).toEqual({
       value: true,
       source: "device",
     });
-    const reset = editPreference(state, "browser.searchSuggestions", undefined);
+    const reset = editPreference(state, "app.startup.login", undefined);
     expect(effectiveValues(reset)).toEqual({});
-    expect(resolveSetting(reset, "browser.searchSuggestions")).toEqual({
+    expect(resolveSetting(reset, "app.startup.login")).toEqual({
       value: false,
       source: "default",
     });
     // An unchanged value returns the same state, so nothing is saved or re-applied.
-    expect(editPreference(state, "browser.searchSuggestions", true)).toBe(state);
+    expect(editPreference(state, "app.startup.login", true)).toBe(state);
   });
   it("rejects invalid values and malformed JSON settings", () => {
     expect(() => editPreference(initialPreferencesState({}), "app.zoom", 10)).toThrow();
@@ -118,7 +118,7 @@ describe("device settings", () => {
     expect(validPreference(definitionById.get("app.shortcuts.bindings")!, "[broken")).toBe(false);
   });
   it("round-trips through JSON", () => {
-    const state = editPreference(initialPreferencesState({}), "browser.searchSuggestions", true);
+    const state = editPreference(initialPreferencesState({}), "app.startup.login", true);
     expect(effectiveValues(JSON.parse(JSON.stringify(state)))).toEqual(effectiveValues(state));
   });
 });

@@ -8,7 +8,6 @@ import {
   type WorkspaceView,
 } from "@/features/app-windows";
 import { layoutTabs } from "@/features/app-windows";
-import { closePeek, usePeekStore } from "@/features/app-windows";
 import { useCallback, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
@@ -40,11 +39,6 @@ export function useWorkspaceTabShortcuts(navigateToActiveLayoutTab: () => void) 
   const location = useLocation();
   const navigate = useNavigate();
   const closeActiveTab = useCallback(() => {
-    const peek = usePeekStore.getState().peek;
-    if (peek && peek.tabId === useWorkspaceStore.getState().layout.activeTabId) {
-      if (closePeek()) navigateToActiveLayoutTab();
-      return;
-    }
     const state = useWorkspaceStore.getState();
     const id = state.layout.activeTabId;
     const pane = findDockLeaf(state.layout.root, state.layout.focusedPaneId);

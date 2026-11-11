@@ -124,7 +124,7 @@ fn offered(row: &JsValue, request: &RunRequest, inputs: &CatalogInputs, grants: 
         _ if is_granted_browser_tool(name) => !grants.labels.is_empty() && grants.capabilities.iter().any(|capability| capability == name),
         _ if name.starts_with("integration.") => inputs.composio_key,
         _ if name.starts_with("folder.") => contexts.iter().any(|device| device.kind == "local_folder"),
-        _ if name.starts_with("browser.tab.") || name.starts_with("bookmark.") || name == "shell.run" => contexts.iter().any(|device| device.kind == "workspace"),
+        "shell.run" => contexts.iter().any(|device| device.kind == "workspace"),
         "log.work.checklist" => !request.planning() && (has_conversation || !request.delegated_from.is_empty()),
         "conversation.ask_user" => request.can_ask(),
         "plan.propose" => request.planning(),
@@ -167,12 +167,10 @@ fn for_this_run(row: &JsValue, request: &RunRequest, inputs: &CatalogInputs, gra
         }).collect();
         return row.with_field("inputSchema", with_folder_names(&schema, &labels));
     }
-    let on_a_workspace = name.starts_with("browser.tab.") || name.starts_with("bookmark.");
-    if on_a_workspace || name == "shell.run" {
+    if name == "shell.run" {
         let computers: Vec<String> = request.device_contexts.iter().filter(|device| device.kind == "workspace").map(device_name).collect();
         if computers.len() > 1 {
-            let lead = if on_a_workspace { "Which computer's Misty browser" } else { "Which computer" };
-            return row.with_field("inputSchema", with_device_choice(&schema, lead, &computers));
+            return row.with_field("inputSchema", with_device_choice(&schema, "Which computer", &computers));
         }
     }
     row.clone()

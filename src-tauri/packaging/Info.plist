@@ -12,8 +12,7 @@
   <string>Misty shares your location only with websites you allow to use it, from the site's permissions.</string>
   <key>NSLocationWhenInUseUsageDescription</key>
   <string>Misty shares your location only with websites you allow to use it, from the site's permissions.</string>
-  <!-- Declares the misty: deep link (also configured for the deep-link plugin) and web links,
-       so macOS can offer Misty as the default browser. Choosing it stays the user's decision. -->
+  <!-- Declares the misty: deep link (also configured for the deep-link plugin). -->
   <key>CFBundleURLTypes</key>
   <array>
     <dict>
@@ -22,17 +21,6 @@
       <key>CFBundleURLSchemes</key>
       <array>
         <string>misty</string>
-      </array>
-    </dict>
-    <dict>
-      <key>CFBundleURLName</key>
-      <string>Web site URL</string>
-      <key>CFBundleTypeRole</key>
-      <string>Viewer</string>
-      <key>CFBundleURLSchemes</key>
-      <array>
-        <string>http</string>
-        <string>https</string>
       </array>
     </dict>
   </array>

@@ -4,8 +4,6 @@ import { Pressable } from "@/shared/ui";
 import { observeAccountChanges } from "@/api/account-events";
 import { onboardingSteps, type OnboardingStep } from "../runs/invocations/localAiSettings";
 import { useMistyStore } from "../conversations/state/useMistyStore";
-import { browserHomeUrl } from "@/features/app-windows";
-import { useWorkspaceStore } from "@/features/app-windows";
 import { appsApi } from "../connected-apps/api";
 import { useMistyPanelStore } from "../panel/mistyPanelStore";
 
@@ -54,11 +52,8 @@ function useAccountProgress(accountId: string) {
   return { apps, steps };
 }
 
-/** A page to ask about, with Misty open beside it. */
-const askOnPage = () => {
-  useWorkspaceStore.getState().openBrowserView({ url: browserHomeUrl() });
-  useMistyPanelStore.getState().setOpen(true);
-};
+/** Misty, open beside the page in front. */
+const askOnPage = () => useMistyPanelStore.getState().setOpen(true);
 
 /**
  * The first steps with agents, ticked off from what the account has actually done. It

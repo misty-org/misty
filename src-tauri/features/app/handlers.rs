@@ -64,7 +64,6 @@ pub fn invoke_handler() -> impl Fn(Invoke<Wry>) -> bool + Send + Sync + 'static 
             crate::browser::commands::window_show_snap_layouts,
             #[cfg(windows)]
             crate::browser::commands::window_set_maximize_button,
-            crate::browser::commands::app_take_launch_urls,
             crate::app::macos_window_effects::mac_rounded_corners::reveal_main_window,
             crate::app::macos_window_effects::mac_rounded_corners::enable_modern_window_style,
             crate::app::macos_window_effects::mac_traffic_lights::set_traffic_lights_visible,

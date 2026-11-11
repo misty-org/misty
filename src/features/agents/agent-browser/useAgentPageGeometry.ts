@@ -13,9 +13,8 @@ import { appZoomChangedEvent } from "@/shared/hooks/useAppZoom";
 export const agentPageKey = (viewId: string) => `agent-page:${viewId}`;
 
 /**
- * Places an agent's live page over its host the way a tab's page is placed over its own
- * (useBrowserWebviewGeometry.ts): measured by the same code, shown through the runtime's
- * adopted pages (first-paint hold, parking and switching included), re-measured on the same
+ * Places an agent's live page over its host: measured by `visibleBrowserBounds`, shown through
+ * the runtime's adopted pages (first-paint hold, parking and switching included), re-measured on the same
  * events, and taken off screen when the host leaves the screen. A dialog or menu opening over the app
  * moves every page beneath the renderer (browser_webviews_set_overlay_active), where the transparent
  * host shows it through, so nothing here hides it for one. Off screen the page keeps painting for

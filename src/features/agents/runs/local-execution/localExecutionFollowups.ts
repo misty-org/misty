@@ -29,10 +29,7 @@ export async function steerLocalExecution(prompt: string) {
       "This workflow stopped at takeover. Review its completed and uncertain results, " +
         "then explicitly start a new run. Automatic workflow resume is not available.",
     );
-  } else if (
-    useLocalExecution.getState().execution?.normalTabs ||
-    useLocalExecution.getState().execution?.desktopControl
-  ) {
+  } else if (useLocalExecution.getState().execution?.desktopControl) {
     const companion = (await import("../../cursor/companionState")).useCompanionState.getState();
     if (!companion.submit || companion.accountId !== before.accountId)
       throw new Error(

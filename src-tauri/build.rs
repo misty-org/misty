@@ -21,7 +21,6 @@ fn main() {
             "CoreImage",
             "CoreMedia",
             "CoreVideo",
-            "LocalAuthentication",
             "NaturalLanguage",
             "UserNotifications",
             "Vision",

@@ -1,3 +1,6 @@
+import { EngineMark, hasEngineMark } from "../../engines/EngineMark";
+import { usePersonalAgentsStore } from "../../personal/personalAgentsStore";
+import { useMistyStore } from "../state/useMistyStore";
 import { useState } from "react";
 import type { GlobalAiMessage } from "../state/conversationTypes";
 import { MistyMarkdown } from "../../runs/markdown/MistyMarkdown";
@@ -47,7 +50,19 @@ export function SummarizedDivider() {
   );
 }
 
+/** Who is answering in the open chat: the engine's own mark for an agent on an outside engine,
+ * and Misty's cloud for one on Misty's own. */
 export function MistyAvatar() {
+  const agentId = useMistyStore((state) => state.selectedAgentId);
+  const engine = usePersonalAgentsStore(
+    (state) => state.agents.find((agent) => agent.id === agentId)?.engine,
+  );
+  if (hasEngineMark(engine))
+    return (
+      <span className="grid size-7 shrink-0 place-items-center rounded-full bg-cream/[0.06] text-cream ring-1 ring-white/5">
+        <EngineMark engine={engine} size={15} />
+      </span>
+    );
   return (
     <span className="grid size-7 shrink-0 place-items-center overflow-hidden rounded-full bg-cream/[0.06] ring-1 ring-white/5">
       <img src={mistyCompanion} alt="Misty" className="size-7 object-contain" draggable={false} />

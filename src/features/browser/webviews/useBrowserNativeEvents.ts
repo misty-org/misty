@@ -1,12 +1,11 @@
 import { useEffect } from "react";
-import type { NavigateFunction } from "react-router-dom";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { listenBrowserInteractionEvents } from "./browserInteractionListeners";
 import { observePageBackgroundHosts } from "./browserPageBackgrounds";
 import { listenBrowserPageEvents } from "./browserPageListeners";
 
 /** Subscribes to every native browser event the desktop shell emits. */
-export function useBrowserNativeEvents(navigate: NavigateFunction): void {
+export function useBrowserNativeEvents(): void {
   useEffect(() => {
     if (!hasTauriInternals()) return;
     let disposed = false;
@@ -15,12 +14,12 @@ export function useBrowserNativeEvents(navigate: NavigateFunction): void {
     const stopBackgroundHosts = observePageBackgroundHosts(pageBackgrounds);
     const listeners = Promise.all([
       ...listenBrowserPageEvents({ isDisposed, pageBackgrounds }),
-      ...listenBrowserInteractionEvents({ isDisposed, navigate }),
+      ...listenBrowserInteractionEvents({ isDisposed }),
     ]);
     return () => {
       disposed = true;
       stopBackgroundHosts();
       void listeners.then((unlisten) => unlisten.forEach((stop) => stop()));
     };
-  }, [navigate]);
+  }, []);
 }

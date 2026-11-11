@@ -192,23 +192,6 @@ fn build_menu<R: Runtime>(
                 "Cmd+R",
             )?,
             &PredefinedMenuItem::separator(manager)?,
-            // Zooming acts on the page; the app's own scale is the same keys with Shift.
-            &command_item(manager, snapshot, "browser.zoom_in", "Zoom In", "Cmd+Plus")?,
-            &command_item(
-                manager,
-                snapshot,
-                "browser.zoom_out",
-                "Zoom Out",
-                "Cmd+Minus",
-            )?,
-            &command_item(
-                manager,
-                snapshot,
-                "browser.zoom_reset",
-                "Actual Size",
-                "Cmd+0",
-            )?,
-            &PredefinedMenuItem::separator(manager)?,
             &command_item(
                 manager,
                 snapshot,
@@ -261,7 +244,6 @@ fn build_menu<R: Runtime>(
                 "Cmd+Shift+W",
             )?,
             &PredefinedMenuItem::separator(manager)?,
-            &command_item(manager, snapshot, "search.toggle", "New Tab", "Cmd+T")?,
             &command_item(
                 manager,
                 snapshot,

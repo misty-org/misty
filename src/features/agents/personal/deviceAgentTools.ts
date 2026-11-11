@@ -1,27 +1,18 @@
 import { invoke } from "@tauri-apps/api/core";
 import { spacesGateway } from "../spaces-gateway/spacesGateway";
-import { bookmarks, bookmarkUrl, saveBookmark } from "@/features/browser";
-import { parseBrowserViewState, useWorkspaceStore } from "@/features/app-windows";
-import { allLayoutViews } from "@/features/app-windows";
 import { devicesNative } from "@/features/devices";
 import { agentsPrepareScopedDocument } from "./useAgentsStore";
 import type { ClaimedWorkflowNodeJob } from "../runs/jobs/workerBrowserJobs";
-import { isIncognitoWindow } from "@/features/app-windows";
 
 /**
  * Device jobs for the grants a desktop chat attached: shared folders (read
- * only) and the Misty browser's tabs and bookmarks. Each job names the grant
- * it runs under; a folder job never reaches outside its folder, and private
- * tabs are never listed.
+ * only) and the chat's shell. Each job names the grant it runs under; a folder
+ * job never reaches outside its folder.
  */
 export const deviceAgentOperations = new Set([
   "folder.list",
   "folder.read",
   "folder.send",
-  "browser.tab.list",
-  "browser.tab.open",
-  "bookmark.list",
-  "bookmark.add",
   "shell.run",
 ]);
 
@@ -45,19 +36,10 @@ function scopedPath(job: ClaimedWorkflowNodeJob["job"]) {
   return { scopeId: job.scopeId, relativePath };
 }
 
-function webAddress(value: unknown) {
-  try {
-    return bookmarkUrl(typeof value === "string" ? value : "");
-  } catch {
-    throw new Error("invalid_url");
-  }
-}
-
 export async function runDeviceAgentOperation(
   job: ClaimedWorkflowNodeJob["job"],
   signal: AbortSignal,
 ): Promise<Record<string, unknown>> {
-  const input = record(job.input);
   switch (job.operation) {
     case "folder.send": {
       const target = scopedPath(job);
@@ -99,41 +81,6 @@ export async function runDeviceAgentOperation(
       } finally {
         signal.removeEventListener("abort", cancel);
       }
-    }
-    case "browser.tab.list": {
-      const tabs: Array<{ id: string; title: string; url: string }> = [];
-      const seen = new Set<string>();
-      for (const view of allLayoutViews(useWorkspaceStore.getState().layout)) {
-        if (view.surfaceId === "browser" && !isIncognitoWindow() && !seen.has(view.id)) {
-          seen.add(view.id);
-          const url = parseBrowserViewState(view.state).url;
-          if (/^https?:/i.test(url)) tabs.push({ id: view.id, title: view.title, url });
-        }
-      }
-      return { tabs: tabs.slice(0, 200) };
-    }
-    case "browser.tab.open": {
-      // A person has no tabs here; an agent opens pages in its own browser.
-      webAddress(input.url);
-      throw new Error("no_person_tabs");
-    }
-    case "bookmark.list": {
-      const query = typeof input.query === "string" ? input.query.trim().toLowerCase() : "";
-      const items = bookmarks(useWorkspaceStore.getState().bookmarks)
-        .filter(
-          (item) =>
-            !query ||
-            item.title.toLowerCase().includes(query) ||
-            item.url.toLowerCase().includes(query),
-        )
-        .slice(0, 100)
-        .map((item) => ({ id: item.id, title: item.title, url: item.url }));
-      return { bookmarks: items };
-    }
-    case "bookmark.add": {
-      const url = webAddress(input.url);
-      const title = typeof input.title === "string" ? input.title : "";
-      return { bookmarkId: saveBookmark({ url, title }), url };
     }
   }
   throw new Error(`unsupported_device_operation:${job.operation}`);

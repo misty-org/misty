@@ -92,6 +92,36 @@ Work this creates:
 - **Order**: prove what exists (look at the app, real Codex and Claude Code turns), then the
   missing features. At most three large commits, not pushed.
 
+## After the night of 2026-11-11
+
+Proven in the running app: Codex end to end (turns, resume, tool rows, the Ask prompt, the
+Space's tools over MCP), the open MCP server with a person-made connection, agent pages after
+the deletions, the files, changes and terminal panels, and the Sims-like office. Claude Code's
+adapter ran but that install's sign-in had expired; OpenCode isn't installed on this computer.
+
+Phase 6, deleted (about 31,000 lines): the tab strip and its parts, the address bar and browser
+search, the person's tab (`BrowserWorkspace`, its pages and internal pages), bars auto-hide,
+peek, reader and find, passwords and card and address autofill, import from other browsers,
+default-browser registration, the extensions interface, the history and downloads pages, and the
+agent tools that listed or opened a person's tabs and bookmarks.
+
+Phase 6, left:
+
+- **Native extensions** (`src-tauri/features/browser/extensions`, about 15,500 lines, and
+  `kiri/src/extensions`). It builds every page's configuration on macOS and has large
+  Windows-only parts, so it needs its own careful pass.
+- **Pinned tabs, tab groups, bookmarks and incognito** in the workspace store. Removing them
+  needs a store migration and about twenty test files rewritten.
+- **Leftovers**: about twenty browser shortcuts that now do nothing, 21 native commands with no
+  caller, `app-windows/addresses/*`, Memory Recall (it records only a person's pages, so it
+  records nothing now), help and feedback and the cloud clipboard (no way in), and vault records
+  for passwords, cards and bookmarks that have no interface to view or delete them.
+- **Windows**: the Windows-only parts of what was deleted were not compiled.
+- **`misty-server`** still lists the four removed agent tools in its fixtures.
+
+Still not built: handoffs and claims, multi-run, preview with element picking, the rest of the
+Space home dashboard, member limits, images for engines, and the engines' own chat history.
+
 ## Where it stands
 
 Written 2026-11-11, after the first pass through every phase on `redesign/workspace`. The type

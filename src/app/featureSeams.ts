@@ -1,13 +1,6 @@
 import { lazy } from "react";
 import { accountResets, deviceDataErasers, memoryExport, setupFlow } from "@/features/account";
-import {
-  BrowserAgentsButton,
-  openBrowserAsk,
-  resetAiSurfaceAccountState,
-  showAgentsPanel,
-  translatePageWithMisty,
-  useBrowserMistyAiAdapter,
-} from "@/features/agents";
+import { resetAiSurfaceAccountState } from "@/features/agents";
 import { libraryPicker } from "@/features/files";
 import { dockLeaves, spacesDirectory, useWorkspaceStore } from "@/features/app-windows";
 import { shortcutScope } from "@/features/shortcuts";
@@ -22,9 +15,9 @@ import {
   spacesGateway,
 } from "@/features/agents";
 import { allMethods, saveMethod } from "@/features/agents/localRun";
-import { browserAgents, browserLibrary, liveSubtitlesMenuItem } from "@/features/browser";
+import { browserLibrary } from "@/features/browser";
 import { memoryApi, memoryWorkflows } from "@/features/memory";
-import { LiveSubtitlesMenuItem, noteAsk, vocativeRouting, voiceDevice } from "@/features/voice";
+import { noteAsk, vocativeRouting, voiceDevice } from "@/features/voice";
 import { SetupStepBody, setupStepCopy, useSetupSteps } from "@/features/onboarding";
 import {
   drawingsApi,
@@ -72,16 +65,6 @@ setupFlow.provide({
   StepBody: SetupStepBody,
   ModelSetupPanel,
 });
-
-browserAgents.provide({
-  AgentsButton: BrowserAgentsButton,
-  openAgentsPanel: showAgentsPanel,
-  translatePageWithMisty,
-  useBrowserMistyAiAdapter,
-  openBrowserAsk,
-});
-
-liveSubtitlesMenuItem.provide(LiveSubtitlesMenuItem);
 
 spacesDirectory.provide(useSpacesStore);
 

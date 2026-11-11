@@ -80,10 +80,6 @@ export {
   CompanionSection,
 } from "./settings/FeatureSections";
 export { MistySection } from "./settings/MistySection";
-export { BrowserAgentsButton } from "./browser-assist/BrowserAgentsButton";
-export { translatePageWithMisty } from "./browser-assist/translatePage";
-export { useBrowserMistyAiAdapter } from "./browser-assist/useBrowserMistyAiAdapter";
-export { openBrowserAsk } from "./conversations/context/browserAskContext";
 
 // Public surface used by other features (generated from their imports).
 export { spaceAgentsApi, type SpaceAgent } from "./api/space-agents";

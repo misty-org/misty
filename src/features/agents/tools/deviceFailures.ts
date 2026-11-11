@@ -117,8 +117,6 @@ const computerMessages: Record<string, string> = {
   unsupported_content: "that file or page is not readable text",
   device_unavailable: "the user's computer is offline",
   device_timeout: "the user's computer did not answer in time",
-  invalid_url: "use an http or https address",
-  no_person_tabs: "the user has no tabs to open it in; open the page in your own browser",
   workspace_unavailable: "the Misty browser is not open on the user's computer",
   device_grant_invalid: "the user's computer could not confirm this request",
 };
@@ -126,9 +124,9 @@ const computerMessages: Record<string, string> = {
 const computerMessage = (code: string) =>
   computerMessages[code] ?? `the user's computer could not do that (${code})`;
 
-const computerReads = new Set(["folder.list", "folder.read", "browser.tab.list", "bookmark.list"]);
+const computerReads = new Set(["folder.list", "folder.read"]);
 
-/** A folder, tab list, bookmark or shell tool's failure (`runDeviceTool`). */
+/** A folder or shell tool's failure (`runDeviceTool`). */
 export function computerToolFailure(name: string, error: unknown, stopped = false): Error {
   const { uncertain, errorCode } = deviceJobFailure(name, error, true);
   if (computerReads.has(name)) {

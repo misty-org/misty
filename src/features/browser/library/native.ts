@@ -1,150 +1,19 @@
 import { invoke } from "@tauri-apps/api/core";
 
-type BrowserDownloadState = "in_progress" | "finished" | "failed" | "cancelled" | "interrupted";
-
-export interface BrowserDownloadEntry {
-  id: string;
-  url: string;
-  path: string;
-  fileName: string;
-  state: BrowserDownloadState;
-  error: string | null;
-  received: number;
-  /** -1 when the size is unknown. */
-  total: number;
-  startedAt: number;
-  finishedAt: number | null;
-  /** Whether a finished file is still where it was saved. */
-  exists: boolean;
-  /** The device that holds the file, for a Space download made on another device. */
-  device?: string | null;
-}
-
-interface BrowserDownloadProgress {
-  id: string;
-  received: number;
-  total: number;
-}
-
-export interface BrowserHistoryVisit {
-  id: number;
-  url: string;
-  title: string;
-  visitedAt: number;
-}
-
-export interface BrowserHistorySuggestion {
-  url: string;
-  title: string;
-  visits: number;
-  /** Visits where the person typed the address. */
-  typedVisits: number;
-  lastVisitedAt: number;
-}
-
-export interface BrowserFindResult {
-  current: number;
-  total: number;
-}
-
-export const browserHistoryClearedEvent = "misty:browser-history-cleared";
-/** Any visit was removed. Lists built from history read it again instead of showing old rows. */
-export const browserHistoryChangedEvent = "misty:browser-history-changed";
-
-const historyChanged = (): void => {
-  window.dispatchEvent(new Event(browserHistoryChangedEvent));
-};
-
 export type BrowserWebsiteDataKind = "cookies" | "cache";
 
+/** What this computer keeps from web pages, for clearing it. */
 export const browserLibrary = {
-  downloads: () => invoke<BrowserDownloadEntry[]>("browser_downloads_list"),
-  downloadProgress: () => invoke<BrowserDownloadProgress[]>("browser_downloads_progress"),
-  cancelDownload: (id: string) => invoke<void>("browser_download_cancel", { request: { id } }),
-  openDownload: (id: string) => invoke<void>("browser_download_open", { request: { id } }),
-  revealDownload: (id: string) => invoke<void>("browser_download_reveal", { request: { id } }),
-  removeDownloads: (request: { ids?: string[]; since?: number }) =>
-    invoke<void>("browser_downloads_remove", {
-      request: { ids: request.ids ?? [], since: request.since },
-    }),
-
-  recordVisit: (request: { url: string; title: string; typed?: boolean }) =>
-    invoke<void>("browser_history_record", { request }),
-  setVisitTitle: (request: { url: string; title: string }) =>
-    invoke<void>("browser_history_set_title", { request }),
-  history: (request: { text?: string; before?: number; limit?: number }) =>
-    invoke<BrowserHistoryVisit[]>("browser_history_query", { request }),
-  /** Empty text returns the profile's top pages. */
-  historySuggestions: (request: { text: string; limit?: number }) =>
-    invoke<BrowserHistorySuggestion[]>("browser_history_suggest", { request }),
-  /** Removes every visit to one page. */
-  forgetPage: (request: { url: string }) =>
-    invoke<void>("browser_history_forget", { request }).then(historyChanged),
-  deleteVisits: (ids: number[]) =>
-    invoke<void>("browser_history_delete", { request: { ids } }).then(historyChanged),
-  clearHistory: (request: { since?: number }) =>
-    invoke<void>("browser_history_clear", { request }).then(() => {
-      // Open history lists reload instead of waiting for a manual refresh.
-      window.dispatchEvent(new Event(browserHistoryClearedEvent));
-      historyChanged();
-    }),
-
+  /** Removes the list of downloads kept on this computer; the files stay on disk. */
+  removeDownloads: (request: { since?: number }) =>
+    invoke<void>("browser_downloads_remove", { request: { ids: [], since: request.since } }),
+  /** Removes the visits recorded while Misty had tabs of a person's own. */
+  clearHistory: (request: { since?: number }) => invoke<void>("browser_history_clear", { request }),
   clearWebsiteData: (request: { kinds: BrowserWebsiteDataKind[]; since: number }) =>
     invoke<void>("browser_clear_website_data", { request }),
 };
 
-export interface BrowserMediaInfo {
-  title: string;
-  artist: string;
-  /** An https image from the page, or "". */
-  artwork: string;
-  duration: number | null;
-  position: number | null;
-  paused: boolean;
-  /** Something has played on the page and not ended, even if it is paused now. */
-  hasMedia?: boolean;
-  canPrevious: boolean;
-  canNext: boolean;
-  /** Floating in the system's picture-in-picture window. */
-  pictureInPicture?: boolean;
-}
-
-export interface BrowserFindOptions {
-  highlightAll: boolean;
-  matchCase: boolean;
-  matchDiacritics: boolean;
-  wholeWords: boolean;
-}
-
 export const browserPageTools = {
-  stop: (id: string) => invoke<void>("browser_webview_stop", { request: { id } }),
-  find: (
-    id: string,
-    query: string,
-    direction: "next" | "previous" | "clear",
-    options: Partial<BrowserFindOptions> = {},
-  ) =>
-    invoke<BrowserFindResult>("browser_webview_find", {
-      request: { id, query, direction, ...options },
-    }),
-  print: (id: string) => invoke<void>("browser_webview_print", { request: { id } }),
-  savePage: (id: string, path: string) =>
-    invoke<void>("browser_webview_save_page", { request: { id, path } }),
-  developerTools: (id: string) =>
-    invoke<{ opened: boolean }>("browser_webview_developer_tools", { request: { id } }),
   readerArticle: (id: string) =>
     invoke<unknown>("browser_webview_reader_article", { request: { id } }),
-  mediaPlayback: (id: string, action: "pause" | "play") =>
-    invoke<void>("browser_webview_media_playback", { request: { id, action } }),
-  /** What the page is playing: its own title, artist and artwork, and its position. */
-  mediaInfo: (id: string) =>
-    invoke<BrowserMediaInfo>("browser_webview_media_info", { request: { id } }),
-  /** Runs the page's own media control, falling back to its media element for play and pause. */
-  mediaAction: (
-    id: string,
-    action: "play" | "pause" | "previoustrack" | "nexttrack" | "seekto",
-    position?: number,
-  ) => invoke<void>("browser_webview_media_action", { request: { id, action, position } }),
-  pictureInPicture: (id: string, mode: "toggle" | "enter" | "exit" | "refresh") =>
-    invoke<void>("browser_webview_picture_in_picture", { request: { id, mode } }),
 };

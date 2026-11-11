@@ -1,11 +1,6 @@
-import { BrowserImportFlow } from "@/features/browser";
-import { ExtensionsSetupStep } from "@/features/browser";
-import { useExtensionsStore } from "@/features/browser";
-import { setTabsAutoHide, useTabsAutoHide } from "@/features/browser";
 import { normalizeDockingLayout, type TabSide } from "@/app/shell/dockingLayout";
 import { useWindowDockingLayout, useWorkspaceStore } from "@/features/app-windows";
-import { hasTauriInternals } from "@/shared/platform/tauri";
-import { cn, Pressable, Switch } from "@/shared/ui";
+import { cn, Pressable } from "@/shared/ui";
 import { Check } from "lucide-react";
 import type { ReactNode } from "react";
 import { TabsPreview } from "./SetupPreviews";
@@ -14,29 +9,18 @@ import type { SetupStep } from "@/features/account";
 
 export type { SetupStep };
 
-/** This computer's setup: import and extensions end the wizard that follows signing in; the tab
- * side is asked once the browser is on screen (`useTabSidePrompt`). */
-
+/** This computer's setup, the step that ends the wizard that follows signing in. */
 export const setupStepCopy: Record<SetupStep, string> = {
-  import: "Import from your browser",
-  extensions: "Add an ad blocker and a password manager",
-  tabs: "Where do you want your tabs?",
+  tabs: "Where do you want the sidebar?",
 };
 
-/** The steps the wizard runs here: importing reads other browsers on this computer, so it needs
- * the native app; extensions need a platform that runs them. Outside the native app there is
- * nothing else to set up, so the tab side stays in the wizard. */
+/** The steps the wizard runs here: the side the sidebar sits on. */
 export function useSetupSteps(): SetupStep[] {
-  const extensionsSupported = useExtensionsStore((state) => state.supported);
-  if (!hasTauriInternals()) return ["tabs"];
-  return extensionsSupported ? ["import", "extensions"] : ["import"];
+  return ["tabs"];
 }
 
-/** One step's body. Importing brings its own Skip, which moves on. */
-export function SetupStepBody(props: { step: SetupStep; onNext(): void }) {
-  if (props.step === "import")
-    return <BrowserImportFlow onClose={props.onNext} closeLabel="Skip" />;
-  if (props.step === "extensions") return <ExtensionsSetupStep />;
+/** One step's body. */
+export function SetupStepBody(_props: { step: SetupStep; onNext(): void }) {
   return <TabsStep />;
 }
 
@@ -45,14 +29,13 @@ const tabSideChoices: Array<{ value: TabSide; label: string }> = [
   { value: "right", label: "Right" },
 ];
 
-/** The tab side applies immediately and stays in Settings. */
+/** The sidebar side applies immediately and stays in Settings. */
 function TabsStep() {
   const layout = useWindowDockingLayout();
   const setLayout = useWorkspaceStore((state) => state.setWindowDockingLayout);
-  const autoHide = useTabsAutoHide();
   return (
     <div className="flex flex-col gap-3">
-      <div role="radiogroup" aria-label="Tab side" className="grid grid-cols-2 gap-3">
+      <div role="radiogroup" aria-label="Sidebar side" className="grid grid-cols-2 gap-3">
         {tabSideChoices.map((choice) => (
           <Choice
             key={choice.value}
@@ -67,10 +50,6 @@ function TabsStep() {
             <TabsPreview side={choice.value} />
           </Choice>
         ))}
-      </div>
-      <div className="flex items-center justify-between gap-3 px-0.5 text-sm text-cream-bright">
-        Auto-hide tabs
-        <Switch aria-label="Auto-hide tabs" checked={autoHide} onCheckedChange={setTabsAutoHide} />
       </div>
     </div>
   );

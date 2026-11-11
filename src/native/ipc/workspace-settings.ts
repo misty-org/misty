@@ -6,11 +6,6 @@ export interface SettingsSnapshot {
   document: Record<string, unknown>;
 }
 
-export interface DefaultBrowserSnapshot {
-  supported: boolean;
-  isDefault: boolean;
-}
-
 export interface LaunchOnLoginSnapshot {
   supported: boolean;
   enabled: boolean;

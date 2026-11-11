@@ -1,7 +1,6 @@
 import { nativeWorkspaceRecoveryEnabled } from "@/features/app-windows";
 import { useWorkspaceRecoveryState } from "@/features/app-windows";
 import { useWorkspaceRecoveryRetry } from "@/features/app-windows";
-import { PageStateBridge } from "@/features/browser";
 import { SpacesRealtimeBridge } from "@/features/spaces/SpacesRealtimeBridge";
 import { LoadingScreen } from "@/shared/ui";
 import { AgentExecutionSurface } from "@/features/agents";
@@ -49,12 +48,7 @@ export function AppFrameLayout() {
   // Browsing data belongs to the signed-in account, or to the local profile with none.
   const accountScope = accountScopeFor(user?.id);
   useWorkspaceRecoveryRetry(!isAuthRoute && !transitioning ? accountScope : "");
-  // An incognito window keeps nothing. Any other window keeps its pages' state once its
-  // saved tabs are back.
   const incognito = useProfileWindowStore((state) => state.incognito);
-  const keepsPageState =
-    !incognito &&
-    (!nativeWorkspaceRecoveryEnabled() || (recovery.accountId === accountScope && recovery.ready));
 
   // First run shows the welcome once, before the shell mounts: the shell sends a bare "/"
   // straight to the active tab, which would skip it. Invite links go through.
@@ -103,7 +97,6 @@ export function AppFrameLayout() {
         <DesktopLayout getRouteId={desktopRouteIdFromPath} />
       </Suspense>
       <DeviceSessionBridge />
-      <PageStateBridge enabled={keepsPageState} />
       <SpacesRealtimeBridge />
       <SpaceWindowBridge />
       {incognito ? null : <AgentExecutionSurface />}

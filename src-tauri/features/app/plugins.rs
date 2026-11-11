@@ -6,9 +6,8 @@ use tauri::{Builder, Wry};
 pub fn register(builder: Builder<Wry>) -> Builder<Wry> {
     // Register this first so duplicate launches are rejected before any other
     // plugin or application service can initialize a second Misty runtime.
-    crate::browser::default_browser::remember_launch(std::env::args().skip(1));
     #[cfg(desktop)]
-    let builder = builder.plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
+    let builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
         if !crate::app::macos_window_effects::mac_rounded_corners::main_window_ready() {
             return;
         }
@@ -18,12 +17,6 @@ pub fn register(builder: Builder<Wry>) -> Builder<Wry> {
             let _ = window.set_focus();
         } else {
             let _ = crate::browser::app_windows::restore(app);
-        }
-        // Links opened while Misty runs, as the default browser, go to the Space
-        // that claims their site, else to the last focused window.
-        let urls = crate::browser::default_browser::web_urls(args.iter().skip(1));
-        if !urls.is_empty() {
-            crate::browser::app_windows::route_app_links(app, urls);
         }
     }));
 

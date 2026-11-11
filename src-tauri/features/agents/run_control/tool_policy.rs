@@ -59,14 +59,12 @@ impl RunFacts {
 /// What stops in Ask, before it reaches the window. Everything else is a read.
 const ASK_MODE_STOPS: &[&str] = &[
     "agent.configure",
-    "bookmark.add",
     "browser.act",
     "browser.fill_form",
     "browser.navigate",
     "browser.run",
     "browser.skill",
     "browser.steps",
-    "browser.tab.open",
     "browser.upload",
     "drawing.apply",
     "drawing.create",
@@ -106,7 +104,6 @@ const HISTORY_STOPS: &[&str] = &[
 
 /// What Plan mode refuses whatever the catalog offered: tools that change something on this computer.
 const PLAN_REFUSES: &[&str] = &[
-    "bookmark.add",
     "browser.act",
     "browser.fill_form",
     "browser.navigate",
@@ -114,7 +111,6 @@ const PLAN_REFUSES: &[&str] = &[
     "browser.run",
     "browser.skill",
     "browser.steps",
-    "browser.tab.open",
     "browser.upload",
     "folder.send",
     "screen.open",
@@ -122,12 +118,7 @@ const PLAN_REFUSES: &[&str] = &[
 ];
 
 /// The tools that open an address, and the field that names it.
-pub(crate) const URL_TOOLS: &[&str] = &[
-    "browser.navigate",
-    "browser.tab.open",
-    "screen.open",
-    "web.fetch",
-];
+pub(crate) const URL_TOOLS: &[&str] = &["browser.navigate", "screen.open", "web.fetch"];
 
 /// What a screen goal may only do with the person's approval, as the model's own flag claims it.
 fn consequential_goal(goal: &str) -> bool {

@@ -1,41 +1,23 @@
-import { useEffect, type ReactNode } from "react";
+import { type ReactNode } from "react";
 import { layoutTabs, tabLabel } from "@/features/app-windows";
 import type { WorkspaceLayout, WorkspaceTab } from "@/features/app-windows";
-import { keepPeek, usePeekStore } from "@/features/app-windows";
 import { useMistyPanelSide } from "@/features/agents";
 import { cn } from "@/shared/ui";
-import { PeekOverlay } from "./PeekOverlay";
 import { WorkspaceMistyDock } from "./WorkspaceMistyDock";
 import { treeKeepsLayoutWhileHidden } from "./keptTabs";
 
-/** One panel per workspace tab; a peeked tab floats over the tab it came from. The
- * active tab also holds the Misty panel when no browser pane does. */
+/** One panel per workspace tab. The active tab also holds the Misty panel. */
 export function WorkspaceTabPanels(props: {
   layout: WorkspaceLayout;
   renderTree(tab: WorkspaceTab, active: boolean): ReactNode;
-  onClosePeek(): void;
   /** Where a grid canvas puts the panels, below the Space bar. */
   gridColumn?: number;
 }) {
   const { layout } = props;
-  const tabs = layoutTabs(layout);
-  const peek = usePeekStore((state) => state.peek);
   const mistySide = useMistyPanelSide();
-  const peeking =
-    peek && peek.tabId === layout.activeTabId && tabs.some((tab) => tab.id === peek.sourceTabId)
-      ? peek
-      : null;
-  // Choosing any other tab keeps the peeked page as an ordinary tab.
-  useEffect(() => {
-    if (peek && peek.tabId !== layout.activeTabId) keepPeek();
-  }, [peek, layout.activeTabId]);
 
-  return tabs.map((tab) => {
-    // A peeked tab floats over its source instead of replacing it.
-    if (peeking?.tabId === tab.id) return null;
-    const source = peeking?.sourceTabId === tab.id;
-    const peekTab = source ? tabs.find((item) => item.id === peeking.tabId) : null;
-    const active = tab.id === layout.activeTabId || source;
+  return layoutTabs(layout).map((tab) => {
+    const active = tab.id === layout.activeTabId;
     // Every panel shares one grid cell, so a kept panel keeps the size it is shown at.
     const kept = !active && treeKeepsLayoutWhileHidden(tab.root);
     return (
@@ -59,14 +41,9 @@ export function WorkspaceTabPanels(props: {
         inert={!active && !kept}
       >
         <div className="misty-pane-frame relative min-h-0 min-w-0 flex-1">
-          {props.renderTree(tab, tab.id === layout.activeTabId)}
+          {props.renderTree(tab, active)}
         </div>
-        {tab.id === layout.activeTabId ? <WorkspaceMistyDock /> : null}
-        {peekTab ? (
-          <PeekOverlay tab={peekTab} onKeep={keepPeek} onClose={props.onClosePeek}>
-            {props.renderTree(peekTab, true)}
-          </PeekOverlay>
-        ) : null}
+        {active ? <WorkspaceMistyDock /> : null}
       </div>
     );
   });

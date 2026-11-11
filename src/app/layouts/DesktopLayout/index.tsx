@@ -11,10 +11,6 @@ import {
   SignOutSheet,
   useAuth,
 } from "@/features/account";
-import { useExtensionsRuntime } from "@/features/browser";
-import { ExtensionPermissionRequest } from "@/features/browser";
-import { ExtensionInstallRequest } from "@/features/browser";
-import { ProfileImportRequest } from "@/features/browser";
 import { NavigationNamesBoundary } from "@/features/app-windows";
 import { blockIfUnsaved } from "@/features/settings";
 import { setBrowserWebviewsSuspended } from "@/features/app-windows";
@@ -34,7 +30,6 @@ import { DeferUntilIdle } from "./DeferUntilIdle";
 import { DesktopShellOverlays } from "./DesktopShellOverlays";
 import { FramePacingOverlay } from "./FramePacingOverlay";
 import { AccountIsland } from "./AccountIsland";
-import { StripDownloads } from "./WorkspaceStripDock";
 import { AppNoticePublisher, RouteNotice } from "./RouteNotices";
 import { StandaloneRouteSurface } from "./StandaloneRouteSurface";
 import * as styles from "./styles";
@@ -56,7 +51,6 @@ import { useCaptionSlot } from "./useCaptionSlot";
 import { useSidebarCollapsedStore } from "@/app/shell/sidebarCollapsed";
 import { WorkspaceCanvas } from "./WorkspaceCanvas";
 export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab }) {
-  useExtensionsRuntime();
   useStrayBrowserPages();
   const { user, refreshUser, transitioning, sessionExpired } = useAuth();
   const { location, navigate, lastAppRoute, lastNonSettingsRouteRef, routeId } =
@@ -168,17 +162,8 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
       }
     />
   ) : null;
-  // The sidebar's bottom edge: downloads on the left, chat on the right.
-  const stripFootEnd = (
-    <>
-      <StripDownloads />
-    </>
-  );
   return (
     <NavigationNamesBoundary userId={user?.id ?? ""} enabled={!isAuthRoute}>
-      <ExtensionPermissionRequest />
-      <ExtensionInstallRequest />
-      <ProfileImportRequest />
       <main
         ref={shellRef}
         className={cn(
@@ -252,7 +237,6 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
                 windowsTitlebarControls={shouldShowWindowsControls}
                 tabPosition={docking.tabs}
                 hideTabStrip={focusMode}
-                stripFootEnd={stripFootEnd}
                 stripAccount={stripAccount}
               />
             )}

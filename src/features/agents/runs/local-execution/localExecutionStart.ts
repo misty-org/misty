@@ -18,16 +18,6 @@ import {
 import { createWorkspaceView } from "./localExecutionView";
 
 interface LocalExecutionOptions {
-  normalTabs: boolean;
-  openWhenMissing?: boolean;
-  /** The page a newly opened tab starts on. */
-  url?: string;
-  /** What the agent said the tab is for, to find the user's matching tab. */
-  hint?: string;
-  /** Exactly this tab: a follow-up continues where the earlier run worked. */
-  tabId?: string;
-  /** new: always a fresh tab; current: the tab in front of the user. */
-  place?: "current" | "new";
   desktopControl?: boolean;
   method?: Execution["method"];
 }
@@ -59,7 +49,6 @@ export async function startLocalExecution(
   const sameScope = (run: Execution) =>
     run.agentId === agentId &&
     run.spaceId === spaceId &&
-    run.normalTabs === options?.normalTabs &&
     run.desktopControl === options?.desktopControl;
   if (previous?.state === "finished" && !sameScope(previous)) {
     await finishLocalExecution();
@@ -76,12 +65,8 @@ export async function startLocalExecution(
     agentId,
     spaceId,
     method: options?.method ? structuredClone(options.method) : undefined,
-    normalTabs: options?.normalTabs,
     desktopControl: options?.desktopControl,
-    autopilot:
-      !options?.normalTabs &&
-      visibleAutopilotAvailable() &&
-      /^space-/.test(getCurrentWindow().label),
+    autopilot: visibleAutopilotAvailable() && /^space-/.test(getCurrentWindow().label),
     state: "running",
     views: [...(previous?.ready ? previous.views : [])],
     childViews: [...(previous?.ready ? (previous.childViews ?? []) : [])],
@@ -123,34 +108,8 @@ export async function startLocalExecution(
     startHeartbeat(execution, assertCurrent);
     await (await import("../../artifacts/taskArtifacts")).trackTaskArtifacts(accountId);
     assertCurrent();
-    if (options?.normalTabs) {
-      const normal = await (
-        await import("../../cursor/normalTabs")
-      ).companionBrowserContext(
-        assertCurrent,
-        options.openWhenMissing,
-        options.url,
-        options.hint,
-        options.tabId,
-        options.place,
-      );
-      assertCurrent();
-      execution.views = [];
-      execution.context = normal.context;
-      execution.deviceContexts = normal.deviceContexts;
-      for (const ref of normal.deviceContexts) {
-        await invoke("agent_workspace_bind_scope", {
-          taskId: execution.taskId,
-          scopeId: ref.opaqueRef,
-        });
-        assertCurrent();
-      }
-      execution.ready = true;
-      useLocalExecution.setState({ execution: { ...execution } });
-      return execution;
-    }
     if (previous) await rebindPreviousViews(execution, previous, assertCurrent);
-    // Agents use the same native default profile as BrowserWorkspace. Logical
+    // Agents use the window's native default profile. Logical
     // encrypted profile ownership will be resolved by the native host, not an
     // installed-app/provider hash selected by the renderer.
     if (!execution.deviceContexts.length)

@@ -54,7 +54,9 @@ pub(super) fn export_cookie(native: &NSHTTPCookie) -> Result<Cookie> {
     Ok(cookie)
 }
 
-/// A cookie exactly as given: refused if Foundation would change anything about it.
+/// A cookie exactly as given: refused if Foundation would change anything about it. The tests
+/// check the conversion both ways through it.
+#[cfg(test)]
 pub(crate) fn import_cookie(cookie: &Cookie) -> Result<Retained<NSHTTPCookie>> {
     let native = native_cookie(cookie)?;
     let exported = aligned_export(cookie, &native)?;

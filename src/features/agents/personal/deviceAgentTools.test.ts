@@ -2,15 +2,8 @@ import "@/app/featureSeams";
 import { beforeEach, expect, it, vi } from "vitest";
 
 const invoke = vi.fn();
-const openBrowserView = vi.fn(() => ({ id: "view-new" }));
-const saveBookmark = vi.fn(() => "bookmark:new");
 const readSharedFile = vi.fn();
 const uploadLibraryBlob = vi.fn();
-const views = [
-  { id: "a", surfaceId: "browser", title: "Docs", state: { url: "https://docs.example.com" } },
-  { id: "a", surfaceId: "browser", title: "Docs", state: { url: "https://docs.example.com" } },
-  { id: "n", surfaceId: "notes", title: "Notes", state: {} },
-];
 vi.mock("@tauri-apps/api/core", () => ({ invoke: (...args: unknown[]) => invoke(...args) }));
 vi.mock("@/features/devices/api/native-devices", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
@@ -27,39 +20,6 @@ vi.mock("./useAgentsStore", () => ({
     truncated: false,
     sections: [{ kind: "text", locator: "1", text: "Revenue grew" }],
   })),
-}));
-vi.mock("@/features/app-windows/panes/layoutTabs", async (importOriginal) => ({
-  ...(await importOriginal<Record<string, unknown>>()),
-  allLayoutViews: () => views,
-}));
-vi.mock("@/features/app-windows", async (importOriginal) => ({
-  ...(await importOriginal<Record<string, unknown>>()),
-  useWorkspaceStore: {
-    getState: () => ({
-      openBrowserView,
-      bookmarks: [
-        {
-          id: "b1",
-          fields: { folder_id: "f", title: "Misty docs", url: "https://misty.app/docs", order: 0 },
-        },
-        {
-          id: "b2",
-          fields: { folder_id: "f", title: "News", url: "https://news.example", order: 1 },
-        },
-      ],
-    }),
-  },
-  parseBrowserViewState: (state: { url: string }) => state,
-}));
-vi.mock("@/features/browser/bookmarks/library", async (importOriginal) => ({
-  ...(await importOriginal<Record<string, unknown>>()),
-  bookmarks: (records: Array<{ id: string; fields: { title: string; url: string } }>) =>
-    records.map((record) => ({ id: record.id, ...record.fields })),
-  bookmarkUrl: (value: string) => {
-    if (!/^https?:\/\//.test(value)) throw new Error("bad");
-    return value;
-  },
-  saveBookmark: (...args: unknown[]) => saveBookmark(...(args as [])),
 }));
 
 const { runDeviceAgentOperation } = await import("./deviceAgentTools");
@@ -78,33 +38,6 @@ const job = (operation: string, input: unknown, scopeId = "scope_reports", space
 const signal = new AbortController().signal;
 
 beforeEach(() => vi.clearAllMocks());
-
-it("lists only shared browser tabs once each", async () => {
-  expect(await runDeviceAgentOperation(job("browser.tab.list", {}), signal)).toEqual({
-    tabs: [{ id: "a", title: "Docs", url: "https://docs.example.com" }],
-  });
-});
-
-it("opens and bookmarks only web addresses", async () => {
-  await expect(
-    runDeviceAgentOperation(job("browser.tab.open", { url: "https://misty.app" }), signal),
-  ).rejects.toThrow("no_person_tabs");
-  expect(openBrowserView).not.toHaveBeenCalled();
-  await expect(
-    runDeviceAgentOperation(job("browser.tab.open", { url: "file:///etc/passwd" }), signal),
-  ).rejects.toThrow("invalid_url");
-  await runDeviceAgentOperation(
-    job("bookmark.add", { url: "https://misty.app", title: "Misty" }),
-    signal,
-  );
-  expect(saveBookmark).toHaveBeenCalledWith({ url: "https://misty.app", title: "Misty" });
-});
-
-it("searches bookmarks by title or address", async () => {
-  expect(await runDeviceAgentOperation(job("bookmark.list", { query: "docs" }), signal)).toEqual({
-    bookmarks: [{ id: "b1", title: "Misty docs", url: "https://misty.app/docs" }],
-  });
-});
 
 it("keeps folder jobs inside the granted folder", async () => {
   invoke.mockResolvedValue({ entries: [] });

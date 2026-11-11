@@ -116,15 +116,6 @@ async function resolveWorkspace(entry: RunEntry, wanted: unknown) {
   return found;
 }
 
-/** The tab list and bookmarks. */
-export async function runWorkspaceTool(request: LocalToolRequest, entry: RunEntry) {
-  const workspace = await resolveWorkspace(entry, request.input.device);
-  const input = Object.fromEntries(
-    Object.entries(request.input).filter(([key]) => key !== "device"),
-  );
-  return runComputerTool(request, entry, workspace.opaqueRef, input);
-}
-
 /** A command in the chat's workspace. The computer takes the workspace from the signed grant. */
 export async function runShellTool(request: LocalToolRequest, entry: RunEntry) {
   const command = request.input.command;

@@ -1,5 +1,5 @@
 import { workspaceDefaultViewIndex } from "@/features/settings";
-import { browserViewTitle, createBrowserViewState, type WorkspaceView } from "./workspaceViews";
+import { type WorkspaceView } from "./workspaceViews";
 
 /** Settings store the view's index in the setting's legacy values, where 0 was the retired Home
  * page, 1 the browser and 2 the retired Files tool; all now open Agents. */
@@ -45,22 +45,3 @@ export function createDefaultWorkspaceView(): WorkspaceView {
   return createTab(defaultIndex, true);
 }
 export const createBlankWorkspaceView = createDefaultWorkspaceView;
-
-/** A browser tab for an address, made but not opened: the layout popup queues it until Apply. */
-export function createBrowserWorkspaceView(url: string): WorkspaceView {
-  const now = Date.now();
-  const id = `tab:${crypto.randomUUID()}`;
-  return {
-    id,
-    surfaceId: "browser",
-    groupKey: "tool:browser",
-    instanceKey: id,
-    title: browserViewTitle(url),
-    route: "/browser",
-    sidebarVisible: false,
-    state: createBrowserViewState(url),
-    createdAt: now,
-    lastFocusedAt: now,
-    placeholder: false,
-  };
-}

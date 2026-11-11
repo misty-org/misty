@@ -3,16 +3,12 @@ import type { TabSide } from "@/app/shell/dockingLayout";
 import { openSignInSheet, useAuth } from "@/features/account";
 import { ProfileSwitcher, type WorkspaceView } from "@/features/app-windows";
 import { SpaceRow, SpaceRowPreview } from "@/features/spaces";
-import { useBrowserToolbarSlot } from "@/features/browser";
 import { OverlaySideProvider, inwardSide } from "@/shared/ui";
-import { SidebarNavFallback } from "./SidebarFallbacks";
+import { SidebarNav } from "./SidebarNav";
 import { SidebarToggleButton } from "./SidebarToggleButton";
-import { LayoutButton } from "./SidebarToolsRow";
+import { LayoutButton } from "./LayoutButton";
 import { SpaceNavigator } from "./SpaceNavigator";
 import { windowsCaptionSlotId } from "./WindowsTitlebarControls";
-
-const setNavSlot = (element: HTMLDivElement | null) =>
-  useBrowserToolbarSlot.getState().setNav(element);
 
 /**
  * The window's sidebar: which Space this is, its pages, then the person's chats under each of
@@ -44,8 +40,7 @@ export function WorkspaceSidebar(props: {
             <SidebarToggleButton side={position} />
             <LayoutButton />
             <div className="misty-sidebar-nav flex items-center">
-              <div ref={setNavSlot} className="flex items-center" />
-              <SidebarNavFallback />
+              <SidebarNav />
             </div>
           </div>
           {/* Which Space this is, and the way to another. */}

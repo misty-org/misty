@@ -1,7 +1,7 @@
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { recallSettings } from "../recall";
 import { useSettingsStore } from "@/features/settings";
-import { useWorkspaceStore } from "@/features/app-windows";
+import { openExternalLink } from "@/shared/platform/openExternalLink";
 import { Button, cn, IconButton, Pressable, Skeleton } from "@/shared/ui";
 import { dayTitle, leftOffPage, siteThreads, threadTime } from "./recapDay";
 import { useMemoryTreeStore } from "./useMemoryTreeStore";
@@ -126,10 +126,7 @@ export function RecapSheet({
                   <span className="min-w-0 flex-1 truncate text-sm text-cream" title={page.url}>
                     {page.title || page.site || page.url}
                   </span>
-                  <Button
-                    size="sm"
-                    onClick={() => useWorkspaceStore.getState().openBrowserView({ url: page.url! })}
-                  >
+                  <Button size="sm" onClick={() => void openExternalLink(page.url!)}>
                     Open
                   </Button>
                 </div>
