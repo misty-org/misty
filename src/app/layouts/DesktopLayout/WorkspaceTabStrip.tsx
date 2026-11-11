@@ -104,7 +104,6 @@ export function WorkspaceTabStrip(
     <>
       <div className="misty-sidebar-address">
         <div className="misty-sidebar-omnibox">
-          <SidebarToolsRow />
           <div ref={setTopSlot} className="misty-workspace-toolbar-slot" />
           <SidebarAddressFallback />
         </div>
@@ -182,13 +181,16 @@ export function WorkspaceTabStrip(
           <SidebarNowPlaying />
           <div className="misty-sidebar-foot" data-misty-window-drag-block="true">
             {/* Downloads keep the left edge and the pane layout the right, never side by side. */}
-            <div className="flex items-center gap-1.5">{props.footEnd}</div>
+            <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+              <SidebarToolsRow />
+              {props.footEnd}
+            </div>
             <div className="flex min-w-0 flex-1 justify-center" data-browser-toolbar data-sidebar>
               <ProfileSwitcher />
             </div>
           </div>
+          {props.account}
         </div>
-        {props.account}
         {hoverCards.card}
         {editingGroup && (
           <TabGroupEditor

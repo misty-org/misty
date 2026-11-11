@@ -4,6 +4,7 @@ import {
   BrowserAgentsButton,
   openBrowserAsk,
   resetAiSurfaceAccountState,
+  showAgentsPanel,
   translatePageWithMisty,
   useBrowserMistyAiAdapter,
 } from "@/features/agents";
@@ -74,6 +75,7 @@ setupFlow.provide({
 
 browserAgents.provide({
   AgentsButton: BrowserAgentsButton,
+  openAgentsPanel: showAgentsPanel,
   translatePageWithMisty,
   useBrowserMistyAiAdapter,
   openBrowserAsk,

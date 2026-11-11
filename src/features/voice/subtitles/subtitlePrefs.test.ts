@@ -12,6 +12,7 @@ describe("subtitle preferences", () => {
       silenceSeconds: 30,
       source: "auto",
       mode: "translate",
+      input: "system",
       save: false,
     });
   });

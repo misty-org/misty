@@ -95,7 +95,7 @@ export function validPreference(d: SettingDefinition, value: unknown): value is 
         );
       if (d.id === "app.sidebar.tools")
         return (
-          parsed.length <= 8 &&
+          parsed.length <= 16 &&
           new Set(parsed).size === parsed.length &&
           parsed.every((id) => typeof id === "string" && /^[a-z][a-z-]{0,31}$/.test(id))
         );

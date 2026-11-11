@@ -36,6 +36,13 @@ fn truthy(value: Option<&Value>) -> bool {
     }
 }
 
+/// The numeric code of an error message from the provider, and nothing else it said.
+pub(crate) fn provider_error_code(text: &str) -> Option<u32> {
+    let raw: Value = serde_json::from_str(text).ok()?;
+    let code = raw.as_object()?.get("error_code")?;
+    code.as_u64().map(|code| code as u32).or_else(|| code.as_str()?.parse().ok())
+}
+
 /// `None` for an error from the provider or a message that can't be read, both of which fail the
 /// stream. What the failure said goes no further, since provider errors can echo request details.
 pub(crate) fn parse_message(text: &str) -> Option<ParsedMessage> {
@@ -118,11 +125,16 @@ pub struct SonioxConfig {
     pub enable_speaker_diarization: Option<bool>,
     pub enable_language_identification: bool,
     pub enable_endpoint_detection: bool,
+    pub max_endpoint_delay_ms: u32,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub context: Option<SonioxContext>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub translation: Option<SonioxTranslation>,
 }
+
+/// How long Soniox waits in silence before it ends a phrase and settles its translation. Its own
+/// default is 2000, which made subtitles sit on a finished sentence; 500 is the shortest it takes.
+const MAX_ENDPOINT_DELAY_MS: u32 = 600;
 
 fn soniox_language(language: &str) -> &str {
     match language {
@@ -149,6 +161,7 @@ pub(crate) fn soniox_config(source: &str, target: &str, model: &str, context: Op
         enable_speaker_diarization: Some(true),
         enable_language_identification: true,
         enable_endpoint_detection: true,
+        max_endpoint_delay_ms: MAX_ENDPOINT_DELAY_MS,
         context: context.filter(has_context),
         translation: (source != target && target != "auto")
             .then(|| SonioxTranslation { kind: "one_way", target_language: soniox_language(target).to_owned() }),

@@ -1,6 +1,6 @@
 import { normalizeDockingLayout, validDockingLayout } from "@/app/shell/dockingLayout";
 import { traversePaneHistory } from "./paneHistory";
-import { appendTab, layoutTabs, activateTab } from "./layoutTabs";
+import { appendTab, layoutTabs, activateTab, singleViewTab } from "./layoutTabs";
 import {
   collapseEmptyDockLeaves,
   createDockId,
@@ -10,6 +10,7 @@ import {
   fillEmptyDockLeaves,
   findDockLeaf,
   insertDockSplit,
+  splitKeepsGrid,
   mapDockLeaf,
   moveDockPane,
   normalizePaneLayout,
@@ -18,7 +19,7 @@ import {
   updateDockSplitRatio,
 } from "./dockTree";
 import { canCloseWorkspaceView, removeDockView } from "../tabs/workspaceViewOperations";
-import { maxWorkspacePanes } from "../tabs/workspaceViews";
+import { maxWorkspacePanes, type WorkspaceLayout } from "../tabs/workspaceViews";
 import { createDefaultWorkspaceView, createBlankWorkspaceView } from "../tabs/workspaceDefaultView";
 import type { StoreApi } from "zustand";
 import type { WorkspaceStore } from "../tabs/useWorkspaceStore";
@@ -34,6 +35,7 @@ export function workspacePaneActions(
   | "moveView"
   | "dockView"
   | "dockViews"
+  | "applyLayoutRoot"
   | "detachPaneToTab"
   | "reorderPaneViews"
   | "reorderView"
@@ -84,6 +86,7 @@ export function workspacePaneActions(
       if (!source || !targetTab || !target || !moving || !sourcePane || sourcePane.id === paneId)
         return false;
       if (zone !== "center" && dockLeaves(targetTab.root).length >= maxWorkspacePanes) return false;
+      if (zone !== "center" && !splitKeepsGrid(targetTab.root, paneId, zone)) return false;
       const same = source.id === targetTab.id;
       let sourceRoot = source.root;
       let targetRoot = targetTab.root;
@@ -119,6 +122,28 @@ export function workspacePaneActions(
           : [];
       });
       set(withLayout(current, activateTab({ ...current.layout, tabs }, targetTab.id)));
+      return true;
+    },
+    applyLayoutRoot: (tabId, root) => {
+      const current = get();
+      const tabs = layoutTabs(current.layout);
+      const target = tabs.find((tab) => tab.id === tabId);
+      const arranged = collapseEmptyDockLeaves(root);
+      if (!target || !arranged) return false;
+      const placed = new Set(dockTreeViews(arranged).map((view) => view.id));
+      const released = dockTreeViews(target.root).filter((view) => !placed.has(view.id));
+      const next = tabs.flatMap((tab) => {
+        if (tab.id === tabId)
+          return [{ ...tab, root: arranged, focusedPaneId: dockLeaves(arranged)[0].id }];
+        let rest = tab.root;
+        for (const id of placed)
+          if (dockTreeViews(rest).some((view) => view.id === id)) rest = removeDockView(rest, id);
+        const kept = collapseEmptyDockLeaves(rest);
+        return kept ? [{ ...tab, root: kept, focusedPaneId: dockLeaves(kept)[0].id }] : [];
+      });
+      let layout: WorkspaceLayout = { ...current.layout, tabs: next };
+      for (const view of released) layout = appendTab(layout, singleViewTab(view));
+      set(withLayout(current, activateTab(layout, tabId)));
       return true;
     },
     detachPaneToTab: (viewId) => {
@@ -164,7 +189,7 @@ export function workspacePaneActions(
       }
       if (dockLeaves(current.layout.root).length >= maxWorkspacePanes) return null;
       const pane = findDockLeaf(current.layout.root, paneId);
-      if (!pane) return null;
+      if (!pane || !splitKeepsGrid(current.layout.root, paneId, direction)) return null;
       const leaf = createDockLeaf([createBlankWorkspaceView()]);
       set({
         ...withLayout(current, {

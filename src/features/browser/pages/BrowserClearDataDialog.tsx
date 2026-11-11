@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useWorkspaceStore } from "@/features/app-windows";
 import {
   Button,
   Checkbox,
@@ -87,7 +88,11 @@ export function ClearBrowsingDataDialog(props: {
     setWorking(true);
     setError(null);
     try {
-      if (selected.has("history")) await browserLibrary.clearHistory({ since });
+      if (selected.has("history")) {
+        await browserLibrary.clearHistory({ since });
+        // Closed tabs keep no time, and they show where the person has been, so they go too.
+        useWorkspaceStore.setState({ closedItems: [] });
+      }
       if (selected.has("downloads")) {
         await browserLibrary.removeDownloads({ since });
         await useBrowserDownloadsStore.getState().refresh();

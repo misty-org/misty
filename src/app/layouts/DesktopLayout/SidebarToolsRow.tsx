@@ -1,41 +1,66 @@
-import { Download, History } from "lucide-react";
 import {
   BrowserAgentsButton,
-  BrowserPaneLayoutMenu,
   useBrowserToolbarSlot,
+  sidebarTools,
   useSidebarTools,
+  type SidebarToolDefinition,
   type SidebarToolId,
 } from "@/features/browser";
-import { activeLayoutView, useWorkspaceStore } from "@/features/app-windows";
+import { LayoutPanelLeft } from "lucide-react";
+import { useLayoutEditor, useWorkspaceStore } from "@/features/app-windows";
 import { browserInternalUrl } from "@/features/app-windows";
+import { invokeShortcutCommand } from "@/features/shortcuts";
+import { openSignInSheet, useAuth } from "@/features/account";
+import { SpaceRow, SpaceRowPreview } from "@/features/spaces";
 import { IconButton, toolbarIconProps } from "@/shared/ui";
 
 const setToolsSlot = (element: HTMLDivElement | null) =>
   useBrowserToolbarSlot.getState().setTools(element);
 
-const openPage = (page: "downloads" | "history") =>
+/** Turns layout mode on or off: split and join the window's tabs over the live page. */
+function LayoutButton() {
+  const active = useLayoutEditor((state) => state.active);
+  return (
+    <IconButton
+      label="Layout"
+      aria-pressed={active}
+      onClick={() => useLayoutEditor.getState().toggle()}
+    >
+      <LayoutPanelLeft {...toolbarIconProps} className="size-4" />
+    </IconButton>
+  );
+}
+
+const openPage = (page: "downloads" | "history" | "passwords") =>
   useWorkspaceStore.getState().openBrowserView({ url: browserInternalUrl(page) });
 
 /**
- * The strip at the top of the address container, the same on every page: the tools pinned from
- * the ⋯ menu (pane layout and Agents to begin with), which belong to the window and not to a
- * page, then at the end the pinned extensions a browser page fills in. With nothing in it the
- * strip takes no room (`.misty-sidebar-tools`).
+ * The tools at the sidebar's foot, the same on every page: the Space button, then those pinned from the pin menu
+ * (pane layout and Agents to begin with), which belong to the window and not to a page, then the
+ * pinned extensions a browser page fills in.
  */
 export function SidebarToolsRow() {
-  const viewId = useWorkspaceStore((state) => activeLayoutView(state.layout)?.id);
+  const { user, sessionExpired } = useAuth();
+  // An expired session loads no Spaces, so it asks to sign in like being signed out does.
+  const signedIn = Boolean(user) && !sessionExpired;
   const { pinned } = useSidebarTools();
   const tool = (id: SidebarToolId) => {
     if (!pinned.includes(id)) return null;
-    if (id === "pane-layout")
-      return viewId ? <BrowserPaneLayoutMenu key={id} tabId={viewId} /> : null;
+    if (id === "pane-layout") return <LayoutButton key={id} />;
     if (id === "agents") return <BrowserAgentsButton key={id} />;
-    const Icon = id === "downloads" ? Download : History;
+    const definition: SidebarToolDefinition | undefined = sidebarTools.find(
+      (item) => item.id === id,
+    );
+    const Icon = definition?.icon;
+    if (!definition || !Icon) return null;
     return (
       <IconButton
         key={id}
-        label={id === "downloads" ? "Downloads" : "History"}
-        onClick={() => openPage(id)}
+        label={definition.label}
+        onClick={() => {
+          if (definition.page) openPage(definition.page);
+          else if (definition.command) invokeShortcutCommand(definition.command);
+        }}
       >
         <Icon {...toolbarIconProps} className="size-4" />
       </IconButton>
@@ -43,16 +68,22 @@ export function SidebarToolsRow() {
   };
   return (
     <div
-      className="misty-sidebar-tools flex items-center gap-1.5"
+      className="misty-sidebar-head-tools"
       data-browser-toolbar
       data-sidebar
       data-misty-window-drag-block="true"
     >
-      {tool("pane-layout")}
-      {tool("agents")}
-      {tool("downloads")}
-      {tool("history")}
-      <div ref={setToolsSlot} className="ml-auto flex items-center gap-1.5" />
+      {signedIn ? (
+        <SpaceRow />
+      ) : (
+        <SpaceRowPreview
+          onSignIn={() =>
+            sessionExpired ? openSignInSheet("expired", user?.email) : openSignInSheet("space")
+          }
+        />
+      )}
+      {sidebarTools.map((item) => tool(item.id))}
+      <div ref={setToolsSlot} className="flex items-center empty:hidden" />
     </div>
   );
 }

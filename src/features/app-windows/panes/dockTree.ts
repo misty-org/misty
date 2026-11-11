@@ -297,3 +297,26 @@ export function mapDockLeafForView(
 }
 
 export { canFitDockSplit, dockPaneBounds, dockPaneCloseDirection };
+
+/**
+ * Whether a layout is one the window allows: a single pane, two side by side or stacked, or a grid
+ * of at most two by two. A row of three or four is never allowed, so a split never goes the same
+ * way as the split it sits in, and nothing nests deeper than two.
+ */
+export function isGridLayout(node: WorkspaceDockNode, parentDirection?: string): boolean {
+  if (node.type === "leaf") return true;
+  if (node.direction === parentDirection) return false;
+  const cap = parentDirection === undefined ? 2 : 1;
+  // A split inside a split holds only panes.
+  if (cap === 1 && (node.first.type === "split" || node.second.type === "split")) return false;
+  return isGridLayout(node.first, node.direction) && isGridLayout(node.second, node.direction);
+}
+
+/** Whether splitting a pane toward a side leaves the layout one the window allows. */
+export function splitKeepsGrid(
+  root: WorkspaceDockNode,
+  paneId: string,
+  zone: "left" | "right" | "up" | "down",
+): boolean {
+  return isGridLayout(insertDockSplit(root, paneId, createDockLeaf(), zone));
+}

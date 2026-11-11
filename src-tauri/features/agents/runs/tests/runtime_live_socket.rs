@@ -53,7 +53,7 @@ async fn a_session_runs_from_start_to_finished() {
         // The fields go in the order `buildConfigMessage` writes them.
         assert_eq!(
             config.as_str(),
-            r#"{"model":"stt-rt-v5","audio_format":"pcm_s16le","sample_rate":16000,"num_channels":1,"language_hints":["en"],"enable_speaker_diarization":true,"enable_language_identification":true,"enable_endpoint_detection":true}"#
+            r#"{"model":"stt-rt-v5","audio_format":"pcm_s16le","sample_rate":16000,"num_channels":1,"language_hints":["en"],"enable_speaker_diarization":true,"enable_language_identification":true,"enable_endpoint_detection":true,"max_endpoint_delay_ms":600}"#
         );
         let audio = socket.next().await.unwrap().unwrap();
         assert_eq!(audio, Message::binary(vec![9u8; 64]));
@@ -95,7 +95,7 @@ async fn a_session_runs_from_start_to_finished() {
 }
 
 #[tokio::test]
-async fn an_error_from_the_provider_says_only_that_it_stopped() {
+async fn an_error_from_the_provider_says_what_kind_it_was_and_nothing_it_echoed() {
     let url = stand_in(|mut socket| async move {
         socket.next().await;
         let failure = json!({ "error_code": 401, "error_message": format!("bad key {KEY}") });
@@ -114,7 +114,7 @@ async fn an_error_from_the_provider_says_only_that_it_stopped() {
     to_session.send(json!({ "type": "start" }).to_string().into_bytes()).await.unwrap();
     assert_eq!(next_message(&mut receiver).await["type"], "ready");
     let failed = next_message(&mut receiver).await;
-    assert_eq!(failed, json!({ "type": "error", "message": "Live transcription stopped. Check your connection and try again." }));
+    assert_eq!(failed, json!({ "type": "error", "message": "Soniox didn't accept your key. Check it in Settings." }));
     assert!(!failed.to_string().contains(KEY));
     drop(to_session);
     tokio::time::timeout(Duration::from_secs(5), session).await.unwrap().unwrap();

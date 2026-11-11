@@ -1,4 +1,4 @@
-import { AppWindow, Eraser, History } from "lucide-react";
+import { AppWindow, History } from "lucide-react";
 import { isBrowserInternalUrl } from "@/features/app-windows";
 import {
   parseBrowserViewState,
@@ -23,11 +23,11 @@ function ClosedViewIcon({ tab }: { tab: WorkspaceView }) {
   );
 }
 
-/** History, like Chrome's: the full history page plus recently closed tabs. */
+/** History, like Chrome's: the full history page, which also clears browsing data, plus recently
+ * closed tabs. */
 export function BrowserHistoryMenu(props: {
   openHistory: () => void;
   reopenClosedView: (index: number) => void;
-  clearBrowsingData: () => void;
 }) {
   const closedTabs = useWorkspaceStore((state) => state.closedItems);
   const recent = closedTabs.slice(0, recentLimit);
@@ -35,15 +35,9 @@ export function BrowserHistoryMenu(props: {
     <MenuSubmenu icon={<History />} label="History" width="xl">
       <MenuItem
         icon={<History />}
-        label="History"
+        label="Show all history"
         shortcut={<ShortcutText commandId="browser.history" />}
         onSelect={props.openHistory}
-      />
-      <MenuItem
-        icon={<Eraser />}
-        label="Clear browsing data…"
-        shortcut={<ShortcutText commandId="browser.clear_data" />}
-        onSelect={props.clearBrowsingData}
       />
       <DropdownMenuSeparator />
       <DropdownMenuLabel>Recently closed</DropdownMenuLabel>

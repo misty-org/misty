@@ -60,8 +60,12 @@
   border-color: transparent;
   background: color-mix(in srgb, var(--misty-theme-text) 7%, transparent);
 }
+[data-browser-toolbar][data-sidebar] input {
+  cursor: text;
+  transition: background-color 150ms ease;
+}
 [data-browser-toolbar][data-sidebar] input:hover {
-  background: color-mix(in srgb, var(--misty-theme-text) 9%, transparent);
+  background: color-mix(in srgb, var(--misty-theme-text) 13%, transparent);
 }
 [data-browser-toolbar][data-sidebar] input:focus {
   border-color: transparent;

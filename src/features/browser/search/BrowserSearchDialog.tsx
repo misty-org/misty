@@ -1,5 +1,5 @@
 import { accountScopeWillResetEvent } from "@/features/account";
-import { useEffect, useState, type KeyboardEvent } from "react";
+import { useEffect, useMemo, useState, type KeyboardEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { Search, ArrowUpRight } from "lucide-react";
@@ -19,16 +19,20 @@ import { hasTauriInternals } from "@/shared/platform/tauri";
 import { browserSearchDestination, useBrowserSearchStore, type SearchAnchor } from "./search";
 import { SearchResultList, type SearchListItem } from "./SearchResultList";
 import { openInNewBrowserTab, openMatch, openTargetBeside } from "./searchTargets";
+import { browserLibrary } from "../library/native";
 import { useSearchItems } from "./useSearchItems";
 
-/** The panel is at least this wide, even over a narrow sidebar's address bar. */
-const anchoredMinWidth = 400;
+/** Over a narrow sidebar field the panel still opens this wide, to the right over the page. */
+const anchoredMinWidth = 560;
 const windowMargin = 8;
 
 /** Margins that put the panel's top-left corner where the address bar was. Wider than a bar near
  * the window's right edge, it moves left to stay inside the window. */
 function overAddressBar(anchor: SearchAnchor) {
-  const width = Math.max(anchor.width, anchoredMinWidth);
+  const width = Math.min(
+    Math.max(anchor.width, anchoredMinWidth),
+    window.innerWidth - 2 * windowMargin,
+  );
   const lastLeft = window.innerWidth - width - windowMargin;
   return {
     marginLeft: Math.max(windowMargin, Math.min(anchor.left, lastLeft)),
@@ -46,8 +50,13 @@ export function BrowserSearchDialog() {
   const [activeIndex, setActiveIndex] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [removed, setRemoved] = useState<ReadonlySet<string>>(new Set());
   const navigate = useNavigate();
-  const { items } = useSearchItems(query, open);
+  const { items: found } = useSearchItems(query, open);
+  const items = useMemo(
+    () => found.filter((item) => !removed.has(item.match.id)),
+    [found, removed],
+  );
   const engine = browserSearchEngine().name;
 
   useEffect(() => {
@@ -62,6 +71,7 @@ export function BrowserSearchDialog() {
     setBrowserWebviewsSuspended(open, "browser-search");
     if (!open) {
       setQuery("");
+      setRemoved(new Set());
       setError(null);
       setNotice(null);
     }
@@ -126,6 +136,12 @@ export function BrowserSearchDialog() {
     choose(item);
   };
 
+  /** Forgets the page's visits, so it stops being suggested. */
+  const remove = (item: SearchListItem) => {
+    setRemoved((current) => new Set(current).add(item.match.id));
+    void browserLibrary.forgetPage({ url: item.match.target.url }).catch(() => undefined);
+  };
+
   const choose = (item: SearchListItem) => {
     const target = item.match.target;
     if (anchor && target.type !== "switch-tab") run(() => anchor.openUrl(target.url));
@@ -163,7 +179,8 @@ export function BrowserSearchDialog() {
         style={anchor ? overAddressBar(anchor) : undefined}
         className={cn(
           anchor ? "max-w-none" : "max-w-[700px]",
-          "gap-0 overflow-hidden rounded-xl border border-charcoal-border bg-charcoal-card p-0",
+          "gap-0 overflow-hidden border border-charcoal-border bg-charcoal-card p-0",
+          "rounded-xl",
           "ring-0 shadow-2xl [&>[data-slot=dialog-close]]:hidden",
         )}
       >
@@ -216,6 +233,7 @@ export function BrowserSearchDialog() {
           activeIndex={active}
           onHover={setActiveIndex}
           onChoose={choose}
+          onRemove={remove}
         />
       </DialogContent>
     </Dialog>

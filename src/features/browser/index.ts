@@ -6,6 +6,7 @@ export { useBrowserMediaStore } from "./library/mediaStore";
 export { browserLibrary, browserPageTools } from "./library/native";
 export type { BrowserDownloadEntry, BrowserHistoryVisit } from "./library/native";
 export { ClearBrowsingDataDialog } from "./pages/BrowserClearDataDialog";
+export { BrowserMenuNoPage } from "./pages/BrowserMenuNoPage";
 // The agent browser's small copy of the browser (agents/agentBrowser): the same controls, tab
 // rows and page measurement.
 export { BrowserNavigationButtons } from "./pages/BrowserNavigationButtons";
@@ -42,10 +43,12 @@ export {
   BrowserPaneLayoutMenu,
   BrowserViewAudioButton,
   BrowserWorkspace,
-  SidebarToolsPinMenu,
+  usePinnableRow,
+  sidebarTools,
   browserToolbarStyles,
   useBrowserToolbarSlot,
   useSidebarTools,
+  type SidebarToolDefinition,
   type SidebarToolId,
 } from "./pages";
 export { PasswordEditor } from "./passwords/PasswordEditor";
@@ -97,11 +100,7 @@ export { useBrowserPaneDim } from "./webviews/useBrowserPaneDim";
 export { websiteIntegrations } from "./webviews/websiteIntegrations";
 
 // Public surface used by other features (generated from their imports).
-export {
-  setBarsAutoHide,
-  setSpaceBarAutoHide,
-  useBarsAutoHide,
-} from "./bars-auto-hide/barsAutoHide";
+export { setTabsAutoHide, useTabsAutoHide } from "./bars-auto-hide/barsAutoHide";
 
 // Public surface used by other features (generated from their imports).
 export { AutofillSettings } from "./autofill/AutofillSettings";

@@ -32,7 +32,7 @@ export function BrowserWorkspaceMenu({
     <BrowserMenu
       toolsIcon={sidebarMenu}
       library={sidebarMenu ? undefined : <BrowserLibraryMenus />}
-      layout={sidebarMenu ? undefined : <BrowserPaneLayoutSubmenu tabId={tab.id} />}
+      layout={<BrowserPaneLayoutSubmenu tabId={tab.id} />}
       lead={
         sidebarMenu ? (
           <BrowserMenuLeadRows

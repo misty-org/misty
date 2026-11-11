@@ -49,6 +49,7 @@ export function parseSubtitlePrefs(saved: string): SubtitlePrefs {
     source: raw.source === "auto" || isLanguage(raw.source) ? (raw.source as string) : "auto",
     target: isLanguage(raw.target) ? (raw.target as string) : computerLanguage(),
     context: readContext(raw.context),
+    input: raw.input === "mic" ? "mic" : "system",
     gain: bounded(raw.gain, 0, 1, fallback.gain),
     muted: raw.muted === true,
     silenceSeconds: bounded(raw.silenceSeconds, 10, 300, fallback.silenceSeconds),

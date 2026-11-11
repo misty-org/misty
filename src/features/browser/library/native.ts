@@ -48,6 +48,12 @@ export interface BrowserFindResult {
 }
 
 export const browserHistoryClearedEvent = "misty:browser-history-cleared";
+/** Any visit was removed. Lists built from history read it again instead of showing old rows. */
+export const browserHistoryChangedEvent = "misty:browser-history-changed";
+
+const historyChanged = (): void => {
+  window.dispatchEvent(new Event(browserHistoryChangedEvent));
+};
 
 export type BrowserWebsiteDataKind = "cookies" | "cache";
 
@@ -72,12 +78,15 @@ export const browserLibrary = {
   historySuggestions: (request: { text: string; limit?: number }) =>
     invoke<BrowserHistorySuggestion[]>("browser_history_suggest", { request }),
   /** Removes every visit to one page. */
-  forgetPage: (request: { url: string }) => invoke<void>("browser_history_forget", { request }),
-  deleteVisits: (ids: number[]) => invoke<void>("browser_history_delete", { request: { ids } }),
+  forgetPage: (request: { url: string }) =>
+    invoke<void>("browser_history_forget", { request }).then(historyChanged),
+  deleteVisits: (ids: number[]) =>
+    invoke<void>("browser_history_delete", { request: { ids } }).then(historyChanged),
   clearHistory: (request: { since?: number }) =>
     invoke<void>("browser_history_clear", { request }).then(() => {
       // Open history lists reload instead of waiting for a manual refresh.
       window.dispatchEvent(new Event(browserHistoryClearedEvent));
+      historyChanged();
     }),
 
   clearWebsiteData: (request: { kinds: BrowserWebsiteDataKind[]; since: number }) =>

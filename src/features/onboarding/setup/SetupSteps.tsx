@@ -1,7 +1,7 @@
 import { BrowserImportFlow } from "@/features/browser";
 import { ExtensionsSetupStep } from "@/features/browser";
 import { useExtensionsStore } from "@/features/browser";
-import { setBarsAutoHide, useBarsAutoHide } from "@/features/browser";
+import { setTabsAutoHide, useTabsAutoHide } from "@/features/browser";
 import { normalizeDockingLayout, type TabSide } from "@/app/shell/dockingLayout";
 import { useWindowDockingLayout, useWorkspaceStore } from "@/features/app-windows";
 import { hasTauriInternals } from "@/shared/platform/tauri";
@@ -49,7 +49,7 @@ const tabSideChoices: Array<{ value: TabSide; label: string }> = [
 function TabsStep() {
   const layout = useWindowDockingLayout();
   const setLayout = useWorkspaceStore((state) => state.setWindowDockingLayout);
-  const autoHide = useBarsAutoHide();
+  const autoHide = useTabsAutoHide();
   return (
     <div className="flex flex-col gap-3">
       <div role="radiogroup" aria-label="Tab side" className="grid grid-cols-2 gap-3">
@@ -69,12 +69,8 @@ function TabsStep() {
         ))}
       </div>
       <div className="flex items-center justify-between gap-3 px-0.5 text-sm text-cream-bright">
-        Auto-hide tabs and Space bar
-        <Switch
-          aria-label="Auto-hide tabs and Space bar"
-          checked={autoHide}
-          onCheckedChange={setBarsAutoHide}
-        />
+        Auto-hide tabs
+        <Switch aria-label="Auto-hide tabs" checked={autoHide} onCheckedChange={setTabsAutoHide} />
       </div>
     </div>
   );

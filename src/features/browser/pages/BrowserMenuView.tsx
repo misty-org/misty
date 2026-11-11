@@ -11,11 +11,11 @@ import {
 import { ShortcutText } from "@/features/shortcuts";
 import {
   AppWindow,
+  Bot,
   CircleHelp,
   Code2,
   Copy,
   Download,
-  Eraser,
   KeyRound,
   ExternalLink,
   FileDown,
@@ -38,7 +38,8 @@ import type { BrowserPageCommands } from "./useBrowserPageCommands";
 import { BrowserHistoryMenu } from "./BrowserHistoryMenu";
 import { pictureInPictureSupported } from "../webviews/pictureInPictureSettings";
 import { SiteAppsMenu } from "./SiteAppsMenu";
-import { SidebarToolsPinMenu } from "./SidebarTools";
+import { usePinnableRow, type SidebarToolId } from "./SidebarTools";
+import { openAgentsPanel } from "./AgentSeams";
 import { LiveSubtitlesMenuItem } from "./VoiceSeams";
 
 interface BrowserMenuViewProps {
@@ -69,15 +70,35 @@ interface BrowserMenuViewProps {
   app?: { title: string; bookmarkId?: string; installable: boolean };
 }
 
-/** A browser command row; rows without a handler render disabled. */
-function Item(props: { icon: ReactNode; label: string; shortcut?: string; onSelect?: () => void }) {
+/** A browser command row; rows without a handler render disabled. In the sidebar's menu a row
+ * that can sit in the toolbar marks it with a pin, and a right-click pins or unpins it. */
+function Item(props: {
+  icon: ReactNode;
+  label: string;
+  shortcut?: string;
+  onSelect?: () => void;
+  pin?: SidebarToolId;
+}) {
+  const row = usePinnableRow(props.pin);
+  const shortcut = props.shortcut ? <ShortcutText commandId={props.shortcut} /> : undefined;
   return (
     <MenuItem
       icon={props.icon}
       label={props.label}
-      shortcut={props.shortcut ? <ShortcutText commandId={props.shortcut} /> : undefined}
+      shortcut={
+        row.mark ? (
+          <span className="flex items-center gap-2">
+            {row.mark}
+            {shortcut}
+          </span>
+        ) : (
+          shortcut
+        )
+      }
+      title={row.title}
       disabled={!props.onSelect}
       onSelect={() => props.onSelect?.()}
+      onContextMenu={row.onContextMenu}
     />
   );
 }
@@ -112,7 +133,9 @@ export function BrowserMenuView(props: BrowserMenuViewProps) {
         }
       />
       <DropdownMenuContent
-        align="end"
+        // The sidebar's menu hangs below its button and runs on to the right, over the page, not
+        // back over the sidebar.
+        align={props.toolsIcon ? "start" : "end"}
         width="lg"
         className="max-h-[var(--radix-dropdown-menu-content-available-height)]"
         data-browser-menu
@@ -125,26 +148,30 @@ export function BrowserMenuView(props: BrowserMenuViewProps) {
               label="New tab"
               shortcut="search.toggle"
               onSelect={commands.newTab}
+              pin="new-tab"
             />
             <Item
               icon={<AppWindow />}
               label="New window"
               shortcut="workspace.new_window"
               onSelect={commands.newWindow}
+              pin="new-window"
             />
             <Item
               icon={<VenetianMask />}
               label="New incognito window"
               shortcut="workspace.new_incognito_window"
               onSelect={commands.newIncognitoWindow}
+              pin="new-incognito"
             />
             {props.layout}
-            {props.toolsIcon ? <SidebarToolsPinMenu /> : null}
+            {props.toolsIcon ? (
+              <Item icon={<Bot />} label="Agents" onSelect={openAgentsPanel} pin="agents" />
+            ) : null}
             <DropdownMenuSeparator />
             <BrowserHistoryMenu
               openHistory={() => commands.openPage("history")}
               reopenClosedView={commands.reopenClosedTab}
-              clearBrowsingData={commands.clearBrowsingData}
             />
             {props.library}
             <Item
@@ -152,11 +179,13 @@ export function BrowserMenuView(props: BrowserMenuViewProps) {
               label="Downloads"
               shortcut="browser.downloads"
               onSelect={() => commands.openPage("downloads")}
+              pin="downloads"
             />
             <Item
               icon={<KeyRound />}
               label="Passwords"
               onSelect={() => commands.openPage("passwords")}
+              pin="passwords"
             />
             {props.app ? <SiteAppsMenu {...props.app} url={props.url} /> : null}
             <DropdownMenuSeparator />
@@ -170,6 +199,7 @@ export function BrowserMenuView(props: BrowserMenuViewProps) {
               label="Find…"
               shortcut="browser.find"
               onSelect={commands.find}
+              pin="find"
             />
             <MenuSubmenu icon={<Wrench />} label="More tools" width="lg">
               {props.tools ? (
@@ -185,6 +215,7 @@ export function BrowserMenuView(props: BrowserMenuViewProps) {
                 label="Reader view"
                 shortcut="browser.reader_mode"
                 onSelect={commands.readerMode}
+                pin="reader"
               />
               {pictureInPictureSupported() && (
                 <Item
@@ -192,6 +223,7 @@ export function BrowserMenuView(props: BrowserMenuViewProps) {
                   label="Picture in picture"
                   shortcut="browser.picture_in_picture"
                   onSelect={commands.pictureInPicture}
+                  pin="pip"
                 />
               )}
               <Item
@@ -214,12 +246,6 @@ export function BrowserMenuView(props: BrowserMenuViewProps) {
                 }
               />
               <DropdownMenuSeparator />
-              <Item
-                icon={<Eraser />}
-                label="Clear browsing data…"
-                shortcut="browser.clear_data"
-                onSelect={commands.clearBrowsingData}
-              />
               <Item
                 icon={<Code2 />}
                 label="Developer tools"

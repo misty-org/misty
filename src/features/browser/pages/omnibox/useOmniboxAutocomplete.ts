@@ -1,4 +1,5 @@
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
+import { browserHistoryChangedEvent } from "../../library/native";
 import { mergeMatches, stillMatches } from "./controller";
 import type { OmniboxInput, OmniboxMatch, OmniboxProvider } from "./omniboxTypes";
 
@@ -20,6 +21,16 @@ export function useOmniboxAutocomplete(
 ): OmniboxMatch[] {
   const [results, setResults] = useState<ProviderResults>({});
   const deferred = useDeferredValue(input);
+  // History changed under the list: drop its rows and ask the providers again.
+  const [version, setVersion] = useState(0);
+  useEffect(() => {
+    const changed = () => {
+      setResults({});
+      setVersion((value) => value + 1);
+    };
+    window.addEventListener(browserHistoryChangedEvent, changed);
+    return () => window.removeEventListener(browserHistoryChangedEvent, changed);
+  }, []);
 
   useEffect(() => {
     const input = deferred;
@@ -55,7 +66,7 @@ export function useOmniboxAutocomplete(
       );
     }
     return () => controller.abort();
-  }, [deferred, providers]);
+  }, [deferred, providers, version]);
 
   return useMemo(() => mergeMatches(Object.values(results)), [results]);
 }

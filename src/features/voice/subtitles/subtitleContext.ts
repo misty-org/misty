@@ -88,7 +88,10 @@ export function withPage(manual: SubtitleContext, page: PageContext | undefined)
   return {
     category: named ? manual.category : "custom",
     customCategory: named ? manual.customCategory : page.domain,
-    text: [manual.text.trim(), page.topic].filter(Boolean).join("\n").slice(0, MAX_TEXT),
+    text: [manual.text.trim(), manual.text.includes(page.topic) ? "" : page.topic]
+      .filter(Boolean)
+      .join("\n")
+      .slice(0, MAX_TEXT),
     terms: [...new Set([...manual.terms, ...page.terms])].slice(0, MAX_TERMS),
     translationTerms: [
       ...manual.translationTerms,

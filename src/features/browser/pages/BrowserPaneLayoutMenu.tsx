@@ -1,5 +1,5 @@
 import { LayoutPanelLeft, PanelBottomDashed, PanelRightDashed, X } from "lucide-react";
-import { dockLeaves, useWorkspaceStore } from "@/features/app-windows";
+import { dockLeaves, useLayoutEditor, useWorkspaceStore } from "@/features/app-windows";
 import { invokeShortcutCommand } from "@/features/shortcuts/runtime";
 import { DropdownMenu, DropdownMenuContent, MenuItem, MenuSubmenu, MenuTrigger } from "@/shared/ui";
 import { browserToolbarStyles } from "./browserToolbarStyles";
@@ -25,6 +25,11 @@ export function BrowserPaneLayoutMenu({ tabId }: { tabId: string }) {
           icon={<LayoutPanelLeft {...browserToolbarStyles.roundIcon} />}
         />
         <DropdownMenuContent align="start">
+          <MenuItem
+            icon={<LayoutPanelLeft />}
+            label="Arrange tabs…"
+            onSelect={() => window.setTimeout(() => useLayoutEditor.getState().toggle(), 0)}
+          />
           <MenuItem
             icon={<PanelRightDashed />}
             label="Split right"
@@ -59,6 +64,11 @@ export function BrowserPaneLayoutSubmenu({ tabId }: { tabId: string }) {
   };
   return (
     <MenuSubmenu icon={<LayoutPanelLeft />} label="Pane layout">
+      <MenuItem
+        icon={<LayoutPanelLeft />}
+        label="Arrange tabs…"
+        onSelect={() => window.setTimeout(() => useLayoutEditor.getState().toggle(), 0)}
+      />
       <MenuItem
         icon={<PanelRightDashed />}
         label="Split right"

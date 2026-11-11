@@ -22,7 +22,8 @@ import {
   usePinTabShortcut,
 } from "./usePinTabShortcut";
 import { WorkspaceTabPanels } from "./WorkspaceTabPanels";
-import { SpaceBar } from "./SpaceBar";
+import { TopEdge } from "./TopEdge";
+import { LayoutPopup } from "./LayoutPopup";
 import type { WorkspaceTab } from "@/features/app-windows";
 import { useWorkspaceCanvasShortcuts } from "./useWorkspaceCanvasShortcuts";
 import { useLegacyTabTitles, useWorkspaceTabShortcuts } from "./useWorkspaceTabShortcuts";
@@ -158,7 +159,7 @@ export function WorkspaceCanvas(props: {
   return (
     <>
       {/* Clipped, not hidden: a collapsed right sidebar waits past this edge, and scrolling its
-          active tab into view must not scroll the Space bar and page sideways. */}
+          active tab into view must not scroll the page sideways. */}
       <div
         className={`grid h-full min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)] overflow-clip bg-charcoal-workspace ${
           side === "right" ? "grid-cols-[minmax(0,1fr)_auto]" : "grid-cols-[auto_minmax(0,1fr)]"
@@ -189,7 +190,7 @@ export function WorkspaceCanvas(props: {
                 footEnd={props.stripFootEnd}
               />
             </SidebarDrawer>
-            <SpaceBar gridColumn={contentColumn} side={side} />
+            <TopEdge gridColumn={contentColumn} side={side} />
           </>
         ) : null}
         <WorkspaceTabPanels
@@ -201,6 +202,7 @@ export function WorkspaceCanvas(props: {
           }}
         />
         <PaneSwapMode />
+        <LayoutPopup onApplied={navigateToActiveLayoutTab} />
       </div>
     </>
   );

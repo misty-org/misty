@@ -71,11 +71,13 @@ describe("a window of one profile", () => {
     expect("windowsByScope" in migrated).toBe(false);
   });
 
-  it("caps the window at four panes", () => {
+  it("caps the window at a two by two grid", () => {
     const first = useWorkspaceStore.getState().layout.focusedPaneId;
     const second = useWorkspaceStore.getState().splitPane(first, "right")!;
-    const third = useWorkspaceStore.getState().splitPane(second, "down")!;
-    const fourth = useWorkspaceStore.getState().splitPane(third, "left")!;
+    // A third pane beside the pair would be a row of three, which a window never has.
+    expect(useWorkspaceStore.getState().splitPane(second, "right")).toBeNull();
+    useWorkspaceStore.getState().splitPane(first, "down")!;
+    const fourth = useWorkspaceStore.getState().splitPane(second, "down")!;
     expect(dockLeaves(useWorkspaceStore.getState().layout.root)).toHaveLength(4);
     expect(useWorkspaceStore.getState().splitPane(fourth, "down")).toBeNull();
   });

@@ -20,7 +20,10 @@ pub struct SttError;
 pub enum SttEvent {
     Result(SonioxResult),
     Endpoint,
+    /// The stream broke: the connection dropped, or what came back could not be read.
     Error,
+    /// The provider refused the session and said why, as its numeric code.
+    Refused(u32),
 }
 
 pub type SttEvents = Arc<dyn Fn(SttEvent) + Send + Sync>;
@@ -191,6 +194,12 @@ impl LiveSession {
                     session.fail("Live transcription stopped. Check your connection and try again.");
                 }
             }
+            // The code names the kind of refusal and nothing else, so it is safe to say.
+            SttEvent::Refused(code) => {
+                if let Some(session) = session.upgrade() {
+                    session.fail(&refusal_message(code));
+                }
+            }
         });
         let stream = self.factory.open(&soniox_config(language, target, model, context), events);
         locked(&self.state).lanes.push(Lane { channel, stream: stream.clone(), captions });
@@ -277,5 +286,18 @@ impl LiveSession {
         }
         self.emit(json!({ "type": "error", "message": message }));
         self.close();
+    }
+}
+
+/// What a provider's numeric refusal means to the person, without anything the provider echoed.
+pub(super) fn refusal_message(code: u32) -> String {
+    match code {
+        400 => "Soniox refused this request. The model or the languages may not be supported.".to_owned(),
+        401 | 403 => "Soniox didn't accept your key. Check it in Settings.".to_owned(),
+        402 => "Your Soniox account has no credit left.".to_owned(),
+        408 => "Soniox timed out waiting for audio. Try again.".to_owned(),
+        429 => "Soniox is limiting this key right now. Wait a moment and try again.".to_owned(),
+        500..=599 => "Soniox is having trouble. Try again in a moment.".to_owned(),
+        _ => format!("Live transcription stopped (Soniox error {code})."),
     }
 }

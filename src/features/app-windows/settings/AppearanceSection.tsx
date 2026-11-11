@@ -12,12 +12,10 @@ import {
   DesktopSettingsSection as SettingsSectionBlock,
 } from "@/features/settings";
 import {
-  booleanSetting,
   ChoiceControl,
   numberSetting,
   SliderControl,
   stringSetting,
-  SwitchControl,
 } from "../../settings/SettingsControls";
 import type { SettingsContentProps } from "../../settings/settingsTypes";
 import { Input } from "@/shared/ui";
@@ -98,30 +96,6 @@ export function AppearanceSection(props: SettingsContentProps) {
 
       <SettingsSectionBlock title="Window">
         <WindowTabsRow />
-        <SettingsRow label="Space bar alignment">
-          <ChoiceControl
-            value={stringSetting(props.document, "appearance", "space_bar_alignment", "left")}
-            disabled={props.working}
-            options={[
-              { value: "left", label: "Left" },
-              { value: "center", label: "Center" },
-              { value: "right", label: "Right" },
-            ]}
-            onValueChange={(value) =>
-              props.onSettingChange("appearance", "space_bar_alignment", value)
-            }
-          />
-        </SettingsRow>
-        <SettingsRow
-          label="Auto-hide the Space bar"
-          description="Shows when the pointer reaches the top edge."
-        >
-          <SwitchControl
-            checked={booleanSetting(props.document, "appearance", "space_bar_auto_hide", false)}
-            disabled={props.working}
-            onChange={(value) => props.onSettingChange("appearance", "space_bar_auto_hide", value)}
-          />
-        </SettingsRow>
         <SettingsRow label="App zoom" description="Also Cmd or Ctrl with +, − and 0.">
           <SliderControl
             value={displayedAppZoom}

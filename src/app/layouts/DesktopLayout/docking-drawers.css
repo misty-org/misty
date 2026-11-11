@@ -6,9 +6,8 @@
 .misty-sidebar-address {
   margin-bottom: 8px;
 }
-/* One container holds the tools row and the address field, split by a hairline: the pill the
-   address field alone used to be. The field inside is clear, so the container carries the fill
-   and its hover and focus lift. */
+/* The address field is a filled pill. The field inside is clear, so the pill carries the fill and
+   its hover and focus lift. The tools sit centered above it with no container of their own. */
 .misty-sidebar-omnibox {
   border-radius: 10px;
   background: color-mix(in srgb, var(--misty-theme-text) 7%, transparent);
@@ -27,16 +26,6 @@
   border-color: transparent;
   background: transparent;
 }
-/* Nothing pinned and no extension to show: the strip and its hairline take no room. */
-.misty-sidebar-tools:not(:has(button)) {
-  display: none;
-}
-.misty-sidebar-tools {
-  min-height: 36px;
-  padding: 4px 6px;
-  border-bottom: 1px solid color-mix(in srgb, var(--misty-theme-text) 14%, transparent);
-}
-
 /* The sidebar toggle and back/forward/reload share the traffic lights' band, so the sidebar
    has no header row of its own: the head row rises into the strip's titlebar padding and
    starts where the native buttons end. */
@@ -202,6 +191,12 @@
 .misty-sidebar-nav [data-browser-toolbar] > div {
   gap: 6px;
 }
+/* The pinned tools sit together at the sidebar's foot. */
+.misty-sidebar-head-tools {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
 /* The sidebar's bottom edge, above the account row: Downloads on the left, chat on
    the right. */
 .misty-sidebar-foot {
@@ -225,22 +220,19 @@
   border-radius: 12px;
   background: var(--workspace-tab-surface);
 }
-/* The account row is its own container beneath the sidebar's, with the same edge and fill. */
+/* The account row closes the sidebar's one panel, under a faint line. */
 .misty-sidebar-account {
   display: flex;
   flex-shrink: 0;
   align-items: center;
   /* Agents and Settings sit 6px apart, like the header's and the Space row's buttons. */
   gap: 6px;
-  margin-top: 8px;
-  /* The account button's own 4px padding holds its 24px avatar, so 8px here and 10px beside the
-     28px settings button put both centers on the same two columns as the downloads and sync
-     buttons above. The height holds with no account button, when signed out. */
-  min-height: 42px;
-  padding: 4px 10px 4px 8px;
-  border: 1px solid var(--color-charcoal-border);
-  border-radius: 12px;
-  background: var(--workspace-tab-surface);
+  margin-top: 4px;
+  /* The account button's own 4px padding holds its 24px avatar, so the row needs no more room of
+     its own. The height holds with no account button, when signed out. */
+  min-height: 32px;
+  padding: 4px 2px 0 0;
+  border-top: 1px solid color-mix(in srgb, var(--misty-theme-text) 10%, transparent);
 }
 .misty-sidebar-card .misty-sidebar-address {
   margin-bottom: 12px;

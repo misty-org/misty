@@ -11,9 +11,10 @@ const ROTATE_MS = 6000;
 const percent = (value: number, muted: boolean) =>
   `${Math.round(value * 100)}%${muted ? " (muted)" : ""}`;
 
-function fields({ prefs, pageTopic }: SubtitlesView): Field[] {
+function fields({ prefs }: SubtitlesView): Field[] {
   const { context } = prefs;
   return [
+    { group: "input", label: "Source", value: prefs.input === "mic" ? "Microphone" : "System audio" },
     prefs.mode === "translate"
       ? {
           group: "languages",
@@ -22,7 +23,6 @@ function fields({ prefs, pageTopic }: SubtitlesView): Field[] {
         }
       : { group: "languages", label: "Subtitles", value: languageName(prefs.source) },
     { group: "context", label: "Context", value: categoryLabel(context) },
-    ...(pageTopic ? [{ group: "context" as const, label: "Page", value: pageTopic }] : []),
     ...(context.text.trim()
       ? [{ group: "context" as const, label: "Notes", value: context.text.trim() }]
       : []),

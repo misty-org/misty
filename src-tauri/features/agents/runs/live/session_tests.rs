@@ -269,3 +269,14 @@ async fn context_stays_within_its_bounds() {
     assert_eq!(config["context"]["text"].as_str().unwrap().len(), 4000);
     assert_eq!(config["context"]["translation_terms"], json!([{ "source": "a", "target": "b" }]));
 }
+
+#[test]
+fn a_refusal_is_said_by_its_code_and_nothing_else() {
+    let message = r#"{"error_code":401,"error_message":"Invalid API key sk-secret"}"#;
+    assert_eq!(super::soniox::provider_error_code(message), Some(401));
+    assert_eq!(super::soniox::provider_error_code(r#"{"tokens":[]}"#), None);
+    let said = super::session::refusal_message(401);
+    assert!(said.contains("key") && !said.contains("sk-secret"));
+    assert!(super::session::refusal_message(402).contains("credit"));
+    assert!(super::session::refusal_message(418).contains("418"));
+}

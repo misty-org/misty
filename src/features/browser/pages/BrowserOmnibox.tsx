@@ -25,18 +25,15 @@ export function BrowserOmnibox(
       trailing={props.trailing}
       leading={props.leading}
       hostOnly={props.hostOnly}
-      onOpenPanel={(field) =>
+      onOpenPanel={(field) => {
+        // The panel is the field grown, so it opens exactly over the field.
         useBrowserSearchStore.getState().show({
           left: field.left,
           top: field.top,
-          // The sidebar's field is narrow; the panel matches it instead of widening to a desktop-sized box.
-          width: Math.min(
-            Math.max(field.width, props.hostOnly ? 320 : 480),
-            window.innerWidth - 16,
-          ),
+          width: Math.min(field.width, window.innerWidth - 16),
           openUrl: (url) => props.onNavigate(url),
-        })
-      }
+        });
+      }}
     />
   );
 }

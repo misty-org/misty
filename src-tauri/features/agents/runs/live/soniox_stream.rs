@@ -18,7 +18,7 @@ use tokio_tungstenite::{
 
 use super::super::network::{ipv4_first, HostLookup, SystemLookup};
 use super::session::{SttError, SttEvent, SttEvents, SttFactory, SttStream};
-use super::soniox::{parse_message, SonioxConfig};
+use super::soniox::{parse_message, provider_error_code, SonioxConfig};
 
 const SONIOX_URL: &str = "wss://stt-rt.soniox.com/transcribe-websocket";
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
@@ -109,6 +109,12 @@ impl Link {
     /// `handleMessage`. Control tokens don't reach the result, and become events.
     fn message(&self, text: &str) {
         if self.phase() == Phase::Ended {
+            return;
+        }
+        if let Some(code) = provider_error_code(text) {
+            (self.events)(SttEvent::Refused(code));
+            self.settle_finish(Err(SttError));
+            self.end();
             return;
         }
         let Some(mut parsed) = parse_message(text) else {

@@ -3,7 +3,7 @@ import { definitionById, validPreference } from "@/features/settings/device-pref
 import { parsePinnedTools } from "./SidebarTools";
 
 it("keeps only tools this build knows, in the stored order", () => {
-  expect(parsePinnedTools('["agents","reader","pane-layout"]')).toEqual(["agents", "pane-layout"]);
+  expect(parsePinnedTools('["agents","translate","pane-layout"]')).toEqual(["agents", "pane-layout"]);
   expect(parsePinnedTools("not json")).toEqual([]);
   expect(parsePinnedTools('{"a":1}')).toEqual([]);
 });
@@ -15,7 +15,7 @@ it("defaults to pane layout and Agents, and rejects duplicates or too many", () 
   expect(
     validPreference(
       definition,
-      JSON.stringify(Array.from({ length: 9 }, (_, i) => `t${"a".repeat(i)}`)),
+      JSON.stringify(Array.from({ length: 17 }, (_, i) => `t${"a".repeat(i)}`)),
     ),
   ).toBe(false);
   expect(validPreference(definition, "[]")).toBe(true);

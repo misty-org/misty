@@ -1,6 +1,6 @@
-import { Volume2, VolumeX } from "lucide-react";
+import { LoaderCircle, Sparkles, Volume2, VolumeX } from "lucide-react";
 import type { ReactNode } from "react";
-import { IconButton, Input, OptionSelect, Slider, Textarea } from "@/shared/ui";
+import { Button, IconButton, Input, OptionSelect, Slider, Textarea } from "@/shared/ui";
 import {
   formatTranslationTerms,
   parseTerms,
@@ -65,6 +65,24 @@ export function SubtitleControls(props: {
   const set = (patch: Partial<SubtitlePrefs>) => act({ type: "prefs", patch });
   const setContext = (patch: Partial<SubtitlePrefs["context"]>) =>
     set({ context: { ...prefs.context, ...patch } });
+  if (group === "input") {
+    return (
+      <div className="subtitle-fields">
+        <Field label="Input source">
+          <OptionSelect
+            aria-label="Input source"
+            value={prefs.input}
+            disabled={active}
+            options={[
+              { value: "system", label: "System audio" },
+              { value: "mic", label: "Microphone" },
+            ]}
+            onValueChange={(input) => set({ input: input as SubtitlePrefs["input"] })}
+          />
+        </Field>
+      </div>
+    );
+  }
   if (group === "languages") {
     return (
       <div className="subtitle-fields">
@@ -109,7 +127,19 @@ export function SubtitleControls(props: {
   if (group === "context") {
     const { context } = prefs;
     return (
-      <div className="subtitle-fields">
+      <div className="subtitle-fields" key={view.contextVersion}>
+        <Button
+          variant="secondary"
+          disabled={active || view.generatingContext}
+          onClick={() => act({ type: "generateContext" })}
+        >
+          {view.generatingContext ? (
+            <LoaderCircle className="subtitle-busy" aria-hidden />
+          ) : (
+            <Sparkles aria-hidden />
+          )}
+          Generate from page
+        </Button>
         <Field label="Category">
           <OptionSelect
             aria-label="Context category"
@@ -164,7 +194,7 @@ export function SubtitleControls(props: {
     return (
       <div className="subtitle-fields">
         <VolumeRow
-          label="Tab audio input"
+          label={prefs.input === "mic" ? "Microphone input" : "System audio input"}
           gain={prefs.gain}
           muted={prefs.muted}
           onGain={(gain) => set({ gain })}

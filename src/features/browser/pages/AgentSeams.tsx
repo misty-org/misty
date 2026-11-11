@@ -7,6 +7,8 @@ import type { BrowserAskSnapshot } from "../webviews/browserAsk";
 /** What the browser asks of agents: the toolbar button and the page tools that talk to Misty. */
 export interface BrowserAgents {
   AgentsButton: ComponentType;
+  /** Opens the Agents panel, for the menu row that sits beside the toolbar button. */
+  openAgentsPanel?(): void;
   translatePageWithMisty(tab: WorkspaceView, url: string): Promise<void>;
   useBrowserMistyAiAdapter(
     tab: WorkspaceView,
@@ -22,6 +24,10 @@ export const browserAgents = createPort<BrowserAgents>("agents in the browser");
 export function BrowserAgentsButton() {
   const Button = browserAgents.maybe()?.AgentsButton;
   return Button ? <Button /> : null;
+}
+
+export function openAgentsPanel(): void {
+  browserAgents.maybe()?.openAgentsPanel?.();
 }
 
 export function translatePageWithMisty(tab: WorkspaceView, url: string): Promise<void> {

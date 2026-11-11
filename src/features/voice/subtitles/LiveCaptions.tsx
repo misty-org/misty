@@ -91,7 +91,7 @@ function CaptionLine(props: {
   );
 }
 
-/** What was said and its translation: one line each when there are both, as in Audeeo. */
+/** What was said and its translation: two or three lines each, so a sentence isn't cut to one line. */
 export function LiveCaptions(props: {
   source: string;
   translation: string;
@@ -106,7 +106,7 @@ export function LiveCaptions(props: {
         <CaptionLine
           kind="source"
           text={source}
-          lines={both ? 1 : 2}
+          lines={both ? 2 : 3}
           size={both ? FONT_SIZE * 0.8 : FONT_SIZE}
           lang={sourceLanguage}
         />
@@ -115,7 +115,7 @@ export function LiveCaptions(props: {
         <CaptionLine
           kind="translation"
           text={translation}
-          lines={both ? 1 : 2}
+          lines={3}
           size={FONT_SIZE}
           lang={targetLanguage}
         />

@@ -8,6 +8,8 @@ import { pickSaveFile } from "@/native/sandbox";
 import { errorText } from "@/shared/lib/format";
 import { useCaptureStore } from "../capture/useCaptureStore";
 import { deleteSubtitleSession, subtitleHistory, subtitleSessionText } from "./savedSubtitles";
+import { withPage } from "./subtitleContext";
+import { currentPage, readPage } from "./subtitlePage";
 import { savedSubtitlePrefs } from "./subtitlePrefs";
 import { SubtitleSession } from "./subtitleSession";
 import {
@@ -45,7 +47,7 @@ async function start() {
     draw({ notice: "Misty is already listening. Stop that, then try again." });
     return;
   }
-  draw({ status: "connecting", source: "", translation: "", notice: undefined, pageTopic: undefined });
+  draw({ status: "connecting", source: "", translation: "", notice: undefined });
   // The relay refuses without a key, and a refused socket can't say why.
   const keys = await invoke<string[]>("model_keys_saved").catch(() => ["soniox"]);
   if (!useSubtitlesStore.getState().on) return;
@@ -68,6 +70,27 @@ async function start() {
   await current.start();
 }
 
+/** Reads the page in front into the Context fields, only when the person asks. */
+async function generateContext() {
+  if (view.generatingContext || view.status !== "idle") return;
+  const page = currentPage();
+  if (!page) {
+    draw({ notice: "Open a web page first, then generate its context." });
+    return;
+  }
+  draw({ generatingContext: true, notice: undefined });
+  try {
+    const { source, mode, target } = view.prefs;
+    const found = await readPage(page, source, mode === "translate" ? target : source);
+    setPrefs({ context: withPage(view.prefs.context, found) });
+    draw({ contextVersion: view.contextVersion + 1 });
+  } catch (error) {
+    draw({ notice: `Subtitles couldn't read this page. ${errorText(error)}` });
+  } finally {
+    draw({ generatingContext: false });
+  }
+}
+
 async function exportSession(id: string) {
   const text = subtitleSessionText(id);
   if (text === undefined) return;
@@ -88,6 +111,8 @@ function act(action: SubtitlesAction) {
       return void useSubtitlesStore.getState().close();
     case "dismiss":
       return draw({ notice: undefined });
+    case "generateContext":
+      return void generateContext();
     case "prefs":
       return setPrefs(action.patch);
     case "export":

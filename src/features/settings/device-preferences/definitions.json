@@ -136,29 +136,6 @@
     "platforms": ["desktop"]
   },
   {
-    "id": "app.appearance.space_bar_alignment",
-    "label": "Space bar alignment",
-    "page": "appearance",
-    "section": "appearance",
-    "key": "space_bar_alignment",
-    "default": "left",
-    "owner": "device",
-    "type": "string",
-    "platforms": ["desktop"],
-    "enum": ["left", "center", "right"]
-  },
-  {
-    "id": "app.appearance.space_bar_auto_hide",
-    "label": "Auto-hide the Space bar",
-    "page": "appearance",
-    "section": "appearance",
-    "key": "space_bar_auto_hide",
-    "default": false,
-    "owner": "device",
-    "type": "boolean",
-    "platforms": ["desktop"]
-  },
-  {
     "id": "app.zoom",
     "label": "App zoom",
     "page": "appearance",
@@ -608,7 +585,7 @@
     "owner": "device",
     "type": "string",
     "format": "json",
-    "maxLength": 256,
+    "maxLength": 512,
     "platforms": ["desktop"]
   },
   {

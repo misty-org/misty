@@ -1,30 +1,12 @@
 import { mistyPublicHost } from "@/shared/platform/mistyPublicUrl";
 import { Fragment, useEffect, useRef, useState } from "react";
-import { Search, Star } from "lucide-react";
-import { BrandIcon, brandIconAsset, cn } from "@/shared/ui";
+import { Search, Star, X } from "lucide-react";
+import { BrandIcon, brandIconAsset, cn, IconButton } from "@/shared/ui";
 import mistyIcon from "@/shared/assets/branding/misty-icon.png?inline";
 import { omniboxMatchIcon, type OmniboxMatch } from "@/features/browser/omnibox";
 import { SiteIcon } from "../webviews/SiteIcon";
 
 export type SearchListItem = { type: "match"; match: OmniboxMatch };
-
-function formatDetail(item: SearchListItem): string {
-  const match = item.match;
-  if (match.kind === "search" || match.kind === "suggestion") {
-    return match.detail;
-  }
-  const urlStr = match.target.url;
-  if (!urlStr) return match.detail;
-  try {
-    const url = new URL(urlStr);
-    if (url.hostname === "localhost" || url.hostname === "127.0.0.1") {
-      return `${url.protocol}//${url.host}`;
-    }
-    return url.host.replace(/^www\./i, "");
-  } catch {
-    return match.detail;
-  }
-}
 
 function ItemIcon({ item }: { item: SearchListItem }) {
   const [imgError, setImgError] = useState(false);
@@ -88,23 +70,16 @@ function ItemIcon({ item }: { item: SearchListItem }) {
   );
 }
 
-/** Rows name only the target: the address or the search. */
+/** Rows show only the page's title or the search; the address is never listed beside it. */
 function Row(props: { item: SearchListItem }) {
   const { item } = props;
   const title = item.match.title;
-
-  const detail = formatDetail(item);
 
   return (
     <>
       <ItemIcon item={item} />
       <div className="flex min-w-0 flex-1 items-center text-sm">
         <span className="truncate font-normal text-cream-bright">{title}</span>
-        {detail && (
-          <span className="ml-3 min-w-0 truncate text-xs font-normal text-cream-muted sm:text-sm">
-            {detail}
-          </span>
-        )}
       </div>
     </>
   );
@@ -115,6 +90,8 @@ export function SearchResultList(props: {
   activeIndex: number;
   onHover(index: number): void;
   onChoose(item: SearchListItem): void;
+  /** Forgets a removable row's page. */
+  onRemove(item: SearchListItem): void;
 }) {
   const list = useRef<HTMLUListElement>(null);
   useEffect(() => {
@@ -147,6 +124,25 @@ export function SearchResultList(props: {
               )}
             >
               <Row item={item} />
+              {item.match.removable ? (
+                <IconButton
+                  label={`Remove ${item.match.title} from history`}
+                  size="xs"
+                  tabIndex={-1}
+                  onMouseDown={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    props.onRemove(item);
+                  }}
+                  className={cn(
+                    "-mr-2 shrink-0 text-cream-muted opacity-0 transition-opacity",
+                    "hover:text-cream-bright group-hover:opacity-100",
+                    index === props.activeIndex && "opacity-100",
+                  )}
+                >
+                  <X size={14} aria-hidden="true" />
+                </IconButton>
+              ) : null}
             </li>
           </Fragment>
         );

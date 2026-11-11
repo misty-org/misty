@@ -26,6 +26,7 @@ import type {
   DockDropZone,
   DockSplitDirection,
   OpenWorkspaceSurfaceRequest,
+  WorkspaceDockNode,
   WorkspaceGroupKey,
   WorkspaceView,
 } from "./workspaceViews";
@@ -75,6 +76,9 @@ export interface WorkspaceStore
   cycleView: (direction: 1 | -1) => WorkspaceView | null;
   selectView: (index: number | "last") => WorkspaceView | null;
   dockViews: (tabIds: string[], paneId: string, zone: DockDropZone, index?: number) => boolean;
+  /** Makes a window tab's pane tree the given one: its views come from other tabs, which give them
+   * up, and views it no longer holds become tabs of their own. */
+  applyLayoutRoot: (tabId: string, root: WorkspaceDockNode) => boolean;
   moveView: (tabId: string, paneId: string, index?: number) => boolean;
   dockView: (tabId: string, paneId: string, zone: DockDropZone, index?: number) => boolean;
   reorderPaneViews: (paneId: string, ids: string[]) => void;

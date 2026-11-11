@@ -1,93 +1,27 @@
 import { useInRouterContext, useNavigate } from "react-router-dom";
+import { ArrowLeft, ArrowRight, Info, RotateCw } from "lucide-react";
 import {
-  AppWindow,
-  ArrowLeft,
-  ArrowRight,
-  Download,
-  History,
-  Info,
-  MoreHorizontal,
-  Plus,
-  RotateCw,
-  Settings,
-  VenetianMask,
-} from "lucide-react";
-import {
+  BrowserMenuNoPage,
   BrowserOmnibox,
-  SidebarToolsPinMenu,
   browserToolbarStyles,
   useBrowserToolbarSlot,
 } from "@/features/browser";
-import { invokeShortcutCommand, ShortcutText, useShortcutHandler } from "@/features/shortcuts";
+import { useShortcutHandler } from "@/features/shortcuts";
 import { useFocusedPaneHistory, useWorkspaceStore } from "@/features/app-windows";
-import { browserInternalUrl } from "@/features/app-windows";
 import { blankBrowserUrl } from "@/features/app-windows";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuSeparator,
-  IconButton,
-  MenuItem,
-  MenuTrigger,
-  toolbarIconProps,
-} from "@/shared/ui";
+import { IconButton, toolbarIconProps } from "@/shared/ui";
 
 /**
  * What the page's own field ends with, at rest: its site information button, off until a browser
- * page has a site, and a ⋯ menu with the browser's window-level rows, which need no page.
+ * page has a site, and the same ⋯ menu a browser page has, with the rows that need a page off.
  */
 function SidebarTrailingFallback() {
-  const open = (page: "history" | "downloads") =>
-    useWorkspaceStore.getState().openBrowserView({ url: browserInternalUrl(page) });
-  const row = (icon: React.ReactNode, label: string, onSelect: () => void, shortcut?: string) => (
-    <MenuItem
-      icon={icon}
-      label={label}
-      shortcut={shortcut ? <ShortcutText commandId={shortcut} /> : undefined}
-      onSelect={onSelect}
-    />
-  );
   return (
     <>
       <IconButton label="Site information and permissions" tooltip={false} disabled>
         <Info {...browserToolbarStyles.roundIcon} />
       </IconButton>
-      <DropdownMenu>
-        <MenuTrigger
-          iconOnly
-          label="Browser menu"
-          title="More"
-          icon={<MoreHorizontal {...toolbarIconProps} />}
-        />
-        <DropdownMenuContent align="end" width="lg">
-          {row(
-            <Plus />,
-            "New tab",
-            () => void invokeShortcutCommand("search.toggle"),
-            "search.toggle",
-          )}
-          {row(
-            <AppWindow />,
-            "New window",
-            () => void invokeShortcutCommand("workspace.new_window"),
-          )}
-          {row(
-            <VenetianMask />,
-            "New private window",
-            () => void invokeShortcutCommand("workspace.new_incognito_window"),
-          )}
-          <SidebarToolsPinMenu />
-          <DropdownMenuSeparator />
-          {row(<History />, "History", () => open("history"))}
-          {row(<Download />, "Downloads", () => open("downloads"))}
-          {row(
-            <Settings />,
-            "Settings",
-            () => window.dispatchEvent(new CustomEvent("misty:open-settings")),
-            "app.open_settings",
-          )}
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <BrowserMenuNoPage />
     </>
   );
 }

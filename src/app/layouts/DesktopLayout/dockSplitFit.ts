@@ -3,6 +3,7 @@ import {
   dockLeaves,
   dockWidgetRegistry,
   maxWorkspacePanes,
+  splitKeepsGrid,
   useWorkspaceStore,
   type DockDropZone,
   type WorkspacePane,
@@ -27,8 +28,9 @@ export function dockSplitFits(
   movingTab: WorkspaceView,
 ): boolean {
   if (zone === "center") return true;
-  if (dockLeaves(useWorkspaceStore.getState().layout.root).length >= maxWorkspacePanes)
-    return false;
+  const root = useWorkspaceStore.getState().layout.root;
+  if (dockLeaves(root).length >= maxWorkspacePanes) return false;
+  if (!splitKeepsGrid(root, pane.id, zone)) return false;
   const remaining = pane.views.filter((tab) => tab.id !== movingTab.id);
   if (!remaining.length) return false;
   return canFitDockSplit(

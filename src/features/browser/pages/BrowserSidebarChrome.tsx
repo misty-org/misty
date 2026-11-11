@@ -5,8 +5,8 @@ import { browserToolbarStyles } from "./browserToolbarStyles";
 
 /**
  * The focused browser pane's toolbar, drawn into the tab sidebar's slots: back, forward and
- * reload beside the sidebar toggle, the pinned extensions in the tools row above the address
- * field, and the address field (with the ⋯ menu) in its top slot.
+ * reload beside the sidebar toggle, the pinned extensions in the row above the address field, and
+ * the address field (with the ⋯ menu) in its top slot.
  */
 export function BrowserSidebarChrome(props: {
   nav: ReactNode;
