@@ -1,5 +1,6 @@
 import type { UnlistenFn } from "@tauri-apps/api/event";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
+import { currentApiBase, mistyCloudServer, mistyWebsite } from "@/api/deployment/serverChoice";
 import { invoke } from "@/native/invoke";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 
@@ -54,9 +55,17 @@ export const directAppsApi = {
   list: () => call<DirectConnection[]>("direct_apps_list"),
   /** Starts a sign-in and returns the address to open; the end arrives as a changed event. */
   connect: (url: string, name: string) =>
-    call<{ url: string }>("direct_apps_connect", { url, name }),
+    call<{ url: string }>("direct_apps_connect", { url, name, donePage: connectedPage() }),
   disconnect: (id: string) => call<void>("direct_apps_disconnect", { id }),
 };
+
+/**
+ * Where the browser tab goes once a sign-in's code is back, so it doesn't end on the one-time local
+ * address: Misty's website, only for someone who chose Misty Cloud. Anyone else keeps the local page.
+ */
+function connectedPage(): string | null {
+  return currentApiBase() === mistyCloudServer() ? `${mistyWebsite()}/connected` : null;
+}
 
 /** A sign-in begun in this window ended, well or not. */
 export function listenDirectApps(

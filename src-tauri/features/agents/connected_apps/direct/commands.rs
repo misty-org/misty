@@ -152,6 +152,16 @@ pub struct Started {
     url: String,
 }
 
+/// The page to end a sign-in on, when it is a plain web address: https, or http on this computer
+/// while developing the website, with no query or fragment that could carry anything along.
+fn plain_page(address: &str) -> Option<String> {
+    let page = url::Url::parse(address).ok()?;
+    let local = matches!(page.host_str(), Some("localhost" | "127.0.0.1"));
+    let allowed = page.scheme() == "https" || (page.scheme() == "http" && local);
+    (allowed && page.query().is_none() && page.fragment().is_none() && page.username().is_empty())
+        .then(|| page.into())
+}
+
 /// Starts a sign-in: returns the address to open in the browser and finishes in the background,
 /// telling the window when it is done.
 #[tauri::command]
@@ -160,8 +170,10 @@ pub async fn direct_apps_connect(
     webview: tauri::Webview,
     url: String,
     name: String,
+    done_page: Option<String>,
 ) -> Result<Started, Failure> {
     let account = person(&webview)?;
+    let done_page = done_page.as_deref().and_then(plain_page);
     let name = name.trim().chars().take(60).collect::<String>();
     if !url.starts_with("https://") || name.is_empty() {
         return Err(rejected("invalid_request", "That app can't be connected."));
@@ -188,7 +200,7 @@ pub async fn direct_apps_connect(
             ))
         }
     };
-    let sign_in = oauth::begin(&http, &found)
+    let sign_in = oauth::begin(&http, &found, done_page)
         .await
         .map_err(|message| rejected("apps_rejected", message))?;
     let authorize_url = sign_in.authorize_url.clone();
@@ -247,4 +259,9 @@ pub async fn direct_apps_disconnect(webview: tauri::Webview, id: String) -> Resu
         .map_err(storage)?;
     tools::forget_tools(&id);
     Ok(())
+}
+
+#[cfg(test)]
+pub(super) fn test_plain_page(address: &str) -> Option<String> {
+    plain_page(address)
 }

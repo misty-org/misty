@@ -337,9 +337,16 @@ pub struct SignIn {
     state: String,
     verifier: String,
     redirect_uri: String,
+    /// A page to send the browser on to once the code is here, so the tab doesn't end on the
+    /// one-time local address. Nothing from the sign-in goes with it.
+    done_page: Option<String>,
 }
 
-pub async fn begin(http: &Client, found: &Discovered) -> Result<SignIn, String> {
+pub async fn begin(
+    http: &Client,
+    found: &Discovered,
+    done_page: Option<String>,
+) -> Result<SignIn, String> {
     // A one-time address on this computer only, which the browser comes back to.
     let listener = TcpListener::bind(("127.0.0.1", 0))
         .await
@@ -375,6 +382,7 @@ pub async fn begin(http: &Client, found: &Discovered) -> Result<SignIn, String> 
         state,
         verifier,
         redirect_uri,
+        done_page,
     })
 }
 
@@ -384,6 +392,22 @@ const DONE_PAGE: &str = "<!doctype html><meta charset=utf-8><title>Misty</title>
 const FAILED_PAGE: &str = "<!doctype html><meta charset=utf-8><title>Misty</title>\
 <body style=\"font:16px system-ui;background:#141414;color:#eee;display:grid;place-items:center;height:90vh\">\
 <p>The sign-in didn't finish. Go back to Misty and try again.</p>";
+
+/// What the browser gets back at the one-time address: on success, a redirect to the done page
+/// when there is one (a bare address, so nothing from the sign-in leaves this computer), else a
+/// local page saying how it went.
+fn callback_answer(ok: bool, done_page: Option<&str>) -> String {
+    if let (true, Some(page)) = (ok, done_page) {
+        return format!(
+            "HTTP/1.1 303 See Other\r\nLocation: {page}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+        );
+    }
+    let page = if ok { DONE_PAGE } else { FAILED_PAGE };
+    format!(
+        "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{page}",
+        page.len()
+    )
+}
 
 /// The `code` from the browser's return to the one-time address, checked against `state`.
 fn callback_code(request_line: &str, state: &str) -> Option<Result<String, String>> {
@@ -427,14 +451,9 @@ impl SignIn {
                         .await;
                     continue;
                 };
-                let page = if outcome.is_ok() { DONE_PAGE } else { FAILED_PAGE };
                 let _ = socket
                     .write_all(
-                        format!(
-                            "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{page}",
-                            page.len()
-                        )
-                        .as_bytes(),
+                        callback_answer(outcome.is_ok(), self.done_page.as_deref()).as_bytes(),
                     )
                     .await;
                 return outcome;
@@ -455,6 +474,11 @@ impl SignIn {
         }
         token_request(http, &found.token_endpoint, form).await
     }
+}
+
+#[cfg(test)]
+pub(super) fn test_callback_answer(ok: bool, done_page: Option<&str>) -> String {
+    callback_answer(ok, done_page)
 }
 
 #[cfg(test)]

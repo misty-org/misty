@@ -2,7 +2,8 @@ use serde_json::json;
 
 use super::catalog::{app_key, by_maker, from_registry, makers};
 use super::client::answer_in;
-use super::oauth::{challenge_of, test_callback_code};
+use super::commands::test_plain_page;
+use super::oauth::{challenge_of, test_callback_answer, test_callback_code};
 use super::store::{unique_app, Connection};
 use super::tools::{is_direct, slug_of, tool_of};
 
@@ -106,6 +107,34 @@ fn the_browser_comes_back_with_a_code_for_this_sign_in() {
         Some(Err(message)) if message.contains("cancelled")
     ));
     assert_eq!(test_callback_code("GET /favicon.ico HTTP/1.1", "s1"), None);
+}
+
+#[test]
+fn a_finished_sign_in_moves_the_tab_off_the_local_address() {
+    let moved = test_callback_answer(true, Some("https://example.com/connected"));
+    assert!(moved.starts_with("HTTP/1.1 303 See Other\r\n"));
+    assert!(moved.contains("\r\nLocation: https://example.com/connected\r\n"));
+    // Without a done page, or when the sign-in failed, the tab stays and says how it went.
+    assert!(test_callback_answer(true, None).contains("You're signed in"));
+    let failed = test_callback_answer(false, Some("https://example.com/connected"));
+    assert!(failed.starts_with("HTTP/1.1 200 OK") && failed.contains("didn't finish"));
+}
+
+#[test]
+fn only_a_bare_web_page_ends_a_sign_in() {
+    assert_eq!(
+        test_plain_page("https://example.com/connected").as_deref(),
+        Some("https://example.com/connected")
+    );
+    assert!(test_plain_page("http://localhost:5176/connected").is_some());
+    assert_eq!(test_plain_page("http://example.com/connected"), None);
+    assert_eq!(
+        test_plain_page("https://example.com/connected?code=1"),
+        None
+    );
+    assert_eq!(test_plain_page("https://example.com/connected#x"), None);
+    assert_eq!(test_plain_page("misty://connected"), None);
+    assert_eq!(test_plain_page("javascript:alert(1)"), None);
 }
 
 #[test]
