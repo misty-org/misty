@@ -28,7 +28,7 @@ const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(
       children,
       className,
       label,
-      shape = "square",
+      shape: _shape = "square",
       size = "sm",
       tooltip = label,
       type = "button",
@@ -47,12 +47,7 @@ const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(
         aria-label={ariaLabel ?? label}
         data-icon-size={size}
         title={tooltip === false ? label : tooltip}
-        className={cn(
-          "shrink-0 p-0 shadow-none",
-          iconButtonSizes[size],
-          shape === "round" && "rounded-full",
-          className,
-        )}
+        className={cn("shrink-0 p-0 shadow-none", iconButtonSizes[size], className)}
         {...props}
       >
         {children}

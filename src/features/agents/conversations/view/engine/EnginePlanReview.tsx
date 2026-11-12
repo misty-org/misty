@@ -1,0 +1,129 @@
+import { useState } from "react";
+import type { EnginePlanReview as PlanReview } from "../../../runs/invocations/invocationTypes";
+import { MistyMarkdown } from "../../../runs/markdown/MistyMarkdown";
+import { setPermissionMode } from "../../../plans/permissionMode";
+import { useCollaborationStore } from "../../../plans/store";
+import { Button, Textarea } from "@/shared/ui";
+import { respondToPlan, type PlanDecision } from "./engineApi";
+
+/** What the chat sends the engine once the person approves its plan, in Auto. */
+export const PLAN_APPROVED_PROMPT = "The plan is approved. Go ahead and carry it out.";
+
+const settledLabel: Record<string, string> = {
+  approved: "Approved",
+  changes_requested: "Changes requested",
+  deferred: "Not now",
+  expired: "No longer current",
+  superseded: "Replaced by a newer plan",
+  cancelled: "Cancelled",
+};
+
+/**
+ * A plan an outside engine finished in Plan mode. Approving switches the chat to Auto and lets
+ * the engine carry it out (in the same turn when the engine is still waiting on the answer);
+ * asking for changes sends the feedback back while the chat keeps planning.
+ */
+export function EnginePlanReview(props: {
+  plan: PlanReview;
+  draft?: boolean;
+  conversationId?: string;
+  onSend?: (prompt: string) => void;
+}) {
+  const { plan } = props;
+  const [status, setStatus] = useState(plan.status);
+  const [changing, setChanging] = useState(false);
+  const [feedback, setFeedback] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const open =
+    !props.draft && plan.complete && (status === "awaiting_review" || status === "deferred");
+
+  const decide = async (decision: PlanDecision) => {
+    setBusy(true);
+    setError("");
+    try {
+      const decided = await respondToPlan(
+        plan.planId,
+        plan.revision,
+        decision,
+        decision === "request_changes" ? feedback.trim() : undefined,
+      );
+      setStatus(decided.review.status);
+      if (decision === "approve") {
+        // A plan the person approved is carried out in Auto.
+        await setPermissionMode(props.conversationId, "auto");
+        await useCollaborationStore.getState().setMode(props.conversationId, "act");
+        if (decided.continueInAuto) props.onSend?.(PLAN_APPROVED_PROMPT);
+      } else if (decision === "request_changes" && !decided.native && feedback.trim()) {
+        props.onSend?.(feedback.trim());
+      }
+      setChanging(false);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : String(reason));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section className="engine-plan" aria-label="Plan">
+      <header className="engine-plan-head">
+        <span>{plan.title || "Plan"}</span>
+        {props.draft ? <span className="engine-plan-status">Writing</span> : null}
+        {!props.draft && !open ? (
+          <span className="engine-plan-status">{settledLabel[status] ?? status}</span>
+        ) : null}
+      </header>
+      <div className="misty-markdown-message engine-plan-body">
+        <MistyMarkdown>{plan.content}</MistyMarkdown>
+      </div>
+      {open ? (
+        changing ? (
+          <div className="engine-plan-feedback">
+            <Textarea
+              aria-label="What to change"
+              placeholder="What should change"
+              value={feedback}
+              onChange={(event) => setFeedback(event.target.value)}
+            />
+            <div className="engine-plan-actions">
+              <Button
+                size="sm"
+                variant="primary"
+                disabled={busy || !feedback.trim()}
+                onClick={() => void decide("request_changes")}
+              >
+                Send changes
+              </Button>
+              <Button size="sm" variant="ghost" disabled={busy} onClick={() => setChanging(false)}>
+                Cancel
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="engine-plan-actions">
+            <Button
+              size="sm"
+              variant="primary"
+              disabled={busy}
+              onClick={() => void decide("approve")}
+            >
+              Approve and run in Auto
+            </Button>
+            <Button size="sm" variant="outline" disabled={busy} onClick={() => setChanging(true)}>
+              Request changes
+            </Button>
+            <Button size="sm" variant="ghost" disabled={busy} onClick={() => void decide("defer")}>
+              Not now
+            </Button>
+          </div>
+        )
+      ) : null}
+      {error ? (
+        <p className="engine-question-error" role="alert">
+          {error}
+        </p>
+      ) : null}
+    </section>
+  );
+}

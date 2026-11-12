@@ -171,6 +171,7 @@ impl DeviceModels for Device {
             DeviceRole::Embedding => "embedding",
             DeviceRole::Transcription => "transcription",
             DeviceRole::Speech => "speech",
+            DeviceRole::Video => "video",
         };
         self.models.get(name).cloned().or_else(|| (name == "fast").then(|| self.models.get("agent").cloned()).flatten())
     }

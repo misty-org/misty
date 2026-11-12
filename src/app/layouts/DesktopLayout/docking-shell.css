@@ -36,7 +36,7 @@
   transition-timing-function: var(--shell-motion-easing, ease-in-out);
 }
 
-/* The tab sidebar. */
+/* The sidebar. */
 .misty-workspace-tabs {
   width: min(var(--shell-side-tabs, 200px), 35%);
   min-height: 0;
@@ -60,24 +60,6 @@
    margin already count toward the room they need. */
 .misty-space-bar-card [data-window-toolbar][data-window-chrome="true"] {
   padding-left: max(0px, calc(var(--window-chrome-left, 0px) - 16px)) !important;
-}
-.misty-workspace-tab-list {
-  scrollbar-width: none;
-}
-.misty-workspace-tab-list::-webkit-scrollbar {
-  display: none;
-}
-.misty-workspace-tab {
-  height: var(--shell-tab-height, 28px);
-  min-width: 80px;
-  max-width: 160px;
-  flex: 1 1 120px;
-}
-.misty-workspace-tabs .misty-workspace-tab {
-  width: 100%;
-  min-width: 0;
-  max-width: none;
-  flex: none;
 }
 .misty-workspace-tabs svg {
   width: 16px;

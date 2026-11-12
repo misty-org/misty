@@ -1,7 +1,7 @@
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Pressable, Skeleton } from "@/shared/ui";
-import { diffSteps, type DiffStep } from "../context-panel/diffSteps";
+import { diffSteps, type DiffStep } from "../context-panel/git/diffSteps";
 import "../context-panel/contextPanel.css";
 import { errorText, multirunApi, type LaneFile } from "./multirunApi";
 import { changeTotals } from "./multirunLogic";

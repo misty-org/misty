@@ -176,14 +176,6 @@ pub async fn devices_start(
         )
         .await;
     }
-    // The encrypted cloud clipboard follows this device's policy and vault.
-    state
-        .cloud_clipboard
-        .start(crate::sync::clipboard::cloud::CloudStart {
-            app: app.clone(),
-            server_device_id: context.server_device_id.clone(),
-            device_name: name.trim().to_owned(),
-        });
     channel::start(ChannelConfig {
         app: Some(app.clone()),
         http: context.http.clone(),
@@ -194,12 +186,8 @@ pub async fn devices_start(
 }
 
 #[tauri::command]
-pub async fn devices_stop(
-    webview: tauri::Webview,
-    state: State<'_, MistyRuntime>,
-) -> Result<(), String> {
+pub async fn devices_stop(webview: tauri::Webview) -> Result<(), String> {
     require_main(&webview)?;
-    state.cloud_clipboard.stop();
     channel::stop();
     trust::close();
     Ok(())

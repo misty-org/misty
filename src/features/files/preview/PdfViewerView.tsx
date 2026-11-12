@@ -88,7 +88,7 @@ export default function PdfViewerView({
   return (
     <div className="flex h-full w-full flex-col bg-charcoal-card">
       {compact ? null : (
-        <div className="flex h-11 flex-none items-center justify-between gap-3 border-b border-charcoal-border bg-charcoal-bg px-3 text-cream ">
+        <div className="flex h-12 flex-none items-center justify-between gap-3 border-b border-charcoal-border bg-charcoal-bg px-3 text-cream ">
           <span className="min-w-0 truncate text-sm font-medium" title={name}>
             {name}
           </span>

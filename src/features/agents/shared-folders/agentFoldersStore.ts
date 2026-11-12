@@ -30,8 +30,8 @@ const setConversationFolder = (
   }));
 
 /**
- * The agent folders on this device. Folders group chats, and chats live on the device
- * that keeps them, so folders do too.
+ * The agent folders on this device, which the sidebar shows as sections of the person's chats.
+ * Folders group chats, and chats live on the device that keeps them, so folders do too.
  */
 export const useAgentFoldersStore = create<AgentFoldersStore>((set, get) => ({
   accountId: "",

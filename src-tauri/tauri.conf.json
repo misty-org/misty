@@ -57,7 +57,10 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "createUpdaterArtifacts": true
+    "createUpdaterArtifacts": true,
+    "resources": {
+      "resources/agent-catalogs": "agent-catalogs"
+    }
   },
   "plugins": {
     "deep-link": {

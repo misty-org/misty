@@ -15,8 +15,8 @@ import { resetMistyDraftAttachments } from "../composer/draftAttachments";
 import { createMistyConversationActions } from "../ask/mistyConversationActions";
 import { persistLocalChats } from "./localChatSync";
 import { advanceSubmissionEpoch } from "../ask/mistySubmissionEpoch";
-import { conversationInSpace } from "./conversationSpace";
-import { onSpaceWindowSwitch } from "@/features/app-windows";
+import { placeUnplacedChats } from "./conversationSpace";
+import { onSpaceWindowSwitch, personalSpaceId, useSpaceWindowStore } from "@/features/app-windows";
 import { resetSteering, steerResponse } from "../ask/mistySteering";
 
 export const useMistyStore = create<MistyState>((set, get) => ({
@@ -51,7 +51,6 @@ export const useMistyStore = create<MistyState>((set, get) => ({
     set({
       context: get().context.filter((ref) => ref.id !== id),
       handoff: undefined,
-      browserRequest: undefined,
     }),
   ...createMistyConversationActions(set, get),
   submitAgentTask: async (prompt, presentation = "panel") =>
@@ -75,12 +74,23 @@ export const useMistyStore = create<MistyState>((set, get) => ({
 // Every change to a chat is saved on this device.
 persistLocalChats((listener) => useMistyStore.subscribe(listener));
 
-// A window shows its current Space's conversations; choosing another Space closes one from the last.
-onSpaceWindowSwitch((space) => {
-  const { activeConversationId, conversations, working } = useMistyStore.getState();
-  const open = conversations.find((item) => item.id === activeConversationId);
-  if (open && !working && !conversationInSpace(open, space))
-    useMistyStore.setState({ activeConversationId: "" });
+// Chats saved before they carried their Space were made in the personal Space. Once its id is
+// known they are given it, and the change is saved like any other.
+function placeOldChats() {
+  const personalId = personalSpaceId();
+  const { accountId, conversations } = useMistyStore.getState();
+  if (!personalId || useSpaceWindowStore.getState().personalSpaceOwner !== accountId) return;
+  const placed = placeUnplacedChats(conversations, personalId);
+  if (placed !== conversations) useMistyStore.setState({ conversations: placed });
+}
+useSpaceWindowStore.subscribe((state, previous) => {
+  if (state.personalSpaceOwner !== previous.personalSpaceOwner) placeOldChats();
 });
+useMistyStore.subscribe((state, previous) => {
+  if (state.conversations !== previous.conversations) placeOldChats();
+});
+
+// A chat keeps its own Space whichever the window shows; a new chat not yet sent follows the window.
+onSpaceWindowSwitch(() => useMistyStore.setState({ draftSpaceId: undefined }));
 
 startRunReconciler(useMistyStore);

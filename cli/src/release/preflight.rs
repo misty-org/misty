@@ -1,6 +1,6 @@
 use std::{collections::BTreeMap, env, path::Path};
 
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
 
 use crate::{process::CommandSpec, workspace::Workspace};
 
@@ -47,8 +47,11 @@ pub(super) fn check(workspace: &Workspace) -> Result<()> {
         &["aarch64-apple-darwin", "x86_64-apple-darwin"]
     } else if cfg!(windows) {
         &["x86_64-pc-windows-msvc", "aarch64-pc-windows-msvc"]
+    } else if cfg!(all(target_os = "linux", target_arch = "x86_64")) {
+        // The AppImage, deb and rpm carry only the updater's minisign signature.
+        &["x86_64-unknown-linux-gnu"]
     } else {
-        bail!("Desktop releases must be built on macOS or Windows");
+        bail!("Desktop releases must be built on macOS, Windows or x64 Linux");
     };
     let missing = required_targets
         .iter()
@@ -78,6 +81,18 @@ pub(super) fn check(workspace: &Workspace) -> Result<()> {
         CommandSpec::new("xcrun")
             .args(["--find", "notarytool"])
             .capture(&workspace.misty)?;
+    }
+    if cfg!(target_os = "linux") {
+        // Repacks the AppImage without its bundled Wayland libraries (appimage.rs).
+        let tool =
+            std::env::var("MISTY_APPIMAGETOOL").unwrap_or_else(|_| "appimagetool".to_owned());
+        CommandSpec::new(&tool)
+            .arg("--version")
+            .env("APPIMAGE_EXTRACT_AND_RUN", "1")
+            .capture(&workspace.misty)
+            .with_context(|| {
+                format!("Install appimagetool or set MISTY_APPIMAGETOOL (tried {tool})")
+            })?;
     }
     if cfg!(windows) {
         super::windows_signing::signtool()?;

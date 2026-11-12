@@ -46,7 +46,6 @@ export function createMistyPanelState(
         conversationsLoading: false,
         error: null,
         context: [],
-        browserRequest: undefined,
         conversations: [],
         activeConversationId: "",
       });
@@ -63,20 +62,10 @@ export function createMistyPanelState(
     },
     closePanel: () => {
       announceGlobalPanel(false);
-      set({
-        panel: "closed",
-        ...(get().browserRequest ? { context: [] } : {}),
-        browserRequest: undefined,
-      });
+      set({ panel: "closed" });
     },
     setQuery: (query) => set({ query }),
     setContext: (context) => set({ context: uniqueGlobalMistyContext(context) }),
-    removeContext: (id) =>
-      set({
-        context: get().context.filter((item) => item.id !== id),
-        ...(get().browserRequest?.context.some((item) => item.id === id)
-          ? { browserRequest: undefined }
-          : {}),
-      }),
+    removeContext: (id) => set({ context: get().context.filter((item) => item.id !== id) }),
   };
 }

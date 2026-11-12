@@ -5,7 +5,7 @@ import { useAccountNotSetUp } from "@/api/client/accountLimits";
 vi.mock("../sessions/authState", () => ({ useAuth: () => ({ user: { id: "account" } }) }));
 vi.mock("@/api/deployment/serverChoice", () => ({
   currentApiBase: () => "https://pro",
-  mistyProServer: () => "https://pro",
+  mistyCloudServer: () => "https://pro",
   mistyWebsite: () => "https://site",
 }));
 vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl: vi.fn() }));

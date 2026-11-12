@@ -1,6 +1,6 @@
 import { spacesSnapshot } from "@/features/app-windows";
 import { spacesGateway, type AgentArtifactProvenance } from "../spaces-gateway/spacesGateway";
-import { spaceAgentsApi } from "../api/space-agents";;
+import { spaceAgentsApi } from "../api/space-agents";
 
 /**
  * What agents make is saved to a Space the agent is in (the personal Space

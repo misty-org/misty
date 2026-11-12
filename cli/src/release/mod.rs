@@ -1,3 +1,4 @@
+mod appimage;
 mod build;
 mod config;
 mod metadata;
@@ -25,8 +26,8 @@ use crate::{
     workspace::Workspace,
 };
 use model::{
-    PlatformManifest, ReleaseManifest, MACOS_PLATFORM, PUBLIC_REPOSITORY, RELEASE_MANIFEST_NAME,
-    WINDOWS_ARM_PLATFORM, WINDOWS_PLATFORM,
+    PlatformManifest, ReleaseManifest, LINUX_PLATFORM, MACOS_PLATFORM, PUBLIC_REPOSITORY,
+    RELEASE_MANIFEST_NAME, WINDOWS_ARM_PLATFORM, WINDOWS_PLATFORM,
 };
 
 pub use publish::publish;
@@ -37,6 +38,7 @@ pub use state::normalize_version;
 pub enum ReleaseOs {
     Macos,
     Windows,
+    Linux,
 }
 
 pub fn check(workspace: &Workspace) -> Result<()> {
@@ -191,6 +193,9 @@ fn selected_platforms(os: &[ReleaseOs]) -> Result<Vec<String>> {
     }
     if os.contains(&ReleaseOs::Windows) {
         platforms.extend([WINDOWS_PLATFORM.to_owned(), WINDOWS_ARM_PLATFORM.to_owned()]);
+    }
+    if os.contains(&ReleaseOs::Linux) {
+        platforms.push(LINUX_PLATFORM.to_owned());
     }
     Ok(platforms)
 }

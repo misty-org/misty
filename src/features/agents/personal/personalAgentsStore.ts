@@ -1,6 +1,7 @@
 import { create } from "zustand";
+import { invoke } from "@/native/invoke";
 import type { AgentProfile } from "@/shared/schemas";
-import { listPersonalAgents, personalAgentsApi } from "./personalAgentsApi";
+import { listPersonalAgents, newEngineAgents, personalAgentsApi } from "./personalAgentsApi";
 
 interface PersonalAgentsState {
   accountId: string;
@@ -12,6 +13,19 @@ interface PersonalAgentsState {
   select(spaceId: string, agentId: string): void;
 }
 let revision = 0;
+
+/** The first new engine agent whose CLI says it is signed in; one whose CLI can't say comes next,
+ * and one signed out is never picked. */
+async function signedInStarter(fresh: AgentProfile[]): Promise<AgentProfile | undefined> {
+  const answers = await Promise.all(
+    fresh.map((agent) =>
+      invoke<{ signedIn: boolean | null }>("engine_cli_signed_in", { engine: agent.engine })
+        .then((status) => status.signedIn)
+        .catch(() => null),
+    ),
+  );
+  return fresh[answers.indexOf(true)] ?? fresh[answers.indexOf(null)];
+}
 export const usePersonalAgentsStore = create<PersonalAgentsState>((set, get) => ({
   accountId: "",
   agents: [],
@@ -28,8 +42,18 @@ export const usePersonalAgentsStore = create<PersonalAgentsState>((set, get) => 
     set({ loading: true });
     try {
       const { agents } = await personalAgentsApi.list();
-      if (revision === request && get().accountId === accountId)
+      if (revision === request && get().accountId === accountId) {
         set({ agents, loading: false, error: "" });
+        // The first time the person's own engines are found, new chats start with one that is
+        // installed and signed in, as its CLI says.
+        const fresh = newEngineAgents;
+        if (!get().selected.global && fresh.length) {
+          void signedInStarter(fresh).then((starter) => {
+            if (starter && get().accountId === accountId && !get().selected.global)
+              set({ selected: { global: starter.id } });
+          });
+        }
+      }
     } catch (error) {
       if (revision === request && get().accountId === accountId)
         set({ loading: false, error: error instanceof Error ? error.message : String(error) });
@@ -42,7 +66,9 @@ export const usePersonalAgentsStore = create<PersonalAgentsState>((set, get) => 
 export function selectedPersonalAgent(_spaceId: string) {
   const state = usePersonalAgentsStore.getState();
   return (
-    state.agents.find((a) => a.id === state.selected.global && a.enabled) ??
+    state.agents.find((a) => a.id === state.selected.global && a.enabled && !a.system_managed) ??
+    // Misty's own runtime is never the default; it is the last resort when no engine agent exists.
+    state.agents.find((a) => a.engine && a.enabled) ??
     state.agents.find((a) => a.system_managed)
   );
 }

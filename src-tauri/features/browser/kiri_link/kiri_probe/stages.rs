@@ -136,49 +136,6 @@ pub(super) async fn context_menu_copies_through_kiri(
     result
 }
 
-pub(super) async fn site_permissions_round_trip(app: &AppHandle) -> Result<(), String> {
-    use super::super::super::site_settings::permissions;
-    let main = crate::browser::app_windows::primary_webview(&app).ok_or("Missing main view")?;
-    let info = serde_json::to_value(
-        permissions::browser_site_info(main.clone(), app.clone(), ID.into()).await?,
-    )
-    .map_err(|e| e.to_string())?;
-    let origin = info["origin"].as_str().ok_or("no origin")?.to_owned();
-    let profile = info["profile"]
-        .as_str()
-        .ok_or("probe tab has no persistent profile")?
-        .to_owned();
-    let allowed = permissions::Permissions {
-        camera: permissions::Decision::Allow,
-        microphone: permissions::Decision::Block,
-        location: permissions::Decision::Allow,
-    };
-    let saved = serde_json::to_value(
-        permissions::browser_site_permissions_set(
-            main.clone(),
-            app.clone(),
-            ID.into(),
-            origin.clone(),
-            allowed,
-        )
-        .await?,
-    )
-    .map_err(|e| e.to_string())?;
-    let listed = permissions::browser_site_permissions_list(main.clone(), app.clone()).await?;
-    let found = listed
-        .iter()
-        .any(|entry| entry.saved.origin == origin && entry.saved.profile == profile);
-    permissions::browser_site_permissions_reset(main.clone(), app.clone(), profile, origin).await?;
-    if saved["permissions"]["camera"] != "allow"
-        || saved["permissions"]["microphone"] != "block"
-        || saved["permissions"]["location"] != "allow"
-        || !found
-    {
-        return Err(format!("decision did not round-trip: {saved}"));
-    }
-    Ok(())
-}
-
 /// Runs Kiri's macOS authenticator for real. Unsigned for the passkey
 /// entitlement, the system must refuse it and Kiri must say so without hanging.
 pub(super) async fn passkey_path_reaches_authentication_services(

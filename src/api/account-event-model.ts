@@ -17,7 +17,6 @@ export function validEvent(value: unknown): value is AccountEvent {
       "runtime",
       "agents",
       "interventions",
-      "workflows",
       "usage",
       "library-renditions",
       "device-pairing",

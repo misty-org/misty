@@ -1,10 +1,10 @@
-//! The user turn (`aiInvocationPrompt`): remembered preferences, recent conversation, prior write
-//! receipts and the request with its context.
+//! The user turn (`aiInvocationPrompt`): recent conversation, prior write receipts and the request
+//! with its context.
 use super::{
     artifact_specs::{artifact_spec, inferred_artifact_kind},
     go_text::{go_object, go_quote, go_string, go_value, truncate_text},
     history::{companion_history, conversation_history},
-    request::{ContextReference, MediaContext, RunRequest, SCHEDULED_RUN_TRIGGER},
+    request::{ContextReference, MediaContext, RunRequest},
 };
 
 fn reference_json(reference: &ContextReference) -> String {
@@ -77,12 +77,6 @@ fn context_prompt(request: &RunRequest) -> String {
 /// `compileAIInvocationPrompt`.
 fn compile_prompt(request: &RunRequest) -> String {
     let mut prompt = context_prompt(request);
-    if request.trigger == "schedule" {
-        prompt = format!("This is an explicitly enabled recurring personal briefing. Include [N] citations for factual claims.\n\n{prompt}");
-    }
-    if request.trigger == SCHEDULED_RUN_TRIGGER {
-        prompt = format!("The user's scheduled workflow started this request automatically; they are not watching it run. Do the work, then report concisely what you found or did. Ask for approval instead of taking any irreversible action.\n\n{prompt}");
-    }
     let mut kind = request.requested_artifact_kind.trim();
     if kind.is_empty() {
         kind = inferred_artifact_kind(request);
@@ -132,13 +126,10 @@ fn media_prompt(media: &MediaContext) -> String {
     out
 }
 
-pub(super) fn user_prompt(request: &RunRequest, memory_context: &str, window_tokens: i64) -> String {
+pub(super) fn user_prompt(request: &RunRequest, window_tokens: i64) -> String {
     let mut prompt = compile_prompt(request);
     if let Some(media) = &request.media_context {
         prompt = format!("{}\n\n{prompt}", media_prompt(media));
-    }
-    if !memory_context.is_empty() {
-        prompt = format!("{memory_context}\n\n{prompt}");
     }
     if request.conversation_id.is_empty() {
         return prompt;

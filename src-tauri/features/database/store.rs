@@ -49,7 +49,7 @@ const MIGRATIONS: &[&str] = &[
          id INTEGER PRIMARY KEY CHECK (id = 1),
          document TEXT NOT NULL
      );",
-    // 6: what this device trusts for each signed-in account (vault root, device list, policy)
+    // 6: what this device trusts for each signed-in account (device list, policy)
     "CREATE TABLE device_trust (
          key TEXT PRIMARY KEY,
          document TEXT NOT NULL
@@ -247,8 +247,7 @@ const MIGRATIONS: &[&str] = &[
      ) WITHOUT ROWID;",
     // 24: Memory on this computer (memory): moments, facts and summaries per account and Space,
     // what waits for a vector, and the vectors themselves, apart so a search reads nothing else.
-    // `sent` says the vault's record store has a row, `changed` that it needs this version, and
-    // `memory_deleted` holds deletions the vault hasn't heard of.
+    // `sent`, `changed`, `backfill` and `memory_deleted` were for syncing it; migration 30 drops them.
     "CREATE TABLE memory_events (
          account TEXT NOT NULL,
          id TEXT NOT NULL,
@@ -370,8 +369,8 @@ const MIGRATIONS: &[&str] = &[
          updated_at INTEGER NOT NULL,
          PRIMARY KEY (account, conversation_id, engine)
      ) WITHOUT ROWID;",
-    // 27: the connections a person made so an agent Misty doesn't start (Cursor, the Claude app) can
-    // use one of their Spaces. Only the token's hash is kept (engines/connections.rs).
+    // 27: the connections a person made so an agent Misty doesn't start (Cursor, the Claude app) could
+    // use one of their Spaces. The feature is gone; migration 29 drops the table.
     "CREATE TABLE space_connections (
          id TEXT PRIMARY KEY,
          account TEXT NOT NULL,
@@ -398,6 +397,367 @@ const MIGRATIONS: &[&str] = &[
          created_at INTEGER NOT NULL,
          PRIMARY KEY (account, multirun, lane)
      ) WITHOUT ROWID;",
+    // 29: outside agents can no longer connect to a Space, so the connections and their token
+    // hashes go, and no token handed out before can ever be honored again.
+    "DROP TABLE IF EXISTS space_connections;",
+    // 30: memory and browsing history stay on this computer, so what tracked their syncing goes:
+    // memory's sent and changed marks, its deletions waiting to go out, the mark on copies that
+    // came from elsewhere, and the history hours waiting to be sent again.
+    "DROP INDEX IF EXISTS memory_events_changed;
+     DROP INDEX IF EXISTS memory_facts_changed;
+     ALTER TABLE memory_events DROP COLUMN sent;
+     ALTER TABLE memory_events DROP COLUMN changed;
+     ALTER TABLE memory_facts DROP COLUMN sent;
+     ALTER TABLE memory_facts DROP COLUMN changed;
+     ALTER TABLE memory_summaries DROP COLUMN sent;
+     ALTER TABLE memory_summaries DROP COLUMN changed;
+     ALTER TABLE memory_chunks DROP COLUMN backfill;
+     DROP TABLE IF EXISTS memory_deleted;
+     DROP TABLE IF EXISTS history_dirty;",
+    // 31: one row per run, whatever engine ran it, for a Space's timeline on this computer: the mode
+    // it started in, how it ended, how many tools it used and which files it wrote
+    // (agents/run_control/run_ledger.rs). Never synced.
+    "CREATE TABLE agent_run_ledger (
+         run_id TEXT PRIMARY KEY,
+         account TEXT NOT NULL,
+         conversation_id TEXT NOT NULL,
+         engine TEXT NOT NULL,
+         mode TEXT NOT NULL,
+         started_at INTEGER NOT NULL,
+         updated_at INTEGER NOT NULL,
+         state TEXT NOT NULL,
+         tools INTEGER NOT NULL DEFAULT 0,
+         files TEXT NOT NULL DEFAULT '[]'
+     ) WITHOUT ROWID;
+     CREATE INDEX agent_run_ledger_chat ON agent_run_ledger(account, conversation_id, started_at);",
+    // 32: each run's steps on this computer, for the person's own activity view
+    // (agents/run_control/run_steps.rs): the tool, the file or page it worked on and how it ended,
+    // never its arguments or result. A sub-agent's run files its steps under the run that started
+    // it. Never synced.
+    "CREATE TABLE agent_run_steps (
+         run_id TEXT NOT NULL,
+         seq INTEGER NOT NULL,
+         account TEXT NOT NULL,
+         call_id TEXT NOT NULL,
+         at INTEGER NOT NULL,
+         tool TEXT NOT NULL,
+         target TEXT NOT NULL DEFAULT '',
+         title TEXT NOT NULL DEFAULT '',
+         state TEXT NOT NULL,
+         duration_ms INTEGER NOT NULL DEFAULT 0,
+         nested INTEGER NOT NULL DEFAULT 0,
+         picture TEXT NOT NULL DEFAULT '',
+         PRIMARY KEY (run_id, seq)
+     ) WITHOUT ROWID;
+     CREATE INDEX agent_run_steps_call ON agent_run_steps(run_id, call_id);
+     CREATE INDEX agent_run_steps_account ON agent_run_steps(account, at);
+     CREATE TABLE agent_run_parents (
+         run_id TEXT PRIMARY KEY,
+         parent_run_id TEXT NOT NULL,
+         at INTEGER NOT NULL
+     ) WITHOUT ROWID;",
+    // 33: memory becomes Engram's sessions, observations, relations and prompts beside MemPalace's
+    // drawers, closets and hallways (features/memory), on this computer only. Facts become
+    // observations, moments become drawers in rooms by kind, recaps and summaries become sessions.
+    // Old vectors go: records are embedded again as the Embedding role is used, tagged by model.
+    "DROP TABLE memory_vectors;
+     DROP TABLE memory_chunks;
+     CREATE TABLE memory_sessions (
+         account TEXT NOT NULL,
+         id TEXT NOT NULL,
+         space_id TEXT NOT NULL,
+         agent_id TEXT NOT NULL DEFAULT '',
+         kind TEXT NOT NULL DEFAULT 'chat',
+         title TEXT NOT NULL DEFAULT '',
+         directory TEXT NOT NULL DEFAULT '',
+         started_at INTEGER NOT NULL,
+         ended_at INTEGER,
+         summary TEXT,
+         outline TEXT,
+         PRIMARY KEY (account, id)
+     ) WITHOUT ROWID;
+     CREATE INDEX memory_sessions_space ON memory_sessions(account, space_id, started_at);
+     CREATE TABLE memory_session_finalizations (
+         account TEXT NOT NULL,
+         session_id TEXT NOT NULL,
+         summary_id INTEGER NOT NULL,
+         summary_sync_id TEXT NOT NULL,
+         PRIMARY KEY (account, session_id)
+     ) WITHOUT ROWID;
+     CREATE TABLE memory_observations (
+         id INTEGER PRIMARY KEY AUTOINCREMENT,
+         sync_id TEXT NOT NULL UNIQUE,
+         account TEXT NOT NULL,
+         session_id TEXT NOT NULL,
+         space_id TEXT NOT NULL,
+         agent_id TEXT NOT NULL DEFAULT '',
+         wing TEXT NOT NULL,
+         room TEXT NOT NULL,
+         type TEXT NOT NULL,
+         title TEXT NOT NULL,
+         content TEXT NOT NULL,
+         tool_name TEXT,
+         scope TEXT NOT NULL DEFAULT 'project',
+         topic_key TEXT,
+         normalized_hash TEXT NOT NULL,
+         revision_count INTEGER NOT NULL DEFAULT 1,
+         duplicate_count INTEGER NOT NULL DEFAULT 1,
+         last_seen_at INTEGER,
+         last_used_at INTEGER,
+         pinned INTEGER NOT NULL DEFAULT 0,
+         origin TEXT NOT NULL DEFAULT 'agent',
+         trust TEXT NOT NULL DEFAULT 'trusted',
+         reason TEXT NOT NULL DEFAULT '',
+         source_conversation_id TEXT NOT NULL DEFAULT '',
+         source_run_id TEXT NOT NULL DEFAULT '',
+         review_after INTEGER,
+         expires_at INTEGER,
+         superseded_by_sync_id TEXT,
+         created_at INTEGER NOT NULL,
+         updated_at INTEGER NOT NULL,
+         deleted_at INTEGER
+     );
+     CREATE INDEX memory_observations_scope ON memory_observations(account, space_id, agent_id, updated_at);
+     CREATE INDEX memory_observations_topic ON memory_observations(account, topic_key) WHERE topic_key IS NOT NULL;
+     CREATE INDEX memory_observations_hash ON memory_observations(account, normalized_hash);
+     CREATE INDEX memory_observations_session ON memory_observations(account, session_id, created_at);
+     CREATE INDEX memory_observations_review ON memory_observations(account, review_after)
+         WHERE review_after IS NOT NULL AND deleted_at IS NULL;
+     CREATE VIRTUAL TABLE memory_observations_fts USING fts5(
+         title, content, tool_name, type, wing, topic_key,
+         tokenize = 'trigram remove_diacritics 1',
+         content = 'memory_observations', content_rowid = 'id'
+     );
+     CREATE TRIGGER memory_observations_ai AFTER INSERT ON memory_observations BEGIN
+         INSERT INTO memory_observations_fts (rowid, title, content, tool_name, type, wing, topic_key)
+         VALUES (new.id, new.title, new.content, new.tool_name, new.type, new.wing, new.topic_key);
+     END;
+     CREATE TRIGGER memory_observations_ad AFTER DELETE ON memory_observations BEGIN
+         INSERT INTO memory_observations_fts (memory_observations_fts, rowid, title, content, tool_name, type, wing, topic_key)
+         VALUES ('delete', old.id, old.title, old.content, old.tool_name, old.type, old.wing, old.topic_key);
+     END;
+     CREATE TRIGGER memory_observations_au AFTER UPDATE OF title, content, tool_name, type, wing, topic_key
+         ON memory_observations BEGIN
+         INSERT INTO memory_observations_fts (memory_observations_fts, rowid, title, content, tool_name, type, wing, topic_key)
+         VALUES ('delete', old.id, old.title, old.content, old.tool_name, old.type, old.wing, old.topic_key);
+         INSERT INTO memory_observations_fts (rowid, title, content, tool_name, type, wing, topic_key)
+         VALUES (new.id, new.title, new.content, new.tool_name, new.type, new.wing, new.topic_key);
+     END;
+     CREATE TABLE memory_observation_versions (
+         id INTEGER PRIMARY KEY AUTOINCREMENT,
+         observation_id INTEGER NOT NULL REFERENCES memory_observations(id) ON DELETE CASCADE,
+         title TEXT,
+         content TEXT NOT NULL,
+         version INTEGER NOT NULL,
+         created_at INTEGER NOT NULL,
+         UNIQUE (observation_id, version)
+     );
+     CREATE TABLE memory_relations (
+         id INTEGER PRIMARY KEY AUTOINCREMENT,
+         sync_id TEXT NOT NULL UNIQUE,
+         account TEXT NOT NULL,
+         source_id TEXT,
+         target_id TEXT,
+         relation TEXT NOT NULL DEFAULT 'pending',
+         reason TEXT,
+         evidence TEXT,
+         confidence REAL,
+         judgment_status TEXT NOT NULL DEFAULT 'pending',
+         marked_by_actor TEXT,
+         marked_by_kind TEXT,
+         marked_by_model TEXT,
+         session_id TEXT,
+         superseded_at INTEGER,
+         superseded_by_relation_id INTEGER REFERENCES memory_relations(id) ON DELETE SET NULL,
+         created_at INTEGER NOT NULL,
+         updated_at INTEGER NOT NULL
+     );
+     CREATE INDEX memory_relations_source ON memory_relations(account, source_id, judgment_status);
+     CREATE INDEX memory_relations_target ON memory_relations(account, target_id, judgment_status);
+     CREATE TABLE memory_prompts (
+         id INTEGER PRIMARY KEY AUTOINCREMENT,
+         sync_id TEXT NOT NULL UNIQUE,
+         account TEXT NOT NULL,
+         session_id TEXT NOT NULL,
+         space_id TEXT NOT NULL,
+         agent_id TEXT NOT NULL DEFAULT '',
+         content TEXT NOT NULL,
+         created_at INTEGER NOT NULL
+     );
+     CREATE INDEX memory_prompts_space ON memory_prompts(account, space_id, created_at);
+     CREATE VIRTUAL TABLE memory_prompts_fts USING fts5(
+         content, tokenize = 'trigram remove_diacritics 1',
+         content = 'memory_prompts', content_rowid = 'id'
+     );
+     CREATE TRIGGER memory_prompts_ai AFTER INSERT ON memory_prompts BEGIN
+         INSERT INTO memory_prompts_fts (rowid, content) VALUES (new.id, new.content);
+     END;
+     CREATE TRIGGER memory_prompts_ad AFTER DELETE ON memory_prompts BEGIN
+         INSERT INTO memory_prompts_fts (memory_prompts_fts, rowid, content) VALUES ('delete', old.id, old.content);
+     END;
+     CREATE TABLE memory_drawers (
+         id INTEGER PRIMARY KEY AUTOINCREMENT,
+         drawer_id TEXT NOT NULL UNIQUE,
+         account TEXT NOT NULL,
+         space_id TEXT NOT NULL,
+         wing TEXT NOT NULL,
+         room TEXT NOT NULL,
+         hall TEXT NOT NULL DEFAULT 'general',
+         source_kind TEXT NOT NULL,
+         source_file TEXT NOT NULL,
+         chunk_index INTEGER NOT NULL DEFAULT 0,
+         title TEXT NOT NULL DEFAULT '',
+         content TEXT NOT NULL,
+         entities TEXT NOT NULL DEFAULT '',
+         added_by TEXT NOT NULL DEFAULT '',
+         url TEXT NOT NULL DEFAULT '',
+         site TEXT NOT NULL DEFAULT '',
+         app TEXT NOT NULL DEFAULT '',
+         window_title TEXT NOT NULL DEFAULT '',
+         capture_session TEXT NOT NULL DEFAULT '',
+         ref_id TEXT NOT NULL DEFAULT '',
+         content_hash TEXT NOT NULL DEFAULT '',
+         filed_at INTEGER NOT NULL,
+         authored_at INTEGER
+     );
+     CREATE INDEX memory_drawers_place ON memory_drawers(account, space_id, wing, room, filed_at);
+     CREATE INDEX memory_drawers_source ON memory_drawers(account, source_file, chunk_index);
+     CREATE VIRTUAL TABLE memory_drawers_fts USING fts5(
+         title, content, entities, room,
+         tokenize = 'trigram remove_diacritics 1',
+         content = 'memory_drawers', content_rowid = 'id'
+     );
+     CREATE TRIGGER memory_drawers_ai AFTER INSERT ON memory_drawers BEGIN
+         INSERT INTO memory_drawers_fts (rowid, title, content, entities, room)
+         VALUES (new.id, new.title, new.content, new.entities, new.room);
+     END;
+     CREATE TRIGGER memory_drawers_ad AFTER DELETE ON memory_drawers BEGIN
+         INSERT INTO memory_drawers_fts (memory_drawers_fts, rowid, title, content, entities, room)
+         VALUES ('delete', old.id, old.title, old.content, old.entities, old.room);
+     END;
+     CREATE TABLE memory_closets (
+         id INTEGER PRIMARY KEY AUTOINCREMENT,
+         closet_id TEXT NOT NULL UNIQUE,
+         account TEXT NOT NULL,
+         space_id TEXT NOT NULL,
+         wing TEXT NOT NULL,
+         room TEXT NOT NULL,
+         source_file TEXT NOT NULL,
+         text TEXT NOT NULL
+     );
+     CREATE INDEX memory_closets_source ON memory_closets(account, space_id, source_file);
+     CREATE VIRTUAL TABLE memory_closets_fts USING fts5(
+         text, tokenize = 'unicode61 remove_diacritics 2',
+         content = 'memory_closets', content_rowid = 'id'
+     );
+     CREATE TRIGGER memory_closets_ai AFTER INSERT ON memory_closets BEGIN
+         INSERT INTO memory_closets_fts (rowid, text) VALUES (new.id, new.text);
+     END;
+     CREATE TRIGGER memory_closets_ad AFTER DELETE ON memory_closets BEGIN
+         INSERT INTO memory_closets_fts (memory_closets_fts, rowid, text) VALUES ('delete', old.id, old.text);
+     END;
+     CREATE TABLE memory_hallways (
+         account TEXT NOT NULL,
+         space_id TEXT NOT NULL,
+         wing TEXT NOT NULL,
+         entity_a TEXT NOT NULL,
+         entity_b TEXT NOT NULL,
+         name_a TEXT NOT NULL,
+         name_b TEXT NOT NULL,
+         count INTEGER NOT NULL DEFAULT 1,
+         rooms TEXT NOT NULL DEFAULT '[]',
+         strength REAL NOT NULL DEFAULT 1.0,
+         stability REAL NOT NULL DEFAULT 1.0,
+         last_activated INTEGER NOT NULL,
+         access_count INTEGER NOT NULL DEFAULT 0,
+         created_at INTEGER NOT NULL,
+         PRIMARY KEY (account, space_id, wing, entity_a, entity_b)
+     ) WITHOUT ROWID;
+     CREATE INDEX memory_hallways_b ON memory_hallways(account, space_id, entity_b);
+     CREATE TABLE memory_vectors (
+         kind TEXT NOT NULL,
+         record_id INTEGER NOT NULL,
+         account TEXT NOT NULL,
+         space_id TEXT NOT NULL,
+         wing TEXT NOT NULL,
+         everywhere INTEGER NOT NULL DEFAULT 0,
+         model TEXT NOT NULL,
+         dimensions INTEGER NOT NULL,
+         text_hash TEXT NOT NULL,
+         embedding BLOB NOT NULL,
+         PRIMARY KEY (kind, record_id)
+     ) WITHOUT ROWID;
+     CREATE INDEX memory_vectors_scope ON memory_vectors(account, model, dimensions, space_id);
+     CREATE TABLE memory_embed_leases (
+         kind TEXT NOT NULL,
+         record_id INTEGER NOT NULL,
+         attempts INTEGER NOT NULL DEFAULT 0,
+         lease_until INTEGER,
+         due_at INTEGER NOT NULL DEFAULT 0,
+         PRIMARY KEY (kind, record_id)
+     ) WITHOUT ROWID;
+     INSERT INTO memory_sessions (account, id, space_id, agent_id, kind, title, started_at)
+         SELECT account, 'manual-' || space_id || '-' || CASE WHEN agent_id = '' THEN 'misty' ELSE agent_id END,
+             space_id, agent_id, 'manual', 'Saved memories', min(created_at)
+         FROM memory_facts GROUP BY account, space_id, agent_id;
+     INSERT INTO memory_observations (sync_id, account, session_id, space_id, agent_id, wing, room, type,
+             title, content, scope, normalized_hash, last_seen_at, last_used_at, origin, reason,
+             source_conversation_id, source_run_id, review_after, created_at, updated_at)
+         SELECT 'obs-' || lower(hex(randomblob(8))), account,
+             'manual-' || space_id || '-' || CASE WHEN agent_id = '' THEN 'misty' ELSE agent_id END,
+             space_id, agent_id, CASE WHEN agent_id = '' THEN 'space' ELSE 'agent:' || agent_id END,
+             kind, kind, CASE WHEN length(content) > 80 THEN substr(content, 1, 79) || '…' ELSE content END,
+             content, CASE WHEN space_id = '' THEN 'personal' ELSE 'project' END, memory_key, updated_at,
+             last_used_at, 'migrated', reason, source_conversation_id, source_invocation_id,
+             CASE WHEN kind = 'preference' THEN updated_at + 7776000000 END, created_at, updated_at
+         FROM memory_facts ORDER BY created_at;
+     INSERT OR IGNORE INTO memory_drawers (drawer_id, account, space_id, wing, room, hall, source_kind,
+             source_file, chunk_index, title, content, url, site, app, window_title, capture_session,
+             ref_id, content_hash, filed_at, authored_at, added_by)
+         SELECT 'drawer_space_' || CASE e.kind WHEN 'voice' THEN 'dictation' WHEN 'recording' THEN 'recordings'
+                 WHEN 'note' THEN 'notes' WHEN 'screen' THEN 'captures' ELSE 'pages' END
+                 || '_' || lower(hex(randomblob(8))),
+             e.account, e.space_id, 'space',
+             CASE e.kind WHEN 'voice' THEN 'dictation' WHEN 'recording' THEN 'recordings'
+                 WHEN 'note' THEN 'notes' WHEN 'screen' THEN 'captures' ELSE 'pages' END,
+             'general', e.kind, 'moment:' || e.id, 0, e.title,
+             CASE WHEN trim(e.body) = '' THEN e.title ELSE e.body END,
+             e.url, e.site, e.app, e.window_title, e.session_id, e.ref_id, '', e.updated_at, e.occurred_at,
+             'person'
+         FROM memory_events e
+         WHERE e.same_as IS NULL AND trim(e.title || e.body) <> '';
+     INSERT OR IGNORE INTO memory_sessions (account, id, space_id, kind, title, started_at, ended_at, summary, outline)
+         SELECT account,
+             CASE WHEN surface_id LIKE 'recap-%' THEN 'recap:' || space_id || ':' || substr(surface_id, 7)
+                  WHEN surface_id LIKE 'manual-%' THEN 'summary-' || substr(surface_id, 8)
+                  ELSE 'summary-' || surface_id END,
+             space_id,
+             CASE WHEN surface_id LIKE 'recap-%' THEN 'recap' ELSE 'manual' END,
+             title, updated_at, updated_at, text, outline
+         FROM memory_summaries;
+     DROP TABLE memory_events;
+     DROP TABLE memory_facts;
+     DROP TABLE memory_summaries;",
+    // 34: the virtual office is called the studio: its rooms and looks move to the new kind.
+    "UPDATE agent_chats SET kind = 'studio' WHERE kind = 'office';",
+    // 35: Misty keeps no memory of its own, and no workflows, schedules or skills: engines have
+    // them. Their tables and saved documents go.
+    "DROP TABLE IF EXISTS memory_observations_fts;
+     DROP TABLE IF EXISTS memory_prompts_fts;
+     DROP TABLE IF EXISTS memory_drawers_fts;
+     DROP TABLE IF EXISTS memory_closets_fts;
+     DROP TABLE IF EXISTS memory_observation_versions;
+     DROP TABLE IF EXISTS memory_relations;
+     DROP TABLE IF EXISTS memory_observations;
+     DROP TABLE IF EXISTS memory_session_finalizations;
+     DROP TABLE IF EXISTS memory_sessions;
+     DROP TABLE IF EXISTS memory_prompts;
+     DROP TABLE IF EXISTS memory_drawers;
+     DROP TABLE IF EXISTS memory_closets;
+     DROP TABLE IF EXISTS memory_hallways;
+     DROP TABLE IF EXISTS memory_embed_leases;
+     DELETE FROM agent_chats
+         WHERE kind IN ('workflow_method', 'workflow_schedule', 'workflow_replay', 'workflow_vector');",
 ];
 
 #[derive(Debug, Clone)]

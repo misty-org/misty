@@ -1,278 +1,137 @@
-// A chat turn on an outside engine: started from the same request as Misty's own runs, and
-// reported as the same run events, so the chat shows it without knowing which engine answered.
+// A chat turn on an outside engine: started from the same request as Misty's own runs, sent
+// through the engine layer's launch path (`mod.rs`, desktop-cc-gui's), and reported as the same
+// run events through the bridge (`bridge.rs`), so the chat shows it without knowing which engine
+// answered.
 //
 // What an engine may do is decided here, in native code, from the mode the run started with:
-// that mode picks the engine's own flags, and in Ask each thing it wants to do goes to the person
+// that mode picks the engine's own flags (`agents/run_control/engine_modes.rs`), and every
+// permission ask the engine raises comes back to `decide`, which in Ask puts it to the person
 // through the same question Misty's own agent asks.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::{LazyLock, Mutex};
-use std::time::Instant;
 
-use serde_json::{json, Value};
+use serde_json::Value;
 use tauri::{AppHandle, Manager};
 
-use crate::agents::run_control::local_runs::publish_native;
+use crate::agents::run_control::engine_modes::{self, EngineMode};
 use crate::agents::run_control::tool_policy::RunFacts;
 use crate::app::runtime::MistyRuntime;
 use crate::browser::agent_pages::action_confirm::{ask_tool, Answer, ToolAsk};
 
-use super::turn::{self, Decision, EngineEvent, RunMode, TurnControl, TurnRequest};
-use super::{store, EngineKind};
+use super::bridge::{self, RunNote};
+use super::gate::Decision;
+use super::run_prompt::{save_images, with_browser_hint, with_history, with_teammates};
+use super::{store, support};
 
-static RUNNING: LazyLock<Mutex<HashMap<String, TurnControl>>> =
-    LazyLock::new(|| Mutex::new(HashMap::new()));
-/// Each live run's request, which the tool gate reads the run's mode and account from.
-static REQUESTS: LazyLock<Mutex<HashMap<String, Value>>> =
-    LazyLock::new(|| Mutex::new(HashMap::new()));
+/// A live run: the request it started with, and what to tidy when it ends.
+struct LiveRun {
+    body: Value,
+    engine: String,
+    account: String,
+    conversation: String,
+    folder: String,
+    images: Vec<PathBuf>,
+    /// The turn ended in the chat, but its engine process lives on for a background task
+    /// (`bridge.rs`, follow-up parking): its request still answers for that process.
+    parked: bool,
+}
 
-/// The request a live run on an outside engine started with.
+static LIVE: LazyLock<Mutex<HashMap<String, LiveRun>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+/// Runs the person stopped, so their settle reads as stopped, not finished.
+static STOPPED: LazyLock<Mutex<HashSet<String>>> = LazyLock::new(|| Mutex::new(HashSet::new()));
+
+fn live() -> std::sync::MutexGuard<'static, HashMap<String, LiveRun>> {
+    LIVE.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
+/// The request a live run on an outside engine started with. An engine run whose process took a
+/// later message of the chat answers with that message's request.
 pub(crate) fn request_of(run_id: &str) -> Option<Value> {
-    REQUESTS
-        .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner())
-        .get(run_id)
-        .cloned()
-}
-
-fn keep_request(run_id: &str, body: Option<Value>) {
-    let mut held = REQUESTS
-        .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner());
-    match body {
-        Some(body) => held.insert(run_id.to_string(), body),
-        None => held.remove(run_id),
-    };
-}
-
-fn running() -> std::sync::MutexGuard<'static, HashMap<String, TurnControl>> {
-    RUNNING
-        .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner())
+    let held = live();
+    held.get(&bridge::chat_run_of(run_id))
+        .or_else(|| held.get(run_id))
+        .map(|run| run.body.clone())
 }
 
 /// Whether this request names an outside engine, and so belongs here and not to Misty's runtime.
 pub(crate) fn wants(body: &Value) -> bool {
-    body["engine"]["id"]
-        .as_str()
-        .is_some_and(|id| EngineKind::from_id(id).is_some())
+    body["engine"]["id"].as_str().is_some_and(super::is_engine)
 }
 
 pub(crate) fn is_live(run_id: &str) -> bool {
-    running().contains_key(run_id)
+    live().get(run_id).is_some_and(|run| !run.parked)
 }
 
 /// Stops a run on an outside engine. False when the run isn't one of these.
 pub(crate) fn cancel(run_id: &str) -> bool {
-    match running().get(run_id) {
-        Some(control) => {
-            control.stop();
-            true
-        }
-        None => false,
+    if !is_live(run_id) {
+        return false;
+    }
+    STOPPED
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .insert(run_id.to_string());
+    kill(run_id);
+    bridge::cancel(run_id);
+    true
+}
+
+/// Stops the engine process behind a chat run: its own, or a parked one it was written into.
+fn kill(run_id: &str) {
+    if let Some(state) = support::state() {
+        let registry = std::sync::Arc::clone(&state.processes);
+        let run = bridge::engine_run_of(run_id);
+        tokio::task::spawn_blocking(move || registry.kill(&run));
     }
 }
 
 /// Multi-run: the live runs working in exactly this folder (multirun.rs).
 pub(crate) fn live_in(folder: &std::path::Path) -> Vec<String> {
-    REQUESTS
-        .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner())
+    live()
         .iter()
-        .filter(|(_, body)| {
-            body["engine"]["folder"]
-                .as_str()
-                .is_some_and(|named| std::path::Path::new(named) == folder)
-        })
-        .map(|(run, _)| run.clone())
+        .filter(|(_, run)| std::path::Path::new(&run.folder) == folder)
+        .map(|(id, _)| id.clone())
         .collect()
 }
 
 pub fn stop_all() {
-    for control in running().values() {
-        control.stop();
-    }
-}
-
-/// What a tool call is about, in one line, from whichever field the engine names it by.
-fn summary(input: &Value) -> String {
-    let field = [
-        "command",
-        "file_path",
-        "path",
-        "url",
-        "pattern",
-        "query",
-        "description",
-    ]
-    .iter()
-    .find_map(|name| input[name].as_str())
-    .or_else(|| input["item"]["command"].as_str())
-    .or_else(|| {
-        input["command"]
-            .as_array()
-            .and_then(|parts| parts.last()?.as_str())
-    });
-    let text = match field {
-        Some(text) => text.to_string(),
-        None if input.is_null() => String::new(),
-        None => input.to_string(),
-    };
-    clip(&text, 600)
-}
-
-fn clip(text: &str, limit: usize) -> String {
-    if text.chars().count() <= limit {
-        return text.to_string();
-    }
-    let mut clipped: String = text.chars().take(limit).collect();
-    clipped.push('…');
-    clipped
-}
-
-fn output_text(output: &Value) -> String {
-    match output {
-        Value::String(text) => clip(text, 4000),
-        Value::Null => String::new(),
-        other => clip(&other.to_string(), 4000),
-    }
-}
-
-/// Turns what the engine reports into the run's events and sends them to the chat.
-struct Reporter {
-    app: AppHandle,
-    run_id: String,
-    sent: u64,
-    /// The answer since the last tool call: what the chat shows as the reply when the turn ends.
-    answer: String,
-    thinking: bool,
-    started: HashMap<String, Instant>,
-}
-
-impl Reporter {
-    fn send(&mut self, mut event: Value) {
-        self.sent += 1;
-        event["id"] = json!(format!("{}:{}", self.run_id, self.sent));
-        event["runId"] = json!(self.run_id);
-        publish_native(&self.app, &self.run_id, &event);
-    }
-
-    fn report(&mut self, event: EngineEvent) {
-        match event {
-            EngineEvent::Text(text) => {
-                self.thinking = false;
-                self.answer.push_str(&text);
-                self.send(json!({ "type": "response.delta", "delta": text }));
-            }
-            EngineEvent::Thinking(_) => {
-                if !self.thinking {
-                    self.thinking = true;
-                    self.send(json!({ "type": "assistant.status", "phase": "thinking" }));
-                }
-            }
-            EngineEvent::ToolStarted { id, name, input } => {
-                self.thinking = false;
-                // The chat turns what was said so far into a note above the tool's row.
-                self.answer.clear();
-                self.started.insert(id.clone(), Instant::now());
-                self.send(json!({ "type": "tool.started", "toolCallId": id, "toolName": name }));
-                let detail = summary(&input);
-                if !detail.is_empty() {
-                    self.send(json!({
-                        "type": "tool.detail",
-                        "toolCallId": id,
-                        "toolName": name,
-                        "activity": { "detail": detail },
-                    }));
-                }
-            }
-            EngineEvent::ToolFinished {
-                id,
-                name,
-                output,
-                failed,
-            } => {
-                let took = self
-                    .started
-                    .remove(&id)
-                    .map_or(0, |began| began.elapsed().as_millis() as u64);
-                let text = output_text(&output);
-                if failed {
-                    self.send(json!({
-                        "type": "tool.failed",
-                        "toolCallId": id,
-                        "toolName": name,
-                        "durationMs": took,
-                        "error": clip(&text, 600),
-                    }));
-                } else {
-                    self.send(json!({
-                        "type": "tool.completed",
-                        "toolCallId": id,
-                        "toolName": name,
-                        "durationMs": took,
-                    }));
-                }
-                if !text.is_empty() {
-                    self.send(json!({
-                        "type": "tool.detail",
-                        "toolCallId": id,
-                        "toolName": name,
-                        "activity": { "output": text },
-                    }));
-                }
-            }
-            EngineEvent::Notice(text) => {
-                self.send(json!({ "type": "assistant.status", "text": clip(&text, 300) }));
-            }
-            // Kept by the caller, or of no use to the chat yet.
-            EngineEvent::Session(_)
-            | EngineEvent::Model(_)
-            | EngineEvent::Usage(_)
-            | EngineEvent::Permission { .. } => {}
-        }
-    }
-
-    fn finish(&mut self, outcome: Result<(), String>, stopped: bool) {
-        if stopped {
-            self.send(json!({ "type": "invocation.canceled", "state": "canceled" }));
-            return;
-        }
-        match outcome {
-            Ok(()) => {
-                let text = self.answer.trim().to_string();
-                self.send(json!({
-                    "type": "assistant.message",
-                    "text": text,
-                    "summary": clip(&text, 200),
-                }));
-                self.send(json!({ "type": "invocation.completed", "state": "completed" }));
-            }
-            Err(error) => self.send(json!({
-                "type": "invocation.failed",
-                "state": "failed",
-                "error": clip(&error, 1200),
-            })),
+    let runs: Vec<(String, bool)> = live()
+        .iter()
+        .map(|(id, run)| (id.clone(), run.parked))
+        .collect();
+    for (run, parked) in runs {
+        if parked {
+            kill(&run);
+        } else {
+            cancel(&run);
         }
     }
 }
 
 /// Whether the engine may go ahead with what it asked for. Auto runs don't stop for ordinary
-/// work, a plan changes nothing, and in Ask the person answers the same question Misty's own
-/// agent would raise.
-async fn decide(
-    app: &AppHandle,
-    facts: &RunFacts,
-    mode: RunMode,
-    tool: &str,
-    input: &Value,
-) -> Decision {
+/// work, a plan changes nothing, Bypass never asks (the engine skips its own asks), and in Ask
+/// the person answers the same question Misty's own agent would raise.
+async fn decide(app: &AppHandle, run_id: &str, tool: &str, input: &Value) -> Decision {
+    let Some(body) = request_of(run_id) else {
+        return Decision::Deny("This run has ended.".into());
+    };
+    let facts = RunFacts::of_request(run_id, &body);
+    let mode = EngineMode::of(&facts);
+    // A call into Misty's own server is journaled and gated there, under this run's mode, so the
+    // person isn't asked once here and once more by the tool itself. A plan still changes nothing.
+    if super::mcp::names_misty_tool(tool, input) && mode != EngineMode::Plan {
+        return Decision::Allow;
+    }
     match mode {
-        RunMode::Auto => Decision::Allow,
-        RunMode::Plan => Decision::Deny("This chat is planning, so nothing is changed yet.".into()),
-        RunMode::Ask => {
-            let about = summary(input);
+        EngineMode::Auto | EngineMode::Bypass => Decision::Allow,
+        EngineMode::Plan => Decision::Deny(
+            "This chat is planning, so nothing is changed yet. Finish the plan instead.".into(),
+        ),
+        EngineMode::Ask => {
+            let about = summarize(input);
             let control = if about.is_empty() {
                 tool.to_string()
             } else {
@@ -303,38 +162,160 @@ async fn decide(
     }
 }
 
+/// What a permission ask is about, in one line.
+fn summarize(input: &Value) -> String {
+    let field = [
+        "command",
+        "file_path",
+        "filePath",
+        "path",
+        "url",
+        "pattern",
+        "query",
+    ]
+    .iter()
+    .find_map(|name| input[name].as_str())
+    .map(str::to_string)
+    .or_else(|| {
+        input["command"]
+            .as_array()
+            .and_then(|parts| parts.last()?.as_str())
+            .map(str::to_string)
+    })
+    .unwrap_or_default();
+    let mut text: String = field.chars().take(600).collect();
+    if field.chars().count() > 600 {
+        text.push('…');
+    }
+    text
+}
+
+/// Opens the engine layer with its events going to the bridge, and installs the gate's decider.
+/// Called once as the app starts.
+pub(crate) fn install(app: &AppHandle) -> Result<support::EngineState, String> {
+    let _ = APP.set(app.clone());
+    let runtime = app.state::<MistyRuntime>();
+    let store = runtime.environment.store();
+    let emit = bridge::Bridge::install(app, note);
+    let state = support::EngineState::open(&store, &runtime.environment.misty_dir(), emit)?;
+    let decider = app.clone();
+    super::gate::install(move |run_id, tool, input| {
+        let app = decider.clone();
+        Box::pin(async move { decide(&app, &run_id, &tool, &input).await })
+    });
+    Ok(state)
+}
+
+/// What the bridge reports about a run: its engine session, and its end.
+fn note(run_id: &str, note: RunNote) {
+    match note {
+        RunNote::Session(session) => {
+            let Some(run) = live().get(run_id).map(|run| {
+                (
+                    run.account.clone(),
+                    run.conversation.clone(),
+                    run.engine.clone(),
+                    run.folder.clone(),
+                )
+            }) else {
+                return;
+            };
+            let Some(app) = APP.get() else {
+                return;
+            };
+            let db = app.state::<MistyRuntime>().environment.store();
+            tokio::task::spawn_blocking(move || {
+                let (account, conversation, engine, folder) = run;
+                if !conversation.is_empty() {
+                    let _ = store::keep_session(
+                        &db,
+                        &account,
+                        &conversation,
+                        &engine,
+                        &folder,
+                        &session,
+                    );
+                }
+            });
+        }
+        RunNote::Parked => {
+            if let Some(run) = live().get_mut(run_id) {
+                run.parked = true;
+            }
+        }
+        RunNote::Resumed => {
+            if let Some(run) = live().get_mut(run_id) {
+                run.parked = false;
+            }
+        }
+        RunNote::Ended => {
+            if let Some(run) = live().remove(run_id) {
+                for image in run.images {
+                    let _ = std::fs::remove_file(image);
+                }
+            }
+            STOPPED
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .remove(run_id);
+            super::mcp::forget(run_id);
+        }
+    }
+}
+
+static APP: std::sync::OnceLock<AppHandle> = std::sync::OnceLock::new();
+
+/// Where an engine works when the chat names no folder: `~/.misty/workspace`, made on first use.
+/// Not `~/.misty` itself, which holds Misty's database and credential store.
+fn default_workspace() -> Result<PathBuf, String> {
+    let home = file_access::paths::misty_home_dir()
+        .ok_or("Misty couldn't find your home folder.")?;
+    let folder = home.join("workspace");
+    std::fs::create_dir_all(&folder)
+        .map_err(|error| format!("Misty couldn't make {}: {error}", folder.display()))?;
+    Ok(folder)
+}
+
 /// Starts a turn on the engine the request names. Returns once it is running; its events follow.
 pub(crate) async fn start(app: &AppHandle, run_id: String, body: Value) -> Result<(), String> {
     let engine = body["engine"]["id"]
         .as_str()
-        .and_then(EngineKind::from_id)
-        .ok_or("That engine has no adapter.")?;
+        .filter(|id| super::is_engine(id))
+        .ok_or("That engine has no adapter.")?
+        .to_string();
+    let state = support::state().ok_or("The engines aren't ready yet.")?;
     let facts = RunFacts::of_request(&run_id, &body);
-    let folder_text = body["engine"]["folder"].as_str().unwrap_or("").to_string();
-    if folder_text.is_empty() {
-        return Err(format!(
-            "Link a project folder to this Space first, so {} has somewhere to work.",
-            engine.name()
-        ));
-    }
-    let folder = PathBuf::from(&folder_text);
+    let named = body["engine"]["folder"].as_str().unwrap_or("").to_string();
+    // A chat with no linked folder works in Misty's own workspace folder. Only native code picks
+    // it, so a page still can't point an engine at a folder the person didn't link.
+    let default = named.is_empty();
+    let folder = if default { default_workspace()? } else { PathBuf::from(&named) };
+    let folder_text = folder.to_string_lossy().into_owned();
     let db = app.state::<MistyRuntime>().environment.store();
     let conversation = body["conversation_id"].as_str().unwrap_or("").to_string();
+    let fresh = body["engine"]["fresh"].as_bool() == Some(true);
     // The folder must be one the person linked themselves: a page can't point an engine elsewhere.
     let (linked, session) = {
-        let (db, account, folder, conversation, folder_text) = (
+        let (db, account, folder, conversation, folder_text, engine) = (
             db.clone(),
             facts.account.clone(),
             folder.clone(),
             conversation.clone(),
             folder_text.clone(),
+            engine.clone(),
         );
         tokio::task::spawn_blocking(move || {
             // Multi-run: a worktree it made for this account counts too (multirun.rs). That
             // record is written only by native code, so a page still can't name a folder.
-            let linked = store::is_linked(&db, &account, &folder).unwrap_or(false)
+            let linked = default
+                || store::is_linked(&db, &account, &folder).unwrap_or(false)
                 || super::multirun::is_worktree(&db, &account, &folder);
-            let session = store::session(&db, &account, &conversation, engine.id(), &folder_text);
+            let session = if fresh {
+                let _ = store::forget_session(&db, &account, &conversation);
+                None
+            } else {
+                store::session(&db, &account, &conversation, &engine, &folder_text)
+            };
             (linked, session)
         })
         .await
@@ -343,92 +324,120 @@ pub(crate) async fn start(app: &AppHandle, run_id: String, body: Value) -> Resul
     if !linked || !file_access::fs::is_dir(&folder) {
         return Err("That folder isn't linked to a Space on this computer.".into());
     }
-    let mode = if facts.planning {
-        RunMode::Plan
-    } else if facts.auto {
-        RunMode::Auto
-    } else {
-        RunMode::Ask
-    };
+    let engine_impl = super::engine_by_id(&engine).ok_or("That engine has no adapter.")?;
+    let permission = engine_modes::permission_for(engine_impl.as_ref(), EngineMode::of(&facts))?;
+    // The run's tool list, in the engine's own names, which the engine then enforces; and the
+    // agent's own arguments for it, never one that changes what it may do.
+    let allowed_tools = engine_modes::engine_tools(engine_impl.as_ref(), &facts)?;
+    let args = engine_modes::engine_args(&body)?;
+    let agent_servers: Vec<String> = body["engine"]["mcp_servers"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_str)
+        .map(str::to_string)
+        .collect();
     let pick = |name: &str| {
         body["engine"][name]
             .as_str()
             .filter(|value| !value.is_empty())
             .map(str::to_string)
     };
-    keep_request(&run_id, Some(body.clone()));
-    let request = TurnRequest {
-        folder,
-        prompt: body["prompt"].as_str().unwrap_or("").to_string(),
-        session: session.unwrap_or_default(),
-        mode,
-        model: pick("model"),
-        effort: pick("effort"),
-        // The Space's tools, for an engine that takes MCP servers on its command line.
-        mcp_servers: super::mcp::servers_for(app, &run_id).await,
-        images: turn::images_of(&body["attachments"]),
+    // The cursor companion's turn brings the person's screens and the pointing rules (companion.rs).
+    let companion = super::companion::companion_turn(&body, engine_impl.supports_images());
+    let images = [companion.images, save_images(&body["attachments"])].concat();
+    let prompt = with_browser_hint(
+        body["prompt"].as_str().unwrap_or(""),
+        body["browser"].as_bool() == Some(true),
+    );
+    let prompt = match companion.note {
+        Some(note) => format!("{prompt}\n\n{note}"),
+        None => prompt,
     };
-    let (link, control, mut events) = turn::link();
-    running().insert(run_id.clone(), control.clone());
-    let app = app.clone();
-    tokio::spawn(async move {
-        let mut reporter = Reporter {
-            app: app.clone(),
-            run_id: run_id.clone(),
-            sent: 0,
-            answer: String::new(),
-            thinking: false,
-            started: HashMap::new(),
-        };
-        reporter.send(json!({ "type": "invocation.started", "state": "running" }));
-        let stopped_check = control.clone();
-        let work = tokio::spawn(engine.run(request, link));
-        while let Some(event) = events.recv().await {
-            match event {
-                EngineEvent::Permission {
-                    request,
-                    tool,
-                    input,
-                } => {
-                    reporter
-                        .send(json!({ "type": "assistant.status", "phase": "awaiting_approval" }));
-                    let decision = decide(&app, &facts, mode, &tool, &input).await;
-                    control.answer(&request, decision);
+    // `/compact` on Oh My Pi is its native compaction call; other engines take the command as
+    // text, which their CLI runs itself.
+    let native_compact = prompt.trim() == "/compact";
+    // In a shared Space, the files teammates' agents are changing right now go first, as advice.
+    let prompt = with_teammates(prompt, &body["engine"]["teammates"]);
+    // A chat the engine has no session for yet starts with its earlier turns written out.
+    let prompt = match &session {
+        Some(_) => prompt,
+        None => with_history(prompt, &body["history_turns"]),
+    };
+    live().insert(
+        run_id.clone(),
+        LiveRun {
+            body: body.clone(),
+            engine: engine.clone(),
+            account: facts.account.clone(),
+            conversation,
+            folder: folder_text.clone(),
+            images: images.clone(),
+            parked: false,
+        },
+    );
+    // Claude Code in a chat may stay alive past its turn for a background task (bridge.rs).
+    bridge::open(&run_id, engine == "claude");
+    let mut mcp_servers = super::mcp::servers_for(app, &run_id).await;
+    // The agent's own MCP servers go in the same per-run config as Misty's Space server.
+    if !agent_servers.is_empty() {
+        let (engine, folder) = (engine.clone(), folder_text.clone());
+        let found = tokio::task::spawn_blocking(move || {
+            super::mcp::agent_servers(&engine, &folder, &agent_servers)
+        })
+        .await
+        .unwrap_or_default();
+        if !found.is_empty() {
+            let merged = mcp_servers.get_or_insert_with(|| Value::Object(Default::default()));
+            if let Some(merged) = merged.as_object_mut() {
+                for (name, server) in found {
+                    merged.entry(name).or_insert(server);
                 }
-                EngineEvent::Session(session) => {
-                    let (db, account, conversation, folder) = (
-                        db.clone(),
-                        facts.account.clone(),
-                        conversation.clone(),
-                        folder_text.clone(),
-                    );
-                    let _ = tokio::task::spawn_blocking(move || {
-                        store::keep_session(
-                            &db,
-                            &account,
-                            &conversation,
-                            engine.id(),
-                            &folder,
-                            &session,
-                        )
-                    })
-                    .await;
-                }
-                other => reporter.report(other),
             }
         }
-        let outcome = work
-            .await
-            .unwrap_or_else(|_| Err(format!("{} stopped unexpectedly.", engine.name())));
-        let stopped = {
-            let mut held = running();
-            held.remove(&run_id);
-            drop(held);
-            keep_request(&run_id, None);
-            super::mcp::forget(&run_id);
-            stopped_check.is_stopped()
-        };
-        reporter.finish(outcome, stopped);
-    });
+    }
+    // What tells this launch apart from another, so a parked process only takes a message that
+    // would have started it the same way.
+    let mut key = args.clone();
+    key.extend(
+        body["engine"]["mcp_servers"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter_map(Value::as_str)
+            .map(|name| format!("mcp:{name}")),
+    );
+    for flag in ["browser", "computer_use"] {
+        if body[flag].as_bool() == Some(true) {
+            key.push(flag.to_string());
+        }
+    }
+    let sent = super::send_message_inner(
+        state,
+        engine,
+        folder_text,
+        session,
+        prompt,
+        Vec::new(),
+        Some(native_compact),
+        Some(
+            images
+                .iter()
+                .map(|path| path.to_string_lossy().into_owned())
+                .collect(),
+        ),
+        pick("model"),
+        pick("effort"),
+        Some(permission.to_string()),
+        None,
+        Some(run_id.clone()),
+        mcp_servers,
+        allowed_tools,
+        super::LaunchExtras { args, key },
+    )
+    .await;
+    if let Err(error) = sent {
+        bridge::fail(&run_id, &error);
+    }
     Ok(())
 }

@@ -2,7 +2,6 @@ import type { UnlistenFn } from "@tauri-apps/api/event";
 import { listen } from "@tauri-apps/api/event";
 import {
   browserTabIdForRuntime,
-  browserTabShowsInternalPage,
   requestBrowserWebviewLayoutByRuntimeId,
   useBrowserRuntimeStore,
 } from "./browserRuntime";
@@ -58,7 +57,6 @@ export function listenBrowserPageEvents({
       if (isDisposed()) return;
       const tabId = browserTabIdForRuntime(payload.id);
       if (!tabId) return;
-      if (browserTabShowsInternalPage(tabId)) return;
       if (payload.phase === "started") {
         pageBackgrounds.delete(payload.id);
         const host = document.querySelector<HTMLElement>(

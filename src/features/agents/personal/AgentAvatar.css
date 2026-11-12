@@ -20,6 +20,14 @@
 .agent-avatar:has(img) {
   background: transparent;
 }
+/* A mark, an initial or the cloud glyph stands by itself: no disc behind it. */
+.agent-avatar[data-bare] {
+  border-radius: 0;
+  background: transparent;
+  color: var(--color-cream);
+  font-weight: 600;
+  overflow: visible;
+}
 .agent-avatar--large {
   width: 64px;
   height: 64px;
@@ -29,6 +37,11 @@
   width: 28px;
   height: 28px;
   font-size: 12px;
+}
+.agent-avatar--compact[data-bare] {
+  width: 18px;
+  height: 18px;
+  font-size: 13px;
 }
 
 .agent-cloud-image {

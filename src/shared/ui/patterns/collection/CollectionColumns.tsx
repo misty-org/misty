@@ -29,7 +29,7 @@ export function CollectionPage({ className, ...props }: ComponentProps<"div">) {
       <div
         className={cn(
           "flex h-full min-h-0 min-w-0 flex-col gap-4 overflow-y-auto bg-charcoal-workspace",
-          "px-4 pt-3 pb-5 sm:px-6 text-cream misty-transient-scrollbar",
+          "px-4 pb-5 sm:px-6 text-cream misty-transient-scrollbar",
           className,
         )}
         {...props}

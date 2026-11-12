@@ -1,4 +1,3 @@
-import { browserSlideExtra } from "./browserSlide";
 import { getAppliedAppRenderScale } from "@/shared/hooks/useAppZoom";
 import { opaqueColorHex } from "./opaqueColorHex";
 import type { BrowserBounds } from "@/features/app-windows";
@@ -16,11 +15,8 @@ export function visibleBrowserBounds(host: HTMLElement): BrowserBounds | null {
   const right = Math.min(window.innerWidth, rect.right);
   const bottom = Math.min(window.innerHeight, rect.bottom);
   const width = right - x;
-  // A page whose bottom is the window's keeps its full size while a panel above it slides, so
-  // only its top edge appears to move (browserSlide.ts).
-  const slideExtra = rect.bottom >= window.innerHeight - 1 ? browserSlideExtra() : 0;
-  const height = bottom - y + slideExtra;
-  if (width < 2 || bottom - y < 2) return null;
+  const height = bottom - y;
+  if (width < 2 || height < 2) return null;
   const cornerRadii = clippedCornerRadii(host, rect);
   const cornerColor = cornerRadii ? paneChromeColor(host) : undefined;
   return browserBoundsAtAppZoom(

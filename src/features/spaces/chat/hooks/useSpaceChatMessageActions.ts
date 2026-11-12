@@ -18,8 +18,10 @@ export interface SpaceChatMessageActionsOptions {
     | undefined;
   activeConversation: SpaceConversation | undefined;
   members: SpaceMember[];
-  /** Agent members people can @mention to ask for help. */
+  /** The person's own agents, the only ones they can @mention and so run. */
   agents?: MentionableAgent[];
+  /** Runs before a message goes out, such as bringing a mentioned agent into the Space. */
+  beforeSend?: (content: SpaceMessage["content"]) => Promise<void>;
   draft: SpaceChatDraft;
   editing: MessageEditingState;
   setGroupMessages: Dispatch<SetStateAction<SpaceMessage[]>>;
@@ -126,6 +128,7 @@ export function useSpaceChatMessageActions(options: SpaceChatMessageActionsOptio
       setGroupMessages((current) => mergeSpaceMessages(current, [optimistic]));
     }
     try {
+      await options.beforeSend?.(message.content);
       if (conversationId) {
         const response = await spacesApi.sendConversationMessage(
           spaceId,

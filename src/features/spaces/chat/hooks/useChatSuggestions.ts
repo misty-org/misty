@@ -1,15 +1,15 @@
 import { spacesApi } from "../../api/api";
 import type { SpaceLibraryItem, SpaceMember } from "../../api/dto/entities";
 import type { ChatComposerSuggestion } from "../../api/dto/space-chat";
-import type { SpaceAgent } from "@/features/agents";
-import { agentOwnerLabel } from "../../members/agents/useSpaceAgentMembers";
+import type { MentionableAgent } from "../useSpaceMessageSpansStore";
 import { useEffect, useMemo, useState } from "react";
 
 const MAX_SUGGESTIONS = 24;
 
 /**
- * The `@` autocomplete: People, then the Space's agents, then unattached
- * Library items. Mentioning an agent asks it for help in the chat.
+ * The `@` autocomplete: People, then the person's own agents, then unattached
+ * Library items. Mentioning one of your agents runs it on your computer; nobody
+ * else's agents are offered.
  *
  * Library items are only offered while there is room left in the attachment
  * budget, so the list never suggests something that cannot be added.
@@ -17,7 +17,7 @@ const MAX_SUGGESTIONS = 24;
 export function useChatSuggestions(options: {
   spaceId: string;
   members: SpaceMember[];
-  agents?: SpaceAgent[];
+  agents?: readonly MentionableAgent[];
   currentUserId: string | undefined;
   canBrowseLibrary: boolean;
   canReadLibrary: boolean;
@@ -63,7 +63,7 @@ export function useChatSuggestions(options: {
       kind: "agent",
       id: agent.agent_id,
       label: agent.agent_name,
-      detail: agentOwnerLabel(agent, currentUserId),
+      detail: "Your agent",
     }));
     const library: ChatComposerSuggestion[] =
       canBrowseLibrary && options.attachmentSlotsLeft > 0

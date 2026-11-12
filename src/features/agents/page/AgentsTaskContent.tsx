@@ -30,7 +30,7 @@ export function AgentsTaskContent({ state, actions, view }: AgentsTaskContentPro
     draftSeed,
     guard,
   } = state;
-  const { showWorkspace, switcher, disabled, taskWorking } = view;
+  const { showWorkspace, switcher, disabled } = view;
   const { create } = actions;
   return (
     <>
@@ -56,7 +56,6 @@ export function AgentsTaskContent({ state, actions, view }: AgentsTaskContentPro
               conversation={conversation}
               switcher={switcher}
               disabled={disabled}
-              working={taskWorking}
             />
             {/* The agent browser shrunk to a picture; clicking it opens the split again. */}
             <AgentBrowserPip
@@ -84,6 +83,7 @@ export function AgentsTaskContent({ state, actions, view }: AgentsTaskContentPro
                 ) : undefined
               }
               onCreate={create}
+              onNewChat={() => profile && actions.select(profile.id, true)}
             />
           </div>
           {/* The agent's own browser beside the chat. */}

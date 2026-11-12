@@ -1,21 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
 
-const internalPageTabs = new Set<string>();
-
-/**
- * Marks a tab as showing a Misty-drawn page (misty://history and so on). Its
- * native page stays alive but hidden, and must not overwrite the tab's
- * address, title or icon while it sits behind the internal page.
- */
-export function setBrowserTabShowsInternalPage(tabId: string, internal: boolean): void {
-  if (internal) internalPageTabs.add(tabId);
-  else internalPageTabs.delete(tabId);
-}
-
-export function browserTabShowsInternalPage(tabId: string): boolean {
-  return internalPageTabs.has(tabId);
-}
-
 let browserDownloadDirectory: string | null = null;
 
 /** Where website downloads are saved; empty means the Downloads folder. */

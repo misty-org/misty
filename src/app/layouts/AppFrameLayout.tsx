@@ -16,14 +16,12 @@ import { UnsavedQuitGuard } from "@/features/app-windows";
 import { SpaceWindowBridge } from "@/features/spaces";
 import { accountScopeFor } from "@/features/app-windows";
 
-// Let the initial Misty flight finish before revealing the app, even when its
-// code is already cached. Load the layout alongside account/workspace restore so
-// they can share one stable loading scene instead of swapping Suspense fallbacks.
-const initialFlight = new Promise<void>((resolve) => setTimeout(resolve, 2_000));
-const desktopLayoutPromise = Promise.all([
-  import("@/app/layouts/DesktopLayout"),
-  initialFlight,
-]).then(([layout]) => ({ default: layout.DesktopLayout }));
+// Load the layout alongside account/workspace restore so they share one stable loading scene
+// instead of swapping Suspense fallbacks. The scene itself lets Misty finish the pass she is on
+// before it leaves (`LoadingScreen`), so nothing here holds the app back on a timer.
+const desktopLayoutPromise = import("@/app/layouts/DesktopLayout").then((layout) => ({
+  default: layout.DesktopLayout,
+}));
 const DesktopLayout = lazy(() => desktopLayoutPromise);
 
 export function AppFrameLayout() {
@@ -69,12 +67,20 @@ export function AppFrameLayout() {
   // Keep hook order stable as identity changes: every hook runs before the returns below.
   const [leavingLabel, clearLeaving] = useLeavingLoadingScreen(loadingLabel);
 
-  if (loadingLabel) return <LoadingScreen fullScreen label={loadingLabel} />;
-  if (showWelcome) return <Navigate to={routes.welcome} replace />;
-
-  const leavingScreen = leavingLabel ? (
-    <LoadingScreen fullScreen label={leavingLabel} leaving onLeft={clearLeaving} />
+  // One splash, keyed, from loading through leaving: the same Misty keeps flying while the shell
+  // mounts under her, instead of a new one starting her flight over as the old one goes.
+  const splashLabel = loadingLabel ?? leavingLabel;
+  const leavingScreen = splashLabel ? (
+    <LoadingScreen
+      key="splash"
+      fullScreen
+      label={splashLabel}
+      leaving={!loadingLabel}
+      onLeft={clearLeaving}
+    />
   ) : null;
+  if (loadingLabel) return <>{leavingScreen}</>;
+  if (showWelcome) return <Navigate to={routes.welcome} replace />;
 
   if (isAuthRoute) {
     return (

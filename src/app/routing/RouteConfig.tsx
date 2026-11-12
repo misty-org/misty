@@ -1,7 +1,7 @@
 import { resolveStartupRoute, routes, useAppRouteMemoryStore } from "@/app/shell";
 import { RegisterPage, SignInPage, useAuth } from "@/features/account";
 import { useSetupStore } from "@/features/account";
-import { WelcomePage } from "@/features/onboarding";
+import { SetupPage, WelcomePage } from "@/features/onboarding";
 import { SpaceInvitationRedemption } from "@/features/spaces";
 import { createBrowserRouter, Navigate } from "react-router";
 import { AppFrameLayout } from "../layouts/AppFrameLayout";
@@ -49,14 +49,6 @@ export const router = createBrowserRouter([
                 element: null,
               },
               {
-                path: "scheduled",
-                element: null,
-              },
-              {
-                path: "browser",
-                element: null,
-              },
-              {
                 path: "agents",
                 element: null,
               },
@@ -67,6 +59,10 @@ export const router = createBrowserRouter([
               {
                 path: "welcome",
                 element: <WelcomePage />,
+              },
+              {
+                path: "setup",
+                element: <SetupPage />,
               },
               {
                 path: "signin",

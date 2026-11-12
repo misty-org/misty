@@ -37,3 +37,4 @@ export { GeneralSection } from "./sections/GeneralSection";
 export { registerSettingsSections } from "./settingsRegistry";
 export type { SettingsContentProps } from "./settingsTypes";
 export { workspaceDefaultViewIndex } from "./settingsConstants";
+export { searchSettings, type SettingsSearchResult } from "./components/SettingsSearchResults";

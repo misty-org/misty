@@ -14,6 +14,10 @@ pub(super) fn person_works_in(label: &str) -> bool {
 pub(super) fn native_handle(window: &tauri::WebviewWindow) -> Option<isize> {
     window.hwnd().ok().map(|hwnd| hwnd.0 as isize)
 }
+#[cfg(target_os = "linux")]
+pub(super) fn native_handle(window: &tauri::WebviewWindow) -> Option<isize> {
+    platform::x11_window_id(window)
+}
 #[cfg(target_os = "macos")]
 pub(super) fn native_handle(window: &tauri::WebviewWindow) -> Option<isize> {
     let native = window.ns_window().ok()? as *const objc2_app_kit::NSWindow;

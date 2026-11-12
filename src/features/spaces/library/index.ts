@@ -1,4 +1,3 @@
-export * from "./components/AddFilesToSpaceDialog";
 export * from "./components/MistyLibraryPicker";
 export * from "./libraryClipboard";
 export * from "./libraryFormat";

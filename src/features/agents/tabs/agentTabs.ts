@@ -11,6 +11,7 @@ import {
   type AgentBrowserTab,
 } from "../agent-browser/agentBrowserStore";
 import { followAgentPages } from "../agent-browser/agentPageEvents";
+import { pictureAgentTab } from "./agentTabPictures";
 import { livePagesAllowed, pressureLevel, resetMemoryPressure } from "./agentTabPressure";
 import { agentPageBounds, restoredAgentTabs, type AgentTab } from "./agentTabRecords";
 
@@ -110,6 +111,8 @@ export function noteAgentPage(
   if (reported.url) tab.url = String(reported.url);
   if (reported.title) tab.title = String(reported.title);
   updateBrowserTab(tab.scopeId, reported);
+  // A click's page often lands after the step ended; the PiP shows where it landed.
+  if (change.loading === false) void pictureAgentTab(tab.scopeId);
 }
 
 /** The tab the person looks at in the split, or none; it stays live while shown. */
@@ -136,11 +139,14 @@ export function noteAgentTabJob(scopeId: string, runId: string, busy: boolean) {
   if (busy) browserTabActed(scopeId);
 }
 
-/** Closes a tab's page and keeps where it was. */
-export function sleepAgentTab(scopeId: string): Promise<void> {
+/**
+ * Closes a tab's page and keeps where it was. A tab in use or in view stays open unless `force`
+ * (the tab itself is closing), which closes it whatever is happening on it.
+ */
+export function sleepAgentTab(scopeId: string, force = false): Promise<void> {
   return serial(scopeId, async () => {
     const tab = tabs.get(scopeId);
-    if (!tab?.viewId || tab.busy || scopeId === shownScope) return;
+    if (!tab?.viewId || (!force && (tab.busy || scopeId === shownScope))) return;
     const view = tab.viewId;
     tab.viewId = "";
     setBrowserRuntimeKeepLive(view, false);
@@ -247,10 +253,13 @@ export async function sleepTaskTabs(taskId: string) {
   forgetOldest();
 }
 
-/** Closes one tab for good: the agent closed it. */
+/**
+ * Closes one tab for good: the agent or the person closed it. Its page goes even while a job runs
+ * on it or it is in view; skipping those left a live page behind with no tab to close it from.
+ */
 export async function closeAgentTab(scopeId: string) {
   if (shownScope === scopeId) shownScope = undefined;
-  await sleepAgentTab(scopeId);
+  await sleepAgentTab(scopeId, true);
   tabs.delete(scopeId);
   kept.delete(scopeId);
   removeBrowserTab(scopeId);

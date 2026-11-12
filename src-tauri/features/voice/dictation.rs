@@ -3,9 +3,9 @@
 //! Hold the chord to talk and release to finish. Tap it twice quickly to keep
 //! listening hands-free; tap once more to finish. A single short tap does
 //! nothing, so brushing the key never inserts text.
-#[cfg(any(target_os = "macos", windows))]
+#[cfg(any(target_os = "macos", windows, target_os = "linux"))]
 pub(crate) mod pill;
-#[cfg(any(target_os = "macos", windows))]
+#[cfg(any(target_os = "macos", windows, target_os = "linux"))]
 pub(crate) mod session;
 
 use std::time::{Duration, Instant};

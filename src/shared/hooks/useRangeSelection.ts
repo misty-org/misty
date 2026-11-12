@@ -54,5 +54,32 @@ export function useRangeSelection(
     commit([]);
   }, [commit]);
 
-  return { selectedIds: current, setSelectedIds: commit, select, clear };
+  /** What a right-click on `id` acts on: the selection when `id` is in it, else `id` alone. */
+  const menuTargets = useCallback(
+    (id: string) => (current.includes(id) ? current : [id]),
+    [current],
+  );
+
+  /** A right-click outside the selection selects that item alone, as in Finder. */
+  const pickForMenu = useCallback(
+    (id: string) => {
+      if (current.includes(id) || !ids.includes(id)) return;
+      anchor.current = id;
+      commit([id]);
+    },
+    [ids, current, commit],
+  );
+
+  // Escape lets go of the selection.
+  const hasSelection = current.length > 0;
+  useEffect(() => {
+    if (!hasSelection) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !event.defaultPrevented) clear();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [hasSelection, clear]);
+
+  return { selectedIds: current, setSelectedIds: commit, select, clear, menuTargets, pickForMenu };
 }

@@ -67,7 +67,7 @@ export function ChatThreadColumn({
       aria-label="Replies"
       className="flex w-[min(360px,40%)] shrink-0 flex-col border-l border-charcoal-border bg-charcoal-bg"
     >
-      <header className="flex min-h-11 items-center gap-2 border-b border-charcoal-border px-3 py-1.5">
+      <header className="flex min-h-12 items-center gap-2 border-b border-charcoal-border px-3 py-1.5">
         <h2 className="m-0 min-w-0 flex-1 text-sm font-medium text-cream-bright">Replies</h2>
         <IconButton
           label="Close replies"

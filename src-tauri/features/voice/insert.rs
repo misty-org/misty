@@ -10,6 +10,8 @@ use std::time::{Duration, Instant};
 
 #[cfg(target_os = "macos")]
 use crate::voice::insert::macos as platform;
+#[cfg(target_os = "linux")]
+use crate::voice::insert::linux as platform;
 #[cfg(windows)]
 use crate::voice::insert::windows as platform;
 
@@ -37,7 +39,7 @@ pub fn paste_keys(terminal: bool) -> PasteKeys {
     }
 }
 
-/// Terminals by macOS bundle id or Windows executable name.
+/// Terminals by macOS bundle id, Windows executable name or X11 window class.
 pub fn is_terminal(app: &str) -> bool {
     const TERMINALS: &[&str] = &[
         "com.apple.terminal",
@@ -59,6 +61,26 @@ pub fn is_terminal(app: &str) -> bool {
         "alacritty.exe",
         "wezterm-gui.exe",
         "warp.exe",
+        "gnome-terminal-server",
+        "org.gnome.terminal",
+        "org.gnome.console",
+        "kgx",
+        "konsole",
+        "xterm",
+        "uxterm",
+        "urxvt",
+        "kitty",
+        "alacritty",
+        "org.wezfurlong.wezterm",
+        "foot",
+        "tilix",
+        "terminator",
+        "xfce4-terminal",
+        "mate-terminal",
+        "lxterminal",
+        "qterminal",
+        "st-256color",
+        "ghostty",
     ];
     let app = app.to_ascii_lowercase();
     TERMINALS.iter().any(|t| app == *t)
@@ -148,12 +170,19 @@ pub fn paste_into_frontmost(text: &str) -> Result<Inserted, String> {
     paste_with(&platform::System, text)
 }
 
+#[cfg(target_os = "linux")]
+pub fn paste_into_frontmost(text: &str) -> Result<Inserted, String> {
+    paste_with(&platform::System::new(), text)
+}
+
 /// Whether the frontmost app is Misty itself, which inserts without the clipboard.
-#[cfg(any(target_os = "macos", windows))]
+#[cfg(any(target_os = "macos", windows, target_os = "linux"))]
 pub fn misty_is_frontmost() -> bool {
     platform::frontmost_is_self()
 }
 
+#[cfg(target_os = "linux")]
+pub(crate) mod linux;
 #[cfg(target_os = "macos")]
 pub(crate) mod macos;
 #[cfg(test)]

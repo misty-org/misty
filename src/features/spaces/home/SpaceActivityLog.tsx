@@ -7,6 +7,7 @@ import {
   type AgentActivityLine,
 } from "../list/memberAgents";
 import { useSpaceItemCreator } from "../overview/useSpaceItemCreator";
+import { OverviewCard } from "./OverviewCard";
 
 const shown = 12;
 
@@ -48,29 +49,28 @@ export function SpaceActivityLog({ spaceId }: { spaceId: string }) {
   }, [spaceId, heard]);
   if (lines && !lines.length) return null;
   return (
-    <section aria-label="Activity" className="grid gap-1">
-      <h2 className="text-sm font-medium text-cream-muted">Activity</h2>
+    <OverviewCard title="Activity">
       {!lines ? (
-        <div className="grid gap-2 py-1" aria-hidden="true">
-          <Skeleton className="h-4 w-72" />
-          <Skeleton className="h-4 w-60" />
-          <Skeleton className="h-4 w-64" />
+        <div className="grid gap-2 px-2.5 py-2" aria-hidden="true">
+          <Skeleton className="h-3 w-3/5" />
+          <Skeleton className="h-3 w-1/2" />
+          <Skeleton className="h-3 w-2/5" />
         </div>
       ) : (
-        <ul className="grid gap-0.5">
+        <ul className="m-0 grid list-none p-0">
           {lines.slice(0, shown).map((line) => (
-            <li key={line.id} className="flex min-w-0 items-baseline gap-2 text-sm">
+            <li key={line.id} className="flex min-h-9 min-w-0 items-center gap-2 px-2.5 text-sm">
               <span className="truncate text-cream">
                 {who(line.user_id, line.agent_id, line.name)}
               </span>
               <span className="shrink-0 text-cream-muted">{what(line)}</span>
-              <span className="ml-auto shrink-0 text-xs text-cream-muted">
+              <span className="ml-auto shrink-0 text-xs tabular-nums text-cream-muted">
                 {timeOf(line.created_at)}
               </span>
             </li>
           ))}
         </ul>
       )}
-    </section>
+    </OverviewCard>
   );
 }

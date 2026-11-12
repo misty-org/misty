@@ -1,40 +1,52 @@
-import { useRef, useState, type ReactNode } from "react";
+import { NotebookText, PenLine, Plus, Upload, type LucideIcon } from "lucide-react";
+import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { spacesApi } from "../api/api";
-import { ErrorNotification, FileInput, Pressable, cn } from "@/shared/ui";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  ErrorNotification,
+  FileInput,
+  MenuTrigger,
+  cn,
+  itemToneClass,
+  itemTones,
+  type ItemTone,
+} from "@/shared/ui";
 import { createSpaceItem, type SpaceCreateKind } from "./createSpaceItem";
-import { MakeArt } from "./MakeArt";
 
-type Tile = { id: SpaceCreateKind; label: string };
+type Choice = { id: SpaceCreateKind; label: string; icon: LucideIcon; tone: ItemTone };
 
-const tiles: Tile[] = [
-  { id: "chat", label: "Chat" },
-  { id: "note", label: "Note" },
-  { id: "drawing", label: "Drawing" },
-  { id: "file", label: "File" },
+const choices: Choice[] = [
+  { id: "note", label: "Note", icon: NotebookText, tone: itemTones.note },
+  { id: "drawing", label: "Drawing", icon: PenLine, tone: itemTones.drawing },
+  { id: "file", label: "Upload file", icon: Upload, tone: itemTones.document },
 ];
 
 /**
- * The Space home's first row: one tile per thing a person can make, each with a small
- * gray drawing of it. File opens the system picker and uploads into the Space in place.
+ * The page head's New menu: a note, a drawing or a file for this Space. Upload file opens the
+ * system picker and adds the files in place, without leaving the page.
  */
 export function MakeSomethingNew({
   spaceId,
   onCreated,
+  only,
 }: {
   spaceId: string;
   onCreated: () => void;
+  /** The kinds to offer, when a page makes only some of them; all of them otherwise. */
+  only?: readonly SpaceCreateKind[];
 }) {
   const navigate = useNavigate();
-  const [busy, setBusy] = useState("");
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const picker = useRef<HTMLInputElement>(null);
 
-  // File uploads right here, into the Space, without leaving the home page.
   async function upload(files: File[]) {
     if (!files.length) return;
     setError("");
-    setBusy("file");
+    setBusy(true);
     try {
       for (const file of files) await spacesApi.uploadLibraryBlob(spaceId, file, file.name);
       onCreated();
@@ -45,26 +57,25 @@ export function MakeSomethingNew({
           : "Couldn't add that file. Try again.",
       );
     } finally {
-      setBusy("");
+      setBusy(false);
       if (picker.current) picker.current.value = "";
     }
   }
 
-  async function make(tile: Tile) {
+  async function make(choice: Choice) {
     setError("");
-    setBusy(tile.id);
+    setBusy(true);
     try {
-      await createSpaceItem(spaceId, tile.id, navigate, () => picker.current?.click(), onCreated);
+      await createSpaceItem(spaceId, choice.id, navigate, () => picker.current?.click(), onCreated);
     } catch {
-      setError(`Couldn't make a new ${tile.label.toLowerCase()}. Try again.`);
+      setError(`Couldn't make a new ${choice.label.toLowerCase()}. Try again.`);
     } finally {
-      setBusy("");
+      setBusy(false);
     }
   }
 
   return (
-    <section aria-label="Create" className="flex flex-col gap-3">
-      <h2 className="m-0 text-sm font-normal text-cream-muted">Create</h2>
+    <>
       <FileInput
         ref={picker}
         multiple
@@ -72,40 +83,25 @@ export function MakeSomethingNew({
         tabIndex={-1}
         onChange={(event) => void upload(Array.from(event.target.files ?? []))}
       />
-      <div className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-3">
-        {tiles.map((tile) => (
-          <Pressable
-            key={tile.id}
-            disabled={busy !== ""}
-            onClick={() => void make(tile)}
-            className="group/make flex flex-col gap-2 text-left"
-          >
-            <Frame>
-              <MakeArt kind={tile.id} />
-            </Frame>
-            <span className="flex items-center gap-2 px-0.5 text-sm text-cream-bright">
-              {tile.label}
-            </span>
-          </Pressable>
-        ))}
-      </div>
+      <DropdownMenu>
+        <MenuTrigger
+          label="New"
+          variant="secondary"
+          disabled={busy}
+          icon={<Plus aria-hidden="true" />}
+        />
+        <DropdownMenuContent align="end" className="min-w-44">
+          {choices
+            .filter((choice) => !only || only.includes(choice.id))
+            .map((choice) => (
+              <DropdownMenuItem key={choice.id} onSelect={() => void make(choice)}>
+                <choice.icon className={cn("size-4", itemToneClass(choice.tone))} aria-hidden />
+                {choice.label}
+              </DropdownMenuItem>
+            ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
       <ErrorNotification message={error} onDismiss={() => setError("")} />
-    </section>
-  );
-}
-
-/** The tile's double frame: an outer rim, then an inset panel holding the drawing. */
-function Frame({ children }: { children: ReactNode }) {
-  return (
-    <span
-      className={cn(
-        "block rounded-xl border border-charcoal-border bg-charcoal-card p-1.5",
-        "group-hover/make:border-cream-muted/40 group-focus-visible/make:border-cream-muted",
-      )}
-    >
-      <span className="grid h-24 place-items-center rounded-lg border border-charcoal-border bg-charcoal-workspace">
-        {children}
-      </span>
-    </span>
+    </>
   );
 }

@@ -2,11 +2,13 @@ import { beforeEach, describe, expect, it } from "vitest";
 import {
   addBrowserTab,
   browserTabActed,
+  closeAgentBrowser,
   finishTaskViews,
   hydrateAgentBrowser,
   MAX_VIEWS,
   removeBrowserTab,
   resetAgentBrowser,
+  setBrowserExpanded,
   useAgentBrowser,
   viewOfTab,
 } from "./agentBrowserStore";
@@ -27,6 +29,20 @@ describe("the agent browser's views", () => {
     addBrowserTab("c", { id: "task", label: "Main", taskId: "task" }, tab("b"));
     expect(chat()).toMatchObject({ shownView: "task", expanded: false });
     expect(chat().views[0]).toMatchObject({ tabs: ["a", "b"], shownScope: "b", status: "working" });
+  });
+
+  it("puts the browser away until the agent opens another page or the person opens it", () => {
+    addBrowserTab("c", { id: "task", label: "Main", taskId: "task" }, tab("a"));
+    setBrowserExpanded("c", true);
+    closeAgentBrowser("c");
+    expect(chat()).toMatchObject({ expanded: false, hidden: true });
+    browserTabActed("a");
+    expect(chat().hidden).toBe(true);
+    addBrowserTab("c", { id: "task", label: "Main", taskId: "task" }, tab("b"));
+    expect(chat()).toMatchObject({ expanded: false, hidden: false });
+    closeAgentBrowser("c");
+    setBrowserExpanded("c", true);
+    expect(chat()).toMatchObject({ expanded: true, hidden: false });
   });
 
   it("keeps each sub-agent in a view of its own, at most four", () => {

@@ -2,7 +2,8 @@ import { confirmAction } from "@/shared/lib/confirmAction";
 import { Button, ErrorNotification, IconButton, SegmentedControl } from "@/shared/ui";
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { openExternalLink } from "@/shared/platform/openExternalLink";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import type { SpaceCalendarEvent, SpaceTask } from "../planner/api";
 import { SpaceTaskDialog } from "../planner/SpaceTaskDialog";
 import { useTaskAssignees } from "../planner/SpacePlanner";
@@ -11,6 +12,7 @@ import { CalendarConnections } from "./CalendarConnections";
 import {
   calendarEntries,
   dayKey,
+  eventDayKey,
   monthTitle,
   moveMonth,
   type CalendarEntry,
@@ -27,7 +29,14 @@ type View = "month" | "agenda";
  * events of the person's connected Google Calendar, which stay on their computer.
  */
 export function SpaceCalendar({ spaceId }: { spaceId: string }) {
-  const [anchor, setAnchor] = useState(() => new Date());
+  // A link to one event (search's results) carries its start, so the right month loads first.
+  const [params, setParams] = useSearchParams();
+  const linkedEvent = params.get("event");
+  const linkedAt = params.get("at");
+  const [anchor, setAnchor] = useState(() => {
+    const at = linkedAt ? new Date(linkedAt) : undefined;
+    return at && !Number.isNaN(at.getTime()) ? at : new Date();
+  });
   const [view, setView] = useState<View>("month");
   const calendar = useSpaceCalendar(spaceId, anchor);
   const planner = useSpaceTasks(spaceId);
@@ -36,6 +45,27 @@ export function SpaceCalendar({ spaceId }: { spaceId: string }) {
   // An open event dialog: an event to edit, or the day a new one starts on.
   const [editing, setEditing] = useState<{ event: SpaceCalendarEvent | null; day: string }>();
   const [task, setTask] = useState<SpaceTask>();
+  useEffect(() => {
+    if (!linkedAt) return;
+    const at = new Date(linkedAt);
+    if (!Number.isNaN(at.getTime())) setAnchor(at);
+  }, [linkedAt]);
+  useEffect(() => {
+    if (!linkedEvent || !calendar.events) return;
+    const event = calendar.events.find((item) => item.id === linkedEvent);
+    // The month it is in may still be loading; the link waits for it.
+    if (!event) return;
+    setEditing({ event, day: eventDayKey(event) });
+    setParams(
+      (current) => {
+        const next = new URLSearchParams(current);
+        next.delete("event");
+        next.delete("at");
+        return next;
+      },
+      { replace: true },
+    );
+  }, [linkedEvent, calendar.events, setParams]);
 
   const entries = useMemo(
     () =>
@@ -59,8 +89,12 @@ export function SpaceCalendar({ spaceId }: { spaceId: string }) {
 
   return (
     <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] bg-charcoal-bg">
-      <header className="flex min-h-11 flex-wrap items-center gap-2 border-b border-charcoal-border px-4 py-1.5">
-        <h1 className="m-0 mr-2 text-sm font-semibold text-cream">Calendar</h1>
+      {/* The month's controls; the page has no title, since the sidebar and the tab name it. */}
+      <div
+        role="toolbar"
+        aria-label="Calendar"
+        className="flex min-h-12 flex-wrap items-center gap-2 px-4 py-1.5"
+      >
         <IconButton label="Previous month" onClick={() => setAnchor(moveMonth(anchor, -1))}>
           <ChevronLeft className="size-4" aria-hidden="true" />
         </IconButton>
@@ -88,7 +122,7 @@ export function SpaceCalendar({ spaceId }: { spaceId: string }) {
           <Plus aria-hidden="true" />
           New event
         </Button>
-      </header>
+      </div>
 
       <div className="min-h-0 overflow-x-auto">
         <View anchor={anchor} entries={entries} onOpen={open} onNew={newEvent} />

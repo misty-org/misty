@@ -25,7 +25,7 @@ export { useNativeSessionStore } from "./native-session";
 export { AccountSection } from "./settings/AccountSection";
 export { ServerSection } from "./settings/ServerSection";
 export { DevicePreferencesBridge } from "./DevicePreferencesBridge";
-export { accountResets, deviceDataErasers, memoryExport } from "./accountSeams";
+export { accountResets, deviceDataErasers } from "./accountSeams";
 
 // Public surface used by other features (generated from their imports).
 export { WelcomeNav } from "./components/WelcomeNav";

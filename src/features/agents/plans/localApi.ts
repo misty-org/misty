@@ -54,7 +54,7 @@ export const localCollaborationApi = {
     return { mode };
   },
   async setPermissionMode(conversationId: string, permissionMode: PermissionMode | "") {
-    if (!["", "ask", "auto"].includes(permissionMode)) throw new RunStateError("invalid");
+    if (!["", "ask", "auto", "bypass"].includes(permissionMode)) throw new RunStateError("invalid");
     await changeConversationState(account(), conversationId, (state) => ({
       next: { ...state, permissionMode },
       result: undefined,

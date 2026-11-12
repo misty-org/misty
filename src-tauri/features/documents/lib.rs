@@ -1,9 +1,10 @@
 //! Documents prepared for agents. Untrusted files are parsed only by the
 //! bundled document worker, confined by the operating system: `sandbox-exec`
-//! on macOS and an AppContainer on Windows.
+//! on macOS, an AppContainer on Windows, and Landlock, seccomp and namespaces
+//! on Linux.
 
-#[cfg(target_os = "macos")]
-pub mod macos;
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+pub mod unix;
 #[cfg(windows)]
 pub mod windows;
 
@@ -50,7 +51,7 @@ pub async fn prepare_document(
 }
 
 /// Parses the document at `path` in the confined worker.
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", target_os = "linux"))]
 pub async fn prepare_document(
     path: std::path::PathBuf,
     worker: WorkerBytes,
@@ -78,10 +79,20 @@ pub async fn prepare_document(
     let _cancel = CancelOnDrop(stop.clone());
     tokio::task::spawn_blocking(move || {
         let _slot = slot;
-        let value = macos::process(&path, &stop, worker)?;
+        let value = unix::process(&path, &stop, worker)?;
         serde_json::from_value(value["document"].clone())
             .map_err(|_| "The document worker returned no document.".to_owned())
     })
     .await
     .map_err(|_| "Document preparation stopped.".to_owned())?
+}
+
+/// No system confines the document worker here, and untrusted files are never parsed in Misty's
+/// own process.
+#[cfg(not(any(target_os = "macos", target_os = "linux", windows)))]
+pub async fn prepare_document(
+    _path: std::path::PathBuf,
+    _worker: WorkerBytes,
+) -> Result<PreparedAgentDocument, String> {
+    Err("Misty can't read documents on this system.".to_owned())
 }

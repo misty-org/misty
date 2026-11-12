@@ -19,12 +19,12 @@ const toolWords: [prefix: string, words: string, code: string][] = [
   ["screen.", "Using the computer", "computer"],
   ["apps.", "Using a connected app", "app"],
   ["agent.", "Working with another agent", "agents"],
-  ["memory.", "Remembering", "memory"],
 ];
 
 type Events = Pick<MistyActivityEntry, "events">;
 
-function wordsOf(tool: string): { words: string; code: string } {
+/** A tool as a few plain words, and as a fixed code. */
+export function wordsOf(tool: string): { words: string; code: string } {
   const known = toolWords.find(([prefix]) => tool.startsWith(prefix));
   return known ? { words: known[1], code: known[2] } : { words: "Working", code: "working" };
 }

@@ -60,6 +60,17 @@ pub fn invoke_handler() -> impl Fn(Invoke<Wry>) -> bool + Send + Sync + 'static 
             crate::browser::commands::link_preview_fetch,
             crate::browser::commands::browser_site_icon,
             crate::agents::commands::agents_prepare_scoped_document,
+            crate::agents::commands::tutor_pick_sources,
+            crate::agents::commands::tutor_transcribe_sources,
+            crate::agents::commands::tutor_overview_make,
+            crate::agents::commands::tutor_overview_audio,
+            crate::agents::commands::tutor_overview_delete,
+            crate::agents::tutor_video::tutor_video_clip_make,
+            crate::agents::tutor_video::tutor_video_clip,
+            crate::agents::tutor_video::tutor_video_clip_delete,
+            crate::agents::tutor_links::tutor_read_link,
+            crate::agents::tutor_links::tutor_read_dropped,
+            crate::agents::tutor_links::tutor_save_export,
             #[cfg(desktop)]
             crate::devices::commands::devices_start,
             #[cfg(desktop)]
@@ -96,48 +107,37 @@ pub fn invoke_handler() -> impl Fn(Invoke<Wry>) -> bool + Send + Sync + 'static 
             #[cfg(desktop)]
             crate::browser::commands::browser_webview_create,
             crate::browser::commands::diagnostic_log,
-            #[cfg(any(target_os = "macos", windows))]
+            #[cfg(any(target_os = "macos", windows, target_os = "linux"))]
             crate::agents::commands::cursor_companion_configure,
-            #[cfg(any(target_os = "macos", windows))]
+            #[cfg(any(target_os = "macos", windows, target_os = "linux"))]
             crate::voice::commands::voice_dictation_configure,
-            #[cfg(any(target_os = "macos", windows))]
+            #[cfg(any(target_os = "macos", windows, target_os = "linux"))]
             crate::voice::commands::voice_dictation_stop,
-            #[cfg(any(target_os = "macos", windows))]
+            #[cfg(any(target_os = "macos", windows, target_os = "linux"))]
             crate::voice::commands::voice_dictation_insert,
-            #[cfg(any(target_os = "macos", windows))]
+            #[cfg(any(target_os = "macos", windows, target_os = "linux"))]
             crate::voice::commands::voice_dictation_pill_hide,
-            #[cfg(any(target_os = "macos", windows))]
-            crate::voice::commands::voice_subtitles_show,
-            #[cfg(any(target_os = "macos", windows))]
-            crate::voice::commands::voice_subtitles_hide,
-            #[cfg(any(target_os = "macos", windows))]
-            crate::voice::commands::voice_subtitles_export,
-            crate::voice::commands::voice_subtitles_frame,
-            crate::voice::commands::voice_subtitles_fit,
-            #[cfg(any(target_os = "macos", windows))]
-            #[cfg(any(target_os = "macos", windows))]
+            #[cfg(any(target_os = "macos", windows, target_os = "linux"))]
             crate::voice::commands::voice_capture_start,
-            #[cfg(any(target_os = "macos", windows))]
+            #[cfg(any(target_os = "macos", windows, target_os = "linux"))]
             crate::voice::commands::voice_capture_mute,
-            #[cfg(any(target_os = "macos", windows))]
+            #[cfg(any(target_os = "macos", windows, target_os = "linux"))]
             crate::voice::commands::voice_capture_stop,
-            crate::voice::commands::voice_tab_capture_start,
-            crate::voice::commands::voice_tab_capture_stop,
-            #[cfg(any(target_os = "macos", windows))]
+            #[cfg(any(target_os = "macos", windows, target_os = "linux"))]
             crate::agents::commands::cursor_companion_interrupt,
-            #[cfg(any(target_os = "macos", windows))]
+            #[cfg(any(target_os = "macos", windows, target_os = "linux"))]
             crate::agents::commands::cursor_companion_present,
-            #[cfg(any(target_os = "macos", windows))]
+            #[cfg(any(target_os = "macos", windows, target_os = "linux"))]
             crate::agents::commands::cursor_companion_capture,
-            #[cfg(any(target_os = "macos", windows))]
+            #[cfg(any(target_os = "macos", windows, target_os = "linux"))]
             crate::agents::commands::cursor_companion_bind_task,
-            #[cfg(any(target_os = "macos", windows))]
+            #[cfg(any(target_os = "macos", windows, target_os = "linux"))]
             crate::agents::commands::cursor_companion_snapshot,
-            #[cfg(any(target_os = "macos", windows))]
+            #[cfg(any(target_os = "macos", windows, target_os = "linux"))]
             crate::agents::commands::cursor_companion_snap,
-            #[cfg(any(target_os = "macos", windows))]
+            #[cfg(any(target_os = "macos", windows, target_os = "linux"))]
             crate::agents::commands::cursor_companion_capture_region,
-            #[cfg(any(target_os = "macos", windows))]
+            #[cfg(any(target_os = "macos", windows, target_os = "linux"))]
             crate::agents::commands::cursor_companion_watch_clicks,
             crate::agents::commands::agent_foreground_queue,
             crate::agents::commands::agent_workspace_acquire,
@@ -147,9 +147,8 @@ pub fn invoke_handler() -> impl Fn(Invoke<Wry>) -> bool + Send + Sync + 'static 
             crate::agents::commands::agent_workspace_bind_scope,
         ));
     move |invoke: Invoke<Wry>| {
-        if !crate::app::trusted_windows::app_command_policy::allows_command(
+        if !crate::app::trusted_windows::app_command_policy::allows(
             invoke.message.webview_ref().label(),
-            invoke.message.command(),
         ) {
             invoke
                 .resolver

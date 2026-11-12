@@ -79,8 +79,8 @@ pub(super) fn run(workspace: &Workspace, dry_run: bool) -> Result<()> {
 fn start(workspace: &Workspace, version: &str, dry_run: bool) -> Result<bool> {
     let systems: Vec<ReleaseOs> = cliclack::select("Which systems does this release cover?")
         .item(
-            vec![ReleaseOs::Macos, ReleaseOs::Windows],
-            "macOS and Windows",
+            vec![ReleaseOs::Macos, ReleaseOs::Windows, ReleaseOs::Linux],
+            "macOS, Windows and Linux",
             "",
         )
         .item(vec![], "Only this computer's system", "")

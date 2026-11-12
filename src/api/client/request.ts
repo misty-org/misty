@@ -58,14 +58,6 @@ export async function apiRequest<T = void>(path: string, init: RequestInit = {})
   return result;
 }
 
-/** Authenticated binary response primitive for domain clients. */
-export async function apiBlobRequest(path: string, init: RequestInit = {}): Promise<Blob> {
-  const { response, accountGeneration } = await authenticatedResponse(path, init);
-  const result = await response.blob();
-  assertStableApiSession(accountGeneration);
-  return result;
-}
-
 async function authenticatedResponse(
   path: string,
   init: RequestInit,

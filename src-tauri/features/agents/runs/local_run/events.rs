@@ -1,6 +1,7 @@
 //! What a run's checkpoints and ending mean to the person following it: the events the chat's reducers
-//! read (`invocationEventTypes.ts`). Tool arguments and results never pass through here whole. A
-//! timeline row is built from known field names only, so tokens and page text stay out of the chat.
+//! read (`invocationEventTypes.ts`). A timeline row's summary is built from known field names only.
+//! The row's payload viewer gets the call's arguments and result too, kept on this computer with the
+//! chat, but with anything named like a secret replaced and long text clipped (`raw_payload`).
 use serde_json::{json, Map, Value};
 
 const MAX_ROWS: usize = 6;
@@ -10,6 +11,43 @@ const MAX_OUTPUT: usize = 1200;
 const MAX_ERROR: usize = 300;
 const MAX_PARTIAL: usize = 12_000;
 const MAX_SUMMARY: usize = 240;
+
+/// A payload's strings, entries and nesting past these are cut.
+const MAX_RAW_TEXT: usize = 8000;
+const MAX_RAW_ENTRIES: usize = 50;
+const MAX_RAW_DEPTH: usize = 6;
+/// Field names whose values never reach the chat, matched as parts of the lowercased name.
+const SECRET_PARTS: [&str; 9] = ["token", "secret", "password", "passwd", "apikey", "api_key", "authorization", "cookie", "credential"];
+
+fn secret_name(name: &str) -> bool {
+    let lower = name.to_lowercase();
+    lower == "key" || lower.ends_with("_key") || lower.ends_with("-key") || SECRET_PARTS.iter().any(|part| lower.contains(part))
+}
+
+/// A tool's arguments or result for the chat's payload viewer: secrets replaced, text clipped.
+pub(crate) fn raw_payload(value: &Value) -> Value {
+    fn walk(value: &Value, depth: usize) -> Value {
+        match value {
+            Value::String(text) => json!(clip(text, MAX_RAW_TEXT)),
+            Value::Array(items) if depth < MAX_RAW_DEPTH => {
+                Value::Array(items.iter().take(MAX_RAW_ENTRIES).map(|item| walk(item, depth + 1)).collect())
+            }
+            Value::Object(fields) if depth < MAX_RAW_DEPTH => Value::Object(
+                fields
+                    .iter()
+                    .take(MAX_RAW_ENTRIES)
+                    .map(|(name, item)| {
+                        let shown = if secret_name(name) { json!("(hidden)") } else { walk(item, depth + 1) };
+                        (name.clone(), shown)
+                    })
+                    .collect(),
+            ),
+            Value::Array(_) | Value::Object(_) => json!("…"),
+            other => other.clone(),
+        }
+    }
+    walk(value, 0)
+}
 
 const DETAIL_KEYS: [&str; 7] = ["query", "q", "url", "title", "name", "path", "command"];
 const LIST_KEYS: [&str; 9] = ["results", "items", "matches", "sources", "pages", "documents", "files", "tabs", "rows"];
@@ -134,6 +172,12 @@ pub(crate) fn checkpoint_events(checkpoint: &Value) -> Vec<Value> {
             _ => "tool.completed",
         };
         let mut event = json!({ "type": kind, "toolCallId": call_id, "toolName": name });
+        if state == "completed" {
+            if let Some(arguments) = output.get("device_arguments") {
+                event["args"] = raw_payload(arguments);
+                event["result"] = raw_payload(output.get("device_result").unwrap_or(&Value::Null));
+            }
+        }
         if state != "running" {
             if let Some(duration) = output.get("duration_ms").and_then(Value::as_i64).filter(|duration| *duration > 0) {
                 event["durationMs"] = json!(duration);
@@ -299,6 +343,25 @@ mod tests {
         assert_eq!(activity["rows"][0], json!({ "title": "Joggers", "meta": "example.com" }));
         let shown = activity.to_string();
         assert!(!shown.contains("secret") && !shown.contains("page text"));
+        // The payload viewer sees the call itself, with the secret replaced.
+        assert_eq!(events[0]["args"], json!({ "query": "  best   joggers ", "token": "(hidden)" }));
+        assert_eq!(events[0]["result"]["results"][0]["body"], "page text");
+    }
+
+    #[test]
+    fn a_raw_payload_hides_secrets_and_clips_long_text() {
+        let shown = raw_payload(&json!({
+            "apiKey": "k", "api_key": "k", "Authorization": "Bearer x", "key": "k", "monkey": "fine",
+            "nested": { "refresh_token": "t", "body": "x".repeat(MAX_RAW_TEXT + 10) },
+            "list": (0..80).collect::<Vec<_>>(),
+        }));
+        for name in ["apiKey", "api_key", "Authorization", "key"] {
+            assert_eq!(shown[name], "(hidden)", "{name}");
+        }
+        assert_eq!(shown["monkey"], "fine");
+        assert_eq!(shown["nested"]["refresh_token"], "(hidden)");
+        assert_eq!(shown["nested"]["body"].as_str().unwrap().chars().count(), MAX_RAW_TEXT);
+        assert_eq!(shown["list"].as_array().unwrap().len(), MAX_RAW_ENTRIES);
     }
 
     #[test]

@@ -4,19 +4,22 @@
 //! their workspace and, when granted, one shared folder. They have no network, no environment beyond
 //! what's set here, and no way to reach tabs, keys or the rest of `.misty`.
 //!
-//! Rust starts every command itself, so the limits don't depend on anything an agent wrote. Linux has
-//! no OS wall here yet, so commands are refused there rather than run without one.
+//! Rust starts every command itself, so the limits don't depend on anything an agent wrote. Each
+//! system has its own wall: Seatbelt on macOS, an AppContainer on Windows, Landlock, seccomp and
+//! namespaces on Linux. Where the wall can't be built, commands are refused rather than run without.
 mod workspace;
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", target_os = "linux"))]
 mod exit_watcher;
+#[cfg(target_os = "linux")]
+mod linux;
 #[cfg(target_os = "macos")]
 mod macos;
-#[cfg(any(target_os = "macos", windows))]
+#[cfg(any(target_os = "macos", windows, target_os = "linux"))]
 mod output;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", target_os = "linux"))]
 mod process_tree;
-#[cfg(any(target_os = "macos", windows))]
+#[cfg(any(target_os = "macos", windows, target_os = "linux"))]
 mod tools;
 #[cfg(windows)]
 mod windows;
@@ -54,7 +57,7 @@ pub struct SharedFolder {
 }
 
 pub struct ShellRequest {
-    /// Which chat or workflow the workspace belongs to.
+    /// Which chat the workspace belongs to.
     pub workspace_key: String,
     pub command: String,
     pub timeout: Option<Duration>,
@@ -130,7 +133,17 @@ async fn platform_run(
     windows::run(workspace, request, timeout, stop).await
 }
 
-#[cfg(not(any(target_os = "macos", windows)))]
+#[cfg(target_os = "linux")]
+async fn platform_run(
+    workspace: &Path,
+    request: &ShellRequest,
+    timeout: Duration,
+    stop: Arc<AtomicBool>,
+) -> Result<ShellOutcome, String> {
+    linux::run(workspace, request, timeout, stop).await
+}
+
+#[cfg(not(any(target_os = "macos", windows, target_os = "linux")))]
 async fn platform_run(
     _workspace: &Path,
     _request: &ShellRequest,

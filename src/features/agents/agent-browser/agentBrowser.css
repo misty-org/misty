@@ -207,6 +207,7 @@ html[data-browser-overlay-active] .agent-browser-page {
 }
 
 .agent-browser-pip {
+  flex-shrink: 0;
   width: min(calc(100% - 24px), 400px);
   margin: 8px 12px 4px;
   border: 1px solid var(--color-charcoal-border);
@@ -215,28 +216,15 @@ html[data-browser-overlay-active] .agent-browser-page {
   overflow: hidden;
 }
 
+/* The picture is the button that opens the split. */
 .agent-browser-pip-picture {
   display: block;
   width: 100%;
   aspect-ratio: 16 / 10;
+  padding: 0;
   background: var(--color-charcoal-card);
-}
-
-.agent-browser-pip-live {
-  display: flex;
-}
-
-.agent-browser-pip-live .agent-browser-page {
-  border: 0;
-  border-radius: 0;
-}
-
-.agent-browser-pip-expand {
-  margin-left: auto;
-}
-
-.agent-browser-pip-expand + .agent-browser-pip-flip {
-  margin-left: 0;
+  cursor: pointer;
+  overflow: hidden;
 }
 
 .agent-browser-pip-picture img,
@@ -246,20 +234,32 @@ html[data-browser-overlay-active] .agent-browser-page {
   height: 100%;
   object-fit: cover;
   object-position: top;
+  transition: opacity 120ms ease;
+}
+
+.agent-browser-pip-picture:hover img {
+  opacity: 0.9;
 }
 
 .agent-browser-pip-foot {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 4px 6px 4px 10px;
+  min-width: 0;
+  padding: 4px 4px 4px 10px;
 }
 
 .agent-browser-pip-flip {
   display: flex;
   align-items: center;
   gap: 2px;
-  margin-left: auto;
   color: var(--color-cream-muted);
   font-size: 11px;
+}
+
+.agent-browser-pip-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
 }

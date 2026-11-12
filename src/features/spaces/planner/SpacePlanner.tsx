@@ -1,7 +1,8 @@
 import { confirmAction } from "@/shared/lib/confirmAction";
-import { Button, ErrorNotification, Input } from "@/shared/ui";
+import { Button, ErrorNotification, SearchField } from "@/shared/ui";
 import { Plus } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useSpacesStore } from "../list/useSpacesStore";
 import { useSpaceAgentMembers } from "../members/agents/useSpaceAgentMembers";
 import type { SpaceTask, SpaceTaskStatus } from "./api";
@@ -41,6 +42,22 @@ export function SpacePlanner({ spaceId }: { spaceId: string }) {
   // `null` is a new task; `undefined` is no dialog.
   const [editing, setEditing] = useState<SpaceTask | null>();
   const [newStatus, setNewStatus] = useState<SpaceTaskStatus>("todo");
+  // A link to one task (search's results) opens it once the board has loaded.
+  const [params, setParams] = useSearchParams();
+  const linkedTask = params.get("task");
+  useEffect(() => {
+    if (!linkedTask || !planner.tasks) return;
+    const task = planner.tasks.find((item) => item.id === linkedTask);
+    if (task) setEditing(task);
+    setParams(
+      (current) => {
+        const next = new URLSearchParams(current);
+        next.delete("task");
+        return next;
+      },
+      { replace: true },
+    );
+  }, [linkedTask, planner.tasks, setParams]);
 
   const names = useMemo(
     () => new Map(assignees.map((assignee) => [assignee.value, assignee.label])),
@@ -61,11 +78,14 @@ export function SpacePlanner({ spaceId }: { spaceId: string }) {
 
   return (
     <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] bg-charcoal-bg">
-      <header className="flex min-h-11 items-center gap-3 border-b border-charcoal-border px-4 py-1.5">
-        <h1 className="m-0 text-sm font-semibold text-cream">Planner</h1>
-        <Input
-          type="search"
-          className="ml-auto h-8 w-52 text-xs"
+      {/* Search and New task; the page has no title, since the sidebar and the tab name it. */}
+      <div
+        role="toolbar"
+        aria-label="Planner"
+        className="flex min-h-12 items-center gap-3 px-4 py-1.5"
+      >
+        <SearchField
+          containerClassName="ml-auto w-56"
           aria-label="Search tasks"
           placeholder="Search tasks"
           value={query}
@@ -82,7 +102,7 @@ export function SpacePlanner({ spaceId }: { spaceId: string }) {
           <Plus aria-hidden="true" />
           New task
         </Button>
-      </header>
+      </div>
 
       <SpaceTaskBoard
         spaceId={spaceId}

@@ -58,7 +58,7 @@ export function SpaceWorkspaceSurface({ tab }: { tab: WorkspaceView }) {
   if (!ready)
     return (
       <div className="flex h-full min-h-0 flex-col overflow-hidden bg-charcoal-workspace">
-        <div className="flex h-11 shrink-0 items-center gap-3 border-b border-charcoal-border px-3">
+        <div className="flex h-12 shrink-0 items-center gap-3 border-b border-charcoal-border px-3">
           <Skeleton className="size-6 rounded-md" />
           <Skeleton className="h-4 w-32" />
           <Skeleton className="h-6 w-72" />

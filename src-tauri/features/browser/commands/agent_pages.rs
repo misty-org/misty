@@ -7,15 +7,9 @@ pub(crate) use crate::browser::agent_pages::action_confirm::{
 #[cfg(desktop)]
 pub(crate) use crate::browser::agent_pages::agent_control::{
     __cmd__browser_agent_execute_bounded, __cmd__browser_agent_execution_cancel,
-    __cmd__browser_agent_execution_renew, __tauri_command_name_browser_agent_execute_bounded,
-    __tauri_command_name_browser_agent_execution_cancel,
-    __tauri_command_name_browser_agent_execution_renew, browser_agent_execute_bounded,
-    browser_agent_execution_cancel, browser_agent_execution_renew,
-};
-#[cfg(desktop)]
-pub(crate) use crate::browser::agent_pages::page_tools::media_tools::{
-    __cmd__browser_webview_reader_article, __tauri_command_name_browser_webview_reader_article,
-    browser_webview_reader_article,
+    __tauri_command_name_browser_agent_execute_bounded,
+    __tauri_command_name_browser_agent_execution_cancel, browser_agent_execute_bounded,
+    browser_agent_execution_cancel,
 };
 #[cfg(desktop)]
 pub(crate) use crate::browser::agent_pages::page_tools::{

@@ -215,7 +215,7 @@
     },
     {
      "name": "agent_tool_load",
-     "description": "Add a group of tools when the task needs it: integration: the person's connected apps (Gmail, Calendar, Slack, GitHub and others); agent: sub-agents that work on independent parts of a large task at the same time; misty: the person's own Misty notes, drawings, files, chats, Spaces, memory and saved workflows.",
+     "description": "Add a group of tools when the task needs it: integration: the person's connected apps (Gmail, Calendar, Slack, GitHub and others); agent: sub-agents that work on independent parts of a large task at the same time; misty: the person's own Misty notes, drawings, files, chats and Spaces.",
      "inputSchema": {
       "type": "object",
       "required": [
@@ -305,7 +305,7 @@
     },
     {
      "name": "agent_tool_load",
-     "description": "Add a group of tools when the task needs it: agent: sub-agents that work on independent parts of a large task at the same time; misty: the person's own Misty notes, drawings, files, chats, Spaces, memory and saved workflows.",
+     "description": "Add a group of tools when the task needs it: agent: sub-agents that work on independent parts of a large task at the same time; misty: the person's own Misty notes, drawings, files, chats and Spaces.",
      "inputSchema": {
       "type": "object",
       "required": [

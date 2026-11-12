@@ -1,8 +1,8 @@
 import { chatDeviceGrants } from "../../personal/deviceGrants";
 import { useCollaborationStore } from "../../plans/agentCollaboration";
 import { admitLocalTurn } from "@/features/agents/localRun";
-import { lessonTurnPayload } from "../../lessons/lessonRouter";
-import { useLessonStore } from "../../lessons/lessonStore";
+import { lessonTurnPayload } from "../../tutor/lessons/lessonRouter";
+import { useLessonStore } from "../../tutor/lessons/lessonStore";
 import {
   runtimeAiApi as aiSurfaceApi,
   subscribeAgentsInvocation as subscribeToAiInvocation,
@@ -23,6 +23,7 @@ import {
   replaceActiveGlobalInvocationStream,
 } from "../state/mistyStoreUpdates";
 import type { MistyGet, MistySet } from "../state/mistyStoreUpdates";
+import { chatSpaceId } from "../state/conversationSpace";
 import { submissionEpoch } from "./mistySubmissionEpoch";
 import { finishNeverStarted } from "./turnExecution";
 import { turnStreamHandlers } from "./turnStream";
@@ -110,8 +111,9 @@ export async function startInvocation(set: MistySet, get: MistyGet, turn: Prepar
     await admitLocalTurn(accountId, conversationId, {
       mode: collaborationMode,
       permissionMode,
-      scheduled: Boolean(companion?.schedule),
     }).catch(() => undefined);
+    const chat = get().conversations.find((c) => c.id === conversationId);
+    const chatSpace = chat ? chatSpaceId(chat) : "";
     const created = await aiSurfaceApi.createInvocation({
       agentId: get().conversations.find((c) => c.id === conversationId)?.agentId || requestAgentId,
       taskId: executionTaskId,
@@ -119,34 +121,23 @@ export async function startInvocation(set: MistySet, get: MistyGet, turn: Prepar
       windowLabel: (await import("@/shared/platform/tauri")).hasTauriInternals()
         ? (await import("@tauri-apps/api/window")).getCurrentWindow().label
         : undefined,
-      // A scheduled turn has this argument too, but nobody is at the cursor: the crate words it as a report.
-      mode: companion && !companion.schedule ? "companion" : "drawer",
+      mode: companion ? "companion" : "drawer",
       companionMode: companion?.interactionMode,
       displayCaptures: companion?.displayCaptures,
-      methodVersionId: companion?.methodVersionId,
-      methodInputs: companion?.methodInputs,
-      ...(companion?.spaceId !== undefined && { spaceId: companion.spaceId }),
-      ...(companion?.schedule && {
-        scheduleId: companion.schedule.id,
-        scheduleClaim: companion.schedule.claim,
-      }),
-      skillVersionIds: companion?.skillVersionIds,
+      // The run works in its chat's one Space; Space tools reach no other (tools/space/routing).
+      ...(companion?.spaceId !== undefined
+        ? { spaceId: companion.spaceId }
+        : chatSpace && { spaceId: chatSpace }),
       surfaceId: handoff?.surfaceId ?? "global",
       // Turns sent to carry on after a card read as events, not as typed messages.
-      trigger: companion?.schedule
-        ? "scheduled_task"
-        : selection
-          ? "selection"
-          : companion?.continuation
-            ? "continuation"
-            : "message",
+      trigger: selection ? "selection" : companion?.continuation ? "continuation" : "message",
       requestedArtifactKind: handoff?.requestedArtifactKind,
       prompt: normalized,
       // Earlier turns from this device's copy of the chat.
       historyTurns: historyTurns(get().conversations.find((c) => c.id === conversationId)),
       historyNotes: get().conversations.find((c) => c.id === conversationId)?.historyNotes,
       // The run works on this computer.
-      originDeviceId: await import("@/features/agents/workflows/deviceScheduledRuns")
+      originDeviceId: await import("@/features/agents/personal/useAgentsStore")
         .then(({ thisComputerDeviceId }) => thisComputerDeviceId())
         .then((id) => id ?? undefined)
         .catch(() => undefined),
@@ -198,17 +189,13 @@ export async function startInvocation(set: MistySet, get: MistyGet, turn: Prepar
           execution: {
             ...execution,
             conversationId,
-            method: execution.method
-              ? { ...execution.method, invocationId: created.invocationId }
-              : undefined,
           },
         });
     }
     patchConversationMessage(set, get, conversationId, assistantMessage.id, {
       invocationId: created.invocationId,
     });
-    // A scheduled run has its own modes, and leaves what the person chose in the composer for them.
-    if (startsConversation && !companion?.schedule) {
+    if (startsConversation) {
       useCollaborationStore.getState().adoptDraftMode(conversationId);
     }
     set({

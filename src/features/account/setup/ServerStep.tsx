@@ -18,7 +18,7 @@ export function useNeedsServer(): boolean {
 /** Asks for the server on the sign-in pages: Misty Pro or a self-hosted one. Choosing brings the
  * page's own form back. A sign-in link names its own server and opens in the sign-in sheet. */
 export function ServerStep() {
-  const { switchToMistyPro } = useServerSwitch();
+  const { switchToMistyCloud } = useServerSwitch();
   const [selfHosted, setSelfHosted] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -27,7 +27,7 @@ export function ServerStep() {
     setError("");
     setBusy(true);
     try {
-      await switchToMistyPro();
+      await switchToMistyCloud();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Misty couldn't switch servers.");
     } finally {

@@ -13,6 +13,18 @@ import { appZoomChangedEvent } from "@/shared/hooks/useAppZoom";
 export const agentPageKey = (viewId: string) => `agent-page:${viewId}`;
 
 /**
+ * Whether the person can see the host. A view left for another stays laid out beneath it
+ * (`[data-tab-kept]`, DockLeafView.tsx) with its full size and place, so measuring alone would keep
+ * the native page, which draws above the whole app, over whatever replaced it.
+ */
+export function agentPageHostShown(host: HTMLElement): boolean {
+  if (host.closest("[data-tab-kept], [hidden]")) return false;
+  return (
+    typeof host.checkVisibility !== "function" || host.checkVisibility({ visibilityProperty: true })
+  );
+}
+
+/**
  * Places an agent's live page over its host: measured by `visibleBrowserBounds`, shown through
  * the runtime's adopted pages (first-paint hold, parking and switching included), re-measured on the same
  * events, and taken off screen when the host leaves the screen. A dialog or menu opening over the app
@@ -31,7 +43,7 @@ export function useAgentPageGeometry(hostRef: RefObject<HTMLDivElement | null>, 
       // While the chrome moves to a new edge the page holds still; the move's end re-measures.
       if (disposed || isBrowserLayoutMoving()) return;
       const host = hostRef.current;
-      const bounds = host ? visibleBrowserBounds(host) : null;
+      const bounds = host && agentPageHostShown(host) ? visibleBrowserBounds(host) : null;
       if (!bounds) {
         if (shown) void hideAdoptedBrowserPage(viewId);
         shown = false;
@@ -54,12 +66,13 @@ export function useAgentPageGeometry(hostRef: RefObject<HTMLDivElement | null>, 
       )
         schedule();
     };
-    // A dialog opening over the app marks the rest of it hidden.
+    // A dialog opening over the app marks the rest of it hidden, and a view left for another is
+    // kept beneath it.
     const dialogs = new MutationObserver(schedule);
     dialogs.observe(document.body, {
       subtree: true,
       attributes: true,
-      attributeFilter: ["aria-hidden", "inert"],
+      attributeFilter: ["aria-hidden", "inert", "hidden", "data-tab-kept"],
     });
     const recover = () => requestBrowserWebviewLayoutByRuntimeId(viewId);
     const stopSettled = onBrowserSettled(schedule);

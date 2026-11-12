@@ -3,6 +3,7 @@ import type {
   ShortcutCommandDefinition,
   ShortcutPlatform,
 } from "./shortcutTypes";
+import { chatCommands } from "./chatCommands";
 import { command } from "./factory";
 import { focusModeCommands } from "./viewAndTabCommands";
 import { libraryCommands } from "./libraryCommands";
@@ -114,6 +115,7 @@ export const shortcutCommandRegistry: ShortcutCommandDefinition[] = [
   ...workspaceCommands,
   ...tabAndToolCommands,
   ...libraryCommands,
+  ...chatCommands,
 ];
 
 export const shortcutCommandsById = new Map(

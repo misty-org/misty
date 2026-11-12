@@ -11,9 +11,8 @@ import {
   DialogHeader,
   DialogTitle,
   EmptyState,
-  IconButton,
-  Input,
   ScrollArea,
+  SearchField,
   Select,
   SelectContent,
   SelectItem,
@@ -21,7 +20,7 @@ import {
   SelectValue,
   Skeleton,
 } from "@/shared/ui";
-import { Search, X } from "lucide-react";
+
 import { useEffect, useMemo, useState } from "react";
 import { libraryPickerItemMIME } from "./MistyLibraryPickerThumbnail";
 import { MistyLibraryPickerTile } from "./MistyLibraryPickerTile";
@@ -31,14 +30,6 @@ const pickerStyles = {
     "grid h-[min(640px,calc(100vh-64px))] w-[min(720px,calc(100vw-32px))] max-w-none",
     "grid-rows-[auto_auto_minmax(0,1fr)_auto] gap-0 overflow-hidden p-0",
     "max-sm:h-screen max-sm:w-screen max-sm:rounded-none",
-  ].join(" "),
-  searchField: [
-    "flex h-9 min-w-0 flex-1 items-center gap-2 rounded-md border border-charcoal-border/80 bg-charcoal-bg",
-    "px-3 text-cream-muted shadow-xs transition-colors",
-  ].join(" "),
-  searchInput: [
-    "!m-0 !h-full !min-h-0 min-w-0 flex-1 !rounded-none !border-0 !bg-transparent !p-0",
-    "text-sm leading-none !shadow-none focus-visible:!ring-0",
   ].join(" "),
 } as const;
 
@@ -124,24 +115,16 @@ export function MistyLibraryPicker({
   const panel = (
     <>
       <div className="flex items-center gap-2 border-b border-charcoal-border px-5 py-3">
-        <div className={pickerStyles.searchField} role="search">
-          <Search size={15} aria-hidden="true" />
-          <Input
-            className={pickerStyles.searchInput}
-            aria-label="Search Library"
-            autoComplete="off"
-            autoFocus={active}
-            spellCheck={false}
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search names, filenames, and tags"
-          />
-          {query ? (
-            <IconButton size="xs" label="Clear Library search" onClick={() => setQuery("")}>
-              <X size={13} />
-            </IconButton>
-          ) : null}
-        </div>
+        <SearchField
+          size="md"
+          containerClassName="flex-1"
+          aria-label="Search Library"
+          autoFocus={active}
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          onClear={() => setQuery("")}
+          placeholder="Search names, filenames, and tags"
+        />
         <Select
           value={mediaFilter}
           onValueChange={(value) => setMediaFilter(value as LibraryMediaFilter)}

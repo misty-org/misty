@@ -143,5 +143,3 @@ export const spaceAdminTools: Record<string, LocalToolHandler> = {
   "space.list": list,
   "space.manage": manage,
 };
-
-export const spaceAdminWriteTools = ["space.manage"];

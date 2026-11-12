@@ -7,11 +7,7 @@ const identityState = {
 };
 
 const defaults: Record<WorkspaceSurfaceId, DockWidgetDescriptor> = {
-  extensions: descriptor("extensions", "singleton", "suspend", 360, 240),
   space: descriptor("space", "per-space", "suspend", 360, 240),
-  // Retired: a saved window may still name it until it loads.
-  browser: descriptor("browser", "multiple", "keep-alive", 360, 240),
-  scheduled: descriptor("scheduled", "singleton", "keep-alive", 360, 240),
   agents: descriptor("agents", "singleton", "suspend", 360, 240),
 };
 

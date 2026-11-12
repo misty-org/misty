@@ -68,7 +68,7 @@ export async function openScreenAndContinue(
       !(await import("@/features/agents/runs/jobs/workspaceAutopilot")).visibleAutopilotAvailable()
     )
       throw new Error("Using other apps needs the Misty app on macOS or Windows.");
-    const { useCompanionState } = await import("@/features/agents/cursor/companionState");
+    const { useCompanionState } = await import("@/features/agents/tutor/cursor/companionState");
     const companion = useCompanionState.getState();
     if (look && companion.submit && companion.accountId === get().accountId) {
       // The companion captures every display, so its answer can point at them.

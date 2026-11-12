@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { FileText, PencilRuler, Plus } from "lucide-react";
+import { FileText, PencilRuler, Plus, Trash2 } from "lucide-react";
 import { useAuth } from "@/features/account";
 import { CaptureMenu } from "@/features/voice";
 import { useSpacesStore } from "@/features/spaces/core";
@@ -11,6 +11,7 @@ import { OrderedCollectionFilters } from "@/features/settings/OrderedCollectionF
 import {
   Button,
   CollectionPage,
+  ContextMenuAction,
   CollectionHeading,
   CollectionSearch,
   CollectionItems,
@@ -19,7 +20,6 @@ import {
   ErrorNotification,
   useCollectionRefinement,
   itemTones,
-  CollectionSelectionBar,
 } from "@/shared/ui";
 import { useRangeSelection } from "@/shared/hooks/useRangeSelection";
 import { confirmAction } from "@/shared/lib/confirmAction";
@@ -29,8 +29,6 @@ export const journalSections = [
   { value: "all", label: "All" },
   { value: "notes", label: "Notes" },
   { value: "drawings", label: "Drawings" },
-  // A day of Memory: what you read, said and recorded.
-  { value: "day", label: "Day" },
 ];
 
 export function JournalAllCollection(props: {
@@ -145,12 +143,6 @@ export function JournalAllCollection(props: {
       </ErrorNotification>
       <ErrorNotification message={actions.error} />
       <ErrorNotification message={bulkError} onDismiss={() => setBulkError("")} />
-      <CollectionSelectionBar
-        count={selection.selectedIds.length}
-        busy={bulkBusy}
-        onClear={selection.clear}
-        onDelete={() => void deleteSelected()}
-      />
       {actions.dialog}
       {data.loading ? (
         <CollectionSkeleton label="Loading journal" view={view} />
@@ -164,6 +156,18 @@ export function JournalAllCollection(props: {
           items={refinement.items.map((item) => ({
             ...item,
             ...actions.forItem(item),
+            ...(selection.menuTargets(item.id).length > 1 && {
+              contextMenu: (
+                <ContextMenuAction
+                  icon={<Trash2 />}
+                  label={`Delete ${selection.selectedIds.length} items`}
+                  destructive
+                  disabled={bulkBusy}
+                  onSelect={() => void deleteSelected()}
+                />
+              ),
+            }),
+            onContextMenuOpen: () => selection.pickForMenu(item.id),
             selectable: !props.readOnly && Boolean(item.remove),
             icon: item.kind === "note" ? <FileText /> : <PencilRuler />,
             tone: item.kind === "note" ? itemTones.note : itemTones.drawing,

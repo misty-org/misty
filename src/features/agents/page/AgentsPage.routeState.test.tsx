@@ -65,10 +65,9 @@ describe("Agents automation route state", () => {
     container.remove();
   });
 
-  it("opens Workflows for old automation links without removing saved workflow data", async () => {
+  it("opens the chat for old automation links and leaves the link as it was", async () => {
     await act(async () => root.render(agentsSurface("/agents?view=automations&automation=flow-1")));
-    const pages = container.querySelector('[aria-label="Agent workspace pages"]');
-    expect(pages?.querySelector('[aria-current="page"]')?.textContent).toBe("Workflows");
+    expect(container.querySelector(".agent-studio")?.getAttribute("data-page")).toBe("task");
     expect(container.querySelector('[data-testid="location-probe"]')?.textContent).toBe(
       "/agents?view=automations&automation=flow-1",
     );

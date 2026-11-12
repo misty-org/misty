@@ -1,13 +1,13 @@
 use browser_data::{
-    crypto::{VaultRoot, VaultScope},
+    crypto::{RecoveryKey, RecoveryScope},
     recovery::RecoveryStore,
 };
 
-fn scope() -> VaultScope {
-    VaultScope {
+fn scope() -> RecoveryScope {
+    RecoveryScope {
         deployment: "https://example.test".into(),
         account_id: "owner".into(),
-        vault_id: "d32b3d14-d7b6-4d4c-a674-d36bb5aefb74".into(),
+        id: "d32b3d14-d7b6-4d4c-a674-d36bb5aefb74".into(),
     }
 }
 
@@ -15,7 +15,7 @@ fn scope() -> VaultScope {
 fn recovery_encrypts_database_and_wal_and_skips_unchanged_writes() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("recovery.sqlite");
-    let mut store = RecoveryStore::open(&path, scope(), VaultRoot::generate()).unwrap();
+    let mut store = RecoveryStore::open(&path, scope(), RecoveryKey::generate()).unwrap();
     let secret = "private-workspace-url-and-title-0123456789";
     assert_eq!(store.write("workspace", 0, secret).unwrap().revision, 1);
     let db = rusqlite::Connection::open(&path).unwrap();
@@ -39,11 +39,11 @@ fn restart_requires_same_key_and_account_and_retries_lost_ack() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("recovery.sqlite");
     let s = scope();
-    let root = VaultRoot::generate();
+    let root = RecoveryKey::generate();
     let mut store = RecoveryStore::open(&path, s.clone(), root.duplicate()).unwrap();
     store.write("workspace", 0, "first").unwrap();
     drop(store);
-    assert!(RecoveryStore::open(&path, s.clone(), VaultRoot::generate()).is_err());
+    assert!(RecoveryStore::open(&path, s.clone(), RecoveryKey::generate()).is_err());
     let mut other = s.clone();
     other.account_id = "other-account".into();
     assert!(RecoveryStore::open(&path, other, root.duplicate()).is_err());
@@ -58,7 +58,7 @@ fn restart_requires_same_key_and_account_and_retries_lost_ack() {
 fn ciphertext_cannot_be_moved_between_records_or_revisions_and_archives_are_immutable() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("recovery.sqlite");
-    let mut store = RecoveryStore::open(&path, scope(), VaultRoot::generate()).unwrap();
+    let mut store = RecoveryStore::open(&path, scope(), RecoveryKey::generate()).unwrap();
     store.write("workspace", 0, "private").unwrap();
     store.write("archive:original", 0, "legacy raw").unwrap();
     assert!(store.write("archive:original", 1, "replacement").is_err());
@@ -77,7 +77,7 @@ fn ciphertext_cannot_be_moved_between_records_or_revisions_and_archives_are_immu
 fn old_archives_are_retired_so_saving_never_stops_at_the_record_cap() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("recovery.sqlite");
-    let mut store = RecoveryStore::open(&path, scope(), VaultRoot::generate()).unwrap();
+    let mut store = RecoveryStore::open(&path, scope(), RecoveryKey::generate()).unwrap();
     store.write("workspace", 0, "first").unwrap();
     for n in 0..300 {
         store
@@ -122,7 +122,7 @@ fn slots(dir: &std::path::Path) -> usize {
 fn failed_saves_wait_in_one_encrypted_slot_per_key_and_replay_once() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("recovery.sqlite");
-    let mut store = RecoveryStore::open(&path, scope(), VaultRoot::generate()).unwrap();
+    let mut store = RecoveryStore::open(&path, scope(), RecoveryKey::generate()).unwrap();
     store.write("workspace", 0, "first").unwrap();
     failing_inserts(&path, true);
     let secret = "pending-private-url-0123456789";
@@ -156,7 +156,7 @@ fn failed_saves_wait_in_one_encrypted_slot_per_key_and_replay_once() {
 fn pending_saves_replay_when_the_store_reopens() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("recovery.sqlite");
-    let root = VaultRoot::generate();
+    let root = RecoveryKey::generate();
     let mut store = RecoveryStore::open(&path, scope(), root.duplicate()).unwrap();
     store.write("workspace", 0, "saved").unwrap();
     failing_inserts(&path, true);

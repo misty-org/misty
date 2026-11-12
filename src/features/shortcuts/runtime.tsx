@@ -151,6 +151,16 @@ export function invokeShortcutCommand(commandId: string): boolean {
   return false;
 }
 
+/** Whether a mounted handler would run the command now, as the command palette asks before it
+ * lists one. Focus isn't checked: the palette's own field has it. */
+export function canInvokeShortcutCommand(commandId: string): boolean {
+  const definition = shortcutCommandsById.get(commandId);
+  if (!definition) return false;
+  const activeScope = (shortcutScope.maybe() ?? defaultScope)();
+  if (!scopeIsActive(definition.scope, activeScope)) return false;
+  return orderedRegistrations(commandId).some((registration) => registration.enabled());
+}
+
 function orderedRegistrations(commandId: string): HandlerRegistration[] {
   return [...(handlers.get(commandId) ?? [])].sort(
     (left, right) => right.priority - left.priority || right.order - left.order,

@@ -122,11 +122,32 @@ pub async fn execute(
         .await
         .map_err(|error| failure(error, false))?;
     let account = resolve_account(&accounts, &info.toolkit.slug, call.account.trim())?;
+    approve_and_run(store, &call, &info, &account, |write| {
+        run_tool(client, &call.tool_slug, &call.arguments, &account, write)
+    })
+    .await
+}
+
+/// What every app call goes through once its tool and account are known, wherever it runs: a read
+/// runs at once; a write runs when the mode, a remembered approval or an answered card allows it,
+/// and otherwise opens a card. `run` gets whether the call writes.
+pub(super) async fn approve_and_run<F, Fut>(
+    store: &Store,
+    call: &ExecuteCall,
+    info: &super::types::ToolInfo,
+    account: &str,
+    run: F,
+) -> Result<Executed, Failure>
+where
+    F: Fn(bool) -> Fut,
+    Fut: std::future::Future<Output = Result<Executed, Failure>>,
+{
+    let account = account.to_owned();
     let kind = policy::classify(&info.slug, &info.tags);
     if kind == Kind::Read {
-        return run_tool(client, &call.tool_slug, &call.arguments, &account, false).await;
+        return run(false).await;
     }
-    let need = policy::grant_need(&info, &call.arguments, &account, kind);
+    let need = policy::grant_need(info, &call.arguments, &account, kind);
     let covering = need.clone();
     let covered = call.mode == "auto"
         && on_store(store, move |store| grants::covering_grant(store, &covering))
@@ -140,9 +161,9 @@ pub async fn execute(
         })
         .await
         .map_err(storage_failure)?;
-        return run_tool(client, &call.tool_slug, &call.arguments, &account, true).await;
+        return run(true).await;
     }
-    let Some((title, summary)) = policy::action_summary(&info, &call.arguments, &account) else {
+    let Some((title, summary)) = policy::action_summary(info, &call.arguments, &account) else {
         return Err(rejected(
             "question_too_long",
             crate::agents::run_control::tool_question::TOO_LONG,
@@ -175,7 +196,7 @@ pub async fn execute(
                     "That approval was already used. Call integration_execute again to ask the user again.",
                 ));
             }
-            run_tool(client, &call.tool_slug, &call.arguments, &account, true).await
+            run(true).await
         }
         "declined" => Err(rejected(
             "declined",

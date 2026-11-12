@@ -137,10 +137,10 @@ vi.mock("@/app/shell", () => {
     useAppRouteMemoryStore: Object.assign(vi.fn(), {
       getState: () => ({
         resetAppRoute: vi.fn(),
-        lastAppRoute: "/browser",
+        lastAppRoute: "/agents",
       }),
     }),
-    routes: { browser: "/browser", welcome: "/welcome", signIn: "/signin" },
+    routes: { agents: "/agents", welcome: "/welcome", signIn: "/signin" },
   };
 });
 vi.mock("@/features/spaces", async (importOriginal) => ({
@@ -553,7 +553,7 @@ describe("AuthProvider account switching", () => {
             <Routes>
               <Route element={<AccountOutlet />}>
                 <Route path="/signin" element={<SignIn />} />
-                <Route path="/browser" element={<Workspace />} />
+                <Route path="/agents" element={<Workspace />} />
               </Route>
             </Routes>
           </AuthProvider>

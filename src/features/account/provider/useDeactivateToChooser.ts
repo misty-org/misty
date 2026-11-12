@@ -85,7 +85,7 @@ export function useDeactivateToChooser(
       );
       setUserState(null);
       setAccounts(listSavedAccountSessions());
-      navigate(routes.browser, {
+      navigate(routes.agents, {
         replace: true,
       });
       for (const error of failures) {

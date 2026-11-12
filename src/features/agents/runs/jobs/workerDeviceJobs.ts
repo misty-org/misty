@@ -1,4 +1,4 @@
-/** Pure helpers for device workflow jobs: content references and error codes. */
+/** Pure helpers for device jobs: content references and error codes. */
 
 export function deviceContentReference(
   input: unknown,

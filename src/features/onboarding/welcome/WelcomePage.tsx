@@ -1,5 +1,4 @@
 import { routes } from "@/app/shell";
-import { useSetupStore } from "@/features/account";
 import { authButtonClass } from "@/features/account/authButtonClass";
 import { mistyPublicPage } from "@/shared/platform/mistyPublicUrl";
 import { BackButton, Button, FlyingMisty, Pressable } from "@/shared/ui";
@@ -23,14 +22,9 @@ export function WelcomePage() {
   const location = useLocation();
   const routeState = location.state as { from?: string; addingAccount?: boolean } | null;
   const addingAccount = Boolean(routeState?.addingAccount);
-  // Agents work without an account; signing in waits until sync or a Space asks for it. Only the tab side is asked, once the tabs can be seen moving, and only on
-  // the first run: backing out of sign-in comes here again on a device that has answered.
-  const getStarted = () => {
-    const setup = useSetupStore.getState();
-    if (!setup.welcomed) setup.askTabSide();
-    setup.finishWelcome();
-    navigate(routes.agents, { replace: true });
-  };
+  // Agents work without an account; signing in waits until sync or a Space asks for it. Get
+  // started sets up the person's own AI and apps, and the setup page ends the welcome.
+  const getStarted = () => navigate(routes.setup);
   // The sign-in pages ask for a server if this device has none; the wizard comes after.
   const signIn = () => navigate(routes.signIn, { state: location.state });
   const createAccount = () => navigate(routes.register, { state: location.state });

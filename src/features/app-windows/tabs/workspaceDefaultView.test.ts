@@ -1,11 +1,5 @@
 import { afterEach, expect, it } from "vitest";
-import {
-  configureWorkspaceDefaultView,
-  createDefaultWorkspaceView,
-  workspaceDefaultViewOption,
-  workspaceDefaultViewOptions,
-  workspaceDefaultViewStoredIndex,
-} from "./workspaceDefaultView";
+import { configureWorkspaceDefaultView, createDefaultWorkspaceView } from "./workspaceDefaultView";
 afterEach(() => configureWorkspaceDefaultView(3));
 it("starts in Agents before a preference is configured", () => {
   expect(createDefaultWorkspaceView()).toMatchObject({
@@ -36,15 +30,6 @@ it("falls back to Agents for invalid preferences and allocates independent ident
   expect(first.surfaceId).toBe("agents");
   expect(first.id).not.toBe(second.id);
   expect(first.instanceKey).not.toBe(second.instanceKey);
-});
-
-it("maps stored indexes to the options shown in Settings", () => {
-  expect(workspaceDefaultViewOptions[workspaceDefaultViewOption(3)]).toBe("Agents");
-  expect(workspaceDefaultViewOptions[workspaceDefaultViewOption(0)]).toBe("Agents");
-  expect(workspaceDefaultViewOptions[workspaceDefaultViewOption(1)]).toBe("Agents");
-  expect(workspaceDefaultViewStoredIndex(workspaceDefaultViewOptions.indexOf("Agents"))).toBe(3);
-  // The retired Files choice opens the default view.
-  expect(workspaceDefaultViewOptions[workspaceDefaultViewOption(2)]).toBe("Agents");
 });
 
 it("round-trips the configurable starting page through portable settings", async () => {

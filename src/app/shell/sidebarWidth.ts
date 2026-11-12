@@ -2,7 +2,9 @@ import { create } from "zustand";
 
 const storageKey = "misty:sidebar-width:v1";
 const sidebarWidthDefault = 320;
-export const sidebarWidthMin = 320;
+/** About an eighth of a laptop screen: the window controls and the two toggles still fit, and
+ * back and forward step aside below 230px. */
+export const sidebarWidthMin = 160;
 const sidebarWidthMax = 480;
 
 const clamp = (value: number) =>
@@ -17,7 +19,7 @@ function read(): number {
   }
 }
 
-/** The vertical tab sidebar's width. The choice stays on this device. */
+/** The sidebar's width. The choice stays on this device. */
 export const useSidebarWidthStore = create<{
   width: number;
   set(width: number): void;

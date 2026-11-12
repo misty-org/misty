@@ -1,3 +1,4 @@
+pub mod region;
 #[cfg(windows)]
 pub mod windows;
 

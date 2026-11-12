@@ -7,8 +7,8 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   suspend: vi.fn(),
   logout: vi.fn().mockResolvedValue(undefined),
-  browseOnly: vi.fn().mockResolvedValue(undefined),
-  switchToMistyPro: vi.fn().mockResolvedValue(undefined),
+  chooseNoServer: vi.fn().mockResolvedValue(undefined),
+  switchToMistyCloud: vi.fn().mockResolvedValue(undefined),
 }));
 vi.mock("@/features/browser/webviews/browserRuntime", () => ({
   setBrowserWebviewsSuspended: mocks.suspend,
@@ -31,8 +31,8 @@ vi.mock("../setup/useServerSwitch", () => ({
   useServerSwitch: () => ({
     moveTo: vi.fn(),
     switchTo: vi.fn(),
-    browseOnly: mocks.browseOnly,
-    switchToMistyPro: mocks.switchToMistyPro,
+    chooseNoServer: mocks.chooseNoServer,
+    switchToMistyCloud: mocks.switchToMistyCloud,
   }),
 }));
 
@@ -152,12 +152,12 @@ it("starts by choosing a server when this device has none", async () => {
   expect(screen.getByLabelText("Sign-in link")).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Back" }));
   await act(async () => fireEvent.click(screen.getByRole("button", { name: /Misty Pro/ })));
-  expect(mocks.switchToMistyPro).toHaveBeenCalled();
+  expect(mocks.switchToMistyCloud).toHaveBeenCalled();
   expect(screen.getByRole("form", { name: "Sign in form" })).toBeTruthy();
 });
 
 it("stays on choosing a server when Misty Pro can't be reached", async () => {
-  mocks.switchToMistyPro.mockRejectedValueOnce(new Error("Misty couldn't reach Misty Pro."));
+  mocks.switchToMistyCloud.mockRejectedValueOnce(new Error("Misty couldn't reach Misty Pro."));
   render(<SignInSheet />);
   act(() => openSignInSheet("setup"));
   await act(async () => fireEvent.click(screen.getByRole("button", { name: /Misty Pro/ })));
@@ -170,7 +170,7 @@ it("is the setup wizard, where Just browse leaves Misty without a server", async
   act(() => openSignInSheet("setup"));
   expect(screen.getByRole("dialog", { name: "Set up Misty" })).toBeTruthy();
   await act(async () => fireEvent.click(screen.getByRole("button", { name: /Just browse/ })));
-  expect(mocks.browseOnly).toHaveBeenCalled();
+  expect(mocks.chooseNoServer).toHaveBeenCalled();
   expect(useSignInSheetStore.getState().reason).toBeNull();
 });
 

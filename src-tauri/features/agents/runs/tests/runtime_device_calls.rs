@@ -206,7 +206,7 @@ async fn bodies_are_limited_and_must_be_json() {
 async fn validation_comes_before_the_model_except_where_the_route_read_the_model_first() {
     let bad = "{}";
     // Parsed first, so a bad body is a 400 even with no model.
-    for name in ["cleanup", "voice-transcription", "screen-model", "refine-point", "subtitle-context", "extract", "embed", "follow-up", "restore-step"] {
+    for name in ["cleanup", "voice-transcription", "screen-model", "refine-point", "extract", "embed", "follow-up", "restore-step"] {
         assert_eq!(calls(Device::default()).device_call(name, bad).await.unwrap_err().status, 400, "{name}");
     }
     // These chose their model first, so the missing model is what they say.

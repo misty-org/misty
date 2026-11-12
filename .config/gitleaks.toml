@@ -2,9 +2,13 @@
 useDefault = true
 
 [allowlist]
-description = "Vendored upstream fixtures"
+description = "Vendored upstream fixtures, and keyboard shortcuts named for assistive technology"
 paths = [
   '''^vendor/''',
+]
+regexTarget = "line"
+regexes = [
+  '''aria-keyshortcuts="[A-Za-z+ ]+"''',
 ]
 
 [[rules]]

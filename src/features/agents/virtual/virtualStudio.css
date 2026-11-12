@@ -1,0 +1,852 @@
+/* The studio is a little lit room floating in the window's own dark. The room itself is in colour,
+   which the owner allowed for this one surface; everything laid over it stays in the app's grays. */
+.virtual-studio {
+  position: relative;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  background: radial-gradient(
+    ellipse at 50% 45%,
+    color-mix(in srgb, var(--misty-theme-text) 13%, var(--color-charcoal-workspace)) 0%,
+    var(--color-charcoal-workspace) 72%
+  );
+}
+.virtual-studio canvas {
+  display: block;
+  touch-action: none;
+}
+.virtual-studio-loading {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 72px 10% 48px;
+}
+.virtual-studio-loading-room {
+  width: min(100%, 880px);
+  aspect-ratio: 20 / 11;
+  border-radius: 28px;
+}
+
+/* Everything laid over the room shares one surface. */
+.virtual-studio-side,
+.virtual-studio-dock,
+.virtual-studio-talk,
+.virtual-studio-near,
+.virtual-studio-palette,
+.virtual-studio-piece {
+  border: 1px solid color-mix(in srgb, var(--misty-theme-text) 9%, transparent);
+  background: color-mix(in srgb, var(--misty-theme-card) 82%, transparent);
+  backdrop-filter: blur(18px) saturate(140%);
+  box-shadow:
+    0 1px 0 color-mix(in srgb, var(--misty-theme-text) 6%, transparent) inset,
+    0 16px 40px rgb(0 0 0 / 32%);
+}
+
+/* A panel down the left side: the team, hiring or the furniture, by mode. */
+.virtual-studio-side {
+  position: absolute;
+  inset: 12px auto auto 12px;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 248px;
+  max-height: calc(100% - 12px - 84px);
+  padding: 12px;
+  border-radius: 16px;
+}
+.virtual-studio-side-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 0 4px;
+}
+.virtual-studio-side-head h3 {
+  color: var(--color-cream-bright);
+  font-size: 13px;
+  font-weight: 600;
+}
+.virtual-studio-side-head span {
+  color: var(--color-cream-muted);
+  font-size: 12px;
+}
+
+/* The team, listed as a game lists its party. */
+.virtual-studio-team-list {
+  display: grid;
+  gap: 2px;
+  min-height: 0;
+  margin: 0 -4px;
+  overflow-y: auto;
+}
+.virtual-studio-team-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 38px;
+  padding: 0 8px;
+  border-radius: 10px;
+  color: var(--color-cream);
+  font-size: 13px;
+}
+.virtual-studio-team-row:hover,
+.virtual-studio-team-row[aria-pressed="true"] {
+  background: var(--color-charcoal-hover);
+  color: var(--color-cream-bright);
+}
+.virtual-studio-team-avatar {
+  position: relative;
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--misty-theme-text) 7%, transparent);
+}
+/* A working or waiting agent's state as a ring round its picture. */
+.virtual-studio-team-row[data-state="working"] .virtual-studio-team-avatar {
+  box-shadow: 0 0 0 2px #4cc961;
+}
+.virtual-studio-team-row[data-state="needs-you"] .virtual-studio-team-avatar {
+  box-shadow: 0 0 0 2px #f5b014;
+}
+.virtual-studio-team-state {
+  flex: none;
+  color: var(--color-cream-muted);
+  font-size: 11px;
+}
+.virtual-studio-team-row[data-state="working"] .virtual-studio-team-state {
+  color: #6fd77f;
+}
+.virtual-studio-team-row[data-state="needs-you"] .virtual-studio-team-state {
+  color: #f5b014;
+}
+
+/* The dock: the studio's one row of controls, along the bottom. */
+.virtual-studio-dock {
+  position: absolute;
+  inset: auto 0 16px;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: fit-content;
+  max-width: calc(100% - 32px);
+  margin-inline: auto;
+  padding: 6px;
+  border-radius: 16px;
+}
+.virtual-studio-dock-main {
+  flex: 1 1 360px;
+  min-width: min(280px, 100%);
+  padding-inline: 4px;
+  border-inline: 1px solid color-mix(in srgb, var(--misty-theme-text) 8%, transparent);
+}
+.virtual-studio-segments {
+  display: flex;
+  flex: none;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--misty-theme-text) 5%, transparent);
+}
+.virtual-studio-segment {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 9px;
+  color: var(--color-cream-muted);
+  font-size: 13px;
+  font-weight: 500;
+}
+.virtual-studio-segment[data-icon-only] {
+  width: 34px;
+  padding: 0;
+}
+.virtual-studio-segment:hover {
+  color: var(--color-cream-bright);
+}
+.virtual-studio-segment[aria-selected="true"],
+.virtual-studio-segment[aria-checked="true"] {
+  background: var(--color-charcoal-hover);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 25%);
+  color: var(--color-cream-bright);
+}
+
+.virtual-studio-stage {
+  position: absolute;
+  inset: 0;
+}
+/* Its own stacking layer: labels order among themselves (TagProjector gives them large
+   z-indexes), but the whole layer stays under every panel, menu and popup drawn over the room. */
+.virtual-studio-tags {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  isolation: isolate;
+  overflow: hidden;
+  pointer-events: none;
+}
+/* A point that follows the figure; its label is centred on it, below it, or above it for what
+   floats over a head. */
+.virtual-studio-tag-anchor {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  justify-content: center;
+  width: 0;
+  visibility: hidden;
+  will-change: transform;
+}
+.virtual-studio-tag-anchor[data-up] {
+  align-items: flex-end;
+  height: 0;
+}
+
+/* The name over each figure's head, as a game shows its players: plain outlined text, no box. */
+.virtual-studio-tag {
+  display: grid;
+  flex: none;
+  justify-items: center;
+  gap: 1px;
+  max-width: 190px;
+  margin-bottom: 4px;
+  padding: 0 4px;
+  color: #fff;
+  text-shadow:
+    0 1px 0 rgb(0 0 0 / 85%),
+    0 0 3px rgb(0 0 0 / 80%),
+    0 0 8px rgb(0 0 0 / 45%);
+  pointer-events: auto;
+  user-select: none;
+}
+.virtual-studio-tag-name,
+.virtual-studio-tag-line {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  white-space: nowrap;
+}
+.virtual-studio-tag-name {
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 15px;
+}
+.virtual-studio-tag-name svg {
+  flex: none;
+  filter: drop-shadow(0 1px 1px rgb(0 0 0 / 80%));
+}
+.virtual-studio-tag-line {
+  color: rgb(255 255 255 / 75%);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 13px;
+}
+.virtual-studio-tag[data-state="working"] .virtual-studio-tag-line {
+  color: #7dff8c;
+}
+.virtual-studio-tag[data-state="needs-you"] .virtual-studio-tag-line {
+  color: #ffd23f;
+}
+.virtual-studio-tag[data-outcome="done"] .virtual-studio-tag-line {
+  color: #7dff8c;
+}
+.virtual-studio-tag[data-outcome="failed"] .virtual-studio-tag-line {
+  color: #ff8a8a;
+}
+/* A resting agent's role shows on hover, so a room of idle agents is just their names; how its
+   last run ended always shows, until the person looks. */
+.virtual-studio-tag[data-state="resting"]:not(
+    [data-outcome],
+    :hover,
+    :focus-visible,
+    [data-selected]
+  )
+  .virtual-studio-tag-line {
+  display: none;
+}
+.virtual-studio-tag:hover .virtual-studio-tag-name,
+.virtual-studio-tag[data-selected] .virtual-studio-tag-name {
+  color: #b8ffbf;
+}
+
+/* A free desk, marked like a plot to take: a quiet round sign that names itself on hover. */
+.virtual-studio-free-desk {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 26px;
+  margin-bottom: 2px;
+  padding: 0 10px 0 7px;
+  border: 1px solid rgb(255 255 255 / 22%);
+  border-radius: var(--radius-md);
+  background: rgb(22 22 22 / 72%);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 4px 14px rgb(0 0 0 / 30%);
+  color: #f2f2f2;
+  font-size: 11px;
+  font-weight: 600;
+  pointer-events: auto;
+}
+.virtual-studio-free-desk:hover {
+  border-color: rgb(255 255 255 / 45%);
+  background: rgb(22 22 22 / 90%);
+}
+
+/* What floats over a head: a small mark for the work, or what the agent is saying. */
+.virtual-studio-bubble {
+  position: relative;
+  display: grid;
+  flex: none;
+  place-items: center;
+  margin-bottom: 6px;
+  border-radius: 999px;
+  background: rgb(250 250 250 / 94%);
+  box-shadow: 0 4px 14px rgb(0 0 0 / 28%);
+  color: #1c1c1c;
+  user-select: none;
+}
+.virtual-studio-bubble::after {
+  position: absolute;
+  bottom: -4px;
+  left: calc(50% - 4px);
+  width: 8px;
+  height: 8px;
+  background: inherit;
+  content: "";
+  transform: rotate(45deg);
+}
+.virtual-studio-bubble[data-kind="speech"] {
+  display: -webkit-box;
+  width: max-content;
+  max-width: 230px;
+  padding: 6px 10px;
+  overflow: hidden;
+  border-radius: 12px;
+  font-size: 12px;
+  line-height: 16px;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+}
+.virtual-studio-bubble[data-kind="speech"]::after {
+  display: none;
+}
+
+.virtual-studio-desk-tag {
+  display: block;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: rgb(250 250 250 / 92%);
+  color: #1c1c1c;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 16px;
+  white-space: nowrap;
+}
+.virtual-studio-desk-tag[data-free] {
+  background: rgb(20 20 20 / 62%);
+  color: #d6d6d6;
+}
+
+/* Talking to the picked agent, docked on the right under the bar. */
+.virtual-studio-talk {
+  position: absolute;
+  inset: 12px calc(12px + var(--window-chrome-right, 0px)) auto auto;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(360px, calc(100% - 24px));
+  max-height: calc(100% - 12px - 84px);
+  padding: 12px;
+  border-radius: 16px;
+}
+.virtual-studio-talk-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 24px;
+}
+.virtual-studio-state {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-cream-muted);
+  font-size: 12px;
+  line-height: 16px;
+}
+.virtual-studio-state::before {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--misty-theme-text) 28%, transparent);
+  content: "";
+}
+.virtual-studio-state[data-state="working"]::before {
+  background: #5fe36b;
+}
+.virtual-studio-state[data-state="needs-you"]::before {
+  background: #ffb703;
+}
+.virtual-studio-talk-now {
+  display: -webkit-box;
+  overflow: hidden;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--misty-theme-text) 5%, transparent);
+  color: var(--color-cream);
+  font-size: 12px;
+  line-height: 17px;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.virtual-studio-talk-ask {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid color-mix(in srgb, #ffb703 45%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, #ffb703 7%, transparent);
+  color: var(--color-cream-bright);
+  font-size: 13px;
+  line-height: 18px;
+}
+.virtual-studio-talk-ask pre {
+  max-height: 120px;
+  margin: 0;
+  padding: 8px;
+  overflow: auto;
+  border-radius: 8px;
+  background: rgb(0 0 0 / 22%);
+  color: var(--color-cream);
+  font-size: 11px;
+  line-height: 15px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.virtual-studio-talk-log {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.virtual-studio-talk-message {
+  max-width: 88%;
+  padding: 7px 10px;
+  border-radius: 12px;
+  color: var(--color-cream-bright);
+  font-size: 13px;
+  line-height: 19px;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.virtual-studio-talk-message[data-role="user"] {
+  align-self: flex-end;
+  background: var(--color-charcoal-hover);
+}
+.virtual-studio-talk-message[data-role="assistant"] {
+  align-self: flex-start;
+  padding-inline: 2px;
+  white-space: normal;
+}
+.virtual-studio-talk-message[data-state="failed"] {
+  color: var(--color-cream-muted);
+}
+.virtual-studio-talk-typing {
+  display: inline-flex;
+  gap: 3px;
+  padding: 6px 0;
+}
+.virtual-studio-talk-typing i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--color-cream-muted);
+  animation: virtual-studio-typing 1.1s ease-in-out infinite;
+}
+.virtual-studio-talk-typing i:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.virtual-studio-talk-typing i:nth-child(3) {
+  animation-delay: 0.3s;
+}
+@keyframes virtual-studio-typing {
+  0%,
+  60%,
+  100% {
+    opacity: 0.3;
+  }
+  30% {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .virtual-studio-talk-typing i {
+    animation: none;
+    opacity: 0.6;
+  }
+}
+.virtual-studio-talk-error,
+.virtual-studio-box-error {
+  color: var(--color-cream-muted);
+  font-size: 12px;
+  line-height: 16px;
+}
+.virtual-studio-talk-compose,
+.virtual-studio-box-field {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  padding: 6px 6px 6px 12px;
+  border: 1px solid var(--color-charcoal-border);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--misty-theme-text) 4%, transparent);
+}
+.virtual-studio-talk-compose:focus-within,
+.virtual-studio-box-field:focus-within {
+  border-color: var(--color-charcoal-border-strong);
+}
+.virtual-studio-talk-input {
+  flex: 1;
+  min-height: 24px;
+  max-height: 120px;
+  padding: 2px 0;
+  field-sizing: content;
+  font-size: 13px;
+  line-height: 20px;
+}
+
+/* The box to talk to the team, inside the dock. */
+.virtual-studio-box {
+  position: relative;
+  display: grid;
+  gap: 4px;
+}
+.virtual-studio-box .virtual-studio-box-field {
+  padding: 4px 4px 4px 8px;
+  border: 0;
+  background: transparent;
+}
+.virtual-studio-box-error {
+  padding: 4px 8px 0;
+}
+/* Above the box, at least wide enough for an agent's name and engine, never cut by the dock. */
+.virtual-studio-box-mentions {
+  position: absolute;
+  inset: auto auto calc(100% + 14px) -4px;
+  z-index: 40;
+  width: max(calc(100% + 8px), 260px);
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+/* Walked up to an agent: the key that talks to it. */
+.virtual-studio-near {
+  position: absolute;
+  inset: auto 0 76px;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: fit-content;
+  max-width: calc(100% - 32px);
+  margin-inline: auto;
+  padding: 6px 12px 6px 6px;
+  border-radius: var(--radius-lg);
+  color: var(--color-cream-bright);
+  font-size: 13px;
+  line-height: 18px;
+}
+.virtual-studio-near kbd {
+  display: grid;
+  place-items: center;
+  min-width: 22px;
+  height: 22px;
+  padding-inline: 5px;
+  border: 1px solid var(--color-charcoal-border-strong);
+  border-radius: 6px;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+@media (max-width: 720px) {
+  .virtual-studio-talk {
+    inset: auto 12px 16px;
+    width: auto;
+    max-height: 60%;
+  }
+  .virtual-studio[data-talking] .virtual-studio-dock,
+  .virtual-studio[data-talking] .virtual-studio-near {
+    display: none;
+  }
+  .virtual-studio-side {
+    display: none;
+  }
+}
+
+/* Build mode: the palette on the left, and the picked piece's actions along the bottom. */
+.virtual-studio-palette {
+  position: absolute;
+  inset: 12px auto auto 12px;
+  z-index: 30;
+  display: grid;
+  gap: 2px;
+  width: 220px;
+  max-height: calc(100% - 12px - 84px);
+  padding: 8px;
+  overflow-y: auto;
+  border-radius: 16px;
+}
+.virtual-studio-piece {
+  position: absolute;
+  inset: auto 0 76px;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  margin-inline: auto;
+  padding: 6px 8px 6px 12px;
+  border-radius: 14px;
+}
+.virtual-studio[data-building] canvas {
+  cursor: default;
+}
+
+/* The room's size, under the furniture palette: one row per side, with a step either way. */
+.virtual-studio-room {
+  display: grid;
+  gap: 2px;
+  margin-top: 4px;
+  padding: 6px 4px 2px 10px;
+  border-top: 1px solid var(--color-charcoal-border);
+}
+.virtual-studio-room-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 28px;
+}
+
+/* Which of its chats the agent is talked to in. */
+.virtual-studio-talk-chat {
+  justify-content: flex-start;
+  width: 100%;
+  margin-top: -4px;
+  padding-inline: 8px;
+  color: var(--color-cream);
+}
+.virtual-studio-talk-chats {
+  max-width: 320px;
+  max-height: 360px;
+  overflow-y: auto;
+}
+.virtual-studio-talk-busy {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  margin-left: 8px;
+  border-radius: 50%;
+  background: #5fe36b;
+}
+
+/* Hiring: a card for each engine. */
+.virtual-studio-shop {
+  width: 300px;
+  overflow-y: auto;
+}
+.virtual-studio-shop-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+.virtual-studio-shop-card {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  min-width: 0;
+  gap: 6px;
+  padding: 10px 6px 8px;
+  border: 1px solid var(--color-charcoal-border);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--misty-theme-text) 3%, transparent);
+  color: var(--color-cream);
+}
+.virtual-studio-shop-card:hover {
+  background: var(--color-charcoal-hover);
+}
+.virtual-studio-shop-card[aria-checked="true"] {
+  border-color: var(--color-cream-muted);
+  background: var(--color-charcoal-hover);
+  color: var(--color-cream-bright);
+}
+.virtual-studio-shop-mark {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--misty-theme-text) 6%, transparent);
+}
+.virtual-studio-shop-badge {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  color: var(--color-cream-bright);
+}
+/* An engine that isn't installed shows, as a locked item does in a shop, but can't be picked. */
+.virtual-studio-shop-card[data-locked] {
+  cursor: default;
+  opacity: 0.45;
+}
+.virtual-studio-shop-card[data-locked]:hover {
+  background: color-mix(in srgb, var(--misty-theme-text) 3%, transparent);
+}
+.virtual-studio-shop-card[data-locked] .virtual-studio-shop-badge {
+  color: var(--color-cream-muted);
+}
+
+/* The meeting room's whiteboard: marker writing on a white board, page text laid onto the scene. */
+.virtual-studio-board {
+  width: 300px;
+  height: 172px;
+  padding: 14px 18px;
+  overflow: hidden;
+  color: #23324a;
+  font-size: 13px;
+  line-height: 18px;
+  pointer-events: none;
+  user-select: none;
+}
+.virtual-studio-board-task {
+  display: -webkit-box;
+  margin-bottom: 10px;
+  overflow: hidden;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 19px;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.virtual-studio-board ul {
+  display: grid;
+  gap: 5px;
+}
+.virtual-studio-board li {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-weight: 600;
+}
+.virtual-studio-board li span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.virtual-studio-board li[data-state="working"] svg {
+  color: #2f6fd1;
+}
+.virtual-studio-board li[data-state="done"] {
+  color: #1f7a3a;
+}
+.virtual-studio-board li[data-state="failed"] {
+  color: #b42323;
+}
+.virtual-studio-team-row[data-outcome="done"] .virtual-studio-team-state {
+  color: #6fd77f;
+}
+.virtual-studio-team-row[data-outcome="failed"] .virtual-studio-team-state {
+  color: #ff8a8a;
+}
+.virtual-studio-team-row[data-outcome="failed"] .virtual-studio-team-avatar {
+  box-shadow: 0 0 0 2px #e05252;
+}
+
+/* Customize: an agent's name, look and desk. */
+.virtual-studio-custom {
+  width: 284px;
+}
+.virtual-studio-custom-body {
+  display: grid;
+  gap: 16px;
+  min-height: 0;
+  margin: 0 -4px;
+  padding: 0 4px 4px;
+  overflow-y: auto;
+}
+.virtual-studio-custom-section {
+  display: grid;
+  gap: 10px;
+  padding-top: 14px;
+  border-top: 1px solid color-mix(in srgb, var(--misty-theme-text) 8%, transparent);
+}
+.virtual-studio-custom-section h4 {
+  color: var(--color-cream-bright);
+  font-size: 12px;
+  font-weight: 600;
+}
+.virtual-studio-custom-row {
+  display: grid;
+  gap: 6px;
+}
+.virtual-studio-custom-label {
+  color: var(--color-cream-muted);
+  font-size: 12px;
+}
+.virtual-studio-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.virtual-studio-swatch {
+  width: 22px;
+  height: 22px;
+  border: 1px solid rgb(0 0 0 / 25%);
+  border-radius: 50%;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 18%);
+}
+.virtual-studio-swatch[aria-checked="true"] {
+  outline: 2px solid var(--color-cream-bright);
+  outline-offset: 2px;
+}
+.virtual-studio-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.virtual-studio-choice {
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--color-charcoal-border);
+  border-radius: 8px;
+  color: var(--color-cream-muted);
+  font-size: 12px;
+}
+.virtual-studio-choice:hover {
+  color: var(--color-cream-bright);
+}
+.virtual-studio-choice[aria-checked="true"] {
+  border-color: transparent;
+  background: var(--color-charcoal-hover);
+  color: var(--color-cream-bright);
+}
+.virtual-studio-custom-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 30px;
+  color: var(--color-cream);
+  font-size: 13px;
+}

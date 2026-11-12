@@ -2,6 +2,8 @@ import "./featureSeams";
 import "./settingsEffects";
 import "./SettingsSections";
 import { initializeHostAgentsRuntime } from "@/features/agents/hostAgentsRuntime";
+import { applySavedFonts } from "@/features/engine-config/fonts";
+import { startPerformanceRecording } from "@/features/engine-config/performance";
 import {
   configureMistyBrowserLinkOpener,
   installExternalLinkRouting,
@@ -16,6 +18,9 @@ configureMistyBrowserLinkOpener(async (url) => {
 });
 installExternalLinkRouting();
 initializeHostAgentsRuntime();
+// The interface and code fonts chosen in Settings, and the performance panel's recording when on.
+void applySavedFonts();
+if (hasTauriInternals()) startPerformanceRecording();
 if (import.meta.env.DEV || import.meta.env.VITE_MISTY_DEBUG === "1") {
   void import("@/shared/platform/clientDebug").then(({ installClientDebugging }) => {
     installClientDebugging();

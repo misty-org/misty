@@ -1,5 +1,4 @@
 import "@/app/SettingsSections";
-import { useVaultState } from "@/features/sync/vault";
 import { initializeHostAgentsRuntime } from "@/features/agents/hostAgentsRuntime";
 import type * as AppShell from "@/app/shell";
 import type { SettingsSection } from "@/features/settings";
@@ -127,7 +126,6 @@ describe("SettingsWorkspace", () => {
     document.body.append(container);
     root = createRoot(container);
     mocks.settingsState.settings = { document: {} };
-    useVaultState.setState({ vault: { state: "off", exists: false, asked: true, notice: null } });
     mocks.settingsState.setActiveSection.mockClear();
   });
   afterEach(async () => {

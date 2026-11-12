@@ -1,7 +1,9 @@
 import { engineFolder, mistyEngine } from "../../engines/enginesApi";
+import { personaInstructions } from "../../personas/catalogApi";
+import { assembleAgentPrompt } from "../../bots/botPrompt";
+import { takeComputerUseAttachment } from "@/features/computer-use/computerUseAttachment";
 import { multirunFolderOf } from "../../multirun/multirunFolders";
 import { agentAccountId, isSignedIn } from "../../personal/agentAccount";
-import { memoryPromptContext } from "@/features/agents/localRun";
 import {
   blankConversationState,
   collaborationOf,
@@ -9,10 +11,12 @@ import {
 } from "@/features/agents/localRun";
 import { computerName } from "@/features/agents/localRun";
 import { personalAgentFor } from "../../personal/personalAgentsStore";
-import { browserReplayForRun } from "@/features/agents/localRun";
-import { methodGuidance, pinnedSkillVersionIds } from "@/features/agents/localRun";
 import { invoke } from "@/native/invoke";
 import { localAttachmentsForRun } from "../../conversations/composer/localAttachments";
+import {
+  choicesForTurn,
+  takeBrowserAttachment,
+} from "../../conversations/composer/controls/composerChoices";
 import { spaceWindow } from "@/features/app-windows";
 import { toServerInvocation } from "../invocations/serverInvocation";
 import type {
@@ -22,6 +26,7 @@ import type {
 import { inferredArtifactKind } from "./artifactSpecs";
 import { resolveContext, type ResolvedSource } from "./resolvedContext";
 import { goNow } from "./runIdentity";
+import { teammateClaimsNote } from "../../virtual/teammates";
 
 /**
  * Everything a run reads to start: the request as the crate's `RunRequest` reads it
@@ -66,10 +71,6 @@ async function deviceNames(contexts: AiInvocationDeviceContext[] | undefined) {
   return Object.fromEntries((contexts ?? []).map((context) => [context.deviceId, name]));
 }
 
-/** Which tools a run would have, which a workflow's requirements are checked against. */
-const toolsFor = (body: Record<string, unknown>) =>
-  invoke<string[]>("agent_run_tools", { body }).catch(() => [] as string[]);
-
 export async function buildRunBody(
   input: AiInvocationRequest,
   runId: string,
@@ -78,7 +79,7 @@ export async function buildRunBody(
   body: Record<string, unknown>;
   sources: ResolvedSource[];
   requestedKind: string;
-  permissionMode: "ask" | "auto";
+  permissionMode: "ask" | "auto" | "bypass";
   collaborationMode: AiInvocationRequest["collaborationMode"];
 }> {
   const account = agentAccountId();
@@ -90,19 +91,18 @@ export async function buildRunBody(
   const requestedKind =
     input.requestedArtifactKind ??
     inferredArtifactKind(input.surfaceId, input.prompt, Boolean(input.selection));
-  const [chat, state, sources, names, memory, attachments, agent, skills] = await Promise.all([
+  const [chat, state, sources, names, attachments, agent, choices, personas] = await Promise.all([
     chatFacts(conversationId, runId),
     conversationId
       ? readConversationState(account, conversationId)
       : Promise.resolve(blankConversationState("")),
     resolveContext(input.context, signedIn),
     deviceNames(input.deviceContexts),
-    memoryPromptContext({ spaceId, agentId }).catch(() => ""),
     localAttachmentsForRun(account, input.attachmentIds ?? []),
     personalAgentFor(account, agentId),
-    input.skillVersionIds?.length
-      ? Promise.resolve(input.skillVersionIds)
-      : pinnedSkillVersionIds(account, spaceId, agentId).catch(() => [] as string[]),
+    choicesForTurn(account, conversationId),
+    // Personas the message names with `#` from the bundled catalog (`agents/personas`).
+    personaInstructions(input.prompt).catch(() => ""),
   ]);
   // A turn that chooses nothing takes the chat's choice, then its agent's default.
   const permissionMode =
@@ -116,49 +116,54 @@ export async function buildRunBody(
     permission_mode: permissionMode,
     requested_artifact_kind: requestedKind || undefined,
     conversation_id: conversationId,
-    skill_version_ids: skills,
     now: goNow(server.timezone, new Date(now)),
     signed_in: signedIn,
     composio_key: await composioKeySaved(),
     device_names: names,
     collaboration: collaborationOf(state, now),
-    memory_context: memory,
     conversation_title: chat.title,
-    agent: agent
-      ? { name: agent.name, role: agent.role, instructions: agent.instructions }
-      : undefined,
+    agent:
+      agent || personas
+        ? {
+            name: agent?.name ?? "",
+            role: agent?.role ?? "",
+            // The agent's soul and rules (`agents/bots`), then any `#` personas.
+            instructions: [agent ? assembleAgentPrompt({ agent }).text : "", personas]
+              .filter(Boolean)
+              .join("\n\n"),
+          }
+        : undefined,
+    // What this run may use: its agent's list. Native code enforces it (`tool_policy.rs`); empty
+    // allows every tool.
+    allowed_tools: agent?.tools?.length ? agent.tools : undefined,
+    // The person sent this with `/computer`: an outside engine gets screen control for it.
+    computer_use: input.computerUse || takeComputerUseAttachment(conversationId) || undefined,
+    // The person attached Misty's browser to this message; only then does an engine get its tools.
+    browser: takeBrowserAttachment(conversationId) || undefined,
     // An agent on an outside engine runs in the Space's linked folder; native code starts it there.
     engine:
       agent?.engine && agent.engine !== mistyEngine
         ? {
             id: agent.engine,
-            model: agent.engine_model ?? "",
+            // The composer's choice for this chat wins over the agent's default.
+            model: choices.model || agent.engine_model || "",
+            effort: choices.effort || agent.reasoning_effort || "",
             // A multi-run lane's chat works in the lane's own worktree, not the linked folder.
             folder: (await multirunFolderOf(conversationId)) ?? (await engineFolder(spaceId)),
+            // A bot's runtime: extra arguments and MCP servers for the engine, by name. Native
+            // code decides which it passes.
+            args: agent.runtime_args?.length ? agent.runtime_args : undefined,
+            mcp_servers: agent.mcp_servers?.length ? agent.mcp_servers : undefined,
+            // In a shared Space: the files teammates' agents are changing now, from their run
+            // events. Native code puts it before the prompt (`engines/runs.rs`).
+            teammates: teammateClaimsNote() || undefined,
           }
         : undefined,
     resolved_context: sources.map(({ kind, title, content }) => ({ kind, title, content })),
     prior_write_receipts: await priorWriteReceipts(chat.priorRuns, input.agentId),
     attachments,
-    browser_replay: await browserReplayForRun(
-      account,
-      input.methodVersionId,
-      (input.deviceContexts ?? []).map((context) => ({
-        kind: context.kind,
-        opaqueRef: context.opaqueRef,
-        capabilities: context.capabilities,
-      })),
-    ),
     ...(import.meta.env.DEV && input.evalTurnLimit ? { eval_turn_limit: input.evalTurnLimit } : {}),
   };
-  if (input.methodVersionId || skills.length) {
-    body.method_guidance = await methodGuidance(account, {
-      agentId,
-      methodVersionId: input.methodVersionId,
-      skillVersionIds: skills,
-      allowedTools: await toolsFor(body),
-    });
-  }
   return { body, sources, requestedKind, permissionMode, collaborationMode };
 }
 

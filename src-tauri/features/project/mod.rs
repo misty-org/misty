@@ -6,8 +6,13 @@
 
 pub mod files;
 pub mod git;
+pub mod git_ignore;
+pub mod html_preview;
+pub mod open_app;
 pub mod preview;
+pub mod reveal;
 pub mod terminal;
+pub mod worktrees;
 
 use std::path::PathBuf;
 

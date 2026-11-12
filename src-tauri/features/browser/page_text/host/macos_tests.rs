@@ -210,7 +210,7 @@ mod confinement {
         // `command` clears it; a key in this process's environment must not reach a parser.
         std::env::set_var("MISTY_TEST_SECRET", "1");
         let worker = staged().unwrap();
-        let spawned = command(&worker);
+        let (spawned, _keep) = command(&worker).unwrap();
         let environment: Vec<_> = spawned
             .as_std()
             .get_envs()

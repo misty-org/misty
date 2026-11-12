@@ -22,7 +22,10 @@ describe("search.all", () => {
       "GET /search?q=q3&limit=5&kinds=note%2Cmessage&space_id=s1": answer,
     });
     await expect(call(tool("search.all"), { query: " q3 budget " })).resolves.toEqual(answer);
-    expect(calls).toHaveLength(1);
+    expect(calls.map((request) => request.path)).toEqual([
+      "/spaces",
+      "/search?q=q3+budget&limit=20",
+    ]);
     await expect(
       call(tool("search.all"), {
         query: "q3",

@@ -1,4 +1,4 @@
-import { initialCompanionPresentation, useCompanionState } from "../../cursor/companionState";
+import { initialCompanionPresentation, useCompanionState } from "../../tutor/cursor/companionState";
 import { beforeEach, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   invoke: vi.fn(),

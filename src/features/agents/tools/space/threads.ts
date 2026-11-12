@@ -138,5 +138,3 @@ export const threadTools: Record<string, LocalToolHandler> = {
   "thread.read": read,
   "thread.post": post,
 };
-
-export const threadWriteTools = ["thread.create", "thread.post"];

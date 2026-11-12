@@ -38,6 +38,7 @@ export function createAgentsPageActions(state: AgentsPageState) {
       const nextConversationId = startNew ? "" : (conversationId ?? "");
       const next = new URLSearchParams(params);
       next.set("agent", id);
+      next.delete("view");
       if (nextConversationId) next.set("conversation", nextConversationId);
       else next.delete("conversation");
       setParams(next, { replace: true });
@@ -47,7 +48,6 @@ export function createAgentsPageActions(state: AgentsPageState) {
         query: prompt,
         context: [],
         handoff: undefined,
-        browserRequest: undefined,
       });
       if (nextConversationId) void useMistyStore.getState().selectConversation(nextConversationId);
     });
@@ -68,7 +68,6 @@ export function createAgentsPageActions(state: AgentsPageState) {
         activeConversationId: "",
         context: [],
         handoff: undefined,
-        browserRequest: undefined,
       });
     }
     setSettingsModalMode("edit");
@@ -81,14 +80,15 @@ export function createAgentsPageActions(state: AgentsPageState) {
     setSettingsModalOpen(false);
     await load(user?.id ?? "");
   };
-  const openApps = () =>
+  // Pages are links, so the sidebar shows where the person is.
+  const openPage = (page: "studio" | "integrations" | "tutor") =>
     change(() => {
-      setWorkspacePage("integrations");
+      setWorkspacePage(page);
+      const next = new URLSearchParams(params);
+      next.set("view", page);
+      setParams(next);
     }, false);
-  const openTemplates = () =>
-    change(() => {
-      setWorkspacePage("workflows");
-    }, false);
+  const openApps = () => openPage("integrations");
   return {
     openSettingsModal,
     select,
@@ -97,7 +97,7 @@ export function createAgentsPageActions(state: AgentsPageState) {
     saveProfile,
     removeProfile,
     openApps,
-    openTemplates,
+    openPage,
   };
 }
 
@@ -110,9 +110,6 @@ export function deriveAgentsPageView(state: AgentsPageState, actions: AgentsPage
     conversations,
     profile,
     activeConversationId,
-    working,
-    workingAgentId,
-    conversation,
     guard,
     settingsModalOpen,
     identityRef,
@@ -130,16 +127,12 @@ export function deriveAgentsPageView(state: AgentsPageState, actions: AgentsPage
     restoreTriggerFocus: !guard.pending && !settingsModalOpen,
     triggerRef: identityRef,
     onSelect: actions.select,
-    onCreate: actions.create,
     onSettings: (agentId: string) => {
       if (agentId !== profile?.id) actions.select(agentId);
       actions.openSettingsModal("settings");
     },
   };
-  const taskWorking = Boolean(
-    profile && working && (workingAgentId === profile.id || Boolean(conversation)),
-  );
-  return { disabled, showWorkspace, switcher, taskWorking };
+  return { disabled, showWorkspace, switcher };
 }
 
 export type AgentsPageView = ReturnType<typeof deriveAgentsPageView>;

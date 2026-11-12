@@ -1,0 +1,39 @@
+/* The folder's start commands in the panel's head: a play button, then named ones. */
+.launch-script-actions {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 2px;
+}
+.launch-script-named {
+  max-width: 140px;
+  color: var(--color-cream-muted);
+}
+.launch-script-named:hover {
+  color: var(--color-cream);
+}
+.launch-script-fields {
+  display: grid;
+  gap: 12px;
+}
+.launch-script-command {
+  font-family: var(--font-mono, ui-monospace, Menlo, monospace);
+  font-size: 12.5px;
+}
+.launch-script-new {
+  display: grid;
+  gap: 12px;
+  padding-top: 12px;
+  border-top: 1px solid color-mix(in srgb, var(--misty-theme-text) 8%, transparent);
+}
+.launch-script-new-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-cream-bright);
+}
+.launch-script-new-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}

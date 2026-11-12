@@ -1,17 +1,10 @@
-import { useBrowserRuntimeStore } from "@/features/app-windows";
-import {
-  parseBrowserViewState,
-  spaceWorkspaceToolFromRoute,
-  type WorkspaceView,
-} from "@/features/app-windows";
+import { spaceWorkspaceToolFromRoute, type WorkspaceView } from "@/features/app-windows";
 import { workspaceAppIcon } from "@/features/app-windows";
-import { appIconStrokeWidth, BrandIcon, brandIconAsset, cn, Spinner } from "@/shared/ui";
+import { appIconStrokeWidth, BrandIcon, brandIconAsset, cn } from "@/shared/ui";
 import { type LucideIcon } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
 import { providerFromRoute } from "@/features/browser";
 import { websiteIntegrations } from "@/features/browser";
 import { DestinationIcon } from "./NavigatorDestinationIcon";
-import { SiteIcon } from "@/features/browser";
 function getViewAppId(tab: WorkspaceView | undefined): string {
   if (!tab) return "";
   if (tab.surfaceId === "space") {
@@ -36,37 +29,6 @@ export function ViewIcon({
   size?: number;
   isActive?: boolean;
 }) {
-  const [faviconFailed, setFaviconFailed] = useState(false);
-  const isBrowser = getViewAppId(tab) === "browser";
-  const browserState = isBrowser && tab ? parseBrowserViewState(tab.state) : null;
-  const isLoading = useBrowserRuntimeStore((state) =>
-    tab?.id ? Boolean(state.loading[tab.id]) : false,
-  );
-  const faviconUrl = browserState?.faviconUrl;
-  useEffect(() => setFaviconFailed(false), [faviconUrl]);
-  const markFaviconFailed = useCallback(() => setFaviconFailed(true), []);
-  if (isBrowser && isLoading) {
-    return (
-      <Spinner
-        label={false}
-        className={isActive ? "text-cream-bright" : "text-cream-muted"}
-        style={{ width: size, height: size }}
-      />
-    );
-  }
-  if (isBrowser && faviconUrl && !faviconFailed) {
-    return (
-      <SiteIcon
-        className={cn(
-          "shrink-0 select-none rounded-sm object-contain [image-rendering:auto]",
-          size === 13 ? "size-3.5" : "size-4",
-        )}
-        key={faviconUrl}
-        onFailed={markFaviconFailed}
-        url={faviconUrl}
-      />
-    );
-  }
   const appId = getViewAppId(tab);
   if (brandIconAsset(appId)) return <BrandIcon brand={appId} size={size} />;
   const provider =

@@ -13,7 +13,7 @@ import { migrateRetiredWorkspaceView } from "@/features/app-windows";
  */
 export function keepsLayoutWhileHidden(view: WorkspaceView): boolean {
   const surfaceId = migrateRetiredWorkspaceView(view)?.surfaceId;
-  return surfaceId === "space" || surfaceId === "agents" || surfaceId === "scheduled";
+  return surfaceId === "space" || surfaceId === "agents";
 }
 
 /** A tab strip tab keeps its layout only while none of its panes holds a browser page. */

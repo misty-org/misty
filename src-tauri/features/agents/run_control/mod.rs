@@ -13,17 +13,24 @@ compile_error!(
 );
 
 pub mod calls;
+pub mod engine_modes;
 pub mod host_lookup;
 pub mod live;
 pub mod local_runs;
 pub mod local_tools;
+pub mod run_notices;
 mod log;
+pub(crate) mod run_ledger;
+pub(crate) mod run_steps;
+pub(crate) mod step_pictures;
 pub(crate) mod run_taint;
 pub mod sessions;
 pub(crate) mod tool_gate;
 pub(crate) mod tool_journal;
 pub(crate) mod tool_policy;
 pub(crate) mod tool_question;
+pub(crate) mod turn_rewind;
+mod turn_snapshots;
 mod untrusted;
 pub(crate) mod windows;
 

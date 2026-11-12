@@ -98,6 +98,46 @@ export async function joinRunTabs(
   return joined;
 }
 
+/**
+ * A chat's agent keeps its tabs from one turn to the next. Each turn is a run of its own, so a tab
+ * the same agent opened earlier in the same chat joins this run when a call names it. Returns the
+ * entry with the tab, or null when no earlier turn of this chat opened it.
+ */
+export async function adoptChatTab(entry: RunEntry, scopeId: string): Promise<RunEntry | null> {
+  if (!entry.conversationId || !entry.agentId) return null;
+  const now = Date.now();
+  let joined: RunEntry | null = null;
+  await change((runs) => {
+    const current = runs[entry.runId];
+    if (!current) return;
+    const earlier = Object.values(runs)
+      .filter(
+        (run) =>
+          run.runId !== current.runId &&
+          run.conversationId === current.conversationId &&
+          run.agentId === current.agentId &&
+          run.account === current.account,
+      )
+      .sort((a, b) => b.updatedAt - a.updatedAt);
+    for (const run of earlier) {
+      const tab = run.contexts.find(
+        (item) =>
+          item.opaqueRef === scopeId &&
+          item.kind === "browser_tab" &&
+          item.metadata.agentOwned === true &&
+          Date.parse(item.expiresAt) > now,
+      );
+      if (!tab) continue;
+      const context = { ...tab, metadata: { ...tab.metadata, window_label: current.windowLabel } };
+      joined = { ...current, contexts: [...current.contexts, context], updatedAt: now };
+      runs[current.runId] = joined;
+      return;
+    }
+  });
+  await tellRun(joined);
+  return joined;
+}
+
 export async function leaveRunTab(runId: string, opaqueRef: string) {
   let left: RunEntry | null = null;
   await change((runs) => {

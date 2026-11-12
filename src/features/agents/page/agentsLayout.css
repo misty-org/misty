@@ -40,16 +40,8 @@
   vertical-align: middle;
   border-radius: 999px;
 }
-.agent-title-reveal {
-  animation: agent-title-reveal 240ms ease-out;
-}
 @keyframes agent-title-reveal {
   from {
     opacity: 0;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .agent-title-reveal {
-    animation: none;
   }
 }

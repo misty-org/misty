@@ -21,7 +21,7 @@ export function WorkspaceSurface({ tab }: { tab: WorkspaceView }) {
         <WorkspaceViewRouteScope tab={current}>
           {current.surfaceId === "space" ? (
             <SpaceWorkspaceSurface tab={current} />
-          ) : current.surfaceId === "agents" || current.surfaceId === "scheduled" ? (
+          ) : current.surfaceId === "agents" ? (
             <AgentsPage />
           ) : (
             // A view this build has no page for. Saved ones are dropped as a window loads.

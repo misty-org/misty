@@ -22,7 +22,6 @@ export function draftRequestForAgent(agentId: string, text: string): string | un
     query: text,
     context: [],
     handoff: undefined,
-    browserRequest: undefined,
   });
   const workspace = useWorkspaceStore.getState();
   const view = workspace.openDestination(surface);

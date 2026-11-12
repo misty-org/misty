@@ -29,7 +29,6 @@ pub async fn agents_list_scoped_files(
 
 /// The document is parsed in the bundled worker, confined by the operating
 /// system; the shared folder's file is copied in, never opened in place.
-#[cfg(any(windows, target_os = "macos"))]
 #[tauri::command]
 pub async fn agents_prepare_scoped_document(
     webview: tauri::Webview,
@@ -45,6 +44,54 @@ pub async fn agents_prepare_scoped_document(
     documents::prepare_document(target, crate::app::embedded_workers::builtin_worker)
         .await
         .map_err(crate::app::error::ApiError::Message)
+}
+
+/// Tutor's file sources: the person picks files in the system dialog, and each is parsed in the
+/// confined document worker. The window never names a path, so it can read only what was picked.
+/// A file that can't be read is left out; nothing picked is an empty list.
+#[tauri::command]
+pub async fn tutor_pick_sources(
+    app: tauri::AppHandle,
+    webview: tauri::Webview,
+) -> ApiResult<Vec<PreparedAgentDocument>> {
+    use tauri_plugin_dialog::DialogExt;
+    if !crate::browser::app_windows::is_person_window(webview.label()) {
+        return Err(crate::app::error::ApiError::Message(
+            "Only Misty's own windows can add sources.".into(),
+        ));
+    }
+    let (send, receive) = tokio::sync::oneshot::channel();
+    app.dialog()
+        .file()
+        .set_title("Add sources")
+        .add_filter(
+            "Documents",
+            &[
+                "pdf", "docx", "pptx", "xlsx", "txt", "md", "markdown", "csv", "json", "html",
+            ],
+        )
+        .pick_files(move |files| {
+            let _ = send.send(files);
+        });
+    let Some(files) = receive.await.ok().flatten() else {
+        return Ok(Vec::new());
+    };
+    let mut prepared = Vec::new();
+    for file in files.into_iter().take(20) {
+        let Ok(path) = file.into_path() else { continue };
+        let too_big = std::fs::metadata(&path)
+            .map(|meta| meta.len() > documents::MAX_AGENT_DOCUMENT_BYTES)
+            .unwrap_or(true);
+        if too_big {
+            continue;
+        }
+        if let Ok(document) =
+            documents::prepare_document(path, crate::app::embedded_workers::builtin_worker).await
+        {
+            prepared.push(document);
+        }
+    }
+    Ok(prepared)
 }
 
 // Commands that live in the feature's other modules, named here so the command table can list them all
@@ -77,7 +124,15 @@ pub(crate) use crate::agents::connected_apps::commands::{
     composio_request_show, composio_tool_connect, composio_tool_connected, composio_tool_execute,
     composio_tool_schemas, composio_tool_search,
 };
-#[cfg(any(target_os = "macos", windows))]
+pub(crate) use crate::agents::connected_apps::direct::commands::{
+    __cmd__direct_apps_catalog, __tauri_command_name_direct_apps_catalog, direct_apps_catalog,
+    __cmd__direct_apps_check, __tauri_command_name_direct_apps_check, direct_apps_check,
+    __cmd__direct_apps_icon, __tauri_command_name_direct_apps_icon, direct_apps_icon,
+    __cmd__direct_apps_connect, __tauri_command_name_direct_apps_connect, direct_apps_connect,
+    __cmd__direct_apps_disconnect, __tauri_command_name_direct_apps_disconnect, direct_apps_disconnect,
+    __cmd__direct_apps_list, __tauri_command_name_direct_apps_list, direct_apps_list,
+};
+#[cfg(any(target_os = "macos", windows, target_os = "linux"))]
 pub(crate) use crate::agents::cursor::{
     __cmd__cursor_companion_bind_task, __cmd__cursor_companion_capture,
     __cmd__cursor_companion_capture_region, __cmd__cursor_companion_configure,
@@ -128,7 +183,12 @@ pub(crate) use crate::agents::models::{
     __tauri_command_name_model_keys_saved, model_keys_remove, model_keys_save, model_keys_saved,
 };
 pub(crate) use crate::agents::run_control::calls::{
-    __cmd__agent_runtime_call, __tauri_command_name_agent_runtime_call, agent_runtime_call,
+    __cmd__agent_runtime_call, __cmd__tutor_overview_audio, __cmd__tutor_overview_delete,
+    __cmd__tutor_overview_make, __cmd__tutor_transcribe_sources,
+    __tauri_command_name_agent_runtime_call, __tauri_command_name_tutor_overview_audio,
+    __tauri_command_name_tutor_overview_delete, __tauri_command_name_tutor_overview_make,
+    __tauri_command_name_tutor_transcribe_sources, agent_runtime_call, tutor_overview_audio,
+    tutor_overview_delete, tutor_overview_make, tutor_transcribe_sources,
 };
 pub(crate) use crate::agents::run_control::host_lookup::{
     __cmd__agent_host_missing, __tauri_command_name_agent_host_missing, agent_host_missing,
@@ -154,12 +214,32 @@ pub(crate) use crate::agents::run_control::local_runs::{
     agent_run_end_proposal, agent_run_follow, agent_run_pause, agent_run_publish,
     agent_run_receipts, agent_run_start, agent_run_steer, agent_run_tools,
 };
+pub(crate) use crate::agents::run_control::run_ledger::{
+    __cmd__agent_run_timeline, __tauri_command_name_agent_run_timeline, agent_run_timeline,
+};
+pub(crate) use crate::agents::run_control::run_steps::{
+    __cmd__agent_run_latest_steps, __cmd__agent_run_steps, __cmd__agent_run_steps_clear,
+    __tauri_command_name_agent_run_latest_steps, __tauri_command_name_agent_run_steps,
+    __tauri_command_name_agent_run_steps_clear, agent_run_latest_steps, agent_run_steps,
+    agent_run_steps_clear,
+};
+pub(crate) use crate::agents::run_control::step_pictures::{
+    __cmd__agent_run_step_picture, __tauri_command_name_agent_run_step_picture,
+    agent_run_step_picture,
+};
+pub(crate) use crate::agents::run_control::run_notices::{
+    __cmd__agent_run_notify, __tauri_command_name_agent_run_notify, agent_run_notify,
+};
 pub(crate) use crate::agents::run_control::local_tools::{
     __cmd__agent_tool_finish, __cmd__agent_tool_host_ready, __tauri_command_name_agent_tool_finish,
     __tauri_command_name_agent_tool_host_ready, agent_tool_finish, agent_tool_host_ready,
 };
 pub(crate) use crate::agents::run_control::tool_gate::{
     __cmd__agent_program_opens, __tauri_command_name_agent_program_opens, agent_program_opens,
+};
+pub(crate) use crate::agents::run_control::turn_rewind::{
+    __cmd__agent_turn_files, __cmd__agent_turn_restore, __tauri_command_name_agent_turn_files,
+    __tauri_command_name_agent_turn_restore, agent_turn_files, agent_turn_restore,
 };
 pub(crate) use crate::agents::run_control::windows::{
     __cmd__agent_window_account, __tauri_command_name_agent_window_account, agent_window_account,
@@ -187,12 +267,12 @@ pub(crate) use crate::agents::shell::commands::{
     device_shell_job,
 };
 pub(crate) use crate::agents::task_scopes::{
-    __cmd__agent_browser_session_id, __cmd__agent_foreground_queue, __cmd__agent_workspace_acquire,
+    __cmd__agent_foreground_queue, __cmd__agent_workspace_acquire,
     __cmd__agent_workspace_bind_scope, __cmd__agent_workspace_release,
-    __tauri_command_name_agent_browser_session_id, __tauri_command_name_agent_foreground_queue,
-    __tauri_command_name_agent_workspace_acquire, __tauri_command_name_agent_workspace_bind_scope,
-    __tauri_command_name_agent_workspace_release, agent_browser_session_id, agent_foreground_queue,
-    agent_workspace_acquire, agent_workspace_bind_scope, agent_workspace_release,
+    __tauri_command_name_agent_foreground_queue, __tauri_command_name_agent_workspace_acquire,
+    __tauri_command_name_agent_workspace_bind_scope, __tauri_command_name_agent_workspace_release,
+    agent_foreground_queue, agent_workspace_acquire, agent_workspace_bind_scope,
+    agent_workspace_release,
 };
 pub(crate) use crate::agents::window_control::{
     __cmd__agent_control_island, __cmd__agent_control_yield, __cmd__agent_workspace_context,

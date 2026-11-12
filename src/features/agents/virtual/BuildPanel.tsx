@@ -4,6 +4,7 @@ import {
   Coffee,
   GlassWater,
   Lamp,
+  Minus,
   Monitor,
   Plus,
   Presentation,
@@ -16,9 +17,17 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { Button, IconButton, OptionSelect } from "@/shared/ui";
-import { furniture, furnitureKinds, type FurnitureKind } from "./office/catalog";
-import { addItem, assignDesk, removeItem, rotateItem, type OfficeLayout } from "./office/layout";
-import type { OfficeAgent } from "./useOfficeAgents";
+import { furniture, furnitureKinds, type FurnitureKind } from "./studio/catalog";
+import { ROOM } from "./studio/grid";
+import {
+  addItem,
+  assignDesk,
+  removeItem,
+  resizeRoom,
+  rotateItem,
+  type StudioLayout,
+} from "./studio/layout";
+import type { StudioAgent } from "./useStudioAgents";
 
 const icons: Record<FurnitureKind, LucideIcon> = {
   desk: Monitor,
@@ -35,16 +44,58 @@ const icons: Record<FurnitureKind, LucideIcon> = {
 };
 
 /**
+ * The room's own size: wider or deeper a few cells at a time, up to the largest studio, and
+ * smaller again as long as no furniture would be left outside the walls.
+ */
+function RoomSizer(props: { layout: StudioLayout; onLayout(next: StudioLayout): void }) {
+  const { layout } = props;
+  const sides = [
+    { label: "Width", key: "w", value: layout.size.w },
+    { label: "Depth", key: "d", value: layout.size.d },
+  ] as const;
+  return (
+    <div className="virtual-studio-room" role="group" aria-label="Room size">
+      {sides.map(({ label, key, value }) => {
+        const smaller = resizeRoom(layout, { [key]: -ROOM.step });
+        const bigger = resizeRoom(layout, { [key]: ROOM.step });
+        return (
+          <div key={key} className="virtual-studio-room-row">
+            <span className="flex-1 text-ui text-cream-muted">{label}</span>
+            <IconButton
+              label={`Less ${label.toLowerCase()}`}
+              size="xs"
+              disabled={smaller === layout}
+              onClick={() => props.onLayout(smaller)}
+            >
+              <Minus aria-hidden="true" />
+            </IconButton>
+            <span className="w-6 text-center text-ui tabular-nums text-cream">{value}</span>
+            <IconButton
+              label={`More ${label.toLowerCase()}`}
+              size="xs"
+              disabled={bigger === layout}
+              onClick={() => props.onLayout(bigger)}
+            >
+              <Plus aria-hidden="true" />
+            </IconButton>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
  * Build mode's controls: a palette that adds a piece of furniture to the room, and, for the piece
  * that is picked, turning it, removing it and, for a desk, choosing whose it is. Moving is done by
  * dragging the piece in the room itself.
  */
 export function BuildPanel(props: {
-  layout: OfficeLayout;
-  agents: OfficeAgent[];
+  layout: StudioLayout;
+  agents: StudioAgent[];
   picked: string | null;
   onPick(id: string | null): void;
-  onLayout(next: OfficeLayout): void;
+  onLayout(next: StudioLayout): void;
   onReset(): void;
 }) {
   const { layout } = props;
@@ -57,7 +108,7 @@ export function BuildPanel(props: {
   };
   return (
     <>
-      <aside className="virtual-office-palette" aria-label="Furniture">
+      <aside className="virtual-studio-palette" aria-label="Furniture">
         {furnitureKinds.map((kind) => {
           const Icon = icons[kind];
           return (
@@ -68,13 +119,14 @@ export function BuildPanel(props: {
             </Button>
           );
         })}
+        <RoomSizer layout={layout} onLayout={props.onLayout} />
         <Button variant="outline" size="sm" className="mt-1" onClick={props.onReset}>
           Reset layout
         </Button>
       </aside>
       {picked ? (
         <div
-          className="virtual-office-piece"
+          className="virtual-studio-piece"
           role="toolbar"
           aria-label={furniture[picked.kind].label}
         >

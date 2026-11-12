@@ -100,6 +100,8 @@ export default defineConfig(({ command, mode }) => {
         input: {
           main: resolve(process.cwd(), "src/app/index.html"),
           companion: resolve(process.cwd(), "src/app/companion.html"),
+          pet: resolve(process.cwd(), "src/app/pet.html"),
+          "computer-cursor": resolve(process.cwd(), "src/app/computer-cursor.html"),
           desktop: resolve(process.cwd(), "src/app/desktop.html"),
         },
       },

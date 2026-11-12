@@ -9,6 +9,7 @@ pub mod apps;
 pub mod calendar;
 pub mod client;
 pub mod commands;
+pub mod direct;
 pub mod execute;
 pub mod grants;
 mod identity;

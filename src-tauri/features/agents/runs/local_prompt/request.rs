@@ -14,8 +14,6 @@ use super::request_parts::{cleaned_media, cleaned_notes, cleaned_turn, has_usabl
 
 const MAX_HISTORY_TURNS: usize = 200;
 
-pub(crate) const SCHEDULED_RUN_TRIGGER: &str = "scheduled_task";
-
 /// Everything the prompt and the catalog read about a run.
 ///
 /// The app's request carries most of it. The chat's own state came from the server's database and now
@@ -142,10 +140,10 @@ impl RunRequest {
         self.collaboration_mode == "plan" && self.has_conversation()
     }
 
-    /// Nobody is present to answer on scheduled work, and a spoken turn can't show a card.
+    /// A spoken turn can't show a card.
     pub(super) fn can_ask(&self) -> bool {
         let voice = self.companion() && self.idempotency_key.starts_with("voice-");
-        self.has_conversation() && !voice && self.trigger != SCHEDULED_RUN_TRIGGER && self.trigger != "schedule"
+        self.has_conversation() && !voice
     }
 
     pub(super) fn approved_plan(&self) -> Option<&PlanState> {

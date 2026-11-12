@@ -25,8 +25,3 @@ const mistyPublicUrl = normalizeMistyPublicUrl(
 export function mistyPublicPage(path: string): string | null {
   return mistyPublicUrl ? new URL(path, `${mistyPublicUrl}/`).href : null;
 }
-
-/** The website's host, or "" when this build names none. */
-export function mistyPublicHost(): string {
-  return mistyPublicUrl ? new URL(mistyPublicUrl).host : "";
-}

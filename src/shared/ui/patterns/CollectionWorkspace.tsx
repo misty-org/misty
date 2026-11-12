@@ -1,5 +1,5 @@
 /** Shared geometry and controls for collection workspaces. */
-export { WorkspaceSidebar, WorkspaceSectionLabel } from "./collection/WorkspaceChrome";
+export { WorkspaceSidebar } from "./collection/WorkspaceChrome";
 export { CollectionPage } from "./collection/CollectionColumns";
 export {
   CollectionHeading,
@@ -7,11 +7,6 @@ export {
   CollectionFilters,
   CollectionViewToggle,
 } from "./collection/CollectionToolbar";
-export {
-  
-  CollectionCardTitle,
-  CollectionCardMetadata,
-} from "./collection/CollectionCards";
+export { CollectionCardTitle, CollectionCardMetadata } from "./collection/CollectionCards";
 export { CollectionItems } from "./collection/CollectionItems";
 export { CollectionSkeleton } from "./collection/CollectionSkeleton";
-;

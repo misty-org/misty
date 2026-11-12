@@ -50,6 +50,7 @@ export function MistyPanel({ side: propSide }: { side?: MistyPanelSide } = {}) {
   const profile =
     agents.find((a) => a.id === selected) ??
     agents.find((a) => a.id === workingAgentId) ??
+    agents.find((a) => a.engine && a.enabled) ??
     agents.find((a) => a.system_managed) ??
     agents[0];
   const conversation = conversations.find(
@@ -71,7 +72,6 @@ export function MistyPanel({ side: propSide }: { side?: MistyPanelSide } = {}) {
       query: prompt,
       context: [],
       handoff: undefined,
-      browserRequest: undefined,
     });
     if (nextConversationId) void useMistyStore.getState().selectConversation(nextConversationId);
   };
@@ -107,7 +107,6 @@ export function MistyPanel({ side: propSide }: { side?: MistyPanelSide } = {}) {
                       restoreTriggerFocus: true,
                       triggerRef: identityRef,
                       onSelect: select,
-                      onCreate: openInAgents,
                       onSettings: openInAgents,
                     }}
                     disabled={false}
@@ -160,6 +159,7 @@ export function MistyPanel({ side: propSide }: { side?: MistyPanelSide } = {}) {
                         : ""
                     }
                     onCreate={openInAgents}
+                    onNewChat={() => profile && select(profile.id, true)}
                   />
                 </div>
               </div>

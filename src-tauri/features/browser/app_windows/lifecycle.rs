@@ -86,6 +86,8 @@ fn open_window<R: Runtime>(app: &AppHandle<R>, window: OpenWindow) -> Result<(),
     }
     .ok_or("Unknown profile.")?;
     let label = new_label();
+    window_geometry::remember(&window.window_id, window.geometry.as_ref());
+    let window_id = window.window_id.clone();
     set_current(
         &label,
         WindowState {
@@ -97,6 +99,10 @@ fn open_window<R: Runtime>(app: &AppHandle<R>, window: OpenWindow) -> Result<(),
     if let Err(error) = build_window(app, &label, &window_title(&entry), &entry) {
         forget_current(&label);
         return Err(error);
+    }
+    // Before it is first shown, so it never appears at its default size and then jumps.
+    if let Some(built) = app.get_window(&label) {
+        window_geometry::apply_and_track(&built, &window_id);
     }
     if let Ok(state) = lock_registry() {
         save(&state);
@@ -124,6 +130,7 @@ pub fn open_profile_window<R: Runtime>(app: &AppHandle<R>, key: &str) -> Result<
             profile: key.to_owned(),
             window_id,
             space: None,
+            geometry: None,
         },
     )
 }
@@ -169,8 +176,7 @@ pub fn restore<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
     Ok(())
 }
 
-/// Window lifecycle: remembers focus and leaves a closed window's tabs in its profile. Closing a
-/// window never tells the vault anything: only closing a tab does.
+/// Window lifecycle: remembers focus and leaves a closed window's tabs in its profile.
 pub fn window_event(window: &Window, event: &tauri::WindowEvent) {
     let label = window.label();
     let Some(parsed) = parse(label) else { return };
@@ -187,14 +193,25 @@ pub fn window_event(window: &Window, event: &tauri::WindowEvent) {
         crate::browser::app_windows::windows::focus::forget(label);
     }
     match event {
+        tauri::WindowEvent::Resized(_)
+        | tauri::WindowEvent::Moved(_)
+        | tauri::WindowEvent::ScaleFactorChanged { .. } => window_geometry::mark_dirty(label),
+        tauri::WindowEvent::CloseRequested { .. } => window_geometry::flush(label),
+        _ => {}
+    }
+    match event {
         tauri::WindowEvent::Focused(true) => {
+            // A maximize or full screen that waited for the window to be shown (macOS).
+            window_geometry::shown(label);
             if let Ok(mut state) = lock_registry() {
                 state.last_focused = Some(label.into());
             }
         }
         tauri::WindowEvent::Destroyed => {
+            window_geometry::forget(label);
             crate::app::macos_window_effects::mac_rounded_corners::forget_window(label);
             crate::browser::forget_closed_pages(window.app_handle());
+            crate::project::terminal::close_window(label);
             if QUITTING.load(Ordering::SeqCst) {
                 return;
             }
@@ -228,6 +245,7 @@ pub fn window_event(window: &Window, event: &tauri::WindowEvent) {
 /// Quitting keeps the windows open for the next launch.
 pub fn quitting() {
     QUITTING.store(true, Ordering::SeqCst);
+    window_geometry::flush_all();
     if let Ok(state) = lock_registry() {
         save(&state);
     }

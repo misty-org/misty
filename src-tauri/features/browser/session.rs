@@ -54,7 +54,6 @@ pub(super) struct BrowserSession {
     // Native auxiliary windows stay attached to this live integration view.
     pub(super) popup_parent: Option<String>,
     pub(super) origin_space_id: Option<String>,
-    pub(super) zoom_factor: Option<f64>,
     pub(super) store_id: Option<String>,
     // The page's Misty profile. Only this, never the store above, is included in renderer and
     // agent observations.
@@ -100,7 +99,7 @@ pub(super) struct PendingAgentDownload {
     pub(super) popup_id: Option<String>,
 }
 
-#[cfg(any(target_os = "macos", windows, test))]
+#[cfg(any(target_os = "macos", windows, target_os = "linux", test))]
 pub(super) fn popup_download_authority(
     source: &BrowserSession,
     popup_id: &str,

@@ -1,0 +1,767 @@
+/*
+ * A notebook: three flat panes (sources, the conversation, the studio) split by hairlines, like the
+ * rest of the app, after NotebookLM, in Misty's colors. Color appears only where it says what kind of thing
+ * the studio makes.
+ */
+.tutor-root {
+  --tutor-tint-audio: #7c9cff;
+  --tutor-tint-map: #b08cff;
+  --tutor-tint-report: #ee86bd;
+  --tutor-tint-cards: #e9b949;
+  --tutor-tint-quiz: #43c6b8;
+  --tutor-tint-slides: #f0965a;
+  --tutor-tint-table: #5ac987;
+  --tutor-tint-teach: #58b9e8;
+  --tutor-tint-video: #e57373;
+  --tutor-tint-infographic: #c8a46a;
+  height: 100%;
+}
+.tutor-workspace {
+  position: relative;
+  display: grid;
+  /* The columns come from the panes' widths (NotebookWorkspace); these are the defaults. */
+  grid-template-columns: 296px minmax(0, 1fr) 336px;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  background: var(--color-charcoal-bg);
+  transition: grid-template-columns 180ms ease;
+}
+.tutor-workspace[data-dragging="true"] {
+  transition: none;
+  cursor: col-resize;
+  user-select: none;
+}
+/* The hairline between two panes, wide enough to grab. */
+.tutor-pane-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 2;
+  width: 6px;
+  cursor: col-resize;
+  touch-action: none;
+}
+.tutor-pane-handle:hover,
+.tutor-pane-handle:focus-visible {
+  outline: none;
+  background: linear-gradient(
+    to right,
+    transparent 2px,
+    var(--color-charcoal-border-strong) 2px,
+    var(--color-charcoal-border-strong) 4px,
+    transparent 4px
+  );
+}
+@media (prefers-reduced-motion: reduce) {
+  .tutor-workspace {
+    transition: none;
+  }
+}
+
+.tutor-pane {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--color-charcoal-bg);
+}
+/* The sources at the left and the studio at the right, each behind a hairline. */
+.tutor-workspace > .tutor-pane:first-child {
+  border-right: 1px solid var(--color-charcoal-border);
+}
+.tutor-workspace-middle + .tutor-pane {
+  border-left: 1px solid var(--color-charcoal-border);
+}
+.tutor-pane-rail {
+  align-items: center;
+  gap: 4px;
+  padding: 8px 0;
+  overflow-y: auto;
+}
+.tutor-pane-head {
+  display: flex;
+  min-height: 48px;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 8px 4px 10px;
+}
+.tutor-pane-head h2 {
+  flex: 1;
+  margin: 0 0 0 4px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-cream-bright);
+}
+.tutor-pane-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding: 4px 12px 10px;
+}
+.tutor-pane-scroll {
+  flex: 1;
+  min-height: 0;
+  padding: 2px 8px 14px;
+  overflow-y: auto;
+}
+.tutor-pane-label {
+  margin: 12px 8px 4px;
+  font-size: 12px;
+  color: var(--color-cream-muted);
+}
+.tutor-pane-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.tutor-pane-label-row .tutor-pane-label {
+  margin: 4px 6px;
+}
+.tutor-pane-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 40px 16px;
+  text-align: center;
+  color: var(--color-cream-muted);
+}
+.tutor-pane-empty p {
+  margin: 0;
+  font-size: 13px;
+}
+
+/* Finding sources: one field, like a search box. */
+.tutor-research {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 12px 10px;
+  padding: 3px 3px 3px 12px;
+  border: 1px solid var(--color-charcoal-border);
+  border-radius: var(--radius-xl);
+  background: var(--color-charcoal-bg);
+  color: var(--color-cream-muted);
+}
+.tutor-research:focus-within {
+  border-color: var(--color-charcoal-border-strong);
+}
+.tutor-research input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.tutor-select-all {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px 6px 8px;
+  font-size: 12px;
+  color: var(--color-cream-muted);
+  cursor: pointer;
+}
+.tutor-source-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 10px 2px 2px;
+  border-radius: var(--radius-lg);
+}
+.tutor-source-item:hover,
+.tutor-source-item[data-open="true"] {
+  background: var(--color-control-hover);
+}
+.tutor-source-item[data-off="true"] .tutor-source-open {
+  color: var(--color-cream-muted);
+}
+.tutor-source-open {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 6px;
+  text-align: left;
+  font-size: 13px;
+  color: var(--color-cream);
+}
+.tutor-source-icon {
+  display: inline-flex;
+  flex: none;
+  color: var(--color-cream-muted);
+}
+
+/* The middle: the conversation, with its box at the foot. */
+.tutor-workspace-middle {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+}
+.tutor-chat-pane {
+  flex: 1;
+}
+.tutor-chat-scroll {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+  gap: 22px;
+  padding: 32px clamp(20px, 6%, 72px) 24px;
+  overflow-y: auto;
+}
+.tutor-cover,
+.tutor-chat-pane .tutor-chat-turns,
+.tutor-suggestions {
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
+}
+.tutor-cover {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.tutor-cover-emoji {
+  font-size: 44px;
+  line-height: 1;
+}
+.tutor-chat-pane .tutor-cover-title {
+  height: auto;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  font-size: 34px;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  color: var(--color-cream-bright);
+}
+.tutor-cover-meta {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-cream-muted);
+}
+.tutor-cover-brief {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 8px;
+  font-size: 15px;
+  line-height: 1.7;
+  color: var(--color-cream);
+}
+.tutor-cover-topics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.tutor-cover-start {
+  margin-top: 12px;
+}
+.tutor-chip {
+  padding: 4px 11px;
+  border: 1px solid var(--color-charcoal-border);
+  border-radius: var(--radius-md);
+  font-size: 12.5px;
+  color: var(--color-cream);
+}
+.tutor-chip:hover {
+  border-color: var(--color-charcoal-border-strong);
+  background: var(--color-control-hover);
+}
+.tutor-suggestions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.tutor-suggestion {
+  padding: 10px 14px;
+  border: 1px solid var(--color-charcoal-border);
+  border-radius: var(--radius-xl);
+  text-align: left;
+  font-size: 14px;
+  color: var(--color-cream);
+}
+.tutor-suggestion:hover {
+  background: var(--color-control-hover);
+}
+.tutor-chat-pane .tutor-chat-turns {
+  max-height: none;
+  overflow: visible;
+}
+.tutor-chat-tools {
+  display: flex;
+  justify-content: flex-end;
+  gap: 2px;
+}
+.tutor-composer {
+  display: flex;
+  width: min(760px, calc(100% - 28px));
+  align-items: flex-end;
+  gap: 8px;
+  margin: 0 auto 14px;
+  padding: 8px 8px 8px 16px;
+  border: 1px solid var(--color-charcoal-border);
+  border-radius: var(--radius-xl);
+  background: var(--color-charcoal-card);
+}
+.tutor-composer:focus-within {
+  border-color: var(--color-charcoal-border-strong);
+}
+.tutor-composer textarea {
+  flex: 1;
+  min-height: 0;
+  max-height: 200px;
+  padding: 7px 0;
+  font-size: 14px;
+  field-sizing: content;
+}
+.tutor-composer-count {
+  padding-bottom: 9px;
+  font-size: 12px;
+  white-space: nowrap;
+  color: var(--color-cream-muted);
+}
+.tutor-composer .tutor-composer-send {
+  border-radius: var(--radius-md);
+  background: var(--color-control-active);
+}
+
+/* A source or note opened in the middle. */
+.tutor-reader-head {
+  display: flex;
+  max-width: 720px;
+  width: 100%;
+  align-items: center;
+  gap: 8px;
+  margin: 0 auto;
+}
+.tutor-reader-head h2 {
+  flex: 1;
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--color-cream-bright);
+}
+.tutor-chat-pane .tutor-chat-scroll > :not(.tutor-reader-head) {
+  max-width: 720px;
+  width: 100%;
+  margin-inline: auto;
+}
+.tutor-reader-link {
+  font-size: 12px;
+  color: var(--color-cream-muted);
+  text-decoration: underline;
+  overflow-wrap: anywhere;
+}
+.tutor-reader-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--color-charcoal-border);
+  border-radius: var(--radius-xl);
+  background: var(--color-charcoal-bg);
+  font-size: 14px;
+  line-height: 1.6;
+}
+.tutor-reader-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.tutor-reader-card-head h3 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-cream-muted);
+}
+
+/* The studio: tiles tinted by what they make, then what was made. Each kind's color. */
+[data-tint="overview"] {
+  --tile-tint: var(--tutor-tint-audio);
+}
+[data-tint="video"] {
+  --tile-tint: var(--tutor-tint-video);
+}
+[data-tint="infographic"] {
+  --tile-tint: var(--tutor-tint-infographic);
+}
+[data-tint="mindmap"] {
+  --tile-tint: var(--tutor-tint-map);
+}
+[data-tint="reports"] {
+  --tile-tint: var(--tutor-tint-report);
+}
+[data-tint="deck"] {
+  --tile-tint: var(--tutor-tint-cards);
+}
+[data-tint="quiz"] {
+  --tile-tint: var(--tutor-tint-quiz);
+}
+[data-tint="slides"] {
+  --tile-tint: var(--tutor-tint-slides);
+}
+[data-tint="data-table"] {
+  --tile-tint: var(--tutor-tint-table);
+}
+[data-tint="teach"] {
+  --tile-tint: var(--tutor-tint-teach);
+}
+.tutor-tiles {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding: 0 4px;
+}
+.tutor-tile {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--tile-tint) 20%, transparent);
+  border-radius: var(--radius-xl);
+  background: color-mix(in srgb, var(--tile-tint) 9%, var(--color-charcoal-bg));
+  text-align: left;
+  font-size: 13px;
+  color: var(--color-cream-bright);
+}
+.tutor-tile:hover,
+.tutor-tile[aria-expanded="true"] {
+  background: color-mix(in srgb, var(--tile-tint) 16%, var(--color-charcoal-bg));
+}
+.tutor-tile-icon {
+  flex: none;
+  color: var(--tile-tint);
+}
+.tutor-report-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 10px 4px 0;
+  padding: 6px;
+  border: 1px solid var(--color-charcoal-border);
+  border-radius: var(--radius-xl);
+  background: var(--color-charcoal-bg);
+}
+.tutor-report-choice {
+  padding: 8px 10px;
+  border-radius: var(--radius-lg);
+  text-align: left;
+  font-size: 13px;
+  color: var(--color-cream);
+}
+.tutor-report-choice:hover {
+  background: var(--color-control-hover);
+}
+.tutor-outputs {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 16px;
+}
+.tutor-output {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: var(--radius-xl);
+  text-align: left;
+}
+.tutor-output:hover {
+  background: var(--color-control-hover);
+}
+.tutor-output-text {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+  text-align: left;
+  font-size: 13px;
+  color: var(--color-cream);
+}
+.tutor-studio-view {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 12px 14px 18px;
+}
+
+/* A mind map grows to the right; each branch folds. */
+.tutor-map {
+  overflow: auto;
+  padding: 8px 4px 16px;
+}
+.tutor-map-children {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0 0 0 24px;
+  list-style: none;
+}
+.tutor-map-root {
+  padding-left: 0;
+}
+.tutor-map-children:not(.tutor-map-root)::before {
+  content: "";
+  position: absolute;
+  top: 14px;
+  bottom: 14px;
+  left: 10px;
+  border-left: 1px solid var(--color-charcoal-border-strong);
+}
+.tutor-map-branch {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.tutor-map-children:not(.tutor-map-root) > .tutor-map-branch::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: -14px;
+  width: 12px;
+  border-top: 1px solid var(--color-charcoal-border-strong);
+}
+.tutor-map-node {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px 5px 11px;
+  border: 1px solid color-mix(in srgb, var(--tutor-tint-map) 26%, transparent);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--tutor-tint-map) 10%, var(--color-charcoal-bg));
+  font-size: 12.5px;
+  white-space: nowrap;
+  color: var(--color-cream-bright);
+}
+.tutor-map-branch[data-depth="0"] > .tutor-map-node {
+  background: color-mix(in srgb, var(--tutor-tint-map) 26%, var(--color-charcoal-bg));
+  font-weight: 600;
+}
+.tutor-map-branch[data-depth="2"] > .tutor-map-node,
+.tutor-map-branch[data-depth="3"] > .tutor-map-node {
+  background: var(--color-charcoal-bg);
+  border-color: var(--color-charcoal-border);
+  color: var(--color-cream);
+}
+.tutor-map-toggle {
+  display: inline-flex;
+  width: 18px;
+  height: 18px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-charcoal-border-strong);
+  border-radius: var(--radius-md);
+  color: var(--color-cream-muted);
+}
+
+/* Slides: one at a time, at 16:9, and full screen when presented. */
+.tutor-slide-stage {
+  display: flex;
+  aspect-ratio: 16 / 9;
+  align-items: center;
+  justify-content: center;
+  padding: 28px 34px;
+  overflow: auto;
+  border: 1px solid var(--color-charcoal-border);
+  border-radius: var(--radius-xl);
+  background: var(--color-charcoal-bg);
+}
+.tutor-slide-stage:fullscreen {
+  padding: 8vh 10vw;
+  border: 0;
+  border-radius: 0;
+  font-size: 1.6em;
+}
+.tutor-slide {
+  width: 100%;
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--color-cream);
+}
+.tutor-slide h1 {
+  font-size: 1.8em;
+  letter-spacing: -0.02em;
+}
+.tutor-slide-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.tutor-slide-notes {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  color: var(--color-cream-muted);
+}
+
+/* Adding sources: one centered dialog that takes dropped files anywhere on it. */
+.tutor-add-dialog {
+  width: 720px !important;
+  max-width: calc(100vw - 48px) !important;
+  gap: 18px !important;
+  padding: 28px !important;
+  border-radius: var(--radius-xl) !important;
+}
+.tutor-add-dialog[data-dragging="true"] {
+  outline: 2px dashed var(--color-charcoal-border-strong);
+  outline-offset: -8px;
+}
+.tutor-add-title {
+  text-align: center;
+  font-size: 22px !important;
+  font-weight: 600;
+}
+.tutor-research-large {
+  margin: 0;
+  padding: 6px 6px 6px 14px;
+  border-radius: var(--radius-xl);
+}
+.tutor-research-large input {
+  height: 38px;
+  font-size: 14px;
+}
+.tutor-add-kinds {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+.tutor-add-kinds > button {
+  height: 40px;
+  border-radius: var(--radius-md);
+}
+.tutor-drop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 34px 20px;
+  border: 1.5px dashed var(--color-charcoal-border-strong);
+  border-radius: var(--radius-xl);
+  text-align: center;
+  color: var(--color-cream-muted);
+}
+.tutor-drop p {
+  margin: 0;
+  font-size: 13px;
+}
+.tutor-add-limit {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.tutor-add-limit > :first-child {
+  flex: 1;
+}
+
+/* A video overview: the scene at 16:9 with its caption, then the scenes as a strip. */
+.tutor-video-stage {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border: 1px solid var(--color-charcoal-border);
+  border-radius: var(--radius-xl);
+  background: #141414;
+}
+.tutor-video-stage:fullscreen {
+  border: 0;
+  border-radius: 0;
+}
+.tutor-video-art {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.tutor-video-fallback {
+  display: flex;
+  height: 100%;
+  flex-direction: column;
+  justify-content: center;
+  gap: 14px;
+  padding: 0 9% 17%;
+  color: #f2efe9;
+}
+.tutor-video-fallback h3 {
+  margin: 0;
+  font-size: clamp(18px, 3.4vw, 40px);
+  font-weight: 600;
+}
+.tutor-video-fallback ul {
+  margin: 0;
+  padding-left: 1.2em;
+  font-size: clamp(12px, 1.8vw, 22px);
+  color: #a8a49c;
+}
+.tutor-video-caption {
+  position: absolute;
+  inset: auto 0 0;
+  margin: 0;
+  padding: 10px 6% 12px;
+  background: rgb(10 10 10 / 0.78);
+  font-size: clamp(11px, 1.5vw, 18px);
+  line-height: 1.45;
+  color: #f2efe9;
+}
+.tutor-video-scenes {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+.tutor-video-thumb {
+  flex: none;
+  width: 96px;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border: 1px solid var(--color-charcoal-border);
+  border-radius: var(--radius-lg);
+  background: #141414;
+  font-size: 9px;
+  color: #a8a49c;
+}
+.tutor-video-thumb[aria-current="true"] {
+  border-color: var(--color-cream-muted);
+}
+.tutor-video-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* An infographic: fit to the panel, or at full size to read the detail. */
+.tutor-infographic {
+  display: block;
+  overflow: auto;
+  border: 1px solid var(--color-charcoal-border);
+  border-radius: var(--radius-xl);
+  background: #141414;
+  cursor: zoom-in;
+}
+.tutor-infographic img {
+  display: block;
+  width: 100%;
+}
+.tutor-infographic[data-full="true"] {
+  cursor: zoom-out;
+}
+.tutor-infographic[data-full="true"] img {
+  width: auto;
+  max-width: none;
+}

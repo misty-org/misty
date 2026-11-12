@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from "react";
-import { useOfficeAgents, useTeammateAgents } from "@/features/agents";
+import { useStudioAgents, useTeammateAgents } from "@/features/agents";
 import { useWindowSpace } from "../components/space-row/useWindowSpace";
 import { useSpaceItemCreator } from "../overview/useSpaceItemCreator";
 import { sendAgentStatuses } from "./createSpacesRealtimeActions";
@@ -17,16 +17,17 @@ export function SpaceAgentsBroadcast() {
   const space = useWindowSpace();
   const spaceId = space?.id ?? "";
   const shared = Boolean(space?.is_shared);
-  const { agents } = useOfficeAgents();
+  const { agents } = useStudioAgents();
   const person = useSpaceItemCreator(spaceId);
   const heard = useMemberAgents((state) => state.bySpace[spaceId]);
   const statuses = useMemo(
     () =>
-      agents.map(({ agent, state, doingCode }) => ({
+      agents.map(({ agent, state, doingCode, files }) => ({
         id: agent.id,
         name: agent.name,
         state,
         doing: doingCode,
+        ...(files.length ? { files } : {}),
       })),
     [agents],
   );
@@ -48,6 +49,7 @@ export function SpaceAgentsBroadcast() {
             owner: person(userId),
             state: agent.state,
             doing: doingLabel(agent.doing, agent.state),
+            files: agent.state === "resting" ? [] : (agent.files ?? []),
           }),
         ),
       );

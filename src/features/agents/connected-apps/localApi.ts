@@ -8,12 +8,10 @@ import type { AppRequest, AppRequestDecision, CatalogApp, ConnectedApp } from ".
  * approvals live in misty.db, and native code decides what an answer allows.
  */
 
-const requestIdPrefix = "localapprq_";
 const grantIdPrefix = "localgrant_";
 /** What this computer's remembered approvals are held by, where the server's name an agent. */
 export const localGrantHolder = "this_computer";
 
-export const isLocalAppRequest = (id: string) => id.startsWith(requestIdPrefix);
 export const isLocalGrant = (id: string) => id.startsWith(grantIdPrefix);
 
 async function call<T>(command: string, args?: Record<string, unknown>): Promise<T> {

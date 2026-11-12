@@ -1,12 +1,5 @@
 /* Shared component motion and touch targets. */
 @layer components {
-  @media (pointer: coarse) {
-    .misty-navigator-icon-target {
-      min-width: 44px;
-      min-height: 44px;
-    }
-  }
-
   @keyframes collapsible-down {
     from {
       height: 0;

@@ -25,13 +25,6 @@ impl kiri::Host for MistyHost {
                     json!({ "id": id, "audible": audible }),
                 );
             }
-            // "Transcribe this tab": forwarded only for a session Misty started.
-            kiri::Signal::MediaAudio { session, pcm } => {
-                crate::voice::tab_audio::forward(&self.app, id, session, Some(pcm), None)
-            }
-            kiri::Signal::MediaTapNotice { session, notice } => {
-                crate::voice::tab_audio::forward(&self.app, id, session, None, Some(notice))
-            }
             _ => {}
         }
     }

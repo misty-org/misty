@@ -1,28 +1,38 @@
-import { CalendarClock, ChevronRight, Plus } from "lucide-react";
-import { useEffect, useMemo } from "react";
+import { ChevronRight, Plus } from "lucide-react";
+import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   AgentAvatar,
   AgentsNow,
+  HappeningNow,
   conversationInSpace,
-  describeNextRun,
+  currentSpaceKey,
+  folderOf,
+  useSpaceFolders,
+  useSpaceRuns,
   shortAgo,
   useChatStatuses,
   useMistyStore,
   usePersonalAgentsStore,
-  useWorkflowSchedulesStore,
+  useTutorChatIds,
 } from "@/features/agents";
 import { Button } from "@/shared/ui";
-import { OverviewCard, OverviewRow, OverviewRowsSkeleton, OverviewStatus } from "./OverviewCard";
+import { HomeSectionHead } from "./HomeSection";
+import {
+  OverviewCard,
+  OverviewEmpty,
+  OverviewRow,
+  OverviewRowsSkeleton,
+  OverviewStatus,
+} from "./OverviewCard";
 import { agentOf, chatHref, chatTitle, recentChats, waitingRuns } from "./overviewData";
+import { PickUpsCard } from "./PickUpsCard";
 import { ProjectFoldersCard } from "./ProjectFoldersCard";
 import { useRuns } from "./useOverviewData";
 
-const scheduledShown = 4;
-
 /**
- * The top of a Space's home: the person's agents and what each is doing, what is waiting for the
- * person, their latest chats, the folders this Space works in and what is scheduled next.
+ * The middle of a Space's home: what is waiting for the person, their agents and what each is
+ * doing, and their latest chats beside the folders this Space works in.
  */
 export function SpaceOverview({ spaceId }: { spaceId: string }) {
   const navigate = useNavigate();
@@ -31,31 +41,36 @@ export function SpaceOverview({ spaceId }: { spaceId: string }) {
   const chatsLoading = useMistyStore((state) => state.conversationsLoading);
   const statuses = useChatStatuses();
   const runs = useRuns();
-  const schedules = useWorkflowSchedulesStore((state) => state.runs);
-  const account = useWorkflowSchedulesStore((state) => state.accountId);
-  useEffect(() => {
-    if (account) void useWorkflowSchedulesStore.getState().load();
-  }, [account]);
 
+  // Tutor's own chats (lessons, notebook questions, studio runs) live in Tutor, not here.
+  const tutorChats = useTutorChatIds();
   const chats = useMemo(
-    () => conversations.filter((conversation) => conversationInSpace(conversation)),
+    () =>
+      conversations.filter(
+        (conversation) => conversationInSpace(conversation) && !tutorChats.has(conversation.id),
+      ),
     // The window's Space decides which chats count, so a change of Space reads them again.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [conversations, spaceId],
+    [conversations, spaceId, tutorChats],
   );
   const waiting = useMemo(() => waitingRuns(runs ?? [], chats), [runs, chats]);
+  const ownRuns = useSpaceRuns(30);
+  const folder = useSpaceFolders((state) => folderOf(state, currentSpaceKey()));
   const recent = useMemo(() => recentChats(chats), [chats]);
-  const upcoming = schedules.filter((run) => run.enabled).slice(0, scheduledShown);
   const name = (agentId: string | undefined) => agentOf(agents, agentId)?.name ?? "Agent";
   const avatar = (agentId: string | undefined) => (
     <AgentAvatar agent={agentOf(agents, agentId)} compact />
   );
 
+  const newChat = (
+    <Button type="button" variant="ghost" size="sm" onClick={() => navigate("/agents")}>
+      <Plus aria-hidden="true" />
+      New chat
+    </Button>
+  );
+
   return (
-    <div className="space-overview">
-      <AgentsNow
-        onOpenChat={(agentId, conversationId) => navigate(chatHref(agentId, conversationId))}
-      />
+    <>
       {waiting.length > 0 && (
         <OverviewCard title="Waiting for you" count={waiting.length} tone="attention">
           {waiting.map((run) => (
@@ -83,8 +98,21 @@ export function SpaceOverview({ spaceId }: { spaceId: string }) {
           ))}
         </OverviewCard>
       )}
-      <div className="space-overview-grid">
-        <OverviewCard title="Recent chats">
+      <HappeningNow
+        runs={ownRuns.runs}
+        chats={ownRuns.chats}
+        folder={folder}
+        className="home-section"
+        heading={<HomeSectionHead title="Happening now" />}
+        onOpenChat={({ agentId, conversationId }) => navigate(chatHref(agentId, conversationId))}
+      />
+      <AgentsNow
+        className="home-section"
+        heading={<HomeSectionHead title="Agents" />}
+        onOpenChat={(agentId, conversationId) => navigate(chatHref(agentId, conversationId))}
+      />
+      <div className="home-pair">
+        <OverviewCard title="Recent chats" action={newChat}>
           {chatsLoading && !recent.length ? (
             <OverviewRowsSkeleton rows={3} />
           ) : recent.length ? (
@@ -106,31 +134,12 @@ export function SpaceOverview({ spaceId }: { spaceId: string }) {
               />
             ))
           ) : (
-            <div className="overview-card-empty">
-              <Button type="button" variant="ghost" size="sm" onClick={() => navigate("/agents")}>
-                <Plus aria-hidden="true" />
-                New chat
-              </Button>
-            </div>
+            <OverviewEmpty>No chats yet</OverviewEmpty>
           )}
         </OverviewCard>
+        <PickUpsCard spaceId={spaceId} chats={recent} />
         <ProjectFoldersCard />
-        {upcoming.length > 0 && (
-          <OverviewCard title="Scheduled work">
-            {upcoming.map((run) => (
-              <OverviewRow
-                key={run.id}
-                kind="schedule"
-                leading={<CalendarClock className="size-4" aria-hidden="true" />}
-                title={run.title || "Workflow"}
-                detail={<span className="truncate">{name(run.agent_id)}</span>}
-                trailing={describeNextRun(run)}
-                onOpen={() => navigate(chatHref(run.agent_id, run.conversation_id ?? ""))}
-              />
-            ))}
-          </OverviewCard>
-        )}
       </div>
-    </div>
+    </>
   );
 }

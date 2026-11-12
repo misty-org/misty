@@ -11,6 +11,38 @@ import {
 } from "./progressTimeline";
 
 describe("progress timeline", () => {
+  it("keeps a call's raw parameters and result on its row", () => {
+    let message: { content: string; progress?: AiProgressItem[] } = { content: "" };
+    message = withToolEvent(message, {
+      id: "1",
+      type: "tool.started",
+      toolCallId: "a",
+      toolName: "Edit",
+      args: { file_path: "src/a.ts", old_string: "a", new_string: "b" },
+      path: "src/a.ts",
+    });
+    message = withToolEvent(message, {
+      id: "2",
+      type: "tool.completed",
+      toolCallId: "a",
+      toolName: "Edit",
+      result: "The file was updated.",
+    });
+    expect(message.progress).toEqual([
+      {
+        type: "tool",
+        id: "a",
+        name: "Edit",
+        state: "completed",
+        args: { file_path: "src/a.ts", old_string: "a", new_string: "b" },
+        path: "src/a.ts",
+        result: "The file was updated.",
+        durationMs: undefined,
+        error: undefined,
+      },
+    ]);
+  });
+
   it("shows a text answer once when the run wraps up with the same answer", () => {
     const answer = "The capital of France is Paris.";
     let message: { content: string; progress?: AiProgressItem[] } = { content: "" };

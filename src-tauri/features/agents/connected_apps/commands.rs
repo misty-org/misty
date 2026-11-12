@@ -267,7 +267,20 @@ pub async fn composio_tool_search(
     queries: Vec<String>,
 ) -> Result<tools::Search, Failure> {
     let account = account_for(&app, &webview, Some(&run_id)).await?;
-    tools::search(&*client(&account, false).await?, &queries).await
+    // Apps connected directly answer beside Composio's, and on their own when there is no key.
+    let mut found = match optional_client(&account).await? {
+        Some(client) => tools::search(&client, &queries).await?,
+        None => tools::Search {
+            found: Default::default(),
+            accounts: Vec::new(),
+        },
+    };
+    let direct = super::direct::tools::search_into(&account, &queries, &mut found.found).await;
+    found.accounts.extend(direct);
+    if found.found.results.is_empty() && found.accounts.is_empty() {
+        return Err(rejected("apps_not_connected", tools::NOT_CONNECTED));
+    }
+    Ok(found)
 }
 
 #[tauri::command]
@@ -278,7 +291,21 @@ pub async fn composio_tool_schemas(
     tool_slugs: Vec<String>,
 ) -> Result<Value, Failure> {
     let account = account_for(&app, &webview, Some(&run_id)).await?;
-    tools::schemas(&*client(&account, false).await?, &tool_slugs).await
+    let (direct, rest): (Vec<String>, Vec<String>) = tool_slugs
+        .into_iter()
+        .partition(|slug| super::direct::tools::is_direct(slug));
+    let mut schemas = if rest.is_empty() {
+        json!({})
+    } else {
+        tools::schemas(&*client(&account, false).await?, &rest).await?
+    };
+    if !direct.is_empty() {
+        let found = super::direct::tools::schemas(&account, &direct).await;
+        if let Some(map) = schemas.as_object_mut() {
+            map.insert("direct_tool_schemas".to_owned(), json!(found));
+        }
+    }
+    Ok(schemas)
 }
 
 #[tauri::command]
@@ -288,7 +315,13 @@ pub async fn composio_tool_connected(
     run_id: String,
 ) -> Result<Vec<tools::ActiveAccount>, Failure> {
     let account = account_for(&app, &webview, Some(&run_id)).await?;
-    tools::connected(&*client(&account, false).await?).await
+    let mut accounts = match optional_client(&account).await? {
+        Some(client) => tools::connected(&client).await?,
+        None => Vec::new(),
+    };
+    let direct = super::direct::tools::connections(&account).await?;
+    accounts.extend(super::direct::tools::active(&direct));
+    Ok(accounts)
 }
 
 #[tauri::command]
@@ -324,6 +357,7 @@ pub async fn composio_tool_execute(
     account: String,
 ) -> Result<execute::Executed, Failure> {
     person(&webview)?;
+    let account_choice = account.clone();
     // The run's frozen mode, as it was started, however the chat has changed since. "Ask before acting"
     // can only make it stricter, and a setting that can't be read counts as asking.
     let facts = crate::agents::run_control::tool_gate::facts_of_run(&app, &run_id).await;
@@ -333,6 +367,21 @@ pub async fn composio_tool_execute(
         settings.app_actions_ask,
         settings.site_blocks.is_some(),
     );
+    if super::direct::tools::is_direct(&tool_slug) {
+        let account = facts.account.clone();
+        return super::direct::tools::execute(
+            &account,
+            &store(&app, &facts.account),
+            execute::ExecuteCall {
+                run_id,
+                tool_slug,
+                arguments,
+                account: account_choice,
+                mode: mode.to_owned(),
+            },
+        )
+        .await;
+    }
     let client = client(&facts.account, false).await?;
     execute::execute(
         &client,

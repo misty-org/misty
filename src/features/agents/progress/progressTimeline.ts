@@ -1,5 +1,5 @@
 import type { AiInvocationEvent, AiProgressItem } from "../runs/invocations/invocationTypes";
-import { companionReply } from "../cursor/companionReply";
+import { companionReply } from "../tutor/cursor/companionReply";
 
 export type ProgressTool = Extract<AiProgressItem, { type: "tool" }>;
 type ProgressGroup =
@@ -16,6 +16,9 @@ export function withToolEvent(
   message: { content: string; progress?: AiProgressItem[] },
   event: Extract<AiInvocationEvent, { type: `tool.${string}` }>,
 ): { content: string; progress: AiProgressItem[] } {
+  // An outside engine's own sub-agent rows nest under its Task (`view/engine/EngineSubagents`).
+  if (event.type === "tool.started" && event.parentToolCallId)
+    return { content: message.content, progress: message.progress ?? [] };
   const progress = [...(message.progress ?? [])];
   const update = (patch: Partial<ProgressTool>) => ({
     content: message.content,
@@ -29,11 +32,22 @@ export function withToolEvent(
       state: event.type === "tool.failed" ? "failed" : "completed",
       durationMs: event.durationMs,
       error: event.type === "tool.failed" ? event.error : undefined,
+      // Misty's own runtime only knows a call's arguments once it ends.
+      ...(event.args !== undefined ? { args: event.args } : {}),
+      ...(event.result !== undefined ? { result: event.result } : {}),
+      ...(event.path ? { path: event.path } : {}),
     });
   const note = message.content.trim();
   if (note) progress.push({ type: "note", text: note });
   if (!progress.some((item) => item.type === "tool" && item.id === event.toolCallId))
-    progress.push({ type: "tool", id: event.toolCallId, name: event.toolName, state: "running" });
+    progress.push({
+      type: "tool",
+      id: event.toolCallId,
+      name: event.toolName,
+      state: "running",
+      ...(event.args !== undefined ? { args: event.args } : {}),
+      ...(event.path ? { path: event.path } : {}),
+    });
   return { content: "", progress };
 }
 
@@ -146,9 +160,6 @@ const verbs: Record<string, [running: string, done: string]> = {
  * people see the UI's labels.
  */
 const uiSubjects: Record<string, string> = {
-  "memory.history": "history",
-  "memory.pref": "memory",
-  "memory.workflow": "workflows",
   "log.work": "notebook",
   file: "Library",
   "file.album": "albums",
@@ -203,7 +214,7 @@ export function toolLabel(name: string, running: boolean): string {
 
 /** What a step acted on: its target when the server knows it, else its tool's subject. */
 export function stepTarget(step: ProgressTool): string {
-  return step.activity?.detail || toolParts(step.name, false).subject;
+  return step.activity?.detail || step.path || toolParts(step.name, false).subject;
 }
 
 /** The right-hand note on a row: retries, the result, or how long it took. */

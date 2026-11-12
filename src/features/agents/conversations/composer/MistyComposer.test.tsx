@@ -94,7 +94,7 @@ it("replaces the send action with stop while a conversation is working", () => {
       trailingControl={<button onClick={stop}>Stop response</button>}
     />,
   );
-  expect(screen.queryByRole("button", { name: "Send to Misty" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Send message" })).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Stop response" }));
   expect(stop).toHaveBeenCalledOnce();
 });
@@ -114,7 +114,7 @@ it("disables the message field and ignores pasted files when unavailable", () =>
       disabled
     />,
   );
-  expect((screen.getByLabelText("Message Misty") as HTMLTextAreaElement).disabled).toBe(true);
+  expect((screen.getByLabelText("Message") as HTMLTextAreaElement).disabled).toBe(true);
   fireEvent.paste(document.querySelector("[data-misty-universal-composer]")!, {
     clipboardData: { files: [new File(["image"], "image.png", { type: "image/png" })] },
   });
@@ -133,7 +133,7 @@ it("sends once on Enter and preserves newline and IME input", () => {
     onSubmit: submit,
   };
   const view = render(<MistyComposer {...props} />);
-  const input = screen.getByLabelText("Message Misty");
+  const input = screen.getByLabelText("Message");
   fireEvent.keyDown(input, { key: "Enter", shiftKey: true });
   fireEvent.keyDown(input, { key: "Enter", isComposing: true });
   expect(submit).not.toHaveBeenCalled();
@@ -167,6 +167,6 @@ it("does not send on Enter with a pending attachment", () => {
       onSubmit={submit}
     />,
   );
-  fireEvent.keyDown(screen.getByLabelText("Message Misty"), { key: "Enter" });
+  fireEvent.keyDown(screen.getByLabelText("Message"), { key: "Enter" });
   expect(submit).not.toHaveBeenCalled();
 });

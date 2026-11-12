@@ -1,10 +1,9 @@
-import { EngineMark, hasEngineMark } from "../../engines/EngineMark";
+import { AgentAvatar } from "../../personal/AgentAvatar";
 import { usePersonalAgentsStore } from "../../personal/personalAgentsStore";
 import { useMistyStore } from "../state/useMistyStore";
 import { useState } from "react";
 import type { GlobalAiMessage } from "../state/conversationTypes";
 import { MistyMarkdown } from "../../runs/markdown/MistyMarkdown";
-import mistyCompanion from "@/shared/assets/misty-cloud-expression-cycle.webp?inline";
 import { Button, cn } from "@/shared/ui";
 import { AgentProgress } from "../../progress/AgentProgress";
 import { useMessageProgress } from "../../progress/useMessageProgress";
@@ -52,20 +51,16 @@ export function SummarizedDivider() {
 
 /** Who is answering in the open chat: the engine's own mark for an agent on an outside engine,
  * and Misty's cloud for one on Misty's own. */
+/** Who is answering, beside its reply: the engine's own mark, an initial, or a plain cloud for
+ * Misty. Nothing sits behind it, and the animated cloud stays with the companion. */
 export function MistyAvatar() {
   const agentId = useMistyStore((state) => state.selectedAgentId);
-  const engine = usePersonalAgentsStore(
-    (state) => state.agents.find((agent) => agent.id === agentId)?.engine,
+  const agent = usePersonalAgentsStore((state) =>
+    state.agents.find((entry) => entry.id === agentId),
   );
-  if (hasEngineMark(engine))
-    return (
-      <span className="grid size-7 shrink-0 place-items-center rounded-full bg-cream/[0.06] text-cream ring-1 ring-white/5">
-        <EngineMark engine={engine} size={15} />
-      </span>
-    );
   return (
-    <span className="grid size-7 shrink-0 place-items-center overflow-hidden rounded-full bg-cream/[0.06] ring-1 ring-white/5">
-      <img src={mistyCompanion} alt="Misty" className="size-7 object-contain" draggable={false} />
+    <span className="grid size-7 shrink-0 place-items-center text-cream">
+      <AgentAvatar agent={agent} compact />
     </span>
   );
 }

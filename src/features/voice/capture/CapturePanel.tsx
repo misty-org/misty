@@ -8,7 +8,6 @@ import { useCaptureStore } from "./useCaptureStore";
 
 const sourceLabel = {
   mic: "Microphone",
-  tab: "This tab",
   system: "System audio",
   app: "An app",
 } as const;

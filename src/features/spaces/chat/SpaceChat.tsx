@@ -28,7 +28,7 @@ import {
   ConversationLoadState,
   ConversationUnavailable,
 } from "./components/ConversationStates";
-import { useSpaceAgentMembers } from "../members/agents/useSpaceAgentMembers";
+import { useBringMentionedAgents, useOwnMentionableAgents } from "./ownAgents";
 import { ChatThreadColumn } from "./components/ChatThreadColumn";
 import { useChatSidePanel } from "./chatSidePanelStore";
 export function SpaceChat({
@@ -80,7 +80,9 @@ export function SpaceChat({
   useWorkspaceViewTitle(workspaceTabId, `${spaceName} Chat`);
   const draft = useSpaceChatDraft(spaceId, conversationId);
   const editing = useMessageEditing();
-  const { agents } = useSpaceAgentMembers(spaceId);
+  // Only the person's own agents can be @mentioned, and so run; nobody runs anyone else's.
+  const agents = useOwnMentionableAgents(user?.id);
+  const bringMentionedAgents = useBringMentionedAgents(spaceId, agents);
   const suggestions = useChatSuggestions({
     spaceId,
     members: scope.members,
@@ -119,6 +121,7 @@ export function SpaceChat({
     activeConversation: scope.activeConversation,
     members: scope.members,
     agents,
+    beforeSend: bringMentionedAgents,
     draft,
     editing,
     setGroupMessages: conversationChat.setMessages,

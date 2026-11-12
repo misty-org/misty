@@ -4,8 +4,8 @@ import { isAllowedServerUrl, normalizeApiBaseUrl, withDefaultApiPath } from "@/a
 
 /**
  * Which Misty server this device uses, chosen before signing in or in Settings and kept in this
- * device's settings (`misty.db`; settings never sync). With none, Misty is the browser only and
- * signed out. Until someone chooses, a development build's requests fall back to
+ * device's settings (`misty.db`; settings never sync). A device uses one server at a time, and
+ * moving to another restarts the app. With none, Misty runs signed out, with no Spaces. Until someone chooses, a development build's requests fall back to
  * `VITE_MISTY_PUBLIC_API_URL`, or the local dev stack; the sign-in pages still ask, with that
  * address filled in.
  */
@@ -30,10 +30,10 @@ export function developmentServer(): string {
 }
 
 /**
- * Misty's own server, which a device only uses once someone chooses Misty Pro. An account's
+ * Misty Cloud's server, which a device only uses once someone chooses Misty Cloud (Free or Pro). An account's
  * credential derives from this address, so it matches the website's in each kind of build.
  */
-export function mistyProServer(): string {
+export function mistyCloudServer(): string {
   return import.meta.env.DEV ? "https://dev-api.mistysys.com/v1" : "https://api.mistysys.com/v1";
 }
 

@@ -43,13 +43,6 @@ export async function startTurnExecution(
       // A run always works in a page of its own, shown as the picture beside its chat. There
       // are no tabs of the person's to work in.
       desktopControl: visibleAutopilotAvailable() && !companion?.openScreen ? true : undefined,
-      method: companion?.methodVersionId
-        ? {
-            versionId: companion.methodVersionId,
-            inputs: companion.methodInputs,
-            skillVersionIds: companion.skillVersionIds,
-          }
-        : undefined,
     });
     if (companion?.turn !== undefined) {
       const { invoke } = await import("@tauri-apps/api/core");

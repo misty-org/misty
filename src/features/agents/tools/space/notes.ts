@@ -95,5 +95,3 @@ export const noteTools: Record<string, LocalToolHandler> = {
   "note.update": update,
   "note.tag": tag,
 };
-
-export const noteWriteTools = ["note.create", "note.update", "note.tag"];

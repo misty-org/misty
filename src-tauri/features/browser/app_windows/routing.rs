@@ -144,20 +144,6 @@ pub fn emit_to_profile<R: Runtime, S: Serialize + Clone>(
     });
 }
 
-/// Sends an event about account data to one profile's windows, and to no other label of it.
-pub fn emit_to_profile_people<R: Runtime, S: Serialize + Clone>(
-    app: &AppHandle<R>,
-    key: &str,
-    event: &str,
-    payload: S,
-) {
-    let _ = app.emit_filter(event, payload, |target| {
-        targets(target, |label| {
-            is_person_window(label) && profile_for_window(label).as_deref() == Some(key)
-        })
-    });
-}
-
 /// Sends an event the person acts on (a menu choice, dictation, the cursor agent) to
 /// the window they use: the last focused person window.
 pub fn emit_to_primary<R: Runtime, S: Serialize + Clone>(

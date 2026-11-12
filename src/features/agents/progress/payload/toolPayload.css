@@ -1,0 +1,184 @@
+/* A tool call's raw payload inside its step row (ToolPayloadViewer). Neutral like the rest of
+ * the timeline; only a diff's added and removed lines carry color, as Git colors them. */
+.tool-payload {
+  overflow: hidden;
+  border: 1px solid var(--color-charcoal-border);
+  border-radius: 8px;
+  background: var(--color-charcoal-bg);
+  color: var(--color-cream);
+  font: 12px/1.55 var(--font-mono);
+}
+.tool-payload-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 4px 6px 4px 10px;
+  border-bottom: 1px solid var(--color-charcoal-border);
+  color: var(--color-cream-muted);
+  font-family: var(--font-sans);
+  font-size: 12px;
+}
+.tool-payload-header > svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+.tool-payload-title {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-cream);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tool-payload-description {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tool-payload-header > button:last-child {
+  margin-left: auto;
+}
+.tool-payload-counts {
+  display: inline-flex;
+  gap: 4px;
+  font-variant-numeric: tabular-nums;
+}
+.tool-payload-counts [data-kind="add"] {
+  color: var(--tone-added);
+}
+.tool-payload-counts [data-kind="del"] {
+  color: var(--tone-failed);
+}
+.tool-payload-body {
+  max-height: 288px;
+  overflow: auto;
+  padding: 4px 0;
+}
+.tool-payload-empty {
+  margin: 0;
+  padding: 6px 12px;
+  color: var(--color-cream-muted);
+}
+.tool-payload-diff-line {
+  display: flex;
+  align-items: baseline;
+  padding: 0 8px;
+}
+.tool-payload-diff-line[data-kind="add"] {
+  background: color-mix(in srgb, var(--tone-added) 14%, transparent);
+}
+.tool-payload-diff-line[data-kind="del"] {
+  background: color-mix(in srgb, var(--tone-failed) 13%, transparent);
+}
+.tool-payload-diff-line[data-kind="header"] {
+  color: var(--color-cream-muted);
+}
+.tool-payload-line-number {
+  width: 32px;
+  flex-shrink: 0;
+  padding-right: 8px;
+  color: var(--color-cream-muted);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  user-select: none;
+  opacity: 0.7;
+}
+.tool-payload-sign {
+  width: 14px;
+  flex-shrink: 0;
+  text-align: center;
+  user-select: none;
+}
+.tool-payload-diff-line[data-kind="add"] .tool-payload-sign {
+  color: var(--tone-added);
+}
+.tool-payload-diff-line[data-kind="del"] .tool-payload-sign {
+  color: var(--tone-failed);
+}
+.tool-payload-line-text {
+  flex: 1;
+  padding-left: 4px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.tool-payload-command {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 12px;
+}
+.tool-payload-command pre {
+  flex: 1;
+  margin: 0;
+  font: inherit;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.tool-payload-prompt {
+  color: var(--color-cream-muted);
+  user-select: none;
+}
+.tool-payload-result,
+.tool-payload-section + .tool-payload-section {
+  border-top: 1px solid var(--color-charcoal-border);
+}
+.tool-payload-result-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  color: var(--color-cream-muted);
+  font-family: var(--font-sans);
+  font-size: 11px;
+}
+.tool-payload-result-toggle:hover {
+  color: var(--color-cream);
+}
+.tool-payload-result-toggle svg {
+  width: 12px;
+  height: 12px;
+}
+.tool-payload-failed {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  color: var(--tone-failed);
+}
+.tool-payload-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 6px 0 10px;
+  color: var(--color-cream-muted);
+  font-family: var(--font-sans);
+  font-size: 11px;
+}
+.tool-payload-output {
+  max-height: 240px;
+  margin: 0;
+  padding: 4px 12px 8px;
+  overflow: auto;
+  color: var(--color-cream-muted);
+  font: 11px/1.5 var(--font-mono);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.tool-payload-output[data-failed] {
+  color: var(--tone-failed);
+}
+/* An edit's +/- counts on its step row, before the row's own note. */
+.agent-progress-row > .tool-payload-counts {
+  margin-left: auto;
+  padding-left: 12px;
+  font-size: 13px;
+}
+.agent-progress-row > .tool-payload-counts ~ .agent-progress-meta {
+  margin-left: 0;
+}
+.agent-progress-row > .tool-payload-counts + .agent-progress-chevron {
+  margin-left: 0;
+}

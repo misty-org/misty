@@ -41,7 +41,7 @@ const PICTURE_WIDTH: f64 = 480.0;
 const LARGEST_PICTURE_WIDTH: f64 = 1280.0;
 
 /// A picture of a page. Small for an agent's tab, which the PiP and the view
-/// switcher show instead of a second live page; live subtitles ask for one they can read.
+/// switcher show instead of a second live page, or larger for a model to read.
 #[tauri::command]
 pub async fn browser_webview_picture(
     app: AppHandle,

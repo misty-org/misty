@@ -35,16 +35,6 @@ interface OpeningWindow {
   space?: unknown;
 }
 
-function currentLabel(): string | null {
-  if (typeof window === "undefined") return null;
-  const internals = (
-    window as typeof window & {
-      __TAURI_INTERNALS__?: { metadata?: { currentWindow?: { label?: string } } };
-    }
-  ).__TAURI_INTERNALS__;
-  return internals?.metadata?.currentWindow?.label ?? null;
-}
-
 /** An app window (not an overlay). */
 export function isProfileWindowLabel(label: string): boolean {
   return /^window-[1-9][0-9]*$/.test(label);
@@ -104,11 +94,6 @@ export function currentProfile(): ProfileEntry {
 /** Names this window's saved tabs. Stable across launches, unlike its label. */
 export function currentWindowId(): string {
   return useProfileWindowStore.getState().windowId;
-}
-
-/** This window's native label, as agent device contexts name it. */
-export function currentWindowLabel(): string {
-  return currentLabel() ?? "window-1";
 }
 
 /** Reads who this window is from the native side: after an account change its profile can differ. */

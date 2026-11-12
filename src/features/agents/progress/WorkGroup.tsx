@@ -1,10 +1,37 @@
 import { Pressable } from "@/shared/ui";
-import { useId, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+
+/** Sent to a closed fold that holds the chat search's current match, so it opens (`timelineSearch.ts`). */
+export const REVEAL_FOLD_EVENT = "misty-reveal-fold";
 
 /** Height animates open and closed; closed content leaves the tab order. */
-export function Fold({ id, open, children }: { id: string; open: boolean; children: ReactNode }) {
+export function Fold({
+  id,
+  open,
+  onReveal,
+  children,
+}: {
+  id: string;
+  open: boolean;
+  /** Opens the fold when search lands on something inside it. */
+  onReveal?: () => void;
+  children: ReactNode;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const element = ref.current;
+    if (!element || !onReveal) return;
+    element.addEventListener(REVEAL_FOLD_EVENT, onReveal);
+    return () => element.removeEventListener(REVEAL_FOLD_EVENT, onReveal);
+  }, [onReveal]);
   return (
-    <div id={id} className="agent-progress-fold" data-open={open || undefined} inert={!open}>
+    <div
+      ref={ref}
+      id={id}
+      className="agent-progress-fold"
+      data-open={open || undefined}
+      inert={!open}
+    >
       <div>{children}</div>
     </div>
   );
@@ -52,7 +79,7 @@ export function WorkGroup({
         </span>
         <Chevron />
       </Pressable>
-      <Fold id={listId} open={open}>
+      <Fold id={listId} open={open} onReveal={() => setChosen(true)}>
         {children}
       </Fold>
     </div>

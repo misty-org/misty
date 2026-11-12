@@ -49,7 +49,6 @@ pub(super) fn adopt_existing(
     position: LogicalPosition<f64>,
     size: LogicalSize<f64>,
 ) -> Result<(), String> {
-    #[cfg(any(target_os = "macos", windows))]
     if state
         .pending_popups
         .lock()

@@ -72,7 +72,7 @@ impl Family {
         match self {
             Self::Integration => "integration: the person's connected apps (Gmail, Calendar, Slack, GitHub and others)",
             Self::Agent => "agent: sub-agents that work on independent parts of a large task at the same time",
-            Self::Misty => "misty: the person's own Misty notes, drawings, files, chats, Spaces, memory and saved workflows",
+            Self::Misty => "misty: the person's own Misty notes, drawings, files, chats and Spaces",
         }
     }
 }
@@ -83,17 +83,17 @@ enum Group {
     Family(Family),
 }
 
-// The person's Misty data and its social and workflow tools: about 50 of a run's 65 tools and
+// The person's Misty data and its social tools: about 50 of a run's 65 tools and
 // 9,000 tokens on every turn of a web task that never uses them.
 // They load up front when the request is about Misty's own things, and otherwise on request.
-const MISTY_DATA: [&str; 15] = [
-    "memory.workflow.", "memory.pref.", "drawing.", "note.", "thread.", "file.", "voice.", "message.", "space.",
+const MISTY_DATA: [&str; 13] = [
+    "drawing.", "note.", "thread.", "file.", "voice.", "message.", "space.",
     "item.", "search.all", "agent.configure", "agent.request", "agent.directory", "agent.list",
 ];
 
 static MISTY_REQUEST: LazyLock<Regex> = LazyLock::new(|| {
     js_regex(
-        r"\b(my|our|this|the person's) (own )?(notes?|notebook|drawings?|sketch(es)?|files?|documents in misty|chats?|threads?|messages in misty|spaces?|saved workflows?|workflows?|memory|memories|preferences|recordings?|voice notes?|schedules?|agents?)\b|\b(in|on|from|to) misty\b|\bmisty('s)? (notes?|files?|chat|spaces?|drawings?)\b|\bremember (that|this|my|me)\b|\bweather\b|\b(a|the|this) space\b",
+        r"\b(my|our|this|the person's) (own )?(notes?|notebook|drawings?|sketch(es)?|files?|documents in misty|chats?|threads?|messages in misty|spaces?|memory|memories|preferences|recordings?|voice notes?|schedules?|agents?)\b|\b(in|on|from|to) misty\b|\bmisty('s)? (notes?|files?|chat|spaces?|drawings?)\b|\bremember (that|this|my|me)\b|\bweather\b|\b(a|the|this) space\b",
         true,
     )
 });

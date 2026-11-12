@@ -27,6 +27,15 @@
     transform: translateY(min(35cqh, 150px)) rotate(8deg);
   }
 }
+/* The opening screen's flight: one quick pass along the track at a time, so the screen can leave
+   as Misty arrives at an end of it rather than mid-flight. */
+.misty-fly-area[data-pace="splash"] .misty-fly-x {
+  animation-duration: 3.4s;
+}
+.misty-fly-area[data-pace="splash"] .misty-fly-y {
+  animation-duration: 2.6s;
+  animation-delay: -0.6s;
+}
 @media (prefers-reduced-motion: reduce) {
   .misty-fly-x,
   .misty-fly-y {

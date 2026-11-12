@@ -29,10 +29,6 @@
   border: 0;
 }
 
-.app-pages-root .misty-file-browser-scrollbar {
-  scrollbar-gutter: stable;
-}
-
 /* Shared sidebar metrics. The Agents and Space sidebars both read these so their rows,
    labels and icons stay in step. */
 :root {

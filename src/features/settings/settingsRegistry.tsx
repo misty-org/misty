@@ -1,15 +1,15 @@
 import {
-  Brain,
-  Cloud,
   EyeOff,
   Keyboard,
   MessagesSquare,
   Mic,
   Palette,
+  Plug,
   Server,
   ShieldCheck,
   Sparkles,
   SlidersHorizontal,
+  SquareTerminal,
   UserCircle,
   Wrench,
   type LucideIcon,
@@ -38,11 +38,11 @@ type SettingsArea =
   | "voice"
   | "privacy"
   | "advanced"
-  | "sync"
   | "models"
   | "conversations"
   | "access"
-  | "memory";
+  | "engines"
+  | "tools";
 
 interface SettingsAreaInfo {
   label: string;
@@ -58,21 +58,24 @@ export const settingsAreas: Record<SettingsArea, SettingsAreaInfo> = {
   voice: { label: "Voice", icon: Mic },
   privacy: { label: "Privacy", icon: EyeOff },
   advanced: { label: "Advanced", icon: Wrench },
-  sync: { label: "Sync", icon: Cloud },
   models: { label: "Models", icon: Sparkles },
   conversations: { label: "Behavior", icon: MessagesSquare },
   access: { label: "Access", icon: ShieldCheck },
-  memory: { label: "Memory", icon: Brain },
+  engines: { label: "Engines", icon: SquareTerminal },
+  tools: { label: "Tools", icon: Plug },
 };
 
 /** Sidebar groups, named by feature, in sidebar order. */
 export const settingsGroups: readonly { label: string; areas: readonly SettingsArea[] }[] = [
-  { label: "Account", areas: ["account", "server", "sync"] },
+  { label: "Account", areas: ["account", "server"] },
   {
     label: "App",
     areas: ["general", "appearance", "shortcuts", "voice", "privacy", "advanced"],
   },
-  { label: "Agents", areas: ["models", "conversations", "access", "memory"] },
+  {
+    label: "Agents",
+    areas: ["models", "engines", "tools", "conversations", "access"],
+  },
 ];
 
 interface SettingsBlock {
@@ -102,19 +105,29 @@ const settingsBlocks: readonly SettingsBlock[] = [
   block("account", "account", "Profile", "resource"),
   block("server", "server", "Server"),
   block("appearance", "appearance", "Appearance"),
+  block("appearance", "fonts", "Fonts"),
+  block("appearance", "pets", "Pet"),
   block("shortcuts", "shortcuts", "Shortcuts"),
   block("voice", "voice", "Voice"),
   block("privacy", "privacy", "Privacy"),
   block("privacy", "browser-permissions", "Websites", "resource"),
+  block("privacy", "agent-activity", "Agent activity"),
   block("advanced", "advanced", "Advanced"),
-  block("sync", "sync", "Sync"),
+  block("advanced", "network", "Network"),
+  block("advanced", "performance", "Performance"),
   block("models", "models", "Models"),
+  block("engines", "engine-clis", "CLIs"),
+  block("engines", "engine-channels", "Channels"),
+  block("engines", "engine-usage", "Usage"),
+  block("tools", "engine-mcp", "MCP servers"),
+  block("tools", "engine-skills", "Skills"),
+  block("tools", "engine-prompts", "Prompts"),
   block("conversations", "agents-defaults", "Conversations"),
   block("conversations", "misty", "Misty", "resource"),
   block("conversations", "agents-companion", "Cursor"),
+  block("conversations", "agents-personas", "Personas"),
   block("access", "agents-permissions", "Access", "resource"),
-  block("memory", "recall", "Memory"),
-  block("memory", "agents-memory", "Remembered", "resource"),
+  block("access", "agents-computer-use", "Computer use"),
 ];
 
 /**

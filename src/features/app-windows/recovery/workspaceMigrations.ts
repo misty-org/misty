@@ -70,24 +70,21 @@ function migrateView(view: WorkspaceView): WorkspaceView | null {
   const tab =
     typeof view.route === "string"
       ? view
-      : { ...view, route: missingRouteFallback[view.surfaceId] ?? "/browser" };
+      : { ...view, route: missingRouteFallback[view.surfaceId] ?? "/" };
   const route = new URL(tab.route, "https://misty.local");
-  if (tab.surfaceId === "scheduled") {
-    const params = route.searchParams;
-    params.set("view", "scheduled");
+  // A Scheduled tab from before scheduled work was removed opens Agents.
+  if ((tab.surfaceId as string) === "scheduled") {
     return {
       ...tab,
       surfaceId: "agents",
       groupKey: "tool:agents",
       title: "Agents",
-      route: `/agents?${params}`,
+      route: "/agents",
     };
   }
   if (tab.surfaceId === "space" && /^\/spaces(?:\/|$)/.test(tab.route)) return tab;
   const agents = tab.surfaceId === "agents" || tab.groupKey === "app:agents";
   if (agents) {
-    // Legacy Scheduled routes keep their section inside Agents.
-    if (route.pathname === "/scheduled") route.searchParams.set("view", "scheduled");
     return {
       ...tab,
       surfaceId: "agents",

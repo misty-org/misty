@@ -10,7 +10,10 @@ import { allLayoutViews } from "../panes/layoutTabs";
 import { migrateWorkspaceStore } from "../tabs/workspaceStorePersistence";
 
 /** Saved views may still carry surfaces this build no longer renders. */
-type LegacyViewOverrides = Omit<Partial<WorkspaceView>, "surfaceId"> & { surfaceId?: string };
+type LegacyViewOverrides = Omit<Partial<WorkspaceView>, "surfaceId" | "groupKey"> & {
+  surfaceId?: string;
+  groupKey?: string;
+};
 
 function legacyTab(overrides: LegacyViewOverrides = {}): WorkspaceView {
   return {
@@ -177,7 +180,7 @@ it.each(["/extensions", "/extensions/installed", "/extensions/addon/607454"])(
   },
 );
 
-it("migrates a saved Scheduled tab into Agents without losing its selected task", () => {
+it("migrates a saved Scheduled tab into Agents", () => {
   const migrated = migrateRetiredWorkspaceView(
     legacyTab({
       surfaceId: "scheduled",
@@ -189,7 +192,7 @@ it("migrates a saved Scheduled tab into Agents without losing its selected task"
     id: "saved-tab",
     surfaceId: "agents",
     groupKey: "tool:agents",
-    route: "/agents?task=weekly&view=scheduled",
+    route: "/agents",
   });
 });
 
@@ -237,7 +240,7 @@ it("restores a route-less Scheduled view into the current Agents collection", ()
   ).toMatchObject({
     surfaceId: "agents",
     groupKey: "tool:agents",
-    route: "/agents?view=scheduled",
+    route: "/agents",
   });
 });
 

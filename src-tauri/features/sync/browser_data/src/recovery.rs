@@ -1,7 +1,7 @@
-//! Device-local encrypted workspace recovery. This key is independent of the
-//! sync vault; records never become network payloads without client reconciliation.
+//! Device-local encrypted workspace recovery: the windows and tabs a crash or quit left open,
+//! sealed with a key kept on this computer. Nothing here leaves it.
 use crate::{
-    crypto::{VaultRoot, VaultScope},
+    crypto::{RecoveryKey, RecoveryScope},
     Error, Result,
 };
 use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};
@@ -29,8 +29,8 @@ pub struct RecoveryRecord {
 
 pub struct RecoveryStore {
     connection: Connection,
-    pub(crate) scope: VaultScope,
-    pub(crate) root: VaultRoot,
+    pub(crate) scope: RecoveryScope,
+    pub(crate) root: RecoveryKey,
     /// Encrypted pending saves beside the database; see `recovery_pending`.
     pub(crate) pending: PathBuf,
 }
@@ -51,7 +51,7 @@ fn aad(key: &str, revision: u64) -> String {
 }
 
 impl RecoveryStore {
-    pub fn open(path: &Path, scope: VaultScope, root: VaultRoot) -> Result<Self> {
+    pub fn open(path: &Path, scope: RecoveryScope, root: RecoveryKey) -> Result<Self> {
         scope.validate()?;
         let mut options = std::fs::OpenOptions::new();
         options.read(true).write(true).create(true).truncate(false);
@@ -77,7 +77,7 @@ impl RecoveryStore {
         if let Some(proof) = proof {
             let bytes = root.open_local(
                 &scope,
-                &scope.vault_id,
+                &scope.id,
                 "workspace-recovery:identity:v1",
                 &serde_json::from_str(&proof)?,
             )?;
@@ -87,7 +87,7 @@ impl RecoveryStore {
         } else {
             let proof = root.seal_local(
                 &scope,
-                &scope.vault_id,
+                &scope.id,
                 "workspace-recovery:identity:v1",
                 b"misty-workspace-recovery-v1",
             )?;
@@ -128,7 +128,7 @@ impl RecoveryStore {
         }
         let raw = self.root.open_local(
             &self.scope,
-            &self.scope.vault_id,
+            &self.scope.id,
             &aad(key, revision),
             &serde_json::from_str(&envelope)?,
         )?;
@@ -170,7 +170,7 @@ impl RecoveryStore {
         let raw = Zeroizing::new(value.as_bytes().to_vec());
         let encrypted = serde_json::to_string(&self.root.seal_local(
             &self.scope,
-            &self.scope.vault_id,
+            &self.scope.id,
             &aad(key, revision),
             &raw,
         )?)?;

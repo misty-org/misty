@@ -18,7 +18,6 @@ import {
 } from "../google/googleSignInCode";
 import { saveAccountAuthToken } from "./useAuthTokenStore";
 
-;
 export { isAccountUnauthorizedError } from "../api/api";
 
 function authenticatedUser(data: LoginResponse, operation: string): AccountAuthUser {

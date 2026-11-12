@@ -19,7 +19,6 @@ import { createWorkspaceView } from "./localExecutionView";
 
 interface LocalExecutionOptions {
   desktopControl?: boolean;
-  method?: Execution["method"];
 }
 
 export async function startLocalExecution(
@@ -64,7 +63,6 @@ export async function startLocalExecution(
     accountId,
     agentId,
     spaceId,
-    method: options?.method ? structuredClone(options.method) : undefined,
     desktopControl: options?.desktopControl,
     autopilot: visibleAutopilotAvailable() && /^space-/.test(getCurrentWindow().label),
     state: "running",

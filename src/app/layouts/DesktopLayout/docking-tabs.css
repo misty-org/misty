@@ -1,191 +1,19 @@
-/* Favorites lead the sidebar in every virtual window: icon tiles, monochrome states. */
-.misty-workspace-favorites {
-  display: flex;
-  flex-shrink: 0;
-  align-items: center;
-  gap: 2px;
-  margin-right: 4px;
-}
-.misty-workspace-favorites-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(36px, 1fr));
-  margin: 0 0 8px;
-  padding: 0 0 8px;
-  border-right: 0;
-  border-bottom: 1px solid var(--color-charcoal-border, rgba(255, 255, 255, 0.08));
-}
-.misty-workspace-favorite {
-  display: grid;
-  place-items: center;
-  width: 30px;
-  height: 28px;
-  border-radius: 8px;
-  color: var(--workspace-tab-muted, inherit);
-}
-.misty-workspace-favorites-grid .misty-workspace-favorite {
-  width: 100%;
-  height: 32px;
-}
-.misty-workspace-favorite:hover,
-.misty-workspace-favorite[data-menu-open] {
-  background: color-mix(in srgb, var(--misty-theme-text) 5%, transparent);
-}
-.misty-workspace-favorite[data-active] {
-  background: color-mix(in srgb, var(--misty-theme-text) 9%, transparent);
-}
-.misty-workspace-favorite:focus-visible {
-  outline: none;
-  background: color-mix(in srgb, var(--misty-theme-text) 5%, transparent);
-}
-
-/* The tab sidebar: roomy. Favorites are a four-column tile grid, tabs are 40px
-   rounded rows with hover-only close buttons, and the window actions sit in a footer. */
+/* The sidebar: roomy rows, with the Space row and account at its foot. */
 .misty-workspace-tabs {
   --shell-tab-height: 32px;
   gap: 0;
   padding-bottom: 8px;
 }
-.misty-workspace-tabs .misty-workspace-favorites-grid {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 6px;
-  margin: 2px 0 10px;
-  padding: 0 0 10px;
-}
-.misty-workspace-tabs .misty-workspace-favorites-grid .misty-workspace-favorite {
-  height: 34px;
-  border-radius: 8px;
-  background: transparent;
-}
-.misty-workspace-tabs
-  .misty-workspace-favorites-grid
-  .misty-workspace-favorite:is(:hover, [data-menu-open]) {
-  background: color-mix(in srgb, var(--misty-theme-text) 5%, transparent);
-}
-.misty-workspace-tabs .misty-workspace-favorites-grid .misty-workspace-favorite[data-active] {
-  background: color-mix(in srgb, var(--misty-theme-text) 9%, transparent);
-}
-.misty-workspace-tabs .misty-workspace-tab-list {
-  gap: 2px;
-}
-.misty-workspace-tabs .misty-workspace-tab {
-  border-radius: 8px;
-  font-size: 13px;
-}
-.misty-workspace-tabs .misty-workspace-tab-close {
-  opacity: 0;
-}
-.misty-workspace-tabs .misty-workspace-tab:is(:hover, :focus-within) .misty-workspace-tab-close {
-  opacity: 1;
-}
-@media (pointer: coarse) {
-  .misty-workspace-tabs .misty-workspace-tab-close {
-    opacity: 1;
-  }
-}
-.misty-workspace-new-tab-row {
-  display: flex;
-  flex: none;
-  align-items: center;
-  /* The plus and label line up with the favicons and titles of the tab rows below, whose
-     1px border sits outside their 8px padding and 6px gap. */
-  gap: 6px;
-  height: var(--shell-tab-height, 34px);
-  padding: 0 8px 0 9px;
-  border-radius: 8px;
-  font-size: 13px;
-  color: var(--workspace-tab-muted, var(--color-cream-muted));
-  text-align: left;
-}
-/* New Tab reads as a tab row: the same hover wash and text, without a close button. */
-.misty-workspace-new-tab-row:hover {
-  background: color-mix(in srgb, var(--misty-theme-text) 5%, transparent);
-  color: var(--workspace-tab-text, var(--color-cream));
-}
-.misty-workspace-new-tab-row:focus-visible {
-  outline: 1px solid var(--color-cream-muted, currentColor);
-  outline-offset: -1px;
-}
-/* The vertical tab list sits directly on the sidebar, fading at the edges that still have
-   tabs beyond them so it reads as scrollable. */
-.misty-workspace-tabs .misty-workspace-tab-list {
-  margin-top: 2px;
-}
-
-/* Favorites (below the address field) sit directly on the sidebar. */
-.misty-workspace-tabs .misty-workspace-favorites-grid {
-  margin: 0 0 6px;
-  padding: 6px;
-  align-content: start;
-  border: 0;
-  border-radius: 10px;
-  background: color-mix(in srgb, var(--misty-theme-text) 7%, transparent);
-}
-/* Until a favorite exists the container takes no room and draws nothing. */
-.misty-workspace-tabs .misty-workspace-favorites-grid[data-empty] {
-  min-height: 0;
-  margin: 0;
-  padding: 0;
-  border: 0;
-}
-/* New Tab is the first row of the tab list: sticky, on the sidebar's own color. */
-.misty-workspace-tabs .misty-workspace-new-tab-row {
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  margin: 0 0 2px;
-  padding: 0 8px 0 9px;
-  width: 100%;
-  background: var(--misty-tab-well);
-}
-/* Its hover is a wash over the sidebar color, like a tab's, kept opaque so tabs scrolling
-   beneath the sticky row never show through. */
-.misty-workspace-tabs .misty-workspace-new-tab-row:is(:hover, :focus-visible) {
-  background:
-    linear-gradient(
-      color-mix(in srgb, var(--misty-theme-text) 5%, transparent),
-      color-mix(in srgb, var(--misty-theme-text) 5%, transparent)
-    ),
-    var(--misty-tab-well);
-  color: var(--workspace-tab-text, var(--color-cream));
-}
-
-/* Tabs fade out at the list's edges while more sit beyond them. The bottom is a mask; the
-   top is a gradient hanging off the sticky New Tab row, so tabs dissolve into that row. */
-.misty-workspace-tabs .misty-workspace-tab-list {
-  mask-image: linear-gradient(to bottom, black calc(100% - var(--tab-fade-end, 0px)), transparent);
-}
-.misty-workspace-tabs .misty-workspace-new-tab-row::after {
-  content: "";
-  position: absolute;
-  top: 100%;
-  left: 0;
-  right: 0;
-  height: var(--tab-fade-start, 0px);
-  background: linear-gradient(var(--misty-tab-well), transparent);
-  pointer-events: none;
-}
-
-/* Vertical tabs: selected and hovered rows are a soft highlight, not a bordered card. */
-.misty-workspace-tabs .misty-workspace-tab {
-  border-color: transparent;
-  box-shadow: none;
-  background: transparent;
-}
-.misty-workspace-tabs .misty-workspace-tab:hover {
-  background: color-mix(in srgb, var(--misty-theme-text) 5%, transparent);
-}
-.misty-workspace-tabs .misty-workspace-tab[data-active="true"] {
-  background: color-mix(in srgb, var(--misty-theme-text) 9%, transparent);
-}
 
 /* The sidebar's rows: a new chat and the Space's pages at the top, then the person's chats under
    each agent's name. The page being shown is marked by a stronger wash. */
+/* Rows keep a visible gap, so a hovered row never runs into the current one. */
 .misty-space-nav {
   display: flex;
   flex: none;
   flex-direction: column;
-  gap: 1px;
-  margin-top: 4px;
+  gap: 6px;
+  margin-top: 6px;
 }
 /* The chats take the room that is left and scroll inside it. */
 .misty-space-chats {
@@ -197,12 +25,16 @@
   margin-top: 14px;
   overflow-x: hidden;
   overflow-y: auto;
+  scrollbar-width: none;
 }
-.misty-space-chats > section {
+.misty-space-chats::-webkit-scrollbar {
+  display: none;
+}
+.misty-space-chats section {
   display: flex;
   flex: none;
   flex-direction: column;
-  gap: 1px;
+  gap: 3px;
 }
 .misty-space-nav-group {
   display: flex;
@@ -238,12 +70,13 @@
   min-width: 0;
   height: var(--shell-tab-height, 34px);
   padding: 0 8px 0 9px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-size: 13px;
   color: var(--workspace-tab-muted, var(--color-cream-muted));
   text-align: left;
 }
-.misty-space-nav-row:is(button):hover {
+/* The open page keeps its own background under the pointer. */
+.misty-space-nav-row:is(button):not([aria-current="page"]):hover {
   background: color-mix(in srgb, var(--misty-theme-text) 5%, transparent);
   color: var(--workspace-tab-text, var(--color-cream));
 }
@@ -262,23 +95,18 @@
   width: 16px;
   height: 16px;
 }
-/* The sidebar's first row: the Space's avatar and name, opening its menu. */
-.misty-sidebar-space {
+/* A chat's row: one line, the title and then a quieter word for what its agent is doing or when
+   it was last touched. It is as tall as the pages' rows above, so the sidebar keeps one rhythm. */
+.misty-space-chat-row {
   display: flex;
   flex: none;
   align-items: center;
-  margin: 4px 0 2px;
-}
-/* A chat's row, after OpenChamber's session rows: the title, then a quieter line with what its
-   agent is doing and when it was last touched. The open chat sits on a soft card. */
-.misty-space-chat-row {
-  display: grid;
-  flex: none;
-  gap: 1px;
+  gap: 8px;
   width: 100%;
   min-width: 0;
-  padding: 7px 9px 7px 10px;
-  border-radius: 10px;
+  height: 32px;
+  padding: 0 8px 0 9px;
+  border-radius: var(--radius-md);
   text-align: left;
   color: var(--workspace-tab-muted, var(--color-cream-muted));
 }
@@ -293,44 +121,46 @@
   outline-offset: -1px;
 }
 .misty-space-chat-title {
+  flex: 1 1 0;
+  min-width: 0;
   overflow: hidden;
   font-size: 13px;
-  line-height: 18px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.misty-space-chat-row:hover .misty-space-chat-title,
+.misty-space-chat-row[aria-current="page"] .misty-space-chat-title {
   color: var(--workspace-tab-text, var(--color-cream));
 }
-.misty-space-chat-meta {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  gap: 6px;
+.misty-space-chat-meta,
+.misty-space-chat-status {
+  flex: none;
   font-size: 11px;
-  line-height: 15px;
+  font-variant-numeric: tabular-nums;
 }
 .misty-space-chat-status {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  padding: 0 4px;
 }
 .misty-space-chat-dot {
-  width: 6px;
-  height: 6px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
   background: currentColor;
 }
-/* The one place the sidebar uses color: what a chat's agent is doing. Each state has its word. */
+/* The one place the sidebar uses color: what a chat's agent is doing, as a dot alone. */
 .misty-space-chat-row[data-status="working"] .misty-space-chat-status {
-  color: #6ea8fe;
+  color: var(--tone-working);
 }
 .misty-space-chat-row[data-status="working"] .misty-space-chat-dot {
   animation: misty-space-chat-pulse 1.4s ease-in-out infinite;
 }
 .misty-space-chat-row[data-status="needs-you"] .misty-space-chat-status {
-  color: #e2a03f;
+  color: var(--tone-waiting);
 }
 .misty-space-chat-row[data-status="failed"] .misty-space-chat-status {
-  color: #ec6a5e;
+  color: var(--tone-failed);
 }
 @keyframes misty-space-chat-pulse {
   50% {
@@ -341,4 +171,85 @@
   .misty-space-chat-row[data-status="working"] .misty-space-chat-dot {
     animation: none;
   }
+}
+
+/* Picked chats share the open chat's wash; that is the only mark a pick leaves. */
+.misty-space-chat-row[data-selected] {
+  background: color-mix(in srgb, var(--misty-theme-text) 9%, transparent);
+}
+.misty-space-chat-row[data-selected] .misty-space-chat-title {
+  color: var(--workspace-tab-text, var(--color-cream));
+}
+/* An unread chat: a brighter title and a small neutral dot before its time. */
+.misty-space-chat-row[data-unread] .misty-space-chat-title {
+  color: var(--workspace-tab-text, var(--color-cream));
+  font-weight: 500;
+}
+.misty-space-chat-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.misty-space-chat-unread {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--workspace-tab-text, var(--color-cream));
+}
+/* Renaming in place: the title becomes a field the same size, on the open chat's wash. */
+.misty-space-chat-row[data-renaming] {
+  background: color-mix(in srgb, var(--misty-theme-text) 9%, transparent);
+}
+.misty-space-chat-rename {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  color: var(--workspace-tab-text, var(--color-cream));
+}
+/* Archived chats fold away under their head, which shows how many there are. */
+.misty-space-nav-group-count {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.7;
+}
+.misty-space-nav-group-chevron {
+  transition: transform 120ms ease;
+}
+.misty-space-nav-group-chevron[data-open] {
+  transform: rotate(90deg);
+}
+@media (prefers-reduced-motion: reduce) {
+  .misty-space-nav-group-chevron {
+    transition: none;
+  }
+}
+
+/* A row's key hint, as in "Search ⌘K". */
+.misty-space-nav-key {
+  display: inline-grid;
+  min-width: 20px;
+  height: 20px;
+  margin-left: auto;
+  padding: 0 5px;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  font-family: inherit;
+  font-size: 11px;
+  color: var(--color-cream-muted);
+}
+/* An agent's mark beside a chat in the sidebar: the mark alone, at icon size. */
+.misty-space-nav-icon > .agent-avatar {
+  width: 16px;
+  height: 16px;
+  background: transparent;
+  font-size: 12px;
+}
+.misty-space-nav-icon > .agent-avatar svg {
+  width: 14px;
+  height: 14px;
 }

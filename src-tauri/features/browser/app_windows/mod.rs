@@ -25,6 +25,7 @@ pub(crate) mod macos;
 mod registry;
 mod routing;
 mod saved;
+pub(crate) mod window_geometry;
 pub use commands::*;
 pub use diagnostics::*;
 pub use lifecycle::*;
@@ -38,8 +39,7 @@ mod tests;
 pub mod windows;
 pub mod workspace_recovery;
 
-/// The first profile's id, the same on every computer, so two computers joining one vault
-/// start with the same profile and there is nothing to reconcile.
+/// The first profile's id, the same on every computer and for every account.
 pub const PERSONAL: &str = "personal";
 const WINDOW_PREFIX: &str = "window-";
 /// Emitted to a window's app when its profile's name or color changes.
@@ -161,18 +161,7 @@ pub fn temporary_store_id(session: &str) -> [u8; 16] {
     id
 }
 
-/// Windows a profile's window opened for an agent belong to that profile.
-static ADOPTED: Mutex<BTreeMap<String, String>> = Mutex::new(BTreeMap::new());
-
-/// Records that `child` (an agent's own window) works for `parent`'s profile.
-pub fn adopt(child: &str, parent: &str) {
-    if let (Some(key), Ok(mut adopted)) = (profile_for_window(parent), ADOPTED.lock()) {
-        adopted.insert(child.to_owned(), key);
-    }
-}
-
-/// The profile a page-opening window belongs to: an app window by its label, or an agent
-/// window by the window that opened it.
+/// The profile a page-opening window belongs to.
 pub fn profile_for_owner(label: &str) -> Option<String> {
-    profile_for_window(label).or_else(|| ADOPTED.lock().ok()?.get(label).cloned())
+    profile_for_window(label)
 }

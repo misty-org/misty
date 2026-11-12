@@ -1,24 +1,27 @@
-/* The panel beside a chat: a head with its title and folder, then one of the tabs. */
-.context-head {
+/* The panel beside a chat has no title bar; the rail says which panel it is. A panel's own
+   controls, when it has any, are its first row: for a folder, its worktrees, launch script and
+   the apps it opens in. */
+.context-tools {
   display: flex;
   flex: none;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  min-height: 40px;
-  padding: 4px 8px 4px 12px;
-  border-bottom: 1px solid var(--color-charcoal-border);
-}
-.context-subhead {
-  display: flex;
-  flex: none;
-  align-items: center;
-  gap: 6px;
+  justify-content: flex-end;
+  gap: 2px;
   min-height: 36px;
-  padding: 2px 8px;
-  border-bottom: 1px solid var(--color-charcoal-border);
-  font-size: 12px;
+  padding: 4px 8px;
+}
+/* A folder panel with no folder yet: what's missing, and the way to link one. */
+.context-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 16px;
+  font-size: 13px;
   color: var(--color-cream-muted);
+}
+.context-empty p {
+  margin: 0;
 }
 .context-foot {
   display: flex;
@@ -28,53 +31,13 @@
   padding: 8px;
   border-top: 1px solid var(--color-charcoal-border);
 }
-.context-foot--stack {
-  flex-direction: column;
-  align-items: stretch;
-}
-.context-label {
-  padding: 10px 12px 4px;
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--color-cream-muted);
-}
-.context-row {
-  display: flex;
-  width: 100%;
-  min-width: 0;
-  align-items: center;
-  gap: 6px;
-  height: 28px;
-  padding: 0 10px;
-  font-size: 13px;
-  color: var(--color-cream);
-  text-align: left;
-}
-.context-row:hover {
-  background: color-mix(in srgb, var(--misty-theme-text) 5%, transparent);
-}
-.context-row:focus-visible {
-  outline: 1px solid var(--color-cream-muted);
-  outline-offset: -1px;
-}
-.context-row [data-muted] {
-  color: var(--color-cream-muted);
-}
-.context-row-with-action {
-  display: flex;
-  align-items: center;
-  padding-right: 6px;
-}
-.context-row-with-action > .context-row {
-  flex: 1;
-}
 /* Color carries meaning here: green for what was added, red for what was removed, amber for a
    changed file. Each still has its sign or word, so none depends on color alone. */
 .context-panel {
-  --context-added: #4cc38a;
-  --context-removed: #ec6a5e;
-  --context-changed: #e2a03f;
-  --context-folder: #6ea8fe;
+  --context-added: var(--tone-added);
+  --context-removed: var(--tone-failed);
+  --context-changed: var(--tone-waiting);
+  --context-folder: var(--tone-working);
 }
 .context-diff {
   font-family: var(--font-mono, ui-monospace, Menlo, monospace);
@@ -130,27 +93,6 @@
 .context-status[data-status="renamed"] {
   color: var(--context-changed);
 }
-.context-row .context-folder-icon {
-  color: var(--context-folder);
-}
-.context-row .context-file-icon {
-  color: var(--color-cream-muted);
-}
-.context-row .context-file-icon[data-kind="code"] {
-  color: #e6b450;
-}
-.context-row .context-file-icon[data-kind="style"] {
-  color: #c594c5;
-}
-.context-row .context-file-icon[data-kind="data"] {
-  color: #7fd1b9;
-}
-.context-row .context-file-icon[data-kind="doc"] {
-  color: #8fb7ff;
-}
-.context-row .context-file-icon[data-kind="image"] {
-  color: #f29e74;
-}
 .context-editor .cm-editor {
   height: 100%;
   font-size: 12.5px;
@@ -159,10 +101,6 @@
 .context-editor .cm-gutters {
   background: var(--color-charcoal-bg);
   border-right: 1px solid var(--color-charcoal-border);
-}
-.context-terminal {
-  padding: 8px 4px 4px 10px;
-  background: var(--color-charcoal-bg);
 }
 
 /* The preview tab: an address row, the person's running app, and the element they picked. */
@@ -231,7 +169,6 @@
 .agent-studio-context:has(.preview-host[data-browser-page-presented]) {
   background: transparent;
 }
-.agent-studio-context:has(.preview-host[data-browser-page-presented]) > .context-head,
 .agent-studio-context:has(.preview-host[data-browser-page-presented]) .preview-bar,
 .agent-studio-context:has(.preview-host[data-browser-page-presented]) .preview-refused,
 .agent-studio-context:has(.preview-host[data-browser-page-presented]) .preview-card {
@@ -324,4 +261,170 @@
   display: flex;
   justify-content: flex-end;
   gap: 6px;
+}
+
+/* The rail down a chat's right edge: one glyph per panel, in groups divided by a short line. It
+   is flush with the window, and the open panel shows only in its glyph's brighter color. */
+.context-rail {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: 44px;
+  padding: 8px 0;
+}
+.context-rail-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.context-rail-group:not([data-first])::before {
+  content: "";
+  width: 16px;
+  height: 1px;
+  margin-bottom: 4px;
+  background: var(--color-charcoal-border-strong);
+}
+.context-rail .context-rail-button {
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-cream-muted);
+}
+.context-rail .context-rail-button:hover {
+  background: transparent;
+  color: var(--color-cream);
+}
+.context-rail .context-rail-button[aria-pressed="true"] {
+  background: transparent;
+  color: var(--color-cream-bright);
+}
+
+/* The session card, after OpenChamber's: groups parted by space alone, a small title, and one row
+   pattern throughout (a muted glyph, a label that gives way, a value held at the end). Nothing
+   fills on hover; a row that opens something only brightens. */
+.session-panel {
+  display: flex;
+  min-height: 0;
+  flex: 0 1 auto;
+  flex-direction: column;
+  padding: 10px 10px 12px;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.session-panel::-webkit-scrollbar {
+  display: none;
+}
+.session-section {
+  display: flex;
+  flex-direction: column;
+}
+.session-section + .session-section {
+  margin-top: 20px;
+}
+.session-section-head {
+  display: flex;
+  min-width: 0;
+  min-height: 24px;
+  align-items: center;
+  gap: 6px;
+  padding: 0 4px;
+}
+.session-section-head h3 {
+  flex: none;
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-cream-bright);
+}
+.session-section-subject {
+  display: flex;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--color-cream-muted);
+}
+.session-row {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  height: 28px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 4px;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  color: var(--color-cream-muted);
+  text-align: left;
+}
+.session-row:is(button):hover {
+  color: var(--color-cream);
+}
+.session-row:focus-visible {
+  outline: 1px solid var(--color-cream-muted);
+  outline-offset: -1px;
+}
+.session-row > svg {
+  flex: none;
+}
+.session-row-label {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.session-row-value {
+  flex: none;
+  max-width: 55%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.session-empty {
+  margin: 0;
+  padding: 4px;
+  font-size: 13px;
+  color: var(--color-cream-muted);
+}
+/* How full the engine's context is: a thin bar under its row. Its color is what it means. */
+.session-meter {
+  height: 4px;
+  margin: 0 4px 4px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--misty-theme-text) 9%, transparent);
+}
+.session-meter > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--tone-added);
+}
+.session-meter[data-level="high"] > span {
+  background: var(--tone-waiting);
+}
+.session-meter[data-level="full"] > span {
+  background: var(--tone-failed);
+}
+/* The project folder as the Project heading's subject: quiet text that opens its menu. */
+.folder-picker-compact {
+  height: auto;
+  min-width: 0;
+  max-width: 100%;
+  padding: 0 2px;
+  border: 0;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--color-cream-muted);
+}
+.folder-picker-compact:hover,
+.folder-picker-compact[data-state="open"] {
+  background: transparent;
+  color: var(--color-cream);
 }

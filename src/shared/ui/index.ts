@@ -11,6 +11,7 @@ export * from "./controls/FileInput";
 export * from "./controls/IconButton";
 export * from "./controls/Input";
 export * from "./controls/InputGroup";
+export * from "./controls/SearchField";
 export * from "./controls/Label";
 export * from "./controls/OptionSelect";
 export * from "./controls/Select";
@@ -43,7 +44,6 @@ export * from "./overlays/WorkspaceOverlay";
 export * from "./layout/Collapsible";
 export * from "./layout/MarqueeGroup";
 export * from "./layout/OverflowFadeText";
-export * from "./layout/PlaybackClock";
 export * from "./layout/ScrollArea";
 export * from "./layout/Separator";
 export * from "./layout/Toolbar";
@@ -67,7 +67,6 @@ export * from "./feedback/StateView";
 
 // navigation
 export * from "./navigation/NavIsland";
-export * from "./navigation/NavigationTree";
 
 // icons
 export * from "./icons/AssetIcon";
@@ -80,7 +79,6 @@ export * from "./icons/itemTones";
 export * from "./patterns/CollectionWorkspace";
 export * from "./patterns/CollectionFilterMenu";
 export * from "./patterns/CollectionItemDialog";
-export * from "./patterns/CollectionSelectionBar";
 
 export * from "./classNames";
 

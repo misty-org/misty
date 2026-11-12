@@ -5,14 +5,11 @@
 use crate::browser::app_windows;
 
 pub fn allows(label: &str) -> bool {
-    app_windows::is_app_window(label) || is_cursor_overlay(label)
+    app_windows::is_app_window(label) || is_cursor_overlay(label) || label == PET_WINDOW
 }
 
-/// The live subtitles panel is a view inside a person's window, so Tauri grants it what that window
-/// has. It only draws, and only ever needs to move itself.
-pub fn allows_command(label: &str, command: &str) -> bool {
-    allows(label) || (crate::voice::is_subtitles_panel(label) && command == "voice_subtitles_frame")
-}
+/// The desktop pet's own window (`pets/overlay.rs`), held to its few commands by `pet-overlay.json`.
+const PET_WINDOW: &str = "misty-pet";
 
 fn is_cursor_overlay(label: &str) -> bool {
     label
@@ -39,8 +36,8 @@ mod tests {
         include_str!("../../../tauri-permissions/capabilities/cursor-companion.json"),
         include_str!("../../../tauri-permissions/capabilities/desktop-control.json"),
         include_str!("../../../tauri-permissions/capabilities/dictation-pill.json"),
-        include_str!("../../../tauri-permissions/capabilities/live-subtitles.json"),
         include_str!("../../../tauri-permissions/capabilities/kiri.json"),
+        include_str!("../../../tauri-permissions/capabilities/pet-overlay.json"),
     ];
 
     fn capability(identifier: &str) -> serde_json::Value {
@@ -153,30 +150,6 @@ mod tests {
         ] {
             assert!(!allows(label), "{label}");
         }
-    }
-
-    #[test]
-    fn the_subtitles_panel_can_only_move_itself() {
-        let panel = "misty-live-subtitles-window-1";
-        assert!(allows_command(panel, "voice_subtitles_frame"));
-        for command in [
-            "voice_capture_start",
-            "voice_subtitles_export",
-            "agent_runtime_call",
-        ] {
-            assert!(!allows_command(panel, command), "{command}");
-        }
-        assert!(!allows_command(
-            "misty-live-subtitles-spoof",
-            "voice_subtitles_frame"
-        ));
-        assert!(!allows_command("misty-browser-a", "voice_subtitles_frame"));
-        assert!(allows_command("window-1", "voice_capture_start"));
-        let permissions = capability("live-subtitles")["permissions"].clone();
-        assert_eq!(
-            permissions,
-            serde_json::json!(["core:event:default", "allow-voice-subtitles-frame"])
-        );
     }
 
     #[test]

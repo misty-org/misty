@@ -39,7 +39,11 @@ pub fn run(workspace: &Workspace) -> Result<PathBuf> {
         command = command.env("APPLE_SIGNING_IDENTITY", identity);
     }
     command.run(&workspace.misty)?;
-    built_app(&workspace.misty.join("src-tauri/target/release"))
+    let output = workspace.misty.join("src-tauri/target/release");
+    if cfg!(target_os = "linux") {
+        super::appimage::prune_bundle(&output.join("bundle"))?;
+    }
+    built_app(&output)
 }
 
 fn bundle_arguments() -> &'static [&'static str] {
@@ -47,6 +51,8 @@ fn bundle_arguments() -> &'static [&'static str] {
         &["--bundles", "nsis"]
     } else if cfg!(target_os = "macos") {
         &["--bundles", "app"]
+    } else if cfg!(target_os = "linux") {
+        &["--bundles", "appimage"]
     } else {
         &["--no-bundle"]
     }
@@ -57,6 +63,8 @@ fn built_app(output: &Path) -> Result<PathBuf> {
         (output.join("bundle/nsis"), "exe")
     } else if cfg!(target_os = "macos") {
         (output.join("bundle/macos"), "app")
+    } else if cfg!(target_os = "linux") {
+        (output.join("bundle/appimage"), "AppImage")
     } else {
         return Ok(output.join("misty-desktop"));
     };

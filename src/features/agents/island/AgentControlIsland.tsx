@@ -75,7 +75,7 @@ export function AgentControlIsland() {
     if (!questions) return null;
     return <AgentControlQuestions />;
   }
-  const takesMessages = !execution.method && execution.state !== "waiting";
+  const takesMessages = execution.state !== "waiting";
   return (
     <aside aria-label="Agent control" className={islandClass}>
       <AgentActionQuestions />

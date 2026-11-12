@@ -21,6 +21,8 @@ export type CollectionItem = {
   actions?: ReactNode;
   marker?: ReactNode;
   contextMenu?: ReactNode;
+  /** Called as the right-click menu opens, before it shows. */
+  onContextMenuOpen?: () => void;
 };
 
 /** The icon slot's glyph color: the item's tone, or the muted default. */

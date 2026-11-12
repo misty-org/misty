@@ -36,8 +36,20 @@ export function MistyComposer(props: {
   busy?: boolean;
   placeholder?: string;
   compact?: boolean;
-  /** "inline": the box is one row (attach, text, voice, send); Stop replaces Send while a reply runs. */
-  layout?: "default" | "conversation" | "inline";
+  /** "inline": the box is one row (attach, text, voice, send); Stop replaces Send while a reply runs.
+   * "toolbar": the text fills the box and every control sits in one bar beneath it, inside the box:
+   * attach and `toolbarStart` on the left, `toolbarEnd`, voice and send on the right. */
+  layout?: "default" | "conversation" | "inline" | "toolbar";
+  /** Toolbar layout: controls after Attach, on the bar's left. */
+  toolbarStart?: ReactNode;
+  /** Toolbar layout: controls before voice and send, on the bar's right. */
+  toolbarEnd?: ReactNode;
+  /** A menu anchored above the text, such as the `@`, `/` and `$` suggestions. */
+  popup?: ReactNode;
+  /** Attachments that aren't files, shown before the files (Misty's browser). */
+  attachedChips?: ReactNode;
+  /** More rows for the Attach menu, after files and capture. */
+  attachMenuItems?: ReactNode;
   /** The surface shows usage itself (the Agents control bar), so the footer omits it. */
   className?: string;
   onError?: (message: string) => void;
@@ -73,11 +85,12 @@ export function MistyComposer(props: {
   const canSend = Boolean(
     props.value.trim() || props.attachments.some((item) => item.state === "ready"),
   );
+  const toolbar = props.layout === "toolbar";
   // An empty footer would still add its bottom padding under the input row.
-  const hasFooter = Boolean(props.modelControl);
+  const hasFooter = toolbar || Boolean(props.modelControl);
   const send = (
     <MessageComposerSend
-      label="Send to Misty"
+      label="Send message"
       disabled={
         props.disabled || !canSend || props.attachments.some((item) => item.state !== "ready")
       }
@@ -88,7 +101,8 @@ export function MistyComposer(props: {
   // In a conversation the one button turns into Stop while a reply runs, rather than
   // a second button appearing beside Send.
   const sendControl =
-    (props.layout === "conversation" || props.layout === "inline") && props.trailingControl ? (
+    (props.layout === "conversation" || props.layout === "inline" || toolbar) &&
+    props.trailingControl ? (
       props.trailingControl
     ) : (
       <>
@@ -96,6 +110,53 @@ export function MistyComposer(props: {
         {props.trailingControl}
       </>
     );
+  const attach = (
+    <>
+      <FileInput
+        ref={fileRef}
+        accept="image/jpeg,image/png,image/webp,.pdf,.docx,.txt,.md,.csv,.json"
+        multiple={props.maxAttachments > 1}
+        onChange={(event) => {
+          accept(Array.from(event.target.files ?? []));
+          event.target.value = "";
+        }}
+      />
+      {props.onCapture || props.attachMenuItems ? (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <IconButton label="Add attachments" tooltip={false} disabled={props.disabled}>
+              <Plus className="size-4" />
+            </IconButton>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" data-misty-layer-portal>
+            <MenuItem
+              icon={<ImagePlus className="size-4" />}
+              label="Attach files"
+              onSelect={() => fileRef.current?.click()}
+            />
+            {props.onCapture ? (
+              <MenuItem
+                icon={<Camera className="size-4" />}
+                label="Capture part of the screen"
+                onSelect={props.onCapture}
+              />
+            ) : null}
+            {props.attachMenuItems}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ) : (
+        <IconButton
+          label="Attach files"
+          disabled={props.disabled}
+          onClick={() => fileRef.current?.click()}
+        >
+          <Plus className="size-4" />
+        </IconButton>
+      )}
+      {props.leadingControl}
+      {toolbar && props.toolbarStart}
+    </>
+  );
   return (
     <MessageComposer
       className={cn(dragging && "border-cream-muted bg-charcoal-hover", props.className)}
@@ -136,12 +197,13 @@ export function MistyComposer(props: {
           }
         },
         disabled: props.disabled,
-        "aria-label": "Message Misty",
+        "aria-label": "Message",
         placeholder: props.placeholder ?? "Ask anything…",
       }}
       context={
-        props.attachments.length ? (
-          <div className="flex gap-2 overflow-x-auto px-3 pt-3">
+        props.attachments.length || props.attachedChips ? (
+          <div className="flex items-center gap-2 overflow-x-auto px-3 pt-3">
+            {props.attachedChips}
             {props.attachments.map((attachment) => (
               <div
                 key={attachment.id}
@@ -194,60 +256,38 @@ export function MistyComposer(props: {
           </div>
         ) : null
       }
-      leading={
-        <>
-          <FileInput
-            ref={fileRef}
-            accept="image/jpeg,image/png,image/webp,.pdf,.docx,.txt,.md,.csv,.json"
-            multiple={props.maxAttachments > 1}
-            onChange={(event) => {
-              accept(Array.from(event.target.files ?? []));
-              event.target.value = "";
-            }}
-          />
-          {props.onCapture ? (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <IconButton label="Add attachments" tooltip={false} disabled={props.disabled}>
-                  <Plus className="size-4" />
-                </IconButton>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" data-misty-layer-portal>
-                <MenuItem
-                  icon={<ImagePlus className="size-4" />}
-                  label="Attach files"
-                  onSelect={() => fileRef.current?.click()}
-                />
-                <MenuItem
-                  icon={<Camera className="size-4" />}
-                  label="Capture part of the screen"
-                  onSelect={props.onCapture}
-                />
-              </DropdownMenuContent>
-            </DropdownMenu>
-          ) : (
-            <IconButton
-              label="Attach files"
-              disabled={props.disabled}
-              onClick={() => fileRef.current?.click()}
-            >
-              <Plus className="size-4" />
-            </IconButton>
-          )}
-          {props.leadingControl}
-        </>
+      leading={toolbar ? undefined : attach}
+      footer={
+        toolbar ? (
+          <div className="misty-composer-toolbar" role="toolbar" aria-label="Message options">
+            <div className="misty-composer-toolbar-start">{attach}</div>
+            <div className="misty-composer-toolbar-end">
+              {props.toolbarEnd}
+              {props.voiceControl}
+              {sendControl}
+            </div>
+          </div>
+        ) : (
+          hasFooter && <div className="flex min-w-0 flex-col gap-2">{props.modelControl}</div>
+        )
       }
-      footer={hasFooter && <div className="flex min-w-0 flex-col gap-2">{props.modelControl}</div>}
       // A conversation keeps send (or Stop) inside the text box; the rest of its toolbar
       // sits beneath the box.
       overlay={
-        props.layout === "conversation" && <div className="misty-composer-send">{sendControl}</div>
+        <>
+          {props.popup}
+          {props.layout === "conversation" && (
+            <div className="misty-composer-send">{sendControl}</div>
+          )}
+        </>
       }
       actions={
-        <>
-          {props.voiceControl}
-          {props.layout !== "conversation" && sendControl}
-        </>
+        toolbar ? undefined : (
+          <>
+            {props.voiceControl}
+            {props.layout !== "conversation" && sendControl}
+          </>
+        )
       }
     />
   );

@@ -1,5 +1,6 @@
 import { invoke } from "@/native/invoke";
 import { agentAccountId } from "../personal/agentAccount";
+import { gitApi, isNotARepo, type GitFileEntry } from "./git/gitApi";
 
 export interface ProjectEntry {
   name: string;
@@ -31,6 +32,11 @@ export interface GitStatus {
 
 const account = () => agentAccountId();
 
+const summaryOf = (entry: GitFileEntry): Omit<GitChange, "staged"> => ({
+  path: entry.path,
+  status: entry.status === "typechange" ? "modified" : entry.status,
+});
+
 /** The panels' native calls. Each path is checked natively against the account's linked folders. */
 export const projectApi = {
   listDir: (path: string) =>
@@ -39,26 +45,26 @@ export const projectApi = {
     invoke<ProjectFile>("project_read_file", { account: account(), path }),
   writeFile: (path: string, content: string) =>
     invoke<void>("project_write_file", { account: account(), path, content }),
-  gitStatus: (folder: string) =>
-    invoke<GitStatus>("project_git_status", { account: account(), folder }),
-  gitDiff: (folder: string, change: GitChange) =>
-    invoke<string>("project_git_diff", {
-      account: account(),
-      folder,
-      file: change.path,
-      staged: change.staged,
-      untracked: change.status === "untracked",
-    }),
-  gitStage: (folder: string, files: string[], stage: boolean) =>
-    invoke<void>("project_git_stage", { account: account(), folder, files, stage }),
-  gitCommit: (folder: string, message: string) =>
-    invoke<void>("project_git_commit", { account: account(), folder, message }),
-  terminalOpen: (id: string, folder: string, cols: number, rows: number) =>
-    invoke<void>("project_terminal_open", { account: account(), id, folder, cols, rows }),
-  terminalWrite: (id: string, data: string) => invoke<void>("project_terminal_write", { id, data }),
-  terminalResize: (id: string, cols: number, rows: number) =>
-    invoke<void>("project_terminal_resize", { id, cols, rows }),
-  terminalClose: (id: string) => invoke<void>("project_terminal_close", { id }),
+  /** A short read of the folder's Git state for the session card and Space home: the branch and
+   * every changed file. The changes panel itself reads the full status (`git/gitApi.ts`). */
+  gitStatus: async (folder: string): Promise<GitStatus> => {
+    try {
+      const status = await gitApi.status(folder);
+      const changes: GitChange[] = [
+        ...status.staged.map((entry) => ({ ...summaryOf(entry), staged: true })),
+        ...status.unstaged.map((entry) => ({ ...summaryOf(entry), staged: false })),
+        ...status.untracked.map((entry) => ({
+          path: entry.path,
+          status: "untracked" as const,
+          staged: false,
+        })),
+      ];
+      return { repository: true, branch: status.branch, changes };
+    } catch (reason) {
+      if (isNotARepo(reason)) return { repository: false, branch: "", changes: [] };
+      throw reason;
+    }
+  },
 };
 
 export const errorText = (reason: unknown) =>

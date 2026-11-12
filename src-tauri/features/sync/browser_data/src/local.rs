@@ -1,10 +1,9 @@
-//! Everything a profile keeps (bookmarks, passwords, downloads, tabs, cookies) as encrypted
-//! records in one local database, whether or not a vault exists. Rows are sealed with a key
-//! kept for this install alone; the vault link re-seals them under the vault root to upload,
-//! so creating, pausing or destroying a vault never touches what is stored here.
+//! Everything a profile keeps (tabs, downloads, site choices, extensions) as encrypted records in
+//! one local database. Rows are sealed with a key kept for this install alone, and never leave
+//! this computer.
 //!
-//! One row per record. A row is `dirty` while it has a change the server has not accepted,
-//! and carries the server version it was last confirmed at (0: the server never had it).
+//! One row per record. `version` and `dirty` are left from when records synced: a row written
+//! before then may still carry a version, and its deletion is remembered for a while.
 use std::path::Path;
 
 use aes_gcm::{
@@ -12,8 +11,7 @@ use aes_gcm::{
     Aes256Gcm, KeyInit, Nonce,
 };
 use rand::{rngs::OsRng, RngCore};
-use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};
-use serde::Serialize;
+use rusqlite::{params, Connection, OptionalExtension};
 use zeroize::Zeroizing;
 
 use crate::{document::ViewRecord, Error, Result};
@@ -33,17 +31,7 @@ CREATE TABLE IF NOT EXISTS records (
 ) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS records_dirty ON records(dirty, edited_at);
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL) WITHOUT ROWID;
-CREATE TABLE IF NOT EXISTS inbox (
-    profile TEXT NOT NULL,
-    collection TEXT NOT NULL,
-    id TEXT NOT NULL,
-    PRIMARY KEY (profile, collection, id)
-) WITHOUT ROWID;
 ";
-
-/// Collections too large to read whole after every change: each record the server changes is listed in
-/// `inbox`, until what reads them says it has them.
-const INBOX_COLLECTIONS: &[&str] = &[crate::collections::MEMORY];
 
 /// The install's key for this database. It never leaves the machine.
 pub struct LocalKey(Zeroizing<[u8; 32]>);
@@ -69,38 +57,10 @@ impl LocalKey {
     }
 }
 
-/// A change waiting to go to the server.
-pub struct DirtyRow {
-    pub profile: String,
-    pub collection: String,
-    pub id: String,
-    /// The record's JSON; `None` is a deletion.
-    pub plaintext: Option<Zeroizing<Vec<u8>>>,
-    pub edited_at: u64,
-    pub version: u64,
-}
-
-/// What a server copy did to the local row.
-#[derive(Debug, PartialEq, Eq)]
-pub enum Applied {
-    /// The server's copy replaced the local one.
-    Replaced,
-    /// The local edit is newer: it stays, and goes out on the server's version.
-    KeptLocal,
-    /// The server sent a version this machine has already moved past.
-    Ignored,
-}
-
-#[derive(Default, Serialize, Debug, PartialEq, Eq)]
-pub struct Totals {
-    pub records: u64,
-    pub waiting: u64,
-}
-
 pub struct LocalStore {
     connection: Connection,
     cipher: Aes256Gcm,
-    /// The latest edit time this store has seen, from any machine.
+    /// The latest edit time this store has seen.
     clock: u64,
 }
 
@@ -137,7 +97,7 @@ impl LocalStore {
         connection.busy_timeout(std::time::Duration::from_secs(5))?;
         connection.execute_batch("PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL;")?;
         connection.execute_batch(SCHEMA)?;
-        // The server forgets a deletion after this long; so can this computer.
+        // A remembered deletion goes after this long.
         connection.execute(
             "DELETE FROM records WHERE sealed IS NULL AND dirty = 0 AND edited_at < ?1",
             params![now_ms().saturating_sub(DELETES_KEPT_MS) as i64],
@@ -154,8 +114,7 @@ impl LocalStore {
         })
     }
 
-    /// An edit time that is never behind anything this store has seen, so a machine with a
-    /// slow clock still orders its new edits after what it just received.
+    /// An edit time that is never behind anything this store has seen, even if the clock went back.
     fn tick(&mut self) -> u64 {
         self.clock = now_ms().max(self.clock + 1);
         self.clock
@@ -225,7 +184,7 @@ impl LocalStore {
             .collect())
     }
 
-    /// Ids deleted in a collection, here or elsewhere, and still remembered.
+    /// Ids deleted in a collection and still remembered.
     pub fn deleted_ids(&self, profile: &str, collection: &str) -> Result<Vec<String>> {
         let mut statement = self.connection.prepare_cached(
             "SELECT id FROM records WHERE profile = ?1 AND collection = ?2 AND sealed IS NULL",
@@ -254,8 +213,8 @@ impl LocalStore {
         }
     }
 
-    /// Local edits. `None` deletes. Writing what is already stored changes nothing, so a
-    /// repeated save never sends anything. Returns how many rows changed.
+    /// Local edits. `None` deletes. Writing what is already stored changes nothing. Returns how
+    /// many rows changed.
     pub fn write(
         &mut self,
         profile: &str,
@@ -305,7 +264,7 @@ impl LocalStore {
             return Ok(false);
         }
         let version = row.as_ref().map_or(0, |(_, version)| *version);
-        // The server never had it, so there is nothing to tell it: the row just goes.
+        // A row with no version was never anywhere else: it just goes.
         if plain.is_none() && version == 0 {
             self.connection.execute(
                 "DELETE FROM records WHERE profile = ?1 AND collection = ?2 AND id = ?3",
@@ -353,7 +312,6 @@ impl LocalStore {
 
 mod notes;
 mod profiles;
-mod sync;
 
 #[cfg(test)]
 mod tests;

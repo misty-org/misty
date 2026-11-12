@@ -1,5 +1,5 @@
 //! The real control at or near a pointed-at spot: macOS Accessibility or
-//! Windows UI Automation.
+//! Windows UI Automation. Linux has no such reader here yet, so the point stands as given.
 /// The actionable control at or near a global point, preferring one whose text
 /// matches the label. None when Accessibility is not allowed or nothing fits.
 #[cfg(target_os = "macos")]
@@ -10,6 +10,11 @@ pub fn snap_point(x: f64, y: f64, label: &str) -> Result<Option<serde_json::Valu
         return Ok(None);
     }
     Ok(value.get("element").cloned())
+}
+
+#[cfg(target_os = "linux")]
+pub fn snap_point(_x: f64, _y: f64, _label: &str) -> Result<Option<serde_json::Value>, String> {
+    Ok(None)
 }
 
 /// The actionable control at or near a global point (physical pixels),

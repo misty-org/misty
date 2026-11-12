@@ -39,7 +39,6 @@ pub(crate) async fn change_account_if<T>(
     }
     #[cfg(not(desktop))]
     let _ = app;
-    crate::sync::vault::close_for_account_change().await;
     close_store();
     // Keep the lifecycle lock through replacing the client, so nothing opens for the old account
     // between shutdown and activation.

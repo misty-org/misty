@@ -24,14 +24,7 @@ pub(crate) struct Taint {
 /// Whether this call read the person's private data.
 pub(crate) fn reads_private(name: &str, input: &Value) -> bool {
     match name {
-        "memory.pref.list"
-        | "memory.history.search"
-        | "memory.history.timeline"
-        | "memory.tree.read"
-        | "memory.workflow.list"
-        | "memory.workflow.find"
-        | "memory.workflow.use"
-        | "folder.read"
+        "folder.read"
         | "shell.run"
         | "note.read"
         | "note.search"
@@ -302,8 +295,6 @@ mod tests {
     #[test]
     fn what_counts_as_a_private_read() {
         for name in [
-            "memory.pref.list",
-            "memory.tree.read",
             "folder.read",
             "note.read",
             "search.all",

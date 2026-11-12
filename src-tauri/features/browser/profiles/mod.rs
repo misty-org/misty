@@ -1,7 +1,7 @@
 //! What each profile keeps, on this computer: one encrypted database per account, reached
-//! through a [`ProfileRecords`] handle. It works with no vault and no account; the vault link
-//! only copies these records to and from the server. Also the account-change barrier, which
-//! keeps browser views and data from outliving the account they belong to.
+//! through a [`ProfileRecords`] handle. It works with no account, and it never leaves this
+//! computer. Also the account-change barrier, which keeps browser views and data from outliving
+//! the account they belong to.
 use file_access::fs;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, OnceLock};
@@ -11,9 +11,8 @@ use browser_data::{
     local::{LocalKey, LocalStore},
     secure_store,
 };
-use serde::Serialize;
 use sha2::{Digest, Sha256};
-use tokio::sync::{broadcast, RwLock, RwLockReadGuard};
+use tokio::sync::{RwLock, RwLockReadGuard};
 
 use crate::browser::app_windows;
 
@@ -23,7 +22,6 @@ mod records;
 mod seed;
 mod tabs;
 pub(crate) use account::*;
-pub use commands::*;
 pub use records::*;
 pub(crate) use seed::seed_first_profile;
 pub use tabs::*;
@@ -33,22 +31,9 @@ pub use tabs::*;
 #[allow(clippy::disallowed_methods, clippy::disallowed_types)]
 mod tests;
 
-/// One change to a profile's records.
-#[derive(Clone, Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct RecordsChanged {
-    pub profile: String,
-    pub collection: String,
-    /// It came from another signed-in session, so native data built from it needs applying.
-    pub remote: bool,
-}
-
 /// Tabs' saved page state and back/forward lists, one row per `<view id>:<slot>`. A tab's rows go
 /// when the tab is closed.
 pub const PAGE_STATE: &str = "page_state";
-
-/// Emitted to a profile's windows when its records change.
-pub const RECORDS_CHANGED_EVENT: &str = "misty://profile-records-changed";
 
 struct OpenStore {
     scope: String,
@@ -57,20 +42,6 @@ struct OpenStore {
 }
 
 static OPEN: Mutex<Option<OpenStore>> = Mutex::new(None);
-
-fn changes() -> &'static broadcast::Sender<RecordsChanged> {
-    static CHANGES: OnceLock<broadcast::Sender<RecordsChanged>> = OnceLock::new();
-    CHANGES.get_or_init(|| broadcast::channel(256).0)
-}
-
-/// Every record change on this computer, local or remote.
-pub fn subscribe() -> broadcast::Receiver<RecordsChanged> {
-    changes().subscribe()
-}
-
-pub(crate) fn announce(change: RecordsChanged) {
-    let _ = changes().send(change);
-}
 
 fn hashed(value: impl AsRef<[u8]>) -> String {
     hex::encode(Sha256::digest(value))
@@ -228,24 +199,6 @@ pub async fn remove_profile(profile: &str) {
     .await;
 }
 
-/// Deletes a profile for every session, once the vault link has told the server.
-pub async fn erase_profile(profile: &str) {
-    let name = profile.to_owned();
-    let _ = tokio::task::spawn_blocking(move || {
-        if let Ok(store) = local_store() {
-            if let Ok(mut store) = store.lock() {
-                let _ = store.erase_profile(&name);
-            }
-        }
-    })
-    .await;
-    announce(RecordsChanged {
-        profile: profile.to_owned(),
-        collection: String::new(),
-        remote: false,
-    });
-}
-
 /// This install's stable id among the account's signed-in sessions.
 pub fn session_id() -> Option<String> {
     let store = local_store().ok()?;
@@ -286,7 +239,7 @@ pub(crate) fn browser_lifecycle() -> &'static RwLock<()> {
 
 /// Takes the lifecycle lease when it is free: engines ask for popups on their UI thread, which
 /// must never wait on an account change.
-#[cfg(any(target_os = "macos", windows))]
+#[cfg(any(target_os = "macos", windows, target_os = "linux"))]
 pub(crate) fn popup_lifecycle_lease() -> Option<RwLockReadGuard<'static, ()>> {
     browser_lifecycle().try_read().ok()
 }

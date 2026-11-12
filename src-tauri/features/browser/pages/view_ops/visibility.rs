@@ -6,12 +6,6 @@ pub async fn browser_webview_reload(
     app: AppHandle,
     request: BrowserWebviewIdRequest,
 ) -> Result<(), String> {
-    #[cfg(any(target_os = "macos", windows))]
-    if let Some(webview) = app.get_webview(&webview_label(&request.id)?) {
-        if let Ok(url) = webview.url() {
-            crate::sync::vault::site_data::prepare_own_page(&webview, &url).await;
-        }
-    }
     with_webview(&app, &request.id, |webview| {
         reload_browser_webview(&webview)
     })

@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { check } from "@tauri-apps/plugin-updater";
 import { settingsBoolean, useSettingsStore } from "@/features/settings";
 import { hasTauriInternals } from "@/shared/platform/tauri";
+import { ReleaseNotesDialog } from "./ReleaseNotesDialog";
 
 /** Checks only. Downloads and installation always follow an explicit user action. */
 const minCheckIntervalMs = 6 * 60 * 60_000;
@@ -71,31 +72,37 @@ export function UpdateNotices({ accountScope }: { accountScope: string }) {
       window.removeEventListener("focus", run);
     };
   }, [accountScope, enabled]);
-  if ((!hostVersion && !notice) || key === dismissed) return null;
+  const showNotice = (hostVersion || notice) && key !== dismissed;
   return (
-    <Notification
-      key={key}
-      title={notice ? undefined : `Misty ${hostVersion} is available`}
-      onDismiss={() => {
-        setDismissed(key);
-        setNotice("");
-      }}
-    >
-      {notice || (
-        <Button
-          type="button"
-          variant="link"
-          size="none"
-          onClick={() => {
+    <>
+      {/* Always in the same place, so a notice coming or going never shows the notes again. */}
+      <ReleaseNotesDialog />
+      {showNotice ? (
+        <Notification
+          key={key}
+          title={notice ? undefined : `Misty ${hostVersion} is available`}
+          onDismiss={() => {
             setDismissed(key);
-            window.dispatchEvent(
-              new CustomEvent("misty:open-settings", { detail: { section: "updates" } }),
-            );
+            setNotice("");
           }}
         >
-          View release
-        </Button>
-      )}
-    </Notification>
+          {notice || (
+            <Button
+              type="button"
+              variant="link"
+              size="none"
+              onClick={() => {
+                setDismissed(key);
+                window.dispatchEvent(
+                  new CustomEvent("misty:open-settings", { detail: { section: "updates" } }),
+                );
+              }}
+            >
+              View release
+            </Button>
+          )}
+        </Notification>
+      ) : null}
+    </>
   );
 }

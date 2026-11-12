@@ -7,7 +7,6 @@ use futures_util::future::BoxFuture;
 use crate::model_calls::{FileData, Message, RawJson, UserPart};
 
 use super::{
-    browser_replay::{run_browser_replay, valid_replay, ReplayOutcome},
     companion_images::{companion_image_parts, DisplayCapture, ScreenControl, TaskFile},
     js_json::JsValue,
     model_input::{initial_messages, TaskInput},
@@ -204,33 +203,6 @@ async fn what_the_monitor_says_when_it_pauses_or_stops() {
     for (name, got) in cases {
         assert_eq!(got.stringify(), want.get(name).unwrap().stringify(), "{name}");
     }
-}
-
-struct Replaying;
-
-impl ToolCheckpoints for Replaying {
-    fn checkpoint(&self, _event: HarnessCheckpoint) -> BoxFuture<'_, Result<(), RuntimeError>> {
-        Box::pin(async { Ok(()) })
-    }
-}
-
-impl ToolTransport for Replaying {
-    fn run<'a>(&'a self, _call_id: &'a str, name: &'a str, _input: &'a JsValue) -> BoxFuture<'a, Result<Option<JsValue>, RuntimeError>> {
-        let output = if name == "browser.wait_for" { r#"{"met":false}"# } else { r#"{"ok":true}"# };
-        Box::pin(async move { Ok(Some(json(output))) })
-    }
-}
-
-#[tokio::test]
-async fn the_replay_note() {
-    let replay = valid_replay(&json(r#"{"scope_id":"scope-12345678","calls":[{"tool":"browser.navigate","args":{"url":"https://a.example"}},{"tool":"browser.wait_for","args":{"textGone":"Loading"}}]}"#)).unwrap();
-    let ReplayOutcome::Diverged { note, actions } = run_browser_replay(&replay, &Replaying, |_| true).await.unwrap() else {
-        panic!("expected a divergence");
-    };
-    let recorded = recorded();
-    let want = recorded.get("replay").unwrap();
-    assert_eq!(note, text(want.get("note")));
-    assert_eq!(Some(&JsValue::Number(actions as f64)), want.get("actions"));
 }
 
 #[test]

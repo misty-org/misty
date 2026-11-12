@@ -314,6 +314,8 @@ pub mod models;
 pub mod run_control;
 pub mod screen_context;
 pub mod shell;
+pub mod tutor_links;
+pub mod tutor_video;
 #[cfg(test)]
 // Tests build their fixtures directly, outside the file gate.
 #[allow(clippy::disallowed_methods, clippy::disallowed_types)]

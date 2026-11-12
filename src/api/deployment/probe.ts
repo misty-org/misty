@@ -1,7 +1,7 @@
 import { nativeAccountFetch } from "@/api/client/native-account-fetch";
 import { invoke } from "@/native/invoke";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { mistyProServer } from "./serverChoice";
+import { mistyCloudServer } from "./serverChoice";
 
 /**
  * A release build refuses a domain that resolves to a private address, such as a hosts-file entry
@@ -9,7 +9,7 @@ import { mistyProServer } from "./serverChoice";
  * address, and that must not lock anyone out of Misty's own server.
  */
 async function refusePrivateServer(apiBase: string): Promise<void> {
-  if (import.meta.env.DEV || !hasTauriInternals() || apiBase === mistyProServer()) return;
+  if (import.meta.env.DEV || !hasTauriInternals() || apiBase === mistyCloudServer()) return;
   const host = new URL(apiBase).hostname;
   if (!(await invoke<boolean>("server_host_resolves_public", { host })))
     throw new Error("That domain points to a private address. Misty needs a public server.");

@@ -58,7 +58,7 @@ fn prompts_match_the_server_byte_for_byte() {
     for (name, fixture) in fixtures() {
         let request = RunRequest::from_json(&fixture["request"]);
         let names: Vec<String> = catalog_of(&request, &inputs_of(&fixture)).into_iter().map(|tool| tool.name).collect();
-        let built = build_prompt(&request, &names, fixture["now"].as_str().unwrap(), fixture["memory_context"].as_str().unwrap(), fixture["method_guidance"].as_str().unwrap());
+        let built = build_prompt(&request, &names, fixture["now"].as_str().unwrap());
         let expected = &fixture["expected"];
         failures.extend(first_difference(&name, "system", &built.system, expected["system"].as_str().unwrap()));
         failures.extend(first_difference(&name, "prompt", &built.prompt, expected["prompt"].as_str().unwrap()));
@@ -153,7 +153,7 @@ fn a_signed_out_run_has_nothing_that_needs_the_server() {
     for gone in ["space.list", "space.manage", "note.read", "message.send", "file.search", "folder.send", "search.all", "agent.configure"] {
         assert!(!out.iter().any(|name| name == gone), "{gone} should need an account");
     }
-    for kept in ["web.fetch", "screen.open", "browser.run", "shell.run", "folder.read", "memory.pref.list", "log.work.write", "conversation.ask_user", "agent.delegate"] {
+    for kept in ["web.fetch", "screen.open", "browser.run", "shell.run", "folder.read", "log.work.write", "conversation.ask_user", "agent.delegate"] {
         assert!(out.iter().any(|name| name == kept), "{kept} should work signed out");
     }
     let signed_in = names(true);
@@ -189,7 +189,7 @@ fn the_chats_plan_and_goal_decide_their_tools_and_instructions() {
         let listed = |tool: &str| tools.iter().any(|item| item.name == tool);
         assert_eq!((listed("plan.update"), listed("goal.update")), (plan_update, goal_update), "{name}");
         let names: Vec<String> = tools.iter().map(|tool| tool.name.clone()).collect();
-        let system = build_prompt(&request, &names, "2026-11-06T17:04:05Z", "", "").system;
+        let system = build_prompt(&request, &names, "2026-11-06T17:04:05Z").system;
         assert!(system.contains(words), "{name}");
     }
 }
@@ -197,4 +197,63 @@ fn the_chats_plan_and_goal_decide_their_tools_and_instructions() {
 #[test]
 fn quotes_as_go_does() {
     assert_eq!(go_quote("a \"b\"\t\u{1}\u{a0}é\u{200b}😀\u{7f}"), "\"a \\\"b\\\"\\t\\x01\\u00a0é\\u200b😀\\x7f\"");
+}
+
+/// Rewrites every fixture's expected prompt and tools from the code as it is now. Run it by hand
+/// after a deliberate change to the prompt or the tools, then read the diff:
+/// `MISTY_BLESS_FIXTURES=1 cargo test -p agent-runs bless_fixtures -- --ignored`.
+#[test]
+#[ignore]
+fn bless_fixtures() {
+    if std::env::var("MISTY_BLESS_FIXTURES").as_deref() != Ok("1") {
+        return;
+    }
+    let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("local_prompt/fixtures");
+    for (name, mut fixture) in fixtures() {
+        let request = RunRequest::from_json(&fixture["request"]);
+        let inputs = inputs_of(&fixture);
+        let tools = catalog_of(&request, &inputs);
+        let names: Vec<String> = tools.iter().map(|tool| tool.name.clone()).collect();
+        let built = build_prompt(
+            &request,
+            &names,
+            fixture["now"].as_str().unwrap(),
+        );
+        let old_rows: HashMap<String, Value> = fixture["expected"]["tools"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .map(|row| (row["name"].as_str().unwrap_or("").to_owned(), row.clone()))
+            .collect();
+        let rows: Vec<Value> = tools
+            .iter()
+            .filter(|tool| !tool.local)
+            .map(|tool| {
+                let old = old_rows.get(&tool.name);
+                let description = match old {
+                    Some(row) if tool.name == "thread.post" => row["description"].clone(),
+                    _ => Value::String(tool.description.clone()),
+                };
+                let read_only = match old {
+                    Some(row) if tool.name == "screen.open" => row["readOnly"].clone(),
+                    _ => Value::Bool(tool.read_only),
+                };
+                let locality = match old {
+                    Some(row) => row["locality"].clone(),
+                    None => Value::String(if tool.concurrent { "server" } else { "device" }.into()),
+                };
+                serde_json::json!({ "name": tool.name, "description": description, "readOnly": read_only, "locality": locality })
+            })
+            .collect();
+        let expected = &mut fixture["expected"];
+        expected["system"] = Value::String(built.system);
+        expected["prompt"] = Value::String(built.prompt);
+        expected["title_prompt"] = Value::String(built.title_prompt);
+        expected["tools"] = Value::Array(rows);
+        if let Some(schemas) = expected["schemas"].as_object_mut() {
+            schemas.retain(|tool, _| names.contains(tool));
+        }
+        let text = serde_json::to_string_pretty(&fixture).unwrap();
+        fs::write(dir.join(format!("{name}.json")), text + "\n").unwrap();
+    }
 }

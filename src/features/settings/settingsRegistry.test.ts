@@ -60,15 +60,15 @@ describe("settings routing", () => {
     expect(settingsPage("diagnostics")?.area).toBe("advanced");
     expect(settingsPage("browser")?.area).toBe("general");
     expect(settingsPage("search")?.id).toBe("general");
-    expect(settingsPage("browser-handoff")?.id).toBe("sync");
+    expect(settingsPage("browser-handoff")?.id).toBe("account");
+    expect(settingsPage("sync")?.id).toBe("account");
     expect(settingsPage("about")?.id).toBe("account");
   });
 
   it("lands every “manage it in Settings” link on the page that holds it", () => {
     const links: Record<string, [SettingsSection, string]> = {
       "update notice": ["updates", "general"],
-      "clipboard devices": ["devices", "sync"],
-      "vault sync": ["sync", "sync"],
+      "clipboard devices": ["devices", "account"],
     };
     for (const [link, [section, area]] of Object.entries(links))
       expect(settingsPage(section)?.area, link).toBe(area);

@@ -1,10 +1,10 @@
-//! Data sealed for this computer under a root, such as workspace recovery.
+//! Data sealed for this computer under a key, such as workspace recovery.
 use super::*;
 
-impl VaultRoot {
+impl RecoveryKey {
     pub(crate) fn seal_local(
         &self,
-        scope: &VaultScope,
+        scope: &RecoveryScope,
         device_id: &str,
         record: &str,
         plaintext: &[u8],
@@ -12,7 +12,7 @@ impl VaultRoot {
         if !valid_id(device_id) {
             return Err(Error::Invalid);
         }
-        let key = self.derive("misty.sync.local-key.v1", &(device_id, &scope.vault_id))?;
+        let key = self.derive("misty.sync.local-key.v1", &(device_id, &scope.id))?;
         encrypt(
             key.as_ref(),
             plaintext,
@@ -23,7 +23,7 @@ impl VaultRoot {
 
     pub(crate) fn open_local(
         &self,
-        scope: &VaultScope,
+        scope: &RecoveryScope,
         device_id: &str,
         record: &str,
         envelope: &Envelope,
@@ -31,7 +31,7 @@ impl VaultRoot {
         if !valid_id(device_id) {
             return Err(Error::Invalid);
         }
-        let key = self.derive("misty.sync.local-key.v1", &(device_id, &scope.vault_id))?;
+        let key = self.derive("misty.sync.local-key.v1", &(device_id, &scope.id))?;
         decrypt(
             key.as_ref(),
             envelope,

@@ -1,7 +1,6 @@
 import { OrderedCollectionFilters as CollectionFilters } from "@/features/settings/OrderedCollectionFilters";
 import { useState, type ComponentProps } from "react";
 import { JournalAllCollection, journalSections } from "../../JournalAllCollection";
-import { JournalDay } from "../../day/JournalDay";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { FileText, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
 import {
@@ -21,7 +20,6 @@ import {
   IconButton,
   CollectionSkeleton,
   itemTones,
-  CollectionSelectionBar,
 } from "@/shared/ui";
 import { useRangeSelection } from "@/shared/hooks/useRangeSelection";
 import type { UnifiedNote } from "../noteTypes";
@@ -47,10 +45,7 @@ export function JournalCollection(props: {
   const creatorName = useSpaceItemCreator(props.spaceId);
   const [params, setParams] = useSearchParams();
   const section = params.get("section");
-  const filter =
-    section === "notes" || (section === "day" && journalSections.some((s) => s.value === "day"))
-      ? section
-      : "all";
+  const filter = section === "notes" ? section : "all";
   const selectSection = (value: string) => {
     if (value === "drawings") navigate(`/spaces/${encodeURIComponent(props.spaceId)}/drawings`);
     else {
@@ -82,19 +77,6 @@ export function JournalCollection(props: {
     .filter((note) => !props.readOnly && note.canDelete)
     .map((note) => note.id);
   const selection = useRangeSelection(selectableIds);
-  if (filter === "day")
-    return (
-      <JournalDay
-        filters={
-          <CollectionFilters
-            collectionId="journal"
-            options={journalSections}
-            value="day"
-            onChange={selectSection}
-          />
-        }
-      />
-    );
   if (filter === "all")
     return <JournalAllCollection {...props} section={filter} onSection={selectSection} />;
   return (
@@ -125,11 +107,6 @@ export function JournalCollection(props: {
         onChange={selectSection}
         filterControl={refinement.control}
         actions={<CollectionViewToggle value={view} onChange={setView} disabled={!notes.length} />}
-      />
-      <CollectionSelectionBar
-        count={selection.selectedIds.length}
-        onClear={selection.clear}
-        onDelete={() => props.onDeleteMany?.(selection.selectedIds)}
       />
       <ErrorNotification message={props.bulkError} />
       <ErrorNotification message={props.error ? "Notes couldn’t load." : ""}>
@@ -167,7 +144,18 @@ export function JournalCollection(props: {
             }),
             onOpen: () => props.onOpen(note),
             selectable: !props.readOnly && note.canDelete,
-            contextMenu: <NoteActions note={note} props={props} context />,
+            contextMenu:
+              selection.menuTargets(note.id).length > 1 ? (
+                <ContextMenuAction
+                  icon={<Trash2 />}
+                  label={`Delete ${selection.selectedIds.length} notes`}
+                  destructive
+                  onSelect={() => props.onDeleteMany?.(selection.selectedIds)}
+                />
+              ) : (
+                <NoteActions note={note} props={props} context />
+              ),
+            onContextMenuOpen: () => selection.pickForMenu(note.id),
             actions: (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>

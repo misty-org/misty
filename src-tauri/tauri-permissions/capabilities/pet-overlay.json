@@ -1,0 +1,24 @@
+{
+  "identifier": "pet-overlay",
+  "description": "The desktop pet's own window: it reads its package and state, and moves and resizes itself",
+  "platforms": [
+    "macOS",
+    "windows",
+    "linux"
+  ],
+  "webviews": [
+    "misty-pet"
+  ],
+  "permissions": [
+    "core:event:default",
+    "core:window:allow-start-dragging",
+    "core:window:allow-outer-position",
+    "core:window:allow-scale-factor",
+    "allow-pet-settings",
+    "allow-pet-get-package",
+    "allow-pet-overlay-state",
+    "allow-pet-set-scale",
+    "allow-pet-save-position"
+  ],
+  "$schema": "../../gen/schemas/desktop-schema.json"
+}

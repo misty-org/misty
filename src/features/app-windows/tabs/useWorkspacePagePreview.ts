@@ -1,7 +1,7 @@
 import { useEffect, useRef, type RefObject } from "react";
 import type { WorkspaceView } from "./workspaceViews";
 import { snapshotPage } from "./pageSnapshot";
-import { pagePreviewGeneration, savePagePreview } from "../page-runtime/browserPagePreview";
+import { savePagePreview } from "../page-runtime/browserPagePreview";
 import { invoke } from "@tauri-apps/api/core";
 import { getAppliedAppRenderScale } from "@/shared/hooks/useAppZoom";
 
@@ -20,7 +20,6 @@ export function useWorkspacePagePreview(
     let disposed = false;
     let capturing = false;
     const capture = async () => {
-      const generation = pagePreviewGeneration();
       const root =
         host.current?.querySelector<HTMLElement>("[data-browser-page-host]") ?? host.current;
       if (
@@ -45,12 +44,7 @@ export function useWorkspacePagePreview(
             height: rect.height * scale,
             maxDimension: 2560,
           });
-          if (
-            !disposed &&
-            generation === pagePreviewGeneration() &&
-            latest.current?.id === tabId &&
-            image.dataUrl.length <= 8_000_000
-          ) {
+          if (!disposed && latest.current?.id === tabId && image.dataUrl.length <= 8_000_000) {
             savePagePreview(tabId, { url, dataUrl: image.dataUrl });
           }
         } catch {

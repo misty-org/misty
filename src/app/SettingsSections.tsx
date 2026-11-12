@@ -1,15 +1,25 @@
 import type { ComponentType } from "react";
 import { AccountSection, ServerSection } from "@/features/account";
 import {
+  AgentActivitySettings,
   AgentDefaultsSection,
   AgentPermissionsSection,
   CompanionSection,
   MistySection,
   ModelsSection,
+  PersonaCatalogSection,
 } from "@/features/agents";
 import { AdvancedSection, AppearanceSection, TabsSettings } from "@/features/app-windows";
 import { BrowserPermissionSettings, DownloadsSettings, PrivacySection } from "@/features/browser";
-import { MemorySection } from "@/features/memory";
+import { ChannelsSection } from "@/features/engine-config/channels";
+import { ClisSection } from "@/features/engine-config/clis";
+import { FontsSection } from "@/features/engine-config/fonts";
+import { McpSection } from "@/features/engine-config/mcp";
+import { NetworkSection } from "@/features/engine-config/network";
+import { PerformanceSection } from "@/features/engine-config/performance";
+import { PromptsSection } from "@/features/engine-config/prompts";
+import { SkillsSection } from "@/features/engine-config/skills";
+import { UsageSection } from "@/features/engine-config/usage";
 import {
   GeneralSection,
   registerSettingsSections,
@@ -17,13 +27,10 @@ import {
   type SettingsSection,
 } from "@/features/settings";
 import { ShortcutsSection } from "@/features/shortcuts";
-import { SyncSection } from "@/features/sync";
 import { UpdatesSection } from "@/features/updater";
 import { VoiceSection } from "@/features/voice";
-
-function MistyMemorySection(props: SettingsContentProps) {
-  return <MistySection {...props} page="memory" />;
-}
+import { ComputerUseSection } from "@/features/computer-use";
+import { PetsSection } from "@/features/pets";
 
 /**
  * Each feature owns the settings blocks of its own area. The settings page only knows block ids,
@@ -37,19 +44,29 @@ const sections: Partial<Record<SettingsSection, ComponentType<SettingsContentPro
   account: AccountSection,
   server: ServerSection,
   appearance: AppearanceSection,
+  fonts: FontsSection,
   shortcuts: ShortcutsSection,
   voice: VoiceSection,
   privacy: PrivacySection,
   "browser-permissions": BrowserPermissionSettings,
+  "agent-activity": AgentActivitySettings,
   advanced: AdvancedSection,
-  sync: SyncSection,
+  network: NetworkSection,
+  performance: PerformanceSection,
   models: ModelsSection,
+  "engine-clis": ClisSection,
+  "engine-channels": ChannelsSection,
+  "engine-usage": UsageSection,
+  "engine-mcp": McpSection,
+  "engine-skills": SkillsSection,
+  "engine-prompts": PromptsSection,
   "agents-defaults": AgentDefaultsSection,
   misty: MistySection,
   "agents-companion": CompanionSection,
   "agents-permissions": AgentPermissionsSection,
-  recall: MemorySection,
-  "agents-memory": MistyMemorySection,
+  "agents-personas": PersonaCatalogSection,
+  "agents-computer-use": ComputerUseSection,
+  pets: PetsSection,
 };
 
 registerSettingsSections(sections);

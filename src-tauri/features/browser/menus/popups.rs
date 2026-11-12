@@ -161,10 +161,6 @@ fn create_popup(
             let started = matches!(payload.event(), tauri::webview::PageLoadEvent::Started);
             if let Some(state) = page_app.try_state::<BrowserSessionState>() {
                 if started {
-                    // Keep popup zoom consistent with normal browser tabs: apply
-                    // it before the page paints so the scrollbar is not resized
-                    // again at load completion.
-                    apply_page_zoom_policy(webview, &page_app, &page_id);
                     if let Ok(mut sessions) = state.sessions.lock() {
                         if let Some(session) = sessions.get_mut(&page_id) {
                             session.element_targets.clear();

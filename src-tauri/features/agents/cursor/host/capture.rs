@@ -99,6 +99,10 @@ async fn capture_displays(app: AppHandle, turn: u64) -> Result<Vec<Value>, Strin
             let _capture_guard = capture_guard;
             platform::screen_access()?;
             if !current(&state,turn) { return Err("Capture interrupted".into()); }
+            // Wayland keeps the pointer from apps; the display in front, else the first, stands in.
+            #[cfg(target_os = "linux")]
+            let cursor=platform::cursor().unwrap_or((f64::MIN, f64::MIN));
+            #[cfg(not(target_os = "linux"))]
             let cursor=platform::cursor().ok_or("Cursor unavailable")?;
             let frames=displays()?;
             // The screen the person works on holds the window in front, not

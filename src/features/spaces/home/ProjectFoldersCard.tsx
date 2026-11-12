@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { currentSpaceKey, folderName, useContextPanel, useSpaceFolders } from "@/features/agents";
 import { Button, ErrorNotification } from "@/shared/ui";
 import { useGitStatuses } from "./useOverviewData";
-import { OverviewCard, OverviewRow, OverviewRowsSkeleton } from "./OverviewCard";
+import { OverviewCard, OverviewEmpty, OverviewRow, OverviewRowsSkeleton } from "./OverviewCard";
 import { gitSummary, shortPath } from "./overviewData";
 
 const noFolders: string[] = [];
@@ -53,7 +53,7 @@ export function ProjectFoldersCard() {
   );
 
   return (
-    <OverviewCard title="Project folders" action={folders.length ? linkButton : undefined}>
+    <OverviewCard title="Project folders" action={linkButton}>
       {!loaded && !settled ? (
         <OverviewRowsSkeleton rows={2} />
       ) : folders.length ? (
@@ -84,7 +84,7 @@ export function ProjectFoldersCard() {
           );
         })
       ) : (
-        <div className="overview-card-empty">{linkButton}</div>
+        <OverviewEmpty>No folders linked</OverviewEmpty>
       )}
       <ErrorNotification message={error} onDismiss={() => setError("")} />
     </OverviewCard>

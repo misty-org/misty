@@ -3,7 +3,10 @@
 //! neither read nor reach. Every frame of a tab announces itself from a private content
 //! world, so pages cannot forge or see it, and Misty keeps each cross-origin frame's
 //! handle to run the page layer inside it. On Windows the frame trees of the tab's
-//! DevTools sessions say the same (browser_frames_windows.rs).
+//! DevTools sessions say the same (browser_frames_windows.rs). On WebKitGTK each frame keeps a
+//! request open with Misty from that world instead (frames/linux.rs).
+#[cfg(target_os = "linux")]
+pub(crate) mod linux;
 #[cfg(windows)]
 pub(crate) mod windows;
 
@@ -249,7 +252,19 @@ pub(crate) fn install(webview: &tauri::Webview) -> Result<(), String> {
     {
         cdp_frames::install(webview)
     }
-    #[cfg(not(any(target_os = "macos", windows)))]
+    #[cfg(target_os = "linux")]
+    {
+        let (send, receive) = std::sync::mpsc::channel();
+        let label = webview.label().to_owned();
+        webview
+            .with_webview(move |platform| {
+                let _ = send.send(linux::install(&platform.inner(), label));
+            })
+            .map_err(|error| error.to_string())?;
+        // with_webview runs on the GTK thread; from there it has already run.
+        return receive.try_recv().unwrap_or(Ok(()));
+    }
+    #[cfg(not(any(target_os = "macos", windows, target_os = "linux")))]
     {
         let _ = webview;
         Ok(())
@@ -276,7 +291,21 @@ pub(crate) async fn list(webview: &tauri::Webview) -> Vec<Frame> {
     {
         cdp_frames::list(webview).await
     }
-    #[cfg(not(any(target_os = "macos", windows)))]
+    #[cfg(target_os = "linux")]
+    {
+        let (send, receive) = tokio::sync::oneshot::channel();
+        let label = webview.label().to_owned();
+        if webview
+            .with_webview(move |_| {
+                let _ = send.send(linux::list(&label));
+            })
+            .is_err()
+        {
+            return Vec::new();
+        }
+        receive.await.unwrap_or_default()
+    }
+    #[cfg(not(any(target_os = "macos", windows, target_os = "linux")))]
     {
         let _ = webview;
         Vec::new()

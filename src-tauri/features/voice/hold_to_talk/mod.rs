@@ -1,7 +1,7 @@
 //! System-wide hold-to-talk chords with key-down and key-up.
 //!
 //! One listen-only hook per process (a CGEventTap on macOS, a low-level
-//! keyboard hook on Windows) serves every chord: Control+Option for the agent
+//! keyboard hook on Windows, the X server's key state on Linux) serves every chord: Control+Option for the agent
 //! at the cursor and the dictation key. Input is observed, never consumed.
 use serde::{Deserialize, Serialize};
 use std::sync::{
@@ -17,6 +17,10 @@ use macos as platform;
 mod windows;
 #[cfg(windows)]
 use windows as platform;
+#[cfg(target_os = "linux")]
+mod linux;
+#[cfg(target_os = "linux")]
+use linux as platform;
 
 /// A modifier a chord can use. `Option` is Alt on Windows and `Command` is the
 /// Windows key. The `Right*` keys match only the right-hand key; plain ones
@@ -207,7 +211,7 @@ pub fn subscribe(chord: Chord) -> Subscription {
     state.subscribers.push((id, tx));
     if !state.started {
         state.started = true;
-        #[cfg(any(target_os = "macos", windows))]
+        #[cfg(any(target_os = "macos", windows, target_os = "linux"))]
         std::thread::Builder::new()
             .name("misty-global-hotkey".into())
             .spawn(|| platform::run(dispatch))
@@ -223,7 +227,10 @@ pub(crate) enum Input {
     Error(String),
 }
 
-#[cfg_attr(not(any(target_os = "macos", windows)), allow(dead_code))]
+#[cfg_attr(
+    not(any(target_os = "macos", windows, target_os = "linux")),
+    allow(dead_code)
+)]
 fn dispatch(input: Input) {
     let Ok(mut state) = hub().lock() else { return };
     let broadcast = |state: &Hub, event: HotkeyEvent| {
@@ -246,9 +253,9 @@ fn dispatch(input: Input) {
 
 /// The modifiers currently held, so paste can wait for the person to let go.
 pub fn held_modifiers() -> Modifiers {
-    #[cfg(any(target_os = "macos", windows))]
+    #[cfg(any(target_os = "macos", windows, target_os = "linux"))]
     return platform::current_modifiers();
-    #[cfg(not(any(target_os = "macos", windows)))]
+    #[cfg(not(any(target_os = "macos", windows, target_os = "linux")))]
     Modifiers::default()
 }
 

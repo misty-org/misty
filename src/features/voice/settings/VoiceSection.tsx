@@ -38,9 +38,7 @@ const languages = [
 ];
 const sources = [
   { value: "mic", label: "Microphone" },
-  { value: "mic-tab", label: "Microphone and this tab" },
   { value: "mic-system", label: "Microphone and system audio" },
-  { value: "tab", label: "This tab only" },
   { value: "system", label: "System audio only" },
 ];
 

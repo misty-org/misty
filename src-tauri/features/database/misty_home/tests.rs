@@ -91,7 +91,7 @@ fn moves_data_and_sync_out_of_dot_local_with_everything_in_them() {
     for file in ["misty.db", "misty.db-wal", "misty.db-shm"] {
         fs::write(root.join(".local/data").join(file), file).unwrap();
     }
-    fs::write(root.join(".local/sync/a/records.sqlite"), "vault").unwrap();
+    fs::write(root.join(".local/sync/a/records.sqlite"), "records").unwrap();
 
     misty_credential_store::move_out_of_dot_local(&root).unwrap();
 
@@ -99,7 +99,7 @@ fn moves_data_and_sync_out_of_dot_local_with_everything_in_them() {
         assert_eq!(fs::read_to_string(root.join("data").join(file)).unwrap(), file);
     }
     assert!(root.join("data/workspace-recovery/a").is_dir());
-    assert_eq!(fs::read_to_string(root.join("sync/a/records.sqlite")).unwrap(), "vault");
+    assert_eq!(fs::read_to_string(root.join("sync/a/records.sqlite")).unwrap(), "records");
     assert!(!root.join(".local").exists());
     let _ = fs::remove_dir_all(base);
 }

@@ -43,7 +43,7 @@ export function ConversationUnavailable(props: { onBack: () => void }) {
 /** The open chat's name above its messages; the chat sidebar switches chats. */
 export function ChatTitleBar(props: { title: string }) {
   return (
-    <header className="flex min-h-11 shrink-0 items-center gap-2 bg-charcoal-bg px-3 py-1.5">
+    <header className="flex min-h-12 shrink-0 items-center gap-2 bg-charcoal-bg px-3 py-1.5">
       <h1 className="m-0 min-w-0 flex-1 truncate px-1 text-sm font-medium text-cream-bright">
         {props.title}
       </h1>

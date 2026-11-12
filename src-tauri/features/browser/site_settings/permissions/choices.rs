@@ -32,40 +32,6 @@ async fn stop_capture(
     Ok(())
 }
 
-#[tauri::command]
-pub async fn browser_site_permissions_set(
-    caller: Webview,
-    app: AppHandle,
-    id: String,
-    origin: String,
-    permissions: Permissions,
-) -> Result<SiteInfo, String> {
-    require_host(&caller)?;
-    let before = inspect(
-        &app,
-        target(&app, &id)?,
-        Some(canonical_origin(&origin)?),
-        None,
-    )
-    .await?;
-    let info = inspect(
-        &app,
-        target(&app, &id)?,
-        Some(canonical_origin(&origin)?),
-        Some(permissions.clone()),
-    )
-    .await?;
-    stop_capture(
-        &app,
-        &info.scope,
-        permissions.camera != Decision::Allow && permissions.camera != before.permissions.camera,
-        permissions.microphone != Decision::Allow
-            && permissions.microphone != before.permissions.microphone,
-    )
-    .await?;
-    Ok(info)
-}
-
 /// The stores of profiles with an open tab, with each profile's name. Dormant stores of
 /// another signed-in account stay hidden.
 fn active_profiles(app: &AppHandle) -> std::collections::HashMap<String, String> {

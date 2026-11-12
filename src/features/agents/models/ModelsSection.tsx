@@ -14,6 +14,7 @@ import {
   providerById,
   qualifiedModel,
   reasoningLevels,
+  videoModels,
   voiceProviders,
 } from "./modelProviders";
 
@@ -131,6 +132,14 @@ export function ModelsSection() {
           placeholder="Off"
           suggestions={suggest("embedding")}
           normalize={qualify}
+        />
+        <ModelTextRow
+          id="models.video_model"
+          label="Video model"
+          description="Films the scenes of Tutor's video overviews, on your Google key. Optional; scenes show drawings when empty."
+          placeholder="Off"
+          suggestions={videoModels}
+          normalize={(value) => qualifiedModel(value, "google")}
         />
         <ModelDropdownRow
           id="models.reasoning"

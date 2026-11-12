@@ -120,5 +120,3 @@ export const messageTools: Record<string, LocalToolHandler> = {
   "message.search": search,
   "message.send": send,
 };
-
-export const messageWriteTools = ["message.send"];

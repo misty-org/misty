@@ -4,10 +4,6 @@ use serde_json::{json, Map, Value};
 
 use super::migration::{prune_retired_settings, SETTINGS_SCHEMA_VERSION};
 
-/// Sites whose page state is never captured by default (banking, payment,
-/// health). Users edit this list in Settings → Privacy.
-const DEFAULT_PAGE_STATE_EXCLUSIONS: &str = "paypal.com\nstripe.com\nchase.com\nbankofamerica.com\nwellsfargo.com\nciti.com\ncapitalone.com\namex.com\nschwab.com\nfidelity.com\nvanguard.com\ncoinbase.com\nmychart.org\nkp.org\nirs.gov\nssa.gov";
-
 pub(super) fn normalize_settings_document(document: &mut Value) -> bool {
     let mut changed = false;
     if !document.is_object() {
@@ -40,8 +36,6 @@ pub(super) fn normalize_settings_document(document: &mut Value) -> bool {
             ("preferred_workspace_root", json!("")),
             ("startup_view_index", json!(0)),
             ("reopen_last_session", json!(true)),
-            ("browser_search_engine_index", json!(0)),
-            ("browser_tab_history_kb", json!(256)),
         ],
     );
     changed |= ensure_section_defaults(
@@ -51,19 +45,6 @@ pub(super) fn normalize_settings_document(document: &mut Value) -> bool {
             ("theme_mode", json!("dark")),
             ("compact_mode_enabled", json!(false)),
             ("app_zoom", json!(1.0)),
-            ("navigator_auto_hide", json!(false)),
-        ],
-    );
-    changed |= ensure_section_defaults(
-        root,
-        "privacy",
-        &[
-            ("page_state_restore", json!(true)),
-            ("page_state_agent_restore", json!(true)),
-            (
-                "page_state_excluded_sites",
-                json!(DEFAULT_PAGE_STATE_EXCLUSIONS),
-            ),
         ],
     );
     changed |= ensure_section_defaults(
@@ -88,8 +69,7 @@ pub(super) fn normalize_settings_document(document: &mut Value) -> bool {
             ("language", json!("auto")),
             ("dictionary", json!("")),
             ("agent_handoff", json!(true)),
-            ("capture_sources", json!("mic-tab")),
-            ("subtitle_preferences", json!("{}")),
+            ("capture_sources", json!("mic-system")),
         ],
     );
     // Memory: on until the person turns it off; a pause is a time in ms.

@@ -17,6 +17,19 @@ export const AgentProfileInputSchema = z.strictObject({
   engine: z.string().max(40).optional(),
   /** The model an outside engine is asked for; empty takes the engine's own default. */
   engine_model: z.string().max(200).optional(),
+  /** Who the agent is, kept apart from how it works (a bot bundle's SOUL.md). */
+  soul: z.string().max(100000).optional(),
+  /** The tools this agent may use, by Misty's own names; empty or absent allows every tool. */
+  tools: z.array(z.string().max(120)).max(200).optional(),
+  /** The MCP servers this agent is given, by name. */
+  mcp_servers: z.array(z.string().max(120)).max(50).optional(),
+  /** The skills this agent uses, by name; `*` is every skill. */
+  skills: z.array(z.string().max(120)).max(200).optional(),
+  /** The folder an outside engine starts in, and extra arguments it is started with. */
+  runtime_cwd: z.string().max(1000).optional(),
+  runtime_args: z.array(z.string().max(400)).max(40).optional(),
+  /** The bot bundle or persona this agent was made from, if any. */
+  origin: z.string().max(200).optional(),
 });
 
 export const AgentProfileSchema = AgentProfileInputSchema.extend({

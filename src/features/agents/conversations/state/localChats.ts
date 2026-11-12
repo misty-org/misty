@@ -18,13 +18,16 @@ type Kind =
   | "collaboration"
   | "notebook"
   | "run"
-  | "workflow_method"
-  | "workflow_schedule"
-  | "workflow_replay"
-  | "workflow_vector"
   | "agent"
   | "attachment"
-  | "artifact";
+  | "artifact"
+  | "composer"
+  | "tutor_notebook"
+  | "tutor_deck"
+  | "tutor_guide"
+  | "tutor_job"
+  | "tutor_index"
+  | "studio";
 
 async function list<T>(account: string, kind: Kind): Promise<T[]> {
   if (!hasTauriInternals() || !account) return [];
@@ -94,7 +97,7 @@ export const localChats = {
   saveFolder: (account: string, folder: AgentConversationFolder) =>
     put(account, "folder", folder.id, folder),
   deleteFolder: (account: string, id: string) => remove(account, "folder", id),
-  /** A Teach-mode chat's lesson progress (src/features/agents/lessons), keyed by the chat. */
+  /** A Teach-mode chat's lesson progress (src/features/agents/tutor/lessons), keyed by the chat. */
   lessons: <T>(account: string) => list<T>(account, "lesson"),
   saveLesson: (account: string, lesson: { id: string }) =>
     put(account, "lesson", lesson.id, lesson),
@@ -103,7 +106,15 @@ export const localChats = {
   courses: <T>(account: string) => list<T>(account, "course"),
   saveCourse: (account: string, course: { id: string }) =>
     put(account, "course", course.id, course),
+  /** Tutor's notebooks, decks, guides and runs (src/features/agents/tutor). */
+  tutor: <T>(account: string, kind: TutorKind) => list<T>(account, kind),
+  saveTutor: (account: string, kind: TutorKind, item: { id: string }) =>
+    put(account, kind, item.id, item),
+  deleteTutor: (account: string, kind: TutorKind, id: string) => remove(account, kind, id),
 };
+
+export type TutorKind =
+  "tutor_notebook" | "tutor_deck" | "tutor_guide" | "tutor_job" | "tutor_index";
 
 /** Bounds what a turn carries: the run trims it further to the model's window. */
 const historyTurnLimit = 120;

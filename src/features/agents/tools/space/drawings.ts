@@ -94,5 +94,3 @@ export const drawingTools: Record<string, LocalToolHandler> = {
   "drawing.read": read,
   "drawing.apply": apply,
 };
-
-export const drawingWriteTools = ["drawing.create", "drawing.apply"];

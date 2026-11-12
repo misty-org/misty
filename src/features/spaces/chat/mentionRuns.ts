@@ -9,9 +9,9 @@ import { hasTauriInternals } from "@/shared/platform/tauri";
 import type { MentionableAgent } from "./useSpaceMessageSpansStore";
 
 /**
- * An `@mention` of your own agent runs on your computer,
- * and its reply posts as an ordinary message answering yours. Nobody else can ask your agent to act: a
- * mention of someone else's agent is only text.
+ * An `@mention` of your own agent runs on your computer, and its reply posts as an ordinary message
+ * answering yours. You can never run anyone else's agent, and nobody else can run yours: only a
+ * message you sent starts anything, and only agents on this computer, found by their id.
  */
 
 const maxAgents = 3;
@@ -79,11 +79,9 @@ async function answerOne(
 ) {
   const account = agentAccountId();
   const mine = await listPersonalAgents(account);
-  // A Space lists an agent by name, and its row may predate this computer's copy.
-  const local =
-    mine.find((item) => item.id === agent.agent_id) ??
-    mine.find((item) => item.name.toLowerCase() === agent.agent_name.toLowerCase());
-  if (!local) return;
+  // Only an agent on this computer runs; another person's agent never matches here.
+  const local = mine.find((item) => item.id === agent.agent_id);
+  if (!local?.enabled) return;
   try {
     const created = await aiSurfaceApi.createInvocation({
       mode: "drawer",
@@ -111,6 +109,8 @@ export function runOwnMentions(
   senderId: string | undefined,
 ): void {
   if (!hasTauriInternals() || !agents?.length) return;
+  // Only the person's own messages start their agents.
+  if (!senderId || message.sender_user_id !== senderId) return;
   const text = plainText(message.content);
   const post = (reply: string) => {
     const content: Span[] = [{ type: "text", text: reply }];

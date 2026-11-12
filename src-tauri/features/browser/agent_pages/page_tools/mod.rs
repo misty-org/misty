@@ -9,23 +9,6 @@ fn running_webview(app: &AppHandle, id: &str) -> Result<Webview, String> {
         .ok_or_else(|| "Browser tab is not running.".to_owned())
 }
 
-/// Evaluates an expression and waits for its JSON-encoded result.
-async fn eval_json(webview: &Webview, script: String) -> Result<String, String> {
-    let (sender, receiver) = tokio::sync::oneshot::channel();
-    let sender = Mutex::new(Some(sender));
-    webview
-        .eval_with_callback(script, move |value| {
-            if let Some(sender) = sender.lock().ok().and_then(|mut sender| sender.take()) {
-                let _ = sender.send(value);
-            }
-        })
-        .map_err(|error| error.to_string())?;
-    tokio::time::timeout(Duration::from_secs(5), receiver)
-        .await
-        .map_err(|_| "The page did not respond.".to_owned())?
-        .map_err(|_| "The page closed before it responded.".to_owned())
-}
-
 #[tauri::command]
 pub fn browser_webview_stop(
     app: AppHandle,

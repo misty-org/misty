@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   theme: "#131313",
 }));
 vi.mock("@/features/settings", () => ({
+  workspaceDefaultViewIndex: 3,
   appThemeChangedEvent: "misty://app-theme-changed",
   appThemeSnapshot: () => ({
     tokens: {
@@ -159,8 +160,8 @@ describe("main window readiness", () => {
     expect(mocks.reveal).toHaveBeenCalledTimes(1);
   });
   it("leaves other platforms' window visibility alone", async () => {
-    // macOS and Windows start hidden; Linux shows its window itself.
-    mocks.platform.mockReturnValue("linux");
+    // macOS, Windows and Linux start hidden; a mobile build shows its window itself.
+    mocks.platform.mockReturnValue("ios");
     render(<DesktopWindowReady />);
     await act(async () => {
       await vi.runAllTimersAsync();

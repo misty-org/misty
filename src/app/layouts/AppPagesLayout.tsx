@@ -7,10 +7,10 @@ import { Outlet, useLocation } from "react-router";
 const appPageTitles = new Map<string, string>([
   [routes.spaces, "Misty - Spaces"],
   [routes.agents, "Misty - Agents"],
-  [routes.scheduled, "Misty - Scheduled"],
   [routes.signIn, "Misty - Sign In"],
   [routes.register, "Misty - Register"],
   [routes.welcome, "Misty"],
+  [routes.setup, "Misty - Setup"],
 ]);
 
 export function AppPagesLayout() {

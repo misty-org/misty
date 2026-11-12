@@ -1,11 +1,13 @@
 import type { LocalToolHandler, LocalToolRequest } from "../host";
+import { runSpaceId } from "../runContexts";
 import { NOT_ALLOWED, SpaceCallRefused, readRoute, refuse } from "./api";
 import { text, truncate } from "./args";
 
 /**
- * Space tools name a Space by name or id with an optional `space`. Reads without one cover every Space
- * the person can access, creates without one use their personal Space, and changes to existing items
- * name the Space returned with them.
+ * Space tools name a Space by name or id with an optional `space`. A chat's run works in that chat's
+ * one Space: every tool acts there, and another Space is refused. A run in no Space reads every
+ * Space the person can access without one, creates in their personal Space, and changes existing
+ * items in the Space returned with them.
  */
 const MAX_READ_SPACES = 25;
 
@@ -21,9 +23,18 @@ export type SpaceToolKind = "read" | "create" | "change";
 
 export type SpaceToolRun = (request: LocalToolRequest, space: SpaceRow) => Promise<unknown>;
 
-export async function listSpaces(request: Pick<LocalToolRequest, "signal">): Promise<SpaceRow[]> {
-  const { spaces } = await readRoute<{ spaces: SpaceRow[] }>(request, "/spaces");
-  return spaces;
+/** The Spaces this run may reach: its chat's one Space, or every Space for a run in none. */
+export async function listSpaces(
+  request: Pick<LocalToolRequest, "signal" | "runId">,
+): Promise<SpaceRow[]> {
+  const [{ spaces }, own] = await Promise.all([
+    readRoute<{ spaces: SpaceRow[] }>(request, "/spaces"),
+    runSpaceId(request.runId),
+  ]);
+  if (!own) return spaces;
+  const space = spaces.find((item) => item.id === own);
+  if (!space) throw refuse("this chat's Space is no longer yours; move the chat to another Space");
+  return [space];
 }
 
 export const isPersonalSpace = (space: SpaceRow) => space.is_default && space.role === "owner";
@@ -49,13 +60,19 @@ export function spaceTargets(
     const named = spaces.filter((space) => space.name.trim().toLowerCase() === wanted);
     if (named.length === 1) return named;
     if (named.length === 0) {
-      throw refuse(`unknown space ${quoted(reference)}; available: ${spaceChoices(spaces)}`);
+      throw refuse(
+        spaces.length === 1
+          ? `this chat works only in ${quoted(spaces[0].name)} (${spaces[0].id})`
+          : `unknown space ${quoted(reference)}; available: ${spaceChoices(spaces)}`,
+      );
     }
     throw refuse(
       `several Spaces are named ${quoted(reference)}; pass one id: ${spaceChoices(named)}`,
     );
   }
   if (spaces.length === 0) throw refuse("this account has no Spaces yet");
+  // One Space reachable, as in a chat's run: everything happens there.
+  if (spaces.length === 1) return spaces;
   if (kind === "read") return spaces.slice(0, MAX_READ_SPACES);
   if (kind === "create") {
     const personal = spaces.find(isPersonalSpace);

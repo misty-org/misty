@@ -26,12 +26,6 @@ pub(super) fn agent_capability_guidance(tools: &[String], desktop_control: bool,
     if has("agent.delegate") {
         out.push_str("\n\nSub-agents: when a large task has independent parts (several companies, products, sources or separate forms), give them to agent_delegate as self-contained goals; they run at the same time, each in its own tab, and report into the notebook. Merge their answers and the notebook's findings into your final answer, and check anything that looks wrong. Do small or sequential work yourself.");
     }
-    if has("memory.workflow.find") {
-        out.push_str("\n\nWorkflows: when a request looks like something done before, check memory_workflow_find; if one matches, follow it with memory_workflow_use, including its learned steps. After a saved workflow runs well, record what worked with memory_workflow_learn: reusable steps, never the person's data.");
-    }
-    if has("memory.pref.list") {
-        out.push_str("\n\nMemory: use memory_pref_list to review preferences. Change durable memory only when the user asks; task corrections are temporary unless the user makes them lasting. Never store secrets or sensitive personal data. Say something was remembered or forgotten only after the memory tool confirms it.");
-    }
     if has("web.search") {
         out.push_str("\n\nWeb: for research, news, current facts or anything outside the user's own data, call web_search; it needs no app or sign-in. Search more than once when a task needs several angles, prefer primary and reputable sources, and cite the links you use.");
         if has(WEB_FETCH_TOOL) {

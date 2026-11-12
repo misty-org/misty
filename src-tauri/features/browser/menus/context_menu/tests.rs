@@ -12,7 +12,6 @@ fn fixture() -> AskContext {
         revision: "1:2".into(),
         content_hash: "hash".into(),
         page,
-        intent: "ask".into(),
     }
 }
 #[test]
@@ -24,14 +23,14 @@ fn custom_menu_only_dispatches_presented_actions_for_its_live_key() {
         actions: menu_actions(&context),
         context,
     };
-    assert!(menu_action_allowed(&menu, "current", "ask"));
+    assert!(menu_action_allowed(&menu, "current", "reload"));
     assert!(menu_action_allowed(&menu, "current", "dismiss"));
-    assert!(!menu_action_allowed(&menu, "old", "ask"));
+    assert!(!menu_action_allowed(&menu, "old", "reload"));
     assert!(!menu_action_allowed(&menu, "current", "create-task"));
     assert!(!menu_action_allowed(&menu, "current", "paste"));
     assert!(!menu_action_allowed(&menu, "current", "separator"));
     menu.created -= Duration::from_secs(121);
-    assert!(!menu_action_allowed(&menu, "current", "ask"));
+    assert!(!menu_action_allowed(&menu, "current", "reload"));
 }
 #[test]
 fn custom_menu_preserves_context_appropriate_browser_commands() {
@@ -41,18 +40,7 @@ fn custom_menu_preserves_context_appropriate_browser_commands() {
     context.page.link = "https://example.com/link".into();
     context.page.image = "https://example.com/image.png".into();
     let actions = menu_actions(&context);
-    assert_eq!(actions.first().map(String::as_str), Some("ask"));
-    for action in [
-        "copy",
-        "cut",
-        "paste",
-        "search-web",
-        "open-link",
-        "open-link-split",
-        "copy-link",
-        "open-image",
-        "copy-image-link",
-    ] {
+    for action in ["copy", "cut", "paste", "copy-link", "copy-image-link"] {
         assert!(actions.iter().any(|a| a == action));
     }
     assert!(
@@ -70,15 +58,7 @@ fn custom_menu_preserves_context_appropriate_browser_commands() {
 fn page_menu_offers_page_commands_without_stray_separators() {
     let context = fixture();
     let actions = menu_actions(&context);
-    for action in [
-        "back",
-        "forward",
-        "reload",
-        "bookmark",
-        "copy-page-link",
-        "qr-code",
-        "annotate",
-    ] {
+    for action in ["back", "forward", "reload", "copy-page-link"] {
         assert!(actions.iter().any(|a| a == action), "{action}");
     }
     assert!(actions

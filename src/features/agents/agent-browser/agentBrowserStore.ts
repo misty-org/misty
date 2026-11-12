@@ -39,6 +39,8 @@ export interface AgentBrowserChat {
   shownView: string;
   /** The full split, or the PiP at the top of the chat. */
   expanded: boolean;
+  /** Put away by the person; the agent opening another page brings it back. */
+  hidden?: boolean;
 }
 
 /** A chat shows up to four views; the agent closes one before it starts another. */
@@ -90,18 +92,37 @@ function savedBrowser(): string | null {
 
 export const useAgentBrowser = create<AgentBrowserState>(() => hydrateAgentBrowser(savedBrowser()));
 
+/**
+ * Saving writes every picture again, so it waits for a quiet moment: a working agent's pages
+ * report loads, titles and addresses many times a second, and writing a megabyte to session
+ * storage on each held up the chat.
+ */
+const SAVE_AFTER_MS = 1_000;
 let saveTimer: ReturnType<typeof setTimeout> | undefined;
-useAgentBrowser.subscribe((state) => {
-  if (typeof sessionStorage === "undefined") return;
-  clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => {
-    try {
-      const text = JSON.stringify({ chats: state.chats, tabs: state.tabs });
-      if (text.length <= MAX_SAVED_CHARS) sessionStorage.setItem(SAVED_KEY, text);
-    } catch {
-      // Storage may be full or blocked; the browser simply starts empty after the next reload.
-    }
-  }, 300);
+let saved: Pick<AgentBrowserState, "chats" | "tabs"> | undefined;
+const idle = (work: () => void) =>
+  typeof requestIdleCallback === "function"
+    ? requestIdleCallback(work, { timeout: 2_000 })
+    : setTimeout(work, 0);
+useAgentBrowser.subscribe(() => {
+  // At most one save a second, of whatever is newest then.
+  if (typeof sessionStorage === "undefined" || saveTimer) return;
+  saveTimer = setTimeout(
+    () =>
+      idle(() => {
+        saveTimer = undefined;
+        const current = useAgentBrowser.getState();
+        if (saved?.chats === current.chats && saved.tabs === current.tabs) return;
+        saved = { chats: current.chats, tabs: current.tabs };
+        try {
+          const text = JSON.stringify(saved);
+          if (text.length <= MAX_SAVED_CHARS) sessionStorage.setItem(SAVED_KEY, text);
+        } catch {
+          // Storage may be full or blocked; the browser simply starts empty after the next reload.
+        }
+      }),
+    SAVE_AFTER_MS,
+  );
 });
 
 const set = (change: (state: AgentBrowserState) => Partial<AgentBrowserState>) =>
@@ -165,7 +186,8 @@ export function addBrowserTab(
           lastActed: Date.now(),
         });
     return {
-      chats: { ...state.chats, [conversationId]: { ...chat, views } },
+      // Another page brings a browser the person put away back, as the PiP.
+      chats: { ...state.chats, [conversationId]: { ...chat, views, hidden: false } },
       tabs: { ...state.tabs, [tab.scopeId]: tab },
     };
   });
@@ -285,7 +307,24 @@ export const setBrowserExpanded = (conversationId: string, expanded: boolean) =>
       ? {
           chats: {
             ...state.chats,
-            [conversationId]: { ...state.chats[conversationId]!, expanded },
+            [conversationId]: {
+              ...state.chats[conversationId]!,
+              expanded,
+              ...(expanded ? { hidden: false } : {}),
+            },
+          },
+        }
+      : {},
+  );
+
+/** Puts a chat's agent browser away, split and PiP, until the agent opens another page. */
+export const closeAgentBrowser = (conversationId: string) =>
+  set((state) =>
+    state.chats[conversationId]
+      ? {
+          chats: {
+            ...state.chats,
+            [conversationId]: { ...state.chats[conversationId]!, expanded: false, hidden: true },
           },
         }
       : {},

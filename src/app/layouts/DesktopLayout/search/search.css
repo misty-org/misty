@@ -1,0 +1,183 @@
+/* Search: an input, the type row, the list and a foot of key hints, in one rounded panel. */
+.misty-search {
+  overflow: hidden;
+}
+.misty-search [data-slot="dialog-close"] {
+  top: 14px;
+  right: 14px;
+}
+.misty-search-command {
+  display: flex;
+  flex-direction: column;
+  max-height: min(560px, calc(100dvh - 8rem));
+}
+.misty-search-input {
+  width: 100%;
+  padding: 20px 56px 10px 20px;
+  font-size: 15px;
+  color: var(--color-cream-bright);
+  background: transparent;
+  outline: none;
+}
+.misty-search-input::placeholder {
+  color: var(--color-cream-muted);
+}
+.misty-search-kinds {
+  display: flex;
+  gap: 2px;
+  padding: 4px 14px 12px;
+  border-bottom: 1px solid var(--color-charcoal-border);
+}
+.misty-search-kind {
+  height: 28px;
+  padding: 0 10px;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  color: var(--color-cream-muted);
+}
+.misty-search-kind:hover {
+  color: var(--color-cream);
+}
+.misty-search-kind[aria-selected="true"] {
+  background: var(--color-control-hover);
+  color: var(--color-cream-bright);
+}
+.misty-search-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 6px 8px 8px;
+}
+.misty-search-list [cmdk-group-heading] {
+  padding: 12px 12px 6px;
+  font-size: 12px;
+  color: var(--color-cream-muted);
+}
+.misty-search-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 38px;
+  padding: 0 12px;
+  border-radius: var(--radius-lg);
+  font-size: 13px;
+  color: var(--color-cream);
+  cursor: default;
+}
+.misty-search-item[data-selected="true"] {
+  background: var(--color-control-hover);
+  color: var(--color-cream-bright);
+}
+.misty-search-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  color: var(--color-cream-muted);
+}
+.misty-search-detail {
+  flex: none;
+  font-size: 12px;
+  color: var(--color-cream-muted);
+}
+.misty-search-empty {
+  padding: 28px 12px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--color-cream-muted);
+}
+.misty-search-skeletons {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px 12px;
+}
+.misty-search-skeletons > span {
+  display: block;
+  width: 60%;
+  height: 12px;
+  border-radius: 6px;
+  background: var(--color-control-hover);
+}
+.misty-search-skeletons > span:nth-child(2n) {
+  width: 42%;
+}
+.misty-search-foot {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--color-charcoal-border);
+  font-size: 12px;
+  color: var(--color-cream-muted);
+}
+.misty-search-foot kbd {
+  display: inline-grid;
+  min-width: 20px;
+  height: 20px;
+  margin-left: 4px;
+  padding: 0 5px;
+  place-items: center;
+  border: 1px solid var(--color-charcoal-border);
+  border-radius: 5px;
+  font-family: inherit;
+  font-size: 11px;
+  color: var(--color-cream-muted);
+}
+.misty-search-foot kbd + kbd {
+  margin-left: 2px;
+}
+/* A row with the words around its match under the title. */
+.misty-search-item[data-two-lines="true"] {
+  height: auto;
+  min-height: 52px;
+  padding-block: 7px;
+}
+.misty-search-item[data-running="true"] {
+  opacity: 0.6;
+}
+.misty-search-text {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.misty-search-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.misty-search-excerpt {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--color-cream-muted);
+}
+.misty-search-list mark {
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--color-cream) 14%, transparent);
+  color: var(--color-cream-bright);
+}
+.misty-search-icon > span {
+  font-size: 14px;
+  line-height: 1;
+}
+.misty-search-icon > .agent-avatar {
+  width: 16px;
+  height: 16px;
+  background: transparent;
+  font-size: 12px;
+}
+.misty-search-icon > .agent-avatar svg {
+  width: 14px;
+  height: 14px;
+}
+.misty-search-error {
+  padding: 8px 20px;
+  font-size: 12px;
+  color: var(--color-cream-bright);
+  border-top: 1px solid var(--color-charcoal-border);
+}

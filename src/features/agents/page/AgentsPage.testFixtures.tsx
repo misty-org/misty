@@ -3,9 +3,9 @@ import type * as Actual1 from "../personal/agentAccount";
 import type * as Actual2 from "@/features/agents/conversations/state/localChats";
 import "../personal/agentCloudAvatars.testFixtures";
 import type * as AgentsRuntimeModule from "../AgentsRuntime";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, vi } from "vitest";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useNavigate, type NavigateFunction } from "react-router-dom";
 import { useMistyStore } from "@/features/agents/conversations/state/useMistyStore";
 import AgentsPage from "./AgentsPage";
 
@@ -89,12 +89,31 @@ beforeEach(() => {
 afterEach(cleanup);
 export { fixture };
 
-export function renderAgentsPage() {
+let navigateTo: NavigateFunction | undefined;
+function NavigationProbe() {
+  navigateTo = useNavigate();
+  return null;
+}
+
+export function renderAgentsPage(entry = "/agents") {
   return render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[entry]}>
+      <NavigationProbe />
       <AgentsPage />
     </MemoryRouter>,
   );
+}
+
+/** Follows a link to the page, as the window's sidebar does. */
+export function openPage(page: "studio" | "integrations" | "tutor") {
+  act(() => void navigateTo?.(`/agents?view=${page}`));
+}
+
+/** Follows a link back to an agent's chat, as a chat row in the sidebar does. */
+export function openChat(agentId = "communications", conversationId?: string) {
+  const params = new URLSearchParams({ agent: agentId });
+  if (conversationId) params.set("conversation", conversationId);
+  act(() => void navigateTo?.(`/agents?${params}`));
 }
 
 /** Opens the agent switcher in the sidebar and chooses one of its items. */
@@ -110,7 +129,7 @@ export function openAgentSettings(agent = "Communications") {
 }
 
 /** Opens the ⋯ menu in the conversation header (Recents has its own) and chooses an action. */
-export const composer = () => screen.getByLabelText("Message Misty") as HTMLTextAreaElement;
+export const composer = () => screen.getByLabelText("Message") as HTMLTextAreaElement;
 
 export function typeDraft(value: string) {
   fireEvent.change(composer(), { target: { value } });

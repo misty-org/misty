@@ -9,23 +9,12 @@ import {
   ArrowRight,
   ClipboardPaste,
   Code,
-  Columns2,
   Copy,
-  ExternalLink,
-  Highlighter,
-  Image,
   Link,
-  QrCode,
   RotateCw,
   Scissors,
-  Search,
-  Star,
 } from "lucide-react";
-import {
-  browserOverlayReady,
-  browserTabShowsInternalPage,
-  setBrowserWebviewsSuspended,
-} from "@/features/app-windows";
+import { browserOverlayReady, setBrowserWebviewsSuspended } from "@/features/app-windows";
 import { browserRuntimeIdForTabId } from "@/features/browser";
 import {
   DropdownMenu,
@@ -49,23 +38,14 @@ const entries = {
   copy: { label: "Copy", icon: Copy },
   cut: { label: "Cut", icon: Scissors },
   paste: { label: "Paste", icon: ClipboardPaste },
-  "search-web": { label: "Search web for selection", icon: Search },
-  "open-link": { label: "Open link in new tab", icon: ExternalLink },
-  "open-link-split": { label: "Open link in split view", icon: Columns2 },
   "copy-link": { label: "Copy link address", icon: Link },
-  "open-image": { label: "Open image in new tab", icon: Image },
   "copy-image-link": { label: "Copy image address", icon: Link },
   back: { label: "Back", icon: ArrowLeft },
   forward: { label: "Forward", icon: ArrowRight },
   reload: { label: "Reload", icon: RotateCw },
-  bookmark: { label: "Bookmark", icon: Star },
   "copy-page-link": { label: "Copy link", icon: Link },
-  "qr-code": { label: "QR code", icon: QrCode },
-  annotate: { label: "Annotate", icon: Highlighter },
   inspect: { label: "Inspect", icon: Code },
 };
-/** Actions the native menu may still send that this menu no longer shows. */
-const hiddenActions = new Set(["ask", "peek-link", "extensions"]);
 const suspensionReason = "browser-context-menu";
 
 /**
@@ -98,7 +78,7 @@ function browserPageAtPoint(
     const tabId = host
       .closest("[data-browser-workspace-tab]")
       ?.getAttribute("data-browser-workspace-tab");
-    if (!tabId || browserTabShowsInternalPage(tabId)) return null;
+    if (!tabId) return null;
     const id = browserRuntimeIdForTabId(tabId);
     if (!id) return null;
     return {
@@ -156,8 +136,7 @@ export function BrowserContextMenuView({
         onPointerDown={(event) => event.stopPropagation()}
       >
         {menu.actions
-          .filter((action) => !hiddenActions.has(action))
-          // Hiding a row can leave a separator first, last or doubled.
+          // A separator never comes first, last or doubled.
           .filter(
             (action, index, all) =>
               action !== "separator" ||

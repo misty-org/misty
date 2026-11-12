@@ -82,7 +82,7 @@ pub(in crate::browser) async fn execute(
             if result["ok"] != true {
                 return Err(page_error(&result, "The page could not be read."));
             }
-            #[cfg(any(target_os = "macos", windows))]
+            #[cfg(any(target_os = "macos", windows, target_os = "linux"))]
             {
                 let reads = frames::markdown(&view).await;
                 if let (false, Some(markdown)) = (reads.is_empty(), result["markdown"].as_str()) {
@@ -152,10 +152,10 @@ pub(super) async fn poll(
     loop {
         let check = call(view, "waitCheck", condition.clone(), false).await?;
         // Text can appear inside an embedded widget's frame rather than the page itself.
-        #[cfg(any(target_os = "macos", windows))]
+        #[cfg(any(target_os = "macos", windows, target_os = "linux"))]
         let met = check["met"] == true
             || (condition["text"].is_string() && frames::shows(view, condition).await);
-        #[cfg(not(any(target_os = "macos", windows)))]
+        #[cfg(not(any(target_os = "macos", windows, target_os = "linux")))]
         let met = check["met"] == true;
         let waited = started.elapsed().as_millis() as u64;
         if met || waited >= timeout_ms {

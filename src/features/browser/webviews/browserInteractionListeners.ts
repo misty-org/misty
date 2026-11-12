@@ -1,7 +1,3 @@
-import {
-  addSitePermissionAsk,
-  type SitePermissionAsk,
-} from "@/features/browser/sitePermissionAsks";
 import type { UnlistenFn } from "@tauri-apps/api/event";
 import { listen } from "@tauri-apps/api/event";
 import { dockLeaves, useWorkspaceStore } from "@/features/app-windows";
@@ -118,8 +114,5 @@ export function listenBrowserInteractionEvents({
         }
       },
     ),
-    listen<SitePermissionAsk>("misty://browser-permission-ask", ({ payload }) => {
-      if (!isDisposed()) addSitePermissionAsk(payload);
-    }),
   ];
 }

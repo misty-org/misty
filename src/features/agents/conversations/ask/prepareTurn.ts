@@ -2,7 +2,6 @@ import { selectedPersonalAgent, usePersonalAgentsStore } from "../../personal/pe
 import type { AiInvocationDeviceContext, AiSelectionSnapshot } from "../../runs/invocations";
 import type { AiCaptureAttachment } from "../../runs/invocations/invocationTypes";
 import { assertMistyAvailable } from "../state/availability";
-import type { BrowserAskRequest } from "../context/browserAskContext";
 import { requestHostContext } from "../context/contextBridge";
 import { globalMistyError } from "../state/globalMistyActions";
 import type { MistyHandoff } from "./handoff";
@@ -26,7 +25,6 @@ export async function prepareTurnContext(
     epoch: number;
     spaceId: string;
     origin: SubmitArgs[5];
-    browserRequest?: BrowserAskRequest;
     handoff?: MistyHandoff;
     companion: SubmitArgs[6];
     requestAgentId?: string;
@@ -42,7 +40,7 @@ export async function prepareTurnContext(
   sourcePaneId?: string;
   capture?: AiCaptureAttachment;
 } | null> {
-  const { accountId, epoch, spaceId, origin, browserRequest, handoff, companion } = input;
+  const { accountId, epoch, spaceId, origin, handoff, companion } = input;
   let requestContext = structuredClone(origin?.context ?? handoff?.context ?? []);
   let sourcePaneId = handoff?.paneId;
   let { requestAgentId, selection, deviceContexts } = input;
@@ -61,7 +59,7 @@ export async function prepareTurnContext(
       selectedAgentId: agent,
     });
     const external = (await (await import("../context/screenContext")).screenStatus()).external;
-    if (!origin && !browserRequest && !handoff?.selection && !external) {
+    if (!origin && !handoff?.selection && !external) {
       const snapshot = await requestHostContext({
         accountId,
         spaceId,
@@ -91,7 +89,6 @@ export async function prepareTurnContext(
     if (
       !companion &&
       !handoff?.selection &&
-      !browserRequest &&
       (await (await import("../context/screenContext")).screenStatus()).external
     ) {
       const screen = await (await import("../context/screenContext")).captureMistyScreen();

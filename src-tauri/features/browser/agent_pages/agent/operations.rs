@@ -14,7 +14,6 @@ pub(super) async fn visual_browser(
     if observed["target"]["authentication"] == "required" {
         return Ok(observed);
     }
-    #[cfg(any(target_os = "macos", windows))]
     if let Some(captures) = crate::agents::cursor::task_visual(
         app,
         request
@@ -47,8 +46,10 @@ pub(super) async fn visual_browser(
     .await?;
     #[cfg(windows)]
     let capture = crate::browser::pages::windows::capture::capture(view).await?;
-    #[cfg(not(any(target_os = "macos", windows)))]
-    let capture: Value = return Err("Visual browser inspection requires macOS or Windows".into());
+    #[cfg(target_os = "linux")]
+    let capture = crate::browser::pages::linux::capture(view).await?;
+    #[cfg(not(any(target_os = "macos", windows, target_os = "linux")))]
+    let capture: Value = return Err("Visual browser inspection isn't available on this system.".into());
     observed["image"] = capture;
     observed["viewport"] = json!({"width":size.width,"height":size.height});
     Ok(observed)

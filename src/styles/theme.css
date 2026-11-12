@@ -20,6 +20,8 @@
   --misty-theme-text-bright: #f1f1f1;
   --misty-theme-text-muted: #8c8c8c;
   --misty-theme-danger: #c94747;
+  /* The top band every surface shares: the sidebar's head, a page's bar, a panel's title row. */
+  --ui-header: 48px;
 }
 
 /* Type. One system face for the whole interface and one monospace face for code, URLs and
@@ -33,6 +35,12 @@
   --text-2xs: 11px;
   --text-ui: 13px;
   --text-md: 15px;
+  /* Corners, after OpenChamber's scale: 4 for marks and chips inside rows, 7 for controls and
+     rows, 9 for fields and menus, 12 for panels and dialogs. */
+  --radius-sm: 4px;
+  --radius-md: 7px;
+  --radius-lg: 9px;
+  --radius-xl: 12px;
 }
 
 @theme inline {
@@ -90,4 +98,18 @@
      messages: a neutral gray tag, so a mention stands out by contrast and
      weight rather than colour. */
   --color-mention-bg: #8a8a8a;
+}
+
+/* What the tones mean where color carries meaning: an agent's state, a Git change, a kind of
+   file. They follow the theme with the tones they are made from. */
+:root {
+  --tone-working: var(--color-tone-blue);
+  --tone-waiting: var(--color-tone-amber);
+  --tone-failed: var(--color-tone-red);
+  --tone-added: var(--color-tone-green);
+  --tone-code: var(--color-tone-amber);
+  --tone-style: var(--color-tone-violet);
+  --tone-data: var(--color-tone-teal);
+  --tone-doc: var(--color-tone-blue);
+  --tone-image: var(--color-tone-orange);
 }

@@ -1,7 +1,7 @@
 import { booleanSetting, stringSetting } from "@/features/settings/SettingsControls";
 
 export type DictationStyle = "plain" | "casual" | "formal";
-export type CaptureSources = "mic" | "mic-tab" | "mic-system" | "tab" | "system";
+export type CaptureSources = "mic" | "mic-system" | "system";
 
 /** Settings › Voice, read from the device's settings document. */
 export interface VoiceSettings {
@@ -20,12 +20,15 @@ export interface VoiceSettings {
 }
 
 const styles: DictationStyle[] = ["plain", "casual", "formal"];
-const sources: CaptureSources[] = ["mic", "mic-tab", "mic-system", "tab", "system"];
+const sources: CaptureSources[] = ["mic", "mic-system", "system"];
+/** Choices from when a browser tab could be heard: the microphone stays as it was. */
+const retiredSources: Record<string, CaptureSources> = { "mic-tab": "mic-system", tab: "system" };
 
 export function voiceSettings(document: Record<string, unknown> | undefined): VoiceSettings {
   const doc = document ?? {};
   const style = stringSetting(doc, "voice", "dictation_style", "plain") as DictationStyle;
-  const capture = stringSetting(doc, "voice", "capture_sources", "mic-tab") as CaptureSources;
+  const stored = stringSetting(doc, "voice", "capture_sources", "mic-system");
+  const capture = (retiredSources[stored] ?? stored) as CaptureSources;
   return {
     dictation: booleanSetting(doc, "voice", "dictation_enabled", true),
     shortcut: stringSetting(doc, "voice", "dictation_shortcut", ""),
@@ -39,6 +42,6 @@ export function voiceSettings(document: Record<string, unknown> | undefined): Vo
       .filter(Boolean)
       .slice(0, 200),
     agentHandoff: booleanSetting(doc, "voice", "agent_handoff", true),
-    captureSources: sources.includes(capture) ? capture : "mic-tab",
+    captureSources: sources.includes(capture) ? capture : "mic-system",
   };
 }

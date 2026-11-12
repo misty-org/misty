@@ -50,16 +50,10 @@ it("does not open the retired Home page as a tab", () => {
   expect(workspaceSurfaceFromRoute("/home")).toBeNull();
 });
 
-it("opens schedule links inside Agents and preserves the task", () => {
-  for (const route of ["/scheduled?task=weekly", "/agents?view=scheduled&task=weekly"]) {
-    const surface = workspaceSurfaceFromRoute(route)!;
-    expect(surface).toMatchObject({
-      surfaceId: "agents",
-      groupKey: "tool:agents",
-    });
-    const url = new URL(surface.route!, "https://misty.local");
-    expect(url.pathname).toBe("/agents");
-    expect(url.searchParams.get("view")).toBe("scheduled");
-    expect(url.searchParams.get("task")).toBe("weekly");
-  }
+it("opens the retired Scheduled link as Agents", () => {
+  expect(workspaceSurfaceFromRoute("/scheduled?task=weekly")).toMatchObject({
+    surfaceId: "agents",
+    groupKey: "tool:agents",
+    route: "/agents",
+  });
 });

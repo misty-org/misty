@@ -1,6 +1,6 @@
-//! Account-scoped local recovery, independent of any vault.
+//! Account-scoped local recovery of the workspace, kept on this computer.
 use browser_data::{
-    crypto::VaultScope,
+    crypto::RecoveryScope,
     recovery::{RecoveryRecord, RecoveryStore},
     secure_store,
 };
@@ -55,12 +55,7 @@ fn recovery_deployment(api_base: &str, account: &str) -> Result<String, String> 
     if account == LOCAL_ACCOUNT_SCOPE {
         return Ok(LOCAL_ACCOUNT_SCOPE.to_owned());
     }
-    let http = reqwest::Client::builder()
-        .build()
-        .map_err(|_| "Could not validate recovery identity")?;
-    Ok(browser_data::transport::SyncApi::new(api_base, http)
-        .map_err(error)?
-        .deployment())
+    browser_data::transport::deployment(api_base).map_err(error)
 }
 fn error(_: browser_data::Error) -> String {
     "Could not save or recover the local workspace. Existing data has been preserved.".into()
@@ -132,10 +127,10 @@ pub async fn browser_recovery_forget(
         // This command serves the saved-account chooser after its cookie entry
         // was removed. It can forget only an inactive local recovery identity.
         let deployment = recovery_deployment(&api_base, &account_id)?;
-        let scope = VaultScope {
+        let scope = RecoveryScope {
             deployment: deployment.clone(),
             account_id: account_id.clone(),
-            vault_id: "d32b3d14-d7b6-4d4c-a674-d36bb5aefb74".into(),
+            id: "d32b3d14-d7b6-4d4c-a674-d36bb5aefb74".into(),
         };
         scope.validate().map_err(error)?;
         let current = client()
@@ -196,10 +191,10 @@ pub async fn browser_recovery_open(
                 pending: active.store.pending_keys().unwrap_or_default(),
             });
         }
-        let scope = VaultScope {
+        let scope = RecoveryScope {
             deployment: deployment.clone(),
             account_id: account_id.clone(),
-            vault_id: "d32b3d14-d7b6-4d4c-a674-d36bb5aefb74".into(),
+            id: "d32b3d14-d7b6-4d4c-a674-d36bb5aefb74".into(),
         };
         let directory = recovery_directory(&app, &deployment, &account_id)?;
         let mut builder = fs::DirBuilder::new();

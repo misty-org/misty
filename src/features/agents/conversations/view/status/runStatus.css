@@ -1,0 +1,203 @@
+/* The run status strip above the composer (RunStatusStrip). Quiet like the timeline: an agent's
+ * state may carry color (the running dot), and edited lines are colored as Git colors them. */
+.run-status-strip {
+  position: relative;
+}
+.run-status-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-height: 28px;
+  padding: 0 4px 8px;
+}
+.run-status-step {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.run-status-step > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.run-status-pills {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+.run-status-pill {
+  display: inline-flex;
+  height: 26px;
+  align-items: center;
+  gap: 6px;
+  padding: 0 9px;
+  border: 1px solid var(--color-charcoal-border);
+  border-radius: var(--radius-md);
+  color: var(--color-cream-muted);
+  font-size: 12px;
+  transition:
+    background-color 150ms ease,
+    color 150ms ease;
+}
+.run-status-pill:hover,
+.run-status-pill[data-selected] {
+  background: var(--color-charcoal-hover);
+  color: var(--color-cream);
+}
+.run-status-pill svg {
+  width: 14px;
+  height: 14px;
+}
+.run-status-count {
+  color: var(--color-cream-muted);
+  font-variant-numeric: tabular-nums;
+}
+.run-status-dot {
+  width: 6px;
+  height: 6px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: var(--tone-working);
+  animation: run-status-breathe 1.6s ease-in-out infinite;
+}
+@keyframes run-status-breathe {
+  50% {
+    opacity: 0.35;
+  }
+}
+.run-status-lines {
+  display: inline-flex;
+  gap: 4px;
+  font-variant-numeric: tabular-nums;
+}
+.run-status-added {
+  color: var(--tone-added);
+}
+.run-status-removed {
+  color: var(--tone-failed);
+}
+/* The panel floats above the strip and folds open with its rows. */
+.run-status-panel {
+  position: absolute;
+  right: 0;
+  bottom: 100%;
+  left: 0;
+  z-index: 20;
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    grid-template-rows 200ms ease-out,
+    opacity 200ms ease-out;
+}
+.run-status-panel[data-open] {
+  grid-template-rows: 1fr;
+  opacity: 1;
+  pointer-events: auto;
+}
+.run-status-panel > div {
+  min-height: 0;
+  overflow: hidden;
+}
+.run-status-panel-body {
+  max-height: min(40vh, 280px);
+  margin-bottom: 6px;
+  overflow-y: auto;
+  border: 1px solid var(--color-charcoal-border);
+  border-radius: 12px;
+  background: var(--color-charcoal-card);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.2);
+}
+.run-status-rows {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+}
+.run-status-rows li {
+  display: flex;
+  min-height: 30px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px;
+  border-radius: 8px;
+  font-size: 13px;
+}
+.run-status-row-title {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  color: var(--color-cream);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.run-status-rows li[data-state="done"] .run-status-row-title,
+.run-status-rows li[data-state="skipped"] .run-status-row-title {
+  color: var(--color-cream-muted);
+}
+.run-status-row-state {
+  flex-shrink: 0;
+  color: var(--color-cream-muted);
+  font-size: 12px;
+}
+.run-status-glyph {
+  width: 10px;
+  height: 10px;
+  flex-shrink: 0;
+  border: 1px dashed var(--color-cream-muted);
+  border-radius: 999px;
+}
+.run-status-glyph[data-state="done"] {
+  border: 0;
+  background: var(--color-cream-muted);
+}
+.run-status-glyph[data-state="in_progress"] {
+  border: 0;
+  background: var(--tone-working);
+  animation: run-status-breathe 1.6s ease-in-out infinite;
+}
+.run-status-glyph[data-state="blocked"] {
+  border: 0;
+  background: var(--tone-failed);
+}
+/* RollingStat: a digit is a 0 to 9 strip moved into view. */
+.rolling-stat {
+  display: inline-flex;
+  align-items: center;
+  line-height: 1;
+}
+.rolling-stat-digit {
+  display: inline-block;
+  height: 1em;
+  overflow: hidden;
+}
+.rolling-stat-digit > span {
+  display: flex;
+  flex-direction: column;
+  transition-property: transform;
+  transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+.rolling-stat-digit > span > span {
+  display: block;
+  height: 1em;
+  line-height: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .run-status-dot,
+  .run-status-glyph[data-state="in_progress"] {
+    animation: none;
+  }
+  .run-status-panel,
+  .run-status-pill,
+  .rolling-stat-digit > span {
+    transition: none;
+  }
+}

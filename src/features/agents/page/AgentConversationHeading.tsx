@@ -1,5 +1,5 @@
 import type { ComponentProps, ReactNode } from "react";
-import { Skeleton, Spinner } from "@/shared/ui";
+import { Skeleton } from "@/shared/ui";
 import { useTitlePending } from "../conversations/state/conversationTitles";
 import { AgentConversationActions } from "../conversations/view/AgentConversationActions";
 import { AgentAvatar } from "../personal/AgentAvatar";
@@ -9,15 +9,14 @@ type SwitcherProps = ComponentProps<typeof AgentSwitcher>;
 
 /**
  * The conversation title bar. Inside the agent workspace the sidebar owns identity and
- * New task, so the bar carries the conversation's title and a quiet Working status while
- * a task runs; rename and delete live on its Recents row. Outside it (loading) the bar keeps the switcher and the conversation's actions.
+ * New task, so the bar carries only the conversation's title; the chat itself shows a run
+ * working, and rename and delete live on its Recents row. Outside it (loading) the bar keeps the switcher and the conversation's actions.
  */
 export function AgentConversationHeading({
   workspace = false,
   conversation,
   switcher,
   disabled,
-  working = false,
   actions,
   panelPicker,
 }: {
@@ -25,7 +24,6 @@ export function AgentConversationHeading({
   conversation?: { id: string; title?: string };
   switcher: SwitcherProps;
   disabled: boolean;
-  working?: boolean;
   /** Extra controls after New chat, for a host that is not the Agents page. */
   actions?: ReactNode;
   /** The Misty panel's conversation picker. Given, the switcher shows only the agent's avatar. */
@@ -57,12 +55,6 @@ export function AgentConversationHeading({
             ""
           )}
         </h1>
-        {working && (
-          <span className="agent-heading-details" role="status">
-            <Spinner size="sm" label={false} />
-            <span className="misty-shimmer">Working</span>
-          </span>
-        )}
       </header>
     );
   return (

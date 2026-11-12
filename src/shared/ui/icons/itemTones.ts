@@ -44,7 +44,6 @@ export const itemTones = {
   memoryScreen: "orange",
   memorySummary: "violet",
   memoryFact: "amber",
-  memoryWorkflow: "teal",
 } as const satisfies Record<string, ItemTone>;
 
 export function itemToneClass(tone: ItemTone): string {

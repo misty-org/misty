@@ -74,5 +74,3 @@ export const fileTools: Record<string, LocalToolHandler> = {
   "file.update": update,
   "file.promote_attachment": promote,
 };
-
-export const fileWriteTools = ["file.update", "file.promote_attachment"];

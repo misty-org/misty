@@ -1,49 +1,48 @@
 import {
-  Brain,
-  CalendarDays,
-  ChevronDown,
-  ChevronRight,
+  Armchair,
+  GraduationCap,
   House,
-  KanbanSquare,
-  Library,
-  MessagesSquare,
-  NotebookPen,
   Plus,
+  Search,
+  Waypoints,
   type LucideIcon,
 } from "lucide-react";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo } from "react";
 import { useAuth } from "@/features/account";
 import {
-  conversationInSpace,
-  EngineMark,
-  hasEngineMark,
-  shortAgo,
   useChatStatuses,
-  type ChatStatus,
   useAgentAccountId,
+  useChatSectionsStore,
+  useLessonStore,
   useMistyStore,
+  tutorChatIds,
+  useTutorStore,
   usePersonalAgentsStore,
-  useTeammateAgents,
 } from "@/features/agents";
-import {
-  dockLeaves,
-  useSpaceWindowStore,
-  useWorkspaceStore,
-  type WorkspaceView,
-} from "@/features/app-windows";
+import { dockLeaves, useWorkspaceStore, type WorkspaceView } from "@/features/app-windows";
 import { useWindowSpace } from "@/features/spaces";
-import { IconButton, Pressable, Skeleton } from "@/shared/ui";
-import { agentChatRoute, openNewChat, openWorkspaceRoute } from "./spaceNavigation";
+import { Skeleton } from "@/shared/ui";
+import { SidebarChats } from "./SidebarChats";
+import { SidebarMore, type SidebarPlace } from "./SidebarPins";
+import { SidebarRow as Row } from "./SidebarRow";
+import { useSidebarPins, type SidebarPlaceId } from "./sidebarPinsStore";
+import { useSearchDialog } from "./search/searchStore";
+import {
+  agentChatRoute,
+  openNewChat,
+  openWorkspaceRoute,
+  openWorkspaceRouteIn,
+} from "./spaceNavigation";
 
-const sections: { section: string; label: string; icon: LucideIcon }[] = [
-  { section: "home", label: "Home", icon: House },
-  { section: "chat", label: "Chat", icon: MessagesSquare },
-  { section: "notes", label: "Journal", icon: NotebookPen },
-  { section: "planner", label: "Planner", icon: KanbanSquare },
-  { section: "calendar", label: "Calendar", icon: CalendarDays },
-  { section: "library", label: "Library", icon: Library },
-  { section: "memory", label: "Memory", icon: Brain },
-];
+/** The sidebar's places: search, the window's Space, the agents' studio and
+ * tutor, and the integrations agents can use. */
+const placeNames: Record<SidebarPlaceId, { label: string; icon: LucideIcon }> = {
+  search: { label: "Search", icon: Search },
+  space: { label: "Space", icon: House },
+  studio: { label: "Studio", icon: Armchair },
+  tutor: { label: "Tutor", icon: GraduationCap },
+  integrations: { label: "Integrations", icon: Waypoints },
+};
 
 /** The route of the page the person is looking at: the focused pane's open view. */
 function useFocusedRoute(): string {
@@ -53,20 +52,6 @@ function useFocusedRoute(): string {
     );
     return pane?.views.find((view) => view.id === pane.activeViewId)?.route ?? "";
   });
-}
-
-function Row(props: { current?: boolean; icon?: ReactNode; label: string; onOpen(): void }) {
-  return (
-    <Pressable
-      type="button"
-      className="misty-space-nav-row"
-      aria-current={props.current ? "page" : undefined}
-      onClick={props.onOpen}
-    >
-      {props.icon ? <span className="misty-space-nav-icon">{props.icon}</span> : null}
-      <span className="truncate">{props.label}</span>
-    </Pressable>
-  );
 }
 
 function RowSkeletons({ count, icon = true }: { count: number; icon?: boolean }) {
@@ -82,122 +67,83 @@ function RowSkeletons({ count, icon = true }: { count: number; icon?: boolean })
   );
 }
 
-const statusWords: Record<ChatStatus, string> = {
-  working: "Working",
-  "needs-you": "Needs you",
-  failed: "Failed",
-  done: "",
-};
-
-/** A chat's row: its title, and under it what its agent is doing or when it was last touched. */
-function ChatRow(props: {
-  chat: { id: string; title: string; updatedAt: string };
-  status?: ChatStatus;
-  current: boolean;
-  onOpen(): void;
-}) {
-  const word = props.status ? statusWords[props.status] : "";
-  return (
-    <Pressable
-      type="button"
-      className="misty-space-chat-row"
-      aria-current={props.current ? "page" : undefined}
-      data-status={props.status}
-      onClick={props.onOpen}
-    >
-      <span className="misty-space-chat-title">{props.chat.title || "New conversation"}</span>
-      <span className="misty-space-chat-meta">
-        {word ? (
-          <span className="misty-space-chat-status">
-            <span className="misty-space-chat-dot" aria-hidden="true" />
-            {word}
-          </span>
-        ) : null}
-        <span className="ml-auto">{shortAgo(props.chat.updatedAt)}</span>
-      </span>
-    </Pressable>
-  );
-}
-
-/** One agent's chats in this Space, under the agent's name; the name folds them away. */
-function AgentChats(props: {
-  name: string;
-  mark?: ReactNode;
-  statuses: Record<string, ChatStatus>;
-  chats: { id: string; title: string; updatedAt: string }[];
-  openChat: string | null;
-  onChat(id: string): void;
-  onNew(): void;
-}) {
-  const [open, setOpen] = useState(true);
-  const Chevron = open ? ChevronDown : ChevronRight;
-  return (
-    <section>
-      <div className="misty-space-nav-group">
-        <Pressable
-          type="button"
-          className="misty-space-nav-group-name"
-          aria-expanded={open}
-          onClick={() => setOpen(!open)}
-        >
-          {props.mark}
-          <span className="truncate">{props.name}</span>
-          <Chevron className="size-3.5 shrink-0" aria-hidden="true" />
-        </Pressable>
-        <IconButton label={`New chat with ${props.name}`} onClick={props.onNew}>
-          <Plus className="size-4" aria-hidden="true" />
-        </IconButton>
-      </div>
-      {open
-        ? props.chats.map((chat) => (
-            <ChatRow
-              key={chat.id}
-              chat={chat}
-              status={props.statuses[chat.id]}
-              current={props.openChat === chat.id}
-              onOpen={() => props.onChat(chat.id)}
-            />
-          ))
-        : null}
-    </section>
-  );
-}
-
 /**
- * What the sidebar holds: a new chat and the Space's pages at the top, then every chat the person
- * has in this Space, under the agent it is with. Each row opens in the focused pane.
+ * What the sidebar holds: a new chat, the places the person pinned and More for the rest, then
+ * every chat the person has, newest first, each marked with its agent. A chat works in its own
+ * Space, whichever the window shows. Lesson chats, and the chats Tutor's runs make, live under
+ * Tutor instead. Each row opens in the focused pane.
  */
 export function SpaceNavigator({ onOpen }: { onOpen(view: WorkspaceView): void }) {
   const { user, sessionExpired } = useAuth();
   const signedIn = Boolean(user) && !sessionExpired;
   const accountId = useAgentAccountId();
   const space = useWindowSpace();
-  const identity = useSpaceWindowStore((state) => state.identity);
   const agents = usePersonalAgentsStore((state) => state.agents);
   const agentsLoading = usePersonalAgentsStore((state) => state.loading);
   const conversations = useMistyStore((state) => state.conversations);
+  const lessons = useLessonStore((state) => state.lessons);
+  const tutorJobs = useTutorStore((state) => state.jobs);
+  const tutorNotebooks = useTutorStore((state) => state.notebooks);
   const route = useFocusedRoute();
   const statuses = useChatStatuses();
-  const teammates = useTeammateAgents((state) => state.agents);
   useEffect(() => {
     void usePersonalAgentsStore.getState().load(accountId);
+    void useLessonStore.getState().load(accountId);
+    void useTutorStore.getState().load(accountId);
+    void useChatSectionsStore
+      .getState()
+      .load(accountId)
+      .catch(() => undefined);
     const chats = useMistyStore.getState();
     chats.setAccount(accountId);
     void chats.loadConversations().catch(() => undefined);
   }, [accountId]);
 
-  const shownAgents = agents.filter((agent) => agent.enabled);
-  const chats = useMemo(
-    () =>
-      conversations
-        .filter((chat) => conversationInSpace(chat, identity) && chat.messages.length > 0)
-        .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
-    [conversations, identity],
-  );
+  const chats = useMemo(() => {
+    const made = tutorChatIds(tutorJobs, tutorNotebooks);
+    return conversations
+      .filter((chat) => chat.messages.length > 0 && !lessons[chat.id] && !made.has(chat.id))
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  }, [conversations, lessons, tutorJobs, tutorNotebooks]);
+  const agentOf = (agentId?: string) =>
+    agents.find((agent) => agent.id === agentId) ??
+    (agentId ? undefined : agents.find((agent) => agent.system_managed));
   const [path, query = ""] = route.split("?");
-  const openChat = path === "/agents" ? new URLSearchParams(query).get("conversation") : null;
+  const params = new URLSearchParams(query);
+  const view = path === "/agents" ? params.get("view") : null;
+  const openChat = path === "/agents" && !view ? params.get("conversation") : null;
   const base = space ? `/spaces/${encodeURIComponent(space.id)}` : "";
   const open = (target: string) => openWorkspaceRoute(target, onOpen);
+  type Page = Exclude<SidebarPlaceId, "search">;
+  const current = (id: Page) =>
+    id === "space" ? Boolean(base) && (path === base || path.startsWith(`${base}/`)) : view === id;
+  const target = (id: Page) => (id === "space" ? base : `/agents?view=${id}`);
+  const order = useSidebarPins((state) => state.order);
+  const pinned = useSidebarPins((state) => state.pinned);
+  useEffect(() => void useSidebarPins.getState().load(), []);
+  const places = Object.fromEntries(
+    order.map((id) => [
+      id,
+      {
+        ...placeNames[id],
+        current: id !== "search" && current(id),
+        open: () => (id === "search" ? useSearchDialog.getState().setOpen(true) : open(target(id))),
+      },
+    ]),
+  ) as Record<SidebarPlaceId, SidebarPlace>;
+  const row = (id: SidebarPlaceId) => {
+    const { label, icon: Icon, current: here, open: go } = places[id];
+    return (
+      <Row
+        key={id}
+        label={label}
+        icon={<Icon className="size-4" aria-hidden="true" />}
+        shortcut={id === "search" ? "Meta+K" : undefined}
+        current={here}
+        onOpen={go}
+      />
+    );
+  };
 
   return (
     <>
@@ -207,60 +153,34 @@ export function SpaceNavigator({ onOpen }: { onOpen(view: WorkspaceView): void }
           icon={<Plus className="size-4" aria-hidden="true" />}
           onOpen={() => openNewChat(onOpen)}
         />
-        {!signedIn ? null : space ? (
-          sections.map(({ section, label, icon: Icon }) => (
-            <Row
-              key={section}
-              label={label}
-              icon={<Icon className="size-4" aria-hidden="true" />}
-              current={path === `${base}/${section}`}
-              onOpen={() => open(`${base}/${section}`)}
-            />
-          ))
+        {!signedIn ? (
+          row("search")
+        ) : space ? (
+          <>
+            {pinned.map(row)}
+            <SidebarMore places={places} />
+          </>
         ) : (
-          <RowSkeletons count={sections.length} />
+          <RowSkeletons count={pinned.length + 1} />
         )}
       </nav>
       <nav className="misty-space-chats" aria-label="Chats" data-misty-window-drag-block="true">
         {agentsLoading && !agents.length ? (
-          <RowSkeletons count={3} icon={false} />
+          <RowSkeletons count={4} icon={false} />
         ) : (
-          shownAgents.map((agent) => (
-            <AgentChats
-              key={agent.id}
-              name={agent.name}
-              mark={
-                hasEngineMark(agent.engine) ? <EngineMark engine={agent.engine} size={13} /> : null
-              }
-              statuses={statuses}
-              chats={chats.filter(
-                (chat) => chat.agentId === agent.id || (!chat.agentId && agent.system_managed),
-              )}
-              openChat={openChat}
-              onChat={(id) => open(agentChatRoute(agent.id, id))}
-              onNew={() => open(agentChatRoute(agent.id, undefined, true))}
-            />
-          ))
+          // With no chats yet, the list still shows its "Chats" heading.
+          <SidebarChats
+            chats={chats}
+            agentOf={agentOf}
+            statuses={statuses}
+            openChat={openChat}
+            onOpen={(agent, chatId) => open(agentChatRoute(agent.id, chatId))}
+            onOpenIn={(agent, chatId, place) =>
+              openWorkspaceRouteIn(agentChatRoute(agent.id, chatId), place, onOpen)
+            }
+            onOpenGone={() => openNewChat(onOpen)}
+          />
         )}
-        {teammates.length ? (
-          <section>
-            <div className="misty-space-nav-group">
-              <span className="misty-space-nav-group-name">Teammates</span>
-            </div>
-            {teammates.map((mate) => (
-              <div key={mate.key} className="misty-space-nav-row" title={mate.doing || undefined}>
-                <span className="truncate">
-                  {mate.name} · {mate.owner}
-                </span>
-                {mate.state !== "resting" ? (
-                  <span className="ml-auto shrink-0 text-2xs">
-                    {mate.state === "needs-you" ? "Waiting" : "Working"}
-                  </span>
-                ) : null}
-              </div>
-            ))}
-          </section>
-        ) : null}
       </nav>
     </>
   );

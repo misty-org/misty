@@ -37,7 +37,7 @@ export function messageFromSpaceEvent(event: SpaceEvent): SpaceMessage | undefin
   return payload as unknown as SpaceMessage;
 }
 
-/** An agent member of the Space that people can @mention to ask for help. */
+/** One of the person's own agents, which they can @mention to ask for help. */
 export interface MentionableAgent {
   agent_id: string;
   agent_name: string;
@@ -48,7 +48,7 @@ export interface MentionableAgent {
 export function buildMessageSpans(
   text: string,
   members: SpaceMember[],
-  agents: MentionableAgent[] = [],
+  agents: readonly MentionableAgent[] = [],
 ): MessageSpan[] {
   const candidates: { label: string; userId?: string; agentId?: string }[] = [
     ...members.map((member) => ({ label: member.name, userId: member.user_id })),

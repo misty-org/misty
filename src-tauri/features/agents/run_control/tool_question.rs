@@ -168,32 +168,15 @@ pub(crate) fn page_refs(name: &str, input: &Value) -> Vec<String> {
         .collect()
 }
 
-/// The saved workflow a call is about, which `memory.workflow.schedule` runs as the person's request.
-#[derive(Clone, Debug, Default, PartialEq)]
-pub(crate) struct WorkflowText {
-    pub(crate) title: String,
-    pub(crate) instructions: String,
-}
-
 /// The full text of what this call does. `Err` when it can't be shown whole.
 pub(crate) fn question_text(
     name: &str,
     input: &Value,
     controls: &Controls,
-    workflow: Option<&WorkflowText>,
 ) -> Result<String, &'static str> {
     let mut lines = vec![match name {
         "browser.run" => "Run a program in your browser tabs".to_owned(),
         "browser.steps" | "browser.fill_form" | "browser.skill" => "Act on a web page".to_owned(),
-        "memory.history.search" | "memory.history.timeline" | "memory.tree.read" => {
-            "Search your Memory".to_owned()
-        }
-        "memory.history.forget" => "Forget part of your Memory".to_owned(),
-        "memory.workflow.save" => "Save a workflow that can run as your request".to_owned(),
-        "memory.workflow.learn" => "Add learned steps to a saved workflow".to_owned(),
-        "memory.workflow.schedule" => {
-            "Run a saved workflow on a schedule, as your request".to_owned()
-        }
         _ => tool_title(name),
     }];
     match name {
@@ -217,13 +200,7 @@ pub(crate) fn question_text(
                 lines.push(format!("{}: {shown}", control_name(reference, controls)));
             }
         }
-        _ => {
-            if let Some(workflow) = workflow {
-                lines.push(format!("Workflow: {}", workflow.title));
-                lines.push(format!("Its request:\n{}", workflow.instructions));
-            }
-            lines.extend(shown_fields(input));
-        }
+        _ => lines.extend(shown_fields(input)),
     }
     let text = lines.join("\n");
     if text.chars().count() > MAX_SHOWN {
@@ -246,14 +223,14 @@ mod tests {
     fn a_long_command_is_shown_whole() {
         let command = "x".repeat(60_000);
         let text =
-            question_text("shell.run", &json!({ "command": command }), &none(), None).unwrap();
+            question_text("shell.run", &json!({ "command": command }), &none()).unwrap();
         assert!(text.contains(&command));
     }
 
     #[test]
     fn a_program_is_shown_whole() {
         let code = "y".repeat(20_000);
-        let text = question_text("browser.run", &json!({ "code": code }), &none(), None).unwrap();
+        let text = question_text("browser.run", &json!({ "code": code }), &none()).unwrap();
         assert!(text.contains(&code));
     }
 
@@ -261,7 +238,7 @@ mod tests {
     fn what_cannot_be_shown_is_refused() {
         let call = json!({ "command": "x".repeat(MAX_SHOWN + 1) });
         assert_eq!(
-            question_text("shell.run", &call, &none(), None),
+            question_text("shell.run", &call, &none()),
             Err(TOO_LONG)
         );
     }
@@ -272,7 +249,7 @@ mod tests {
         for index in 0..30 {
             call.insert(format!("field{index}"), json!("z".repeat(500)));
         }
-        let text = question_text("note.update", &Value::Object(call), &none(), None).unwrap();
+        let text = question_text("note.update", &Value::Object(call), &none()).unwrap();
         for index in 0..30 {
             assert!(text.contains(&format!("field{index}: {}", "z".repeat(500))));
         }
@@ -289,7 +266,7 @@ mod tests {
             },
         );
         let call = json!({ "steps": [{ "action": "click", "ref": "e12" }, { "action": "type", "ref": "e9", "text": "hello", "submit": true }, { "action": "key", "key": "Enter", "modifiers": ["Meta"] }] });
-        let text = question_text("browser.steps", &call, &controls, None).unwrap();
+        let text = question_text("browser.steps", &call, &controls).unwrap();
         assert!(text.contains("click button \"Send\""));
         assert!(text.contains("type control e9: hello, then press Enter"));
         assert!(text.contains("key Enter with Meta"));
@@ -313,12 +290,12 @@ mod tests {
             },
         );
         let call = json!({ "fields": [{ "ref": "e1", "value": "a@example.com" }, { "ref": "e2", "value": "hunter2" }] });
-        let text = question_text("browser.fill_form", &call, &controls, None).unwrap();
+        let text = question_text("browser.fill_form", &call, &controls).unwrap();
         assert!(text.contains("textbox \"Email\": a@example.com"));
         assert!(text.contains("textbox \"Password\": ••••••"));
         assert!(!text.contains("hunter2"));
         let typed = json!({ "steps": [{ "action": "type", "ref": "e2", "text": "hunter2" }] });
-        assert!(!question_text("browser.steps", &typed, &controls, None)
+        assert!(!question_text("browser.steps", &typed, &controls)
             .unwrap()
             .contains("hunter2"));
     }
@@ -326,7 +303,7 @@ mod tests {
     #[test]
     fn a_skill_shows_its_arguments_and_a_named_password_is_masked() {
         let call = json!({ "skill": "docs", "action": "replace", "args": { "text": "all of it", "password": "hunter2" } });
-        let text = question_text("browser.skill", &call, &none(), None).unwrap();
+        let text = question_text("browser.skill", &call, &none()).unwrap();
         assert!(
             text.contains("skill: docs") && text.contains("replace") && text.contains("all of it")
         );
@@ -334,29 +311,11 @@ mod tests {
     }
 
     #[test]
-    fn scheduling_shows_the_workflows_whole_request() {
-        let workflow = WorkflowText {
-            title: "Morning".into(),
-            instructions: "w".repeat(6000),
-        };
-        let text = question_text(
-            "memory.workflow.schedule",
-            &json!({ "workflow_id": "m1" }),
-            &none(),
-            Some(&workflow),
-        )
-        .unwrap();
-        assert!(text.contains(&workflow.instructions) && text.contains("Workflow: Morning"));
-    }
-
-    #[test]
     fn handles_stay_out_of_the_view() {
         let text = question_text(
             "browser.navigate",
             &json!({ "scopeId": "tab-1", "url": "https://example.com" }),
-            &none(),
-            None,
-        )
+            &none())
         .unwrap();
         assert_eq!(text, "Browser navigate\nurl: https://example.com");
     }

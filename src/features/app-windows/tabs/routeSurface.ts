@@ -20,18 +20,9 @@ export function workspaceSurfaceFromRoute(pathname: string): OpenWorkspaceSurfac
     path === "/register"
   )
     return null;
-  const url = new URL(pathname, "https://misty.local");
-  if (path === "/scheduled") {
-    url.searchParams.set("view", "scheduled");
-    return request(
-      "agents",
-      "tool:agents",
-      "Agents",
-      `/agents${url.search}${url.hash}`,
-      "agents",
-      "single",
-    );
-  }
+  // Scheduled work is gone; its old link opens Agents.
+  if (path === "/scheduled")
+    return request("agents", "tool:agents", "Agents", "/agents", "agents", "single");
   if (path === "/spaces" || path.startsWith("/spaces/")) {
     const parts = path.split("/").filter(Boolean);
     let spaceId = "";
@@ -54,11 +45,9 @@ export function workspaceSurfaceFromRoute(pathname: string): OpenWorkspaceSurfac
               ? "Calendar"
               : tool === "library"
                 ? "Library"
-                : tool === "memory"
-                  ? "Memory"
-                  : spaceId
-                    ? "Home"
-                    : "Spaces",
+                : spaceId
+                  ? "Home"
+                  : "Spaces",
       pathname,
       spaceId ? `${spaceId}:${tool}` : "spaces",
       "single",
@@ -76,8 +65,7 @@ export function workspaceSurfaceFromRoute(pathname: string): OpenWorkspaceSurfac
   return null;
 }
 
-type SpaceWorkspaceTool =
-  "journal" | "social" | "planner" | "calendar" | "library" | "memory" | "space";
+type SpaceWorkspaceTool = "journal" | "social" | "planner" | "calendar" | "library" | "space";
 
 export function spaceWorkspaceToolFromRoute(pathname: string): SpaceWorkspaceTool {
   return spaceToolFromSection(pathname.split(/[?#]/)[0].split("/").filter(Boolean)[2]);
@@ -107,12 +95,6 @@ function request(
 function spaceToolFromSection(section: string | undefined): SpaceWorkspaceTool {
   if (section === "notes" || section === "drawings") return "journal";
   if (section === "chat" || section === "social") return "social";
-  if (
-    section === "planner" ||
-    section === "calendar" ||
-    section === "library" ||
-    section === "memory"
-  )
-    return section;
+  if (section === "planner" || section === "calendar" || section === "library") return section;
   return "space";
 }

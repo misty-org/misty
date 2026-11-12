@@ -8,16 +8,15 @@ import { AgentWorkspaceFrame } from "../methods/AgentWorkspaceFrame";
 import { AgentsTaskContent } from "./AgentsTaskContent";
 import { createAgentsPageActions, deriveAgentsPageView } from "./agentsPageActions";
 import { useAgentsPageState } from "./useAgentsPageState";
-import { useSpacesDirectory } from "@/features/app-windows";
+import { useCollaborationStore } from "../plans/store";
 
 /*
  * THESIS: Agents opens straight into a conversation with the selected agent.
  * OWN-WORLD: Misty monochrome shared controls, 6px buttons, 8px islands, existing cloud avatars.
- * STORY: Start a task, resume recent work, or browse reusable guidance.
- * FIRST VIEWPORT: The New task composer, what the agent can reach, recent work and templates.
+ * STORY: Start a task or resume recent work.
+ * FIRST VIEWPORT: The New task composer and what the agent can reach.
  * FORM: Polar's page columns and catalog density inside Misty; no Spaces navigation.
  * SIGNATURE: The conversation stays mounted across catalogs.
- * BOUNDARY: New workflow, skill, connector and window-execution UI has no backend actions.
  */
 export default function NativeAgentsPage() {
   return <AgentsWorkspacePage />;
@@ -26,7 +25,6 @@ export default function NativeAgentsPage() {
 function AgentsWorkspacePage() {
   const state = useAgentsPageState();
   // Agents group by their home Space here; the quick panel just lists them.
-  const spaces = useSpacesDirectory((store) => store.spaces);
   const actions = createAgentsPageActions(state);
   const view = deriveAgentsPageView(state, actions);
   const {
@@ -42,7 +40,6 @@ function AgentsWorkspacePage() {
     settingsModalMode,
     setSettingsModalOpen,
     setWorkspacePage,
-    setChatRevision,
     setParams,
     agentConversations,
     activity,
@@ -52,14 +49,12 @@ function AgentsWorkspacePage() {
   } = state;
   const { change, setEditorStatus } = guard;
   const { select, closeSettings, saveProfile, removeProfile, openApps } = actions;
-  const profileSection = (onDone: () => void) =>
+  const profileSection = () =>
     profile && (
       <AgentEditor
         key={`${user?.id}:${profile.id}:${spaceId}`}
         profile={profile}
         onStatusChange={setEditorStatus}
-        onTalk={onDone}
-        spaceId={spaceId}
         onSaved={saveProfile}
         onRemoved={removeProfile}
       />
@@ -77,25 +72,23 @@ function AgentsWorkspacePage() {
           activity={activity.entries}
           conversationId={activeConversationId}
           disabled={view.disabled}
-          identity={
-            <AgentSwitcher {...switcher} spaces={spaces} className="agent-studio-identity" />
-          }
+          identity={<AgentSwitcher {...switcher} className="agent-studio-identity" />}
           onPageChange={(page) =>
-            change(() => {
-              setWorkspacePage(page);
-            }, false)
+            page === "task"
+              ? change(() => {
+                  setWorkspacePage("task");
+                  const next = new URLSearchParams(state.params);
+                  next.delete("view");
+                  setParams(next, { replace: true });
+                }, false)
+              : actions.openPage(page)
           }
+          onLearn={(prompt) => {
+            void useCollaborationStore.getState().setMode(undefined, "teach");
+            select(profile.id, true, undefined, prompt);
+          }}
           onNewTask={() => select(profile.id, true)}
           onConversation={(id) => select(profile.id, false, id)}
-          onUseTemplate={(prompt) => select(profile.id, true, undefined, prompt)}
-          onStartWork={(action) =>
-            change(() => {
-              setChatRevision((n) => n + 1);
-              setWorkspacePage("task");
-              setParams({ agent: profile.id });
-              action();
-            })
-          }
         >
           {taskContent}
         </AgentWorkspaceFrame>
@@ -108,7 +101,7 @@ function AgentsWorkspacePage() {
         activeTab={settingsModalTab}
         mode={settingsModalMode}
       >
-        {settingsModalMode === "edit" && profileSection(closeSettings)}
+        {settingsModalMode === "edit" && profileSection()}
         {settingsModalMode === "create" && (
           <AgentSetup
             key={`${user?.id}:create`}

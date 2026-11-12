@@ -8,7 +8,6 @@ import {
   mayPreload,
   preloadArrived,
   preloadSeen,
-  preloadsToReload,
 } from "./tabPreload";
 import { markFromElsewhere } from "./tabsFromElsewhere";
 
@@ -74,40 +73,5 @@ describe("tab preload", () => {
     expect(isUnseenPreload("opened")).toBe(false);
     expect(isUnseenPreload("closed")).toBe(false);
     expect(isUnseenPreload("waiting")).toBe(true);
-  });
-
-  it("reloads a page once when its sign-in arrives soon after", () => {
-    markFromElsewhere(["gmail"]);
-    preloadArrived(
-      views("gmail"),
-      () => undefined,
-      () => 1_000,
-    );
-    vi.advanceTimersByTime(8_000);
-    expect(preloadsToReload(5_000)).toEqual(["gmail"]);
-    expect(preloadsToReload(6_000)).toEqual([]);
-  });
-
-  it("doesn't reload for cookies a site keeps writing later on", () => {
-    markFromElsewhere(["gmail"]);
-    preloadArrived(
-      views("gmail"),
-      () => undefined,
-      () => 1_000,
-    );
-    vi.advanceTimersByTime(8_000);
-    expect(preloadsToReload(1_000 + 60_001)).toEqual([]);
-  });
-
-  it("doesn't reload a page once it's been opened", () => {
-    markFromElsewhere(["gmail"]);
-    preloadArrived(
-      views("gmail"),
-      () => undefined,
-      () => 1_000,
-    );
-    vi.advanceTimersByTime(8_000);
-    preloadSeen("gmail");
-    expect(preloadsToReload(2_000)).toEqual([]);
   });
 });

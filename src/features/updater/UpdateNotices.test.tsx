@@ -5,6 +5,7 @@ import { UpdateNotices } from "./UpdateNotices";
 const mocks = vi.hoisted(() => ({ check: vi.fn(), enabled: true, native: true, apps: vi.fn() }));
 vi.mock("@/features/settings", () => ({
   settingsBoolean: () => mocks.enabled,
+  workspaceDefaultViewIndex: 3,
   useSettingsStore: (selector: (s: object) => unknown) => selector({}),
 }));
 vi.mock("@/shared/platform/tauri", () => ({ hasTauriInternals: () => mocks.native }));

@@ -20,7 +20,34 @@ a header, and the notices below are preserved as their licenses require.
 
 desktop-cc-gui (https://github.com/zhukunpenglinyutong/desktop-cc-gui)
   Adapted in src-tauri/features/engines and src-tauri/features/project: the agent engine adapters
-  (Claude Code, Codex, OpenCode), program discovery, and the files, Git and terminal backends.
+  (Claude Code, Codex, OpenCode, the Agent Client Protocol engines Kimi, Grok, MiniMax, Qoder and
+  Oh My Pi, CodeBuddy, Antigravity and Pi), program discovery, and the files, Git, Git-ignore,
+  worktree, terminal, open-in-app, HTML preview and clipboard backends (src-tauri/features/project)
+  and window state (src-tauri/features/browser/app_windows). The panels beside a chat follow its
+  file tree, editor, find and replace, Markdown and HTML preview, changes panel, terminal,
+  worktree, open-in and launch-script features and its workspace grouping
+  (src/features/agents/context-panel, src/features/agents/engines/enginesApi.ts). The chat composer's `@` file, `/` command, `$` skill and `!` prompt menus and its
+  engine command and skill catalog follow its composer
+  (src/features/agents/conversations/composer/controls). The chat view adapts its streaming
+  Markdown (paced reveal, chunked parsing, cached highlighting), tool payload viewer and edit line
+  stats, run status strip, run details and context breakdown, message anchor rail, search inside a
+  chat, file links, directory grant card, prompt history and command palette
+  (src/features/agents/runs/markdown, src/features/agents/progress/payload,
+  src/features/agents/conversations, src/features/commands,
+  src-tauri/features/engines/folder_grant.rs). Engine management is adapted in
+  src-tauri/features/engine_config and src/features/engine-config: the engines' own MCP servers,
+  the skills hub, the prompt library, usage statistics and plan limits, CLI install and update,
+  provider channels and CC Switch import, the network proxy, fonts and the performance panel,
+  and Pi's per-provider editor (piFamilyModelsBlocks.ts). The notes shown after an update follow
+  its upgrade announcement (src/features/updater).
+  The safety scan on what an engine writes into memory follows its memory scan
+  (src-tauri/features/memory/scan.rs).
+  Also adapted: bot bundles and the bot prompt (src-tauri/features/bots, src/features/bots), the
+  persona catalog and the composer's `#` menu (src-tauri/features/agent_catalog,
+  src/features/agent-catalog), computer use for outside engines and its virtual cursor
+  (src-tauri/features/computer_use, src/features/computer-use, src/app/computer-cursor.html),
+  desktop pets (src-tauri/features/pets, src/features/pets), and pruning the AppImage's bundled
+  Wayland libraries (cli/src/release/appimage.rs).
 
   MIT License
 
@@ -40,3 +67,159 @@ desktop-cc-gui (https://github.com/zhukunpenglinyutong/desktop-cc-gui)
   NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
   DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+lobe-icons (https://github.com/lobehub/lobe-icons)
+  The engines' marks in src/features/agents/engines/engineMarks.json and the providers' marks in
+  src/features/engine-config/brands/brandMarks.json are generated from
+  @lobehub/icons-static-svg. The marks belong to their owners and only name their products.
+
+  MIT License
+
+  Copyright (c) 2023 LobeHub
+
+Oh My Pi (https://github.com/can1357/oh-my-pi)
+  Oh My Pi's mark in src/features/agents/engines/engineMarks.json is its assets/icon.svg, with
+  its white drawn in the text colour. The mark belongs to its owners and only names their product.
+
+  MIT License
+
+  Copyright (c) 2025 Mario Zechner
+  Copyright (c) 2025-2026 Can Bölük
+  Copyright (c) 2026 Stencil Labs, Inc.
+
+LiteLLM (https://github.com/BerriAI/litellm)
+  Its model price table (model_prices_and_context_window.json) is bundled as
+  src-tauri/features/engine_config/usage_stats/model-prices.json and refreshed from its repository
+  to price engine usage.
+
+  MIT License
+
+  Copyright (c) 2023 Berri AI
+
+  Permission is hereby granted, free of charge, to any person obtaining a copy of this software
+  and associated documentation files (the "Software"), to deal in the Software without
+  restriction, including without limitation the rights to use, copy, modify, merge, publish,
+  distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the
+  Software is furnished to do so, subject to the following conditions:
+
+  The above copyright notice and this permission notice shall be included in all copies or
+  substantial portions of the Software.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING
+  BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+  NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+  DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+TokenTracker (https://github.com/xiufengsun/TokenTracker)
+  The usage log parsers in src-tauri/features/engine_config/usage_stats/parsers follow it, by way
+  of desktop-cc-gui.
+
+  MIT License
+
+  Copyright (c) xiufengsun
+
+  Permission is hereby granted, free of charge, to any person obtaining a copy of this software
+  and associated documentation files (the "Software"), to deal in the Software without
+  restriction, including without limitation the rights to use, copy, modify, merge, publish,
+  distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the
+  Software is furnished to do so, subject to the following conditions:
+
+  The above copyright notice and this permission notice shall be included in all copies or
+  substantial portions of the Software.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING
+  BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+  NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+  DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+agency-agents (https://github.com/msitarzewski/agency-agents)
+  The persona catalog bundled in src-tauri/resources/agent-catalogs/agency-agents (prompts and
+  their metadata, at revision 459dce837db3bdfdc4763d3fefd1fd854e73c8f1), as desktop-cc-gui
+  packages it.
+
+  MIT License
+
+  Copyright (c) 2025 AgentLand Contributors
+
+  Permission is hereby granted, free of charge, to any person obtaining a copy
+  of this software and associated documentation files (the "Software"), to deal
+  in the Software without restriction, including without limitation the rights
+  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+  copies of the Software, and to permit persons to whom the Software is
+  furnished to do so, subject to the following conditions:
+
+  The above copyright notice and this permission notice shall be included in all
+  copies or substantial portions of the Software.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+  SOFTWARE.
+
+BrowserOS (https://github.com/browseros-ai/BrowserOS)
+  The agent activity view follows its cockpit, History and task page: the cards for runs going on
+  now, runs grouped by day, and a run's steps as plain sentences with repeated steps and an
+  agent's checks of its own work folded together and housekeeping calls hidden behind a count
+  (src/features/agents/activity).
+
+  GNU Affero General Public License, version 3 or (at your option) any later version
+
+  Copyright 2026 BrowserOS
+
+Engram (https://github.com/Gentleman-Programming/engram)
+  Misty's memory, since removed, was a port of its store. Migration 33 in
+  src-tauri/features/database/store.rs still creates its tables (sessions, observations, versions,
+  relations, prompts and their FTS5 indexes), which migration 35 drops.
+
+  MIT License
+
+  Copyright (c) 2026 Alan Buscaglia
+
+  Permission is hereby granted, free of charge, to any person obtaining a copy
+  of this software and associated documentation files (the "Software"), to deal
+  in the Software without restriction, including without limitation the rights
+  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+  copies of the Software, and to permit persons to whom the Software is
+  furnished to do so, subject to the following conditions:
+
+  The above copyright notice and this permission notice shall be included in all
+  copies or substantial portions of the Software.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+  SOFTWARE.
+
+MemPalace (https://github.com/MemPalace/mempalace)
+  Misty's memory, since removed, followed its palace. Migration 33 in
+  src-tauri/features/database/store.rs still creates its drawer, closet and hallway tables, which
+  migration 35 drops.
+
+  MIT License
+
+  Copyright (c) 2026 MemPalace Contributors
+
+  Permission is hereby granted, free of charge, to any person obtaining a copy
+  of this software and associated documentation files (the "Software"), to deal
+  in the Software without restriction, including without limitation the rights
+  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+  copies of the Software, and to permit persons to whom the Software is
+  furnished to do so, subject to the following conditions:
+
+  The above copyright notice and this permission notice shall be included in all
+  copies or substantial portions of the Software.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+  SOFTWARE.

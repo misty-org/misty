@@ -13,20 +13,6 @@ export const sitePermissionKinds: { kind: SitePermissionKind; label: string }[] 
   { kind: "microphone", label: "Microphone" },
   { kind: "location", label: "Location" },
 ];
-export const askForEverything: SitePermissions = {
-  camera: "ask",
-  microphone: "ask",
-  location: "ask",
-};
-export interface BrowserSiteInfo {
-  url: string;
-  origin: string;
-  secure: boolean;
-  persistent: boolean;
-  permissions: SitePermissions;
-  /** macOS refuses Misty this computer's location, so a site's allowance reaches nothing. */
-  locationBlocked?: boolean;
-}
 export interface SavedSitePermission {
   /** The website data store holding the choice; native code names it. */
   profile: string;

@@ -1,0 +1,43 @@
+/* Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong). */
+/* "Open in": the chosen app's own mark as a button, and a narrow chevron for the rest. An app's
+   icon keeps its colors; everything around it stays neutral. */
+.open-app {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+}
+.open-app .open-app-main {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.open-app .open-app-more {
+  width: 18px;
+  min-width: 18px;
+  padding: 0;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+.open-app-icon {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  object-fit: contain;
+}
+.open-app-letter {
+  display: grid;
+  width: 16px;
+  height: 16px;
+  flex: none;
+  place-items: center;
+  border-radius: 4px;
+  background: var(--color-control-hover);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--color-cream);
+}
+.open-app-row-icons {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+}

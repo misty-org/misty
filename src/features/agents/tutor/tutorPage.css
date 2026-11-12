@@ -1,0 +1,664 @@
+/* Tutor: a column with its tabs, then the open tab: Learn, a notebook, flashcards or guides. */
+.tutor-page {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  width: 100%;
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 28px 24px 40px;
+}
+.tutor-ask {
+  display: flex;
+  border: 1px solid var(--color-charcoal-border);
+  border-radius: var(--radius-xl);
+  background: var(--color-charcoal-card);
+}
+.tutor-ask:focus-within {
+  border-color: var(--color-charcoal-border-strong);
+}
+.tutor-ask textarea {
+  flex: 1;
+  min-height: 0;
+  padding: 6px 0;
+  font-size: 14px;
+  field-sizing: content;
+  max-height: 160px;
+}
+.tutor-ask-icon {
+  flex: none;
+  color: var(--color-cream-muted);
+}
+.tutor-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.tutor-section h2 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--color-cream-muted);
+}
+.tutor-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+}
+.tutor-card {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  padding: 14px;
+  text-align: left;
+  border: 1px solid var(--color-charcoal-border);
+  border-radius: var(--radius-xl);
+  background: var(--color-charcoal-card);
+}
+.tutor-card:hover {
+  border-color: var(--color-charcoal-border-strong);
+}
+.tutor-card-title {
+  font-size: 14px;
+  color: var(--color-cream-bright);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tutor-card-detail {
+  flex: none;
+  font-size: 12px;
+  color: var(--color-cream-muted);
+}
+.tutor-meter {
+  display: block;
+  height: 4px;
+  margin-top: 10px;
+  border-radius: 999px;
+  background: var(--color-control-hover);
+  overflow: hidden;
+}
+.tutor-meter > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--color-cream-muted);
+}
+.tutor-rows {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--color-charcoal-border);
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+}
+.tutor-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  text-align: left;
+  color: var(--color-cream);
+}
+.tutor-row + .tutor-row {
+  border-top: 1px solid var(--color-charcoal-border);
+}
+.tutor-row:hover {
+  background: var(--color-control-hover);
+}
+
+/* Tutor's tabs lead the page; there is no title bar. A notebook takes the wider column. */
+.tutor-page[data-wide="true"] {
+  max-width: 1180px;
+}
+.tutor-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: -8px;
+}
+.tutor-lead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 36px;
+}
+.tutor-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+}
+.tutor-lead .tutor-title-input {
+  flex: 1;
+  min-width: 0;
+  height: 34px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: transparent;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-cream-bright);
+  outline: none;
+  box-shadow: none;
+}
+.tutor-lead .tutor-title-input:hover {
+  background: var(--color-control-hover);
+}
+.tutor-lead .tutor-title-input:focus {
+  border-color: var(--color-charcoal-border-strong);
+  background: var(--color-charcoal-card);
+}
+.tutor-search {
+  width: 260px;
+  flex: none;
+}
+.tutor-empty {
+  margin: 0;
+  padding: 18px 2px;
+  font-size: 13px;
+  color: var(--color-cream-muted);
+}
+.tutor-muted {
+  color: var(--color-cream-muted);
+}
+
+/* The ask box: the request, then what to make and Start, as one card. */
+.tutor-ask {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  padding: 8px 8px 8px 14px;
+}
+.tutor-ask-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.tutor-ask-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 4px;
+}
+
+/* Cards due: one quiet row that opens a review. */
+.tutor-due {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--color-charcoal-border);
+  border-radius: var(--radius-xl);
+  background: var(--color-charcoal-card);
+  text-align: left;
+}
+.tutor-due:hover {
+  border-color: var(--color-charcoal-border-strong);
+}
+.tutor-due-count {
+  min-width: 28px;
+  font-size: 20px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-cream-bright);
+}
+.tutor-due-go {
+  margin-left: auto;
+  font-size: 13px;
+  color: var(--color-cream-muted);
+}
+.tutor-row-lead {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+.tutor-row-lead > svg {
+  flex: none;
+  color: var(--color-cream-muted);
+}
+.tutor-job {
+  padding: 4px 6px 4px 0;
+}
+.tutor-job-open {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 8px 6px 14px;
+  text-align: left;
+}
+.tutor-job[data-state="failed"] .tutor-card-detail {
+  max-width: 50%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@container agent-studio (max-width: 860px) {
+  .tutor-search {
+    width: 140px;
+  }
+}
+.tutor-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid var(--color-charcoal-border);
+  border-radius: var(--radius-xl);
+  background: var(--color-charcoal-card);
+}
+.tutor-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 32px;
+}
+.tutor-panel-head h2,
+.tutor-panel > header h2 {
+  margin: 0 0 0 4px;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--color-cream-muted);
+}
+.tutor-section > .tutor-panel-head h2 {
+  margin-left: 0;
+}
+.tutor-sources {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.tutor-source {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px;
+  border-radius: var(--radius-lg);
+}
+.tutor-source:hover {
+  background: var(--color-control-hover);
+}
+.tutor-source[data-off="true"] .tutor-source-title,
+.tutor-source[data-off="true"] .tutor-source-icon {
+  opacity: 0.5;
+}
+.tutor-source-row {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+}
+.tutor-source-index {
+  flex: none;
+  min-width: 16px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-cream-muted);
+  text-align: right;
+}
+.tutor-source-icon {
+  display: inline-flex;
+  flex: none;
+  color: var(--color-cream-muted);
+}
+.tutor-source-title {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  padding: 2px 0;
+  text-align: left;
+  font-size: 13px;
+  color: var(--color-cream);
+}
+.tutor-source-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-left: 44px;
+}
+.tutor-source-context {
+  width: auto;
+  height: 26px;
+  font-size: 12px;
+}
+.tutor-source-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 4px 0 2px 44px;
+  font-size: 12px;
+  color: var(--color-cream);
+}
+.tutor-source-body a {
+  color: var(--color-cream-muted);
+  text-decoration: underline;
+  overflow-wrap: anywhere;
+}
+.tutor-source-text {
+  max-height: 260px;
+  margin: 0;
+  overflow: auto;
+  white-space: pre-wrap;
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--color-cream-muted);
+}
+.tutor-make {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.tutor-notes {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.tutor-note {
+  padding: 10px 12px;
+  border: 1px solid var(--color-charcoal-border);
+  border-radius: var(--radius-xl);
+  background: var(--color-charcoal-card);
+}
+.tutor-note .tutor-source-title {
+  font-weight: 500;
+  color: var(--color-cream-bright);
+}
+.tutor-note-body {
+  font-size: 13px;
+  color: var(--color-cream);
+}
+.tutor-note[data-open="false"] .tutor-note-body {
+  max-height: 96px;
+  overflow: hidden;
+  mask-image: linear-gradient(to bottom, #000 60%, transparent);
+}
+.tutor-card-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.tutor-card-form > button {
+  align-self: flex-start;
+}
+.tutor-dialog {
+  width: 560px;
+  max-width: calc(100vw - 48px);
+}
+
+/* Flashcards. */
+.tutor-flashcard-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto auto auto;
+  align-items: start;
+}
+.tutor-flashcard-side {
+  min-width: 0;
+  font-size: 13px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.tutor-review {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.tutor-flashcard {
+  display: flex;
+  min-height: 260px;
+  flex-direction: column;
+  justify-content: center;
+  gap: 22px;
+  padding: 32px;
+  border: 1px solid var(--color-charcoal-border);
+  border-radius: var(--radius-xl);
+  background: var(--color-charcoal-card);
+  text-align: center;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.tutor-flashcard-front {
+  font-size: 18px;
+  line-height: 1.5;
+  color: var(--color-cream-bright);
+}
+.tutor-flashcard-back {
+  padding-top: 22px;
+  border-top: 1px solid var(--color-charcoal-border);
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--color-cream);
+}
+.tutor-grades {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+}
+.tutor-grades > button {
+  min-width: 96px;
+  height: 48px;
+  flex-direction: column;
+  gap: 0;
+}
+.tutor-review-done {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 64px 0;
+}
+
+/* Guides and quizzes. */
+.tutor-guide {
+  max-width: 760px;
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--color-cream);
+}
+.tutor-quiz {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  margin: 0;
+  padding-left: 20px;
+}
+.tutor-quiz > li::marker {
+  color: var(--color-cream-muted);
+}
+.tutor-quiz-question {
+  margin: 0 0 8px;
+  font-size: 14px;
+  color: var(--color-cream-bright);
+}
+.tutor-quiz-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.tutor-quiz-choice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 12px;
+  border: 1px solid var(--color-charcoal-border);
+  border-radius: var(--radius-lg);
+  text-align: left;
+  font-size: 13px;
+  color: var(--color-cream);
+}
+.tutor-quiz-choice:hover:not(:disabled) {
+  background: var(--color-control-hover);
+}
+.tutor-quiz-choice[aria-checked="true"] {
+  border-color: var(--color-charcoal-border-strong);
+  background: var(--color-control-active);
+  color: var(--color-cream-bright);
+}
+/* Right and wrong carry meaning, so they get color. */
+.tutor-quiz-choice[data-verdict="right"] {
+  border-color: color-mix(in srgb, #3fb950 55%, transparent);
+  color: #56d364;
+}
+.tutor-quiz-choice[data-verdict="wrong"] {
+  border-color: color-mix(in srgb, #f85149 55%, transparent);
+  color: #ff7b72;
+}
+
+/* The cursor companion's controls, as on its settings page. */
+.tutor-cursor {
+  max-width: 720px;
+}
+
+/* Search across notebooks: the box leads the list's row, and results drop under it. */
+.tutor-search-all {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  max-width: 420px;
+}
+.tutor-search-all .tutor-search {
+  width: 100%;
+}
+.tutor-search-results {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 10;
+  display: flex;
+  max-height: 420px;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px;
+  overflow: auto;
+  border: 1px solid var(--color-charcoal-border);
+  border-radius: var(--radius-xl);
+  background: var(--color-charcoal-card);
+  box-shadow: 0 16px 40px -18px rgb(0 0 0 / 0.7);
+}
+.tutor-search-hit {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  padding: 8px 10px;
+  border-radius: var(--radius-lg);
+  text-align: left;
+  font-size: 13px;
+  color: var(--color-cream);
+}
+.tutor-search-hit:hover {
+  background: var(--color-control-hover);
+}
+.tutor-search-snippet {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  font-size: 12px;
+  color: var(--color-cream-muted);
+}
+.tutor-search-mode {
+  padding: 6px 10px 2px;
+}
+
+/* An audio overview: the player over the script it reads. */
+.tutor-player {
+  display: flex;
+  min-height: 48px;
+  align-items: center;
+  padding: 8px 12px;
+  border: 1px solid var(--color-charcoal-border);
+  border-radius: var(--radius-xl);
+  background: var(--color-charcoal-card);
+}
+.tutor-script {
+  display: flex;
+  max-width: 760px;
+  flex-direction: column;
+  gap: 10px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--color-cream);
+}
+.tutor-script > p {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  gap: 8px;
+  margin: 0;
+}
+.tutor-script-speaker {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.9;
+  color: var(--color-cream-muted);
+}
+
+/* Asking a notebook: the conversation over its box, inside the notebook. */
+.tutor-chat {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.tutor-chat-turns {
+  display: flex;
+  max-height: 560px;
+  flex-direction: column;
+  gap: 14px;
+  padding: 4px 2px;
+  overflow: auto;
+}
+.tutor-chat-question {
+  align-self: flex-end;
+  max-width: 85%;
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: var(--radius-xl);
+  background: var(--color-control-hover);
+  font-size: 14px;
+  color: var(--color-cream-bright);
+  white-space: pre-wrap;
+}
+.tutor-chat-answer {
+  font-size: 14px;
+  line-height: 1.65;
+  color: var(--color-cream);
+}
+/* A citation is a small chip that opens its source. */
+.tutor-chat-answer a[href^="#tutor-source-"] {
+  display: inline-block;
+  min-width: 18px;
+  margin: 0 1px;
+  padding: 0 5px;
+  border-radius: var(--radius-md);
+  background: var(--color-control-hover);
+  font-size: 11px;
+  line-height: 17px;
+  text-align: center;
+  text-decoration: none;
+  color: var(--color-cream);
+  vertical-align: 1px;
+}
+.tutor-chat-answer a[href^="#tutor-source-"]:hover {
+  background: var(--color-control-active);
+  color: var(--color-cream-bright);
+}
+.tutor-source[data-cited="true"] {
+  background: var(--color-control-hover);
+  box-shadow: inset 0 0 0 1px var(--color-charcoal-border-strong);
+}

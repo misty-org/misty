@@ -6,6 +6,7 @@ import {
 import type { AiCitation, AiInvocationEvent } from "../../runs/invocations";
 import { settleProgress, withAnswer, withToolEvent } from "../../progress/progressTimeline";
 import type { GlobalAiCitation } from "../state/conversationTypes";
+import { withDeniedFolder } from "../view/grants/folderGrants";
 
 import {
   patchConversationMessage,
@@ -179,6 +180,39 @@ export function applyGlobalInvocationEvent(
       patchConversationMessage(set, get, conversationId, messageId, withToolEvent(current, event));
     return;
   }
+  if (event.type === "usage.updated") {
+    const current = get()
+      .conversations.find((conversation) => conversation.id === conversationId)
+      ?.messages.find((message) => message.id === messageId);
+    const previous = current?.usage ?? {};
+    const pick = (value: number | null | undefined, kept: number | undefined) =>
+      typeof value === "number" ? value : kept;
+    patchConversationMessage(set, get, conversationId, messageId, {
+      usage: {
+        input: pick(event.input, previous.input),
+        output: pick(event.output, previous.output),
+        cacheRead: pick(event.cacheRead, previous.cacheRead),
+        cacheWrite: pick(event.cacheWrite, previous.cacheWrite),
+        used: pick(event.used, previous.used),
+        // A report without a window keeps the one an earlier report gave.
+        window: pick(event.window, previous.window),
+        reasoning: pick(event.reasoning, previous.reasoning),
+        costUsd: pick(event.costUsd, previous.costUsd),
+      },
+      ...(event.model ? { model: event.model } : {}),
+    });
+    return;
+  }
+  if (event.type === "permission.denied") {
+    const current = get()
+      .conversations.find((conversation) => conversation.id === conversationId)
+      ?.messages.find((message) => message.id === messageId);
+    if (current)
+      patchConversationMessage(set, get, conversationId, messageId, {
+        folderGrants: withDeniedFolder(current.folderGrants, event),
+      });
+    return;
+  }
   if (event.type === "assistant.status") {
     patchConversationMessage(set, get, conversationId, messageId, {
       activity: event.text || event.phase,
@@ -188,7 +222,13 @@ export function applyGlobalInvocationEvent(
   }
   if (event.type === "invocation.completed") {
     replaceActiveGlobalInvocationStream();
+    const current = get()
+      .conversations.find((conversation) => conversation.id === conversationId)
+      ?.messages.find((message) => message.id === messageId);
+    const started = current ? Date.parse(current.createdAt) : NaN;
     patchConversationMessage(set, get, conversationId, messageId, {
+      durationMs: event.durationMs ?? (Number.isFinite(started) ? Date.now() - started : undefined),
+      ...(event.model ? { model: event.model } : {}),
       state: "completed",
       retryable: false,
       activity: undefined,

@@ -1,6 +1,6 @@
-import type { DisplayCapture } from "../../cursor/protocol";
-import type { LessonPayload, LessonSummaryPayload } from "../../lessons/lessonTypes";
-import type { MediaContext } from "../../cursor/mediaContext";
+import type { DisplayCapture } from "../../tutor/cursor/protocol";
+import type { LessonPayload, LessonSummaryPayload } from "../../tutor/lessons/lessonTypes";
+import type { MediaContext } from "../../tutor/cursor/mediaContext";
 
 import type { AiInvocationState } from "./invocationEventTypes";
 
@@ -25,7 +25,6 @@ export interface ScreenRequest {
 export const AI_ARTIFACT_SCHEMA_VERSION = 1 as const;
 export type AiSurfaceId =
   | "global"
-  | "activity"
   | "space.chat"
   | "notes"
   | "drawings"
@@ -34,20 +33,11 @@ export type AiSurfaceId =
   | "extensions"
   | "files"
   | "photo-editor"
-  | "scheduled"
   | "agents"
   | "settings";
 type AiInvocationMode = "quick" | "drawer" | "companion";
 type AiTrigger =
-  | "message"
-  | "selection"
-  | "object"
-  | "schedule"
-  | "scheduled_task"
-  | "event"
-  | "handoff"
-  | "continuation"
-  | "delegated";
+  "message" | "selection" | "object" | "event" | "handoff" | "continuation" | "delegated";
 type AiPrivacyClass = "shared" | "private" | "device" | "provider";
 type AiRisk = "observe" | "draft" | "consequential" | "dangerous";
 type AiApprovalPolicy =
@@ -207,12 +197,6 @@ export interface AiInvocationRequest {
   historyTurns?: { invocation_id?: string; prompt: string; reply?: string; created_at: string }[];
   /** The chat's running notes on older turns, as the last run sent them. */
   historyNotes?: unknown;
-  /** A scheduled run this computer claimed and is starting (roadmap C1). */
-  scheduleId?: string;
-  scheduleClaim?: string;
-  methodVersionId?: string;
-  methodInputs?: Record<string, string | number | boolean>;
-  skillVersionIds?: string[];
   companionMode?: "team" | "auto";
   displayCaptures?: DisplayCapture[];
   agentId?: string;
@@ -252,7 +236,9 @@ export interface AiInvocationRequest {
   /** What the video in front was saying, for a question at the cursor. */
   mediaContext?: MediaContext;
   /** Ask or Auto for this turn. Omitted uses the chat's choice or its agent's default. */
-  permissionMode?: "ask" | "auto";
+  permissionMode?: "ask" | "auto" | "bypass";
+  /** Screen and input control for an outside engine, which the person turned on for this send. */
+  computerUse?: boolean;
   idempotencyKey: string;
   timezone?: string;
 }

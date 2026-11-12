@@ -2,10 +2,8 @@ import type { AppTab } from "@/app/shell";
 import { routes } from "@/app/shell";
 
 const deepLinkPrefixes = [
-  routes.browser,
   routes.invite,
   routes.agents,
-  routes.scheduled,
   routes.spaces,
   routes.settings,
   routes.signIn,
@@ -13,11 +11,10 @@ const deepLinkPrefixes = [
 ];
 
 export function desktopRouteIdFromPath(pathname: string): AppTab {
-  if (pathname.startsWith(routes.browser)) return "browser";
   if (pathname.startsWith(routes.agents)) return "agents";
   if (pathname.startsWith(routes.spaces)) return "spaces";
   if (pathname.startsWith(routes.settings)) return "settings";
-  return "browser";
+  return "agents";
 }
 
 export function isDeepLinkRouteAllowed(route: string): boolean {
@@ -25,5 +22,5 @@ export function isDeepLinkRouteAllowed(route: string): boolean {
 }
 
 export function resolveAuthDeepLinkRoute(): string {
-  return routes.browser;
+  return routes.agents;
 }

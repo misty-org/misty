@@ -1,7 +1,7 @@
 import { isReservedShortcut, shortcutFromEvent } from "@/shared/shortcuts/bindings";
 import type { ReassignShortcutRequest, UpdateShortcutRequest } from "@/native/ipc";
-import { Button, Input, SkeletonList } from "@/shared/ui";
-import { Search } from "lucide-react";
+import { Button, SearchField, SkeletonList } from "@/shared/ui";
+
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   DesktopSettingsNotice,
@@ -197,19 +197,14 @@ export function ShortcutsSection(props: SettingsContentProps) {
           />
         </SettingsRow>
         <div className="flex flex-wrap items-center gap-2 pb-3">
-          <label className="relative min-w-[200px] flex-1">
-            <Search
-              size={14}
-              className="pointer-events-none absolute inset-y-0 left-2.5 my-auto text-cream-muted"
-            />
-            <Input
-              aria-label="Search shortcuts"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search commands, tools, or shortcuts"
-              className="pl-8"
-            />
-          </label>
+          <SearchField
+            size="md"
+            containerClassName="min-w-[200px] flex-1"
+            aria-label="Search shortcuts"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search commands, tools, or shortcuts"
+          />
           <DropdownControl
             label="Shortcut category"
             value={shownCategory}

@@ -10,7 +10,7 @@ use crate::{artifacts, workspace::Workspace};
 
 use super::{
     model::{
-        PlatformManifest, ReleaseManifest, MACOS_PLATFORM, PUBLIC_REPOSITORY,
+        PlatformManifest, ReleaseManifest, LINUX_PLATFORM, MACOS_PLATFORM, PUBLIC_REPOSITORY,
         RELEASE_MANIFEST_NAME, WINDOWS_ARM_PLATFORM, WINDOWS_PLATFORM,
     },
     state,
@@ -131,28 +131,32 @@ pub(super) fn public_asset_names(manifests: &[PlatformManifest]) -> Result<BTree
         }
         names.insert(manifest.updater_asset.clone());
 
-        let installer_extension = match manifest.platform.as_str() {
-            MACOS_PLATFORM => "dmg",
-            WINDOWS_PLATFORM | WINDOWS_ARM_PLATFORM => "exe",
+        // Linux ships the AppImage (also the updater) and a deb and an rpm for package managers.
+        let installer_extensions: &[&str] = match manifest.platform.as_str() {
+            MACOS_PLATFORM => &["dmg"],
+            WINDOWS_PLATFORM | WINDOWS_ARM_PLATFORM => &["exe"],
+            LINUX_PLATFORM => &["AppImage", "deb", "rpm"],
             platform => bail!("cannot select a public installer for {platform}"),
         };
-        let installers = manifest
-            .files
-            .iter()
-            .filter(|file| {
-                Path::new(&file.name)
-                    .extension()
-                    .is_some_and(|extension| extension == installer_extension)
-            })
-            .collect::<Vec<_>>();
-        if installers.len() != 1 {
-            bail!(
-                "{} release must contain exactly one .{installer_extension} installer, found {}",
-                manifest.platform,
-                installers.len()
-            );
+        for installer_extension in installer_extensions {
+            let installers = manifest
+                .files
+                .iter()
+                .filter(|file| {
+                    Path::new(&file.name)
+                        .extension()
+                        .is_some_and(|extension| extension == *installer_extension)
+                })
+                .collect::<Vec<_>>();
+            if installers.len() != 1 {
+                bail!(
+                    "{} release must contain exactly one .{installer_extension} installer, found {}",
+                    manifest.platform,
+                    installers.len()
+                );
+            }
+            names.insert(installers[0].name.clone());
         }
-        names.insert(installers[0].name.clone());
     }
     Ok(names)
 }
@@ -236,6 +240,10 @@ pub(super) fn latest_json(
             }
             WINDOWS_ARM_PLATFORM => {
                 platforms.insert("windows-aarch64".to_owned(), updater);
+            }
+            // The updater replaces the AppImage; deb and rpm installs update through the package.
+            LINUX_PLATFORM => {
+                platforms.insert("linux-x86_64".to_owned(), updater);
             }
             platform => bail!("cannot generate updater metadata for {platform}"),
         }

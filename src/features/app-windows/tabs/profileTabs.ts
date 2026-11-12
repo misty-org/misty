@@ -1,5 +1,4 @@
 import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { registerRecoveryFlush } from "../recovery/recoveryStorage";
 import {
@@ -20,8 +19,7 @@ import {
   usableFields,
   type TabFields,
 } from "./profileTabRecord";
-import { currentProfile } from "../profiles/profileWindow";
-import { keepPreloads, preloadArrived, preloadSeen, preloadsToReload } from "./tabPreload";
+import { keepPreloads, preloadArrived, preloadSeen } from "./tabPreload";
 import { keepFromElsewhere, markFromElsewhere } from "./tabsFromElsewhere";
 import { useWorkspaceStore } from "./useWorkspaceStore";
 import { normalizeWorkspaceLayout } from "../profiles/windows";
@@ -37,8 +35,6 @@ import { migrateRetiredWorkspaceTab } from "../recovery/workspaceMigrations";
  * it for the profile the way closing it here would.
  */
 const publishDelayMs = 1_000;
-/** Sign-ins for a site come in several records; a page loads again once for all of them. */
-const signInReloadDelayMs = 2_000;
 
 interface TabsForWindow {
   tabs: { id: string; fields: unknown }[];
@@ -59,7 +55,6 @@ export function startProfileTabs(): () => void {
   let stopped = false;
   let started = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
-  let signInTimer: ReturnType<typeof setTimeout> | undefined;
   let queue: Promise<unknown> = Promise.resolve();
   /** Until the window says otherwise, nobody is taken to be here. */
   let focused = false;
@@ -175,18 +170,6 @@ export function startProfileTabs(): () => void {
       await publish();
     });
 
-  const reloadForSignIn = () => {
-    clearTimeout(signInTimer);
-    signInTimer = setTimeout(() => {
-      for (const view of preloadsToReload<ReturnType<typeof dockTreeViews>[number]>()) {
-        if (!browserRuntimeCreated(view)) continue;
-        void invoke("browser_webview_reload", {
-          request: { id: browserRuntimeId(view) },
-        }).catch(() => undefined);
-      }
-    }, signInReloadDelayMs);
-  };
-
   const unsubscribe = useWorkspaceStore.subscribe((state, previous) => {
     if (state.layout === previous.layout) return;
     const opened = layoutTabs(state.layout).find((tab) => tab.id === state.layout.activeTabId);
@@ -202,16 +185,6 @@ export function startProfileTabs(): () => void {
     clearTimeout(timer);
     return inOrder(publish) as Promise<void>;
   });
-  const stopListening = listen<{ profile: string; collection: string; remote: boolean }>(
-    "misty://profile-records-changed",
-    ({ payload }) => {
-      if (stopped || !payload.remote || payload.profile !== currentProfile().id) return;
-      if (payload.collection === "tabs") void sync();
-      if (payload.collection === "cookies" || payload.collection === "local_storage") {
-        reloadForSignIn();
-      }
-    },
-  ).catch(() => undefined);
   // Only ever costs a hold lifted late: it must not get in the way of restoring the workspace.
   const stopFocus = (async () => {
     const current = getCurrentWindow();
@@ -228,10 +201,8 @@ export function startProfileTabs(): () => void {
   return () => {
     stopped = true;
     clearTimeout(timer);
-    clearTimeout(signInTimer);
     unsubscribe();
     unregister();
-    void stopListening.then((stop) => stop?.());
     void stopFocus.then((stop) => stop?.());
   };
 }

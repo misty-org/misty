@@ -235,6 +235,8 @@ fn grants_for(reach: Reach) -> &'static [&'static str] {
         | Reach::ChosenDownloadFolder
         | Reach::RecordedDownload
         | Reach::BenchmarkKeys
+        | Reach::EngineConfig
+        | Reach::BundledResources
         | Reach::TestFixtures => &[],
     }
 }
@@ -258,6 +260,7 @@ fn the_list_matches_grants_toml() {
         Reach::SharedFolder,
         Reach::LinkedFolder,
         Reach::PickedFile,
+        Reach::EngineConfig,
         Reach::BenchmarkKeys,
         Reach::TestFixtures,
     ]

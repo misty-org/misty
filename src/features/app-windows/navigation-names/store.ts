@@ -16,18 +16,7 @@ function createNamesStore() {
   return create<NamesState>(() => ({ account: "", ready: false, names: {}, error: null }));
 }
 export const useNavigationNames = (shared.__mistyNavigationNames ??= createNamesStore());
-export function useNavigationName(key: string, automatic: string) {
-  return useNavigationNames((s) => s.names[key] ?? automatic);
-}
-export function navigationName(key: string, automatic: string) {
-  return useNavigationNames.getState().names[key] ?? automatic;
-}
-export function validateNavigationName(value: string): string {
-  const name = value.trim();
-  if (!name || [...name].length > 120 || /[\p{Cc}\u2028\u2029]/u.test(name))
-    throw new Error("Choose a single-line name of 1–120 characters.");
-  return name;
-}
+
 let sequence = 0;
 export async function refreshNavigationNames(account: string) {
   const run = ++sequence;
@@ -42,17 +31,3 @@ export async function refreshNavigationNames(account: string) {
       useNavigationNames.setState({ ...result, ready: true });
   }
 }
-export async function setNavigationName(key: string, value: string | null) {
-  const account = useNavigationNames.getState().account;
-  if (!account) throw new Error("Sign in before saving navigation names.");
-  const name = value === null ? null : validateNavigationName(value);
-  ++sequence;
-  const result = await invoke<NamesSnapshot>("navigation_names_update", { account, key, name });
-  // Read after committing: overlapping windows/requests must not apply stale snapshots.
-  if (useNavigationNames.getState().account === account) {
-    useNavigationNames.setState({ error: result.error });
-    await refreshNavigationNames(account);
-  }
-}
-export const tabNameKey = (id: string) => `tab:${id}`;
-export const groupNameKey = (id: string) => `group:${id}`;

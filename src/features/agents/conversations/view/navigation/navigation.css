@@ -1,0 +1,175 @@
+/* The rail of the person's messages beside the transcript (MessageAnchorRail). It takes no
+ * layout space: it floats over the conversation's left edge, under the transcript's padding. */
+.message-anchor-rail {
+  position: absolute;
+  top: 56px;
+  bottom: 140px;
+  left: 12px;
+  z-index: 10;
+  display: flex;
+  width: 40px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  overflow: visible;
+  pointer-events: none;
+}
+.message-anchor-slot {
+  position: relative;
+  width: 40px;
+  height: 8px;
+  flex-shrink: 0;
+  pointer-events: auto;
+}
+.message-anchor-dash {
+  position: relative;
+  display: block;
+  width: 40px;
+  height: 8px;
+  border-radius: 4px;
+}
+.message-anchor-dash > span {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  height: 2px;
+  margin: auto 0;
+  border-radius: 999px;
+  background: var(--color-charcoal-border);
+  transition:
+    width 150ms ease,
+    background-color 150ms ease;
+}
+.message-anchor-dash > span[data-near] {
+  background: var(--color-cream-muted);
+}
+.message-anchor-dash > span[data-active] {
+  background: var(--color-cream);
+}
+.message-anchor-preview {
+  position: absolute;
+  left: 40px;
+  z-index: 10;
+  display: grid;
+  width: clamp(220px, 40vw, 380px);
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-charcoal-border);
+  border-radius: 10px;
+  background: var(--color-charcoal-card);
+  box-shadow: 0 8px 22px rgb(0 0 0 / 0.22);
+  pointer-events: none;
+}
+.message-anchor-preview[data-placement="down"] {
+  top: -2px;
+}
+.message-anchor-preview[data-placement="up"] {
+  bottom: -2px;
+}
+.message-anchor-preview[data-placement="center"] {
+  top: -200px;
+  bottom: -200px;
+  height: fit-content;
+  margin: auto 0;
+}
+.message-anchor-preview strong {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--color-cream);
+  font-size: 13px;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.message-anchor-preview span {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--color-cream-muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+@media (max-width: 900px) {
+  .message-anchor-rail {
+    display: none;
+  }
+}
+
+/* Search inside a chat (FindPanel). */
+.chat-find {
+  position: absolute;
+  top: 12px;
+  right: 16px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  border: 1px solid var(--color-charcoal-border);
+  border-radius: 12px;
+  background: var(--color-charcoal-card);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.22);
+}
+.chat-find-field {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 28px;
+  padding: 0 4px 0 8px;
+  border: 1px solid var(--color-charcoal-border);
+  border-radius: 8px;
+  background: var(--color-charcoal-bg);
+}
+.chat-find-field:focus-within {
+  border-color: var(--color-cream-muted);
+}
+.chat-find-field input {
+  width: 180px;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--color-cream);
+  font-size: 13px;
+}
+.chat-find-field input::placeholder {
+  color: var(--color-cream-muted);
+}
+.chat-find-toggle {
+  height: 20px;
+  min-width: 22px;
+  padding: 0 4px;
+  border-radius: 5px;
+  color: var(--color-cream-muted);
+  font: 11px/1 var(--font-mono);
+}
+.chat-find-toggle:hover {
+  color: var(--color-cream);
+}
+.chat-find-toggle[aria-pressed="true"] {
+  background: var(--color-charcoal-hover);
+  color: var(--color-cream);
+}
+.chat-find-status {
+  min-width: 64px;
+  padding: 0 4px;
+  color: var(--color-cream-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+::highlight(misty-chat-search) {
+  background-color: color-mix(in srgb, var(--color-cream) 22%, transparent);
+  color: inherit;
+}
+::highlight(misty-chat-search-current) {
+  background-color: color-mix(in srgb, var(--color-cream) 55%, transparent);
+  color: var(--color-charcoal-bg);
+}
+@media (prefers-reduced-motion: reduce) {
+  .message-anchor-dash > span {
+    transition: none;
+  }
+}

@@ -22,13 +22,21 @@ const KINDS: &[&str] = &[
     "collaboration",
     "notebook",
     "run",
-    "workflow_method",
-    "workflow_schedule",
-    "workflow_replay",
-    "workflow_vector",
     "agent",
     "attachment",
     "artifact",
+    // A chat's composer choices: the model and effort its next turn asks the engine for.
+    "composer",
+    // Tutor: notebooks with their sources and notes, flashcard decks, guides, and the agent runs
+    // that make them.
+    "tutor_notebook",
+    "tutor_deck",
+    "tutor_guide",
+    "tutor_job",
+    // A notebook's chunks and their vectors, for search by meaning.
+    "tutor_index",
+    // The virtual studio on this computer: each Space's room and how each agent looks in it.
+    "studio",
 ];
 /// A long chat with its timelines stays far below this.
 const MAX_DOCUMENT_BYTES: usize = 16 * 1024 * 1024;
@@ -70,7 +78,7 @@ impl AgentChatsService {
         Self { store }
     }
 
-    /// What adopting would hand over that someone would want asked about first: chats and workflows.
+    /// What adopting would hand over that someone would want asked about first: chats.
     /// Built-in rows and approvals go or stay without a question.
     pub async fn adoptable(&self, from: String, to: String) -> Result<u64, String> {
         check(&from, "conversation", "adopt")?;
@@ -80,7 +88,7 @@ impl AgentChatsService {
             connection
                 .query_row(
                     "SELECT COUNT(*) FROM agent_chats AS kept WHERE kept.account = ?1
-                     AND kept.kind IN ('conversation', 'workflow_method', 'workflow_schedule')
+                     AND kept.kind = 'conversation'
                      AND NOT EXISTS (SELECT 1 FROM agent_chats AS theirs
                        WHERE theirs.account = ?2 AND theirs.kind = kept.kind AND theirs.id = kept.id)",
                     [from, to],
@@ -93,10 +101,9 @@ impl AgentChatsService {
         .map_err(|e| e.to_string())?
     }
 
-    /// What was kept signed out goes to the account that signs in, once it's said yes. Its schedules
-    /// arrive turned off: one set by whoever used this computer before must not run in this account in
-    /// Auto. Its remembered site approvals stay behind. A row the account already has stays as it is,
-    /// and the signed-out copy stays behind it.
+    /// What was kept signed out goes to the account that signs in, once it's said yes. Its remembered
+    /// site approvals stay behind. A row the account already has stays as it is, and the signed-out
+    /// copy stays behind it.
     pub async fn adopt(&self, from: String, to: String) -> Result<u64, String> {
         check(&from, "conversation", "adopt")?;
         check(&to, "conversation", "adopt")?;
@@ -104,14 +111,6 @@ impl AgentChatsService {
         tokio::task::spawn_blocking(move || {
             let mut connection = store.connect().map_err(|e| e.to_string())?;
             let transaction = connection.transaction().map_err(|e| e.to_string())?;
-            transaction
-                .execute(
-                    "UPDATE agent_chats SET document =
-                       json_remove(json_set(document, '$.enabled', json('false'), '$.state', 'idle'), '$.next_run_at')
-                     WHERE account = ?1 AND kind = 'workflow_schedule'",
-                    [&from],
-                )
-                .map_err(|e| e.to_string())?;
             let moved = transaction
                 .execute(
                     "UPDATE OR IGNORE agent_chats SET account = ?2 WHERE account = ?1
@@ -261,7 +260,7 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn adopting_turns_schedules_off_and_leaves_approvals_behind() {
+    async fn adopting_moves_chats_and_leaves_approvals_behind() {
         let directory = tempfile::tempdir().unwrap();
         let store = Store::at(directory.path().join("misty.db"));
         let service = AgentChatsService::new(store.clone());
@@ -273,34 +272,17 @@ mod tests {
             0
         );
         put("local", "conversation", "c1", "{}").await.unwrap();
-        put(
-            "local",
-            "workflow_schedule",
-            "m1",
-            r#"{"enabled":true,"state":"idle","next_run_at":"2026-11-07T00:00:00Z"}"#,
-        )
-        .await
-        .unwrap();
         put("local", "agent", "sitegrant_x", "{}").await.unwrap();
         put("local", "agent", "personal_misty", "{}").await.unwrap();
         assert_eq!(
             service.adoptable("local".into(), "a".into()).await.unwrap(),
-            2
+            1
         );
         service.adopt("local".into(), "a".into()).await.unwrap();
         assert_eq!(
             service.adoptable("local".into(), "a".into()).await.unwrap(),
             0
         );
-        let schedule: serde_json::Value = serde_json::from_str(
-            &service
-                .list("a".into(), "workflow_schedule".into())
-                .await
-                .unwrap()[0],
-        )
-        .unwrap();
-        assert_eq!(schedule["enabled"], false);
-        assert!(schedule.get("next_run_at").is_none());
         let kept = |account: &str| -> Vec<String> {
             let connection = store.connect().unwrap();
             let mut statement = connection
@@ -417,7 +399,7 @@ mod tests {
         service
             .put(
                 "a".into(),
-                "workflow_schedule".into(),
+                "run".into(),
                 "s1".into(),
                 start.into(),
             )
@@ -430,7 +412,7 @@ mod tests {
                     service
                         .swap(
                             "a".into(),
-                            "workflow_schedule".into(),
+                            "run".into(),
                             "s1".into(),
                             Some(start.to_owned()),
                             format!(r#"{{"state":"running","by":{index}}}"#),

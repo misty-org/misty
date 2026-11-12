@@ -4,7 +4,7 @@ export * from "./list/reference-mode";
 export * from "./list/useSpacesStore";
 export { SpaceInvitationRedemption } from "./components/SpaceInvitationRedemption";
 
-export { SpaceRow, SpaceRowPreview } from "./components/space-row/SpaceRow";
+export { SpaceSwitcher } from "./components/space-row/SpaceSwitcher";
 export { SpaceChatPanel } from "./chat/SpaceChatPanel";
 
 // Public surface used by other features (generated from their imports).
@@ -23,3 +23,14 @@ export { preferredDefaultSpace, windowSpace } from "./routes/defaultSpace";
 export { SpaceWindowBridge } from "./SpaceWindowBridge";
 export { useWindowSpace } from "./components/space-row/useWindowSpace";
 export { spaceNavigationName } from "./routes/defaultSpace";
+export { useSpaceGallery } from "./home/useSpaceGallery";
+export { kindIcon } from "./home/GalleryPreview";
+export {
+  createSpaceEvent,
+  createSpaceNote,
+  createSpaceTask,
+  searchSpaceText,
+  spaceEvents,
+  spaceTasks,
+  type SpaceSearchHit,
+} from "./search/spaceSearch";

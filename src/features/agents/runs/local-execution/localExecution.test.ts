@@ -3,13 +3,12 @@ import { mocks } from "./localExecution.testFixtures";
 import {
   startLocalExecution,
   routeLocalFollowup,
-  steerLocalExecution,
   pauseLocalExecution,
   settleLocalExecution,
   finishLocalExecution,
   useLocalExecution,
 } from "./localExecution";
-import { useCompanionState } from "../../cursor/companionState";
+import { useCompanionState } from "../../tutor/cursor/companionState";
 beforeEach(async () => {
   await finishLocalExecution();
   vi.clearAllMocks();
@@ -354,34 +353,4 @@ it("does not cancel a successor invocation while an older pause is awaiting modu
   expect(mocks.state.working).toBe(true);
   expect(mocks.cancel).not.toHaveBeenCalled();
   expect(mocks.invoke).toHaveBeenCalledWith("agent_workspace_release", { taskId: old.taskId });
-});
-
-it("retains workflow pins but blocks automatic resume after takeover", async () => {
-  const inputs = { subject: "research" };
-  const execution = await startLocalExecution("owner", "agent", {
-    method: {
-      versionId: "immutable-v1",
-      inputs,
-      invocationId: "parent-run",
-      skillVersionIds: ["skill-v2"],
-    },
-  });
-  inputs.subject = "mutated draft";
-  useLocalExecution.setState({
-    execution: { ...execution, conversationId: "original-conversation" },
-  });
-  mocks.state.activeConversationId = "different-conversation";
-  await expect(steerLocalExecution("Continue after inspecting prior effects")).rejects.toThrow(
-    "Automatic workflow resume is not available",
-  );
-  expect(mocks.state.submitAnswer).not.toHaveBeenCalled();
-  expect(useLocalExecution.getState().execution).toMatchObject({
-    state: "paused",
-    conversationId: "original-conversation",
-    method: {
-      versionId: "immutable-v1",
-      inputs: { subject: "research" },
-      invocationId: "parent-run",
-    },
-  });
 });

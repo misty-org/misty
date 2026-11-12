@@ -8,6 +8,10 @@ use tauri::{AppHandle, Manager, Webview};
 mod windows_dispatch;
 #[cfg(windows)]
 use windows_dispatch::dispatch_windows;
+#[cfg(target_os = "linux")]
+mod linux_dispatch;
+#[cfg(target_os = "linux")]
+use linux_dispatch::dispatch_linux;
 
 /// The modifiers that make a key a browser or system shortcut: Command on
 /// macOS; Control (and the Windows key) elsewhere.
@@ -105,7 +109,6 @@ pub(in crate::browser) fn validate(input: &Value) -> Result<(), String> {
 
 /// Where an action puts the agent cursor, as a fraction of the viewport. Typing
 /// and keys act where the cursor already is, so they leave it in place.
-#[cfg_attr(not(any(target_os = "macos", windows)), allow(dead_code))]
 pub(in crate::browser) fn cursor_target(input: &Value) -> Option<(f64, f64)> {
     let (x, y) = match input["kind"].as_str()? {
         "click" | "scroll" | "move" => ("x", "y"),
@@ -118,7 +121,6 @@ pub(in crate::browser) fn cursor_target(input: &Value) -> Option<(f64, f64)> {
 /// Script that glides the agent's in-page cursor to a viewport point and keeps
 /// it there, so the next screenshot shows where the agent is pointing. It is a
 /// drawing only: the user's own pointer never moves.
-#[cfg_attr(not(any(target_os = "macos", windows)), allow(dead_code))]
 pub(in crate::browser) fn cursor_script(input: &Value, viewport: &Value) -> Option<String> {
     let (x, y) = match input["kind"].as_str()? {
         "drag" => (input["fromX"].as_f64()?, input["fromY"].as_f64()?),
@@ -144,7 +146,9 @@ pub(in crate::browser) fn set_locked(webview: &Webview, locked: bool) -> Result<
         .map_err(|error| error.to_string());
     #[cfg(windows)]
     return windows::set_locked(webview, locked);
-    #[cfg(not(any(target_os = "macos", windows)))]
+    #[cfg(target_os = "linux")]
+    return linux::set_locked(webview, locked);
+    #[cfg(not(any(target_os = "macos", windows, target_os = "linux")))]
     {
         let _ = (webview, locked);
         Ok(())
@@ -162,7 +166,9 @@ pub(in crate::browser) async fn dispatch(
 ) -> Result<Value, String> {
     #[cfg(windows)]
     return dispatch_windows(app, webview, request, input, origin, observed, generation).await;
-    #[cfg(not(any(target_os = "macos", windows)))]
+    #[cfg(target_os = "linux")]
+    return dispatch_linux(app, webview, request, input, origin, observed, generation).await;
+    #[cfg(not(any(target_os = "macos", windows, target_os = "linux")))]
     {
         let _ = (app, webview, request, input, origin, observed, generation);
         return Err("Native browser input is not available on this platform.".into());
@@ -243,3 +249,44 @@ pub(in crate::browser) async fn dispatch(
 mod tests;
 #[cfg(windows)]
 pub(crate) mod windows;
+#[cfg(target_os = "linux")]
+pub(crate) mod linux;
+
+/// The agent still owns the task, the page has not navigated or changed since
+/// it was observed, and its origin is the one the agent saw.
+#[cfg(any(windows, target_os = "linux"))]
+fn authorize_native_input(
+    app: &AppHandle,
+    view: &Webview,
+    request: &BrowserAgentExecuteRequest,
+    expected_origin: &str,
+    generation: u64,
+) -> Result<(), String> {
+    crate::agents::task_scopes::authorize_scope(
+        app,
+        &request.scope_id,
+        &request.agent_id,
+        request.input["__mistyTaskId"].as_str().unwrap_or(""),
+    )?;
+    let state = app.state::<BrowserSessionState>();
+    let (id, _) = crate::browser::resolve_agent_webview(app, &state, request)?;
+    let current_generation = state
+        .sessions
+        .lock()
+        .map_err(|_| "Browser state unavailable")?
+        .get(&id)
+        .map(|session| session.snapshot_generation);
+    if current_generation != Some(generation) {
+        return Err(
+            "browser_snapshot_stale: browser navigated or observation changed before native input"
+                .into(),
+        );
+    }
+    if crate::browser::browser_page_origin(&view.url().map_err(|e| e.to_string())?)
+        != expected_origin
+    {
+        return Err("browser_snapshot_stale: browser origin changed before native input".into());
+    }
+    Ok(())
+}
+

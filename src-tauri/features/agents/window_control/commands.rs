@@ -3,7 +3,10 @@
 use super::*;
 
 #[tauri::command]
-#[cfg_attr(not(any(target_os = "macos", windows)), allow(unreachable_code))]
+#[cfg_attr(
+    not(any(target_os = "macos", windows, target_os = "linux")),
+    allow(unreachable_code)
+)]
 pub fn agent_workspace_context(
     app: AppHandle,
     webview: Webview,
@@ -15,7 +18,7 @@ pub fn agent_workspace_context(
     if !supported() {
         return Err("Misty window control requires macOS 14.4 or later".into());
     }
-    #[cfg(not(any(target_os = "macos", windows)))]
+    #[cfg(not(any(target_os = "macos", windows, target_os = "linux")))]
     return Err("Misty window control isn't available on this system".into());
     if !crate::browser::app_windows::is_person_window(webview.label())
         || context.to_string().len() > 32000
@@ -63,7 +66,11 @@ pub fn agent_workspace_context(
         if desktop {
             crate::agents::desktop_control::windows::prepare(&app, &task_id, ask);
         }
-        #[cfg(not(any(target_os = "macos", windows)))]
+        #[cfg(target_os = "linux")]
+        if desktop {
+            crate::agents::desktop_control::linux::control::prepare(&app, &task_id, ask);
+        }
+        #[cfg(not(any(target_os = "macos", windows, target_os = "linux")))]
         let _ = (desktop, ask);
         #[cfg(target_os = "macos")]
         if desktop {
@@ -124,7 +131,13 @@ pub fn agent_control_yield(webview: Webview, task_id: String, yielded: bool) -> 
         }
         crate::agents::desktop_control::windows::overlays::set_mist_waiting(app, yielded);
     }
-    #[cfg(not(any(target_os = "macos", windows)))]
+    #[cfg(target_os = "linux")]
+    if desktop && yielded {
+        crate::agents::desktop_control::linux::control::yield_control(&task_id);
+    } else if !desktop && yielded {
+        crate::agents::window_control::linux::release();
+    }
+    #[cfg(not(any(target_os = "macos", windows, target_os = "linux")))]
     let _ = (desktop, yielded);
     Ok(())
 }

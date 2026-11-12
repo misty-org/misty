@@ -1,5 +1,5 @@
-//! Misty's credential store. Every secret (account logins, device keys, API keys, the
-//! vault secret) is a row in `misty.db`, encrypted with a single master key. Release
+//! Misty's credential store. Every secret (account logins, device keys, API keys, local
+//! storage keys) is a row in `misty.db`, encrypted with a single master key. Release
 //! builds keep that key in the operating system's keychain under the service
 //! `com.misty.auth`; debug builds keep it in a private file, so rebuilding never asks
 //! the keychain for anything. Nothing else holds a credential on disk.

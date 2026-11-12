@@ -27,8 +27,8 @@ pub(super) fn rejected(code: &str, message: impl Into<String>) -> Failure {
     }
 }
 
-pub(super) const NOT_CONNECTED: &str = "Apps aren't connected on this computer. Use the app's web \
-     page in the browser instead. The person can connect apps by adding a Composio key in Settings › Models.";
+pub(super) const NOT_CONNECTED: &str = "No apps are connected on this computer. Use the app's web \
+     page in the browser instead. The person can connect apps in Misty's Apps page.";
 
 /// A Composio error as a call's answer. `Unavailable` and anything Composio refused had no effect;
 /// the rest may have, which only matters for a write.

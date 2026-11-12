@@ -12,7 +12,7 @@ use tauri::AppHandle;
 use super::{
     run_taint,
     tool_policy::{decide, prepared_input, Decision, RunFacts},
-    tool_question::{page_refs, question_text, Controls, WorkflowText},
+    tool_question::{page_refs, question_text, Controls},
 };
 use crate::browser::agent_pages::action_confirm as confirm;
 use database::store::Store;
@@ -64,9 +64,7 @@ pub(crate) fn active_call(id: &str) -> Option<ActiveCall> {
 /// The run as it was started, or Ask with nothing known when nobody can say.
 pub(crate) async fn facts_of_run(app: &AppHandle, run_id: &str) -> RunFacts {
     // A run on an outside engine is known to its adapter, not to Misty's runtime.
-    if let Some(body) = crate::engines::runs::request_of(run_id)
-        .or_else(|| crate::engines::connections::request_of(run_id))
-    {
+    if let Some(body) = crate::engines::runs::request_of(run_id) {
         return RunFacts::of_request(run_id, &body);
     }
     let body = super::ensure(app)
@@ -91,29 +89,6 @@ async fn family(app: &AppHandle, facts: &RunFacts) -> Vec<String> {
         parent = facts_of_run(app, &parent).await.parent_run_id;
     }
     runs
-}
-
-/// A saved workflow's text, which is what scheduling it really runs.
-fn workflow_text(store: &Store, account: &str, id: &str) -> Option<WorkflowText> {
-    let connection = store.connect().ok()?;
-    let document: String = connection
-        .query_row(
-            "SELECT document FROM agent_chats WHERE account = ?1 AND kind = 'workflow_method' AND id = ?2",
-            [account, id],
-            |row| row.get(0),
-        )
-        .ok()?;
-    let value: Value = serde_json::from_str(&document).ok()?;
-    Some(WorkflowText {
-        title: value["definition"]["title"]
-            .as_str()
-            .unwrap_or("")
-            .to_owned(),
-        instructions: value["definition"]["instructions"]
-            .as_str()
-            .unwrap_or("")
-            .to_owned(),
-    })
 }
 
 fn rejected(code: &str, message: String) -> LocalToolOutcome {
@@ -154,16 +129,7 @@ async fn ask(
     } else {
         crate::browser::page_controls(app, scope, &refs).await
     };
-    let workflow = (call.name == "memory.workflow.schedule")
-        .then(|| {
-            workflow_text(
-                store,
-                &facts.account,
-                call.input["workflow_id"].as_str().unwrap_or("").trim(),
-            )
-        })
-        .flatten();
-    let text = match question_text(&call.name, &call.input, &controls, workflow.as_ref()) {
+    let text = match question_text(&call.name, &call.input, &controls) {
         Ok(text) => text,
         Err(message) => return Some(rejected("question_too_long", message.to_owned())),
     };

@@ -9,8 +9,8 @@ use serde_json::Value;
 use crate::{process::CommandSpec, workspace::Workspace};
 
 use super::model::{
-    PlatformManifest, ReleaseManifest, MACOS_PLATFORM, PUBLIC_REPOSITORY, RELEASE_MANIFEST_NAME,
-    WINDOWS_ARM_PLATFORM, WINDOWS_PLATFORM,
+    PlatformManifest, ReleaseManifest, LINUX_PLATFORM, MACOS_PLATFORM, PUBLIC_REPOSITORY,
+    RELEASE_MANIFEST_NAME, WINDOWS_ARM_PLATFORM, WINDOWS_PLATFORM,
 };
 
 pub fn normalize_version(raw: &str) -> Result<String> {
@@ -218,7 +218,7 @@ pub(super) fn validate_release_platforms(release: &ReleaseManifest) -> Result<()
     for (index, platform) in release.platforms.iter().enumerate() {
         if !matches!(
             platform.as_str(),
-            MACOS_PLATFORM | WINDOWS_PLATFORM | WINDOWS_ARM_PLATFORM
+            MACOS_PLATFORM | WINDOWS_PLATFORM | WINDOWS_ARM_PLATFORM | LINUX_PLATFORM
         ) {
             bail!("release contains unsupported platform: {platform}");
         }

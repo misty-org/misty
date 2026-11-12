@@ -33,12 +33,7 @@ export function AgentControlTaskControls({
         </Button>
       ) : (
         !finished && (
-          <Button
-            size="sm"
-            variant="primary"
-            disabled={pending || Boolean(execution.method && execution.state !== "waiting")}
-            onClick={resume}
-          >
+          <Button size="sm" variant="primary" disabled={pending} onClick={resume}>
             {execution.state === "waiting" ? (
               <Check className="size-3.5" aria-hidden="true" />
             ) : (

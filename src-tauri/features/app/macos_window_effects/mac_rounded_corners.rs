@@ -178,7 +178,8 @@ pub async fn reveal_main_window<R: Runtime>(webview: tauri::Webview<R>) -> Resul
     // The main window can already contain embedded provider views on reload.
     // Command injection as WebviewWindow rejects any multi-webview window.
     let label = webview.label().to_owned();
-    if !crate::browser::app_windows::is_app_window(&label) || window_ready(&label) {
+    // Linux windows start visible (tauri.linux.conf.json), so they count as revealed already.
+    if !crate::browser::app_windows::is_app_window(&label) || window_revealed(&label) {
         return Ok(());
     }
     #[cfg(target_os = "macos")]

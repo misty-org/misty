@@ -1,19 +1,16 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { create } from "zustand";
-import { rememberCapture } from "@/features/memory";
 import { voiceDeviceId } from "../api";
 import { LiveTranscriber, type LiveChannel } from "../liveTranscriber";
 import { captureApi, type VoiceNoteMode, type VoiceSourceKind, type VoiceTurn } from "./captureApi";
 import { savedTurns } from "./transcriptTurns";
 
-/** What to listen to. A tab is heard through the page itself. */
+/** What to listen to. */
 export interface CaptureSource {
-  kind: Exclude<VoiceSourceKind, "library_item">;
+  kind: Exclude<VoiceSourceKind, "library_item" | "tab">;
   title: string;
   url?: string;
-  /** The tab's browser runtime id, for kind "tab". */
-  tabId?: string;
   /** Processes to hear, for kind "app". */
   pids?: number[];
   /** Also hear the person, on its own channel. */
@@ -55,7 +52,6 @@ interface Running {
   live: LiveTranscriber;
   sessions: Set<number>;
   native: boolean;
-  tabId?: string;
   startedAt: number;
   language: string;
   unlisten: Promise<UnlistenFn>[];
@@ -74,10 +70,7 @@ const message = (error: unknown, fallback: string) =>
   error instanceof Error && error.message ? error.message : fallback;
 
 async function release(current: Running) {
-  await Promise.allSettled([
-    current.native ? invoke("voice_capture_stop") : undefined,
-    current.tabId ? invoke("voice_tab_capture_stop", { id: current.tabId }) : undefined,
-  ]);
+  await Promise.allSettled([current.native ? invoke("voice_capture_stop") : undefined]);
   for (const remove of current.unlisten) void remove.then((fn) => fn());
 }
 
@@ -149,10 +142,6 @@ export const useCaptureStore = create<CaptureStore>((set, get) => ({
         });
         current.sessions.add(session);
       }
-      if (source.kind === "tab" && source.tabId) {
-        current.tabId = source.tabId;
-        current.sessions.add(await invoke<number>("voice_tab_capture_start", { id: source.tabId }));
-      }
       await live.connect({ channels, language }, { language, context: { text: source.title } });
       if (running === current) set({ phase: "live" });
     } catch (error) {
@@ -193,14 +182,6 @@ export const useCaptureStore = create<CaptureStore>((set, get) => ({
         duration_ms: Date.now() - current.startedAt,
       });
       set({ phase: "done", turns, transcriptId: saved.id });
-      rememberCapture({
-        id: saved.id,
-        title,
-        url: source.url,
-        text: turns
-          .map((turn) => `${speakers[turn.speaker] ?? turn.speaker}: ${turn.text}`)
-          .join("\n"),
-      });
     } catch (error) {
       set({ phase: "done", turns, notice: message(error, "The transcript couldn't be saved.") });
     }

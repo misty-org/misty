@@ -16,7 +16,7 @@ import {
 export function ServerSection() {
   const { user } = useAuth();
   const choice = useServerChoice((state) => state.choice);
-  const { browseOnly } = useServerSwitch();
+  const { chooseNoServer } = useServerSwitch();
   const [error, setError] = useState("");
   const [leaving, setLeaving] = useState(false);
   const base = choice ? (choice.mode === "server" ? choice.url : "") : currentApiBase();
@@ -25,7 +25,7 @@ export function ServerSection() {
     setError("");
     setLeaving(true);
     try {
-      await browseOnly();
+      await chooseNoServer();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Misty couldn't leave this server.");
     } finally {

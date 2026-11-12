@@ -42,10 +42,14 @@ const PAGE_INTERACTIVE_SELECTOR = [
  * their presses.
  */
 export function isTopEdgeDragPress(event: { clientY: number; target: EventTarget | null }) {
-  if (event.clientY > Math.min(72, window.innerHeight * 0.05)) return false;
+  // At least a page's 48px top band, so pages without a title bar still have one to hold.
+  if (event.clientY > Math.min(72, Math.max(48, window.innerHeight * 0.05))) return false;
   if (shouldSuppressWindowDrag(event.target)) return false;
   const element = event.target instanceof Element ? event.target : null;
-  return !element?.closest(PAGE_INTERACTIVE_SELECTOR);
+  const interactive = element?.closest(PAGE_INTERACTIVE_SELECTOR);
+  // A workspace pane takes focus itself (tabIndex 0), so it is not a control: only what it holds
+  // can opt out.
+  return !interactive || interactive.hasAttribute("data-workspace-pane");
 }
 
 export function windowRectsMatch(actual: WindowRect, expected: WindowRect, tolerance = 4) {

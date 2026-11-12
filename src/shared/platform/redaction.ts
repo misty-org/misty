@@ -34,26 +34,6 @@ function redactValue(value: unknown): unknown {
   return value;
 }
 
-export function redactedError(error: unknown): Error {
-  const source =
-    error instanceof Error
-      ? error
-      : new Error(typeof error === "string" ? error : "Unexpected error");
-  const safe = new Error(redactText(source.message));
-  safe.name = source.name;
-  safe.stack = source.stack ? redactStack(source.stack) : undefined;
-  return safe;
-}
-
-function redactStack(value: string): string {
-  return value
-    .replace(URL_VALUE, redactUrl)
-    .replace(EMAIL, "[REDACTED_USER_DATA]")
-    .replace(WINDOWS_PATH, "[REDACTED_PATH]")
-    .replace(UNIX_PATH, (match) => `${match.startsWith(" ") ? " " : ""}[REDACTED_PATH]`)
-    .replace(TOKEN, "[REDACTED_TOKEN]");
-}
-
 function redactUrl(value: string): string {
   try {
     const parsed = new URL(value);

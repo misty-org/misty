@@ -1,29 +1,19 @@
 import { lazy, Suspense, useEffect, type ReactNode } from "react";
-import {
-  Armchair,
-  FolderTree,
-  GitCompareArrows,
-  MessageSquare,
-  MonitorPlay,
-  Repeat2,
-  SquarePen,
-  SquareTerminal,
-  Waypoints,
-  type LucideIcon,
-} from "lucide-react";
+import { SquarePen } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import type { MistyActivityEntry } from "../conversations/state/activity";
 import type { AgentProfile } from "@/shared/schemas";
-import { Button, IconButton, Skeleton } from "@/shared/ui";
-import { ConnectAgentButton } from "../engines/ConnectAgentDialog";
+import { IconButton, Skeleton } from "@/shared/ui";
 import { MultirunButton } from "../multirun/MultirunButton";
 import { SessionGoalButton } from "../goals/SessionGoalButton";
 import { useSessionGoalRunner } from "../goals/sessionGoals";
-import { VirtualOffice } from "../virtual/VirtualOffice";
-import { useContextPanel, type ContextPanelTab } from "../context-panel/contextPanelStore";
+import { VirtualStudio } from "../virtual/VirtualStudio";
+import { ContextRail } from "../context-panel/ContextRail";
+import { useContextPanel } from "../context-panel/contextPanelStore";
 import { isUnread, markConversationRead } from "./conversationReads";
 import { isRunInProgress } from "./RecentStatusBadge";
-import { AgentWorkspaceCatalog } from "./AgentWorkspaceCatalog";
+import { IntegrationsPage } from "../connected-apps/IntegrationsPage";
+import { TutorPage } from "../tutor/TutorPage";
 import "./agentWorkspaceCatalog.css";
 import "./agentWorkspaceFrame.css";
 
@@ -31,7 +21,7 @@ const AgentContextPanel = lazy(async () => ({
   default: (await import("../context-panel/AgentContextPanel")).AgentContextPanel,
 }));
 
-export type AgentWorkspacePage = "task" | "workflows" | "integrations" | "office";
+export type AgentWorkspacePage = "task" | "integrations" | "studio" | "tutor";
 type RecentConversation = {
   id: string;
   title?: string;
@@ -40,26 +30,14 @@ type RecentConversation = {
   lastReadAt?: string;
 };
 
-const pages: [AgentWorkspacePage, string, LucideIcon][] = [
-  ["task", "Chat", MessageSquare],
-  ["office", "Office", Armchair],
-  ["workflows", "Workflows", Repeat2],
-  ["integrations", "Integrations", Waypoints],
-];
-
-const panels: [ContextPanelTab, string, LucideIcon][] = [
-  ["files", "Files", FolderTree],
-  ["changes", "Changes", GitCompareArrows],
-  ["terminal", "Terminal", SquareTerminal],
-  ["preview", "Preview", MonitorPlay],
-];
-
 /**
- * The Agents page around a chat: a bar with the agent and the page's views (chat, office,
- * workflows, integrations), the chat in the middle, and a context panel on the right for the
- * folder's files, changes and a terminal. The chats themselves are listed in the window's
- * sidebar, so this page has no list of its own. Presentation only: conversation and account
- * actions remain owned by AgentsPage.
+ * The Agents page: a chat with its agent, or one of the pages the sidebar opens (studio, tutor,
+ * and integrations from the studio). Only the chat has a bar, holding the agent and the context
+ * panel for the folder's files, changes and a terminal. The other pages have no title bar, since
+ * the sidebar and the tab already name them: integrations puts the agent switcher on its first
+ * row, and the studio floats its few buttons over the room. The
+ * chats are listed in the window's sidebar, so this page has no list of its own. Presentation
+ * only: conversation and account actions remain owned by AgentsPage.
  */
 export function AgentWorkspaceFrame({
   agent,
@@ -73,8 +51,7 @@ export function AgentWorkspaceFrame({
   onPageChange,
   onNewTask,
   onConversation,
-  onUseTemplate,
-  onStartWork,
+  onLearn,
 }: {
   agent: AgentProfile;
   page: AgentWorkspacePage;
@@ -89,8 +66,8 @@ export function AgentWorkspaceFrame({
   onPageChange(page: AgentWorkspacePage): void;
   onNewTask(): void;
   onConversation(id: string): void;
-  onUseTemplate(prompt: string): void;
-  onStartWork(action: () => void): void;
+  /** Starts a Teach chat that opens with this request. */
+  onLearn(prompt: string): void;
 }) {
   // The open conversation is read once its run settles while the window is in view.
   const activeId = page === "task" ? conversationId : undefined;
@@ -115,53 +92,39 @@ export function AgentWorkspaceFrame({
   const [, setParams] = useSearchParams();
   useSessionGoalRunner(activeId ?? "");
   const panel = useContextPanel((state) => state.tab);
-  const togglePanel = useContextPanel((state) => state.toggle);
   return (
     <div className="agent-studio" data-page={page}>
-      <header className="agent-studio-bar" data-window-toolbar>
-        {identity}
-        <nav className="agent-studio-views" aria-label="Agent workspace pages">
-          {pages.map(([id, label, Icon]) => (
-            <Button
-              key={id}
-              data-agent-navigation-control
-              variant="ghost"
-              size="sm"
-              aria-current={page === id ? "page" : undefined}
-              onClick={() => onPageChange(id)}
-            >
-              <Icon size={15} />
-              <span>{label}</span>
-            </Button>
-          ))}
-        </nav>
-        <div className="agent-studio-panels">
-          <IconButton label="New task" disabled={disabled} onClick={onNewTask}>
-            <SquarePen size={16} />
-          </IconButton>
-          <ConnectAgentButton />
-          <MultirunButton agentId={agent.id} onPage={onPageChange} onChat={onConversation} />
-          <SessionGoalButton conversationId={page === "task" ? conversationId : ""} />
-          {panels.map(([id, label, Icon]) => (
-            <IconButton
-              key={id}
-              label={label}
-              aria-pressed={panel === id}
-              onClick={() => togglePanel(id)}
-            >
-              <Icon size={16} />
+      {page === "task" ? (
+        <header className="agent-studio-bar" data-window-toolbar>
+          {identity}
+          <div className="agent-studio-panels">
+            <IconButton label="New task" disabled={disabled} onClick={onNewTask}>
+              <SquarePen size={16} />
             </IconButton>
-          ))}
-        </div>
-      </header>
+            <MultirunButton agentId={agent.id} onPage={onPageChange} onChat={onConversation} />
+            <SessionGoalButton conversationId={conversationId} />
+          </div>
+        </header>
+      ) : null}
       <div className="agent-studio-body">
         <div className="agent-studio-canvas">
           {/* Keep the live conversation mounted while browsing other views; its draft and voice state belong to it. */}
           <div className="agent-studio-task" hidden={page !== "task"}>
             {children}
           </div>
-          {page === "office" ? (
-            <VirtualOffice
+          {page === "tutor" ? (
+            <TutorPage
+              agentId={agent.id}
+              onLesson={(agentId, id) => {
+                onPageChange("task");
+                if (agentId === agent.id) onConversation(id);
+                else setParams({ agent: agentId, conversation: id });
+              }}
+              onLearn={onLearn}
+            />
+          ) : null}
+          {page === "studio" ? (
+            <VirtualStudio
               onOpenChat={(agentId, chat) => {
                 onPageChange("task");
                 if (agentId === agent.id && chat) onConversation(chat);
@@ -169,22 +132,20 @@ export function AgentWorkspaceFrame({
               }}
             />
           ) : null}
-          <div
-            className="agent-studio-catalog-host"
-            hidden={page !== "workflows" && page !== "integrations"}
-          >
-            <AgentWorkspaceCatalog
-              agentId={agent.id}
-              agentName={agent.name}
-              page={page === "integrations" ? "integrations" : "workflows"}
-              onUse={onUseTemplate}
-              onConversation={onConversation}
-              onStartWork={onStartWork}
-            />
+          <div className="agent-studio-catalog-host" hidden={page !== "integrations"}>
+            <div className="agent-studio-pages integrations">
+              <div className="agent-studio-page-scroll">
+                <IntegrationsPage />
+              </div>
+            </div>
           </div>
         </div>
-        {panel ? (
-          <aside className="agent-studio-context context-panel" aria-label="Context">
+        {panel && page === "task" ? (
+          <aside
+            className="agent-studio-context context-panel"
+            aria-label="Context"
+            data-panel={panel}
+          >
             <Suspense
               fallback={
                 <div className="grid gap-2 p-3" aria-hidden="true">
@@ -198,6 +159,7 @@ export function AgentWorkspaceFrame({
             </Suspense>
           </aside>
         ) : null}
+        {page === "task" ? <ContextRail /> : null}
       </div>
     </div>
   );

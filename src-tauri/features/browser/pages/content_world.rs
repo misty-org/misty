@@ -229,3 +229,74 @@ pub(crate) async fn evaluate_in_content_world(
     let expression = format!("(async () => {{\n{function_body}\n}})()");
     answer(evaluate(&webview, expression, Some(context)).await)
 }
+
+/// Runs `function_body` in the named Misty script world of the page's main frame. WebKitGTK
+/// keeps one world per name for as long as the document lives, invisible to page scripts.
+#[cfg(target_os = "linux")]
+pub(crate) async fn evaluate_in_content_world(
+    webview: Webview,
+    world_name: &'static str,
+    function_body: String,
+) -> Result<String, String> {
+    call_async_in_world(webview, Some(world_name), function_body, 10).await
+}
+
+/// Runs `function_body` in Misty's world of one cross-origin frame the tab announced
+/// (agent_pages/frames/linux.rs), where the frame's own script runs it. A frame that no longer
+/// answers is forgotten.
+#[cfg(target_os = "linux")]
+pub(crate) async fn evaluate_in_frame(
+    webview: Webview,
+    world_name: &'static str,
+    function_body: String,
+    frame: u64,
+) -> Result<String, String> {
+    // Frames run Misty's code in the page layer's world, the only one their script lives in.
+    debug_assert_eq!(world_name, "misty-agent-page");
+    crate::browser::agent_pages::frames::linux::evaluate(&webview, frame, function_body).await
+}
+
+/// Runs `function_body` as an async function in `world` (the page's own world when `None`) and
+/// returns the string it resolves to, as WebKit's callAsyncJavaScript does.
+#[cfg(target_os = "linux")]
+pub(crate) async fn call_async_in_world(
+    webview: Webview,
+    world: Option<&'static str>,
+    function_body: String,
+    timeout_seconds: u64,
+) -> Result<String, String> {
+    use javascriptcore::ValueExt;
+    use std::{sync::Mutex, time::Duration};
+    use webkit2gtk::WebViewExt;
+
+    let (sender, receiver) = tokio::sync::oneshot::channel();
+    let sender = Mutex::new(Some(sender));
+    webview
+        .with_webview(move |platform| {
+            platform.inner().call_async_javascript_function(
+                &function_body,
+                None,
+                world,
+                None,
+                None::<&gtk::gio::Cancellable>,
+                move |result| {
+                    let answer = match result {
+                        Ok(value) if value.is_string() => Ok(value.to_str().to_string()),
+                        Ok(value) if value.is_null() || value.is_undefined() => {
+                            Ok("null".to_owned())
+                        }
+                        Ok(_) => Err("The page returned an invalid page state.".to_owned()),
+                        Err(_) => Err("The page could not run page-state code.".to_owned()),
+                    };
+                    if let Some(sender) = sender.lock().ok().and_then(|mut s| s.take()) {
+                        let _ = sender.send(answer);
+                    }
+                },
+            );
+        })
+        .map_err(|error| error.to_string())?;
+    tokio::time::timeout(Duration::from_secs(timeout_seconds), receiver)
+        .await
+        .map_err(|_| "Page state timed out.".to_owned())?
+        .map_err(|_| "Page state was canceled.".to_owned())?
+}

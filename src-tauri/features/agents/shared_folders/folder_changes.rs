@@ -10,8 +10,6 @@ use rusqlite::{params, Connection, OptionalExtension};
 const SCOPE: &str = "grant:agent-folder-changes";
 /// A new chat's choice, before the chat has an id.
 pub const DRAFT_KEY: &str = "draft";
-/// A scheduled workflow's choice, which each of its runs takes on.
-pub const WORKFLOW_PREFIX: &str = "workflow:";
 
 type Answers = BTreeSet<(String, String)>;
 
@@ -95,18 +93,14 @@ pub(in crate::agents) fn allowed(
     Ok(read(connection)?.contains(&(key.to_owned(), folder.to_owned())))
 }
 
-/// A new chat takes its draft's answer, which is then spent, and a scheduled run copies its
-/// workflow's. Nothing else can be passed on, so one chat's answer can't reach another chat.
+/// A new chat takes its draft's answer, which is then spent. Nothing else can be passed on, so one
+/// chat's answer can't reach another chat.
 pub(in crate::agents) fn adopt(
     connection: &Connection,
     from: &str,
     chat: &str,
 ) -> rusqlite::Result<()> {
-    let from_draft = from == DRAFT_KEY;
-    if !from_draft && !from.starts_with(WORKFLOW_PREFIX) {
-        return Ok(());
-    }
-    if chat.is_empty() || chat == DRAFT_KEY || chat.starts_with(WORKFLOW_PREFIX) {
+    if from != DRAFT_KEY || chat.is_empty() || chat == DRAFT_KEY {
         return Ok(());
     }
     change(connection, |answers| {
@@ -115,9 +109,7 @@ pub(in crate::agents) fn adopt(
             .filter(|(key, _)| key == from)
             .map(|(_, folder)| (chat.to_owned(), folder.clone()))
             .collect();
-        if from_draft {
-            answers.retain(|(key, _)| key != from);
-        }
+        answers.retain(|(key, _)| key != from);
         answers.extend(adopted);
     })
 }
@@ -162,20 +154,13 @@ mod tests {
     }
 
     #[test]
-    fn a_draft_is_spent_and_a_workflow_is_copied() {
+    fn a_draft_is_spent() {
         let db = connection();
         allow(&db, DRAFT_KEY, "folder").unwrap();
         adopt(&db, DRAFT_KEY, "chat").unwrap();
         assert!(allowed(&db, "chat", "folder").unwrap());
         adopt(&db, DRAFT_KEY, "second-chat").unwrap();
         assert!(!allowed(&db, "second-chat", "folder").unwrap());
-
-        allow(&db, "workflow:nightly", "folder").unwrap();
-        adopt(&db, "workflow:nightly", "run-1").unwrap();
-        adopt(&db, "workflow:nightly", "run-2").unwrap();
-        assert!(
-            allowed(&db, "run-1", "folder").unwrap() && allowed(&db, "run-2", "folder").unwrap()
-        );
     }
 
     #[test]
@@ -184,8 +169,5 @@ mod tests {
         allow(&db, "chat", "folder").unwrap();
         adopt(&db, "chat", "stolen").unwrap();
         assert!(!allowed(&db, "stolen", "folder").unwrap());
-        allow(&db, DRAFT_KEY, "folder").unwrap();
-        adopt(&db, DRAFT_KEY, "workflow:widen").unwrap();
-        assert!(!allowed(&db, "workflow:widen", "folder").unwrap());
     }
 }

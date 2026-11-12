@@ -7,7 +7,7 @@ pub(super) const MAX_FORM_FIELDS: usize = 30;
 const MAX_TEXT: usize = 20_000;
 pub(super) const MAX_WAIT_MS: u64 = 20_000;
 
-/// A ref-free target recorded for workflow replays: role, accessible name and
+/// A ref-free target: role, accessible name and
 /// which of the same-named controls it is.
 #[derive(Debug, Clone, Deserialize, serde::Serialize, PartialEq)]
 #[serde(deny_unknown_fields)]

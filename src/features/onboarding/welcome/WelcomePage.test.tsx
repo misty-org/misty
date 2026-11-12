@@ -35,21 +35,12 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
-it("gets started straight in the agents, asking only for the tab side", () => {
+it("gets started on the setup page, which ends the welcome", () => {
   renderAt();
   fireEvent.click(screen.getByRole("button", { name: "Get started" }));
   expect(useSignInSheetStore.getState().reason).toBeNull();
-  expect(screen.getByTestId("where").textContent).toBe("/agents");
-  expect(useSetupStore.getState().welcomed).toBe(true);
-  expect(useSetupStore.getState().tabSidePending).toBe(true);
-});
-
-it("does not ask for the tab side again after the first run", () => {
-  useSetupStore.setState({ welcomed: true });
-  renderAt();
-  fireEvent.click(screen.getByRole("button", { name: "Get started" }));
-  expect(screen.getByTestId("where").textContent).toBe("/agents");
-  expect(useSetupStore.getState().tabSidePending).toBe(false);
+  expect(screen.getByTestId("where").textContent).toBe("/setup");
+  expect(useSetupStore.getState().welcomed).toBe(false);
 });
 
 it("offers Sign in beside Get started", () => {

@@ -55,14 +55,14 @@ describe("Agents conversation page", () => {
     expect(headings).toContain("What can I do for you?");
     expect(headings).not.toContain("Agents");
     expect(container.querySelector('[aria-label="Search all"]')).toBeNull();
-    expect(container.querySelector('[aria-label="Agent workspace pages"]')).not.toBeNull();
+    expect(container.querySelector('[aria-label="Agent workspace pages"]')).toBeNull();
     expect(container.textContent).not.toContain("Browse all agents");
     expect(container.querySelector('[role="tablist"]')).toBeNull();
 
     await act(async () => root.unmount());
   });
 
-  it("opens Workflows for retired automation links without a duplicate page switcher", async () => {
+  it("opens the chat for retired automation links without a duplicate page switcher", async () => {
     const container = document.createElement("div");
     document.body.append(container);
     const root = createRoot(container);
@@ -75,8 +75,7 @@ describe("Agents conversation page", () => {
     );
 
     expect(container.querySelector('[aria-label="Automations workspace"]')).toBeNull();
-    const pages = container.querySelector('[aria-label="Agent workspace pages"]');
-    expect(pages?.querySelector('[aria-current="page"]')?.textContent).toBe("Workflows");
+    expect(container.querySelector(".agent-studio")?.getAttribute("data-page")).toBe("task");
     expect(container.querySelector('[role="tablist"]')).toBeNull();
 
     await act(async () => root.unmount());
@@ -93,8 +92,7 @@ describe("Agents conversation page", () => {
         </MemoryRouter>,
       ),
     );
-    const pages = container.querySelector('[aria-label="Agent workspace pages"]');
-    expect(pages?.textContent).not.toContain("Connect");
+    expect(container.querySelector(".agent-studio")?.getAttribute("data-page")).toBe("task");
     expect(document.body.querySelector('[aria-label="Tool connections sheet"]')).toBeNull();
     await act(async () => root.unmount());
   });

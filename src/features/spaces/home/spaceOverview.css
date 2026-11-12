@@ -1,46 +1,37 @@
-/* The Space overview: cards that sit two across once the pane has room for them. */
-.space-overview {
+/*
+ * A Space's home. Every block shares one column system, so edges line up down the page: on a wide
+ * pane pages sit six across, agents and items three (four when there is room), and paired panels
+ * two, each a whole number of page tiles wide.
+ */
+.space-home,
+.home-items-wrap {
   container-type: inline-size;
-  display: grid;
-  gap: 16px;
 }
-.space-overview-grid {
+.space-home {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  align-items: start;
-  gap: 16px;
+  gap: 28px;
+  padding-top: 12px;
 }
-@container (min-width: 680px) {
-  .space-overview-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  /* An odd card out takes the whole row instead of leaving a hole beside it. */
-  .space-overview-grid > :last-child:nth-child(odd) {
-    grid-column: 1 / -1;
-  }
+.home-items-head {
+  margin-top: 12px;
+  margin-bottom: -6px;
 }
 
-.overview-card {
+.home-section {
   display: grid;
-  align-content: start;
   min-width: 0;
-  padding: 6px;
-  border: 1px solid var(--color-charcoal-border);
-  border-radius: 16px;
-  background: color-mix(in srgb, var(--misty-theme-text) 3%, transparent);
+  grid-template-rows: auto 1fr;
+  align-content: start;
+  gap: 10px;
 }
-.overview-card[data-tone="attention"] {
-  border-color: color-mix(in srgb, var(--color-tone-amber) 32%, var(--color-charcoal-border));
-}
-.overview-card-head {
+.home-section-head {
   display: flex;
-  min-height: 40px;
+  min-height: 32px;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 2px 4px 2px 10px;
 }
-.overview-card-title {
+.home-section-title {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -49,14 +40,124 @@
   font-size: 13px;
   font-weight: 600;
 }
-.overview-card-count {
+.home-section-count {
   color: var(--color-cream-muted);
   font-weight: 400;
   font-variant-numeric: tabular-nums;
 }
+.home-section-action {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-right: -6px;
+  color: var(--color-cream-muted);
+}
+
+.home-places,
+.home-pair,
+.home-items,
+.space-home .agents-now {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr);
+}
+.home-places {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.home-pair {
+  align-items: stretch;
+  row-gap: 28px;
+}
+@container (min-width: 520px) {
+  .home-places {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .home-items,
+  .space-home .agents-now {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@container (min-width: 800px) {
+  .home-places {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+  .home-items,
+  .space-home .agents-now {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .home-pair {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  /* An odd block out takes the whole row instead of leaving a hole beside it. */
+  .home-pair > :last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
+}
+@container (min-width: 1200px) {
+  .home-items,
+  .space-home .agents-now {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+/* A page tile: one slim row, its icon on a quiet neutral square. */
+.home-place {
+  display: flex;
+  min-width: 0;
+  height: 48px;
+  align-items: center;
+  gap: 10px;
+  padding: 0 12px;
+  border: 1px solid var(--color-charcoal-border);
+  border-radius: var(--radius-xl);
+  background: color-mix(in srgb, var(--misty-theme-text) 3%, transparent);
+  color: var(--color-cream);
+  font-size: 13px;
+  text-align: left;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease;
+}
+.home-place:hover {
+  border-color: var(--color-charcoal-border-strong);
+  background: color-mix(in srgb, var(--misty-theme-text) 6%, transparent);
+}
+.home-place:focus-visible {
+  border-color: var(--color-cream-muted);
+  outline: none;
+}
+.home-place-icon {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  place-items: center;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--misty-theme-text) 6%, transparent);
+  color: var(--color-cream-muted);
+}
+
+/* The panel under a block's heading, holding its rows. */
+.overview-panel {
+  display: grid;
+  align-content: start;
+  min-width: 0;
+  padding: 4px;
+  border: 1px solid var(--color-charcoal-border);
+  border-radius: var(--radius-xl);
+  background: color-mix(in srgb, var(--misty-theme-text) 3%, transparent);
+}
+.overview-panel[data-tone="attention"] {
+  border-color: color-mix(in srgb, var(--color-tone-amber) 32%, var(--color-charcoal-border));
+}
 .overview-card-empty {
   display: flex;
-  padding: 2px 4px 6px;
+  min-height: 52px;
+  align-items: center;
+  margin: 0;
+  padding: 0 10px;
+  color: var(--color-cream-muted);
+  font-size: 13px;
 }
 
 .overview-row {
@@ -79,14 +180,11 @@
   flex-shrink: 0;
   place-items: center;
 }
-.overview-row-mark[data-kind="folder"] {
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--color-tone-blue) 14%, transparent);
-  color: var(--color-tone-blue);
-}
+.overview-row-mark[data-kind="folder"],
 .overview-row-mark[data-kind="schedule"] {
   border-radius: 8px;
-  background: color-mix(in srgb, var(--misty-theme-text) 7%, transparent);
+  background: color-mix(in srgb, var(--misty-theme-text) 6%, transparent);
+  color: var(--color-cream-muted);
 }
 .overview-row-detail {
   display: flex;

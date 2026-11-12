@@ -88,7 +88,7 @@ pub(super) async fn rebuild(app: &AppHandle) -> Result<(), String> {
             let Some(window) = app.get_webview_window(&format!("{PREFIX}{}", d.id)) else {
                 continue;
             };
-            #[cfg(target_os = "macos")]
+            #[cfg(any(target_os = "macos", target_os = "linux"))]
             platform::position_overlay(&window, d)?;
             #[cfg(windows)]
             {

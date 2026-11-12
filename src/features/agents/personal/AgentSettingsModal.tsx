@@ -1,7 +1,7 @@
 import { IconButton, Sheet, SheetContent, SheetDescription, SheetTitle } from "@/shared/ui";
 import { X } from "lucide-react";
 import { useRef } from "react";
-import { AgentCompanionPanel } from "../cursor/AgentCompanionPanel";
+import { AgentCompanionPanel } from "../tutor/cursor/AgentCompanionPanel";
 
 export type AgentSettingsTab = "settings" | "companion";
 

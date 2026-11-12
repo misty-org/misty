@@ -1,8 +1,6 @@
 import type { ReactNode } from "react";
 import type { TabSide } from "@/app/shell/dockingLayout";
-import { openSignInSheet, useAuth } from "@/features/account";
 import { ProfileSwitcher, type WorkspaceView } from "@/features/app-windows";
-import { SpaceRow, SpaceRowPreview } from "@/features/spaces";
 import { OverlaySideProvider, inwardSide } from "@/shared/ui";
 import { SidebarNav } from "./SidebarNav";
 import { SidebarToggleButton } from "./SidebarToggleButton";
@@ -11,8 +9,8 @@ import { SpaceNavigator } from "./SpaceNavigator";
 import { windowsCaptionSlotId } from "./WindowsTitlebarControls";
 
 /**
- * The window's sidebar: which Space this is, its pages, then the person's chats under each of
- * their agents, with the account at the foot. The layout button sits in the head beside back and
+ * The window's sidebar: a new chat, search and the places, then the person's chats, each in its
+ * own Space, with the account at the foot. Switching Spaces happens on the Space page. The layout button sits in the head beside back and
  * forward; there is no agents side panel, since the chats are right here. It lists no tabs and has no address
  * field; web pages belong to agents, and every row opens in the focused pane.
  */
@@ -23,9 +21,6 @@ export function WorkspaceSidebar(props: {
   account?: ReactNode;
 }) {
   const position = props.position ?? "left";
-  const { user, sessionExpired } = useAuth();
-  // An expired session loads no Spaces, so it asks to sign in like being signed out does.
-  const signedIn = Boolean(user) && !sessionExpired;
   return (
     <OverlaySideProvider value={inwardSide[position]}>
       <header
@@ -42,20 +37,6 @@ export function WorkspaceSidebar(props: {
             <div className="misty-sidebar-nav flex items-center">
               <SidebarNav />
             </div>
-          </div>
-          {/* Which Space this is, and the way to another. */}
-          <div className="misty-sidebar-space" data-misty-window-drag-block="true">
-            {signedIn ? (
-              <SpaceRow labeled />
-            ) : (
-              <SpaceRowPreview
-                onSignIn={() =>
-                  sessionExpired
-                    ? openSignInSheet("expired", user?.email)
-                    : openSignInSheet("space")
-                }
-              />
-            )}
           </div>
           <SpaceNavigator onOpen={props.onOpen} />
           <div className="misty-sidebar-foot" data-misty-window-drag-block="true">

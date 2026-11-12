@@ -1,8 +1,5 @@
-//! What a record holds. Stored kind and field names never change (`entities::Kind`);
-//! `renderer` maps them to the renderer's names at the boundary.
-pub mod credentials;
+//! What a record holds. Stored kind and field names never change (`entities::Kind`).
 pub mod entities;
-pub mod renderer;
 
 use serde::{Deserialize, Serialize};
 

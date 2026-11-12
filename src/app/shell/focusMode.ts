@@ -11,7 +11,7 @@ function readFocusMode(): boolean {
 }
 
 /**
- * Focus mode hides the navigator and the tab strip together so pages fill the window.
+ * Focus mode hides the sidebar so pages fill the window.
  * The navigator still reveals at its edge; the choice stays on this device.
  */
 export const useFocusModeStore = create<{ active: boolean; toggle(): void }>((set, get) => ({

@@ -11,7 +11,7 @@ function read(): boolean {
 }
 
 /**
- * Whether the vertical tab sidebar is tucked away. Unlike focus mode it leaves navigation
+ * Whether the sidebar is tucked away. Unlike focus mode it leaves navigation
  * alone; a browser page then shows its own toolbar, which holds the button to bring it back.
  * The choice stays on this device.
  */

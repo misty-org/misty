@@ -27,7 +27,7 @@ fn scene() -> Scene {
     fs::create_dir_all(&misty).unwrap();
     fs::create_dir_all(folder.join("sub")).unwrap();
     fs::create_dir_all(&outside).unwrap();
-    fs::write(misty.join("vault.db"), "secret").unwrap();
+    fs::write(misty.join("secrets.db"), "secret").unwrap();
     fs::write(folder.join("a.txt"), "keep").unwrap();
     fs::write(folder.join("sub/b.txt"), "keep").unwrap();
     fs::write(folder.join(".env"), "TOKEN=1").unwrap();
@@ -102,8 +102,8 @@ async fn nothing_outside_can_be_read_changed_or_deleted() {
         format!("rm -rf {outside}"),
         format!("echo x > {outside}/new.txt"),
         format!("mv {outside}/o.txt moved.txt"),
-        format!("cat {misty}/vault.db"),
-        format!("rm {misty}/vault.db"),
+        format!("cat {misty}/secrets.db"),
+        format!("rm {misty}/secrets.db"),
         format!("ls {}", dirs::home_dir().unwrap().display()),
     ] {
         let outcome = shell(&scene, "chat", &command, None).await;
@@ -115,7 +115,7 @@ async fn nothing_outside_can_be_read_changed_or_deleted() {
         );
     }
     assert!(scene.outside.join("o.txt").exists());
-    assert!(scene.misty.join("vault.db").exists());
+    assert!(scene.misty.join("secrets.db").exists());
     assert!(!scene.outside.join("new.txt").exists());
 }
 

@@ -54,69 +54,6 @@ fn a_sub_agent_has_no_person_prompt() {
 }
 
 #[test]
-fn workflows_stop_in_both_modes() {
-    for name in [
-        "memory.workflow.save",
-        "memory.workflow.learn",
-        "memory.workflow.schedule",
-    ] {
-        for auto in [true, false] {
-            assert!(
-                asks(&decide(&run(auto), &Taint::default(), name, &json!({}))),
-                "{name}"
-            );
-        }
-    }
-    assert_eq!(
-        decide(
-            &run(true),
-            &Taint::default(),
-            "memory.workflow.unschedule",
-            &json!({})
-        ),
-        Decision::Run
-    );
-    assert!(asks(&decide(
-        &run(false),
-        &Taint::default(),
-        "memory.workflow.unschedule",
-        &json!({})
-    )));
-}
-
-#[test]
-fn history_stops_in_both_modes_as_it_always_has() {
-    for auto in [true, false] {
-        for name in [
-            "memory.history.search",
-            "memory.history.timeline",
-            "memory.tree.read",
-        ] {
-            assert_eq!(
-                decide(&run(auto), &Taint::default(), name, &json!({})),
-                Decision::Ask {
-                    kind: "action",
-                    why: String::new()
-                },
-                "{name}"
-            );
-        }
-        assert_eq!(
-            decide(
-                &run(auto),
-                &Taint::default(),
-                "memory.history.forget",
-                &json!({})
-            ),
-            Decision::Ask {
-                kind: "delete",
-                why: String::new()
-            }
-        );
-    }
-}
-
-#[test]
 fn auto_does_not_stop_for_ordinary_work() {
     let plain = Taint::default();
     for name in [
@@ -127,9 +64,6 @@ fn auto_does_not_stop_for_ordinary_work() {
         "shell.run",
         "note.update",
         "message.send",
-        "memory.pref.update",
-        "memory.pref.forget",
-        "memory.pref.remember",
         "agent.configure",
     ] {
         assert_eq!(
@@ -171,10 +105,6 @@ fn ask_stops_every_change_and_a_screen_with_an_address() {
         "browser.steps",
         "shell.run",
         "note.update",
-        "memory.pref.remember",
-        "memory.pref.update",
-        "memory.pref.forget",
-        "memory.history.search",
     ] {
         assert!(
             asks(&decide(&run(false), &plain, name, &json!({}))),
@@ -307,30 +237,6 @@ fn a_program_is_judged_by_the_addresses_it_names() {
 }
 
 #[test]
-fn remembering_after_reading_a_page_asks_in_both_modes() {
-    let read = Taint {
-        page_read: true,
-        ..Taint::default()
-    };
-    assert!(asks(&decide(
-        &run(true),
-        &read,
-        "memory.pref.remember",
-        &json!({ "content": "x" })
-    )));
-    assert!(asks(&decide(
-        &run(false),
-        &read,
-        "memory.pref.remember",
-        &json!({ "content": "x" })
-    )));
-    assert_eq!(
-        decide(&run(true), &read, "memory.pref.update", &json!({})),
-        Decision::Run
-    );
-}
-
-#[test]
 fn changing_an_agents_instructions_always_asks() {
     let plain = Taint::default();
     assert!(asks(&decide(
@@ -418,4 +324,20 @@ fn private_addresses_need_the_persons_own_words() {
         ),
         Decision::Run
     );
+}
+
+#[test]
+fn an_engine_opens_pages_freely_in_ask_mode_and_asks_before_acting() {
+    let engine = RunFacts::of_request("r", &json!({ "prompt": "p", "engine": { "id": "claude" } }));
+    assert!(engine.engine && !engine.auto);
+    let taint = Taint::default();
+    for name in ["browser.navigate", "screen.open"] {
+        let input = json!({ "url": "https://example.com", "reason": "Read it" });
+        assert!(!asks(&decide(&engine, &taint, name, &input)), "{name}");
+        // Misty's own agent still asks.
+        assert!(asks(&decide(&run(false), &taint, name, &input)), "{name}");
+    }
+    for name in ["browser.steps", "browser.fill_form", "browser.run"] {
+        assert!(asks(&decide(&engine, &taint, name, &json!({}))), "{name}");
+    }
 }

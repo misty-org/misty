@@ -1,6 +1,6 @@
 // What the rest of the app uses of the web page runtime: the pages agents open, shown beside
 // their chats, and what a person can do about the data those pages keep.
-export { browserLibrary, browserPageTools } from "./library/native";
+export { browserLibrary } from "./library/native";
 export { BrowserNavigationButtons } from "./webviews/BrowserNavigationButtons";
 export { visibleBrowserBounds } from "./webviews/browserHostBounds";
 export { usePresentedPageHost } from "./webviews/presentedPageHost";
@@ -8,6 +8,7 @@ export { BrowserRuntimeBridge } from "./webviews/BrowserRuntimeBridge";
 export { SiteIcon } from "./webviews/SiteIcon";
 export {
   browserRuntimeIdForTabId,
+  closeOrphanAgentPages,
   closeOrphanBrowserPages,
   hideAdoptedBrowserPage,
   requestBrowserWebviewLayoutByRuntimeId,
@@ -17,12 +18,7 @@ export {
 } from "./webviews/browserRuntime";
 export { configureHiddenTabSleep } from "./webviews/hiddenTabSleep";
 export { providerFromRoute } from "./webviews/providers";
-export { configureBrowserSiteStyles } from "./webviews/siteStyles";
-export { configureBrowserSiteZoom } from "./webviews/siteZoom";
-export { configureTabHistoryBudget } from "./webviews/tabHistory";
-export { useBrowserPaneDim } from "./webviews/useBrowserPaneDim";
 export { websiteIntegrations } from "./webviews/websiteIntegrations";
 export { BrowserPermissionSettings } from "./settings/BrowserPermissionSettings";
 export { DownloadsSettings } from "./settings/BrowserSection";
 export { PrivacySection } from "./settings/PrivacySection";
-export type { BrowserAskSnapshot } from "./webviews/browserAsk";

@@ -1,0 +1,3302 @@
+// Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong), src-tauri/src/history/reader.rs.
+use super::{parse_session_file, Message, ParsedSession, SessionMeta};
+use base64::Engine as _;
+use parking_lot::Mutex;
+use rusqlite::OptionalExtension;
+use serde::Serialize;
+use std::collections::{HashMap, HashSet};
+use std::future::Future;
+use std::path::{Path, PathBuf};
+use std::sync::{Arc, LazyLock};
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionPage {
+    pub messages: Vec<Message>,
+    pub next_before: Option<i64>,
+    /// Earlier delegation rows and turn boundaries, independent of paging.
+    pub subagent_history: Vec<Message>,
+}
+
+/// Run a parameterless query on the WAL read connection, so a background
+/// index write cannot stall session/workspace enumeration.
+fn query_rows<T>(
+    db: &crate::engines::support::db::Db,
+    sql: &str,
+    map_row: impl Fn(&rusqlite::Row<'_>) -> rusqlite::Result<T>,
+) -> Result<Vec<T>, String> {
+    let conn = db.read();
+    let mut stmt = conn.prepare(sql).map_err(|e| e.to_string())?;
+    let rows = stmt.query_map([], map_row).map_err(|e| e.to_string())?;
+    let mut out = Vec::new();
+    for row in rows {
+        match row {
+            Ok(value) => out.push(value),
+            Err(e) => eprintln!("[history] skipping undecodable row: {e}"),
+        }
+    }
+    Ok(out)
+}
+
+/// Run a sessions-table mutation. The caller emits the change notification
+/// after its blocking task completes, so the async command does not hold a
+/// `State` borrow across the await.
+fn mutate_sessions(
+    db: &crate::engines::support::db::Db,
+    sql: &str,
+    params: impl rusqlite::Params,
+) -> Result<(), String> {
+    let conn = db.0.lock();
+    conn.execute(sql, params).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+fn list_sessions_from(db: &crate::engines::support::db::Db) -> Result<Vec<SessionMeta>, String> {
+    query_rows(
+        db,
+        "SELECT s.engine, s.session_id, s.workspace_path, s.file_path, s.file_size, s.file_mtime_ms,
+                s.title, s.preview, s.created_at, s.updated_at, s.message_count, s.pinned, s.custom_title,
+                m.model, e.effort, p.provider_id
+         FROM cli_sessions s
+         LEFT JOIN cli_session_models m ON m.engine = s.engine AND m.session_id = s.session_id
+         LEFT JOIN cli_session_efforts e ON e.engine = s.engine AND e.session_id = s.session_id
+         LEFT JOIN cli_session_providers p ON p.engine = s.engine AND p.session_id = s.session_id
+         WHERE NOT EXISTS (
+             SELECT 1 FROM cli_session_archives a
+             WHERE a.engine = s.engine AND a.session_id = s.session_id
+         )
+         ORDER BY COALESCE(s.updated_at, 0) DESC",
+        |r| {
+            Ok(SessionMeta {
+                engine: r.get(0)?,
+                session_id: r.get(1)?,
+                workspace_path: r.get(2)?,
+                file_path: r.get(3)?,
+                file_size: r.get(4)?,
+                file_mtime_ms: r.get(5)?,
+                title: r.get(6)?,
+                preview: r.get(7)?,
+                created_at: r.get(8)?,
+                updated_at: r.get(9)?,
+                message_count: r.get(10)?,
+                pinned: r.get::<_, i64>(11)? != 0,
+                custom_title: r.get(12)?,
+                model: r.get(13)?,
+                effort: r.get(14)?,
+                provider: r.get(15)?,
+                remote: None,
+                remote_path: None,
+            })
+        },
+    )
+}
+
+#[tauri::command]
+pub async fn list_sessions(
+    state: tauri::State<'_, crate::engines::support::EngineState>,
+) -> Result<Vec<SessionMeta>, String> {
+    let db = Arc::clone(&state.db);
+    tauri::async_runtime::spawn_blocking(move || list_sessions_from(&db))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+/// One session's metadata (the same JOIN and row mapping as `list_sessions`, narrowed to
+/// `(engine, session_id)`). Forking needs the source session's `file_path` and title without
+/// listing everything.
+pub(crate) fn session_meta_by_id(
+    db: &crate::engines::support::db::Db,
+    engine: &str,
+    session_id: &str,
+) -> Result<Option<SessionMeta>, String> {
+    let conn = db.read();
+    conn.query_row(
+        "SELECT s.engine, s.session_id, s.workspace_path, s.file_path, s.file_size, s.file_mtime_ms,
+                s.title, s.preview, s.created_at, s.updated_at, s.message_count, s.pinned, s.custom_title,
+                m.model, e.effort, p.provider_id
+         FROM cli_sessions s
+         LEFT JOIN cli_session_models m ON m.engine = s.engine AND m.session_id = s.session_id
+         LEFT JOIN cli_session_efforts e ON e.engine = s.engine AND e.session_id = s.session_id
+         LEFT JOIN cli_session_providers p ON p.engine = s.engine AND p.session_id = s.session_id
+         WHERE s.engine = ?1 AND s.session_id = ?2",
+        rusqlite::params![engine, session_id],
+        |r| {
+            Ok(SessionMeta {
+                engine: r.get(0)?,
+                session_id: r.get(1)?,
+                workspace_path: r.get(2)?,
+                file_path: r.get(3)?,
+                file_size: r.get(4)?,
+                file_mtime_ms: r.get(5)?,
+                title: r.get(6)?,
+                preview: r.get(7)?,
+                created_at: r.get(8)?,
+                updated_at: r.get(9)?,
+                message_count: r.get(10)?,
+                pinned: r.get::<_, i64>(11)? != 0,
+                custom_title: r.get(12)?,
+                model: r.get(13)?,
+                effort: r.get(14)?,
+                provider: r.get(15)?,
+                remote: None,
+                remote_path: None,
+            })
+        },
+    )
+    .optional()
+    .map_err(|e| format!("lookup session {engine}/{session_id}: {e}"))
+}
+
+fn list_archived_sessions_from(db: &crate::engines::support::db::Db) -> Result<Vec<SessionMeta>, String> {
+    let conn = db.read();
+    let mut stmt = conn
+        .prepare("SELECT snapshot_json FROM cli_session_archives ORDER BY archived_at DESC")
+        .map_err(|e| e.to_string())?;
+    let rows = stmt
+        .query_map([], |r| r.get::<_, String>(0))
+        .map_err(|e| e.to_string())?;
+    let mut out = Vec::new();
+    for row in rows {
+        match row {
+            Ok(json) => match serde_json::from_str::<SessionMeta>(&json) {
+                Ok(session) => out.push(session),
+                Err(e) => eprintln!("[history] skipping corrupt archive snapshot: {e}"),
+            },
+            Err(e) => eprintln!("[history] skipping unreadable archive row: {e}"),
+        }
+    }
+    Ok(out)
+}
+
+#[tauri::command]
+pub async fn list_archived_sessions(
+    state: tauri::State<'_, crate::engines::support::EngineState>,
+) -> Result<Vec<SessionMeta>, String> {
+    let db = Arc::clone(&state.db);
+    tauri::async_runtime::spawn_blocking(move || list_archived_sessions_from(&db))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+fn archive_session_in(db: &crate::engines::support::db::Db, session: &SessionMeta) -> Result<(), String> {
+    if session.engine.trim().is_empty()
+        || session.session_id.trim().is_empty()
+        || session.workspace_path.trim().is_empty()
+    {
+        return Err("archive_session: engine, sessionId and workspacePath are required".into());
+    }
+    let snapshot = serde_json::to_string(session).map_err(|e| e.to_string())?;
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as i64;
+    let conn = db.0.lock();
+    conn.execute(
+        "INSERT INTO cli_session_archives(engine, session_id, workspace_path, snapshot_json, archived_at)
+         VALUES(?1,?2,?3,?4,?5)
+         ON CONFLICT(engine, session_id) DO UPDATE SET
+           workspace_path=excluded.workspace_path,
+           snapshot_json=excluded.snapshot_json,
+           archived_at=excluded.archived_at",
+        rusqlite::params![
+            session.engine,
+            session.session_id,
+            session.workspace_path,
+            snapshot,
+            now
+        ],
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn archive_session(
+    state: tauri::State<'_, crate::engines::support::EngineState>,
+    session: SessionMeta,
+) -> Result<(), String> {
+    let db = Arc::clone(&state.db);
+    let sink = Arc::clone(&state.sink);
+    tauri::async_runtime::spawn_blocking(move || archive_session_in(&db, &session))
+        .await
+        .map_err(|e| e.to_string())??;
+    sink.emit_sessions_changed();
+    Ok(())
+}
+
+fn restore_session_in(db: &crate::engines::support::db::Db, engine: &str, session_id: &str) -> Result<(), String> {
+    let conn = db.0.lock();
+    conn.execute(
+        "DELETE FROM cli_session_archives WHERE engine=?1 AND session_id=?2",
+        rusqlite::params![engine, session_id],
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn restore_session(
+    state: tauri::State<'_, crate::engines::support::EngineState>,
+    engine: String,
+    session_id: String,
+) -> Result<(), String> {
+    let db = Arc::clone(&state.db);
+    let sink = Arc::clone(&state.sink);
+    tauri::async_runtime::spawn_blocking(move || restore_session_in(&db, &engine, &session_id))
+        .await
+        .map_err(|e| e.to_string())??;
+    sink.emit_sessions_changed();
+    Ok(())
+}
+
+/// Remember the model id a session ran, spelled as the picker spells it
+/// ("provider/model"). The engine's transcript only carries the bare model
+/// name, so this row is what keeps a session's provider and model across
+/// clients and restarts — see [`SessionMeta::model`].
+#[tauri::command]
+pub async fn remember_session_model(
+    state: tauri::State<'_, crate::engines::support::EngineState>,
+    engine: String,
+    session_id: String,
+    model: String,
+) -> Result<(), String> {
+    if model.trim().is_empty() {
+        return Ok(());
+    }
+    let now = crate::engines::support::db::next_write_stamp();
+    let db = Arc::clone(&state.db);
+    let sink = Arc::clone(&state.sink);
+    tauri::async_runtime::spawn_blocking(move || {
+        db.remember_session_model(&engine, &session_id, &model, now)
+    })
+    .await
+    .map_err(|e| e.to_string())??;
+    sink.emit_sessions_changed();
+    Ok(())
+}
+
+/// Remember the reasoning effort a session ran, beside its model and for the
+/// same reason — see [`SessionMeta::effort`].
+#[tauri::command]
+pub async fn remember_session_effort(
+    state: tauri::State<'_, crate::engines::support::EngineState>,
+    engine: String,
+    session_id: String,
+    effort: String,
+) -> Result<(), String> {
+    if effort.trim().is_empty() {
+        return Ok(());
+    }
+    let now = crate::engines::support::db::next_write_stamp();
+    let db = Arc::clone(&state.db);
+    let sink = Arc::clone(&state.sink);
+    tauri::async_runtime::spawn_blocking(move || {
+        db.remember_session_effort(&engine, &session_id, &effort, now)
+    })
+    .await
+    .map_err(|e| e.to_string())??;
+    sink.emit_sessions_changed();
+    Ok(())
+}
+
+/// Remember the in-app channel a session ran. Spawn injects env from this id
+/// and never rewrites the CLI's own files — see [`SessionMeta::provider`].
+#[tauri::command]
+pub async fn remember_session_provider(
+    state: tauri::State<'_, crate::engines::support::EngineState>,
+    engine: String,
+    session_id: String,
+    provider_id: String,
+) -> Result<(), String> {
+    if provider_id.trim().is_empty() {
+        return Ok(());
+    }
+    // Same standard as run ids (send_message_inner): bounded length and a
+    // channel-id charset (plugin-prefixed ids use alnum/-/_; dots tolerated
+    // for hand-written configs). A hand-edited db must not smuggle odd keys
+    // into downstream lookups.
+    if engine.trim().is_empty() || engine.len() > 64 {
+        return Err("invalid engine".into());
+    }
+    if session_id.trim().is_empty() || session_id.len() > 256 {
+        return Err("invalid session id".into());
+    }
+    if provider_id.len() > 128
+        || !provider_id
+            .bytes()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, b'-' | b'_' | b'.'))
+    {
+        return Err("invalid provider id".into());
+    }
+    let now = crate::engines::support::db::next_write_stamp();
+    let db = Arc::clone(&state.db);
+    let sink = Arc::clone(&state.sink);
+    tauri::async_runtime::spawn_blocking(move || {
+        db.remember_session_provider(&engine, &session_id, &provider_id, now)
+    })
+    .await
+    .map_err(|e| e.to_string())??;
+    sink.emit_sessions_changed();
+    Ok(())
+}
+
+pub(crate) fn session_file_path(
+    db: &crate::engines::support::db::Db,
+    engine: &str,
+    session_id: &str,
+) -> Result<PathBuf, String> {
+    find_session_file_path(db, engine, session_id)?
+        .ok_or_else(|| format!("session not found: {engine}/{session_id}"))
+}
+
+fn find_session_file_path(
+    db: &crate::engines::support::db::Db,
+    engine: &str,
+    session_id: &str,
+) -> Result<Option<PathBuf>, String> {
+    let conn = db.read();
+    conn.query_row(
+        "SELECT file_path FROM cli_sessions WHERE engine=?1 AND session_id=?2",
+        rusqlite::params![engine, session_id],
+        |r| r.get::<_, String>(0),
+    )
+    .optional()
+    .map(|path| path.map(PathBuf::from))
+    .map_err(|e| format!("lookup session {engine}/{session_id}: {e}"))
+}
+
+/// One cache entry: the parse plus the subagent fold over all its messages,
+/// so paging cuts the fold at the page start instead of refolding the whole
+/// prefix on every turn of the page. The fold derives from `parsed.messages`
+/// alone, so it invalidates with the same stat key.
+struct CachedSession {
+    parsed: ParsedSession,
+    fold: SubagentFold,
+    /// Computed once on a miss, never by an ordinary paging cache hit.
+    footprint: usize,
+}
+
+/// Parsed sessions keyed by (path, size, mtime_ms, accepted-frame signature):
+/// paging re-slices a cached parse instead of re-reading the file. The
+/// signature belongs in the key because recording a newly accepted frame
+/// changes what the parse must hide while the file's stat key is unchanged.
+/// Explicit reload bypasses this key and replaces only the selected path;
+/// supplemental native files and SQLite WAL writes need not change its stat.
+/// Bounded two ways: 32 entries and a ~128MB byte budget (image data URLs
+/// make entries heavy).
+static PARSED_CACHE: LazyLock<Mutex<HashMap<(PathBuf, i64, i64, String), Arc<CachedSession>>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+static PARSED_CACHE_BYTES: LazyLock<Mutex<usize>> = LazyLock::new(|| Mutex::new(0));
+/// Bumped (under the cache lock) by every [`forget_parsed_session`]. A parse
+/// that began before a save may have read the old source under a stat key the
+/// save did not move, so it is served but never published once this changed.
+static PARSED_CACHE_GENERATION: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+const PARSED_CACHE_CAPACITY: usize = 32;
+const PARSED_CACHE_BUDGET_BYTES: usize = 128 * 1024 * 1024;
+
+/// Rough in-memory footprint of one parsed session. Text and images used to
+/// be the whole story, but tool-result-heavy sessions keep most of their
+/// bytes in retained payloads: an hourly task's omp transcript measured
+/// 28MB of `result.details` against 18MB of chat text, so a text-only sum
+/// lets the 128MB budget admit multiples of itself.
+fn value_footprint(value: &serde_json::Value) -> usize {
+    match value {
+        serde_json::Value::String(s) => s.len(),
+        serde_json::Value::Array(items) => {
+            items.iter().map(value_footprint).sum::<usize>() + items.len() * 32
+        }
+        serde_json::Value::Object(map) => map
+            .iter()
+            .map(|(k, v)| k.len() + value_footprint(v) + 32)
+            .sum::<usize>(),
+        _ => 8,
+    }
+}
+
+fn todo_footprint(todos: &crate::engines::TodosPayload) -> usize {
+    todos
+        .items
+        .iter()
+        .map(|i| i.content.len() + i.status.len() + i.id.as_deref().map(str::len).unwrap_or(0) + 32)
+        .sum()
+}
+
+fn message_footprint(m: &Message) -> usize {
+    m.text.len()
+        + m.images.iter().map(|i| i.len()).sum::<usize>()
+        + m.ts.as_deref().map(str::len).unwrap_or(0)
+        + m.path.as_deref().map(str::len).unwrap_or(0)
+        + m.model.as_deref().map(str::len).unwrap_or(0)
+        + m.effort.as_deref().map(str::len).unwrap_or(0)
+        + m.args.as_ref().map(value_footprint).unwrap_or(0)
+        + m.result.as_ref().map(value_footprint).unwrap_or(0)
+        + m.usage.as_ref().map(value_footprint).unwrap_or(0)
+        + m.todos.as_ref().map(todo_footprint).unwrap_or(0)
+        + 128
+}
+
+fn parsed_footprint(parsed: &ParsedSession) -> usize {
+    parsed.messages.iter().map(message_footprint).sum()
+}
+
+/// Drop every cached parse of one source after the app rewrote it. A native
+/// save need not change the cache key's stat: an OpenCode tree edit can touch
+/// only part files under unchanged session metadata, SQLite writes land in WAL.
+pub(crate) fn forget_parsed_session(path: &Path) {
+    let mut cache = PARSED_CACHE.lock();
+    let mut bytes = PARSED_CACHE_BYTES.lock();
+    cache.retain(|(cached_path, ..), previous| {
+        if cached_path == path {
+            *bytes -= previous.footprint;
+            false
+        } else {
+            true
+        }
+    });
+    PARSED_CACHE_GENERATION.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+}
+
+fn cached_session(
+    engine: &str,
+    path: &Path,
+    accepted_frames: &HashSet<String>,
+    accepted_signature: &str,
+    force_reload: bool,
+) -> Result<Arc<CachedSession>, String> {
+    let generation = PARSED_CACHE_GENERATION.load(std::sync::atomic::Ordering::SeqCst);
+    let Some((size, mtime_ms)) = super::stat_signature(path) else {
+        // Unstattable file: let the parse produce the real error.
+        let parsed = parse_session_file(engine, path, accepted_frames)?;
+        let fold = subagent_fold(&parsed.messages);
+        return Ok(Arc::new(CachedSession { parsed, fold, footprint: 0 }));
+    };
+    let key = (
+        path.to_path_buf(),
+        size,
+        mtime_ms,
+        accepted_signature.to_string(),
+    );
+    if !force_reload {
+        if let Some(hit) = PARSED_CACHE.lock().get(&key) {
+            return Ok(Arc::clone(hit));
+        }
+    }
+    let parsed = parse_session_file(engine, path, accepted_frames)?;
+    let fold = subagent_fold(&parsed.messages);
+    // The fold's cloned delegation rows count toward the budget too.
+    let footprint = parsed_footprint(&parsed)
+        + fold
+            .iter()
+            .map(|(_, row)| message_footprint(row))
+            .sum::<usize>();
+    let cached = Arc::new(CachedSession { parsed, fold, footprint });
+    Ok(publish_parse(key, path, cached, force_reload, generation))
+}
+
+/// Cache a finished parse unless a save evicted the cache while it ran.
+fn publish_parse(
+    key: (PathBuf, i64, i64, String),
+    path: &Path,
+    cached: Arc<CachedSession>,
+    force_reload: bool,
+    generation: u64,
+) -> Arc<CachedSession> {
+    let footprint = cached.footprint;
+    let mut cache = PARSED_CACHE.lock();
+    if PARSED_CACHE_GENERATION.load(std::sync::atomic::Ordering::SeqCst) != generation {
+        return cached;
+    }
+    // An ordinary miss may finish after a forced same-stat reload. Keep the
+    // already-published parse rather than overwriting it with that older read.
+    if !force_reload {
+        if let Some(hit) = cache.get(&key) {
+            return Arc::clone(hit);
+        }
+    }
+    let mut bytes = PARSED_CACHE_BYTES.lock();
+    // Replace all previous stat/frame versions of this source, but never the
+    // other session addresses within a shared OpenCode SQLite database.
+    cache.retain(|(cached_path, ..), previous| {
+        if cached_path == path {
+            *bytes -= previous.footprint;
+            false
+        } else {
+            true
+        }
+    });
+    // Oversized parses can still supply the requested page without making the
+    // bounded cache oversized or clearing unrelated sessions to admit them.
+    if footprint > PARSED_CACHE_BUDGET_BYTES {
+        return cached;
+    }
+    while cache.len() >= PARSED_CACHE_CAPACITY
+        || *bytes + footprint > PARSED_CACHE_BUDGET_BYTES
+    {
+        let Some(victim) = cache.keys().next().cloned() else {
+            break;
+        };
+        if let Some(previous) = cache.remove(&victim) {
+            *bytes -= previous.footprint;
+        }
+    }
+    *bytes += footprint;
+    cache.insert(key, Arc::clone(&cached));
+    cached
+}
+
+/// The fold over a whole session, each row tagged with the index of the
+/// message whose processing emitted it: a delegation or boundary row tags its
+/// own index, a user row tags the index of the delegation or boundary that
+/// closes its turn, and the trailing unclosed user tags `usize::MAX`. Paging
+/// cuts this at the page start — see `subagent_history_until`.
+type SubagentFold = Vec<(usize, Message)>;
+
+/// Keep the inputs the subagent fold consumes, not old chat bodies or tool output.
+/// Turn boundaries remain so a reopened session never treats an old spawn as new.
+fn subagent_fold(messages: &[Message]) -> SubagentFold {
+    let mut rows = SubagentFold::new();
+    let mut last_user = None;
+    let mut needs_boundary = false;
+    for (index, message) in messages.iter().enumerate() {
+        if message.role == "user" {
+            last_user = Some(message);
+            continue;
+        }
+        let delegation = message.role == "tool" && is_subagent_history_tool(message);
+        let boundary = needs_boundary && matches!(message.role.as_str(), "assistant" | "thinking");
+        if !delegation && !boundary {
+            continue;
+        }
+        if let Some(user) = last_user.take() {
+            rows.push((index, subagent_history_row(user, false)));
+        }
+        rows.push((index, subagent_history_row(message, delegation)));
+        needs_boundary = delegation;
+    }
+    if !rows.is_empty() {
+        if let Some(user) = last_user {
+            rows.push((usize::MAX, subagent_history_row(user, false)));
+        }
+    }
+    rows
+}
+
+/// The fold of one prefix, kept for tests as the reference the cached
+/// truncation is pinned against.
+#[cfg(test)]
+fn subagent_history(messages: &[Message]) -> Vec<Message> {
+    subagent_fold(messages)
+        .into_iter()
+        .map(|(_, row)| row)
+        .collect()
+}
+
+/// Cut a full-session fold at `start`, byte-identical to folding
+/// `messages[..start]` directly. Rows triggered before the cut keep the order
+/// the prefix fold emits them in; the pending user at the cut is appended
+/// exactly when the prefix fold would — its turn was never closed inside the
+/// prefix (even when the full fold spends it on a delegation past the cut, or
+/// a newer user replaces it and it never appears there at all).
+fn subagent_history_until(messages: &[Message], fold: &SubagentFold, start: usize) -> Vec<Message> {
+    let mut rows: Vec<Message> = fold
+        .iter()
+        .take_while(|(trigger, _)| *trigger < start)
+        .map(|(_, row)| row.clone())
+        .collect();
+    if rows.is_empty() {
+        return rows;
+    }
+    let Some(user_index) = messages[..start].iter().rposition(|m| m.role == "user") else {
+        return rows;
+    };
+    // The pending user was already spent if a delegation or boundary closed
+    // its turn inside the prefix; as the last user before the cut, any row
+    // triggered between it and the cut closed its turn.
+    let closed = fold
+        .iter()
+        .any(|(trigger, _)| user_index < *trigger && *trigger < start);
+    if !closed {
+        rows.push(subagent_history_row(&messages[user_index], false));
+    }
+    rows
+}
+
+fn is_subagent_history_tool(message: &Message) -> bool {
+    if message.todos.is_some() {
+        return true;
+    }
+    if message.args.as_ref().is_some_and(|args| {
+        args.get("tasks").is_some()
+            || args.get("ids").is_some()
+            || args.get("todos").is_some()
+            || args.get("op").is_some()
+    }) {
+        return true;
+    }
+    if message.result.as_ref().and_then(|result| result.get("details")).is_some_and(|details| {
+        ["jobs", "peers", "progress", "phases"].iter().any(|key| details.get(key).is_some())
+            || details.get("op").and_then(serde_json::Value::as_str) == Some("jobs")
+    }) {
+        return true;
+    }
+    let head = message.text.split('·').next().unwrap_or_default().trim().to_ascii_lowercase();
+    let first = head.split(|c: char| c.is_whitespace() || c == '/' || c == '\\').next().unwrap_or_default().replace('-', "_");
+    matches!(first.as_str(), "task" | "agent" | "spawn" | "spawn_agent" | "spawn_subagent"
+        | "workflow" | "run_workflow" | "pipeline" | "dispatch" | "dispatch_agent" | "delegate" | "todo")
+        || ["spawn agent", "agent swarm", "agent_swarm", "workflow", "subagent", "todo"].iter().any(|name| head.contains(name))
+}
+
+fn subagent_history_row(message: &Message, delegation: bool) -> Message {
+    Message {
+        seq: message.seq,
+        role: message.role.clone(),
+        text: if delegation {
+            message.text.clone()
+        } else {
+            String::new()
+        },
+        ts: None,
+        path: None,
+        args: if delegation {
+            message.args.clone()
+        } else {
+            None
+        },
+        // Status snapshots and result presence matter; the full output still
+        // lives in the paginated timeline and need not cross IPC twice.
+        result: if delegation {
+            message.result.as_ref().map(|result| match result.get("details") {
+                Some(details) => serde_json::json!({ "details": details }),
+                None => serde_json::Value::Bool(true),
+            })
+        } else { None },
+        todos: if delegation { message.todos.clone() } else { None },
+        usage: None,
+        model: None,
+        effort: None,
+        duration_ms: None,
+        images: Vec::new(),
+    }
+}
+
+/// Slice a cached parse into a page (shared by local and remote loaders).
+fn page_from_cached(
+    cached: &CachedSession,
+    limit: Option<usize>,
+    before_seq: Option<i64>,
+) -> SessionPage {
+    let limit = limit.unwrap_or(100).clamp(1, 500);
+    let messages = &cached.parsed.messages;
+    let (page, next_before, start) = match before_seq {
+        Some(before) => {
+            let end = messages
+                .iter()
+                .position(|m| m.seq >= before)
+                .unwrap_or(messages.len());
+            let start = end.saturating_sub(limit);
+            let next = if start > 0 {
+                messages.get(start).map(|m| m.seq)
+            } else {
+                None
+            };
+            (messages[start..end].to_vec(), next, start)
+        }
+        None => {
+            let start = messages.len().saturating_sub(limit);
+            let next = if start > 0 {
+                messages.get(start).map(|m| m.seq)
+            } else {
+                None
+            };
+            (messages[start..].to_vec(), next, start)
+        }
+    };
+    SessionPage {
+        messages: page,
+        next_before,
+        subagent_history: subagent_history_until(messages, &cached.fold, start),
+    }
+}
+
+/// Sync body of `load_session_page` (parsing multi-MB session files must not
+/// run on the IPC main thread).
+pub(super) fn load_session_page_blocking(
+    db: &crate::engines::support::db::Db,
+    engine: &str,
+    session_id: &str,
+    limit: Option<usize>,
+    before_seq: Option<i64>,
+    force_reload: bool,
+) -> Result<SessionPage, String> {
+    let path = session_file_path(db, engine, session_id)?;
+    let (accepted_frames, accepted_signature) = db.accepted_internal_frames(engine, session_id)?;
+    let cached = cached_session(engine, &path, &accepted_frames, &accepted_signature, force_reload)?;
+    Ok(page_from_cached(&cached, limit, before_seq))
+}
+
+/// Sync body of `load_remote_session_page`, once the remote transcript is
+/// cached on this machine. A remote page must consult the same accepted-frame
+/// table as a local one: `record_accepted_internal_frame` scopes an identity by
+/// `(engine, session_id)` alone and never consults the `sessions` table, and a
+/// turn run in a remote workspace goes through the same send path, so its
+/// accepted frames are recorded exactly like a local session's. Parsing with an
+/// empty set would re-reveal every frame the capture validator hid.
+fn remote_session_page_blocking(
+    db: &crate::engines::support::db::Db,
+    engine: &str,
+    session_id: &str,
+    cache_path: &Path,
+    limit: Option<usize>,
+    before_seq: Option<i64>,
+    force_reload: bool,
+) -> Result<SessionPage, String> {
+    let (accepted_frames, accepted_signature) = db.accepted_internal_frames(engine, session_id)?;
+    let cached = cached_session(engine, cache_path, &accepted_frames, &accepted_signature, force_reload)?;
+    Ok(page_from_cached(&cached, limit, before_seq))
+}
+
+#[tauri::command]
+pub async fn load_session_page(
+    state: tauri::State<'_, crate::engines::support::EngineState>,
+    engine: String,
+    session_id: String,
+    limit: Option<usize>,
+    before_seq: Option<i64>,
+    force_reload: Option<bool>,
+) -> Result<SessionPage, String> {
+    let db = Arc::clone(&state.db);
+    tauri::async_runtime::spawn_blocking(move || {
+        load_session_page_blocking(&db, &engine, &session_id, limit, before_seq, force_reload.unwrap_or(false))
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// The allowed shapes of a remote session path. The local equivalent, session_file_path, only
+/// accepts files inside an engine home the db registered; a remote session has no db row
+/// (remotePath is reported by a session source), so it must be an absolute .jsonl inside the
+/// engine's known session-folder layout. That stops IPC from reading any .jsonl in the distro.
+pub(crate) fn is_plausible_remote_session_path(engine: &str, path: &str) -> bool {
+    // dsh transcripts are zstd-compressed session*.jsonl.zstd; every other engine uses .jsonl.
+    let suffix_ok = path.ends_with(".jsonl") || (engine == "dsh" && path.ends_with(".jsonl.zstd"));
+    if !suffix_ok || !path.starts_with('/') {
+        return false;
+    }
+    // Refuse `..` segments and NUL, so a joined path can't escape the session tree.
+    if path.contains('\0') || path.split('/').any(|seg| seg == "..") {
+        return false;
+    }
+    let markers: &[&str] = match engine {
+        // ~/.claude/projects/<encoded>/<sid>.jsonl; qoder has the same layout (.qoder*/projects)
+        "claude" | "qoder" => &["/projects/"],
+        // codex ~/.codex/sessions/…; kimi/grok/dsh are rooted at a sessions folder too
+        "codex" | "kimi" | "grok" | "dsh" | "agy" => &["/sessions/", "/session/"],
+        // the pi family: ~/.{pi,omp}/agent/sessions/…
+        "pi" | "omp" => &["/agent/sessions/"],
+        _ => &["/sessions/", "/session/", "/projects/"],
+    };
+    markers.iter().any(|m| path.contains(m))
+}
+
+/// The most a remote transcript fetch reads (before base64).
+const MAX_REMOTE_SESSION_BYTES: u64 = 64 * 1024 * 1024;
+
+/// History of a remote workspace's session: a session source reports the remote jsonl's
+/// absolute path as `remotePath`; the transcript is fetched as base64 over the same remote
+/// channel engines spawn through, cached locally, and parsed, paged and folded as usual. The
+/// cache file is rewritten only when its content changed (an unchanged stat hits the parse
+/// cache when paging; an explicit forced reload doesn't depend on the cache file's stat).
+#[tauri::command]
+pub async fn load_remote_session_page(
+    state: tauri::State<'_, crate::engines::support::EngineState>,
+    workspace_path: String,
+    engine: String,
+    session_id: String,
+    remote_path: String,
+    limit: Option<usize>,
+    before_seq: Option<i64>,
+    force_reload: Option<bool>,
+) -> Result<SessionPage, String> {
+    use sha2::Digest as _;
+    if !is_plausible_remote_session_path(&engine, &remote_path) {
+        return Err(format!("invalid remote session path: {remote_path}"));
+    }
+    let transport =
+        crate::engines::wsl_transport::transport_for_workspace(&state.db, &workspace_path)
+            .ok_or_else(|| format!("workspace {workspace_path} has no remote transport registered"))?;
+    // stat on the remote side first to enforce the byte limit before base64: too large or
+    // unreadable exits non-zero, so a huge transcript never lands in memory at 1.33x its size.
+    let quoted = crate::engines::wsl_transport::sh_quote(&remote_path);
+    let script = format!(
+        "sz=$(stat -c %s -- {quoted} 2>/dev/null) || {{ echo 'remote session file is unreadable' >&2; exit 3; }}; \
+         [ \"$sz\" -le {MAX_REMOTE_SESSION_BYTES} ] || {{ echo \"remote session file is too large (${{sz}}B, limit {MAX_REMOTE_SESSION_BYTES}B)\" >&2; exit 4; }}; \
+         base64 -w0 -- {quoted}"
+    );
+    // run_script_output already strips transport noise; the payload is one line of base64.
+    let raw = crate::engines::wsl_transport::run_script_output(&transport, &script).await?;
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(raw.trim())
+        .map_err(|e| format!("could not decode the remote transcript: {e}"))?;
+
+    let dir = crate::engines::support::paths::app_home().join("remote-sessions");
+    std::fs::create_dir_all(&dir).map_err(|e| format!("could not create the cache folder: {e}"))?;
+    let digest = sha2::Sha256::digest(format!(
+        "{workspace_path}|{engine}|{session_id}|{remote_path}"
+    ));
+    let name: String = digest[..16].iter().map(|b| format!("{b:02x}")).collect();
+    let cache_path = dir.join(format!("{name}.jsonl"));
+    let stale = std::fs::read(&cache_path)
+        .map(|old| old != bytes)
+        .unwrap_or(true);
+    if stale {
+        let tmp = dir.join(format!("{name}.jsonl.tmp"));
+        std::fs::write(&tmp, &bytes).map_err(|e| format!("could not write the cache: {e}"))?;
+        std::fs::rename(&tmp, &cache_path).map_err(|e| format!("could not move the cache into place: {e}"))?;
+    }
+
+    let engine_for_parse = engine.clone();
+    let db = Arc::clone(&state.db);
+    tauri::async_runtime::spawn_blocking(move || {
+        remote_session_page_blocking(
+            &db,
+            &engine_for_parse,
+            &session_id,
+            &cache_path,
+            limit,
+            before_seq,
+            force_reload.unwrap_or(false),
+        )
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Remove the session's on-disk file/dir. kimi/grok/dsh transcripts live
+/// under a per-session dir — validated against the engine's anchor roots
+/// before removal so a corrupt/stale db row can never point remove_dir_all
+/// at an arbitrary tree. Returns Ok when the disk state is gone (or wisely
+/// skipped), Err when the removal failed — callers keep the db row on Err
+/// so a session cannot "delete then resurrect" on the next scan.
+fn delete_session_disk(engine: &str, path: &Path) -> Result<(), String> {
+    match engine {
+        "claude" | "codex" | "pi" | "omp" | "agy" | "qoder" | "qoder-cn" => {
+            match std::fs::remove_file(path) {
+                Ok(()) => Ok(()),
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+                Err(e) => Err(format!("remove {}: {e}", path.display())),
+            }
+        }
+        // codebuddy: a session id can exist under more than one project dir
+        // (resume/move). The scan keeps the newest copy, so removing only the
+        // recorded path would let a sibling resurrect the session.
+        "codebuddy" => delete_codebuddy_session_disk(path),
+        // opencode: the db row points at `storage/session/<project>/<id>.json`;
+        // the transcript also lives in `storage/message/<id>/` and one
+        // `storage/part/<msg>/` dir per message — all under the same storage root.
+        "opencode" => delete_opencode_session_disk(path),
+        "kimi" | "grok" | "dsh" | "minimax" => delete_dir_session_disk(engine, path),
+        // An unknown engine fails hard: better an error than silently skipping the disk delete
+        // so the session comes back on the next scan (dsh once fell into the kimi/grok arm,
+        // whose anchor check always failed).
+        _ => Err(format!("delete_session: unknown engine {engine}")),
+    }
+}
+
+/// codebuddy: single-file transcripts under CLI-private project dirs. Resolve
+/// the session id from the recorded file, then remove every copy before
+/// reporting success. A missing or confirmed-damaged recorded copy can use its
+/// filename stem; an unreadable copy cannot, because its real id is unknown.
+fn delete_codebuddy_session_disk(path: &Path) -> Result<(), String> {
+    let mut paths = vec![path.to_path_buf()];
+    let stem = || {
+        path.file_stem()
+            .and_then(|stem| stem.to_str())
+            .map(str::to_string)
+    };
+    let session_id = match super::discovery::codebuddy_session_id(path) {
+        Ok(Some(session_id)) => Some(session_id),
+        Ok(None) => stem(),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => stem(),
+        Err(_) => None,
+    };
+    if let Some(session_id) = session_id {
+        for sibling in super::discovery::codebuddy_session_paths(&session_id) {
+            if !paths.contains(&sibling) {
+                paths.push(sibling);
+            }
+        }
+    }
+    for candidate in paths {
+        match std::fs::remove_file(&candidate) {
+            Ok(()) => {}
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+            Err(e) => return Err(format!("remove {}: {e}", candidate.display())),
+        }
+    }
+    Ok(())
+}
+
+/// kimi/grok/dsh: the db row points at the main transcript inside the session folder, and the
+/// whole folder is deleted (sub-agent logs go with it). The anchor roots are the scanner's
+/// (dir_session_anchor_roots), so any session found can be deleted (v0.9 legacy/provider homes
+/// included), and a stale or damaged db row can't aim remove_dir_all at an arbitrary tree.
+fn delete_dir_session_disk(engine: &str, path: &Path) -> Result<(), String> {
+    delete_dir_session_disk_anchored(
+        engine,
+        path,
+        &super::discovery::dir_session_anchor_roots(engine),
+    )
+}
+
+/// The root list is injectable, so unit tests don't depend on HOME/DSH_HOME.
+fn delete_dir_session_disk_anchored(
+    engine: &str,
+    path: &Path,
+    roots: &[PathBuf],
+) -> Result<(), String> {
+    // kimi: .../<sessionDir>/agents/main/wire.jsonl -> <sessionDir>
+    // grok: .../<sessionDir>/chat_history.jsonl -> <sessionDir>
+    // dsh:  .../<sessionDir>/session*.jsonl.zstd -> <sessionDir>
+    let Some(session_dir) = (if engine == "kimi" {
+        path.parent()
+            .and_then(|p| p.parent())
+            .and_then(|a| a.parent())
+    } else {
+        path.parent()
+    }) else {
+        return Err(format!("no session dir for {}", path.display()));
+    };
+    let anchored = roots.iter().any(|root| {
+        crate::engines::support::files::canonicalize_lenient(session_dir)
+            .map(|resolved| {
+                crate::engines::support::files::canonicalize_lenient(root)
+                    .map(|base| resolved.starts_with(base))
+                    .unwrap_or(false)
+            })
+            .unwrap_or(false)
+    });
+    let structure_ok = match engine {
+        // Kimi dirs must show the expected agents/main/wire.jsonl shape.
+        "kimi" => session_dir
+            .join("agents")
+            .join(crate::known_names::KIMI_PRIMARY_AGENT)
+            .join("wire.jsonl")
+            .is_file(),
+        "grok" => session_dir.join("chat_history.jsonl").is_file(),
+        // A minimax session folder is a dated folder holding manifest.json + messages.jsonl.
+        "minimax" => {
+            path.is_file() && session_dir.join("manifest.json").is_file()
+        }
+        // A dsh main transcript's generation file name is its marker (the db path came from a
+        // scan by the same rule).
+        _ => {
+            path.is_file()
+                && path
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .is_some_and(|name| super::discovery::dsh_log_generation(name).is_some())
+        }
+    };
+    if !anchored || !structure_ok {
+        eprintln!(
+            "[history] refusing disk delete outside {} home or unexpected layout: {}",
+            engine,
+            session_dir.display()
+        );
+        return Ok(());
+    }
+    match std::fs::remove_dir_all(session_dir) {
+        Ok(()) => Ok(()),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(e) => Err(format!("remove {}: {e}", session_dir.display())),
+    }
+}
+
+/// Remove one OpenCode session's storage tree: the metadata file (`path` =
+/// `…/storage/session/<project>/<id>.json`), the `storage/message/<id>/`
+/// dir, and the `storage/part/<msg>/` dirs of its messages. The layout check
+/// (`…/storage/session/*/*.json`) anchors the removal so a corrupt db row
+/// can never point remove_dir_all at an arbitrary tree — same guard as the
+/// kimi/grok arm above.
+fn delete_opencode_session_disk(path: &Path) -> Result<(), String> {
+    // OpenCode ≥1.18: one SQLite file holds every session; the virtual address
+    // carries the session id. Delete the row (FK cascades clear message/part).
+    if let Some((db, session_id)) = super::split_opencode_db_path(path) {
+        return delete_opencode_db_session(&db, &session_id);
+    }
+    let session_id = path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
+    let storage = path
+        .parent()
+        .and_then(|project| project.parent())
+        .filter(|session_root| session_root.file_name().and_then(|n| n.to_str()) == Some("session"))
+        .and_then(|session_root| session_root.parent());
+    let structure_ok = session_id.starts_with("ses_")
+        && path.extension().and_then(|e| e.to_str()) == Some("json")
+        && storage.is_some_and(|root| root.join("session").is_dir());
+    let Some(storage) = storage.filter(|_| structure_ok) else {
+        eprintln!(
+            "[history] refusing opencode disk delete outside storage/session layout: {}",
+            path.display()
+        );
+        return Ok(());
+    };
+    // Part dirs are keyed by message id, so collect them before the message
+    // dir goes away.
+    let message_dir = storage.join("message").join(session_id);
+    let mut message_ids: Vec<std::ffi::OsString> = Vec::new();
+    if let Ok(entries) = std::fs::read_dir(&message_dir) {
+        for entry in entries.flatten() {
+            let p = entry.path();
+            if p.extension().and_then(|e| e.to_str()) == Some("json") {
+                if let Some(stem) = p.file_stem() {
+                    message_ids.push(stem.to_os_string());
+                }
+            }
+        }
+    }
+    match std::fs::remove_file(path) {
+        Ok(()) => {}
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+        Err(e) => return Err(format!("remove {}: {e}", path.display())),
+    }
+    if message_dir.is_dir() {
+        std::fs::remove_dir_all(&message_dir)
+            .map_err(|e| format!("remove {}: {e}", message_dir.display()))?;
+    }
+    for id in message_ids {
+        let part_dir = storage.join("part").join(&id);
+        if part_dir.is_dir() {
+            std::fs::remove_dir_all(&part_dir)
+                .map_err(|e| format!("remove {}: {e}", part_dir.display()))?;
+        }
+    }
+    Ok(())
+}
+
+/// Remove one SQLite-backed OpenCode session: delete its `session` row and let
+/// the schema's `ON DELETE CASCADE` foreign keys take the message, part, todo
+/// and share rows with it. The filename + id-shape guard mirrors the storage
+/// arm so a corrupt history row can never point a delete at an arbitrary db.
+fn delete_opencode_db_session(db: &Path, session_id: &str) -> Result<(), String> {
+    let structure_ok = session_id.starts_with("ses_")
+        && db.file_name().and_then(|n| n.to_str()) == Some("opencode.db");
+    if !structure_ok {
+        eprintln!(
+            "[history] refusing opencode db delete outside opencode.db layout: {}#{}",
+            db.display(),
+            session_id
+        );
+        return Ok(());
+    }
+    match std::fs::metadata(db) {
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(e) => return Err(format!("stat {}: {e}", db.display())),
+        Ok(_) => {}
+    }
+    let conn = rusqlite::Connection::open(db).map_err(|e| format!("open {}: {e}", db.display()))?;
+    // Cascades are off by default per connection; without this the child rows
+    // would orphan rather than follow the session.
+    conn.execute_batch("PRAGMA foreign_keys=ON;")
+        .map_err(|e| e.to_string())?;
+    conn.execute(
+        "DELETE FROM session WHERE id=?1",
+        rusqlite::params![session_id],
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+/// A deleted transcript must not survive as its editor backup. Only once the
+/// source is really gone: the layout guards above may refuse a delete.
+fn delete_session_backups(engine: &str, path: &Path) -> Result<(), String> {
+    let gone = super::split_opencode_db_path(path).is_some()
+        || matches!(std::fs::symlink_metadata(path), Err(e) if e.kind() == std::io::ErrorKind::NotFound);
+    if !gone {
+        return Ok(());
+    }
+    for backup in super::edit::session_backup_files(engine, path) {
+        match std::fs::remove_file(&backup) {
+            Ok(()) => {}
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+            Err(e) => return Err(format!("remove session backup {}: {e}", backup.display())),
+        }
+    }
+    Ok(())
+}
+
+/// Sync body of `delete_session` (disk + db work off the main thread).
+pub(super) fn delete_session_blocking(
+    db: &crate::engines::support::db::Db,
+    engine: &str,
+    session_id: &str,
+) -> Result<(), String> {
+    // A failed first turn can announce an id before its transcript is indexed.
+    // Hold the scan lock through deletion so an older scan cannot reinsert it.
+    if !crate::engines::support::config::ENGINES.contains(&engine) {
+        return Err(format!("delete_session: unknown engine {engine}"));
+    }
+    let scan_guard = super::scanner::SCAN_LOCK.lock();
+    let mut path = find_session_file_path(db, engine, session_id)?;
+    if path.is_none() {
+        super::scanner::scan_with_guard(db, || {}, &scan_guard)
+            .map_err(|e| format!("scan before deleting {engine}/{session_id}: {e}"))?;
+        path = find_session_file_path(db, engine, session_id)?;
+    }
+    if let Some(path) = path {
+        delete_session_disk(engine, &path)?;
+        delete_session_backups(engine, &path)?;
+    }
+    // No indexed transcript after the scan is a valid empty/failed session.
+    // Model and effort can already exist even when no transcript was created.
+    let mut conn = db.0.lock();
+    let tx = conn.transaction().map_err(|e| e.to_string())?;
+    // Recorded frame identities become unreachable with their session and
+    // must be reclaimed in the same transaction as its indexed metadata.
+    for table in [
+        "cli_accepted_internal_frames",
+        "cli_sessions",
+        "cli_session_models",
+        "cli_session_efforts",
+        "cli_session_providers",
+        "cli_session_archives",
+    ] {
+        tx.execute(
+            &format!("DELETE FROM {table} WHERE engine=?1 AND session_id=?2"),
+            rusqlite::params![engine, session_id],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+    crate::engines::plan_review::delete_reviews_for_session(&tx, engine, session_id)?;
+    tx.commit().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn delete_session(
+    state: tauri::State<'_, crate::engines::support::EngineState>,
+    engine: String,
+    session_id: String,
+) -> Result<(), String> {
+    let db = Arc::clone(&state.db);
+    let sink = Arc::clone(&state.sink);
+    tauri::async_runtime::spawn_blocking(move || {
+        delete_session_blocking(&db, &engine, &session_id)
+    })
+    .await
+    .map_err(|e| e.to_string())??;
+    sink.emit_sessions_changed();
+    Ok(())
+}
+
+fn remote_session_delete_script(engine: &str, remote_path: &str) -> Result<String, String> {
+    if !is_plausible_remote_session_path(engine, remote_path) {
+        return Err(format!("invalid remote session path: {remote_path}"));
+    }
+    let quoted = crate::engines::wsl_transport::sh_quote(remote_path);
+    // run_script_output checks the final status, without enabling set -e.
+    // Only empty-directory cleanup may mask a failure, never transcript rm.
+    // The editor's previous-version backup (`<source>.ccgui-backup`) goes with it.
+    let mut script = format!("rm -f -- {quoted} || exit $?\nrm -f -- {quoted}.ccgui-backup || exit $?");
+    if engine == "dsh" {
+        // Generations share a folder (session.jsonl.zstd / session.vN.jsonl.zstd); deleting
+        // only the current one would leave older ones to be listed again. The folder goes only
+        // once empty.
+        script.push_str(&format!(
+            "\ndir=$(dirname -- {quoted}) || exit $?\nrm -f -- \"$dir\"/session.jsonl.zstd \"$dir\"/session.v*.jsonl.zstd \"$dir\"/session.jsonl.zstd.ccgui-backup \"$dir\"/session.v*.jsonl.zstd.ccgui-backup || exit $?\nrmdir -- \"$dir\" 2>/dev/null || true"
+        ));
+    }
+    Ok(script)
+}
+
+/// Reclaim session-scoped identities only after the remote disk operation
+/// succeeds. Remote sessions need not have a local `sessions` row.
+async fn delete_remote_session_and_frames(
+    db: Arc<crate::engines::support::db::Db>,
+    engine: String,
+    session_id: String,
+    delete_disk: impl Future<Output = Result<String, String>>,
+) -> Result<(), String> {
+    delete_disk.await?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let conn = db.0.lock();
+        conn.execute(
+            "DELETE FROM cli_accepted_internal_frames WHERE engine=?1 AND session_id=?2",
+            rusqlite::params![engine, session_id],
+        )
+        .map(|_| ())
+        .map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Deletes a remote (WSL distro) session: the reported remotePath passes the same shape check as
+/// load_remote_session_page, then rm runs over the same remote channel. dsh's older generations
+/// in the folder go too, and the folder only when empty. Afterwards the local
+/// accepted_internal_frames are reclaimed; a remote session has no local sessions row, so no
+/// emit_sessions_changed — the caller refreshes after deleting.
+#[tauri::command]
+pub async fn delete_remote_session(
+    state: tauri::State<'_, crate::engines::support::EngineState>,
+    workspace_path: String,
+    engine: String,
+    session_id: String,
+    remote_path: String,
+) -> Result<(), String> {
+    let script = remote_session_delete_script(&engine, &remote_path)?;
+    let transport = crate::engines::wsl_transport::transport_for_workspace(&state.db, &workspace_path)
+        .ok_or_else(|| format!("workspace {workspace_path} has no remote transport registered"))?;
+    delete_remote_session_and_frames(
+        Arc::clone(&state.db),
+        engine,
+        session_id,
+        crate::engines::wsl_transport::run_script_output(&transport, &script),
+    )
+    .await
+}
+
+#[tauri::command]
+pub async fn pin_session(
+    state: tauri::State<'_, crate::engines::support::EngineState>,
+    engine: String,
+    session_id: String,
+    pinned: bool,
+) -> Result<(), String> {
+    let db = Arc::clone(&state.db);
+    let sink = Arc::clone(&state.sink);
+    tauri::async_runtime::spawn_blocking(move || {
+        mutate_sessions(
+            &db,
+            "UPDATE cli_sessions SET pinned=?3 WHERE engine=?1 AND session_id=?2",
+            rusqlite::params![engine, session_id, pinned as i64],
+        )
+    })
+    .await
+    .map_err(|e| e.to_string())??;
+    sink.emit_sessions_changed();
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn rename_session(
+    state: tauri::State<'_, crate::engines::support::EngineState>,
+    engine: String,
+    session_id: String,
+    title: String,
+) -> Result<(), String> {
+    let db = Arc::clone(&state.db);
+    let sink = Arc::clone(&state.sink);
+    tauri::async_runtime::spawn_blocking(move || {
+        rename_session_in(&db, &engine, &session_id, &title)
+    })
+    .await
+    .map_err(|e| e.to_string())??;
+    sink.emit_sessions_changed();
+    Ok(())
+}
+
+fn rename_session_in(
+    db: &crate::engines::support::db::Db,
+    engine: &str,
+    session_id: &str,
+    title: &str,
+) -> Result<(), String> {
+    let value = if title.trim().is_empty() {
+        None
+    } else {
+        Some(title.trim())
+    };
+    let changed =
+        db.0.lock()
+            .execute(
+                "UPDATE cli_sessions SET custom_title=?3 WHERE engine=?1 AND session_id=?2",
+                rusqlite::params![engine, session_id, value],
+            )
+            .map_err(|e| e.to_string())?;
+    if changed == 0 {
+        return Err("CCGUI_SESSION_NOT_FOUND".to_string());
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn rescan_sessions(state: tauri::State<'_, crate::engines::support::EngineState>) {
+    super::scanner::spawn_scan(Arc::clone(&state.db), Arc::clone(&state.sink));
+}
+
+/// Frames recorded for one session. A long-lived session can accept a snapshot
+/// every turn; this bounds what one session contributes to the table. The
+/// earliest identities are the ones kept — evicting one would unhide a frame
+/// the user has already stopped seeing.
+/// `pub(crate)` because the fork copy (`engine::fork::copy_accepted_frames`)
+/// writes the same table and must not exceed what a live session may record.
+pub(crate) const MAX_RECORDED_FRAMES_PER_SESSION: i64 = 5_000;
+
+/// Ceiling across every session. The per-session cap alone bounds nothing
+/// globally, because the scope is chosen by the caller; every scan reads and
+/// hashes this whole table, so unbounded growth is a permanent tax.
+pub(crate) const MAX_RECORDED_FRAMES_TOTAL: i64 = 100_000;
+
+/// Longest native session id an identity is scoped to. Native ids are short
+/// (uuid-like), so this only rejects abuse.
+const MAX_RECORDED_SESSION_ID_LEN: usize = 128;
+
+/// Normalize and bound the scope one recorded identity is stored under: the
+/// engine must be one this app runs, and the session id must be short enough
+/// to be a native id. Without both, a caller could turn the table into
+/// arbitrary unbounded storage that slows every later scan.
+fn recordable_frame_scope(engine: &str, session_id: &str) -> Result<(String, String), String> {
+    let engine = engine.trim();
+    let session_id = session_id.trim();
+    if !crate::engines::support::config::ENGINES.contains(&engine) {
+        return Err(format!("unknown engine: {engine}"));
+    }
+    if session_id.is_empty() || session_id.len() > MAX_RECORDED_SESSION_ID_LEN {
+        return Err("session id is empty or longer than a native id".to_string());
+    }
+    Ok((engine.to_string(), session_id.to_string()))
+}
+
+/// Record the identity of one internal frame a live capture validator accepted.
+/// The frame itself stays in the native transcript; only its hash is stored, so
+/// the history parser can hide exactly the frames the user was never meant to
+/// see while unrecorded look-alikes, malformed frames, and model prose stay
+/// visible.
+///
+/// The host re-derives the identity from the frame bytes rather than trusting
+/// the caller, and bounds the scope it will store. It cannot verify *which*
+/// capture accepted the frame — validators run in the renderer — so this is a
+/// trusted-caller command: the plugin bridge's allowlist covers only its
+/// http/exec commands and rejects this one.
+#[tauri::command]
+pub async fn record_accepted_internal_frame(
+    state: tauri::State<'_, crate::engines::support::EngineState>,
+    engine: String,
+    session_id: String,
+    frame: String,
+    workspace_path: String,
+) -> Result<(), String> {
+    let (engine, session_id) = recordable_frame_scope(&engine, &session_id)?;
+    // The workspace the frame was accepted in. A remote session never gets a
+    // `sessions` row, so a purge that joins through it cannot reach these
+    // identities: this is the only key `remove_workspace` can reclaim them by.
+    let workspace_path = workspace_path.trim().to_string();
+    let Some(frame_hash) = super::recordable_internal_frame_hash(&frame) else {
+        return Err("frame is not one complete internal frame with a JSON payload".to_string());
+    };
+    let db = Arc::clone(&state.db);
+    let sink = Arc::clone(&state.sink);
+    let stale_summary = tauri::async_runtime::spawn_blocking(move || -> Result<bool, String> {
+        let conn = db.0.lock();
+        let (for_session, total): (i64, i64) = conn
+            .query_row(
+                "SELECT
+                    (SELECT COUNT(*) FROM cli_accepted_internal_frames
+                      WHERE engine=?1 AND session_id=?2),
+                    (SELECT COUNT(*) FROM cli_accepted_internal_frames)",
+                rusqlite::params![engine, session_id],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .map_err(|error| error.to_string())?;
+        // At capacity the identity cannot be stored, so the frame will be
+        // visible again on reload: report it instead of answering success,
+        // which would look identical to a stored identity.
+        if for_session >= MAX_RECORDED_FRAMES_PER_SESSION || total >= MAX_RECORDED_FRAMES_TOTAL {
+            return Err(format!(
+                "accepted-frame table is at capacity for {engine}/{session_id}"
+            ));
+        }
+        let inserted = conn
+            .execute(
+                "INSERT OR IGNORE INTO cli_accepted_internal_frames(engine, session_id, frame_hash, workspace_path)
+                 VALUES(?1, ?2, ?3, ?4)",
+                rusqlite::params![engine, session_id, frame_hash, workspace_path],
+            )
+            .map_err(|error| error.to_string())?
+            != 0;
+        if !inserted {
+            return Ok(false);
+        }
+        // The FTS stamp tracks only file stat + INDEX_VERSION, so frame text
+        // ingested between the transcript write and this record would stay
+        // searchable forever. Drop the stamp under the same lock: PENDING_FROM
+        // treats a missing row as pending, and the scan below chains into
+        // spawn_index, which re-indexes with this identity hidden.
+        conn.execute(
+            "DELETE FROM cli_fts_state WHERE engine=?1 AND session_id=?2",
+            rusqlite::params![engine, session_id],
+        )
+        .map_err(|error| error.to_string())?;
+        // Only an indexed session has a stored summary that now hides fewer
+        // frames than it should. One the scanner has never reached derives its
+        // summary from the identity set current at that time, so rescanning for
+        // it here would be pure amplification.
+        let indexed: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM cli_sessions WHERE engine=?1 AND session_id=?2",
+                rusqlite::params![engine, session_id],
+                |row| row.get(0),
+            )
+            .map_err(|error| error.to_string())?;
+        Ok(indexed > 0)
+    })
+    .await
+    .map_err(|error| error.to_string())??;
+    if stale_summary {
+        // This session's stored summary still hides only the previously
+        // recorded frames; rebuild it from the enlarged identity set.
+        super::scanner::spawn_scan(Arc::clone(&state.db), Arc::clone(&sink));
+    }
+    Ok(())
+}
+
+// ==================== Workspaces ====================
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Workspace {
+    pub id: String,
+    pub path: String,
+    pub name: String,
+    pub last_opened_at: Option<i64>,
+    pub sort_order: Option<i64>,
+    pub pinned: bool,
+    /// Sidebar group this workspace belongs to; None = ungrouped.
+    pub group_id: Option<String>,
+    /// "worktree" = git worktree child hanging under its parent workspace
+    /// row in the sidebar; None = ordinary workspace.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub kind: Option<String>,
+    /// Parent workspace id; only set when kind="worktree".
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parent_id: Option<String>,
+    /// Opaque metadata written via host-capability callers (plugin
+    /// `workspaces.add`); absent for ordinary directories. The backend never
+    /// interprets it — consumers (spawn transport, plugin panels) own the shape.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub meta: Option<serde_json::Value>,
+}
+
+fn list_workspaces_from(db: &crate::engines::support::db::Db) -> Result<Vec<Workspace>, String> {
+    query_rows(
+        db,
+        "SELECT id, path, name, last_opened_at, sort_order, group_id, kind, parent_id, meta, pinned FROM cli_workspaces
+         ORDER BY sort_order IS NULL, sort_order, COALESCE(last_opened_at, 0) DESC",
+        |r| {
+            let meta_json: Option<String> = r.get(8)?;
+            Ok(Workspace {
+                id: r.get(0)?,
+                path: r.get(1)?,
+                name: r.get(2)?,
+                last_opened_at: r.get(3)?,
+                sort_order: r.get(4)?,
+                pinned: r.get::<_, i64>(9)? != 0,
+                group_id: r.get(5)?,
+                kind: r.get(6)?,
+                parent_id: r.get(7)?,
+                meta: meta_json.and_then(|s| serde_json::from_str(&s).ok()),
+            })
+        },
+    )
+}
+
+#[tauri::command]
+pub async fn list_workspaces(
+    state: tauri::State<'_, crate::engines::support::EngineState>,
+) -> Result<Vec<Workspace>, String> {
+    let db = Arc::clone(&state.db);
+    tauri::async_runtime::spawn_blocking(move || list_workspaces_from(&db))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn add_workspace(
+    state: tauri::State<'_, crate::engines::support::EngineState>,
+    path: String,
+    meta: Option<serde_json::Value>,
+    kind: Option<String>,
+    parent_id: Option<String>,
+) -> Result<Workspace, String> {
+    // `wsl` meta steers engine traffic over ssh to a plugin-named host (outbound and remote
+    // execution) — it must come through plugin_caps::plugin_add_workspace
+    // where the manifest grant is checked server-side. This general command
+    // serves trusted host UI only (a plugin bypassing the JS gate via direct
+    // IPC would otherwise set it here).
+    if let Some(m) = &meta {
+        if m.as_object().is_some_and(|o| o.contains_key("wsl")) {
+            return Err(
+                "wsl meta requires plugin_add_workspace (host:workspace:remote grant)".to_string(),
+            );
+        }
+    }
+    // kind/parent_id shape checks: "worktree" requires an existing parent
+    // row; an ordinary workspace must not carry a parent.
+    match kind.as_deref() {
+        None => {
+            if parent_id.is_some() {
+                return Err("parent_id requires kind=\"worktree\"".to_string());
+            }
+        }
+        Some("worktree") => {
+            let pid = parent_id
+                .as_deref()
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+                .ok_or_else(|| "kind=\"worktree\" requires parent_id".to_string())?;
+            let exists = {
+                let conn = state.db.read();
+                conn.query_row(
+                    "SELECT 1 FROM cli_workspaces WHERE id=?1",
+                    rusqlite::params![pid],
+                    |_| Ok(()),
+                )
+                .is_ok()
+            };
+            if !exists {
+                return Err(format!("unknown parent workspace: {pid}"));
+            }
+        }
+        Some(other) => return Err(format!("unknown workspace kind: {other}")),
+    }
+    let db = Arc::clone(&state.db);
+    let sink = Arc::clone(&state.sink);
+    tauri::async_runtime::spawn_blocking(move || {
+        add_workspace_inner(&db, &sink, &path, meta, kind, parent_id)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Shared body of `add_workspace` / `plugin_caps::plugin_add_workspace`:
+/// shape checks + upsert. Grant checks live in the callers.
+pub(crate) fn add_workspace_inner(
+    db: &Arc<crate::engines::support::db::Db>,
+    sink: &Arc<crate::engines::support::event_sink::EventSink>,
+    path: &str,
+    meta: Option<serde_json::Value>,
+    kind: Option<String>,
+    parent_id: Option<String>,
+) -> Result<Workspace, String> {
+    let trimmed = path.trim();
+    if trimmed.is_empty() {
+        return Err("empty path".to_string());
+    }
+    // Host-capability callers (plugin workspaces.add) may register paths that
+    // do not exist on this machine (remote host / WSL distro) — meta presence
+    // is the opt-in that skips the local is_dir check.
+    if meta.is_none() {
+        let dir = std::path::PathBuf::from(trimmed);
+        if !dir.is_dir() {
+            return Err(format!("not a directory: {trimmed}"));
+        }
+    }
+    if let Some(m) = &meta {
+        if m.as_object().is_none_or(|o| o.is_empty()) {
+            return Err("meta must be a non-empty object when provided".to_string());
+        }
+    }
+    let name = std::path::Path::new(trimmed)
+        .file_name()
+        .and_then(|n| n.to_str())
+        .map(str::to_string)
+        // A separator-only path like "/": file_name is None and the trimmed text is empty, so
+        // fall back to the original; an empty name in the db would be an unrecognizable row.
+        .unwrap_or_else(|| match trimmed.trim_end_matches(['/', '\\']) {
+            "" => trimmed.to_string(),
+            rest => rest.to_string(),
+        });
+    let id = uuid::Uuid::new_v4().to_string();
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as i64)
+        .unwrap_or(0);
+    let meta_json = meta.as_ref().map(|m| m.to_string());
+    {
+        let conn = db.0.lock();
+        conn.execute(
+            "INSERT INTO cli_workspaces(id, path, name, last_opened_at, kind, parent_id, meta)
+             VALUES(?1,?2,?3,?4,?5,?6,?7)
+             ON CONFLICT(path) DO UPDATE SET last_opened_at=excluded.last_opened_at,
+                kind=COALESCE(excluded.kind, cli_workspaces.kind),
+                parent_id=COALESCE(excluded.parent_id, cli_workspaces.parent_id),
+                meta=COALESCE(excluded.meta, cli_workspaces.meta)",
+            rusqlite::params![id, trimmed, name, now, kind, parent_id, meta_json],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+    super::scanner::spawn_scan(Arc::clone(db), Arc::clone(sink));
+    Ok(Workspace {
+        id,
+        path: trimmed.to_string(),
+        name,
+        last_opened_at: Some(now),
+        sort_order: None,
+        pinned: false,
+        group_id: None,
+        kind,
+        parent_id,
+        meta,
+    })
+}
+fn reorder_workspaces_blocking(db: &crate::engines::support::db::Db, ids: &[String]) -> Result<(), String> {
+    let mut conn = db.0.lock();
+    let tx = conn.transaction().map_err(|e| e.to_string())?;
+    for (index, id) in ids.iter().enumerate() {
+        tx.execute(
+            "UPDATE cli_workspaces SET sort_order=?2 WHERE id=?1",
+            rusqlite::params![id, index as i64],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+    tx.commit().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn reorder_workspaces(
+    state: tauri::State<'_, crate::engines::support::EngineState>,
+    ids: Vec<String>,
+) -> Result<(), String> {
+    let db = Arc::clone(&state.db);
+    tauri::async_runtime::spawn_blocking(move || reorder_workspaces_blocking(&db, &ids))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+/// Worktree children follow their parent row, so only top-level workspaces
+/// (parent_id IS NULL) can be pinned.
+fn set_workspace_pinned_blocking(db: &crate::engines::support::db::Db, id: &str, pinned: bool) -> Result<(), String> {
+    let conn = db.0.lock();
+    let changed = conn
+        .execute(
+            "UPDATE cli_workspaces SET pinned=?2 WHERE id=?1 AND parent_id IS NULL",
+            rusqlite::params![id, pinned],
+        )
+        .map_err(|e| e.to_string())?;
+    if changed == 0 {
+        return Err("workspace not found or is a worktree child".into());
+    }
+    Ok(())
+}
+
+/// Async + spawn_blocking like the other workspace writes: a sync command
+/// runs on the main thread and would freeze the window while a background
+/// index pass holds the writer lock.
+#[tauri::command]
+pub async fn set_workspace_pinned(
+    state: tauri::State<'_, crate::engines::support::EngineState>,
+    id: String,
+    pinned: bool,
+) -> Result<(), String> {
+    let db = Arc::clone(&state.db);
+    tauri::async_runtime::spawn_blocking(move || set_workspace_pinned_blocking(&db, &id, pinned))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+/// Sync body of `remove_workspace`. Split out so the identity reclamation
+/// below is reachable from a test without a Tauri `State`.
+fn remove_workspace_blocking(db: &crate::engines::support::db::Db, id: &str) -> Result<(), String> {
+    let mut conn = db.0.lock();
+    let tx = conn.transaction().map_err(|e| e.to_string())?;
+    let path: Option<String> = tx
+        .query_row(
+            "SELECT path FROM cli_workspaces WHERE id=?1",
+            rusqlite::params![id],
+            |r| r.get(0),
+        )
+        .ok();
+    tx.execute("DELETE FROM cli_workspaces WHERE id=?1", rusqlite::params![id])
+        .map_err(|e| e.to_string())?;
+    if let Some(path) = path {
+        // Same cleanup as delete_session: these identities are scoped to
+        // sessions that no longer exist. Remote sessions have no `sessions`
+        // row, so the workspace the frame was accepted in is matched directly
+        // — without it their identities would never be reclaimed.
+        tx.execute(
+            "DELETE FROM cli_accepted_internal_frames
+              WHERE workspace_path=?1
+                 OR (engine, session_id) IN
+                    (SELECT engine, session_id FROM cli_sessions WHERE workspace_path=?1)",
+            rusqlite::params![path],
+        )
+        .map_err(|e| e.to_string())?;
+        tx.execute(
+            "DELETE FROM cli_sessions WHERE workspace_path=?1",
+            rusqlite::params![path],
+        )
+        .map_err(|e| e.to_string())?;
+        // Plan reviews declare no foreign key (a sessions row can arrive after the plan), so the
+        // cleanup cascades to them here.
+        crate::engines::plan_review::delete_reviews_for_workspace(&tx, &path)?;
+    }
+    tx.commit().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn remove_workspace(
+    state: tauri::State<'_, crate::engines::support::EngineState>,
+    id: String,
+) -> Result<(), String> {
+    let db = Arc::clone(&state.db);
+    let sink = Arc::clone(&state.sink);
+    tauri::async_runtime::spawn_blocking(move || remove_workspace_blocking(&db, &id))
+        .await
+        .map_err(|e| e.to_string())??;
+    sink.emit_sessions_changed();
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rename_session_requires_existing_row_and_persists_title() {
+        let home = scratch_dir("rename");
+        {
+            let db = crate::engines::support::db::Db::open_at(&home.join("app.db")).unwrap();
+            assert_eq!(
+                rename_session_in(&db, "qoder", "missing", "title"),
+                Err("CCGUI_SESSION_NOT_FOUND".to_string())
+            );
+            db.0.lock().execute(
+                    "INSERT INTO cli_sessions(engine, session_id, workspace_path, file_path, file_size, file_mtime_ms)
+                     VALUES('qoder', 'sid', '/ws', '/ws/sid.jsonl', 1, 1)", [],
+                ).unwrap();
+            assert!(rename_session_in(&db, "claude", "sid", "wrong engine").is_err());
+            rename_session_in(&db, "qoder", "sid", "  新标题  ").unwrap();
+            rename_session_in(&db, "qoder", "sid", "新标题").unwrap();
+            assert_eq!(
+                list_sessions_from(&db).unwrap()[0].custom_title.as_deref(),
+                Some("新标题")
+            );
+        }
+        {
+            let db = crate::engines::support::db::Db::open_at(&home.join("app.db")).unwrap();
+            assert_eq!(
+                list_sessions_from(&db).unwrap()[0].custom_title.as_deref(),
+                Some("新标题")
+            );
+            rename_session_in(&db, "qoder", "sid", "   ").unwrap();
+            assert_eq!(list_sessions_from(&db).unwrap()[0].custom_title, None);
+        }
+        std::fs::remove_dir_all(&home).unwrap();
+    }
+
+    fn scratch_dir(tag: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!(
+            "ccgui-reader-{tag}-{}",
+            uuid::Uuid::new_v4()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    struct CodebuddyConfigGuard {
+        _lock: parking_lot::MutexGuard<'static, ()>,
+        previous: Option<std::ffi::OsString>,
+    }
+
+    impl CodebuddyConfigGuard {
+        fn set(config_dir: &Path) -> Self {
+            let lock = crate::engines::history::scanner::tests::HOME_LOCK.lock();
+            let previous = std::env::var_os("CODEBUDDY_CONFIG_DIR");
+            std::env::set_var("CODEBUDDY_CONFIG_DIR", config_dir);
+            Self {
+                _lock: lock,
+                previous,
+            }
+        }
+    }
+
+    impl Drop for CodebuddyConfigGuard {
+        fn drop(&mut self) {
+            match &self.previous {
+                Some(value) => std::env::set_var("CODEBUDDY_CONFIG_DIR", value),
+                None => std::env::remove_var("CODEBUDDY_CONFIG_DIR"),
+            }
+        }
+    }
+
+    fn write_codebuddy_copy(
+        config_dir: &Path,
+        project: &str,
+        file_name: &str,
+        session_id: &str,
+    ) -> PathBuf {
+        let project_dir = config_dir.join("projects").join(project);
+        std::fs::create_dir_all(&project_dir).unwrap();
+        let path = project_dir.join(file_name);
+        let line = serde_json::json!({
+            "type": "message",
+            "role": "user",
+            "content": [],
+            "sessionId": session_id,
+            "cwd": "/ws",
+        });
+        std::fs::write(&path, format!("{line}\n")).unwrap();
+        path
+    }
+
+    /// The sidebar list must not queue behind an in-flight index transaction:
+    /// the WAL reader has its own snapshot and mutex.
+    #[test]
+    fn session_list_reads_through_writer_lock() {
+        let home = scratch_dir("list-reader");
+        let db = Arc::new(crate::engines::support::db::Db::open_at(&home.join("app.db")).unwrap());
+        db.0.lock()
+            .execute(
+                "INSERT INTO cli_sessions(engine, session_id, workspace_path, file_path, file_size, file_mtime_ms, title)
+                 VALUES('omp', 'sid-1', '/ws', '/tmp/sid-1.jsonl', 1, 1, 'readable while indexing')",
+                [],
+            )
+            .unwrap();
+
+        let writer = db.0.lock();
+        let (tx, rx) = std::sync::mpsc::channel();
+        let worker_db = Arc::clone(&db);
+        let worker = std::thread::spawn(move || {
+            tx.send(list_sessions_from(&worker_db)).unwrap();
+        });
+        // A read that took the writer mutex would time out here. Drop the
+        // writer before asserting so the old implementation still terminates.
+        let result = rx.recv_timeout(std::time::Duration::from_secs(2));
+        drop(writer);
+        worker.join().unwrap();
+
+        let sessions = result.expect("list_sessions blocked on the writer").unwrap();
+        assert_eq!(sessions.len(), 1);
+        assert_eq!(sessions[0].session_id, "sid-1");
+    }
+
+    /// One omp rollout whose assistant turn carries two look-alike frames.
+    fn write_session(path: &Path, workspace: &Path, text: &str) {
+        let lines = [
+            serde_json::json!({"type": "title", "v": 1, "title": "t"}),
+            serde_json::json!({
+                "type": "session",
+                "version": 3,
+                "id": "sid-1",
+                "timestamp": "2026-09-05T07:13:57.946Z",
+                "cwd": workspace.to_string_lossy(),
+            }),
+            serde_json::json!({
+                "type": "message",
+                "timestamp": "2026-09-05T07:14:06.682Z",
+                "message": {"role": "user", "content": [{"type": "text", "text": "hello"}]},
+            }),
+            serde_json::json!({
+                "type": "message",
+                "timestamp": "2026-09-05T07:14:07.682Z",
+                "message": {"role": "assistant", "content": [{"type": "text", "text": text}]},
+            }),
+        ];
+        let body = lines
+            .iter()
+            .map(|line| serde_json::to_string(line).unwrap())
+            .collect::<Vec<_>>()
+            .join("\n");
+        std::fs::write(path, format!("{body}\n")).unwrap();
+    }
+
+    fn register_history_source(db: &crate::engines::support::db::Db, engine: &str, id: &str, path: &Path) {
+        db.0.lock().execute(
+            "INSERT INTO cli_sessions(engine,session_id,workspace_path,file_path,file_size,file_mtime_ms)
+             VALUES(?1,?2,'/ws',?3,1,1)",
+            rusqlite::params![engine, id, path.to_string_lossy()],
+        ).unwrap();
+    }
+
+    fn assistant_text(page: &SessionPage) -> &str {
+        &page.messages.iter().find(|row| row.role == "assistant").unwrap().text
+    }
+
+    fn restore_modified(path: &Path, modified: std::time::SystemTime) {
+        std::fs::OpenOptions::new().write(true).open(path).unwrap()
+            .set_times(std::fs::FileTimes::new().set_modified(modified)).unwrap();
+    }
+
+    /// A load that read the source before a save and finishes after the save
+    /// evicted the cache is served, but never published under a stat key the
+    /// save did not move (the next ordinary load would return pre-save text).
+    #[test]
+    fn parse_overlapping_a_save_is_served_but_not_cached() {
+        let scratch = Scratch::new();
+        let file = scratch.0.join("raced.jsonl");
+        write_session(&file, &scratch.0, "before the save");
+        let (size, mtime_ms) = super::super::stat_signature(&file).unwrap();
+        let key = (file.clone(), size, mtime_ms, String::new());
+        let parsed = parse_session_file("omp", &file, &HashSet::new()).unwrap();
+        let fold = subagent_fold(&parsed.messages);
+        let stale = Arc::new(CachedSession { parsed, fold, footprint: 1 });
+        let generation = PARSED_CACHE_GENERATION.load(std::sync::atomic::Ordering::SeqCst);
+        forget_parsed_session(&file); // the save lands while that parse runs
+        let served = publish_parse(key.clone(), &file, Arc::clone(&stale), false, generation);
+        assert!(Arc::ptr_eq(&served, &stale));
+        assert!(!PARSED_CACHE.lock().contains_key(&key));
+    }
+
+    #[test]
+    fn force_reload_same_stat_preserves_frames_and_unrelated_cache() {
+        let scratch = Scratch::new();
+        let file = scratch.0.join("edited.jsonl");
+        let other = scratch.0.join("other.jsonl");
+        let recorded = "<CCGUI_INTERNAL_abcdefgh>{\"pluginId\":\"bridge\"}</CCGUI_INTERNAL_abcdefgh>";
+        let unrecorded = "<CCGUI_INTERNAL_zzzzzzzz>{\"pluginId\":\"other\"}</CCGUI_INTERNAL_zzzzzzzz>";
+        write_session(&file, &scratch.0, &format!("before {recorded} tail {unrecorded}"));
+        write_session(&other, &scratch.0, "unrelated");
+        let db = crate::engines::support::db::Db::open_at(&scratch.0.join("app.db")).unwrap();
+        register_history_source(&db, "omp", "edited", &file);
+        db.record_accepted_internal_frame_hash(
+            "omp", "edited", &super::super::internal_frame_hash(recorded), "/ws",
+        ).unwrap();
+        let unrelated = cached_session("omp", &other, &HashSet::new(), "", false).unwrap();
+        let first = load_session_page_blocking(&db, "omp", "edited", Some(1), None, false).unwrap();
+        assert_eq!(assistant_text(&first), format!("before  tail {unrecorded}"));
+        let original_stat = super::super::stat_signature(&file);
+        let modified = std::fs::metadata(&file).unwrap().modified().unwrap();
+        write_session(&file, &scratch.0, &format!("after! {recorded} tail {unrecorded}"));
+        restore_modified(&file, modified);
+        assert_eq!(super::super::stat_signature(&file), original_stat);
+        let stale = load_session_page_blocking(&db, "omp", "edited", Some(1), None, false).unwrap();
+        assert_eq!(assistant_text(&stale), assistant_text(&first));
+
+        let refreshed = load_session_page_blocking(&db, "omp", "edited", Some(1), None, true).unwrap();
+        assert_eq!(assistant_text(&refreshed), format!("after!  tail {unrecorded}"));
+        assert_eq!(refreshed.next_before, first.next_before);
+        assert_eq!(refreshed.messages.len(), 1);
+        let older = load_session_page_blocking(
+            &db, "omp", "edited", Some(1), refreshed.next_before, false,
+        ).unwrap();
+        assert_eq!(older.messages[0].text, "hello");
+        assert!(older.next_before.is_none());
+        assert_eq!(assistant_text(&load_session_page_blocking(
+            &db, "omp", "edited", Some(1), None, false,
+        ).unwrap()), format!("after!  tail {unrecorded}"));
+        assert!(Arc::ptr_eq(&unrelated, &cached_session(
+            "omp", &other, &HashSet::new(), "", false,
+        ).unwrap()));
+        let cache = PARSED_CACHE.lock();
+        assert_eq!(cache.keys().filter(|key| key.0 == file).count(), 1);
+        assert_eq!(*PARSED_CACHE_BYTES.lock(), cache.values().map(|value| value.footprint).sum::<usize>());
+    }
+
+    #[test]
+    fn force_reload_remote_same_stat_keeps_recorded_frames_hidden() {
+        let scratch = Scratch::new();
+        let cache = scratch.0.join("remote.jsonl");
+        let recorded = "<CCGUI_INTERNAL_abcdefgh>{\"pluginId\":\"bridge\"}</CCGUI_INTERNAL_abcdefgh>";
+        write_session(&cache, &scratch.0, &format!("before {recorded}"));
+        let db = crate::engines::support::db::Db::open_at(&scratch.0.join("app.db")).unwrap();
+        db.record_accepted_internal_frame_hash(
+            "omp", "remote", &super::super::internal_frame_hash(recorded), "/ws",
+        ).unwrap();
+        let first = remote_session_page_blocking(&db, "omp", "remote", &cache, None, None, false).unwrap();
+        assert_eq!(assistant_text(&first), "before");
+        let original_stat = super::super::stat_signature(&cache);
+        let modified = std::fs::metadata(&cache).unwrap().modified().unwrap();
+        write_session(&cache, &scratch.0, &format!("after! {recorded}"));
+        restore_modified(&cache, modified);
+        assert_eq!(super::super::stat_signature(&cache), original_stat);
+        assert_eq!(assistant_text(&remote_session_page_blocking(
+            &db, "omp", "remote", &cache, None, None, false,
+        ).unwrap()), "before");
+        assert_eq!(assistant_text(&remote_session_page_blocking(
+            &db, "omp", "remote", &cache, None, None, true,
+        ).unwrap()), "after!");
+    }
+
+
+    #[test]
+    fn force_reload_opencode_part_change_replaces_metadata_stat_cache() {
+        let scratch = Scratch::new();
+        let storage = scratch.0.join("storage");
+        let file = storage.join("session/project/ses_edit.json");
+        let message = storage.join("message/ses_edit/msg_a.json");
+        let part = storage.join("part/msg_a/prt_a.json");
+        for path in [&file, &message, &part] {
+            std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        }
+        std::fs::write(&file, json!({"id":"ses_edit"}).to_string()).unwrap();
+        std::fs::write(&message, json!({"id":"msg_a","role":"assistant","time":{"created":1}}).to_string()).unwrap();
+        std::fs::write(&part, json!({"type":"text","text":"before"}).to_string()).unwrap();
+        let db = crate::engines::support::db::Db::open_at(&scratch.0.join("app.db")).unwrap();
+        register_history_source(&db, "opencode", "ses_edit", &file);
+        let original_stat = super::super::stat_signature(&file);
+        assert_eq!(assistant_text(&load_session_page_blocking(
+            &db, "opencode", "ses_edit", None, None, false,
+        ).unwrap()), "before");
+        std::fs::write(&part, json!({"type":"text","text":"after!"}).to_string()).unwrap();
+        assert_eq!(super::super::stat_signature(&file), original_stat);
+        assert_eq!(assistant_text(&load_session_page_blocking(
+            &db, "opencode", "ses_edit", None, None, false,
+        ).unwrap()), "before");
+        assert_eq!(assistant_text(&load_session_page_blocking(
+            &db, "opencode", "ses_edit", None, None, true,
+        ).unwrap()), "after!");
+    }
+
+    #[test]
+    fn force_reload_opencode_wal_preserves_other_session_cache() {
+        let scratch = Scratch::new();
+        let file = scratch.0.join("opencode.db");
+        let conn = rusqlite::Connection::open(&file).unwrap();
+        conn.execute_batch(
+            "PRAGMA journal_mode=WAL; PRAGMA wal_autocheckpoint=0;
+             CREATE TABLE message(id TEXT PRIMARY KEY, session_id TEXT NOT NULL,
+                 time_created INTEGER NOT NULL, data TEXT NOT NULL);
+             CREATE TABLE part(id TEXT PRIMARY KEY, message_id TEXT NOT NULL,
+                 time_created INTEGER NOT NULL, data TEXT NOT NULL);
+             INSERT INTO message VALUES('msg_a','ses_edit',1,'{\"role\":\"assistant\"}');
+             INSERT INTO message VALUES('msg_b','ses_keep',2,'{\"role\":\"assistant\"}');
+             INSERT INTO part VALUES('prt_a','msg_a',1,'{\"type\":\"text\",\"text\":\"before\"}');
+             INSERT INTO part VALUES('prt_b','msg_b',2,'{\"type\":\"text\",\"text\":\"unrelated\"}');
+             PRAGMA wal_checkpoint(TRUNCATE);",
+        ).unwrap();
+        let edited = super::super::opencode_db_session_path(&file, "ses_edit");
+        let other = super::super::opencode_db_session_path(&file, "ses_keep");
+        let db = crate::engines::support::db::Db::open_at(&scratch.0.join("app.db")).unwrap();
+        register_history_source(&db, "opencode", "ses_edit", &edited);
+        let unrelated = cached_session("opencode", &other, &HashSet::new(), "", false).unwrap();
+        assert_eq!(assistant_text(&load_session_page_blocking(
+            &db, "opencode", "ses_edit", None, None, false,
+        ).unwrap()), "before");
+        let original_stat = super::super::stat_signature(&edited);
+        conn.execute("UPDATE part SET data=?1 WHERE id='prt_a'", [json!({"type":"text","text":"after!"}).to_string()]).unwrap();
+        assert_eq!(super::super::stat_signature(&edited), original_stat);
+        assert_eq!(assistant_text(&load_session_page_blocking(
+            &db, "opencode", "ses_edit", None, None, false,
+        ).unwrap()), "before");
+        assert_eq!(assistant_text(&load_session_page_blocking(
+            &db, "opencode", "ses_edit", None, None, true,
+        ).unwrap()), "after!");
+        assert!(Arc::ptr_eq(&unrelated, &cached_session(
+            "opencode", &other, &HashSet::new(), "", false,
+        ).unwrap()));
+        drop(conn);
+    }
+
+    #[test]
+    fn force_reload_agy_prompt_change_replaces_conversation_stat_cache() {
+        let scratch = Scratch::new();
+        let _home_lock = crate::engines::support::paths::HOME_ENV_LOCK.lock();
+        struct RestoreAgyHome(Option<std::ffi::OsString>);
+        impl Drop for RestoreAgyHome {
+            fn drop(&mut self) {
+                match &self.0 {
+                    Some(value) => std::env::set_var("ANTIGRAVITY_HOME", value),
+                    None => std::env::remove_var("ANTIGRAVITY_HOME"),
+                }
+            }
+        }
+        let _restore = RestoreAgyHome(std::env::var_os("ANTIGRAVITY_HOME"));
+        std::env::set_var("ANTIGRAVITY_HOME", &scratch.0);
+        let file = scratch.0.join("conv_edit.db");
+        let conn = rusqlite::Connection::open(&file).unwrap();
+        conn.execute_batch("CREATE TABLE steps(idx INTEGER,step_type INTEGER,step_payload BLOB);
+            INSERT INTO steps VALUES(0,14,X'');").unwrap();
+        drop(conn);
+        let prompt = scratch.0.join("history.jsonl");
+        let write_prompt = |text: &str| std::fs::write(&prompt, json!({
+            "conversationId":"conv_edit", "timestamp":1,
+            "display":format!("{text}\n\n[CCGUI internal system-tail]\nprivate protocol"),
+        }).to_string()).unwrap();
+        write_prompt("before");
+        let db = crate::engines::support::db::Db::open_at(&scratch.0.join("app.db")).unwrap();
+        register_history_source(&db, "agy", "conv_edit", &file);
+        let original_stat = super::super::stat_signature(&file);
+        let first = load_session_page_blocking(&db, "agy", "conv_edit", None, None, false).unwrap();
+        assert_eq!(first.messages[0].text, "before");
+        write_prompt("after!");
+        assert_eq!(super::super::stat_signature(&file), original_stat);
+        assert_eq!(load_session_page_blocking(&db, "agy", "conv_edit", None, None, false).unwrap().messages[0].text, "before");
+        let refreshed = load_session_page_blocking(&db, "agy", "conv_edit", None, None, true).unwrap();
+        assert_eq!(refreshed.messages[0].text, "after!");
+        assert_eq!(refreshed.messages[0].role, "user");
+    }
+
+    /// The page a restored conversation renders hides exactly the frames a live
+    /// capture validator accepted, and recording a new identity re-derives the
+    /// page instead of serving the parse cached under the older identity set.
+    #[test]
+    fn session_page_hides_only_recorded_internal_frames() {
+        let home = scratch_dir("page-frames");
+        let workspace = home.join("ws");
+        std::fs::create_dir_all(&workspace).unwrap();
+        let file = home.join("s.jsonl");
+        let recorded = "<CCGUI_INTERNAL_abcdefgh>{\"pluginId\":\"bridge\"}</CCGUI_INTERNAL_abcdefgh>";
+        let unrecorded = "<CCGUI_INTERNAL_zzzzzzzz>{\"pluginId\":\"other\"}</CCGUI_INTERNAL_zzzzzzzz>";
+        write_session(&file, &workspace, &format!("answer {recorded} tail {unrecorded}"));
+
+        let db = crate::engines::support::db::Db::open_at(&home.join("app.db")).unwrap();
+        {
+            let conn = db.0.lock();
+            conn.execute(
+                "INSERT INTO cli_sessions(engine, session_id, workspace_path, file_path, file_size, file_mtime_ms)
+                 VALUES('omp', 'sid-1', ?1, ?2, 1, 1)",
+                rusqlite::params![
+                    workspace.to_string_lossy(),
+                    file.to_string_lossy(),
+                ],
+            )
+            .unwrap();
+        }
+
+        // Nothing recorded yet: both frames are ordinary model output.
+        let page = load_session_page_blocking(&db, "omp", "sid-1", None, None, false).unwrap();
+        let assistant = |page: &SessionPage| {
+            page.messages
+                .iter()
+                .find(|m| m.role == "assistant")
+                .expect("assistant row")
+                .text
+                .clone()
+        };
+        assert_eq!(
+            assistant(&page),
+            format!("answer {recorded} tail {unrecorded}")
+        );
+
+        // Recording one identity hides that frame only. The first page was
+        // cached under the empty identity set, so a cache keyed on file stat
+        // alone would still serve the stale text here.
+        db.record_accepted_internal_frame_hash(
+            "omp",
+            "sid-1",
+            &super::super::internal_frame_hash(recorded),
+            &workspace.to_string_lossy(),
+        )
+        .unwrap();
+        let page = load_session_page_blocking(&db, "omp", "sid-1", None, None, false).unwrap();
+        assert_eq!(assistant(&page), format!("answer  tail {unrecorded}"));
+
+        drop(db);
+        std::fs::remove_dir_all(&home).ok();
+    }
+
+    /// A remote workspace's turn records accepted frame identities exactly like
+    /// a local one — `record_accepted_internal_frame` scopes them by
+    /// `(engine, session_id)` and never consults the `sessions` table — so the
+    /// remote page must consult the same table. Parsing a remote transcript with
+    /// an empty set re-reveals the whole handoff payload the capture validator
+    /// hid from the live transcript. Note there is deliberately no `sessions`
+    /// row here: a remote session has none, which is what made the empty-set
+    /// resolution look defensible.
+    #[test]
+    fn remote_session_page_hides_recorded_internal_frames() {
+        let home = scratch_dir("remote-frames");
+        let workspace = home.join("ws");
+        std::fs::create_dir_all(&workspace).unwrap();
+        let cache = home.join("remote-cache.jsonl");
+        let recorded = "<CCGUI_INTERNAL_abcdefgh>{\"pluginId\":\"bridge\"}</CCGUI_INTERNAL_abcdefgh>";
+        let unrecorded = "<CCGUI_INTERNAL_zzzzzzzz>{\"pluginId\":\"other\"}</CCGUI_INTERNAL_zzzzzzzz>";
+        write_session(&cache, &workspace, &format!("answer {recorded} tail {unrecorded}"));
+
+        let db = crate::engines::support::db::Db::open_at(&home.join("app.db")).unwrap();
+        let assistant = |page: &SessionPage| {
+            page.messages
+                .iter()
+                .find(|m| m.role == "assistant")
+                .expect("assistant row")
+                .text
+                .clone()
+        };
+
+        db.record_accepted_internal_frame_hash(
+            "omp",
+            "sid-1",
+            &super::super::internal_frame_hash(recorded),
+            &workspace.to_string_lossy(),
+        )
+        .unwrap();
+
+        let page = remote_session_page_blocking(&db, "omp", "sid-1", &cache, None, None, false).unwrap();
+        assert_eq!(assistant(&page), format!("answer  tail {unrecorded}"));
+
+        drop(db);
+        std::fs::remove_dir_all(&home).ok();
+    }
+
+    /// The scope one identity is stored under is bounded: only engines this app
+    /// runs, and only ids short enough to be native session ids. Without both,
+    /// the table becomes arbitrary storage that taxes every later scan.
+    #[test]
+    fn recorded_frame_scope_rejects_unknown_engines_and_oversized_ids() {
+        assert_eq!(
+            recordable_frame_scope(" omp ", " sid-1 ").unwrap(),
+            ("omp".to_string(), "sid-1".to_string())
+        );
+        assert!(recordable_frame_scope("not-an-engine", "sid-1").is_err());
+        assert!(recordable_frame_scope("omp", "").is_err());
+        assert!(
+            recordable_frame_scope("omp", &"x".repeat(MAX_RECORDED_SESSION_ID_LEN + 1)).is_err()
+        );
+    }
+
+    /// Deleting a conversation drops the identities scoped to it. They can never
+    /// match another session's frames again, and every scan re-reads and hashes
+    /// the whole table, so orphans are a permanent tax.
+    #[test]
+    fn deleting_a_session_drops_its_recorded_frame_identities() {
+        let home = scratch_dir("delete-frames");
+        let workspace = home.join("ws");
+        std::fs::create_dir_all(&workspace).unwrap();
+        let file = home.join("s.jsonl");
+        write_session(&file, &workspace, "answer");
+        let db = crate::engines::support::db::Db::open_at(&home.join("app.db")).unwrap();
+        {
+            let conn = db.0.lock();
+            conn.execute(
+                "INSERT INTO cli_sessions(engine, session_id, workspace_path, file_path, file_size, file_mtime_ms)
+                 VALUES('omp', 'sid-1', ?1, ?2, 1, 1)",
+                rusqlite::params![workspace.to_string_lossy(), file.to_string_lossy()],
+            )
+            .unwrap();
+        }
+        db.record_accepted_internal_frame_hash("omp", "sid-1", &"a".repeat(64), &workspace.to_string_lossy())
+            .unwrap();
+        db.record_accepted_internal_frame_hash("omp", "kept", &"b".repeat(64), &workspace.to_string_lossy())
+            .unwrap();
+        for session_id in ["sid-1", "kept"] {
+            db.remember_session_provider("omp", session_id, "provider", 1).unwrap();
+            let session = SessionMeta {
+                engine: "omp".into(),
+                session_id: session_id.into(),
+                workspace_path: workspace.to_string_lossy().into_owned(),
+                ..archived_fixture()
+            };
+            archive_session_in(&db, &session).unwrap();
+        }
+
+        delete_session_blocking(&db, "omp", "sid-1").unwrap();
+
+        assert!(db.accepted_internal_frames("omp", "sid-1").unwrap().0.is_empty());
+        assert_eq!(db.accepted_internal_frames("omp", "kept").unwrap().0.len(), 1);
+        let archived = list_archived_sessions_from(&db).unwrap();
+        assert_eq!(archived.len(), 1);
+        assert_eq!(archived[0].session_id, "kept");
+        let providers: Vec<String> = db.0.lock()
+            .prepare("SELECT session_id FROM cli_session_providers WHERE engine='omp'")
+            .unwrap()
+            .query_map([], |row| row.get(0))
+            .unwrap()
+            .collect::<Result<_, _>>()
+            .unwrap();
+        assert_eq!(providers, ["kept"]);
+
+        drop(db);
+        std::fs::remove_dir_all(&home).ok();
+    }
+
+    #[tokio::test]
+    async fn remote_delete_failure_preserves_all_frame_identities() {
+        let scratch = Scratch::new();
+        let db = Arc::new(crate::engines::support::db::Db::open_at(&scratch.0.join("app.db")).unwrap());
+        for (engine, session_id, hash) in [
+            ("dsh", "remote-1", "a"),
+            ("dsh", "kept", "b"),
+            ("omp", "remote-1", "c"),
+        ] {
+            db.record_accepted_internal_frame_hash(engine, session_id, &hash.repeat(64), "/remote/ws")
+                .unwrap();
+        }
+        let before = (
+            db.accepted_internal_frames("dsh", "remote-1").unwrap(),
+            db.accepted_internal_frames("dsh", "kept").unwrap(),
+            db.accepted_internal_frames("omp", "remote-1").unwrap(),
+        );
+
+        let result = delete_remote_session_and_frames(
+            Arc::clone(&db),
+            "dsh".to_string(),
+            "remote-1".to_string(),
+            async { Err("remote transcript removal failed".to_string()) },
+        )
+        .await;
+
+        assert_eq!(result, Err("remote transcript removal failed".to_string()));
+        assert_eq!(
+            (
+                db.accepted_internal_frames("dsh", "remote-1").unwrap(),
+                db.accepted_internal_frames("dsh", "kept").unwrap(),
+                db.accepted_internal_frames("omp", "remote-1").unwrap(),
+            ),
+            before
+        );
+    }
+
+    #[tokio::test]
+    async fn remote_delete_success_reclaims_only_its_session_frame_identities() {
+        let scratch = Scratch::new();
+        let db = Arc::new(crate::engines::support::db::Db::open_at(&scratch.0.join("app.db")).unwrap());
+        // Remote identities have no local sessions row to join against.
+        for (engine, session_id, hash) in [
+            ("dsh", "remote-1", "a"),
+            ("dsh", "remote-1", "b"),
+            ("dsh", "kept", "c"),
+            ("omp", "remote-1", "d"),
+        ] {
+            db.record_accepted_internal_frame_hash(engine, session_id, &hash.repeat(64), "/remote/ws")
+                .unwrap();
+        }
+        let before = db.accepted_internal_frames("dsh", "remote-1").unwrap();
+        let same_engine = db.accepted_internal_frames("dsh", "kept").unwrap();
+        let same_session_id = db.accepted_internal_frames("omp", "remote-1").unwrap();
+
+        delete_remote_session_and_frames(
+            Arc::clone(&db),
+            "dsh".to_string(),
+            "remote-1".to_string(),
+            async {
+                // Nothing can be reclaimed before the remote operation succeeds.
+                assert_eq!(db.accepted_internal_frames("dsh", "remote-1").unwrap(), before);
+                Ok(String::new())
+            },
+        )
+        .await
+        .unwrap();
+
+        assert!(db.accepted_internal_frames("dsh", "remote-1").unwrap().0.is_empty());
+        assert_eq!(db.accepted_internal_frames("dsh", "kept").unwrap(), same_engine);
+        assert_eq!(db.accepted_internal_frames("omp", "remote-1").unwrap(), same_session_id);
+    }
+
+    /// Removing a workspace reclaims every identity accepted in it. A remote
+    /// session never gets a `sessions` row, so the stored workspace is the only
+    /// key that can reach its rows: without it they accumulate until the global
+    /// cap makes every later record fail and hidden frames reappear app-wide.
+    #[test]
+    fn removing_a_workspace_reclaims_remote_session_frame_identities() {
+        let home = scratch_dir("workspace-frames");
+        let workspace = home.join("ws");
+        std::fs::create_dir_all(&workspace).unwrap();
+        let db = crate::engines::support::db::Db::open_at(&home.join("app.db")).unwrap();
+        let ws_path = workspace.to_string_lossy().to_string();
+        {
+            let conn = db.0.lock();
+            conn.execute(
+                "INSERT INTO cli_workspaces(id, path, name) VALUES('w1', ?1, 'ws')",
+                rusqlite::params![ws_path],
+            )
+            .unwrap();
+        }
+        // Deliberately no `sessions` row: this is the remote shape, the one the
+        // old `sessions`-only purge could never reach.
+        db.record_accepted_internal_frame_hash("codex", "remote-1", &"a".repeat(64), &ws_path)
+            .unwrap();
+        db.record_accepted_internal_frame_hash("codex", "elsewhere", &"b".repeat(64), "C:/other")
+            .unwrap();
+
+        remove_workspace_blocking(&db, "w1").unwrap();
+
+        assert!(db
+            .accepted_internal_frames("codex", "remote-1")
+            .unwrap()
+            .0
+            .is_empty());
+        assert_eq!(
+            db.accepted_internal_frames("codex", "elsewhere")
+                .unwrap()
+                .0
+                .len(),
+            1
+        );
+
+        drop(db);
+        std::fs::remove_dir_all(&home).ok();
+    }
+
+    #[test]
+    fn workspace_pin_only_applies_to_top_level_rows() {
+        let home = scratch_dir("workspace-pin");
+        let db = crate::engines::support::db::Db::open_at(&home.join("app.db")).unwrap();
+        {
+            let conn = db.0.lock();
+            conn.execute_batch(
+                "INSERT INTO cli_workspaces(id, path, name) VALUES('p', '/ws/p', 'p');
+                 INSERT INTO cli_workspaces(id, path, name, kind, parent_id)
+                   VALUES('c', '/ws/p-wt', 'c', 'worktree', 'p');",
+            )
+            .unwrap();
+        }
+        set_workspace_pinned_blocking(&db, "p", true).unwrap();
+        // Writing the same value again still matches the row.
+        set_workspace_pinned_blocking(&db, "p", true).unwrap();
+        assert!(set_workspace_pinned_blocking(&db, "c", true).is_err());
+        assert!(set_workspace_pinned_blocking(&db, "missing", true).is_err());
+        let rows = list_workspaces_from(&db).unwrap();
+        assert!(rows.iter().find(|w| w.id == "p").unwrap().pinned);
+        assert!(!rows.iter().find(|w| w.id == "c").unwrap().pinned);
+
+        set_workspace_pinned_blocking(&db, "p", false).unwrap();
+        let rows = list_workspaces_from(&db).unwrap();
+        assert!(!rows.iter().find(|w| w.id == "p").unwrap().pinned);
+        drop(db);
+        std::fs::remove_dir_all(&home).ok();
+    }
+
+    #[test]
+    fn workspace_removal_and_reorder_commit_atomically() {
+        let home = scratch_dir("workspace-atomic");
+        let ws1 = home.join("ws1");
+        let ws2 = home.join("ws2");
+        std::fs::create_dir_all(&ws1).unwrap();
+        std::fs::create_dir_all(&ws2).unwrap();
+        let db = crate::engines::support::db::Db::open_at(&home.join("app.db")).unwrap();
+        let ws1_path = ws1.to_string_lossy().to_string();
+        let ws2_path = ws2.to_string_lossy().to_string();
+        {
+            let conn = db.0.lock();
+            conn.execute(
+                "INSERT INTO cli_workspaces(id, path, name, sort_order) VALUES('w1', ?1, 'ws1', 0)",
+                rusqlite::params![ws1_path],
+            )
+            .unwrap();
+            conn.execute(
+                "INSERT INTO cli_workspaces(id, path, name, sort_order) VALUES('w2', ?1, 'ws2', 1)",
+                rusqlite::params![ws2_path],
+            )
+            .unwrap();
+            conn.execute(
+                "INSERT INTO cli_sessions(engine, session_id, workspace_path, file_path, file_size, file_mtime_ms, title)
+                 VALUES('omp', 's1', ?1, 's1.jsonl', 1, 1, 'session in ws1')",
+                rusqlite::params![ws1_path],
+            )
+            .unwrap();
+            conn.execute(
+                "CREATE TEMP TRIGGER abort_session_delete
+                 BEFORE DELETE ON cli_sessions
+                 BEGIN
+                     SELECT RAISE(ABORT, 'stop mid workspace removal');
+                 END;",
+                [],
+            )
+            .unwrap();
+        }
+        db.record_accepted_internal_frame_hash("omp", "s1", &"a".repeat(64), &ws1_path)
+            .unwrap();
+
+        assert!(remove_workspace_blocking(&db, "w1").is_err());
+        // Reader snapshot must never see the workspace gone while its sessions
+        // and accepted frame identities remain.
+        assert_eq!(list_workspaces_from(&db).unwrap().len(), 2);
+        assert_eq!(list_sessions_from(&db).unwrap().len(), 1);
+        assert_eq!(
+            db.accepted_internal_frames("omp", "s1").unwrap().0.len(),
+            1
+        );
+
+        {
+            let conn = db.0.lock();
+            conn.execute("DROP TRIGGER abort_session_delete", []).unwrap();
+            conn.execute(
+                "CREATE TEMP TRIGGER abort_second_workspace_reorder
+                 BEFORE UPDATE OF sort_order ON cli_workspaces
+                 WHEN NEW.id = 'w1' AND NEW.sort_order = 1
+                 BEGIN
+                     SELECT RAISE(ABORT, 'stop mid workspace reorder');
+                 END;",
+                [],
+            )
+            .unwrap();
+        }
+
+        assert!(reorder_workspaces_blocking(&db, &["w2".to_string(), "w1".to_string()]).is_err());
+        let order: Vec<(String, Option<i64>)> = list_workspaces_from(&db)
+            .unwrap()
+            .into_iter()
+            .map(|w| (w.id, w.sort_order))
+            .collect();
+        assert_eq!(order, vec![("w1".to_string(), Some(0)), ("w2".to_string(), Some(1))]);
+
+        {
+            let conn = db.0.lock();
+            conn.execute("DROP TRIGGER abort_second_workspace_reorder", [])
+                .unwrap();
+        }
+        reorder_workspaces_blocking(&db, &["w2".to_string(), "w1".to_string()]).unwrap();
+        let reordered: Vec<String> = list_workspaces_from(&db)
+            .unwrap()
+            .into_iter()
+            .map(|w| w.id)
+            .collect();
+        assert_eq!(reordered, vec!["w2".to_string(), "w1".to_string()]);
+
+        remove_workspace_blocking(&db, "w1").unwrap();
+        assert_eq!(list_workspaces_from(&db).unwrap().len(), 1);
+        assert!(list_sessions_from(&db).unwrap().is_empty());
+
+        drop(db);
+        std::fs::remove_dir_all(&home).ok();
+    }
+
+    use serde_json::json;
+
+    struct Scratch(PathBuf);
+    impl Scratch {
+        fn new() -> Self {
+            let dir = std::env::temp_dir().join(format!("ccgui-history-{}", uuid::Uuid::new_v4()));
+            std::fs::create_dir_all(&dir).unwrap();
+            Self(dir)
+        }
+    }
+    impl Drop for Scratch {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+
+    fn archived_fixture() -> SessionMeta {
+        SessionMeta {
+            engine: "codex".into(),
+            session_id: "archived-1".into(),
+            workspace_path: "/ws/demo".into(),
+            file_path: "/tmp/archived-1.jsonl".into(),
+            file_size: 12,
+            file_mtime_ms: 34,
+            title: "Archived title".into(),
+            preview: "preview".into(),
+            created_at: Some(1),
+            updated_at: Some(2),
+            message_count: 3,
+            pinned: false,
+            custom_title: None,
+            model: Some("provider/model".into()),
+            effort: Some("high".into()),
+            provider: Some("provider".into()),
+            remote: None,
+            remote_path: None,
+        }
+    }
+
+    fn visible_session_count(db: &crate::engines::support::db::Db) -> i64 {
+        db.0.lock()
+            .query_row(
+                "SELECT COUNT(*) FROM cli_sessions s WHERE NOT EXISTS (
+                   SELECT 1 FROM cli_session_archives a
+                   WHERE a.engine=s.engine AND a.session_id=s.session_id
+                 )",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap()
+    }
+
+    #[test]
+    fn archive_hides_across_scans_and_restore_reveals() {
+        let scratch = Scratch::new();
+        let db = crate::engines::support::db::Db::open_at(&scratch.0.join("app.db")).unwrap();
+        let session = archived_fixture();
+        db.0.lock().execute(
+            "INSERT INTO cli_sessions(engine,session_id,workspace_path,file_path,file_size,file_mtime_ms,title,preview,created_at,updated_at,message_count)
+             VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11)",
+            rusqlite::params![
+                session.engine,
+                session.session_id,
+                session.workspace_path,
+                session.file_path,
+                session.file_size,
+                session.file_mtime_ms,
+                session.title,
+                session.preview,
+                session.created_at,
+                session.updated_at,
+                session.message_count,
+            ],
+        ).unwrap();
+
+        assert_eq!(visible_session_count(&db), 1);
+        archive_session_in(&db, &session).unwrap();
+        assert_eq!(visible_session_count(&db), 0);
+        assert_eq!(
+            list_archived_sessions_from(&db).unwrap()[0].session_id,
+            "archived-1"
+        );
+
+        // A scanner update never touches the independent archive marker.
+        db.0.lock().execute(
+            "UPDATE cli_sessions SET updated_at=99 WHERE engine='codex' AND session_id='archived-1'",
+            [],
+        ).unwrap();
+        assert_eq!(visible_session_count(&db), 0);
+
+        restore_session_in(&db, "codex", "archived-1").unwrap();
+        assert_eq!(visible_session_count(&db), 1);
+        assert!(list_archived_sessions_from(&db).unwrap().is_empty());
+    }
+
+    #[test]
+    fn archive_snapshot_preserves_remote_delete_route() {
+        let scratch = Scratch::new();
+        let db = crate::engines::support::db::Db::open_at(&scratch.0.join("app.db")).unwrap();
+        let mut session = archived_fixture();
+        session.engine = "dsh".into();
+        session.file_path.clear();
+        session.remote = Some(true);
+        session.remote_path =
+            Some("/home/dev/.dsh/sessions/-ws-demo/archived-1/session.jsonl.zstd".into());
+
+        archive_session_in(&db, &session).unwrap();
+        let archived = list_archived_sessions_from(&db).unwrap();
+        assert_eq!(archived[0].remote, Some(true));
+        assert_eq!(archived[0].remote_path, session.remote_path);
+    }
+
+    #[test]
+    fn remote_session_path_shape_is_per_engine() {
+        // Valid: an absolute .jsonl inside the engine's known session folder
+        assert!(is_plausible_remote_session_path(
+            "claude",
+            "/home/dev/.claude/projects/-home-dev-proj/s-1.jsonl"
+        ));
+        assert!(is_plausible_remote_session_path(
+            "codex",
+            "/home/dev/.codex/sessions/2026/09/15/rollout-abc.jsonl"
+        ));
+        assert!(is_plausible_remote_session_path(
+            "omp",
+            "/home/dev/.omp/agent/sessions/s-1.jsonl"
+        ));
+        // Invalid shapes: relative, not jsonl, a `..` segment, the wrong folder layout
+        assert!(!is_plausible_remote_session_path(
+            "claude",
+            "home/dev/x.jsonl"
+        ));
+        assert!(!is_plausible_remote_session_path(
+            "claude",
+            "/home/dev/.claude/projects/p/s.txt"
+        ));
+        assert!(!is_plausible_remote_session_path(
+            "claude",
+            "/home/dev/.claude/projects/../settings.jsonl"
+        ));
+        // Any .jsonl outside the session layout is refused, so IPC can't read distro files
+        assert!(!is_plausible_remote_session_path(
+            "claude",
+            "/etc/cron.d/job.jsonl"
+        ));
+        assert!(!is_plausible_remote_session_path(
+            "codex",
+            "/home/dev/.claude/projects/p/s.jsonl"
+        ));
+    }
+
+    #[test]
+    fn session_page_restores_subagents_older_than_the_visible_page() {
+        let scratch = Scratch::new();
+        let path = scratch.0.join("session.jsonl");
+        let db_path = scratch.0.join("app.db");
+        let brief = "# Target\nReview the relay.\n# Acceptance\nRecover without toggling.";
+        let mut lines = vec![
+            json!({"type":"message","message":{"role":"user","content":"Review"}}),
+            json!({"type":"message","message":{"role":"assistant","content":[{
+                "type":"toolCall","id":"dispatch","name":"task",
+                "arguments":{"tasks":[{"name":"SavedReviewer","agent":"reviewer","task":brief}]}
+            }]}}),
+            json!({"type":"message","message":{"role":"toolResult","toolCallId":"dispatch",
+                "content":[{"type":"text","text":"Spawned"}],
+                "details":{"progress":[{"id":"SavedReviewer","status":"pending"}]}
+            }}),
+            json!({"type":"message","message":{"role":"assistant","content":[{
+                "type":"toolCall","id":"roster","name":"hub","arguments":{"op":"jobs"}
+            }]}}),
+            json!({"type":"message","message":{"role":"toolResult","toolCallId":"roster",
+                "content":[{"type":"text","text":"Review complete"}],
+                "details":{"op":"jobs","jobs":[{"id":"SavedReviewer","status":"completed"}]}
+            }}),
+        ];
+        for i in 0..120 {
+            lines.push(json!({"type":"message","message":{"role":"assistant","content":format!("later {i}")}}));
+        }
+        std::fs::write(
+            &path,
+            lines
+                .iter()
+                .map(serde_json::Value::to_string)
+                .collect::<Vec<_>>()
+                .join("\n"),
+        )
+        .unwrap();
+        {
+            let db = crate::engines::support::db::Db::open_at(&db_path).unwrap();
+            db.0.lock().execute(
+                "INSERT INTO cli_sessions(engine,session_id,workspace_path,file_path,file_size,file_mtime_ms,title) VALUES('omp','saved','/ws',?1,1,1,'Review')",
+                rusqlite::params![path.to_string_lossy().as_ref()],
+            ).unwrap();
+        }
+        // Reopen the DB as a fresh process would, with no frontend roster cache.
+        let db = crate::engines::support::db::Db::open_at(&db_path).unwrap();
+        let page = load_session_page_blocking(&db, "omp", "saved", Some(100), None, false).unwrap();
+        assert_eq!(page.messages.len(), 100);
+        assert!(page
+            .messages
+            .iter()
+            .all(|message| message.text.starts_with("later")));
+        let wire = serde_json::to_value(&page).unwrap();
+        let forced = load_session_page_blocking(&db, "omp", "saved", Some(100), None, true).unwrap();
+        assert_eq!(serde_json::to_value(&forced).unwrap(), wire);
+        let history = wire["subagentHistory"]
+            .as_array()
+            .expect("session history is independent of pagination");
+        let task = history.iter().find(|row| row["text"] == "task").unwrap();
+        assert_eq!(task["args"]["tasks"][0]["name"], "SavedReviewer");
+        assert_eq!(task["args"]["tasks"][0]["task"], brief);
+        let roster = history.iter().find(|row| row["text"] == "hub").unwrap();
+        assert_eq!(
+            roster["result"]["details"]["jobs"][0]["status"],
+            "completed"
+        );
+        let older =
+            load_session_page_blocking(&db, "omp", "saved", Some(100), page.next_before, false).unwrap();
+        assert!(older.messages.iter().any(|row| row.text == "task"));
+    }
+
+    fn plain(seq: i64, role: &str) -> Message {
+        Message {
+            seq,
+            role: role.into(),
+            text: String::new(),
+            ts: None,
+            path: None,
+            args: None,
+            result: None,
+            todos: None,
+            usage: None,
+            model: None,
+            effort: None,
+            duration_ms: None,
+            images: Vec::new(),
+        }
+    }
+
+    fn delegation(seq: i64) -> Message {
+        let mut message = plain(seq, "tool");
+        message.text = "task · worker".into();
+        message.args = Some(json!({"tasks": []}));
+        message
+    }
+
+    /// Cutting the cached full fold at a page start must reproduce a fresh
+    /// fold of that prefix byte for byte — including the pending-user row
+    /// that the full fold spends past the cut, and one a newer user replaces
+    /// so it never appears in the full fold at all.
+    #[test]
+    fn truncated_fold_matches_a_fresh_prefix_fold() {
+        let messages = vec![
+            plain(0, "user"),      // closed by the delegation at 1
+            delegation(1),         // emits user 0 + itself
+            plain(2, "assistant"), // turn boundary
+            plain(3, "user"),      // replaced by user 4: absent from the full fold
+            plain(4, "user"),      // closed by the delegation at 5
+            delegation(5),
+            plain(6, "user"),      // spent past the cut by the boundary at 7
+            plain(7, "thinking"),  // turn boundary, emits user 6
+            plain(8, "user"),      // trailing unclosed user
+            plain(9, "assistant"), // no boundary: follows a boundary, not a delegation
+        ];
+        let fold = subagent_fold(&messages);
+        for start in 0..=messages.len() {
+            let cut =
+                serde_json::to_value(subagent_history_until(&messages, &fold, start)).unwrap();
+            let fresh = serde_json::to_value(subagent_history(&messages[..start])).unwrap();
+            assert_eq!(cut, fresh, "start={start}");
+        }
+    }
+
+    #[test]
+    fn delete_session_preserves_database_errors() {
+        let scratch = Scratch::new();
+        let db = crate::engines::support::db::Db::open_at(&scratch.0.join("app.db")).unwrap();
+        db.0.lock().execute("DROP TABLE cli_sessions", []).unwrap();
+
+        let error = delete_session_blocking(&db, "codex", "missing").unwrap_err();
+        assert!(error.contains("lookup session codex/missing"), "{error}");
+        assert!(error.contains("no such table"), "{error}");
+        assert!(!error.contains("session not found"));
+    }
+
+    #[test]
+    fn delete_session_keeps_records_when_disk_removal_fails() {
+        let scratch = Scratch::new();
+        // remove_file on a directory fails on both Unix and Windows.
+        let path = scratch.0.join("not-a-transcript.jsonl");
+        std::fs::create_dir(&path).unwrap();
+        let db = crate::engines::support::db::Db::open_at(&scratch.0.join("app.db")).unwrap();
+        for engine in ["claude", "codex"] {
+            db.0.lock().execute(
+                "INSERT INTO cli_sessions(engine,session_id,workspace_path,file_path,file_size,file_mtime_ms) VALUES(?1,'failed','/ws',?2,0,0)",
+                rusqlite::params![engine, path.to_string_lossy().as_ref()],
+            ).unwrap();
+            db.remember_session_model(engine, "failed", "model", 1).unwrap();
+            db.remember_session_effort(engine, "failed", "high", 1).unwrap();
+            db.remember_session_provider(engine, "failed", "provider", 1).unwrap();
+            let session = SessionMeta {
+                engine: engine.into(),
+                session_id: "failed".into(),
+                workspace_path: "/ws".into(),
+                ..archived_fixture()
+            };
+            archive_session_in(&db, &session).unwrap();
+            db.record_accepted_internal_frame_hash(engine, "failed", &"a".repeat(64), "/ws")
+                .unwrap();
+
+            let error = delete_session_blocking(&db, engine, "failed").unwrap_err();
+            assert!(error.contains("remove "), "{error}");
+            assert!(path.is_dir());
+            for table in ["cli_accepted_internal_frames", "cli_sessions", "cli_session_models", "cli_session_efforts", "cli_session_providers", "cli_session_archives"] {
+                let count: i64 = db.0.lock().query_row(
+                    &format!("SELECT COUNT(*) FROM {table} WHERE engine=?1 AND session_id='failed'"),
+                    [engine],
+                    |r| r.get(0),
+                ).unwrap();
+                assert_eq!(count, 1, "{engine}: {table}");
+            }
+        }
+    }
+
+    #[test]
+    fn delete_codebuddy_missing_recorded_copy_removes_all_duplicates() {
+        let scratch = Scratch::new();
+        let config_dir = scratch.0.join("codebuddy-config");
+        let _guard = CodebuddyConfigGuard::set(&config_dir);
+        let recorded = write_codebuddy_copy(&config_dir, "newest", "dup.jsonl", "dup");
+        let older = write_codebuddy_copy(&config_dir, "older", "older.jsonl", "dup");
+        let damaged = config_dir
+            .join("projects")
+            .join("damaged")
+            .join("dup.jsonl");
+        std::fs::create_dir_all(damaged.parent().unwrap()).unwrap();
+        std::fs::write(&damaged, "not json\n").unwrap();
+        let unrelated = write_codebuddy_copy(&config_dir, "other", "other.jsonl", "other");
+        std::fs::remove_file(&recorded).unwrap();
+
+        delete_codebuddy_session_disk(&recorded).unwrap();
+
+        assert!(!recorded.exists());
+        assert!(!older.exists());
+        assert!(!damaged.exists());
+        assert!(unrelated.exists());
+        // A repeated delete still sees the desired disk state: everything is gone.
+        delete_codebuddy_session_disk(&recorded).unwrap();
+    }
+
+    #[test]
+    fn delete_codebuddy_damaged_recorded_copy_uses_stem() {
+        let scratch = Scratch::new();
+        let config_dir = scratch.0.join("codebuddy-config");
+        let _guard = CodebuddyConfigGuard::set(&config_dir);
+        let recorded = config_dir
+            .join("projects")
+            .join("recorded")
+            .join("dup.jsonl");
+        std::fs::create_dir_all(recorded.parent().unwrap()).unwrap();
+        std::fs::write(&recorded, "not json\n").unwrap();
+        let sibling = write_codebuddy_copy(&config_dir, "sibling", "copy.jsonl", "dup");
+
+        delete_codebuddy_session_disk(&recorded).unwrap();
+
+        assert!(!recorded.exists());
+        assert!(!sibling.exists());
+    }
+
+    #[test]
+    fn delete_codebuddy_skips_unreadable_same_stem_with_different_id() {
+        let scratch = Scratch::new();
+        let config_dir = scratch.0.join("codebuddy-config");
+        let _guard = CodebuddyConfigGuard::set(&config_dir);
+        let recorded = write_codebuddy_copy(&config_dir, "recorded", "a.jsonl", "a");
+        let confirmed = write_codebuddy_copy(&config_dir, "confirmed", "copy.jsonl", "a");
+        let unreadable = write_codebuddy_copy(&config_dir, "uncertain", "a.jsonl", "B");
+        std::fs::remove_file(&recorded).unwrap();
+        crate::engines::history::discovery::inject_codebuddy_head_io_error(&unreadable);
+
+        delete_codebuddy_session_disk(&recorded).unwrap();
+
+        assert!(!confirmed.exists());
+        assert!(unreadable.is_file());
+        // The one-shot failure is gone; the untouched file really belongs to B.
+        assert_eq!(
+            crate::engines::history::discovery::codebuddy_session_id(&unreadable).unwrap(),
+            Some("B".to_string())
+        );
+    }
+
+    #[test]
+    fn delete_codebuddy_returns_real_io_errors() {
+        let scratch = Scratch::new();
+        let config_dir = scratch.0.join("codebuddy-config");
+        let _guard = CodebuddyConfigGuard::set(&config_dir);
+        // remove_file on a directory fails on both Unix and Windows.
+        let recorded = scratch.0.join("not-a-transcript.jsonl");
+        std::fs::create_dir(&recorded).unwrap();
+
+        let error = delete_codebuddy_session_disk(&recorded).unwrap_err();
+
+        assert!(error.contains("remove "), "{error}");
+        assert!(recorded.is_dir());
+    }
+
+    /// qoder sessions are a single jsonl — the plain remove_file arm.
+    #[test]
+    fn delete_qoder_removes_single_file() {
+        let scratch = Scratch::new();
+        let path = scratch.0.join("sess-1.jsonl");
+        std::fs::write(&path, "{}\n").unwrap();
+        delete_session_disk("qoder", &path).unwrap();
+        assert!(!path.exists());
+    }
+
+    /// opencode spreads a session over session/message/part; deleting the
+    /// metadata file must take the message dir and its part dirs, and leave
+    /// other sessions' trees alone.
+    #[test]
+    fn delete_opencode_removes_storage_tree() {
+        let scratch = Scratch::new();
+        let storage = scratch.0.join("data").join("storage");
+        let meta = storage.join("session").join("proj1").join("ses_x.json");
+        std::fs::create_dir_all(meta.parent().unwrap()).unwrap();
+        std::fs::write(&meta, "{}").unwrap();
+        let msg_dir = storage.join("message").join("ses_x");
+        std::fs::create_dir_all(&msg_dir).unwrap();
+        std::fs::write(msg_dir.join("msg_1.json"), "{}").unwrap();
+        let part_dir = storage.join("part").join("msg_1");
+        std::fs::create_dir_all(&part_dir).unwrap();
+        std::fs::write(part_dir.join("prt_1.json"), "{}").unwrap();
+        let other_part_dir = storage.join("part").join("msg_other");
+        std::fs::create_dir_all(&other_part_dir).unwrap();
+        std::fs::write(other_part_dir.join("prt_9.json"), "{}").unwrap();
+
+        delete_session_disk("opencode", &meta).unwrap();
+        assert!(!meta.exists());
+        assert!(!msg_dir.exists());
+        assert!(!part_dir.exists());
+        assert!(other_part_dir.exists());
+    }
+
+    /// A path outside the storage/session layout is refused (db corruption
+    /// must never aim remove_dir_all at an arbitrary tree).
+    #[test]
+    fn delete_opencode_refuses_unexpected_layout() {
+        let scratch = Scratch::new();
+        let stray = scratch.0.join("random").join("ses_x.json");
+        std::fs::create_dir_all(stray.parent().unwrap()).unwrap();
+        std::fs::write(&stray, "{}").unwrap();
+        delete_session_disk("opencode", &stray).unwrap();
+        assert!(stray.exists());
+    }
+
+    /// OpenCode ≥1.18: one SQLite db holds every session. The virtual address
+    /// deletes just this session's row, and the schema's cascades take its
+    /// message/part rows — other sessions survive.
+    #[test]
+    fn delete_opencode_db_removes_session_and_children() {
+        let scratch = Scratch::new();
+        let db = scratch.0.join("opencode.db");
+        let conn = rusqlite::Connection::open(&db).unwrap();
+        conn.execute_batch(
+            "CREATE TABLE session(id TEXT PRIMARY KEY);
+             CREATE TABLE message(id TEXT PRIMARY KEY, session_id TEXT NOT NULL
+                REFERENCES session(id) ON DELETE CASCADE);
+             CREATE TABLE part(id TEXT PRIMARY KEY, message_id TEXT NOT NULL
+                REFERENCES message(id) ON DELETE CASCADE);",
+        )
+        .unwrap();
+        conn.execute_batch(
+            "INSERT INTO session VALUES('ses_doomed');
+             INSERT INTO session VALUES('ses_keep');
+             INSERT INTO message VALUES('msg_a','ses_doomed');
+             INSERT INTO message VALUES('msg_b','ses_keep');
+             INSERT INTO part VALUES('prt_a','msg_a');
+             INSERT INTO part VALUES('prt_b','msg_b');",
+        )
+        .unwrap();
+        drop(conn);
+
+        let address = super::super::opencode_db_session_path(&db, "ses_doomed");
+        delete_session_disk("opencode", &address).unwrap();
+
+        let conn = rusqlite::Connection::open(&db).unwrap();
+        let count = |table: &str| -> i64 {
+            conn.query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |r| r.get(0))
+                .unwrap()
+        };
+        assert_eq!(count("session"), 1);
+        assert_eq!(count("message"), 1);
+        assert_eq!(count("part"), 1);
+        let remaining: String = conn
+            .query_row("SELECT id FROM session", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(remaining, "ses_keep");
+    }
+    /// dsh sessions live in a per-session dir (`<home>/sessions/<cwd>/<dir>/
+    /// session*.jsonl.zstd`) with subagent logs alongside — deleting takes
+    /// the whole dir. Regression: dsh used to fall into the kimi/grok
+    /// fallback arm, whose `.grok` anchor always rejected the delete, so the
+    /// transcript survived and the next scan resurrected the session.
+    #[test]
+    fn delete_dsh_removes_session_dir() {
+        let scratch = Scratch::new();
+        let root = scratch.0.join("dsh").join("sessions");
+        let dir = root.join("-home-dev-ws").join("sess-1");
+        std::fs::create_dir_all(&dir).unwrap();
+        let log = dir.join("session.v1.jsonl.zstd");
+        std::fs::write(&log, b"zstd-bytes").unwrap();
+        std::fs::write(dir.join("subagent.log"), b"x").unwrap();
+
+        delete_dir_session_disk_anchored("dsh", &log, &[root]).unwrap();
+        assert!(!dir.exists());
+    }
+
+    /// A dsh dir outside every anchor root is refused (stale db rows must
+    /// never aim remove_dir_all at an arbitrary tree).
+    #[test]
+    fn delete_dsh_refuses_outside_anchor() {
+        let scratch = Scratch::new();
+        let root = scratch.0.join("dsh").join("sessions");
+        let dir = root.join("-home-dev-ws").join("sess-1");
+        std::fs::create_dir_all(&dir).unwrap();
+        let log = dir.join("session.jsonl.zstd");
+        std::fs::write(&log, b"zstd-bytes").unwrap();
+
+        let elsewhere = scratch.0.join("other-home");
+        delete_dir_session_disk_anchored("dsh", &log, &[elsewhere]).unwrap();
+        assert!(log.exists());
+    }
+
+    /// A non-generation file name is not a dsh transcript — refuse.
+    #[test]
+    fn delete_dsh_refuses_non_generation_name() {
+        let scratch = Scratch::new();
+        let root = scratch.0.join("dsh").join("sessions");
+        let dir = root.join("-home-dev-ws").join("sess-1");
+        std::fs::create_dir_all(&dir).unwrap();
+        let log = dir.join("session.jsonl");
+        std::fs::write(&log, b"{}").unwrap();
+
+        delete_dir_session_disk_anchored("dsh", &log, &[root]).unwrap();
+        assert!(log.exists());
+    }
+
+    /// kimi discovery spans the current home plus legacy/provider homes; the
+    /// delete anchor must accept every root discovery scans, or sessions
+    /// from a legacy home delete-then-resurrect.
+    #[test]
+    fn delete_kimi_anchors_every_discovery_root() {
+        let scratch = Scratch::new();
+        let primary = scratch.0.join(".kimi-code");
+        let legacy = scratch.0.join(".kimi");
+        let dir = legacy.join("sess-9");
+        let wire = dir.join("agents").join(crate::known_names::KIMI_PRIMARY_AGENT).join("wire.jsonl");
+        std::fs::create_dir_all(wire.parent().unwrap()).unwrap();
+        std::fs::write(&wire, b"{}").unwrap();
+
+        // Anchored to the main home only (the old behavior): a legacy home's session is refused.
+        delete_dir_session_disk_anchored("kimi", &wire, &[primary.clone()]).unwrap();
+        assert!(wire.exists());
+        // Anchors match discovery: the delete succeeds.
+        delete_dir_session_disk_anchored("kimi", &wire, &[primary, legacy]).unwrap();
+        assert!(!dir.exists());
+    }
+
+    /// Deleting a session must not leave its full transcript behind in the
+    /// editor's previous-version backup; a refused delete keeps it.
+    #[test]
+    fn deleting_a_session_removes_its_editor_backups() {
+        let scratch = Scratch::new();
+        let db = crate::engines::support::db::Db::open_at(&scratch.0.join("app.db")).unwrap();
+        let transcript = scratch.0.join("2026-10-29_sid-one.jsonl");
+        let backup = scratch.0.join("2026-10-29_sid-one.jsonl.ccgui-backup");
+        std::fs::write(&transcript, "{}\n").unwrap();
+        std::fs::write(&backup, "previous transcript").unwrap();
+        register_history_source(&db, "omp", "sid-one", &transcript);
+        delete_session_blocking(&db, "omp", "sid-one").unwrap();
+        assert!(!transcript.exists());
+        assert!(!backup.exists());
+
+        // OpenCode tree: hidden metadata and aggregate backups beside the session.
+        let project = scratch.0.join("storage/session/proj");
+        std::fs::create_dir_all(&project).unwrap();
+        let meta = project.join("ses_gone.json");
+        std::fs::write(&meta, json!({"id":"ses_gone"}).to_string()).unwrap();
+        let hidden = [project.join(".ses_gone.json.ccgui-backup"), project.join(".ses_gone.ccgui-session.json.ccgui-backup")];
+        for path in &hidden {
+            std::fs::write(path, "previous").unwrap();
+        }
+        let unrelated = project.join(".ses_other.ccgui-session.json.ccgui-backup");
+        std::fs::write(&unrelated, "other session").unwrap();
+        delete_session_disk("opencode", &meta).unwrap();
+        delete_session_backups("opencode", &meta).unwrap();
+        assert!(hidden.iter().all(|path| !path.exists()));
+        assert!(unrelated.exists());
+
+        // OpenCode SQLite: the JSON aggregate beside opencode.db.
+        let address = super::super::opencode_db_session_path(&scratch.0.join("opencode.db"), "ses_db");
+        let aggregate = scratch.0.join("opencode.db.ses_db.json.ccgui-backup");
+        std::fs::write(&aggregate, "previous").unwrap();
+        delete_session_backups("opencode", &address).unwrap();
+        assert!(!aggregate.exists());
+
+        // A delete the layout guard refused leaves the source, so the backup stays.
+        let kept = scratch.0.join("kept.jsonl");
+        let kept_backup = scratch.0.join("kept.jsonl.ccgui-backup");
+        std::fs::write(&kept, "{}\n").unwrap();
+        std::fs::write(&kept_backup, "previous").unwrap();
+        delete_session_backups("omp", &kept).unwrap();
+        assert!(kept_backup.exists());
+    }
+
+    /// Unknown engines fail loudly instead of silently skipping the disk
+    /// delete (the silent path is how deleted sessions resurrect).
+    #[test]
+    fn delete_unknown_engine_errors() {
+        let scratch = Scratch::new();
+        let path = scratch.0.join("sess.jsonl");
+        std::fs::write(&path, "{}").unwrap();
+        assert!(delete_session_disk("future-engine", &path).is_err());
+        assert!(path.exists());
+    }
+
+    // Unix runs the actual production script. Windows CI still exercises the
+    // async deletion/identity gate above without depending on an installed sh.
+    #[cfg(unix)]
+    fn run_remote_delete_script(engine: &str, path: &Path) -> std::process::Output {
+        let script = remote_session_delete_script(engine, path.to_str().unwrap()).unwrap();
+        std::process::Command::new("/bin/sh")
+            .args(["-c", &script])
+            .output()
+            .unwrap()
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn remote_dsh_delete_propagates_primary_transcript_failure() {
+        let scratch = Scratch::new();
+        let dir = scratch.0.join("sessions").join("session-1");
+        let transcript = dir.join("session.v2.jsonl.zstd");
+        // rm -f cannot remove a directory, even when tests run as root.
+        std::fs::create_dir_all(&transcript).unwrap();
+        let old = dir.join("session.v1.jsonl.zstd");
+        std::fs::write(&old, "old transcript").unwrap();
+
+        let output = run_remote_delete_script("dsh", &transcript);
+
+        assert!(!output.status.success());
+        assert!(transcript.is_dir());
+        assert_eq!(std::fs::read_to_string(old).unwrap(), "old transcript");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn remote_dsh_delete_propagates_old_generation_failure() {
+        let scratch = Scratch::new();
+        let dir = scratch.0.join("sessions").join("session-1");
+        let old = dir.join("session.v1.jsonl.zstd");
+        std::fs::create_dir_all(&old).unwrap();
+        let transcript = dir.join("session.v2.jsonl.zstd");
+        std::fs::write(&transcript, "current transcript").unwrap();
+
+        let output = run_remote_delete_script("dsh", &transcript);
+
+        assert!(!output.status.success());
+        assert!(!transcript.exists());
+        assert!(old.is_dir());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn remote_dsh_delete_removes_generations_but_preserves_unrelated_files() {
+        let scratch = Scratch::new();
+        let dir = scratch.0.join("sessions").join("session 'one");
+        std::fs::create_dir_all(&dir).unwrap();
+        let generations = ["session.jsonl.zstd", "session.v1.jsonl.zstd", "session.v2.jsonl.zstd"];
+        for name in generations {
+            std::fs::write(dir.join(name), "transcript").unwrap();
+        }
+        let unrelated = dir.join("notes.txt");
+        std::fs::write(&unrelated, "keep").unwrap();
+        let sibling = scratch.0.join("sessions").join("session-two");
+        std::fs::create_dir_all(&sibling).unwrap();
+        let sibling_transcript = sibling.join("session.jsonl.zstd");
+        std::fs::write(&sibling_transcript, "other session").unwrap();
+
+        for name in ["session.v2.jsonl.zstd.ccgui-backup", "session.v1.jsonl.zstd.ccgui-backup"] {
+            std::fs::write(dir.join(name), "previous transcript").unwrap();
+        }
+
+        let output = run_remote_delete_script("dsh", &dir.join("session.v2.jsonl.zstd"));
+
+        assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+        for name in generations {
+            assert!(!dir.join(name).exists(), "generation remains: {name}");
+            assert!(!dir.join(format!("{name}.ccgui-backup")).exists(), "backup remains: {name}");
+        }
+        // Nonempty-directory cleanup is best effort, not a transcript failure.
+        assert_eq!(std::fs::read_to_string(unrelated).unwrap(), "keep");
+        assert_eq!(std::fs::read_to_string(sibling_transcript).unwrap(), "other session");
+    }
+
+    /// dsh remote transcripts are zstd-compressed: .jsonl.zstd passes under the same /sessions/ layout.
+    #[test]
+    fn remote_dsh_zstd_path_shape() {
+        assert!(is_plausible_remote_session_path(
+            "dsh",
+            "/home/dev/.dsh/sessions/-home-dev-ws/sess-1/session.v2.jsonl.zstd"
+        ));
+        // Other engines don't take the zstd suffix; dsh's must still be in the session layout.
+        assert!(!is_plausible_remote_session_path(
+            "claude",
+            "/home/dev/.claude/projects/p/session.jsonl.zstd"
+        ));
+        assert!(!is_plausible_remote_session_path(
+            "dsh",
+            "/home/dev/notes/session.jsonl.zstd"
+        ));
+    }
+    /// Tool-result-heavy sessions are the steady state (an hourly task's omp
+    /// transcript measured 28MB of `result.details` against 18MB of chat
+    /// text): the cache budget must see those payloads, or the 128MB cap
+    /// admits multiples of itself. Regression: `parsed_footprint` only
+    /// summed text + images + ts, so args AND result are each sized here.
+    #[test]
+    fn parsed_footprint_counts_retained_tool_payloads() {
+        let big_args = "A".repeat(20_000);
+        let big_result = "R".repeat(20_000);
+        let row = |args: Option<serde_json::Value>, result: Option<serde_json::Value>| Message {
+            seq: 1,
+            role: "tool".into(),
+            text: "ok".into(),
+            ts: None,
+            path: None,
+            args,
+            result,
+            todos: None,
+            usage: Some(json!({ "input_tokens": 10 })),
+            model: None,
+            effort: None,
+            duration_ms: None,
+            images: Vec::new(),
+        };
+        let full = ParsedSession {
+            messages: vec![row(
+                Some(json!({ "command": big_args })),
+                Some(json!({ "details": { "log": big_result } })),
+            )],
+        };
+        // 40k of args+result dwarfs the 2-char text; a threshold above either
+        // payload alone fails if args OR result accounting is dropped.
+        assert!(
+            parsed_footprint(&full) >= 38_000,
+            "args and result payloads must both count toward the cache budget",
+        );
+        // The same row shape without the payloads is orders of magnitude
+        // smaller: the footprint tracks retained bytes, not the row count.
+        let bare = ParsedSession {
+            messages: vec![row(None, None)],
+        };
+        assert!(
+            parsed_footprint(&full) > parsed_footprint(&bare) + 39_000,
+            "the payloads, not the row, drive the footprint",
+        );
+    }
+}

@@ -10,8 +10,6 @@ const MARKED: &[&str] = &[
     "file.read",
     "file.search",
     "integration.execute",
-    "memory.history.timeline",
-    "memory.pref.list",
     "message.search",
     "note.read",
     "note.search",

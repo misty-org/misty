@@ -8,8 +8,8 @@
   flex: none;
   align-items: center;
   gap: 8px;
-  min-height: 44px;
-  padding: 4px 10px;
+  min-height: 48px;
+  padding: 4px 12px;
   border-bottom: 1px solid var(--color-charcoal-border);
   background: var(--color-charcoal-bg);
 }
@@ -17,22 +17,6 @@
   width: 26px;
   height: 26px;
   flex-shrink: 0;
-}
-.agent-studio-views {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  gap: 2px;
-  margin-left: 4px;
-}
-.agent-studio-views > button {
-  gap: 6px;
-  color: var(--color-cream-muted);
-  font-weight: 400;
-}
-.agent-studio-views > button[aria-current="page"] {
-  background: var(--color-charcoal-active);
-  color: var(--color-cream-bright);
 }
 .agent-studio-panels {
   display: flex;
@@ -62,14 +46,11 @@
 }
 /* A narrow page gives the whole body to the panel's neighbour by stacking it below the bar. */
 @container agent-studio (max-width: 760px) {
-  .agent-studio-views > button > span {
-    display: none;
-  }
   .agent-studio-context {
     width: 100%;
     min-width: 0;
     position: absolute;
-    inset: 44px 0 0 0;
+    inset: 48px 0 0 0;
     z-index: 15;
   }
 }

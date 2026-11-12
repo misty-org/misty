@@ -12,7 +12,7 @@ import {
 } from "./NavigatorDestinationIcons";
 import { MistyBrandIcon } from "@/features/app-windows";
 import { Link2, Plug } from "lucide-react";
-import { BotMessageSquare, Workflow } from "lucide-react";
+import { BotMessageSquare } from "lucide-react";
 import type { NavigationItem as MistyNavigationItem } from "@/app/layouts/DesktopLayout/NavigationItem";
 import { FileText } from "lucide-react";
 
@@ -61,8 +61,7 @@ export function DestinationIcon({
     if (Icon) return <Icon aria-hidden />;
   }
   if (appId === "agents") {
-    const Icon = item.id === "automations" ? Workflow : BotMessageSquare;
-    return <Icon aria-hidden />;
+    return <BotMessageSquare aria-hidden />;
   }
   return <FileText aria-hidden />;
 }

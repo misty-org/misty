@@ -61,6 +61,29 @@ fn place(window: &WebviewWindow) {
     ));
 }
 
+#[cfg(target_os = "linux")]
+fn place(window: &WebviewWindow) {
+    let Some((x, y)) = crate::voice::linux::Display::open().and_then(|display| display.pointer())
+    else {
+        return;
+    };
+    let scale = window.scale_factor().unwrap_or(1.0);
+    let _ = window.set_position(tauri::PhysicalPosition::new(
+        x + (OFFSET.0 * scale) as i32,
+        y + (OFFSET.1 * scale) as i32,
+    ));
+}
+
+#[cfg(target_os = "linux")]
+fn show_without_focus(pill: &WebviewWindow) {
+    let _ = pill.show();
+}
+
+#[cfg(any(target_os = "macos", windows))]
+fn show_without_focus(pill: &WebviewWindow) {
+    crate::agents::cursor::show_overlay(pill);
+}
+
 /// Shows the pill at the pointer without activating Misty.
 pub fn show(app: &AppHandle) {
     let handle = app.clone();
@@ -69,7 +92,7 @@ pub fn show(app: &AppHandle) {
     std::thread::spawn(move || {
         let Some(pill) = window(&handle) else { return };
         place(&pill);
-        let _ = handle.run_on_main_thread(move || crate::agents::cursor::show_overlay(&pill));
+        let _ = handle.run_on_main_thread(move || show_without_focus(&pill));
     });
 }
 

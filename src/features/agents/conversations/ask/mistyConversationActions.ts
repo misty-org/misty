@@ -7,7 +7,6 @@ import { newLocalConversation } from "../state/localConversation";
 import type { MistyGet, MistySet } from "../state/mistyStoreUpdates";
 import { updateMistyDraftAttachments } from "../composer/draftAttachments";
 import { localChats } from "../state/localChats";
-import { spaceWindow } from "@/features/app-windows";
 import { submissionEpoch } from "./mistySubmissionEpoch";
 
 import { createLoadConversations } from "../state/loadConversations";
@@ -30,10 +29,10 @@ export function createMistyConversationActions(
     newConversation: async (_legacySpaceId, requestedAgentId) => {
       const accountId = get().accountId;
       const epoch = submissionEpoch();
-      // It goes to the Space this window shows, and this device keeps it.
+      // It goes to the Space picked for it, else the one this window shows, and this device keeps it.
       const conversation = newLocalConversation(
         "New conversation",
-        spaceWindow().spaceId ?? "",
+        get().draftSpaceId || undefined,
         requestedAgentId || get().selectedAgentId || selectedPersonalAgent("")?.id,
       );
       // A browser handoff can get here after the user switched accounts.
@@ -44,13 +43,13 @@ export function createMistyConversationActions(
           ...get().conversations.filter((item) => item.id !== conversation.id),
         ],
         activeConversationId: conversation.id,
+        draftSpaceId: undefined,
         pendingArtifact: undefined,
         artifactPaneId: undefined,
         artifactConversationId: undefined,
         panel: get().panel === "closed" ? "closed" : "answer",
         query: "",
         context: [],
-        browserRequest: undefined,
         error: null,
       });
       return conversation.id;
@@ -65,7 +64,6 @@ export function createMistyConversationActions(
         artifactConversationId: activeConversationId,
         artifactPaneId: undefined,
         selectedAgentId: get().conversations.find((c) => c.id === activeConversationId)?.agentId,
-        browserRequest: undefined,
         handoff: undefined,
         targets: [],
         selectedSpaceId: "",
@@ -107,7 +105,6 @@ export function createMistyConversationActions(
                 query: "",
                 context: [],
                 handoff: undefined,
-                browserRequest: undefined,
                 targets: [],
               }
             : {}),

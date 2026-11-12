@@ -16,7 +16,7 @@ pub(in crate::browser) fn apply_agent_input_lock(
         "({})({locked}, window, 0, {})",
         include_str!("../kiri_link/scripts/agent_input_guard.js"),
         // A native lock already keeps the person's own input out.
-        cfg!(any(target_os = "macos", windows))
+        cfg!(any(target_os = "macos", windows, target_os = "linux"))
     );
     webview.eval(&script).map_err(|e| e.to_string())
 }
@@ -178,36 +178,4 @@ pub(crate) fn authorize_workspace_dispatch(
     };
     validate_browser_grant(session, &request)?;
     Ok(())
-}
-
-/// Enumerate only registered website views in the actual selected native profile.
-#[cfg(any(target_os = "macos", windows))]
-pub(crate) fn sync_storage_views(
-    app: &AppHandle,
-    physical: &str,
-) -> Result<Vec<(String, Webview)>, String> {
-    let state = app.state::<BrowserSessionState>();
-    let sessions = state
-        .sessions
-        .lock()
-        .map_err(|_| "Browser state is unavailable")?;
-    let original = crate::browser::site_data::profile_store::original_store_identity();
-    Ok(sessions
-        .iter()
-        .filter(|(_, session)| session.store_id.as_deref().unwrap_or(&original) == physical)
-        .filter_map(|(id, session)| {
-            webview_label(id)
-                .ok()
-                .and_then(|label| app.get_webview(&label))
-                .map(|view| {
-                    (
-                        session
-                            .workspace_tab_id
-                            .clone()
-                            .unwrap_or_else(|| id.clone()),
-                        view,
-                    )
-                })
-        })
-        .collect())
 }

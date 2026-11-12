@@ -9,12 +9,12 @@ changing a feature. There are no feature docs to keep current, and none should b
 
 # Rules that apply everywhere
 
-- The interface is quiet and mostly neutral, and it has to look finished: floating rounded panels, generous spacing,
-  modelled on OpenChamber. Color is used where it carries meaning: Git changes, file and folder icons, an agent's
-  state, an engine's own mark. The virtual office uses full color. Selections and focus rings stay neutral.
+- The interface is quiet and mostly neutral, and it has to look finished: flat panes split by hairlines on the
+  window's surface, never floating cards, with generous spacing, modelled on OpenChamber. Color is used where it carries meaning: Git changes, file and folder icons, an agent's
+  state, an engine's own mark. The studio uses full color. Selections and focus rings stay neutral.
 - Dropdowns and context menus mark the selection with a checkmark, never a dot.
 - Never show "Loading…" text; first loads use skeletons shaped like the content.
-- Labels, buttons and headings use sentence case. No subtext under titles, buttons or forms.
+- Labels, buttons and headings use sentence case. No subtext under titles, buttons or forms, except settings rows.
 - Settings belong to the device (`misty.db`) and never sync.
 - The sidebar holds the Space's pages and the person's chats. It lists no tabs and has no address field.
 - An agent belongs to the person who made it, is saved on their computer, and takes requests only from them.
@@ -25,23 +25,58 @@ changing a feature. There are no feature docs to keep current, and none should b
 - The open repositories have no billing. Misty Pro's Stripe side lives in the private `misty-cloud` service and
   reaches the server only through the operator account API. Never add prices, plan gates or payment code here. The
   server only enforces generic per-account limits, each unlimited unless set, and `misty-cloud` decides the numbers.
-- Nothing AI runs on the server. Agents, every model call, tools, memory, chats, workflows and schedules run on the
-  person's computer, on that computer's own keys. Keys reach only their provider: model keys, the search key (Decodo
-  or Serper) and the Composio key. Never send a key, prompt, tool result or model output to the server, store or log
-  them. `misty-server` has a contract test that enforces this.
+- Nothing AI runs on the server. Agents, every model call, tools and chats run on the
+  person's computer, on that computer's own keys. Keys reach only their provider: model keys, an engine's provider
+  channel key (kept in the OS keychain, never synced), the search key (Decodo or Serper), the Composio key, and the
+  tokens from signing in to an app's own MCP server (keychain, never synced, sent only to that app). Never send a
+  key, prompt, tool result or model output to the server, store or log them. `misty-server` has a contract test
+  that enforces this.
+- Apps connect with no key of Misty's and no middleman: Misty offers a direct sign-in only to a server run by the
+  app's own maker that registers Misty during the sign-in (`agents/connected_apps/direct`). Anything else goes
+  through the person's own Composio key or the app's web page. Misty never registers an app of its own with a
+  vendor or holds a client secret.
   What a shared Space's members see of each other's agents is the one thing that leaves: the agent's name, a fixed
-  code for its state and one for the kind of work, built in code from the run and never written by a model. The
-  server drops anything else (`realtime_agents.go`).
+  code for its state and one for the kind of work, and its claim: the paths, relative to the linked folder, of the
+  files its run is changing. All of it is built in code from the run and never written by a model. The server drops
+  anything else (`realtime_agents.go`).
+- Misty has no memory, workflows, schedules or skills of its own: engines already have them natively. Don't add them back.
+- Misty needs no model of its own. The person's engines do the thinking and use Misty's harness (the browser, Space
+  tools) through the local MCP server. Misty starts the vendor's own CLI under the person's own
+  sign-in, or on a provider channel they set up, and never reads, reuses or proxies their subscription tokens. Misty's own runtime stays in the code, not the default.
+- Tutor, the cursor companion, runs its live conversation on a raw fast model on the person's own key, never through a
+  CLI. Its keys stay on the device.
 - What agents may do is decided in native code (`src-tauri/features/agents/run_control/tool_policy.rs`), from the mode
   the run started with, never from the renderer at call time, the model or a page. An outside engine (Claude Code,
   Codex and the like) gets its permission flags the same way, and its calls into a Space or the browser pass the same
   gate. Agents are autonomous: Auto doesn't
-  pause for ordinary work.
-- Agent chats and memory live in `misty.db`. Chats never sync, and memory syncs only through the encrypted vault, so
-  the server can't read it. Only the vault is protected from the server: Space notes, chats and files are readable there.
+  pause for ordinary work, and Bypass passes the engine's own skip-permissions flag, chosen by the person.
+- Agent chats live in `misty.db`, stay on the device and never sync. Space notes, chats and files are
+  readable on the server.
 - No `*.env` file is ever committed, not even an example. Every server address in the app comes from the person's
   choice, never a built-in default; the one address the app knows is Misty Cloud's, used only when someone chooses
   Misty Cloud, Free or Pro (`src/api/deployment/`).
+
+# Design protocol
+
+Every visible thing is built from `src/shared/ui`. A feature puts shared components together and never picks its own
+colors, borders, corners, sizes or spacing, or adds a stylesheet of its own. When a feature needs a look the shared set
+doesn't have, add it to `src/shared/ui` first, then use it. `src/tests/architecture/uiRules.ts` enforces this.
+
+- Nothing wraps into ragged rows or spills past its edge. Every bar declares what gives way first: labels turn into
+  icons, then the longest name shortens, then items move into a ⋯ menu.
+- Long text (names, models, paths, branches) shortens with a fade-out edge (`OverflowFadeText`), never an ellipsis.
+- A control that doesn't work, or doesn't apply where it is, isn't shown.
+- An item's actions live in one place, its action bar or its ⋯ menu, never as a stray icon beside it.
+- No loose status words ("Saved", "Done") in a row. Changes save themselves, and a failure shows next to what failed.
+- Controls in one row share one height. Spacing comes from the 4px scale, with no one-off pixel widths.
+- Buttons have four roles and three sizes: primary (at most one per surface), secondary, quiet, and danger (only where
+  something is deleted), at 24, 32 and 36px, with 36 only in dialogs and empty states.
+- The composer is one bar that never wraps. Where the chat works (Space, folder, branch) is a path line under the box,
+  and screen capture lives in the + menu.
+- Every message has the same action bar under it, aligned to its edge, shown on hover and always on the latest message.
+- A saved secret is one field the size of the empty one that says it's saved, with Replace and Remove in its ⋯ menu.
+- A shortcut is recorded in an ordinary field, one per command, cleared with its ×.
+- Settings keep their sections and rows as they are, and list only what exists today.
 
 # Decided, not built
 
@@ -51,6 +86,8 @@ AGPL. Free returns on the hosted server with every feature and small limits, and
 paid plan. When Pro ends or a payment fails, the account moves to Free. Inactive free accounts are never deleted.
 
 # Commits
+
+- One commit per session, made at the end, covering all of that session's work. Never a string of small commits.
 
 - Commit messages and pull request descriptions never carry a `Co-Authored-By:` trailer or any other AI attribution
   line ("Generated with ...", tool or model names). Commits are authored by the person alone.

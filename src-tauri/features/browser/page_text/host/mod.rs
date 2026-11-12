@@ -1,5 +1,6 @@
 //! Reads the pages `web.fetch` gets in a worker the OS confines (`permission-page-reader`), so Misty's
-//! own process never parses them: `sandbox-exec` on macOS and an AppContainer on Windows. The worker
+//! own process never parses them: `sandbox-exec` on macOS, an AppContainer on Windows, and Landlock,
+//! seccomp and namespaces on Linux. The worker
 //! runs the same code as `readable_page` (`src-tauri/features/browser/page_text`). If it fails, that fetch
 //! fails. There is no way back to reading in this process.
 use agent_runs::{PageReadError, PageReader, ReadablePage};
@@ -9,10 +10,10 @@ use page_text::{
     readable::ReadableError,
 };
 
-#[cfg(target_os = "macos")]
-mod macos;
-#[cfg(target_os = "macos")]
-use macos as worker;
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+mod unix;
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+use unix as worker;
 #[cfg(windows)]
 mod windows;
 #[cfg(windows)]
@@ -21,7 +22,7 @@ use windows as worker;
 /// Longer than any honest page takes, and the same as a fetch's own limit.
 const TIME_LIMIT_SECONDS: u64 = 20;
 
-#[cfg(not(any(target_os = "macos", windows)))]
+#[cfg(not(any(target_os = "macos", windows, target_os = "linux")))]
 mod worker {
     pub(super) async fn run(_input: Vec<u8>) -> Result<Vec<u8>, String> {
         Err("The page reader isn't built for this system.".to_owned())

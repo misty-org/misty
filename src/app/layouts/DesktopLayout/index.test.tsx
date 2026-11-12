@@ -67,8 +67,8 @@ vi.mock("./useDesktopBootstrap", () => ({
       navigate: vi.fn(),
       app: null,
       settingsLoad: vi.fn(),
-      lastAppRoute: "/browser",
-      lastNonSettingsRouteRef: { current: "/browser" },
+      lastAppRoute: "/agents",
+      lastNonSettingsRouteRef: { current: "/agents" },
       routeId: location.pathname.slice(1),
     };
   },
@@ -134,10 +134,6 @@ vi.mock(
     BrowserContextMenuBridge: () => null,
   }),
 );
-vi.mock("@/features/agents/workflows/WorkflowSchedulesBridge", async (importOriginal) => ({
-  ...(await importOriginal<Record<string, unknown>>()),
-  WorkflowSchedulesBridge: () => null,
-}));
 vi.mock("@/features/agents/runs/jobs/AgentJobWorker", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   AgentJobWorker: () => null,
@@ -241,7 +237,7 @@ describe("DesktopLayout on Auth Routes", () => {
             <Route element={<DesktopLayout getRouteId={() => "signin" as any} />}>
               <Route path="/signin" element={<SignIn />} />
             </Route>
-            <Route path="/browser" element={<div>Account workspace</div>} />
+            <Route path="/agents" element={<div>Account workspace</div>} />
           </Routes>
         </MemoryRouter>,
       );
@@ -261,14 +257,14 @@ describe("DesktopLayout on Auth Routes", () => {
   });
 
   it.each([
-    ["/browser", "1 / 4"],
+    ["/agents", "1 / 4"],
     ["/invite/token", "1 / 4"],
     ["/signin", "2"],
   ])("reserves native chrome correctly on %s", async (route, row) => {
     await act(async () => {
       root.render(
         <MemoryRouter initialEntries={[route]}>
-          <DesktopLayout getRouteId={() => "browser"} />
+          <DesktopLayout getRouteId={() => "agents"} />
         </MemoryRouter>,
       );
     });
@@ -280,8 +276,8 @@ describe("DesktopLayout on Auth Routes", () => {
   it("gives no room to a navigation rail: the tab strip carries its buttons", async () => {
     await act(async () =>
       root.render(
-        <MemoryRouter initialEntries={["/browser"]}>
-          <DesktopLayout getRouteId={() => "browser"} />
+        <MemoryRouter initialEntries={["/agents"]}>
+          <DesktopLayout getRouteId={() => "agents"} />
         </MemoryRouter>,
       ),
     );

@@ -52,7 +52,6 @@ pub(super) fn invalidate_account_leases(inner: &mut WorkspaceState) -> Vec<Strin
 }
 
 pub(crate) fn stop_account_tasks(app: &AppHandle) -> Result<(), String> {
-    #[cfg(any(target_os = "macos", windows))]
     crate::agents::cursor::stop(app);
     let Some(state) = app.try_state::<AgentWorkspaceState>() else {
         return Ok(());

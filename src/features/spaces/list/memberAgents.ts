@@ -11,6 +11,8 @@ export interface MemberAgentStatus {
   state: "working" | "needs-you" | "resting";
   /** The kind of work, as a code (`browser`, `shell`, `files`…); empty at rest. */
   doing: string;
+  /** The files it is changing, relative to the Space's linked folder: its claim. It ends with
+   * the run, or after half an hour with nothing from it. */
   files?: string[];
 }
 
@@ -68,7 +70,6 @@ export function doingLabel(doing: string, state: MemberAgentStatus["state"]): st
       computer: "Using the computer",
       app: "Using a connected app",
       agents: "Working with another agent",
-      memory: "Remembering",
       thinking: "Thinking",
     }[doing] ?? "Working"
   );

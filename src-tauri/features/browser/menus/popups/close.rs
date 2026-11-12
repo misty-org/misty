@@ -158,3 +158,26 @@ pub(super) fn install_close_handler(
         })
         .map_err(|error| error.to_string())
 }
+
+/// WebKitGTK reports `window.close()` as the view's close signal.
+#[cfg(target_os = "linux")]
+pub(super) fn install_close_handler(
+    app: &AppHandle,
+    webview: &Webview,
+    id: &str,
+) -> Result<(), String> {
+    use webkit2gtk::WebViewExt;
+    let app = app.clone();
+    let id = id.to_owned();
+    webview
+        .with_webview(move |native| {
+            native.inner().connect_close(move |_| {
+                close_from_page(app.clone(), id.clone());
+            });
+        })
+        .map_err(|error| error.to_string())
+}
+
+/// The close signal goes with the view, so nothing outlives it.
+#[cfg(target_os = "linux")]
+pub(in crate::browser) fn forget_close_handler(_id: &str) {}

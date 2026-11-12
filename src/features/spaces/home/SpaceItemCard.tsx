@@ -1,15 +1,23 @@
 import { Lock, Users } from "lucide-react";
-import { Pressable, TooltipHint, cn, itemToneClass } from "@/shared/ui";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuTrigger,
+  Pressable,
+  TooltipHint,
+  cn,
+  itemToneClass,
+} from "@/shared/ui";
 import type { ItemVisibility } from "../api/visibility";
 import { VisibilityMenu } from "../components/VisibilityMenu";
 import { editedLabel, type GalleryItem } from "./galleryItems";
 import { GalleryPreview, kindIcon } from "./GalleryPreview";
-import type { MouseEvent } from "react";
+import type { MouseEvent, ReactNode } from "react";
 
 /**
  * One thing in a Space as a card: a live preview, the kind's glyph sitting on its
  * edge, the title, who can see it and when it changed. Its owner's menu carries the
- * Private toggle.
+ * Private toggle; right-clicking it removes it, or the whole selection it's part of.
  */
 export function SpaceItemCard(props: {
   item: GalleryItem;
@@ -21,6 +29,9 @@ export function SpaceItemCard(props: {
   onVisibilityChange?(visibility: ItemVisibility): void;
   selected?: boolean;
   onSelect?: (event: MouseEvent, id: string, onOpen: () => void) => void;
+  /** The right-click menu, when there is anything to do with the item. */
+  contextMenu?: ReactNode;
+  onContextMenuOpen?(): void;
 }) {
   const { item } = props;
   const { Icon, tone, label } = kindIcon[item.kind];
@@ -31,7 +42,7 @@ export function SpaceItemCard(props: {
       ? "Private to the people in this chat"
       : "Private to you"
     : "Shared with everyone in this Space";
-  return (
+  const card = (
     <div
       className={cn(
         "group/card relative min-w-0 overflow-hidden rounded-xl border border-charcoal-border",
@@ -84,5 +95,12 @@ export function SpaceItemCard(props: {
         />
       )}
     </div>
+  );
+  if (!props.contextMenu) return card;
+  return (
+    <ContextMenu onOpenChange={(open) => open && props.onContextMenuOpen?.()}>
+      <ContextMenuTrigger asChild>{card}</ContextMenuTrigger>
+      <ContextMenuContent>{props.contextMenu}</ContextMenuContent>
+    </ContextMenu>
   );
 }

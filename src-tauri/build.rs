@@ -111,17 +111,27 @@ fn read_env_value(path: &Path, key: &str) -> Option<String> {
 /// another desktop profile competes for the same worker build directory.
 fn build_builtin_workers() {
     let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap_or_default();
-    if target_os != "macos" && target_os != "windows" {
+    if target_os != "macos" && target_os != "windows" && target_os != "linux" {
         return;
     }
     let windows = target_os == "windows";
+    let out_dir = PathBuf::from(env::var_os("OUT_DIR").expect("Cargo output directory"));
+    // Linux helpers link against the system's C library, so they build on a Linux host. A check
+    // from another system embeds none, and every request for one fails.
+    if target_os == "linux" && !env::var("HOST").unwrap_or_default().contains("linux") {
+        std::fs::write(
+            out_dir.join("builtin_workers.rs"),
+            "{ let _ = (service, protocol); Err(\"This helper wasn't built on Linux.\".into()) }",
+        )
+        .expect("write bundled worker map");
+        return;
+    }
     let root = env::var_os("CARGO_MANIFEST_DIR")
         .map(PathBuf::from)
         .unwrap_or_else(|| PathBuf::from("."))
         .join("features");
     let target = env::var("TARGET").expect("Cargo target");
     let profile = env::var("PROFILE").expect("Cargo profile");
-    let out_dir = PathBuf::from(env::var_os("OUT_DIR").expect("Cargo output directory"));
     let mut source = String::from("match (service, protocol) {\n");
     // The page reader's code is in a crate the agent runtime shares, outside its worker's folder.
     let shared = root.join("browser").join("page_text");

@@ -223,4 +223,14 @@ export async function loadRunEntry(runId: string): Promise<RunEntry | null> {
   return read();
 }
 
+/**
+ * The one Space a run works in: its chat's, saved before the run started. Empty for a run that
+ * names none, which then reaches every Space the person can.
+ */
+export async function runSpaceId(runId: string): Promise<string> {
+  if (!runId) return "";
+  const entry = (await snapshot().catch(() => null))?.state?.runs?.[runId];
+  return entry?.spaceId ?? "";
+}
+
 export * from "./runContextScopes";

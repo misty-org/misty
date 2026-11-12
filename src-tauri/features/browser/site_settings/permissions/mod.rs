@@ -2,15 +2,13 @@
 //! pages use the browser store (private sessions keep theirs to themselves).
 //! Kiri applies them in every engine; this module stores them and serves
 //! Misty's site settings.
-use kiri::engine::{self, AskAnswer, LocationRequest, MediaRequest, PermissionAsk, StoreScope};
+use kiri::engine::{self, LocationRequest, MediaRequest, StoreScope};
 use kiri::permissions::{canonical_origin, location_verdict, media_verdict, Verdict};
 pub use kiri::permissions::{Decision, SitePermissions as Permissions};
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager, Webview};
 
-mod ask;
 mod choices;
-pub use ask::*;
 pub use choices::*;
 
 #[derive(Clone, Deserialize, Serialize)]
@@ -28,21 +26,6 @@ pub struct ListedPermission {
     #[serde(flatten)]
     pub saved: SavedPermission,
     pub profile_name: String,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SiteInfo {
-    url: String,
-    origin: String,
-    secure: bool,
-    persistent: bool,
-    profile: Option<String>,
-    permissions: Permissions,
-    /// macOS refuses Misty the device's location, so a site's allowance reaches nothing.
-    location_blocked: bool,
-    #[serde(skip)]
-    scope: StoreScope,
 }
 
 /// Answers Kiri's engine hooks from the stored choices.
@@ -84,11 +67,6 @@ impl engine::SitePolicy for Policy {
             |origin| sites.get(origin).cloned().unwrap_or_default(),
         )
     }
-
-    fn ask(&self, request: PermissionAsk, answer: AskAnswer) -> Result<(), AskAnswer> {
-        ask::ask(&self.app, request, answer);
-        Ok(())
-    }
 }
 
 pub(crate) fn init(app: &AppHandle) {
@@ -114,93 +92,6 @@ fn require_host(caller: &Webview) -> Result<(), String> {
     Ok(())
 }
 
-fn target(app: &AppHandle, id: &str) -> Result<Webview, String> {
-    if id.is_empty()
-        || !id
-            .chars()
-            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_'))
-    {
-        return Err("Invalid browser tab.".into());
-    }
-    app.get_webview(&format!("misty-browser-{id}"))
-        .ok_or("This browser tab has closed.".into())
-}
-
-/// Runs a store operation on the tab's UI thread while the tab is alive, so a
-/// private store it refers to cannot be released underneath it.
-async fn with_tab<T: Send + 'static>(
-    view: &Webview,
-    operation: impl FnOnce() -> T + Send + 'static,
-) -> Result<T, String> {
-    let (send, receive) = tokio::sync::oneshot::channel();
-    view.with_webview(move |_| {
-        let _ = send.send(operation());
-    })
-    .map_err(|error| error.to_string())?;
-    receive
-        .await
-        .map_err(|_| "The browser closed while reading site settings.".to_owned())
-}
-
-async fn inspect(
-    app: &AppHandle,
-    view: Webview,
-    expected_origin: Option<String>,
-    update: Option<Permissions>,
-) -> Result<SiteInfo, String> {
-    let facts = engine::page_facts(&view).await?;
-    let origin = canonical_origin(&facts.url)?;
-    if expected_origin
-        .as_ref()
-        .is_some_and(|expected| expected != &origin)
-    {
-        return Err("The page changed. Reopen site settings and try again.".into());
-    }
-    let scope = facts
-        .store
-        .clone()
-        .or_else(|| session_scope(app, view.label()))
-        .ok_or("This browser tab has closed.")?;
-    let (sites, location_blocked) = {
-        let (scope, origin, update) = (scope.clone(), origin.clone(), update.clone());
-        with_tab(&view, move || unsafe {
-            let sites = match update {
-                Some(update) => update_scope(&scope, &origin, update),
-                None => Ok(sites_for_scope(&scope)),
-            };
-            sites.map(|sites| (sites, engine::location_blocked_by_system()))
-        })
-        .await??
-    };
-    if let (Some(update), StoreScope::Persistent(profile)) = (update, &scope) {
-        profile::publish(profile.clone(), [(origin.clone(), update)].into());
-    }
-    let profile = match &scope {
-        StoreScope::Persistent(profile) => Some(profile.clone()),
-        StoreScope::Temporary(_) => None,
-    };
-    Ok(SiteInfo {
-        url: facts.url,
-        permissions: sites.get(&origin).cloned().unwrap_or_default(),
-        origin,
-        secure: facts.secure,
-        persistent: profile.is_some(),
-        profile,
-        location_blocked,
-        scope,
-    })
-}
-
-#[tauri::command]
-pub async fn browser_site_info(
-    caller: Webview,
-    app: AppHandle,
-    id: String,
-) -> Result<SiteInfo, String> {
-    require_host(&caller)?;
-    inspect(&app, target(&app, &id)?, None, None).await
-}
-
 /// The key a website data store is filed under, as WebKit's `UUIDString` writes it.
 pub(crate) fn store_key(store: Option<&str>) -> Result<String, String> {
     let identifier = crate::browser::site_data::profile_store::data_store_identifier(store)?;
@@ -214,12 +105,12 @@ mod db;
 mod profile;
 #[cfg(target_os = "macos")]
 use macos::store;
-pub(crate) use profile::{follow_remote_changes, seed_records};
+pub(crate) use profile::seed_records;
 // The Windows and Linux store, compiled and tested on macOS too.
 #[cfg(any(not(target_os = "macos"), test))]
 #[cfg_attr(target_os = "macos", allow(dead_code))]
 mod store_file;
-use store::{read_store, sites_for_scope, update_scope, write_store, SitePermissions};
+use store::{read_store, sites_for_scope, write_store, SitePermissions};
 #[cfg(not(target_os = "macos"))]
 use store_file as store;
 

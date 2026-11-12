@@ -1,6 +1,6 @@
 /**
  * Plan mode researches and proposes; Teach mode is a lesson that teaches one step
- * at a time and never acts (src/features/agents/lessons); otherwise the agent does the work.
+ * at a time and never acts (src/features/agents/tutor/lessons); otherwise the agent does the work.
  */
 export type ConversationMode = "act" | "plan" | "teach";
 
@@ -9,7 +9,8 @@ export type ConversationMode = "act" | "plan" | "teach";
  * remembered approval covers the action. A chat follows its agent's default
  * until it picks one.
  */
-export type PermissionMode = "ask" | "auto";
+/** Bypass is for an outside engine: it gets its own skip-permissions flag. */
+export type PermissionMode = "ask" | "auto" | "bypass";
 
 interface AgentQuestionOption {
   label: string;

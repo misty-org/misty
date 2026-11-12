@@ -10,7 +10,6 @@ const validSections = new Set([
   "planner",
   "calendar",
   "library",
-  "memory",
   "members",
   "settings",
 ]);

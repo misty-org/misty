@@ -13,7 +13,6 @@ export async function steerLocalExecution(prompt: string) {
   const { useMistyStore } = await import("@/features/agents/conversations/state/useMistyStore");
   const before = useMistyStore.getState();
   const execution = useLocalExecution.getState().execution;
-  const method = execution?.method;
   const conversationId = execution?.conversationId ?? before.activeConversationId;
   await pauseLocalExecution();
   const { replaceActiveGlobalInvocationStream } =
@@ -24,13 +23,10 @@ export async function steerLocalExecution(prompt: string) {
     activeConversationId: conversationId,
     selectedSpaceId: useLocalExecution.getState().execution?.spaceId ?? before.selectedSpaceId,
   });
-  if (method) {
-    throw new Error(
-      "This workflow stopped at takeover. Review its completed and uncertain results, " +
-        "then explicitly start a new run. Automatic workflow resume is not available.",
-    );
-  } else if (useLocalExecution.getState().execution?.desktopControl) {
-    const companion = (await import("../../cursor/companionState")).useCompanionState.getState();
+  if (useLocalExecution.getState().execution?.desktopControl) {
+    const companion = (
+      await import("../../tutor/cursor/companionState")
+    ).useCompanionState.getState();
     if (!companion.submit || companion.accountId !== before.accountId)
       throw new Error(
         "Fresh desktop context is unavailable in this window. Open the main Misty window and ask there. The task remains paused.",
@@ -49,10 +45,6 @@ export async function routeLocalFollowup(prompt: string): Promise<string> {
   const conversationId = useMistyStore.getState().activeConversationId;
   if (!execution || !conversationId) throw new Error("Open the active task conversation first.");
   await pauseLocalExecution(execution.taskId);
-  if (execution.method)
-    throw new Error(
-      "This workflow is stopped. Review its results and explicitly start a new run; automatic workflow resume is not available.",
-    );
   const routingGeneration = executionGeneration();
   // The device's fast model decides; the chat's last turns give it the task's context.
   const { route } = await deviceModelCall<{ route: "steer" | "queue" | "stop" }>("follow-up", {
@@ -95,7 +87,7 @@ const enqueueForegroundTask = ({ accountId, agentId, spaceId }: Execution, promp
 /** Queues an independent request after the current task, which keeps running. */
 export async function queueLocalFollowup(prompt: string) {
   const execution = useLocalExecution.getState().execution;
-  if (!execution || execution.method)
+  if (!execution)
     throw new Error("This task can't take new requests. Start a new task after it finishes.");
   await enqueueForegroundTask(execution, prompt);
 }

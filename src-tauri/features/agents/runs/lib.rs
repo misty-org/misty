@@ -31,6 +31,7 @@ pub(crate) mod instance_model;
 #[allow(dead_code)]
 pub mod local_run;
 pub(crate) mod local_prompt;
+pub use local_prompt::companion_engine_note;
 pub mod local_tools;
 #[allow(dead_code)]
 pub(crate) mod logger;
@@ -98,8 +99,6 @@ pub(crate) mod transcript_json;
 pub(crate) mod turn_deadline;
 #[allow(dead_code)]
 pub(crate) mod proof_tabs;
-#[allow(dead_code)]
-pub(crate) mod browser_replay;
 #[allow(dead_code)]
 pub(crate) mod companion_images;
 #[allow(dead_code)]

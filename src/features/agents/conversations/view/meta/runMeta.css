@@ -1,0 +1,18 @@
+/* A finished run's time, tokens and model, under its answer (RunMeta). */
+.agent-run-meta {
+  margin: 6px 0 0;
+  color: var(--color-cream-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  opacity: 0;
+  transition: opacity 150ms ease;
+}
+.group\/message:hover .agent-run-meta,
+.group\/message:focus-within .agent-run-meta {
+  opacity: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .agent-run-meta {
+    transition: none;
+  }
+}

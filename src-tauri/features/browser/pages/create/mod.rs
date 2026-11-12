@@ -37,10 +37,6 @@ pub async fn browser_webview_create(
     let temporary =
         eval_ephemeral_session().map(|session| app_windows::temporary_store_id(&session));
     request.private = temporary.is_some();
-    #[cfg(any(target_os = "macos", windows))]
-    if !request.private {
-        crate::sync::vault::site_data::prepare_page(&profile, &request.url).await;
-    }
     // Holds the account steady until the view has finished opening.
     let page_store = crate::browser::profiles::page_store(&profile).await?;
     trace_create("lease acquired");

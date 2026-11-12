@@ -118,6 +118,8 @@ fn account_of_run(run_id: &str) -> Option<String> {
 /// Keeps an event and tells the run's account's windows.
 pub(crate) fn publish_native(app: &AppHandle, run_id: &str, event: &Value) {
     keep(run_id, event);
+    super::run_ledger::note_event(app, run_id, event);
+    super::turn_rewind::after_run(app, run_id, event);
     emit_to_account(
         app,
         &account_of_run(run_id).unwrap_or_default(),
@@ -159,7 +161,7 @@ fn person_window(webview: &Webview) -> Result<(), String> {
 }
 
 /// A window of the run's own account, or of a run nobody can place.
-fn window_of_run(webview: &Webview, run_id: &str) -> Result<(), String> {
+pub(super) fn window_of_run(webview: &Webview, run_id: &str) -> Result<(), String> {
     person_window(webview)?;
     match (account_of_run(run_id), account_of_window(webview.label())) {
         (Some(run), Some(window)) if run != window => {
@@ -202,6 +204,9 @@ pub async fn agent_run_start(
         note_window(webview.label(), account);
         log().accounts.insert(run_id.clone(), account.to_owned());
     }
+    super::run_ledger::note_start(&app, &run_id, &body);
+    // The folder the turn works in is saved first, so a rewind can put its files back.
+    super::turn_rewind::before_run(&app, &run_id, &body).await;
     // A request that names an outside engine goes to its adapter, and reports the same events.
     if crate::engines::runs::wants(&body) {
         return crate::engines::runs::start(&app, run_id, body).await;

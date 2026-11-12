@@ -1,7 +1,4 @@
-//! The shared clipboard as the browser's popover shows it
-//! Clips are opened natively; the webview
-//! only sees what this device could already paste. Library items are copied to
-//! the system clipboard as files.
+//! Library items are copied to the system clipboard as files.
 #![cfg(desktop)]
 
 use file_access::fs_async;
@@ -13,101 +10,9 @@ use std::{
 };
 
 use serde::Deserialize;
-use tauri::State;
 
 use crate::app::error::{ApiError, ApiResult};
-use crate::app::runtime::MistyRuntime;
-use crate::devices::commands::require_main;
-use crate::sync::clipboard::cloud::CloudClipboardView;
-use crate::sync::clipboard::ClipboardPayload;
 use crate::sync::clipboard::PasteItem;
-
-/// Takes the system clipboard into the shared buffer if it isn't there yet.
-async fn capture_system(state: &State<'_, MistyRuntime>) -> Option<ClipboardPayload> {
-    let clipboard = state.clipboard.clone();
-    tokio::task::spawn_blocking(move || clipboard.capture_system())
-        .await
-        .ok()
-        .flatten()
-}
-
-#[tauri::command]
-pub async fn clipboard_cloud_view(
-    state: State<'_, MistyRuntime>,
-) -> Result<CloudClipboardView, String> {
-    capture_system(&state).await;
-    Ok(state.cloud_clipboard.view())
-}
-
-/// Puts a clip from the account's devices on this device's clipboard.
-#[tauri::command]
-pub async fn clipboard_cloud_copy(
-    webview: tauri::Webview,
-    state: State<'_, MistyRuntime>,
-    clip_id: String,
-) -> Result<(), String> {
-    require_main(&webview)?;
-    let payload = state.cloud_clipboard.open_clip(&clip_id).await?;
-    let clipboard = state.clipboard.clone();
-    let written = tokio::task::spawn_blocking(move || clipboard.apply_payload_to_system(payload))
-        .await
-        .map_err(|error| error.to_string())?;
-    if !written {
-        return Err("This clip couldn't be copied here.".into());
-    }
-    Ok(())
-}
-
-/// Pastes the newest clip into the page's focused field. The system clipboard is not touched.
-/// Images can't be typed in; they go to the clipboard with Copy.
-#[tauri::command]
-pub async fn clipboard_cloud_paste(
-    webview: tauri::Webview,
-    app: tauri::AppHandle,
-    state: State<'_, MistyRuntime>,
-    id: String,
-) -> Result<(), String> {
-    require_main(&webview)?;
-    // Whatever is on the system clipboard now joins the buffer first, and is then the newest.
-    let fresh = capture_system(&state).await;
-    let payload = match fresh.filter(|copy| !copy.text.is_empty() || !copy.html.is_empty()) {
-        Some(copy) => copy,
-        None => {
-            let clip_id = state
-                .cloud_clipboard
-                .latest_clip_id()
-                .ok_or("Nothing has been copied in the last 24 hours.")?;
-            state.cloud_clipboard.open_clip(&clip_id).await?
-        }
-    };
-    if payload.text.is_empty() && payload.html.is_empty() {
-        return Err("The newest clip is an image. Use Copy to put it on this computer.".into());
-    }
-    crate::browser::paste_into_page(&app, &webview, &id, &payload.text, &payload.html)
-}
-
-/// Saves a clip's files to Downloads and returns where they landed.
-#[tauri::command]
-pub async fn clipboard_cloud_save(
-    webview: tauri::Webview,
-    app: tauri::AppHandle,
-    state: State<'_, MistyRuntime>,
-    clip_id: String,
-) -> Result<Vec<String>, String> {
-    require_main(&webview)?;
-    let downloads = dirs::download_dir().ok_or("Misty can't find your Downloads folder.")?;
-    if !permissions::ensure_downloads_folder_async(&app).await {
-        return Err("Misty needs your OK to save to the Downloads folder.".to_owned());
-    }
-    let saved = state
-        .cloud_clipboard
-        .save_clip_files(&clip_id, &downloads)
-        .await?;
-    Ok(saved
-        .into_iter()
-        .map(|path| path.to_string_lossy().into_owned())
-        .collect())
-}
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]

@@ -35,14 +35,14 @@ const menu = {
   key: "native-key",
   x: 0.6,
   y: 0.4,
-  actions: ["ask", "separator", "copy-link", "open-link"],
+  actions: ["copy-link", "separator", "reload"],
 };
-it("uses the shared menu without the retired Ask row, keeping only host-admitted actions", () => {
+it("uses the shared menu, showing the actions the host admitted", () => {
   const select = vi.fn();
   render(<BrowserContextMenuView menu={menu} onSelect={select} />);
   expect(screen.getAllByRole("menuitem").map((el) => el.textContent)).toEqual([
     "Copy link address",
-    "Open link in new tab",
+    "Reload",
   ]);
   expect(screen.queryByText("Create task…")).toBeNull();
   expect(screen.queryByText(/Ask Misty/)).toBeNull();
@@ -61,9 +61,7 @@ it("supports keyboard navigation and Escape dismissal", async () => {
   );
   fireEvent.keyDown(document.activeElement!, { key: "ArrowDown" });
   await waitFor(() =>
-    expect(document.activeElement).toBe(
-      screen.getByText("Open link in new tab").closest('[role="menuitem"]'),
-    ),
+    expect(document.activeElement).toBe(screen.getByText("Reload").closest('[role="menuitem"]')),
   );
   fireEvent.keyDown(document.activeElement!, { key: "Escape" });
   expect(select).toHaveBeenCalledWith("dismiss");

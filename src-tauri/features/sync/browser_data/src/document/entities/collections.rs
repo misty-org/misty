@@ -1,19 +1,6 @@
-//! Records kept in vault collections: sign-ins, Space settings, extensions,
-//! site permissions, search, downloads and history.
+//! Records kept in a profile's collections: Space settings, extensions,
+//! site permissions, search and downloads.
 use super::*;
-
-/// A saved website sign-in. The origin is where it may be filled, never wider.
-#[derive(Clone, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct Login {
-    /// `scheme://host[:port]`, as the sign-in page reported it.
-    pub origin: String,
-    pub username: String,
-    pub password: String,
-    /// Milliseconds since the Unix epoch.
-    pub created_at: i64,
-    pub updated_at: i64,
-}
 
 /// The sites a Space claims, as hosts (`mail.example.com`); subdomains match too.
 #[derive(Clone, Default, Serialize, Deserialize)]
@@ -138,25 +125,4 @@ pub struct Download {
     pub finished_at: i64,
     /// The device that holds the file.
     pub device_id: String,
-}
-
-#[derive(Clone, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct Visit {
-    pub url: String,
-    pub title: String,
-    /// Milliseconds since the Unix epoch.
-    pub visited_at: i64,
-    pub typed: bool,
-}
-
-#[derive(Clone, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct HistoryBatch {
-    /// The device that browsed.
-    pub origin: String,
-    /// Hours since the Unix epoch.
-    pub hour: i64,
-    pub part: u32,
-    pub visits: Vec<Visit>,
 }

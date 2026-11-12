@@ -84,7 +84,23 @@ pub(crate) async fn evaluate_browser_async_javascript(
     }
 }
 
-#[cfg(not(any(target_os = "macos", windows)))]
+/// Runs `function_body` as an async function in the page's own world and
+/// returns the string it resolves to, as WebKit's callAsyncJavaScript does.
+#[cfg(target_os = "linux")]
+pub(crate) async fn evaluate_browser_async_javascript(
+    webview: Webview,
+    function_body: String,
+) -> Result<String, String> {
+    crate::browser::pages::content_world::call_async_in_world(webview, None, function_body, 15)
+        .await
+        .map_err(|error| match error.as_str() {
+            "Page state timed out." => "Browser capture timed out.".to_owned(),
+            "Page state was canceled." => "Browser capture was canceled.".to_owned(),
+            _ => "The Browser page could not run that request.".to_owned(),
+        })
+}
+
+#[cfg(not(any(target_os = "macos", windows, target_os = "linux")))]
 pub(crate) async fn evaluate_browser_async_javascript(
     _webview: Webview,
     _function_body: String,

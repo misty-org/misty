@@ -2,7 +2,7 @@ import { useMemo, type FormEvent } from "react";
 import { SpaceChatPicker } from "../composer/SpaceChatPicker";
 import type { SpaceChatDraft } from "../composer/useSpaceChatDraft";
 import type { MistyPickerSource } from "@/features/files";
-import type { useSpaceAgentMembers } from "../../members/agents/useSpaceAgentMembers";
+import type { MentionableAgent } from "../useSpaceMessageSpansStore";
 import type { ChatSuggestionsState } from "../hooks/useChatSuggestions";
 import type { useComposerInput } from "../hooks/useComposerInput";
 import type { useSpaceChatScope } from "../hooks/useSpaceChatData";
@@ -38,7 +38,7 @@ export function SpaceChatComposerArea({
   input: ReturnType<typeof useComposerInput>;
   typing: ReturnType<typeof useSpaceChatTyping>;
   members: Scope["members"];
-  agents: ReturnType<typeof useSpaceAgentMembers>["agents"];
+  agents: readonly MentionableAgent[];
   messages: Scope["messages"];
   pickerOpen: boolean;
   pickerSource: MistyPickerSource;

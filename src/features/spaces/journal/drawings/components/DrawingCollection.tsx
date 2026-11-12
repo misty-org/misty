@@ -20,7 +20,6 @@ import {
   ErrorNotification,
   IconButton,
   itemTones,
-  CollectionSelectionBar,
 } from "@/shared/ui";
 import { useRangeSelection } from "@/shared/hooks/useRangeSelection";
 import { MoreHorizontal, Pencil, PencilRuler, Plus, Trash2 } from "lucide-react";
@@ -97,12 +96,6 @@ export function DrawingCollection(props: {
           <CollectionViewToggle value={view} onChange={setView} disabled={!drawings.length} />
         }
       />
-      <CollectionSelectionBar
-        count={selection.selectedIds.length}
-        busy={props.bulkBusy}
-        onClear={selection.clear}
-        onDelete={() => props.onDeleteMany(selection.selectedIds)}
-      />
       <ErrorNotification message={props.bulkError} />
       {
         <CollectionItems
@@ -130,7 +123,19 @@ export function DrawingCollection(props: {
             }),
             onOpen: () => props.onOpen(d),
             selectable: !props.readOnly && d.can_delete,
-            contextMenu: <DrawingActions drawing={d} props={props} context />,
+            contextMenu:
+              selection.menuTargets(d.id).length > 1 ? (
+                <ContextMenuAction
+                  icon={<Trash2 />}
+                  label={`Delete ${selection.selectedIds.length} drawings`}
+                  destructive
+                  disabled={props.bulkBusy}
+                  onSelect={() => props.onDeleteMany(selection.selectedIds)}
+                />
+              ) : (
+                <DrawingActions drawing={d} props={props} context />
+              ),
+            onContextMenuOpen: () => selection.pickForMenu(d.id),
             actions: (
               <DropdownMenu modal={false}>
                 <DropdownMenuTrigger asChild>

@@ -22,7 +22,7 @@ async fn native(
     input: Value,
     prepared: &Value,
 ) -> Result<Option<Value>, String> {
-    if !cfg!(any(target_os = "macos", windows)) {
+    if !cfg!(any(target_os = "macos", windows, target_os = "linux")) {
         return Ok(None);
     }
     let (id, _) = resolve_agent_webview(app, state, request)?;

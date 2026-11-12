@@ -13,7 +13,7 @@ vi.mock("./screenContext", () => ({ captureMistyScreen: mocks.capture }));
 vi.mock("@/features/agents/runs/jobs/workspaceAutopilot", () => ({
   visibleAutopilotAvailable: () => mocks.desktop,
 }));
-vi.mock("@/features/agents/cursor/companionState", () => ({
+vi.mock("@/features/agents/tutor/cursor/companionState", () => ({
   useCompanionState: { getState: () => mocks.companion },
 }));
 import {

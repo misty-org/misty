@@ -50,25 +50,31 @@ Decided:
   as the upgrade. **Self-hosting is free and complete**, mostly for developers. Only
   `misty-cloud` (billing) stays private.
 
-Proposed, not yet confirmed:
+Decided 2026-11-11 (late), with the person:
 
-- **Agents share artifacts, not transcripts.** Each engine's chat history stays in its own files.
-  Agents save files, notes, decisions and where they left off to the Space with provenance
-  (`agents/artifacts/agentArtifacts.ts`), and whoever picks up next, on any engine, starts there.
-- **Memory is shared across engines** through the existing encrypted vault.
-- **The Space MCP server becomes an open, documented interface**, so agents Misty doesn't start
-  (Cursor, the Claude desktop app) can join a Space too. Today `engines/mcp.rs` gives a token
-  only to a run Misty started.
-- **End-to-end encryption for Space content** may need to move up: only the vault is protected
-  from the server today.
+- **Pick up where any agent left off.** Built (`agents/pickup`, Space home's Pick up card): "Save
+  where it left off" asks the chat's agent, in its chat, for a note under fixed headings; the
+  person edits it and sends it to the Space as a note titled "Pick up: …" with where it came from
+  (agent, engine, folder name). Picking one up starts a chat with any of the person's agents with
+  the note in its composer, unsent.
+- **The vault is removed**, in the app and in `misty-server`. The agent browser's sign-ins and
+  site data stay on each computer.
+- **Space content is not end-to-end encrypted.** The server can read notes, chats and files.
+- **One server at a time**: self-hosted or Misty Cloud. Built: leaving a server in use restarts
+  the app (`useServerSwitch.ts`); the address is `mistyCloudServer()`.
+- **Claims are automatic.** Built: an agent's status carries the files its run is writing,
+  relative to the linked folder (`agents/virtual/runWork.ts`), and they end with the run or after
+  30 quiet minutes. Space home's agent cards name them and warn in amber when a teammate's agent
+  is on the same file, and an engine turn starts with a note of teammates' claimed files
+  (`engines/run_prompt.rs`). Nothing is blocked. `misty-server` passes relative paths only.
+- **A per-Space timeline** of what every agent did, on any engine and in which mode. Built
+  natively: `agent_run_ledger` (`run_control/run_ledger.rs`, command `agent_run_timeline`); the
+  view is the Live activity log session's.
+- **Not planned now**: moving a Space between servers, several servers in one app.
+- **Not seen working yet**: claims between two accounts, a pick-up drafted by a real engine.
 
 Work this creates:
 
-- **Several servers in one app.** `src/api/deployment/serverChoice.ts` keeps one server per
-  device, so a self-hosted server and friends' Spaces on Misty Cloud can't be used together. It
-  also still names the address `mistyProServer()`.
-- **Moving a Space between servers** (notes, files, library, history). Without it "portable"
-  isn't true.
 - **A plain local mode for `misty-server`**, lower priority: files on disk, no tunnel, and
   `docker compose up` working first time.
 - **Free limits** on what costs money: storage, shared Spaces, members and history kept, with
@@ -80,23 +86,25 @@ Work this creates:
 
 - **Interface quality comes first.** The interface today is unpolished. Model it on OpenChamber
   (and OpenHands): floating bars and panels, generous spacing, rounded cards. A little color is
-  welcome where it carries meaning (Git changes, file and folder icons); the virtual office may
+  welcome where it carries meaning (Git changes, file and folder icons); the virtual studio may
   use full color. `AGENTS.md` still states the old gray-only rule and must be brought in line.
-- **The office is a Sims-like world**, built ourselves after Hermes3D in Misty's look: characters
+- **The studio is a Sims-like world**, built ourselves after Hermes3D in Misty's look: characters
   that walk around, furnished rooms, a card for the picked agent with actions, and a build mode.
-  The first 2D/3D office is far below this and is to be replaced.
+  The first 2D/3D studio is far below this and is to be replaced.
 - **Phase 6 is confirmed**: delete everything listed there, checking first what agents share.
 - **Handoffs**: the agent drafts on the person's computer and the person sends it, so nothing a
   model wrote reaches the server unapproved.
-- **The Space MCP server opens** to agents Misty doesn't start.
+- ~~**The Space MCP server opens** to agents Misty doesn't start.~~ Built, then removed on
+  2026-11-11: the person found connecting outside agents unnecessary. The server serves Misty's own
+  engine runs only.
 - **Order**: prove what exists (look at the app, real Codex and Claude Code turns), then the
   missing features. At most three large commits, not pushed.
 
 ## After the night of 2026-11-11
 
 Proven in the running app: Codex end to end (turns, resume, tool rows, the Ask prompt, the
-Space's tools over MCP), the open MCP server with a person-made connection, agent pages after
-the deletions, the files, changes and terminal panels, and the Sims-like office. Claude Code's
+Space's tools over MCP), the open MCP server with a person-made connection (since removed), agent pages after
+the deletions, the files, changes and terminal panels, and the Sims-like studio. Claude Code's
 adapter ran but that install's sign-in had expired; OpenCode isn't installed on this computer.
 
 Phase 6, deleted (about 31,000 lines): the tab strip and its parts, the address bar and browser
@@ -112,8 +120,7 @@ tests, and an agent page and a Codex turn retried in the running app):
   groups, pinned tabs, bookmarks and incognito in the workspace store (saved windows migrate),
   the person's web view in the store, the browser shortcuts, and 16 native commands with no
   caller. Help is in the account menu.
-- **Space home** is a dashboard: agents now, waiting for you, recent chats, project folders,
-  scheduled work.
+- **Space home** is a dashboard: agents now, waiting for you, recent chats, project folders.
 - **Handoffs and claims**, carried over the Space's own chat as the person's messages, marked by
   their first words ("Handoff:", "Working on:"). No server change.
 - **Multi-run**: one task on several engine agents, each in its own Git worktree, compared side
@@ -133,10 +140,181 @@ Left:
   The server's whole suite passes against its test database.
 - **Left out on purpose**: reading each engine's own chat history, since Misty keeps every chat's
   transcript itself.
-- **Stale leftovers**: `companion_misty_guide.md` still describes the browser menu; dead
-  `surfaceId === "browser"` branches in Memory Recall, subtitles and a few shell files; the cloud
-  clipboard has no way in; `misty-server` fixtures still list the four removed agent tools; vault
-  records for passwords, cards and bookmarks have no interface.
+- **Phase 6 dead-code pass (2026-11-11, uncommitted), done**: everything left of a person's own
+  browsing is gone, front end and native: site styles, zoom by site, mouse gestures, Peek, the
+  tab-history budget, the bars slide, pane dimming and card previews of pages, the address-bar
+  search seed, Memory Recall's page recorder, subtitles' "Generate from page", reader articles,
+  "Transcribe this tab" (and Kiri's media tap), Ask about a page, tab and group renaming, the cloud
+  clipboard, the vault's password, card, address and bookmark kinds (stored rows are kept, never
+  read), the "browser" and "extensions" surfaces and the `/browser` route (Agents is the landing
+  route), the page menu's dead items (Back, Forward, Reload and the trackpad swipe now run natively),
+  Misty's own site-permission asks (the engine asks now), the old Agents-page sidebar, CSS no
+  element uses, and 25 native commands with no caller, with their permissions and tests. The Misty
+  guide in the cursor companion's prompt describes the workspace instead of the browser.
+- **Also removed**: live subtitles, which had no way in once the Browser menu went (the panel,
+  its commands and capability, and the Misty-tabs audio capture).
+- **Workflows, schedules and skills are gone** (2026-11-11): engines have them natively. Removed
+  the Workflows page and pin, the Scheduled surface, Integrations › Skills, the saved-methods store,
+  browser replays, the `memory.workflow.*` tools, Memory's Workflows branch, and the run fields
+  that carried a method, a schedule or skills.
+- **Still open**: an account's sign-in password can't be changed from the app
+  (`accountChangePassword` has no screen). The device policy keeps its always-false `clipboard`
+  field: it is part of the signed record other devices verify.
+
+## Decisions of 2026-11-11 (day): engines are the brain, and Tutor
+
+Order of work: browser tools on the MCP server, then finishing the interface, then Tutor.
+
+### Engines are Misty's brain
+
+Misty needs no model of its own. The person's engines (Claude Code, Codex, OpenCode and the like) do
+the thinking, and Misty's harness is what they use through the local MCP server
+(`src-tauri/features/engines/mcp.rs`): the browser, take-over, Space tools and the gate.
+
+- **Browser tools on the MCP server.** Today the server offers only the Space families and sends
+  browser work through `ask_misty`, which starts Misty's own agent on its own model key. The browser
+  tools are offered directly instead, so an engine drives Misty's browser itself while the person
+  watches and takes over to sign in. Each call passes the native gate. In a Manual chat, opening and
+  reading pages runs freely, and clicking, typing and submitting ask first; Auto doesn't stop for
+  ordinary work. `ask_misty` stays, offered only when the person has set up Misty's own agent.
+- **The browser is opt-in per message** (decided with the person, 2026-11-11 evening). An engine run
+  gets the browser tools only when the person attaches Misty's browser to the message (the
+  composer's Attach menu, or `/browser`); otherwise it uses its own tools. The person also has a
+  plain browser of their own in the chat's right rail, which agents don't drive.
+- **Modes move to engines.** Plan maps to each engine's own plan mode through native
+  permission flags. Workflows and schedules are the engines' own. Anything Misty does with a
+  model in the background goes through an engine or goes away.
+- **Misty's own runtime stays in the code**, hidden and not the default.
+- **First run** finds which CLIs are installed and signed in, and starts with one of them. The
+  composer doesn't say "Message Misty…" unless the chat is with Misty's own agent.
+- **Terms.** Misty always starts the vendor's own CLI under the person's own sign-in. It never
+  reuses or proxies their subscription tokens.
+
+### Teach becomes Tutor
+
+Tutor is the cursor companion that floats over the desktop and shows the person what to do. It is
+first-class but optional, and a harness like the browser. It was `src/features/agents/cursor` (now under `tutor/`),
+the voice session in `src-tauri/features/agents/runs/voice`, lessons and the Teach chat mode.
+
+- **Its live conversation never goes through a CLI**, which is too slow for live voice. Its brain is
+  a raw fast model on the person's own key.
+- **Setup is layered**, and only the model key is required: with no keys Tutor is off; a fast model
+  that reads images gives typed questions, answers in bubbles and pointing; Soniox adds talking and
+  live translation; ElevenLabs lets it talk back.
+- **Engines don't drive the overlay.** Offering it as MCP tools (`tutor_point` and the like) was
+  proposed and turned down: an engine's turn takes seconds, so pointing would lag what is on screen.
+  Tutor's voice tools `start_task` and `steer_task` hand bigger work to the person's chosen engine.
+- **Interface.** A permanent place in the top bar and a hotkey. Not set up, a click opens a short
+  setup with one field and a test button per key. Its own Settings section, keys on the device,
+  never synced. macOS Screen Recording and Accessibility are asked for on first use. States: off,
+  needs setup, ready, listening. Labels say Tutor.
+- **Code.** Tutor becomes its own feature (`src/features/tutor`, `src-tauri/features/tutor`). Teach
+  leaves the chat's Act/Plan/Teach toggle. The Fast role is called "Tutor model" in Settings.
+
+### Built on 2026-11-11 (day), uncommitted
+
+- **Claude Code, seen working**: turns, resume, tool rows, the Ask prompt and the Space's tools.
+- **Browser tools for engines**: `mcp.rs` offers a run `screen_open`, `screen_close`, the reading
+  tools and the acting tools; `browser_act` and `browser_extract` are left out because they read a
+  page with Misty's own model. A connected outside agent gets none of them. A chat's agent keeps
+  its tabs from one turn to the next (`adoptChatTab`). Seen working with Claude Code only.
+- **Interface**: the app runs edge to edge; every page has one 48px top band; corners follow
+  4, 7, 9 and 12px; sidebar rows are 32px. The chat has a right-hand rail of panels with a Session
+  panel, and the open panel floats beside the chat. Journal is its own page of notes and drawings.
+- **Studio**: Misty's own scene, with no Hermes3D integration (decided). The room has a size
+  (28 by 18 to start, 20 by 13 up to 48 by 32) that build mode changes; walls sink and rise
+  smoothly; figures sit down from free floor beside a seat and get up before leaving; walk mode
+  puts the person in the room as a figure.
+- **First run**: an agent is made for each engine found installed, once per engine, and new chats
+  start with one of them. Get started opens a setup page (`onboarding/setup-page`, also Help ›
+  Run setup again): each engine shows one next step (Install, Sign in, Ready), and then the
+  Composio key and one-click sign-ins for common apps. An npm engine says it needs Node.js first.
+  Seen only in a mocked preview: the native app didn't build while `features/memory` was mid-change.
+- **Apps connected directly** (2026-11-11, decided with the person: no keys of Misty's, no
+  middlemen): the person signs in to an app maker's own MCP server (MCP authorization with dynamic
+  client registration and PKCE, a one-time callback on 127.0.0.1), the tokens stay in the keychain,
+  and every engine reaches the app through `integration_*` on Misty's MCP server, through the same
+  gate and approval cards as Composio (`connected_apps/direct`). The shipped catalog
+  (`direct/catalog.json`, made by `generate.rs` from the official MCP Registry on 2026-11-11) holds
+  6,491 apps whose sign-in was checked keyless, 6,301 with the maker's own logo (published with the
+  server or declared by its home page; native code fetches and keeps it). Only servers on the
+  domain their publisher proved are kept, skipping publishers with more than five servers (they
+  list other companies' apps) and other brands' names. Search adds the registry's newer makers,
+  checked live. Regenerate it before each release.
+  Composio stays for apps without a direct sign-in (Gmail, Google Calendar, Slack, GitHub, Outlook,
+  HubSpot, Asana). A sample of 400 registry servers: 37% keyless, 54% need no sign-in.
+  Left: a real sign-in and tool call in the running app; servers that only take Client ID
+  Metadata Documents (needs a public JSON on Misty's website, not a key); the agent's Connect card
+  for a direct app (agents can only ask for Composio apps today); servers that need no sign-in.
+
+Checked against the code, already so:
+
+- **Plan** maps to each engine's own plan mode: Claude Code's `plan` permission mode, Codex's
+  read-only sandbox with no approvals, OpenCode's `plan` agent.
+
+Left from these decisions: Tutor as its own feature; rigged characters for the studio (a model download the person has to allow); light
+theme.
+
+## Decisions of 2026-11-11 (evening): Tutor is a place to learn
+
+Tutor grows from the cursor companion into a section of its own, after open-notebook; the cursor
+companion is one tab of it. Pages have no title bar: the sidebar and the tab name them.
+
+Built, uncommitted (`src/features/agents/tutor`, with `lessons/` and `cursor/` moved under it): tabs
+Learn, Notebooks, Flashcards, Guides and Cursor.
+
+- **Notebooks** hold sources: files read by the confined document worker (`tutor_pick_sources`),
+  recordings transcribed with speakers on the person's Soniox key (`tutor_transcribe_sources`),
+  links and pasted text. Each is sent in full, as a summary or not at all. Notes, built-in and
+  custom transformations, search in a notebook, and questions answered with numbered citations.
+- **Made by the person's own agent** in background runs kept out of the sidebar (`tutorRuns.ts`):
+  guides, flashcards, quizzes, lessons, and audio overviews, whose two-voice script is spoken on
+  the device's speech key and kept as a WAV in Misty's folder (`tutor_overview_*`).
+- **Flashcards** review on SM-2.
+- **Search across notebooks** by meaning on the device's embedding model, vectors cached in
+  `misty.db` (`tutor_index`); by words without one.
+- **Sharing**: a notebook, guide, quiz or overview goes to the window's Space as a note, only when
+  the person asks; sharing again updates that note.
+
+Everything else in Tutor lives in `misty.db` and never syncs.
+
+Redesigned the same evening after NotebookLM, at the person's request: Tutor's home asks what to
+learn (a notebook whose agent finds sources on the web) and shows notebooks as cards; a notebook is
+three floating panels: sources and notes with checkboxes, the conversation with an agent-written
+overview and clickable citations, and a studio of tiles (audio overview, mind map, reports, flashcards,
+quiz, slides, data table, teach me) whose outputs open in place. Misty reads links, PDFs and YouTube
+captions itself (`tutor_read_link`) and dropped files through the document worker
+(`tutor_read_dropped`). Tutor's runs are ordinary chat turns, never the agent desktop. Seen working
+end to end with Codex: sources found and read, overview, a cited answer, a mind map.
+
+Video overviews: the engine writes each scene's narration, drawing and shot; the narration is spoken
+on the speech key and each shot filmed on the Video model in Settings → Models (Google's Gemini Omni
+on the person's own key, the one video API left since Sora and the Veo previews shut down), else
+the drawing shows. Filming has never been run against Google.
+
+Left: a notebook shared with a Space as a live notebook rather than a note.
+
+## Memory
+
+Removed 2026-11-11, too much to maintain for the beta: engines keep their own memory. Gone are the
+Memory page and settings, recall (remembered dictation and captures, recaps, the morning brief, the
+Journal's Day view), the `mem_*` tools for Misty's agent and for engines over MCP, the memory
+context in each run, agents' remembered preferences, and `src-tauri/features/memory`. Migration 35
+drops its tables. Don't add it back.
+
+## ccgui parity
+
+Decided 2026-11-11: Misty matches desktop-cc-gui feature for feature or goes beyond it. The whole
+list, with what is done and what is left, is `docs/plans/ccgui-parity.md`. Decided with it:
+
+- **Bypass** is a fourth mode beside Ask, Auto and Plan: native code passes the engine's own
+  skip-permissions flag. Space and browser calls still pass Misty's gate.
+- **Provider channels** come across, with presets and CC Switch import. Keys stay in the OS
+  keychain on the device, never sync, and reach only the vendor chosen.
+- **No plugin system.** The engines have their own (Claude Code plugins, Codex plugins and
+  skills), and Misty lists their commands and skills.
+- **No remote interface.** The desktop app is not served to phones or other computers.
+- **Usage limits** are read through each CLI, never from the person's sign-in in the Keychain.
 
 ## Where it stands
 
@@ -148,13 +326,13 @@ running app yet, and nothing is committed.
 | Phase | Built | Left |
 |---|---|---|
 | 1 Shell | Sidebar of Space pages and chats; no tabs, no address field; web pages only for agents | Tabs still exist underneath; README |
-| 1b Together | Live status of teammates' agents (sidebar, Space home, office) and a stored activity log, as fixed codes only; server relay and log in `misty-server` | Handoffs and claims (they wait on who writes their text); member limits; `AGENTS.md` and the server contract test don't yet state the rule for the log |
+| 1b Together | Live status of teammates' agents (sidebar, Space home, studio) and a stored activity log, as fixed codes only; server relay and log in `misty-server` | Handoffs and claims (they wait on who writes their text); member limits; `AGENTS.md` and the server contract test don't yet state the rule for the log |
 | 2 Engines | Adapters for Claude Code, Codex and OpenCode in `src-tauri/features/engines`; engine choice per agent; linked folders; sessions resumed; modes mapped natively and Ask goes to the person; session goals | A real turn was not sent (Codex's handshake was checked, OpenCode isn't installed here); images; multi-run; engine history isn't read from the CLIs' own files |
 | 3 Panels | Files with an editor, changes with step-by-step diffs and commit, terminal, in a panel beside the chat (`agents/context-panel`, `src-tauri/features/project`) | Preview with element picking; branches and history in the changes panel |
 | 4 Space for engines | Local MCP server (`engines/mcp.rs`) offering the Space's tools and `ask_misty`, through the same journal and gate as Misty's own agent; handed to all three engines | Unverified end to end; a "save to Space" tool for a file in the folder |
-| 5 Space home | Agents and what each is doing at the top of home; activity log on a shared Space | Waiting-for-you items, recent chats, linked folders, cost and schedules on home |
+| 5 Space home | Agents and what each is doing at the top of home; Happening now cards; each run's steps, page pictures and playback in its chat (`agents/activity`, `run_control/run_steps.rs`); activity log on a shared Space. The Space Activity page was removed (2026-11-11): chats already show it | Waiting-for-you items, recent chats, linked folders and cost on home; the activity views not yet watched in the running app |
 | 6 Human browsing | Nothing deleted | Every deletion, each to be confirmed |
-| 7 Virtual view | Office in 2D and 3D on the Agents page, with teammates' agents | Not a Space page of its own |
+| 7 Virtual view | Studio in 2D and 3D on the Agents page, with teammates' agents | Not a Space page of its own |
 
 ## What already exists
 
@@ -163,7 +341,7 @@ Most of the product is built; the plan mainly re-points the shell at it.
 - **Named agents**: `src/shared/schemas/native-agents.ts` (name, role, instructions, avatar, model,
   default mode, `space_id`), saved per device, edited in `AgentEditor.tsx`. Missing: an engine
   field and a per-agent tool list.
-- **Spaces**: sections home, chat, notes, drawings, library, memory, members and settings under
+- **Spaces**: sections home, chat, notes, drawings, library, members and settings under
   `/spaces/:id/<section>` (`src/features/spaces/overview/SpaceSectionView.tsx`). Presence and live
   editing work today.
 - **Agents in Spaces**: chats carry a `spaceId`, agents can be listed as Space members, and
@@ -324,12 +502,11 @@ ask Misty to do something on a web page.
 
 - the person's agents in this Space and what each is doing now,
 - anything waiting for the person (`WaitingForYouCard`, app requests, questions),
-- recent chats, recent artifacts, linked folders, schedules.
+- recent chats, recent artifacts, linked folders.
 
 The gallery stays as the library's view. First load uses skeletons shaped like these rows.
 
-OpenChamber's dashboard is the model: status, approvals and cost across the Space's work, with
-scheduling. Cost is shown only for engines that report it.
+OpenChamber's dashboard is the model: status, approvals and cost across the Space's work. Cost is shown only for engines that report it.
 
 ## Phase 6: retire human browsing
 

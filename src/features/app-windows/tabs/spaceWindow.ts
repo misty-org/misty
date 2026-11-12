@@ -29,9 +29,42 @@ function identityFor(key: string): SpaceWindowIdentity {
 }
 
 /** The current Space of this window, and a store for surfaces that follow it. */
-export const useSpaceWindowStore = create<{ identity: SpaceWindowIdentity }>(() => ({
+export const useSpaceWindowStore = create<{
+  identity: SpaceWindowIdentity;
+  /** The personal Space's id, once the account's Spaces have loaded. */
+  personalSpaceId: string | null;
+  /** Whose personal Space that is, so one account's id never lands on another's chats. */
+  personalSpaceOwner: string | null;
+}>(() => ({
   identity: identityFor(openingSpaceKey() ?? personalSpaceKey),
+  personalSpaceId: null,
+  personalSpaceOwner: null,
 }));
+
+/** The personal Space's id, or null until the account's Spaces load. */
+export function personalSpaceId(): string | null {
+  return useSpaceWindowStore.getState().personalSpaceId;
+}
+
+/** Records which Space is the person's personal one, and whose, as the account's Spaces load. */
+export function notePersonalSpace(space: { id: string; owner_user_id: string } | null) {
+  const id = space?.id ?? null;
+  const owner = space?.owner_user_id ?? null;
+  const known = useSpaceWindowStore.getState();
+  if (known.personalSpaceId !== id || known.personalSpaceOwner !== owner)
+    useSpaceWindowStore.setState({ personalSpaceId: id, personalSpaceOwner: owner });
+}
+
+/**
+ * The Space a new thing made in this window belongs to: its id, and whether it is the personal
+ * Space. The id is null only in the personal Space before the account's Spaces load.
+ */
+export function spaceForNewItems(): { spaceId: string | null; personal: boolean } {
+  const { identity, personalSpaceId: personalId } = useSpaceWindowStore.getState();
+  return identity.personal
+    ? { spaceId: personalId, personal: true }
+    : { spaceId: identity.spaceId, personal: false };
+}
 
 const listeners = new Set<(next: SpaceWindowIdentity, previous: SpaceWindowIdentity) => void>();
 

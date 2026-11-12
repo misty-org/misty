@@ -49,7 +49,7 @@ export function DrawingHeader({ reportError, drawing, onBack, onRename }: Drawin
   };
 
   return (
-    <header className="flex min-h-11 shrink-0 items-center gap-2 border-b border-charcoal-border bg-charcoal-bg py-1.5 pl-1 pr-3">
+    <header className="flex min-h-12 shrink-0 items-center gap-2 border-b border-charcoal-border bg-charcoal-bg py-1.5 pl-1 pr-3">
       {onBack ? (
         <BackButton onClick={onBack} aria-label="Back to drawings" />
       ) : (

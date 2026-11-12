@@ -16,7 +16,7 @@ export function JournalAttribution({
       target="_blank"
       rel="noreferrer"
       className={cn(
-        "inline-flex h-7 shrink-0 items-center gap-1 rounded-full border border-charcoal-border/60",
+        "inline-flex h-7 shrink-0 items-center gap-1 rounded-md border border-charcoal-border/60",
         "bg-charcoal-card px-2.5 text-2xs text-cream-muted no-underline transition-colors",
         "hover:bg-charcoal-card hover:text-cream focus-visible:outline-none",
         "focus-visible:ring-2 focus-visible:ring-charcoal-active",

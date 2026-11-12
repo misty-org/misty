@@ -1,6 +1,7 @@
 //! Commands stop when Misty does, even when Misty crashes and never gets to stop them.
 //!
-//! macOS can't tie a process's life to its parent's, so a small shell waits beside each command,
+//! macOS can't tie a process's life to its parent's, and Linux ties only the first process's (with
+//! `PR_SET_PDEATHSIG`) when no process namespace holds the rest, so a small shell waits beside each command,
 //! reading a pipe only Misty holds. The system closes that pipe however Misty dies, and the shell
 //! then kills the command's process group. Nothing is written to disk, so there's no stale process
 //! id to get wrong at the next launch, and it works even if Misty is never opened again.

@@ -93,12 +93,3 @@
   inherits: true;
   initial-value: 1;
 }
-.playback-elapsed::after {
-  counter-reset: ph round(down, calc(var(--playback-position) / 3600), 1) pm
-    round(down, mod(calc(var(--playback-position) / 60), 60), 1) ps
-    round(down, mod(var(--playback-position), 60), 1);
-  content: counter(pm) ":" counter(ps, decimal-leading-zero);
-}
-.playback-elapsed[data-hours]::after {
-  content: counter(ph) ":" counter(pm, decimal-leading-zero) ":" counter(ps, decimal-leading-zero);
-}

@@ -48,7 +48,7 @@ impl RunPlanner for PromptPlanner {
             "" => chrono::DateTime::from_timestamp_millis(now_ms()).map(|at| at.to_rfc3339_opts(SecondsFormat::Secs, true)).unwrap_or_default(),
             now => now.to_owned(),
         };
-        let built = build_prompt(&parsed, &tools, &now, text(request, "memory_context"), text(request, "method_guidance"));
+        let built = build_prompt(&parsed, &tools, &now);
         let mut context = json!({
             "system": built.system,
             "prompt": built.prompt,
@@ -67,7 +67,7 @@ impl RunPlanner for PromptPlanner {
             context["context_window_tokens"] = json!(window);
         }
         // Handed to the loop as the app sent them.
-        for name in ["capture", "display_captures", "attachments", "browser_replay"] {
+        for name in ["capture", "display_captures", "attachments"] {
             if let Some(value) = request.get(name).filter(|value| !value.is_null()) {
                 context[name] = value.clone();
             }

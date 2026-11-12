@@ -1,0 +1,50 @@
+/* A folder the engine was refused, offered to the person to allow (GrantCard). */
+.agent-grant-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+.agent-grant-card {
+  display: grid;
+  gap: 8px;
+  max-width: 85%;
+  padding: 12px 14px;
+  border: 1px solid var(--color-charcoal-border);
+  border-radius: 12px;
+  background: var(--color-charcoal-card);
+}
+.agent-grant-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  color: var(--color-cream);
+  font-size: 13px;
+  font-weight: 500;
+}
+.agent-grant-title svg {
+  width: 14px;
+  height: 14px;
+  color: var(--color-cream-muted);
+}
+.agent-grant-message,
+.agent-grant-done {
+  margin: 0;
+  color: var(--color-cream-muted);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.agent-grant-path {
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: var(--color-charcoal-bg);
+  color: var(--color-cream-muted);
+  font: 12px/1.5 var(--font-mono);
+  overflow-wrap: anywhere;
+}
+.agent-grant-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}

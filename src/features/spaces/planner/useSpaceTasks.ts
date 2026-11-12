@@ -86,5 +86,3 @@ export function useSpaceTasks(spaceId: string) {
       }),
   };
 }
-
-export type SpaceTasks = ReturnType<typeof useSpaceTasks>;

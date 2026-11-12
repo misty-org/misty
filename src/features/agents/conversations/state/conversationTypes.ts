@@ -69,9 +69,47 @@ export interface GlobalAiMessage {
   /** Sub-agents the run started, with their progress. */
   subagents?: AgentSubagent[];
   /** Set on turns Misty started itself rather than the person typing them. */
-  source?: "scheduled_task" | "goal_continuation" | "continuation";
+  source?: "goal_continuation" | "continuation";
   /** Misty sees this message and everything before it only as summarized notes. */
   compactedAfter?: boolean;
+  /** The engine's last usage report during this reply (`usage.updated`). */
+  usage?: MessageUsage;
+  /** The model the engine says answered. */
+  model?: string;
+  /** How long the run took, set when it completes. */
+  durationMs?: number;
+  /** Folders the engine was refused during this reply, each offered to the person to allow. */
+  folderGrants?: FolderGrant[];
+}
+
+/** A folder an engine was refused (`permission.denied`), and what the person did about it. */
+export interface FolderGrant {
+  id: string;
+  /** The path the engine wanted, as it named it. */
+  path?: string;
+  /** What the engine said. */
+  message: string;
+  toolCallId?: string;
+  toolName?: string;
+  /** The folder allowing it would cover, as native code worked it out. */
+  dir?: string;
+  status: "pending" | "granted" | "declined";
+}
+
+/** One usage report's token buckets; they don't overlap, and any may be missing. */
+export interface MessageUsage {
+  input?: number;
+  output?: number;
+  cacheRead?: number;
+  cacheWrite?: number;
+  /** Tokens held in the context. */
+  used?: number;
+  /** The model's context window, when the engine said. */
+  window?: number;
+  /** Of the output, the tokens spent reasoning. */
+  reasoning?: number;
+  /** What the reply cost in US dollars, when the engine said. */
+  costUsd?: number;
 }
 
 export interface MistyImageAttachment {
@@ -110,6 +148,12 @@ export interface GlobalAiConversation {
   updatedAt: string;
   /** When the user last saw it on this device; runs newer than this are unread. */
   lastReadAt?: string;
+  /** The person marked it unread; opening it clears this. */
+  markedUnread?: boolean;
+  /** When it was pinned to the top of the sidebar. */
+  pinnedAt?: string;
+  /** When it was archived, which keeps it out of the sidebar's lists. */
+  archivedAt?: string;
   /** The device that keeps this chat; absent while it waits in the server's inbox. */
   keptOnDeviceId?: string;
   /** Running notes on turns too old to send, written by this device's model; opaque here. */

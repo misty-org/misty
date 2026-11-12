@@ -11,7 +11,7 @@ import type { AiInvocationRequest } from "./invocationTypes";
 
 const scope = "device:agent-settings";
 
-export type OnboardingStep = "page_ask" | "workflow_run";
+export type OnboardingStep = "page_ask";
 
 interface Stored {
   version: 1;
@@ -26,7 +26,6 @@ interface Snapshot {
 
 const defaults: AiUserSettings = {
   enabled: true,
-  memory_enabled: true,
   app_actions_ask: false,
   payments_ask: true,
   screen_location: "window",
@@ -76,16 +75,10 @@ export async function changeAgentSettings(
   return { settings: settingsOf(stored) };
 }
 
-export async function onboardingSteps(): Promise<OnboardingStep[]> {
-  if (!hasTauriInternals()) return [];
-  return (await snapshot()).state?.steps ?? [];
-}
-
 /** Get started ticks off what's actually been done here. Never gets in a run's way. */
 export async function noteOnboardingStep(run: AiInvocationRequest): Promise<void> {
-  const step: OnboardingStep | null = run.methodVersionId
-    ? "workflow_run"
-    : run.currentTab || run.context.some((reference) => reference.kind === "browser-tab")
+  const step: OnboardingStep | null =
+    run.currentTab || run.context.some((reference) => reference.kind === "browser-tab")
       ? "page_ask"
       : null;
   if (!step) return;

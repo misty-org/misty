@@ -3,7 +3,7 @@ import {
   useAccountNotSetUp,
   useAccountSuspension,
 } from "@/api/client/accountLimits";
-import { currentApiBase, mistyProServer, mistyWebsite } from "@/api/deployment/serverChoice";
+import { currentApiBase, mistyCloudServer, mistyWebsite } from "@/api/deployment/serverChoice";
 import { Button, Notification } from "@/shared/ui";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { useEffect, useState } from "react";
@@ -57,7 +57,7 @@ export function AccountSuspendedNotice() {
   };
   if (!suspended) {
     if (!notSetUp || dismissed) return null;
-    return currentApiBase() === mistyProServer() ? (
+    return currentApiBase() === mistyCloudServer() ? (
       <Notification onDismiss={dismiss}>
         This account doesn&apos;t have Misty Pro.
         <br />

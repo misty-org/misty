@@ -2,9 +2,9 @@
 //! accessibility snapshots with refs that survive actions, batches of actions
 //! by ref, waiting without model calls, and page text for extraction.
 //!
-//! On macOS the runtime lives in its own WKContentWorld, so page scripts can
-//! neither read nor forge its refs, and clicks and keys arrive as native,
-//! trusted input. Other platforms use the page world and script events.
+//! The runtime lives in its own script world (a WKContentWorld on macOS, an
+//! isolated world on Windows and WebKitGTK), so page scripts can neither read
+//! nor forge its refs, and clicks and keys arrive as native, trusted input.
 use crate::browser::input::native_input;
 use crate::browser::{
     browser_target_observation, resolve_agent_webview, BrowserAgentExecuteRequest,
@@ -21,7 +21,7 @@ use consent::decline_consent;
 mod execute;
 mod judge;
 pub(crate) use judge::{judge_point, page_controls, scope_site};
-#[cfg(any(target_os = "macos", windows))]
+#[cfg(any(target_os = "macos", windows, target_os = "linux"))]
 mod frames;
 pub(in crate::browser) use execute::execute;
 use execute::poll;
@@ -52,7 +52,7 @@ const RUNTIME: &str = concat!(
     "\n",
     include_str!("page_skills.js")
 );
-#[cfg(any(target_os = "macos", windows))]
+#[cfg(any(target_os = "macos", windows, target_os = "linux"))]
 const WORLD: &str = "misty-agent-page";
 const SNAPSHOT_CHARS: u64 = 24_000;
 const AFTER_STEPS_SNAPSHOT_CHARS: u64 = 12_000;
@@ -90,11 +90,11 @@ async fn call(
 /// The cross-origin frame a ref belongs to and its document id (frames.rs); None for the
 /// top document's refs.
 fn frame_of(view: &Webview, reference: Option<&str>) -> Option<(u64, String)> {
-    #[cfg(any(target_os = "macos", windows))]
+    #[cfg(any(target_os = "macos", windows, target_os = "linux"))]
     {
         reference.and_then(|reference| frames::frame_of(view.label(), reference))
     }
-    #[cfg(not(any(target_os = "macos", windows)))]
+    #[cfg(not(any(target_os = "macos", windows, target_os = "linux")))]
     {
         let _ = (view, reference);
         None
@@ -122,7 +122,7 @@ async fn call_at(
         serde_json::to_string(&args).map_err(|error| error.to_string())?
     );
     let operation = serde_json::to_string(operation).map_err(|error| error.to_string())?;
-    #[cfg(any(target_os = "macos", windows))]
+    #[cfg(any(target_os = "macos", windows, target_os = "linux"))]
     {
         let body = format!(
             "{RUNTIME}\n{invocation}\nreturn JSON.stringify(await page.call({operation}, args));"
@@ -149,7 +149,7 @@ async fn call_at(
         serde_json::from_str(&raw)
             .map_err(|error| format!("The page returned invalid data: {error}"))
     }
-    #[cfg(not(any(target_os = "macos", windows)))]
+    #[cfg(not(any(target_os = "macos", windows, target_os = "linux")))]
     {
         let _ = frame;
         // The page world has no awaiting evaluation; settle is a host sleep there.
@@ -169,7 +169,7 @@ async fn call_at(
 
 /// Adds what the page's cross-origin frames show under their iframes (frames.rs).
 async fn with_frame_trees(view: &Webview, snapshot: &mut Value) {
-    #[cfg(any(target_os = "macos", windows))]
+    #[cfg(any(target_os = "macos", windows, target_os = "linux"))]
     {
         let reads = frames::trees(view).await;
         if let (false, Some(tree)) = (reads.is_empty(), snapshot["tree"].as_str()) {
@@ -177,7 +177,7 @@ async fn with_frame_trees(view: &Webview, snapshot: &mut Value) {
             snapshot["skills"] = frames::merge_skills(&snapshot["skills"], &reads);
         }
     }
-    #[cfg(not(any(target_os = "macos", windows)))]
+    #[cfg(not(any(target_os = "macos", windows, target_os = "linux")))]
     let _ = (view, snapshot);
 }
 

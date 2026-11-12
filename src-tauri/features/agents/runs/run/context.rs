@@ -24,7 +24,6 @@ pub(crate) struct SpaceTaskContext {
     pub(crate) device_search: Option<SearchProviderId>,
     pub(crate) title_prompt: String,
     pub(crate) summary_request: Option<(String, String)>,
-    pub(crate) browser_replay: Option<JsValue>,
 }
 
 fn typed<T: serde::de::DeserializeOwned>(value: Option<&JsValue>) -> Option<T> {
@@ -64,7 +63,6 @@ impl SpaceTaskContext {
             device_search,
             title_prompt: text("title_prompt"),
             summary_request: summary,
-            browser_replay: raw.get("browser_replay").cloned(),
             raw,
         }
     }

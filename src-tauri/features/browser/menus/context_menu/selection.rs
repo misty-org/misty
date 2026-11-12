@@ -18,7 +18,7 @@ pub(in crate::browser) fn select(
         return Err("Only Misty's trusted shell can select a browser action.".into());
     }
     let state = app.state::<BrowserSessionState>();
-    let mut context = {
+    let context = {
         let mut pending = state
             .context_menu
             .lock()
@@ -59,51 +59,9 @@ pub(in crate::browser) fn select(
         "dismiss" => {}
         #[cfg(debug_assertions)]
         "inspect" => view.open_devtools(),
-        "ask" => {
-            context.intent = action.into();
-            app.emit_to(
-                webview.window().label(),
-                "misty://browser-ask-context",
-                context,
-            )
-            .map_err(|e| e.to_string())?;
-        }
-        "open-link" | "open-image" => {
-            let url = if action == "open-link" {
-                context.page.link
-            } else {
-                context.page.image
-            };
-            app.emit_to(
-                webview.window().label(),
-                "misty://browser-popup",
-                json!({"sourceId": context.id, "url": url}),
-            )
-            .map_err(|e| e.to_string())?;
-        }
-        command if WORKSPACE_COMMANDS.contains(&command) => {
-            let url = if matches!(command, "open-link-split" | "peek-link") {
-                context.page.link
-            } else {
-                context.page.url
-            };
-            app.emit_to(
-                webview.window().label(),
-                "misty://browser-menu-command",
-                json!({"sourceId": context.id, "command": command, "url": url}),
-            )
-            .map_err(|e| e.to_string())?;
-        }
-        "search-web" => {
-            // The selection only leaves the native side once the person asks to search for it.
-            let query: String = context.page.content.trim().chars().take(400).collect();
-            app.emit_to(
-                webview.window().label(),
-                "misty://browser-menu-command",
-                json!({"sourceId": context.id, "command": "search-web", "query": query}),
-            )
-            .map_err(|e| e.to_string())?;
-        }
+        "back" => view.eval("history.back()").map_err(|e| e.to_string())?,
+        "forward" => view.eval("history.forward()").map_err(|e| e.to_string())?,
+        "reload" => view.eval("location.reload()").map_err(|e| e.to_string())?,
         "copy-link" | "copy-image-link" | "copy-page-link" => {
             let text = match action {
                 "copy-link" => context.page.link,

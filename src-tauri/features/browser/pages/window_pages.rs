@@ -50,6 +50,9 @@ pub fn browser_webviews_hide_all(caller: Webview, app: AppHandle) -> Result<(), 
 #[serde(rename_all = "camelCase")]
 pub struct BrowserWebviewsHideExceptRequest {
     pub keep: Vec<String>,
+    /// For `browser_webviews_close_except`: close the agents' pages instead of the tab pages.
+    #[serde(default)]
+    pub agent_pages: bool,
 }
 
 /// Hides every tab page in the caller's window that the interface does not want on screen. A
@@ -77,6 +80,10 @@ pub fn browser_webviews_hide_except(
 /// renderer on purpose, so a reload can hand each tab its live page back; a page whose tab was
 /// closed or lost meanwhile would otherwise stay alive (and audible) until the app quits. Popups
 /// still waiting for a tab to adopt them, agent pages and previews are left alone.
+///
+/// With `agent_pages` it closes the agents' pages the renderer does not know instead. The agent
+/// browser starts every tab asleep after a reload and opens a new page when one is shown, so a page
+/// from before the reload has no tab, never moves again and stays drawn over the window.
 /// Async for the same reason as `browser_webview_close`: never close on the UI thread.
 #[tauri::command]
 pub async fn browser_webviews_close_except(
@@ -92,7 +99,12 @@ pub async fn browser_webviews_close_except(
         .iter()
         .cloned()
         .collect();
-    let orphans: Vec<String> = window_pages(&caller, &app, "misty-browser-tab-", &request.keep)
+    let prefix = if request.agent_pages {
+        "misty-browser-agent-"
+    } else {
+        "misty-browser-tab-"
+    };
+    let orphans: Vec<String> = window_pages(&caller, &app, prefix, &request.keep)
         .iter()
         .filter_map(|webview| {
             webview

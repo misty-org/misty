@@ -14,9 +14,9 @@ const EVENT: &str = "misty://signed-out-hotkey";
 static ARMED: Mutex<Option<Arc<AtomicBool>>> = Mutex::new(None);
 
 fn access_granted() -> bool {
-    #[cfg(any(target_os = "macos", windows))]
+    #[cfg(any(target_os = "macos", windows, target_os = "linux"))]
     return super::platform::access_granted();
-    #[cfg(not(any(target_os = "macos", windows)))]
+    #[cfg(not(any(target_os = "macos", windows, target_os = "linux")))]
     false
 }
 

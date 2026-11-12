@@ -1,12 +1,11 @@
-/* Integrations: the shared page shell, then one tab per area. */
+/* Integrations: the shared page shell, then the apps. */
 .agent-integrations {
   display: grid;
-  gap: 24px;
+  gap: 16px;
 }
 .agent-integrations-panel {
   display: grid;
-  gap: 40px;
-  margin-top: 8px;
+  gap: 24px;
 }
 .agent-integrations-panel[hidden] {
   display: none;
@@ -81,33 +80,22 @@
   gap: 6px;
 }
 .agent-integrations-search {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  width: 220px;
-  height: 30px;
-  padding-inline: 10px;
-  border: 1px solid var(--color-charcoal-border);
-  border-radius: var(--radius-md);
-  color: var(--color-cream-muted);
-}
-.agent-integrations-search input {
-  font-size: 13px;
+  width: 240px;
 }
 .agent-integrations-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
+  gap: 2px 16px;
 }
+/* Flat rows, as everywhere in Misty: no card, a hover tint only. */
 .agent-integrations-tile {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   min-width: 0;
-  padding: 12px 8px 12px 14px;
-  border: 1px solid var(--color-charcoal-border);
-  border-radius: var(--radius-xl);
-  background: var(--color-charcoal-card);
+  min-height: 40px;
+  padding: 4px 8px;
+  border-radius: var(--radius-md);
 }
 @container agent-studio (max-width: 1100px) {
   .agent-integrations-grid {
@@ -115,10 +103,6 @@
   }
 }
 @container agent-studio (max-width: 760px) {
-  .agent-integrations {
-    max-width: calc(100% - 32px);
-    margin-top: 24px;
-  }
   .agent-integrations-grid {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -132,7 +116,7 @@
   height: auto;
   width: 100%;
   justify-content: flex-start;
-  padding: 12px 8px 12px 14px;
+  padding: 4px 8px;
   font-weight: 400;
   text-align: left;
   white-space: normal;

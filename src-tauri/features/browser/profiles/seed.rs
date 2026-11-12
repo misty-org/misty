@@ -1,8 +1,7 @@
-//! Copies what this computer already kept for itself (site choices, the downloads list, search
-//! shortcuts) into the first profile's records, once per account. Extensions arrive with the next
-//! reconcile, which writes every installed one.
+//! Copies what this computer already kept for itself (site choices and the downloads list) into
+//! the first profile's records, once per account.
 use super::*;
-use browser_data::collections::{DOWNLOADS, SEARCH, SITE_PERMISSIONS};
+use browser_data::collections::{DOWNLOADS, SITE_PERMISSIONS};
 
 enum SeedError {
     Database,
@@ -20,7 +19,7 @@ fn read(
     connection: &rusqlite::Connection,
     store_key: &str,
     session: &str,
-) -> [(&'static str, Vec<ViewRecord>); 3] {
+) -> [(&'static str, Vec<ViewRecord>); 2] {
     [
         (
             SITE_PERMISSIONS,
@@ -29,10 +28,6 @@ fn read(
         (
             DOWNLOADS,
             crate::browser::history_downloads::library::seed_download_records(connection, session),
-        ),
-        (
-            SEARCH,
-            crate::browser::search::profile::seed_records(connection),
         ),
     ]
 }
@@ -63,7 +58,6 @@ fn seed() -> Result<(), SeedError> {
     if done {
         return Ok(());
     }
-    let mut changed = Vec::new();
     {
         let mut records = records.lock().map_err(|_| SeedError::Records)?;
         for (collection, seeded) in read(&transaction, &store_key, &session) {
@@ -71,12 +65,9 @@ fn seed() -> Result<(), SeedError> {
                 .into_iter()
                 .map(|record| (record.id.clone(), Some(record)))
                 .collect();
-            let written = records
+            records
                 .write(crate::browser::app_windows::PERSONAL, collection, writes)
                 .map_err(|_| SeedError::Records)?;
-            if written > 0 {
-                changed.push(collection);
-            }
         }
     }
     transaction.execute(
@@ -84,13 +75,6 @@ fn seed() -> Result<(), SeedError> {
         [&marker],
     )?;
     transaction.commit()?;
-    for collection in changed {
-        announce(RecordsChanged {
-            profile: crate::browser::app_windows::PERSONAL.to_owned(),
-            collection: collection.to_owned(),
-            remote: false,
-        });
-    }
     Ok(())
 }
 

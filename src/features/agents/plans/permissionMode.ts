@@ -10,6 +10,11 @@ export const permissionModes: { id: PermissionMode; label: string; description: 
     label: "Auto",
     description: "Continues where you remembered an approval; asks for the rest",
   },
+  {
+    id: "bypass",
+    label: "Bypass",
+    description: "The engine skips its own permission asks; Space and browser calls still ask",
+  },
 ];
 
 export const permissionModeLabel = (mode: PermissionMode) =>

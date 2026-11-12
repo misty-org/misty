@@ -1,6 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { sidebarWidthMin, useSidebarWidthStore } from "@/app/shell/sidebarWidth";
-import { useSitePermissionAsks } from "@/features/browser/sitePermissionAsks";
 import { useSidebarCollapsedStore } from "@/app/shell/sidebarCollapsed";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -31,7 +30,7 @@ const hideDelayMs = 180;
 const sidebarCloseDistance = 70;
 
 /**
- * Holds the vertical tab sidebar. Open, it is a column beside the page. Collapsed, the column
+ * Holds the sidebar. Open, it is a column beside the page. Collapsed, the column
  * animates shut and the sidebar waits at its window edge as a drawer, like an auto-hidden
  * navigator: moving the pointer to that edge slides it over the page, and leaving hides it.
  */
@@ -42,13 +41,6 @@ export function SidebarDrawer(props: { side: "left" | "right"; children: ReactNo
   const panel = useRef<HTMLDivElement>(null);
   const [resizing, setResizing] = useState(false);
   const hidden = collapsed && !revealed;
-  // A site's permission question opens from a button on the sidebar, so it comes out to ask; the
-  // open popup then holds it out until it is answered.
-  const asking = useSitePermissionAsks((state) => state.asks.length > 0);
-  useEffect(() => {
-    if (collapsed && asking) setRevealed(true);
-  }, [collapsed, asking]);
-
   useEffect(() => {
     if (!collapsed) {
       setRevealed(false);

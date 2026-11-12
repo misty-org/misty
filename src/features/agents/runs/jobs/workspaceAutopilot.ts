@@ -8,7 +8,7 @@ import { useUserStore } from "@/features/account/core";
 import { agentAccountId } from "../../personal/agentAccount";
 import { isApiSessionTransitioning } from "@/api/client/session";
 import { desktopOs } from "@/shared/platform/desktopOs";
-import { useCompanionState } from "../../cursor/companionState";
+import { useCompanionState } from "../../tutor/cursor/companionState";
 
 /**
  * Stops a visible autopilot run from the keyboard. Plain Escape would also

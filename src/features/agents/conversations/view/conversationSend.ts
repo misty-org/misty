@@ -1,7 +1,7 @@
 import { releasePendingWait } from "../../interventions/WaitingForYouCard";
 import type { MistyImageAttachment } from "../state/conversationTypes";
 import { useMistyStore } from "../state/useMistyStore";
-import type { Presentation } from "../../cursor/protocol";
+import type { Presentation } from "../../tutor/cursor/protocol";
 import { continuationScreen } from "../../runs/jobs/executionHandoff";
 
 /** Writing to a run that waits for you means you are back: the wait is released so the run
@@ -44,5 +44,5 @@ export async function submitWorkspaceMessage(
   );
   // Folder work keeps its handoff for follow-ups; other context is sent once.
   if (handoff && handoff.surfaceId !== "files" && useMistyStore.getState().handoff === handoff)
-    useMistyStore.setState({ handoff: undefined, browserRequest: undefined, context: [] });
+    useMistyStore.setState({ handoff: undefined, context: [] });
 }

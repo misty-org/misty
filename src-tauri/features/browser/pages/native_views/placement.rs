@@ -1,82 +1,6 @@
 //! Placing a page's native view: its position, stacking and rounded corners.
 use super::*;
 
-/// The live subtitles panel rides above the window's tabs. While app UI draws over them it goes under
-/// the renderer with them, so it never covers a menu.
-#[cfg(target_os = "macos")]
-pub(crate) fn stack_subtitles_panel(app: &AppHandle, window: &str) {
-    use objc2_app_kit::{NSView, NSWindowOrderingMode};
-    let Some(panel) = app.get_webview(&crate::voice::subtitles_panel_label(window)) else {
-        return;
-    };
-    let own_renderer = renderer(window);
-    let _ = panel.with_webview(move |platform_webview| unsafe {
-        let view: &NSView = &*platform_webview.inner().cast();
-        crate::browser::pages::macos::pointer_guard::keep_pointer_on_panel(view);
-        let Some(parent) = view.superview() else {
-            return;
-        };
-        let main_view = own_renderer.native;
-        if main_view != 0 && browser_child_should_be_below_renderer(own_renderer.overlay) {
-            let main_view: &NSView = &*(main_view as *const NSView);
-            parent.addSubview_positioned_relativeTo(
-                view,
-                NSWindowOrderingMode::Below,
-                Some(main_view),
-            );
-        } else if !parent
-            .subviews()
-            .lastObject()
-            .is_some_and(|top| std::ptr::eq(&*top, view))
-        {
-            parent.addSubview_positioned_relativeTo(view, NSWindowOrderingMode::Above, None);
-        }
-    });
-}
-
-#[cfg(windows)]
-pub(crate) fn stack_subtitles_panel(app: &AppHandle, window: &str) {
-    use windows_sys::Win32::{
-        Foundation::HWND,
-        UI::WindowsAndMessaging::{
-            SetWindowPos, HWND_TOP, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOOWNERZORDER, SWP_NOSIZE,
-        },
-    };
-    let Some(panel) = app.get_webview(&crate::voice::subtitles_panel_label(window)) else {
-        return;
-    };
-    let own_renderer = renderer(window);
-    let _ = panel.with_webview(move |platform_webview| unsafe {
-        let mut child = Default::default();
-        if platform_webview
-            .controller()
-            .ParentWindow(&mut child)
-            .is_err()
-        {
-            return;
-        }
-        let below = own_renderer.native != 0
-            && browser_child_should_be_below_renderer(own_renderer.overlay);
-        let insert_after = if below {
-            own_renderer.native as HWND
-        } else {
-            HWND_TOP
-        };
-        SetWindowPos(
-            child.0 as HWND,
-            insert_after,
-            0,
-            0,
-            0,
-            0,
-            SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOOWNERZORDER | SWP_NOSIZE,
-        );
-    });
-}
-
-#[cfg(not(any(target_os = "macos", windows)))]
-pub(crate) fn stack_subtitles_panel(_app: &AppHandle, _window: &str) {}
-
 #[cfg(target_os = "macos")]
 pub(in crate::browser) fn position_macos_webview(
     webview: &Webview,
@@ -213,11 +137,7 @@ pub(in crate::browser) fn position_windows_webview(
         })
         .map_err(|error| error.to_string())?;
     match failure.load(Ordering::Acquire) {
-        0 => {
-            // Every placement here takes the top, which would put the page over the panel.
-            stack_subtitles_panel(webview.app_handle(), webview.window().label());
-            refresh_browser_cursor_ownership(webview)
-        }
+        0 => refresh_browser_cursor_ownership(webview),
         u32::MAX => Err("A WebView2 window handle is unavailable.".to_owned()),
         code => Err(format!(
             "Could not update Browser stacking (Windows error {code})."

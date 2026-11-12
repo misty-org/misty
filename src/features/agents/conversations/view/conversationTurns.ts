@@ -1,6 +1,6 @@
 import type { GlobalAiMessage } from "../state/conversationTypes";
 import { splitLedger } from "../../checkpoints/ledger";
-import { companionReply } from "../../cursor/companionReply";
+import { companionReply } from "../../tutor/cursor/companionReply";
 
 type Turn = {
   key: string;

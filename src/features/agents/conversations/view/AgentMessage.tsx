@@ -1,6 +1,6 @@
 import { memo, useMemo } from "react";
 import { Link } from "react-router-dom";
-import { CalendarClock, Flag } from "lucide-react";
+import { Flag } from "lucide-react";
 import { MistyMarkdown } from "../../runs/markdown/MistyMarkdown";
 import { MistyActivityStatus } from "../state/MistyActivityStatus";
 import { MistyMessageAttachments } from "../composer/MistyMessageAttachments";
@@ -19,7 +19,11 @@ import { useMessageProgress } from "../../progress/useMessageProgress";
 import { AgentMessageActions } from "./AgentMessageActions";
 import { AgentNotebookCard } from "./AgentNotebookCard";
 import { AgentRunOutcome } from "./AgentRunOutcome";
+import { GrantCards } from "./grants/GrantCard";
+import { RunMeta } from "./meta/RunMeta";
 import { AgentSubagents } from "./AgentSubagents";
+import { EngineTurnParts } from "./engine/EngineTurnParts";
+import { EngineForkButton } from "./engine/EngineChatContext";
 import { CollapsibleText, EarlierReply, MistyAvatar } from "./AgentTranscriptParts";
 import { visibleConversationContent } from "./conversationTurns";
 import { splitFailure } from "./failureSummary";
@@ -98,13 +102,11 @@ function AgentMessageView(props: AgentMessageProps) {
     if (continuationEvent(content, message.source)) return null;
     const reply = splitReplyQuote(content);
     return (
-      <div className="agent-message-user group/message flex flex-col items-end gap-1.5">
-        {message.source === "scheduled_task" ? (
-          <span className="flex items-center gap-1.5 text-xs text-cream-muted">
-            <CalendarClock size={13} aria-hidden="true" />
-            Sent by scheduled task
-          </span>
-        ) : null}
+      <div
+        className="agent-message-user group/message flex flex-col items-end gap-1.5"
+        data-message-id={message.id}
+        data-anchor-id={message.id}
+      >
         <div
           className={cn(
             "max-w-[82%] rounded-2xl rounded-br-md border border-charcoal-border/60 bg-charcoal-card",
@@ -125,6 +127,7 @@ function AgentMessageView(props: AgentMessageProps) {
           onRetry={props.onRetry}
           onEdit={props.onEdit}
         />
+        <EngineForkButton messageId={message.id} />
       </div>
     );
   }
@@ -132,6 +135,7 @@ function AgentMessageView(props: AgentMessageProps) {
     <article
       className="agent-message-assistant group/message flex items-start gap-3.5"
       data-state={message.state}
+      data-message-id={message.id}
     >
       <MistyAvatar />
       <div className="min-w-0 flex-1">
@@ -144,6 +148,14 @@ function AgentMessageView(props: AgentMessageProps) {
           running={message.state === "pending" || message.state === "streaming"}
           hold={message.appRequest?.state === "pending" ? "waiting_for_you" : undefined}
         />
+        {message.invocationId ? (
+          <EngineTurnParts
+            runId={message.invocationId}
+            live={message.state === "pending" || message.state === "streaming"}
+            conversationId={props.conversationId}
+            onSend={(prompt) => props.onRetry(prompt)}
+          />
+        ) : null}
         {progress?.length ? (
           <AgentProgress
             items={progress}
@@ -154,7 +166,9 @@ function AgentMessageView(props: AgentMessageProps) {
         {message.notebook ? <AgentNotebookCard notebook={message.notebook} /> : null}
         {content ? (
           <div className="misty-markdown-message text-sm leading-6 text-cream">
-            <MistyMarkdown>{content}</MistyMarkdown>
+            <MistyMarkdown streaming={message.state === "pending" || message.state === "streaming"}>
+              {content}
+            </MistyMarkdown>
             <LinkPreviews
               text={content}
               enabled={message.state !== "pending" && message.state !== "streaming"}
@@ -199,12 +213,23 @@ function AgentMessageView(props: AgentMessageProps) {
         {message.screenRequest ? (
           <ScreenRequestCard messageId={message.id} request={message.screenRequest} />
         ) : null}
+        {message.folderGrants?.length ? (
+          <GrantCards
+            conversationId={props.conversationId}
+            message={message}
+            working={props.working}
+            retryPrompt={props.retryPrompt}
+            retryFrom={props.retryFrom}
+            onRetry={props.onRetry}
+          />
+        ) : null}
         {props.conversationId ? (
           <AgentAnsweredQuestions
             conversationId={props.conversationId}
             invocationId={message.invocationId}
           />
         ) : null}
+        {message.state === "completed" ? <RunMeta message={message} /> : null}
         <AgentMessageActions
           message={message}
           text={content}

@@ -25,15 +25,3 @@ export function microphoneSettingsHint(): string {
     ? "Allow it for Misty in Windows Settings › Privacy & security › Microphone, then try again."
     : "Allow it for Misty in System Settings, then try again.";
 }
-
-/** The name of the system's file manager, for "Show in …" actions. */
-export function fileManagerName(): string {
-  switch (desktopOs()) {
-    case "macos":
-      return "Finder";
-    case "windows":
-      return "File Explorer";
-    default:
-      return "Files";
-  }
-}

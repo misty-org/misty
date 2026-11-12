@@ -1,4 +1,4 @@
-import { Check, Plus, RefreshCw, Search } from "lucide-react";
+import { Check, Plus, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { confirmAction } from "@/shared/lib/confirmAction";
 import { openExternalLink } from "@/shared/platform/openExternalLink";
@@ -6,15 +6,16 @@ import {
   Button,
   ErrorNotification,
   IconButton,
-  Input,
   Popover,
   PopoverContent,
   PopoverTrigger,
+  SearchField,
   Skeleton,
 } from "@/shared/ui";
 import { modelKeysChangedEvent, openModelSettings } from "@/features/agents/modelKeysPublic";
 import { appsApi, type CatalogApp, type ConnectedApp } from "./api";
 import { AppAccountsCard, AppLogo, accountSummary, groupApps } from "./ConnectedAppRows";
+import { DirectApps } from "./DirectApps";
 
 /** A sign-in open in the browser, and the accounts that app already had when it began. */
 interface SignIn {
@@ -24,7 +25,7 @@ interface SignIn {
 }
 
 /** Account-wide connected apps. Every agent can use them; nothing is set per agent. */
-export function ConnectedAppsCatalog() {
+export function ConnectedAppsCatalog({ find = "" }: { find?: string } = {}) {
   const [apps, setApps] = useState<ConnectedApp[] | null>(null);
   const [available, setAvailable] = useState(true);
   const [query, setQuery] = useState("");
@@ -175,10 +176,16 @@ export function ConnectedAppsCatalog() {
   };
   return (
     <>
+      <section aria-labelledby="direct-apps-heading" className="agent-integrations-section">
+        <header>
+          <h2 id="direct-apps-heading">Sign in directly</h2>
+        </header>
+        <DirectApps find={find} />
+      </section>
       <ErrorNotification message={error} />
       {!available ? (
         <div className="agent-integrations-description grid justify-items-start gap-2">
-          <p>Add a Composio key to connect apps. Without one, agents use each app’s web page.</p>
+          <p>Add a Composio key for apps that don’t offer a direct sign-in, such as Gmail.</p>
           <Button variant="outline" size="sm" onClick={openModelSettings}>
             Open Models
           </Button>
@@ -196,19 +203,16 @@ export function ConnectedAppsCatalog() {
       {available ? (
         <section aria-labelledby="add-app-heading" className="agent-integrations-section">
           <header>
-            <h2 id="add-app-heading">Apps</h2>
+            <h2 id="add-app-heading">Through Composio</h2>
             <div className="flex items-center gap-2">
-              <label className="agent-integrations-search">
-                <Search size={14} aria-hidden="true" />
-                <Input
-                  variant="bare"
-                  value={query}
-                  maxLength={100}
-                  onChange={(event) => setQuery(event.target.value)}
-                  placeholder="Find an app"
-                  aria-label="Find an app"
-                />
-              </label>
+              <SearchField
+                containerClassName="agent-integrations-search"
+                value={query}
+                maxLength={100}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Find an app"
+                aria-label="Find an app"
+              />
               <IconButton label="Refresh apps" disabled={busy} onClick={() => void act(reload)}>
                 <RefreshCw size={14} />
               </IconButton>

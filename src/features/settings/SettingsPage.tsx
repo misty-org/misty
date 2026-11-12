@@ -1,5 +1,5 @@
 import { useAppStore } from "@/app/shell";
-import { Button, Input } from "@/shared/ui";
+import { Button, SearchField } from "@/shared/ui";
 import { memo, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
@@ -125,16 +125,13 @@ export const SettingsWorkspace = memo(function SettingsWorkspace(props: Settings
       presentation={props.presentation}
       title={settingsAreas[entry.area].label}
       navigationHeader={
-        <Input
+        <SearchField
           aria-label="Search settings"
           placeholder="Search"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
+          onClear={() => setQuery("")}
           onKeyDown={(event) => {
-            if (event.key === "Escape" && query) {
-              event.stopPropagation();
-              setQuery("");
-            }
             if (event.key === "Enter" && results[0]) openResult(results[0]);
           }}
         />

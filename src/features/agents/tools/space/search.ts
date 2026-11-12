@@ -13,8 +13,10 @@ const searchAll: LocalToolHandler = async (request) => {
   const reference = spaceArgument(input);
   const params = new URLSearchParams({ q: query, limit: String(limit) });
   if (kinds.length > 0) params.set("kinds", kinds.join(","));
-  if (reference) {
-    const [space] = spaceTargets(await listSpaces(request), reference, "read");
+  // A chat's run searches only its own Space.
+  const spaces = await listSpaces(request);
+  if (reference || spaces.length === 1) {
+    const [space] = spaceTargets(spaces, reference, "read");
     params.set("space_id", space.id);
   }
   return readRoute(request, `/search?${params}`);

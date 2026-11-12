@@ -8,7 +8,6 @@ pub(super) fn new_window(
     url: Url,
     features: tauri::webview::NewWindowFeatures,
 ) -> NewWindowResponse<tauri::Wry> {
-    #[cfg(any(target_os = "macos", windows))]
     if let Some(response) = provider_popup(popup_app, popup_id, &url, features) {
         return response;
     }
@@ -87,8 +86,6 @@ pub(super) fn page_load(
     }
     let _ = apply_browser_pointer_tracking(&webview, renderer(webview.window().label()).tracking);
     if matches!(payload.event(), tauri::webview::PageLoadEvent::Started) {
-        // Apply saved zoom before the page paints. Applying it at load
-        // completion resizes the page and scrollbar after render.
         if let Some(state) = page_app.try_state::<BrowserSessionState>() {
             if let Ok(mut sessions) = state.sessions.lock() {
                 if let Some(session) = sessions.get_mut(page_id) {
@@ -126,8 +123,6 @@ pub(super) fn page_load(
         if let Some(state) = page_app.try_state::<BrowserSessionState>() {
             let _ = apply_shortcuts(&webview, &state);
         }
-        apply_page_zoom_policy(&webview, page_app, page_id);
-        crate::browser::site_settings::style::apply(&webview);
         crate::browser::pages::night_light::apply(&webview);
         let _ = webview.eval("window.__MISTY_REPORT_BACKGROUND__?.()");
         request_browser_favicon(&webview, page_app, page_id);

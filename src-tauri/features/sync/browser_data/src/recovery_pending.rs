@@ -128,7 +128,7 @@ impl RecoveryStore {
         validate_key(&slot.key)?;
         let raw = self.root.open_local(
             &self.scope,
-            &self.scope.vault_id,
+            &self.scope.id,
             &aad(&slot.key, slot.base),
             &serde_json::from_value(slot.envelope.clone())?,
         )?;
@@ -139,7 +139,7 @@ impl RecoveryStore {
         let raw = Zeroizing::new(value.as_bytes().to_vec());
         let envelope = serde_json::to_value(self.root.seal_local(
             &self.scope,
-            &self.scope.vault_id,
+            &self.scope.id,
             &aad(key, base),
             &raw,
         )?)?;
@@ -222,18 +222,18 @@ fn remove(path: &std::path::Path) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::crypto::{VaultRoot, VaultScope};
+    use crate::crypto::{RecoveryKey, RecoveryScope};
 
     #[test]
     fn a_slot_behind_the_database_is_dropped_not_replayed() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("recovery.sqlite");
-        let scope = VaultScope {
+        let scope = RecoveryScope {
             deployment: "https://example.test".into(),
             account_id: "owner".into(),
-            vault_id: "d32b3d14-d7b6-4d4c-a674-d36bb5aefb74".into(),
+            id: "d32b3d14-d7b6-4d4c-a674-d36bb5aefb74".into(),
         };
-        let mut store = RecoveryStore::open(&path, scope, VaultRoot::generate()).unwrap();
+        let mut store = RecoveryStore::open(&path, scope, RecoveryKey::generate()).unwrap();
         store.write("workspace", 0, "first").unwrap();
         store.save_slot("workspace", 1, "older pending").unwrap();
         // A database save that landed while removing its slot failed.

@@ -1,6 +1,5 @@
 import { CursorCompanionController } from "@/features/agents";
 import { CapturePanel, DictationController } from "@/features/voice";
-import { MorningBriefMount, RecallRecorderMount } from "@/features/memory";
 import { type AppTab } from "@/app/shell";
 import {
   AccountClosingNotice,
@@ -37,7 +36,6 @@ import { useDesktopBootstrap } from "./useDesktopBootstrap";
 import { useDesktopFrameStyle } from "./useDesktopFrameStyle";
 import { useDesktopRouteEffects } from "./useDesktopRouteEffects";
 import { useDesktopShellStatus } from "./useDesktopShellStatus";
-import { VaultStartup } from "@/features/sync";
 import { HelpDialog } from "./HelpDialog";
 import { useDesktopShortcuts } from "./useDesktopShortcuts";
 import { useDesktopTitlebarGeometry } from "./useDesktopTitlebarGeometry";
@@ -246,8 +244,6 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
                 <CursorCompanionController key={user.id} accountId={user.id} />
                 <DictationController key={`dictation-${user.id}`} />
                 <CapturePanel key={`capture-${user.id}`} />
-                <RecallRecorderMount key={`recall-${user.id}`} />
-                <MorningBriefMount key={`morning-brief-${user.id}`} />
               </DeferUntilIdle>
             ) : null}
           </>
@@ -262,7 +258,6 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
         {!isAuthRoute && user ? <ServerAlertsNotice /> : null}
         {!isAuthRoute ? <ProfileDialogs /> : null}
         {!isAuthRoute ? <HelpDialog /> : null}
-        {!isAuthRoute && user ? <VaultStartup key={user.id} /> : null}
         {!isAuthRoute ? (
           <DesktopShellOverlays
             settingsOpen={settingsOpen}

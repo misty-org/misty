@@ -1,0 +1,2524 @@
+// Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong), src-tauri/src/engine/pi_family.rs.
+use super::{
+    command_for_binary, images, push_session_id, BuiltCommand, Engine, EngineEvent, SendRequest,
+};
+use serde_json::Value;
+/// The OMP ACP plan-session driver. Declared here rather than in mod.rs: the adapter belongs to
+/// pi_family, and mod.rs only routes to it (send_reserved's Own branch and send_host_stream's
+/// "omp" arm).
+#[path = "omp_acp.rs"]
+pub(crate) mod omp_acp;
+
+/// Extract and normalize the context-window field.
+fn attach_context_window(mut usage: Value) -> Value {
+    if usage.get("model_context_window").is_some() {
+        return usage;
+    }
+
+    let window = usage
+        .get("context_window")
+        .or_else(|| usage.get("contextWindow"))
+        .or_else(|| usage.get("model_context_window"))
+        .and_then(|v| match v {
+            Value::Number(n) => n.as_i64(),
+            Value::String(s) => s.parse().ok(),
+            _ => None,
+        })
+        .filter(|&w| w > 0);
+
+    if let Some(w) = window {
+        if let Some(obj) = usage.as_object_mut() {
+            obj.insert("model_context_window".to_string(), Value::Number(w.into()));
+        }
+    }
+
+    usage
+}
+
+/// pi and omp are the same CLI protocol (omp is a fork of pi), but they
+/// diverge at spawn: pi runs one-shot `--print --mode json`, while omp runs
+/// `--mode rpc-ui` — the only headless mode where the CLI registers its `ask`
+/// tool (hasUI gate) and bridges the question dialogs as `extension_ui_request`
+/// frames we can answer over stdin.
+pub struct PiFamilyEngine {
+    pub id: &'static str,
+    pub home_dir_name: &'static str, // ".pi" | ".omp"
+    /// The reassembly buffer for omp rpc-ui v2 large frames: chunkId → chunks. pi's json mode doesn't use it.
+    rpc_chunks: std::sync::Mutex<std::collections::HashMap<String, RpcChunkAcc>>,
+    /// This run's served-model sidecar, set before the reader starts and only
+    /// when the injected extension was told to write it. `message_end`
+    /// consults it when the runtime did not set `upstreamModel` itself.
+    served_models_file: std::sync::OnceLock<std::path::PathBuf>,
+}
+
+/// A sidecar untouched this long belongs to no live run: the extension
+/// appends on every provider response, and the reader removes the file when
+/// the run settles. Leftovers come from runs the reader never settled (app
+/// quit mid-turn, crash).
+const SERVED_MODELS_STALE_AFTER: std::time::Duration = std::time::Duration::from_secs(24 * 60 * 60);
+
+fn served_models_dir() -> std::path::PathBuf {
+    crate::engines::support::paths::app_home().join("served-models")
+}
+
+/// Sidecar path for one run's provider-reported served models.
+pub(crate) fn served_models_path(run_id: &str) -> std::path::PathBuf {
+    served_models_dir().join(format!("{run_id}.tsv"))
+}
+
+/// Whether this launch loads the ask bridge extension, which is what writes
+/// the served-model sidecar. Read-only pi runs pass `--no-extensions`, and an
+/// omp plan request runs over ACP without it.
+pub(crate) fn loads_served_model_bridge(engine: &str, req: &SendRequest) -> bool {
+    match engine {
+        "omp" => !acp_plan_requested(req),
+        "pi" => req.allowed_tools.is_none(),
+        _ => false,
+    }
+}
+
+/// Fresh sidecar path for a run: the directory exists, no stale file sits at
+/// the path, and leftovers from unsettled runs are swept once per process.
+/// `None` when the directory cannot be created — the run then reports no
+/// served model instead of pointing the extension at an unwritable path.
+pub(crate) fn prepare_served_models_file(run_id: &str) -> Option<std::path::PathBuf> {
+    static SWEEP: std::sync::Once = std::sync::Once::new();
+    let dir = served_models_dir();
+    std::fs::create_dir_all(&dir).ok()?;
+    SWEEP.call_once(|| sweep_stale_served_models(&dir, SERVED_MODELS_STALE_AFTER));
+    let path = served_models_path(run_id);
+    let _ = std::fs::remove_file(&path);
+    Some(path)
+}
+
+fn sweep_stale_served_models(dir: &std::path::Path, stale_after: std::time::Duration) {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.extension().and_then(|ext| ext.to_str()) != Some("tsv") {
+            continue;
+        }
+        let stale = entry
+            .metadata()
+            .and_then(|meta| meta.modified())
+            .ok()
+            .and_then(|modified| modified.elapsed().ok())
+            .is_some_and(|age| age >= stale_after);
+        if stale {
+            let _ = std::fs::remove_file(&path);
+        }
+    }
+}
+
+/// Last `responseId<TAB>model` row for `response_id`. The extension may append
+/// retries/subagent calls to the same file; the newest matching row wins.
+fn parse_served_model_sidecar(text: &str, response_id: &str) -> Option<String> {
+    text.lines().rev().find_map(|line| {
+        let (id, model) = line.split_once('\t')?;
+        (id == response_id && !model.trim().is_empty()).then(|| model.trim().to_string())
+    })
+}
+
+/// Only a row keyed by this message's own response id is evidence. A message
+/// without one (user, tool result, a failed call) adopts nothing: omp's
+/// background calls (session title and the like) go through the same
+/// observed `fetch`, so a lone row need not belong to this turn.
+fn served_model_from_sidecar(
+    sidecar: Option<&std::path::Path>,
+    response_id: Option<&str>,
+) -> Option<String> {
+    let (sidecar, response_id) = (sidecar?, response_id?);
+    let text = std::fs::read_to_string(sidecar).ok()?;
+    parse_served_model_sidecar(&text, response_id)
+}
+
+/// The partial state of reassembling a v2 `rpc_chunk` sequence.
+struct RpcChunkAcc {
+    parts: Vec<Option<String>>,
+    received: usize,
+}
+
+/// The "Confirm" option's label when an omp `confirm` dialog becomes a two-choice card; the
+/// answer frame's confirmed check and the card share this constant, so neither spells it alone.
+pub(crate) const CONFIRM_YES_LABEL: &str = "Confirm";
+
+/// pi has no built-in question tool (omp's ask is its fork's own): this bridge extension is the
+/// pi session's ask_user tool, calling ctx.ui.select/input per question. In rpc mode those become
+/// extension_ui_request frames, which the app shows as question cards and answers. The options
+/// follow omp's ask fallback chain: single choice is one select frame, multiple choice loops
+/// until Done, and the Other sentinel switches to input for free text. At runtime it imports
+/// only node:fs (to write the upstream-model sidecar); parameters are plain JSON Schema.
+const PI_ASK_BRIDGE: &str = r#"// CC GUI ask bridge — pi sessions get their ask_user tool from this
+// extension. One select/input dialog per question (pi's wire format has no
+// multi-select), mirroring omp's degraded ask chain so the host app renders
+// both engines with the same card.
+import { appendFileSync } from "node:fs";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+
+// The provider response names the model that actually served the turn in its
+// own `model` field (OpenAI Responses `response.created/completed`, Anthropic
+// `message_start`, OpenAI Completions first chunk). The runtime keeps only the
+// requested id on the assistant message, so observe the response here and
+// append `responseId<TAB>model` for the host's response-check bridge. The env
+// is set per run; unset means the host does not want the observation.
+const SERVED_MODEL_FILE = process.env.CCGUI_SERVED_MODEL_FILE;
+const SERVED_MODEL_MAX_BYTES = 256 * 1024;
+
+function recordServedModel(id: unknown, model: unknown): boolean {
+	if (!SERVED_MODEL_FILE || typeof id !== "string" || !id) return false;
+	if (typeof model !== "string" || !model.trim()) return false;
+	try {
+		appendFileSync(SERVED_MODEL_FILE, `${id}\t${model.trim()}\n`);
+		return true;
+	} catch {
+		return false;
+	}
+}
+
+async function observeSseBody(response: Response): Promise<void> {
+	const reader = response.body?.getReader();
+	if (!reader) return;
+	const decoder = new TextDecoder();
+	let buffer = "";
+	let bytes = 0;
+	try {
+		while (bytes < SERVED_MODEL_MAX_BYTES) {
+			const { done, value } = await reader.read();
+			if (done) break;
+			bytes += value.byteLength;
+			buffer += decoder.decode(value, { stream: true });
+			let newline = buffer.indexOf("\n");
+			while (newline >= 0) {
+				const line = buffer.slice(0, newline).trim();
+				buffer = buffer.slice(newline + 1);
+				newline = buffer.indexOf("\n");
+				if (!line.startsWith("data:")) continue;
+				const data = line.slice(5).trim();
+				if (!data || data === "[DONE]") continue;
+				try {
+					const parsed = JSON.parse(data) as Record<string, any>;
+					const id = parsed.response?.id ?? parsed.message?.id ?? parsed.id;
+					const model =
+						parsed.response?.model ?? parsed.message?.model ?? parsed.model;
+					if (recordServedModel(id, model)) {
+						void reader.cancel().catch(() => {});
+						return;
+					}
+				} catch {
+					// A partial/non-JSON data line is not an error.
+				}
+			}
+		}
+	} finally {
+		void reader.cancel().catch(() => {});
+	}
+}
+
+if (SERVED_MODEL_FILE) {
+	const originalFetch = globalThis.fetch;
+	globalThis.fetch = (async (...args: Parameters<typeof fetch>) => {
+		const response = await originalFetch(...args);
+		const input = args[0];
+		const url =
+			typeof input === "string"
+				? input
+				: input instanceof URL
+					? input.href
+					: (input as Request).url;
+		if (!/(?:\/responses|\/chat\/completions|\/messages|\/complete)(?:[?#]|$)/.test(url)) {
+			return response;
+		}
+		try {
+			const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
+			if (contentType.includes("text/event-stream")) {
+				void observeSseBody(response.clone()).catch(() => {});
+			} else if (contentType.includes("application/json")) {
+				const length = Number(response.headers.get("content-length") ?? "0");
+				if (Number.isFinite(length) && length > 0 && length <= SERVED_MODEL_MAX_BYTES) {
+					void response
+						.clone()
+						.json()
+						.then((parsed: any) => {
+							const id = parsed?.response?.id ?? parsed?.message?.id ?? parsed?.id;
+							const model =
+								parsed?.response?.model ?? parsed?.message?.model ?? parsed?.model;
+							recordServedModel(id, model);
+						})
+						.catch(() => {});
+				}
+			}
+		} catch {
+			// Observation must never break the provider request.
+		}
+		return response;
+	}) as typeof fetch;
+}
+
+const OTHER_OPTION = "Other (type your own)";
+const DONE_OPTION = "✓ Done selecting";
+
+interface AskOption {
+	label: string;
+	description?: string;
+}
+interface AskQuestion {
+	id: string;
+	question: string;
+	header?: string;
+	multi?: boolean;
+	options: AskOption[];
+}
+
+const DISMISSED = "The user dismissed the question; continue without it and say what you assumed.";
+
+export default function ccguiAskBridge(pi: ExtensionAPI) {
+	pi.registerTool({
+		name: "ask_user",
+		label: "Ask user",
+		description:
+			"Ask the user one or more questions and wait for the answers. Use it when a decision, " +
+			"preference or missing detail changes what you would do; never for facts you can look up. " +
+			"Each question takes 2-4 mutually exclusive options (first = recommended when one is " +
+			"clearly best); the user can always pick Other to type a custom answer.",
+		promptSnippet: "ask the user questions with selectable options",
+		parameters: {
+			type: "object",
+			additionalProperties: false,
+			required: ["questions"],
+			properties: {
+				questions: {
+					type: "array",
+					minItems: 1,
+					items: {
+						type: "object",
+						additionalProperties: false,
+						required: ["id", "question", "options"],
+						properties: {
+							id: { type: "string", description: "Stable question id, echoed in the answer." },
+							question: { type: "string" },
+							header: { type: "string", description: "Short chip label." },
+							multi: { type: "boolean", description: "Allow selecting several options." },
+							options: {
+								type: "array",
+								minItems: 2,
+								items: {
+									type: "object",
+									additionalProperties: false,
+									required: ["label"],
+									properties: {
+										label: { type: "string" },
+										description: { type: "string" },
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		} as never,
+		async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
+			if (!ctx.hasUI) {
+				return {
+					content: [{ type: "text", text: "Error: ask_user needs an interactive session (rpc mode provides one)." }],
+				};
+			}
+			const lines: string[] = [];
+			for (const q of params.questions as AskQuestion[]) {
+				const labels = q.options.map((o) => o.label);
+				if (q.multi === true) {
+					const selected: string[] = [];
+					let custom: string | undefined;
+					for (;;) {
+						const remaining = labels.filter((l) => !selected.includes(l));
+						const title = selected.length > 0 ? `${q.question} (${selected.length} selected)` : q.question;
+						const choice = await ctx.ui.select(title, [...remaining, DONE_OPTION, OTHER_OPTION]);
+						if (choice === undefined) {
+							return { content: [{ type: "text", text: DISMISSED }], details: { cancelled: true } };
+						}
+						if (choice === DONE_OPTION) break;
+						if (choice === OTHER_OPTION) {
+							custom = (await ctx.ui.input(q.question, "Type your answer")) ?? undefined;
+							break;
+						}
+						selected.push(choice);
+					}
+					lines.push(`${q.id}: ${custom !== undefined ? `custom: ${custom}` : selected.join(", ") || "(none)"}`);
+				} else {
+					const choice = await ctx.ui.select(q.question, [...labels, OTHER_OPTION]);
+					if (choice === undefined) {
+						return { content: [{ type: "text", text: DISMISSED }], details: { cancelled: true } };
+					}
+					if (choice === OTHER_OPTION) {
+						const custom = await ctx.ui.input(q.question, "Type your answer");
+						lines.push(`${q.id}: ${custom ?? "(no answer)"}`);
+					} else {
+						lines.push(`${q.id}: ${choice}`);
+					}
+				}
+			}
+			return {
+				content: [{ type: "text", text: `User answers:\n${lines.join("\n")}` }],
+				details: { answers: lines },
+			};
+		},
+	});
+}
+"#;
+
+/// Writes the bridge extension under app_home (rewritten only when its content changed) and
+/// returns the path `-e` takes.
+fn ensure_pi_ask_bridge() -> Result<String, String> {
+    let dir = crate::engines::support::paths::app_home().join("pi-extensions");
+    std::fs::create_dir_all(&dir)
+        .map_err(|e| format!("create pi extension dir {}: {e}", dir.display()))?;
+    let path = dir.join("ccgui-ask-bridge.ts");
+    let stale = std::fs::read_to_string(&path)
+        .map(|current| current != PI_ASK_BRIDGE)
+        .unwrap_or(true);
+    if stale {
+        std::fs::write(&path, PI_ASK_BRIDGE)
+            .map_err(|e| format!("write pi ask bridge {}: {e}", path.display()))?;
+    }
+    Ok(path.to_string_lossy().into_owned())
+}
+
+pub fn pi() -> PiFamilyEngine {
+    PiFamilyEngine {
+        id: "pi",
+        home_dir_name: ".pi",
+        rpc_chunks: std::sync::Mutex::new(std::collections::HashMap::new()),
+        served_models_file: std::sync::OnceLock::new(),
+    }
+}
+
+pub fn omp() -> PiFamilyEngine {
+    PiFamilyEngine {
+        id: "omp",
+        home_dir_name: ".omp",
+        rpc_chunks: std::sync::Mutex::new(std::collections::HashMap::new()),
+        served_models_file: std::sync::OnceLock::new(),
+    }
+}
+
+/// An explicit omp plan request runs on the ACP plan transport: mod.rs routes that send to
+/// send_host_stream's "omp" arm (omp_acp::run_acp_turn) instead of the usual rpc-ui child.
+pub(crate) fn acp_plan_requested(req: &SendRequest) -> bool {
+    req.permission.as_deref() == Some("plan")
+}
+
+/// The ACP plan session's launch command: `omp --mode acp` (the `omp acp` subcommand is
+/// equivalent). The omp_acp driver spawns the child and stdin/stdout are JSON-RPC pipes, so
+/// there is no stdin_payload and no --extension ask bridge (ACP asks go through elicitation).
+/// Model and effort are passed over ACP after the handshake (session/set_config_option
+/// model|thinking), not repeated on argv, so the person's choice isn't downgraded.
+fn build_omp_acp_plan_command(
+    req: &SendRequest,
+    mut cmd: tokio::process::Command,
+) -> Result<BuiltCommand, String> {
+    // The review point (planModeState / the proposal handler) lives only in memory and
+    // session/load doesn't re-register it: a resumed session has no verifiable human wait
+    // point, so it is refused before spawning.
+    if req.session_id.is_some() {
+        return Err(omp_acp::RESUME_REFUSAL.to_string());
+    }
+    cmd.args(["--mode", "acp"]);
+    // service-tier has no ACP config equivalent, so it stays a launch flag (the same check and
+    // gating as the rpc path: only an explicit openai-codex selector passes it).
+    if req.model.as_deref().is_some_and(|m| {
+        m.strip_prefix("openai-codex/")
+            .is_some_and(|id| !id.is_empty())
+    }) {
+        if let Some(tier) = req.service_tier.as_deref() {
+            if !matches!(tier, "default" | "priority") {
+                return Err("Invalid OMP OpenAI service tier".to_string());
+            }
+            cmd.args(["--service-tier", tier]);
+        }
+    }
+    Ok(BuiltCommand {
+        command: cmd,
+        stdin_payload: None,
+        keep_stdin_open: false,
+        cleanup_files: Vec::new(),
+        preassigned_session_id: None,
+    })
+}
+
+impl Engine for PiFamilyEngine {
+    fn id(&self) -> &'static str {
+        self.id
+    }
+
+    fn supports_images(&self) -> bool {
+        true
+    }
+    fn supports_effort(&self) -> bool {
+        true
+    }
+
+    /// omp exposes real approval switches (`--approval-mode`,
+    /// `--auto-approve`); pi 0.85 has none of them, so it keeps the trait
+    /// default. "plan" runs on OMP's native ACP plan flow (plan_approval's Typed declaration +
+    /// the omp_acp driver); the `--plan-yolo` auto-approving flow is gone and never comes back
+    /// as a "human plan review" entry point.
+    ///
+    /// `always-ask`/`write` are deliberately absent: they leave write/exec
+    /// tools on a `prompt` policy, and print mode has no UI to answer with —
+    /// the CLI aborts the turn with "requires approval but no interactive UI
+    /// available" the moment a gated tool runs. Only the non-prompting modes
+    /// can be honored headlessly.
+    fn supported_permissions(&self) -> &'static [&'static str] {
+        if self.id == "omp" {
+            &["auto", "bypass", "plan"]
+        } else {
+            &["auto"]
+        }
+    }
+
+    /// OMP's human plan review uses the native ACP plan flow (session/set_mode plan + the
+    /// elicitation.form handshake + the plan file's full text, driven by omp_acp). pi has no
+    /// plan support at all, and silently falling back to auto is a forbidden downgrade. The old
+    /// headless `--plan-yolo` flow auto-approved plans and can never be a "human plan review"
+    /// entry point.
+    fn plan_approval(&self) -> crate::engines::plan_review::PlanApproval {
+        if self.id == "omp" {
+            crate::engines::plan_review::PlanApproval::Typed {
+                review_kind: crate::engines::plan_review::PlanReviewKind::NativeRequest,
+                evidence: "OMP 18.0.11 acp-agent.ts elicitation.form handshake + the plan file's full text",
+                limitations: "ACP feedback is only a yes/no Refine signal with no text; the review point doesn't survive a restart; only a new session can enter plan mode",
+            }
+        } else {
+            crate::engines::plan_review::PlanApproval::Unavailable {
+                reason: "pi exposes no plan mode; a plan request would silently degrade to auto",
+            }
+        }
+    }
+
+    fn supports_tool_constraints(&self) -> bool {
+        self.id == "pi"
+    }
+
+    fn build_command(&self, req: &SendRequest, bin: &str) -> Result<BuiltCommand, String> {
+        let mut cmd = command_for_binary(bin);
+        if let Some(tools) = req.allowed_tools.as_deref() {
+            if self.id != "pi"
+                || tools.is_empty()
+                || tools
+                    .iter()
+                    .any(|tool| !matches!(tool.as_str(), "read" | "grep" | "find" | "ls"))
+            {
+                return Err("read-only tool constraints require Pi built-in read/grep/find/ls tools without computer use".into());
+            }
+            if req.session_id.as_deref().is_some_and(|session| {
+                session.contains('/') || session.contains('\\') || session.ends_with(".jsonl")
+            }) {
+                return Err(
+                    "read-only Pi runs accept session IDs, not writable session file paths".into(),
+                );
+            }
+            cmd.args(["--no-extensions", "--tools", &tools.join(",")]);
+        }
+        // OMP's native ACP plan flow: an explicit plan request runs on the ACP transport and the
+        // omp_acp driver owns the child (stdio JSON-RPC + a parked elicitation). Approving a plan
+        // is the person's decision, so this command line never carries
+        // --plan-yolo/--plan-yolo-into/--auto-approve.
+        if self.id == "omp" && acp_plan_requested(req) {
+            return build_omp_acp_plan_command(req, cmd);
+        }
+        // pi and omp both run rpc: question dialogs arrive as extension_ui_request frames and the
+        // answers are written back on stdin. omp uses rpc-ui (hasUI turns on the CLI's own ask);
+        // pi uses rpc plus our ask bridge extension (pi has no built-in question tool).
+        let rpc_ui = self.id == "omp";
+        let rpc_mode = rpc_ui || self.id == "pi";
+        if rpc_ui {
+            cmd.arg("--mode");
+            cmd.arg("rpc-ui");
+            cmd.arg("--extension");
+            cmd.arg(ensure_pi_ask_bridge()?);
+        } else if rpc_mode {
+            cmd.arg("--mode");
+            cmd.arg("rpc");
+            if req.allowed_tools.is_none() {
+                cmd.arg("--extension");
+                cmd.arg(ensure_pi_ask_bridge()?);
+            }
+        } else {
+            cmd.arg("--print");
+            cmd.arg("--mode");
+            cmd.arg("json");
+        }
+        if let Some(model) = req.model.as_deref() {
+            cmd.arg("--model");
+            cmd.arg(model);
+        }
+        // Only explicit OpenAI-Codex selectors opt into this per-app preference.
+        // Never leak it to pi, another provider or an unknown CLI default.
+        if self.id == "omp"
+            && req.model.as_deref().is_some_and(|m| {
+                m.strip_prefix("openai-codex/")
+                    .is_some_and(|id| !id.is_empty())
+            })
+        {
+            if let Some(tier) = req.service_tier.as_deref() {
+                if !matches!(tier, "default" | "priority") {
+                    return Err("Invalid OMP OpenAI service tier".to_string());
+                }
+                cmd.args(["--service-tier", tier]);
+            }
+        }
+        // Let the CLI encode thinking for the selected provider; adding generic
+        // effort fields in the bridge breaks Responses and other strict APIs.
+        if let Some(effort) = req.effort.as_deref() {
+            cmd.arg("--thinking");
+            cmd.arg(effort);
+        }
+        match self.resolve_permission(req.permission.as_deref()) {
+            // Skips every approval tier for this run, and also sets the
+            // session's explicit auto-approve flag (not just the setting), so
+            // the ACP permission gate stands down too.
+            "bypass" => {
+                cmd.arg("--auto-approve");
+            }
+            // "auto": leave the CLI's own tools.approvalMode alone. An explicit omp plan request
+            // already took the ACP command above (build_omp_acp_plan_command, after
+            // prepare_launch's gate) and never reaches this rpc branch; a pi plan request is
+            // refused by ensure_plan_approval before the command is built.
+            _ => {}
+        }
+        if let Some(session_id) = req.session_id.as_deref() {
+            if !session_id.starts_with('-') {
+                // Resuming in rpc mode: omp takes `--resume` (an id prefix works), pi takes
+                // `--session <id>` (pi's --session-id assigns an id to a new session, it doesn't
+                // resume). Only pi's one-shot json mode uses --session-id.
+                if self.id == "omp" {
+                    cmd.arg("--resume");
+                } else if rpc_mode {
+                    cmd.arg("--session");
+                } else {
+                    cmd.arg("--session-id");
+                }
+                cmd.arg(session_id);
+            }
+        }
+        // Image attachments as `@<abs path>` file references ahead of the
+        // prompt. data: URLs can't be file-referenced; the frontend's paste
+        // flow already materializes blobs to files, so anything left is
+        // skipped here rather than breaking argv. rpc mode refuses @file arguments, so omp's
+        // pictures go in the prompt command's base64 field instead (below).
+        if !rpc_mode {
+            for raw in &req.images {
+                if let Some(absolute) = images::absolutize_image_path(raw, &req.workspace) {
+                    cmd.arg(format!("@{}", absolute.display()));
+                }
+            }
+        }
+        if rpc_mode {
+            // In rpc mode the prompt is an NDJSON command on stdin (positional arguments aren't
+            // dispatched). Commands run in order: get_state for the sessionId (json mode's
+            // session header frame has no rpc equivalent), then the task; omp first negotiates
+            // v2 chunking. Writing early is harmless: the input loop starts once the session is
+            // ready, and the pipe buffers these lines.
+            let is_omp_compact =
+                self.id == "omp" && req.native_compact && req.images.is_empty();
+            // OMP handles /compact as a local RPC command. As a plain prompt it would answer
+            // agentInvoked:false and command_output but never agent_end, so the host would wait
+            // forever for the turn to end. The native command responds once compaction is done.
+            let request = if is_omp_compact {
+                serde_json::json!({ "id": "ccgui-compact", "type": "compact" })
+            } else {
+                let mut prompt = serde_json::json!({
+                    "id": "ccgui-prompt",
+                    "type": "prompt",
+                    "message": req.prompt,
+                });
+                if !req.images.is_empty() {
+                    let mut payloads = Vec::new();
+                    for raw in &req.images {
+                        let (mime, data) = images::load_image(raw, &req.workspace)?;
+                        payloads.push(serde_json::json!({
+                            "type": "image",
+                            "data": data,
+                            "mimeType": mime,
+                        }));
+                    }
+                    prompt["images"] = Value::Array(payloads);
+                }
+                prompt
+            };
+            // v2 chunk negotiation is omp's own addition; pi only has v1 (oversized frames are
+            // truncated, the session is unaffected). json mode's session header frame has no rpc
+            // equivalent; the get_state response carries the sessionId.
+            let mut lines = Vec::new();
+            if rpc_ui {
+                lines.push(serde_json::json!({"id": "ccgui-negotiate", "type": "negotiate_protocol", "protocolVersion": 2}).to_string());
+            }
+            if let Some(effort) = req
+                .effort
+                .as_deref()
+                .map(str::trim)
+                .filter(|e| !e.is_empty())
+            {
+                lines.push(serde_json::json!({"id": "ccgui-effort", "type": "set_thinking_level", "level": effort}).to_string());
+            }
+            lines.push(serde_json::json!({"id": "ccgui-state", "type": "get_state"}).to_string());
+            lines.push(request.to_string());
+            let payload = lines.join("\n");
+            return Ok(BuiltCommand {
+                command: cmd,
+                stdin_payload: Some(payload),
+                // Question answers (extension_ui_response) are written back on this same stdin;
+                // the reader closes it when Done settles, and the rpc process drains and exits.
+                keep_stdin_open: true,
+                cleanup_files: Vec::new(),
+                preassigned_session_id: None,
+            });
+        }
+        // Prompt travels through stdin, never argv: on Windows the pi shim is a
+        // `.cmd` batch file spawned via `cmd /c`, and cmd.exe cuts a multiline
+        // argument at the first newline - every line after the first was
+        // dropped. pi joins piped stdin into the initial message
+        // (`readPipedStdin` -> `buildInitialMessage`), so the prompt rides
+        // stdin verbatim, matching codex; `@<abs path>` image refs stay in argv.
+        Ok(BuiltCommand {
+            command: cmd,
+            stdin_payload: Some(req.prompt.clone()),
+            keep_stdin_open: false,
+            cleanup_files: Vec::new(),
+            preassigned_session_id: None,
+        })
+    }
+
+    fn set_served_models_file(&self, path: &std::path::Path) {
+        let _ = self.served_models_file.set(path.to_path_buf());
+    }
+
+    /// Only a run whose extension writes the sidecar can report what served
+    /// it; WSL, read-only and ACP plan runs have no observer.
+    fn reports_served(&self) -> bool {
+        self.served_models_file.get().is_some()
+    }
+
+    fn parse_line(&self, line: &str, out: &mut Vec<EngineEvent>) {
+        let sidecar = self
+            .served_models_file
+            .get()
+            .map(std::path::PathBuf::as_path);
+        // v2 chunk reassembly: a complete frame goes through the normal parse, and partial
+        // chunks produce no events. The cheap check first spares every other line the lock.
+        if line.contains("\"rpc_chunk\"") {
+            if let Some(frame) = self.reassemble_chunk(line) {
+                parse_pi_family_line_for_engine(self.id, sidecar, &frame, out);
+            }
+            return;
+        }
+        parse_pi_family_line_for_engine(self.id, sidecar, line, out);
+    }
+}
+
+fn parse_pi_family_line_for_engine(
+    id: &str,
+    sidecar: Option<&std::path::Path>,
+    line: &str,
+    out: &mut Vec<EngineEvent>,
+) {
+    // Avoid a second JSON parse for normal OMP stream frames; only compact
+    // responses need the OMP-specific terminal mapping below.
+    if id == "omp"
+        && line.contains("\"command\"")
+        && line.contains("\"compact\"")
+        && parse_omp_compact_response(line, out)
+    {
+        return;
+    }
+    parse_pi_family_line_with_sidecar(line, out, sidecar);
+}
+
+fn parse_omp_compact_response(line: &str, out: &mut Vec<EngineEvent>) -> bool {
+    let Ok(value) = serde_json::from_str::<Value>(line) else {
+        return false;
+    };
+    if value.get("type").and_then(Value::as_str) != Some("response")
+        || value.get("command").and_then(Value::as_str) != Some("compact")
+    {
+        return false;
+    }
+
+    if value.get("success").and_then(Value::as_bool) == Some(true) {
+        out.push(EngineEvent::Done {
+            session_id: None,
+            usage: None,
+        });
+    } else {
+        let error = value
+            .get("error")
+            .and_then(Value::as_str)
+            .unwrap_or("unknown error");
+        out.push(EngineEvent::Error(format!("omp compaction failed: {error}")));
+    }
+    true
+}
+
+impl PiFamilyEngine {
+    /// Reassembles a v2 `rpc_chunk` sequence, returning the full frame text once complete.
+    /// Out-of-order and repeated chunks are accepted; a sequence with contradicting counts is
+    /// dropped whole.
+    fn reassemble_chunk(&self, line: &str) -> Option<String> {
+        use base64::Engine as _;
+        let value: Value = serde_json::from_str(line).ok()?;
+        if value.get("type").and_then(Value::as_str) != Some("rpc_chunk") {
+            return None;
+        }
+        let chunk_id = value.get("chunkId").and_then(Value::as_str)?.to_string();
+        let index = value.get("index").and_then(Value::as_u64)? as usize;
+        let count = value.get("count").and_then(Value::as_u64)? as usize;
+        let data = value.get("data").and_then(Value::as_str)?.to_string();
+        if count == 0 || index >= count {
+            return None;
+        }
+        let mut chunks = self.rpc_chunks.lock().ok()?;
+        let acc = chunks
+            .entry(chunk_id.clone())
+            .or_insert_with(|| RpcChunkAcc {
+                parts: vec![None; count],
+                received: 0,
+            });
+        if acc.parts.len() != count {
+            chunks.remove(&chunk_id);
+            return None;
+        }
+        if acc.parts.get(index).is_some_and(Option::is_none) {
+            acc.parts[index] = Some(data);
+            acc.received += 1;
+        }
+        if acc.received < count {
+            return None;
+        }
+        let acc = chunks.remove(&chunk_id)?;
+        let mut bytes = Vec::new();
+        for part in acc.parts {
+            let decoded = base64::engine::general_purpose::STANDARD
+                .decode(part?.as_bytes())
+                .ok()?;
+            bytes.extend_from_slice(&decoded);
+        }
+        String::from_utf8(bytes).ok()
+    }
+}
+
+/// Builds the omp rpc-ui answer frame. answers is the UI's map (question text → the chosen
+/// label or free text); omp's fallback chain asks one question at a time, so the one value is
+/// taken. None = the person dismissed it (cancelled; the CLI carries on as cancelled).
+pub(crate) fn extension_ui_answer_frame(
+    method: &str,
+    request_id: &str,
+    answers: Option<&Value>,
+) -> Value {
+    let answer = answers
+        .and_then(Value::as_object)
+        .and_then(|map| map.values().next());
+    let Some(answer) = answer else {
+        return serde_json::json!({
+            "type": "extension_ui_response",
+            "id": request_id,
+            "cancelled": true,
+        });
+    };
+    // select/input/editor answers are single strings; an array can only come from the UI's
+    // multi-select card (omp's select frame is single choice), so it is joined as a fallback.
+    let text = match answer {
+        Value::String(s) => s.clone(),
+        Value::Array(labels) => labels
+            .iter()
+            .filter_map(Value::as_str)
+            .collect::<Vec<_>>()
+            .join(", "),
+        other => other.to_string(),
+    };
+    if method == "confirm" {
+        return serde_json::json!({
+            "type": "extension_ui_response",
+            "id": request_id,
+            "confirmed": text == CONFIRM_YES_LABEL,
+        });
+    }
+    serde_json::json!({
+        "type": "extension_ui_response",
+        "id": request_id,
+        "value": text,
+    })
+}
+
+/// Shared NDJSON parser for pi and omp (`--mode json`).
+#[cfg(test)]
+fn parse_pi_family_line(line: &str, out: &mut Vec<EngineEvent>) {
+    parse_pi_family_line_with_sidecar(line, out, None);
+}
+
+fn parse_pi_family_line_with_sidecar(
+    line: &str,
+    out: &mut Vec<EngineEvent>,
+    sidecar: Option<&std::path::Path>,
+) {
+    // Stream updates can include the entire growing message twice (message
+    // and assistantMessageEvent.partial). Skip those snapshots without
+    // allocating a JSON object tree for every token.
+    #[derive(serde::Deserialize)]
+    struct Envelope {
+        #[serde(rename = "type")]
+        kind: String,
+        #[serde(rename = "assistantMessageEvent")]
+        event: Option<Delta>,
+    }
+    #[derive(serde::Deserialize)]
+    struct Delta {
+        #[serde(rename = "type")]
+        kind: String,
+        delta: Option<String>,
+    }
+    let Ok(envelope) = serde_json::from_str::<Envelope>(line) else {
+        return;
+    };
+    if envelope.kind == "message_update" {
+        if let Some(delta) = envelope.event {
+            if let Some(text) = delta.delta.filter(|text| !text.is_empty()) {
+                match delta.kind.as_str() {
+                    "text_delta" => out.push(EngineEvent::Delta(text)),
+                    "thinking_delta" => out.push(EngineEvent::Thinking(text)),
+                    _ => {}
+                }
+            }
+        }
+        return;
+    }
+    let event_type = envelope.kind.as_str();
+    if !matches!(
+        event_type,
+        "session"
+            | "tool_execution_start"
+            | "tool_execution_end"
+            | "message_end"
+            | "message_start"
+            | "turn_end"
+            | "agent_end"
+            | "auto_retry_start"
+            | "auto_retry_end"
+            | "auto_compaction_start"
+            | "auto_compaction_end"
+            | "agent_settled"
+            | "response"
+            | "extension_ui_request"
+            | "rpc_frame_error"
+            | "thinking_level_changed"
+    ) {
+        return;
+    }
+    let Ok(value) = serde_json::from_str::<Value>(line) else {
+        return;
+    };
+    match event_type {
+        // Response stream opens: reader.rs starts the genMs window here so
+        // TTFT and tool-argument decoding are counted, not just text deltas.
+        "message_start" => out.push(EngineEvent::Generation { active: true }),
+        "session" => {
+            push_session_id(&value, "id", out);
+        }
+        "thinking_level_changed" => {
+            if let Some(level) = value.get("thinkingLevel").and_then(Value::as_str) {
+                let trimmed = level.trim();
+                if !trimmed.is_empty() {
+                    out.push(EngineEvent::Effort(trimmed.to_string()));
+                    // The session's effective level is the runtime's own
+                    // account of the level in force — auto-thinking can move
+                    // it away from the request, which is exactly what the
+                    // response check should surface.
+                    out.push(EngineEvent::Served {
+                        model: None,
+                        effort: Some(trimmed.to_string()),
+                    });
+                }
+            }
+        }
+        // omp rpc-ui command responses: get_state carries the sessionId (json mode's session
+        // header frame has no rpc equivalent); a failed prompt and a failed OMP compact are
+        // fatal, other failed commands only warn. A failed negotiate_protocol means the server
+        // speaks only v1: large frames may be truncated, but the session is unaffected.
+        "response" => {
+            let command = value.get("command").and_then(Value::as_str).unwrap_or("");
+            let success = value
+                .get("success")
+                .and_then(Value::as_bool)
+                .unwrap_or(false);
+            if success {
+                if command == "get_state" {
+                    if let Some(id) = value
+                        .pointer("/data/sessionId")
+                        .and_then(Value::as_str)
+                        .filter(|id| !id.is_empty())
+                    {
+                        out.push(EngineEvent::SessionId(id.to_string()));
+                    }
+                }
+            } else {
+                let error = value
+                    .get("error")
+                    .and_then(Value::as_str)
+                    .unwrap_or("unknown error");
+                match command {
+                    "prompt" => out.push(EngineEvent::Error(format!("omp couldn't take the task: {error}"))),
+                    "negotiate_protocol" => {}
+                    _ => out.push(EngineEvent::Warn(format!(
+                        "omp command {command} failed: {error}"
+                    ))),
+                }
+            }
+        }
+        // A v1 oversized frame was truncated or the server failed to chunk: content is lost,
+        // but at least the person knows.
+        "rpc_frame_error" => {
+            out.push(EngineEvent::Warn(
+                "omp protocol frame error; some output may be truncated".to_string(),
+            ));
+        }
+        "extension_ui_request" => parse_ui_request(&value, out),
+        // pi's final settle (omp doesn't send this frame; if it did, the monotonic settle guard
+        // would drop it).
+        "agent_settled" => out.push(EngineEvent::AgentSettled),
+        "tool_execution_start" => {
+            let name = value
+                .get("toolName")
+                .and_then(Value::as_str)
+                .unwrap_or("tool");
+            let intent = value.get("intent").and_then(Value::as_str);
+            out.push(super::tool_call_message_with_id(
+                tool_label(name, intent),
+                value.get("args"),
+                value.get("toolCallId").and_then(Value::as_str),
+            ));
+        }
+        "tool_execution_end" => {
+            let name = value.get("toolName").and_then(Value::as_str).unwrap_or("");
+            let result = value.get("result");
+            out.push(super::tool_result_patch_with_id(
+                name,
+                result,
+                value.get("toolCallId").and_then(Value::as_str),
+            ));
+        }
+        "message_end" => {
+            let reported_model = value
+                .get("message")
+                .and_then(|m| m.get("model"))
+                .or_else(|| value.get("model"))
+                .and_then(Value::as_str)
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+                .map(str::to_string);
+            let reported_effort = value
+                .get("message")
+                .and_then(|m| m.get("thinking_effort"))
+                .or_else(|| value.get("thinking_effort"))
+                .and_then(Value::as_str)
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+                .map(str::to_string);
+            if let Some(model) = reported_model.clone() {
+                out.push(EngineEvent::Model(model));
+            }
+            if let Some(effort) = reported_effort.clone() {
+                out.push(EngineEvent::Effort(effort));
+            }
+            // What actually served the turn, when the runtime can tell:
+            // `upstreamModel` is the id recovered from the response itself
+            // (thinking signature / router). When the runtime does not fill
+            // it, the injected extension has already observed the provider's
+            // own `model` field and appended it to this run's sidecar; match
+            // it by the response id. `message.model` itself is only the
+            // request record for OpenAI-compatible providers, so it is never
+            // used as served evidence here.
+            let response_id = value
+                .get("message")
+                .and_then(|m| {
+                    m.get("responseId")
+                        .or_else(|| m.get("response_id"))
+                        .or_else(|| m.get("id"))
+                })
+                .and_then(Value::as_str);
+            let served_model = value
+                .get("message")
+                .and_then(|m| m.get("upstreamModel"))
+                .and_then(Value::as_str)
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+                .map(str::to_string)
+                .or_else(|| served_model_from_sidecar(sidecar, response_id));
+            if served_model.is_some() || reported_effort.is_some() {
+                out.push(EngineEvent::Served {
+                    model: served_model,
+                    effort: reported_effort,
+                });
+            }
+            if let Some(usage) = value
+                .get("message")
+                .and_then(|m| m.get("usage"))
+                .filter(|u| !u.is_null())
+            {
+                out.push(EngineEvent::Usage(attach_context_window(usage.clone())));
+            }
+            // A failed model call can still retry. Only a terminal agent_end
+            // (or process EOF) decides the run's outcome.
+            if let Some(error) = nested_error_text(&value, &["message"]) {
+                out.push(EngineEvent::Warn(error));
+            }
+        }
+        "auto_compaction_start" => {
+            // Forwarded by rpc-ui (omp) only — pi's rpc whitelist carries
+            // just the end event, which harmlessly clears a never-shown
+            // indicator.
+            out.push(EngineEvent::Compaction {
+                active: true,
+                reason: value
+                    .get("reason")
+                    .and_then(Value::as_str)
+                    .map(str::trim)
+                    .filter(|s| !s.is_empty())
+                    .map(str::to_string),
+            });
+        }
+        "auto_compaction_end" => {
+            out.push(EngineEvent::Compaction {
+                active: false,
+                reason: None,
+            });
+        }
+        "auto_retry_start" => {
+            // The CLI is backing off before re-issuing the request (provider
+            // 5xx / stream-envelope failures). Live progress, not an error:
+            // the run status line renders "Retrying x of y" and the next content
+            // event clears it.
+            out.push(EngineEvent::Retry {
+                attempt: value.get("attempt").and_then(Value::as_u64).unwrap_or(0),
+                max: value
+                    .get("maxAttempts")
+                    .and_then(Value::as_u64)
+                    .unwrap_or(0),
+                message: value
+                    .get("errorMessage")
+                    .and_then(Value::as_str)
+                    .map(str::trim)
+                    .filter(|s| !s.is_empty())
+                    .unwrap_or("")
+                    .to_string(),
+            });
+        }
+        "auto_retry_end" => {
+            // A retry saga can hand off to compaction/continuation. Clear its
+            // indicator, but leave run settlement to terminal agent_end/EOF.
+            out.push(EngineEvent::Retry {
+                attempt: 0,
+                max: 0,
+                message: String::new(),
+            });
+            if value.get("success").and_then(Value::as_bool) == Some(false) {
+                let error = value
+                    .get("finalError")
+                    .and_then(Value::as_str)
+                    .filter(|text| !text.trim().is_empty())
+                    .unwrap_or("Automatic retry failed")
+                    .to_string();
+                out.push(EngineEvent::AttemptEnd { error: Some(error) });
+            }
+        }
+        "turn_end" | "agent_end" => {
+            let error = attempt_error(&value);
+            // turn_end precedes the retry decision. OMP explicitly marks its
+            // final agent_end; pi/older CLIs may emit agent_end BEFORE retry
+            // and lack isTerminal, so their outcome remains provisional to EOF.
+            if event_type == "agent_end"
+                && value.get("isTerminal").and_then(Value::as_bool) == Some(true)
+                && value.get("willRetry").and_then(Value::as_bool) != Some(true)
+            {
+                out.push(match error {
+                    Some(error) => EngineEvent::Error(error),
+                    None => EngineEvent::Done {
+                        session_id: None,
+                        usage: None,
+                    },
+                });
+            } else {
+                out.push(EngineEvent::AttemptEnd { error });
+            }
+        }
+        _ => {}
+    }
+}
+
+/// The final assistant result wins; earlier failed attempts may have recovered.
+fn attempt_error(value: &Value) -> Option<String> {
+    let message = value.get("message").or_else(|| {
+        value
+            .get("messages")?
+            .as_array()?
+            .iter()
+            .rev()
+            .find(|message| message.get("role").and_then(Value::as_str) == Some("assistant"))
+    });
+    nested_error_text(value, &["message"])
+        .or_else(|| message.and_then(|message| nested_error_text(message, &[])))
+        .or_else(|| {
+            (message?.get("stopReason")?.as_str()? == "error")
+                .then(|| "Model request failed".to_string())
+        })
+}
+/// Display label for a tool call: the human-readable intent when the CLI
+/// provides one, prefixed with the tool name so the frontend's type
+/// classification still sees the raw name token.
+pub fn tool_label(name: &str, intent: Option<&str>) -> String {
+    match intent {
+        Some(intent) if !intent.trim().is_empty() && intent.trim() != name => {
+            format!("{} · {}", name, intent.trim())
+                .chars()
+                .take(120)
+                .collect()
+        }
+        _ => name.to_string(),
+    }
+}
+
+/// Find the first non-empty error text across the shapes omp emits:
+/// `<prefix>.errorMessage`, top-level `errorMessage`, `error.message`, and
+/// `<prefix>.error` when it is a plain string. Returns the
+/// trimmed text; None when the event carries no error.
+fn nested_error_text(value: &Value, prefix: &[&str]) -> Option<String> {
+    let mut candidates: Vec<Option<&str>> = Vec::new();
+    for pre in prefix {
+        candidates.push(
+            value
+                .get(*pre)
+                .and_then(|m| m.get("errorMessage"))
+                .and_then(Value::as_str),
+        );
+    }
+    candidates.push(value.get("errorMessage").and_then(Value::as_str));
+    candidates.push(
+        value
+            .get("error")
+            .and_then(|e| e.get("message"))
+            .and_then(Value::as_str),
+    );
+    for pre in prefix {
+        candidates.push(
+            value
+                .get(*pre)
+                .and_then(|m| m.get("error"))
+                .and_then(Value::as_str),
+        );
+    }
+    candidates
+        .into_iter()
+        .flatten()
+        .map(str::trim)
+        .find(|text| !text.is_empty())
+        .map(str::to_string)
+}
+
+/// The bridge for omp rpc-ui's question/input dialogs. Without askDialog frames, AskTool falls
+/// back to a select/editor chain per question (multiple choice is a CLI-side loop of selects),
+/// so the wire carries only single choice and free text. Each method that needs an answer
+/// becomes one question card, answered by `extension_ui_answer_frame`. cancel is a withdrawal
+/// notice (no answer, just close the card); fire-and-forget methods such as
+/// notify/setStatus/setWidget don't appear here.
+fn parse_ui_request(value: &Value, out: &mut Vec<EngineEvent>) {
+    let method = value.get("method").and_then(Value::as_str).unwrap_or("");
+    if method == "cancel" {
+        if let Some(target) = value.get("targetId").and_then(Value::as_str) {
+            out.push(EngineEvent::QuestionSettled {
+                request_id: target.to_string(),
+            });
+        }
+        return;
+    }
+    let id = value.get("id").and_then(Value::as_str).unwrap_or("");
+    if id.is_empty() {
+        return;
+    }
+    let title = value
+        .get("title")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .to_string();
+    let (question, options) = match method {
+        "select" => {
+            let labels = value
+                .get("options")
+                .and_then(Value::as_array)
+                .cloned()
+                .unwrap_or_default();
+            // optionDetails lines up with options by position and carries only descriptions.
+            let details = value.get("optionDetails").and_then(Value::as_array);
+            let options: Vec<Value> = labels
+                .iter()
+                .enumerate()
+                .filter_map(|(index, label)| {
+                    let label = label.as_str()?;
+                    let description = details
+                        .and_then(|d| d.get(index))
+                        .and_then(|d| d.get("description"))
+                        .and_then(Value::as_str);
+                    Some(match description {
+                        Some(d) => serde_json::json!({ "label": label, "description": d }),
+                        None => serde_json::json!({ "label": label }),
+                    })
+                })
+                .collect();
+            if options.is_empty() {
+                return;
+            }
+            (title, options)
+        }
+        "confirm" => {
+            let message = value.get("message").and_then(Value::as_str).unwrap_or("");
+            let question = if message.is_empty() {
+                title
+            } else {
+                format!("{title}\n\n{message}")
+            };
+            (
+                question,
+                vec![
+                    serde_json::json!({ "label": CONFIRM_YES_LABEL }),
+                    serde_json::json!({ "label": "Cancel" }),
+                ],
+            )
+        }
+        // input/editor are free text: the card's own text field answers them, with no options.
+        "input" | "editor" => (title, Vec::new()),
+        _ => return,
+    };
+    out.push(EngineEvent::Question {
+        request_id: id.to_string(),
+        tool_use_id: None,
+        input: serde_json::json!({
+            "questions": [{
+                "question": question,
+                "header": "Question",
+                "multiSelect": false,
+                "options": options,
+            }],
+            // The answer side needs only the method to shape the response frame; id is the request_id.
+            "extui": { "method": method },
+        }),
+    });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn plan_req(permission: Option<&str>) -> SendRequest {
+        SendRequest {
+            session_id: None,
+            workspace: std::path::PathBuf::from("/tmp/ccgui-pi-family-test"),
+            prompt: "Make a plan".to_string(),
+            prompt_contributions: Vec::new(),
+            native_compact: false,
+            images: Vec::new(),
+            model: None,
+            effort: None,
+            service_tier: None,
+            permission: permission.map(str::to_string),
+            additional_dirs: Vec::new(),
+            provider_id: None,
+            mcp_servers: None,
+            allowed_tools: None,
+        }
+    }
+
+    fn argv_of(built: &BuiltCommand) -> Vec<String> {
+        built
+            .command
+            .as_std()
+            .get_args()
+            .map(|arg| arg.to_string_lossy().to_string())
+            .collect()
+    }
+    #[test]
+    fn omp_native_compact_uses_the_rpc_command_and_nothing_else_does() {
+        // The built-in /compact: OMP takes its native compact command.
+        let mut req = plan_req(None);
+        req.prompt = "/compact".to_string();
+        req.native_compact = true;
+        assert_eq!(rpc_command_types(&omp(), &req), vec!["compact"]);
+        // pi has no such command; it stays a plain prompt.
+        assert_eq!(rpc_command_types(&pi(), &req), vec!["prompt"]);
+
+        // A person's own catalog command of the same name is expanded by the CLI: the text is
+        // the same but unmarked, and must never become the compact command (or it could never run).
+        req.native_compact = false;
+        assert_eq!(rpc_command_types(&omp(), &req), vec!["prompt"]);
+
+        // /compact with an argument is the CLI's command too, not the host's button.
+        req.prompt = "/compact focus on the changes".to_string();
+        assert_eq!(rpc_command_types(&omp(), &req), vec!["prompt"]);
+    }
+
+    /// The command types this send writes on stdin, after the fixed negotiate/state prefix.
+    fn rpc_command_types(engine: &PiFamilyEngine, req: &SendRequest) -> Vec<String> {
+        let built = engine.build_command(req, "fake-cli").unwrap();
+        built
+            .stdin_payload
+            .as_deref()
+            .unwrap()
+            .lines()
+            .filter_map(|line| {
+                let value: serde_json::Value = serde_json::from_str(line).unwrap();
+                let kind = value["type"].as_str().unwrap().to_string();
+                matches!(kind.as_str(), "prompt" | "compact").then_some(kind)
+            })
+            .collect()
+    }
+
+    #[test]
+    fn omp_plan_capability_is_typed_and_pi_stays_unavailable() {
+        assert_eq!(omp().supported_permissions(), ["auto", "bypass", "plan"]);
+        assert_eq!(pi().supported_permissions(), ["auto"]);
+        let crate::engines::plan_review::PlanApproval::Typed {
+            review_kind,
+            limitations,
+            ..
+        } = omp().plan_approval()
+        else {
+            panic!("omp plan approval must be Typed once the ACP adapter is wired");
+        };
+        assert_eq!(
+            review_kind,
+            crate::engines::plan_review::PlanReviewKind::NativeRequest
+        );
+        // The limitations must tell the person: no text feedback, no recovery of the review
+        // point, new sessions only.
+        assert!(limitations.contains("Refine"), "{limitations}");
+        assert!(matches!(
+            pi().plan_approval(),
+            crate::engines::plan_review::PlanApproval::Unavailable { .. }
+        ));
+    }
+
+    #[test]
+    fn acp_plan_requested_only_matches_explicit_plan() {
+        assert!(acp_plan_requested(&plan_req(Some("plan"))));
+        assert!(!acp_plan_requested(&plan_req(Some("auto"))));
+        assert!(!acp_plan_requested(&plan_req(Some("bypass"))));
+        assert!(!acp_plan_requested(&plan_req(None)));
+    }
+
+    #[test]
+    fn omp_plan_builds_the_acp_command_without_any_auto_approve_flag() {
+        let mut req = plan_req(Some("plan"));
+        req.model = Some("openai-codex/gpt-5.4".to_string());
+        req.service_tier = Some("priority".to_string());
+        let built = omp().build_command(&req, "fake-omp").unwrap();
+        let args = argv_of(&built);
+        // The ACP entry flag; the driver owns stdin.
+        let mode = args.iter().position(|arg| arg == "--mode").expect("--mode");
+        assert_eq!(args[mode + 1], "acp");
+        // No auto-approve flag ever appears on the plan command line.
+        assert!(!args.contains(&"--plan-yolo".to_string()), "{args:?}");
+        assert!(!args.contains(&"--plan-yolo-into".to_string()), "{args:?}");
+        assert!(!args.contains(&"--auto-approve".to_string()), "{args:?}");
+        // The rpc-ui ask bridge isn't part of the ACP transport.
+        assert!(!args.contains(&"--extension".to_string()), "{args:?}");
+        // Model and effort go over the ACP config protocol, not repeated on argv.
+        assert!(!args.contains(&"--model".to_string()), "{args:?}");
+        assert!(!args.contains(&"--thinking".to_string()), "{args:?}");
+        // service-tier has no ACP equivalent: it stays a launch flag and passes the check.
+        let tier = args
+            .iter()
+            .position(|arg| arg == "--service-tier")
+            .expect("--service-tier");
+        assert_eq!(args[tier + 1], "priority");
+        assert!(built.stdin_payload.is_none());
+        assert!(!built.keep_stdin_open);
+        // An invalid tier fails the same check as on the rpc path.
+        req.service_tier = Some("flex".to_string());
+        assert!(omp().build_command(&req, "fake-omp").is_err());
+    }
+
+    #[test]
+    fn omp_plan_refuses_resume_before_spawn() {
+        // A resumed session has no verifiable human wait point (planModeState is memory only).
+        let mut req = plan_req(Some("plan"));
+        req.session_id = Some("01JOLD".to_string());
+        let error = omp().build_command(&req, "fake-omp").err().unwrap();
+        assert!(error.contains("new session"), "{error}");
+        // The auto/bypass paths are unaffected.
+        assert!(omp().build_command(&plan_req(Some("auto")), "fake-omp").is_ok());
+    }
+
+    #[test]
+    fn sidecar_returns_the_newest_matching_provider_model() {
+        let text = "gen-1\ta/model-old\ngen-2\tb/model\ngen-1\ta/model-new\n";
+        assert_eq!(
+            parse_served_model_sidecar(text, "gen-1").as_deref(),
+            Some("a/model-new")
+        );
+        assert_eq!(
+            parse_served_model_sidecar(text, "gen-2").as_deref(),
+            Some("b/model")
+        );
+        assert_eq!(parse_served_model_sidecar(text, "gen-3"), None);
+        assert_eq!(parse_served_model_sidecar("malformed-line\n", "x"), None);
+    }
+
+    /// A sidecar under the system temp dir, never the real app home.
+    fn temp_sidecar(tag: &str, rows: &str) -> std::path::PathBuf {
+        let path = std::env::temp_dir().join(format!(
+            "ccgui-served-models-{tag}-{}.tsv",
+            std::process::id()
+        ));
+        std::fs::write(&path, rows).unwrap();
+        path
+    }
+
+    fn message_end_with_sidecar(
+        message: serde_json::Value,
+        sidecar: &std::path::Path,
+    ) -> Vec<EngineEvent> {
+        let mut out = Vec::new();
+        parse_pi_family_line_with_sidecar(
+            &serde_json::json!({ "type": "message_end", "message": message }).to_string(),
+            &mut out,
+            Some(sidecar),
+        );
+        out
+    }
+
+    fn served_model_of(out: &[EngineEvent]) -> Option<&str> {
+        out.iter().find_map(|e| match e {
+            EngineEvent::Served {
+                model: Some(model), ..
+            } => Some(model.as_str()),
+            _ => None,
+        })
+    }
+
+    #[test]
+    fn message_end_uses_the_run_sidecar_when_upstream_model_is_absent() {
+        let path = temp_sidecar("hit", "gen-sidecar\tdeepseek/deepseek-v4.1-flash-1017\n");
+        let out = message_end_with_sidecar(
+            serde_json::json!({ "model": "deepseek-v4.1-flash", "responseId": "gen-sidecar" }),
+            &path,
+        );
+        let _ = std::fs::remove_file(&path);
+        assert_eq!(
+            served_model_of(&out),
+            Some("deepseek/deepseek-v4.1-flash-1017"),
+            "the provider-reported model must be used as served evidence: {out:?}"
+        );
+    }
+
+    #[test]
+    fn message_end_accepts_snake_case_and_plain_response_ids() {
+        // Provider/runtime payloads are not consistent about the field name:
+        // the sidecar key is the provider's response id regardless of which
+        // spelling the runtime used on the assistant message.
+        for field in ["response_id", "id"] {
+            let path = temp_sidecar(field, "chatcmpl-1\tserved/model\n");
+            let out = message_end_with_sidecar(
+                serde_json::json!({ "model": "requested-model", field: "chatcmpl-1" }),
+                &path,
+            );
+            let _ = std::fs::remove_file(&path);
+            assert_eq!(
+                served_model_of(&out),
+                Some("served/model"),
+                "message.{field} must key the sidecar lookup: {out:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn message_end_without_a_response_id_adopts_no_sidecar_row() {
+        // omp's background calls (session title and the like) go through the
+        // same observed fetch: a lone row can be one of them, e.g. when the
+        // turn's own request failed before any response. A message that does
+        // not name its response id — a failed call, a user or tool-result
+        // message — therefore adopts nothing.
+        let path = temp_sidecar("lone", "gen-title\tvendor/smol-upstream\n");
+        let failed = message_end_with_sidecar(
+            serde_json::json!({ "role": "assistant", "model": "main-model", "stopReason": "error" }),
+            &path,
+        );
+        let tool_result = message_end_with_sidecar(
+            serde_json::json!({ "role": "toolResult", "toolCallId": "call-1" }),
+            &path,
+        );
+        let _ = std::fs::remove_file(&path);
+        assert_eq!(served_model_of(&failed), None, "{failed:?}");
+        assert_eq!(served_model_of(&tool_result), None, "{tool_result:?}");
+    }
+
+    #[test]
+    fn message_end_without_a_sidecar_reports_no_served_model() {
+        let mut out = Vec::new();
+        parse_pi_family_line_with_sidecar(
+            &serde_json::json!({
+                "type": "message_end",
+                "message": { "model": "requested-model", "responseId": "gen-1" }
+            })
+            .to_string(),
+            &mut out,
+            None,
+        );
+        assert_eq!(served_model_of(&out), None, "{out:?}");
+    }
+
+    #[test]
+    fn only_runs_that_load_the_bridge_get_a_sidecar() {
+        let plain = plan_req(None);
+        assert!(loads_served_model_bridge("omp", &plain));
+        assert!(loads_served_model_bridge("pi", &plain));
+        // omp plan requests run over ACP without the extension.
+        assert!(!loads_served_model_bridge("omp", &plan_req(Some("plan"))));
+        // Read-only pi passes --no-extensions.
+        let read_only = SendRequest {
+            allowed_tools: Some(vec!["read".to_string()]),
+            ..plan_req(None)
+        };
+        assert!(!loads_served_model_bridge("pi", &read_only));
+        assert!(!loads_served_model_bridge("claude", &plain));
+    }
+
+    #[test]
+    fn reports_served_only_once_a_sidecar_is_attached() {
+        let engine = omp();
+        assert!(!engine.reports_served(), "no observer, nothing to report");
+        engine.set_served_models_file(std::path::Path::new("/tmp/ccgui-served.tsv"));
+        assert!(engine.reports_served());
+    }
+
+    #[test]
+    fn sweep_removes_only_stale_sidecars() {
+        let dir =
+            std::env::temp_dir().join(format!("ccgui-served-models-sweep-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let sidecar = dir.join("run-1.tsv");
+        let other = dir.join("notes.txt");
+        std::fs::write(&sidecar, "gen-1\tmodel\n").unwrap();
+        std::fs::write(&other, "keep").unwrap();
+
+        sweep_stale_served_models(&dir, std::time::Duration::from_secs(3600));
+        assert!(sidecar.exists(), "a fresh sidecar may belong to a live run");
+
+        sweep_stale_served_models(&dir, std::time::Duration::ZERO);
+        let swept = !sidecar.exists();
+        let kept = other.exists();
+        let _ = std::fs::remove_dir_all(&dir);
+        assert!(swept, "a sidecar past the threshold is a leftover");
+        assert!(kept, "only .tsv sidecars are swept");
+    }
+
+    #[test]
+    fn message_end_reports_the_served_model() {
+        // `upstreamModel` is the id recovered from the response itself
+        // (thinking signature / router) and wins over the runtime's record.
+        let mut out = Vec::new();
+        parse_pi_family_line(
+            &serde_json::json!({
+                "type": "message_end",
+                "message": {
+                    "model": "claude-opus-5-5",
+                    "upstreamModel": "claude-opus-4-1-20250805"
+                }
+            })
+            .to_string(),
+            &mut out,
+        );
+        assert!(
+            out.iter().any(|e| matches!(
+                e,
+                EngineEvent::Served { model: Some(model), effort: None }
+                    if model == "claude-opus-4-1-20250805"
+            )),
+            "got {out:?}"
+        );
+
+        // No upstream id recovered: `message.model` is the runtime's request
+        // record, not evidence of what served the turn. Echoing it here made
+        // the response check report the request as its own response.
+        let mut out = Vec::new();
+        parse_pi_family_line(
+            &serde_json::json!({
+                "type": "message_end",
+                "message": { "model": "kimi-k2" }
+            })
+            .to_string(),
+            &mut out,
+        );
+        assert!(
+            !out.iter()
+                .any(|e| matches!(e, EngineEvent::Served { model: Some(_), .. })),
+            "the requested id must not be reported as served: {out:?}"
+        );
+
+        // Effort is still independent evidence even when the model is unknown.
+        let mut out = Vec::new();
+        parse_pi_family_line(
+            &serde_json::json!({
+                "type": "message_end",
+                "message": { "model": "kimi-k2", "thinking_effort": "high" }
+            })
+            .to_string(),
+            &mut out,
+        );
+        assert!(
+            out.iter().any(|e| matches!(
+                e,
+                EngineEvent::Served { model: None, effort: Some(level) } if level == "high"
+            )),
+            "got {out:?}"
+        );
+    }
+
+    #[test]
+    fn message_end_reports_actual_thinking_effort() {
+        let mut out = Vec::new();
+        parse_pi_family_line(
+            &serde_json::json!({
+                "type": "message_end",
+                "message": { "model": "kimi-k2", "thinking_effort": "xhigh" }
+            })
+            .to_string(),
+            &mut out,
+        );
+        assert!(
+            out.iter()
+                .any(|e| matches!(e, EngineEvent::Effort(level) if level == "xhigh")),
+            "got {out:?}"
+        );
+
+        // Blank or absent effort emits nothing.
+        for line in [
+            serde_json::json!({ "type": "message_end", "thinking_effort": " " }).to_string(),
+            serde_json::json!({ "type": "message_end", "message": {} }).to_string(),
+        ] {
+            let mut out = Vec::new();
+            parse_pi_family_line(&line, &mut out);
+            assert!(
+                !out.iter().any(|e| matches!(e, EngineEvent::Effort(_))),
+                "got {out:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn message_start_opens_the_generation_window() {
+        let mut out = Vec::new();
+        let line = r#"{"type":"message_start","message":{"role":"assistant","content":[]}}"#;
+        parse_pi_family_line(line, &mut out);
+        match &out[..] {
+            [EngineEvent::Generation { active: true }] => {}
+            other => panic!("expected generation start, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn stream_updates_skip_snapshots_and_preserve_delta_order() {
+        let mut out = Vec::new();
+        for (kind, text) in [("thinking_delta", "思考\n"), ("text_delta", "答案\"你好\"")] {
+            let snapshot =
+                serde_json::json!({"content": [{"type": "text", "text": "长文本".repeat(20000)}]});
+            let line = serde_json::json!({
+                "type": "message_update", "message": snapshot,
+                "assistantMessageEvent": {"type": kind, "delta": text, "partial": snapshot}
+            })
+            .to_string();
+            parse_pi_family_line(&line, &mut out);
+        }
+        assert_eq!(out.len(), 2);
+        assert!(matches!(&out[0], EngineEvent::Thinking(t) if t == "思考\n"));
+        assert!(matches!(&out[1], EngineEvent::Delta(t) if t == "答案\"你好\""));
+        for line in [
+            r#"{"type":"message_update"}"#,
+            r#"{"type":"message_update","assistantMessageEvent":{"type":"text_delta","delta":""}}"#,
+            r#"{"type":"message_update","assistantMessageEvent":{"type":"toolcall_delta","delta":"ignored"}}"#,
+            "{incomplete",
+        ] {
+            parse_pi_family_line(line, &mut out);
+        }
+        assert_eq!(out.len(), 2);
+    }
+
+    #[test]
+    fn rpc_get_state_response_announces_the_session_id() {
+        let line = serde_json::json!({
+            "id": "ccgui-state",
+            "type": "response",
+            "command": "get_state",
+            "success": true,
+            "data": { "sessionId": "01JABC", "isStreaming": false },
+        })
+        .to_string();
+        let mut out = Vec::new();
+        parse_pi_family_line(&line, &mut out);
+        assert!(
+            matches!(&out[..], [EngineEvent::SessionId(id)] if id == "01JABC"),
+            "got {out:?}"
+        );
+    }
+
+    #[test]
+    fn rpc_prompt_and_compact_results_set_terminal_state() {
+        let mut out = Vec::new();
+        omp().parse_line(
+            &serde_json::json!({
+                "id": "ccgui-prompt", "type": "response", "command": "prompt",
+                "success": false, "error": "rate limited",
+            })
+            .to_string(),
+            &mut out,
+        );
+        assert!(matches!(&out[..], [EngineEvent::Error(_)]), "got {out:?}");
+
+        let compact_success = serde_json::json!({
+            "id": "ccgui-compact", "type": "response", "command": "compact",
+            "success": true, "data": { "tokensBefore": 100, "tokensAfter": 20 },
+        })
+        .to_string();
+        let mut out = Vec::new();
+        omp().parse_line(&compact_success, &mut out);
+        assert!(
+            matches!(
+                &out[..],
+                [EngineEvent::Done {
+                    session_id: None,
+                    usage: None
+                }]
+            ),
+            "got {out:?}"
+        );
+
+        let mut out = Vec::new();
+        omp().parse_line(
+            &serde_json::json!({
+                "id": "ccgui-compact", "type": "response", "command": "compact",
+                "success": false, "error": "busy",
+            })
+            .to_string(),
+            &mut out,
+        );
+        assert!(matches!(&out[..], [EngineEvent::Error(_)]), "got {out:?}");
+
+        // The shared Pi-family parser must not make Pi treat an OMP-only
+        // response as a terminal event.
+        let mut out = Vec::new();
+        pi().parse_line(&compact_success, &mut out);
+        assert!(out.is_empty(), "got {out:?}");
+
+        // Unrelated command failures remain non-terminal warnings.
+        let mut out = Vec::new();
+        omp().parse_line(
+            &serde_json::json!({
+                "id": "x", "type": "response", "command": "set_thinking_level",
+                "success": false, "error": "unsupported",
+            })
+            .to_string(),
+            &mut out,
+        );
+        assert!(matches!(&out[..], [EngineEvent::Warn(_)]), "got {out:?}");
+
+        // A failed negotiate_protocol = v1 fallback: neither a warning nor fatal.
+        let mut out = Vec::new();
+        omp().parse_line(
+            &serde_json::json!({
+                "id": "ccgui-negotiate", "type": "response", "command": "negotiate_protocol",
+                "success": false, "error": "unsupported",
+            })
+            .to_string(),
+            &mut out,
+        );
+        assert!(out.is_empty(), "got {out:?}");
+    }
+
+    #[test]
+    fn auto_compaction_events_map_to_compaction_progress() {
+        let mut out = Vec::new();
+        parse_pi_family_line(
+            &serde_json::json!({
+                "type": "auto_compaction_start", "reason": "threshold", "action": "compact",
+            })
+            .to_string(),
+            &mut out,
+        );
+        assert!(
+            matches!(&out[..], [EngineEvent::Compaction { active: true, reason }] if reason.as_deref() == Some("threshold")),
+            "got {out:?}"
+        );
+
+        let mut out = Vec::new();
+        parse_pi_family_line(
+            &serde_json::json!({ "type": "auto_compaction_end" }).to_string(),
+            &mut out,
+        );
+        assert!(
+            matches!(&out[..], [EngineEvent::Compaction { active: false, .. }]),
+            "got {out:?}"
+        );
+    }
+
+    #[test]
+    fn select_request_becomes_a_question_card() {
+        let line = serde_json::json!({
+            "type": "extension_ui_request",
+            "id": "0192ab3cd4ef0123",
+            "method": "select",
+            "title": "Deploy where?",
+            "options": ["staging (Recommended)", "prod", "Other (type your own)"],
+            "optionDetails": [{ "description": "Staging" }, {}, {}],
+        })
+        .to_string();
+        let mut out = Vec::new();
+        parse_pi_family_line(&line, &mut out);
+        match &out[..] {
+            [EngineEvent::Question {
+                request_id, input, ..
+            }] => {
+                assert_eq!(request_id, "0192ab3cd4ef0123");
+                assert_eq!(input["questions"][0]["question"], "Deploy where?");
+                assert_eq!(
+                    input["questions"][0]["options"][0]["label"],
+                    "staging (Recommended)"
+                );
+                assert_eq!(input["questions"][0]["options"][0]["description"], "Staging");
+                assert_eq!(input["extui"]["method"], "select");
+            }
+            other => panic!("expected question event, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn input_and_editor_requests_are_free_text_cards() {
+        for method in ["input", "editor"] {
+            let line = serde_json::json!({
+                "type": "extension_ui_request",
+                "id": "req-free",
+                "method": method,
+                "title": "Say anything",
+            })
+            .to_string();
+            let mut out = Vec::new();
+            parse_pi_family_line(&line, &mut out);
+            match &out[..] {
+                [EngineEvent::Question { input, .. }] => {
+                    assert_eq!(input["questions"][0]["options"], serde_json::json!([]));
+                    assert_eq!(input["extui"]["method"], method);
+                }
+                other => panic!("expected question event, got {other:?}"),
+            }
+        }
+    }
+
+    #[test]
+    fn confirm_request_maps_to_a_two_option_card_and_cancel_settles() {
+        let line = serde_json::json!({
+            "type": "extension_ui_request",
+            "id": "req-confirm",
+            "method": "confirm",
+            "title": "Continue?",
+            "message": "This deletes files",
+        })
+        .to_string();
+        let mut out = Vec::new();
+        parse_pi_family_line(&line, &mut out);
+        match &out[..] {
+            [EngineEvent::Question { input, .. }] => {
+                assert_eq!(input["questions"][0]["question"], "Continue?\n\nThis deletes files");
+                assert_eq!(
+                    input["questions"][0]["options"][0]["label"],
+                    CONFIRM_YES_LABEL
+                );
+                assert_eq!(input["extui"]["method"], "confirm");
+            }
+            other => panic!("expected question event, got {other:?}"),
+        }
+
+        let cancel = serde_json::json!({
+            "type": "extension_ui_request",
+            "method": "cancel",
+            "targetId": "req-confirm",
+        })
+        .to_string();
+        let mut out = Vec::new();
+        parse_pi_family_line(&cancel, &mut out);
+        assert!(
+            matches!(&out[..], [EngineEvent::QuestionSettled { request_id }] if request_id == "req-confirm"),
+            "got {out:?}"
+        );
+    }
+
+    #[test]
+    fn extension_ui_answer_frame_builds_the_response_per_method() {
+        // select: the value is returned as it is (the CLI matches labels exactly, and free text
+        // falls back to the chosen item).
+        let frame = extension_ui_answer_frame(
+            "select",
+            "r1",
+            Some(&serde_json::json!({ "Deploy where?": "prod" })),
+        );
+        assert_eq!(frame["type"], "extension_ui_response");
+        assert_eq!(frame["id"], "r1");
+        assert_eq!(frame["value"], "prod");
+
+        // Free text goes in value too.
+        let frame =
+            extension_ui_answer_frame("editor", "r2", Some(&serde_json::json!({ "q": "anything" })));
+        assert_eq!(frame["value"], "anything");
+
+        // confirm maps to the confirmed boolean.
+        let yes = extension_ui_answer_frame(
+            "confirm",
+            "r3",
+            Some(&serde_json::json!({ "q": CONFIRM_YES_LABEL })),
+        );
+        assert_eq!(yes["confirmed"], true);
+        let no =
+            extension_ui_answer_frame("confirm", "r3", Some(&serde_json::json!({ "q": "Cancel" })));
+        assert_eq!(no["confirmed"], false);
+
+        // Dismissed = cancelled.
+        let cancel = extension_ui_answer_frame("select", "r4", None);
+        assert_eq!(cancel["cancelled"], true);
+    }
+
+    #[test]
+    fn rpc_chunks_reassemble_into_a_full_frame() {
+        use base64::Engine as _;
+        let engine = omp();
+        let frame = serde_json::json!({
+            "type": "extension_ui_request",
+            "id": "chunked-1",
+            "method": "input",
+            "title": "大帧标题",
+        })
+        .to_string();
+        let bytes = frame.as_bytes();
+        let half = bytes.len() / 2;
+        for (index, slice) in [(0, &bytes[..half]), (1, &bytes[half..])].into_iter() {
+            let chunk = serde_json::json!({
+                "type": "rpc_chunk",
+                "chunkId": "c1",
+                "index": index,
+                "count": 2,
+                "byteLength": slice.len(),
+                "data": base64::engine::general_purpose::STANDARD.encode(slice),
+            })
+            .to_string();
+            let mut out = Vec::new();
+            engine.parse_line(&chunk, &mut out);
+            if index == 0 {
+                assert!(out.is_empty(), "mid-sequence events: {out:?}");
+            } else {
+                assert!(
+                    matches!(&out[..], [EngineEvent::Question { request_id, .. }] if request_id == "chunked-1"),
+                    "got {out:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    #[ignore = "manual parser throughput benchmark"]
+    fn benchmark_snapshot_updates() {
+        let snapshot = serde_json::json!({"content": (0..200).map(|_| serde_json::json!({"type":"text", "text":"x".repeat(320)})).collect::<Vec<_>>()});
+        let line = serde_json::json!({"type":"message_update", "message":snapshot, "assistantMessageEvent":{"type":"text_delta", "delta":"token", "partial":snapshot}}).to_string();
+        let start = std::time::Instant::now();
+        for _ in 0..1000 {
+            std::hint::black_box(serde_json::from_str::<Value>(&line).unwrap());
+        }
+        let full = start.elapsed();
+        let start = std::time::Instant::now();
+        let mut out = Vec::new();
+        for _ in 0..1000 {
+            out.clear();
+            parse_pi_family_line(&line, &mut out);
+            std::hint::black_box(&out);
+        }
+        eprintln!(
+            "1000 snapshot updates ({} bytes): full JSON {:?}, delta parser {:?}",
+            line.len(),
+            full,
+            start.elapsed()
+        );
+    }
+
+    #[test]
+    fn tool_execution_start_carries_args_path() {
+        let line = serde_json::json!({
+            "type": "tool_execution_start",
+            "toolCallId": "tool_1",
+            "toolName": "edit",
+            "args": { "path": "src/app.tsx", "input": {} },
+            "intent": "Adding chrome token"
+        })
+        .to_string();
+        let mut out = Vec::new();
+        parse_pi_family_line(&line, &mut out);
+        match &out[0] {
+            EngineEvent::Message {
+                role,
+                text,
+                path,
+                args,
+                tool_call_id,
+                ..
+            } => {
+                assert_eq!(role, "tool");
+                assert_eq!(text, "edit · Adding chrome token");
+                assert_eq!(path.as_deref(), Some("src/app.tsx"));
+                assert_eq!(
+                    args,
+                    &Some(serde_json::json!({"path": "src/app.tsx", "input": {}}))
+                );
+                assert_eq!(tool_call_id.as_deref(), Some("tool_1"));
+            }
+            _ => panic!("expected tool message"),
+        }
+
+        // bash-style args carry no path key -> None. No file chip, but the
+        // command still lands in `args` for the expandable panel.
+        let line = serde_json::json!({
+            "type": "tool_execution_start",
+            "toolCallId": "tool_2",
+            "toolName": "bash",
+            "args": { "command": "ls" }
+        })
+        .to_string();
+        let mut out = Vec::new();
+        parse_pi_family_line(&line, &mut out);
+        match &out[0] {
+            EngineEvent::Message {
+                path,
+                args,
+                tool_call_id,
+                ..
+            } => {
+                assert_eq!(*path, None);
+                assert_eq!(args, &Some(serde_json::json!({"command": "ls"})));
+                assert_eq!(tool_call_id.as_deref(), Some("tool_2"));
+            }
+            _ => panic!("expected tool message"),
+        }
+    }
+
+    #[test]
+    fn tool_execution_end_carries_tool_call_identity() {
+        let line = serde_json::json!({
+            "type": "tool_execution_end",
+            "toolCallId": "tool_2",
+            "toolName": "bash",
+            "result": { "exitCode": 3 }
+        })
+        .to_string();
+        let mut out = Vec::new();
+        parse_pi_family_line(&line, &mut out);
+        match &out[0] {
+            EngineEvent::Message {
+                tool_call_id,
+                result,
+                ..
+            } => {
+                assert_eq!(tool_call_id.as_deref(), Some("tool_2"));
+                assert_eq!(result, &Some(serde_json::json!({"exitCode": 3})));
+            }
+            _ => panic!("expected tool result"),
+        }
+    }
+
+    #[test]
+    fn tool_execution_start_carries_todo_payload() {
+        let line = serde_json::json!({
+            "type": "tool_execution_start",
+            "toolCallId": "tool_3",
+            "toolName": "todo",
+            "args": {
+                "op": "init",
+                "list": [
+                    {"phase": "scaffold", "items": ["scan files", "write code"]}
+                ]
+            }
+        })
+        .to_string();
+        let mut out = Vec::new();
+        parse_pi_family_line(&line, &mut out);
+        match &out[0] {
+            EngineEvent::Message {
+                todos: Some(todos), ..
+            } => {
+                assert!(todos.replace);
+                assert_eq!(todos.items.len(), 2);
+                assert_eq!(todos.items[0].content, "scan files");
+                assert_eq!(todos.items[0].status, "pending");
+                assert_eq!(todos.items[1].content, "write code");
+                assert_eq!(todos.items[1].status, "pending");
+            }
+            _ => panic!("expected tool message with todos"),
+        }
+
+        // Non-todo tool args carry no payload.
+        let line = serde_json::json!({
+            "type": "tool_execution_start",
+            "toolCallId": "tool_4",
+            "toolName": "bash",
+            "args": { "command": "ls" }
+        })
+        .to_string();
+        let mut out = Vec::new();
+        parse_pi_family_line(&line, &mut out);
+        match &out[0] {
+            EngineEvent::Message { todos, .. } => assert!(todos.is_none()),
+            _ => panic!("expected tool message"),
+        }
+    }
+
+    /// The live path's only reliable todo source for this tool. Two real
+    /// gaps it covers: the start event carries no `args` for `todo` (so the
+    /// list would stay stale until the session was reloaded), and a
+    /// phase-wide `done` names a PHASE, which no task-keyed patch could
+    /// apply. `abandoned` is omp's own spelling for a dropped task and must
+    /// not read as still-to-do.
+    #[test]
+    fn tool_execution_end_carries_the_authoritative_todo_snapshot() {
+        let line = serde_json::json!({
+            "type": "tool_execution_end",
+            "toolCallId": "tool_5",
+            "toolName": "todo",
+            "result": {
+                "content": [{"type": "text", "text": "Remaining items (1)"}],
+                "details": {
+                    "phases": [
+                        {"name": "scaffold", "tasks": [
+                            {"content": "scan files", "status": "completed"},
+                            {"content": "write code", "status": "running"}
+                        ]},
+                        {"name": "verify", "tasks": [
+                            {"content": "run tests", "status": "pending"},
+                            {"content": "update snapshots", "status": "abandoned"},
+                            {"content": "await review", "status": "blocked", "blocker": "waiting on user"}
+                        ]}
+                    ],
+                    "storage": "session"
+                }
+            }
+        })
+        .to_string();
+        let mut out = Vec::new();
+        parse_pi_family_line(&line, &mut out);
+        match &out[0] {
+            EngineEvent::Message {
+                todos: Some(todos),
+                patch,
+                ..
+            } => {
+                // A full post-op list, not a delta: it replaces what the row holds.
+                assert!(todos.replace);
+                assert!(*patch, "must land on the in-flight todo row");
+                let seen: Vec<(&str, &str)> = todos
+                    .items
+                    .iter()
+                    .map(|i| (i.content.as_str(), i.status.as_str()))
+                    .collect();
+                assert_eq!(
+                    seen,
+                    [
+                        ("scan files", "complete"),
+                        ("write code", "active"),
+                        ("run tests", "pending"),
+                        ("update snapshots", "dropped"),
+                        ("await review", "blocked"),
+                    ]
+                );
+            }
+            other => panic!("expected a todo snapshot patch, got {other:?}"),
+        }
+
+        // A non-todo tool's result carries no list.
+        let line = serde_json::json!({
+            "type": "tool_execution_end",
+            "toolName": "bash",
+            "result": {"content": [{"type": "text", "text": "ok"}]}
+        })
+        .to_string();
+        let mut out = Vec::new();
+        parse_pi_family_line(&line, &mut out);
+        match &out[0] {
+            EngineEvent::Message { todos, .. } => assert!(todos.is_none()),
+            other => panic!("expected tool result patch, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn message_end_extracts_nested_error_shapes_as_warn() {
+        for line in [
+            serde_json::json!({"type":"message_end","message":{"errorMessage":"upstream 429"}}),
+            serde_json::json!({"type":"message_end","errorMessage":"top-level 429"}),
+            serde_json::json!({"type":"message_end","error":{"message":"nested 429"}}),
+            serde_json::json!({"type":"message_end","message":{"error":"message.error 429"}}),
+        ] {
+            let mut out = Vec::new();
+            parse_pi_family_line(&line.to_string(), &mut out);
+            match out.last() {
+                Some(EngineEvent::Warn(text)) => assert!(text.contains("429"), "{line}"),
+                other => panic!("expected Warn for {line}, got {other:?}"),
+            }
+        }
+    }
+
+    #[test]
+    fn turn_end_preserves_provisional_errors_from_all_shapes() {
+        for line in [
+            serde_json::json!({"type":"turn_end","errorMessage":"boom"}),
+            serde_json::json!({"type":"turn_end","error":{"message":"nested boom"}}),
+            // Real omp 401 shape: the failure nests in `message.errorMessage`
+            // with stopReason=error on the enclosing message.
+            serde_json::json!({"type":"turn_end","message":{"role":"assistant","stopReason":"error","errorStatus":401,"errorMessage":"401 Invalid token"}}),
+        ] {
+            let mut out = Vec::new();
+            parse_pi_family_line(&line.to_string(), &mut out);
+            match out.first() {
+                Some(EngineEvent::AttemptEnd { error: Some(text) }) => {
+                    assert!(text.contains("boom") || text.contains("401"), "{line}")
+                }
+                other => panic!("expected provisional error for {line}, got {other:?}"),
+            }
+        }
+    }
+
+    #[test]
+    fn agent_end_after_error_does_not_emit_done() {
+        // A terminal agent_end must preserve failure rather than emit Done.
+        let line = serde_json::json!({
+            "type":"agent_end",
+            "message":{"stopReason":"error","errorMessage":"401 Invalid token"},
+            "isTerminal":true
+        })
+        .to_string();
+        let mut out = Vec::new();
+        parse_pi_family_line(&line, &mut out);
+        assert!(matches!(out[0], EngineEvent::Error(_)), "got {out:?}");
+        assert!(
+            !out.iter().any(|e| matches!(e, EngineEvent::Done { .. })),
+            "Done leaked after Error: {out:?}"
+        );
+
+        // Healthy turn: agent_end without an error still settles with Done.
+        let ok_line = serde_json::json!({"type":"agent_end","isTerminal":true}).to_string();
+        let mut ok_out = Vec::new();
+        parse_pi_family_line(&ok_line, &mut ok_out);
+        assert!(
+            matches!(ok_out[0], EngineEvent::Done { .. }),
+            "got {ok_out:?}"
+        );
+    }
+
+    #[test]
+    fn failed_attempt_can_retry_before_the_agent_finishes() {
+        // turn_end describes one model call, before the session decides
+        // whether to retry. It must not cause the runner to kill the CLI.
+        let lines = [
+            serde_json::json!({"type":"message_end","message":{"role":"assistant","stopReason":"error","errorMessage":"socket closed unexpectedly"}}),
+            serde_json::json!({"type":"turn_end","message":{"role":"assistant","stopReason":"error","errorMessage":"socket closed unexpectedly"}}),
+            serde_json::json!({"type":"auto_retry_start","attempt":1,"maxAttempts":50,"errorMessage":"socket closed unexpectedly"}),
+            serde_json::json!({"type":"agent_end","isTerminal":false,"messages":[{"role":"assistant","stopReason":"error","errorMessage":"socket closed unexpectedly"}]}),
+            serde_json::json!({"type":"message_update","assistantMessageEvent":{"type":"text_delta","delta":"recovered"}}),
+            serde_json::json!({"type":"auto_retry_end","success":true,"attempt":1}),
+        ];
+        let mut out = Vec::new();
+        for line in lines {
+            parse_pi_family_line(&line.to_string(), &mut out);
+        }
+        assert!(
+            !out.iter()
+                .any(|event| matches!(event, EngineEvent::Error(_) | EngineEvent::Done { .. })),
+            "retry was terminated: {out:?}"
+        );
+        assert!(out
+            .iter()
+            .any(|event| matches!(event, EngineEvent::Delta(text) if text == "recovered")));
+    }
+
+    #[test]
+    fn terminal_agent_end_uses_the_last_assistant_result() {
+        let mut out = Vec::new();
+        parse_pi_family_line(
+            &serde_json::json!({
+                "type":"agent_end", "isTerminal":true,
+                "messages":[
+                    {"role":"assistant","stopReason":"stop","content":[]},
+                    {"role":"assistant","stopReason":"error","errorMessage":"HTTP 502"},
+                    {"role":"toolResult","content":[]}
+                ]
+            })
+            .to_string(),
+            &mut out,
+        );
+        assert!(
+            matches!(out.as_slice(), [EngineEvent::Error(text)] if text == "HTTP 502"),
+            "final error was lost: {out:?}"
+        );
+
+        out.clear();
+        parse_pi_family_line(
+            &serde_json::json!({
+                "type":"agent_end", "isTerminal":true,
+                "messages":[
+                    {"role":"assistant","stopReason":"error","errorMessage":"HTTP 502"},
+                    {"role":"assistant","stopReason":"stop","content":[]}
+                ]
+            })
+            .to_string(),
+            &mut out,
+        );
+        assert!(
+            matches!(out.as_slice(), [EngineEvent::Done { .. }]),
+            "recovered error leaked: {out:?}"
+        );
+    }
+
+    #[test]
+    fn exhausted_retry_settles_when_the_agent_finishes() {
+        let mut out = Vec::new();
+        for line in [
+            serde_json::json!({"type":"auto_retry_end", "success":false,
+                "attempt":50, "finalError":"socket closed unexpectedly"}),
+            serde_json::json!({"type":"agent_end", "isTerminal":true,
+                "messages":[{"role":"assistant", "stopReason":"error",
+                    "errorMessage":"socket closed unexpectedly"}]}),
+        ] {
+            parse_pi_family_line(&line.to_string(), &mut out);
+        }
+        assert!(
+            matches!(out.last(), Some(EngineEvent::Error(text)) if text == "socket closed unexpectedly"),
+            "final failure was lost: {out:?}"
+        );
+        assert!(!out
+            .iter()
+            .any(|event| matches!(event, EngineEvent::Done { .. })));
+    }
+
+    #[test]
+    fn build_command_passes_effort_through() {
+        let engine = omp();
+        let req = SendRequest {
+            session_id: None,
+            prompt: "hi".into(),
+            prompt_contributions: vec![],
+            native_compact: false,
+            images: vec![],
+            workspace: std::path::PathBuf::from("/tmp"),
+            model: None,
+            effort: Some("ultra".into()),
+            service_tier: None,
+            permission: None,
+            additional_dirs: vec![],
+            provider_id: None,
+            mcp_servers: None,
+            allowed_tools: None,
+        };
+        let built = engine.build_command(&req, "omp").unwrap();
+        let args: Vec<String> = built
+            .command
+            .as_std()
+            .get_args()
+            .map(|a| a.to_string_lossy().to_string())
+            .collect();
+        assert!(args.windows(2).any(|w| w == ["--thinking", "ultra"]));
+    }
+
+    #[test]
+    fn build_command_injects_set_thinking_level_in_rpc_mode() {
+        let engine = omp();
+        let req = SendRequest {
+            session_id: Some("s1".into()),
+            prompt: "hi".into(),
+            prompt_contributions: vec![],
+            native_compact: false,
+            images: vec![],
+            workspace: std::path::PathBuf::from("/tmp"),
+            model: None,
+            effort: Some("high".into()),
+            service_tier: None,
+            permission: None,
+            additional_dirs: vec![],
+            provider_id: None,
+            mcp_servers: None,
+            allowed_tools: None,
+        };
+        let built = engine.build_command(&req, "omp").unwrap();
+        let payload = built.stdin_payload.expect("rpc stdin payload");
+        let commands: Vec<serde_json::Value> = payload
+            .lines()
+            .map(|line| serde_json::from_str(line).expect("valid RPC command JSON"))
+            .collect();
+        assert_eq!(
+            commands,
+            vec![
+                serde_json::json!({"id": "ccgui-negotiate", "type": "negotiate_protocol", "protocolVersion": 2}),
+                serde_json::json!({"id": "ccgui-effort", "type": "set_thinking_level", "level": "high"}),
+                serde_json::json!({"id": "ccgui-state", "type": "get_state"}),
+                serde_json::json!({"id": "ccgui-prompt", "type": "prompt", "message": "hi"}),
+            ]
+        );
+    }
+
+    #[test]
+    fn parse_thinking_level_changed_event() {
+        let mut out = Vec::new();
+        let line = serde_json::json!({
+            "type": "thinking_level_changed",
+            "thinkingLevel": "high"
+        })
+        .to_string();
+        parse_pi_family_line(&line, &mut out);
+        assert!(out
+            .iter()
+            .any(|e| matches!(e, EngineEvent::Effort(l) if l == "high")));
+        // The effective level is also evidence for the response check:
+        // auto-thinking can move it away from the request.
+        assert!(out.iter().any(|e| matches!(
+            e,
+            EngineEvent::Served { model: None, effort: Some(l) } if l == "high"
+        )));
+    }
+
+    #[test]
+    fn omp_build_command_includes_bridge_extension() {
+        let engine = omp();
+        let req = SendRequest {
+            session_id: None,
+            prompt: "hi".into(),
+            prompt_contributions: vec![],
+            native_compact: false,
+            images: vec![],
+            workspace: std::path::PathBuf::from("/tmp"),
+            model: None,
+            effort: Some("high".into()),
+            service_tier: None,
+            permission: None,
+            additional_dirs: vec![],
+            provider_id: None,
+            mcp_servers: None,
+            allowed_tools: None,
+        };
+        let built = engine.build_command(&req, "omp").unwrap();
+        let args: Vec<String> = built
+            .command
+            .as_std()
+            .get_args()
+            .map(|a| a.to_string_lossy().to_string())
+            .collect();
+        assert!(args
+            .windows(2)
+            .any(|w| w[0] == "--extension" && w[1].ends_with("ccgui-ask-bridge.ts")));
+    }
+}

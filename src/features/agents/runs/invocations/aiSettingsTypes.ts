@@ -3,7 +3,6 @@ import type { AiArtifact } from "./invocationTypes";
 export type ScreenLocation = "window" | "ask";
 export interface AiUserSettings {
   enabled: boolean;
-  memory_enabled: boolean;
   /** Agents pause before sending, sharing, deleting and paying. Off by default. */
   app_actions_ask: boolean;
   /** Agents pause before paying while they otherwise act on their own. */
@@ -20,17 +19,6 @@ export interface AiUserSettings {
   purge_state: "none" | "queued" | "working" | "verified" | "failed";
   disabled_at?: string;
   updated_at?: string;
-}
-
-export interface AiMemoryRecord {
-  id: string;
-  space_id?: string;
-  kind: "fact" | "preference" | "instruction";
-  content: string;
-  reason?: string;
-  last_used_at?: string;
-  created_at: string;
-  updated_at: string;
 }
 
 export interface AiSurfacePreferenceRecord {

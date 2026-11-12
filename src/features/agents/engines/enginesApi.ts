@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { create } from "zustand";
 import { invoke } from "@/native/invoke";
 import { spaceWindow } from "@/features/app-windows";
@@ -9,6 +10,8 @@ export interface EngineInfo {
   name: string;
   installed: boolean;
   version: string | null;
+  /** Misty's modes this engine can run in; native code decides what each passes to it. */
+  modes?: Array<"ask" | "auto" | "plan" | "bypass">;
 }
 
 /** Misty's own runtime, which needs nothing installed. */
@@ -22,61 +25,246 @@ export interface EngineModel {
   default: boolean;
 }
 
-export const listEngineModels = (engine: string) =>
-  invoke<EngineModel[]>("engine_models", { engine });
+/** The engine's own models, then the model names the person added for it in Settings › Engines. */
+export async function listEngineModels(engine: string): Promise<EngineModel[]> {
+  const [models, settings] = await Promise.all([
+    invoke<EngineModel[]>("engine_models", { engine }),
+    invoke<{ customModels?: Record<string, string[]> }>("engine_settings_get").catch(() => null),
+  ]);
+  const known = new Set(models.map((model) => model.id));
+  const added = (settings?.customModels?.[engine] ?? [])
+    .filter((id) => id.trim() && !known.has(id))
+    .map((id) => ({ id, default: false }));
+  return [...models, ...added];
+}
+
+/** One of an engine's slash commands or skills, and what the composer inserts to use it. */
+export interface EngineCatalogItem {
+  name: string;
+  description: string;
+  source: "builtin" | "user" | "project";
+  insert: string;
+}
+
+export interface EngineCatalog {
+  commands: EngineCatalogItem[];
+  skills: EngineCatalogItem[];
+}
+
+/** An engine's commands and skills, from its own folders and the chat's linked folder. */
+export const engineCatalog = (engine: string, folder: string) =>
+  invoke<EngineCatalog>("engine_catalog", { account: agentAccountId(), engine, folder });
+
+/** A file or folder inside a linked folder, for the composer's `@` menu. */
+export interface FoundFile {
+  path: string;
+  relative: string;
+  isDir: boolean;
+}
+
+export const findFiles = (folder: string, query: string) =>
+  invoke<FoundFile[]>("project_find_files", { account: agentAccountId(), folder, query });
 
 /** The Space this window shows, as the key its linked folders are kept under. */
 export const currentSpaceKey = () => spaceWindow().spaceId ?? "";
 
+/**
+ * What the person set for a Space's linked folders on this device, kept in `misty.db` and never
+ * synced: the folder in use, a name for each, their order, and which are archived (still linked,
+ * out of the way). Adapted from desktop-cc-gui's workspace grouping (MIT, Copyright (c) 2026
+ * zhukunpenglinyutong).
+ */
+export interface SpaceFolderPrefs {
+  chosen?: string;
+  names?: Record<string, string>;
+  order?: string[];
+  archived?: string[];
+}
+
 interface SpaceFoldersState {
-  /** Each Space's linked folders on this computer, by Space key, once loaded. */
+  /** Each Space's linked folders on this computer, by Space key, once loaded, in link order. */
   folders: Record<string, string[]>;
-  /** The folder a Space's chats and panels work in; the first linked one unless another is picked. */
+  /** The folder a Space's chats and panels work in; the first one in order unless another is picked. */
   chosen: Record<string, string>;
+  /** Each Space's names, order and archive for its folders. */
+  prefs: Record<string, SpaceFolderPrefs>;
   load(space: string): Promise<string[]>;
   link(space: string): Promise<string | null>;
   unlink(space: string, path: string): Promise<void>;
   choose(space: string, path: string): void;
+  /** Names a folder in lists; an empty name goes back to the folder's own. */
+  rename(space: string, path: string, name: string): Promise<void>;
+  /** Moves a folder to `index` in the Space's order. */
+  move(space: string, path: string, index: number): Promise<void>;
+  archive(space: string, path: string, archived: boolean): Promise<void>;
 }
 
-export const useSpaceFolders = create<SpaceFoldersState>((set, get) => ({
-  folders: {},
-  chosen: {},
-  async load(space) {
-    const folders = await invoke<string[]>("space_folder_list", {
-      account: agentAccountId(),
-      space,
-    });
-    set({ folders: { ...get().folders, [space]: folders } });
-    return folders;
-  },
-  async link(space) {
-    const path = await invoke<string | null>("space_folder_link", {
-      account: agentAccountId(),
-      space,
-    });
-    if (!path) return null;
-    await get().load(space);
-    set({ chosen: { ...get().chosen, [space]: path } });
-    return path;
-  },
-  async unlink(space, path) {
-    await invoke<void>("space_folder_unlink", { account: agentAccountId(), space, path });
-    const chosen = { ...get().chosen };
-    if (chosen[space] === path) delete chosen[space];
-    set({ chosen });
-    await get().load(space);
-  },
-  choose(space, path) {
-    set({ chosen: { ...get().chosen, [space]: path } });
-  },
-}));
+const prefsScope = (space: string) => `project-folders:${agentAccountId()}:${space}`;
 
-/** The folder a Space works in, out of what is loaded: the picked one if it is still linked. */
-export function folderOf(state: Pick<SpaceFoldersState, "folders" | "chosen">, space: string) {
-  const linked = state.folders[space] ?? [];
+interface Stored<T> {
+  revision: number;
+  state: T | null;
+}
+
+async function savePrefs(space: string, change: (prefs: SpaceFolderPrefs) => SpaceFolderPrefs) {
+  for (let attempt = 0; attempt < 20; attempt++) {
+    const current = await invoke<Stored<SpaceFolderPrefs>>("settings_session_state", {
+      scope: prefsScope(space),
+    });
+    const next = change(current.state ?? {});
+    try {
+      await invoke("settings_session_commit", {
+        scope: prefsScope(space),
+        revision: current.revision,
+        document: next,
+      });
+      return next;
+    } catch (error) {
+      if (!String(error).includes("SETTINGS_REVISION_CONFLICT")) throw error;
+    }
+  }
+  throw new Error("This changed in another window. Try again.");
+}
+
+export const useSpaceFolders = create<SpaceFoldersState>((set, get) => {
+  const update = async (space: string, change: (prefs: SpaceFolderPrefs) => SpaceFolderPrefs) => {
+    // Shown at once; the stored copy follows, and wins if another window wrote meanwhile.
+    set({ prefs: { ...get().prefs, [space]: change(get().prefs[space] ?? {}) } });
+    const saved = await savePrefs(space, change);
+    set({
+      prefs: { ...get().prefs, [space]: saved },
+      chosen: saved.chosen ? { ...get().chosen, [space]: saved.chosen } : get().chosen,
+    });
+  };
+  return {
+    folders: {},
+    chosen: {},
+    prefs: {},
+    async load(space) {
+      const [folders, stored] = await Promise.all([
+        invoke<string[]>("space_folder_list", { account: agentAccountId(), space }),
+        invoke<Stored<SpaceFolderPrefs>>("settings_session_state", { scope: prefsScope(space) })
+          .then((found) => found.state ?? {})
+          .catch(() => get().prefs[space] ?? {}),
+      ]);
+      const chosen = { ...get().chosen };
+      // A pick made in this window stays; otherwise the remembered one comes back.
+      if (!chosen[space] && stored.chosen) chosen[space] = stored.chosen;
+      set({
+        folders: { ...get().folders, [space]: folders },
+        prefs: { ...get().prefs, [space]: stored },
+        chosen,
+      });
+      return folders;
+    },
+    async link(space) {
+      const path = await invoke<string | null>("space_folder_link", {
+        account: agentAccountId(),
+        space,
+      });
+      if (!path) return null;
+      await get().load(space);
+      get().choose(space, path);
+      return path;
+    },
+    async unlink(space, path) {
+      await invoke<void>("space_folder_unlink", { account: agentAccountId(), space, path });
+      const chosen = { ...get().chosen };
+      if (chosen[space] === path) delete chosen[space];
+      set({ chosen });
+      await update(space, (prefs) => ({
+        ...prefs,
+        chosen: prefs.chosen === path ? undefined : prefs.chosen,
+        order: prefs.order?.filter((item) => item !== path),
+        archived: prefs.archived?.filter((item) => item !== path),
+        names: Object.fromEntries(
+          Object.entries(prefs.names ?? {}).filter(([key]) => key !== path),
+        ),
+      })).catch(() => undefined);
+      await get().load(space);
+    },
+    choose(space, path) {
+      set({ chosen: { ...get().chosen, [space]: path } });
+      void update(space, (prefs) => ({ ...prefs, chosen: path })).catch(() => undefined);
+    },
+    rename(space, path, name) {
+      const trimmed = name.trim();
+      return update(space, (prefs) => {
+        const names = { ...prefs.names };
+        if (trimmed && trimmed !== folderName(path)) names[path] = trimmed;
+        else delete names[path];
+        return { ...prefs, names };
+      });
+    },
+    move(space, path, index) {
+      return update(space, (prefs) => {
+        const order = orderFolders(get().folders[space] ?? [], prefs).filter(
+          (item) => item !== path,
+        );
+        order.splice(Math.max(0, Math.min(index, order.length)), 0, path);
+        return { ...prefs, order };
+      });
+    },
+    archive(space, path, archived) {
+      return update(space, (prefs) => {
+        const rest = (prefs.archived ?? []).filter((item) => item !== path);
+        return {
+          ...prefs,
+          archived: archived ? [...rest, path] : rest,
+          // An archived folder isn't worked in; the next one in order takes over.
+          chosen: archived && prefs.chosen === path ? undefined : prefs.chosen,
+        };
+      }).then(() => {
+        if (archived && get().chosen[space] === path) {
+          const chosen = { ...get().chosen };
+          delete chosen[space];
+          set({ chosen });
+        }
+      });
+    },
+  };
+});
+
+/** `linked` in the person's order: the ones they placed first, then any linked since. */
+export function orderFolders(linked: string[], prefs: SpaceFolderPrefs): string[] {
+  const placed = (prefs.order ?? []).filter((path) => linked.includes(path));
+  return [...placed, ...linked.filter((path) => !placed.includes(path))];
+}
+
+/** A Space's folders in order, archived ones left out unless asked for. */
+export function spaceFolderList(
+  state: Pick<SpaceFoldersState, "folders" | "prefs">,
+  space: string,
+  includeArchived = false,
+): string[] {
+  const prefs = state.prefs[space] ?? {};
+  const ordered = orderFolders(state.folders[space] ?? [], prefs);
+  return includeArchived ? ordered : ordered.filter((path) => !prefs.archived?.includes(path));
+}
+
+/** What a folder is called in lists: the person's name for it, or its own. */
+export function folderLabel(
+  state: Pick<SpaceFoldersState, "prefs">,
+  space: string,
+  path: string,
+): string {
+  return state.prefs[space]?.names?.[path] ?? folderName(path);
+}
+
+/** The folder a Space works in, out of what is loaded: the picked one if it is still linked and
+ * not archived, else the first in order. */
+export function folderOf(
+  state: Pick<SpaceFoldersState, "folders" | "chosen"> & {
+    prefs?: Record<string, SpaceFolderPrefs>;
+  },
+  space: string,
+) {
+  const prefs = state.prefs?.[space] ?? {};
+  const active = orderFolders(state.folders[space] ?? [], prefs).filter(
+    (path) => !prefs.archived?.includes(path),
+  );
   const picked = state.chosen[space];
-  return picked && linked.includes(picked) ? picked : (linked[0] ?? "");
+  return picked && active.includes(picked) ? picked : (active[0] ?? "");
 }
 
 /** The folder an engine's turn runs in for this Space, read fresh so a new link counts at once. */
@@ -88,3 +276,20 @@ export async function engineFolder(space: string): Promise<string> {
 
 /** A folder's own name, for a row that has no room for its whole path. */
 export const folderName = (path: string) => path.split(/[\\/]/).filter(Boolean).pop() ?? path;
+
+const noLinkedFolders: string[] = [];
+
+/** This window's Space's linked folders and the one picked, loaded on first use. */
+export function useLinkedFolders(): { folders: string[]; picked?: string } {
+  const space = currentSpaceKey();
+  const folders = useSpaceFolders((state) => state.folders[space]);
+  const picked = useSpaceFolders((state) => state.chosen[space]);
+  useEffect(() => {
+    if (!folders)
+      void useSpaceFolders
+        .getState()
+        .load(space)
+        .catch(() => []);
+  }, [space, folders]);
+  return { folders: folders ?? noLinkedFolders, picked };
+}

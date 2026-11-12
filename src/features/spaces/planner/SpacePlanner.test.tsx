@@ -1,5 +1,6 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
+import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SpaceCalendarEvent, SpaceTask } from "./api";
 
@@ -24,6 +25,10 @@ const task = (patch: Partial<SpaceTask>): SpaceTask => ({
   updated_at: "",
   ...patch,
 });
+/** The pages read their links (`?task=`, `?event=`), so they render inside a router. */
+const routed = (page: React.ReactNode, at = "/") => (
+  <MemoryRouter initialEntries={[at]}>{page}</MemoryRouter>
+);
 const meeting: SpaceCalendarEvent = {
   id: "event-1",
   space_id: "space-1",
@@ -123,7 +128,7 @@ describe("a Space's planner and calendar", () => {
   });
 
   it("shows each task in its column, with who it is assigned to", async () => {
-    act(() => root.render(<SpacePlanner spaceId="space-1" />));
+    act(() => root.render(routed(<SpacePlanner spaceId="space-1" />)));
     expect(host.textContent).not.toContain("Loading");
     await settle();
     expect(column("To do").textContent).toContain("Write the brief");
@@ -140,7 +145,7 @@ describe("a Space's planner and calendar", () => {
       api.tasks.mockResolvedValue({ tasks: [task({}), shipped] });
       return Promise.resolve(shipped);
     });
-    act(() => root.render(<SpacePlanner spaceId="space-1" />));
+    act(() => root.render(routed(<SpacePlanner spaceId="space-1" />)));
     await settle();
     act(() =>
       column("In progress")
@@ -166,8 +171,16 @@ describe("a Space's planner and calendar", () => {
     expect(column("In progress").textContent).toContain("Ship");
   });
 
+  it("opens the task a link names", async () => {
+    act(() => root.render(routed(<SpacePlanner spaceId="space-1" />, "/?task=task-1")));
+    await settle();
+    const dialog = document.querySelector<HTMLElement>('[role="dialog"]');
+    expect(dialog).not.toBeNull();
+    expect(dialog!.querySelector<HTMLInputElement>("input")?.value).toBe("Write the brief");
+  });
+
   it("puts events and due tasks on the calendar's days", async () => {
-    act(() => root.render(<SpaceCalendar spaceId="space-1" />));
+    act(() => root.render(routed(<SpaceCalendar spaceId="space-1" />)));
     await settle();
     const day = host.querySelector<HTMLElement>(`section[aria-label="${now.toDateString()}"]`)!;
     expect(day.textContent).toContain("Planning call");

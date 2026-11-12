@@ -21,12 +21,13 @@ pub const PROVIDERS: [&str; 12] = [
 ];
 
 /// Each role the header carries and the device setting (section `models`) naming its model.
-pub const ROLES: [(&str, &str); 5] = [
+pub const ROLES: [(&str, &str); 6] = [
     ("agent", "agent_model"),
     ("fast", "fast_model"),
     ("embedding", "embedding_model"),
     ("transcription", "transcription_model"),
     ("speech", "speech_model"),
+    ("video", "video_model"),
 ];
 
 /// The web search providers a key can be saved for. The runtime runs `web.search` on the one
@@ -101,8 +102,9 @@ fn base_url(settings: &Value, provider: &str) -> Option<String> {
     usable.then(|| raw.trim_end_matches('/').to_owned())
 }
 
-/// This device's model choices and the keys they need. None when no agent model has a usable
-/// provider and there's no Soniox key for the live relay.
+/// This device's model choices and the keys they need. None when no role has a model with a usable
+/// provider and there's no Soniox key for the live relay. Engines do the thinking, so a device
+/// with only a speech or video model still gets its document.
 pub fn document(settings: &Value, key: &dyn Fn(&str) -> Option<String>) -> Option<Value> {
     let mut providers = Map::new();
     let mut models = Map::new();
@@ -150,7 +152,7 @@ pub fn document(settings: &Value, key: &dyn Fn(&str) -> Option<String>) -> Optio
             providers.insert("soniox".to_owned(), json!({ "apiKey": api_key }));
         }
     }
-    if !models.contains_key("agent") && !providers.contains_key("soniox") {
+    if models.is_empty() && !providers.contains_key("soniox") {
         return None;
     }
     let reasoning = text(settings, "reasoning")

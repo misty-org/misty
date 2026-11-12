@@ -1,0 +1,161 @@
+// Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
+/**
+ * The bot fields in an agent's editor: its soul, the tools, skills and MCP servers it may use,
+ * and how an outside engine starts it. Under them, the prompt the run gets, built by the same
+ * function the run uses, and the bot folder export.
+ */
+import { Download } from "lucide-react";
+import { useState } from "react";
+import type { AgentProfile, AgentProfileInput } from "@/shared/schemas";
+import { Button, ErrorNotification, Field, Input, Textarea } from "@/shared/ui";
+import { exportBotBundle, importBotBundle } from "./botBundle";
+import { assembleAgentPrompt, duplicateProseLines, proseOverLimit, PROSE_LIMIT } from "./botPrompt";
+
+const listText = (values?: string[]) => (values ?? []).join(", ");
+const listOf = (text: string) => [
+  ...new Set(
+    text
+      .split(/[,\n]/)
+      .map((value) => value.trim())
+      .filter(Boolean),
+  ),
+];
+
+export function AgentBotFields({
+  draft,
+  onChange,
+}: {
+  draft: AgentProfileInput;
+  onChange<K extends keyof AgentProfileInput>(key: K, value: AgentProfileInput[K]): void;
+}) {
+  const [tools, setTools] = useState(listText(draft.tools));
+  const [skills, setSkills] = useState(listText(draft.skills));
+  const [servers, setServers] = useState(listText(draft.mcp_servers));
+  const [args, setArgs] = useState((draft.runtime_args ?? []).join("\n"));
+  const duplicates = duplicateProseLines(draft);
+  const preview = assembleAgentPrompt({ agent: draft });
+  return (
+    <>
+      <Field label="Soul">
+        <Textarea
+          className="min-h-32 resize-y"
+          maxLength={100000}
+          placeholder="Who this agent is: its voice, values and way of thinking"
+          value={draft.soul ?? ""}
+          onChange={(event) => onChange("soul", event.target.value)}
+        />
+      </Field>
+      <Field label="Tools it may use">
+        <Input
+          placeholder="Every tool"
+          value={tools}
+          onChange={(event) => setTools(event.target.value)}
+          onBlur={() => onChange("tools", listOf(tools))}
+        />
+      </Field>
+      <Field label="Skills">
+        <Input
+          placeholder="Every skill"
+          value={skills}
+          onChange={(event) => setSkills(event.target.value)}
+          onBlur={() => onChange("skills", listOf(skills))}
+        />
+      </Field>
+      <Field label="MCP servers">
+        <Input
+          placeholder="None"
+          value={servers}
+          onChange={(event) => setServers(event.target.value)}
+          onBlur={() => onChange("mcp_servers", listOf(servers))}
+        />
+      </Field>
+      {draft.engine && draft.engine !== "misty" ? (
+        <Field label="Engine arguments">
+          <Textarea
+            className="min-h-16 resize-y font-mono text-xs"
+            placeholder="One per line"
+            value={args}
+            onChange={(event) => setArgs(event.target.value)}
+            onBlur={() =>
+              onChange(
+                "runtime_args",
+                args
+                  .split("\n")
+                  .map((line) => line.trim())
+                  .filter(Boolean),
+              )
+            }
+          />
+        </Field>
+      ) : null}
+      <details className="agent-advanced-settings">
+        <summary>
+          {proseOverLimit(draft)
+            ? `Prompt preview, over ${PROSE_LIMIT.toLocaleString()} characters`
+            : duplicates.length
+              ? "Prompt preview, with lines in both soul and instructions"
+              : "Prompt preview"}
+        </summary>
+        <pre className="m-0 max-h-72 overflow-auto whitespace-pre-wrap rounded-lg bg-charcoal-card p-3 text-xs text-cream">
+          {preview.text || "Nothing yet"}
+        </pre>
+      </details>
+    </>
+  );
+}
+
+/** Import a bot folder as a new agent. */
+export function ImportBotButton({ onImported }: { onImported(agent: AgentProfile): void }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  return (
+    <>
+      <Button
+        variant="ghost"
+        size="sm"
+        type="button"
+        disabled={busy}
+        onClick={() => {
+          setBusy(true);
+          setError("");
+          importBotBundle()
+            .then((agent) => agent && onImported(agent))
+            .catch((reason) => setError(String(reason)))
+            .finally(() => setBusy(false));
+        }}
+      >
+        <Download size={15} />
+        <span>Import bot</span>
+      </Button>
+      <ErrorNotification message={error} onDismiss={() => setError("")} />
+    </>
+  );
+}
+
+/** Export an agent as a bot folder. */
+export function ExportBotButton({ agent }: { agent: AgentProfile }) {
+  const [state, setState] = useState<"idle" | "working" | "done">("idle");
+  const [error, setError] = useState("");
+  return (
+    <>
+      <Button
+        variant="outline"
+        type="button"
+        disabled={state === "working"}
+        onClick={() => {
+          setState("working");
+          setError("");
+          exportBotBundle(agent)
+            .then((folder) => setState(folder ? "done" : "idle"))
+            .catch((reason) => {
+              setState("idle");
+              setError(String(reason));
+            });
+        }}
+      >
+        {state === "done" ? "Exported" : "Export as bot"}
+      </Button>
+      <ErrorNotification message={error} onDismiss={() => setError("")} />
+    </>
+  );
+}

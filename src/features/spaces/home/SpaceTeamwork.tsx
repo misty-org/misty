@@ -4,19 +4,20 @@ import { HandoffActions } from "../handoffs/HandoffActions";
 import { postedAgo } from "../handoffs/spacePosts";
 import { useIncomingHandoffs } from "../handoffs/useIncomingHandoffs";
 import { OverviewCard } from "./OverviewCard";
+import { SpaceActivityLog } from "./SpaceActivityLog";
 import { WorkingOn } from "./WorkingOn";
 
 /**
  * How the members of a shared Space pass work to each other: the handoffs waiting for this
- * person, and what everyone said they are working on.
+ * person, what everyone said they are working on, and what their agents did lately.
  */
 export function SpaceTeamwork({ spaceId }: { spaceId: string }) {
   const { handoffs, me } = useIncomingHandoffs(spaceId);
   const [error, setError] = useState("");
   const now = Date.now();
   return (
-    <div className="space-overview">
-      <div className="space-overview-grid">
+    <>
+      <div className="home-pair">
         {handoffs?.length ? (
           <OverviewCard title="Handoffs waiting for you" count={handoffs.length} tone="attention">
             <ul className="m-0 grid list-none gap-1 p-0">
@@ -44,8 +45,9 @@ export function SpaceTeamwork({ spaceId }: { spaceId: string }) {
           </OverviewCard>
         ) : null}
         <WorkingOn spaceId={spaceId} me={me} />
+        <SpaceActivityLog spaceId={spaceId} />
       </div>
       <ErrorNotification message={error} onDismiss={() => setError("")} />
-    </div>
+    </>
   );
 }

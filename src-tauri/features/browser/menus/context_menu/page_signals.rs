@@ -1,5 +1,5 @@
-//! Page signals that share the context menu's token: Option-click Peek, swipe and mouse
-//! gestures and reports that protected video could not play.
+//! Page signals that share the context menu's token: trackpad swipes and reports that protected
+//! video could not play.
 use super::*;
 use std::borrow::Cow;
 
@@ -31,39 +31,15 @@ pub(super) fn forward(
             }
             true
         }
-        // A gesture runs the same page commands as the context menu. A trackpad swipe is
-        // always on; a right-drag only while Mouse gestures is.
+        // A trackpad swipe past the page's edge goes back or forward.
         "gesture" => {
-            let action = values.get("action").map(|s| s.as_ref()).unwrap_or("");
-            let allowed = match values.get("source").map(|s| s.as_ref()) {
-                Some("swipe") => matches!(action, "back" | "forward"),
-                _ => {
-                    matches!(action, "back" | "forward" | "reload")
-                        && crate::browser::site_settings::style::gestures_enabled()
-                }
+            let script = match values.get("action").map(|s| s.as_ref()) {
+                Some("back") => Some("history.back()"),
+                Some("forward") => Some("history.forward()"),
+                _ => None,
             };
-            if allowed {
-                if let Some(view) = view() {
-                    let _ = app.emit_to(
-                        view.window().label(),
-                        "misty://browser-menu-command",
-                        json!({"sourceId": id, "command": action}),
-                    );
-                }
-            }
-            true
-        }
-        // Option-click on a link: the browser that owns the page opens it in Peek.
-        "peek" => {
-            let link = values.get("url").map(|s| s.as_ref()).unwrap_or("");
-            if link.len() <= 8192 && external_url(link).is_ok() {
-                if let Some(view) = view() {
-                    let _ = app.emit_to(
-                        view.window().label(),
-                        "misty://browser-menu-command",
-                        json!({"sourceId": id, "command": "peek-link", "url": link}),
-                    );
-                }
+            if let (Some(script), Some(view)) = (script, view()) {
+                let _ = view.eval(script);
             }
             true
         }

@@ -5,24 +5,14 @@ import { type WorkspaceView } from "./workspaceViews";
  * page, 1 the browser and 2 the retired Files tool; all now open Agents. */
 const defaultViewSurfaces = [null, "agents", null, "agents"] as const;
 const defaultViewChoices = [{ label: "Agents", storedIndex: 3 }] as const;
-export const workspaceDefaultViewOptions = defaultViewChoices.map((choice) => choice.label);
+
 export { workspaceDefaultViewIndex };
 let defaultIndex = workspaceDefaultViewIndex;
 export function configureWorkspaceDefaultView(index: number): void {
   defaultIndex =
     Number.isInteger(index) && defaultViewSurfaces[index] ? index : workspaceDefaultViewIndex;
 }
-/** The option shown for a stored index, and the index stored for an option. */
-export const workspaceDefaultViewOption = (index: number) =>
-  Math.max(
-    0,
-    defaultViewChoices.findIndex(
-      (choice) =>
-        choice.storedIndex === (defaultViewSurfaces[index] ? index : workspaceDefaultViewIndex),
-    ),
-  );
-export const workspaceDefaultViewStoredIndex = (option: number) =>
-  defaultViewChoices[option]?.storedIndex ?? workspaceDefaultViewIndex;
+
 function createTab(index: number, placeholder: boolean): WorkspaceView {
   const now = Date.now();
   const id = `tab:${crypto.randomUUID()}`;

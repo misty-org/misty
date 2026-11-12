@@ -11,7 +11,8 @@ use crate::{
 
 use super::{
     model::{
-        cross_target, ReleaseManifest, MACOS_PLATFORM, WINDOWS_ARM_PLATFORM, WINDOWS_PLATFORM,
+        cross_target, ReleaseManifest, LINUX_PLATFORM, MACOS_PLATFORM, WINDOWS_ARM_PLATFORM,
+        WINDOWS_PLATFORM,
     },
     state,
 };
@@ -22,10 +23,10 @@ pub(super) fn platform(
     platform: &str,
     config_path: &Path,
 ) -> Result<()> {
-    let bundles = if platform == MACOS_PLATFORM {
-        "app,dmg"
-    } else {
-        "nsis"
+    let bundles = match platform {
+        MACOS_PLATFORM => "app,dmg",
+        LINUX_PLATFORM => "appimage,deb,rpm",
+        _ => "nsis",
     };
     let mut arguments = vec!["run", "tauri", "--", "build", "--bundles", bundles];
     if let Some(target) = cross_target(platform) {
@@ -47,6 +48,14 @@ pub(super) fn platform(
         notarize_macos_bundle(workspace, &bundle)?;
         verify_macos_bundle(workspace, &bundle)?;
         archive_stapled_app(workspace, &bundle)?;
+    } else if platform == LINUX_PLATFORM {
+        // Repacking changes the AppImage after Tauri signed it for the updater; sign it again.
+        if let Some(appimage) = super::appimage::prune_bundle(&bundle)? {
+            let mut signature = appimage.clone().into_os_string();
+            signature.push(".sig");
+            let _ = std::fs::remove_file(&signature);
+            sign_updater(workspace, &appimage)?;
+        }
     } else {
         super::windows_signing::verify(workspace, &output)?;
     }
@@ -92,6 +101,11 @@ fn archive_stapled_app(workspace: &Workspace, bundle: &Path) -> Result<()> {
         .arg(app.parent().context("app parent missing")?.as_os_str())
         .arg(app.file_name().context("app name missing")?)
         .run(&workspace.misty)?;
+    sign_updater(workspace, &archive)
+}
+
+/// Signs an updater artifact with the release's minisign key, next to it as `<file>.sig`.
+fn sign_updater(workspace: &Workspace, artifact: &Path) -> Result<()> {
     let configured_key = std::env::var("TAURI_SIGNING_PRIVATE_KEY")?;
     let key = if Path::new(&configured_key).is_file() {
         std::fs::read_to_string(&configured_key)?
@@ -100,7 +114,7 @@ fn archive_stapled_app(workspace: &Workspace, bundle: &Path) -> Result<()> {
     };
     CommandSpec::new(npm())
         .args(["run", "tauri", "--", "signer", "sign"])
-        .arg(archive.as_os_str())
+        .arg(artifact.as_os_str())
         .env("TAURI_SIGNING_PRIVATE_KEY", key)
         .env_remove("TAURI_SIGNING_PRIVATE_KEY_PATH")
         .run(&workspace.misty)
@@ -172,10 +186,10 @@ fn verify_macos_bundle(workspace: &Workspace, bundle: &Path) -> Result<()> {
 }
 
 fn select_artifacts(bundle: &Path, platform: &str) -> Result<Vec<PathBuf>> {
-    let extensions: &[&str] = if platform == MACOS_PLATFORM {
-        &["dmg", "gz", "sig"]
-    } else {
-        &["exe", "sig"]
+    let extensions: &[&str] = match platform {
+        MACOS_PLATFORM => &["dmg", "gz", "sig"],
+        LINUX_PLATFORM => &["AppImage", "deb", "rpm", "sig"],
+        _ => &["exe", "sig"],
     };
     let files = artifacts::files_under(bundle)?
         .into_iter()
@@ -199,10 +213,11 @@ fn updater_pair(root: &Path, platform: &str) -> Result<(String, String)> {
     let updater = files
         .iter()
         .find(|path| {
-            if platform == MACOS_PLATFORM {
-                path.to_string_lossy().ends_with(".app.tar.gz")
-            } else {
-                path.extension().is_some_and(|extension| extension == "exe")
+            match platform {
+                MACOS_PLATFORM => path.to_string_lossy().ends_with(".app.tar.gz"),
+                // Tauri's Linux updater replaces the AppImage in place.
+                LINUX_PLATFORM => path.extension().is_some_and(|extension| extension == "AppImage"),
+                _ => path.extension().is_some_and(|extension| extension == "exe"),
             }
         })
         .context("updater artifact was not produced")?;
@@ -225,15 +240,17 @@ fn updater_pair(root: &Path, platform: &str) -> Result<(String, String)> {
     ))
 }
 
-/// The platforms this machine builds: one universal macOS app, or Windows
-/// for x64 and ARM64.
+/// The platforms this machine builds: one universal macOS app, Windows
+/// for x64 and ARM64, or Linux for x64.
 pub(super) fn current_platforms() -> Result<&'static [&'static str]> {
     if cfg!(target_os = "macos") {
         Ok(&[MACOS_PLATFORM])
     } else if cfg!(windows) {
         Ok(&[WINDOWS_PLATFORM, WINDOWS_ARM_PLATFORM])
+    } else if cfg!(all(target_os = "linux", target_arch = "x86_64")) {
+        Ok(&[LINUX_PLATFORM])
     } else {
-        bail!("desktop releases must be built on macOS or Windows")
+        bail!("desktop releases must be built on macOS, Windows or x64 Linux")
     }
 }
 

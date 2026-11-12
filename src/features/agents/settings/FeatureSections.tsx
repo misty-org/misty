@@ -1,7 +1,7 @@
 import type { AgentScope } from "../personal/agentScope";
 import { agentsDeviceSnapshot, forgetFolder, shareFolder } from "../personal/useAgentsStore";
 import { shareFolderWarning } from "../plans/AgentFolderMenu";
-import { CompanionAppearanceSettings } from "../cursor/CompanionAppearanceSettings";
+import { CompanionAppearanceSettings } from "../tutor/cursor/CompanionAppearanceSettings";
 import { confirmAction } from "@/shared/lib/confirmAction";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { Button, ErrorNotification, SkeletonList } from "@/shared/ui";
@@ -24,6 +24,8 @@ export function AgentDefaultsSection() {
         <CollaborationModeRow />
         <PreferenceRow id="agents.plan_deep_thinking" />
         <PanelSideRow />
+        <PreferenceRow id="agents.studio_sounds" />
+        <PreferenceRow id="agents.run_notifications" />
       </Section>
       <ScreenLocationSection />
     </>

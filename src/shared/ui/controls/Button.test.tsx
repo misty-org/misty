@@ -18,7 +18,8 @@ describe("Button CVA variants", () => {
       </Button>,
     );
     const btn = getByRole("button", { name: "Tag" });
-    expect(btn.className).toContain("rounded-full");
+    expect(btn.className).toContain("rounded-md");
+    expect(btn.className).not.toContain("rounded-full");
     expect(btn.className).toContain("aria-pressed:bg-charcoal-active");
     expect(btn.getAttribute("data-variant")).toBe("chip");
     expect(btn.getAttribute("data-size")).toBe("chip");

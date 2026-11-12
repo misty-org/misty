@@ -144,7 +144,8 @@
   text-align: right;
 }
 
-/* Code blocks: a header with the language and Copy, then the scrolling code. */
+/* Code blocks: a header with the language and Copy, then the code, wrapped so nothing hides past
+   the edge. */
 .misty-markdown-code {
   margin: 0.7em 0;
   overflow: hidden;
@@ -178,8 +179,8 @@
   background: transparent;
   font-size: 0.88em;
   line-height: 1.55;
-  overflow-wrap: normal;
-  white-space: pre;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
 }
 
 /* Monochrome highlight.js theme. */
@@ -267,4 +268,25 @@
   border-top: 1px solid var(--color-charcoal-border);
   color: var(--color-cream-muted);
   font-size: 0.9em;
+}
+
+/* A long reply parses in chunks (streaming/markdownChunks.ts); each chunk lays out as if it
+ * weren't there, and one not parsed yet shows its plain text. */
+.misty-markdown-chunk {
+  display: contents;
+}
+.misty-markdown-plain {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+/* A local file path in a reply (fileLinks/FileLink): opens in the editor beside the chat. */
+.misty-markdown-file-link {
+  color: inherit;
+  text-decoration: underline dotted;
+  text-decoration-color: var(--color-cream-muted);
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.misty-markdown-file-link:hover {
+  text-decoration-color: var(--color-cream);
 }

@@ -11,5 +11,6 @@ mod session_tests;
 mod turn;
 
 pub use models::DeviceVoiceModels;
+pub(crate) use models::wav;
 pub use route::run_voice_session;
 pub use session::{VoiceDecision, VoiceModels};

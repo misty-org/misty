@@ -1,7 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { emitTo, listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { voiceApi, voiceDeviceId } from "./api";
-import { rememberDictation } from "@/features/memory";
 import { insertIntoFocusedField } from "./insertText";
 import { LiveTranscriber } from "./liveTranscriber";
 import type { VoiceSettings } from "./voiceSettings";
@@ -210,7 +209,6 @@ export class DictationController {
   }
 
   private async insert(text: string) {
-    rememberDictation(text);
     const result = await invoke<{ inserted: string }>("voice_dictation_insert", {
       text,
       force: false,

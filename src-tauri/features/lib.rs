@@ -1,12 +1,19 @@
 use file_access::fs;
 pub mod account;
+pub mod agent_catalog;
 pub mod agents;
+pub mod bots;
+#[cfg(any(target_os = "macos", windows, target_os = "linux"))]
+pub mod computer_use;
 mod app;
 #[cfg(desktop)]
 pub mod browser;
 pub mod devices;
+pub mod engine_config;
 pub mod engines;
-pub mod memory;
+pub mod known_names;
+#[cfg(desktop)]
+pub mod pets;
 pub mod project;
 #[cfg(desktop)]
 pub mod sync;

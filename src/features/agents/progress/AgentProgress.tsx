@@ -14,6 +14,8 @@ import {
   type ProgressTool,
 } from "./progressTimeline";
 import { usageLimitNotice, usageLimitNotices } from "./usageLimits";
+import { countEditLines } from "./payload/editLineStats";
+import { hasToolPayload, LineCounts, ToolPayloadViewer } from "./payload/ToolPayloadViewer";
 
 /**
  * How a reply got its answer, kept quiet: the whole timeline folds into one line that opens to
@@ -100,11 +102,14 @@ function Step({ step }: { step: ProgressStep }) {
   const { verb } = toolParts(step.name, false);
   const meta = stepMeta(step);
   const output = stepOutput(step);
+  // An edit's +/- counts, from its own arguments.
+  const lines = step.args === undefined ? null : countEditLines(step.args);
   const row = (
     <>
       <span className="agent-progress-verb">{verb}</span>
       <span className="agent-progress-target">{stepTarget(step)}</span>
       {step.state === "failed" ? <span className="sr-only">, failed</span> : null}
+      {lines ? <LineCounts additions={lines.additions} deletions={lines.deletions} /> : null}
       {meta ? <span className="agent-progress-meta">{meta}</span> : null}
       {output ? <Chevron /> : null}
     </>
@@ -124,7 +129,7 @@ function Step({ step }: { step: ProgressStep }) {
         <div className="agent-progress-row">{row}</div>
       )}
       {output ? (
-        <Fold id={outputId} open={open}>
+        <Fold id={outputId} open={open} onReveal={() => setOpen(true)}>
           <div className="agent-progress-output">{output}</div>
         </Fold>
       ) : null}
@@ -155,7 +160,18 @@ function stepOutput(step: ProgressStep): ReactNode {
         </tbody>
       </table>,
     );
-  if (activity?.output)
+  // The raw payload, when the run sent it, says more than the summarized output.
+  if (hasToolPayload(step.args, step.result))
+    parts.push(
+      <ToolPayloadViewer
+        key="payload"
+        toolName={step.name}
+        path={step.path}
+        args={step.args}
+        result={step.result}
+      />,
+    );
+  else if (activity?.output)
     parts.push(
       <pre key="output" className="agent-progress-pre">
         {activity.output}

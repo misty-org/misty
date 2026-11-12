@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { useDesktopBootstrap } from "./useDesktopBootstrap";
 
 function BootstrapProbe() {
-  useDesktopBootstrap({ getRouteId: () => "browser" });
+  useDesktopBootstrap({ getRouteId: () => "agents" });
   return null;
 }
 

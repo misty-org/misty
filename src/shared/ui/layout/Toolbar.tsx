@@ -11,7 +11,7 @@ const Toolbar = React.forwardRef<HTMLDivElement, ToolbarProps>(
       aria-label={label}
       className={cn(
         // The browser chrome's geometry: 44px bar, 4px rhythm, 30px icon buttons.
-        "flex min-h-11 min-w-0 shrink-0 items-center gap-1 px-2 py-1",
+        "flex min-h-12 min-w-0 shrink-0 items-center gap-1 px-2 py-1",
         wrap ? "flex-wrap" : "overflow-x-auto",
         variant === "default" && "border-b border-charcoal-border/60 bg-charcoal-bg",
         variant === "floating" &&

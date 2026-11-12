@@ -1,5 +1,3 @@
-import { isWindowsExplorerPath, normalizeExplorerPath } from "@/shared/lib/pathNormalization";
-
 export function formatBytes(bytes: number | null): string {
   if (bytes == null) return "-";
   if (bytes < 1024) return `${bytes} B`;
@@ -23,29 +21,4 @@ export function formatDate(timestamp: number | string | null | undefined): strin
   const minutes = String(date.getMinutes()).padStart(2, "0");
   const period = hours >= 12 ? "PM" : "AM";
   return `${date.getMonth() + 1}/${date.getDate()}/${date.getFullYear()} ${hour}:${minutes} ${period}`;
-}
-
-export function breadcrumbSegments(path: string): Array<{ label: string; path: string }> {
-  if (path === "misty://recent") return [{ label: "Recent", path }];
-  if (path === "misty://starred") return [{ label: "Starred", path }];
-  if (path === "misty://trash") return [{ label: "Trash", path }];
-  const normalized = normalizeExplorerPath(path);
-  const parts = normalized.split("/").filter(Boolean);
-  if (isWindowsExplorerPath(normalized) && /^[A-Za-z]:$/.test(parts[0] ?? "")) {
-    const [drive, ...children] = parts;
-    const segments = [{ label: drive, path: `${drive}/` }];
-    let current = `${drive}/`;
-    for (const part of children) {
-      current = `${current.replace(/\/+$/, "")}/${part}`;
-      segments.push({ label: part, path: current });
-    }
-    return segments;
-  }
-  const segments = [{ label: "/", path: "/" }];
-  let current = "";
-  for (const part of parts) {
-    current += `/${part}`;
-    segments.push({ label: part, path: current });
-  }
-  return segments;
 }

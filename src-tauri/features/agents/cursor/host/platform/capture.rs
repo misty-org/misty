@@ -56,7 +56,7 @@ pub fn capture_display(monitor: &xcap::Monitor) -> Result<(Vec<u8>, u32, u32), S
     Ok((bytes, width, height))
 }
 
-#[cfg(windows)]
+#[cfg(any(windows, target_os = "linux"))]
 pub fn capture_display(monitor: &xcap::Monitor) -> Result<(Vec<u8>, u32, u32), String> {
     capture_legacy_display(monitor)
 }
@@ -85,7 +85,7 @@ fn window_crop(
 /// The focused window at the display's full resolution, cropped to the part
 /// on `display`, then fitted to `companion_capture_size`. Returns the image and
 /// the captured area in global units.
-#[cfg(windows)]
+#[cfg(any(windows, target_os = "linux"))]
 pub fn capture_window(
     monitor: &xcap::Monitor,
     display: &super::super::Display,

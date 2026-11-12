@@ -1,11 +1,12 @@
+import "@/tests/ports/spaces";
 import { createRef } from "react";
 import { useMistyStore } from "@/features/agents/conversations/state/useMistyStore";
 import type { AgentProfile } from "@/shared/schemas";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { initialCompanionPresentation, useCompanionState } from "../../cursor/companionState";
-import { AgentCompanionPanel } from "../../cursor/AgentCompanionPanel";
+import { initialCompanionPresentation, useCompanionState } from "../../tutor/cursor/companionState";
+import { AgentCompanionPanel } from "../../tutor/cursor/AgentCompanionPanel";
 import { AgentWorkspaceConversation, type AgentVoiceControl } from "./AgentWorkspaceConversation";
 const voiceMock = vi.hoisted(() => ({
   recording: false,
@@ -101,14 +102,14 @@ describe("Agents workspace conversations", () => {
   });
   it("submits to the displayed agent without binding its conversation to a Space", async () => {
     renderWorkspace();
-    fireEvent.change(screen.getByLabelText("Message Misty"), {
+    fireEvent.change(screen.getByLabelText("Message"), {
       target: {
         value: "Draft a launch note",
       },
     });
     fireEvent.click(
       screen.getByRole("button", {
-        name: "Send to Misty",
+        name: "Send message",
       }),
     );
     await waitFor(() => expect(submit).toHaveBeenCalledOnce());
@@ -133,7 +134,7 @@ describe("Agents workspace conversations", () => {
     );
     // Typing here never goes through the cursor companion.
     expect(companionSubmit).not.toHaveBeenCalled();
-    expect((screen.getByLabelText("Message Misty") as HTMLTextAreaElement).value).toBe("");
+    expect((screen.getByLabelText("Message") as HTMLTextAreaElement).value).toBe("");
   });
   it("keeps a failed draft available to retry", async () => {
     submit.mockImplementationOnce(async () => {
@@ -142,28 +143,26 @@ describe("Agents workspace conversations", () => {
       });
     });
     renderWorkspace();
-    fireEvent.change(screen.getByLabelText("Message Misty"), {
+    fireEvent.change(screen.getByLabelText("Message"), {
       target: {
         value: "Keep this draft",
       },
     });
     fireEvent.click(
       screen.getByRole("button", {
-        name: "Send to Misty",
+        name: "Send message",
       }),
     );
     await waitFor(() =>
       expect(screen.getByRole("alert").textContent).toContain("Connection interrupted"),
     );
-    expect((screen.getByLabelText("Message Misty") as HTMLTextAreaElement).value).toBe(
-      "Keep this draft",
-    );
+    expect((screen.getByLabelText("Message") as HTMLTextAreaElement).value).toBe("Keep this draft");
   });
   it("leaves the empty conversation focused on the composer", () => {
     renderWorkspace();
     expect(screen.queryByRole("heading")).toBeNull();
     expect(screen.queryByRole("switch", { name: "Ask before taking control" })).toBeNull();
-    expect(screen.getByLabelText("Message Misty")).toBeTruthy();
+    expect(screen.getByLabelText("Message")).toBeTruthy();
     expect(submit).not.toHaveBeenCalled();
   });
   it("does not send to a disabled agent", () => {
@@ -171,19 +170,19 @@ describe("Agents workspace conversations", () => {
       ...agent,
       enabled: false,
     });
-    fireEvent.change(screen.getByLabelText("Message Misty"), {
+    fireEvent.change(screen.getByLabelText("Message"), {
       target: {
         value: "Hello",
       },
     });
-    fireEvent.keyDown(screen.getByLabelText("Message Misty"), {
+    fireEvent.keyDown(screen.getByLabelText("Message"), {
       key: "Enter",
     });
     expect(submit).not.toHaveBeenCalled();
     expect(
       (
         screen.getByRole("button", {
-          name: "Send to Misty",
+          name: "Send message",
         }) as HTMLButtonElement
       ).disabled,
     ).toBe(true);
@@ -215,10 +214,10 @@ it("sends follow-ups to the scheduled conversation even when another chat is glo
       />
     </MemoryRouter>,
   );
-  fireEvent.change(screen.getByLabelText("Message Misty"), {
+  fireEvent.change(screen.getByLabelText("Message"), {
     target: { value: "Expand on the last run" },
   });
-  fireEvent.click(screen.getByRole("button", { name: "Send to Misty" }));
+  fireEvent.click(screen.getByRole("button", { name: "Send message" }));
   await waitFor(() => expect(submit).toHaveBeenCalledOnce());
   expect(submit.mock.calls[0][5]).toEqual({ conversationId: "scheduled-chat", context: [] });
 });
@@ -244,8 +243,8 @@ it("shares panel voice controls with the composer and leaves transcription for r
   voiceRef.current?.toggle();
   expect(voiceMock.stop).toHaveBeenCalledOnce();
   await act(async () => voiceMock.onTranscript?.("Review my notes"));
-  expect(
-    (screen.getByRole("textbox", { name: "Message Misty" }) as HTMLTextAreaElement).value,
-  ).toBe("Review my notes");
+  expect((screen.getByRole("textbox", { name: "Message" }) as HTMLTextAreaElement).value).toBe(
+    "Review my notes",
+  );
   expect(submit).not.toHaveBeenCalled();
 });

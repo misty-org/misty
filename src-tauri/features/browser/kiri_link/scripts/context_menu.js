@@ -1,13 +1,6 @@
-// Runs in the initialization closure; the gesture token is never published on window.
+// Runs in the initialization closure; the shortcut token is never published on window.
 let rightClickPrevented = false;
-// Mouse gestures (Settings › Advanced): right-drag left, right or up runs back,
-// forward or reload. While on, the context menu opens on release instead of press.
-// A two-finger trackpad swipe past the page's edge goes back or forward whatever the
-// setting; both show the same arrow (below).
-let gesturesEnabled = false;
-let gesture = null;
-let suppressMenuUntil = 0;
-window.__MISTY_SET_GESTURES__ = (enabled) => { gesturesEnabled = Boolean(enabled); };
+// A two-finger trackpad swipe past the page's edge goes back or forward, with an arrow (below).
 
 const updateRightClickState = (event) => {
   if (event.button === 2) {
@@ -21,11 +14,6 @@ const updateRightClickState = (event) => {
 
 const handleContextMenu = (event) => {
   if (!event.isTrusted) return;
-  // The release that ended a gesture must not also open the menu.
-  if (performance.now() < suppressMenuUntil) {
-    event.preventDefault();
-    return;
-  }
   // If the page prevented the right-click or contextmenu event, do not show Misty's menu.
   if (event.defaultPrevented || rightClickPrevented) {
     rightClickPrevented = false;
@@ -55,10 +43,7 @@ const handleContextMenu = (event) => {
   // The page's own data may pass through its hooks; the token never does.
   const json = stringify(payload);
   if (typeof json !== 'string') return;
-  const open = () => sendHostNavigation('misty-context-menu:open?token=' + encode(shortcutToken) + '&payload=' + encode(json));
-  // On macOS the menu event arrives on press: wait to see whether this is a gesture.
-  if (gesture) gesture.pendingMenu = open;
-  else open();
+  sendHostNavigation('misty-context-menu:open?token=' + encode(shortcutToken) + '&payload=' + encode(json));
 };
 
 window.addEventListener('pointerdown', updateRightClickState, true);
@@ -71,28 +56,14 @@ window.addEventListener('mousedown', (event) => {
 }, false);
 window.addEventListener('contextmenu', handleContextMenu);
 
-// Option-click (Alt-click) on a link opens it in Peek instead of navigating.
-const peekURL = (value) => { try { const u = new URL(value, location.href); return /^https?:$/.test(u.protocol) && !u.username && !u.password ? u.href.slice(0, 2048) : ''; } catch { return ''; } };
-window.addEventListener('click', (event) => {
-  if (!event.isTrusted || event.button !== 0 || !event.altKey || event.metaKey || event.ctrlKey || event.shiftKey) return;
-  const target = event.target instanceof Element ? event.target : event.target?.parentElement;
-  const link = target?.closest('a[href]');
-  const url = link ? peekURL(link.href) : '';
-  if (!url) return;
-  event.preventDefault();
-  event.stopImmediatePropagation();
-  sendHostNavigation('misty-context-menu:peek?token=' + encode(shortcutToken) + '&url=' + encode(url));
-}, true);
-
-// The arrow that shows where a gesture leads: a black circle sliding in from the edge
-// (top for reload) that turns white once letting go would navigate. It lives in a closed
+// The arrow that shows where a swipe leads: a black circle sliding in from the edge
+// that turns white once letting go would navigate. It lives in a closed
 // shadow root so the page's styles cannot reach it.
 const gestureArrow = (() => {
   let host = null;
   let circle = null;
   let hideTimer = 0;
   const arrow = '<path d="M5 12h14M13 6l6 6-6 6"/>';
-  const reload = '<path d="M20 12a8 8 0 1 1-2.34-5.66L20 8.5"/><path d="M20 3.5v5h-5"/>';
   const build = () => {
     host = document.createElement('div');
     host.style.cssText = 'all:initial;position:fixed;top:0;left:0;width:0;height:0;pointer-events:none;z-index:2147483647;';
@@ -114,20 +85,13 @@ const gestureArrow = (() => {
       const p = Math.max(0, Math.min(1, progress));
       const inset = Math.round(-56 + 40 * p) + 'px';
       const svg = circle.firstElementChild;
-      const icon = action === 'reload' ? reload : arrow;
-      if (svg.innerHTML !== icon) svg.innerHTML = icon;
+      if (svg.innerHTML !== arrow) svg.innerHTML = arrow;
       svg.style.transform = action === 'back' ? 'rotate(180deg)' : '';
       const style = circle.style;
       style.top = style.left = style.right = style.marginTop = style.marginLeft = '';
-      if (action === 'reload') {
-        style.top = inset;
-        style.left = '50%';
-        style.marginLeft = '-28px';
-      } else {
-        style.top = '50%';
-        style.marginTop = '-28px';
-        style[action === 'back' ? 'left' : 'right'] = inset;
-      }
+      style.top = '50%';
+      style.marginTop = '-28px';
+      style[action === 'back' ? 'left' : 'right'] = inset;
       style.opacity = String(Math.min(1, p * 2));
       circle.classList.toggle('ready', p >= 1);
     },
@@ -140,40 +104,8 @@ const gestureArrow = (() => {
   };
 })();
 
-const sendGesture = (action, source) =>
-  sendHostNavigation('misty-context-menu:gesture?token=' + encode(shortcutToken) + '&action=' + action + '&source=' + source);
-
-// Right-drag past 60px; a slant up to half the distance still counts.
-const dragAction = (dx, dy, distance) => {
-  if (Math.abs(dx) > distance && Math.abs(dy) < Math.abs(dx) / 2) return dx < 0 ? 'back' : 'forward';
-  if (dy < -distance && Math.abs(dx) < -dy / 2) return 'reload';
-  return '';
-};
-window.addEventListener('mousedown', (event) => {
-  if (gesturesEnabled && event.isTrusted && event.button === 2)
-    gesture = { x: event.clientX, y: event.clientY, pendingMenu: null };
-}, true);
-window.addEventListener('mousemove', (event) => {
-  if (!gesture || !(event.buttons & 2)) return;
-  const dx = event.clientX - gesture.x;
-  const dy = event.clientY - gesture.y;
-  const action = dragAction(dx, dy, 12);
-  if (action) gestureArrow.show(action, (action === 'reload' ? -dy : Math.abs(dx)) / 60);
-  else gestureArrow.hide();
-}, true);
-window.addEventListener('mouseup', (event) => {
-  if (!gesture || event.button !== 2) return;
-  const started = gesture;
-  gesture = null;
-  gestureArrow.hide();
-  const action = dragAction(event.clientX - started.x, event.clientY - started.y, 60);
-  if (action) {
-    suppressMenuUntil = performance.now() + 500;
-    sendGesture(action, 'drag');
-  } else if (started.pendingMenu) {
-    started.pendingMenu();
-  }
-}, true);
+const sendGesture = (action) =>
+  sendHostNavigation('misty-context-menu:gesture?token=' + encode(shortcutToken) + '&action=' + action);
 
 // Two-finger swipe: horizontal scrolling that nothing on the page can take moves the
 // arrow in from that edge; letting go past the threshold goes back (swipe right) or
@@ -199,7 +131,7 @@ const endSwipe = () => {
   gestureArrow.hide();
   if (ended && ended.distance >= swipeThreshold) {
     swipeLockedUntil = performance.now() + 600;
-    sendGesture(ended.action, 'swipe');
+    sendGesture(ended.action);
   }
 };
 window.addEventListener('wheel', (event) => {

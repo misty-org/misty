@@ -15,20 +15,6 @@ pub(in crate::browser) fn forget_page_background(id: &str) {
     }
 }
 
-/// The page's last reported color, if it has reported one.
-pub(in crate::browser) fn reported_page_background(id: &str) -> Option<String> {
-    page_backgrounds()
-        .lock()
-        .ok()
-        .and_then(|values| values.get(id).cloned())
-}
-
-/// Re-applies a reported page color to the native view.
-#[cfg(any(target_os = "macos", windows))]
-pub(in crate::browser) fn apply_page_background(webview: &Webview, hex: String) {
-    set_under_page_background(webview, hex);
-}
-
 #[cfg(target_os = "macos")]
 pub(in crate::browser) fn replay_page_background(app: &AppHandle, id: &str) {
     let color = page_backgrounds()

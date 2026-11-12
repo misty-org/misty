@@ -27,7 +27,7 @@ const PROVIDERS: [ProviderId; 12] = [
     ProviderId::Elevenlabs,
     ProviderId::Soniox,
 ];
-const ROLES: [&str; 5] = ["agent", "fast", "embedding", "transcription", "speech"];
+const ROLES: [&str; 6] = ["agent", "fast", "embedding", "transcription", "speech", "video"];
 const REASONING: [&str; 6] = ["none", "minimal", "low", "medium", "high", "xhigh"];
 
 fn role_name(role: DeviceRole) -> &'static str {
@@ -37,6 +37,7 @@ fn role_name(role: DeviceRole) -> &'static str {
         DeviceRole::Embedding => "embedding",
         DeviceRole::Transcription => "transcription",
         DeviceRole::Speech => "speech",
+        DeviceRole::Video => "video",
     }
 }
 

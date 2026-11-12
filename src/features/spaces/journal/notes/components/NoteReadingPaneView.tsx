@@ -14,7 +14,7 @@ export interface NoteReadingRuntime {
 }
 const paneClass = "grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] bg-charcoal-bg";
 const headerClass =
-  "flex min-h-11 shrink-0 items-center gap-2 border-b border-charcoal-border bg-charcoal-bg py-1.5 pl-1 pr-3";
+  "flex min-h-12 shrink-0 items-center gap-2 border-b border-charcoal-border bg-charcoal-bg py-1.5 pl-1 pr-3";
 export function NoteReadingPaneView(
   props: NoteReadingPaneProps & {
     runtime: NoteReadingRuntime;
@@ -88,7 +88,7 @@ export function NoteReadingPaneView(
             <Link2 size={14} />
             <span className="hidden xl:inline">Backlinks</span>
             {note.backlinkCount ? (
-              <span className="rounded-full bg-charcoal-active px-1.5 text-3xs">
+              <span className="rounded-sm bg-charcoal-active px-1.5 text-3xs">
                 {note.backlinkCount}
               </span>
             ) : null}

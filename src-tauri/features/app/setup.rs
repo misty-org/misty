@@ -13,6 +13,9 @@ use tauri::Manager;
 pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     // Before anything below opens a file in Misty's own folders.
     file_access::configure(app.handle());
+    // The virtual cursor an outside engine acts with (`computer_use`).
+    #[cfg(any(target_os = "macos", windows, target_os = "linux"))]
+    crate::computer_use::init(app.handle());
     #[cfg(target_os = "macos")]
     crate::app::macos_window_effects::mac_pip_observer::install(app.handle());
     #[cfg(target_os = "macos")]
@@ -43,8 +46,8 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         eprintln!("Could not prepare ~/.misty: {error}");
     }
     let runtime = MistyRuntime::new();
-    // What this device trusts (vault root pin, device list, its own
-    // policy) lives beside its other app data.
+    // What this device trusts (device list, its own policy) lives beside
+    // its other app data.
     #[cfg(desktop)]
     crate::devices::trust::set_storage_root(
         runtime
@@ -60,23 +63,26 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     #[cfg(desktop)]
     runtime.agents.restore_folder_grants();
     crate::engines::commands::allow_linked_folders(&runtime.environment.store());
+    crate::engine_config::setup(app.handle());
     app.manage(permissions::Backing(runtime.environment.store()));
     app.manage(runtime);
+    // The pet reads its settings from the runtime's store, so it starts once that is managed.
+    #[cfg(desktop)]
+    crate::pets::overlay::init(app.handle());
+    crate::engines::start(app);
     crate::agents::run_control::resume_at_launch(app.handle());
-    // Agents the person connected to a Space can reach it as soon as Misty is open.
-    tauri::async_runtime::spawn(crate::engines::connections::start(app.handle().clone()));
     #[cfg(desktop)]
     permissions::restore(app.handle());
     #[cfg(desktop)]
     app.manage(BrowserSessionState::default());
     app.manage(crate::agents::task_scopes::AgentWorkspaceState::default());
-    #[cfg(any(target_os = "macos", windows))]
+    #[cfg(any(target_os = "macos", windows, target_os = "linux"))]
     app.manage(std::sync::Arc::new(
         crate::agents::cursor::CursorCompanionState::default(),
     ));
-    #[cfg(any(target_os = "macos", windows))]
+    #[cfg(any(target_os = "macos", windows, target_os = "linux"))]
     app.manage(voice::DictationState::default());
-    #[cfg(any(target_os = "macos", windows))]
+    #[cfg(any(target_os = "macos", windows, target_os = "linux"))]
     app.manage(voice::CaptureState::default());
     #[cfg(desktop)]
     app.manage(BrowserExecutionState::default());
@@ -94,10 +100,6 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     crate::agents::screen_context::windows::start_foreground_watch();
     #[cfg(desktop)]
     {
-        crate::browser::profiles::forward_changes(app.handle().clone());
-        crate::browser::site_settings::permissions::follow_remote_changes(app.handle().clone());
-        crate::sync::vault::follow_remote_list(app.handle().clone());
-        crate::sync::vault::site_data::start(app.handle());
         // Every window belongs to a profile: reopen those open at quit.
         crate::browser::app_windows::restore(app.handle())?;
     }

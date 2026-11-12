@@ -20,17 +20,16 @@ it("edits a global agent without requiring a work Space", async () => {
   expect((screen.getByLabelText("Name") as HTMLInputElement).value).toBe("Launch coordinator");
 });
 
-it("omits model and app permission setup for a new global agent", async () => {
+it("makes a new agent from a name and an engine", async () => {
   renderAgentsPage();
   chooseFromSwitcher("New agent");
-  fireEvent.click(screen.getByText("Instructions", { selector: "summary" }));
-  expect(screen.queryByRole("group", { name: "Personal apps" })).toBeNull();
-  expect(screen.queryByRole("checkbox", { name: "browser" })).toBeNull();
-  expect(within(screen.getByRole("dialog")).queryByLabelText("Model")).toBeNull();
-  expect(screen.queryByText("Select a Space to assign apps.")).toBeNull();
+  const dialog = await screen.findByRole("dialog", { name: "New agent" });
+  expect(within(dialog).getByLabelText("Name")).toBeTruthy();
+  expect(within(dialog).getByRole("group", { name: "Engine" })).toBeTruthy();
+  expect(within(dialog).queryByText("Instructions")).toBeNull();
 });
 
-it("shows the conversations of the window's Space and starts new work in it", async () => {
+it("continues the open chat and starts new work", async () => {
   useMistyStore.setState({
     conversations: [
       { ...conversation("draft", "Launch draft"), spaceId: "home", personalSpace: true },
@@ -43,7 +42,7 @@ it("shows the conversations of the window's Space and starts new work in it", as
   renderAgentsPage();
   typeDraft("Continue this conversation");
   await act(async () => {
-    fireEvent.click(screen.getByRole("button", { name: "Send to Misty" }));
+    fireEvent.click(screen.getByRole("button", { name: "Send message" }));
   });
   await waitFor(() => expect(fixture.submit).toHaveBeenCalledOnce());
   expect(fixture.submit).toHaveBeenLastCalledWith(
@@ -59,7 +58,7 @@ it("shows the conversations of the window's Space and starts new work in it", as
   fireEvent.click(screen.getByRole("button", { name: "New task" }));
   typeDraft("Start personal work");
   await act(async () => {
-    fireEvent.click(screen.getByRole("button", { name: "Send to Misty" }));
+    fireEvent.click(screen.getByRole("button", { name: "Send message" }));
   });
   await waitFor(() => expect(fixture.submit).toHaveBeenCalledTimes(2));
   expect(fixture.submit).toHaveBeenLastCalledWith(

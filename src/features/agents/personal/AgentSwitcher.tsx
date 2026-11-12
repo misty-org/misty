@@ -15,7 +15,8 @@ import {
   PopoverContent,
 } from "@/shared/ui";
 import { AgentAvatar } from "./AgentAvatar";
-import { agentsByHomeSpace } from "./agentHomeSpaces";
+import { NewAgentDialog } from "../engines/NewAgentDialog";
+import { offeredAgents } from "./offeredAgents";
 
 export function AgentSwitcher({
   agents,
@@ -26,9 +27,7 @@ export function AgentSwitcher({
   className = "agent-heading-identity",
   iconOnly = false,
   onSelect,
-  onCreate,
   onSettings,
-  spaces,
 }: {
   agents: AgentProfile[];
   conversations: GlobalAiConversation[];
@@ -40,14 +39,13 @@ export function AgentSwitcher({
   className?: string;
   /** Only the agent's avatar on the trigger, as in the Misty panel's header. */
   iconOnly?: boolean;
-  /** The Agents page groups agents under their home Space; the quick panel just lists them. */
-  spaces?: ReadonlyArray<{ id: string; name: string; is_default?: boolean }>;
   onSelect(agentId: string, startNew?: boolean, conversationId?: string): void;
-  onCreate(): void;
   /** Opens the given agent's settings. */
   onSettings(agentId: string): void;
 }) {
   const [open, setOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const shown = offeredAgents(agents);
   const choose = (action: () => void) => {
     setOpen(false);
     action();
@@ -76,54 +74,52 @@ export function AgentSwitcher({
       >
         <Command label="Switch agent">
           <CommandList>
-            {agentsByHomeSpace(agents, spaces).map((group) => (
-              <CommandGroup key={group.id} heading={group.name}>
-                {group.agents.map((agent) => (
-                  <CommandItem
-                    key={agent.id}
-                    value={`agent:${agent.id}`}
-                    disabled={disabled}
-                    className="group"
-                    onSelect={() =>
-                      choose(() => {
-                        if (agent.id !== selectedAgent?.id) onSelect(agent.id);
-                      })
-                    }
-                  >
-                    <span className="size-6 shrink-0 [&_.agent-avatar]:!size-6">
-                      <AgentAvatar agent={agent} />
-                    </span>
-                    <span className="min-w-0 flex-1 truncate">{agent.name}</span>
-                    {!agent.enabled && <span className="text-xs text-cream-muted">Disabled</span>}
-                    <span className="relative flex size-6 shrink-0 items-center justify-center">
-                      {agent.id === selectedAgent?.id && (
-                        <Check
-                          aria-label="Current agent"
-                          className="group-hover:invisible group-data-[selected=true]:invisible"
-                        />
+            <CommandGroup>
+              {shown.map((agent) => (
+                <CommandItem
+                  key={agent.id}
+                  value={`agent:${agent.id}`}
+                  disabled={disabled}
+                  className="group"
+                  onSelect={() =>
+                    choose(() => {
+                      if (agent.id !== selectedAgent?.id) onSelect(agent.id);
+                    })
+                  }
+                >
+                  <span className="size-6 shrink-0 [&_.agent-avatar]:!size-6">
+                    <AgentAvatar agent={agent} />
+                  </span>
+                  <span className="min-w-0 flex-1 truncate">{agent.name}</span>
+                  {!agent.enabled && <span className="text-xs text-cream-muted">Disabled</span>}
+                  <span className="relative flex size-6 shrink-0 items-center justify-center">
+                    {agent.id === selectedAgent?.id && (
+                      <Check
+                        aria-label="Current agent"
+                        className="group-hover:invisible group-data-[selected=true]:invisible"
+                      />
+                    )}
+                    <IconButton
+                      label={`${agent.name} settings`}
+                      disabled={disabled}
+                      className={cn(
+                        "absolute inset-0 !h-auto !w-auto opacity-0 focus-visible:opacity-100",
+                        "group-hover:opacity-100 group-data-[selected=true]:opacity-100",
                       )}
-                      <IconButton
-                        label={`${agent.name} settings`}
-                        disabled={disabled}
-                        className={cn(
-                          "absolute inset-0 !h-auto !w-auto opacity-0 focus-visible:opacity-100",
-                          "group-hover:opacity-100 group-data-[selected=true]:opacity-100",
-                        )}
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          choose(() => onSettings(agent.id));
-                        }}
-                      >
-                        <Settings className="size-4" />
-                      </IconButton>
-                    </span>
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            ))}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        choose(() => onSettings(agent.id));
+                      }}
+                    >
+                      <Settings className="size-4" />
+                    </IconButton>
+                  </span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
             <CommandSeparator />
             <CommandGroup>
-              <CommandItem disabled={disabled} onSelect={() => choose(onCreate)}>
+              <CommandItem disabled={disabled} onSelect={() => choose(() => setCreating(true))}>
                 <Plus />
                 New agent
               </CommandItem>
@@ -131,6 +127,13 @@ export function AgentSwitcher({
           </CommandList>
         </Command>
       </PopoverContent>
+      {creating ? (
+        <NewAgentDialog
+          agents={agents}
+          onClose={() => setCreating(false)}
+          onCreated={(agentId) => onSelect(agentId)}
+        />
+      ) : null}
     </Popover>
   );
 }

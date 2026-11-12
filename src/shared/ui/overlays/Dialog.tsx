@@ -151,7 +151,7 @@ const DialogContent = React.forwardRef<
                 data-slot="dialog-close"
                 className={cn(
                   "absolute right-4 top-4 grid size-8 place-items-center rounded-md",
-                  "text-cream-muted outline-none transition-colors hover:bg-charcoal-card",
+                  "text-cream-muted outline-none transition-colors hover:bg-control-hover",
                   "hover:text-cream focus-visible:ring-[3px]",
                   "focus-visible:ring-charcoal-active/40 disabled:pointer-events-none",
                 )}

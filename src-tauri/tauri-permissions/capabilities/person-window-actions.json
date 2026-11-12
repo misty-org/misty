@@ -22,6 +22,7 @@
     "action-clipboard",
     "action-cursor-companion",
     "action-devices",
+    "action-engine-config",
     "action-misty-screen",
     "action-model-keys",
     "action-profile",
@@ -29,8 +30,9 @@
     "action-sandbox",
     "action-settings",
     "action-shortcuts",
-    "action-vault",
     "action-voice",
-    "action-workspace"
+    "action-workspace",
+    "action-agent-extras",
+    "action-pets"
   ]
 }

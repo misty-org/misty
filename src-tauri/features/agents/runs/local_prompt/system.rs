@@ -3,7 +3,7 @@ use super::{
     capabilities::agent_capability_guidance,
     companion::{companion_system_prompt, misty_guide_section},
     go_text::truncate_text,
-    request::{RunRequest, SCHEDULED_RUN_TRIGGER},
+    request::RunRequest,
 };
 
 // Fixes how answers read. Without it a model mirrors the person's own typing, so a lowercase,
@@ -22,20 +22,14 @@ fn entry_guidance(request: &RunRequest) -> &'static str {
     if request.companion() {
         return "";
     }
-    if request.trigger == SCHEDULED_RUN_TRIGGER {
-        return "\n\nWhere this reply goes: a scheduled run the person reads later. Nobody is watching: don't ask questions, write a self-contained report of what you found and did.";
-    }
     "\n\nWhere this reply goes: the conversation in Misty. Format it for reading: short paragraphs, lists and tables where they help, links to sources."
 }
 
 // The app's names for what the agent's tools act on, by tool family. Renaming a section changes one
 // line here and nothing in the agent.
-const UI_LABELS: [(&str, &str); 8] = [
+const UI_LABELS: [(&str, &str); 5] = [
     ("space.", "Spaces are what the app calls a space (space_*)."),
     ("file.", "The Library holds files (file_*)."),
-    ("memory.history.", "Settings › Memory and the Journal day show history (memory_history_*): pages visited, dictations and captures."),
-    ("memory.pref.", "Memory the person asks you to keep is memory_pref_*."),
-    ("memory.workflow.", "The Workflows page shows saved workflows (memory_workflow_*)."),
     ("log.work.", "The Notebook card in the conversation shows log_work_*."),
     ("integration.", "Integrations are the person's connected apps (integration_*)."),
     ("folder.", "Shared folders are folders on the person's computer (folder_*)."),
@@ -71,9 +65,8 @@ fn current_tab_guidance(request: &RunRequest, tools: &[String]) -> String {
     out
 }
 
-pub(super) fn invocation_system(request: &RunRequest, tools: &[String], now: &str, method_guidance: &str) -> String {
+pub(super) fn invocation_system(request: &RunRequest, tools: &[String], now: &str) -> String {
     let mut system = base_prompt(&request.surface_id);
-    system.push_str(method_guidance);
     if request.companion() {
         system.push_str(&companion_system_prompt(request, tools));
     } else {

@@ -30,9 +30,6 @@ const Planner = lazy(() =>
 const Calendar = lazy(() =>
   import("@/features/spaces/calendar/SpaceCalendar").then((m) => ({ default: m.SpaceCalendar })),
 );
-const MemoryTree = lazy(() =>
-  import("@/features/memory/tree").then((m) => ({ default: m.MemoryTreePage })),
-);
 async function loadHome() {
   const { SpaceHome } = await import("../home/SpaceHome");
   return { default: SpaceHome };
@@ -63,9 +60,6 @@ export async function preloadSpaceSection(section: string) {
       break;
     case "calendar":
       await import("@/features/spaces/calendar/SpaceCalendar");
-      break;
-    case "memory":
-      await import("@/features/memory/tree");
       break;
   }
 }
@@ -159,13 +153,13 @@ export function SpaceSectionView(props: {
   return (
     <div className="relative h-full min-h-0 overflow-hidden">
       <Suspense fallback={<SpacePageLoadingPlaceholder />}>
-        {/* The Journal lists are gone: Notes and Drawings without an item show the home. */}
+        {/* Notes and Drawings without an item show the Journal: the home's collection, narrowed. */}
         {section === "home" ||
         (section === "notes" && !new URLSearchParams(location.search).get("note")) ||
         (section === "drawings" && !studioKind) ||
         // There is no settings page: its links land on the home, and the Space menu has the rest.
         section === "settings" ? (
-          <Home space={space} />
+          <Home space={space} journal={section === "notes" || section === "drawings"} />
         ) : section === "notes" ? (
           <Notes spaceId={spaceId} spaceName={space.name} workspaceTabId={props.workspaceTabId} />
         ) : section === "drawings" ? (
@@ -180,8 +174,6 @@ export function SpaceSectionView(props: {
           <Planner spaceId={spaceId} />
         ) : section === "calendar" ? (
           <Calendar spaceId={spaceId} />
-        ) : section === "memory" ? (
-          <MemoryTree spaceId={spaceId} spaceName={space.name} />
         ) : section === "social" || section === "chat" ? (
           <Chat spaceId={spaceId} spaceName={space.name} workspaceTabId={props.workspaceTabId} />
         ) : (

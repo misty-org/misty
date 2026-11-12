@@ -88,7 +88,6 @@ pub fn close_browser_webview(
             BrowserWebviewIdRequest { id },
         )?;
     }
-    #[cfg(any(target_os = "macos", windows))]
     crate::browser::menus::popups::forget_close_handler(&request.id);
     crate::browser::kiri_link::host_messages::forget(&request.id);
     if let Ok(mut pending) = state.pending_popups.lock() {

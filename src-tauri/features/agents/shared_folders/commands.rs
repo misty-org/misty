@@ -50,7 +50,7 @@ pub async fn agents_share_folder(
         .map(Some)
 }
 
-/// A chat, new chat or workflow's key, which only ever names those things.
+/// A chat or new chat's key, which only ever names those things.
 fn folder_changes_key(key: &str) -> ApiResult<()> {
     if key.is_empty() || key.len() > 200 {
         return Err(ApiError::Message("That chat can't be given this.".into()));
@@ -109,7 +109,7 @@ pub async fn agents_stop_folder_changes(
     state.agents.stop_folder_changes(key, scope_id).await
 }
 
-/// A new chat takes on its draft's answer, and a scheduled run its workflow's.
+/// A new chat takes on its draft's answer.
 #[tauri::command]
 pub async fn agents_adopt_folder_changes(
     webview: tauri::Webview,

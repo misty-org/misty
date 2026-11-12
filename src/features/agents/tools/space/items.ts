@@ -171,5 +171,3 @@ export const itemTools: Record<string, LocalToolHandler> = {
   "item.delete": deleteItem,
   "item.rename": renameItem,
 };
-
-export const itemWriteTools = ["item.delete", "item.rename"];

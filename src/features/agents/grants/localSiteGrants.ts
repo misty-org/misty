@@ -55,8 +55,6 @@ export async function rememberSiteGrant(input: { agentId: string; kind: string; 
   });
 }
 
-export const isSiteGrant = (id: string) => id.startsWith(idPrefix);
-
 export const revokeSiteGrant = (id: string) => localDocuments.remove(agentAccountId(), kind, id);
 
 export async function revokeAgentSiteGrants(agentId: string) {

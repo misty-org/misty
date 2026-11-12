@@ -4,33 +4,28 @@
  * chat as a card of its own. Loaded last, so it settles the page's look in one place.
  */
 
-/* The bar carries no line of its own; the page reads as one surface. */
+/* The bar is the page's one top band: as tall as the sidebar's head and closed by the same
+   hairline, with plain buttons on it and no groups boxed inside. */
 .agent-studio-bar {
-  min-height: 48px;
-  padding: 6px 12px;
-  border-bottom: 0;
+  box-sizing: border-box;
+  height: var(--ui-header);
+  min-height: var(--ui-header);
+  padding: 0 12px;
   background: transparent;
 }
-.agent-studio-views {
-  gap: 4px;
-  padding: 3px;
-  border-radius: 10px;
-  background: color-mix(in srgb, var(--misty-theme-text) 4%, transparent);
-}
-.agent-studio-views > button {
-  height: 28px;
-  border-radius: 8px;
-  padding: 0 10px;
-}
-.agent-studio-views > button[aria-current="page"] {
-  background: color-mix(in srgb, var(--misty-theme-text) 10%, transparent);
-  box-shadow: 0 1px 2px rgb(0 0 0 / 0.25);
-}
 .agent-studio-panels {
-  gap: 4px;
-  padding: 3px;
-  border-radius: 10px;
-  background: color-mix(in srgb, var(--misty-theme-text) 4%, transparent);
+  gap: 2px;
+}
+.agent-studio-panels > button[aria-pressed="true"] {
+  background: var(--color-control-active);
+}
+/* The chat's name is a quiet line under the bar, not a second header. */
+.agent-studio .agent-conversation-heading {
+  height: 40px;
+}
+.agent-studio .agent-heading-title {
+  font-size: 13px;
+  color: var(--color-cream-muted);
 }
 
 /* The composer: the text and its toolbar share one card, as one thing to type into. */
@@ -38,7 +33,7 @@
   row-gap: 4px;
   padding: 10px 10px 8px;
   border: 1px solid color-mix(in srgb, var(--misty-theme-text) 12%, transparent);
-  border-radius: 18px;
+  border-radius: var(--radius-xl);
   background: var(--color-charcoal-card);
   box-shadow:
     0 1px 0 color-mix(in srgb, var(--misty-theme-text) 4%, transparent) inset,
@@ -75,25 +70,42 @@
   bottom: 10px;
 }
 
-/* The context panel floats: a rounded card with air around it, not a column cut off by a line. */
+/* The context panel floats: a card lifted by a hairline and a soft shadow, with air around it,
+   not a column cut off by a line. */
 .agent-studio-body {
   gap: 0;
 }
 .agent-studio-context {
-  margin: 4px 10px 10px 0;
-  border: 1px solid color-mix(in srgb, var(--misty-theme-text) 10%, transparent);
-  border-radius: 16px;
+  margin: 8px 0 8px 0;
+  border: 0;
+  border-radius: var(--radius-xl);
   background: var(--color-charcoal-card);
-  box-shadow: 0 18px 44px -24px rgb(0 0 0 / 0.7);
+  /* An outline draws over the panel's content, so a terminal or page never covers the edge. */
+  outline: 1px solid color-mix(in srgb, var(--misty-theme-text) 7%, transparent);
+  outline-offset: -1px;
+  box-shadow:
+    0 2px 4px rgb(0 0 0 / 0.3),
+    0 1px 2px rgb(0 0 0 / 0.3);
   overflow: hidden;
 }
-.agent-studio-context .context-head {
-  min-height: 44px;
-  padding: 6px 8px 6px 14px;
-  border-bottom-color: color-mix(in srgb, var(--misty-theme-text) 8%, transparent);
-}
 .agent-studio-context .context-editor .cm-editor,
-.agent-studio-context .context-editor .cm-gutters,
-.agent-studio-context .context-terminal {
+.agent-studio-context .context-editor .cm-gutters {
   background: transparent;
+}
+
+/* The session card is a glance, not a workspace: narrow, and only as tall as what it holds. */
+.agent-studio-context[data-panel="session"] {
+  align-self: flex-start;
+  width: 256px;
+  min-width: 0;
+  max-height: calc(100% - 16px);
+}
+/* On a narrow page the open panel covers the chat, and the rail stays at its edge. */
+@container agent-studio (max-width: 760px) {
+  .agent-studio-context {
+    margin: 0;
+    inset: var(--ui-header) 44px 0 0;
+    width: auto;
+    border-radius: 0;
+  }
 }

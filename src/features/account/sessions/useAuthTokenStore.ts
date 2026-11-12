@@ -27,7 +27,6 @@ import {
   selectActiveSession,
   updateSavedAccountSession,
 } from "./savedAccountSessions";
-;
 export { listSavedAccountSessions, readActiveSavedAccountSession, updateSavedAccountSession };
 let cachedToken: string | null | undefined;
 // A cold start can fan out several authenticated requests before the first

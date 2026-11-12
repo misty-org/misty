@@ -2,7 +2,7 @@
 //! `site_permissions` collection of the profile whose pages use that store, and `misty.db` keeps
 //! a copy keyed by store that the engines read synchronously. Private sessions stay on this
 //! computer.
-use super::{read_store, store::SitePermissions, write_store, Decision, Permissions};
+use super::{Decision, Permissions};
 use crate::browser::profiles::{self, hashed_id, ProfileRecords};
 use browser_data::{
     collections::SITE_PERMISSIONS,
@@ -16,7 +16,6 @@ use std::{
     collections::BTreeMap,
     sync::{Mutex, OnceLock},
 };
-use tauri::AppHandle;
 
 type Changes = BTreeMap<String, Permissions>;
 
@@ -36,14 +35,6 @@ fn site_decision(decision: &Decision) -> SiteDecision {
         Decision::Ask => SiteDecision::Ask,
         Decision::Allow => SiteDecision::Allow,
         Decision::Block => SiteDecision::Block,
-    }
-}
-
-fn decision(value: SiteDecision) -> Decision {
-    match value {
-        SiteDecision::Ask => Decision::Ask,
-        SiteDecision::Allow => Decision::Allow,
-        SiteDecision::Block => Decision::Block,
     }
 }
 
@@ -142,65 +133,6 @@ pub(crate) fn publish(store_key: String, changes: Changes) {
                 unsent.entry(store_key).or_default().extend(changes);
             }
         }
-    });
-}
-
-/// Follows other signed-in sessions' changes to site choices into the cache.
-pub(crate) fn follow_remote_changes(app: AppHandle) {
-    let mut changes = profiles::subscribe();
-    tauri::async_runtime::spawn(async move {
-        loop {
-            match changes.recv().await {
-                Ok(change) if change.remote && change.collection == SITE_PERMISSIONS => {
-                    let store_key = crate::browser::app_windows::store_for_profile(&change.profile)
-                        .and_then(|store| super::store_key(store.as_deref()));
-                    if let (Ok(store_key), Some(profile)) =
-                        (store_key, profiles::profile_records(&change.profile))
-                    {
-                        profile_changed(&app, &profile, store_key).await;
-                    }
-                }
-                Ok(_) | Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => {}
-                Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
-            }
-        }
-    });
-}
-
-/// The profile's choices changed in another signed-in session: its copy replaces the cache for
-/// the store its pages use.
-async fn profile_changed(app: &AppHandle, profile: &ProfileRecords, store_key: String) {
-    let Ok(records) = profile.records_list(SITE_PERMISSIONS).await else {
-        return;
-    };
-    let sites: SitePermissions = records
-        .iter()
-        .filter_map(parse)
-        .filter_map(|site| {
-            let permissions = Permissions {
-                camera: decision(site.camera),
-                microphone: decision(site.microphone),
-                location: decision(site.location),
-            };
-            (permissions != Permissions::default()).then_some((site.origin, permissions))
-        })
-        .collect();
-    // Store read/modify/write runs on the main thread, like every other edit.
-    let _ = app.run_on_main_thread(move || {
-        let mut store = read_store();
-        let unchanged = match store.get(&store_key) {
-            Some(cached) => *cached == sites,
-            None => sites.is_empty(),
-        };
-        if unchanged {
-            return;
-        }
-        if sites.is_empty() {
-            store.remove(&store_key);
-        } else {
-            store.insert(store_key, sites);
-        }
-        let _ = write_store(&store);
     });
 }
 

@@ -12,9 +12,9 @@ pub(crate) mod model_calls;
 mod model_checks;
 mod models;
 mod screen_calls;
-mod subtitle_context;
 mod text_calls;
 mod transcribe_diarized;
+mod video;
 mod voice_notes;
 pub(crate) mod zod;
 
@@ -25,6 +25,7 @@ use serde_json::Value;
 pub use failure::{model_call_failure, CallError, DeviceCallFailure};
 pub use model_calls::{embed_call, speech_call, EmbedCall, EmbedImage, SpeechCall};
 pub use models::{DeviceModels, DeviceRole};
+pub use video::VideoCall;
 
 use super::js_json::JsValue;
 use crate::model_calls::{ModelError, ModelRoute};
@@ -34,12 +35,11 @@ use failure::answered;
 pub const MAX_DEVICE_BODY_BYTES: usize = 40 << 20;
 
 /// Every call [`DeviceCalls::device_call`] knows, by its route's name.
-pub const DEVICE_CALL_NAMES: [&str; 13] = [
+pub const DEVICE_CALL_NAMES: [&str; 12] = [
     "cleanup",
     "voice-transcription",
     "screen-model",
     "refine-point",
-    "subtitle-context",
     "extract",
     "embed",
     "day-summary",
@@ -49,6 +49,21 @@ pub const DEVICE_CALL_NAMES: [&str; 13] = [
     "follow-up",
     "restore-step",
 ];
+
+/// Two voices that sound apart: the person's chosen one (or the provider's default) and another of
+/// the provider's stock voices.
+fn dialogue_voices(model: &str, chosen: Option<String>) -> [Option<String>; 2] {
+    if model.starts_with("elevenlabs/") {
+        // ElevenLabs' premade "Rachel" and "Adam".
+        const FIRST: &str = "21m00Tcm4TlvDq8ikWAM";
+        const SECOND: &str = "pNInz6obpgDQGcFmaJgB";
+        let first = chosen.unwrap_or_else(|| FIRST.to_owned());
+        let second = if first == SECOND { FIRST } else { SECOND };
+        [Some(first), Some(second.to_owned())]
+    } else {
+        [Some("alloy".to_owned()), Some("echo".to_owned())]
+    }
+}
 
 /// The body as `express.json` read it: within the limit, and an object or array. An empty body reads
 /// as `{}`. Text rather than a parsed value, because a run's schema goes to the model in its own key
@@ -92,7 +107,6 @@ impl DeviceCalls {
             "voice-transcription" => self.voice_transcription(body).await,
             "screen-model" => self.screen_model(body).await,
             "refine-point" => self.refine_point(body).await,
-            "subtitle-context" => self.subtitle_context(body).await,
             "extract" => self.extract(body).await,
             "embed" => self.embed(body).await,
             "day-summary" => self.day_summary(body).await,
@@ -137,14 +151,6 @@ impl DeviceCalls {
         answered("refine-point", result)
     }
 
-    pub async fn subtitle_context(&self, body: &str) -> Result<Value, DeviceCallFailure> {
-        let result = match read_body(body) {
-            Ok(body) => subtitle_context::subtitle_context_call(self, &body).await,
-            Err(error) => Err(error),
-        };
-        answered("subtitle-context", result)
-    }
-
     pub async fn extract(&self, body: &str) -> Result<Value, DeviceCallFailure> {
         let result = match read_body(body) {
             Ok(body) => text_calls::extract_call(self, &body).await,
@@ -183,6 +189,46 @@ impl DeviceCalls {
             });
         }
         Ok(serde_json::json!({ "model": model, "embeddings": embeddings }))
+    }
+
+    /// Tutor's audio overview: each line in its speaker's voice on the device's speech model and
+    /// key, with a short pause between lines, as one 24 kHz WAV file. Speaker 0 has the voice chosen
+    /// in Settings; speaker 1 another.
+    pub async fn speak_dialogue(&self, lines: &[(u8, String)]) -> Result<Vec<u8>, CallError> {
+        use crate::model_calls::resolve_speech_model;
+        let (model, route) = self.on_device(DeviceRole::Speech)?;
+        let resolved = resolve_speech_model(&model, &route, &self.client)?;
+        let voices = dialogue_voices(&model, self.models.speech_voice());
+        let pause = vec![0u8; 24_000 * 2 * 35 / 100];
+        let mut pcm = Vec::new();
+        for (index, (speaker, text)) in lines.iter().enumerate() {
+            let text = text.trim();
+            if text.is_empty() {
+                continue;
+            }
+            // The same speaker's neighbouring lines keep its delivery even across the other's turns.
+            let around = |step: isize| {
+                let at = index as isize + step;
+                (at >= 0)
+                    .then(|| lines.get(at as usize))
+                    .flatten()
+                    .filter(|(other, _)| other == speaker)
+                    .map(|(_, text)| text.as_str())
+            };
+            let call = SpeechCall {
+                model: &model,
+                text,
+                voice: voices[(*speaker as usize) % 2].as_deref(),
+                previous_text: around(-1),
+                next_text: around(1),
+            };
+            pcm.extend(speech_call(resolved.as_ref(), call).await?);
+            pcm.extend_from_slice(&pause);
+        }
+        if pcm.is_empty() {
+            return Err(CallError::invalid());
+        }
+        Ok(crate::voice::wav(&pcm))
     }
 
     /// One day of the person's Memory, summarized on the device's fast model. The server sends the

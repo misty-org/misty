@@ -1,3 +1,4 @@
+import { routes } from "@/app/shell";
 import { NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "../AuthContext";
 import AuthCard from "../components/AuthCard";
@@ -14,7 +15,7 @@ export default function RegisterPage() {
   const from =
     rawFrom && !rawFrom.startsWith("/signin") && !rawFrom.startsWith("/register")
       ? rawFrom
-      : "/browser";
+      : routes.agents;
   const addingAccount = Boolean(routeState?.addingAccount || user);
   const finishSignIn = useFinishSignIn(from, !user);
   const needsServer = useNeedsServer();

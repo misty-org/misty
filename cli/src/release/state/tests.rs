@@ -58,7 +58,8 @@ fn release_requires_a_supported_unique_platform_set() {
     assert!(validate_release_platforms(&release(vec![MACOS_PLATFORM, WINDOWS_PLATFORM])).is_ok());
     assert!(validate_release_platforms(&release(vec![])).is_err());
     assert!(validate_release_platforms(&release(vec![MACOS_PLATFORM, MACOS_PLATFORM])).is_err());
-    assert!(validate_release_platforms(&release(vec!["linux-x86_64"])).is_err());
+    assert!(validate_release_platforms(&release(vec![LINUX_PLATFORM])).is_ok());
+    assert!(validate_release_platforms(&release(vec!["freebsd-x86_64"])).is_err());
 }
 
 #[test]

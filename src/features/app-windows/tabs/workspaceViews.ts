@@ -9,7 +9,7 @@ export {
   normalizeBrowserHomeUrl,
 } from "../addresses/browserHome";
 
-export type WorkspaceSurfaceId = "space" | "browser" | "agents" | "scheduled" | "extensions";
+export type WorkspaceSurfaceId = "space" | "agents";
 
 export type WorkspaceGroupKey = `space:${string}` | `tool:${WorkspaceSurfaceId}` | `app:${string}`;
 type WorkspaceInstancePolicy = "multiple" | "single";

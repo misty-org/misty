@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { Hand, PictureInPicture2, Play } from "lucide-react";
+import { Hand, PictureInPicture2, Play, X } from "lucide-react";
 import { useState } from "react";
 import { aiSurfaceApi } from "../runs/invocations/api";
 import { BrowserNavigationButtons } from "@/features/browser";
@@ -11,7 +11,7 @@ import { AgentViewSwitcher } from "./AgentViewSwitcher";
 import { hostAddress } from "./hostAddress";
 import { openPersonTab } from "../tabs/agentPersonTabs";
 import { agentTab } from "../tabs/agentTabs";
-import { setBrowserExpanded, useAgentBrowser } from "./agentBrowserStore";
+import { closeAgentBrowser, setBrowserExpanded, useAgentBrowser } from "./agentBrowserStore";
 
 /**
  * The agent browser in the full split: a small copy of
@@ -25,7 +25,7 @@ export function AgentBrowser({ conversationId }: { conversationId?: string }) {
   );
   const tabs = useAgentBrowser((state) => state.tabs);
   const [takenOver, setTakenOver] = useState(false);
-  if (!chat?.expanded || !chat.views.length) return null;
+  if (!chat?.expanded || chat.hidden || !chat.views.length) return null;
   const view = chat.views.find((item) => item.id === chat.shownView) ?? chat.views[0]!;
   const shown = tabs[view.shownScope];
   const runId = agentTab(view.shownScope)?.runId;
@@ -111,6 +111,12 @@ export function AgentBrowser({ conversationId }: { conversationId?: string }) {
         onClick={() => setBrowserExpanded(chat.conversationId, false)}
       >
         <PictureInPicture2 />
+      </IconButton>
+      <IconButton
+        label="Close the agent browser"
+        onClick={() => closeAgentBrowser(chat.conversationId)}
+      >
+        <X />
       </IconButton>
     </>
   );

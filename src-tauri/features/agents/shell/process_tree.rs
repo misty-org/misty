@@ -22,6 +22,7 @@ pub struct Tree {
     task: tokio::task::JoinHandle<()>,
 }
 
+#[cfg(target_os = "macos")]
 fn start_time(pid: i32) -> Option<(u64, u64)> {
     let mut info: libc::proc_bsdinfo = unsafe { std::mem::zeroed() };
     let size = std::mem::size_of::<libc::proc_bsdinfo>() as libc::c_int;
@@ -37,6 +38,7 @@ fn start_time(pid: i32) -> Option<(u64, u64)> {
     (read == size).then_some((info.pbi_start_tvsec, info.pbi_start_tvusec))
 }
 
+#[cfg(target_os = "macos")]
 fn children(pid: i32) -> Vec<i32> {
     let mut buffer = vec![0 as libc::pid_t; 512];
     let bytes = unsafe {
@@ -54,6 +56,39 @@ fn children(pid: i32) -> Vec<i32> {
     buffer.truncate(count);
     buffer.retain(|pid| *pid > 1);
     buffer
+}
+
+/// On Linux, the start time in clock ticks since boot: field 22 of `/proc/<pid>/stat`, counted
+/// after the command name, which may hold spaces itself.
+#[cfg(target_os = "linux")]
+// `/proc` is the kernel's view of processes, not anyone's files, so the file gate has no say here.
+#[allow(clippy::disallowed_methods)]
+fn start_time(pid: i32) -> Option<(u64, u64)> {
+    let stat = std::fs::read_to_string(format!("/proc/{pid}/stat")).ok()?;
+    let rest = &stat[stat.rfind(')')? + 1..];
+    let ticks = rest.split_whitespace().nth(19)?.parse().ok()?;
+    Some((ticks, 0))
+}
+
+/// Every thread's children: a multithreaded shell forks from any of its threads.
+#[cfg(target_os = "linux")]
+#[allow(clippy::disallowed_methods)]
+fn children(pid: i32) -> Vec<i32> {
+    let mut found = Vec::new();
+    for task in std::fs::read_dir(format!("/proc/{pid}/task")).into_iter().flatten().flatten() {
+        let Ok(list) = std::fs::read_to_string(task.path().join("children")) else {
+            continue;
+        };
+        found.extend(
+            list.split_whitespace()
+                .filter_map(|child| child.parse::<i32>().ok())
+                .filter(|child| *child > 1),
+        );
+        if found.len() >= 512 {
+            break;
+        }
+    }
+    found
 }
 
 fn record(root: i32, seen: &Seen) {

@@ -16,7 +16,6 @@ import {
   accountExportError,
   requestAccountExport,
   saveAccountExport,
-  saveMemoryExport,
   type AccountExportProof,
 } from "./accountExport";
 
@@ -45,9 +44,7 @@ export function AccountExportDialog(props: {
     setBusy(true);
     setError("");
     try {
-      const account = saveAccountExport(await requestAccountExport(proof));
-      const memory = await saveMemoryExport();
-      setSaved(memory ? `${account} and ${memory}` : account);
+      setSaved(saveAccountExport(await requestAccountExport(proof)));
     } catch (cause) {
       setError(accountExportError(cause));
     } finally {

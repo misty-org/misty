@@ -26,10 +26,10 @@ import {
 } from "@/features/agents/tools/run-state/conversationState";
 import { rows, settings } from "@/features/agents/tools/run-state/fakeMistyDb.test-support";
 import { openQuestionSet } from "@/features/agents/tools/run-state/questions";
-import { forgetKnownRunsForTests, runContext } from "@/features/agents/tools/runContexts";
+import { forgetKnownRunsForTests } from "@/features/agents/tools/runContexts";
 import { setGoal } from "@/features/agents/tools/run-state/goals";
 import { collaborationApi } from "./api";
-import { admitLocalTurn, noteLocalRun, supersedeRunQuestions } from "./localTurns";
+import { admitLocalTurn, supersedeRunQuestions } from "./localTurns";
 import { turnModes } from "./permissionMode";
 import { pendingQuestionSet, useCollaborationStore } from "./store";
 
@@ -68,17 +68,12 @@ it("reads and writes misty.db, and never the server", async () => {
   expect(client.cachedRequest).not.toHaveBeenCalled();
 });
 
-it("a typed turn keeps its modes and answers open questions; a scheduled one answers nothing", async () => {
+it("a typed turn keeps its modes and answers open questions", async () => {
   await open();
-  await admitLocalTurn("me", "chat", { mode: "plan", permissionMode: "auto", scheduled: true });
-  let state = await readConversationState("me", "chat");
-  expect(state).toMatchObject({ mode: "plan", permissionMode: "auto" });
-  expect(state.questionSets[0]!.state).toBe("pending");
-
   await useCollaborationStore.getState().load("chat");
   expect(pendingQuestionSet(useCollaborationStore.getState().byConversation.chat)).toBeDefined();
-  await admitLocalTurn("me", "chat", { scheduled: false });
-  state = await readConversationState("me", "chat");
+  await admitLocalTurn("me", "chat", { mode: "plan", permissionMode: "auto" });
+  const state = await readConversationState("me", "chat");
   expect(state).toMatchObject({ mode: "plan", permissionMode: "auto" });
   expect(state.questionSets[0]!.state).toBe("superseded");
   // The card goes at once, without waiting for a reload.
@@ -94,12 +89,6 @@ it("a follow-up answers only its own run's questions", async () => {
     run: "superseded",
     other: "pending",
   });
-});
-
-it("a run's chat survives this window forgetting it", async () => {
-  await noteLocalRun("r1", { account: "me", conversationId: "chat", voice: true });
-  forgetKnownRunsForTests();
-  await expect(runContext("r1")).resolves.toMatchObject({ account: "me", voice: true });
 });
 
 it("sends a chat's own Ask or Auto, which only this computer now knows", async () => {

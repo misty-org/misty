@@ -3,40 +3,42 @@ export { agentsDeviceSnapshot, forgetFolder, shareFolder } from "./personal/useA
 export { shareFolderWarning } from "./plans/AgentFolderMenu";
 export { ensureAgentDevice } from "./personal/useAgentDeviceStore";
 
-export { CompanionAppearanceSettings } from "./cursor/CompanionAppearanceSettings";
-export { CursorCompanionController } from "./cursor/CursorCompanionController";
+export { CompanionAppearanceSettings } from "./tutor/cursor/CompanionAppearanceSettings";
+export { CursorCompanionController } from "./tutor/cursor/CursorCompanionController";
 export { MistyPanelDock } from "./panel/MistyPanelDock";
 export { useMistyPanelSide } from "./panel/mistyPanelSide";
 export { showAgentsPanel, useMistyPanelStore, type MistyPanelView } from "./panel/mistyPanelStore";
 
 export type { AgentScope } from "./personal/agentScope";
 
-export type { DisplayCapture } from "./cursor/protocol";
+export type { DisplayCapture } from "./tutor/cursor/protocol";
 
 export { usePersonalAgentsStore } from "./personal/personalAgentsStore";
 
 export type { AppRequest } from "./connected-apps/api";
 export { AppRequestCard } from "./connected-apps/AppRequestCard";
+export { appsApi, type ConnectedApp } from "./connected-apps/api";
+export { AppLogo } from "./connected-apps/ConnectedAppRows";
+export { DirectApps } from "./connected-apps/DirectApps";
 export { StatusRow, StatusTable, type StatusState } from "./progress/StatusTable";
 
 export { settleProgress, withAnswer, withToolEvent } from "./progress/progressTimeline";
-export { WorkflowSchedulesBridge } from "./workflows/WorkflowSchedulesBridge";
 export { grantsApi, groupGrants, lastUsedText } from "./grants/api";
 export type { AgentGrant } from "./grants/api";
 // Dictation hands "Hey <agent>, …" to an agent through the cursor session.
-export { useCompanionState } from "./cursor/companionState";
+export { useCompanionState } from "./tutor/cursor/companionState";
 export { routeLocalFollowup, useLocalExecution } from "./runs/local-execution/localExecution";
 export { AgentAvatar } from "./personal/AgentAvatar";
-export type { MediaContext } from "./cursor/mediaContext";
-export { lessonTurnPayload } from "./lessons/lessonRouter";
-export { useLessonStore } from "./lessons/lessonStore";
-export type { LessonPayload, LessonSummaryPayload } from "./lessons/lessonTypes";
+export type { MediaContext } from "./tutor/cursor/mediaContext";
+export { lessonTurnPayload } from "./tutor/lessons/lessonRouter";
+export { useLessonStore } from "./tutor/lessons/lessonStore";
+export { tutorChatIds, useTutorChatIds, useTutorStore } from "./tutor/tutorStore";
+export type { LessonPayload, LessonSummaryPayload } from "./tutor/lessons/lessonTypes";
 
 // Public surface used by other features (generated from their imports).
 export { managedAiRequest } from "../../api/managed/managed";
 export { BrowserContextMenuBridge } from "./conversations/context/BrowserContextMenuBridge";
 export { MistyContextBridgeHost } from "./conversations/context/MistyContextBridgeHost";
-export { type BrowserAskSnapshot } from "./conversations/context/browserAskContext";
 export { useMistyStore } from "./conversations/state/useMistyStore";
 export { AgentExecutionSurface } from "./island/AgentExecutionSurface";
 export { agentAccountId } from "./personal/agentAccount";
@@ -47,7 +49,6 @@ export { resetAiSurfaceAccountState } from "./runs/invocations";
 export {
   aiSurfaceApi,
   subscribeToAiInvocation,
-  type AiMemoryRecord,
   type AiUserSettings,
   type ScreenLocation,
 } from "./runs/invocations/api";
@@ -84,7 +85,7 @@ export { MistySection } from "./settings/MistySection";
 // Public surface used by other features (generated from their imports).
 export { spaceAgentsApi, type SpaceAgent } from "./api/space-agents";
 export { spacesGateway, type AgentArtifactProvenance } from "./spaces-gateway/spacesGateway";
-export { findVocative, routeToAgent } from "./cursor/vocativeRoute";
+export { findVocative, routeToAgent } from "./tutor/cursor/vocativeRoute";
 
 // Public surface used by other features (generated from their imports).
 export { DeviceSessionBridge } from "./personal/DeviceSessionBridge";
@@ -93,19 +94,66 @@ export { draftRequestForAgent } from "./conversations/ask/draftRequest";
 export { conversationInSpace } from "./conversations/state/conversationSpace";
 export { useAgentAccountId } from "./personal/agentAccount";
 export { AgentsNow } from "./virtual/AgentsNow";
-export { VirtualOffice } from "./virtual/VirtualOffice";
-export { useOfficeAgents } from "./virtual/useOfficeAgents";
+export { VirtualStudio } from "./virtual/VirtualStudio";
+export { useStudioAgents } from "./virtual/useStudioAgents";
 export { useTeammateAgents, type TeammateAgent } from "./virtual/teammates";
 export { shortAgo, useChatStatuses, type ChatStatus } from "./page/useChatStatuses";
-export { EngineMark, hasEngineMark } from "./engines/EngineMark";
-// The Space home's overview reads runs, linked folders and schedules.
+export { EngineMark, hasEngineMark } from "@/features/engine-config/EngineMark";
+export { EnginesStep } from "./engines/EnginesStep";
+export { engineSetupState, type EngineSetupState } from "./engines/EngineSetupRow";
+// The Space home's overview reads runs and linked folders.
 export { runtimeAiApi } from "./AgentsRuntime";
 export type { MistyActivityEntry } from "./conversations/state/activity";
 export type { GlobalAiConversation } from "./conversations/state/conversationTypes";
 export { watchAllRunEvents } from "./runs/local-run/localRunEvents";
-export { currentSpaceKey, folderName, useSpaceFolders } from "./engines/enginesApi";
+export {
+  currentSpaceKey,
+  folderName,
+  folderOf,
+  useLinkedFolders,
+  useSpaceFolders,
+} from "./engines/enginesApi";
+export { RunNotifier } from "./runs/notices/RunNotifier";
+// Personas from the bundled catalog, and their page in Settings.
+export { PersonaCatalogSection } from "./personas";
 export { projectApi, type GitStatus } from "./context-panel/projectApi";
 export { useContextPanel } from "./context-panel/contextPanelStore";
-export { useWorkflowSchedulesStore } from "./workflows/useWorkflowSchedulesStore";
-export { describeNextRun } from "./workflows/scheduleSummary";
-export type { UpcomingWorkflowRun } from "./api/agent-methods";
+export { readDeviceState, updateDeviceState } from "./context-panel/folders/deviceState";
+export {
+  fileChats,
+  forkChat,
+  isChatUnread,
+  setChatsArchived,
+  setChatsPinned,
+  setChatsUnread,
+} from "./conversations/state/chatOrganizing";
+export {
+  useAgentFoldersStore as useChatSectionsStore,
+  type AgentConversationFolder as ChatSection,
+} from "./shared-folders/agentFoldersStore";
+export { PickUpDialog } from "./pickup/PickUpDialog";
+export { pickUpRequest, pickUpTopic } from "./pickup/pickUp";
+export { activityApi, type RunRow, type RunStep } from "./activity/activityApi";
+export { HappeningNow, type OpenChatRequest } from "./activity/HappeningNow";
+export { RunSteps, StepPicture } from "./activity/RunSteps";
+export { RunStateBadge, dayKey, dayLabel, runTime } from "./activity/RunLabels";
+export { tookLabel } from "./activity/stepSentences";
+export { forgetStepPictures, useRunSteps } from "./activity/useRunSteps";
+export { useSpaceRuns } from "./activity/useSpaceRuns";
+export { AgentActivitySettings } from "./activity/AgentActivitySettings";
+
+// What ⌘K search reads and starts.
+export { askInNewChat, resumeInNewChat } from "./conversations/startChat";
+export { requestChatFind } from "./conversations/view/navigation/chatFind";
+export { messageSearchText } from "./conversations/view/navigation/timelineSearch";
+export {
+  searchEngineSessions,
+  type EngineSearchHit,
+} from "./conversations/view/engine/engineHistory";
+export { searchNotebooks, type SearchHit as NotebookSearchHit } from "./tutor/tutorSearch";
+export { directAppsApi, type DirectCatalogApp } from "./connected-apps/directApi";
+export {
+  openFolderFile,
+  searchFolderFiles,
+  type FolderFileHit,
+} from "./context-panel/files/folderFileSearch";

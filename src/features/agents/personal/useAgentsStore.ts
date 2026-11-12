@@ -5,8 +5,16 @@ export async function agentsDeviceSnapshot(): Promise<AgentDeviceSnapshot> {
   return invoke<AgentDeviceSnapshot>("agents_device_snapshot");
 }
 
+/** This computer's id for its agents, or null outside the desktop app. */
+export async function thisComputerDeviceId(): Promise<string | null> {
+  const { hasTauriInternals } = await import("@/shared/platform/tauri");
+  if (!hasTauriInternals()) return null;
+  const local = await agentsDeviceSnapshot().catch(() => null);
+  return local?.device && local.device.status !== "revoked" ? local.device.id : null;
+}
+
 /** Shares a folder with agents, read-only, chosen in the system picker. */
-/** The native question behind "Allow changes", for a chat, the new chat ("draft") or `workflow:<id>`. */
+/** The native question behind "Allow changes", for a chat or the new chat ("draft"). */
 export function allowFolderChanges(key: string, scopeId: string): Promise<boolean> {
   return invoke<boolean>("agents_allow_folder_changes", { key, scopeId });
 }
@@ -16,7 +24,7 @@ export function stopFolderChanges(key: string, scopeId?: string): Promise<void> 
   return invoke<void>("agents_stop_folder_changes", { key, scopeId: scopeId ?? null });
 }
 
-/** A new chat takes on its draft's answer, or a scheduled run its workflow's. */
+/** A new chat takes on its draft's answer. */
 export function adoptFolderChanges(from: string, chat: string): Promise<void> {
   return invoke<void>("agents_adopt_folder_changes", { from, chat });
 }

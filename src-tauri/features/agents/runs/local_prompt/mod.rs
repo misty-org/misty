@@ -10,6 +10,7 @@ mod catalog;
 mod catalog_schemas;
 mod collaboration;
 mod companion;
+pub use companion::companion_engine_note;
 mod go_text;
 mod history;
 mod request;
@@ -96,17 +97,16 @@ fn turn_limit(request: &RunRequest) -> i64 {
 }
 
 /// `tools` is the run's catalog (`run_catalog`). `now_rfc3339` is the time in the request's timezone,
-/// written as Go's `time.RFC3339` does: `Z` for UTC, no fractional seconds. `memory_context` and
-/// `method_guidance` are ready text, in the same place the server put them.
-pub(crate) fn build_prompt(request: &RunRequest, tools: &[String], now_rfc3339: &str, memory_context: &str, method_guidance: &str) -> BuiltPrompt {
+/// written as Go's `time.RFC3339` does: `Z` for UTC, no fractional seconds.
+pub(crate) fn build_prompt(request: &RunRequest, tools: &[String], now_rfc3339: &str) -> BuiltPrompt {
     let teach = request.teach();
-    let mut prompt = user_prompt(request, memory_context, DEFAULT_CONTEXT_WINDOW);
+    let mut prompt = user_prompt(request, DEFAULT_CONTEXT_WINDOW);
     let system = if teach {
         // A lesson turn runs the tutor's fast lane, with its own prompt.
         prompt = format!("{}{prompt}", teach_lesson_context(request));
         teach_system_prompt(request, now_rfc3339)
     } else {
-        format!("{}{}", invocation_system(request, tools, now_rfc3339, method_guidance), collaboration::collaboration_instructions(request))
+        format!("{}{}", invocation_system(request, tools, now_rfc3339), collaboration::collaboration_instructions(request))
     };
     BuiltPrompt {
         system,

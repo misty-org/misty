@@ -1,7 +1,6 @@
 //! Changes to the profiles themselves: creating, renaming, coloring and deleting them, and
 //! moving every window to the account that just signed in.
 use super::*;
-use std::collections::BTreeSet;
 
 /// Rebuilds every menu that lists profiles.
 pub fn refresh_menus<R: Runtime>(app: &AppHandle<R>) {
@@ -50,7 +49,6 @@ pub fn create_profile<R: Runtime>(
         save(&state);
         entry
     };
-    crate::sync::vault::profile_changed(&entry.id, Some(&entry));
     profiles_changed(app);
     open_profile_window(app, &entry.id)?;
     Ok(entry)
@@ -70,7 +68,6 @@ pub fn update_profile<R: Runtime>(
         save(&state);
         entry
     };
-    crate::sync::vault::profile_changed(key, Some(&entry));
     emit_to_profile(app, key, PROFILE_CHANGED_EVENT, &entry);
     for window in windows_for_profile(app, key) {
         let _ = window.set_title(&window_title(&entry));
@@ -108,17 +105,6 @@ pub fn set_color<R: Runtime>(
 /// Deletes a profile from this computer: its windows close now, and its website data is
 /// erased once the engine has let go of the store. The first profile always stays.
 pub fn delete_profile(app: &AppHandle, key: &str) -> Result<(), String> {
-    delete_profile_here(app, key, true)?;
-    crate::sync::vault::profile_changed(key, None);
-    Ok(())
-}
-
-/// A deletion made elsewhere arrives through here.
-pub(super) fn delete_profile_locally(app: &AppHandle, key: &str) -> Result<(), String> {
-    delete_profile_here(app, key, false)
-}
-
-fn delete_profile_here(app: &AppHandle, key: &str, everywhere: bool) -> Result<(), String> {
     if key == PERSONAL {
         return Err("The first profile can't be deleted.".into());
     }
@@ -141,15 +127,14 @@ fn delete_profile_here(app: &AppHandle, key: &str, everywhere: bool) -> Result<(
     profiles_changed(app);
     let (app, key) = (app.clone(), key.to_owned());
     tauri::async_runtime::spawn(async move {
-        if everywhere {
-            crate::browser::profiles::erase_profile(&key).await;
-        } else {
-            crate::browser::profiles::remove_profile(&key).await;
-        }
+        crate::browser::profiles::remove_profile(&key).await;
         let library_key =
             crate::browser::history_downloads::library::history::store_key(store.clone());
         if let Ok(library) = crate::browser::history_downloads::library::library(&app) {
-            let _ = crate::sync::vault::history::forget_profile(&library, &library_key);
+            let _ = crate::browser::history_downloads::library::history::forget_profile(
+                &library,
+                &library_key,
+            );
         }
         if let Some(store) = store {
             if let Err(error) =
@@ -208,41 +193,3 @@ pub fn set_window_space(label: &str, space: Option<String>) {
     }
 }
 
-/// The list of profiles arrived from the vault. Profiles this computer hasn't seen appear; a
-/// profile missing from it was deleted elsewhere, and goes here too. Nothing here overwrites a
-/// computer's store for a profile, which isn't in the list at all.
-pub fn apply_remote_profiles(app: &AppHandle, incoming: Vec<ProfileEntry>) {
-    let (changed, removed) = {
-        let Ok(mut state) = lock_registry() else {
-            return;
-        };
-        let incoming_ids: BTreeSet<String> = incoming.iter().map(|p| p.id.clone()).collect();
-        let profiles = state.current();
-        let removed: Vec<String> = profiles
-            .keys()
-            .filter(|id| id.as_str() != PERSONAL && !incoming_ids.contains(*id))
-            .cloned()
-            .collect();
-        let mut changed = Vec::new();
-        for entry in incoming.into_iter().filter(|entry| valid_key(&entry.id)) {
-            if profiles.get(&entry.id) != Some(&entry) {
-                profiles.insert(entry.id.clone(), entry.clone());
-                changed.push(entry);
-            }
-        }
-        save(&state);
-        (changed, removed)
-    };
-    for entry in &changed {
-        emit_to_profile(app, &entry.id, PROFILE_CHANGED_EVENT, entry);
-        for window in windows_for_profile(app, &entry.id) {
-            let _ = window.set_title(&window_title(entry));
-        }
-    }
-    for id in removed {
-        let _ = delete_profile_locally(app, &id);
-    }
-    if !changed.is_empty() {
-        profiles_changed(app);
-    }
-}

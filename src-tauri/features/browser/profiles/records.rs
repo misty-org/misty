@@ -27,22 +27,7 @@ impl ProfileRecords {
         .map_err(|_| "Local storage is unavailable.".to_owned())?
     }
 
-    /// Saves local edits: `None` deletes. Tells this profile's windows and native data.
-    /// Ids deleted here or elsewhere, and still remembered.
-    pub async fn deleted_ids(&self, collection: &str) -> Result<Vec<String>, String> {
-        let store = self.store.clone();
-        let (profile, collection) = (self.profile.clone(), collection.to_owned());
-        tokio::task::spawn_blocking(move || {
-            store
-                .lock()
-                .map_err(|_| "Local storage is unavailable.".to_owned())?
-                .deleted_ids(&profile, &collection)
-                .map_err(|_| "Local storage is unavailable.".to_owned())
-        })
-        .await
-        .map_err(|_| "Local storage is unavailable.".to_owned())?
-    }
-
+    /// Saves local edits: `None` deletes.
     pub async fn records_write(
         &self,
         collection: &str,
@@ -53,7 +38,7 @@ impl ProfileRecords {
             self.profile.clone(),
             collection.to_owned(),
         );
-        let changed = tokio::task::spawn_blocking(move || {
+        tokio::task::spawn_blocking(move || {
             store
                 .lock()
                 .map_err(|_| "Local storage is unavailable.".to_owned())?
@@ -62,37 +47,10 @@ impl ProfileRecords {
         })
         .await
         .map_err(|_| "Local storage is unavailable.".to_owned())??;
-        if changed > 0 {
-            announce(RecordsChanged {
-                profile: self.profile.clone(),
-                collection: collection.to_owned(),
-                remote: false,
-            });
-        }
         Ok(())
     }
 
-    /// An opaque record body, for data that isn't a [`ViewRecord`].
-    pub async fn raw_read(&self, collection: &str, id: &str) -> Result<Option<Vec<u8>>, String> {
-        let (store, profile, collection, id) = (
-            self.store.clone(),
-            self.profile.clone(),
-            collection.to_owned(),
-            id.to_owned(),
-        );
-        tokio::task::spawn_blocking(move || {
-            let body = store
-                .lock()
-                .map_err(|_| "Local storage is unavailable.".to_owned())?
-                .read_raw(&profile, &collection, &id)
-                .map_err(|_| "Local storage is unavailable.".to_owned())?;
-            Ok(body.map(|body| body.to_vec()))
-        })
-        .await
-        .map_err(|_| "Local storage is unavailable.".to_owned())?
-    }
-
-    /// Saves an opaque record body: `None` deletes. Tells this profile's windows and native data.
+    /// Saves an opaque record body: `None` deletes.
     pub async fn raw_write(
         &self,
         collection: &str,
@@ -105,7 +63,7 @@ impl ProfileRecords {
             collection.to_owned(),
             id.to_owned(),
         );
-        let changed = tokio::task::spawn_blocking(move || {
+        tokio::task::spawn_blocking(move || {
             store
                 .lock()
                 .map_err(|_| "Local storage is unavailable.".to_owned())?
@@ -114,13 +72,6 @@ impl ProfileRecords {
         })
         .await
         .map_err(|_| "Local storage is unavailable.".to_owned())??;
-        if changed {
-            announce(RecordsChanged {
-                profile: self.profile.clone(),
-                collection: collection.to_owned(),
-                remote: false,
-            });
-        }
         Ok(())
     }
 }

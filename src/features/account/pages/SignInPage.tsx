@@ -1,3 +1,4 @@
+import { routes } from "@/app/shell";
 import { Avatar, AvatarFallback, Button, IconButton, Pressable } from "@/shared/ui";
 import { Trash2, UserPlus } from "lucide-react";
 import { useState } from "react";
@@ -24,7 +25,7 @@ export default function SignIn() {
   const from =
     rawFrom && !rawFrom.startsWith("/signin") && !rawFrom.startsWith("/register")
       ? rawFrom
-      : "/browser";
+      : routes.agents;
   const addingAccount = Boolean(routeState?.addingAccount);
   const finishSignIn = useFinishSignIn(from, !user);
   const needsServer = useNeedsServer();

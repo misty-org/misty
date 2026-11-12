@@ -1,5 +1,9 @@
 import { useEffect } from "react";
-import { closeOrphanBrowserPages, scheduleStrayPageSweep } from "@/features/browser";
+import {
+  closeOrphanAgentPages,
+  closeOrphanBrowserPages,
+  scheduleStrayPageSweep,
+} from "@/features/browser";
 import { useWorkspaceStore } from "@/features/app-windows";
 import { allLayoutViews } from "@/features/app-windows";
 import { hasTauriInternals } from "@/shared/platform/tauri";
@@ -11,12 +15,14 @@ const orphanCloseDelayMs = 8_000;
  * Cleans up pages left from before this renderer loaded. Native pages outlive a reload so tabs
  * can take theirs back, but until a tab does, a page still sits where it was, over whatever
  * the window shows now. So every tab page is hidden at once, and once the tabs have settled,
- * pages that belong to none of the window's tabs are closed.
+ * pages that belong to none of the window's tabs are closed. Agents' pages from before the load
+ * belong to nothing here at all, so they close at once.
  */
 export function useStrayBrowserPages() {
   useEffect(() => {
     if (!hasTauriInternals()) return;
     scheduleStrayPageSweep();
+    void closeOrphanAgentPages();
     const timer = window.setTimeout(() => {
       void closeOrphanBrowserPages(() => {
         return allLayoutViews(useWorkspaceStore.getState().layout);

@@ -1,41 +1,36 @@
-//! Native-only browser synchronization. Secret types deliberately cannot be
-//! serialized or formatted; the web renderer only receives projected UI state.
+//! What the browser keeps on this computer: profile records, workspace recovery and the keys that
+//! seal them. Secret types deliberately cannot be serialized or formatted; the web renderer only
+//! receives projected UI state.
 pub mod collections;
 pub mod crypto;
 pub mod document;
 pub mod local;
-pub mod password;
 pub mod recovery;
 mod recovery_pending;
 pub mod secure_store;
 pub mod transport;
-pub mod vault;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
-    #[error("Invalid sync data")]
+    #[error("Invalid data")]
     Invalid,
-    #[error("Sync identity or signature did not match")]
+    #[error("Identity did not match")]
     Identity,
-    #[error("Could not unlock encrypted sync data")]
+    #[error("Could not unlock encrypted data")]
     Unlock,
-    #[error("Sync data exceeds the supported size")]
+    #[error("Data exceeds the supported size")]
     TooLarge,
-    #[error("Sync replay has a gap or conflicting receipt")]
+    #[error("A newer copy was saved first")]
     Sequence,
-    #[error("OS-protected sync key storage is unavailable")]
+    #[error("OS-protected key storage is unavailable")]
     SecureStorage,
-    #[error("Sync connection is unavailable")]
+    #[error("Connection is unavailable")]
     Network,
-    #[error("Sign in again to reconnect sync")]
-    Authentication,
-    #[error("This device does not have permission to sync this account")]
-    DeviceForbidden,
-    #[error("Sync requires a newer client or a vault recovery step")]
+    #[error("Local recovery files are unavailable")]
     Recovery,
-    #[error("Local sync storage is unavailable")]
+    #[error("Local storage is unavailable")]
     Storage(#[from] rusqlite::Error),
-    #[error("Sync data could not be encoded")]
+    #[error("Data could not be encoded")]
     Encoding(#[from] serde_json::Error),
 }
 

@@ -3,18 +3,17 @@ import type { DockingLayout } from "@/app/shell/dockingLayout";
 
 export const dockingMetrics = {
   titlebar: 38,
-  /** Top inset shared by the tab sidebar and its native window controls: the window edge. */
-  sideTabInset: 6,
+  /** Top inset shared by the sidebar and its native window controls: none, it meets the edge. */
+  sideTabInset: 0,
   sideTabs: 280,
-  /** Between two panels (the sidebar and the page, the Space bar and the page). */
-  gap: 4,
+  /** Between two panels (the sidebar and the page): nothing, a hairline divides them. */
+  gap: 0,
   tab: 28,
-  /** Between a panel and the window's edge, on every side: wide enough that a panel's rounded
-   * corner sits inside the window's own instead of being cut by it. */
-  edge: 6,
+  /** Between a panel and the window's edge: nothing, panels run to the edge of the window. */
+  edge: 0,
   /** The Space bar's own height, below the window edge. */
   spaceBar: 36,
-  paneRadius: 12,
+  paneRadius: 0,
 };
 export const dockingMotion = { duration: 300, easing: "ease-in-out" };
 type ShellStyle = CSSProperties & Record<`--${string}`, string | number>;
@@ -27,7 +26,7 @@ export function dockingGeometry({
   navigation,
   sideTabsWidth = dockingMetrics.sideTabs,
 }: DockingLayout & {
-  /** The tab sidebar's width, which the person can drag. */
+  /** The sidebar's width, which the person can drag. */
   sideTabsWidth?: number;
 }) {
   const { titlebar, gap, edge, paneRadius } = dockingMetrics;
@@ -43,8 +42,7 @@ export function dockingGeometry({
     "--shell-motion-duration": `${dockingMotion.duration}ms`,
     "--shell-motion-easing": dockingMotion.easing,
   };
-  // The page is always a pane: the gap toward the sidebar and the Space bar above it, the window
-  // edge's margin on its other sides, with the page's own rounded corners inside.
+  // The page runs to the window's edge on every side; these stay so a margin can come back.
   const seams = {
     top: gap,
     bottom: edge,

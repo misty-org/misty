@@ -1,4 +1,4 @@
-//! The remembered vault root, local records key and workspace recovery key, kept in Misty's credential
+//! The local records key and workspace recovery key, kept in Misty's credential
 //! store: encrypted rows in `misty.db` under the one master key the OS keychain holds
 //! (service `com.misty.auth`), on every platform. These blocking APIs belong on the
 //! native coordinator's blocking worker.
@@ -6,37 +6,36 @@ use sha2::{Digest, Sha256};
 use zeroize::Zeroizing;
 
 use crate::{
-    crypto::{VaultRoot, VaultScope},
+    crypto::{RecoveryKey, RecoveryScope},
     Error, Result,
 };
 
 const SERVICE: &str = "com.misty.browser-sync.root.v1";
 
-fn account(scope: &VaultScope) -> Result<String> {
+fn account(scope: &RecoveryScope) -> Result<String> {
     scope.validate()?;
     let digest = Sha256::digest(serde_json::to_vec(&(
         &scope.deployment,
         &scope.account_id,
-        &scope.vault_id,
+        &scope.id,
     ))?);
     Ok(digest.iter().map(|b| format!("{b:02x}")).collect())
 }
 
-/// A separate key on this computer for workspace recovery, whether or not the vault
-/// is open. Call under the recovery database's exclusive process lock. Never
+/// A separate key on this computer for workspace recovery. Call under the recovery database's exclusive process lock. Never
 /// replace a missing key when a database already contains recoverable records.
-pub fn workspace_recovery_root(scope: &VaultScope, create: bool) -> Result<VaultRoot> {
+pub fn workspace_recovery_root(scope: &RecoveryScope, create: bool) -> Result<RecoveryKey> {
     let name = format!("workspace-recovery:v1:{}", account(scope)?);
     if let Some(bytes) = platform::read(&name)? {
         if bytes.len() != 33 || bytes[0] != 1 {
             return Err(Error::SecureStorage);
         }
-        return VaultRoot::from_protected(&bytes[1..]);
+        return RecoveryKey::from_protected(&bytes[1..]);
     }
     if !create {
         return Err(Error::SecureStorage);
     }
-    let root = VaultRoot::generate();
+    let root = RecoveryKey::generate();
     let mut bytes = Zeroizing::new(Vec::with_capacity(33));
     bytes.push(1);
     bytes.extend_from_slice(root.protected_bytes());
@@ -44,7 +43,7 @@ pub fn workspace_recovery_root(scope: &VaultScope, create: bool) -> Result<Vault
     Ok(root)
 }
 
-pub fn forget_workspace_recovery_root(scope: &VaultScope) -> Result<()> {
+pub fn forget_workspace_recovery_root(scope: &RecoveryScope) -> Result<()> {
     platform::delete(&format!("workspace-recovery:v1:{}", account(scope)?))
 }
 
@@ -61,23 +60,6 @@ pub fn create_local_records_key(identity: &str) -> Result<crate::local::LocalKey
     let key = crate::local::LocalKey::generate();
     platform::write(&format!("local-records:v1:{identity}"), key.bytes())?;
     Ok(key)
-}
-
-/// Keeps the vault root in this computer's protected storage, so the vault password is only ever
-/// typed once per session. `identity` names the account.
-pub fn remember_vault_root(identity: &str, root: &VaultRoot) -> Result<()> {
-    platform::write(&format!("vault-root:v1:{identity}"), root.protected_bytes())
-}
-
-/// The remembered root. `Ok(None)` is confirmed missing; a failed read is an error, and retries.
-pub fn recall_vault_root(identity: &str) -> Result<Option<VaultRoot>> {
-    platform::read(&format!("vault-root:v1:{identity}"))?
-        .map(|bytes| VaultRoot::from_protected(&bytes))
-        .transpose()
-}
-
-pub fn forget_vault_root(identity: &str) -> Result<()> {
-    platform::delete(&format!("vault-root:v1:{identity}"))
 }
 
 mod platform {
@@ -133,10 +115,10 @@ mod tests {
 
     #[test]
     fn credential_names_are_scoped_without_containing_account_identifiers() {
-        let mut scope = VaultScope {
+        let mut scope = RecoveryScope {
             deployment: "https://sync.example.test".into(),
             account_id: "user@example.test".into(),
-            vault_id: "01951d32-40ac-7000-8000-000000000001".into(),
+            id: "01951d32-40ac-7000-8000-000000000001".into(),
         };
         let original = account(&scope).unwrap();
         assert_eq!(original.len(), 64);

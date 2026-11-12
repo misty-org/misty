@@ -9,12 +9,14 @@ import { repositoryPath, walkAppCrate } from "./repositoryPolicy";
  * longer exists, and fail silently.
  */
 const helper = /^src-tauri\/features\/browser\/app_windows(\.rs|\/)/;
+/** Other programs' names that happen to be "main" (a Git branch, Kimi's agent folder). */
+const knownNames = "src-tauri/features/known_names.rs";
 
 describe("Profile window labels contract", () => {
   it('names no window "main" outside the profile windows helper', () => {
     const failures = walkAppCrate("src-tauri/features", new Set([".rs"]))
       .map((path) => [repositoryPath(path), readFileSync(path, "utf8")] as const)
-      .filter(([path]) => !helper.test(path))
+      .filter(([path]) => !helper.test(path) && path !== knownNames)
       .flatMap(([path, text]) =>
         text
           .split("\n")

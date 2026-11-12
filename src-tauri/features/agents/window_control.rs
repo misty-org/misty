@@ -30,6 +30,8 @@ pub fn renew(task: &str) {
     crate::agents::desktop_control::macos::renew(task);
     #[cfg(windows)]
     crate::agents::desktop_control::windows::renew(task);
+    #[cfg(target_os = "linux")]
+    crate::agents::desktop_control::linux::control::renew(task);
 }
 mod commands;
 pub use commands::*;
@@ -55,6 +57,11 @@ pub fn stop(task: &str) {
             crate::agents::window_control::windows::release(app);
         }
     }
+    #[cfg(target_os = "linux")]
+    {
+        crate::agents::desktop_control::linux::control::stop(task);
+        crate::agents::window_control::linux::release();
+    }
 }
 fn authorize(app: &AppHandle, request: &BrowserAgentExecuteRequest) -> Result<Value, String> {
     let task = request.input["__mistyTaskId"].as_str().unwrap_or("");
@@ -78,7 +85,9 @@ fn authorize(app: &AppHandle, request: &BrowserAgentExecuteRequest) -> Result<Va
         return decode(focus_reason());
         #[cfg(windows)]
         return Err(crate::agents::window_control::windows::focus_reason());
-        #[cfg(not(any(target_os = "macos", windows)))]
+        #[cfg(target_os = "linux")]
+        return Err(crate::agents::window_control::linux::focus_reason());
+        #[cfg(not(any(target_os = "macos", windows, target_os = "linux")))]
         return Err("Bring Misty to the front, then resume the agent".into());
     }
     Ok(state.context.clone())
@@ -88,12 +97,12 @@ pub async fn execute(
     request: &BrowserAgentExecuteRequest,
 ) -> Result<Value, String> {
     let context = authorize(app, request)?;
-    #[cfg(not(any(target_os = "macos", windows)))]
+    #[cfg(not(any(target_os = "macos", windows, target_os = "linux")))]
     {
         let _ = context;
         return Err("Misty window control isn't available on this system".into());
     }
-    #[cfg(any(target_os = "macos", windows))]
+    #[cfg(any(target_os = "macos", windows, target_os = "linux"))]
     match request.operation.as_str() {
         "browser.workspace.visual" => {
             let desktop = context["desktopControl"] == true;
@@ -162,6 +171,12 @@ pub async fn execute(
                 let (desktop, input) = take_snapshot(&task, &document, action)?;
                 return crate::agents::window_control::windows::perform(&app, desktop, input).await;
             }
+            #[cfg(target_os = "linux")]
+            {
+                crate::browser::authorize_workspace_dispatch(&app, &scope, &agent, &grant, &task)?;
+                let (desktop, input) = take_snapshot(&task, &document, action)?;
+                return crate::agents::window_control::linux::perform(&app, desktop, input).await;
+            }
             #[cfg(target_os = "macos")]
             let (send, receive) = tokio::sync::oneshot::channel();
             #[cfg(target_os = "macos")]
@@ -193,7 +208,7 @@ pub async fn execute(
 
 /// Takes the inspected snapshot an action acts on: the one the agent saw, and
 /// recent. Whether it shows the desktop, and its geometry with the action.
-#[cfg(any(target_os = "macos", windows))]
+#[cfg(any(target_os = "macos", windows, target_os = "linux"))]
 fn take_snapshot(task: &str, document: &str, action: Value) -> Result<(bool, Value), String> {
     let mut state = session().lock().map_err(|_| "workspace_unavailable")?;
     if state.task != task {
@@ -214,7 +229,7 @@ fn take_snapshot(task: &str, document: &str, action: Value) -> Result<(bool, Val
 }
 
 /// One capture of the display under control, or of the Misty window.
-#[cfg(any(target_os = "macos", windows))]
+#[cfg(any(target_os = "macos", windows, target_os = "linux"))]
 async fn native_capture(app: &AppHandle, desktop: bool, task: String) -> Result<Value, String> {
     #[cfg(target_os = "macos")]
     {
@@ -231,6 +246,8 @@ async fn native_capture(app: &AppHandle, desktop: bool, task: String) -> Result<
     }
     #[cfg(windows)]
     return crate::agents::window_control::windows::native_capture(app, desktop, task).await;
+    #[cfg(target_os = "linux")]
+    return crate::agents::window_control::linux::native_capture(app, desktop, task).await;
 }
 fn validate_action(action: &Value) -> Result<(), String> {
     let coordinate = |key: &str| {
@@ -280,5 +297,7 @@ fn validate_action(action: &Value) -> Result<(), String> {
 pub(crate) mod macos;
 #[cfg(test)]
 mod tests;
+#[cfg(target_os = "linux")]
+pub mod linux;
 #[cfg(windows)]
 pub mod windows;

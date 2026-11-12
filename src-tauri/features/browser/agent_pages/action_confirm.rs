@@ -91,8 +91,8 @@ fn origin_of(url: &url::Url) -> String {
     }
 }
 
-/// How long a step waits for an answer. A scheduled run with nobody at the
-/// computer stops here and says so.
+/// How long a step waits for an answer. A run with nobody at the computer
+/// stops here and says so.
 const WAIT: Duration = Duration::from_secs(180);
 
 pub(crate) enum Answer {
@@ -263,7 +263,7 @@ pub(crate) async fn ask_to_adopt(app: &AppHandle, window: &str, account: &str) -
         Question {
             id: &id,
             kind: "action",
-            control: "Move the chats and workflows kept signed out on this computer to this account. Schedules arrive turned off.",
+            control: "Move the chats kept signed out on this computer to this account.",
             reason: "",
             site: "",
             origin: "",

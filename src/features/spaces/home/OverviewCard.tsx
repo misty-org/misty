@@ -1,8 +1,9 @@
 import type { ReactNode } from "react";
 import { Pressable, Skeleton } from "@/shared/ui";
+import { HomeSection } from "./HomeSection";
 import "./spaceOverview.css";
 
-/** One card of the Space overview: a heading, an optional action beside it, then its rows. */
+/** One block of the Space overview: the shared heading, then its rows on a panel. */
 export function OverviewCard(props: {
   title: string;
   /** How many things the card holds, shown quietly after the heading. */
@@ -12,18 +13,23 @@ export function OverviewCard(props: {
   children: ReactNode;
 }) {
   return (
-    <section className="overview-card" aria-label={props.title} data-tone={props.tone}>
-      <header className="overview-card-head">
-        <h2 className="overview-card-title">
-          {props.tone === "attention" && <span className="overview-dot" data-status="needs-you" />}
-          {props.title}
-          {props.count ? <span className="overview-card-count">{props.count}</span> : null}
-        </h2>
-        {props.action}
-      </header>
-      {props.children}
-    </section>
+    <HomeSection
+      title={props.title}
+      count={props.count}
+      attention={props.tone === "attention"}
+      action={props.action}
+      className="overview-card"
+    >
+      <div className="overview-panel" data-tone={props.tone}>
+        {props.children}
+      </div>
+    </HomeSection>
   );
+}
+
+/** What an empty panel says, on one quiet line. */
+export function OverviewEmpty({ children }: { children: ReactNode }) {
+  return <p className="overview-card-empty">{children}</p>;
 }
 
 /** A row that opens something: a mark, a title over one quiet line, and what belongs at the end. */
@@ -50,7 +56,7 @@ export function OverviewRow(props: {
   );
 }
 
-/** A chat's or run's state as a dot and a word; nothing for one that finished. */
+/** A chat's or run's state as a colored dot, its word only for screen readers and the tooltip. */
 export function OverviewStatus({ status }: { status: string | undefined }) {
   const word =
     status === "working"
@@ -62,9 +68,14 @@ export function OverviewStatus({ status }: { status: string | undefined }) {
           : "";
   if (!word) return null;
   return (
-    <span className="overview-status" data-status={status}>
+    <span
+      className="overview-status"
+      data-status={status}
+      role="img"
+      aria-label={word}
+      title={word}
+    >
       <span className="overview-dot" data-status={status} />
-      {word}
     </span>
   );
 }

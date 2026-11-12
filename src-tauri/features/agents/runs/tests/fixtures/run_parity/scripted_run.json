@@ -339,7 +339,7 @@
        }
       }
      },
-     "description": "Add a group of tools when the task needs it: misty: the person's own Misty notes, drawings, files, chats, Spaces, memory and saved workflows."
+     "description": "Add a group of tools when the task needs it: misty: the person's own Misty notes, drawings, files, chats and Spaces."
     },
     {
      "type": "function",
@@ -749,7 +749,7 @@
        }
       }
      },
-     "description": "Add a group of tools when the task needs it: misty: the person's own Misty notes, drawings, files, chats, Spaces, memory and saved workflows."
+     "description": "Add a group of tools when the task needs it: misty: the person's own Misty notes, drawings, files, chats and Spaces."
     },
     {
      "type": "function",
@@ -1232,7 +1232,7 @@
        }
       }
      },
-     "description": "Add a group of tools when the task needs it: misty: the person's own Misty notes, drawings, files, chats, Spaces, memory and saved workflows."
+     "description": "Add a group of tools when the task needs it: misty: the person's own Misty notes, drawings, files, chats and Spaces."
     },
     {
      "type": "function",
@@ -1761,7 +1761,7 @@
        }
       }
      },
-     "description": "Add a group of tools when the task needs it: misty: the person's own Misty notes, drawings, files, chats, Spaces, memory and saved workflows."
+     "description": "Add a group of tools when the task needs it: misty: the person's own Misty notes, drawings, files, chats and Spaces."
     },
     {
      "type": "function",
@@ -2319,7 +2319,7 @@
        }
       }
      },
-     "description": "Add a group of tools when the task needs it: misty: the person's own Misty notes, drawings, files, chats, Spaces, memory and saved workflows."
+     "description": "Add a group of tools when the task needs it: misty: the person's own Misty notes, drawings, files, chats and Spaces."
     },
     {
      "type": "function",
@@ -2905,7 +2905,7 @@
        }
       }
      },
-     "description": "Add a group of tools when the task needs it: misty: the person's own Misty notes, drawings, files, chats, Spaces, memory and saved workflows."
+     "description": "Add a group of tools when the task needs it: misty: the person's own Misty notes, drawings, files, chats and Spaces."
     },
     {
      "type": "function",

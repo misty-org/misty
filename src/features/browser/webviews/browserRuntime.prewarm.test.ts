@@ -12,8 +12,8 @@ vi.mock("@tauri-apps/api/core", () => ({ invoke }));
 
 const browserTab = (instanceKey: string): WorkspaceView => ({
   id: `tab:${instanceKey}`,
-  surfaceId: "browser",
-  groupKey: "tool:browser",
+  surfaceId: "agents",
+  groupKey: "tool:agents",
   instanceKey,
   title: "Browser",
   route: "/browser",

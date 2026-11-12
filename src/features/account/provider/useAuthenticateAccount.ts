@@ -1,3 +1,4 @@
+import { routes } from "@/app/shell";
 import { flushWorkspaceRecovery } from "@/features/app-windows";
 import { useNativeSessionStore } from "../native-session";
 import {
@@ -77,7 +78,7 @@ export function useAuthenticateAccount(
         setUserState(nextUser);
         setAccounts(listSavedAccountSessions());
         if (window.location.pathname.startsWith("/spaces/")) {
-          navigate("/browser", {
+          navigate(routes.agents, {
             replace: true,
           });
         }

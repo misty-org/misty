@@ -1,6 +1,5 @@
 import { changeConversationState, publicQuestionSet } from "../tools/run-state/conversationState";
 import { endOpenQuestionSets } from "../tools/run-state/questions";
-import { noteRunOwner, type RunContextOfChat } from "../tools/runContexts";
 import { useCollaborationStore } from "./store";
 import type { ConversationMode, PermissionMode } from "./planTypes";
 
@@ -14,15 +13,11 @@ export async function admitLocalTurn(
   turn: {
     mode?: ConversationMode;
     permissionMode?: PermissionMode;
-    /** Nobody typed this one, so it answers nothing. */
-    scheduled: boolean;
   },
 ): Promise<void> {
   if (conversationId.startsWith("local-")) return;
   const ended = await changeConversationState(account, conversationId, (state) => {
-    const { state: closed, ended } = turn.scheduled
-      ? { state, ended: [] }
-      : endOpenQuestionSets(state, "superseded");
+    const { state: closed, ended } = endOpenQuestionSets(state, "superseded");
     return {
       next: {
         ...closed,
@@ -61,9 +56,4 @@ export async function loadLocalModes(account: string, conversationId: string): P
   const store = useCollaborationStore.getState();
   store.setAccount(account);
   await store.load(conversationId);
-}
-
-/** Tells this computer's tools which chat a run belongs to. Never stops the turn: a tool would refuse. */
-export async function noteLocalRun(runId: string, context: RunContextOfChat): Promise<void> {
-  await noteRunOwner(runId, context).catch(() => undefined);
 }

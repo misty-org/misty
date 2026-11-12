@@ -6,37 +6,39 @@ import {
   type ComponentProps,
   type ReactNode,
 } from "react";
-import { Columns3, LayoutGrid, List, Search } from "lucide-react";
+import { Columns3, LayoutGrid, List } from "lucide-react";
 import { usePointerReorder, reorderIds } from "@/shared/hooks/usePointerReorder";
 import { Button } from "../../controls/Button";
-import { InputGroup } from "../../controls/InputGroup";
-import { Input } from "../../controls/Input";
+import { SearchField } from "../../controls/SearchField";
 import { NavIsland, NavIslandItem } from "../../navigation/NavIsland";
 import { Toolbar, ToolbarGroup } from "../../layout/Toolbar";
 import { Separator } from "../../layout/Separator";
 import { cn } from "../../classNames";
 import { CollectionColumnChooser, CollectionColumnsContext } from "./CollectionColumns";
 
-export function CollectionHeading({ title, actions }: { title: string; actions?: ReactNode }) {
+/**
+ * A collection page's top band: as tall as the sidebar's head and every other page's bar, closed
+ * by the same hairline, and it stays put while the page scrolls under it.
+ */
+export function CollectionHeading({ title, actions }: { title: ReactNode; actions?: ReactNode }) {
   return (
-    <header className="flex min-h-9 shrink-0 flex-wrap items-start justify-between gap-4">
-      <h1 className="flex min-h-9 items-center text-xl font-medium text-cream-bright">{title}</h1>
-      <div className="flex min-w-0 flex-wrap items-center gap-3">{actions}</div>
+    <header
+      className={cn(
+        "sticky top-0 z-10 -mx-4 flex min-h-12 shrink-0 flex-wrap items-center gap-3",
+        "justify-between border-b border-charcoal-border bg-inherit px-4 sm:-mx-6 sm:px-6",
+      )}
+    >
+      <h1 className="flex min-w-0 items-center truncate text-sm font-semibold text-cream-bright">
+        {title}
+      </h1>
+      <div className="flex min-w-0 flex-wrap items-center gap-2">{actions}</div>
     </header>
   );
 }
 
-export const CollectionSearch = forwardRef<HTMLInputElement, ComponentProps<typeof Input>>(
-  ({ className, ...props }, ref) => (
-    <InputGroup
-      className={cn(
-        "w-auto min-w-0 flex-row items-center h-9 gap-2 rounded-md px-4 text-cream-muted",
-        "shadow-none transition-none focus-within:ring-2 focus-within:ring-cream-muted",
-      )}
-    >
-      <Search size={16} aria-hidden="true" />
-      <Input ref={ref} variant="bare" className={cn("w-44 text-sm", className)} {...props} />
-    </InputGroup>
+export const CollectionSearch = forwardRef<HTMLInputElement, ComponentProps<typeof SearchField>>(
+  ({ containerClassName, ...props }, ref) => (
+    <SearchField ref={ref} containerClassName={cn("w-56", containerClassName)} {...props} />
   ),
 );
 CollectionSearch.displayName = "CollectionSearch";

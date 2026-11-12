@@ -2,12 +2,9 @@ import { describe, expect, it } from "vitest";
 import { createElement, createRef } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
-import {
-  buildChatDisplayRows,
-  formatChatMessageTime,
-  mergeSpaceMessages,
-  messageReplyPreviewText,
-} from "@/features/spaces/chat";
+import { buildChatDisplayRows, formatChatMessageTime } from "./ChatDisplay";
+import { messageReplyPreviewText } from "./messageText";
+import { mergeSpaceMessages } from "../useSpaceMessageSpansStore";
 import { SpaceChatMessages } from "@/features/spaces/chat/components/ChatMessages";
 import type { SpaceMessage } from "@/features/spaces/api/dto/entities";
 

@@ -65,12 +65,6 @@ pub struct BrowserWebviewBoundsRequest {
     pub beneath: bool,
 }
 
-#[derive(Deserialize)]
-pub struct BrowserZoomRequest {
-    pub(super) id: String,
-    pub(super) factor: f64,
-}
-
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BrowserWebviewIdRequest {
@@ -95,12 +89,6 @@ pub struct BrowserNavigateRequest {
     pub url: String,
     #[serde(default)]
     pub oauth_callback: Option<crate::browser::provider_accounts::OAuthCallback>,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct BrowserThemeRequest {
-    pub theme: String,
 }
 
 #[derive(Debug, Serialize, Clone)]

@@ -4,26 +4,6 @@ use super::*;
 pub fn validate(kind: Kind, fields: &Fields) -> Result<()> {
     let value = serde_json::to_value(fields)?;
     match kind {
-        Kind::Folder => {
-            let v: Folder = serde_json::from_value(value)?;
-            text(&v.label, 160, false)?;
-            group_icon(&v.icon)?;
-            order(v.order)?;
-            if v.parent_id.as_deref().is_some_and(|id| !valid_id(id)) {
-                return Err(Error::Invalid);
-            }
-            added_at(v.added_at)?;
-        }
-        Kind::Bookmark => {
-            let v: Bookmark = serde_json::from_value(value)?;
-            if !valid_id(&v.folder_id) {
-                return Err(Error::Invalid);
-            }
-            text(&v.title, 512, false)?;
-            web_url(&v.url)?;
-            order(v.order)?;
-            added_at(v.added_at)?;
-        }
         Kind::Window => {
             let v: Window = serde_json::from_value(value)?;
             text(&v.title, 160, true)?;
@@ -63,22 +43,6 @@ pub fn validate(kind: Kind, fields: &Fields) -> Result<()> {
             }
             order(v.order)?;
         }
-        Kind::Login => {
-            let v: Login = serde_json::from_value(value)?;
-            login_origin(&v.origin)?;
-            if v.username.len() > 512
-                || v.password.is_empty()
-                || v.password.len() > 4096
-                || v.username.contains('\0')
-                || v.password.contains('\0')
-            {
-                return Err(Error::Invalid);
-            }
-            added_at(Some(v.created_at))?;
-            added_at(Some(v.updated_at))?;
-        }
-        Kind::Address => autofill::validate_address(&serde_json::from_value(value)?)?,
-        Kind::Card => autofill::validate_card(&serde_json::from_value(value)?)?,
         Kind::SpaceSites => {
             let v: SpaceSites = serde_json::from_value(value)?;
             let unique: BTreeSet<&str> = v.hosts.iter().map(String::as_str).collect();
@@ -126,7 +90,7 @@ pub fn validate(kind: Kind, fields: &Fields) -> Result<()> {
         }
         // Their shape is the client's own business: a record that can't be read is ignored by what
         // reads it, and nothing here can hold up the others.
-        Kind::Profile | Kind::OpenTab | Kind::SiteCookies | Kind::SiteStorage => {}
+        Kind::OpenTab => {}
         Kind::Download => {
             let v: Download = serde_json::from_value(value)?;
             web_url(&v.url)?;
@@ -135,58 +99,6 @@ pub fn validate(kind: Kind, fields: &Fields) -> Result<()> {
                 return Err(Error::Invalid);
             }
             added_at(Some(v.finished_at))?;
-        }
-        Kind::ExtensionRemoval => {
-            #[derive(Deserialize)]
-            #[serde(deny_unknown_fields)]
-            struct Removed {
-                extension: String,
-                generation: String,
-            }
-            let v: Removed = serde_json::from_value(value)?;
-            if v.extension.is_empty()
-                || v.extension.len() > 256
-                || uuid::Uuid::parse_str(&v.generation).is_err()
-            {
-                return Err(Error::Invalid);
-            }
-        }
-        Kind::ExtensionSyncKey => {
-            #[derive(Deserialize)]
-            #[serde(deny_unknown_fields)]
-            struct ExtensionValue {
-                extension: String,
-                generation: String,
-                key: String,
-                change: Value,
-            }
-            let v: ExtensionValue = serde_json::from_value(value)?;
-            if v.extension.is_empty()
-                || v.extension.len() > 256
-                || !valid_id(&v.generation)
-                || v.key.len() > 8192
-                || serde_json::to_vec(&v.change)?.len() + v.key.len() > 8192
-                || !v.change.as_object().is_some_and(|change| {
-                    change.len() == 1
-                        && (change.get("deleted") == Some(&Value::Bool(true))
-                            || change.contains_key("value"))
-                })
-            {
-                return Err(Error::Invalid);
-            }
-        }
-        Kind::HistoryBatch => {
-            let v: HistoryBatch = serde_json::from_value(value)?;
-            if !valid_id(&v.origin) || v.hour < 0 || v.part > 64 || v.visits.len() > 2000 {
-                return Err(Error::Invalid);
-            }
-            for visit in &v.visits {
-                web_url(&visit.url)?;
-                text(&visit.title, 512, true)?;
-                if visit.visited_at / 3_600_000 != v.hour {
-                    return Err(Error::Invalid);
-                }
-            }
         }
         Kind::View => {
             let v: View = serde_json::from_value(value)?;

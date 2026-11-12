@@ -7,6 +7,8 @@ fn platform_selection_defaults_to_host() {
         assert_eq!(selected.unwrap(), [MACOS_PLATFORM]);
     } else if cfg!(windows) {
         assert_eq!(selected.unwrap(), [WINDOWS_PLATFORM, WINDOWS_ARM_PLATFORM]);
+    } else if cfg!(all(target_os = "linux", target_arch = "x86_64")) {
+        assert_eq!(selected.unwrap(), [LINUX_PLATFORM]);
     } else {
         assert!(selected.is_err());
     }
@@ -25,6 +27,10 @@ fn platform_selection_accepts_explicit_platforms_without_duplicates() {
     assert_eq!(
         selected_platforms(&[ReleaseOs::Windows, ReleaseOs::Macos, ReleaseOs::Windows]).unwrap(),
         [MACOS_PLATFORM, WINDOWS_PLATFORM, WINDOWS_ARM_PLATFORM]
+    );
+    assert_eq!(
+        selected_platforms(&[ReleaseOs::Linux, ReleaseOs::Macos]).unwrap(),
+        [MACOS_PLATFORM, LINUX_PLATFORM]
     );
 }
 

@@ -3,11 +3,14 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   switchTo: vi.fn().mockResolvedValue(true),
-  switchToMistyPro: vi.fn().mockResolvedValue(undefined),
+  switchToMistyCloud: vi.fn().mockResolvedValue(undefined),
 }));
 vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl: vi.fn() }));
 vi.mock("./useServerSwitch", () => ({
-  useServerSwitch: () => ({ switchTo: mocks.switchTo, switchToMistyPro: mocks.switchToMistyPro }),
+  useServerSwitch: () => ({
+    switchTo: mocks.switchTo,
+    switchToMistyCloud: mocks.switchToMistyCloud,
+  }),
 }));
 
 import { useServerChoice, type ServerChoice } from "@/api/deployment/serverChoice";

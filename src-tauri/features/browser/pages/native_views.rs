@@ -3,7 +3,6 @@
 use crate::browser::*;
 
 mod placement;
-pub(crate) use placement::stack_subtitles_panel;
 pub(in crate::browser) use placement::*;
 
 #[cfg(target_os = "macos")]
@@ -154,29 +153,7 @@ pub(in crate::browser) unsafe fn browser_stacking_is_correct(
 
 #[cfg(target_os = "macos")]
 pub(in crate::browser) fn present_macos_webview(webview: &Webview) -> Result<(), String> {
-    position_macos_webview(webview, true)?;
-    // A new page lands on top of its siblings, the subtitles panel included.
-    stack_subtitles_panel(webview.app_handle(), webview.window().label());
-    Ok(())
-}
-
-/// Returns keyboard focus to a page that lost it to the app view, so typing continues where
-/// it stopped. The page keeps its own caret while it is unfocused.
-#[tauri::command]
-pub fn browser_webview_restore_focus(
-    app: AppHandle,
-    request: BrowserWebviewIdRequest,
-) -> Result<(), String> {
-    let Some(webview) = app.get_webview(&webview_label(&request.id)?) else {
-        return Ok(());
-    };
-    #[cfg(windows)]
-    return crate::browser::app_windows::windows::focus::restore_page(&webview);
-    #[cfg(not(windows))]
-    {
-        let _ = webview;
-        Ok(())
-    }
+    position_macos_webview(webview, true)
 }
 
 /// Whether the page exists but is still parked for its first paint. The

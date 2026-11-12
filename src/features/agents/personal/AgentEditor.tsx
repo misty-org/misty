@@ -1,14 +1,12 @@
-import { personalAgentsApi, type AgentMemory } from "./personalAgentsApi";
+import { personalAgentsApi } from "./personalAgentsApi";
 import { AgentPermissionsField } from "./AgentPermissionsField";
 import { AgentEngineField } from "../engines/AgentEngineField";
-import { AgentSpaceField } from "./AgentSpaceField";
-import { openMisty } from "../conversations/ask/handoff";
 import type { AgentProfile, AgentProfileInput } from "@/shared/schemas";
 import { Button, ErrorNotification, Field, Input, Textarea } from "@/shared/ui";
 import { Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { AgentAvatarPicker } from "./AgentAvatarPicker";
-import { AgentMemoryList } from "./AgentMemoryList";
+import { AgentBotFields, ExportBotButton } from "../bots/AgentBotFields";
 
 const emptyProfile: AgentProfileInput = {
   name: "",
@@ -26,34 +24,21 @@ const emptyProfile: AgentProfileInput = {
 
 export function AgentEditor({
   profile,
-  spaceId,
   onSaved,
   onRemoved,
   onStatusChange,
-  onTalk,
 }: {
   profile?: AgentProfile;
-  spaceId: string;
   onSaved(id: string): Promise<void>;
   onRemoved(): Promise<void>;
   onStatusChange(status: { dirty: boolean; busy: boolean }): void;
-  onTalk?: () => void;
 }) {
   const [draft, setDraft] = useState<AgentProfileInput>(profile ?? emptyProfile);
   const [baselineDraft, setBaselineDraft] = useState(draft);
-  const profileId = profile?.id;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [memories, setMemories] = useState<AgentMemory[]>([]);
-  const [editingMemory, setEditingMemory] = useState<string>();
-  const [memoryDraft, setMemoryDraft] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const dirty =
-    JSON.stringify(draft) !== JSON.stringify(baselineDraft) ||
-    Boolean(
-      editingMemory &&
-      memoryDraft !== memories.find((memory) => memory.id === editingMemory)?.content,
-    );
+  const dirty = JSON.stringify(draft) !== JSON.stringify(baselineDraft);
   useEffect(() => {
     onStatusChange({
       dirty,
@@ -65,21 +50,6 @@ export function AgentEditor({
         busy: false,
       });
   }, [dirty, busy, onStatusChange]);
-  useEffect(() => {
-    let canceled = false;
-    if (!profileId) return;
-    void personalAgentsApi
-      .memories(profileId, spaceId)
-      .then((result) => {
-        if (!canceled) setMemories(result.memories);
-      })
-      .catch((reason) => {
-        if (!canceled) setError(String(reason));
-      });
-    return () => {
-      canceled = true;
-    };
-  }, [profileId, spaceId]);
   const update = <K extends keyof AgentProfileInput>(key: K, value: AgentProfileInput[K]) =>
     setDraft({
       ...draft,
@@ -103,6 +73,13 @@ export function AgentEditor({
         default_run_mode,
         engine,
         engine_model,
+        soul,
+        tools,
+        mcp_servers,
+        skills,
+        runtime_cwd,
+        runtime_args,
+        origin,
       } = draft;
       const saved = await personalAgentsApi.save(
         {
@@ -119,6 +96,13 @@ export function AgentEditor({
           default_run_mode,
           engine,
           engine_model,
+          soul,
+          tools,
+          mcp_servers,
+          skills,
+          runtime_cwd,
+          runtime_args,
+          origin,
           version: profile?.version,
         },
         profile?.id,
@@ -129,21 +113,6 @@ export function AgentEditor({
       setError(String(reason));
     } finally {
       setBusy(false);
-    }
-  }
-  async function talk() {
-    if (!profile) return;
-    if (onTalk) {
-      onTalk();
-      return;
-    }
-    try {
-      await openMisty({
-        spaceId,
-        agentId: profile.id,
-      });
-    } catch (reason) {
-      setError(String(reason));
     }
   }
   return (
@@ -170,6 +139,15 @@ export function AgentEditor({
           onChange={(e) => update("name", e.target.value)}
         />
       </Field>
+      {/* What it does, in a few words: the studio and the @ menu tell agents apart by it. */}
+      <Field label="Role">
+        <Input
+          maxLength={160}
+          placeholder="Reviews pull requests"
+          value={draft.role}
+          onChange={(e) => update("role", e.target.value)}
+        />
+      </Field>
       <Field label="Description">
         <Textarea
           className="min-h-20 resize-y"
@@ -191,16 +169,8 @@ export function AgentEditor({
         onChange={(mode) => update("default_run_mode", mode)}
       />
       <details className="agent-advanced-settings">
-        <summary>Instructions and memory</summary>
+        <summary>Soul and instructions</summary>
         <div>
-          <Field label="Label (optional)">
-            <Input
-              maxLength={160}
-              placeholder="Manage launch communications"
-              value={draft.role}
-              onChange={(e) => update("role", e.target.value)}
-            />
-          </Field>
           <Field label="Instructions">
             <Textarea
               className="min-h-32 resize-y"
@@ -210,21 +180,7 @@ export function AgentEditor({
               onChange={(e) => update("instructions", e.target.value)}
             />
           </Field>
-          {profile ? <AgentSpaceField agentId={profile.id} /> : null}
-          {profile ? (
-            <AgentMemoryList
-              agentId={profile.id}
-              spaceId={spaceId}
-              memories={memories}
-              setMemories={setMemories}
-              editing={editingMemory}
-              setEditing={setEditingMemory}
-              draft={memoryDraft}
-              setDraft={setMemoryDraft}
-              onError={setError}
-              onTalk={() => void talk()}
-            />
-          ) : null}
+          <AgentBotFields draft={draft} onChange={update} />
         </div>
       </details>
       <ErrorNotification message={error} onDismiss={() => setError("")} />
@@ -234,6 +190,7 @@ export function AgentEditor({
             {busy ? "Saving…" : profile ? "Save changes" : "Create agent"}
           </Button>
         )}
+        {profile && !dirty ? <ExportBotButton agent={profile} /> : null}
         {profile && !profile.system_managed && (
           <Button
             variant="outline"

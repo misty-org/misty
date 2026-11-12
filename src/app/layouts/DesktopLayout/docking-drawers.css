@@ -15,8 +15,8 @@
   /* The width the person chose, whatever the window's. A sidebar that followed the window would
      pull away from the native page during a live resize, since AppKit holds the page's left edge
      until the window settles, and the gap would show the host behind it. Only a sidebar too wide
-     to leave the page 240px gives way. */
-  --sidebar-w: max(272px, min(var(--shell-side-tabs, 280px), calc(100vw - 240px)));
+     to leave the page 240px gives way. It goes as narrow as the person drags it (sidebarWidth.ts). */
+  --sidebar-w: max(160px, min(var(--shell-side-tabs, 280px), calc(100vw - 240px)));
   position: relative;
   flex: none;
   width: var(--sidebar-w);
@@ -84,9 +84,8 @@
    through the gaps around them. It floats as one piece: the same inset on every side, and its
    corners are the cards' 12px plus that inset, so every corner shares one center. */
 .misty-sidebar-drawer[data-collapsed][data-revealed] .misty-sidebar-drawer-panel {
-  padding: var(--pane-frame, 6px);
+  overflow: hidden;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
-  border-radius: calc(12px + var(--pane-frame, 6px));
 }
 
 /* Flat sidebar: the color the sticky New Tab row and the top fade blend into. */
@@ -134,8 +133,8 @@
   box-sizing: border-box;
   /* The card's 1px border and this row together center on the Space bar's line, 24px down, so the
      two read as one row. */
-  height: 34px;
-  min-height: 34px;
+  height: var(--ui-header);
+  min-height: var(--ui-header);
   margin: 0;
   /* The window buttons sit on this panel, centered on it (the shell lowers them 5pt); the row
      starts where they end. */
@@ -169,14 +168,15 @@
 }
 .misty-sidebar-card {
   --misty-tab-well: var(--workspace-tab-surface);
+  /* Its rows follow the card's own width, so a narrow sidebar sheds what doesn't fit. */
+  container: misty-sidebar / inline-size;
   display: flex;
   flex: 1 1 0;
   min-height: 0;
   flex-direction: column;
-  padding: 0 10px 10px;
-  border: 1px solid var(--color-charcoal-border);
-  border-radius: 12px;
-  background: var(--workspace-tab-surface);
+  padding: 0 8px 8px;
+  border-right: 1px solid var(--color-charcoal-border);
+  background: var(--misty-theme-sidebar);
 }
 /* The account row closes the sidebar's one panel, under a faint line. */
 .misty-sidebar-account {
@@ -191,4 +191,17 @@
   min-height: 32px;
   padding: 4px 2px 0 0;
   border-top: 1px solid color-mix(in srgb, var(--misty-theme-text) 10%, transparent);
+}
+.misty-sidebar-drawer[data-side="right"] .misty-sidebar-card {
+  border-right: 0;
+  border-left: 1px solid var(--color-charcoal-border);
+}
+
+/* A narrow sidebar keeps the window buttons and its two toggles; back and forward step aside (the
+   keyboard and mouse buttons still go back), and the shortcut hints drop. */
+@container misty-sidebar (max-width: 230px) {
+  .misty-sidebar-card .misty-sidebar-head .misty-sidebar-nav,
+  .misty-sidebar-card .misty-space-nav-key {
+    display: none;
+  }
 }

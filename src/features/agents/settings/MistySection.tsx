@@ -1,7 +1,7 @@
 import { useAuth } from "@/features/account";
 import { SystemErrorNotice } from "@/shared/platform/systemErrors";
 import { aiSurfaceApi } from "../runs/invocations/api";
-import { type AiMemoryRecord, type AiUserSettings } from "../runs/invocations/aiSettingsTypes";
+import { type AiUserSettings } from "../runs/invocations/aiSettingsTypes";
 import { useAiSurfaceStore } from "../runs/invocations/store";
 import { confirmAction } from "@/shared/lib/confirmAction";
 import { useEffect, useState } from "react";
@@ -11,13 +11,10 @@ import {
 } from "@/features/settings";
 import { SwitchControl } from "../../settings/SettingsControls";
 import type { SettingsContentProps } from "../../settings/settingsTypes";
-import { MistyRememberedSection } from "./MistyRememberedSection";
 
-export function MistySection(_props: SettingsContentProps & { page?: "misty" | "memory" }) {
-  const memoryPage = _props.page === "memory";
+export function MistySection(_props: SettingsContentProps) {
   const { user } = useAuth();
   const [settings, setSettings] = useState<AiUserSettings | null>(null);
-  const [memories, setMemories] = useState<AiMemoryRecord[]>([]);
   const [working, setWorking] = useState(false);
   const [error, setError] = useState("");
 
@@ -30,10 +27,6 @@ export function MistySection(_props: SettingsContentProps & { page?: "misty" | "
         setSettings(result.settings);
       })
       .catch(() => active && setError("Misty settings could not load."));
-    void aiSurfaceApi
-      .memories()
-      .then((result) => active && setMemories(result.memories))
-      .catch(() => undefined);
     return () => {
       active = false;
     };
@@ -42,7 +35,6 @@ export function MistySection(_props: SettingsContentProps & { page?: "misty" | "
   const updateSettings = async (
     enabled: boolean,
     retentionDays = settings?.retention_days ?? 30,
-    memoryEnabled = settings?.memory_enabled ?? true,
   ) => {
     if (!settings || working) return;
     if (
@@ -58,7 +50,7 @@ export function MistySection(_props: SettingsContentProps & { page?: "misty" | "
     setWorking(true);
     setError("");
     try {
-      const result = await aiSurfaceApi.updateSettings(enabled, retentionDays, memoryEnabled);
+      const result = await aiSurfaceApi.updateSettings(enabled, retentionDays);
       setSettings(result.settings);
       if (!enabled && user?.id) useAiSurfaceStore.getState().clearAccount(user.id);
     } catch {
@@ -68,47 +60,17 @@ export function MistySection(_props: SettingsContentProps & { page?: "misty" | "
     }
   };
 
-  const forgetMemory = async (memoryId: string) => {
-    if (working) return;
-    setWorking(true);
-    setError("");
-    try {
-      await aiSurfaceApi.forgetMemory(memoryId);
-      setMemories((items) => items.filter((item) => item.id !== memoryId));
-    } catch {
-      setError("That memory could not be forgotten. Try again.");
-    } finally {
-      setWorking(false);
-    }
-  };
-
   return (
     <>
-      {!memoryPage && (
-        <SettingsSectionBlock title="Misty">
-          <SettingsRow label="Enable Misty" description="Hosted AI in the panel and across Misty.">
-            <SwitchControl
-              checked={settings?.enabled ?? false}
-              disabled={!settings || working}
-              onChange={(value) => void updateSettings(value)}
-            />
-          </SettingsRow>
-        </SettingsSectionBlock>
-      )}
-
-      {memoryPage && (
-        <>
-          <MistyRememberedSection
-            settings={settings}
-            working={working}
-            memories={memories}
-            onMemoryEnabledChange={(value) =>
-              void updateSettings(true, settings?.retention_days ?? 30, value)
-            }
-            onForget={(memoryId) => void forgetMemory(memoryId)}
+      <SettingsSectionBlock title="Misty">
+        <SettingsRow label="Enable Misty" description="Hosted AI in the panel and across Misty.">
+          <SwitchControl
+            checked={settings?.enabled ?? false}
+            disabled={!settings || working}
+            onChange={(value) => void updateSettings(value)}
           />
-        </>
-      )}
+        </SettingsRow>
+      </SettingsSectionBlock>
       {error ? (
         <SystemErrorNotice
           error={error}

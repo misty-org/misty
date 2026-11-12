@@ -2,9 +2,8 @@
 //! hidden `__cmd__*` macros.
 
 pub(crate) use crate::browser::app_windows::navigation_names::commands::{
-    __cmd__navigation_names_snapshot, __cmd__navigation_names_update,
-    __tauri_command_name_navigation_names_snapshot, __tauri_command_name_navigation_names_update,
-    navigation_names_snapshot, navigation_names_update,
+    __cmd__navigation_names_snapshot, __tauri_command_name_navigation_names_snapshot,
+    navigation_names_snapshot,
 };
 #[cfg(windows)]
 pub(crate) use crate::browser::app_windows::windows::snap::{

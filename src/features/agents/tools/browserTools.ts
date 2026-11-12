@@ -12,6 +12,7 @@ import { browserToolConfig, buildDeviceJob, settleDeviceJob } from "./deviceJob"
 import { extractionReply } from "./extractLinks";
 import { LocalToolRejected, type LocalToolRequest } from "./host";
 import {
+  adoptChatTab,
   browserScopeAllowed,
   browserToolSurface,
   contextFor,
@@ -118,11 +119,17 @@ async function uploadConfig(entry: RunEntry, input: Record<string, unknown>) {
   return { upload: await attachmentDetails(file) };
 }
 
-export async function runBrowserTool(request: LocalToolRequest, entry: RunEntry) {
+export async function runBrowserTool(request: LocalToolRequest, started: RunEntry) {
   const name = request.name;
   const scopeId = typeof request.input.scopeId === "string" ? request.input.scopeId : "";
   if (scopeId.length < 8) throw argumentsInvalid();
-  if (!browserScopeAllowed(entry, scopeId)) throw notAllowed();
+  let entry = started;
+  if (!browserScopeAllowed(entry, scopeId)) {
+    // A tab this chat's agent opened in an earlier turn is still its own.
+    const adopted = await adoptChatTab(entry, scopeId);
+    if (!adopted || !browserScopeAllowed(adopted, scopeId)) throw notAllowed();
+    entry = adopted;
+  }
   const context = contextFor(entry, scopeId, name);
   if (!context) throw new LocalToolRejected("invalid_scope", deviceFailureMessage("invalid_scope"));
   const surface = browserToolSurface(entry, scopeId);

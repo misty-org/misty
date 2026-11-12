@@ -201,7 +201,7 @@ export function CollectionItemSurface({
   children: ReactElement;
 }) {
   return item.contextMenu ? (
-    <ContextMenu>
+    <ContextMenu onOpenChange={(open) => open && item.onContextMenuOpen?.()}>
       <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
       <ContextMenuContent>{item.contextMenu}</ContextMenuContent>
     </ContextMenu>

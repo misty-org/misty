@@ -1,4 +1,5 @@
 import { act } from "react";
+import { MemoryRouter, useLocation } from "react-router-dom";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -30,7 +31,6 @@ vi.mock("./recoveryActions", () => ({
   resetWorkspaceLayout: mocks.resetLayout,
 }));
 
-import { useSignInSheetStore } from "@/features/account/sign-in-sheet/signInSheetStore";
 import { SupportRecoverySection } from "./SupportRecoverySection";
 
 describe("SupportRecoverySection", () => {
@@ -53,7 +53,13 @@ describe("SupportRecoverySection", () => {
   });
 
   it("requires a second click before resetting the workspace layout", async () => {
-    await act(async () => root.render(<SupportRecoverySection />));
+    await act(async () =>
+      root.render(
+        <MemoryRouter>
+          <SupportRecoverySection />
+        </MemoryRouter>,
+      ),
+    );
     const button = () =>
       Array.from(container.querySelectorAll("button")).find((candidate) =>
         candidate.textContent?.includes("Reset layout"),
@@ -72,7 +78,13 @@ describe("SupportRecoverySection", () => {
   });
 
   it("keeps diagnostics as a separate local download", async () => {
-    await act(async () => root.render(<SupportRecoverySection />));
+    await act(async () =>
+      root.render(
+        <MemoryRouter>
+          <SupportRecoverySection />
+        </MemoryRouter>,
+      ),
+    );
     const download = Array.from(container.querySelectorAll("button")).find((candidate) =>
       candidate.textContent?.includes("Download diagnostics"),
     );
@@ -84,7 +96,13 @@ describe("SupportRecoverySection", () => {
   });
 
   it("opens a reviewable public ticket without attaching diagnostics", async () => {
-    await act(async () => root.render(<SupportRecoverySection />));
+    await act(async () =>
+      root.render(
+        <MemoryRouter>
+          <SupportRecoverySection />
+        </MemoryRouter>,
+      ),
+    );
     const summary = container.querySelector<HTMLInputElement>(
       'input[placeholder="What went wrong or could be better?"]',
     );
@@ -108,11 +126,17 @@ describe("SupportRecoverySection", () => {
   });
 
   it("reopens setup and closes settings when requested", async () => {
-    useSignInSheetStore.getState().close();
     const closeSettingsListener = vi.fn();
     window.addEventListener("misty:close-settings", closeSettingsListener);
 
-    await act(async () => root.render(<SupportRecoverySection />));
+    await act(async () =>
+      root.render(
+        <MemoryRouter initialEntries={["/agents"]}>
+          <SupportRecoverySection />
+          <Where />
+        </MemoryRouter>,
+      ),
+    );
     const openSetupButton = Array.from(container.querySelectorAll("button")).find((btn) =>
       btn.textContent?.includes("Open setup"),
     );
@@ -121,11 +145,14 @@ describe("SupportRecoverySection", () => {
     await act(async () => openSetupButton?.click());
 
     expect(closeSettingsListener).toHaveBeenCalledOnce();
-    expect(useSignInSheetStore.getState().reason).toBe("device");
-    useSignInSheetStore.getState().close();
+    expect(container.querySelector("[data-testid=where]")?.textContent).toBe("/setup");
     window.removeEventListener("misty:close-settings", closeSettingsListener);
   });
 });
+
+function Where() {
+  return <p data-testid="where">{useLocation().pathname}</p>;
+}
 
 function setFormValue(element: HTMLInputElement | HTMLTextAreaElement | null, value: string) {
   if (!element) throw new Error("Expected form control");

@@ -4,7 +4,7 @@ use tauri::Webview;
 
 /// Opens a hidden `about:blank` page in `store` (the original store when
 /// `None`). The caller closes it; [`StoreView`] does so on drop.
-// Windows reaches store data through it today; the vault link uses it next on macOS too.
+// Windows reaches store data through it.
 #[cfg_attr(not(windows), allow(dead_code))]
 pub(crate) fn open_hidden_store_view(
     app: &tauri::AppHandle,

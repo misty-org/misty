@@ -196,34 +196,6 @@
     "platforms": ["desktop"]
   },
   {
-    "id": "browser.siteStyles",
-    "label": "Customized sites",
-    "keywords": ["boost", "css", "dark mode", "hide element", "zap", "style"],
-    "page": "browser-appearance",
-    "section": "general",
-    "key": "browser_site_styles_json",
-    "default": "[]",
-    "owner": "device",
-    "type": "string",
-    "format": "json",
-    "maxLength": 65536,
-    "platforms": ["desktop"]
-  },
-  {
-    "id": "browser.siteZoom",
-    "label": "Zoom by site",
-    "keywords": ["zoom", "page zoom", "site", "magnify"],
-    "page": "browser-appearance",
-    "section": "general",
-    "key": "browser_site_zoom_json",
-    "default": "[]",
-    "owner": "device",
-    "type": "string",
-    "format": "json",
-    "maxLength": 16384,
-    "platforms": ["desktop"]
-  },
-  {
     "id": "browser.homepage",
     "label": "Homepage",
     "page": "browser-tabs",
@@ -326,6 +298,17 @@
     "platforms": ["desktop"]
   },
   {
+    "id": "agents.studio_sounds",
+    "label": "Studio sounds",
+    "page": "agents-defaults",
+    "section": "agent",
+    "key": "studio_sounds",
+    "default": false,
+    "owner": "device",
+    "type": "boolean",
+    "platforms": ["desktop"]
+  },
+  {
     "id": "agents.panel_side",
     "label": "Misty panel side",
     "page": "agents-defaults",
@@ -336,6 +319,17 @@
     "type": "string",
     "platforms": ["desktop"],
     "enum": ["left", "right"]
+  },
+  {
+    "id": "agents.run_notifications",
+    "label": "Notify when a chat finishes or needs you",
+    "page": "agents-defaults",
+    "section": "agent",
+    "key": "run_notifications",
+    "default": true,
+    "owner": "device",
+    "type": "boolean",
+    "platforms": ["desktop"]
   },
   {
     "id": "app.appearance.pane_dim_strength",
@@ -376,6 +370,17 @@
     "platforms": ["desktop"],
     "maxLength": 65536,
     "format": "json"
+  },
+  {
+    "id": "agents.companion.on",
+    "label": "Cursor tutor",
+    "page": "agents-companion",
+    "section": "companion",
+    "key": "on",
+    "default": true,
+    "type": "boolean",
+    "owner": "device",
+    "platforms": ["desktop"]
   },
   {
     "id": "agents.companion.size",
@@ -556,87 +561,12 @@
     "page": "voice",
     "section": "voice",
     "key": "capture_sources",
-    "default": "mic-tab",
+    "default": "mic-system",
     "owner": "device",
     "type": "string",
     "platforms": ["desktop"],
-    "keywords": ["microphone", "tab audio", "system audio"],
+    "keywords": ["microphone", "system audio"],
     "enum": ["mic", "mic-tab", "mic-system", "tab", "system"]
-  },
-  {
-    "id": "voice.subtitle_preferences",
-    "label": "Live subtitles",
-    "page": "voice",
-    "section": "voice",
-    "key": "subtitle_preferences",
-    "default": "{}",
-    "owner": "device",
-    "type": "string",
-    "platforms": ["desktop"],
-    "maxLength": 60000
-  },
-  {
-    "id": "recall.enabled",
-    "label": "Remember pages I read",
-    "page": "recall",
-    "section": "recall",
-    "key": "enabled",
-    "default": true,
-    "owner": "device",
-    "type": "boolean",
-    "platforms": ["desktop"],
-    "keywords": ["memory", "history", "recall"]
-  },
-  {
-    "id": "recall.paused_until",
-    "label": "Pause Memory",
-    "page": "recall",
-    "section": "recall",
-    "key": "paused_until",
-    "default": 0,
-    "owner": "device",
-    "type": "number",
-    "platforms": ["desktop"],
-    "keywords": ["memory", "pause"],
-    "min": 0,
-    "max": 9007199254740991
-  },
-  {
-    "id": "recall.excluded_sites",
-    "label": "Sites Memory skips",
-    "page": "recall",
-    "section": "recall",
-    "key": "excluded_sites",
-    "default": "",
-    "owner": "device",
-    "type": "string",
-    "platforms": ["desktop"],
-    "keywords": ["memory", "exclude", "privacy"],
-    "maxLength": 8000
-  },
-  {
-    "id": "recall.remember_dictation",
-    "label": "Remember dictation",
-    "page": "recall",
-    "section": "recall",
-    "key": "remember_dictation",
-    "default": true,
-    "owner": "device",
-    "type": "boolean",
-    "platforms": ["desktop"],
-    "keywords": ["memory", "voice"]
-  },
-  {
-    "id": "recall.morning_brief",
-    "label": "Morning brief",
-    "page": "recall",
-    "section": "recall",
-    "key": "morning_brief",
-    "default": true,
-    "owner": "device",
-    "type": "boolean",
-    "platforms": ["desktop"],
-    "keywords": ["memory", "recap", "briefing", "summary"]
   },
   {
     "id": "models.provider",
@@ -736,6 +666,19 @@
     "type": "string",
     "platforms": ["desktop"],
     "keywords": ["AI", "memory", "search", "embeddings"],
+    "maxLength": 200
+  },
+  {
+    "id": "models.video_model",
+    "label": "Video model",
+    "page": "models",
+    "section": "models",
+    "key": "video_model",
+    "default": "",
+    "owner": "device",
+    "type": "string",
+    "platforms": ["desktop"],
+    "keywords": ["video", "Tutor", "Gemini Omni", "clips"],
     "maxLength": 200
   },
   {

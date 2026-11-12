@@ -7,11 +7,8 @@ import type {
 import type { WorkspaceSurfaceId, WorkspaceView } from "@/features/app-windows";
 
 const surfaceLabels: Record<WorkspaceSurfaceId, string> = {
-  extensions: "Extensions",
   space: "Space",
-  browser: "Browser",
   agents: "Agents",
-  scheduled: "Scheduled",
 };
 
 export function workspaceAiAdapter(tab: WorkspaceView | undefined): AiSurfaceAdapter | null {
@@ -36,7 +33,6 @@ function aiSurfaceForView(tab: WorkspaceView): AiSurfaceId {
   if (section === "drawings") return "drawings";
   if (section === "social" || section === "chat") return "space.chat";
   if (section === "library") return "library";
-  if (section === "activity") return "activity";
   return "settings";
 }
 
@@ -52,13 +48,11 @@ function aiContextForView(tab: WorkspaceView): AiContextReference {
       spaceId,
     };
   }
-  const privacy = tab.surfaceId === "browser" ? "device" : "private";
   return {
-    kind: privacy === "device" ? "device-scope" : "route",
+    kind: "route",
     id: tab.id,
     title: tab.title || surfaceLabels[tab.surfaceId] || "Tool",
-    privacy,
-    opaqueScopeId: privacy === "device" ? tab.instanceKey : undefined,
+    privacy: "private",
   };
 }
 
@@ -70,9 +64,6 @@ const action = (id: string, label: string, prompt: string): AiSuggestedAction =>
 });
 
 const workspaceAiActions: Partial<Record<AiSurfaceId, AiSuggestedAction[]>> = {
-  activity: [
-    action("activity.catch-up", "Catch me up", "Summarize unread activity by outcome and Space."),
-  ],
   "space.chat": [
     action(
       "chat.recap",

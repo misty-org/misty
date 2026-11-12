@@ -19,6 +19,11 @@ serde_json = "1"
 [target.'cfg(target_os = "windows")'.dependencies]
 wasapi = "0.24"
 
+# PulseAudio's client library (MIT or Apache-2.0 bindings; libpulse itself is LGPL-2.1), which
+# PipeWire also answers through pipewire-pulse.
+[target.'cfg(target_os = "linux")'.dependencies]
+libpulse-binding = "2.30"
+
 # Swift is only built on macOS hosts, so only they need the linker helper.
 [target.'cfg(target_os = "macos")'.build-dependencies]
 swift-rs = { version = "1.0.7", features = ["build"] }

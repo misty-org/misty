@@ -6,10 +6,8 @@ import { appsTools } from "./appsTools";
 import { cancelSubAgentsOf, delegationTools } from "./delegationTools";
 import { deviceTools } from "./deviceTools";
 import { registerLocalTools, type LocalToolHandler } from "./host";
-import { memoryTools } from "./memoryTools";
 import { runStateTools } from "./runStateTools";
 import { spaceTools } from "./spaceTools";
-import { workflowTools } from "./workflowTools";
 
 /**
  * Every tool a run can call, in one place: the same list as `LOCAL_TOOLS` in
@@ -21,9 +19,7 @@ import { workflowTools } from "./workflowTools";
 export const allLocalTools: Record<string, LocalToolHandler> = {
   ...deviceTools,
   ...runStateTools,
-  ...memoryTools,
   ...appsTools,
-  ...workflowTools,
   ...spaceTools,
   ...agentTools,
   ...delegationTools,

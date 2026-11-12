@@ -1,5 +1,4 @@
 import { AgentJobWorker } from "@/features/agents";
-import { WorkflowSchedulesBridge } from "@/features/agents";
 import { MistyContextBridgeHost } from "@/features/agents";
 import { BrowserContextMenuBridge } from "@/features/agents";
 import { BrowserRuntimeBridge } from "@/features/browser";
@@ -19,7 +18,6 @@ export function DesktopShellOverlays(props: {
       <BrowserContextMenuBridge />
       <DeferUntilIdle>
         <MistyContextBridgeHost />
-        <WorkflowSchedulesBridge />
         <AgentJobWorker />
       </DeferUntilIdle>
     </>

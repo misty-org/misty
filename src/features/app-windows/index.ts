@@ -21,7 +21,6 @@ export * from "./profiles/windowColors";
 
 // Public surface used by other features (generated from their imports).
 export { NavigationNamesBoundary } from "./navigation-names/NavigationNamesBoundary";
-export { Renameable } from "./navigation-names/Renameable";
 export { useNavigationNames } from "./navigation-names/store";
 export { StablePaneLayout } from "./panes/StablePaneLayout";
 export { dockLeaves, dockTreeViews } from "./panes/dockTree";
@@ -49,7 +48,6 @@ export {
   createProfile,
   currentProfile,
   currentWindowId,
-  currentWindowLabel,
   firstProfileId,
   isHostWindow,
   isLinkTargetWindow,
@@ -117,11 +115,9 @@ export {
   browserNoticeRects,
 } from "./page-runtime/browserBlockingOverlay";
 export {
-  browserTabShowsInternalPage,
   setBrowserDownloadDirectory,
   setBrowserDownloadPrompt,
   setBrowserStatusBubbleEnabled,
-  setBrowserTabShowsInternalPage,
 } from "./page-runtime/browserHostSettings";
 export {
   browserOverlayReady,
@@ -132,13 +128,7 @@ export {
   setBrowserPointerTrackingEnabled,
   setBrowserWebviewsSuspended,
 } from "./page-runtime/browserOverlayRuntime";
-export {
-  captureBrowserPagePreview,
-  invalidatePagePreviews,
-  pagePreviewGeneration,
-  prepareBrowserPagePreview,
-  savePagePreview,
-} from "./page-runtime/browserPagePreview";
+export { savePagePreview } from "./page-runtime/browserPagePreview";
 export {
   adoptedPages,
   browserRuntimeCreated,

@@ -1,11 +1,10 @@
-import type { DisplayCapture } from "../../cursor/protocol";
-import type { MediaContext } from "../../cursor/mediaContext";
+import type { DisplayCapture } from "../../tutor/cursor/protocol";
+import type { MediaContext } from "../../tutor/cursor/mediaContext";
 import type { ThinkingMode } from "../../runs/jobs/thinkingMode";
 import type { AiInvocationDeviceContext, AiSelectionSnapshot } from "../../runs/invocations";
 import type { AiArtifact, AiCaptureAttachment } from "../../runs/invocations/invocationTypes";
 import type { MistyContextTarget } from "../context/context";
 import type { MistyHandoff } from "../ask/handoff";
-import type { BrowserAskRequest } from "../context/browserAskContext";
 import type {
   GlobalAiContextRef,
   GlobalAiConversation,
@@ -24,11 +23,12 @@ export interface MistyState {
   pendingArtifact?: AiArtifact;
   screenLabel?: string;
   selectedSpaceId?: string;
+  /** The Space picked for a new chat before its first message; unset, it is the window's. */
+  draftSpaceId?: string;
   targets?: MistyContextTarget[];
   handoff?: MistyHandoff;
   invocationId?: string;
   invocationConversationId?: string;
-  browserRequest?: BrowserAskRequest;
   accountId: string;
   panel: UnifiedMistyPanel;
   query: string;
@@ -74,22 +74,17 @@ export interface MistyState {
       turn?: number;
       interactionMode?: "team" | "auto";
       idempotencyKey?: string;
-      /** Ask or Auto for this turn, whatever the chat's saved choice. A scheduled run names its own. */
-      permissionMode?: "ask" | "auto";
-      methodVersionId?: string;
-      methodInputs?: Record<string, string | number | boolean>;
-      skillVersionIds?: string[];
+      /** Ask or Auto for this turn, whatever the chat's saved choice. */
+      permissionMode?: "ask" | "auto" | "bypass";
       displayCaptures?: DisplayCapture[];
       capture?: AiCaptureAttachment;
       /** Continues the conversation after a screen opened; shows no new user turn. */
       continuation?: boolean;
-      /** Sends the turn as a lesson step (Teach mode), or a scheduled run in Act, whatever the chat's saved mode. */
+      /** Sends the turn as a lesson step (Teach mode) or in Act, whatever the chat's saved mode. */
       collaborationMode?: "teach" | "act";
       /** What the video in front was saying (companion/mediaContext.ts). */
       mediaContext?: MediaContext;
-      /** A scheduled run this computer claimed (roadmap C1). */
-      schedule?: { id: string; claim: string };
-      /** The Space a workflow kept on this computer runs in; absent is the window's. */
+      /** The Space the turn runs in; absent is the window's. */
       spaceId?: string;
       /** Opens a tab in this window for the task, at this page when given. */
       openScreen?: { url?: string; hint?: string; tabId?: string; place?: "current" | "new" };

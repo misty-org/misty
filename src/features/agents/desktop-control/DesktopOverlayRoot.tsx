@@ -3,7 +3,7 @@ import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useEffect, useState, type FormEvent } from "react";
 import { Button, Input } from "@/shared/ui";
-import { DictationPill, isSubtitlesPanel, LiveSubtitles } from "@/features/voice";
+import { DictationPill } from "@/features/voice";
 import "./desktopOverlay.css";
 
 /**
@@ -13,11 +13,9 @@ import "./desktopOverlay.css";
  * window's label says which this page is.
  */
 export function DesktopOverlayRoot() {
-  // The webview's own label: the subtitles panel is a view inside a Misty window.
   const label = getCurrentWebview().label;
   if (label === "misty-desktop-island") return <DesktopIsland />;
   if (label === "misty-dictation-pill") return <DictationPill />;
-  if (isSubtitlesPanel(label)) return <LiveSubtitles />;
   return <DesktopMist />;
 }
 

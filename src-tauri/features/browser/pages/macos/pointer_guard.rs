@@ -21,14 +21,11 @@ use objc2_app_kit::{NSEvent, NSView};
 mod caret;
 mod notice_regions;
 mod overrides;
-mod panels;
 pub(crate) use caret::set_caret_rect;
 use caret::*;
 pub(crate) use notice_regions::set_notice_rects;
 use notice_regions::*;
 use overrides::*;
-pub(crate) use panels::keep_pointer_on_panel;
-use panels::*;
 
 /// Every window has its own renderer. Only ever compared, since a closed window's stays.
 static MAIN_WEBVIEW_VIEWS: OnceLock<Mutex<HashSet<usize>>> = OnceLock::new();

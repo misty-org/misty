@@ -1,1 +1,1 @@
-export type AppTab = "browser" | "spaces" | "agents" | "settings";
+export type AppTab = "spaces" | "agents" | "settings";

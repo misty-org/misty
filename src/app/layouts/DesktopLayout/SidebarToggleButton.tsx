@@ -3,7 +3,7 @@ import { IconButton, toolbarIconProps } from "@/shared/ui";
 import { setBrowserWebviewsSuspended } from "@/features/app-windows";
 import { useSidebarCollapsedStore } from "../../shell/sidebarCollapsed";
 
-/** Hides or shows the vertical tab sidebar. */
+/** Hides or shows the sidebar. */
 export function SidebarToggleButton({ side = "left" }: { side?: "left" | "right" }) {
   const collapsed = useSidebarCollapsedStore((state) => state.collapsed);
   const Icon = side === "left" ? PanelLeft : PanelRight;

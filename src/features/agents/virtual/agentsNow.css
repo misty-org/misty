@@ -10,7 +10,7 @@
   gap: 12px;
   padding: 12px 14px;
   border: 1px solid var(--color-charcoal-border);
-  border-radius: 16px;
+  border-radius: var(--radius-xl);
   background: color-mix(in srgb, var(--misty-theme-text) 3%, transparent);
   color: var(--color-cream-muted);
   transition:
@@ -65,4 +65,18 @@
   .agents-now-card[data-state="working"] .agents-now-dot {
     animation: none;
   }
+}
+/* A claim: the file a working agent is changing, in the code font. Amber when a teammate's agent
+   is on the same file, which is a warning and never a stop. */
+.agents-now-claim {
+  display: flex;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-cream-muted);
+  opacity: 0.85;
+}
+.agents-now-claim[data-clash="true"] {
+  font-family: inherit;
+  color: var(--color-tone-amber);
 }

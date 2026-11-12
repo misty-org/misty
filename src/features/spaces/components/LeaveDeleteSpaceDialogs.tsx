@@ -119,7 +119,6 @@ export function LeaveDeleteSpaceDialogs({
 function WhatGoes() {
   return (
     <ul className="m-0 list-disc space-y-1 pl-5 text-sm text-cream">
-      <li>Memory from this Space</li>
       <li>Agent conversations in this Space</li>
       <li>Private notes, drawings and files</li>
       <li>The app accounts picked for this Space</li>

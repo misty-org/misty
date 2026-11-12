@@ -70,6 +70,12 @@ pub enum Reach {
     PickedFile,
     /// `agents.env`, read-only, on a debug build's benchmark run (`models/benchmark_env.rs`).
     BenchmarkKeys,
+    /// The agent engines' own configuration in the person's home folder (`~/.claude`,
+    /// `~/.claude.json`, `~/.codex` and the like), which Settings › Engines reads and edits: their
+    /// MCP servers, skills, commands, provider channels and session logs for usage.
+    EngineConfig,
+    /// A read-only folder Misty ships with itself, such as the bundled agent catalog.
+    BundledResources,
     /// Unit tests build their fixtures anywhere in the temp folder.
     #[cfg(any(test, feature = "test-fixtures"))]
     TestFixtures,
@@ -185,9 +191,35 @@ pub fn allow_picked_file(path: &Path, access: Access) {
     with_policy(|policy| policy.add(Reach::PickedFile, path, Shape::Exact, access));
 }
 
+/// A folder Misty ships with itself, read-only. Only code that resolved it from the app's own
+/// resource folder (or, in a development build, the source tree) calls this.
+pub fn allow_bundled_resources(folder: &Path) {
+    with_policy(|policy| {
+        policy.add(Reach::BundledResources, folder, Shape::Folder, Access::Read);
+    });
+}
+
 /// Only a debug build's benchmark run calls this, for the one file it reads its keys from.
 pub fn allow_benchmark_keys(path: &Path) {
     with_policy(|policy| policy.add(Reach::BenchmarkKeys, path, Shape::Exact, Access::Read));
+}
+
+/// An engine's own configuration folder, such as `~/.codex`, and everything in it.
+pub fn allow_engine_config_folder(folder: &Path) {
+    with_policy(|policy| policy.add(Reach::EngineConfig, folder, Shape::Folder, Access::Write));
+}
+
+/// An engine's configuration file directly in `folder`, such as `~/.claude.json`, together with the
+/// files staged beside it for a safe write (`.claude.json.misty-….tmp`) and its backups.
+pub fn allow_engine_config_file(folder: &Path, name: &'static str) {
+    with_policy(|policy| {
+        policy.add(
+            Reach::EngineConfig,
+            folder,
+            Shape::NamesStarting(name),
+            Access::Write,
+        )
+    });
 }
 
 pub fn allow_downloads_folder(folder: &Path) {

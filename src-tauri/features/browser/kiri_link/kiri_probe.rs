@@ -115,7 +115,6 @@ pub(crate) async fn run(app: AppHandle) -> bool {
         ("page → plugin:kiri|call (ACL, gate, media signal, no app commands, no passkey shim unentitled)", page_calls_reach_kiri_and_nothing_else(&app).await),
         ("host channel (token focus, Escape-stop status, shortcut; forgeries dropped; no navigation)", host_channel_authenticates_misty_scripts(&app).await),
         ("context menu over the host channel, copy via kiri::engine::edit", context_menu_copies_through_kiri(&app, &url).await),
-        ("site permissions set, list and reset through Kiri's engine facts", site_permissions_round_trip(&app).await),
         ("macOS passkey path runs AuthenticationServices end to end (refused without the entitlement)", passkey_path_reaches_authentication_services(&app).await),
     ];
     for (stage, result) in &checks {

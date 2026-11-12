@@ -18,16 +18,17 @@ import { useClearTabsShortcut } from "./useClearTabsShortcut";
 import { WorkspaceTabPanels } from "./WorkspaceTabPanels";
 import { TopEdge } from "./TopEdge";
 import { LayoutPopup } from "./LayoutPopup";
+import { WorkspaceSearch } from "./search/WorkspaceSearch";
 import type { WorkspaceTab } from "@/features/app-windows";
 import { useWorkspaceCanvasShortcuts } from "./useWorkspaceCanvasShortcuts";
 import { useLegacyTabTitles, useWorkspaceTabShortcuts } from "./useWorkspaceTabShortcuts";
 import { disposeWorkspaceTab, workspaceTabsById } from "./workspaceViewLifecycle";
 
 export function WorkspaceCanvas(props: {
-  /** The side of the window the tab sidebar sits on. */
+  /** The side of the window the sidebar sits on. */
   tabPosition?: TabSide;
   windowsTitlebarControls?: boolean;
-  /** Focus mode: pages fill the window without the tab strip. */
+  /** Focus mode: pages fill the window without the sidebar. */
   hideTabStrip?: boolean;
   /** The vertical sidebar's closing row: the account and settings, inside its panel. */
   stripAccount?: ReactNode;
@@ -79,8 +80,7 @@ export function WorkspaceCanvas(props: {
     if (followedSavedPages.current) return;
     followedSavedPages.current = true;
     if (allLayoutViews(useWorkspaceStore.getState().layout).length) navigateToActiveLayoutTab();
-    else if ([routes.browser, routes.newTab].includes(location.pathname as never))
-      navigate(routes.agents, { replace: true });
+    else if (location.pathname === routes.newTab) navigate(routes.agents, { replace: true });
   }, [location.pathname, navigate, navigateToActiveLayoutTab]);
 
   useEffect(() => {
@@ -166,6 +166,7 @@ export function WorkspaceCanvas(props: {
         <WorkspaceTabPanels gridColumn={contentColumn} layout={layout} renderTree={dockTree} />
         <PaneSwapMode />
         <LayoutPopup onApplied={navigateToActiveLayoutTab} />
+        <WorkspaceSearch onOpen={openTab} />
       </div>
     </>
   );

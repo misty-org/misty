@@ -13,9 +13,7 @@ import {
   Popover,
   PopoverContent,
 } from "@/shared/ui";
-import { conversationInSpace } from "../conversations/state/conversationSpace";
 import { useMistyStore } from "../conversations/state/useMistyStore";
-import { useSpaceWindowStore } from "@/features/app-windows";
 import {
   activityStateLabels,
   formatActivityTime,
@@ -53,7 +51,6 @@ export function PanelConversationPicker({
   const [open, setOpen] = useState(false);
   const activity = useAgentActivity(accountId, agentId);
   const conversations = useMistyStore((state) => state.conversations);
-  const space = useSpaceWindowStore((state) => state.identity);
   // The latest run's state per conversation, for the ones that need a word.
   const states = new Map<string, { state: string; updatedAt: string }>();
   for (const entry of activity.entries) {
@@ -64,10 +61,7 @@ export function PanelConversationPicker({
   }
   const recent = conversations
     .filter(
-      (c) =>
-        c.messages.length &&
-        conversationInSpace(c, space) &&
-        (c.agentId === agentId || (!c.agentId && includeUnassigned)),
+      (c) => c.messages.length && (c.agentId === agentId || (!c.agentId && includeUnassigned)),
     )
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
     .slice(0, 30);

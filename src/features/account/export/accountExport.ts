@@ -1,5 +1,4 @@
 import { apiRequest } from "@/api/client/request";
-import { memoryExport } from "../accountSeams";
 import { ApiRequestError } from "@/api/client/errors";
 
 /** How the person proves it is them: their Misty password, or a fresh Google sign-in. */
@@ -71,14 +70,6 @@ export function saveAccountExport(data: unknown, now = new Date()): string {
   link.click();
   URL.revokeObjectURL(url);
   return name;
-}
-
-/**
- * Memory lives on this computer, so the server's export can't hold it: it is saved as a second file.
- * Answers with that file's name.
- */
-export async function saveMemoryExport(now = new Date()): Promise<string> {
-  return memoryExport.get()(now);
 }
 
 /** What the dialog says when the export couldn't be made. */

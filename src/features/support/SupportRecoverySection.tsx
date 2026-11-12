@@ -11,8 +11,9 @@ import {
   RotateCcw,
   ShieldCheck,
 } from "lucide-react";
-import { openSignInSheet } from "@/features/account";
+import { routes } from "@/app/shell";
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { buildPublicFeedbackIssueUrl, type FeedbackDraft } from "./feedbackIssue";
 import { downloadSupportBundle } from "./supportBundle";
 import {
@@ -41,10 +42,12 @@ export function SupportRecoverySection({ onClose }: { onClose?: () => void } = {
   const [resetArmed, setResetArmed] = useState(false);
   const [reloadArmed, setReloadArmed] = useState(false);
 
+  const navigate = useNavigate();
+  // The first-run setup page: the person's AI and apps, each one already done shown as ready.
   const reopenSetup = () => {
     onClose?.();
     window.dispatchEvent(new CustomEvent("misty:close-settings"));
-    openSignInSheet("device");
+    navigate(routes.setup);
   };
 
   const updateDraft = <Key extends keyof FeedbackDraft>(key: Key, value: FeedbackDraft[Key]) =>
@@ -127,13 +130,13 @@ export function SupportRecoverySection({ onClose }: { onClose?: () => void } = {
     <>
       <SupportSectionBlock
         title="Setup"
-        description="Choose your theme and layout again, or import from another browser."
+        description="Install and sign in to your AI again, or connect more apps."
       >
         <div className="grid gap-px bg-charcoal-border">
           <RecoveryAction
             icon={Compass}
             title="Run setup again"
-            detail="Import from another browser, add extensions and choose where tabs sit. Your current choices stay selected."
+            detail="Your AI and apps, with whatever is already set up marked ready."
             action="Open setup"
             onClick={reopenSetup}
           />

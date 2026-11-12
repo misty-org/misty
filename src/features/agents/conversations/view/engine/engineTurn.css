@@ -1,0 +1,200 @@
+/* An outside engine's turn: reasoning, tasks, sub-agents, questions and plans, in the same quiet
+   style as Misty's own progress. Color only where it means something: the chosen option. */
+.engine-turn {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.engine-turn:empty {
+  display: none;
+}
+.engine-thinking {
+  margin: 0;
+  padding: 4px 0 4px 14px;
+  border-left: 2px solid var(--color-charcoal-border);
+  color: var(--color-cream-muted);
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+.engine-turn-status,
+.engine-turn-model {
+  margin: 0;
+  color: var(--color-cream-muted);
+  font-size: 13px;
+}
+.engine-question,
+.engine-plan {
+  display: grid;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--color-charcoal-border);
+  border-radius: 14px;
+  background: var(--color-charcoal-card);
+}
+.engine-question[data-closed] {
+  opacity: 0.7;
+}
+.engine-question-item {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+.engine-question-text {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  padding: 0;
+  color: var(--color-cream);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.engine-question-header {
+  padding: 1px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--color-charcoal-active);
+  color: var(--color-cream-muted);
+  font-size: 12px;
+}
+.engine-question-options {
+  display: grid;
+  gap: 6px;
+}
+.engine-question-option {
+  display: grid;
+  gap: 2px;
+  padding: 8px 12px;
+  border: 1px solid var(--color-charcoal-border);
+  border-radius: 10px;
+  color: var(--color-cream);
+  font-size: 13px;
+  text-align: left;
+}
+.engine-question-option:hover {
+  background: var(--color-charcoal-active);
+}
+.engine-question-option-on {
+  border-color: var(--color-cream-muted);
+  background: var(--color-charcoal-active);
+}
+.engine-question-option-description {
+  color: var(--color-cream-muted);
+  font-size: 12px;
+}
+.engine-question-actions,
+.engine-plan-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.engine-question-closed {
+  margin: 0;
+  color: var(--color-cream-muted);
+  font-size: 13px;
+}
+.engine-question-error {
+  margin: 0;
+  color: var(--color-tone-red);
+  font-size: 13px;
+}
+.engine-plan-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--color-cream);
+  font-size: 14px;
+  font-weight: 500;
+}
+.engine-plan-status {
+  color: var(--color-cream-muted);
+  font-size: 12px;
+  font-weight: 400;
+}
+.engine-plan-body {
+  max-height: 420px;
+  overflow: auto;
+}
+.engine-plan-feedback {
+  display: grid;
+  gap: 8px;
+}
+.engine-queue {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 8px;
+  padding: 0;
+  list-style: none;
+}
+.engine-queue-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  max-width: 100%;
+  padding: 2px 4px 2px 12px;
+  border: 1px solid var(--color-charcoal-border);
+  border-radius: var(--radius-md);
+  background: var(--color-charcoal-card);
+  color: var(--color-cream);
+  font-size: 13px;
+}
+.engine-queue-text {
+  min-width: 0;
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.engine-history {
+  display: grid;
+  gap: 12px;
+}
+.engine-history-list {
+  display: grid;
+  gap: 4px;
+  max-height: 420px;
+  margin: 0;
+  padding: 0;
+  overflow: auto;
+  list-style: none;
+}
+.engine-history-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.engine-history-pick {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  text-align: left;
+}
+.engine-history-pick:hover {
+  background: var(--color-charcoal-active);
+}
+.engine-history-title {
+  overflow: hidden;
+  color: var(--color-cream);
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.engine-history-meta,
+.engine-history-empty {
+  color: var(--color-cream-muted);
+  font-size: 12px;
+}
+.engine-history-skeleton {
+  height: 44px;
+  border-radius: 10px;
+  background: var(--color-charcoal-active);
+  opacity: 0.6;
+}

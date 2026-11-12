@@ -8,7 +8,7 @@ use serde_json::{Map, Value};
 
 /// Bumped whenever a key is retired, so the prune below runs exactly once per
 /// user rather than on every launch.
-pub(super) const SETTINGS_SCHEMA_VERSION: i64 = 12;
+pub(super) const SETTINGS_SCHEMA_VERSION: i64 = 13;
 
 /// Whole sections that no longer exist. `account` and `ai` were never read.
 /// Schema 6: the Code workspace (`editor`, `terminal`), the file manager
@@ -73,13 +73,27 @@ const RETIRED_KEYS: &[(&str, &str)] = &[
     ("privacy", "anonymous_error_reporting_enabled"),
 ];
 
-/// Removes retired keys from an existing settings file.
+/// Keys that moved to a new name, as (section, old key, new key). A value already under the new
+/// name wins. Schema 13: the virtual office is called the studio.
+const RENAMED_KEYS: &[(&str, &str, &str)] = &[("agent", "office_sounds", "studio_sounds")];
+
+/// Removes retired keys from an existing settings file and moves renamed ones.
 ///
 /// Deliberately an allowlist rather than a wholesale rewrite: unknown keys and
 /// extension-owned namespaces must survive untouched, which the round-trip test
 /// asserts by planting a plugin namespace.
 pub(super) fn prune_retired_settings(root: &mut Map<String, Value>) -> bool {
     let mut changed = false;
+
+    for (section, old, new) in RENAMED_KEYS {
+        let Some(entries) = root.get_mut(*section).and_then(Value::as_object_mut) else {
+            continue;
+        };
+        if let Some(value) = entries.remove(*old) {
+            entries.entry(*new).or_insert(value);
+            changed = true;
+        }
+    }
 
     for section in RETIRED_SECTIONS {
         if root.remove(*section).is_some() {
@@ -160,6 +174,15 @@ mod tests {
             privacy.get("page_state_restore").and_then(Value::as_bool),
             Some(false)
         );
+    }
+
+    #[test]
+    fn moves_renamed_keys() {
+        let mut root = object(json!({ "agent": { "office_sounds": true } }));
+        assert!(prune_retired_settings(&mut root));
+        let agent = root.get("agent").and_then(Value::as_object).unwrap();
+        assert!(!agent.contains_key("office_sounds"));
+        assert_eq!(agent.get("studio_sounds").and_then(Value::as_bool), Some(true));
     }
 
     #[test]

@@ -1,7 +1,7 @@
 import { useSettingsStore } from "@/features/settings";
 import { voiceSettings } from "../voiceSettings";
 import { captureApi } from "./captureApi";
-import { useCaptureStore, type CaptureSource } from "./useCaptureStore";
+import { useCaptureStore } from "./useCaptureStore";
 
 function settings() {
   return voiceSettings(useSettingsStore.getState().settings?.document);
@@ -20,18 +20,6 @@ export function captureSystemAudio(title = "System audio") {
   return useCaptureStore
     .getState()
     .start({ kind: "system", title, mic: withMic() }, settings().language);
-}
-
-/** Listens to a browser tab through the page itself; tabId is its runtime id. */
-export function captureTab(tabId: string, title: string, url?: string) {
-  const source: CaptureSource = {
-    kind: "tab",
-    tabId,
-    title: title || "This tab",
-    url,
-    mic: withMic(),
-  };
-  return useCaptureStore.getState().start(source, settings().language);
 }
 
 /** Transcribes an audio or video file from a Library and shows the result. */

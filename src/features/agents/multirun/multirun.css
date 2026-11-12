@@ -16,7 +16,7 @@
   min-height: 0;
   overflow: hidden;
   border: 1px solid var(--color-charcoal-border);
-  border-radius: 14px;
+  border-radius: var(--radius-xl);
   background: color-mix(in srgb, var(--misty-theme-text) 2.5%, transparent);
 }
 /* The kept lane is the one thing here that is marked: it is where the folder's changes came from. */

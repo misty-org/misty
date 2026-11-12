@@ -136,22 +136,12 @@ it("preserves an occupied split when an explicit open targets it", () => {
   expect(store().layout.focusedPaneId).not.toBe(paneId);
 });
 
-it("opens Scheduled inside Agents and persists the selected task", () => {
+it("opens the retired Scheduled link in the Agents tab", () => {
   const agents = go("/agents");
-  const scheduled = go("/scheduled");
-  expect(scheduled).toMatchObject({ id: agents.id, surfaceId: "agents" });
-  store().updateViewRoute(scheduled.id, "/agents?view=scheduled&task=weekly");
-  const saved = JSON.parse(JSON.stringify(partialWorkspaceStore(store())));
-  useWorkspaceStore.setState(migrateWorkspaceStore(saved, 11));
-  expect(activeLayoutView(store().layout)).toMatchObject({
-    id: agents.id,
-    surfaceId: "agents",
-    groupKey: "tool:agents",
-    route: "/agents?view=scheduled&task=weekly",
-  });
+  expect(go("/scheduled")).toMatchObject({ id: agents.id, surfaceId: "agents" });
 });
 
-it("migrates saved legacy Scheduled routes into Agents without losing the selected task", () => {
+it("migrates saved legacy Scheduled routes into Agents", () => {
   const agents = go("/agents");
   store().updateViewRoute(agents.id, "/scheduled?task=weekly");
   const saved = JSON.parse(JSON.stringify(partialWorkspaceStore(store())));
@@ -160,6 +150,6 @@ it("migrates saved legacy Scheduled routes into Agents without losing the select
     id: agents.id,
     surfaceId: "agents",
     groupKey: "tool:agents",
-    route: "/agents?task=weekly&view=scheduled",
+    route: "/agents?task=weekly",
   });
 });

@@ -10,4 +10,5 @@ pub(crate) mod eval_bridge;
 pub(crate) mod frames;
 pub(crate) mod page_agent;
 pub(crate) mod page_tools;
+pub(crate) mod run_picture;
 pub(crate) mod task_files;

@@ -6,6 +6,8 @@ import { DevicePreferencesBridge } from "@/features/account";
 import { useDocumentAppAppearance } from "@/features/settings";
 import { useShortcutHandler } from "@/features/shortcuts";
 import { ShortcutRuntime } from "../ShortcutRuntime";
+import { PetRuntime } from "@/features/pets";
+import { RunNotifier } from "@/features/agents";
 import { useAppZoom } from "@/shared/hooks/useAppZoom";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { platform as osPlatform } from "@tauri-apps/plugin-os";
@@ -57,6 +59,8 @@ export function RootLayout(props: {
       <AuthProvider>
         <DevicePreferencesBridge />
         <ShortcutRuntime />
+        <PetRuntime />
+        <RunNotifier />
         <RenderErrorBoundary>
           <AuthenticatedTreeOutlet />
         </RenderErrorBoundary>
@@ -73,7 +77,7 @@ function AppZoomIndicator(props: { visible: boolean; percent: number }) {
   return (
     <div
       className={cn(
-        "pointer-events-none fixed inset-x-0 top-10 layer-dialog-backdrop mx-auto w-fit rounded-full",
+        "pointer-events-none fixed inset-x-0 top-10 layer-dialog-backdrop mx-auto w-fit rounded-lg",
         "border border-charcoal-border bg-charcoal-card px-3 py-1.5 text-sm font-semibold text-cream",
         "shadow-xl transition duration-150",
         props.visible ? "translate-y-0 opacity-100" : "-translate-y-2 opacity-0",

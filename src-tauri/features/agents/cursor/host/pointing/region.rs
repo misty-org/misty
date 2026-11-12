@@ -36,7 +36,7 @@ pub fn capture_region(
     })
 }
 
-#[cfg(windows)]
+#[cfg(any(windows, target_os = "linux"))]
 pub fn capture_region(
     monitor: &xcap::Monitor,
     region: (f64, f64, f64, f64),

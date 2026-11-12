@@ -8,6 +8,7 @@ import { DesktopSettingsRow } from "@/features/settings/desktop";
 import { SystemErrorNotice } from "@/shared/platform/systemErrors";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { Button, Progress } from "@/shared/ui";
+import { rememberReleaseNotes } from "./releaseNotes";
 import {
   applyUpdateProgress,
   EMPTY_UPDATE_PROGRESS,
@@ -85,6 +86,8 @@ export function DesktopUpdaterSettings() {
     let releaseUpdate = () => {};
     try {
       releaseUpdate = reserveMistyUpdate();
+      // Its notes wait for the restart, to be shown once the new version runs.
+      rememberReleaseNotes(update);
       await update.downloadAndInstall((event) => {
         setProgress((current) => applyUpdateProgress(current, event));
       });

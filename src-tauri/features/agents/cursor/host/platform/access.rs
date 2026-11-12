@@ -75,3 +75,14 @@ pub fn screen_access() -> Result<(), String> {
 pub fn screen_access() -> Result<(), String> {
     Ok(())
 }
+
+/// Linux asks for neither: the microphone opens through PipeWire or PulseAudio as it is, and
+/// screen captures go through X11 or the desktop's own Screenshot portal prompt.
+#[cfg(target_os = "linux")]
+pub fn microphone_access() -> Result<(), String> {
+    Ok(())
+}
+#[cfg(target_os = "linux")]
+pub fn screen_access() -> Result<(), String> {
+    Ok(())
+}

@@ -1,9 +1,11 @@
 use crate::{AudioSource, Capabilities, CaptureError, CaptureSources, PcmChunk};
 use std::sync::Arc;
 
+#[cfg(target_os = "linux")]
+use crate::linux as platform;
 #[cfg(target_os = "macos")]
 use crate::macos as platform;
-#[cfg(not(any(target_os = "macos", target_os = "windows")))]
+#[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
 use crate::unsupported as platform;
 #[cfg(target_os = "windows")]
 use crate::windows as platform;
@@ -65,10 +67,16 @@ pub fn capabilities() -> Capabilities {
 }
 
 /// Numbers samples per capture so chunks carry continuous frame indices.
-#[cfg_attr(not(any(target_os = "macos", target_os = "windows")), allow(dead_code))]
+#[cfg_attr(
+    not(any(target_os = "macos", target_os = "windows", target_os = "linux")),
+    allow(dead_code)
+)]
 pub(crate) struct FrameCounter(u64);
 
-#[cfg_attr(not(any(target_os = "macos", target_os = "windows")), allow(dead_code))]
+#[cfg_attr(
+    not(any(target_os = "macos", target_os = "windows", target_os = "linux")),
+    allow(dead_code)
+)]
 impl FrameCounter {
     pub fn new() -> Self {
         Self(0)

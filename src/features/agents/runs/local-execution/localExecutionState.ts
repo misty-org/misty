@@ -21,12 +21,6 @@ export interface Execution {
   ready?: boolean;
   context: GlobalAiContextRef[];
   deviceContexts: AiInvocationDeviceContext[];
-  method?: {
-    versionId: string;
-    inputs?: Record<string, string | number | boolean>;
-    skillVersionIds?: string[];
-    invocationId?: string;
-  };
 }
 export const useLocalExecution = create<{ execution: Execution | null }>(() => ({
   execution: null,

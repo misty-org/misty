@@ -51,17 +51,17 @@ export function DesktopSettingsFrame<Id extends string>(props: DesktopSettingsFr
       {navigation ? <div aria-hidden="true" className="bg-charcoal-border" /> : null}
 
       <main className="relative flex min-h-0 min-w-0 flex-col bg-charcoal-bg">
-        {/* The page we're on, over a divider; the page scrolls under it, never behind it. */}
-        <header className="flex h-12 shrink-0 items-center justify-between gap-3 border-b border-charcoal-border pl-6 pr-4 max-[720px]:pl-4">
-          <h1 className="min-w-0 truncate text-md font-semibold leading-6 text-cream-bright">
-            {props.title}
-          </h1>
-          {overlay ? (
-            <IconButton label={`Close ${props.ariaLabel.toLowerCase()}`} onClick={props.onClose}>
-              <X className="size-4" strokeWidth={1.8} />
-            </IconButton>
-          ) : null}
-        </header>
+        {/* No title bar: the navigation names the page. An overlay's close button floats in the
+            corner. */}
+        {overlay ? (
+          <IconButton
+            className="absolute right-4 top-3 z-10"
+            label={`Close ${props.ariaLabel.toLowerCase()}`}
+            onClick={props.onClose}
+          >
+            <X className="size-4" strokeWidth={1.8} />
+          </IconButton>
+        ) : null}
         {/* The scrollbar floats inset from the panel edge, clear of the rounded corners. */}
         <div
           data-settings-scroller

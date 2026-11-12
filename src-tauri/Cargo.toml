@@ -71,18 +71,23 @@ tauri-plugin-os = "2"
 tauri-plugin-notification = "2.3.3"
 thiserror = "1"
 tokio = { version = "1", features = ["fs", "io-util", "macros", "net", "process", "rt-multi-thread", "sync", "time"] }
-reqwest = { version = "0.13.4", default-features = false, features = ["json", "query", "rustls-no-provider", "stream"] }
+reqwest = { version = "0.13.4", default-features = false, features = ["json", "query", "rustls-no-provider", "socks", "stream"] }
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
 rusqlite = { version = "0.32", features = ["bundled"] }
 uuid = { version = "1", features = ["v4"] }
 # The terminal panel beside a chat runs the person's shell on a real pseudo-terminal (MIT).
 portable-pty = "0.8"
+# The panels beside a chat, adapted from desktop-cc-gui (MIT): libgit2 for reading a folder's
+# Git state and writing its index (MIT/Apache-2.0 bindings; libgit2 is GPL-2.0 with the linking
+# exception), ripgrep's walker for .gitignore-aware search (MIT/Unlicense) and the OS trash (MIT).
+git2 = { version = "0.20", default-features = false, features = ["vendored-libgit2"] }
+ignore = "0.4"
+trash = "5"
 zeroize = "1"
 url = "2"
-image = { version = "0.25.10", default-features = false, features = ["hdr", "png", "pnm", "jpeg"] }
+image = { version = "0.25.10", default-features = false, features = ["hdr", "png", "pnm", "jpeg", "webp"] }
 ed25519-dalek = "2"
-# Devices: sealing the vault key to a newly
-# approved device, the control channel socket, and LAN discovery.
+# Devices: the control channel socket.
 futures-util = { version = "0.3", features = ["sink"] }
 tokio-tungstenite = { version = "0.30", default-features = false, features = ["connect", "rustls-tls-native-roots"] }
 # Deflate through flate2's Rust backend only; zip's "deflate" also builds zopfli and zlib-rs.
@@ -92,18 +97,37 @@ zstd = { version = "0.13", default-features = false }
 tauri-plugin-keystore = { path = "vendor/tauri-plugin-keystore" }
 tauri-plugin-deep-link = "2"
 percent-encoding = "2"
+# desktop-cc-gui's engine layer (features/engines) and engine settings (features/engine_config):
+# the CLIs' TOML and YAML configs, a lock for live registries and caches, process trees and
+# figures for the performance panel, and program lookup. All MIT or Apache-2.0.
+parking_lot = "0.12"
+toml = "0.8"
+toml_edit = "0.25"
+serde_yaml = "0.9"
+sysinfo = "0.36.1"
+which = "7"
+dunce = "1"
 
-[target.'cfg(any(target_os = "macos", windows))'.dependencies]
-# Confined helpers: Seatbelt on macOS, an AppContainer and Job object on Windows.
+[target.'cfg(any(target_os = "macos", windows, target_os = "linux"))'.dependencies]
+# Confined helpers: Seatbelt on macOS, an AppContainer and Job object on Windows, Landlock,
+# seccomp and namespaces on Linux.
 sandbox = { path = "features/sandbox" }
 # Microphone, system and per-process capture for dictation, live transcription and recording.
 voice_capture = { path = "features/voice/capture" }
+# Screen capture for computer use and captures (X11 and PipeWire on Linux).
 xcap = "0.9"
+# Computer use: mouse and keyboard input for an outside engine's screen control (MIT; X11 on Linux).
+enigo = "0.6"
+tauri-plugin-single-instance = { version = "2.4.3", features = ["deep-link"] }
+tauri-plugin-process = "2.3.1"
+tauri-plugin-updater = "2.10.1"
 
 [target.'cfg(not(target_os = "macos"))'.dependencies]
 image = { version = "0.25.10", default-features = false, features = ["bmp", "gif", "jpeg", "tga", "webp"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
+# System notices that open their chat when clicked (agents/run_control/run_notices.rs).
+mac-notification-sys = "0.6.15"
 block2 = "0.6.2"
 # The vendored copy (see [patch.crates-io]); used for download progress and cancel.
 wry = { version = "=0.55.1", default-features = false }
@@ -128,12 +152,24 @@ objc2-core-video = "0.3.2"
 objc2-core-foundation = "0.3.2"
 objc2-application-services = "0.3.2"
 
-[target.'cfg(any(target_os = "macos", windows, target_os = "linux"))'.dependencies]
-tauri-plugin-single-instance = { version = "2.4.3", features = ["deep-link"] }
-tauri-plugin-process = "2.3.1"
-tauri-plugin-updater = "2.10.1"
+[target.'cfg(target_os = "linux")'.dependencies]
+# Agent page captures on WebKitGTK (features/browser/pages/linux.rs). The same versions kiri and
+# Tauri's wry resolve to; they move with Tauri.
+gtk = "0.18"
+webkit2gtk = { version = "=2.0", features = ["v2_40"] }
+# Dictation's keys, pointer, front window and paste on X11 (MIT or Apache-2.0; enigo already
+# builds it with these extensions).
+x11rb = { version = "0.13", features = ["xtest"] }
+# Script worlds and frame messages for agent pages on WebKitGTK (MIT; the version webkit2gtk uses).
+javascriptcore-rs = "=1.1"
+# Computer use on Wayland: the RemoteDesktop and ScreenCast portals, which the person approves (MIT).
+ashpd = { version = "0.13", default-features = false, features = ["tokio", "remote_desktop", "screencast"] }
+# Loads gtk-layer-shell when the compositor has it, for overlays above every window (ISC).
+libloading = "0.8"
 
 [target.'cfg(windows)'.dependencies]
+# The engine layer reads the live User/Machine PATH from the registry (MIT).
+winreg = "0.55"
 rfd = { version = "0.16", default-features = false }
 # Confined helpers and agent commands (AppContainer and Job objects).
 webview2-com = "0.38.2"
@@ -141,8 +177,8 @@ webview2-com = "0.38.2"
 windows-future = "0.2"
 # The vendored copy (see [patch.crates-io]); used for download progress and cancel.
 wry = { version = "=0.55.1", default-features = false }
-windows = { version = "0.61", features = ["Foundation", "Graphics", "Graphics_Capture", "Graphics_DirectX", "Graphics_DirectX_Direct3D11", "Security_Credentials_UI", "Win32_Foundation", "Win32_Graphics_Direct3D", "Win32_Graphics_Direct3D11", "Win32_Graphics_Dxgi", "Win32_Graphics_Dxgi_Common", "Win32_Graphics_Gdi", "Win32_Media_MediaFoundation", "Win32_Security_Cryptography", "Win32_System_Com", "Win32_System_Com_StructuredStorage", "Win32_System_Ole", "Win32_System_Variant", "Win32_System_WinRT", "Win32_System_WinRT_Direct3D11", "Win32_System_WinRT_Graphics_Capture", "Win32_UI_Accessibility"] }
-windows-sys = { version = "0.59", features = ["Wdk_Storage_FileSystem", "Win32_Devices_DeviceAndDriverInstallation", "Win32_Foundation", "Win32_Graphics_Dwm", "Win32_Graphics_Gdi", "Win32_NetworkManagement_WNet", "Win32_Security", "Win32_Security_Authorization", "Win32_Security_Isolation", "Win32_Storage_FileSystem", "Win32_System_Diagnostics_Debug", "Win32_System_IO", "Win32_System_Ioctl", "Win32_System_JobObjects", "Win32_System_LibraryLoader", "Win32_System_Power", "Win32_System_Registry", "Win32_System_Com", "Win32_System_DataExchange", "Win32_System_Memory", "Win32_System_SystemInformation", "Win32_System_SystemServices", "Win32_System_Threading", "Win32_System_WindowsProgramming", "Win32_UI_Accessibility", "Win32_UI_HiDpi", "Win32_UI_Input_KeyboardAndMouse", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging"] }
+windows = { version = "0.61", features = ["Foundation", "Graphics", "Graphics_Capture", "Graphics_DirectX", "Graphics_DirectX_Direct3D11", "Security_Credentials_UI", "Win32_Foundation", "Win32_Graphics_Direct3D", "Win32_Graphics_Direct3D11", "Win32_Graphics_Dxgi", "Win32_Graphics_Dxgi_Common", "Win32_Graphics_Gdi", "Win32_Media_MediaFoundation", "Win32_Security", "Win32_Security_Authorization", "Win32_Security_Cryptography", "Win32_Storage_FileSystem", "Win32_System_Com", "Win32_System_Com_StructuredStorage", "Win32_System_JobObjects", "Win32_System_Ole", "Win32_System_Registry", "Win32_System_Threading", "Win32_System_Variant", "Win32_System_WinRT", "Win32_System_WinRT_Direct3D11", "Win32_System_WinRT_Graphics_Capture", "Win32_UI_Accessibility", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging"] }
+windows-sys = { version = "0.59", features = ["Wdk_Storage_FileSystem", "Win32_Devices_DeviceAndDriverInstallation", "Win32_Foundation", "Win32_Graphics_Dwm", "Win32_Graphics_Gdi", "Win32_NetworkManagement_WNet", "Win32_Security", "Win32_Security_Authorization", "Win32_Security_Isolation", "Win32_Storage_FileSystem", "Win32_System_Com", "Win32_System_DataExchange", "Win32_System_Diagnostics_Debug", "Win32_System_Diagnostics_ToolHelp", "Win32_System_IO", "Win32_System_Ioctl", "Win32_System_JobObjects", "Win32_System_LibraryLoader", "Win32_System_Memory", "Win32_System_Power", "Win32_System_Registry", "Win32_System_SystemInformation", "Win32_System_SystemServices", "Win32_System_Threading", "Win32_System_WindowsProgramming", "Win32_UI_Accessibility", "Win32_UI_HiDpi", "Win32_UI_Input_KeyboardAndMouse", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging"] }
 
 [features]
 custom-protocol = ["tauri/custom-protocol"]
@@ -174,6 +210,9 @@ strip = false
 
 [dev-dependencies]
 ctor = "0.8"
+# The engine layer's tests drive commands on Tauri's mock runtime and pause tokio's clock.
+tauri = { version = "2", features = ["test"] }
+tokio = { version = "1", features = ["test-util"] }
 file_access = { path = "features/file_access", features = ["test-fixtures"] }
 # Build fixtures/reference decoders without shipping these codecs in the macOS host.
 image = { version = "0.25.10", default-features = false, features = ["bmp", "gif", "jpeg", "tga", "webp"] }

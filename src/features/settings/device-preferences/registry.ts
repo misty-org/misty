@@ -29,12 +29,8 @@ type SettingSearchEntry = Pick<
 // Controls with their own server APIs are searchable alongside preferences.
 // Preference serialization and updates use settingDefinitions exclusively.
 export const settingSearchEntries: SettingSearchEntry[] = [
-  // Tab orders are edited in place, and live subtitles in their own panel.
-  ...settingDefinitions.filter(
-    (definition) =>
-      !definition.id.startsWith("collections.tabs.") &&
-      definition.id !== "voice.subtitle_preferences",
-  ),
+  // Tab orders are edited in place.
+  ...settingDefinitions.filter((definition) => !definition.id.startsWith("collections.tabs.")),
   {
     id: "agents.misty.enabled",
     label: "Enable Misty",
@@ -50,14 +46,6 @@ export const settingSearchEntries: SettingSearchEntry[] = [
     owner: "device",
     platforms: ["desktop"],
     keywords: ["payments", "buy", "purchase", "approve"],
-  },
-  {
-    id: "agents.memory.enabled",
-    label: "Remembered context",
-    page: "recall",
-    owner: "device",
-    platforms: ["desktop"],
-    keywords: ["memory", "remember", "personal"],
   },
 ];
 export const definitionById = new Map(settingDefinitions.map((d) => [d.id, d]));
@@ -101,28 +89,6 @@ export function validPreference(d: SettingDefinition, value: unknown): value is 
             [entry.primary, entry.alternate].every(
               (slot) => slot === undefined || slot === null || typeof slot === "string",
             ),
-        );
-      if (d.id === "browser.siteStyles")
-        return parsed.every(
-          (entry) =>
-            entry &&
-            typeof entry.host === "string" &&
-            entry.host.length > 0 &&
-            entry.host.length <= 253 &&
-            typeof entry.css === "string" &&
-            entry.css.length <= 32768 &&
-            typeof entry.dark === "boolean",
-        );
-      if (d.id === "browser.siteZoom")
-        return parsed.every(
-          (entry) =>
-            entry &&
-            typeof entry.host === "string" &&
-            entry.host.length > 0 &&
-            entry.host.length <= 253 &&
-            typeof entry.factor === "number" &&
-            entry.factor >= 0.25 &&
-            entry.factor <= 5,
         );
       if (d.id === "app.layout.presets")
         return parsed.every(

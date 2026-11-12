@@ -1,6 +1,6 @@
 use crate::browser::*;
 use sha2::{Digest, Sha256};
-// Peek, mouse gestures and protected-video reports share the menu's token.
+// Swipes and protected-video reports share the menu's token.
 mod page_signals;
 mod right_click;
 mod selection;
@@ -33,7 +33,6 @@ struct AskContext {
     revision: String,
     content_hash: String,
     page: PageContext,
-    intent: String,
 }
 
 pub(in crate::browser) struct PendingMenu {
@@ -102,7 +101,6 @@ pub(in crate::browser) fn forward(app: &AppHandle, id: &str, url: &Url) -> bool 
             revision: page.document_revision.clone(),
             content_hash: format!("{:x}", Sha256::digest(page.content.as_bytes())),
             page,
-            intent: "ask".into(),
         }
     };
     let app = app.clone();
@@ -122,30 +120,17 @@ struct MenuPresentation {
     actions: Vec<String>,
 }
 
-/// Commands the owning browser workspace runs itself; the menu only names the page they target.
-const WORKSPACE_COMMANDS: [&str; 8] = [
-    "back",
-    "forward",
-    "reload",
-    "bookmark",
-    "qr-code",
-    "annotate",
-    "open-link-split",
-    "peek-link",
-];
-
 fn menu_actions(context: &AskContext) -> Vec<String> {
     let page = &context.page;
-    let mut actions = vec!["ask", "separator"];
+    let mut actions = Vec::new();
     if !page.link.is_empty() {
-        actions.extend(["open-link", "open-link-split", "copy-link", "separator"]);
-        actions.insert(actions.len() - 2, "peek-link");
+        actions.extend(["copy-link", "separator"]);
     }
     if !page.image.is_empty() {
-        actions.extend(["open-image", "copy-image-link", "separator"]);
+        actions.extend(["copy-image-link", "separator"]);
     }
     if page.selection {
-        actions.extend(["copy", "search-web"]);
+        actions.push("copy");
     }
     if page.editable {
         if page.selection {
@@ -155,17 +140,7 @@ fn menu_actions(context: &AskContext) -> Vec<String> {
     }
     // Page commands belong to the page itself, not to a link, image, or selection under the pointer.
     if !page.selection && !page.editable && page.link.is_empty() && page.image.is_empty() {
-        actions.extend([
-            "back",
-            "forward",
-            "reload",
-            "separator",
-            "bookmark",
-            "copy-page-link",
-            "qr-code",
-            "separator",
-            "annotate",
-        ]);
+        actions.extend(["back", "forward", "reload", "separator", "copy-page-link"]);
     }
     #[cfg(debug_assertions)]
     actions.extend(["separator", "inspect"]);

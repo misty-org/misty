@@ -69,7 +69,7 @@ const buttonVariants = cva(
         ],
         // Filters, tags, reactions, and presence: outlined until pressed, then filled.
         chip: [
-          "rounded-full border-charcoal-border/70 text-cream-muted hover:bg-control-hover hover:text-cream",
+          "border-charcoal-border/70 text-cream-muted hover:bg-control-hover hover:text-cream",
           "aria-pressed:border-transparent aria-pressed:bg-charcoal-active aria-pressed:text-cream-bright",
           "data-[state=open]:bg-control-active data-[state=open]:text-cream",
         ],

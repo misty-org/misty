@@ -3,10 +3,12 @@ import {
   conversation,
   fixture,
   openAgentSettings,
+  openChat,
+  openPage,
   renderAgentsPage,
   typeDraft,
 } from "./AgentsPage.testFixtures";
-import { fireEvent, screen, within } from "@testing-library/react";
+import { fireEvent, screen } from "@testing-library/react";
 import { expect, it } from "vitest";
 import { useMistyStore } from "@/features/agents/conversations/state/useMistyStore";
 
@@ -16,9 +18,8 @@ it("opens straight into the agent's New task conversation without a directory", 
   renderAgentsPage();
   expect(screen.queryByRole("heading", { name: "Agents" })).toBeNull();
   expect(screen.getByRole("heading", { name: "What can I do for you?" })).toBeTruthy();
-  const pages = screen.getByRole("navigation", { name: "Agent workspace pages" });
-  expect(within(pages).getByRole("button", { name: "Workflows" })).toBeTruthy();
-  expect(within(pages).queryByRole("button", { name: "Activity" })).toBeNull();
+  // The window's sidebar opens the other pages; the chat's bar has no page tabs.
+  expect(screen.queryByRole("navigation", { name: "Agent workspace pages" })).toBeNull();
   expect(screen.getByRole("button", { name: "Switch agent: Communications" })).toBeTruthy();
   expect(screen.queryByRole("button", { name: "Back to agents" })).toBeNull();
   expect(screen.queryByRole("button", { name: "Agent settings" })).toBeNull();
@@ -76,57 +77,37 @@ it("preserves one conversation draft across catalogs", () => {
   renderAgentsPage();
   const draft = composer();
   typeDraft("Keep this while I browse");
-  fireEvent.click(screen.getByRole("button", { name: "Workflows" }));
-  expect(screen.getByRole("heading", { name: "Workflows", level: 1 })).toBeTruthy();
+  openPage("integrations");
+  expect(document.querySelector(".agent-studio")?.getAttribute("data-page")).toBe("integrations");
   expect(screen.queryByRole("alertdialog")).toBeNull();
   expect(composer()).toBe(draft);
   expect(draft.value).toBe("Keep this while I browse");
-  fireEvent.click(screen.getByRole("button", { name: "Chat" }));
+  openChat("communications", "launch");
   expect(composer()).toBe(draft);
   expect(draft.value).toBe("Keep this while I browse");
   expect(fixture.submit).not.toHaveBeenCalled();
 });
 
-it("requires draft-discard confirmation before filling a template, without submitting it", () => {
-  renderAgentsPage();
-  typeDraft("Original draft");
-  fireEvent.click(screen.getByRole("button", { name: "Workflows" }));
-  const template = () =>
-    screen.getByRole("button", { name: /Research a topic and build a useful report/ });
-  fireEvent.click(template());
-  fireEvent.click(screen.getByRole("button", { name: "Open draft" }));
-  expect(screen.getByRole("alertdialog")).toBeTruthy();
-  fireEvent.click(screen.getByRole("button", { name: "Keep editing" }));
-  expect(composer().value).toBe("Original draft");
-  fireEvent.click(template());
-  fireEvent.click(screen.getByRole("button", { name: "Open draft" }));
-  fireEvent.click(screen.getByRole("button", { name: "Discard and switch" }));
-  expect(composer().value).toContain("Research a topic");
-  expect(fixture.submit).not.toHaveBeenCalled();
-});
-
-it("opens a reusable workflow editor without starting work", () => {
-  renderAgentsPage();
-  fireEvent.click(screen.getByRole("button", { name: "Workflows" }));
-  fireEvent.click(screen.getByRole("button", { name: "New workflow" }));
-  fireEvent.change(nameField(), { target: { value: "My research workflow" } });
-  fireEvent.change(screen.getByLabelText("Instructions"), {
-    target: { value: "Research the chosen topic." },
-  });
-  expect(screen.getByRole("button", { name: "Save workflow" }).hasAttribute("disabled")).toBe(
-    false,
-  );
-  fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
-  expect(fixture.save).not.toHaveBeenCalled();
-  expect(fixture.submit).not.toHaveBeenCalled();
-});
-
-it("opens the existing profile editor from the workspace and guards catalog navigation", () => {
+it("opens the existing profile editor from the workspace and guards page changes", () => {
   renderAgentsPage();
   openAgentSettings();
   fireEvent.change(nameField(), { target: { value: "Unsaved identity" } });
-  fireEvent.click(screen.getByRole("button", { name: "Workflows" }));
+  fireEvent.click(screen.getByRole("button", { name: "Close settings" }));
   expect(screen.getByRole("alertdialog")).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Keep editing" }));
   expect(nameField().value).toBe("Unsaved identity");
+});
+
+it("opens Integrations and Tutor from links, with no title bar", () => {
+  renderAgentsPage("/agents?view=tutor");
+  expect(screen.queryByRole("heading", { name: "Tutor", level: 1 })).toBeNull();
+  expect(screen.getByRole("heading", { name: "Notebooks" })).toBeTruthy();
+  const page = () => document.querySelector(".agent-studio")?.getAttribute("data-page");
+  openPage("integrations");
+  expect(page()).toBe("integrations");
+  expect(document.querySelector(".agent-studio-bar")).toBeNull();
+  openChat();
+  expect(page()).toBe("task");
+  expect(document.querySelector(".agent-studio-bar")).toBeTruthy();
+  expect(composer()).toBeTruthy();
 });

@@ -22,7 +22,6 @@ struct WorkspaceState {
     foreground_pending: HashMap<String, VecDeque<Value>>,
     leases: HashMap<String, Lease>,
     scopes: HashMap<String, Scope>,
-    browser_session_id: Option<String>,
 }
 struct Lease {
     agent: String,
@@ -214,14 +213,6 @@ pub fn agent_workspace_bind_scope(
     }
     inner.scopes.insert(scope_id, scope);
     Ok(())
-}
-#[tauri::command]
-pub fn agent_browser_session_id(state: State<'_, AgentWorkspaceState>) -> Result<String, String> {
-    let mut inner = state.0.lock().map_err(|_| "agent_workspace_unavailable")?;
-    Ok(inner
-        .browser_session_id
-        .get_or_insert_with(|| uuid::Uuid::new_v4().to_string())
-        .clone())
 }
 
 mod requests;

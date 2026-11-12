@@ -118,24 +118,6 @@ pub fn browser_agent_execution_cancel(
     revoke_execution_grant(&app, &browser, &entry.scope, &entry.grant)
 }
 #[tauri::command]
-pub fn browser_agent_execution_renew(
-    state: State<'_, BrowserExecutionState>,
-    request: ExecutionControlRequest,
-) -> Result<(), String> {
-    let entry = control(&state, &request, false)?;
-    let next = instant(&request.lease_expires_at)?.min(entry.deadline);
-    let mut inner = entry
-        .inner
-        .lock()
-        .map_err(|_| "device_control_unavailable")?;
-    if inner.stopped || inner.lease <= Instant::now() {
-        return Err("device_execution_stopped".into());
-    }
-    inner.lease = inner.lease.max(next);
-    entry.changed.notify_one();
-    Ok(())
-}
-#[tauri::command]
 pub async fn browser_agent_execute_bounded(
     caller: tauri::Webview,
     app: AppHandle,

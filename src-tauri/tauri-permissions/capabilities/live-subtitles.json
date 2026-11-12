@@ -1,1 +1,0 @@
-{"identifier":"live-subtitles","description":"Presentation-only live subtitles panel inside a Misty window: draws what that window sends, and can move and resize itself within it","platforms":["macOS","windows"],"webviews":["misty-live-subtitles-*"],"permissions":["core:event:default","allow-voice-subtitles-frame"]}

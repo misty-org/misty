@@ -1,43 +1,34 @@
-import { runtimeAiApi, subscribeAgentsInvocation } from "@/features/agents/AgentsRuntime";
-import type {
-  GlobalAiConversation,
-  GlobalAiMessage,
-} from "../conversations/state/conversationTypes";
+import { runtimeAiApi } from "@/features/agents/AgentsRuntime";
+import type { GlobalAiConversation } from "../conversations/state/conversationTypes";
+import {
+  followReply as follow,
+  isFollowingRun,
+  latestReply as laneReply,
+} from "../conversations/state/backgroundReplies";
 import { newLocalConversation } from "../conversations/state/localConversation";
 import {
-  applyGlobalInvocationEvent,
   conversationMessage,
-  flushStreamedText,
   patchConversationMessage,
   settleConversationMessage,
 } from "../conversations/state/mistyStoreUpdates";
 import { useMistyStore } from "../conversations/state/useMistyStore";
-import { followAddress } from "../runs/local-run/localRunParts";
 import { errorText, type Multirun, type MultirunLane } from "./multirunApi";
 import { laneTitle } from "./multirunLogic";
 
 /**
  * A multi-run's lanes are ordinary chats, one per agent, so each has its transcript, its
- * approvals and its follow-ups like any other. The chat store follows one run at a time, so the
- * lanes are followed here instead: several at once, each into its own chat's reply.
+ * approvals and its follow-ups like any other. Their runs are followed in the background, several
+ * at once, each into its own chat's reply (`backgroundReplies.ts`).
  */
 
 const set = useMistyStore.setState;
 const get = useMistyStore.getState;
 
-/** Runs being followed, by run id, and chats whose run is being started. */
-const following = new Set<string>();
+/** Chats whose run is being started. */
 const starting = new Set<string>();
 
 /** A lane's reply: the last thing its agent said in the lane's chat. */
-export function laneReply(
-  conversations: readonly GlobalAiConversation[],
-  conversationId: string,
-): GlobalAiMessage | undefined {
-  const chat = conversations.find((item) => item.id === conversationId);
-  const replies = chat?.messages.filter((message) => message.role === "assistant");
-  return replies?.[replies.length - 1];
-}
+export { laneReply };
 
 /** One new chat per agent, holding the task and an empty reply. Not shown until `showLaneChats`. */
 export function draftLaneChats(task: string, agentIds: readonly string[]): GlobalAiConversation[] {
@@ -54,38 +45,6 @@ export function draftLaneChats(task: string, agentIds: readonly string[]): Globa
 export function showLaneChats(chats: GlobalAiConversation[]) {
   for (const chat of chats) starting.add(chat.id);
   set({ conversations: [...chats, ...get().conversations] });
-}
-
-type Ending = Partial<GlobalAiMessage> & { state: "completed" | "failed" | "canceled" };
-
-function follow(conversationId: string, messageId: string, runId: string) {
-  if (following.has(runId)) return;
-  following.add(runId);
-  let stop = () => {};
-  let ended = false;
-  const said = () => laneReply(get().conversations, conversationId)?.content ?? "";
-  const end = (ending: Ending) => {
-    if (ended) return;
-    ended = true;
-    following.delete(runId);
-    flushStreamedText();
-    settleConversationMessage(set, get, conversationId, messageId, { retryable: false, ...ending });
-    stop();
-  };
-  stop = subscribeAgentsInvocation(followAddress(runId), {
-    onEvent: (event) => {
-      if (ended) return;
-      // The chat store's own handling of an ending also ends whichever run it is following,
-      // which may be another chat's, so a lane's ending is applied here.
-      if (event.type === "invocation.completed") end({ state: "completed" });
-      else if (event.type === "invocation.failed") end({ state: "failed", content: event.error });
-      else if (event.type === "invocation.canceled")
-        end({ state: "canceled", content: said() || "This run was stopped." });
-      else applyGlobalInvocationEvent(set, get, conversationId, messageId, event);
-    },
-    onError: (error) => end({ state: "failed", content: said() || error.message }),
-  });
-  if (ended) stop();
 }
 
 /** Starts a lane's agent on the task, in the lane's worktree, and follows it into its chat. */
@@ -131,7 +90,7 @@ export async function resumeLanes(runs: readonly Multirun[]) {
     if (!reply || starting.has(lane.conversationId)) continue;
     if (reply.state !== "pending" && reply.state !== "streaming") continue;
     const runId = reply.invocationId;
-    const settle = (ending: Ending) =>
+    const settle = (ending: Parameters<typeof settleConversationMessage>[4]) =>
       settleConversationMessage(set, get, lane.conversationId, reply.id, {
         retryable: false,
         ...ending,
@@ -141,7 +100,7 @@ export async function resumeLanes(runs: readonly Multirun[]) {
       continue;
     }
     // The chat store may have picked this one up itself as the window loaded.
-    if (following.has(runId) || get().invocationId === runId) continue;
+    if (isFollowingRun(runId) || get().invocationId === runId) continue;
     const { state } = await runtimeAiApi.invocationState(runId).catch(() => ({ state: "" }));
     if (state === "completed") settle({ state: "completed" });
     else if (state === "canceled") settle({ state: "canceled" });

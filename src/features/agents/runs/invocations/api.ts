@@ -1,4 +1,3 @@
-import { deviceMemory } from "@/api/runtime/device-memory";
 import { localRunActivity } from "@/features/agents/localRun";
 import { invoke } from "@/native/invoke";
 import type {
@@ -14,7 +13,7 @@ import type { MistyActivityEntry } from "../../conversations/state/activity";
 
 export * from "./aiSettingsTypes";
 export { subscribeToAiInvocation } from "./invocationSubscription";
-import type { AiMemoryRecord, ScreenLocation } from "./aiSettingsTypes";
+import type { ScreenLocation } from "./aiSettingsTypes";
 import { changeAgentSettings, readAgentSettings } from "./localAiSettings";
 import { completeLocalArtifact, decideLocalArtifact } from "../local-run/artifacts";
 import { localRunProgress, localRunState } from "../local-run/runState";
@@ -22,12 +21,8 @@ import { startLocalRun } from "../local-run/startRun";
 
 export const aiSurfaceApi = {
   settings: async () => ({ settings: await readAgentSettings() }),
-  updateSettings: (enabled: boolean, retentionDays: number, memoryEnabled?: boolean) =>
-    changeAgentSettings({
-      enabled,
-      retention_days: retentionDays,
-      ...(memoryEnabled === undefined ? {} : { memory_enabled: memoryEnabled }),
-    }),
+  updateSettings: (enabled: boolean, retentionDays: number) =>
+    changeAgentSettings({ enabled, retention_days: retentionDays }),
   updateScreenLocation: (location: ScreenLocation) =>
     changeAgentSettings({ screen_location: location }),
   updateAgentSites: (change: { block_sensitive?: boolean; blocked_sites?: string[] }) =>
@@ -41,11 +36,6 @@ export const aiSurfaceApi = {
   updatePaymentsAsk: (paymentsAsk: boolean) => changeAgentSettings({ payments_ask: paymentsAsk }),
   updateKeepAwake: (keepAwake: boolean) =>
     changeAgentSettings({ keep_awake_for_agents: keepAwake }),
-  memories: async (): Promise<{ memories: AiMemoryRecord[] }> => ({
-    memories: await deviceMemory.prefs({ space_id: "", agent_id: "" }),
-  }),
-  forgetMemory: (memoryId: string) =>
-    deviceMemory.forgetPref({ space_id: "", agent_id: "", id: memoryId }),
   activity: async (
     _spaceId: string,
     agentId?: string,

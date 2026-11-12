@@ -61,7 +61,7 @@ export function createSubmitAnswer(set: MistySet, get: MistyGet): MistyState["su
       prompt: normalized,
       attachments,
       echoed: !(companion?.idempotencyKey?.startsWith("voice-") || companion?.continuation),
-      conversationId: origin?.conversationId ?? get().browserRequest?.conversationId,
+      conversationId: origin?.conversationId,
     });
     const { userMessage, assistantMessage, isEcho, unshow } = echo;
     set({
@@ -72,15 +72,6 @@ export function createSubmitAnswer(set: MistySet, get: MistyGet): MistyState["su
       invocationConversationId: undefined,
       ...echo.patch,
     });
-    const browserRequest = get().browserRequest;
-    if (browserRequest && !origin) {
-      origin = {
-        conversationId: browserRequest.conversationId,
-        context: structuredClone(browserRequest.context),
-      };
-      selection = structuredClone(browserRequest.selection);
-      deviceContexts = structuredClone(browserRequest.deviceContexts);
-    }
     const accountId = get().accountId;
     const requestState = origin
       ? {
@@ -99,7 +90,6 @@ export function createSubmitAnswer(set: MistySet, get: MistyGet): MistyState["su
       epoch,
       spaceId,
       origin,
-      browserRequest,
       handoff,
       companion,
       requestAgentId: requestState.selectedAgentId,
@@ -174,7 +164,7 @@ export function createSubmitAnswer(set: MistySet, get: MistyGet): MistyState["su
     const collaborationMode = companion?.collaborationMode ?? modes.collaborationMode;
     echo.settle(conversationId);
     // The server names a new conversation with a separate model call; until then its title is a skeleton.
-    if (startsConversation && !companion?.continuation && !companion?.schedule)
+    if (startsConversation && !companion?.continuation)
       awaitConversationTitle(conversationId, normalized, normalized.slice(0, 56));
     updateConversation(set, get, conversationId, (conversation) =>
       openTurn(conversation, {
@@ -184,7 +174,6 @@ export function createSubmitAnswer(set: MistySet, get: MistyGet): MistyState["su
         isEcho,
         echoed: echo.echoed,
         continuation: Boolean(companion?.continuation),
-        keepTitle: Boolean(companion?.schedule),
         reasoningEffort: thinkingEffort(requestedThinking),
       }),
     );
@@ -194,7 +183,7 @@ export function createSubmitAnswer(set: MistySet, get: MistyGet): MistyState["su
       working: true,
       error: null,
       query: "",
-      context: browserRequest?.context ?? [],
+      context: [],
     });
     replaceActiveGlobalInvocationStream();
     await startInvocation(set, get, {

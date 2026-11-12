@@ -19,25 +19,8 @@ pub(crate) use crate::browser::site_icons::{
 };
 #[cfg(desktop)]
 pub(crate) use crate::browser::site_settings::permissions::{
-    __cmd__browser_site_info, __cmd__browser_site_permission_answer,
     __cmd__browser_site_permissions_list, __cmd__browser_site_permissions_reset,
-    __cmd__browser_site_permissions_set, __tauri_command_name_browser_site_info,
-    __tauri_command_name_browser_site_permission_answer,
     __tauri_command_name_browser_site_permissions_list,
-    __tauri_command_name_browser_site_permissions_reset,
-    __tauri_command_name_browser_site_permissions_set, browser_site_info,
-    browser_site_permission_answer, browser_site_permissions_list, browser_site_permissions_reset,
-    browser_site_permissions_set,
-};
-#[cfg(any(all(desktop, desktop), desktop))]
-pub(crate) use crate::browser::site_settings::style::{
-    __cmd__browser_set_site_styles, __cmd__browser_webview_pick_element,
-    __tauri_command_name_browser_set_site_styles,
-    __tauri_command_name_browser_webview_pick_element, browser_set_site_styles,
-    browser_webview_pick_element,
-};
-#[cfg(desktop)]
-pub(crate) use crate::browser::site_settings::zoom::{
-    __cmd__browser_set_site_zoom_levels, __tauri_command_name_browser_set_site_zoom_levels,
-    browser_set_site_zoom_levels,
+    __tauri_command_name_browser_site_permissions_reset, browser_site_permissions_list,
+    browser_site_permissions_reset,
 };

@@ -14,10 +14,19 @@ pub(crate) struct RunFacts {
     pub(crate) agent_id: String,
     pub(crate) task_id: String,
     pub(crate) auto: bool,
+    /// The person chose Bypass for an outside engine: it gets its own skip-permissions flag,
+    /// and Misty's own tools still pass this gate as in Auto.
+    pub(crate) bypass: bool,
     pub(crate) planning: bool,
     /// What the person asked for. Empty for a sub-agent: its request is another model's words.
     pub(crate) person_prompt: String,
     pub(crate) parent_run_id: String,
+    /// The run is on an outside engine, which drives Misty's browser itself.
+    pub(crate) engine: bool,
+    /// The tools this run may use (its agent's list). Empty allows every tool.
+    pub(crate) allowed_tools: Vec<String>,
+    /// The person turned on screen and input control for this send.
+    pub(crate) computer_use: bool,
 }
 
 impl RunFacts {
@@ -44,7 +53,8 @@ impl RunFacts {
             account: text("account"),
             agent_id: text("agent_id"),
             task_id: text("task_id"),
-            auto: text("permission_mode") == "auto",
+            auto: matches!(text("permission_mode").as_str(), "auto" | "bypass"),
+            bypass: text("permission_mode") == "bypass",
             planning: mode == "plan" && !chat.is_empty(),
             person_prompt: if delegated {
                 String::new()
@@ -52,6 +62,20 @@ impl RunFacts {
                 text("prompt")
             },
             parent_run_id: text("parent_run_id"),
+            engine: body["engine"]["id"]
+                .as_str()
+                .is_some_and(|id| !id.is_empty()),
+            allowed_tools: body["allowed_tools"]
+                .as_array()
+                .map(|tools| {
+                    tools
+                        .iter()
+                        .filter_map(Value::as_str)
+                        .map(str::to_owned)
+                        .collect()
+                })
+                .unwrap_or_default(),
+            computer_use: body["computer_use"].as_bool() == Some(true),
         }
     }
 }
@@ -73,10 +97,6 @@ const ASK_MODE_STOPS: &[&str] = &[
     "folder.send",
     "item.delete",
     "item.rename",
-    "memory.pref.forget",
-    "memory.pref.remember",
-    "memory.pref.update",
-    "memory.workflow.unschedule",
     "message.send",
     "note.create",
     "note.tag",
@@ -85,21 +105,6 @@ const ASK_MODE_STOPS: &[&str] = &[
     "space.manage",
     "thread.create",
     "thread.post",
-];
-
-/// A saved workflow later runs as the person's own request in Auto, so a page must never be able to
-/// plant one: these stop in both modes.
-const ALWAYS_STOPS: &[&str] = &[
-    "memory.workflow.save",
-    "memory.workflow.learn",
-    "memory.workflow.schedule",
-];
-
-/// A person's browsing history is theirs to hand over, whatever the mode.
-const HISTORY_STOPS: &[&str] = &[
-    "memory.history.search",
-    "memory.history.timeline",
-    "memory.tree.read",
 ];
 
 /// What Plan mode refuses whatever the catalog offered: tools that change something on this computer.
@@ -116,6 +121,46 @@ const PLAN_REFUSES: &[&str] = &[
     "screen.open",
     "shell.run",
 ];
+
+/// Screen and input control (`features/computer_use`): what only looks.
+pub(crate) const COMPUTER_READS: &[&str] = &[
+    "computer.screenshot",
+    "computer.list_displays",
+    "computer.get_app_state",
+    "computer.wait",
+];
+
+/// Screen and input control that acts on the person's computer. Ask asks before each one, Auto
+/// and Bypass go on, and Plan refuses them.
+pub(crate) const COMPUTER_ACTS: &[&str] = &[
+    "computer.mouse_move",
+    "computer.left_click",
+    "computer.right_click",
+    "computer.middle_click",
+    "computer.double_click",
+    "computer.drag",
+    "computer.scroll",
+    "computer.type_text",
+    "computer.press_key",
+    "computer.press_element",
+    "computer.set_element_value",
+    "computer.sequence",
+];
+
+/// Whether a tool is allowed by the run's list. The tools a run needs to talk to the person and
+/// to report are never left out.
+fn allowed_by_list(facts: &RunFacts, name: &str) -> bool {
+    const ALWAYS: &[&str] = &["conversation.ask_user", "goal.update", "log.work.write"];
+    facts.allowed_tools.is_empty()
+        || ALWAYS.contains(&name)
+        || facts.allowed_tools.iter().any(|allowed| {
+            allowed == name
+                || allowed
+                    .strip_suffix(".*")
+                    .or_else(|| allowed.strip_suffix('*'))
+                    .is_some_and(|family| name.starts_with(family))
+        })
+}
 
 /// The tools that open an address, and the field that names it.
 pub(crate) const URL_TOOLS: &[&str] = &["browser.navigate", "screen.open", "web.fetch"];
@@ -201,6 +246,34 @@ fn private_address_refusal(facts: &RunFacts, url: &str) -> Option<Decision> {
 /// One call's verdict. Reads whose results an instruction could hide in never stop here, unless a
 /// private read came first.
 pub(crate) fn decide(facts: &RunFacts, taint: &Taint, name: &str, input: &Value) -> Decision {
+    if !allowed_by_list(facts, name) {
+        return Decision::Refuse {
+            code: "tool_not_allowed",
+            message: format!("This agent isn't allowed to use {name}. Nothing was done."),
+        };
+    }
+    let computer = COMPUTER_ACTS.contains(&name) || COMPUTER_READS.contains(&name);
+    if computer && !facts.computer_use {
+        return Decision::Refuse {
+            code: "computer_use_off",
+            message: "Screen control is off for this message. The person turns it on when they send."
+                .to_owned(),
+        };
+    }
+    if facts.planning && COMPUTER_ACTS.contains(&name) {
+        return Decision::Refuse {
+            code: "plan_mode",
+            message: "Plan mode is read-only. Put this action in the plan as a step instead."
+                .to_owned(),
+        };
+    }
+    if COMPUTER_ACTS.contains(&name) {
+        return if facts.auto || facts.bypass {
+            Decision::Run
+        } else {
+            ask("This acts on your screen with Misty's cursor.")
+        };
+    }
     if facts.planning && PLAN_REFUSES.contains(&name) {
         return Decision::Refuse {
             code: "plan_mode",
@@ -232,21 +305,6 @@ pub(crate) fn decide(facts: &RunFacts, taint: &Taint, name: &str, input: &Value)
             }
         }
     }
-    if ALWAYS_STOPS.contains(&name) {
-        return ask("A saved workflow runs later as your own request.");
-    }
-    if HISTORY_STOPS.contains(&name) {
-        return ask("");
-    }
-    if name == "memory.history.forget" {
-        return Decision::Ask {
-            kind: "delete",
-            why: String::new(),
-        };
-    }
-    if name == "memory.pref.remember" && taint.page_read {
-        return ask("This run read a web page, which may be where this came from.");
-    }
     if name == "agent.configure" && !text(input, "instructions").trim().is_empty() {
         return ask("These instructions go into the agent's every run.");
     }
@@ -259,7 +317,12 @@ pub(crate) fn decide(facts: &RunFacts, taint: &Taint, name: &str, input: &Value)
             why: String::new(),
         };
     }
-    if !facts.auto && (ASK_MODE_STOPS.contains(&name) || (name == "screen.open" && !url.is_empty()))
+    // An engine opens and reads pages freely and asks before it acts on one; where it may go is
+    // still settled above, by the address.
+    let opens_page = name == "browser.navigate" || name == "screen.open";
+    if !facts.auto
+        && !(facts.engine && opens_page)
+        && (ASK_MODE_STOPS.contains(&name) || (name == "screen.open" && !url.is_empty()))
     {
         return ask("");
     }

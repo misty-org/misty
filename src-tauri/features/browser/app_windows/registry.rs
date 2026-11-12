@@ -2,10 +2,9 @@
 //! in `misty.db` (`saved`), with nothing secret in it.
 //!
 //! Each account (or nobody signed in, `local`) has its own list. The store a profile's pages
-//! open in comes from here and never from a vault, so creating or destroying a vault changes
-//! nothing about where someone's sign-ins are. The store this computer has always browsed in
-//! belongs to the first account to ask for it, so nobody is signed out by an upgrade or by
-//! signing in.
+//! open in comes from here, and stays on this computer. The store this computer has always
+//! browsed in belongs to the first account to ask for it, so nobody is signed out by an upgrade
+//! or by signing in.
 use super::saved::{self, Saved};
 use super::*;
 use serde::Deserialize;
@@ -37,6 +36,9 @@ pub struct OpenWindow {
     pub window_id: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub space: Option<String>,
+    /// Where the window was and how big (`window_geometry`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub geometry: Option<super::window_geometry::SavedGeometry>,
 }
 
 #[derive(Default)]
@@ -120,6 +122,7 @@ pub(super) fn save(state: &Registry) {
         .filter(|(label, _)| is_person_window(label))
         .map(|(_, window)| OpenWindow {
             profile: window.profile,
+            geometry: super::window_geometry::geometry_for(&window.window_id),
             window_id: window.window_id,
             space: window.space,
         })

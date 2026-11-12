@@ -8,14 +8,12 @@ use kiri::channel::{HostChannel, HostMessage};
 mod messages;
 use messages::*;
 mod page_background;
-#[cfg(any(target_os = "macos", windows))]
-pub(in crate::browser) use page_background::apply_page_background;
 use page_background::page_backgrounds;
 #[cfg(target_os = "macos")]
 pub(in crate::browser) use page_background::replay_page_background;
 #[cfg(any(target_os = "macos", windows))]
 use page_background::set_under_page_background;
-pub(in crate::browser) use page_background::{forget_page_background, reported_page_background};
+pub(in crate::browser) use page_background::forget_page_background;
 use std::sync::OnceLock;
 
 fn trusted(app: &AppHandle, id: &str, token: &str) -> bool {

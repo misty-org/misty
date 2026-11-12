@@ -1,4 +1,4 @@
-//! Deleting visits: single visits, every visit to a page, or a time range.
+//! Deleting visits: a time range, or every visit of a deleted profile.
 use super::*;
 
 #[derive(Debug, Deserialize)]
@@ -15,11 +15,6 @@ pub(super) fn browser_history_clear_blocking(
 ) -> Result<(), String> {
     let since = request.since.unwrap_or(0);
     let connection = library(&app)?;
-    mark_dirty(
-        &connection,
-        "profile_id = ?1 AND visited_at >= ?2",
-        params![profile, since],
-    )?;
     connection
         .execute(
             "DELETE FROM visits WHERE profile_id = ?1 AND visited_at >= ?2",
@@ -29,23 +24,8 @@ pub(super) fn browser_history_clear_blocking(
     Ok(())
 }
 
-/// Records the hours of visits about to be deleted, so their synced batches
-/// are rewritten without them (on every device, not just this one).
-pub(super) fn mark_dirty(
-    connection: &rusqlite::Connection,
-    filter: &str,
-    values: impl rusqlite::Params,
-) -> Result<(), String> {
-    connection
-        .execute(
-            &format!(
-                "INSERT OR REPLACE INTO history_dirty(profile_id, origin, hour, marked_at)
-                 SELECT DISTINCT profile_id, origin, visited_at / 3600000,
-                        CAST(unixepoch('subsec') * 1000 AS INTEGER)
-                 FROM visits WHERE {filter}"
-            ),
-            values,
-        )
-        .map(|_| ())
-        .map_err(|error| error.to_string())
+/// Deletes every visit of a profile that was deleted.
+pub(crate) fn forget_profile(connection: &rusqlite::Connection, key: &str) -> rusqlite::Result<()> {
+    connection.execute("DELETE FROM visits WHERE profile_id = ?1", params![key])?;
+    Ok(())
 }

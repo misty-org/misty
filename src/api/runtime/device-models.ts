@@ -6,7 +6,6 @@ type DeviceModelCall =
   | "voice-transcription"
   | "screen-model"
   | "refine-point"
-  | "subtitle-context"
   | "extract"
   | "embed"
   | "day-summary"

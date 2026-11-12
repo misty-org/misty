@@ -7,6 +7,10 @@ use capture::companion_capture_size;
 pub use capture::{capture_display, capture_window};
 mod foreground;
 pub use foreground::*;
+#[cfg(target_os = "linux")]
+mod linux;
+#[cfg(target_os = "linux")]
+pub use linux::{cursor, foreground_window, position_overlay, x11_window_id};
 
 #[cfg(target_os = "macos")]
 fn overlay_frame(display: &super::Display, main_height: f64) -> objc2_foundation::NSRect {
@@ -87,6 +91,10 @@ mod access;
 pub use access::{microphone_access, screen_access};
 
 pub fn configure_overlay(window: &tauri::WebviewWindow) -> Result<(), String> {
+    // Unfocusable, click-through and above everything (desktop_control/linux/overlay.rs).
+    #[cfg(target_os = "linux")]
+    crate::agents::desktop_control::linux::overlay::prepare(window)?;
+    #[cfg(not(target_os = "linux"))]
     window
         .set_ignore_cursor_events(true)
         .map_err(|e| e.to_string())?;
@@ -128,6 +136,9 @@ pub fn configure_overlay(window: &tauri::WebviewWindow) -> Result<(), String> {
 /// that goes fullscreen afterwards can cover it, so it is asserted again on
 /// every show.
 pub fn show_overlay(window: &tauri::WebviewWindow) {
+    #[cfg(target_os = "linux")]
+    crate::agents::desktop_control::linux::overlay::show(window);
+    #[cfg(not(target_os = "linux"))]
     let _ = window.show();
     #[cfg(windows)]
     if let Ok(hwnd) = window.hwnd() {

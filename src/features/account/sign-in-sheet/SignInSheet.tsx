@@ -1,4 +1,4 @@
-import { mistyProServer, useServerChoice } from "@/api/deployment/serverChoice";
+import { mistyCloudServer, useServerChoice } from "@/api/deployment/serverChoice";
 import { isAuthPath, routes } from "@/app/shell/routes";
 import { setupFlow, type SetupStep } from "../setup/setupFlow";
 import { useSetupStore } from "../setup/useSetupStore";
@@ -55,7 +55,7 @@ export function SignInSheet() {
   const initialEmail = useSignInSheetStore((state) => state.email);
   const close = useSignInSheetStore((state) => state.close);
   const choice = useServerChoice((state) => state.choice);
-  const { browseOnly, switchToMistyPro } = useServerSwitch();
+  const { chooseNoServer, switchToMistyCloud } = useServerSwitch();
   const finishWelcome = useSetupStore((state) => state.finishWelcome);
   const askTabSide = useSetupStore((state) => state.askTabSide);
   const linkRevision = useSetupLinkStore((state) => state.revision);
@@ -80,7 +80,7 @@ export function SignInSheet() {
   useEffect(() => {
     if (!reason || isSetupReason(reason)) return;
     close();
-    const from = isAuthPath(location.pathname) ? routes.browser : location.pathname;
+    const from = isAuthPath(location.pathname) ? routes.agents : location.pathname;
     if (reason === "expired")
       navigate(routes.signIn, {
         state: { from, addingAccount: true, reauthenticateEmail: initialEmail },
@@ -134,7 +134,7 @@ export function SignInSheet() {
       finishWelcome();
       // A wizard that already asked (outside the native app) has nothing left for the browser.
       if (!setupSteps.includes("tabs")) askTabSide();
-      navigate(routes.browser, { replace: true });
+      navigate(routes.agents, { replace: true });
     }
     close();
   };
@@ -167,8 +167,8 @@ export function SignInSheet() {
     setBusy(true);
     const chosen =
       target === "cloud"
-        ? switchToMistyPro().then(() => setScreen("signin"))
-        : browseOnly().then(afterAccount);
+        ? switchToMistyCloud().then(() => setScreen("signin"))
+        : chooseNoServer().then(afterAccount);
     void chosen
       .catch((cause) => setError(cause instanceof Error ? cause.message : String(cause)))
       .finally(() => setBusy(false));
@@ -177,7 +177,7 @@ export function SignInSheet() {
   const host =
     choice?.mode !== "server"
       ? ""
-      : choice.url === mistyProServer()
+      : choice.url === mistyCloudServer()
         ? "Misty Pro"
         : serverHost(choice.url);
   const title = setupStep

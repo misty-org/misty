@@ -137,3 +137,31 @@ pub fn keep_session(
         .map(|_| ())
         .map_err(text)
 }
+
+/// Forgets the engine's session for a chat (`/clear`): the next turn starts a new one.
+pub fn forget_session(store: &Store, account: &str, conversation: &str) -> Result<(), String> {
+    store
+        .connect()
+        .map_err(text)?
+        .execute(
+            "DELETE FROM engine_sessions WHERE account = ?1 AND conversation_id = ?2",
+            [account, conversation],
+        )
+        .map(|_| ())
+        .map_err(text)
+}
+
+
+/// The engine session a chat last ran: its engine, session id and folder.
+pub fn chat_session(store: &Store, account: &str, conversation: &str) -> Option<(String, String, String)> {
+    store
+        .connect()
+        .ok()?
+        .query_row(
+            "SELECT engine, session_id, folder FROM engine_sessions
+             WHERE account = ?1 AND conversation_id = ?2 ORDER BY updated_at DESC LIMIT 1",
+            [account, conversation],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+        )
+        .ok()
+}

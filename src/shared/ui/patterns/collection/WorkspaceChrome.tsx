@@ -1,4 +1,4 @@
-import type { ComponentProps, ReactNode } from "react";
+import type { ComponentProps } from "react";
 import { cn } from "../../classNames";
 
 /** Shared geometry for tool navigation and collection workspaces. */
@@ -12,34 +12,5 @@ export function WorkspaceSidebar({ className, ...props }: ComponentProps<"aside"
       )}
       {...props}
     />
-  );
-}
-
-export function WorkspaceSectionLabel({
-  children,
-  actions,
-  compact = false,
-  className,
-}: {
-  children: ReactNode;
-  actions?: ReactNode;
-  compact?: boolean;
-  className?: string;
-}) {
-  return (
-    <div
-      className={cn(
-        "flex min-h-6 items-center justify-between gap-2 px-2",
-        // The label sits tight on the list it names; the space above separates the sections.
-        !compact && "mt-4",
-        className,
-      )}
-    >
-      {/* Sidebar titles read lighter than the muted rows beneath them. */}
-      <h2 className={cn("text-xs font-medium", compact ? "text-cream-muted" : "text-cream")}>
-        {children}
-      </h2>
-      {actions}
-    </div>
   );
 }

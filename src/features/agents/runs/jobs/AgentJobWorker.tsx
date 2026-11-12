@@ -1,7 +1,6 @@
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { useEffect, useState } from "react";
 import { useAgentAccountId } from "../../personal/agentAccount";
-import { DeviceEmbeddingWorker } from "../../personal/deviceEmbeddings";
 import { endAllHostedSessions } from "../hosted-sessions/hostedSessions";
 import { startLocalToolHost } from "../../tools/host";
 import { startLocalRunWork } from "../../tools";
@@ -36,9 +35,6 @@ export function AgentJobWorker() {
   useEffect(() => {
     if (!hasTauriInternals() || !host) return;
     const stopRunWork = startLocalRunWork();
-    // The vectors memory ranks by are made here too.
-    const embeddings = new DeviceEmbeddingWorker();
-    embeddings.start();
     // This computer stays awake while its own agent task runs.
     const unwatch = watchLocalExecutionForKeepAwake((listener) => {
       const running = (state: ReturnType<typeof useLocalExecution.getState>) =>
@@ -47,7 +43,6 @@ export function AgentJobWorker() {
       return useLocalExecution.subscribe((state) => listener(running(state)));
     });
     return () => {
-      embeddings.stop();
       stopRunWork();
       unwatch();
       // The agent's own sessions end with this account here.

@@ -1,8 +1,8 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
-const defaultAppRoute = "/browser";
-const workspaceRoutes = ["/browser", "/agents", "/spaces"];
+const defaultAppRoute = "/agents";
+const workspaceRoutes = ["/agents", "/spaces"];
 
 interface AppRouteMemoryStore {
   lastAppRoute: string;
@@ -42,10 +42,9 @@ export function isRememberableAppRoute(path: string): boolean {
 function normalizeRememberedRoute(path: string): string | null {
   if (typeof path !== "string") return null;
   const pathname = path.split(/[?#]/, 1)[0];
-  if (["/home", "/new", "/apps/browser"].includes(pathname)) return defaultAppRoute;
+  if (["/home", "/new", "/browser", "/apps/browser"].includes(pathname)) return defaultAppRoute;
   if (pathname === "/apps/agents") return path.replace("/apps/agents", "/agents");
   if (!workspaceRoutes.some((route) => pathname === route || pathname.startsWith(`${route}/`)))
     return null;
-  // URLs and navigation history belong to the browser tab, not shell route memory.
-  return pathname === "/browser" ? defaultAppRoute : path.split("#", 1)[0];
+  return path.split("#", 1)[0];
 }

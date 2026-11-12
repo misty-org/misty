@@ -15,61 +15,28 @@
   /* Content that grows past the fold must not narrow the page and shift it sideways. */
   scrollbar-gutter: stable;
 }
-.agent-studio-heading {
+/* A page's first row: the agent switcher, then its own controls. Pages have no title bar. */
+.agent-studio-lead {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
-  gap: 25px;
+  gap: 12px;
+  min-height: 36px;
+  margin-bottom: 20px;
 }
-.agent-studio-heading h1 {
-  font-size: 20px;
-  font-weight: 600;
-  line-height: 30px;
-  letter-spacing: -0.02em;
-  margin: 0;
+.agent-studio-lead .agent-avatar {
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
 }
-.agent-studio-heading p {
-  font-size: 14px;
-  color: var(--color-cream-muted);
-  margin-top: 9px;
-}
-.agent-studio-heading > button,
-.agent-studio-heading > div + button {
+.agent-studio-lead > button:last-child {
   font-size: 13px;
-  height: 36px;
+  height: 34px;
 }
-.agent-studio-workflows {
+.agent-studio-catalog-page {
   width: 960px;
-  max-width: calc(100% - 64px);
-  margin: 32px auto 70px;
-}
-.agent-studio-workflow-empty {
-  text-align: center;
-  margin: 58px auto 35px;
-  max-width: 560px;
-}
-.agent-studio-workflow-empty > svg {
-  color: var(--color-cream-muted);
-  margin: 0 auto 14px;
-  display: block;
-}
-.agent-studio-workflow-empty h2 {
-  font-size: 16px;
-  font-weight: 500;
-  margin-bottom: 8px;
-}
-.agent-studio-workflow-empty p {
-  font-size: 14px;
-  line-height: 1.7;
-  color: var(--color-cream-muted);
-}
-.agent-studio-workflow-empty code {
-  font-family: inherit;
-  font-size: 12px;
-  background: var(--color-charcoal-hover);
-  border-radius: 5px;
-  padding: 2px 6px;
-  color: var(--color-cream);
+  max-width: calc(100% - 32px);
+  margin: 12px auto 32px;
 }
 .agent-studio-grid {
   display: grid;

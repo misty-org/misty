@@ -7,7 +7,6 @@ use std::sync::{atomic::Ordering, Arc};
 
 use tokio::sync::Mutex as AsyncMutex;
 
-use crate::browser_replay::{run_browser_replay, valid_replay, ReplayOutcome};
 use crate::control_plane_steps::{checkpoint, HarnessCompletion};
 use crate::js_json::JsValue;
 use crate::model_budget::model_turn_limit;
@@ -173,21 +172,6 @@ impl RunLoop {
     async fn before_first_turn(&mut self) -> Result<Option<RunResult>, RuntimeError> {
         let mut messages = initial_messages(&self.shared.context.task_input());
         self.state.plain_tail = messages.len();
-        if let Some(replay) = self.shared.context.browser_replay.as_ref().and_then(valid_replay) {
-            // A workflow that ran before replays its saved browser steps without a model; the agent takes
-            // over at the first step the page no longer matches.
-            let advertised = self.tools.advertised.clone();
-            match run_browser_replay(&replay, self.shared.as_ref(), |name| advertised.contains(name)).await? {
-                ReplayOutcome::Completed { text, .. } | ReplayOutcome::Handoff { text } => return self.finish(HarnessCompletion::success(text)).await.map(Some),
-                ReplayOutcome::Stopped { text } => return self.finish(HarnessCompletion::ended("incomplete", text.as_str(), "tool_sequence_stopped", &text)).await.map(Some),
-                ReplayOutcome::Diverged { note, .. } => {
-                    if !note.is_empty() {
-                        messages.push(user_message(note));
-                        self.state.plain_tail += 1;
-                    }
-                }
-            }
-        }
         // A long request's requirements, listed once before work starts (requirements_review.rs).
         let context = &self.shared.context;
         if worth_ledger(&context.prompt) {

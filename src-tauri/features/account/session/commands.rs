@@ -100,12 +100,5 @@ pub async fn auth_session_forget(
             Ok(())
         },
     )
-    .await?;
-    // Signing out forgets the vault key on this computer. Local browsing data stays.
-    crate::sync::vault::forget_on_sign_out(&crate::browser::profiles::account_scope(
-        &url,
-        Some(&account_id),
-    ))
-    .await;
-    Ok(())
+    .await
 }

@@ -6,7 +6,7 @@ vi.mock("@/api/client/native-account-fetch", () => ({ nativeAccountFetch: mocks.
 vi.mock("@/shared/platform/tauri", () => ({ hasTauriInternals: () => true }));
 
 import { probeServer } from "./probe";
-import { mistyProServer } from "./serverChoice";
+import { mistyCloudServer } from "./serverChoice";
 
 const server = "https://misty.example.org/v1";
 
@@ -36,7 +36,7 @@ it("contacts a domain on a public address in a release build", async () => {
 
 it("doesn't check Misty's own server", async () => {
   vi.stubEnv("DEV", false);
-  await expect(probeServer(mistyProServer())).resolves.toBe(true);
+  await expect(probeServer(mistyCloudServer())).resolves.toBe(true);
   expect(mocks.invoke).not.toHaveBeenCalled();
 });
 

@@ -38,7 +38,7 @@ pub(crate) use input::click_focus::install as install_click_focus;
 #[cfg(target_os = "macos")]
 pub(crate) use pages::corner_scrollbars::install as install_corner_scrollbars;
 
-#[cfg(any(target_os = "macos", windows))]
+#[cfg(any(target_os = "macos", windows, target_os = "linux"))]
 use menus::popups::provider_popup;
 
 #[cfg(windows)]
@@ -194,7 +194,6 @@ fn external_url(raw: &str) -> Result<Url, String> {
     Err("Misty Browser supports only http and https pages.".to_owned())
 }
 
-pub(crate) use input::paste::paste_into_page;
 use pages::bounds::{logical_bounds, set_webview_bounds_if_changed};
 
 fn apply_browser_pointer_tracking(webview: &Webview, enabled: bool) -> Result<(), String> {
@@ -219,7 +218,6 @@ pub mod pages;
 #[cfg(desktop)]
 pub mod profiles;
 pub mod provider_accounts;
-pub mod search;
 pub mod site_data;
 pub mod site_icons;
 pub mod site_settings;

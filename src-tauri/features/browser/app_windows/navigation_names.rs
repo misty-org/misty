@@ -1,4 +1,5 @@
-//! Names the person gave to windows, tabs and groups, per account, in `misty.db`.
+//! Names the person once gave to tabs and groups, per account, in `misty.db`. Nothing renames
+//! anything now; saved tabs read them once for their titles.
 pub mod commands;
 
 use database::store::Store;
@@ -13,19 +14,6 @@ pub struct NavigationSnapshot {
 
 pub struct NavigationNamesService {
     store: Store,
-}
-
-fn valid_name(value: &str) -> bool {
-    !value.is_empty()
-        && value.trim() == value
-        && value.chars().count() <= 120
-        && !value
-            .chars()
-            .any(|c| c.is_control() || matches!(c, '\u{2028}' | '\u{2029}'))
-}
-
-fn valid_key(key: &str) -> bool {
-    !key.is_empty() && key.len() <= 2048 && !key.chars().any(char::is_control)
 }
 
 fn read_names(store: &Store, account: &str) -> Result<BTreeMap<String, String>, String> {
@@ -58,38 +46,6 @@ impl NavigationNamesService {
             },
         }
     }
-
-    pub async fn update(
-        &self,
-        account: String,
-        key: String,
-        name: Option<String>,
-    ) -> Result<NavigationSnapshot, String> {
-        if !valid_key(&account) || !valid_key(&key) || name.as_ref().is_some_and(|n| !valid_name(n))
-        {
-            return Err("Choose a single-line name of 1–120 characters.".into());
-        }
-        let store = self.store.clone();
-        let names = tokio::task::spawn_blocking(move || {
-            let connection = store.connect().map_err(|e| e.to_string())?;
-            match name {
-                Some(name) => connection.execute(
-                    "INSERT INTO navigation_names (account, key, name) VALUES (?1, ?2, ?3)
-                     ON CONFLICT (account, key) DO UPDATE SET name = excluded.name",
-                    rusqlite::params![account, key, name],
-                ),
-                None => connection.execute(
-                    "DELETE FROM navigation_names WHERE account = ?1 AND key = ?2",
-                    rusqlite::params![account, key],
-                ),
-            }
-            .map_err(|e| e.to_string())?;
-            read_names(&store, &account)
-        })
-        .await
-        .map_err(|e| e.to_string())??;
-        Ok(NavigationSnapshot { names, error: None })
-    }
 }
 
 #[cfg(test)]
@@ -101,44 +57,17 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn names_merge_reset_and_stay_per_account() {
+    async fn names_stay_per_account() {
         let directory = tempfile::tempdir().unwrap();
         let service = service(&directory);
-        let (a, b) = tokio::join!(
-            service.update("account-a".into(), "tab:1".into(), Some("School".into())),
-            service.update("account-a".into(), "tab:2".into(), Some("Mail".into()))
-        );
-        a.unwrap();
-        b.unwrap();
-        assert_eq!(service.snapshot("account-a").await.names.len(), 2);
-        // A new service over the same database sees the saved names.
-        assert_eq!(
-            self::service(&directory).snapshot("account-a").await.names["tab:1"],
-            "School"
-        );
+        let connection = service.store.connect().unwrap();
+        connection
+            .execute(
+                "INSERT INTO navigation_names (account, key, name) VALUES ('account-a', 'tab:1', 'School')",
+                [],
+            )
+            .unwrap();
+        assert_eq!(service.snapshot("account-a").await.names["tab:1"], "School");
         assert!(service.snapshot("account-b").await.names.is_empty());
-        service
-            .update("account-a".into(), "tab:1".into(), Some("Edited".into()))
-            .await
-            .unwrap();
-        assert_eq!(service.snapshot("account-a").await.names["tab:1"], "Edited");
-        service
-            .update("account-a".into(), "tab:1".into(), None)
-            .await
-            .unwrap();
-        assert!(!service
-            .snapshot("account-a")
-            .await
-            .names
-            .contains_key("tab:1"));
-    }
-
-    #[test]
-    fn labels_are_bounded_single_line() {
-        for value in ["", " padded ", "a\nb", "a\u{2028}b"] {
-            assert!(!valid_name(value));
-        }
-        assert!(valid_name("家族"));
-        assert!(!valid_name(&"a".repeat(121)));
     }
 }
