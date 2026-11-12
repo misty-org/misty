@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
+import { connect } from "node:net";
 import { test } from "node:test";
 import { toolCommand, toolingRoot } from "./tooling.ts";
 import { getFileInfo } from "prettier";
@@ -16,11 +17,7 @@ test("Prettier keeps generated files ignored after relocating its ignore file", 
     resolve(toolingRoot, ".gitignore"),
     resolve(toolingRoot, ".config/prettierignore"),
   ]);
-  for (const file of [
-    "dist/entry.js",
-    "coverage/report.js",
-    "src-tauri/gen/apple/generated.ts",
-  ]) {
+  for (const file of ["dist/entry.js", "coverage/report.js", "src-tauri/gen/apple/generated.ts"]) {
     assert.equal(
       (await getFileInfo(resolve(toolingRoot, file), { ignorePath })).ignored,
       true,
@@ -112,4 +109,44 @@ test("forwards tool failure exit codes", () => {
     { encoding: "utf8" },
   );
   assert.notEqual(result.status, 0);
+});
+
+const portAnswers = (port: number) =>
+  new Promise<boolean>((done) => {
+    const socket = connect(port, "127.0.0.1");
+    socket.once("connect", () => {
+      socket.destroy();
+      done(true);
+    });
+    socket.once("error", () => done(false));
+  });
+
+async function until(check: () => Promise<boolean>, timeoutMs: number) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (await check()) return true;
+    await new Promise((wait) => setTimeout(wait, 100));
+  }
+  return false;
+}
+
+test("stopping the runner stops the dev server under it", async () => {
+  const port = 5190 + Math.floor(Math.random() * 100);
+  const runner = spawn(
+    process.execPath,
+    [resolve(toolingRoot, "cli/tasks/run-tool.ts"), "vite", "--port", String(port), "--strictPort"],
+    { stdio: "ignore" },
+  );
+  const exited = new Promise<number | null>((done) => runner.once("exit", (code) => done(code)));
+  try {
+    assert.ok(await until(() => portAnswers(port), 30_000), "Vite never started listening");
+    runner.kill("SIGTERM");
+    assert.equal(await exited, 128 + 15);
+    assert.ok(
+      await until(async () => !(await portAnswers(port)), 5_000),
+      "Vite outlived the runner",
+    );
+  } finally {
+    runner.kill("SIGKILL");
+  }
 });
