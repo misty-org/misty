@@ -63,7 +63,7 @@ test("a failed check fails its suite even when the checks beside it pass", () =>
 });
 
 /** A repository with a staged source file, and stand-ins for the tools a commit calls. */
-function commitFixture(npm: string) {
+function commitFixture(npm: string, docker = "exit 0") {
   const directory = mkdtempSync(resolve(tmpdir(), "misty-hook-commit-"));
   const git = (...args: string[]) => execFileSync("git", args, { cwd: directory, stdio: "ignore" });
   git("init");
@@ -76,7 +76,7 @@ function commitFixture(npm: string) {
   mkdirSync(tools);
   writeFileSync(resolve(directory, ".git/info/exclude"), ".tools\n");
   writeFileSync(resolve(tools, "npm"), `#!/bin/sh\n${npm}\n`, { mode: 0o755 });
-  writeFileSync(resolve(tools, "docker"), "#!/bin/sh\nexit 0\n", { mode: 0o755 });
+  writeFileSync(resolve(tools, "docker"), `#!/bin/sh\n${docker}\n`, { mode: 0o755 });
   return { directory, env: { ...process.env, PATH: `${tools}:${process.env.PATH}` } };
 }
 
@@ -95,16 +95,35 @@ test("a commit stops at its limit, says what it left, and isn't refused for it",
 });
 
 test("a limit used up before the suites start doesn't turn into no limit", () => {
-  const { directory, env } = commitFixture("sleep 60");
+  // The secret scan alone outlasts the limit.
+  const { directory, env } = commitFixture("sleep 60", "sleep 2");
   try {
     const began = Date.now();
     const result = spawnSync("bash", [hook, "commit"], {
-      cwd: directory, encoding: "utf8", env: { ...env, MISTY_COMMIT_SECONDS: "0" },
+      cwd: directory, encoding: "utf8", env: { ...env, MISTY_COMMIT_SECONDS: "1" },
     });
     assert.ok(Date.now() - began < 20_000, "the suites ran with no limit");
     assert.equal(result.status, 0, result.stderr);
     assert.match(result.stdout, /Stopped at the \d+s limit/);
   } finally { rmSync(directory, { recursive: true, force: true }); }
+});
+
+test("without a limit, a commit runs every suite it touches to the end", () => {
+  const { directory, env } = commitFixture("sleep 2");
+  try {
+    const { MISTY_COMMIT_SECONDS: _, ...unlimited } = env;
+    const result = spawnSync("bash", [hook, "commit"], { cwd: directory, encoding: "utf8", env: unlimited });
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /✓ scripts/);
+    assert.match(result.stdout, /✓ frontend/);
+    assert.doesNotMatch(result.stdout, /Stopped at the/);
+  } finally { rmSync(directory, { recursive: true, force: true }); }
+});
+
+test("a push runs no test suites, only the guard on what may be published", () => {
+  const source = readFileSync(resolve(root, ".githooks/pre-push"), "utf8");
+  assert.doesNotMatch(source, /checks\.sh/);
+  assert.match(source, /check-public-history\.py/);
 });
 
 test("a suite that ignores being asked to stop can't hold a commit", () => {
@@ -130,7 +149,7 @@ test("a commit stops at the first failing suite and is refused", () => {
   } finally { rmSync(directory, { recursive: true, force: true }); }
 });
 
-test("a commit and a push never compile for other platforms", () => {
+test("a commit never compiles for other platforms", () => {
   const source = readFileSync(hook, "utf8");
   assert.doesNotMatch(source.match(/^rust_desktop\(\).*$/m)?.[0] ?? "", /desktop-windows/);
   assert.match(source, /release\) sequence 0 secrets .* desktop-windows/);

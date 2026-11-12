@@ -574,7 +574,7 @@ fn target_list_covers_every_cli_and_reports_availability() {
         ids,
         vec![
             "claude", "codex", "kimi", "grok", "pi", "omp", "dsh", "agy", "gemini", "opencode",
-            "qoder", "qoder-cn", "hermes",
+            "qoder", "qoder-cn", "qwen", "codebuddy", "hermes",
         ]
     );
     // The hidden agents target stays out of the UI list.

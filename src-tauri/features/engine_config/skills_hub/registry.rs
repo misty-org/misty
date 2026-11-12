@@ -19,7 +19,7 @@ pub(super) fn default_repos() -> Vec<Value> {
     vec![
         json!({"owner": "anthropics", "name": "skills", "branch": crate::known_names::DEFAULT_BRANCH, "enabled": true}),
         json!({"owner": "ComposioHQ", "name": "awesome-claude-skills", "branch": "master", "enabled": true}),
-        json!({"owner": "cexll", "name": "myclaude", "branch": "master", "enabled": true}),
+        json!({"owner": "obra", "name": "superpowers", "branch": crate::known_names::DEFAULT_BRANCH, "enabled": true}),
         json!({"owner": "JimLiu", "name": "baoyu-skills", "branch": crate::known_names::DEFAULT_BRANCH, "enabled": true}),
     ]
 }

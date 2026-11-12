@@ -194,6 +194,8 @@ pub(super) enum TargetKind {
     Opencode,
     Qoder,
     QoderCn,
+    Qwen,
+    Codebuddy,
     Hermes,
     Agents,
 }
@@ -207,7 +209,7 @@ pub(super) struct Target {
 
 /// The user-level skills root of every CLI that has one, in the engine list's order, with Gemini
 /// CLI and Hermes at the end.
-pub(super) static TARGETS: [Target; 14] = [
+pub(super) static TARGETS: [Target; 16] = [
     Target {
         id: "claude",
         label: "Claude",
@@ -281,6 +283,18 @@ pub(super) static TARGETS: [Target; 14] = [
         kind: TargetKind::QoderCn,
     },
     Target {
+        id: "qwen",
+        label: "Qwen Code",
+        visible: true,
+        kind: TargetKind::Qwen,
+    },
+    Target {
+        id: "codebuddy",
+        label: "CodeBuddy",
+        visible: true,
+        kind: TargetKind::Codebuddy,
+    },
+    Target {
         id: "hermes",
         label: "Hermes",
         visible: true,
@@ -342,6 +356,12 @@ pub(super) fn target_home_dirs(target: &Target) -> Vec<PathBuf> {
         TargetKind::QoderCn => vec![crate::engine_config::support::engine_home(
             None,
             ".qoder-cn",
+        )],
+        // Both read `<home>/skills` (Qwen Code's and CodeBuddy's skills docs).
+        TargetKind::Qwen => vec![crate::engine_config::support::engine_home(None, ".qwen")],
+        TargetKind::Codebuddy => vec![crate::engine_config::support::engine_home(
+            None,
+            ".codebuddy",
         )],
         TargetKind::Hermes => vec![crate::engine_config::support::engine_home(
             Some("HERMES_HOME"),

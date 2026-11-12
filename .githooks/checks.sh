@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-# Local checks for every commit and push (there is no GitHub CI).
-#   .githooks/checks.sh commit   suites touched by the staged changes, at most 5 minutes
-#   .githooks/checks.sh push     every suite, on a clean tree
+# Local checks for every commit (there is no GitHub CI). A push runs none: each commit was checked
+# when it was made, and pre-push only guards what may be published.
+#   .githooks/checks.sh commit   every suite the staged changes touch, run to the end
 #   .githooks/checks.sh all|frontend|scripts|rust-cli|rust-desktop|secrets|plan
 #   .githooks/checks.sh release  also compiles for Windows; run it when cutting a release
-# Skip once with git commit/push --no-verify.
+# MISTY_COMMIT_SECONDS=<n> caps a commit's checks for once; whatever is cut off goes unchecked.
+# Skip once with git commit --no-verify.
 set -euo pipefail
 root=$(git rev-parse --show-toplevel)
 cd "$root"
@@ -72,8 +73,8 @@ if [ "$git_common" != "$root/.git" ]; then
 fi
 gitleaks_image=zricethezav/gitleaks@sha256:e1b35e12a8c6fa8901f060459cfb6b2fc4c484d3afbe3b029733a3bbfab07055
 # Scans commits, never the working folder: git-ignored .env files stay out.
-# On push, only the commits the remote does not have yet. A new branch has no
-# upstream, so it scans the commits no remote branch contains.
+# Only the commits the remote does not have yet. A new branch has no upstream,
+# so it scans the commits no remote branch contains.
 secrets() {
   local range="HEAD --not --remotes"
   if upstream=$(git rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' 2>/dev/null); then
@@ -180,8 +181,8 @@ stop_group() {
 }
 
 # One suite at a time, cheapest first: a failure shows up early, and the machine isn't running
-# everything at once. With a limit, a suite still going when it's reached is stopped and left to
-# the push, which runs them all. A commit never waits longer, and a failure still refuses it.
+# everything at once. With a limit, a suite still going when it's reached is stopped and named as
+# unchecked; a failure before then still refuses the commit.
 sequence() { # seconds (0 for no limit), then suite names
   local limit=$1 started=$SECONDS name pid code unfinished=
   shift
@@ -209,7 +210,7 @@ sequence() { # seconds (0 for no limit), then suite names
     [ "$code" -eq 0 ] || return "$code"
   done
   if [ -n "$unfinished" ]; then
-    echo "⚠ Stopped at the ${limit}s limit, so these weren't fully checked:$unfinished. The push runs them."
+    echo "⚠ Stopped at the ${limit}s limit, so these weren't fully checked:$unfinished."
   fi
 }
 
@@ -233,8 +234,8 @@ suites_for() { # paths on stdin -> suite names
 }
 
 all=(scripts rust-cli rust-desktop frontend)
-# A commit takes at most 5 minutes, secret scan and all, leaving a little for git itself.
-commit_seconds=${MISTY_COMMIT_SECONDS:-285}
+# A commit runs its suites to the end unless MISTY_COMMIT_SECONDS sets a limit.
+commit_seconds=${MISTY_COMMIT_SECONDS:-0}
 case "${1:-}" in
   plan) suites_for ;;
   commit)
@@ -247,22 +248,17 @@ case "${1:-}" in
     # macOS ships bash 3.2, which has no mapfile.
     suites=$(git diff --cached --name-only --diff-filter=ACMRD | suites_for)
     [ -n "$suites" ] || { echo "No test suites affected."; exit 0; }
-    # What's left of the limit. Never 0, which would mean no limit at all.
-    remaining=$((commit_seconds - SECONDS))
-    [ "$remaining" -gt 0 ] || remaining=1
+    remaining=0
+    if [ "$commit_seconds" -gt 0 ]; then
+      # What's left of the limit. Never 0, which would mean no limit at all.
+      remaining=$((commit_seconds - SECONDS))
+      [ "$remaining" -gt 0 ] || remaining=1
+    fi
     # shellcheck disable=SC2086 # one suite name per word
     sequence "$remaining" $suites
-    ;;
-  push)
-    # Tests run on the working tree, so it must match what is being pushed.
-    if ! git diff --quiet || ! git diff --cached --quiet || [ -n "$(git ls-files --others --exclude-standard)" ]; then
-      echo "Commit or discard local changes before pushing; checks must run on the pushed commit." >&2
-      exit 1
-    fi
-    sequence 0 secrets "${all[@]}"
     ;;
   all) sequence 0 secrets "${all[@]}" ;;
   release) sequence 0 secrets "${all[@]}" desktop-windows ;;
   frontend | scripts | rust-cli | rust-desktop | desktop-windows | secrets) run "$1" ;;
-  *) echo "Usage: .githooks/checks.sh commit|push|all|release|frontend|scripts|rust-cli|rust-desktop|desktop-windows|secrets|plan" >&2; exit 2 ;;
+  *) echo "Usage: .githooks/checks.sh commit|all|release|frontend|scripts|rust-cli|rust-desktop|desktop-windows|secrets|plan" >&2; exit 2 ;;
 esac

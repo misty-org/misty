@@ -27,6 +27,8 @@ export type SkillTargetId =
   | "opencode"
   | "qoder"
   | "qoder-cn"
+  | "qwen"
+  | "codebuddy"
   | "hermes"
   | "agents";
 

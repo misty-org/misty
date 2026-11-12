@@ -428,7 +428,7 @@ permissions = [
 
 [[set]]
 identifier = "action-engine-config"
-description = "Settings for the agent engines themselves: their MCP servers, skills, prompts, usage and plan limits, installing and updating the CLIs, provider channels, the network proxy, fonts and the performance panel"
+description = "Settings for the agent engines themselves: their MCP servers, skills, plugin marketplaces, prompts, usage and plan limits, installing and updating the CLIs, provider channels, the network proxy, fonts and the performance panel"
 permissions = [
   "allow-engine-cc-switch-check",
   "allow-engine-cc-switch-dismiss",
@@ -457,6 +457,12 @@ permissions = [
   "allow-engine-fonts-pick",
   "allow-engine-fonts-read",
   "allow-engine-fonts-set",
+  "allow-engine-market-add-source",
+  "allow-engine-market-connectors",
+  "allow-engine-market-install",
+  "allow-engine-market-list",
+  "allow-engine-market-remove",
+  "allow-engine-market-remove-source",
   "allow-engine-mcp-inventory",
   "allow-engine-mcp-probe",
   "allow-engine-mcp-probe-plan",

@@ -8,7 +8,7 @@
 | `src-tauri/` | The Tauri desktop shell in Rust. Everything for one feature, with its native macOS and Windows code, its tests and its worker programs, is in `src-tauri/features/<feature>/`. |
 | `src-tauri/features/kiri/` | Kiri, the native web platform layer that supplies web APIs the system webviews leave out. |
 | `cli/` | The `misty` CLI for setup, the local server stack, checks and releases, plus the TypeScript build tasks in `cli/tasks/`. |
-| `.githooks/` | The commit and push checks. There is no hosted CI. |
+| `.githooks/` | The commit checks and the push guard. There is no hosted CI. |
 
 ## Prerequisites
 
@@ -67,8 +67,10 @@ git config core.hooksPath .githooks
 
 There is no hosted CI; the checks run on your computer through `.githooks`:
 
-- Every commit runs a secret scan of the staged changes and the test suites the commit touches.
-- Every push needs a clean tree and runs every suite.
+- Every commit runs a secret scan of the staged changes and every test suite the commit touches,
+  to the end. A failure refuses the commit.
+- A push runs no tests, since each commit was checked when it was made. It only refuses history
+  the public repository must not contain.
 - Run a suite by hand with `.githooks/checks.sh frontend|server|rust-cli|rust-desktop|all`, or
   the whole local gate with `npm run cli -- check all`.
 - `npm run check` covers formatting, types, lint, the frontend tests and the dependency audit.

@@ -13,6 +13,7 @@ pub mod cc_switch;
 pub mod channels;
 pub mod cli_lifecycle;
 pub mod fonts;
+pub mod marketplace;
 pub mod mcp;
 pub mod metrics;
 pub mod prompts;

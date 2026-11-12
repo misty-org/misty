@@ -95,7 +95,7 @@ fn cli_binary_name(engine: &str) -> &str {
 /// Where the engine's program is: the program path set in Settings › Engines when there is one,
 /// else found the way Misty finds engines to run; the bare name when it isn't installed
 /// (starting it then fails, which reads as not installed).
-fn engine_bin(engine: &str) -> String {
+pub(crate) fn engine_bin(engine: &str) -> String {
     let settings = crate::engines::support::settings::read_settings().unwrap_or_default();
     let overridden = settings
         .bin_override(engine)
@@ -112,7 +112,7 @@ fn engine_bin(engine: &str) -> String {
 
 /// A command for `bin` with Misty's search PATH and the proxy from Settings. On Windows a `.cmd`
 /// or `.bat` wrapper (how npm installs a program) runs through `cmd /c`.
-fn command_for_binary(bin: &str) -> Command {
+pub(crate) fn command_for_binary(bin: &str) -> Command {
     #[cfg(windows)]
     let mut command = {
         let wrapper = std::path::Path::new(bin)
@@ -695,14 +695,14 @@ impl ProgressReporter {
 /// Run a short-lived command to completion with a timeout, capturing all of
 /// stdout/stderr. The child gets its own process group (unix) so a timeout
 /// kill takes grandchildren (npm's cmd/node chain) down too.
-struct ProcOutput {
-    status: Option<std::process::ExitStatus>,
-    stdout: String,
-    stderr: String,
-    timed_out: bool,
+pub(crate) struct ProcOutput {
+    pub(crate) status: Option<std::process::ExitStatus>,
+    pub(crate) stdout: String,
+    pub(crate) stderr: String,
+    pub(crate) timed_out: bool,
 }
 
-async fn run_capture(command: &mut Command, limit: Duration) -> Result<ProcOutput, String> {
+pub(crate) async fn run_capture(command: &mut Command, limit: Duration) -> Result<ProcOutput, String> {
     command
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
