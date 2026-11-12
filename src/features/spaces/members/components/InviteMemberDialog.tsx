@@ -50,14 +50,19 @@ export function InviteMemberDialog({
             </label>
             <DialogFooter className="mt-5">
               <Button
-                variant="outline"
+                variant="secondary"
+                size="lg"
                 type="button"
                 disabled={dialogs.inviting}
                 onClick={dialogs.closeInvite}
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={dialogs.inviting || !dialogs.inviteEmail.trim()}>
+              <Button
+                type="submit"
+                size="lg"
+                disabled={dialogs.inviting || !dialogs.inviteEmail.trim()}
+              >
                 Invite
               </Button>
             </DialogFooter>
@@ -96,13 +101,12 @@ function InvitationLink(props: { email: string; link: string; onDone: () => void
           className="min-w-0 flex-1 font-mono text-xs"
           onFocus={(event) => event.currentTarget.select()}
         />
-        <Button type="button" variant="outline" onClick={copy}>
-          {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
-          {copied ? "Copied" : "Copy"}
+        <Button type="button" variant="secondary" icon={copied ? Check : Copy} onClick={copy}>
+          Copy
         </Button>
       </div>
       <DialogFooter className="mt-5">
-        <Button type="button" onClick={props.onDone}>
+        <Button type="button" size="lg" onClick={props.onDone}>
           Done
         </Button>
       </DialogFooter>

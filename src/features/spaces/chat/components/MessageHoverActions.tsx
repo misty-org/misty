@@ -2,9 +2,9 @@ import type { SpaceMessage } from "../../api/dto/entities";
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuTrigger,
   IconButton,
+  MenuItem,
 } from "@/shared/ui";
 import { Copy, MoreHorizontal, Pencil, Reply, SmilePlus, Trash2 } from "lucide-react";
 import { useState } from "react";
@@ -83,7 +83,9 @@ export function MessageHoverActions({ canWrite = true, ...props }: MessageHoverA
           </IconButton>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuItem
+          <MenuItem
+            icon={Copy}
+            label="Copy text"
             onSelect={() => {
               void navigator.clipboard
                 .writeText(
@@ -93,23 +95,16 @@ export function MessageHoverActions({ canWrite = true, ...props }: MessageHoverA
                   props.onError?.("Could not copy this message. Try selecting its text."),
                 );
             }}
-          >
-            <Copy />
-            Copy text
-          </DropdownMenuItem>
+          />
           {canEdit && (
-            <DropdownMenuItem
+            <MenuItem
+              icon={Pencil}
+              label="Edit"
               onSelect={() => requestAnimationFrame(() => props.onBeginEditing(message))}
-            >
-              <Pencil />
-              Edit
-            </DropdownMenuItem>
+            />
           )}
           {canDelete && (
-            <DropdownMenuItem onSelect={() => props.onDelete(message)}>
-              <Trash2 />
-              Delete
-            </DropdownMenuItem>
+            <MenuItem icon={Trash2} label="Delete" onSelect={() => props.onDelete(message)} />
           )}
         </DropdownMenuContent>
       </DropdownMenu>

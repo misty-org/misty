@@ -24,12 +24,12 @@ html[data-pointer-dragging="true"] * {
 .pointer-reorder-shield {
   position: fixed;
   inset: 0;
-  z-index: 2147483400;
+  z-index: var(--layer-drag-shield);
   cursor: grabbing;
 }
 .pointer-reorder-preview {
   position: fixed;
-  z-index: 2147483500;
+  z-index: var(--layer-drag-preview);
   pointer-events: none;
   opacity: 0.7;
 }
@@ -38,9 +38,9 @@ html[data-pointer-dragging="true"] * {
 }
 .pointer-reorder-indicator {
   position: fixed;
-  z-index: 2147483501;
+  z-index: var(--layer-drag-indicator);
   pointer-events: none;
-  background: var(--color-cream, #eee);
+  background: var(--color-cream);
   border-radius: 1px;
 }
 
@@ -50,13 +50,11 @@ html[data-pointer-dragging="true"] * {
   text-overflow: clip;
   white-space: nowrap;
   padding: 6px 10px;
-  border: 1px solid var(--color-charcoal-border, #262626);
-  border-radius: 6px;
-  background: var(--color-charcoal-card, #191919);
-  color: var(--color-cream, #e0e0e0);
-  font:
-    500 13px/20px system-ui,
-    sans-serif;
+  border: 1px solid var(--color-charcoal-border);
+  border-radius: var(--radius-md);
+  background: var(--color-charcoal-card);
+  color: var(--color-cream);
+  font: 500 var(--text-meta) / var(--text-meta--line-height) var(--font-sans);
   opacity: 1;
 }
 

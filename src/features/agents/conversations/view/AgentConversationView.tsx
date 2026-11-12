@@ -38,6 +38,7 @@ export const AgentConversationView = memo(function AgentConversationView(props: 
     );
   }
 
+  const latestId = messages?.[messages.length - 1]?.id;
   return (
     <div className="agent-transcript mx-auto w-full max-w-[760px] px-6 py-7 max-sm:px-4">
       <div className="space-y-7">
@@ -54,13 +55,20 @@ export const AgentConversationView = memo(function AgentConversationView(props: 
           };
           return (
             <Fragment key={turn.key}>
-              {turn.prompt && <AgentMessage message={turn.prompt} {...handlers} />}
+              {turn.prompt && (
+                <AgentMessage
+                  message={turn.prompt}
+                  latest={turn.prompt.id === latestId}
+                  {...handlers}
+                />
+              )}
               {turn.answer && (
                 <AgentMessage
                   message={turn.answer}
                   steps={turn.steps}
                   retryPrompt={turn.prompt?.content}
                   retryFrom={turn.prompt?.id}
+                  latest={turn.answer.id === latestId}
                   {...handlers}
                 />
               )}

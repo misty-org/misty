@@ -13,7 +13,7 @@
  */
 import { useState } from "react";
 import { DesktopSettingsSection as Section } from "@/features/settings";
-import { SegmentedControl } from "@/shared/ui";
+import { ChoiceGroup } from "@/shared/ui";
 import { DiscoverPane } from "./DiscoverPane";
 import { InstalledPane } from "./InstalledPane";
 import { SkillUsagePane } from "./SkillUsagePane";
@@ -26,7 +26,7 @@ export function SkillsSection() {
   return (
     <Section title="Skills">
       <div>
-        <SegmentedControl
+        <ChoiceGroup
           label="Skills"
           value={tab}
           onChange={setTab}

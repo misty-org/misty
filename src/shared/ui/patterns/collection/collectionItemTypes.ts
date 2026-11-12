@@ -4,7 +4,10 @@ import { itemToneClass, type ItemTone } from "../../icons/itemTones";
 export type CollectionItem = {
   id: string;
   title: string;
-  icon: ReactNode;
+  /**
+   * The item's type glyph. Grid cards show it; list rows start with their text and leave it out.
+   */
+  icon?: ReactNode;
   /** Glyph color for the item type; omit for artwork that brings its own colors. */
   tone?: ItemTone;
   preview?: ReactNode;
@@ -18,11 +21,17 @@ export type CollectionItem = {
   onOpen: () => void;
   /** Whether modifier-click can select this item for a bulk action. */
   selectable?: boolean;
-  actions?: ReactNode;
+  /**
+   * The item's actions as menu rows (MenuItem, MenuCheckItem, MenuSubmenu…). They open from the
+   * ⋯ at the row's or card's right end on hover and from a right-click anywhere on it, so an item
+   * has its actions in one place.
+   */
+  menu?: ReactNode;
+  /** The ⋯ button's name and tooltip. Defaults to "Actions for {title}". */
+  menuLabel?: string;
+  /** Called as either menu opens, before its rows are used, e.g. to point a selection at it. */
+  onMenuOpen?: () => void;
   marker?: ReactNode;
-  contextMenu?: ReactNode;
-  /** Called as the right-click menu opens, before it shows. */
-  onContextMenuOpen?: () => void;
 };
 
 /** The icon slot's glyph color: the item's tone, or the muted default. */
@@ -30,17 +39,22 @@ export function collectionIconTone(item: Pick<CollectionItem, "tone">) {
   return item.tone ? itemToneClass(item.tone) : "text-cream-muted";
 }
 
-/** Reveals row and card utilities on hover, focus, or while one of their menus is open. */
-export const collectionUtilityReveal = [
-  "pointer-events-none opacity-0",
-  "group-hover/collection-item:pointer-events-auto group-hover/collection-item:opacity-100",
-  "group-focus-within/collection-item:pointer-events-auto",
-  "group-focus-within/collection-item:opacity-100",
-  "group-data-[state=open]/collection-item:pointer-events-auto",
-  "group-data-[state=open]/collection-item:opacity-100",
-  "group-has-[[data-state=open]]/collection-item:pointer-events-auto",
-  "group-has-[[data-state=open]]/collection-item:opacity-100",
-].join(" ");
+/** Whether the item has a menu of actions. */
+export function hasItemActions(item: CollectionItem) {
+  return item.menu !== undefined && item.menu !== null && item.menu !== false;
+}
+
+/** The ⋯ name for an item's menu. */
+export function itemMenuLabel(item: CollectionItem) {
+  return item.menuLabel ?? `Actions for ${item.title}`;
+}
+
+/** Calls the item's open hook as one of its menus opens. */
+export function itemMenuOpened(item: CollectionItem) {
+  return (open: boolean) => {
+    if (open) item.onMenuOpen?.();
+  };
+}
 
 export type CollectionColumn = {
   key: string;

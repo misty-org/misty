@@ -3,6 +3,7 @@ import { X } from "lucide-react";
 import * as React from "react";
 
 import { cn } from "../classNames";
+import { IconButton } from "../controls/IconButton";
 
 function cleanupPointerEvents() {
   if (typeof document === "undefined") return;
@@ -78,7 +79,7 @@ const DialogOverlay = React.forwardRef<
     ref={ref}
     data-slot="dialog-overlay"
     className={cn(
-      "fixed inset-0 layer-dialog-backdrop bg-black/45 duration-160",
+      "fixed inset-0 layer-dialog-backdrop bg-scrim duration-160",
       "data-[state=open]:animate-in data-[state=closed]:animate-out",
       "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
       "data-[state=closed]:pointer-events-none",
@@ -89,10 +90,36 @@ const DialogOverlay = React.forwardRef<
 ));
 DialogOverlay.displayName = DialogPrimitive.Overlay.displayName;
 
+/**
+ * How wide a dialog is: sm 384 (a confirm, a rename), md 512 (default, most forms), lg 672
+ * (a picker, a list), xl 896 (a layout chooser, help), and `media`, a large viewer that takes
+ * the window less a margin, for images, documents and previews.
+ */
+export type DialogSize = "sm" | "md" | "lg" | "xl" | "media";
+
+/**
+ * `flow` (default): the whole dialog scrolls when it is taller than the window. `scroll`: the
+ * header and footer stay put and only the DialogBody between them scrolls. `media` always uses
+ * `scroll`, with the body filling the height.
+ */
+export type DialogLayout = "flow" | "scroll";
+
+const dialogSizeClass: Record<DialogSize, string> = {
+  sm: "max-w-sm",
+  md: "max-w-lg",
+  lg: "max-w-2xl",
+  xl: "max-w-4xl",
+  media: "h-[calc(100dvh-4rem-var(--misty-modal-inset-top,0px))] w-[calc(100%-4rem)] max-w-6xl",
+};
+
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & {
     container?: HTMLElement | null;
+    /** sm 384, md 512 (default), lg 672, xl 896, or `media` for a large viewer. */
+    size?: DialogSize;
+    /** `scroll` keeps the header and footer fixed and scrolls the DialogBody. */
+    layout?: DialogLayout;
     /** `top` sits the panel in the upper part of the window, for search-style dialogs. */
     placement?: "center" | "top";
     /** Leaves the page undimmed, for panels that open over one control. */
@@ -102,9 +129,20 @@ const DialogContent = React.forwardRef<
   }
 >(
   (
-    { className, children, container, placement = "center", backdrop = true, hideClose, ...props },
+    {
+      className,
+      children,
+      container,
+      size = "md",
+      layout = "flow",
+      placement = "center",
+      backdrop = true,
+      hideClose,
+      ...props
+    },
     ref,
   ) => {
+    const scrolls = layout === "scroll" || size === "media";
     React.useEffect(() => {
       return () => {
         cleanupPointerEvents();
@@ -135,11 +173,15 @@ const DialogContent = React.forwardRef<
           <DialogPrimitive.Content
             ref={ref}
             data-slot="dialog-content"
+            data-size={size}
+            data-layout={scrolls ? "scroll" : "flow"}
             className={cn(
-              "pointer-events-auto relative grid",
-              "max-h-[calc(100dvh-4rem-var(--misty-modal-inset-top,0px))] w-[calc(100%-2rem)] max-w-lg",
-              "gap-4 overflow-y-auto rounded-xl bg-charcoal-card p-6",
-              "text-cream shadow-xl ring-1 ring-cream/10 misty-dialog-motion",
+              "group/dialog pointer-events-auto relative",
+              scrolls ? "flex flex-col overflow-hidden" : "grid overflow-y-auto",
+              "max-h-[calc(100dvh-4rem-var(--misty-modal-inset-top,0px))] w-[calc(100%-2rem)]",
+              dialogSizeClass[size],
+              "gap-4 rounded-xl bg-charcoal-card p-6",
+              "text-body text-cream shadow-xl ring-1 ring-cream/10 misty-dialog-motion",
               "data-[state=closed]:pointer-events-none",
               className,
             )}
@@ -147,17 +189,15 @@ const DialogContent = React.forwardRef<
           >
             {children}
             {hideClose ? null : (
-              <DialogPrimitive.Close
-                data-slot="dialog-close"
-                className={cn(
-                  "absolute right-4 top-4 grid size-8 place-items-center rounded-md",
-                  "text-cream-muted outline-none transition-colors hover:bg-control-hover",
-                  "hover:text-cream focus-visible:ring-[3px]",
-                  "focus-visible:ring-charcoal-active/40 disabled:pointer-events-none",
-                )}
-              >
-                <X className="h-4 w-4" />
-                <span className="sr-only">Close</span>
+              <DialogPrimitive.Close asChild>
+                <IconButton
+                  label="Close"
+                  variant="quiet"
+                  data-slot="dialog-close"
+                  className="absolute right-4 top-4"
+                >
+                  <X />
+                </IconButton>
               </DialogPrimitive.Close>
             )}
           </DialogPrimitive.Content>
@@ -171,16 +211,44 @@ DialogContent.displayName = DialogPrimitive.Content.displayName;
 const DialogHeader = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
   <div
     data-slot="dialog-header"
-    className={cn("flex flex-col space-y-1.5 text-center sm:text-left", className)}
+    className={cn("flex shrink-0 flex-col gap-1.5 pr-8 text-left", className)}
     {...props}
   />
 );
 DialogHeader.displayName = "DialogHeader";
 
+/**
+ * The dialog's content between its header and footer. With `layout="scroll"` (and always at
+ * `size="media"`) it takes the height that's left and scrolls on its own, edge to edge, while the
+ * header and footer stay put. In the default flow it is a plain block.
+ *
+ * ```tsx
+ * <DialogContent size="lg" layout="scroll">
+ *   <DialogHeader><DialogTitle>Keyboard shortcuts</DialogTitle></DialogHeader>
+ *   <DialogBody>{rows}</DialogBody>
+ *   <DialogFooter><Button size="lg">Done</Button></DialogFooter>
+ * </DialogContent>
+ * ```
+ */
+const DialogBody = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
+  <div
+    data-slot="dialog-body"
+    className={cn(
+      "min-h-0 min-w-0",
+      "group-data-[layout=scroll]/dialog:-mx-6 group-data-[layout=scroll]/dialog:flex-1",
+      "group-data-[layout=scroll]/dialog:overflow-y-auto group-data-[layout=scroll]/dialog:px-6",
+      className,
+    )}
+    {...props}
+  />
+);
+DialogBody.displayName = "DialogBody";
+
+/** The dialog's buttons, right-aligned at 36px: a quiet Cancel, then its one primary action. */
 const DialogFooter = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
   <div
     data-slot="dialog-footer"
-    className={cn("flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2", className)}
+    className={cn("flex shrink-0 items-center justify-end gap-2", className)}
     {...props}
   />
 );
@@ -193,7 +261,7 @@ const DialogTitle = React.forwardRef<
   <DialogPrimitive.Title
     ref={ref}
     data-slot="dialog-title"
-    className={cn("font-heading text-lg font-medium leading-none tracking-tight", className)}
+    className={cn("text-title font-semibold text-cream-bright", className)}
     {...props}
   />
 ));
@@ -206,7 +274,7 @@ const DialogDescription = React.forwardRef<
   <DialogPrimitive.Description
     ref={ref}
     data-slot="dialog-description"
-    className={cn("text-sm text-cream-muted", className)}
+    className={cn("text-body text-cream-muted", className)}
     {...props}
   />
 ));
@@ -214,6 +282,7 @@ DialogDescription.displayName = DialogPrimitive.Description.displayName;
 
 export {
   Dialog,
+  DialogBody,
   DialogClose,
   DialogContent,
   DialogDescription,

@@ -1,4 +1,4 @@
-//! `test/model-calls.test.ts`, `model-test-call.test.ts` and `device-routing.test.ts`, and the routes'
+//! `test/model-calls.test.ts` and `device-routing.test.ts`, and the routes'
 //! edges, against a local provider.
 #[path = "runtime_device_support/mod.rs"]
 mod support;
@@ -96,57 +96,6 @@ async fn embeddings_of_the_wrong_size_are_refused() {
 }
 
 #[tokio::test]
-async fn the_model_test_passes_a_model_that_calls_tools_and_sees_screenshots() {
-    let server = provider(|request| {
-        let body = request.json();
-        if body["messages"].to_string().contains("image_url") {
-            return Answer::completion(&json!({ "content": "Red." }));
-        }
-        if !body["messages"].as_array().unwrap().iter().any(|message| message["role"] == "tool") {
-            return Answer::completion(&json!({ "tool_calls": [{ "id": "call_1", "type": "function", "function": { "name": "stock", "arguments": r#"{"store":"North","product":"blue kettle"}"# } }] }));
-        }
-        Answer::completion(&json!({ "content": "The North store has 37." }))
-    })
-    .await;
-    let result = calls(local(&server.base_url)).model_test("{}").await.unwrap();
-    assert_eq!(result["model"], "ollama/qwen3:14b");
-    assert_eq!(result["tools"]["ok"], true);
-    assert_eq!(result["images"]["ok"], true);
-}
-
-#[tokio::test]
-async fn the_model_test_says_which_check_a_weaker_model_fails() {
-    let server = provider(|request| {
-        let saw = request.json()["messages"].to_string().contains("image_url");
-        Answer::completion(&json!({ "content": if saw { "I can't see images." } else { "I don't know." } }))
-    })
-    .await;
-    let result = calls(local(&server.base_url)).model_test("{}").await.unwrap();
-    assert_eq!(result["tools"], json!({ "ok": false, "detail": "It answered without calling the tool." }));
-    assert_eq!(result["images"]["ok"], false);
-}
-
-#[tokio::test]
-async fn the_model_test_reports_a_provider_error_on_the_check_it_hit() {
-    let server = provider(|request| {
-        if request.json()["messages"].to_string().contains("image_url") {
-            Answer::json(400, json!({ "error": { "message": "no images here" } }))
-        } else {
-            Answer::completion(&json!({ "content": "I don't know." }))
-        }
-    })
-    .await;
-    let result = calls(local(&server.base_url)).model_test("{}").await.unwrap();
-    assert_eq!(result["images"], json!({ "ok": false, "detail": "The model returned an error." }));
-    assert_eq!(result["tools"]["ok"], false);
-}
-
-#[tokio::test]
-async fn the_model_test_asks_for_a_model_when_the_device_has_none() {
-    needs_a_model(calls(Device::default()).model_test("{}").await.unwrap_err());
-}
-
-#[tokio::test]
 async fn routes_a_message_on_the_devices_fast_model() {
     let server = provider(answers(r#"{"route":"queue"}"#)).await;
     let result = calls(local(&server.base_url)).follow_up(r#"{"conversation":[],"new_message":"Then plan a separate trip"}"#).await.unwrap();
@@ -210,7 +159,7 @@ async fn validation_comes_before_the_model_except_where_the_route_read_the_model
         assert_eq!(calls(Device::default()).device_call(name, bad).await.unwrap_err().status, 400, "{name}");
     }
     // These chose their model first, so the missing model is what they say.
-    for name in ["day-summary", "voice-notes", "transcribe-diarized", "model-test"] {
+    for name in ["day-summary", "voice-notes", "transcribe-diarized"] {
         assert_eq!(calls(Device::default()).device_call(name, bad).await.unwrap_err().status, 409, "{name}");
     }
 }

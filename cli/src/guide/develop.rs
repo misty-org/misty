@@ -7,28 +7,8 @@ use crate::{checks, desktop, environment, server, setup, workspace::Workspace};
 use super::tools;
 
 pub(super) fn run_app(workspace: &Workspace) -> Result<()> {
-    let separate = cliclack::select("Which copy of the app?")
-        .item(false, "The usual one", "")
-        .item(
-            true,
-            "A separate profile, to test sync beside the usual one",
-            "",
-        )
-        .interact()?;
-    let profile: Option<String> = if separate {
-        Some(
-            cliclack::input("Name this profile")
-                .default_input("dev2")
-                .validate(|name: &String| {
-                    desktop::validate_profile(Some(name)).map_err(|e| e.to_string())
-                })
-                .interact()?,
-        )
-    } else {
-        None
-    };
     cliclack::outro("Starting the app. Press Ctrl-C here to stop it.")?;
-    desktop::dev(workspace, profile.as_deref(), None)
+    desktop::dev(workspace, None)
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]

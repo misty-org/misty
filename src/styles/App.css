@@ -17,33 +17,18 @@
   font-variant-ligatures: no-contextual;
 }
 
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
-}
-
-/* Shared sidebar metrics. The Agents and Space sidebars both read these so their rows,
-   labels and icons stay in step. */
+/* Sidebar metrics the Agents sidebar's stylesheets still read until they move to ListRow, which
+   has the same 32px rows at the control text size. */
 :root {
-  --misty-sidebar-row-height: 38px;
-  --misty-sidebar-item-height: 36px;
+  --misty-sidebar-row-height: 32px;
   --misty-sidebar-row-padding: 10px;
-  --misty-sidebar-label-size: 14px;
-  --misty-sidebar-icon-size: 18px;
+  --misty-sidebar-label-size: var(--text-control);
+  --misty-sidebar-icon-size: 16px;
   --misty-sidebar-badge-size: 7px;
-  /* Status dots on agent conversation rows (the one surface approved for status color).
-     Mixed toward the theme text so they sit right on dark and light themes. */
-  --misty-status-idle: color-mix(in srgb, var(--misty-theme-text-muted) 70%, transparent);
-  --misty-status-attention: color-mix(in srgb, #e8a33a 82%, var(--misty-theme-text));
-  --misty-status-failed: var(--misty-theme-danger);
-  --misty-status-done: color-mix(in srgb, #4ade80 70%, var(--misty-theme-text));
+  /* Deprecated: the agent state tones under their older names (theme.css --tone-*). */
+  --misty-status-idle: var(--tone-idle);
+  --misty-status-attention: var(--tone-waiting);
+  --misty-status-failed: var(--tone-failed);
 }
 
 /* Keep UI glyphs on a stable compositing layer in WebKit. At fractional page

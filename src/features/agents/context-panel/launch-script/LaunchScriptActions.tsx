@@ -8,11 +8,13 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  ErrorNotification,
   IconButton,
   Input,
   Label,
+  OverflowFadeText,
   Textarea,
+  Tooltip,
+  useNotice,
 } from "@/shared/ui";
 import { errorText } from "../projectApi";
 import { createLaunchScriptEntry, useLaunchScripts, type LaunchScriptEntry } from "./launchScripts";
@@ -86,6 +88,7 @@ export function LaunchScriptButton({ folder }: { folder: string }) {
   const [newLabel, setNewLabel] = useState("");
   const [newScript, setNewScript] = useState("");
   const [error, setError] = useState("");
+  useNotice(Boolean(error), { message: error, tone: "error", onDismiss: () => setError("") });
 
   useEffect(() => {
     void useLaunchScripts
@@ -169,51 +172,50 @@ export function LaunchScriptButton({ folder }: { folder: string }) {
   return (
     <div className="launch-script-actions">
       {primary?.label ? (
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="launch-script-named"
-          title={`${primary.label}: ${primary.script}`}
-          onClick={() => run(primary, 0)}
-          onContextMenu={(event) => {
-            event.preventDefault();
-            openEditor(0);
-          }}
-        >
-          <Play size={14} />
-          <span className="truncate">{primary.label}</span>
-        </Button>
+        <Tooltip content={`${primary.label}: ${primary.script}`}>
+          <Button
+            type="button"
+            variant="quiet"
+            icon={Play}
+            className="launch-script-named"
+            onClick={() => run(primary, 0)}
+            onContextMenu={(event) => {
+              event.preventDefault();
+              openEditor(0);
+            }}
+          >
+            <OverflowFadeText>{primary.label}</OverflowFadeText>
+          </Button>
+        </Tooltip>
       ) : (
         <IconButton
           label={primaryLabel}
-          tooltip={primary ? `${primaryLabel}: ${primary.script}` : primaryLabel}
+          hint={primary ? `${primaryLabel}: ${primary.script}` : undefined}
           onClick={() => (primary ? run(primary, 0) : openEditor(null))}
           onContextMenu={(event) => {
             event.preventDefault();
             openEditor(primary ? 0 : null);
           }}
         >
-          <Play size={15} />
+          <Play />
         </IconButton>
       )}
       {rest.map((entry, index) => (
-        <Button
-          key={entry.id}
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="launch-script-named"
-          title={entry.script}
-          onClick={() => run(entry, index + 1)}
-          onContextMenu={(event) => {
-            event.preventDefault();
-            openEditor(index + 1);
-          }}
-        >
-          <Play size={14} />
-          <span className="truncate">{entry.label || entry.script}</span>
-        </Button>
+        <Tooltip key={entry.id} content={entry.script}>
+          <Button
+            type="button"
+            variant="quiet"
+            icon={Play}
+            className="launch-script-named"
+            onClick={() => run(entry, index + 1)}
+            onContextMenu={(event) => {
+              event.preventDefault();
+              openEditor(index + 1);
+            }}
+          >
+            <OverflowFadeText>{entry.label || entry.script}</OverflowFadeText>
+          </Button>
+        </Tooltip>
       ))}
       <Dialog open={editIndex !== false} onOpenChange={(open) => !open && closeEditor()}>
         <DialogContent aria-describedby={undefined} className="max-w-[420px]">
@@ -239,26 +241,25 @@ export function LaunchScriptButton({ folder }: { folder: string }) {
                 onScript={setNewScript}
               />
               <div className="launch-script-new-actions">
-                <Button type="button" variant="ghost" size="sm" onClick={() => setShowNew(false)}>
+                <Button type="button" variant="quiet" onClick={() => setShowNew(false)}>
                   Cancel
                 </Button>
-                <Button type="button" size="sm" disabled={!newScript.trim()} onClick={createNew}>
+                <Button type="button" disabled={!newScript.trim()} onClick={createNew}>
                   Add command
                 </Button>
               </div>
             </div>
           ) : null}
-          <ErrorNotification message={error} onDismiss={() => setError("")} />
           <DialogFooter>
-            <Button type="button" variant="ghost" size="sm" onClick={closeEditor}>
+            <Button type="button" variant="quiet" onClick={closeEditor}>
               Cancel
             </Button>
             {showNew ? null : (
-              <Button type="button" variant="ghost" size="sm" onClick={() => setShowNew(true)}>
+              <Button type="button" variant="quiet" onClick={() => setShowNew(true)}>
                 New command
               </Button>
             )}
-            <Button type="button" size="sm" onClick={saveEdit}>
+            <Button type="button" onClick={saveEdit}>
               Save
             </Button>
           </DialogFooter>

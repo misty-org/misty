@@ -157,7 +157,7 @@ describe("SettingsWorkspace", () => {
 
   it("renders every block of a page together", async () => {
     await render("general");
-    for (const id of ["general", "browser-tabs", "updates"])
+    for (const id of ["general", "updates"])
       expect(container.querySelector(`[data-settings-page="${id}"]`)).not.toBeNull();
     expect(container.querySelector('[data-settings-nav-entry="updates"]')).toBeNull();
   });
@@ -180,14 +180,17 @@ describe("SettingsWorkspace", () => {
     await render();
     await act(async () =>
       fireEvent.change(container.querySelector('input[aria-label="Search settings"]')!, {
-        target: { value: "homepage" },
+        target: { value: "reopen" },
       }),
     );
     const result = container.querySelector(
       '[aria-label="Settings search results"] button',
     ) as HTMLButtonElement;
-    expect(result.textContent).toContain("Homepage");
+    expect(result.textContent).toContain("Reopen last session");
     await act(async () => result.click());
-    expect(mocks.settingsState.setActiveSection).toHaveBeenCalledWith("browser-tabs", "Homepage");
+    expect(mocks.settingsState.setActiveSection).toHaveBeenCalledWith(
+      "general",
+      "Reopen last session",
+    );
   });
 });

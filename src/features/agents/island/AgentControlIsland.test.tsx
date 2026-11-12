@@ -1,5 +1,6 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { NoticeViewport } from "@/shared/ui";
 const mocks = vi.hoisted(() => ({
   pause: vi.fn(),
   watch: vi.fn(() => vi.fn()),
@@ -227,7 +228,12 @@ it("mirrors itself on the desktop island and acts on its presses", async () => {
 
 it("shows the exact desktop blocker without relying on a tooltip", async () => {
   show({ ready: true, desktopControl: true });
-  render(<AgentControlIsland />);
+  render(
+    <>
+      <AgentControlIsland />
+      <NoticeViewport />
+    </>,
+  );
   fireEvent(
     window,
     new CustomEvent("misty:autopilot-error", {

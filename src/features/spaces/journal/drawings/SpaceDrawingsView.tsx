@@ -1,13 +1,7 @@
 import type { AiSurfaceAdapter } from "@/features/agents";
 import { confirmAction } from "@/shared/lib/confirmAction";
 import { JournalDeleteDialog } from "..";
-import {
-  Button,
-  CollectionItemDialog,
-  CollectionSkeleton,
-  EmptyState,
-  PermissionState,
-} from "@/shared/ui";
+import { CollectionSkeleton, EmptyState, RenameItemDialog } from "@/shared/ui";
 import { DrawingCollection } from "./components/DrawingCollection";
 import { DrawingCanvasSkeleton, DrawingWorkspace } from "./components/DrawingWorkspace";
 import {
@@ -155,10 +149,9 @@ export function SpaceDrawingsView(props: {
 
   if (!user) {
     return (
-      <PermissionState
-        className="h-full"
+      <EmptyState
         title="Sign in to open drawings"
-        description="Collaborative drawings require an active Misty session."
+        line="Collaborative drawings require an active Misty session."
       />
     );
   }
@@ -176,14 +169,9 @@ export function SpaceDrawingsView(props: {
           "Drawings could not be loaded",
         )}
         <EmptyState
-          className="h-full"
           title="Drawings are unavailable"
-          description="They couldn't be loaded. Try again."
-          action={
-            <Button type="button" onClick={() => void drawings.reload()}>
-              Try again
-            </Button>
-          }
+          line="They couldn't be loaded. Try again."
+          action={{ label: "Try again", onClick: () => void drawings.reload() }}
         />
       </>
     );
@@ -240,11 +228,11 @@ export function SpaceDrawingsView(props: {
         }}
       />
       {renameTarget && renameTarget.space_id === props.spaceId && (
-        <CollectionItemDialog
+        <RenameItemDialog
           key={renameTarget.id}
           title="Rename drawing"
           initialName={renameTarget.title}
-          actionLabel="Save"
+          confirmLabel="Save"
           onConfirm={(title) => {
             const current = drawings.drawings.find((drawing) => drawing.id === renameTarget.id);
             if (runtime.readOnly || !current || current.role === "viewer")

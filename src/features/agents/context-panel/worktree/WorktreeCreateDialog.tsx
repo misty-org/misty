@@ -10,7 +10,7 @@ import {
   Field,
   Input,
   Label,
-  SegmentedControl,
+  ChoiceGroup,
   Spinner,
   Switch,
 } from "@/shared/ui";
@@ -259,7 +259,7 @@ export function WorktreeCreateDialog({
             }
           }}
         >
-          <SegmentedControl
+          <ChoiceGroup
             label="Start from"
             size="sm"
             value={tab}
@@ -348,17 +348,17 @@ export function WorktreeCreateDialog({
             </div>
           ) : null}
           <Field label="Location">
-            <Input readOnly value={location} placeholder="Beside the repository" title={location} />
+            <Input readOnly value={location} placeholder="Beside the repository" />
           </Field>
           <label className="worktree-switch">
             <Switch checked={switchAfter} onCheckedChange={setSwitchAfter} />
             <span>Switch to it when it's ready</span>
           </label>
           <DialogFooter>
-            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
+            <Button type="button" variant="quiet" size="lg" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={!canSubmit}>
+            <Button type="submit" size="lg" disabled={!canSubmit}>
               Create worktree
             </Button>
           </DialogFooter>

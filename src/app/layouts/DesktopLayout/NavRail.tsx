@@ -1,7 +1,7 @@
 import { useAccountAvatarUrl, useAuth, useUserStore } from "@/features/account";
 import { useNativeSessionStore } from "@/features/account";
 import { avatarColorClass, avatarInkClass } from "@/shared/lib/avatarPalette";
-import { Avatar, AvatarFallback, AvatarImage, Button, cn } from "@/shared/ui";
+import { Avatar, AvatarFallback, AvatarImage, Button, OverflowFadeText, cn } from "@/shared/ui";
 import { UserCircle } from "lucide-react";
 import { forwardRef, memo, type ButtonHTMLAttributes } from "react";
 import { useShallow } from "zustand/react/shallow";
@@ -47,7 +47,7 @@ export const AccountNavButton = memo(
       <Button
         ref={ref}
         className={cn("group/profile", props.className ?? profileDockClass)}
-        variant="ghost"
+        variant="quiet"
         type="button"
         aria-label="Account"
         aria-haspopup="menu"
@@ -79,7 +79,9 @@ export const AccountNavButton = memo(
           />
         )}
         {(props.label ?? (props.showAccountName ? displayName : null)) ? (
-          <span className="min-w-0 flex-1 truncate text-left">{props.label ?? displayName}</span>
+          <OverflowFadeText className="flex-1 text-left">
+            {props.label ?? displayName}
+          </OverflowFadeText>
         ) : null}
       </Button>
     );

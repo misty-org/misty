@@ -121,6 +121,8 @@ export function NoteSuggestionMenu(props: {
             <SuggestionItem
               key={item.label}
               selected={false}
+              icon={item.icon}
+              label={item.label}
               onClick={() => {
                 props.editor
                   .chain()
@@ -133,15 +135,14 @@ export function NoteSuggestionMenu(props: {
                 item.run();
                 props.onClose();
               }}
-            >
-              <item.icon />
-              {item.label}
-            </SuggestionItem>
+            />
           ))
         : notes.map((note) => (
             <SuggestionItem
               key={note.id}
               selected={false}
+              icon={Link2}
+              label={note.title}
               onClick={() => {
                 props.editor
                   .chain()
@@ -165,10 +166,7 @@ export function NoteSuggestionMenu(props: {
                   .run();
                 props.onClose();
               }}
-            >
-              <Link2 />
-              {note.title}
-            </SuggestionItem>
+            />
           ))}
       {props.suggestion.type === "wiki" && notes.length === 0 ? (
         <span className="p-2 text-xs text-cream-muted">No matching notes</span>

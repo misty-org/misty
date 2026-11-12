@@ -28,16 +28,16 @@ export function NoteSearchReplacePanel(props: {
         aria-label="Replacement text"
         onChange={(event) => props.onReplaceChange(event.target.value)}
       />
-      <Button size="sm" variant="ghost" onClick={() => commands.goToPreviousResult()}>
+      <Button variant="quiet" onClick={() => commands.goToPreviousResult()}>
         Previous
       </Button>
-      <Button size="sm" variant="ghost" onClick={() => commands.goToNextResult()}>
+      <Button variant="quiet" onClick={() => commands.goToNextResult()}>
         Next
       </Button>
-      <Button size="sm" variant="ghost" onClick={() => commands.replace()}>
+      <Button variant="quiet" onClick={() => commands.replace()}>
         Replace
       </Button>
-      <Button size="sm" variant="ghost" onClick={() => commands.replaceAll()}>
+      <Button variant="quiet" onClick={() => commands.replaceAll()}>
         All
       </Button>
       <IconButton size="md" label="Close search" onClick={props.onClose}>

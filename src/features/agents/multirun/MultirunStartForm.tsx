@@ -3,8 +3,9 @@ import {
   Button,
   Checkbox,
   EmptyState,
-  ErrorNotification,
+  FieldError,
   Label,
+  OverflowFadeText,
   Skeleton,
   Spinner,
   Textarea,
@@ -83,30 +84,23 @@ export function MultirunStartForm({
     return (
       <>
         <EmptyState
-          compact
+          inline
           title={notice.title}
           action={
-            notice.action === "link" ? (
-              <Button
-                type="button"
-                size="sm"
-                onClick={() =>
-                  void useSpaceFolders
-                    .getState()
-                    .link(space)
-                    .catch(() => null)
+            notice.action === "link"
+              ? {
+                  label: "Link a folder",
+                  variant: "secondary",
+                  onClick: () =>
+                    void useSpaceFolders
+                      .getState()
+                      .link(space)
+                      .catch(() => null),
                 }
-              >
-                Link a folder
-              </Button>
-            ) : (
-              <Button type="button" size="sm" onClick={check}>
-                Check again
-              </Button>
-            )
+              : { label: "Check again", variant: "secondary", onClick: check }
           }
         />
-        <ErrorNotification message={error} onDismiss={() => setError("")} />
+        <FieldError message={error} />
       </>
     );
   if (!ready)
@@ -115,7 +109,7 @@ export function MultirunStartForm({
         <Skeleton className="h-24 w-full rounded-lg" />
         <Skeleton className="h-10 w-full rounded-lg" />
         <Skeleton className="h-10 w-full rounded-lg" />
-        <ErrorNotification message={error} onDismiss={() => setError("")} />
+        <FieldError message={error} />
       </div>
     );
   return (
@@ -156,7 +150,7 @@ export function MultirunStartForm({
                   onCheckedChange={() => setChosen(toggleChoice(chosen, agent.id))}
                 />
                 <AgentAvatar agent={agent} compact />
-                <span className="min-w-0 flex-1 truncate">{agent.name}</span>
+                <OverflowFadeText className="min-w-0 flex-1">{agent.name}</OverflowFadeText>
                 {reason ? <span className="flex-none text-xs">{reason}</span> : null}
               </label>
             );
@@ -165,16 +159,16 @@ export function MultirunStartForm({
       </div>
       <div className="flex justify-end gap-2">
         {onCancel ? (
-          <Button type="button" variant="ghost" size="sm" onClick={onCancel}>
+          <Button type="button" variant="quiet" onClick={onCancel}>
             Cancel
           </Button>
         ) : null}
-        <Button type="submit" size="sm" disabled={busy || !task.trim() || !chosen.length}>
+        <Button type="submit" disabled={busy || !task.trim() || !chosen.length}>
           {busy ? <Spinner size="sm" label="Starting" /> : null}
           Start multi-run
         </Button>
       </div>
-      <ErrorNotification message={error} onDismiss={() => setError("")} />
+      <FieldError message={error} />
     </form>
   );
 }

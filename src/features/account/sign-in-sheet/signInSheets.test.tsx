@@ -25,7 +25,6 @@ vi.mock("../components/SignInForm", () => ({
 vi.mock("../components/RegisterForm", () => ({
   default: () => <form aria-label="Create account form" />,
 }));
-vi.mock("@/features/agents/models/modelSetup", () => ({ ModelSetupPanel: () => null }));
 vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl: vi.fn() }));
 vi.mock("../setup/useServerSwitch", () => ({
   useServerSwitch: () => ({
@@ -37,6 +36,7 @@ vi.mock("../setup/useServerSwitch", () => ({
 }));
 
 import { useServerChoice } from "@/api/deployment/serverChoice";
+import { NoticeViewport } from "@/shared/ui";
 import { SignInSheet as Sheet } from "./SignInSheet";
 import { openSignInSheet, useSignInSheetStore } from "./signInSheetStore";
 import { openSignOutSheet, SignOutSheet } from "./SignOutSheet";
@@ -105,11 +105,11 @@ it("goes back to the page with Not now, hiding page views only while open", () =
   expect(mocks.suspend).toHaveBeenLastCalledWith(false, "sign-in-sheet");
 });
 
-it("runs the wizard after a first sign-in, starting on the model", () => {
+it("runs the wizard after a first sign-in, starting on the sidebar's side", () => {
   render(<SignInSheet />);
   act(() => openSignInSheet("wizard"));
-  expect(screen.getByRole("dialog", { name: "Choose a model" })).toBeTruthy();
-  expect(screen.getByRole("button", { name: "Continue" })).toBeTruthy();
+  expect(screen.getByRole("dialog", { name: "Where do you want the sidebar?" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Done" })).toBeTruthy();
 });
 
 it("offers the wizard again after a later sign-in, or carries on", () => {
@@ -121,7 +121,7 @@ it("offers the wizard again after a later sign-in, or carries on", () => {
 
   act(() => openSignInSheet("rerun"));
   fireEvent.click(screen.getByRole("button", { name: "Run setup" }));
-  expect(screen.getByRole("dialog", { name: "Choose a model" })).toBeTruthy();
+  expect(screen.getByRole("dialog", { name: "Where do you want the sidebar?" })).toBeTruthy();
 });
 
 it("signs out keeping browsing data unless removing it is chosen", async () => {
@@ -158,18 +158,25 @@ it("starts by choosing a server when this device has none", async () => {
 
 it("stays on choosing a server when Misty Pro can't be reached", async () => {
   mocks.switchToMistyCloud.mockRejectedValueOnce(new Error("Misty couldn't reach Misty Pro."));
-  render(<SignInSheet />);
+  render(
+    <>
+      <NoticeViewport />
+      <SignInSheet />
+    </>,
+  );
   act(() => openSignInSheet("setup"));
   await act(async () => fireEvent.click(screen.getByRole("button", { name: /Misty Pro/ })));
-  expect(screen.getByRole("alert").textContent).toContain("couldn't reach Misty Pro");
-  expect(screen.getByRole("button", { name: /Just browse/ })).toBeTruthy();
+  expect((await screen.findByRole("alert")).textContent).toContain("couldn't reach Misty Pro");
+  expect(screen.getByRole("button", { name: /Only this computer/ })).toBeTruthy();
 });
 
-it("is the setup wizard, where Just browse leaves Misty without a server", async () => {
+it("is the setup wizard, where Only this computer leaves Misty without a server", async () => {
   render(<SignInSheet />);
   act(() => openSignInSheet("setup"));
   expect(screen.getByRole("dialog", { name: "Set up Misty" })).toBeTruthy();
-  await act(async () => fireEvent.click(screen.getByRole("button", { name: /Just browse/ })));
+  await act(async () =>
+    fireEvent.click(screen.getByRole("button", { name: /Only this computer/ })),
+  );
   expect(mocks.chooseNoServer).toHaveBeenCalled();
   expect(useSignInSheetStore.getState().reason).toBeNull();
 });

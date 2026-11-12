@@ -5,13 +5,12 @@ import { spacesApi } from "../api/api";
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
-  ErrorNotification,
   FileInput,
+  MenuItem,
   MenuTrigger,
-  cn,
   itemToneClass,
   itemTones,
+  notify,
   type ItemTone,
 } from "@/shared/ui";
 import { createSpaceItem, type SpaceCreateKind } from "./createSpaceItem";
@@ -23,6 +22,8 @@ const choices: Choice[] = [
   { id: "drawing", label: "Drawing", icon: PenLine, tone: itemTones.drawing },
   { id: "file", label: "Upload file", icon: Upload, tone: itemTones.document },
 ];
+
+const failed = (message: string) => notify({ message, tone: "error", id: "space-new" });
 
 /**
  * The page head's New menu: a note, a drawing or a file for this Space. Upload file opens the
@@ -40,18 +41,16 @@ export function MakeSomethingNew({
 }) {
   const navigate = useNavigate();
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
   const picker = useRef<HTMLInputElement>(null);
 
   async function upload(files: File[]) {
     if (!files.length) return;
-    setError("");
     setBusy(true);
     try {
       for (const file of files) await spacesApi.uploadLibraryBlob(spaceId, file, file.name);
       onCreated();
     } catch (cause) {
-      setError(
+      failed(
         cause instanceof Error && cause.message
           ? cause.message
           : "Couldn't add that file. Try again.",
@@ -63,12 +62,11 @@ export function MakeSomethingNew({
   }
 
   async function make(choice: Choice) {
-    setError("");
     setBusy(true);
     try {
       await createSpaceItem(spaceId, choice.id, navigate, () => picker.current?.click(), onCreated);
     } catch {
-      setError(`Couldn't make a new ${choice.label.toLowerCase()}. Try again.`);
+      failed(`Couldn't make a new ${choice.label.toLowerCase()}. Try again.`);
     } finally {
       setBusy(false);
     }
@@ -84,24 +82,20 @@ export function MakeSomethingNew({
         onChange={(event) => void upload(Array.from(event.target.files ?? []))}
       />
       <DropdownMenu>
-        <MenuTrigger
-          label="New"
-          variant="secondary"
-          disabled={busy}
-          icon={<Plus aria-hidden="true" />}
-        />
+        <MenuTrigger label="New" variant="secondary" disabled={busy} icon={Plus} />
         <DropdownMenuContent align="end" className="min-w-44">
           {choices
             .filter((choice) => !only || only.includes(choice.id))
             .map((choice) => (
-              <DropdownMenuItem key={choice.id} onSelect={() => void make(choice)}>
-                <choice.icon className={cn("size-4", itemToneClass(choice.tone))} aria-hidden />
-                {choice.label}
-              </DropdownMenuItem>
+              <MenuItem
+                key={choice.id}
+                icon={<choice.icon className={itemToneClass(choice.tone)} aria-hidden />}
+                label={choice.label}
+                onSelect={() => void make(choice)}
+              />
             ))}
         </DropdownMenuContent>
       </DropdownMenu>
-      <ErrorNotification message={error} onDismiss={() => setError("")} />
     </>
   );
 }

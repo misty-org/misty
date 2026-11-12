@@ -2,7 +2,7 @@ import { Folder, GitBranch, Plus } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { currentSpaceKey, folderName, useContextPanel, useSpaceFolders } from "@/features/agents";
-import { Button, ErrorNotification } from "@/shared/ui";
+import { Button, OverflowFadeText, useNotice } from "@/shared/ui";
 import { useGitStatuses } from "./useOverviewData";
 import { OverviewCard, OverviewEmpty, OverviewRow, OverviewRowsSkeleton } from "./OverviewCard";
 import { gitSummary, shortPath } from "./overviewData";
@@ -33,6 +33,8 @@ export function ProjectFoldersCard() {
     };
   }, [space]);
 
+  useNotice(Boolean(error), { message: error, tone: "error", onDismiss: () => setError("") });
+
   const link = () => {
     setError("");
     void useSpaceFolders
@@ -46,8 +48,7 @@ export function ProjectFoldersCard() {
     navigate("/agents");
   };
   const linkButton = (
-    <Button type="button" variant="ghost" size="sm" onClick={link}>
-      <Plus aria-hidden="true" />
+    <Button type="button" variant="quiet" icon={Plus} onClick={link}>
       Link a folder
     </Button>
   );
@@ -65,13 +66,13 @@ export function ProjectFoldersCard() {
               kind="folder"
               leading={<Folder className="size-4" aria-hidden="true" />}
               title={folderName(path)}
-              detail={<span className="truncate">{shortPath(path)}</span>}
+              detail={<OverflowFadeText full>{shortPath(path)}</OverflowFadeText>}
               trailing={
                 summary && (
                   <>
                     <span className="overview-git">
                       <GitBranch className="size-3.5 shrink-0" aria-hidden="true" />
-                      <span className="truncate">{summary.branch}</span>
+                      <OverflowFadeText full>{summary.branch}</OverflowFadeText>
                     </span>
                     {summary.changed > 0 && (
                       <span className="overview-git-changed">{summary.changed} changed</span>
@@ -86,7 +87,6 @@ export function ProjectFoldersCard() {
       ) : (
         <OverviewEmpty>No folders linked</OverviewEmpty>
       )}
-      <ErrorNotification message={error} onDismiss={() => setError("")} />
     </OverviewCard>
   );
 }

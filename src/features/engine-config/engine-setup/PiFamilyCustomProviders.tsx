@@ -17,6 +17,7 @@ import {
   IconButton,
   SkeletonList,
   Textarea,
+  OverflowFadeText,
 } from "@/shared/ui";
 import { BrandTile } from "../brands/BrandMark";
 import { notifyCliConfigChanged } from "../channels/providers";
@@ -154,13 +155,11 @@ export function CustomProviders({
   ) : null;
   const editorActions = (onCancel: () => void, onSave: () => void) => (
     <div className="flex items-center justify-end gap-2">
-      <code className="mr-auto min-w-0 truncate text-2xs text-cream-muted">
+      <code className="mr-auto min-w-0 truncate text-micro text-cream-muted">
         {config?.file.path}
       </code>
-      <Button size="sm" variant="secondary" onClick={onCancel}>
-        Cancel
-      </Button>
-      <Button size="sm" variant="primary" disabled={saving} onClick={onSave}>
+      <Button onClick={onCancel}>Cancel</Button>
+      <Button variant="primary" disabled={saving} onClick={onSave}>
         {saving ? "Saving" : "Save"}
       </Button>
     </div>
@@ -169,9 +168,9 @@ export function CustomProviders({
   return (
     <section aria-label="Custom providers" className="mb-8">
       <div className="mb-3 flex items-center justify-between gap-3">
-        <h2 className="text-md font-semibold text-cream-bright">Custom providers</h2>
+        <h2 className="text-body font-semibold text-cream-bright">Custom providers</h2>
         {draft === null ? (
-          <Button size="sm" variant="secondary" disabled={!config} onClick={() => edit()}>
+          <Button disabled={!config} onClick={() => edit()}>
             Edit {file}
           </Button>
         ) : null}
@@ -198,7 +197,7 @@ export function CustomProviders({
         <div className="grid gap-2">
           <div className={CARD}>
             {!config ? (
-              <SkeletonList label="Reading custom providers" rows={2} leading="tile" />
+              <SkeletonList lines={2} label="Reading custom providers" rows={2} leading="tile" />
             ) : config.parseError ? (
               <div role="alert" className={cn(ROW, "text-sm text-cream-muted")}>
                 {file} can't be read: {config.parseError}
@@ -211,16 +210,17 @@ export function CustomProviders({
                   <div className={cn(ROW, "border-b-0")}>
                     <BrandTile mark={null} />
                     <div className="grid min-w-0 flex-1">
-                      <p className="truncate text-sm text-cream-bright">
+                      <OverflowFadeText as="p" full className="text-sm text-cream-bright">
                         {provider.name ?? provider.id}
-                      </p>
+                      </OverflowFadeText>
                       {provider.baseUrl ? (
-                        <p
-                          className="truncate font-mono text-2xs text-cream-muted"
-                          title={provider.baseUrl}
+                        <OverflowFadeText
+                          as="p"
+                          full
+                          className="font-mono text-micro text-cream-muted"
                         >
                           {provider.baseUrl}
-                        </p>
+                        </OverflowFadeText>
                       ) : null}
                     </div>
                     <span className="shrink-0 text-xs text-cream-muted">
@@ -229,8 +229,7 @@ export function CustomProviders({
                     <State on={provider.hasApiKey} label={provider.hasApiKey ? "Key" : "No key"} />
                     <IconButton
                       label={`Edit ${provider.id}`}
-                      size="xs"
-                      variant="ghost"
+                      size="sm"
                       disabled={saving}
                       aria-pressed={editingId === provider.id}
                       onClick={() => editProvider(provider.id)}
@@ -239,8 +238,7 @@ export function CustomProviders({
                     </IconButton>
                     <IconButton
                       label={`Remove ${provider.id}`}
-                      size="xs"
-                      variant="ghost"
+                      size="sm"
                       disabled={saving}
                       onClick={() => setDeleteTarget(provider)}
                     >

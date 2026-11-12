@@ -1,5 +1,6 @@
 import "./agentCloudAvatars.testFixtures";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { NoticeViewport, resetNotices } from "@/shared/ui";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 const save = vi.hoisted(() => vi.fn());
 vi.mock("@/features/agents/personal/personalAgentsApi", () => ({ personalAgentsApi: { save } }));
@@ -13,16 +14,23 @@ const access = {
   deviceError: false,
   retry: vi.fn(),
 };
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  act(() => resetNotices());
+});
 beforeEach(() => save.mockReset());
 const start = (onSaved = vi.fn(async () => {})) => {
+  // A failure is a notice, drawn where the app draws them.
   render(
-    <AgentSetup
-      access={access}
-      onConnections={vi.fn()}
-      onStatusChange={vi.fn()}
-      onSaved={onSaved}
-    />,
+    <>
+      <NoticeViewport />
+      <AgentSetup
+        access={access}
+        onConnections={vi.fn()}
+        onStatusChange={vi.fn()}
+        onSaved={onSaved}
+      />
+    </>,
   );
   fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Research partner" } });
   fireEvent.change(screen.getByLabelText("Purpose"), { target: { value: "Compare sources" } });

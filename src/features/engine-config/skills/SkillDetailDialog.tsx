@@ -16,10 +16,12 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  Pressable,
   Skeleton,
   SkeletonDocument,
   Spinner,
   cn,
+  OverflowFadeText,
 } from "@/shared/ui";
 import { skillsHubApi } from "./api";
 import { EngineGlyph, InlineError, SourceBadge } from "./components";
@@ -64,15 +66,13 @@ function DetailProperties({ skill }: { skill: SkillRow }) {
     <div className="shrink-0 rounded-lg border border-charcoal-border px-3 py-1">
       {skill.repoOwner && skill.repoName ? (
         <PropertyRow label={t("detail.repository")}>
-          <Button
-            variant="link"
-            size="none"
-            className="h-auto gap-1 text-sm"
+          <Pressable
+            className="inline-flex items-center gap-1 text-sm text-cream-bright hover:underline"
             onClick={() => (skill.readmeUrl ? void openExternalLink(skill.readmeUrl) : undefined)}
           >
             {skill.repoOwner}/{skill.repoName}
             <ExternalLink className="size-3.5" aria-hidden />
-          </Button>
+          </Pressable>
         </PropertyRow>
       ) : null}
       <PropertyRow label={t("detail.directory")}>
@@ -318,9 +318,9 @@ export function SkillDetailDialog({
           </DialogTitle>
           <div className="flex min-w-0 items-center gap-2">
             <SourceBadge skill={skill} />
-            <span className="truncate text-xs text-cream-muted" title={skill.directory}>
+            <OverflowFadeText full className="text-xs text-cream-muted">
               {skill.directory}
-            </span>
+            </OverflowFadeText>
           </div>
         </DialogHeader>
 
@@ -351,7 +351,7 @@ export function SkillDetailDialog({
               <InlineError
                 message={contentError ?? ""}
                 action={
-                  <Button variant="secondary" size="xs" onClick={() => void loadContent()}>
+                  <Button size="sm" onClick={() => void loadContent()}>
                     {t("common.refresh")}
                   </Button>
                 }
@@ -363,8 +363,6 @@ export function SkillDetailDialog({
         <div className="flex shrink-0 flex-col gap-3">
           {!readonly ? (
             <Button
-              variant="outline"
-              size="sm"
               className="w-full"
               disabled={pending}
               title={t("detail.removeAllHint")}
@@ -377,30 +375,18 @@ export function SkillDetailDialog({
           <div className="flex items-center justify-between gap-2">
             <div className="flex gap-2">
               {!skill.managed && !readonly ? (
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  disabled={pending}
-                  onClick={() => onImport(skill)}
-                >
+                <Button disabled={pending} onClick={() => onImport(skill)}>
                   {t("actions.import")}
                 </Button>
               ) : null}
             </div>
             <div className="flex gap-2">
               {hasUpdate ? (
-                <Button
-                  variant="primary"
-                  size="sm"
-                  disabled={pending}
-                  onClick={() => onTriggerUpdate(skill)}
-                >
+                <Button variant="primary" disabled={pending} onClick={() => onTriggerUpdate(skill)}>
                   {t("actions.update")}
                 </Button>
               ) : null}
-              <Button variant="secondary" size="sm" onClick={onClose}>
-                {t("common.close")}
-              </Button>
+              <Button onClick={onClose}>{t("common.close")}</Button>
             </div>
           </div>
         </div>

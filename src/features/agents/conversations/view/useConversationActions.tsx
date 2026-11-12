@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { ExternalLink, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import { useMistyStore } from "../state/useMistyStore";
 import { globalMistyError } from "../state/globalMistyActions";
 import {
@@ -11,7 +11,6 @@ import {
   AlertDialogFooter,
   AlertDialogTitle,
   Button,
-  ContextMenuAction,
   ContextMenuContent,
   ContextMenuSeparator,
   Dialog,
@@ -22,7 +21,7 @@ import {
   DropdownMenuContent,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-  ErrorNotification,
+  FieldError,
   IconButton,
   Input,
   MenuItem,
@@ -112,13 +111,13 @@ export function useConversationActions({
         </IconButton>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" onCloseAutoFocus={keepDialogFocus}>
-        {onOpen && <MenuItem label="Open" onSelect={onOpen} />}
-        <MenuItem icon={<Pencil />} label="Rename" disabled={disabled} onSelect={startRename} />
+        {onOpen && <MenuItem icon={ExternalLink} label="Open" onSelect={onOpen} />}
+        <MenuItem icon={Pencil} label="Rename" disabled={disabled} onSelect={startRename} />
         <DropdownMenuSeparator />
-        <MenuItem icon={<Trash2 />} label="Delete" disabled={disabled} onSelect={startDelete} />
+        <MenuItem icon={Trash2} label="Delete" disabled={disabled} onSelect={startDelete} />
         {deleteAll && (
           <MenuItem
-            icon={<Trash2 />}
+            icon={Trash2}
             label={`Delete all ${selectedCount}`}
             disabled={disabled}
             onSelect={onDeleteSelected}
@@ -129,23 +128,13 @@ export function useConversationActions({
   );
   const contextMenu = (
     <ContextMenuContent onCloseAutoFocus={keepDialogFocus}>
-      {onOpen && <ContextMenuAction label="Open" onSelect={onOpen} />}
-      <ContextMenuAction
-        icon={<Pencil />}
-        label="Rename"
-        disabled={disabled || busy}
-        onSelect={startRename}
-      />
+      {onOpen && <MenuItem icon={ExternalLink} label="Open" onSelect={onOpen} />}
+      <MenuItem icon={Pencil} label="Rename" disabled={disabled || busy} onSelect={startRename} />
       <ContextMenuSeparator />
-      <ContextMenuAction
-        icon={<Trash2 />}
-        label="Delete"
-        disabled={disabled || busy}
-        onSelect={startDelete}
-      />
+      <MenuItem icon={Trash2} label="Delete" disabled={disabled || busy} onSelect={startDelete} />
       {deleteAll && (
-        <ContextMenuAction
-          icon={<Trash2 />}
+        <MenuItem
+          icon={Trash2}
           label={`Delete all ${selectedCount}`}
           disabled={disabled || busy}
           onSelect={onDeleteSelected}
@@ -178,9 +167,9 @@ export function useConversationActions({
               onFocus={(event) => event.target.select()}
               onChange={(event) => setTitle(event.target.value)}
             />
-            <ErrorNotification message={error} onDismiss={() => setError("")} />
+            <FieldError message={error} />
             <DialogFooter>
-              <Button type="button" variant="outline" disabled={busy} onClick={close}>
+              <Button type="button" disabled={busy} onClick={close}>
                 Cancel
               </Button>
               <Button type="submit" disabled={disabled || busy || !title.trim()}>
@@ -201,7 +190,7 @@ export function useConversationActions({
           <AlertDialogDescription className="break-words">
             “{name}” and its messages will be permanently deleted.
           </AlertDialogDescription>
-          <ErrorNotification message={error} onDismiss={() => setError("")} />
+          <FieldError message={error} />
           <AlertDialogFooter>
             <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
             <Button disabled={disabled || busy} onClick={() => void submit()}>

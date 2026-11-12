@@ -24,8 +24,7 @@ export function ShareToSpace({
   const here = shared?.spaceId === space.id;
   return (
     <Button
-      variant="ghost"
-      size="sm"
+      variant="quiet"
       disabled={busy}
       onClick={() => {
         setBusy(true);

@@ -12,7 +12,6 @@ import {
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Button,
-  ErrorNotification,
   IconButton,
   Input,
   MenuTrigger,
@@ -20,7 +19,8 @@ import {
   PopoverContent,
   Pressable,
   Skeleton,
-  Spinner,
+  Tooltip,
+  useNotice,
 } from "@/shared/ui";
 import type { BranchInfo } from "./gitApi";
 import { useGitStore } from "./store";
@@ -66,11 +66,14 @@ export function ChangesPanelHeader({
   const [newBranchName, setNewBranchName] = useState("");
   const [branchQuery, setBranchQuery] = useState("");
   const git = useGitStore.getState;
+  useNotice(Boolean(error), { message: error ?? "", tone: "error", onDismiss: onDismissError });
 
+  // Outside a repository nothing here applies: the panel shows only its way to make one.
+  if (notRepo && !followedRepoPath) return null;
   return (
     <div className="git-head">
-      <div className="git-head-row">
-        {notRepo ? null : (
+      {notRepo ? null : (
+        <div className="git-head-row">
           <BranchPicker
             workspacePath={workspacePath}
             branch={branch}
@@ -85,57 +88,60 @@ export function ChangesPanelHeader({
               setCreatingBranch(true);
             }}
           />
-        )}
-        {ahead !== undefined && behind !== undefined ? (
-          <span
-            className="git-sync"
-            title={`${ahead} ahead, ${behind} behind`}
-            aria-label={`${ahead} commits ahead, ${behind} behind`}
-          >
-            ↑{ahead} ↓{behind}
-          </span>
-        ) : null}
-        <div className="git-head-actions">
-          {onToggleViewMode ? (
-            <IconButton
-              label={viewMode === "tree" ? "View as list" : "View as tree"}
-              size="xs"
-              onClick={onToggleViewMode}
-            >
-              {viewMode === "tree" ? <List /> : <FolderTree />}
-            </IconButton>
+          {ahead !== undefined && behind !== undefined ? (
+            <Tooltip content={`${ahead} ahead, ${behind} behind`}>
+              <span className="git-sync" aria-label={`${ahead} commits ahead, ${behind} behind`}>
+                ↑{ahead} ↓{behind}
+              </span>
+            </Tooltip>
           ) : null}
-          <IconButton
-            label="Refresh"
-            size="xs"
-            disabled={pending.refresh === true}
-            onClick={() => run("refresh", () => git().refresh(workspacePath, true))}
-          >
-            {pending.refresh ? <Spinner className="size-3.5" /> : <RefreshCw />}
-          </IconButton>
-          <IconButton
-            label="Pull"
-            size="xs"
-            disabled={notRepo || pending.pull === true}
-            onClick={() => run("pull", () => git().pull(workspacePath))}
-          >
-            {pending.pull ? <Spinner className="size-3.5" /> : <CloudDownload />}
-          </IconButton>
-          <IconButton
-            label="Push"
-            size="xs"
-            disabled={notRepo || pending.push === true}
-            onClick={() => run("push", () => git().push(workspacePath))}
-          >
-            {pending.push ? <Spinner className="size-3.5" /> : <CloudUpload />}
-          </IconButton>
+          <div className="git-head-actions">
+            {onToggleViewMode ? (
+              <IconButton
+                label={viewMode === "tree" ? "View as list" : "View as tree"}
+                size="sm"
+                onClick={onToggleViewMode}
+              >
+                {viewMode === "tree" ? <List /> : <FolderTree />}
+              </IconButton>
+            ) : null}
+            <IconButton
+              label="Refresh"
+              size="sm"
+              loading={pending.refresh === true}
+              disabled={pending.refresh === true}
+              onClick={() => run("refresh", () => git().refresh(workspacePath, true))}
+            >
+              <RefreshCw />
+            </IconButton>
+            <IconButton
+              label="Pull"
+              size="sm"
+              loading={pending.pull === true}
+              disabled={pending.pull === true}
+              onClick={() => run("pull", () => git().pull(workspacePath))}
+            >
+              <CloudDownload />
+            </IconButton>
+            <IconButton
+              label="Push"
+              size="sm"
+              loading={pending.push === true}
+              disabled={pending.push === true}
+              onClick={() => run("push", () => git().push(workspacePath))}
+            >
+              <CloudUpload />
+            </IconButton>
+          </div>
         </div>
-      </div>
+      )}
       {followedRepoPath ? (
         <div className="git-head-row">
-          <span className="git-repo-badge" title={followedRepoPath}>
-            {followedRepoPath.split(/[\\/]/).filter(Boolean).pop() ?? followedRepoPath}
-          </span>
+          <Tooltip content={followedRepoPath}>
+            <span className="git-repo-badge">
+              {followedRepoPath.split(/[\\/]/).filter(Boolean).pop() ?? followedRepoPath}
+            </span>
+          </Tooltip>
         </div>
       ) : null}
       {creatingBranch ? (
@@ -156,7 +162,6 @@ export function ChangesPanelHeader({
           }}
         />
       ) : null}
-      <ErrorNotification message={error ?? ""} onDismiss={onDismissError} />
     </div>
   );
 }
@@ -200,9 +205,9 @@ function BranchPicker(props: {
       <MenuTrigger
         kind="popover"
         label="Branch"
-        icon={<GitBranch size={14} aria-hidden="true" />}
+        icon={GitBranch}
         value={props.branch ?? ""}
-        variant="outline"
+        variant="secondary"
         className="git-branch-trigger"
       />
       <PopoverContent
@@ -303,10 +308,10 @@ function NewBranchForm(props: {
           if (event.key === "Escape") props.onCancel();
         }}
       />
-      <Button type="submit" size="sm" disabled={!props.name.trim() || props.busy}>
+      <Button type="submit" disabled={!props.name.trim() || props.busy}>
         Create
       </Button>
-      <Button type="button" variant="ghost" size="sm" onClick={props.onCancel}>
+      <Button type="button" variant="quiet" onClick={props.onCancel}>
         Cancel
       </Button>
     </form>

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { MistyMarkdown } from "../runs/markdown/MistyMarkdown";
-import { Button, ErrorNotification } from "@/shared/ui";
+import { Button } from "@/shared/ui";
+import { ErrorNotice } from "../conversations/ErrorNotice";
 import { StatusRow, StatusTable } from "../progress/StatusTable";
 import { AgentPlanEditor } from "./AgentPlanEditor";
 import { PlanRiskTag } from "./PlanRiskTag";
@@ -128,11 +129,10 @@ export function AgentPlanCard({
           </ul>
         </details>
       )}
-      <ErrorNotification message={error} onDismiss={() => setError("")} />
+      <ErrorNotice message={error} onDismiss={() => setError("")} />
       <div className="agent-plan-actions">
         <Button
           variant="primary"
-          size="sm"
           disabled={busy || working}
           onClick={() =>
             void act(async () => onRun(await useCollaborationStore.getState().approvePlan(plan)))
@@ -140,20 +140,14 @@ export function AgentPlanCard({
         >
           Run plan
         </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={busy || working}
-          onClick={() => setEditing(true)}
-        >
+        <Button disabled={busy || working} onClick={() => setEditing(true)}>
           Edit
         </Button>
-        <Button variant="ghost" size="sm" disabled={busy} onClick={onKeepPlanning}>
+        <Button variant="quiet" disabled={busy} onClick={onKeepPlanning}>
           Keep planning
         </Button>
         <Button
-          variant="ghost"
-          size="sm"
+          variant="quiet"
           className="agent-plan-dismiss"
           disabled={busy || working}
           onClick={() => void act(() => useCollaborationStore.getState().rejectPlan(plan))}

@@ -12,7 +12,7 @@
  * timer.
  */
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { ArrowUp, BookOpen, Check, Download, LogIn, RefreshCw } from "lucide-react";
+import { ArrowUp, BookOpen, Check, Download, Globe, LogIn, MapPin, RefreshCw } from "lucide-react";
 import { useState } from "react";
 import { EngineMark, hasEngineMark } from "../EngineMark";
 import { DesktopSettingsSection as Section } from "@/features/settings";
@@ -21,10 +21,11 @@ import {
   cn,
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuTrigger,
+  MenuItem,
   Skeleton,
   IconButton,
+  OverflowFadeText,
 } from "@/shared/ui";
 import { ENGINE_DOCS_URLS, ENGINE_IDS, ENGINE_NAMES, type EngineId } from "../channels/engines";
 import type { CliVersionStatus } from "./api";
@@ -87,14 +88,16 @@ export function CliRow({ engine }: { engine: EngineId }) {
     status?.installed === true && signIn !== null && signIn.signedIn !== true && engine !== "dsh";
   return (
     <div className="flex min-h-[52px] items-center gap-3 border-b border-charcoal-border px-3 py-2.5 last:border-b-0">
-      <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-charcoal-card text-cream">
+      <span className="flex size-8 shrink-0 items-center justify-center text-cream">
         {hasEngineMark(engine) ? (
           <EngineMark engine={engine} size={16} />
         ) : (
           <span className="text-xs font-semibold">{name.charAt(0)}</span>
         )}
       </span>
-      <p className="min-w-0 flex-1 truncate text-sm text-cream-bright">{ENGINE_NAMES[engine]}</p>
+      <OverflowFadeText as="p" full className="min-w-0 flex-1 text-sm text-cream-bright">
+        {ENGINE_NAMES[engine]}
+      </OverflowFadeText>
       <SignInPill
         signedIn={status?.installed ? (signIn?.signedIn ?? null) : null}
         detail={signIn?.detail ?? null}
@@ -102,34 +105,33 @@ export function CliRow({ engine }: { engine: EngineId }) {
       {canSignIn && engine === "minimax" ? (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button size="sm" variant="secondary" disabled={updating}>
+            <Button disabled={updating}>
               <LogIn />
               Sign in
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onSelect={() => setSigningIn({ provider: "global" })}>
-              Global account
-            </DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => setSigningIn({ provider: "cn" })}>
-              China account
-            </DropdownMenuItem>
+            <MenuItem
+              icon={Globe}
+              label="Global account"
+              onSelect={() => setSigningIn({ provider: "global" })}
+            />
+            <MenuItem
+              icon={MapPin}
+              label="China account"
+              onSelect={() => setSigningIn({ provider: "cn" })}
+            />
           </DropdownMenuContent>
         </DropdownMenu>
       ) : canSignIn ? (
-        <Button size="sm" variant="secondary" disabled={updating} onClick={() => setSigningIn({})}>
+        <Button disabled={updating} onClick={() => setSigningIn({})}>
           <LogIn />
           Sign in
         </Button>
       ) : null}
       <VersionPill status={status} error={error} />
       {canAct ? (
-        <Button
-          size="sm"
-          variant="primary"
-          disabled={updating || loading}
-          onClick={() => void flow.begin()}
-        >
+        <Button variant="primary" disabled={updating || loading} onClick={() => void flow.begin()}>
           {updating ? null : status.installed ? <ArrowUp /> : <Download />}
           {updating
             ? "Updating"
@@ -139,19 +141,15 @@ export function CliRow({ engine }: { engine: EngineId }) {
         </Button>
       ) : null}
       <IconButton
-        size="xs"
-        variant="ghost"
+        size="sm"
         label={`${ENGINE_NAMES[engine]} docs`}
-        title="Docs"
         onClick={() => openDocs(ENGINE_DOCS_URLS[engine])}
       >
         <BookOpen />
       </IconButton>
       <IconButton
-        size="xs"
-        variant="ghost"
+        size="sm"
         label={`Check ${ENGINE_NAMES[engine]} again`}
-        title="Check again"
         disabled={loading || updating}
         onClick={refresh}
       >

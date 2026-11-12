@@ -36,13 +36,18 @@ export function BringAgentMenu({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button type="button" variant="outline">
-          <Bot className="size-4" /> Bring an agent
+        <Button type="button" variant="secondary" icon={Bot}>
+          Bring an agent
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         {available.map((agent) => (
-          <MenuItem key={agent.id} label={agent.name} onSelect={() => onBring(agent.id)} />
+          <MenuItem
+            key={agent.id}
+            icon={Bot}
+            label={agent.name}
+            onSelect={() => onBring(agent.id)}
+          />
         ))}
       </DropdownMenuContent>
     </DropdownMenu>

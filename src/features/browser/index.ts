@@ -16,9 +16,7 @@ export {
   showAdoptedBrowserPage,
   windowChromeChangedEvent,
 } from "./webviews/browserRuntime";
-export { configureHiddenTabSleep } from "./webviews/hiddenTabSleep";
 export { providerFromRoute } from "./webviews/providers";
 export { websiteIntegrations } from "./webviews/websiteIntegrations";
 export { BrowserPermissionSettings } from "./settings/BrowserPermissionSettings";
-export { DownloadsSettings } from "./settings/BrowserSection";
 export { PrivacySection } from "./settings/PrivacySection";

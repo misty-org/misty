@@ -1,7 +1,7 @@
 import type { LibraryEditDefinition } from "../../api/dto/common";
 import { SystemErrorNotice } from "@/shared/platform/systemErrors";
 import { Button } from "@/shared/ui";
-import { RotateCw } from "lucide-react";
+import { Palette, RotateCw } from "lucide-react";
 import type { Dispatch, SetStateAction } from "react";
 import { LibrarySelect } from "../SpaceLibraryPrimitives";
 import {
@@ -51,20 +51,14 @@ export function LibraryEditPanel(props: LibraryEditPanelProps) {
     <section className="mb-6 border-b border-charcoal-border/60 pb-5">
       <div className="flex items-center justify-between">
         <h3 className="m-0 text-sm">Edit</h3>
-        <Button
-          size="sm"
-          variant="outline"
-          type="button"
-          onClick={() => onChange(defaultLibraryEdit())}
-        >
+        <Button variant="secondary" type="button" onClick={() => onChange(defaultLibraryEdit())}>
           Reset
         </Button>
       </div>
 
       <div className="mt-4 flex flex-wrap gap-2">
         <Button
-          size="sm"
-          variant="outline"
+          variant="secondary"
           type="button"
           onClick={() =>
             onChange((current) => ({
@@ -76,13 +70,13 @@ export function LibraryEditPanel(props: LibraryEditPanelProps) {
           <RotateCw size={12} />
           Rotate
         </Button>
-        <Button size="sm" variant="outline" type="button" onClick={toggle("flip_horizontal")}>
+        <Button variant="secondary" type="button" onClick={toggle("flip_horizontal")}>
           Flip H
         </Button>
-        <Button size="sm" variant="outline" type="button" onClick={toggle("flip_vertical")}>
+        <Button variant="secondary" type="button" onClick={toggle("flip_vertical")}>
           Flip V
         </Button>
-        <Button size="sm" variant="outline" type="button" onClick={toggle("auto_enhance")}>
+        <Button variant="secondary" type="button" onClick={toggle("auto_enhance")}>
           {draft.auto_enhance ? "Auto on" : "Auto"}
         </Button>
       </div>
@@ -98,6 +92,7 @@ export function LibraryEditPanel(props: LibraryEditPanelProps) {
             }))
           }
           label="Filter"
+          icon={Palette}
           options={filterOptions}
         />
       </label>
@@ -134,21 +129,14 @@ export function LibraryEditPanel(props: LibraryEditPanelProps) {
       <div className="mt-4 flex gap-2">
         <Button
           className="flex-1"
-          size="sm"
-          variant="outline"
+          variant="secondary"
           type="button"
           disabled={props.editSaving}
           onClick={props.onCancel}
         >
           Cancel
         </Button>
-        <Button
-          className="flex-1"
-          size="sm"
-          type="button"
-          disabled={props.editSaving}
-          onClick={props.onSave}
-        >
+        <Button className="flex-1" type="button" disabled={props.editSaving} onClick={props.onSave}>
           {props.editSaving ? "Saving…" : "Save edit"}
         </Button>
       </div>

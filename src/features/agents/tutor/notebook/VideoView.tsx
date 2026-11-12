@@ -12,7 +12,7 @@ import {
   Video,
 } from "lucide-react";
 import { confirmAction } from "@/shared/lib/confirmAction";
-import { Button, ErrorNotification, IconButton, Pressable } from "@/shared/ui";
+import { Button, IconButton, Pressable, useNotice, OverflowFadeText } from "@/shared/ui";
 import { deleteVideoAudio, makeVideoAudio, sceneAudioBytes } from "../tutorAudio";
 import { deleteVideoClips, makeVideoClips, sceneClipUrl } from "../tutorClips";
 import { useTutorStore } from "../tutorStore";
@@ -49,14 +49,23 @@ function useClip(guideId: string, index: number, filmed: boolean): string | unde
 
 /**
  * A video overview, after NotebookLM's: each scene filmed on this computer's video model (or the
- * engine's drawing without one), its narration spoken on this computer's speech key, with captions. It plays here, fills the screen, and saves as a
- * video file.
+ * engine's drawing without one), its narration spoken on this computer's speech key, with
+ * captions. It plays here, fills the screen, and saves as a video file.
  */
 export function VideoView({ video, onClose }: { video: Guide; onClose(): void }) {
   const scenes = video.scenes ?? [];
   const [at, setAt] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [error, setError] = useState("");
+  const shownError =
+    error ||
+    (video.audio?.state === "failed" ? (video.audio.error ?? "") : "") ||
+    (video.clips?.state === "failed" ? (video.clips.error ?? "") : "");
+  useNotice(Boolean(shownError), {
+    message: shownError,
+    tone: "error",
+    onDismiss: () => setError(""),
+  });
   const [saving, setSaving] = useState<{ done: number; total: number }>();
   const audio = useRef<HTMLAudioElement>(null);
   const stage = useRef<HTMLDivElement>(null);
@@ -64,6 +73,7 @@ export function VideoView({ video, onClose }: { video: Guide; onClose(): void })
   const scene = scenes[at];
   const clip = useClip(video.id, at, Boolean(scene?.clip));
   const filming = video.clips?.state === "making";
+  const filmingScene = Math.min(scenes.length, scenes.filter((item) => item.clip).length + 1);
   const unfilmed = scenes.some((item) => !item.clip);
 
   // Each scene plays its own narration; without one it holds for reading time.
@@ -125,20 +135,18 @@ export function VideoView({ video, onClose }: { video: Guide; onClose(): void })
   return (
     <>
       <div className="tutor-lead">
-        <IconButton label="Back to the studio" onClick={onClose}>
-          <ArrowLeft size={16} />
+        <IconButton label="Back to Create" onClick={onClose}>
+          <ArrowLeft />
         </IconButton>
-        <span className="tutor-card-title">{video.title}</span>
+        <OverflowFadeText className="tutor-card-title">{video.title}</OverflowFadeText>
         <span className="tutor-actions">
           {video.audio?.state === "failed" ? (
-            <Button variant="ghost" size="sm" onClick={() => void makeVideoAudio(video.id)}>
-              <RotateCcw size={14} />
+            <Button variant="quiet" onClick={() => void makeVideoAudio(video.id)} icon={RotateCcw}>
               Make narration
             </Button>
           ) : null}
           {unfilmed && !filming && video.audio?.state !== "making" ? (
-            <Button variant="ghost" size="sm" onClick={() => void makeVideoClips(video.id)}>
-              <Video size={14} />
+            <Button variant="quiet" onClick={() => void makeVideoClips(video.id)} icon={Video}>
               Film scenes
             </Button>
           ) : null}
@@ -147,21 +155,13 @@ export function VideoView({ video, onClose }: { video: Guide; onClose(): void })
             disabled={Boolean(saving)}
             onClick={() => void save()}
           >
-            <Download size={15} />
+            <Download />
           </IconButton>
           <IconButton label="Delete" onClick={() => void remove()}>
-            <Trash2 size={15} />
+            <Trash2 />
           </IconButton>
         </span>
       </div>
-      <ErrorNotification
-        message={
-          error ||
-          (video.audio?.state === "failed" ? (video.audio.error ?? "") : "") ||
-          (video.clips?.state === "failed" ? (video.clips.error ?? "") : "")
-        }
-        onDismiss={() => setError("")}
-      />
       {scene ? (
         <div ref={stage} className="tutor-video-stage">
           {clip ? (
@@ -192,17 +192,17 @@ export function VideoView({ video, onClose }: { video: Guide; onClose(): void })
       ) : null}
       <div className="tutor-slide-controls">
         <IconButton label="Previous scene" disabled={at === 0} onClick={() => setAt(at - 1)}>
-          <ChevronLeft size={16} />
+          <ChevronLeft />
         </IconButton>
         <IconButton label={playing ? "Pause" : "Play"} onClick={() => setPlaying(!playing)}>
-          {playing ? <Pause size={16} /> : <Play size={16} />}
+          {playing ? <Pause /> : <Play />}
         </IconButton>
         <IconButton
           label="Next scene"
           disabled={at >= scenes.length - 1}
           onClick={() => setAt(at + 1)}
         >
-          <ChevronRight size={16} />
+          <ChevronRight />
         </IconButton>
         <span className="tutor-card-detail">
           {saving
@@ -210,16 +210,15 @@ export function VideoView({ video, onClose }: { video: Guide; onClose(): void })
             : video.audio?.state === "making"
               ? "Speaking the narration"
               : filming
-                ? `Filming scene ${Math.min(scenes.length, scenes.filter((item) => item.clip).length + 1)} of ${scenes.length}`
+                ? `Filming scene ${filmingScene} of ${scenes.length}`
                 : `Scene ${at + 1} of ${scenes.length} · ${clock(total)}`}
         </span>
         <Button
-          variant="ghost"
-          size="sm"
+          variant="quiet"
           className="ml-auto"
           onClick={() => void stage.current?.requestFullscreen?.().catch(() => undefined)}
+          icon={Maximize2}
         >
-          <Maximize2 size={14} />
           Full screen
         </Button>
       </div>
@@ -244,6 +243,7 @@ export function VideoView({ video, onClose }: { video: Guide; onClose(): void })
 export function InfographicView({ infographic, onClose }: { infographic: Guide; onClose(): void }) {
   const [full, setFull] = useState(false);
   const [error, setError] = useState("");
+  useNotice(Boolean(error), { message: error, tone: "error", onDismiss: () => setError("") });
   const remove = async () => {
     if (!(await confirmAction(`Delete “${infographic.title}”? This can’t be undone.`))) return;
     useTutorStore.getState().removeGuide(infographic.id);
@@ -252,10 +252,10 @@ export function InfographicView({ infographic, onClose }: { infographic: Guide; 
   return (
     <>
       <div className="tutor-lead">
-        <IconButton label="Back to the studio" onClick={onClose}>
-          <ArrowLeft size={16} />
+        <IconButton label="Back to Create" onClick={onClose}>
+          <ArrowLeft />
         </IconButton>
-        <span className="tutor-card-title">{infographic.title}</span>
+        <OverflowFadeText className="tutor-card-title">{infographic.title}</OverflowFadeText>
         <span className="tutor-actions">
           <IconButton
             label="Save as SVG"
@@ -268,14 +268,13 @@ export function InfographicView({ infographic, onClose }: { infographic: Guide; 
               ).catch((reason: unknown) => setError(String(reason)))
             }
           >
-            <Download size={15} />
+            <Download />
           </IconButton>
           <IconButton label="Delete" onClick={() => void remove()}>
-            <Trash2 size={15} />
+            <Trash2 />
           </IconButton>
         </span>
       </div>
-      <ErrorNotification message={error} onDismiss={() => setError("")} />
       <Pressable
         className="tutor-infographic"
         data-full={full ? "true" : undefined}

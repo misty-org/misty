@@ -71,7 +71,7 @@ export function ChatThreadColumn({
         <h2 className="m-0 min-w-0 flex-1 text-sm font-medium text-cream-bright">Replies</h2>
         <IconButton
           label="Close replies"
-          size="xs"
+          size="sm"
           onClick={() => useChatSidePanel.getState().closeThread()}
         >
           <X />

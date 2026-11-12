@@ -2,13 +2,12 @@ import { create } from "zustand";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { isWindowColor, type WindowColor } from "./windowColors";
 
 /**
  * A Misty window belongs to one profile for its whole life, as in Chrome: its tabs, the store
  * its pages open in, its extensions and its saved data are that profile's. The native side
  * decides who a window is and tells it before the app first renders; this module holds that
- * identity and is the only way to open, close or change windows and profiles.
+ * identity and opens and closes windows. The native Window menu lists the profiles.
  */
 
 /** The first profile's id, the same on every computer. It can't be deleted. */
@@ -17,11 +16,7 @@ export const firstProfileId = "personal";
 export interface ProfileEntry {
   id: string;
   name: string;
-  /** Tints the window's chrome. */
-  color?: WindowColor;
   order: number;
-  /** The sites this profile claims for links from other apps. */
-  sites: string[];
 }
 
 interface WindowIdentity {
@@ -48,11 +43,7 @@ export function parseProfileEntry(value: unknown): ProfileEntry | null {
   return {
     id: candidate.id,
     name: candidate.name,
-    color: isWindowColor(candidate.color) ? candidate.color : undefined,
     order: typeof candidate.order === "number" ? candidate.order : 0,
-    sites: Array.isArray(candidate.sites)
-      ? candidate.sites.filter((site): site is string => typeof site === "string")
-      : [],
   };
 }
 
@@ -75,16 +66,12 @@ function openingIdentity(): WindowIdentity {
       id: firstProfileId,
       name: "Personal",
       order: 0,
-      sites: [],
     },
   };
 }
 
-/** Who this window is, and the profiles a menu can offer. */
-export const useProfileWindowStore = create<WindowIdentity & { profiles: ProfileEntry[] }>(() => ({
-  ...openingIdentity(),
-  profiles: [],
-}));
+/** Who this window is. */
+export const useProfileWindowStore = create<WindowIdentity>(() => openingIdentity());
 
 /** The profile this window belongs to. */
 export function currentProfile(): ProfileEntry {
@@ -111,35 +98,18 @@ export async function refreshProfileWindow(): Promise<void> {
   });
 }
 
-export async function listProfiles(): Promise<ProfileEntry[]> {
-  const listed = await invoke<unknown[]>("profiles_list");
-  return listed
-    .map(parseProfileEntry)
-    .filter((profile): profile is ProfileEntry => profile !== null)
-    .sort((a, b) => a.order - b.order);
-}
-
-async function refreshProfiles(): Promise<void> {
-  const profiles = await listProfiles().catch(() => null);
-  if (profiles) useProfileWindowStore.setState({ profiles });
-}
-
 let started = false;
 
-/** Loads this window's identity and the profile list, and follows their changes. */
+/** Loads this window's identity and follows its profile's changes. */
 export function startProfileWindow() {
   if (started || !hasTauriInternals()) return;
   started = true;
   void refreshProfileWindow();
-  void refreshProfiles();
   void listen<unknown>("misty://profile-window", ({ payload }) => {
     const profile = parseProfileEntry(payload);
     if (profile && profile.id === currentProfile().id) useProfileWindowStore.setState({ profile });
   }).catch(() => undefined);
-  void listen("misty://profiles-changed", () => {
-    void refreshProfiles();
-    void refreshProfileWindow();
-  }).catch(() => undefined);
+  void listen("misty://profiles-changed", () => void refreshProfileWindow()).catch(() => undefined);
 }
 
 /** Whether this window runs the computer's own background work (agent jobs). */
@@ -177,43 +147,4 @@ export function openNewWindow() {
 /** Closes this window. Its tabs stay in the profile. */
 export function closeWindow() {
   return invoke("profile_window_close");
-}
-
-/** Brings a window of the profile forward, opening one if none is open. Tabs never swap. */
-export function openProfile(id: string) {
-  return invoke("profile_open", { id });
-}
-
-async function savedProfile(request: Promise<unknown>): Promise<ProfileEntry> {
-  const profile = parseProfileEntry(await request);
-  if (!profile) throw new Error("The profile couldn't be read.");
-  if (profile.id === currentProfile().id) useProfileWindowStore.setState({ profile });
-  return profile;
-}
-
-/** Adds a profile and opens its first window. */
-export function createProfile(name: string, color?: WindowColor): Promise<ProfileEntry> {
-  return savedProfile(invoke("profile_create", { name, color: color ?? null }));
-}
-
-export function renameProfile(id: string, name: string): Promise<ProfileEntry> {
-  return savedProfile(invoke("profile_rename", { id, name }));
-}
-
-export function setProfileColor(id: string, color: WindowColor): Promise<ProfileEntry> {
-  return savedProfile(invoke("profile_set_color", { id, color }));
-}
-
-/** Removes a profile and everything it keeps on this computer. */
-export function deleteProfile(id: string) {
-  return invoke("profile_delete", { id });
-}
-
-/** The sites links from other apps open in this profile's windows for. */
-export function profileSites(id: string) {
-  return invoke<string[]>("profile_sites", { id });
-}
-
-export function setProfileSites(id: string, sites: string[]) {
-  return invoke<string[]>("profile_set_sites", { id, sites });
 }

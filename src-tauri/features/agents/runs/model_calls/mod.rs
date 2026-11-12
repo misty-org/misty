@@ -38,21 +38,13 @@ pub use raw_json::RawJson;
 pub use route::{parse_model_id, resolve_model, Credential, ModelRoute, ProviderId};
 pub use stream::{FinishReason, InputTokens, OutputTokens, StreamPart, Usage};
 
-/// Lets tests reach clients whose address is fixed, as ChatGPT's and ElevenLabs' are, at a local
-/// mock. Nothing else may use it: the app always goes to the real address.
+/// Lets tests reach clients whose address is fixed, as ElevenLabs' is, at a local mock. Nothing
+/// else may use it: the app always goes to the real address.
 #[doc(hidden)]
 pub mod testing {
     use std::sync::Arc;
 
-    use super::{providers::chatgpt, CallOptions, LanguageModel, SpeechModel};
-
-    pub fn chatgpt_model(client: &reqwest::Client, base_url: &str, token: &str, model: &str, options: CallOptions) -> (Arc<dyn LanguageModel>, CallOptions) {
-        let mut options = options;
-        if let Some(provider_options) = &mut options.provider_options {
-            provider_options.remove("gateway");
-        }
-        (Arc::new(chatgpt::ChatGptModel::new(client.clone(), base_url, token, model)), chatgpt::prepared_options(options))
-    }
+    use super::SpeechModel;
 
     pub fn elevenlabs_speech_model(client: &reqwest::Client, base_url: &str, key: &str, model: &str) -> Arc<dyn SpeechModel> {
         super::media::elevenlabs_speech_model(client.clone(), base_url, key, model)

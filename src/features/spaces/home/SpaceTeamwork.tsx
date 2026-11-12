@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ErrorNotification } from "@/shared/ui";
+import { OverflowFadeText, useNotice } from "@/shared/ui";
 import { HandoffActions } from "../handoffs/HandoffActions";
 import { postedAgo } from "../handoffs/spacePosts";
 import { useIncomingHandoffs } from "../handoffs/useIncomingHandoffs";
@@ -15,6 +15,7 @@ export function SpaceTeamwork({ spaceId }: { spaceId: string }) {
   const { handoffs, me } = useIncomingHandoffs(spaceId);
   const [error, setError] = useState("");
   const now = Date.now();
+  useNotice(Boolean(error), { message: error, tone: "error", onDismiss: () => setError("") });
   return (
     <>
       <div className="home-pair">
@@ -24,7 +25,9 @@ export function SpaceTeamwork({ spaceId }: { spaceId: string }) {
               {handoffs.map((handoff) => (
                 <li key={handoff.id} className="grid gap-2 rounded-[10px] px-2.5 py-2">
                   <span className="flex min-w-0 items-baseline gap-2 text-sm">
-                    <span className="truncate text-cream">{handoff.fromName}</span>
+                    <OverflowFadeText full className="text-cream">
+                      {handoff.fromName}
+                    </OverflowFadeText>
                     <span className="shrink-0 text-xs text-cream-muted">
                       {postedAgo(handoff.createdAt, now)}
                     </span>
@@ -47,7 +50,6 @@ export function SpaceTeamwork({ spaceId }: { spaceId: string }) {
         <WorkingOn spaceId={spaceId} me={me} />
         <SpaceActivityLog spaceId={spaceId} />
       </div>
-      <ErrorNotification message={error} onDismiss={() => setError("")} />
     </>
   );
 }

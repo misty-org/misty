@@ -1,7 +1,7 @@
 import { X } from "lucide-react";
 import { useState } from "react";
 import type { AgentProfile } from "@/shared/schemas";
-import { ErrorNotification, Field, IconButton, Input, Pressable, Switch } from "@/shared/ui";
+import { Field, IconButton, Input, Pressable, Switch, useNotice } from "@/shared/ui";
 import { updateAgent } from "./HireAgent";
 import { hairs, hashOf, shirts, skins, trousers } from "./studio/look";
 import { emptyLook, useStudioLooks, type Accessory, type FigureLook } from "./studioLooks";
@@ -95,6 +95,7 @@ export function CustomizePanel(props: {
   const [name, setName] = useState(agent.name);
   const [role, setRole] = useState(agent.role);
   const [error, setError] = useState("");
+  useNotice(Boolean(error), { message: error, tone: "error", onDismiss: () => setError("") });
   const figure = (next: FigureLook) =>
     change(agent.id, (known) => ({ ...known, figure: { ...known.figure, ...next } }));
   const desk = (next: typeof look.desk) =>
@@ -116,7 +117,7 @@ export function CustomizePanel(props: {
     >
       <header className="virtual-studio-side-head">
         <h3>Customize</h3>
-        <IconButton label="Done" size="xs" onClick={props.onClose}>
+        <IconButton label="Done" size="sm" onClick={props.onClose}>
           <X aria-hidden="true" />
         </IconButton>
       </header>
@@ -207,7 +208,6 @@ export function CustomizePanel(props: {
           />
         </section>
       </div>
-      <ErrorNotification message={error} onDismiss={() => setError("")} />
     </aside>
   );
 }

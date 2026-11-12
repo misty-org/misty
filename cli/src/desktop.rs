@@ -14,8 +14,7 @@ use crate::{
     workspace::Workspace,
 };
 
-pub fn dev(workspace: &Workspace, profile: Option<&str>, route: Option<&str>) -> Result<()> {
-    validate_profile(profile)?;
+pub fn dev(workspace: &Workspace, route: Option<&str>) -> Result<()> {
     validate_route(route)?;
     let port = available_port(
         env::var("MISTY_DESKTOP_DEV_PORT")
@@ -33,16 +32,12 @@ pub fn dev(workspace: &Workspace, profile: Option<&str>, route: Option<&str>) ->
         .prefix("misty-tauri-dev-")
         .tempdir()?;
     let config_path = temporary.path().join("tauri.dev.conf.json");
-    let mut config = json!({
+    let config = json!({
         "build": {
             "devUrl": format!("http://127.0.0.1:{port}{route}"),
             "beforeDevCommand": "node cli/tasks/run-tool.ts vite --mode desktop"
         }
     });
-    if let Some(profile) = profile {
-        config["productName"] = json!(format!("Misty {profile}"));
-        config["identifier"] = json!(format!("com.misty.desktop.{profile}"));
-    }
     fs::write(&config_path, serde_json::to_vec_pretty(&config)?)?;
 
     // Node directly, like `beforeDevCommand` above, not through npm: npm is a batch file on
@@ -58,9 +53,6 @@ pub fn dev(workspace: &Workspace, profile: Option<&str>, route: Option<&str>) ->
         ])
         .arg(config_path.as_os_str())
         .env("MISTY_DESKTOP_DEV_PORT", port.to_string());
-    if let Some(profile) = profile {
-        command = command.env("MISTY_PROFILE", profile);
-    }
     for (name, value) in development_addresses(workspace) {
         if env::var_os(name).is_none() {
             command = command.env(name, value);
@@ -139,20 +131,6 @@ pub fn sync_icons(workspace: &Workspace, source: Option<&Path>) -> Result<()> {
         fs::copy(&source, &canonical)?;
     }
     println!("Desktop icons are synchronized.");
-    Ok(())
-}
-
-pub fn validate_profile(profile: Option<&str>) -> Result<()> {
-    let Some(profile) = profile else {
-        return Ok(());
-    };
-    let allowed = |byte: u8| byte.is_ascii_lowercase() || byte.is_ascii_digit();
-    let valid = profile.len() <= 32
-        && profile.bytes().next().is_some_and(allowed)
-        && profile.bytes().all(|byte| allowed(byte) || byte == b'-');
-    if !valid {
-        bail!("profile names must use 1-32 lowercase letters, numbers, or hyphens");
-    }
     Ok(())
 }
 
@@ -248,9 +226,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn validates_profiles_and_routes() {
-        assert!(validate_profile(Some("owner-2")).is_ok());
-        assert!(validate_profile(Some("../owner")).is_err());
+    fn validates_routes() {
         assert!(validate_route(Some("/spaces/demo")).is_ok());
         assert!(validate_route(Some("https://example.com")).is_err());
     }

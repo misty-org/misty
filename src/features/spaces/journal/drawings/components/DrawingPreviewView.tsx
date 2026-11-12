@@ -3,13 +3,13 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuTrigger,
-  ErrorNotification,
   MenuItem,
+  useNotice,
   Skeleton,
 } from "@/shared/ui";
 import type { ExcalidrawElement, NonDeleted } from "@excalidraw/excalidraw/element/types";
 import type { BinaryFiles } from "@excalidraw/excalidraw/types";
-import { ClipboardCopy, ImageDown } from "lucide-react";
+import { ClipboardCopy, FileCode, FileImage, ImageDown } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { readDrawingElements } from "../collaboration/drawingSceneStore";
 import type { useDrawingRoomView, DrawingUser } from "../hooks/useDrawingRoomView";
@@ -64,6 +64,12 @@ export function DrawingPreviewView(props: {
   const [renderFailed, setRenderFailed] = useState(false);
   const previewBlobRef = useRef<Blob | null>(null);
   const previewUrlRef = useRef("");
+  useNotice(Boolean(room.error) || renderFailed, { message: "Preview unavailable", tone: "error" });
+  useNotice(Boolean(exportError), {
+    message: exportError,
+    tone: "error",
+    onDismiss: () => setExportError(""),
+  });
 
   useEffect(() => {
     const session = room.session;
@@ -215,14 +221,19 @@ export function DrawingPreviewView(props: {
 
   const renderExportChoices = () => (
     <>
-      <MenuItem label="PNG" disabled={!previewUrl} onSelect={exportPng} />
-      <MenuItem label="SVG" disabled={!exportData} onSelect={() => void exportSvg()} />
+      <MenuItem icon={FileImage} label="PNG" disabled={!previewUrl} onSelect={exportPng} />
+      <MenuItem
+        icon={FileCode}
+        label="SVG"
+        disabled={!exportData}
+        onSelect={() => void exportSvg()}
+      />
     </>
   );
 
   let content: ReactNode;
   if (room.error || renderFailed) {
-    content = <ErrorNotification message="Preview unavailable" />;
+    content = null;
   } else if (empty) {
     content = <PreviewMessage>This canvas is empty</PreviewMessage>;
   } else if (!previewUrl) {
@@ -259,7 +270,7 @@ export function DrawingPreviewView(props: {
           <DropdownMenuTrigger asChild>
             <Button
               type="button"
-              variant="ghost"
+              variant="quiet"
               className="h-8 shrink-0 gap-1.5 px-2 text-xs text-cream-muted hover:text-cream-bright"
               disabled={!exportData}
             >
@@ -273,7 +284,7 @@ export function DrawingPreviewView(props: {
         </DropdownMenu>
         <Button
           type="button"
-          variant="ghost"
+          variant="quiet"
           className="h-8 shrink-0 gap-1.5 px-2 text-xs text-cream-muted hover:text-cream-bright"
           disabled={!exportData}
           onClick={() => void copyPng()}
@@ -284,7 +295,6 @@ export function DrawingPreviewView(props: {
         <BackgroundChoices value={previewSurface} onChange={setPreviewSurface} />
       </div>
       <div className="min-h-0 transition-colors" style={{ backgroundColor: previewSurface }}>
-        <ErrorNotification message={exportError} onDismiss={() => setExportError("")} />
         {content}
       </div>
     </div>

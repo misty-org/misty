@@ -17,7 +17,7 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react";
-import { IconButton, Pressable } from "@/shared/ui";
+import { IconButton, OverflowFadeText, Pressable } from "@/shared/ui";
 import { shortAgo } from "../../page/useChatStatuses";
 import { useMistyStore } from "../../conversations/state/useMistyStore";
 import { DeckView, ReviewSession } from "../TutorDecks";
@@ -74,8 +74,8 @@ type Output = { kind: "guide"; item: Guide } | { kind: "deck"; item: Deck };
 type Viewing = { id: string; review?: boolean };
 
 /**
- * The notebook's right panel, after NotebookLM's Studio: one tile per thing the person's agent can
- * make from the sources, what is being made, and what was made, which opens here in place.
+ * The notebook's right panel, Create (NotebookLM's Studio): one tile per thing the person's agent
+ * can make from the sources, what is being made, and what was made, which opens here in place.
  */
 export function StudioPanel({
   notebook,
@@ -171,9 +171,9 @@ export function StudioPanel({
 
   if (collapsed)
     return (
-      <aside className="tutor-pane tutor-pane-rail" aria-label="Studio">
-        <IconButton label="Show the studio" onClick={() => onCollapse(false)}>
-          <PanelRightOpen size={16} />
+      <aside className="tutor-pane tutor-pane-rail" aria-label="Create">
+        <IconButton label="Show Create" onClick={() => onCollapse(false)}>
+          <PanelRightOpen />
         </IconButton>
         {tiles.map((tile) => (
           <IconButton key={tile.id} label={tile.label} onClick={() => press(tile)}>
@@ -188,7 +188,7 @@ export function StudioPanel({
   if (viewing && (open || openDeck)) {
     const close = () => onView(undefined);
     return (
-      <aside className="tutor-pane tutor-studio-pane" data-viewing="true" aria-label="Studio">
+      <aside className="tutor-pane tutor-studio-pane" data-viewing="true" aria-label="Create">
         <div className="tutor-pane-scroll tutor-studio-view">
           {openDeck ? (
             viewing.review ? (
@@ -221,11 +221,11 @@ export function StudioPanel({
   }
 
   return (
-    <aside className="tutor-pane tutor-studio-pane" aria-label="Studio">
+    <aside className="tutor-pane tutor-studio-pane" aria-label="Create">
       <header className="tutor-pane-head">
-        <h2>Studio</h2>
-        <IconButton label="Hide the studio" onClick={() => onCollapse(true)}>
-          <PanelRightClose size={16} />
+        <h2>Create</h2>
+        <IconButton label="Hide Create" onClick={() => onCollapse(true)}>
+          <PanelRightClose />
         </IconButton>
       </header>
       <div className="tutor-pane-scroll">
@@ -239,7 +239,7 @@ export function StudioPanel({
               onClick={() => press(tile)}
             >
               <tile.icon size={18} className="tutor-tile-icon" />
-              <span className="truncate">{tile.label}</span>
+              <OverflowFadeText full>{tile.label}</OverflowFadeText>
             </Pressable>
           ))}
         </div>
@@ -247,8 +247,8 @@ export function StudioPanel({
           <div className="tutor-report-choices" role="group" aria-label="Reports">
             <div className="tutor-pane-label-row">
               <span className="tutor-pane-label">Reports</span>
-              <IconButton label="Close reports" size="xs" onClick={() => setChoosing(false)}>
-                <X size={13} />
+              <IconButton label="Close reports" size="sm" onClick={() => setChoosing(false)}>
+                <X />
               </IconButton>
             </div>
             {reports
@@ -292,7 +292,7 @@ export function StudioPanel({
               >
                 <tile.icon size={16} className="tutor-tile-icon" />
                 <span className="tutor-output-text">
-                  <span className="truncate">{output.item.title}</span>
+                  <OverflowFadeText full>{output.item.title}</OverflowFadeText>
                   <span className="tutor-card-detail">
                     {meta} · {shortAgo(output.item.createdAt)}
                   </span>
@@ -303,7 +303,7 @@ export function StudioPanel({
           {!made.length && !making.length ? (
             <div className="tutor-pane-empty">
               <Sparkles size={22} aria-hidden="true" />
-              <p>What the studio makes is saved here.</p>
+              <p>What you create is saved here.</p>
             </div>
           ) : null}
         </div>
@@ -326,22 +326,24 @@ function JobOutput({ job, actions }: { job: TutorJob; actions: TutorActions }) {
         className="tutor-output-text"
         onClick={() => actions.onChat(job.agentId, job.conversationId)}
       >
-        <span className={failed ? "truncate" : "truncate misty-shimmer"}>{job.title}</span>
-        <span className="tutor-card-detail truncate">
+        <OverflowFadeText className={failed ? undefined : "misty-shimmer"}>
+          {job.title}
+        </OverflowFadeText>
+        <OverflowFadeText className="tutor-card-detail">
           {failed
             ? (job.error ?? "Failed")
             : job.state === "queued" && !started
               ? "Waiting for a turn to end"
               : "Making"}
-        </span>
+        </OverflowFadeText>
       </Pressable>
       {failed ? (
         <>
-          <IconButton label="Try again" size="xs" onClick={() => void retryJob(job)}>
-            <RotateCcw size={13} />
+          <IconButton label="Try again" size="sm" onClick={() => void retryJob(job)}>
+            <RotateCcw />
           </IconButton>
-          <IconButton label="Dismiss" size="xs" onClick={() => void dismissJob(job)}>
-            <X size={13} />
+          <IconButton label="Dismiss" size="sm" onClick={() => void dismissJob(job)}>
+            <X />
           </IconButton>
         </>
       ) : null}

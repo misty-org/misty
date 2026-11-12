@@ -5,7 +5,7 @@ import { cn } from "../classNames";
 const Table = React.forwardRef<HTMLTableElement, TableProps>(
   ({ className, unwrapped = false, ...props }, ref) => {
     const table = (
-      <table ref={ref} className={cn("w-full caption-bottom text-sm", className)} {...props} />
+      <table ref={ref} className={cn("w-full caption-bottom text-control", className)} {...props} />
     );
 
     if (unwrapped) return table;
@@ -52,7 +52,7 @@ const TableHead = React.forwardRef<
   <th
     ref={ref}
     className={cn(
-      "h-10 px-2 text-left align-middle text-ui font-medium text-cream-muted [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
+      "h-8 px-2 text-left align-middle text-meta font-medium text-cream-muted [&:has([role=checkbox])]:pr-0",
       className,
     )}
     {...props}
@@ -66,10 +66,7 @@ const TableCell = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <td
     ref={ref}
-    className={cn(
-      "p-2 align-middle [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
-      className,
-    )}
+    className={cn("h-8 px-2 py-1.5 align-middle [&:has([role=checkbox])]:pr-0", className)}
     {...props}
   />
 ));

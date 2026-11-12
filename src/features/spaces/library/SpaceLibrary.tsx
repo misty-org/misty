@@ -96,7 +96,7 @@ export function SpaceLibrary({
           <>
             <LibraryEntryHeader />
             <SpaceLibraryStatus />
-            <div className="min-h-0">
+            <div className="flex min-h-0 flex-1 flex-col">
               <LibraryItemsRegion />
             </div>
           </>

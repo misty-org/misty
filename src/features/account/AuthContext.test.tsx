@@ -4,6 +4,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter, Navigate, Outlet, Route, Routes } from "react-router-dom";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { AuthProvider, useAuth, type AuthContextValue } from "./AuthContext";
+import { NoticeViewport } from "@/shared/ui";
 import SignIn from "./pages/SignInPage";
 const mocks = vi.hoisted(() => {
   const accountA = {
@@ -548,16 +549,19 @@ describe("AuthProvider account switching", () => {
     }
     await act(async () => {
       root!.render(
-        <MemoryRouter initialEntries={["/signin"]}>
-          <AuthProvider>
-            <Routes>
-              <Route element={<AccountOutlet />}>
-                <Route path="/signin" element={<SignIn />} />
-                <Route path="/agents" element={<Workspace />} />
-              </Route>
-            </Routes>
-          </AuthProvider>
-        </MemoryRouter>,
+        <>
+          <NoticeViewport />
+          <MemoryRouter initialEntries={["/signin"]}>
+            <AuthProvider>
+              <Routes>
+                <Route element={<AccountOutlet />}>
+                  <Route path="/signin" element={<SignIn />} />
+                  <Route path="/agents" element={<Workspace />} />
+                </Route>
+              </Routes>
+            </AuthProvider>
+          </MemoryRouter>
+        </>,
       );
     });
     const accountButton = () =>

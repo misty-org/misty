@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { FileText, StickyNote } from "lucide-react";
-import { Pressable, SearchField, Skeleton } from "@/shared/ui";
+import { Pressable, SearchField, Skeleton, OverflowFadeText } from "@/shared/ui";
 import type { TutorActions } from "./TutorPage";
 import { searchNotebooks, type SearchHit } from "./tutorSearch";
 import { useTutorStore } from "./tutorStore";
@@ -60,10 +60,10 @@ export function SearchAll({ actions }: { actions: TutorActions }) {
               >
                 <span className="tutor-row-lead">
                   {hit.kind === "note" ? <StickyNote size={14} /> : <FileText size={14} />}
-                  <span className="truncate">{hit.title}</span>
-                  <span className="tutor-card-detail truncate">
+                  <OverflowFadeText>{hit.title}</OverflowFadeText>
+                  <OverflowFadeText className="tutor-card-detail">
                     {notebooks[hit.notebookId]?.title}
-                  </span>
+                  </OverflowFadeText>
                 </span>
                 <span className="tutor-search-snippet">{hit.text.slice(0, 220)}</span>
               </Pressable>

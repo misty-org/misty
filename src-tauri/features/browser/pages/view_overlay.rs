@@ -165,16 +165,3 @@ pub fn browser_webviews_set_pointer_tracking(
         Err(errors.join("; "))
     }
 }
-
-/// Shows or hides the hovered-link and loading bubble in every browser page.
-#[tauri::command]
-pub fn browser_webviews_set_status_bubble(app: AppHandle, enabled: bool) -> Result<(), String> {
-    set_status_bubble_enabled(enabled);
-    let script = browser_status_update_script(&json!({ "enabled": enabled }));
-    for (label, webview) in app.webviews() {
-        if label.starts_with("misty-browser-") {
-            let _ = webview.eval(&script);
-        }
-    }
-    Ok(())
-}

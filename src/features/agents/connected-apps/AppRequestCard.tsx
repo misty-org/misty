@@ -1,7 +1,7 @@
 import { ExternalLink } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { openExternalLink } from "@/shared/platform/openExternalLink";
-import { BrandIcon, brandIconAsset, Button, ErrorNotification } from "@/shared/ui";
+import { BrandIcon, brandIconAsset, Button, useNotice } from "@/shared/ui";
 import { StatusRow, StatusTable, type StatusState } from "../progress/StatusTable";
 import { appsApi, type AppRequest, type AppRequestDecision } from "./api";
 import { ApprovalActions } from "./ApprovalActions";
@@ -102,10 +102,10 @@ export function AppRequestCard({
   const actions = pending ? (
     current.kind === "connect" ? (
       <>
-        <Button size="sm" variant="primary" disabled={busy} onClick={() => void connect()}>
+        <Button variant="primary" disabled={busy} onClick={() => void connect()}>
           <ExternalLink className="size-3.5" /> {opened ? "Open sign-in again" : "Connect"}
         </Button>
-        <Button size="sm" variant="ghost" disabled={busy} onClick={() => void decide("deny")}>
+        <Button variant="quiet" disabled={busy} onClick={() => void decide("deny")}>
           Not now
         </Button>
       </>
@@ -117,6 +117,7 @@ export function AppRequestCard({
       />
     )
   ) : undefined;
+  useNotice(Boolean(error), { message: error, tone: "error", onDismiss: () => setError("") });
   return (
     <>
       <StatusTable label={current.title} actions={actions}>
@@ -137,7 +138,6 @@ export function AppRequestCard({
           {current.title}
         </StatusRow>
       </StatusTable>
-      <ErrorNotification message={error} onDismiss={() => setError("")} />
     </>
   );
 }

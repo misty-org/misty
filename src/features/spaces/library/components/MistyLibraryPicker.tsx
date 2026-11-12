@@ -21,6 +21,7 @@ import {
   Skeleton,
 } from "@/shared/ui";
 
+import { AudioLines, FileText, Film, ImageIcon, LibraryBig, type LucideIcon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { libraryPickerItemMIME } from "./MistyLibraryPickerThumbnail";
 import { MistyLibraryPickerTile } from "./MistyLibraryPickerTile";
@@ -33,12 +34,12 @@ const pickerStyles = {
   ].join(" "),
 } as const;
 
-const mediaOptions: Array<{ value: LibraryMediaFilter; label: string }> = [
-  { value: "all", label: "All media" },
-  { value: "image", label: "Images" },
-  { value: "video", label: "Videos" },
-  { value: "audio", label: "Audio" },
-  { value: "document", label: "Documents" },
+const mediaOptions: Array<{ value: LibraryMediaFilter; label: string; icon: LucideIcon }> = [
+  { value: "all", label: "All media", icon: LibraryBig },
+  { value: "image", label: "Images", icon: ImageIcon },
+  { value: "video", label: "Videos", icon: Film },
+  { value: "audio", label: "Audio", icon: AudioLines },
+  { value: "document", label: "Documents", icon: FileText },
 ];
 
 export function MistyLibraryPicker({
@@ -134,9 +135,12 @@ export function MistyLibraryPicker({
           </SelectTrigger>
           <SelectContent>
             {mediaOptions.map((option) => (
-              <SelectItem key={option.value} value={option.value}>
-                {option.label}
-              </SelectItem>
+              <SelectItem
+                key={option.value}
+                value={option.value}
+                icon={option.icon}
+                label={option.label}
+              />
             ))}
           </SelectContent>
         </Select>
@@ -162,24 +166,22 @@ export function MistyLibraryPicker({
           ) : filteredItems.length === 0 ? (
             <EmptyState
               title={searching ? "No matching items" : "This Library is empty"}
-              description={
+              line={
                 searching
                   ? "Try another search or media type."
                   : "Items added to this Space will appear here."
               }
               action={
-                searching ? (
-                  <Button
-                    variant="outline"
-                    type="button"
-                    onClick={() => {
-                      setQuery("");
-                      setMediaFilter("all");
-                    }}
-                  >
-                    Clear filters
-                  </Button>
-                ) : null
+                searching
+                  ? {
+                      label: "Clear filters",
+                      variant: "secondary",
+                      onClick: () => {
+                        setQuery("");
+                        setMediaFilter("all");
+                      },
+                    }
+                  : undefined
               }
             />
           ) : (
@@ -208,7 +210,7 @@ export function MistyLibraryPicker({
           {selection.length} of {maximumSelected} selected
         </p>
         <div className="flex gap-2">
-          <Button type="button" variant="outline" onClick={onCancel}>
+          <Button type="button" variant="secondary" onClick={onCancel}>
             Cancel
           </Button>
           <Button

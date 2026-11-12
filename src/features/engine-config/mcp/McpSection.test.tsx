@@ -27,6 +27,32 @@ vi.mock("./api", () => ({
 vi.mock("../EngineMark", () => ({ EngineMark: () => null, hasEngineMark: () => false }));
 
 import { engineConfigHost } from "../host";
+
+/** The tooltip an icon button shows on focus: its hint, which says why a switch is inert. */
+async function hintOf(button: HTMLElement | null | undefined) {
+  // Let the section settle first: a render while the tooltip opens would close it again.
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  });
+  // A later render may have replaced the button found before it.
+  const label = button?.getAttribute("aria-label");
+  const live = button?.isConnected
+    ? button
+    : document.querySelector<HTMLElement>(`button[aria-label="${label}"]`);
+  await act(async () => {
+    // Blurred first, so a button that already has focus gets the focus that opens its tooltip.
+    live?.blur();
+    live?.focus();
+    await new Promise((resolve) => setTimeout(resolve, 800));
+  });
+  const text = document.querySelector('[data-slot="tooltip-content"]')?.textContent ?? "";
+  // Closed again, so no test starts with a tooltip left open.
+  await act(async () => {
+    live?.blur();
+    await new Promise((resolve) => setTimeout(resolve, 200));
+  });
+  return text;
+}
 import { useMcpProbeStore } from "./probe-store";
 import { McpSection } from "./McpSection";
 
@@ -247,7 +273,7 @@ describe("McpSection", () => {
     );
     expect(toggle?.getAttribute("aria-pressed")).toBe("true");
     expect(toggle?.getAttribute("aria-disabled")).toBe("true");
-    expect(toggle?.getAttribute("title")).toBe("Read-only here");
+    expect(await hintOf(toggle)).toContain("Read-only here");
     await act(async () => toggle?.click());
     expect(api.setEnabled).not.toHaveBeenCalled();
   });
@@ -268,8 +294,12 @@ describe("McpSection", () => {
       }),
     );
     await renderSection();
-    const toggle = document.querySelector<HTMLButtonElement>('button[aria-label="Enable alpha"]');
-    expect(toggle?.getAttribute("title")).toContain("Choose a folder");
+    // The switch's hover says why; so do the entry's details, which this reads.
+    const open = document.querySelector<HTMLButtonElement>(
+      'button[aria-label="Details for alpha"]',
+    );
+    await act(async () => open?.click());
+    expect(document.querySelector('[role="dialog"]')?.textContent).toContain("Choose a folder");
   });
 
   it("toggles a writable entry from its row, with the version it read", async () => {

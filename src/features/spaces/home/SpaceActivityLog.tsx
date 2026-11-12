@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Skeleton } from "@/shared/ui";
+import { OverflowFadeText, Skeleton } from "@/shared/ui";
 import {
   agentActivityApi,
   doingLabel,
@@ -60,9 +60,9 @@ export function SpaceActivityLog({ spaceId }: { spaceId: string }) {
         <ul className="m-0 grid list-none p-0">
           {lines.slice(0, shown).map((line) => (
             <li key={line.id} className="flex min-h-9 min-w-0 items-center gap-2 px-2.5 text-sm">
-              <span className="truncate text-cream">
+              <OverflowFadeText full className="text-cream">
                 {who(line.user_id, line.agent_id, line.name)}
-              </span>
+              </OverflowFadeText>
               <span className="shrink-0 text-cream-muted">{what(line)}</span>
               <span className="ml-auto shrink-0 text-xs tabular-nums text-cream-muted">
                 {timeOf(line.created_at)}

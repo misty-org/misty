@@ -1,7 +1,16 @@
 import { Check, Lock } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { AgentProfile, AgentProfileInput } from "@/shared/schemas";
-import { Button, ErrorNotification, Field, Input, Pressable, Skeleton } from "@/shared/ui";
+import {
+  Button,
+  Field,
+  Input,
+  OverflowFadeText,
+  Pressable,
+  Skeleton,
+  Tooltip,
+  useNotice,
+} from "@/shared/ui";
 import { EngineMark, hasEngineMark } from "@/features/engine-config/EngineMark";
 import { listEngines, mistyEngine, type EngineInfo } from "../engines/enginesApi";
 import { personalAgentsApi } from "../personal/personalAgentsApi";
@@ -83,6 +92,7 @@ export function HirePanel(props: {
   const [role, setRole] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  useNotice(Boolean(error), { message: error, tone: "error", onDismiss: () => setError("") });
   useEffect(() => {
     if (engines) return;
     let live = true;
@@ -153,36 +163,39 @@ export function HirePanel(props: {
                 <Skeleton key={index} className="h-[74px] rounded-xl" />
               ))
             : cards.map((card) => (
-                <Pressable
+                <Tooltip
                   key={card.id}
-                  type="button"
-                  role="radio"
-                  aria-checked={engine === card.id}
-                  aria-disabled={!card.installed || undefined}
-                  aria-label={card.installed ? card.name : `${card.name}, not installed`}
-                  title={
+                  content={
                     card.installed ? card.name : `${card.name} isn't installed on this computer`
                   }
-                  className="virtual-studio-shop-card"
-                  data-locked={!card.installed || undefined}
-                  onClick={() => card.installed && setEngine(card.id)}
                 >
-                  <span className="virtual-studio-shop-mark" aria-hidden="true">
-                    {hasEngineMark(card.id) ? (
-                      <EngineMark engine={card.id} size={20} />
-                    ) : (
-                      <span className="text-base font-semibold">{card.name[0]}</span>
-                    )}
-                  </span>
-                  <span className="w-full truncate text-center text-xs font-medium">
-                    {card.name}
-                  </span>
-                  {engine === card.id ? (
-                    <Check className="virtual-studio-shop-badge" size={13} aria-hidden="true" />
-                  ) : !card.installed ? (
-                    <Lock className="virtual-studio-shop-badge" size={11} aria-hidden="true" />
-                  ) : null}
-                </Pressable>
+                  <Pressable
+                    type="button"
+                    role="radio"
+                    aria-checked={engine === card.id}
+                    aria-disabled={!card.installed || undefined}
+                    aria-label={card.installed ? card.name : `${card.name}, not installed`}
+                    className="virtual-studio-shop-card"
+                    data-locked={!card.installed || undefined}
+                    onClick={() => card.installed && setEngine(card.id)}
+                  >
+                    <span className="virtual-studio-shop-mark" aria-hidden="true">
+                      {hasEngineMark(card.id) ? (
+                        <EngineMark engine={card.id} size={20} />
+                      ) : (
+                        <span className="text-base font-semibold">{card.name[0]}</span>
+                      )}
+                    </span>
+                    <OverflowFadeText className="w-full text-center text-xs font-medium">
+                      {card.name}
+                    </OverflowFadeText>
+                    {engine === card.id ? (
+                      <Check className="virtual-studio-shop-badge" size={13} aria-hidden="true" />
+                    ) : !card.installed ? (
+                      <Lock className="virtual-studio-shop-badge" size={11} aria-hidden="true" />
+                    ) : null}
+                  </Pressable>
+                </Tooltip>
               ))}
         </div>
         <div className="grid gap-3">
@@ -209,7 +222,6 @@ export function HirePanel(props: {
           Hire
         </Button>
       </form>
-      <ErrorNotification message={error} onDismiss={() => setError("")} />
     </aside>
   );
 }

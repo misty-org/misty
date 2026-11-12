@@ -2,7 +2,7 @@ import { useInRouterContext, useNavigate } from "react-router-dom";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { useShortcutHandler } from "@/features/shortcuts";
 import { useFocusedPaneHistory } from "@/features/app-windows";
-import { IconButton, toolbarIconProps } from "@/shared/ui";
+import { IconButton } from "@/shared/ui";
 
 function NavButtons(props: {
   canBack: boolean;
@@ -13,16 +13,11 @@ function NavButtons(props: {
   return (
     // Sidebar chrome, 6px apart.
     <div className="flex items-center gap-1.5" data-browser-toolbar data-sidebar>
-      <IconButton tooltip={false} label="Back" disabled={!props.canBack} onClick={props.onBack}>
-        <ArrowLeft {...toolbarIconProps} />
+      <IconButton label="Back" disabled={!props.canBack} onClick={props.onBack}>
+        <ArrowLeft />
       </IconButton>
-      <IconButton
-        tooltip={false}
-        label="Forward"
-        disabled={!props.canForward}
-        onClick={props.onForward}
-      >
-        <ArrowRight {...toolbarIconProps} />
+      <IconButton label="Forward" disabled={!props.canForward} onClick={props.onForward}>
+        <ArrowRight />
       </IconButton>
     </div>
   );

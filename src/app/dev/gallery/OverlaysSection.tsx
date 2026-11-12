@@ -14,6 +14,8 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  Field,
+  Input,
   Popover,
   PopoverContent,
   PopoverTrigger,
@@ -21,84 +23,83 @@ import {
   SheetContent,
   SheetDescription,
   SheetTitle,
+  Text,
   Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
 } from "@/shared/ui";
 import { useState } from "react";
 import { GalleryRow, GallerySection } from "./GalleryLayout";
 
+type Open = "dialog" | "alert" | "sheet" | null;
+
 export function OverlaysSection() {
-  const [open, setOpen] = useState<"dialog" | "alert" | "sheet" | null>(null);
-  const openChange = (kind: "dialog" | "alert" | "sheet") => (next: boolean) =>
-    setOpen(next ? kind : null);
+  const [open, setOpen] = useState<Open>(null);
+  const openChange = (kind: Exclude<Open, null>) => (next: boolean) => setOpen(next ? kind : null);
   return (
-    <GallerySection
-      title="Overlays"
-      note="Popover is for rich content (details, pickers, forms). Anything that lists actions is a DropdownMenu."
-    >
+    <GallerySection title="Overlays">
       <GalleryRow label="Popover">
         <Popover>
           <PopoverTrigger asChild>
-            <Button variant="outline" size="sm">
-              Site information
-            </Button>
+            <Button variant="secondary">Connection details</Button>
           </PopoverTrigger>
           <PopoverContent align="start" className="grid gap-2">
-            <p className="m-0 text-sm font-medium text-cream-bright">Connection is secure</p>
-            <p className="m-0 text-xs text-cream-muted">
-              Rich content lives here: details, small forms, pickers.
-            </p>
+            <Text size="control" weight="medium" tone="bright">
+              Connected to Misty Cloud
+            </Text>
+            <Text size="meta" tone="muted" lines={2}>
+              Rich content lives here: details, small forms and pickers.
+            </Text>
           </PopoverContent>
         </Popover>
-        <TooltipProvider delayDuration={200}>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button variant="ghost" size="sm">
-                Hover for tooltip
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Tooltips are one line</TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
+      </GalleryRow>
+      <GalleryRow label="Tooltip">
+        <Tooltip content="Branch">
+          <Button variant="quiet">Label only</Button>
+        </Tooltip>
+        <Tooltip content="Search" shortcut="⌘K">
+          <Button variant="quiet">With shortcut</Button>
+        </Tooltip>
+        <Tooltip content="Opens below" side="bottom">
+          <Button variant="quiet">Below</Button>
+        </Tooltip>
+        <Tooltip content="A longer tooltip wraps inside its own width instead of running off the edge of the window.">
+          <Button variant="quiet">Long text</Button>
+        </Tooltip>
       </GalleryRow>
       <GalleryRow label="Dialogs">
-        <Button size="sm" onClick={() => setOpen("dialog")}>
-          Open dialog
-        </Button>
+        <Button onClick={() => setOpen("dialog")}>Open dialog</Button>
         <Dialog open={open === "dialog"} onOpenChange={openChange("dialog")}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Rename space</DialogTitle>
-              <DialogDescription>Everyone in the space sees the new name.</DialogDescription>
+              <DialogTitle>Rename Space</DialogTitle>
+              <DialogDescription>Everyone in the Space sees the new name.</DialogDescription>
             </DialogHeader>
+            <Field label="Name">
+              <Input defaultValue="Design team" />
+            </Field>
             <DialogFooter>
-              <Button variant="outline">Cancel</Button>
-              <Button>Save</Button>
+              <Button variant="quiet" size="lg" onClick={() => setOpen(null)}>
+                Cancel
+              </Button>
+              <Button variant="primary" size="lg" onClick={() => setOpen(null)}>
+                Save
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
-        <Button variant="destructive" size="sm" onClick={() => setOpen("alert")}>
-          Delete…
-        </Button>
+        <Button onClick={() => setOpen("alert")}>Confirm, not a delete</Button>
         <AlertDialog open={open === "alert"} onOpenChange={openChange("alert")}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Delete this note?</AlertDialogTitle>
-              <AlertDialogDescription>
-                It moves to Recently Deleted for 30 days.
-              </AlertDialogDescription>
+              <AlertDialogTitle>Leave without sending?</AlertDialogTitle>
+              <AlertDialogDescription>Your draft stays in the composer.</AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction>Delete</AlertDialogAction>
+              <AlertDialogCancel>Stay</AlertDialogCancel>
+              <AlertDialogAction>Leave</AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
-        <Button variant="secondary" size="sm" onClick={() => setOpen("sheet")}>
-          Open sheet
-        </Button>
+        <Button onClick={() => setOpen("sheet")}>Open sheet</Button>
         <Sheet open={open === "sheet"} onOpenChange={openChange("sheet")}>
           <SheetContent>
             <SheetTitle>Details</SheetTitle>

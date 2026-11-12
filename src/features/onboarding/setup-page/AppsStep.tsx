@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { AppLogo, appsApi, DirectApps, type ConnectedApp } from "@/features/agents";
 import { useSavedModelKeys } from "@/features/agents/modelKeysPublic";
 import { openExternalLink } from "@/shared/platform/openExternalLink";
-import { Button, cn, ErrorNotification, Input, Skeleton, IconButton } from "@/shared/ui";
+import { Button, cn, IconButton, Input, OverflowFadeText, Skeleton, useNotice } from "@/shared/ui";
 
 /** Composio's dashboard, where a person makes the key connected apps run on. */
 const COMPOSIO_KEYS_URL = "https://platform.composio.dev";
@@ -37,8 +37,7 @@ export function AppsStep() {
     <div className="grid gap-4">
       <DirectApps limit={8} />
       <Button
-        variant="ghost"
-        size="sm"
+        variant="quiet"
         className="justify-self-start text-cream-muted"
         aria-expanded={composio}
         onClick={() => setComposio((open) => !open)}
@@ -63,6 +62,8 @@ function ComposioKey({ keys }: { keys: ReturnType<typeof useSavedModelKeys> }) {
   const [key, setKey] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const shownError = error || keys.error || "";
+  useNotice(Boolean(shownError), { message: shownError, tone: "error" });
   const save = async () => {
     const value = key.trim();
     if (!value || busy) return;
@@ -82,15 +83,13 @@ function ComposioKey({ keys }: { keys: ReturnType<typeof useSavedModelKeys> }) {
   };
   return (
     <div className={`${cardClass} grid gap-4 p-4`}>
-      <ErrorNotification message={error || keys.error} />
       <div className="flex items-center gap-3">
-        <span className="flex size-9 shrink-0 items-center justify-center rounded-[9px] bg-charcoal-hover">
+        <span className="flex size-9 shrink-0 items-center justify-center">
           <AppLogo app="composio" size={18} />
         </span>
         <p className="min-w-0 flex-1 text-sm font-medium text-cream-bright">Composio key</p>
         <Button
-          size="sm"
-          variant="ghost"
+          variant="quiet"
           onClick={() => void openExternalLink(COMPOSIO_KEYS_URL).catch(() => {})}
         >
           <ExternalLink />
@@ -115,7 +114,7 @@ function ComposioKey({ keys }: { keys: ReturnType<typeof useSavedModelKeys> }) {
           className="min-w-0 flex-1"
           onChange={(event) => setKey(event.target.value)}
         />
-        <Button type="submit" variant="outline" disabled={busy || !key.trim()}>
+        <Button type="submit" variant="secondary" disabled={busy || !key.trim()}>
           {busy ? "Checking" : "Save"}
         </Button>
       </form>
@@ -129,6 +128,7 @@ function AppTiles() {
     null,
   );
   const [error, setError] = useState("");
+  useNotice(Boolean(error), { message: error, tone: "error" });
   const load = useCallback(async () => {
     try {
       setApps((await appsApi.list()).apps);
@@ -168,7 +168,6 @@ function AppTiles() {
   };
   return (
     <div className="grid gap-3">
-      <ErrorNotification message={error} />
       {pending ? (
         <p role="status" className="text-sm text-cream-muted">
           Finish signing in to {pending.name} in your browser, then come back here.
@@ -179,20 +178,19 @@ function AppTiles() {
           const connected = active(app).length > 0;
           return (
             <li key={app} className={`${cardClass} flex min-h-[56px] items-center gap-3 px-3 py-2`}>
-              <span className="flex size-8 shrink-0 items-center justify-center rounded-[7px] bg-charcoal-hover">
+              <span className="flex size-8 shrink-0 items-center justify-center">
                 <AppLogo app={app} size={18} />
               </span>
-              <p className="min-w-0 flex-1 truncate text-sm font-medium text-cream-bright">
+              <OverflowFadeText as="p" className="flex-1 text-sm font-medium text-cream-bright">
                 {name}
-              </p>
+              </OverflowFadeText>
               {apps === null ? (
                 <Skeleton className="size-8 rounded-md" />
               ) : connected ? (
                 <Check aria-label={`${name} connected`} className="mx-2 size-4 text-cream-bright" />
               ) : (
                 <IconButton
-                  size="sm"
-                  variant="ghost"
+                  variant="quiet"
                   label={`Connect ${name}`}
                   disabled={pending?.app === app}
                   onClick={() => void connect(app, name)}

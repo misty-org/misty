@@ -13,7 +13,9 @@ const SpaceChat = lazy(async () => {
   return { default: SpaceChat };
 });
 
-const chatSkeleton = <SkeletonList label="Chat" leading="avatar" rows={4} className="p-4" />;
+const chatSkeleton = (
+  <SkeletonList label="Chat" leading="avatar" lines={2} rows={4} className="p-4" />
+);
 
 /**
  * Your Space's chat in the side panel beside the page, the Chat button's view. One header

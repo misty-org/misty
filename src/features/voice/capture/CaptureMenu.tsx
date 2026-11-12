@@ -4,8 +4,8 @@ import {
   Button,
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuTrigger,
+  MenuItem,
 } from "@/shared/ui";
 import { captureMicrophone, captureSystemAudio } from "./startCapture";
 import { useCaptureStore } from "./useCaptureStore";
@@ -18,18 +18,17 @@ export function CaptureMenu() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="px-3" disabled={busy}>
-          <AudioLines />
+        <Button variant="quiet" icon={AudioLines} className="px-3" disabled={busy}>
           Listen
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-52">
-        <DropdownMenuItem onSelect={() => void captureMicrophone()}>
-          <Mic /> Microphone
-        </DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => void captureSystemAudio()}>
-          <MonitorSpeaker /> System audio
-        </DropdownMenuItem>
+        <MenuItem icon={Mic} label="Microphone" onSelect={() => void captureMicrophone()} />
+        <MenuItem
+          icon={MonitorSpeaker}
+          label="System audio"
+          onSelect={() => void captureSystemAudio()}
+        />
       </DropdownMenuContent>
     </DropdownMenu>
   );

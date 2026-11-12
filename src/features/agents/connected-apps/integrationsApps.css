@@ -3,6 +3,11 @@
   display: grid;
   gap: 16px;
 }
+/* Pages have no title bar, so the content starts a top bar's height down, clear of the window's
+   own controls at the top edge. */
+.agent-studio-catalog-page.agent-integrations {
+  margin-top: var(--ui-header);
+}
 .agent-integrations-panel {
   display: grid;
   gap: 24px;

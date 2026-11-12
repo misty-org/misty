@@ -1,7 +1,13 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 import type { ReactNode } from "react";
 import { FileText, FolderOpen, Link2 } from "lucide-react";
-import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from "@/shared/ui";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuTrigger,
+  MenuItem,
+  Tooltip,
+} from "@/shared/ui";
 import { resolveFilePath } from "./fileLinks";
 import {
   copyChatFilePath,
@@ -35,33 +41,35 @@ export function FileLink({
   const resolved = resolveFilePath(path, folder);
   return (
     <ContextMenu>
-      <ContextMenuTrigger asChild>
-        <a
-          className="misty-markdown-file-link"
-          href={href}
-          title={resolved ?? path}
-          onClick={(event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            openChatFilePath(path, folder);
-          }}
-        >
-          {children}
-        </a>
-      </ContextMenuTrigger>
+      <Tooltip content={resolved ?? path}>
+        <ContextMenuTrigger asChild>
+          <a
+            className="misty-markdown-file-link"
+            href={href}
+            onClick={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              openChatFilePath(path, folder);
+            }}
+          >
+            {children}
+          </a>
+        </ContextMenuTrigger>
+      </Tooltip>
       <ContextMenuContent data-misty-layer-portal>
-        <ContextMenuItem disabled={!resolved} onSelect={() => openChatFilePath(path, folder)}>
-          <FileText aria-hidden="true" />
-          Open file
-        </ContextMenuItem>
-        <ContextMenuItem disabled={!resolved} onSelect={() => revealChatFilePath(path, folder)}>
-          <FolderOpen aria-hidden="true" />
-          {revealLabel}
-        </ContextMenuItem>
-        <ContextMenuItem onSelect={() => copyChatFilePath(path, folder)}>
-          <Link2 aria-hidden="true" />
-          Copy path
-        </ContextMenuItem>
+        <MenuItem
+          icon={FileText}
+          label="Open file"
+          disabled={!resolved}
+          onSelect={() => openChatFilePath(path, folder)}
+        />
+        <MenuItem
+          icon={FolderOpen}
+          label={revealLabel}
+          disabled={!resolved}
+          onSelect={() => revealChatFilePath(path, folder)}
+        />
+        <MenuItem icon={Link2} label="Copy path" onSelect={() => copyChatFilePath(path, folder)} />
       </ContextMenuContent>
     </ContextMenu>
   );

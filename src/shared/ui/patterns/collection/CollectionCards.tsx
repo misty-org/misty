@@ -1,33 +1,55 @@
-import type { ReactElement, ReactNode } from "react";
-import type { MouseEvent } from "react";
-import { Button } from "../../controls/Button";
+import type { MouseEvent, ReactNode } from "react";
+import { Pressable } from "../../controls/Pressable";
 import { Card } from "../../display/Card";
-import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from "../../overlays/ContextMenu";
+import { OverflowFadeText } from "../../layout/OverflowFadeText";
+import { Tooltip } from "../../overlays/Tooltip";
 import { cn } from "../../classNames";
-import {
-  collectionIconTone,
-  collectionUtilityReveal,
-  type CollectionItem,
-} from "./collectionItemTypes";
+import { CollectionItemActions } from "./CollectionItemActions";
+import { collectionIconTone, hasItemActions, type CollectionItem } from "./collectionItemTypes";
 
 function CollectionGrid({ children }: { children: ReactNode }) {
   return (
-    <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3">{children}</div>
+    <div className="grid grid-cols-[repeat(auto-fill,minmax(min(180px,100%),1fr))] gap-3">
+      {children}
+    </div>
   );
 }
 
-/** Fade overflowing titles without replacing the end with an ellipsis. */
-export function CollectionCardTitle({ title }: { title: string }) {
+/**
+ * A card's title: one line (or two with `lines={2}`) that fades at its end only when it doesn't
+ * fit, never an ellipsis.
+ */
+export function CollectionCardTitle({ title, lines = 1 }: { title: string; lines?: 1 | 2 }) {
   return (
-    <span
-      title={title}
-      className={cn(
-        "block min-w-0 flex-1 overflow-hidden whitespace-nowrap text-sm font-medium text-cream",
-        "[mask-image:linear-gradient(to_right,black_calc(100%_-_20px),transparent)]",
-      )}
-    >
+    <OverflowFadeText full lines={lines} className="flex-1 text-control font-medium text-cream">
       {title}
-    </span>
+    </OverflowFadeText>
+  );
+}
+
+/**
+ * Who made an item. The longer attribution (added, contributed, uploaded by) shows in a tooltip;
+ * without one, the name itself shows there when it has faded.
+ */
+export function CollectionCreator({
+  children,
+  description,
+  className,
+}: {
+  children: string;
+  description?: string;
+  className?: string;
+}) {
+  if (!description)
+    return (
+      <OverflowFadeText full className={className}>
+        {children}
+      </OverflowFadeText>
+    );
+  return (
+    <Tooltip content={description}>
+      <OverflowFadeText className={className}>{children}</OverflowFadeText>
+    </Tooltip>
   );
 }
 
@@ -44,31 +66,37 @@ export function CollectionCardMetadata({
   creatorDescription?: string;
   creatorLabel?: string;
 }) {
-  const attribution = creatorDescription || (creator ? `${creatorLabel} ${creator}` : undefined);
   return (
-    <span className="mt-3 flex min-w-0 flex-col gap-1 text-xs font-normal text-cream-muted">
+    <span className="mt-3 flex min-w-0 flex-col gap-1 text-meta font-normal text-cream-muted">
       <span className="flex min-w-0 items-center justify-between gap-3">
-        <span className="truncate" title={category}>
+        <OverflowFadeText full className="flex-1">
           {category}
-        </span>
-        <span className="shrink-0" title={`Last activity: ${updated}`}>
-          {updated}
-        </span>
+        </OverflowFadeText>
+        <span className="shrink-0 whitespace-nowrap">{updated}</span>
       </span>
       {creator && (
-        <span className="truncate" title={attribution}>
-          {creatorLabel} {creator}
-        </span>
+        <CollectionCreator description={creatorDescription}>
+          {`${creatorLabel} ${creator}`}
+        </CollectionCreator>
       )}
     </span>
   );
 }
+
+// A card is the item's surface: it highlights while hovered, focused or picked, and its actions
+// sit in one ⋯ at the top right.
+const cardClass = cn(
+  "group/row relative min-w-0 gap-0 p-0",
+  "hover:bg-charcoal-hover has-[:focus-visible]:bg-charcoal-hover",
+  "data-[selected]:bg-charcoal-active",
+);
 
 export function CollectionItemsGrid({
   items,
   hasCreators,
   creatorLabel,
   layout = "preview",
+  titleLines = 1,
   selectedIds = [],
   onSelect,
 }: {
@@ -76,82 +104,65 @@ export function CollectionItemsGrid({
   hasCreators: boolean;
   creatorLabel: string;
   layout?: "preview" | "compact";
+  /** How many lines a compact card's title may take. */
+  titleLines?: 1 | 2;
   selectedIds?: string[];
   onSelect?: (event: MouseEvent, id: string, onOpen: () => void) => void;
 }) {
   return (
     <CollectionGrid>
-      {items.map((item) => (
-        <CollectionItemSurface key={item.id} item={item}>
-          {layout === "compact" ? (
-            <Card
-              className={cn(
-                "group/collection-item min-w-0 gap-0 p-0 hover:bg-charcoal-hover focus-within:bg-charcoal-hover",
-                selectedIds.includes(item.id) && "bg-charcoal-active",
-              )}
-            >
-              <Button
-                variant="ghost"
-                size="none"
+      {items.map((item) => {
+        const open = (event: MouseEvent) => {
+          if (item.selectable && onSelect) onSelect(event, item.id, item.onOpen);
+          else item.onOpen();
+        };
+        const actions = hasItemActions(item);
+        const metadata = (
+          <CollectionCardMetadata
+            category={item.category}
+            updated={item.updated}
+            creator={hasCreators ? item.creator || "Unknown" : undefined}
+            creatorDescription={item.creatorDescription}
+            creatorLabel={creatorLabel}
+          />
+        );
+        return (
+          <Card
+            key={item.id}
+            data-selected={selectedIds.includes(item.id) || undefined}
+            className={cardClass}
+          >
+            {layout === "compact" ? (
+              <Pressable
                 aria-label={item.title}
-                className={cn(
-                  "w-full flex-1 flex-col items-stretch justify-start gap-0 whitespace-normal",
-                  "rounded-none p-4 pb-0 text-left font-normal hover:bg-transparent",
-                  "focus-visible:ring-inset",
-                )}
-                onClick={(event) => {
-                  if (item.selectable && onSelect) onSelect(event, item.id, item.onOpen);
-                  else item.onOpen();
-                }}
+                className="flex w-full flex-1 flex-col p-4"
+                onClick={open}
               >
-                <span className="flex min-h-10 min-w-0 items-center gap-3">
-                  <span
-                    aria-hidden="true"
-                    className={cn(
-                      "grid size-8 shrink-0 place-items-center [&_img]:size-8 [&_img]:object-contain [&_svg]:!size-6",
-                      collectionIconTone(item),
-                    )}
-                  >
-                    {item.icon}
-                  </span>
-                  <span
-                    className="line-clamp-2 min-w-0 flex-1 break-words text-sm font-medium text-cream"
-                    title={item.title}
-                  >
-                    {item.title}
-                  </span>
+                <span className={cn("flex min-h-10 min-w-0 items-center gap-3", actions && "pr-8")}>
+                  {item.icon ? (
+                    <span
+                      aria-hidden="true"
+                      className={cn(
+                        "grid size-8 shrink-0 place-items-center",
+                        "[&_img]:size-8 [&_img]:object-contain [&_svg]:size-6",
+                        collectionIconTone(item),
+                      )}
+                    >
+                      {item.icon}
+                    </span>
+                  ) : null}
+                  <CollectionCardTitle title={item.title} lines={titleLines} />
                   {item.marker}
                 </span>
-                <CollectionCardMetadata
-                  category={item.category}
-                  updated={item.updated}
-                  creator={hasCreators ? item.creator || "Unknown" : undefined}
-                  creatorDescription={item.creatorDescription}
-                  creatorLabel={creatorLabel}
-                />
-              </Button>
-              {item.actions && (
-                <div className="flex justify-end px-4 pt-3 pb-4">{item.actions}</div>
-              )}
-            </Card>
-          ) : (
-            <Card
-              className={cn(
-                "group/collection-item relative gap-0 p-0",
-                selectedIds.includes(item.id) && "bg-charcoal-active",
-              )}
-            >
-              <Button
-                variant="ghost"
-                size="none"
+                {metadata}
+              </Pressable>
+            ) : (
+              <Pressable
                 aria-label={item.title}
-                className="h-64 w-full flex-col items-stretch gap-0 whitespace-normal p-4 text-left font-normal"
-                onClick={(event) => {
-                  if (item.selectable && onSelect) onSelect(event, item.id, item.onOpen);
-                  else item.onOpen();
-                }}
+                className="flex h-64 w-full flex-col p-4"
+                onClick={open}
               >
-                <span className={cn("flex h-8 min-w-0 items-center gap-2", item.actions && "pr-8")}>
+                <span className={cn("flex h-8 min-w-0 items-center gap-2", actions && "pr-8")}>
                   <CollectionCardTitle title={item.title} />
                   {item.marker}
                 </span>
@@ -162,50 +173,28 @@ export function CollectionItemsGrid({
                     collectionIconTone(item),
                     item.preview
                       ? "[&>img]:size-full [&>img]:object-cover"
-                      : "[&_img]:size-10 [&_img]:object-contain [&_svg]:!size-10",
+                      : "[&_img]:size-10 [&_img]:object-contain [&_svg]:size-10",
                   )}
                 >
                   {item.preview ?? item.icon}
                 </span>
-                <CollectionCardMetadata
-                  category={item.category}
-                  updated={item.updated}
-                  creator={hasCreators ? item.creator || "Unknown" : undefined}
-                  creatorDescription={item.creatorDescription}
-                  creatorLabel={creatorLabel}
-                />
-              </Button>
-              {item.actions && (
-                <div
-                  className={cn(
-                    "absolute right-3 top-4 flex items-center",
-                    collectionUtilityReveal,
-                  )}
-                >
-                  {item.actions}
-                </div>
-              )}
-            </Card>
-          )}
-        </CollectionItemSurface>
-      ))}
+                {metadata}
+              </Pressable>
+            )}
+            {actions ? (
+              // Level with the title line, inside the card's padding.
+              <div
+                className={cn(
+                  "absolute right-3 top-4 flex items-center",
+                  layout === "compact" ? "h-10" : "h-8",
+                )}
+              >
+                <CollectionItemActions item={item} />
+              </div>
+            ) : null}
+          </Card>
+        );
+      })}
     </CollectionGrid>
-  );
-}
-
-export function CollectionItemSurface({
-  item,
-  children,
-}: {
-  item: CollectionItem;
-  children: ReactElement;
-}) {
-  return item.contextMenu ? (
-    <ContextMenu onOpenChange={(open) => open && item.onContextMenuOpen?.()}>
-      <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
-      <ContextMenuContent>{item.contextMenu}</ContextMenuContent>
-    </ContextMenu>
-  ) : (
-    children
   );
 }

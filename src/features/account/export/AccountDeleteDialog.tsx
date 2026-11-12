@@ -8,8 +8,8 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  ErrorNotification,
   Input,
+  useNotice,
 } from "@/shared/ui";
 import GoogleSignInButton from "../components/GoogleSignInButton";
 import {
@@ -34,6 +34,7 @@ export function AccountDeleteDialog(props: {
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  useNotice(Boolean(error), { message: error, tone: "error", onDismiss: () => setError("") });
   const [password, setPassword] = useState("");
   const [confirmation, setConfirmation] = useState("");
   useEffect(() => {
@@ -99,7 +100,6 @@ export function AccountDeleteDialog(props: {
             onChange={(event) => setPassword(event.target.value)}
           />
         )}
-        <ErrorNotification message={error} onDismiss={() => setError("")} />
         <AlertDialogFooter>
           <AlertDialogCancel disabled={busy}>Keep my account</AlertDialogCancel>
           {props.google ? null : (

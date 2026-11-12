@@ -72,13 +72,12 @@ export function initialWorkspaceWindow(): WorkspaceWindowsState {
   };
 }
 
-/** This OS window as agents see it, tinted with its profile's color. */
+/** This OS window as agents see it, named after its profile. */
 export function currentWindow(state: WorkspaceWindowsState): WorkspaceWindow {
   const { profile } = useProfileWindowStore.getState();
   return {
     id: state.activeWindowId,
     title: profile.name,
-    ...(profile.color ? { color: profile.color } : {}),
     ...(state.dockingLayout ? { dockingLayout: state.dockingLayout } : {}),
     layout: state.layout,
     createdAt: 0,

@@ -140,7 +140,6 @@ export function EngineHistoryDialog(props: {
                 )}
                 <IconButton
                   label="Rename session"
-                  variant="toolbar"
                   onClick={() => {
                     setTitle(titleOf(session));
                     setRenaming(session.sessionId);
@@ -159,7 +158,7 @@ export function EngineHistoryDialog(props: {
           </p>
         ) : null}
         <div className="engine-plan-actions">
-          <Button size="sm" variant="ghost" onClick={() => props.onOpenChange(false)}>
+          <Button variant="quiet" onClick={() => props.onOpenChange(false)}>
             Close
           </Button>
         </div>

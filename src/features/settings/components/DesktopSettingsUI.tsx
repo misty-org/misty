@@ -1,6 +1,6 @@
-import { Button, cn, IconButton, Notification } from "@/shared/ui";
+import { Button, cn, IconButton, useNotice, type NoticeAction } from "@/shared/ui";
 import { X } from "lucide-react";
-import { createContext, type ReactNode } from "react";
+import { Children, createContext, isValidElement, type ReactNode } from "react";
 import { useSettingReset } from "../device-preferences/SettingScope";
 import { type DesktopSettingsNavGroup, SettingsNavigation } from "./SettingsNavigation";
 export const SettingsControlLabelContext = createContext<string | undefined>(undefined);
@@ -176,7 +176,7 @@ export function DesktopSettingsRow(props: {
                 {props.description ? " " : null}
                 <Button
                   type="button"
-                  variant="link"
+                  variant="quiet"
                   aria-label={`Reset ${props.label} to default`}
                   className={cn(
                     "inline h-auto border-0 p-0 align-baseline text-sm leading-[22px]",
@@ -205,14 +205,30 @@ export function DesktopSettingsRow(props: {
     </div>
   );
 }
-/** A failure for a whole page, e.g. a save that failed, shown as a notification. */
-export function DesktopSettingsNotice(props: { children: ReactNode; action?: ReactNode }) {
-  return (
-    <Notification tone="error">
-      {props.children}
-      {props.action}
-    </Notification>
+/** The words of a node, for a notice, which is one line of text. */
+function textOf(node: ReactNode): string {
+  if (typeof node === "string" || typeof node === "number") return String(node);
+  if (Array.isArray(node)) return node.map(textOf).join("");
+  if (isValidElement<{ children?: ReactNode }>(node)) return textOf(node.props.children);
+  return "";
+}
+
+/** A notice's one action, read from the button a page hands over: its label and its click. */
+function noticeAction(action: ReactNode): NoticeAction | undefined {
+  const button = Children.toArray(action).find((child) =>
+    isValidElement<{ children?: ReactNode; onClick?: () => void }>(child),
   );
+  if (!isValidElement<{ children?: ReactNode; onClick?: () => void }>(button)) return undefined;
+  const { children, onClick } = button.props;
+  const label = textOf(children);
+  return label && onClick ? { label, onSelect: () => onClick() } : undefined;
+}
+
+/** A failure for a whole page, e.g. a save that failed, shown as a notice in the corner. */
+export function DesktopSettingsNotice(props: { children: ReactNode; action?: ReactNode }) {
+  const message = textOf(props.children).trim();
+  useNotice(Boolean(message), { message, tone: "error", action: noticeAction(props.action) });
+  return null;
 }
 interface DesktopSettingsFrameProps<Id extends string> {
   activeId: Id;

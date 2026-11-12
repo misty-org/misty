@@ -9,7 +9,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import type { ReactNode } from "react";
-import { Pressable, Skeleton } from "@/shared/ui";
+import { OverflowFadeText, Pressable, Skeleton, Tooltip } from "@/shared/ui";
 import { AgentAvatar } from "../personal/AgentAvatar";
 import type { StudioAgent } from "./useStudioAgents";
 
@@ -73,9 +73,9 @@ export function TeamPanel(props: {
                 <span className="virtual-studio-team-avatar">
                   <AgentAvatar agent={agent} compact />
                 </span>
-                <span className="min-w-0 flex-1 truncate text-left">
+                <OverflowFadeText className="flex-1 text-left">
                   {props.names.get(agent.id) ?? agent.name}
-                </span>
+                </OverflowFadeText>
                 <span className="virtual-studio-team-state">
                   {outcomeWords[props.outcomes.get(agent.id) ?? ""] ?? stateWords[state]}
                 </span>
@@ -109,53 +109,54 @@ export function StudioDock(props: {
     <div className="virtual-studio-dock">
       <div className="virtual-studio-segments" role="tablist" aria-label="Mode">
         {modes.map(({ id, label, key, icon: Icon }) => (
-          <Pressable
-            key={id}
-            type="button"
-            role="tab"
-            aria-selected={props.mode === id}
-            className="virtual-studio-segment"
-            title={`${label} (${key})`}
-            onClick={() => props.onMode(id)}
-          >
-            <Icon size={15} aria-hidden="true" />
-            <span>{label}</span>
-          </Pressable>
+          <Tooltip key={id} content={label} shortcut={key}>
+            <Pressable
+              type="button"
+              role="tab"
+              aria-selected={props.mode === id}
+              className="virtual-studio-segment"
+              onClick={() => props.onMode(id)}
+            >
+              <Icon size={15} aria-hidden="true" />
+              <span>{label}</span>
+            </Pressable>
+          </Tooltip>
         ))}
       </div>
       {props.children ? <div className="virtual-studio-dock-main">{props.children}</div> : null}
       <div className="virtual-studio-segments" role="radiogroup" aria-label="Camera">
         {cameras.map(({ walking, label, icon: Icon }) => (
-          <Pressable
-            key={label}
-            type="button"
-            role="radio"
-            aria-checked={props.walking === walking}
-            aria-label={label}
-            className="virtual-studio-segment"
-            data-icon-only="true"
-            title={`${label} (V)`}
-            onClick={() => props.onWalking(walking)}
-          >
-            <Icon size={15} aria-hidden="true" />
-          </Pressable>
+          <Tooltip key={label} content={label} shortcut="V">
+            <Pressable
+              type="button"
+              role="radio"
+              aria-checked={props.walking === walking}
+              aria-label={label}
+              className="virtual-studio-segment"
+              data-icon-only="true"
+              onClick={() => props.onWalking(walking)}
+            >
+              <Icon size={15} aria-hidden="true" />
+            </Pressable>
+          </Tooltip>
         ))}
       </div>
-      <Pressable
-        type="button"
-        className="virtual-studio-segment"
-        data-icon-only="true"
-        aria-pressed={props.sounds}
-        aria-label="Studio sounds"
-        title="Studio sounds"
-        onClick={() => props.onSounds(!props.sounds)}
-      >
-        {props.sounds ? (
-          <Volume2 size={15} aria-hidden="true" />
-        ) : (
-          <VolumeX size={15} aria-hidden="true" />
-        )}
-      </Pressable>
+      <Tooltip content="Studio sounds">
+        <Pressable
+          type="button"
+          className="virtual-studio-segment"
+          data-icon-only="true"
+          aria-pressed={props.sounds}
+          aria-label="Studio sounds"
+          onClick={() => props.onSounds(!props.sounds)}
+        >
+          {props.sounds ? (
+            <Volume2 size={15} aria-hidden="true" />
+          ) : (
+            <VolumeX size={15} aria-hidden="true" />
+          )}
+        </Pressable>
+      </Tooltip>
     </div>
   );
 }

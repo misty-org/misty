@@ -1,5 +1,6 @@
 import { act, cleanup, fireEvent, render, screen, within, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { NoticeViewport } from "@/shared/ui";
 import { OrderedCollectionFilters, orderedTabs, mergeTabOrder } from "./OrderedCollectionFilters";
 import { useDevicePreferences } from "./device-preferences/store";
 import { initialPreferencesState, editPreference } from "./device-preferences/settingResolution";
@@ -26,9 +27,11 @@ afterEach(() => {
   useDevicePreferences.setState(initial);
   vi.clearAllMocks();
 });
+// The section tabs are the bar's pressed-or-not chips.
 const tabNames = () =>
-  within(screen.getByRole("navigation", { name: "Filter items" }))
+  within(screen.getByRole("toolbar", { name: "Collection controls" }))
     .getAllByRole("button")
+    .filter((tab) => tab.hasAttribute("aria-pressed"))
     .map((tab) => tab.textContent);
 it("moves a tab without selecting it, persists across remounts, and isolates accounts", async () => {
   const select = vi.fn();
@@ -74,12 +77,15 @@ it("keeps new and temporarily hidden tabs without duplicates", () => {
 it("reports a failed save and keeps the last saved order", async () => {
   useDevicePreferences.setState({ edit: vi.fn().mockRejectedValue(new Error("Disk unavailable")) });
   render(
-    <OrderedCollectionFilters
-      collectionId="journal"
-      options={options}
-      value="all"
-      onChange={vi.fn()}
-    />,
+    <>
+      <NoticeViewport />
+      <OrderedCollectionFilters
+        collectionId="journal"
+        options={options}
+        value="all"
+        onChange={vi.fn()}
+      />
+    </>,
   );
   fireEvent.keyDown(screen.getByRole("button", { name: "Notes" }), {
     key: "ArrowLeft",

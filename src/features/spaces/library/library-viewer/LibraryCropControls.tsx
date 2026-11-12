@@ -31,8 +31,7 @@ export function LibraryCropControls({
         {cropPresets.map(({ label, crop }) => (
           <Button
             key={label}
-            size="sm"
-            variant="outline"
+            variant="secondary"
             type="button"
             onClick={() => onChange((current) => ({ ...current, crop }))}
           >

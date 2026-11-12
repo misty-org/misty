@@ -9,7 +9,16 @@
 import { Download, ExternalLink } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { openExternalLink } from "@/shared/platform/openExternalLink";
-import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, Spinner } from "@/shared/ui";
+import {
+  Button,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  Pressable,
+  Spinner,
+  OverflowFadeText,
+} from "@/shared/ui";
 import { SkillsHubError, skillsHubApi } from "./api";
 import { SkillMarkdown } from "./SkillDetailDialog";
 import { t } from "./strings";
@@ -38,10 +47,8 @@ function DiscoverFailure({
         <p className="break-all font-mono text-xs text-cream-muted">{error.message}</p>
       ) : null}
       <div className="flex gap-2">
-        <Button variant="secondary" size="sm" onClick={onRetry}>
-          {t("discover.retry")}
-        </Button>
-        <Button variant="secondary" size="sm" onClick={() => void openExternalLink(repoUrl)}>
+        <Button onClick={onRetry}>{t("discover.retry")}</Button>
+        <Button onClick={() => void openExternalLink(repoUrl)}>
           <ExternalLink aria-hidden />
           {t("discover.openRepo")}
         </Button>
@@ -108,22 +115,20 @@ export function SkillDiscoverDialog({
             {t("discover.detailTitle", { name: skill.name })}
           </DialogTitle>
           <div className="flex flex-wrap items-center gap-2 text-xs text-cream-muted">
-            <Button
-              variant="link"
-              size="none"
-              className="h-auto gap-1 text-xs"
+            <Pressable
+              className="inline-flex items-center gap-1 text-xs text-cream-bright hover:underline"
               onClick={() => void openExternalLink(repoUrl)}
             >
               {skill.repoOwner}/{skill.repoName}
               <ExternalLink className="size-3.5" aria-hidden />
-            </Button>
+            </Pressable>
             {typeof skill.installs === "number" ? (
               <span>· {t("discover.installs", { count: skill.installs })}</span>
             ) : null}
             {content?.path ? (
-              <span className="max-w-full truncate" title={content.path}>
+              <OverflowFadeText full className="max-w-full">
                 · {content.path}
-              </span>
+              </OverflowFadeText>
             ) : null}
           </div>
         </DialogHeader>
@@ -144,10 +149,8 @@ export function SkillDiscoverDialog({
         <div className="flex shrink-0 items-center justify-between gap-2">
           <p className="text-xs text-cream-muted">{t("discover.installTargets")}</p>
           <div className="flex gap-2">
-            <Button variant="secondary" size="sm" onClick={onClose}>
-              {t("common.close")}
-            </Button>
-            <Button variant="primary" size="sm" disabled={busy || installed} onClick={onInstall}>
+            <Button onClick={onClose}>{t("common.close")}</Button>
+            <Button variant="primary" disabled={busy || installed} onClick={onInstall}>
               {busy ? (
                 <Spinner size="sm" label={false} />
               ) : installed ? null : (

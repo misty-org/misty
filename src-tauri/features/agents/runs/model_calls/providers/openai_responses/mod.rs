@@ -49,16 +49,8 @@ pub(crate) fn error_message(body: &Value) -> Option<String> {
     Some(error.get("message")?.as_str()?.to_owned())
 }
 
-/// The request as JSON text, for a client that has to adjust it first (ChatGPT sign-in).
-pub(crate) fn request_text(model: &str, options: &CallOptions) -> Result<(String, Vec<Value>), ModelError> {
-    let (body, warnings) = request::build(model, options)?;
-    let text = serde_json::to_string(&body)
-        .map_err(|error| ModelError::Unsupported(format!("The request couldn't be built: {error}")))?;
-    Ok((text, warnings))
-}
-
 /// Reads an accepted response as a stream, with the same checks as a plain call.
-pub(crate) async fn decoded_response(
+async fn decoded_response(
     response: reqwest::Response,
     options: &CallOptions,
     warnings: Vec<Value>,
@@ -69,17 +61,6 @@ pub(crate) async fn decoded_response(
     let stored = request::store_option(options).unwrap_or(false);
     let decoder = decoder::ResponsesDecoder::new(warnings, tools, stored);
     Ok(decoded_body(body, decoder, secret))
-}
-
-/// `expandParallelToolCall`, for a client reading a whole answer.
-pub(crate) fn expanded_tool_call(
-    tool_call_id: &str,
-    tool_name: &str,
-    input: &str,
-    tools: &[String],
-    item_id: &str,
-) -> Option<Vec<crate::model_calls::stream::StreamPart>> {
-    parallel::expand_parallel_tool_call(tool_call_id, tool_name, input, tools, item_id)
 }
 
 impl LanguageModel for OpenAiResponsesModel {

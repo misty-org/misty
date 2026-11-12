@@ -4,7 +4,7 @@ import { shareFolderWarning } from "../plans/AgentFolderMenu";
 import { CompanionAppearanceSettings } from "../tutor/cursor/CompanionAppearanceSettings";
 import { confirmAction } from "@/shared/lib/confirmAction";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { Button, ErrorNotification, SkeletonList } from "@/shared/ui";
+import { Button, useNotice, SkeletonList } from "@/shared/ui";
 import { useEffect, useState } from "react";
 import { DesktopSettingsRow as Row, DesktopSettingsSection as Section } from "@/features/settings";
 import { definitionById, fromLegacy } from "@/features/settings";
@@ -99,10 +99,11 @@ function AgentScopeList() {
   useEffect(() => {
     void refresh();
   }, []);
+  useNotice(Boolean(error), { message: error, tone: "error", onDismiss: () => setError("") });
   if (loading)
     return (
       <Section title="Shared folders">
-        <SkeletonList label="Shared folders" rows={2} leading="none" trailing />
+        <SkeletonList lines={2} label="Shared folders" rows={2} leading="none" trailing />
       </Section>
     );
   const share = async () => {
@@ -120,7 +121,6 @@ function AgentScopeList() {
       {scopes.map((s) => (
         <Row key={s.id} label={s.displayName}>
           <Button
-            variant="outline"
             onClick={() =>
               void (async () => {
                 if (
@@ -144,11 +144,8 @@ function AgentScopeList() {
         </Row>
       ))}
       <Row label="Add a folder">
-        <Button variant="outline" onClick={() => void share()}>
-          Share a folder
-        </Button>
+        <Button onClick={() => void share()}>Share a folder</Button>
       </Row>
-      <ErrorNotification message={error} onDismiss={() => setError("")} />
     </Section>
   );
 }

@@ -1,11 +1,13 @@
-import { ModelKeyNeededButton, needsModelKey } from "../../models/ModelKeyNeeded";
+import { needsModelKey } from "../../models/ModelKeyNeeded";
+import { openModelSettings } from "../../models/modelKeys";
+import { ErrorNotice } from "../ErrorNotice";
 import { useAiSurfaceStore } from "../../runs/invocations/store";
 import { runtimeAiApi } from "@/features/agents/AgentsRuntime";
 import { useEffect, useState } from "react";
 import { useMistyStore } from "../state/useMistyStore";
 import { requestHostContext } from "../context/contextBridge";
 import { assertMistyAvailable } from "../state/availability";
-import { Button, ErrorNotification } from "@/shared/ui";
+import { Button } from "@/shared/ui";
 
 export function MistyContextBar() {
   const notice = useMistyStore((s) => s.handoff?.notice);
@@ -34,7 +36,7 @@ export function MistyContextBar() {
     <div className="border-t border-charcoal-border px-4 py-3 text-xs text-cream-muted">
       {working && invocationId && (
         <Button
-          variant="link"
+          variant="quiet"
           className="mt-1"
           onClick={() =>
             void runtimeAiApi
@@ -57,7 +59,7 @@ export function MistyContextBar() {
           </details>
           {(["accept", "reject"] as const).map((decision) => (
             <Button
-              variant="link"
+              variant="quiet"
               key={decision}
               disabled={deciding}
               className="mr-3 mt-1"
@@ -147,7 +149,7 @@ export function MistyContextBar() {
       )}
       {undo && Date.parse(undo.expiresAt) > Date.now() && (
         <Button
-          variant="link"
+          variant="quiet"
           className="mt-2"
           onClick={() =>
             void requestHostContext({
@@ -165,9 +167,15 @@ export function MistyContextBar() {
         </Button>
       )}
       {notice && <p role="status">{notice}</p>}
-      <ErrorNotification message={error} onDismiss={() => setError("")}>
-        {needsModelKey(error) && <ModelKeyNeededButton />}
-      </ErrorNotification>
+      <ErrorNotice
+        message={error}
+        action={
+          needsModelKey(error)
+            ? { label: "Open Models settings", onSelect: openModelSettings }
+            : undefined
+        }
+        onDismiss={() => setError("")}
+      />
     </div>
   );
 }

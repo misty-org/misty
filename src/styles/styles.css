@@ -1,6 +1,5 @@
 @import "tailwindcss" source("../../");
 @import "tw-animate-css";
-@import "./overflow-fade.css";
 @import "./scrollbars.css";
 @import "./theme.css";
 @import "./overlays.css";

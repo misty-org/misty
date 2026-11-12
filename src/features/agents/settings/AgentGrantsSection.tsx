@@ -55,7 +55,7 @@ export function AgentGrantsSection() {
     return (
       <DesktopSettingsNotice
         action={
-          <Button variant="ghost" size="sm" onClick={() => void refresh()}>
+          <Button variant="quiet" onClick={() => void refresh()}>
             Retry
           </Button>
         }
@@ -63,13 +63,20 @@ export function AgentGrantsSection() {
         {error}
       </DesktopSettingsNotice>
     );
-  if (grants !== null && !groups.length) return null;
   return (
     <>
       {error ? <DesktopSettingsNotice>{error}</DesktopSettingsNotice> : null}
       <Section title="Approvals">
         {grants === null && !error ? (
-          <SkeletonList label="Approvals" rows={3} leading="none" trailing />
+          <SkeletonList lines={2} label="Approvals" rows={3} leading="none" trailing />
+        ) : null}
+        {grants !== null && !groups.length ? (
+          <Row
+            label="No remembered approvals"
+            description="When you choose Accept and remember on an agent's request, it shows here."
+          >
+            {null}
+          </Row>
         ) : null}
         {groups.flatMap((group) =>
           group.grants.map((grant) => (
@@ -79,7 +86,6 @@ export function AgentGrantsSection() {
               description={`${group.agentName} · ${lastUsedText(grant)}`}
             >
               <Button
-                variant="outline"
                 disabled={Boolean(working)}
                 onClick={() =>
                   void run(
@@ -96,7 +102,7 @@ export function AgentGrantsSection() {
         )}
         {(grants?.length ?? 0) > 1 ? (
           <Row label="Revoke all">
-            <Button variant="outline" disabled={Boolean(working)} onClick={() => void revokeAll()}>
+            <Button disabled={Boolean(working)} onClick={() => void revokeAll()}>
               Revoke all
             </Button>
           </Row>

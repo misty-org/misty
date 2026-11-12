@@ -38,7 +38,7 @@ describe("MistyComposer", () => {
     expect(onError).toHaveBeenCalledWith("Misty accepts up to 1 image here.");
   });
 
-  it("renders modelControl on the left without a static Ask badge", () => {
+  it("puts the chat's controls in the bar and where it works under the box", () => {
     render(
       <MistyComposer
         value=""
@@ -48,11 +48,16 @@ describe("MistyComposer", () => {
         onAddFiles={vi.fn()}
         onRemoveAttachment={vi.fn()}
         onSubmit={vi.fn()}
-        modelControl={<span data-testid="model-control">GPT 5.6 Terra</span>}
+        items={[
+          { id: "goal", icon: () => null, label: "Set a goal", priority: 1, onSelect: vi.fn() },
+        ]}
+        path={[{ label: "Home" }, { label: "misty" }]}
       />,
     );
-    expect(screen.getByTestId("model-control")).toBeDefined();
-    expect(screen.queryByText("Ask")).toBeNull();
+    expect(screen.getByRole("toolbar", { name: "Message options" })).toBeDefined();
+    expect(screen.getByRole("group", { name: "Where this chat works" }).textContent).toContain(
+      "misty",
+    );
   });
   it("opens screen capture from the attachment menu", async () => {
     const capture = vi.fn();
@@ -68,7 +73,7 @@ describe("MistyComposer", () => {
         onCapture={capture}
       />,
     );
-    fireEvent.pointerDown(screen.getByRole("button", { name: "Add attachments" }), {
+    fireEvent.pointerDown(screen.getByRole("button", { name: "Add" }), {
       button: 0,
       pointerType: "mouse",
     });
@@ -82,7 +87,6 @@ it("replaces the send action with stop while a conversation is working", () => {
   const stop = vi.fn();
   render(
     <MistyComposer
-      layout="conversation"
       value=""
       onChange={vi.fn()}
       attachments={[]}
@@ -90,8 +94,7 @@ it("replaces the send action with stop while a conversation is working", () => {
       onAddFiles={vi.fn()}
       onRemoveAttachment={vi.fn()}
       onSubmit={vi.fn()}
-      busy
-      trailingControl={<button onClick={stop}>Stop response</button>}
+      sendControl={<button onClick={stop}>Stop response</button>}
     />,
   );
   expect(screen.queryByRole("button", { name: "Send message" })).toBeNull();
@@ -103,7 +106,6 @@ it("disables the message field and ignores pasted files when unavailable", () =>
   const addFiles = vi.fn();
   render(
     <MistyComposer
-      layout="conversation"
       value=""
       onChange={vi.fn()}
       attachments={[]}

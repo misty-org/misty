@@ -1,6 +1,6 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 import { X } from "lucide-react";
-import { Button, IconButton, Spinner } from "@/shared/ui";
+import { Button, IconButton, Spinner, Tooltip } from "@/shared/ui";
 import { useWorktreeStore, type PendingCreation } from "./worktreeStore";
 import "./worktree.css";
 
@@ -19,7 +19,8 @@ const ERROR_TEXT: Record<string, string> = {
   invalid_args: "Choose a branch to start from",
   register_failed: "The worktree was made but couldn't be linked. Trying again uses it as it is",
   sparse_checkout_empty:
-    "Sparse checkout rules leave out every file, so nothing was checked out. Run git sparse-checkout disable, or change the rules, and try again",
+    "Sparse checkout rules leave out every file, so nothing was checked out. " +
+    "Run git sparse-checkout disable, or change the rules, and try again",
   unknown: "The worktree couldn't be made. Try again",
 };
 
@@ -59,13 +60,13 @@ export function WorktreeProgressRow({ pending }: { pending: PendingCreation }) {
     const line = `${pending.branch} wasn't made: ${failureReason(pending)}`;
     return (
       <div role="alert" className="worktree-row worktree-row--failed">
-        <span className="worktree-row-name" title={line}>
-          {line}
-        </span>
-        <Button type="button" variant="ghost" size="xs" onClick={() => retry(pending.creationId)}>
+        <Tooltip content={line}>
+          <span className="worktree-row-name">{line}</span>
+        </Tooltip>
+        <Button type="button" variant="quiet" size="sm" onClick={() => retry(pending.creationId)}>
           Retry
         </Button>
-        <IconButton label="Dismiss" size="xs" onClick={() => dismiss(pending.creationId)}>
+        <IconButton label="Dismiss" size="sm" onClick={() => dismiss(pending.creationId)}>
           <X size={14} aria-hidden="true" />
         </IconButton>
       </div>
@@ -76,7 +77,7 @@ export function WorktreeProgressRow({ pending }: { pending: PendingCreation }) {
     <div className="worktree-row">
       <Spinner size="sm" label={false} className="text-cream-muted" />
       <span className="worktree-row-name worktree-row-muted">{stageText(pending)}</span>
-      <IconButton label="Cancel" size="xs" onClick={() => cancel(pending.creationId)}>
+      <IconButton label="Cancel" size="sm" onClick={() => cancel(pending.creationId)}>
         <X size={14} aria-hidden="true" />
       </IconButton>
     </div>

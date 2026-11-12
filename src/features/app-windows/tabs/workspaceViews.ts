@@ -1,13 +1,8 @@
-import type { WindowColor } from "../profiles/windowColors";
 import type { DockingLayout } from "@/app/shell/dockingLayout";
 import { browserHomeUrl } from "../addresses/browserHome";
 
 export { blankBrowserUrl } from "../addresses/browserUrl";
-export {
-  browserHomeUrl,
-  defaultBrowserHomeUrl,
-  normalizeBrowserHomeUrl,
-} from "../addresses/browserHome";
+export { browserHomeUrl } from "../addresses/browserHome";
 
 export type WorkspaceSurfaceId = "space" | "agents";
 
@@ -133,8 +128,6 @@ export interface WorkspaceTab {
 
 /** An OS window of one profile (window → tab → pane → view). */
 export interface WorkspaceWindow {
-  /** The profile's color, which tints the window's chrome. */
-  color?: WindowColor;
   dockingLayout?: DockingLayout;
   id: string;
   title: string;

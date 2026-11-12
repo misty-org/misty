@@ -3,14 +3,12 @@
 //! `com.misty.models`, and so do the web search keys (Decodo, Serper) and the Composio key; the model choices are device settings (section `models` of
 //! `misty.db`). The renderer can save, replace or remove a key and learn which providers
 //! have one; it can never read a key back. Only the agent runtime on this computer gets
-//! them (`agent_runtime`), as a model document with a fresh ChatGPT access token when the
-//! person signed in with ChatGPT (`chatgpt`); no server ever does.
+//! them (`agent_runtime`), as a model document; no server ever does. Misty takes keys only:
+//! it never signs in to a provider or holds a subscription's tokens.
 pub mod benchmark_env;
 pub mod catalog;
-pub mod chatgpt;
 pub mod header;
 pub mod keys;
-pub mod oauth;
 
 use serde_json::Value;
 use tauri::Manager;
@@ -58,32 +56,15 @@ pub async fn device_document(app: &tauri::AppHandle) -> Result<Option<Value>, St
     let document = runtime.settings.document().await.map_err(|_| UNREADABLE)?;
     let section = document.get("models").cloned().unwrap_or(Value::Null);
     let section = benchmark_env::settings(section);
-    let uses_chatgpt = header::ROLES.iter().any(|(_, setting)| {
-        section
-            .get(*setting)
-            .and_then(Value::as_str)
-            .is_some_and(|model| model.trim().starts_with("chatgpt/"))
-    });
-    let chatgpt = if uses_chatgpt {
-        chatgpt::access_token().await
-    } else {
-        None
-    };
-    if let Some((_, expires_at)) = &chatgpt {
-        // The runtime holds this token; it gets the next one before this one runs out.
-        chatgpt::renew_before(*expires_at);
-    }
-    let token = chatgpt.map(|(token, _)| token);
     tokio::task::spawn_blocking(move || {
         let unreadable = std::cell::Cell::new(false);
-        let document = header::document(&section, &|provider| match provider {
-            "chatgpt" => token.clone(),
-            _ => benchmark_env::key(provider).or_else(|| {
+        let document = header::document(&section, &|provider| {
+            benchmark_env::key(provider).or_else(|| {
                 crate::account::credential_store::load(KEY_SERVICE, provider).unwrap_or_else(|_| {
                     unreadable.set(true);
                     None
                 })
-            }),
+            })
         });
         if unreadable.get() {
             Err(UNREADABLE.to_owned())
@@ -124,9 +105,6 @@ pub async fn model_keys_saved() -> Result<Vec<String>, String> {
 #[tauri::command]
 pub async fn model_keys_save(provider_id: String, key: String) -> Result<Vec<String>, String> {
     let provider_id = provider(&provider_id)?.to_owned();
-    if provider_id == "chatgpt" {
-        return Err("ChatGPT takes a sign-in, not a key.".into());
-    }
     let key = key.trim().to_owned();
     if key.is_empty() || key.len() > MAX_KEY_BYTES || key.chars().any(char::is_control) {
         return Err("That key doesn't look right. Paste it again.".into());

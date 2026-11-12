@@ -1,5 +1,5 @@
 import type { SpaceMessage } from "../../api/dto/entities";
-import { Avatar, AvatarFallback, AvatarImage, Pressable } from "@/shared/ui";
+import { Avatar, AvatarFallback, AvatarImage, cn, OverflowFadeText, Pressable } from "@/shared/ui";
 import { ImageIcon } from "lucide-react";
 import {
   hasAnyAttachment,
@@ -27,10 +27,18 @@ export function MessageReplyPreview({
   return (
     <div className="col-span-2 col-start-1 row-start-1 grid h-7 grid-cols-[44px_minmax(0,1fr)] gap-x-4">
       <div aria-hidden="true" className="relative">
-        <span className="absolute left-[21px] top-3 h-5 w-[37px] rounded-tl-md border-l-2 border-t-2 border-cream-muted/55" />
+        <span
+          className={cn(
+            "absolute left-[21px] top-3 h-5 w-[37px] rounded-tl-md",
+            "border-l-2 border-t-2 border-cream-muted/55",
+          )}
+        />
       </div>
       <Pressable
-        className="flex min-w-0 items-center gap-1.5 self-start overflow-hidden text-ui leading-5 text-cream-muted hover:text-cream"
+        className={cn(
+          "flex min-w-0 items-center gap-1.5 self-start overflow-hidden text-ui leading-5",
+          "text-cream-muted hover:text-cream",
+        )}
         onClick={onOpen}
         aria-label={
           message ? `Jump to ${message.sender_name}'s message` : "Original message unavailable"
@@ -44,18 +52,18 @@ export function MessageReplyPreview({
                 {agentAuthored ? "AI" : initials(message.sender_name)}
               </AvatarFallback>
             </Avatar>
-            <strong className="max-w-[40%] truncate font-semibold text-cream-bright">
+            <OverflowFadeText className="max-w-[40%] font-semibold text-cream-bright">
               @{message.sender_name}
-            </strong>
-            <span className="min-w-0 truncate text-cream/80">
+            </OverflowFadeText>
+            <OverflowFadeText className="min-w-0 text-cream/80">
               {messageReplyPreviewText(message)}
-            </span>
+            </OverflowFadeText>
             {hasAnyAttachment(message) ? (
               <ImageIcon className="size-4 shrink-0 rounded-[2px] bg-cream p-0.5 text-charcoal-bg" />
             ) : null}
           </>
         ) : (
-          <span className="truncate italic">Original message unavailable</span>
+          <OverflowFadeText className="italic">Original message unavailable</OverflowFadeText>
         )}
       </Pressable>
     </div>

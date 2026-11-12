@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { ArrowLeft, Plus, RotateCcw, Trash2, Wand2 } from "lucide-react";
-import { Button, IconButton, Input, SegmentedControl, Textarea } from "@/shared/ui";
+import { Button, ChoiceGroup, IconButton, Input, OverflowFadeText, Textarea } from "@/shared/ui";
 import { MistyMarkdown } from "../../runs/markdown/MistyMarkdown";
 import {
   builtinTransformations,
@@ -79,9 +79,9 @@ export function SourceReader({
       <div className="tutor-chat-scroll">
         <div className="tutor-reader-head">
           <IconButton label="Back to chat" onClick={onClose}>
-            <ArrowLeft size={16} />
+            <ArrowLeft />
           </IconButton>
-          <h2 className="truncate">{source.title}</h2>
+          <OverflowFadeText as="h2">{source.title}</OverflowFadeText>
           <IconButton
             label="Remove source"
             onClick={() => {
@@ -89,7 +89,7 @@ export function SourceReader({
               onClose();
             }}
           >
-            <Trash2 size={15} />
+            <Trash2 />
           </IconButton>
         </div>
         {source.url ? (
@@ -98,7 +98,7 @@ export function SourceReader({
           </a>
         ) : null}
         {source.why ? <p className="tutor-card-detail">{source.why}</p> : null}
-        <SegmentedControl<SourceContext>
+        <ChoiceGroup<SourceContext>
           label="What questions get"
           value={source.context}
           options={contexts}
@@ -111,8 +111,7 @@ export function SourceReader({
         <div className="tutor-reader-card">
           <div className="tutor-reader-card-head">
             <h3>Summary</h3>
-            <Button variant="ghost" size="sm" disabled={busy("summary")} onClick={summarize}>
-              <RotateCcw size={14} />
+            <Button variant="quiet" disabled={busy("summary")} onClick={summarize} icon={RotateCcw}>
               {source.summary ? "Again" : "Summarize"}
             </Button>
           </div>
@@ -131,17 +130,18 @@ export function SourceReader({
             {[...builtinTransformations, ...notebook.transformations].map((item) => (
               <Button
                 key={item.id}
-                variant="outline"
-                size="sm"
                 disabled={busy("note", item.id)}
                 onClick={() => transform(item.id)}
+                icon={Wand2}
               >
-                <Wand2 size={14} />
                 {item.title}
               </Button>
             ))}
-            <Button variant="ghost" size="sm" onClick={() => setMaking({ title: "", prompt: "" })}>
-              <Plus size={14} />
+            <Button
+              variant="quiet"
+              onClick={() => setMaking({ title: "", prompt: "" })}
+              icon={Plus}
+            >
               Your own
             </Button>
           </div>
@@ -175,9 +175,7 @@ export function SourceReader({
                 value={making.prompt}
                 onChange={(event) => setMaking({ ...making, prompt: event.target.value })}
               />
-              <Button type="submit" size="sm">
-                Save
-              </Button>
+              <Button type="submit">Save</Button>
             </form>
           ) : null}
         </div>
@@ -187,14 +185,13 @@ export function SourceReader({
             <h3>Text</h3>
             {source.kind === "link" ? (
               <Button
-                variant="ghost"
-                size="sm"
+                variant="quiet"
                 disabled={source.reading}
                 onClick={() =>
                   void readLink(notebook.id, source).then((failed) => failed && onError(failed))
                 }
+                icon={RotateCcw}
               >
-                <RotateCcw size={14} />
                 Read again
               </Button>
             ) : null}
@@ -242,9 +239,11 @@ export function NoteReader({
       <div className="tutor-chat-scroll">
         <div className="tutor-reader-head">
           <IconButton label="Back to chat" onClick={onClose}>
-            <ArrowLeft size={16} />
+            <ArrowLeft />
           </IconButton>
-          <h2 className="truncate">{note ? note.title || "Untitled note" : "New note"}</h2>
+          <OverflowFadeText as="h2">
+            {note ? note.title || "Untitled note" : "New note"}
+          </OverflowFadeText>
           {note ? (
             <IconButton
               label="Delete note"
@@ -253,7 +252,7 @@ export function NoteReader({
                 onClose();
               }}
             >
-              <Trash2 size={15} />
+              <Trash2 />
             </IconButton>
           ) : null}
         </div>
@@ -273,14 +272,10 @@ export function NoteReader({
               onChange={(event) => setBody(event.target.value)}
             />
             <div className="flex gap-1.5">
-              <Button size="sm" disabled={!body.trim()} onClick={save}>
+              <Button disabled={!body.trim()} onClick={save}>
                 Save
               </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => (note ? setEditing(false) : onClose())}
-              >
+              <Button variant="quiet" onClick={() => (note ? setEditing(false) : onClose())}>
                 Cancel
               </Button>
             </div>
@@ -290,9 +285,7 @@ export function NoteReader({
             <div className="tutor-guide">
               <MistyMarkdown>{note.body}</MistyMarkdown>
             </div>
-            <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
-              Edit
-            </Button>
+            <Button onClick={() => setEditing(true)}>Edit</Button>
           </>
         ) : null}
       </div>

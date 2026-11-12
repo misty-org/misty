@@ -6,7 +6,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  ErrorNotification,
+  FieldError,
   Input,
   Label,
   Skeleton,
@@ -135,19 +135,18 @@ export function PickUpDialog(props: {
             </div>
           </div>
         )}
-        <ErrorNotification message={error} onDismiss={() => setError("")} />
+        <FieldError message={error} />
         <DialogFooter>
-          <Button type="button" variant="ghost" size="sm" onClick={() => props.onOpenChange(false)}>
+          <Button type="button" variant="quiet" onClick={() => props.onOpenChange(false)}>
             Cancel
           </Button>
           {error && !text && !drafting ? (
-            <Button type="button" size="sm" onClick={() => setAttempt((value) => value + 1)}>
+            <Button type="button" onClick={() => setAttempt((value) => value + 1)}>
               Try again
             </Button>
           ) : (
             <Button
               type="button"
-              size="sm"
               disabled={drafting || sending || !text.trim()}
               onClick={() => void send()}
             >

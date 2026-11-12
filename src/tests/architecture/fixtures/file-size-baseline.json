@@ -58,7 +58,6 @@
   "src-tauri/features/engines/wsl_transport.rs": 675,
   "src-tauri/features/pets/mod.rs": 528,
   "src/features/account/AuthContext.test.tsx": 715,
-  "src/features/agents/context-panel/editor/EditorSearchPanel.tsx": 556,
   "src/features/agents/context-panel/files/filesStore.test.ts": 592,
   "src/features/agents/context-panel/files/filesStore.ts": 673,
   "src/features/app-windows/tabs/useWorkspaceStore.test.ts": 619,

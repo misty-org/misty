@@ -80,7 +80,7 @@ export function CollapsibleText({ text }: { text: string }) {
       </p>
       {long ? (
         <Button
-          variant="ghost"
+          variant="quiet"
 
           className="mt-2 text-xs font-medium text-cream-muted hover:text-cream"
           onClick={() => setExpanded((value) => !value)}

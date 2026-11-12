@@ -1,4 +1,4 @@
-import { Button, EmptyState, ErrorNotification, Skeleton } from "@/shared/ui";
+import { Button, EmptyState, Skeleton, useNotice } from "@/shared/ui";
 import { ClipboardCopy } from "lucide-react";
 import { Suspense, useState, type ComponentType } from "react";
 import type { UnifiedNote } from "../noteTypes";
@@ -17,6 +17,11 @@ export interface NotePreviewProps {
 }
 export function NotePreviewView(props: NotePreviewProps & { runtime: NotePreviewRuntime }) {
   const [copyFailed, setCopyFailed] = useState(false);
+  useNotice(copyFailed, {
+    message: "Copy failed. Try Copy to clipboard again or select and copy the text.",
+    tone: "error",
+    onDismiss: () => setCopyFailed(false),
+  });
   const NoteBlockEditor = props.runtime.Editor;
   const noteText = props.note.bodyMarkdown ?? props.note.preview ?? props.note.body;
   const linkableNotes = props.linkableNotes
@@ -42,7 +47,7 @@ export function NotePreviewView(props: NotePreviewProps & { runtime: NotePreview
       >
         <Button
           type="button"
-          variant="ghost"
+          variant="quiet"
           className="h-8 shrink-0 gap-1.5 px-2 text-xs text-cream-muted hover:text-cream-bright"
           disabled={!noteText.trim()}
           onClick={() => void copyToClipboard()}
@@ -53,14 +58,6 @@ export function NotePreviewView(props: NotePreviewProps & { runtime: NotePreview
       </div>
 
       <div className="misty-scrollbar min-h-0 overflow-auto">
-        <ErrorNotification
-          message={
-            copyFailed
-              ? "Copy failed. Try Copy to clipboard again or select and copy the text."
-              : ""
-          }
-          onDismiss={() => setCopyFailed(false)}
-        />
         {noteText.trim() ? (
           <Suspense
             fallback={
@@ -84,11 +81,7 @@ export function NotePreviewView(props: NotePreviewProps & { runtime: NotePreview
             />
           </Suspense>
         ) : (
-          <EmptyState
-            className="h-full"
-            title="This note is empty"
-            description="Open the note to start writing."
-          />
+          <EmptyState title="This note is empty" line="Open the note to start writing." />
         )}
       </div>
     </div>

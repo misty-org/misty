@@ -5,21 +5,13 @@ import {
 } from "@/features/settings";
 import {
   booleanSetting,
-  ChoiceControl,
   numberSetting,
   SliderControl,
   SwitchControl,
 } from "../../settings/SettingsControls";
 import type { SettingsContentProps } from "../../settings/settingsTypes";
 
-const sleepOptions = [
-  { value: "60", label: "1 minute" },
-  { value: "300", label: "5 minutes" },
-  { value: "1800", label: "30 minutes" },
-  { value: "0", label: "Never" },
-];
-
-/** Options few people change: page behaviors, window density and diagnostics. */
+/** Options few people change: link previews, window density and diagnostics. */
 export function AdvancedSection(props: SettingsContentProps) {
   const toggle = (section: string, key: string, fallback: boolean) => ({
     checked: booleanSetting(props.document, section, key, fallback),
@@ -32,21 +24,6 @@ export function AdvancedSection(props: SettingsContentProps) {
       <SettingsSectionBlock title="Pages">
         <SettingsRow label="Link previews" description="Cards under links in chats and replies.">
           <SwitchControl {...toggle("general", "browser_link_previews", true)} />
-        </SettingsRow>
-        <SettingsRow label="Link and loading status" description="Shown in the page's corner.">
-          <SwitchControl {...toggle("general", "browser_status_bubble", true)} />
-        </SettingsRow>
-        <SettingsRow label="Sleep hidden tabs" description="Tabs playing sound keep running.">
-          <ChoiceControl
-            value={String(
-              numberSetting(props.document, "general", "browser_hidden_tab_sleep_seconds", 0),
-            )}
-            options={sleepOptions}
-            disabled={props.working}
-            onValueChange={(value) =>
-              props.onSettingChange("general", "browser_hidden_tab_sleep_seconds", Number(value))
-            }
-          />
         </SettingsRow>
       </SettingsSectionBlock>
       <SettingsSectionBlock title="Display">

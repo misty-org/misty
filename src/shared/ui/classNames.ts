@@ -19,12 +19,24 @@ const layers = [
   "tooltip",
 ];
 
-// The type scale's added steps (theme.css) are font sizes, not text colors. Without this,
-// `cn("text-ui", "text-cream")` would drop the size as a conflicting color.
+// The type roles in theme.css. They are font sizes, not text colors: without this,
+// `cn("text-control", "text-cream")` would drop the size as a conflicting color, and
+// `cn("text-meta", "text-control")` would keep both.
+export const typeRoles = [
+  "micro",
+  "caption",
+  "meta",
+  "control",
+  "body",
+  "page",
+  "title",
+  "display",
+] as const;
+
 const twMerge = extendTailwindMerge({
   extend: {
     classGroups: { z: [{ layer: layers }] },
-    theme: { text: ["3xs", "2xs", "ui", "md"] },
+    theme: { text: [...typeRoles] },
   },
 });
 

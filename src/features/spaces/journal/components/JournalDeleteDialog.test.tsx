@@ -1,5 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { NoticeViewport } from "@/shared/ui";
 import { JournalDeleteDialog } from "./JournalDeleteDialog";
 
 describe("JournalDeleteDialog", () => {
@@ -52,15 +53,18 @@ describe("JournalDeleteDialog", () => {
     const onOpenChange = vi.fn();
 
     render(
-      <JournalDeleteDialog
-        kind="drawing"
-        title="System map"
-        open
-        onOpenChange={onOpenChange}
-        onConfirm={async () => {
-          throw new Error("The drawing is temporarily unavailable.");
-        }}
-      />,
+      <>
+        <NoticeViewport />
+        <JournalDeleteDialog
+          kind="drawing"
+          title="System map"
+          open
+          onOpenChange={onOpenChange}
+          onConfirm={async () => {
+            throw new Error("The drawing is temporarily unavailable.");
+          }}
+        />
+      </>,
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Delete" }));

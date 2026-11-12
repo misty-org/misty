@@ -5,9 +5,9 @@ import {
   Dialog,
   DialogContent,
   DialogTitle,
-  ErrorNotification,
+  FieldError,
+  ChoiceGroup,
   IconButton,
-  SegmentedControl,
   Skeleton,
 } from "@/shared/ui";
 import { currentSpaceKey } from "../engines/enginesApi";
@@ -77,9 +77,9 @@ function MultirunDialog({ agentId, onPage, onChat, onClose }: Props & { onClose(
       <div className="flex items-center gap-4 pr-10">
         <DialogTitle>{shown === "start" ? "New multi-run" : "Multi-run"}</DialogTitle>
         {wide && runs && runs.length > 1 ? (
-          <SegmentedControl
+          <ChoiceGroup
             label="Which multi-run"
-            size="xs"
+            size="sm"
             value={shown ?? ""}
             options={runs.slice(0, 4).map((item) => ({ value: item.id, label: runLabel(item) }))}
             onChange={setView}
@@ -110,7 +110,7 @@ function MultirunDialog({ agentId, onPage, onChat, onClose }: Props & { onClose(
           }}
         />
       ) : null}
-      <ErrorNotification message={error} onDismiss={() => setError("")} />
+      <FieldError message={error} />
     </DialogContent>
   );
 }

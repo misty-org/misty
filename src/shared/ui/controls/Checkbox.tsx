@@ -12,10 +12,11 @@ const Checkbox = React.forwardRef<
     ref={ref}
     data-slot="checkbox"
     className={cn(
-      "peer grid size-4 shrink-0 place-content-center rounded-[4px] border",
-      "border-charcoal-border-strong bg-transparent shadow-xs outline-none",
-      "transition-all duration-150 ease-out",
-      "focus-visible:ring-[3px] focus-visible:ring-charcoal-active/40",
+      "peer grid size-4 shrink-0 place-content-center rounded-sm border",
+      "border-charcoal-border-strong bg-transparent outline-none",
+      "transition-colors duration-150 ease-out",
+      // Focus shows as a brighter edge; the app draws no focus rings.
+      "hover:border-cream-muted focus-visible:border-cream",
       "disabled:cursor-not-allowed disabled:opacity-50",
       "data-[state=checked]:border-charcoal-active data-[state=checked]:bg-charcoal-active",
       "data-[state=checked]:text-cream-bright",

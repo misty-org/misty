@@ -6,7 +6,7 @@ import { MistyContextBar } from "../composer/MistyContextBar";
 import { useGlobalMistyAttachments } from "../composer/useGlobalMistyAttachments";
 import { useMistyStore } from "../state/useMistyStore";
 import type { AgentProfile } from "@/shared/schemas";
-import { useEffect, useMemo, useRef, useState, type Ref, type ReactNode } from "react";
+import { useEffect, useRef, useState, type Ref, type ReactNode } from "react";
 import { useStableCallback } from "@/shared/hooks/useStableCallback";
 import { useShallow } from "zustand/react/shallow";
 import { useCompanionState } from "../../tutor/cursor/companionState";
@@ -38,8 +38,6 @@ import { agentAccountId } from "../../personal/agentAccount";
 import { invoke } from "@/native/invoke";
 import { openSettings } from "@/features/settings";
 import { EngineQueueChips } from "./engine/EngineQueueChips";
-import { EngineChatContext } from "./engine/EngineChatContext";
-import { forkEngineChat } from "./engine/forkChat";
 import { EngineHistoryDialog } from "./engine/EngineHistoryDialog";
 import { useEngineQueue } from "./engine/engineQueue";
 export type { AgentVoiceControl } from "./useConversationVoice";
@@ -141,13 +139,15 @@ export function AgentWorkspaceConversation({
       // to the next message here.
       ...(useMistyStore.getState().handoff ? {} : { handoff: undefined, context: [] }),
     });
+  /** The open conversation's id, made first when there is none yet. */
+  const ensureConversation = async () => {
+    prepare();
+    return useMistyStore.getState().newConversation(spaceId);
+  };
   const attachments = useGlobalMistyAttachments({
     sharedAccountId: accountId,
     activeConversationId: conversation?.id ?? "",
-    newConversation: async () => {
-      prepare();
-      return useMistyStore.getState().newConversation(spaceId);
-    },
+    newConversation: ensureConversation,
     onError: reportError,
   });
   useDraftStatus(
@@ -163,10 +163,7 @@ export function AgentWorkspaceConversation({
     conversationId: conversation?.id,
     working: state.working,
     send: (prompt, id) => void send(prompt, "", id),
-    ensureConversation: async () => {
-      prepare();
-      return useMistyStore.getState().newConversation(spaceId);
-    },
+    ensureConversation,
     clearDraft: () => setDraft(""),
     reportError,
   });
@@ -268,29 +265,6 @@ export function AgentWorkspaceConversation({
       (prompt, resume) => void send(prompt, "", undefined, resume),
       reportError,
     );
-  const onEngineAgent = Boolean(agent?.engine && agent.engine !== mistyEngine);
-  const forkAt = useStableCallback((messageId: string) => {
-    const messages = conversation?.messages ?? [];
-    const index = messages.findIndex((message) => message.id === messageId);
-    if (!conversation?.id || index < 0) return;
-    const text = messages[index]!.content;
-    // Later messages of the person's with the same text tell native code which one this is.
-    const laterSame = messages
-      .slice(index + 1)
-      .filter((message) => message.role === "user" && message.content === text).length;
-    void forkEngineChat({
-      conversationId: conversation.id,
-      agentId: agent?.id,
-      text,
-      laterSame,
-    }).catch((error: unknown) =>
-      reportError(error instanceof Error ? error.message : String(error)),
-    );
-  });
-  const engineChat = useMemo(
-    () => (onEngineAgent ? { fork: forkAt } : undefined),
-    [onEngineAgent, forkAt],
-  );
   const editPrompt = useStableCallback((text: string) => {
     setDraft(text);
     textareaRef.current?.focus();
@@ -306,26 +280,24 @@ export function AgentWorkspaceConversation({
       aria-label={`${agent?.name || "Misty"} conversation`}
     >
       <div className="agent-conversation-scroll" ref={scrollRef}>
-        <EngineChatContext.Provider value={engineChat}>
-          <AgentConversationTranscript
-            view={{
-              conversation,
-              working: shownWorking,
-              onRetry: retryPrompt,
-              onResume: resumeLedger,
-              onLedgerChange: changeLedger,
-              onEdit: editPrompt,
-              onReply: replyTo,
-            }}
-            plan={proposedPlan}
-            planHistory={collaboration.state?.planHistory}
-            onRunPlan={(prompt) => void send(prompt, "")}
-            onKeepPlanning={() => textareaRef.current?.focus()}
-            emptyContent={emptyContent}
-            showCreate={!agent && !state.conversationsLoading}
-            onCreate={onCreate}
-          />
-        </EngineChatContext.Provider>
+        <AgentConversationTranscript
+          view={{
+            conversation,
+            working: shownWorking,
+            onRetry: retryPrompt,
+            onResume: resumeLedger,
+            onLedgerChange: changeLedger,
+            onEdit: editPrompt,
+            onReply: replyTo,
+          }}
+          plan={proposedPlan}
+          planHistory={collaboration.state?.planHistory}
+          onRunPlan={(prompt) => void send(prompt, "")}
+          onKeepPlanning={() => textareaRef.current?.focus()}
+          emptyContent={emptyContent}
+          showCreate={!agent && !state.conversationsLoading}
+          onCreate={onCreate}
+        />
       </div>
       <RewindFilesDialog plan={filesAsk} onChoose={chooseFiles} />
       <ConversationNavigation
@@ -394,6 +366,7 @@ export function AgentWorkspaceConversation({
           permission={permission}
           working={state.working}
           send={() => void send()}
+          ensureConversation={ensureConversation}
           reportError={reportError}
         />
       </div>

@@ -1,31 +1,33 @@
 import {
   ClipboardList,
+  Cpu,
   Gauge,
   Globe,
+  GraduationCap,
   Hammer,
-  Scan,
   Shield,
   ShieldCheck,
   ShieldOff,
+  Sparkles,
   Target,
   X,
   type LucideIcon,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
-  cn,
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuLabel,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuSeparator,
   IconButton,
+  MenuLabel,
+  MenuRadioGroup,
+  MenuRadioItem,
+  MenuSeparator,
   MenuTrigger,
+  type ActionBarItem,
+  type ActionBarMode,
 } from "@/shared/ui";
 import { invoke } from "@/native/invoke";
 import { captureAttachmentFromDataUrl } from "../../../runs/invocations/captureAttachment";
-import { AgentGoalDialog } from "../../../plans/AgentGoalDialog";
 import { CodexFastItem } from "../../view/engine/CodexFastItem";
 import {
   permissionModeLabel,
@@ -36,31 +38,8 @@ import { useCollaborationStore } from "../../../plans/store";
 import type { ConversationMode, PermissionMode } from "../../../plans/planTypes";
 import { EngineMark, hasEngineMark } from "@/features/engine-config/EngineMark";
 import { listEngineModels, mistyEngine, type EngineModel } from "../../../engines/enginesApi";
-import { useChatChoices, useComposerChoices } from "./composerChoices";
+import { useComposerChoices, type ComposerChoices } from "./composerChoices";
 import { effortLabel, engineOptions } from "./engineOptions";
-
-/** A quiet chip in the composer's bar: an icon, and its value where there is room. */
-function Chip(props: {
-  label: string;
-  title: string;
-  icon: React.ReactNode;
-  value?: React.ReactNode;
-  disabled?: boolean;
-}) {
-  return (
-    <MenuTrigger
-      label={props.label}
-      title={props.title}
-      icon={props.icon}
-      value={props.value}
-      chevron={false}
-      disabled={props.disabled}
-      className="composer-chip"
-    />
-  );
-}
-
-const chipIcon = (Icon: LucideIcon) => <Icon aria-hidden className="size-4 shrink-0" />;
 
 /** Captures part of the screen with the system's own picker and attaches it. */
 export async function captureRegionFile(): Promise<File | null> {
@@ -75,189 +54,236 @@ export async function captureRegionFile(): Promise<File | null> {
   return new File([bytes], "Screen capture.jpg", { type });
 }
 
-export function CaptureButton(props: { disabled?: boolean; onCapture(): void }) {
-  return (
-    <IconButton
-      label="Capture part of the screen"
-      variant="toolbar"
-      disabled={props.disabled}
-      className="composer-icon"
-      onClick={props.onCapture}
-    >
-      <Scan className="size-4" />
-    </IconButton>
-  );
+/**
+ * A picker in the composer's bar. With room it shows its value; in icon form, or when the bar has
+ * folded it into ⋯, its rows still choose (as a submenu of ⋯).
+ */
+function picker(input: {
+  id: string;
+  icon: LucideIcon | ReactNode;
+  /** What it picks, the tooltip in icon form and the ⋯ row's name. */
+  name: string;
+  value: string;
+  priority: number;
+  rows: ReactNode;
+  disabled?: boolean;
+  shrink?: boolean;
+  /** Always icon-only, even with room (Permissions, which is a shield). */
+  iconOnly?: boolean;
+}): ActionBarItem {
+  const icon = input.icon as ActionBarItem["icon"];
+  return {
+    id: input.id,
+    icon,
+    label: input.iconOnly ? `${input.name}: ${input.value}` : input.value,
+    priority: input.priority,
+    shrink: input.shrink,
+    disabled: input.disabled,
+    menu: input.rows,
+    render: (mode: ActionBarMode) => (
+      <DropdownMenu>
+        {mode === "icon" || input.iconOnly ? (
+          <MenuTrigger
+            label={`${input.name}: ${input.value}`}
+            iconOnly
+            icon={icon}
+            disabled={input.disabled}
+          />
+        ) : (
+          <MenuTrigger
+            label={input.name}
+            icon={icon}
+            value={input.value}
+            chevron={false}
+            disabled={input.disabled}
+            className="max-w-full"
+          />
+        )}
+        <DropdownMenuContent align="start" side="top" className="w-64" data-misty-layer-portal>
+          {input.rows}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    ),
+  };
 }
 
-/** Manual or Auto: whether the agent stops before it changes something. */
-export function PermissionMenu(props: {
+const permissionIcons: Record<PermissionMode, LucideIcon> = {
+  ask: Shield,
+  auto: ShieldCheck,
+  bypass: ShieldOff,
+};
+
+/** Manual, Auto or Bypass: whether the agent stops before it changes something. */
+export function permissionItem(props: {
   conversationId?: string;
   permission: PermissionMode;
   engine?: string;
   disabled?: boolean;
-}) {
+}): ActionBarItem {
   const allowed = engineOptions(props.engine).modes;
-  const Icon =
-    props.permission === "bypass" ? ShieldOff : props.permission === "auto" ? ShieldCheck : Shield;
-  const label = permissionModeLabel(props.permission);
-  return (
-    <DropdownMenu>
-      <MenuTrigger
-        label="Permissions"
-        title={`Permissions: ${label}`}
-        iconOnly
-        icon={<Icon className="size-4" />}
-        disabled={props.disabled}
-        className={cn("composer-icon", props.permission !== "ask" && "text-cream")}
-      />
-      <DropdownMenuContent align="start" className="w-64" data-misty-layer-portal>
-        <DropdownMenuLabel>Permissions</DropdownMenuLabel>
-        <DropdownMenuRadioGroup
-          value={props.permission}
-          onValueChange={(next) =>
-            void setPermissionMode(props.conversationId, next as PermissionMode)
-          }
-        >
-          {permissionModes
-            // Bypass is an outside engine's own flag; it isn't offered where it can't apply.
-            .filter((option) => option.id !== "bypass" || allowed.includes("bypass"))
-            .map((option) => (
-              <DropdownMenuRadioItem
-                key={option.id}
-                value={option.id}
-                disabled={!allowed.includes(option.id)}
-                className="items-start"
-              >
-                <span className="grid gap-0.5">
-                  <span>{option.label}</span>
-                  <span className="text-xs text-cream-muted">{option.description}</span>
-                </span>
-              </DropdownMenuRadioItem>
-            ))}
-        </DropdownMenuRadioGroup>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
-
-/** The chat's goal: set one, or see how it is going. */
-export function GoalButton(props: { conversationId?: string; disabled?: boolean }) {
-  const [open, setOpen] = useState(false);
-  const goal = useCollaborationStore((s) =>
-    props.conversationId ? s.byConversation[props.conversationId]?.goal : undefined,
-  );
-  const active = goal?.status === "pursuing" || goal?.status === "paused";
-  return (
+  const rows = (
     <>
-      <IconButton
-        label={active && goal ? `Goal: ${goal.objective}` : "Set a goal"}
-        variant="toolbar"
-        disabled={props.disabled || !props.conversationId}
-        className={cn("composer-icon", active && "text-cream")}
-        data-active={active || undefined}
-        onClick={() => setOpen(true)}
+      <MenuLabel>Permissions</MenuLabel>
+      <MenuRadioGroup
+        value={props.permission}
+        onValueChange={(next) =>
+          void setPermissionMode(props.conversationId, next as PermissionMode)
+        }
       >
-        <Target className="size-4" />
-      </IconButton>
-      <AgentGoalDialog conversationId={props.conversationId} open={open} onOpenChange={setOpen} />
+        {permissionModes
+          // Bypass is an outside engine's own flag; it isn't offered where it can't apply.
+          .filter((option) => option.id !== "bypass" || allowed.includes("bypass"))
+          .map((option) => (
+            <MenuRadioItem
+              key={option.id}
+              icon={permissionIcons[option.id]}
+              value={option.id}
+              label={option.label}
+              disabled={!allowed.includes(option.id)}
+              reason={allowed.includes(option.id) ? undefined : "This engine can't run this way"}
+            />
+          ))}
+      </MenuRadioGroup>
     </>
   );
+  return picker({
+    id: "permissions",
+    icon: permissionIcons[props.permission],
+    name: "Permissions",
+    value: permissionModeLabel(props.permission),
+    priority: 4,
+    rows,
+    disabled: props.disabled,
+    iconOnly: true,
+  });
 }
 
-/** How hard the engine thinks. Hidden for an engine that has no levels to choose. */
-export function EffortMenu(props: {
+/** The chat's goal: set one, or see how it is going. Pressing it makes the chat if needed. */
+export function goalItem(props: {
+  goal?: { objective: string; status: string };
+  disabled?: boolean;
+  onOpen(): void;
+}): ActionBarItem {
+  const goal = props.goal;
+  const active = goal?.status === "pursuing" || goal?.status === "paused";
+  const label = active && goal ? `Goal: ${goal.objective}` : "Set a goal";
+  return {
+    id: "goal",
+    icon: Target,
+    label,
+    priority: 2,
+    disabled: props.disabled,
+    onSelect: props.onOpen,
+    render: () => (
+      <IconButton
+        label={label}
+        disabled={props.disabled}
+        aria-pressed={active || undefined}
+        onClick={props.onOpen}
+      >
+        <Target />
+      </IconButton>
+    ),
+  };
+}
+
+/** How hard the engine thinks. None for an engine that has no levels to choose. */
+export function effortItem(props: {
   accountId: string;
   conversationId?: string;
   engine?: string;
+  choices: ComposerChoices;
   agentEffort?: string;
   disabled?: boolean;
-}) {
+}): ActionBarItem | null {
   const { efforts } = engineOptions(props.engine);
-  const choices = useChatChoices(props.conversationId);
   if (!efforts.length) return null;
-  const current = choices.effort || props.agentEffort || "";
+  const current = props.choices.effort || props.agentEffort || "";
   const shown = current && efforts.includes(current) ? effortLabel(current) : "Default";
-  return (
-    <DropdownMenu>
-      <Chip
-        label="Reasoning effort"
-        title={`Reasoning effort: ${shown}`}
-        icon={chipIcon(Gauge)}
-        value={shown}
-        disabled={props.disabled}
-      />
-      <DropdownMenuContent align="end" className="w-48" data-misty-layer-portal>
-        <DropdownMenuLabel>Reasoning effort</DropdownMenuLabel>
-        <DropdownMenuRadioGroup
-          value={choices.effort}
-          onValueChange={(effort) =>
-            useComposerChoices.getState().choose(props.accountId, props.conversationId, { effort })
-          }
-        >
-          <DropdownMenuRadioItem value="">
-            {props.agentEffort
+  const rows = (
+    <>
+      <MenuLabel>Reasoning effort</MenuLabel>
+      <MenuRadioGroup
+        value={props.choices.effort}
+        onValueChange={(effort) =>
+          useComposerChoices.getState().choose(props.accountId, props.conversationId, { effort })
+        }
+      >
+        <MenuRadioItem
+          icon={Gauge}
+          value=""
+          label={
+            props.agentEffort
               ? `Agent's default (${effortLabel(props.agentEffort)})`
-              : "Engine's default"}
-          </DropdownMenuRadioItem>
-          {efforts.map((effort) => (
-            <DropdownMenuRadioItem key={effort} value={effort}>
-              {effortLabel(effort)}
-            </DropdownMenuRadioItem>
-          ))}
-        </DropdownMenuRadioGroup>
-        <CodexFastItem engine={props.engine} />
-      </DropdownMenuContent>
-    </DropdownMenu>
+              : "Engine's default"
+          }
+        />
+        {efforts.map((effort) => (
+          <MenuRadioItem key={effort} icon={Gauge} value={effort} label={effortLabel(effort)} />
+        ))}
+      </MenuRadioGroup>
+      <CodexFastItem engine={props.engine} />
+    </>
   );
+  return picker({
+    id: "effort",
+    icon: Gauge,
+    name: "Reasoning effort",
+    value: shown,
+    priority: 3,
+    rows,
+    disabled: props.disabled,
+  });
 }
 
-const modeIcons: Record<"act" | "plan", LucideIcon> = { act: Hammer, plan: ClipboardList };
+const modeIcons: Record<"act" | "plan" | "teach", LucideIcon> = {
+  act: Hammer,
+  plan: ClipboardList,
+  teach: GraduationCap,
+};
 
 /** Build or Plan. Shift+Tab switches too. The next message uses it. */
-export function ModeMenu(props: {
+export function modeItem(props: {
   conversationId?: string;
   mode: ConversationMode;
   engine?: string;
   disabled?: boolean;
-}) {
+}): ActionBarItem {
   const canPlan = engineOptions(props.engine).modes.includes("plan");
-  const current = props.mode === "plan" ? "plan" : "act";
-  const label = props.mode === "teach" ? "Teach" : current === "plan" ? "Plan" : "Build";
-  return (
-    <DropdownMenu>
-      <Chip
-        label="Mode"
-        title={`Mode: ${label} · Shift+Tab switches Plan`}
-        icon={chipIcon(modeIcons[current])}
-        value={label}
-        disabled={props.disabled}
-      />
-      <DropdownMenuContent align="end" className="w-60" data-misty-layer-portal>
-        <DropdownMenuLabel>Mode</DropdownMenuLabel>
-        <DropdownMenuRadioGroup
-          value={props.mode === "teach" ? "" : current}
-          onValueChange={(next) =>
-            void useCollaborationStore
-              .getState()
-              .setMode(props.conversationId, next as ConversationMode)
-          }
-        >
-          <DropdownMenuRadioItem value="act" className="items-start">
-            <span className="grid gap-0.5">
-              <span>Build</span>
-              <span className="text-xs text-cream-muted">Works on the task and makes changes</span>
-            </span>
-          </DropdownMenuRadioItem>
-          <DropdownMenuRadioItem value="plan" disabled={!canPlan} className="items-start">
-            <span className="grid gap-0.5">
-              <span>Plan</span>
-              <span className="text-xs text-cream-muted">Reads and proposes a plan first</span>
-            </span>
-          </DropdownMenuRadioItem>
-        </DropdownMenuRadioGroup>
-      </DropdownMenuContent>
-    </DropdownMenu>
+  const current = props.mode === "plan" ? "plan" : props.mode === "teach" ? "teach" : "act";
+  const label = current === "teach" ? "Teach" : current === "plan" ? "Plan" : "Build";
+  const rows = (
+    <>
+      <MenuLabel>Mode</MenuLabel>
+      <MenuRadioGroup
+        value={current === "teach" ? "" : current}
+        onValueChange={(next) =>
+          void useCollaborationStore
+            .getState()
+            .setMode(props.conversationId, next as ConversationMode)
+        }
+      >
+        <MenuRadioItem icon={Hammer} value="act" label="Build" shortcut="⇧⇥" />
+        <MenuRadioItem
+          icon={ClipboardList}
+          value="plan"
+          label="Plan"
+          shortcut="⇧⇥"
+          disabled={!canPlan}
+          reason={canPlan ? undefined : "This engine can't plan without changing anything"}
+        />
+      </MenuRadioGroup>
+    </>
   );
+  return picker({
+    id: "mode",
+    icon: modeIcons[current],
+    name: "Mode",
+    value: label,
+    priority: 5,
+    rows,
+    disabled: props.disabled,
+  });
 }
 
 const modelCache = new Map<string, Promise<EngineModel[]>>();
@@ -265,7 +291,8 @@ const modelCache = new Map<string, Promise<EngineModel[]>>();
 if (typeof window !== "undefined")
   window.addEventListener("misty:engine-channels-changed", () => modelCache.clear());
 
-function useEngineModels(engine: string | undefined) {
+/** The models an engine offers, read once per engine. */
+export function useEngineModels(engine: string | undefined) {
   const [models, setModels] = useState<{ engine: string; list: EngineModel[] }>();
   useEffect(() => {
     if (!engine || engine === mistyEngine) return;
@@ -284,60 +311,55 @@ function useEngineModels(engine: string | undefined) {
 }
 
 /** The model the engine is asked for in this chat, out of what the engine offers. */
-export function ModelMenu(props: {
+export function modelItem(props: {
   accountId: string;
   conversationId?: string;
   engine?: string;
   engineName?: string;
+  models?: EngineModel[];
+  choices: ComposerChoices;
   agentModel?: string;
   disabled?: boolean;
-}) {
-  const choices = useChatChoices(props.conversationId);
-  const models = useEngineModels(props.engine);
+}): ActionBarItem | null {
   if (!props.engine || props.engine === mistyEngine) return null;
-  const current = choices.model || props.agentModel || "";
-  const fallback = models?.find((model) => model.default)?.id;
+  const current = props.choices.model || props.agentModel || "";
+  const fallback = props.models?.find((model) => model.default)?.id;
   const shown = current || fallback || "Default model";
-  const mark = hasEngineMark(props.engine) ? <EngineMark engine={props.engine} size={14} /> : null;
-  const list = [...(models ?? [])];
+  const icon = hasEngineMark(props.engine) ? <EngineMark engine={props.engine} size={16} /> : Cpu;
+  const list = [...(props.models ?? [])];
   if (current && !list.some((model) => model.id === current))
     list.unshift({ id: current, default: false });
-  return (
-    <DropdownMenu>
-      <Chip
-        label="Model"
-        title={`${props.engineName ?? props.engine} · ${shown}`}
-        icon={
-          mark ?? <span aria-hidden className="size-4 shrink-0 rounded-full bg-cream-muted/40" />
+  const rows = (
+    <>
+      <MenuLabel>{props.engineName ?? "Model"}</MenuLabel>
+      <MenuRadioGroup
+        value={props.choices.model}
+        onValueChange={(model) =>
+          useComposerChoices.getState().choose(props.accountId, props.conversationId, { model })
         }
-        value={shown}
-        disabled={props.disabled}
-      />
-      <DropdownMenuContent
-        align="end"
-        className="max-h-80 w-64 overflow-y-auto"
-        data-misty-layer-portal
       >
-        <DropdownMenuLabel>{props.engineName ?? "Model"}</DropdownMenuLabel>
-        <DropdownMenuRadioGroup
-          value={choices.model}
-          onValueChange={(model) =>
-            useComposerChoices.getState().choose(props.accountId, props.conversationId, { model })
-          }
-        >
-          <DropdownMenuRadioItem value="">
-            {props.agentModel ? `Agent's default (${props.agentModel})` : "Engine's default"}
-          </DropdownMenuRadioItem>
-          {list.length ? <DropdownMenuSeparator /> : null}
-          {list.map((model) => (
-            <DropdownMenuRadioItem key={model.id} value={model.id}>
-              <span className="truncate">{model.id}</span>
-            </DropdownMenuRadioItem>
-          ))}
-        </DropdownMenuRadioGroup>
-      </DropdownMenuContent>
-    </DropdownMenu>
+        <MenuRadioItem
+          icon={Sparkles}
+          value=""
+          label={props.agentModel ? `Agent's default (${props.agentModel})` : "Engine's default"}
+        />
+        {list.length ? <MenuSeparator /> : null}
+        {list.map((model) => (
+          <MenuRadioItem key={model.id} icon={Cpu} value={model.id} label={model.id} />
+        ))}
+      </MenuRadioGroup>
+    </>
   );
+  return picker({
+    id: "model",
+    icon,
+    name: "Model",
+    value: shown,
+    priority: 6,
+    rows,
+    disabled: props.disabled,
+    shrink: true,
+  });
 }
 
 /** Misty's browser, attached to the message: the engine is told to work there, and gets its tools. */
@@ -346,14 +368,8 @@ export function BrowserChip(props: { onRemove(): void }) {
     <span className="composer-attached-chip">
       <Globe aria-hidden className="size-3.5 shrink-0" />
       <span>Misty's browser</span>
-      <IconButton
-        label="Remove Misty's browser"
-        size="2xs"
-        variant="ghost"
-        tooltip={false}
-        onClick={props.onRemove}
-      >
-        <X className="size-3" />
+      <IconButton label="Remove Misty's browser" size="sm" onClick={props.onRemove}>
+        <X />
       </IconButton>
     </span>
   );

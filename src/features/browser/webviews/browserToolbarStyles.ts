@@ -1,7 +1,6 @@
 import "./browserToolbar.css";
 
-/** Page toolbar geometry. Buttons are the shared IconButton; icons use toolbarIconProps, and
- * browserToolbar.css sets both a size up inside the bar. */
+/** Page toolbar geometry. Buttons are the shared IconButton, whose icons size themselves. */
 export const browserToolbarStyles = {
   group: "flex shrink-0 items-center gap-0.5",
   // Circular glyphs need a smaller optical size beside arrows and line icons.

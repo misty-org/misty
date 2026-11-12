@@ -4,7 +4,7 @@
 use serde_json::{json, Map, Value};
 
 /// Every provider a key can be saved for.
-pub const PROVIDERS: [&str; 12] = [
+pub const PROVIDERS: [&str; 11] = [
     "openai",
     "anthropic",
     "google",
@@ -14,8 +14,6 @@ pub const PROVIDERS: [&str; 12] = [
     "ollama",
     "ollama-cloud",
     "openai-compatible",
-    // Signed in, not keyed: its short-lived access token is put in the runtime's document only.
-    "chatgpt",
     "elevenlabs",
     "soniox",
 ];

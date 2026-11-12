@@ -39,11 +39,10 @@ export function AgentControlComposer({
             }
           },
         }}
-        actions={
+        end={
           <>
             <IconButton
               label="New task"
-              size="sm"
               disabled={pending || !message.trim()}
               onClick={() => send(message, true)}
             >

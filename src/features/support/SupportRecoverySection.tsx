@@ -1,6 +1,6 @@
 import { clientMetadata } from "./clientMetadata";
 import { openSystemExternalLink } from "@/shared/platform/openExternalLink";
-import { Button, ErrorNotification } from "@/shared/ui";
+import { Button, useNotice } from "@/shared/ui";
 import {
   AlertTriangle,
   Compass,
@@ -38,6 +38,7 @@ export function SupportRecoverySection({ onClose }: { onClose?: () => void } = {
   const [draft, setDraft] = useState(initialDraft);
   const [notice, setNotice] = useState("");
   const [failure, setFailure] = useState("");
+  useNotice(Boolean(failure), { message: failure, tone: "error", onDismiss: () => setFailure("") });
   const [working, setWorking] = useState<"bundle" | "feedback" | "">("");
   const [resetArmed, setResetArmed] = useState(false);
   const [reloadArmed, setReloadArmed] = useState(false);
@@ -191,7 +192,7 @@ export function SupportRecoverySection({ onClose }: { onClose?: () => void } = {
 
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-charcoal-border pt-5">
             <Button
-              variant="outline"
+              variant="secondary"
               disabled={Boolean(working)}
               onClick={() => void downloadDiagnostics()}
             >
@@ -225,7 +226,6 @@ export function SupportRecoverySection({ onClose }: { onClose?: () => void } = {
           {notice}
         </p>
       ) : null}
-      <ErrorNotification message={failure} onDismiss={() => setFailure("")} />
     </>
   );
 }

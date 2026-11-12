@@ -1,4 +1,4 @@
-import { Button, Notification } from "@/shared/ui";
+import { useNotice } from "@/shared/ui";
 import { useEffect, useState } from "react";
 import { check } from "@tauri-apps/plugin-updater";
 import { settingsBoolean, useSettingsStore } from "@/features/settings";
@@ -72,37 +72,27 @@ export function UpdateNotices({ accountScope }: { accountScope: string }) {
       window.removeEventListener("focus", run);
     };
   }, [accountScope, enabled]);
-  const showNotice = (hostVersion || notice) && key !== dismissed;
-  return (
-    <>
-      {/* Always in the same place, so a notice coming or going never shows the notes again. */}
-      <ReleaseNotesDialog />
-      {showNotice ? (
-        <Notification
-          key={key}
-          title={notice ? undefined : `Misty ${hostVersion} is available`}
-          onDismiss={() => {
+  const showNotice = Boolean(hostVersion || notice) && key !== dismissed;
+  const dismiss = () => {
+    setDismissed(key);
+    setNotice("");
+  };
+  // A workspace notice says itself; otherwise the notice offers the new version's release.
+  useNotice(showNotice, {
+    message: notice || `Misty ${hostVersion} is available`,
+    action: notice
+      ? undefined
+      : {
+          label: "View release",
+          onSelect: () => {
             setDismissed(key);
-            setNotice("");
-          }}
-        >
-          {notice || (
-            <Button
-              type="button"
-              variant="link"
-              size="none"
-              onClick={() => {
-                setDismissed(key);
-                window.dispatchEvent(
-                  new CustomEvent("misty:open-settings", { detail: { section: "updates" } }),
-                );
-              }}
-            >
-              View release
-            </Button>
-          )}
-        </Notification>
-      ) : null}
-    </>
-  );
+            window.dispatchEvent(
+              new CustomEvent("misty:open-settings", { detail: { section: "updates" } }),
+            );
+          },
+        },
+    onDismiss: dismiss,
+  });
+  // Always in the same place, so a notice coming or going never shows the notes again.
+  return <ReleaseNotesDialog />;
 }

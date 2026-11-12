@@ -47,9 +47,6 @@ describe("models a provider listed", () => {
   it("picks Misty's suggestion when the provider offers it, else its first chat model", () => {
     expect(defaultAgentModel("openai", listed)).toBe("openai/gpt-5.5");
     expect(defaultAgentModel("openai", listed.slice(0, 2))).toBe("openai/gpt-4.1");
-    expect(defaultAgentModel("chatgpt", [{ id: "chatgpt/gpt-6.1-sol", embedding: false }])).toBe(
-      "chatgpt/gpt-6.1-sol",
-    );
     expect(defaultAgentModel("openai", [])).toBe("");
   });
   it("suggests the listed models for each role, and Misty's own before a list", () => {
@@ -63,8 +60,7 @@ describe("models a provider listed", () => {
       "openai/gpt-5.5-mini",
     ]);
   });
-  it("names ChatGPT and Ollama Cloud models as their own", () => {
+  it("names Ollama Cloud models as its own", () => {
     expect(qualifiedModel("gpt-oss:120b", "ollama-cloud")).toBe("ollama-cloud/gpt-oss:120b");
-    expect(qualifiedModel("chatgpt/gpt-6.1-sol", "openai")).toBe("chatgpt/gpt-6.1-sol");
   });
 });

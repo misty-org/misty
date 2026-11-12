@@ -12,8 +12,6 @@ export function needsModelKey(message: string | null | undefined): boolean {
 export function ModelKeyNeededButton(props: { onOpen?: () => void }) {
   return (
     <Button
-      variant="outline"
-      size="sm"
       onClick={() => {
         props.onOpen?.();
         openModelSettings();

@@ -1,7 +1,7 @@
 import { useMistyStore } from "../../conversations/state/useMistyStore";
 import { DesktopSettingsRow, DesktopSettingsSection } from "@/features/settings";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { Button, ErrorNotification, IconButton, Switch, Slider } from "@/shared/ui";
+import { Button, IconButton, Kbd, Switch, Slider, useNotice } from "@/shared/ui";
 import { RotateCcw, Square, VolumeX } from "lucide-react";
 import { useState } from "react";
 import "./agentCompanionPanel.css";
@@ -15,6 +15,10 @@ import {
   normalizeCompanionSize,
 } from "./companionSize";
 
+const teachLine =
+  "Misty teaches one step at a time and checks your work when you ask, instead of doing it for " +
+  "you. Each topic becomes its own lesson.";
+
 export function AgentCompanionPanel() {
   const { presentation: state, control } = useCompanionState();
   const working = useMistyStore((s) => s.working);
@@ -26,6 +30,15 @@ export function AgentCompanionPanel() {
     setError("");
     void companionControl(value).catch((reason) => setError(String(reason)));
   };
+  const shownError = error || state.error || "";
+  useNotice(Boolean(shownError), {
+    message: shownError,
+    tone: "error",
+    onDismiss: () => setError(""),
+    action: desktop
+      ? { label: "Retry companion", onSelect: () => act({ kind: "retry" }) }
+      : undefined,
+  });
   const active = working || state.phase !== "idle";
   const status =
     state.phase === "listening"
@@ -41,23 +54,11 @@ export function AgentCompanionPanel() {
             {status}
           </span>
           {state.phase !== "idle" && (
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={!control}
-              onClick={() => act({ kind: "stop_audio" })}
-            >
-              <VolumeX size={16} />
+            <Button icon={VolumeX} disabled={!control} onClick={() => act({ kind: "stop_audio" })}>
               Stop audio
             </Button>
           )}
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={!control}
-            onClick={() => act({ kind: "stop" })}
-          >
-            <Square size={16} />
+          <Button icon={Square} disabled={!control} onClick={() => act({ kind: "stop" })}>
             Stop task
           </Button>
         </div>
@@ -80,10 +81,7 @@ export function AgentCompanionPanel() {
             />
           </DesktopSettingsRow>
         )}
-        <DesktopSettingsRow
-          label="Teach mode"
-          description="Misty teaches one step at a time and checks your work when you ask, instead of doing it for you. Each topic becomes its own lesson."
-        >
+        <DesktopSettingsRow label="Teach mode" description={teachLine}>
           <Switch
             aria-label="Teach mode"
             checked={state.teach === true}
@@ -108,7 +106,7 @@ export function AgentCompanionPanel() {
               disabled={!control || size === companionSizeDefault}
               onClick={() => act({ kind: "size", size: companionSizeDefault })}
             >
-              <RotateCcw size={16} />
+              <RotateCcw />
             </IconButton>
           </div>
           <Slider
@@ -126,17 +124,10 @@ export function AgentCompanionPanel() {
       <DesktopSettingsSection title="Voice">
         {desktop && (
           <DesktopSettingsRow label="Talk shortcut">
-            <kbd>{/Mac/.test(navigator.platform) ? "⌃ ⌥" : "Ctrl + Alt"}</kbd>
+            <Kbd>{/Mac/.test(navigator.platform) ? "⌃ ⌥" : "Ctrl + Alt"}</Kbd>
           </DesktopSettingsRow>
         )}
       </DesktopSettingsSection>
-      <ErrorNotification message={error || state.error} onDismiss={() => setError("")}>
-        {desktop && (
-          <Button type="button" variant="ghost" size="sm" onClick={() => act({ kind: "retry" })}>
-            Retry companion
-          </Button>
-        )}
-      </ErrorNotification>
     </div>
   );
 }

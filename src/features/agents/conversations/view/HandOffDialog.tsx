@@ -1,3 +1,4 @@
+import { UserRound } from "lucide-react";
 import { useEffect, useState } from "react";
 import {
   Button,
@@ -6,8 +7,8 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  ErrorNotification,
   Field,
+  FieldError,
   OptionSelect,
   Skeleton,
   Textarea,
@@ -85,17 +86,18 @@ export function HandOffDialog(props: {
                 value={to}
                 placeholder="Choose a member"
                 disabled={!members.length}
-                options={members.map((member) => ({ value: member.userId, label: member.name }))}
+                options={members.map((member) => ({
+                  value: member.userId,
+                  label: member.name,
+                  icon: UserRound,
+                }))}
                 onValueChange={setTo}
               />
             ) : (
               <Skeleton className="h-9 w-full rounded-md" />
             )}
           </Field>
-          <Field
-            label="Your message"
-            hint={shortened ? "The reply was shortened to fit one message." : undefined}
-          >
+          <Field label={shortened ? "Your message, shortened to fit" : "Your message"}>
             <Textarea
               value={text}
               rows={8}
@@ -103,12 +105,10 @@ export function HandOffDialog(props: {
               onChange={(event) => setText(event.target.value)}
             />
           </Field>
-          <ErrorNotification message={error} onDismiss={() => setError("")} />
+          <FieldError message={error} />
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={props.onClose}>
-            Cancel
-          </Button>
+          <Button onClick={props.onClose}>Cancel</Button>
           <Button disabled={busy || !members?.length} onClick={() => void send()}>
             Send
           </Button>

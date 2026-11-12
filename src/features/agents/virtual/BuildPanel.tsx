@@ -1,6 +1,7 @@
 import {
   Armchair,
   BookOpen,
+  Bot,
   Coffee,
   GlassWater,
   Lamp,
@@ -14,6 +15,7 @@ import {
   Sprout,
   Table,
   Trash2,
+  Users,
   type LucideIcon,
 } from "lucide-react";
 import { Button, IconButton, OptionSelect } from "@/shared/ui";
@@ -63,7 +65,7 @@ function RoomSizer(props: { layout: StudioLayout; onLayout(next: StudioLayout): 
             <span className="flex-1 text-ui text-cream-muted">{label}</span>
             <IconButton
               label={`Less ${label.toLowerCase()}`}
-              size="xs"
+              size="sm"
               disabled={smaller === layout}
               onClick={() => props.onLayout(smaller)}
             >
@@ -72,7 +74,7 @@ function RoomSizer(props: { layout: StudioLayout; onLayout(next: StudioLayout): 
             <span className="w-6 text-center text-ui tabular-nums text-cream">{value}</span>
             <IconButton
               label={`More ${label.toLowerCase()}`}
-              size="xs"
+              size="sm"
               disabled={bigger === layout}
               onClick={() => props.onLayout(bigger)}
             >
@@ -112,15 +114,20 @@ export function BuildPanel(props: {
         {furnitureKinds.map((kind) => {
           const Icon = icons[kind];
           return (
-            <Button key={kind} variant="ghost" size="sm" justify="start" onClick={() => add(kind)}>
-              <Icon aria-hidden="true" />
+            <Button
+              key={kind}
+              variant="quiet"
+              justify="start"
+              onClick={() => add(kind)}
+              icon={Icon}
+            >
               <span className="flex-1 text-left">{furniture[kind].label}</span>
               <Plus aria-hidden="true" className="size-3.5 opacity-60" />
             </Button>
           );
         })}
         <RoomSizer layout={layout} onLayout={props.onLayout} />
-        <Button variant="outline" size="sm" className="mt-1" onClick={props.onReset}>
+        <Button className="mt-1" onClick={props.onReset}>
           Reset layout
         </Button>
       </aside>
@@ -139,8 +146,12 @@ export function BuildPanel(props: {
               className="h-8 w-44"
               value={picked.agent ?? ""}
               options={[
-                { value: "", label: "Anyone" },
-                ...props.agents.map(({ agent }) => ({ value: agent.id, label: agent.name })),
+                { value: "", label: "Anyone", icon: Users },
+                ...props.agents.map(({ agent }) => ({
+                  value: agent.id,
+                  label: agent.name,
+                  icon: Bot,
+                })),
               ]}
               onValueChange={(agent) =>
                 props.onLayout(assignDesk(layout, picked.id, agent || null))

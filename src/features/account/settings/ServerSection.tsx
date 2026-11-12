@@ -46,20 +46,20 @@ export function ServerSection() {
               ? user
                 ? `${host}. Signed in as ${user.email || user.username}.`
                 : `${host}. Not signed in.`
-              : "None. Misty is the browser only, and nothing is sent to a server."
+              : "None. Agents work on this computer; Spaces need a server."
           }
         >
-          <Button variant="outline" size="sm" onClick={() => openSignInSheet("setup")}>
+          <Button variant="secondary" onClick={() => openSignInSheet("setup")}>
             {host ? "Change" : "Set up"}
           </Button>
         </Row>
         {host ? (
           <Row
-            label="Browse only"
-            description="Signs out and leaves this server. Your tabs and browsing stay on this computer."
+            label="Leave server"
+            description="Signs out of it. Agents and their chats stay on this computer."
           >
-            <Button variant="outline" size="sm" disabled={leaving} onClick={() => void leave()}>
-              Leave server
+            <Button variant="secondary" disabled={leaving} onClick={() => void leave()}>
+              Leave
             </Button>
           </Row>
         ) : null}

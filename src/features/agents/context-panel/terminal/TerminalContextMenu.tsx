@@ -4,7 +4,7 @@ import { ClipboardPaste, Copy, Eraser, FileText, FolderOpen, TextSelect, X } fro
 import { useEffect, useState, type ReactNode } from "react";
 import {
   ContextMenu,
-  ContextMenuAction,
+  MenuItem,
   ContextMenuContent,
   ContextMenuSeparator,
   ContextMenuTrigger,
@@ -66,14 +66,14 @@ export function TerminalContextMenu({
     >
       <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
       <ContextMenuContent width="sm">
-        <ContextMenuAction
-          icon={<Copy className="size-4" />}
+        <MenuItem
+          icon={Copy}
           label="Copy"
           disabled={!selection}
           onSelect={() => void navigator.clipboard.writeText(selection).catch(() => undefined)}
         />
-        <ContextMenuAction
-          icon={<ClipboardPaste className="size-4" />}
+        <MenuItem
+          icon={ClipboardPaste}
           label="Paste"
           onSelect={() =>
             void navigator.clipboard
@@ -88,29 +88,21 @@ export function TerminalContextMenu({
               .catch(() => undefined)
           }
         />
-        <ContextMenuAction
-          icon={<TextSelect className="size-4" />}
-          label="Select all"
-          onSelect={() => term()?.selectAll()}
-        />
-        <ContextMenuAction
-          icon={<Eraser className="size-4" />}
-          label="Clear"
-          onSelect={() => term()?.clear()}
-        />
+        <MenuItem icon={TextSelect} label="Select all" onSelect={() => term()?.selectAll()} />
+        <MenuItem icon={Eraser} label="Clear" onSelect={() => term()?.clear()} />
         {resolved && inside ? (
           <>
             <ContextMenuSeparator />
             {target?.isDir ? null : (
-              <ContextMenuAction
-                icon={<FileText className="size-4" />}
+              <MenuItem
+                icon={FileText}
                 label="Open in editor"
                 disabled={!target}
                 onSelect={() => target && openTerminalPath(target)}
               />
             )}
-            <ContextMenuAction
-              icon={<FolderOpen className="size-4" />}
+            <MenuItem
+              icon={FolderOpen}
               label={revealLabel()}
               disabled={!target}
               onSelect={() => target && void filesApi.reveal(target.path).catch(() => undefined)}
@@ -118,12 +110,7 @@ export function TerminalContextMenu({
           </>
         ) : null}
         <ContextMenuSeparator />
-        <ContextMenuAction
-          icon={<X className="size-4" />}
-          label="Close terminal"
-          destructive
-          onSelect={onCloseTab}
-        />
+        <MenuItem icon={X} label="Close terminal" danger onSelect={onCloseTab} />
       </ContextMenuContent>
     </ContextMenu>
   );

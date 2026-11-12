@@ -14,11 +14,6 @@ export {
   setBrowserPointerTrackingEnabled,
   setBrowserWebviewsSuspended,
 } from "@/features/app-windows";
-export {
-  setBrowserDownloadDirectory,
-  setBrowserDownloadPrompt,
-  setBrowserStatusBubbleEnabled,
-} from "@/features/app-windows";
 
 export {
   browserRuntimeCreated,

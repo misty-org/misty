@@ -750,11 +750,6 @@
   gap: 7px;
   font-weight: 600;
 }
-.virtual-studio-board li span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 .virtual-studio-board li[data-state="working"] svg {
   color: #2f6fd1;
 }

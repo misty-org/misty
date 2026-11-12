@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, ChevronLeft, ChevronRight, Maximize2, Minus, Plus, Trash2 } from "lucide-react";
 import { confirmAction } from "@/shared/lib/confirmAction";
-import { Button, IconButton, Pressable } from "@/shared/ui";
+import { Button, IconButton, Pressable, OverflowFadeText } from "@/shared/ui";
 import { MistyMarkdown } from "../../runs/markdown/MistyMarkdown";
 import { slidesOf } from "../tutorStudio";
 import { useTutorStore } from "../tutorStore";
@@ -16,13 +16,13 @@ async function remove(guide: Guide, onClose: () => void) {
 function Head({ guide, onClose }: { guide: Guide; onClose(): void }) {
   return (
     <div className="tutor-lead">
-      <IconButton label="Back to the studio" onClick={onClose}>
-        <ArrowLeft size={16} />
+      <IconButton label="Back to Create" onClick={onClose}>
+        <ArrowLeft />
       </IconButton>
-      <span className="tutor-card-title">{guide.title}</span>
+      <OverflowFadeText className="tutor-card-title">{guide.title}</OverflowFadeText>
       <span className="tutor-actions">
         <IconButton label="Delete" onClick={() => void remove(guide, onClose)}>
-          <Trash2 size={15} />
+          <Trash2 />
         </IconButton>
       </span>
     </div>
@@ -110,21 +110,20 @@ export function SlidesView({ deck, onClose }: { deck: Guide; onClose(): void }) 
       </div>
       <div className="tutor-slide-controls">
         <IconButton label="Previous slide" disabled={at === 0} onClick={() => move(-1)}>
-          <ChevronLeft size={16} />
+          <ChevronLeft />
         </IconButton>
         <span className="tutor-card-detail">
           {at + 1} / {slides.length}
         </span>
         <IconButton label="Next slide" disabled={at >= slides.length - 1} onClick={() => move(1)}>
-          <ChevronRight size={16} />
+          <ChevronRight />
         </IconButton>
         <Button
-          variant="ghost"
-          size="sm"
+          variant="quiet"
           className="ml-auto"
           onClick={() => void stage.current?.requestFullscreen?.().catch(() => undefined)}
+          icon={Maximize2}
         >
-          <Maximize2 size={14} />
           Present
         </Button>
       </div>

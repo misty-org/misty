@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useState, type ReactNode } from "react";
 import { resolveApiBase } from "@/api/deployment/api";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { Notification } from "@/shared/ui";
+import { useNotice } from "@/shared/ui";
 import { refreshNavigationNames, useNavigationNames } from "./store";
 
 export function NavigationNamesBoundary({
@@ -83,14 +83,9 @@ function AccountNavigationNamesBoundary({
       window.removeEventListener("focus", refresh);
     };
   }, [scope]);
-  return (
-    <>
-      {state.error && (
-        <Notification key={state.error} tone="error">
-          {state.error} Your last valid names are retained. Fix navigation.json to retry.
-        </Notification>
-      )}
-      {children}
-    </>
-  );
+  useNotice(Boolean(state.error), {
+    tone: "error",
+    message: `${state.error ?? ""} Your last valid names are retained. Fix navigation.json to retry.`,
+  });
+  return <>{children}</>;
 }

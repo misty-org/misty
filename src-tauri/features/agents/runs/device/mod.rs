@@ -9,7 +9,6 @@ pub(crate) mod device_calls;
 mod device_routing;
 mod failure;
 pub(crate) mod model_calls;
-mod model_checks;
 mod models;
 mod screen_calls;
 mod text_calls;
@@ -35,7 +34,7 @@ use failure::answered;
 pub const MAX_DEVICE_BODY_BYTES: usize = 40 << 20;
 
 /// Every call [`DeviceCalls::device_call`] knows, by its route's name.
-pub const DEVICE_CALL_NAMES: [&str; 12] = [
+pub const DEVICE_CALL_NAMES: [&str; 11] = [
     "cleanup",
     "voice-transcription",
     "screen-model",
@@ -45,7 +44,6 @@ pub const DEVICE_CALL_NAMES: [&str; 12] = [
     "day-summary",
     "voice-notes",
     "transcribe-diarized",
-    "model-test",
     "follow-up",
     "restore-step",
 ];
@@ -112,7 +110,6 @@ impl DeviceCalls {
             "day-summary" => self.day_summary(body).await,
             "voice-notes" => self.voice_notes(body).await,
             "transcribe-diarized" => self.transcribe_diarized(body).await,
-            "model-test" => self.model_test(body).await,
             "follow-up" => self.follow_up(body).await,
             "restore-step" => self.restore_step(body).await,
             _ => Err(DeviceCallFailure { status: 404, body: serde_json::json!({ "code": "not_found" }) }),
@@ -259,14 +256,6 @@ impl DeviceCalls {
             transcribe_diarized::transcribe_diarized_call(self, MODEL, &route, &read_body(body)?).await
         };
         answered("transcribe-diarized", result.await)
-    }
-
-    pub async fn model_test(&self, body: &str) -> Result<Value, DeviceCallFailure> {
-        let result = async {
-            read_body(body)?;
-            model_checks::model_test_call(self).await
-        };
-        answered("model-test", result.await)
     }
 
     pub async fn follow_up(&self, body: &str) -> Result<Value, DeviceCallFailure> {

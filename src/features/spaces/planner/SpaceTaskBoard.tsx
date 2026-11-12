@@ -1,5 +1,5 @@
 import { usePointerReorder } from "@/shared/hooks/usePointerReorder";
-import { Button, cn, IconButton, Input, Pressable, Skeleton } from "@/shared/ui";
+import { Button, cn, IconButton, Input, OverflowFadeText, Pressable, Skeleton } from "@/shared/ui";
 import { Plus } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import type { SpaceTask, SpaceTaskStatus } from "./api";
@@ -109,12 +109,11 @@ function BoardColumn(props: BoardProps & { column: { id: SpaceTaskStatus; label:
               }}
             />
             <div className="flex justify-end gap-1.5">
-              <Button type="button" size="sm" variant="ghost" onClick={() => setCreating(false)}>
+              <Button type="button" variant="quiet" onClick={() => setCreating(false)}>
                 Cancel
               </Button>
               <Button
                 type="submit"
-                size="sm"
                 disabled={!title.trim() || props.busy === `create:${column.id}`}
               >
                 Add
@@ -171,7 +170,11 @@ function TaskCard(props: { task: SpaceTask; assignee: string; onOpen(): void }) 
             {dueLabel(task.due_at)}
           </span>
         ) : null}
-        {props.assignee ? <span className="ml-auto truncate">{props.assignee}</span> : null}
+        {props.assignee ? (
+          <OverflowFadeText full className="ml-auto">
+            {props.assignee}
+          </OverflowFadeText>
+        ) : null}
       </span>
     </Pressable>
   );

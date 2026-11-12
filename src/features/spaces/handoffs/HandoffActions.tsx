@@ -1,11 +1,12 @@
+import { Bot } from "lucide-react";
 import { useEffect } from "react";
 import { agentAccountId, draftRequestForAgent, usePersonalAgentsStore } from "@/features/agents";
 import {
   Button,
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuTrigger,
+  MenuItem,
 } from "@/shared/ui";
 import { markHandoffHandled } from "./handledHandoffs";
 
@@ -39,30 +40,32 @@ export function HandoffActions(props: {
       {mine.length > 1 ? (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button type="button" variant="outline" size="sm">
+            <Button type="button" variant="secondary">
               Give to my agent
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start">
             {mine.map((agent) => (
-              <DropdownMenuItem key={agent.id} onSelect={() => give(agent.id)}>
-                {agent.name}
-              </DropdownMenuItem>
+              <MenuItem
+                key={agent.id}
+                icon={Bot}
+                label={agent.name}
+                onSelect={() => give(agent.id)}
+              />
             ))}
           </DropdownMenuContent>
         </DropdownMenu>
       ) : (
         <Button
           type="button"
-          variant="outline"
-          size="sm"
+          variant="secondary"
           disabled={!mine.length}
           onClick={() => mine[0] && give(mine[0].id)}
         >
           Give to my agent
         </Button>
       )}
-      <Button type="button" variant="ghost" size="sm" onClick={done}>
+      <Button type="button" variant="quiet" onClick={done}>
         Dismiss
       </Button>
     </div>

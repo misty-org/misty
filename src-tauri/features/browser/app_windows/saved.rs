@@ -39,28 +39,16 @@ struct Place {
     old_file: PathBuf,
 }
 
-/// A development copy can share the database, so it keeps its own list beside the others.
-fn place_in(home: &Path, development: Option<&str>) -> Place {
-    let (row, file) = match development {
-        Some(name) => (
-            format!("profile-registry:{name}"),
-            format!("profiles-{name}.json"),
-        ),
-        None => ("profile-registry".to_owned(), "profiles.json".to_owned()),
-    };
+fn place_in(home: &Path) -> Place {
     Place {
         store: Store::in_home(home),
-        row,
-        old_file: home.join(file),
+        row: "profile-registry".to_owned(),
+        old_file: home.join("profiles.json"),
     }
 }
 
 fn place() -> Option<Place> {
-    let home = file_access::paths::misty_home_dir()?;
-    let development = std::env::var("MISTY_PROFILE")
-        .ok()
-        .filter(|name| !name.is_empty());
-    Some(place_in(&home, development.as_deref()))
+    Some(place_in(&file_access::paths::misty_home_dir()?))
 }
 
 /// The saved list. `Err` means it couldn't be read, and may well exist.
@@ -164,7 +152,7 @@ mod tests {
     #[test]
     fn brings_the_old_file_over_once_and_removes_it() {
         let home = home();
-        let place = place_in(home.path(), None);
+        let place = place_in(home.path());
         std::fs::write(&place.old_file, OLD).unwrap();
         std::fs::write(place.old_file.with_extension("json.tmp"), "partial").unwrap();
 
@@ -192,14 +180,14 @@ mod tests {
     #[test]
     fn a_new_computer_starts_with_an_empty_list() {
         let home = home();
-        let saved = read_from(&place_in(home.path(), None)).unwrap();
+        let saved = read_from(&place_in(home.path())).unwrap();
         assert!(saved.legacy_owner.is_none() && saved.profiles.is_empty());
     }
 
     #[test]
     fn a_file_it_cannot_read_is_not_taken_for_an_empty_list() {
         let home = home();
-        let place = place_in(home.path(), None);
+        let place = place_in(home.path());
         // Reading a folder fails with something other than "not found".
         std::fs::create_dir(&place.old_file).unwrap();
         assert!(read_from(&place).is_err());
@@ -215,32 +203,17 @@ mod tests {
     #[test]
     fn a_damaged_file_is_left_where_it_is() {
         let home = home();
-        let place = place_in(home.path(), None);
+        let place = place_in(home.path());
         std::fs::write(&place.old_file, "not json").unwrap();
         assert!(read_from(&place).unwrap().legacy_owner.is_none());
         assert!(place.old_file.exists());
     }
 
-    #[test]
-    fn a_development_copy_keeps_its_own_list_in_the_same_database() {
-        let home = home();
-        let (real, copy) = (
-            place_in(home.path(), None),
-            place_in(home.path(), Some("dev1")),
-        );
-        assert_eq!(real.store.path(), copy.store.path());
-        assert_ne!(real.row, copy.row);
-        assert_eq!(copy.old_file, home.path().join("profiles-dev1.json"));
-        std::fs::write(&real.old_file, OLD).unwrap();
-        read_from(&real).unwrap();
-        assert!(read_from(&copy).unwrap().legacy_owner.is_none());
-        assert!(read_from(&real).unwrap().legacy_owner.is_some());
-    }
 
     #[test]
     fn saving_again_replaces_the_row() {
         let home = home();
-        let place = place_in(home.path(), None);
+        let place = place_in(home.path());
         let connection = place.store.connect().unwrap();
         write_row(&connection, &place.row, r#"{"scope": "first"}"#).unwrap();
         write_row(&connection, &place.row, r#"{"scope": "second"}"#).unwrap();

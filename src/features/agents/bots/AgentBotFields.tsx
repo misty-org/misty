@@ -7,7 +7,7 @@
 import { Download } from "lucide-react";
 import { useState } from "react";
 import type { AgentProfile, AgentProfileInput } from "@/shared/schemas";
-import { Button, ErrorNotification, Field, Input, Textarea } from "@/shared/ui";
+import { Button, useNotice, Field, Input, Textarea } from "@/shared/ui";
 import { exportBotBundle, importBotBundle } from "./botBundle";
 import { assembleAgentPrompt, duplicateProseLines, proseOverLimit, PROSE_LIMIT } from "./botPrompt";
 
@@ -108,11 +108,11 @@ export function AgentBotFields({
 export function ImportBotButton({ onImported }: { onImported(agent: AgentProfile): void }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  useNotice(Boolean(error), { message: error, tone: "error", onDismiss: () => setError("") });
   return (
     <>
       <Button
-        variant="ghost"
-        size="sm"
+        variant="quiet"
         type="button"
         disabled={busy}
         onClick={() => {
@@ -127,7 +127,6 @@ export function ImportBotButton({ onImported }: { onImported(agent: AgentProfile
         <Download size={15} />
         <span>Import bot</span>
       </Button>
-      <ErrorNotification message={error} onDismiss={() => setError("")} />
     </>
   );
 }
@@ -136,10 +135,10 @@ export function ImportBotButton({ onImported }: { onImported(agent: AgentProfile
 export function ExportBotButton({ agent }: { agent: AgentProfile }) {
   const [state, setState] = useState<"idle" | "working" | "done">("idle");
   const [error, setError] = useState("");
+  useNotice(Boolean(error), { message: error, tone: "error", onDismiss: () => setError("") });
   return (
     <>
       <Button
-        variant="outline"
         type="button"
         disabled={state === "working"}
         onClick={() => {
@@ -155,7 +154,6 @@ export function ExportBotButton({ agent }: { agent: AgentProfile }) {
       >
         {state === "done" ? "Exported" : "Export as bot"}
       </Button>
-      <ErrorNotification message={error} onDismiss={() => setError("")} />
     </>
   );
 }

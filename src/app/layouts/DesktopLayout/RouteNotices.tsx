@@ -1,40 +1,15 @@
 import type { AppNoticeEntry, AppNoticeSource } from "@/app/layouts/desktop-state";
 import { reportSystemError } from "@/shared/platform/systemErrors";
-import type { AppTab } from "@/app/shell";
 import { useAppStore } from "@/app/shell";
 import { useSettingsStore } from "@/features/settings";
-import { Notification } from "@/shared/ui";
+import { notify } from "@/shared/ui";
 import { memo, useEffect, useRef } from "react";
-export const RouteNotice = memo(function RouteNotice(props: { routeId: AppTab }) {
-  const appError = useAppStore((state) => state.error);
-  const appMessage = useAppStore((state) => state.message);
-  const settingsError = useSettingsStore((state) => state.error);
-  const settingsMessage = useSettingsStore((state) => state.message);
-  const notice = noticeForRoute(props.routeId, {
-    app: { error: appError, message: appMessage },
-    settings: { error: settingsError, message: settingsMessage },
-  });
-  const dismissNotice = () => {
-    useAppStore.getState().clearNotice();
-    useSettingsStore.setState({ error: null, message: null });
-  };
 
-  useEffect(() => {
-    if (!notice.error) return;
-    const timeoutMs = 5500;
-    const timer = window.setTimeout(dismissNotice, timeoutMs);
-    return () => window.clearTimeout(timer);
-  }, [notice.error]);
-
-  if (!notice.message) return null;
-
-  return (
-    <Notification key={notice.message} tone="success" duration={3500} onDismiss={dismissNotice}>
-      {notice.message}
-    </Notification>
-  );
-});
-
+/**
+ * What the app and settings stores have to say. A message is a notice that leaves on its own; an
+ * error goes to the system error report, which says what failed. Each is said once, then cleared:
+ * a message when its notice leaves, an error a few seconds after it was reported.
+ */
 export const AppNoticePublisher = memo(function AppNoticePublisher() {
   const appError = useAppStore((state) => state.error);
   const appMessage = useAppStore((state) => state.message);
@@ -56,40 +31,40 @@ export const AppNoticePublisher = memo(function AppNoticePublisher() {
         lastPublished.current[key] = "";
         continue;
       }
-
       const signature = `${kind}:${message}`;
       if (lastPublished.current[key] === signature) continue;
       lastPublished.current[key] = signature;
-      if (kind === "error") {
+      if (kind === "error")
         reportSystemError({
           title: `${appNoticeSourceLabel(source)} encountered a problem`,
           error: message,
           scope: `app-notice:${source}`,
         });
-        continue;
-      }
+      else
+        notify({
+          id: key,
+          message,
+          duration: 3500,
+          onDismiss: () => {
+            if (source === "app") useAppStore.getState().setMessage(null);
+            else useSettingsStore.setState({ message: null });
+          },
+        });
     }
   }, [appError, appMessage, settingsError, settingsMessage]);
+
+  useEffect(() => {
+    if (!appError && !settingsError) return;
+    const timer = window.setTimeout(() => {
+      useAppStore.setState({ error: null });
+      useSettingsStore.setState({ error: null });
+    }, 5500);
+    return () => window.clearTimeout(timer);
+  }, [appError, settingsError]);
 
   return null;
 });
 
-function noticeForRoute(
-  route: AppTab,
-  notices: Record<"app" | "settings", { error: string | null; message: string | null }>,
-) {
-  const scoped = route === "settings" ? notices[route] : notices.app;
-  return {
-    error: scoped.error ?? notices.app.error,
-    message: scoped.message ?? notices.app.message,
-  };
-}
-
 function appNoticeSourceLabel(source: AppNoticeSource): string {
-  switch (source) {
-    case "settings":
-      return "Settings";
-    case "app":
-      return "Misty";
-  }
+  return source === "settings" ? "Settings" : "Misty";
 }

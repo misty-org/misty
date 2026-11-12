@@ -3,7 +3,7 @@ import { appsApi } from "../connected-apps/api";
 import { agentsDeviceSnapshot } from "./useAgentsStore";
 import type { AgentDeviceSnapshot } from "./agentScope";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { Button, ErrorNotification, Skeleton } from "@/shared/ui";
+import { Button, OverflowFadeText, Skeleton, useNotice } from "@/shared/ui";
 import { Cable, Layers } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
@@ -106,6 +106,11 @@ export function AgentAccess({
   access: AgentAccessState;
   onConnections(): void;
 }) {
+  useNotice(Boolean(access.connectionsError), {
+    message: "Some connections couldn’t load.",
+    tone: "error",
+    action: { label: "Retry connections", onSelect: access.retry },
+  });
   return (
     <div className="grid gap-5">
       <section aria-label="Context" className="grid gap-2">
@@ -135,26 +140,19 @@ export function AgentAccess({
             ))}
           </div>
         ) : null}
-        <ErrorNotification
-          message={access.connectionsError ? "Some connections couldn’t load." : ""}
-        >
-          <Button type="button" variant="ghost" size="sm" onClick={access.retry}>
-            Retry connections
-          </Button>
-        </ErrorNotification>
         {!access.loading && access.connections.length ? (
           access.connections.map((connection) => (
             <Button
               type="button"
               key={connection.id}
-              variant="ghost"
+              variant="quiet"
               justify="start"
               className="h-auto min-h-9 -mx-2 gap-3 whitespace-normal px-2 text-left"
               onClick={onConnections}
             >
               <Cable className="size-4 shrink-0 text-cream-muted" />
               <span className="min-w-0">
-                <span className="block truncate">{connection.name}</span>
+                <OverflowFadeText full>{connection.name}</OverflowFadeText>
                 <span className="block text-xs font-normal text-cream-muted">
                   {connection.detail ??
                     (connection.status === "active"
@@ -169,13 +167,7 @@ export function AgentAccess({
         ) : !access.loading && !access.connectionsError ? (
           <p className="text-xs text-cream-muted">No tool connections.</p>
         ) : null}
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="justify-self-start"
-          onClick={() => onConnections()}
-        >
+        <Button type="button" className="justify-self-start" onClick={() => onConnections()}>
           Manage connections
         </Button>
       </section>

@@ -17,7 +17,6 @@ export * from "./tabs/WorkspaceAppIcon";
 export * from "./tabs/workspaceDefaultView";
 export * from "./tabs/workspaceViewOperations";
 export * from "./tabs/WorkspaceViewRouteScope";
-export * from "./profiles/windowColors";
 
 // Public surface used by other features (generated from their imports).
 export { NavigationNamesBoundary } from "./navigation-names/NavigationNamesBoundary";
@@ -40,26 +39,19 @@ export { panePlacement } from "./panes/panePlacement";
 export { usePaneSwapMode, type PaneSwapDirection } from "./panes/paneSwapMode";
 export { useLayoutEditor } from "./panes/layoutEditor";
 export { draftAdd, draftPlace, draftRemove } from "./panes/layoutDraft";
-export { ProfileDialogs } from "./profiles/ProfileDialogs";
-export { ProfileMenuItems } from "./profiles/ProfileMenuItems";
-export { ProfileSwitcher } from "./profiles/ProfileSwitcher";
 export {
   closeWindow,
-  createProfile,
   currentProfile,
   currentWindowId,
   firstProfileId,
   isHostWindow,
   isLinkTargetWindow,
   isProfileWindowLabel,
-  listProfiles,
   onHostWindow,
   openNewWindow,
-  openProfile,
   useProfileWindowStore,
   type ProfileEntry,
 } from "./profiles/profileWindow";
-export { windowChromeBackground } from "./profiles/windowColors";
 export { currentWindows } from "./profiles/windows";
 export { UnsavedQuitGuard } from "./recovery/UnsavedQuitGuard";
 export {
@@ -107,18 +99,12 @@ export {
 // Public surface used by other features (generated from their imports).
 export { AdvancedSection } from "./settings/AdvancedSection";
 export { AppearanceSection } from "./settings/AppearanceSection";
-export { TabsSettings } from "./settings/TabsSettings";
 
 // Public surface used by other features (generated from their imports).
 export {
   browserBlockingOverlayOpen,
   browserNoticeRects,
 } from "./page-runtime/browserBlockingOverlay";
-export {
-  setBrowserDownloadDirectory,
-  setBrowserDownloadPrompt,
-  setBrowserStatusBubbleEnabled,
-} from "./page-runtime/browserHostSettings";
 export {
   browserOverlayReady,
   isBrowserLayoutMoving,
@@ -177,12 +163,7 @@ export { type BrowserBounds, type BrowserTheme } from "./page-runtime/pageRuntim
 export { startProfileWindow } from "./profiles/profileWindow";
 
 // Public surface used by other features (generated from their imports).
-export {
-  browserHomeUrl,
-  configureBrowserHomeUrl,
-  defaultBrowserHomeUrl,
-  normalizeBrowserHomeUrl,
-} from "./addresses/browserHome";
+export { browserHomeUrl } from "./addresses/browserHome";
 export {
   preferredDefaultSpace,
   spacesDirectory,

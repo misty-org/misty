@@ -1,3 +1,20 @@
+import {
+  Bot,
+  CircleHelp,
+  Code,
+  Folder,
+  Globe,
+  MessageSquare,
+  NotebookPen,
+  PenTool,
+  Repeat,
+  Repeat1,
+  Settings,
+  Shapes,
+  Shuffle,
+  Sparkles,
+  type LucideIcon,
+} from "lucide-react";
 import { cn, Input, OptionSelect, Pressable, Textarea } from "@/shared/ui";
 import type { FeedbackDraft, FeedbackKind } from "./feedbackIssue";
 import { FeedbackField } from "./SupportRecoveryParts";
@@ -7,6 +24,21 @@ const feedbackKinds: Array<{ id: FeedbackKind; label: string }> = [
   { id: "confusing", label: "Something was confusing" },
   { id: "idea", label: "I have an idea" },
   { id: "accessibility", label: "Accessibility" },
+];
+
+/** The areas a ticket can be about, each with the icon its menu row starts with. */
+const feedbackAreas: Array<[string, LucideIcon]> = [
+  ["General", CircleHelp],
+  ["Onboarding", Sparkles],
+  ["Spaces", Shapes],
+  ["Chat", MessageSquare],
+  ["Notes", NotebookPen],
+  ["Drawings", PenTool],
+  ["Files", Folder],
+  ["Code", Code],
+  ["Browser", Globe],
+  ["Agents", Bot],
+  ["Settings", Settings],
 ];
 
 /** The parts of a feedback ticket the person writes: its kind, area, frequency and text. */
@@ -47,19 +79,7 @@ export function SupportFeedbackFields({
           <OptionSelect
             value={draft.area}
             onValueChange={(value) => updateDraft("area", value)}
-            options={[
-              "General",
-              "Onboarding",
-              "Spaces",
-              "Chat",
-              "Notes",
-              "Drawings",
-              "Files",
-              "Code",
-              "Browser",
-              "Agents",
-              "Settings",
-            ].map((area) => ({ value: area, label: area }))}
+            options={feedbackAreas.map(([area, icon]) => ({ value: area, label: area, icon }))}
           />
         </FeedbackField>
         <FeedbackField label="How often?">
@@ -67,10 +87,10 @@ export function SupportFeedbackFields({
             value={draft.frequency}
             onValueChange={(value) => updateDraft("frequency", value as FeedbackDraft["frequency"])}
             options={[
-              { value: "unknown", label: "Not sure" },
-              { value: "once", label: "Once" },
-              { value: "sometimes", label: "Sometimes" },
-              { value: "always", label: "Every time" },
+              { value: "unknown", label: "Not sure", icon: CircleHelp },
+              { value: "once", label: "Once", icon: Repeat1 },
+              { value: "sometimes", label: "Sometimes", icon: Shuffle },
+              { value: "always", label: "Every time", icon: Repeat },
             ]}
           />
         </FeedbackField>

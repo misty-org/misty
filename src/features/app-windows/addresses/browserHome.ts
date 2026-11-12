@@ -1,49 +1,9 @@
 import { blankBrowserUrl } from "./browserUrl";
 
-/** Where an agent's page starts when nothing else asked for a URL. */
-export const defaultBrowserHomeUrl = "https://www.google.com";
-
-let configuredHomeUrl = defaultBrowserHomeUrl;
-
 /**
- * The homepage an agent's new page opens on.
- *
- * Read through a function rather than a constant so the value stays live: the
- * settings store pushes the saved preference in on load and on every change.
+ * Where an agent's page starts when nothing else asked for a URL: a blank page. Agents search with
+ * Google once they know what to look for; a page of its own choosing would only be noise.
  */
 export function browserHomeUrl(): string {
-  return configuredHomeUrl;
-}
-
-export function configureBrowserHomeUrl(value: string): void {
-  configuredHomeUrl = normalizeBrowserHomeUrl(value);
-}
-
-/**
- * Resolves a user-entered homepage.
- *
- * A bare host is completed to HTTPS, an explicitly blank page is honoured, and
- * anything that is not a usable web address falls back to the default rather
- * than opening tabs on something broken.
- */
-export function normalizeBrowserHomeUrl(value: string): string {
-  const trimmed = value.trim();
-  if (!trimmed) return defaultBrowserHomeUrl;
-  if (trimmed === blankBrowserUrl) return blankBrowserUrl;
-  const hasScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed);
-  let candidate: string;
-  if (hasScheme) {
-    candidate = trimmed;
-  } else if (/^(?:localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])(?::\d+)?(?:[/?#]|$)/i.test(trimmed)) {
-    candidate = `http://${trimmed}`;
-  } else {
-    candidate = `https://${trimmed}`;
-  }
-  try {
-    const parsed = new URL(candidate);
-    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return defaultBrowserHomeUrl;
-    return parsed.hostname ? parsed.toString() : defaultBrowserHomeUrl;
-  } catch {
-    return defaultBrowserHomeUrl;
-  }
+  return blankBrowserUrl;
 }

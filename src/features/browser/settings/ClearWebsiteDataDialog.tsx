@@ -1,3 +1,4 @@
+import { CalendarDays, Clock, History } from "lucide-react";
 import { useEffect, useState } from "react";
 import {
   Button,
@@ -7,21 +8,22 @@ import {
   DialogDescription,
   DialogFooter,
   DialogTitle,
-  ErrorNotification,
   Field,
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
+  useNotice,
 } from "@/shared/ui";
 import { browserLibrary, type BrowserWebsiteDataKind } from "../library/native";
 
+// Every menu row starts with an icon: a clock for the recent spans, history for all of it.
 const ranges = [
-  { label: "Last hour", ms: 3_600_000 },
-  { label: "Last 24 hours", ms: 86_400_000 },
-  { label: "Last 7 days", ms: 7 * 86_400_000 },
-  { label: "All time", ms: Number.POSITIVE_INFINITY },
+  { label: "Last hour", ms: 3_600_000, icon: Clock },
+  { label: "Last 24 hours", ms: 86_400_000, icon: Clock },
+  { label: "Last 7 days", ms: 7 * 86_400_000, icon: CalendarDays },
+  { label: "All time", ms: Number.POSITIVE_INFINITY, icon: History },
 ];
 
 const choices: { id: BrowserWebsiteDataKind; label: string; detail: string }[] = [
@@ -43,6 +45,11 @@ export function ClearWebsiteDataDialog(props: {
   const [selected, setSelected] = useState<Set<BrowserWebsiteDataKind>>(new Set(["cache"]));
   const [working, setWorking] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  useNotice(Boolean(error), {
+    message: error ?? "",
+    tone: "error",
+    onDismiss: () => setError(null),
+  });
   useEffect(() => {
     if (props.open) setError(null);
   }, [props.open]);
@@ -75,9 +82,12 @@ export function ClearWebsiteDataDialog(props: {
             </SelectTrigger>
             <SelectContent>
               {ranges.map((item, index) => (
-                <SelectItem key={item.label} value={String(index)}>
-                  {item.label}
-                </SelectItem>
+                <SelectItem
+                  key={item.label}
+                  value={String(index)}
+                  icon={item.icon}
+                  label={item.label}
+                />
               ))}
             </SelectContent>
           </Select>
@@ -110,12 +120,16 @@ export function ClearWebsiteDataDialog(props: {
             next time this computer syncs.
           </p>
         ) : null}
-        <ErrorNotification message={error} onDismiss={() => setError(null)} />
         <DialogFooter>
-          <Button type="button" variant="ghost" onClick={() => props.onOpenChange(false)}>
+          <Button type="button" variant="quiet" size="lg" onClick={() => props.onOpenChange(false)}>
             Cancel
           </Button>
-          <Button type="button" disabled={working || !selected.size} onClick={() => void clear()}>
+          <Button
+            type="button"
+            size="lg"
+            disabled={working || !selected.size}
+            onClick={() => void clear()}
+          >
             {working ? "Clearing…" : "Clear data"}
           </Button>
         </DialogFooter>

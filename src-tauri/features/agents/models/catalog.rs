@@ -45,7 +45,6 @@ pub fn label(provider: &str) -> &'static str {
         "ollama" => "Ollama",
         "ollama-cloud" => "Ollama Cloud",
         "openai-compatible" => "the OpenAI-compatible server",
-        "chatgpt" => "ChatGPT",
         _ => "that provider",
     }
 }
@@ -73,7 +72,7 @@ pub fn listing(provider: &str, base: Option<&str>) -> Option<Listing> {
         verify: None,
     };
     Some(match provider {
-        "openai" | "chatgpt" => simple("https://api.openai.com/v1/models"),
+        "openai" => simple("https://api.openai.com/v1/models"),
         "anthropic" => Listing {
             url: "https://api.anthropic.com/v1/models?limit=100".into(),
             auth: Auth::Header("x-api-key"),
@@ -121,11 +120,6 @@ pub fn parse(provider: &str, body: &Value) -> Vec<ModelInfo> {
     };
     let text = |row: &Value, key: &str| row[key].as_str().unwrap_or_default().to_owned();
     let mut models: Vec<ModelInfo> = match provider {
-        "chatgpt" => rows("models")
-            .iter()
-            .filter(|row| row["visibility"].as_str() == Some("list"))
-            .map(|row| model(&text(row, "slug"), &text(row, "display_name"), false))
-            .collect(),
         "google" => rows("models")
             .iter()
             .filter_map(|row| {

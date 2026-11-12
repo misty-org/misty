@@ -1,5 +1,5 @@
 import type { SpaceMessage } from "../../api/dto/entities";
-import { Button } from "@/shared/ui";
+import { FilterChip } from "@/shared/ui";
 
 /** The reaction pills under a message. Read-only members see counts but cannot toggle. */
 export function MessageReactions({
@@ -17,19 +17,16 @@ export function MessageReactions({
   return (
     <div className="mt-2 flex flex-wrap gap-1.5">
       {reactions.map((reaction) => (
-        <Button
-          variant="chip"
-          size="chip"
-          className="disabled:opacity-80"
+        <FilterChip
+          size="sm"
+          className="tabular-nums disabled:opacity-80"
           key={reaction.emoji}
           disabled={!canWrite}
-          onClick={() => onToggle(message, reaction.emoji, reaction.reacted_by_me === true)}
-          aria-pressed={reaction.reacted_by_me === true}
+          pressed={reaction.reacted_by_me === true}
+          onPressedChange={() => onToggle(message, reaction.emoji, reaction.reacted_by_me === true)}
+          label={`${reaction.emoji} ${reaction.count}`}
           aria-label={`${reaction.reacted_by_me ? "Remove" : "Add"} ${reaction.emoji} reaction`}
-        >
-          <span className="text-sm leading-none">{reaction.emoji}</span>
-          <span className="tabular-nums">{reaction.count}</span>
-        </Button>
+        />
       ))}
     </div>
   );

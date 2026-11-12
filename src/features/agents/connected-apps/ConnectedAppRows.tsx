@@ -84,8 +84,7 @@ export function AppAccountsCard({
         </div>
       ))}
       <Button
-        variant="ghost"
-        size="sm"
+        variant="quiet"
         className="agent-integrations-add"
         disabled={actions.busy}
         onClick={() => {
@@ -126,8 +125,6 @@ function AccountActions({
     <>
       {item.status === "needs_attention" && (
         <Button
-          variant="outline"
-          size="sm"
           disabled={actions.busy}
           onClick={() => {
             onDone();
@@ -138,8 +135,7 @@ function AccountActions({
         </Button>
       )}
       <Button
-        variant="ghost"
-        size="sm"
+        variant="quiet"
         disabled={actions.busy}
         aria-label={`Disconnect ${label}`}
         onClick={() => actions.onDisconnect(item, label)}

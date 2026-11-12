@@ -1,4 +1,4 @@
-import { Plus } from "lucide-react";
+import { List, MessageSquare, Plus } from "lucide-react";
 import { useState } from "react";
 import {
   Command,
@@ -8,11 +8,11 @@ import {
   CommandItem,
   CommandList,
   CommandSeparator,
-  ErrorNotification,
   MenuTrigger,
   Popover,
   PopoverContent,
 } from "@/shared/ui";
+import { ErrorNotice } from "../conversations/ErrorNotice";
 import { useMistyStore } from "../conversations/state/useMistyStore";
 import {
   activityStateLabels,
@@ -92,35 +92,30 @@ export function PanelConversationPicker({
                     <CommandItem
                       key={conversation.id}
                       value={`${conversation.id}:${conversation.title}`}
-                      onSelect={() => choose(() => onSelect(conversation.id))}
-                    >
-                      <span className="min-w-0 flex-1 truncate">
-                        {conversation.title || "Untitled conversation"}
-                      </span>
-                      <span className="shrink-0 text-xs text-cream-muted">
-                        {!run || run.state === "completed"
+                      icon={MessageSquare}
+                      label={conversation.title || "Untitled conversation"}
+                      shortcut={
+                        !run || run.state === "completed"
                           ? time
-                          : `${activityStateLabels[run.state] ?? run.state.replace(/_/g, " ")} · ${time}`}
-                      </span>
-                    </CommandItem>
+                          : `${activityStateLabels[run.state] ?? run.state.replace(/_/g, " ")} · ${time}`
+                      }
+                      onSelect={() => choose(() => onSelect(conversation.id))}
+                    />
                   );
                 })}
               </CommandGroup>
               <CommandGroup>
-                <CommandItem onSelect={() => choose(onViewAll)}>View all</CommandItem>
+                <CommandItem icon={List} label="View all" onSelect={() => choose(onViewAll)} />
               </CommandGroup>
               <CommandSeparator />
               <CommandGroup>
-                <CommandItem onSelect={() => choose(onNew)}>
-                  <Plus aria-hidden="true" />
-                  New conversation
-                </CommandItem>
+                <CommandItem icon={Plus} label="New conversation" onSelect={() => choose(onNew)} />
               </CommandGroup>
             </CommandList>
           </Command>
         </PopoverContent>
       </Popover>
-      <ErrorNotification message={activity.failed ? "Conversations couldn’t load." : ""} />
+      <ErrorNotice message={activity.failed ? "Conversations couldn’t load." : ""} />
     </>
   );
 }

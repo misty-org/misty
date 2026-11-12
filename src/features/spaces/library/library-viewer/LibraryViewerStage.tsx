@@ -41,7 +41,7 @@ export function LibraryViewerStage(props: LibraryViewerStageProps) {
           onVideoTime={props.onVideoTime}
           fallbackAction={
             props.canCopy ? (
-              <Button size="sm" variant="outline" type="button" onClick={props.onCopy}>
+              <Button variant="secondary" type="button" onClick={props.onCopy}>
                 <ClipboardCopy size={14} />
                 Copy
               </Button>
@@ -54,8 +54,6 @@ export function LibraryViewerStage(props: LibraryViewerStageProps) {
         <>
           <IconButton
             variant="overlay"
-            shape="round"
-            size="lg"
             label="Previous item"
             className="absolute inset-y-0 left-4 z-20 my-auto disabled:opacity-20"
             disabled={index <= 0}
@@ -65,8 +63,6 @@ export function LibraryViewerStage(props: LibraryViewerStageProps) {
           </IconButton>
           <IconButton
             variant="overlay"
-            shape="round"
-            size="lg"
             label="Next item"
             className="absolute inset-y-0 right-4 z-20 my-auto disabled:opacity-20"
             disabled={index < 0 || index >= itemCount - 1}

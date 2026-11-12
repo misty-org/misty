@@ -38,7 +38,7 @@ export function SettingsSaveBar() {
       </p>
       <div className="flex shrink-0 items-center gap-2">
         <Button
-          variant="ghost"
+          variant="quiet"
           disabled={saving}
           onClick={() =>
             void useDevicePreferences

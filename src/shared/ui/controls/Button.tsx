@@ -1,147 +1,202 @@
-import { Slot } from "@radix-ui/react-slot";
-import { cva, type VariantProps } from "class-variance-authority";
+import { Slot, Slottable } from "@radix-ui/react-slot";
 import * as React from "react";
 
-export interface ButtonProps
-  extends React.ButtonHTMLAttributes<HTMLButtonElement>, VariantProps<typeof buttonVariants> {
+import { cn } from "../classNames";
+import { Spinner } from "../feedback/Spinner";
+
+/**
+ * The four roles. primary is the one filled call to action on a surface (at most one);
+ * secondary is the bordered everyday button; quiet is a wash on hover and nothing else, for
+ * toolbars and inline actions; danger is only for what deletes.
+ */
+export type ButtonVariant = "primary" | "secondary" | "quiet" | "danger";
+
+/** The three heights: sm 24, md 32 (the default), lg 36, which belongs to dialogs and empty states. */
+export type ButtonSize = "sm" | "md" | "lg";
+
+/**
+ * `overlay` is the one sanctioned look outside the four roles: a dark translucent disc for
+ * controls drawn over images, video and the Studio, where a role would vanish into the picture.
+ * Only media viewers and the Studio use it, usually through IconButton.
+ */
+export type ButtonLook = ButtonVariant | "overlay";
+
+export type ButtonJustify = "center" | "start" | "end" | "between" | "none";
+
+type IconComponent = React.ComponentType<{
+  className?: string;
+  "aria-hidden"?: boolean | "true" | "false";
+}>;
+
+/** A glyph for `icon` and `iconEnd`: a Lucide icon (or any icon component), or an element. */
+export type ButtonIcon = IconComponent | React.ReactNode;
+
+export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  /** Defaults to secondary. */
+  variant?: ButtonLook | null;
+  /** Defaults to md (32). */
+  size?: ButtonSize | null;
+  justify?: ButtonJustify | null;
+  /** The 16px glyph before the label. A spinner takes its place while `loading`. */
+  icon?: ButtonIcon;
+  /** The 16px glyph after the label, such as a chevron or an arrow. */
+  iconEnd?: ButtonIcon;
+  /** Working on the click: a spinner replaces the icon, the label stays, and clicks wait. */
+  loading?: boolean;
+  /** Styles its one child instead, such as a router Link. */
   asChild?: boolean;
+  /** Defaults to "button": a form's submit button says `type="submit"`. */
+  type?: "button" | "submit" | "reset";
 }
 
-import { cn } from "../classNames";
-
-const buttonVariants = cva(
-  [
-    "group/button inline-flex shrink-0 items-center rounded-md border",
-    "border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap",
-    "transition-none outline-none select-none",
-    "focus-visible:ring-3",
-    "focus-visible:ring-charcoal-active/50 disabled:pointer-events-none",
-    "disabled:opacity-50 aria-invalid:border-charcoal-active",
-    "aria-invalid:ring-3 aria-invalid:ring-charcoal-active/20",
-    "aria-invalid:border-charcoal-active/50",
-    "aria-invalid:ring-charcoal-active/40 [&_svg]:pointer-events-none",
-    "[&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
-  ],
-  {
-    variants: {
-      variant: {
-        default: "bg-charcoal-active text-cream-bright hover:bg-[#494949]",
-        destructive:
-          "border-charcoal-active bg-charcoal-card text-cream-bright hover:bg-charcoal-active focus-visible:ring-charcoal-active/40",
-        // Every variant fills on hover and while open/pressed, so interactive
-        // controls read the same across the app.
-        outline: [
-          "border-charcoal-border-strong bg-transparent shadow-none",
-          "hover:border-charcoal-active hover:bg-charcoal-hover",
-          "hover:text-cream-bright aria-expanded:bg-charcoal-hover",
-          "aria-expanded:text-cream-bright aria-pressed:bg-charcoal-hover",
-        ],
-        secondary: [
-          "bg-charcoal-card text-cream hover:bg-charcoal-hover",
-          "hover:text-cream-bright aria-expanded:bg-charcoal-hover",
-          "aria-expanded:text-cream-bright aria-pressed:bg-charcoal-hover",
-        ],
-        // Same wash as the toolbar look, for ghost buttons that keep their own text color.
-        ghost: [
-          "hover:bg-control-hover hover:text-cream",
-          "aria-pressed:bg-control-active aria-expanded:bg-control-active aria-expanded:text-cream",
-          "data-[state=open]:bg-control-active data-[state=open]:text-cream",
-        ],
-        // The browser chrome's look: muted glyph, a soft wash of the text color on hover.
-        // Washing with cream keeps it right on light surfaces too.
-        toolbar: [
-          "border-0 text-cream-muted hover:bg-control-hover hover:text-cream",
-          "aria-pressed:bg-control-active aria-pressed:text-cream",
-          "aria-expanded:bg-control-active aria-expanded:text-cream",
-          "data-[state=open]:bg-control-active data-[state=open]:text-cream",
-          // A menu trigger whose setting is on, e.g. agent access or a narrowed viewport.
-          "data-[active=true]:bg-control-active data-[active=true]:text-cream",
-          "focus-visible:ring-2 focus-visible:ring-cream/15 disabled:opacity-40",
-        ],
-        link: "text-cream-bright underline-offset-4 hover:underline",
-        // The one filled call to action on a surface: sign in, confirm, mark all read.
-        // Its fill reaches under the border, so it is as big as an outlined button beside it.
-        primary: "bg-cream-bright bg-clip-border text-charcoal-bg hover:bg-cream-action-hover",
-        // Controls drawn over images and video: a dark translucent disc that reads on any media.
-        overlay: [
-          "border-cream/10 bg-charcoal-bg/75 text-cream backdrop-blur-sm",
-          "hover:bg-charcoal-bg/90 hover:text-cream-bright",
-        ],
-        // Filters, tags, reactions, and presence: outlined until pressed, then filled.
-        chip: [
-          "border-charcoal-border/70 text-cream-muted hover:bg-control-hover hover:text-cream",
-          "aria-pressed:border-transparent aria-pressed:bg-charcoal-active aria-pressed:text-cream-bright",
-          "data-[state=open]:bg-control-active data-[state=open]:text-cream",
-        ],
-      },
-      /*
-       * The control scale. Each height carries its own text size, so controls that share
-       * a row also share a type size:
-       *   xs   24px / 12px  inline closers inside rows and tabs
-       *   chip 28px / 12px  inline chips: reactions, tags, presence, citations, context
-       *   sm   32px / 13px  toolbar rows: section and filter chips (with variant="chip"),
-       *                     toolbar actions, row actions; matches 32px icon buttons
-       *   default 36px / 14px  page headings (beside the 36px search), forms, dialogs
-       *   lg   40px / 14px  large calls to action
-       * Sizes leave the corner radius to the variant, so a chip stays a pill at any size.
-       */
-      size: {
-        default:
-          "h-9 gap-1.5 px-2.5 in-data-[slot=button-group]:rounded-md has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2",
-        xs: [
-          "h-6 gap-1 px-2 text-xs in-data-[slot=button-group]:rounded-md",
-          "has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5",
-          "[&_svg:not([class*='size-'])]:size-3",
-        ],
-        sm: [
-          "h-8 gap-1 px-2.5 text-ui in-data-[slot=button-group]:rounded-md",
-          "has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5",
-        ],
-        lg: "h-10 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2",
-        icon: "size-9",
-        "icon-xs":
-          "size-6 in-data-[slot=button-group]:rounded-md [&_svg:not([class*='size-'])]:size-3",
-        chip: "h-7 gap-1.5 px-2.5 text-xs [&_svg:not([class*='size-'])]:size-3.5",
-        none: "",
-      },
-      justify: {
-        center: "justify-center",
-        start: "justify-start",
-        end: "justify-end",
-        between: "justify-between",
-        none: "",
-      },
-    },
-    // Chips keep a minimum width (about 1.75x their height) so a short label like "All"
-    // reads as a pill, not a bubble. The label stays centered within it.
-    compoundVariants: [
-      { variant: "chip", size: "chip", class: "min-w-12" },
-      { variant: "chip", size: "sm", class: "min-w-14" },
-    ],
-    defaultVariants: {
-      variant: "default",
-      size: "default",
-      justify: "center",
-    },
-  },
+const baseClass = cn(
+  "group/button inline-flex shrink-0 items-center rounded-md border border-transparent",
+  "bg-clip-padding text-control font-medium whitespace-nowrap",
+  "transition-none outline-none select-none",
+  "disabled:pointer-events-none disabled:opacity-50",
+  "[&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
 );
 
+// Focus rings are off app-wide (base.css), so keyboard focus shows as the hover fill.
+const variantClass: Record<ButtonLook, string> = {
+  // Its fill reaches under the border, so it is as big as a bordered button beside it.
+  primary: cn(
+    "bg-cream-bright bg-clip-border text-charcoal-bg",
+    "hover:bg-cream-action-hover focus-visible:bg-cream-action-hover",
+    "aria-expanded:bg-cream-action-hover data-[state=open]:bg-cream-action-hover",
+  ),
+  secondary: cn(
+    "border-charcoal-border-strong bg-transparent text-cream",
+    "hover:border-charcoal-active hover:bg-charcoal-hover hover:text-cream-bright",
+    "focus-visible:bg-charcoal-hover focus-visible:text-cream-bright",
+    "aria-expanded:bg-charcoal-hover aria-expanded:text-cream-bright",
+    "aria-pressed:bg-charcoal-hover aria-pressed:text-cream-bright",
+    "data-[state=open]:bg-charcoal-hover data-[state=open]:text-cream-bright",
+  ),
+  // Washing with the text color keeps it right on light themes too.
+  quiet: cn(
+    "text-cream-muted hover:bg-control-hover hover:text-cream",
+    "focus-visible:bg-control-hover focus-visible:text-cream",
+    "aria-pressed:bg-control-active aria-pressed:text-cream",
+    "aria-expanded:bg-control-active aria-expanded:text-cream",
+    "data-[state=open]:bg-control-active data-[state=open]:text-cream",
+    // A menu trigger whose setting is on, such as agent access.
+    "data-[active=true]:bg-control-active data-[active=true]:text-cream",
+  ),
+  danger: cn(
+    "border-charcoal-border-strong bg-transparent text-danger",
+    "hover:bg-danger-wash focus-visible:bg-danger-wash",
+    "aria-expanded:bg-danger-wash data-[state=open]:bg-danger-wash",
+  ),
+  // Controls drawn over images and video: a dark translucent disc that reads on any media.
+  overlay: cn(
+    "border-cream/10 bg-charcoal-bg/75 text-cream backdrop-blur-sm",
+    "hover:bg-charcoal-bg/90 hover:text-cream-bright",
+    "focus-visible:bg-charcoal-bg/90 focus-visible:text-cream-bright",
+  ),
+};
+
+// A side with a glyph sits a little tighter, so the glyph and the label look centered.
+const sizeClass: Record<ButtonSize, string> = {
+  sm: cn("h-6 gap-1 px-2", "has-data-[icon=inline-start]:pl-1.5 has-data-[icon=inline-end]:pr-1.5"),
+  md: cn(
+    "h-8 gap-1.5 px-3",
+    "has-data-[icon=inline-start]:pl-2.5 has-data-[icon=inline-end]:pr-2.5",
+  ),
+  lg: cn("h-9 gap-1.5 px-4", "has-data-[icon=inline-start]:pl-3 has-data-[icon=inline-end]:pr-3"),
+};
+
+const justifyClass: Record<ButtonJustify, string> = {
+  center: "justify-center",
+  start: "justify-start",
+  end: "justify-end",
+  between: "justify-between",
+  none: "",
+};
+
+function buttonClassName(
+  variant: ButtonLook,
+  size: ButtonSize,
+  justify: ButtonJustify,
+  className?: string,
+) {
+  return cn(baseClass, variantClass[variant], sizeClass[size], justifyClass[justify], className);
+}
+
+// forwardRef and memo components (every Lucide icon) are objects, not functions.
+function isIconComponent(icon: ButtonIcon): icon is IconComponent {
+  if (typeof icon === "function") return true;
+  return (
+    typeof icon === "object" && icon !== null && !React.isValidElement(icon) && "$$typeof" in icon
+  );
+}
+
+function renderIcon(icon: ButtonIcon, side: "inline-start" | "inline-end") {
+  if (icon === null || icon === undefined || typeof icon === "boolean") return null;
+  if (isIconComponent(icon)) {
+    const Icon = icon;
+    return <Icon data-icon={side} aria-hidden="true" />;
+  }
+  if (React.isValidElement(icon))
+    return React.cloneElement(icon as React.ReactElement<Record<string, unknown>>, {
+      "data-icon": side,
+    });
+  return icon;
+}
+
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, justify, asChild = false, ...props }, ref) => {
+  (
+    {
+      className,
+      variant,
+      size,
+      justify,
+      icon,
+      iconEnd,
+      loading = false,
+      asChild = false,
+      children,
+      onClick,
+      type,
+      ...props
+    },
+    ref,
+  ) => {
     const Comp = asChild ? Slot : "button";
+    const resolvedVariant = variant ?? "secondary";
+    const resolvedSize = size ?? "md";
+    const resolvedJustify = justify ?? "center";
+    const start = loading ? (
+      <Spinner label={false} data-icon="inline-start" />
+    ) : (
+      renderIcon(icon, "inline-start")
+    );
     return (
       <Comp
         data-slot="button"
-        data-variant={variant ?? "default"}
-        data-size={size ?? "default"}
-        data-justify={justify ?? "center"}
-        className={cn(buttonVariants({ variant, size, justify, className }))}
+        data-variant={resolvedVariant}
+        data-size={resolvedSize}
+        data-justify={resolvedJustify}
+        data-loading={loading ? "true" : undefined}
+        aria-busy={loading || undefined}
+        className={buttonClassName(resolvedVariant, resolvedSize, resolvedJustify, className)}
         ref={ref}
+        // A plain button unless it says otherwise, so one inside a form never submits it by
+        // accident. With `asChild` the child (a link) keeps its own semantics.
+        type={type ?? (asChild ? undefined : "button")}
+        // A click while it works would start the same thing twice; a link or submit waits too.
+        onClick={
+          loading ? (event: React.MouseEvent<HTMLButtonElement>) => event.preventDefault() : onClick
+        }
         {...props}
-      />
+      >
+        {start}
+        <Slottable>{children}</Slottable>
+        {renderIcon(iconEnd, "inline-end")}
+      </Comp>
     );
   },
 );
 Button.displayName = "Button";
 
-export { Button, buttonVariants };
+export { Button };

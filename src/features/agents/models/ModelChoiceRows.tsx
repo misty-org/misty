@@ -28,10 +28,14 @@ export function ModelDropdownRow(props: {
   options: { value: string; label: string }[];
 }) {
   const setting = useModelSetting(props.id);
+  // A value no longer offered (a provider since removed) shows as the first choice, not blank.
+  const value = props.options.some((option) => option.value === setting.value)
+    ? setting.value
+    : (props.options[0]?.value ?? "");
   return (
     <Row label={props.label} description={props.description}>
       <DropdownControl
-        value={setting.value}
+        value={value}
         options={props.options}
         disabled={setting.disabled}
         className="w-[240px]"

@@ -93,18 +93,12 @@ export function MultirunLaneCard({
       </div>
       <MultirunChanges files={files} error={error} />
       <footer className="multirun-lane-foot">
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          disabled={status === "missing"}
-          onClick={onOpenChat}
-        >
+        <Button type="button" disabled={status === "missing"} onClick={onOpenChat}>
           <MessageSquare size={14} />
           Open chat
         </Button>
         {settled ? null : (
-          <Button type="button" size="sm" variant="ghost" onClick={onStop}>
+          <Button type="button" variant="quiet" onClick={onStop}>
             Stop
           </Button>
         )}
@@ -116,7 +110,6 @@ export function MultirunLaneCard({
         ) : (
           <Button
             type="button"
-            size="sm"
             className="ml-auto"
             disabled={busy || !settled || !files?.length}
             onClick={onKeep}

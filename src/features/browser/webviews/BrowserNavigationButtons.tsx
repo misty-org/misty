@@ -1,4 +1,4 @@
-import { IconButton, toolbarIconProps } from "@/shared/ui";
+import { IconButton } from "@/shared/ui";
 import { ArrowLeft, ArrowRight, RotateCw, X } from "lucide-react";
 import { browserToolbarStyles } from "./browserToolbarStyles";
 
@@ -15,33 +15,18 @@ export function BrowserNavigationButtons(props: {
 }) {
   return (
     <div className={browserToolbarStyles.group}>
-      <IconButton
-        label="Back"
-        tooltip={false}
-        disabled={!props.canGoBack}
-        onClick={() => props.onTravel(-1)}
-      >
-        <ArrowLeft {...toolbarIconProps} />
+      <IconButton label="Back" disabled={!props.canGoBack} onClick={() => props.onTravel(-1)}>
+        <ArrowLeft />
       </IconButton>
-      <IconButton
-        label="Forward"
-        tooltip={false}
-        disabled={!props.canGoForward}
-        onClick={() => props.onTravel(1)}
-      >
-        <ArrowRight {...toolbarIconProps} />
+      <IconButton label="Forward" disabled={!props.canGoForward} onClick={() => props.onTravel(1)}>
+        <ArrowRight />
       </IconButton>
       <IconButton
         label={props.showStop ? "Stop loading" : "Reload"}
-        tooltip={false}
         disabled={!props.showStop && props.reloadDisabled}
         onClick={props.showStop ? props.onStop : props.onReload}
       >
-        {props.showStop ? (
-          <X {...toolbarIconProps} />
-        ) : (
-          <RotateCw {...browserToolbarStyles.roundIcon} />
-        )}
+        {props.showStop ? <X /> : <RotateCw {...browserToolbarStyles.roundIcon} />}
       </IconButton>
     </div>
   );

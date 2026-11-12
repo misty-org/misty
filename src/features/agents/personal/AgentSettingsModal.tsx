@@ -45,7 +45,6 @@ export function AgentSettingsModal(props: {
           <IconButton
             ref={closeRef}
             label="Close settings"
-            tooltip={false}
             className="ml-auto"
             onClick={() => props.onOpenChange(false)}
           >

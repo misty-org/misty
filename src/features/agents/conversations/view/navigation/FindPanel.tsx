@@ -92,7 +92,7 @@ export function FindPanel(props: {
         {status}
       </span>
       <IconButton
-        size="xs"
+        size="sm"
         label="Previous match"
         disabled={!props.total}
         onMouseDown={keepFocus}
@@ -101,7 +101,7 @@ export function FindPanel(props: {
         <ChevronUp />
       </IconButton>
       <IconButton
-        size="xs"
+        size="sm"
         label="Next match"
         disabled={!props.total}
         onMouseDown={keepFocus}
@@ -109,7 +109,7 @@ export function FindPanel(props: {
       >
         <ChevronDown />
       </IconButton>
-      <IconButton size="xs" label="Close search" onMouseDown={keepFocus} onClick={props.onClose}>
+      <IconButton size="sm" label="Close search" onMouseDown={keepFocus} onClick={props.onClose}>
         <X />
       </IconButton>
     </div>

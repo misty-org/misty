@@ -1,4 +1,4 @@
-import { Button } from "@/shared/ui";
+import { Button, cn } from "@/shared/ui";
 import { Component, type ErrorInfo, type ReactNode } from "react";
 
 export class RenderErrorBoundary extends Component<
@@ -21,7 +21,12 @@ export class RenderErrorBoundary extends Component<
   render() {
     if (!this.state.error) return this.props.children;
     return (
-      <section className="grid h-full min-h-0 min-w-0 content-center justify-items-center gap-3 bg-charcoal-bg p-8 text-center text-cream">
+      <section
+        className={cn(
+          "grid h-full min-h-0 min-w-0 content-center justify-items-center gap-3 bg-charcoal-bg p-8",
+          "text-center text-cream",
+        )}
+      >
         <h1 className="m-0 text-xl font-semibold">
           {this.props.scope === "tab" ? "This tab could not be loaded" : "Workspace render failed"}
         </h1>
@@ -29,7 +34,8 @@ export class RenderErrorBoundary extends Component<
           {this.state.error.message}
         </p>
         <Button
-          variant="outline"
+          variant="secondary"
+          size="lg"
           onClick={() => {
             // A failed module request does not imply damaged workspace data.
             if (this.state.error && isHookOrderMismatch(this.state.error)) {

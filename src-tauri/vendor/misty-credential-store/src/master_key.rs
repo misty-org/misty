@@ -70,13 +70,7 @@ fn load_or_create() -> io::Result<Key> {
 
 #[cfg(not(debug_assertions))]
 fn load_or_create() -> io::Result<Key> {
-    let profile = super::profile();
-    let account = if profile == "default" {
-        "master-key".to_owned()
-    } else {
-        format!("master-key:{profile}")
-    };
-    let entry = keyring::Entry::new(SERVICE, &account).map_err(keychain_error)?;
+    let entry = keyring::Entry::new(SERVICE, "master-key").map_err(keychain_error)?;
     match entry.get_secret() {
         Ok(bytes) => return decode(&bytes),
         Err(keyring::Error::NoEntry) => (),

@@ -129,9 +129,9 @@ pub(super) enum WebsiteCommand {
 
 #[derive(Debug, Subcommand)]
 pub(super) enum DesktopCommand {
+    /// Start the app in development, always as com.misty.desktop.
     Dev {
-        #[arg(long)]
-        profile: Option<String>,
+        /// The in-app path the first window opens, e.g. /spaces/demo.
         #[arg(long)]
         route: Option<String>,
     },

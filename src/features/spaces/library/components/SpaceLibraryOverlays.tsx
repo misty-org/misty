@@ -3,10 +3,8 @@ import { MistyFilePicker } from "@/features/files";
 import { useSpaceLibraryContext } from "../SpaceLibraryContext";
 import { SpaceLibraryDialogs } from "../SpaceLibraryDialogs";
 import { SpaceLibraryViewer } from "../SpaceLibraryViewer";
-import { transcribeLibraryFile } from "@/features/voice";
-import { libraryMediaKind } from "../library-viewer/libraryMediaKind";
-import { libraryItemMIME } from "../SpaceLibraryPrimitives";
 import { LibraryItemContextMenu } from "./LibraryItemContextMenu";
+import { useLibraryItemMenuActions } from "./useLibraryItemMenuActions";
 
 export function SpaceLibraryOverlays() {
   const { data, itemActions, collectionActions } = useSpaceLibraryContext();
@@ -17,7 +15,6 @@ export function SpaceLibraryOverlays() {
     items,
     visibleItems,
     displayItems,
-    collection,
     itemMenu,
     setItemMenu,
     filePickerOpen,
@@ -45,19 +42,10 @@ export function SpaceLibraryOverlays() {
     textDialogError,
     setCopiedEditDefinition,
     setReloadKey,
-    showTextDialog,
   } = data;
-  const {
-    uploadFiles,
-    duplicateItems,
-    copyItemsToClipboard,
-    updateItem,
-    replaceItem,
-    trashItem,
-    restoreItem,
-    saveBulkMetadata,
-  } = itemActions;
+  const { uploadFiles, updateItem, replaceItem, trashItem, saveBulkMetadata } = itemActions;
   const { submitTextDialog } = collectionActions;
+  const menuActions = useLibraryItemMenuActions();
   const menuItem = itemMenu
     ? (items.find((item) => item.id === itemMenu.itemId) ??
       visibleItems.find((item) => item.id === itemMenu.itemId) ??
@@ -68,39 +56,9 @@ export function SpaceLibraryOverlays() {
     <>
       {itemMenu && menuItem ? (
         <LibraryItemContextMenu
+          {...menuActions(menuItem)}
           state={itemMenu}
-          item={menuItem}
-          canCopy
-          canEdit={canEditLibrary}
-          deleted={collection === "deleted"}
           onClose={() => setItemMenu(null)}
-          onTranscribe={
-            transcribable(menuItem)
-              ? () => void transcribeLibraryFile(spaceId, menuItem.id, menuItem.display_name)
-              : undefined
-          }
-          onCopy={() => void copyItemsToClipboard([menuItem])}
-          onDuplicate={() => void duplicateItems([menuItem.id])}
-          onRename={() =>
-            showTextDialog({
-              kind: "rename-item",
-              title: "Rename Library item",
-              primaryLabel: "Name",
-              primaryValue: menuItem.display_name,
-              itemId: menuItem.id,
-            })
-          }
-          onEditTags={() =>
-            showTextDialog({
-              kind: "edit-tags",
-              title: "Edit tags",
-              primaryLabel: "Tags, separated by commas",
-              primaryValue: menuItem.tags.join(", "),
-              itemId: menuItem.id,
-            })
-          }
-          onTrash={() => void trashItem(menuItem)}
-          onRestore={() => void restoreItem(menuItem)}
         />
       ) : null}
       {filePickerOpen && canUploadLibrary ? (
@@ -169,10 +127,4 @@ export function SpaceLibraryOverlays() {
       />
     </>
   );
-}
-
-/** Audio and video files can be transcribed. */
-function transcribable(item: Parameters<typeof libraryItemMIME>[0]) {
-  const kind = libraryMediaKind(libraryItemMIME(item), item.file.intrinsic_metadata);
-  return kind.isAudio || kind.isVideo;
 }

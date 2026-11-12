@@ -88,12 +88,7 @@ export function LibraryMetadataForm({
           onChange={(event) => setTags(event.target.value)}
         />
       </label>
-      <Button
-        className="mt-4 w-full"
-        size="sm"
-        type="submit"
-        disabled={saving || !displayName.trim()}
-      >
+      <Button className="mt-4 w-full" type="submit" disabled={saving || !displayName.trim()}>
         {saving ? "Saving…" : "Save metadata"}
       </Button>
     </form>

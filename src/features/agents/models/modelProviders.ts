@@ -6,8 +6,6 @@ interface ModelProvider {
   baseUrlSetting?: string;
   /** Works without a key, e.g. a local Ollama. */
   keyOptional?: boolean;
-  /** Takes a sign-in rather than a key (Sign in with ChatGPT). */
-  signIn?: boolean;
   /** Where to get a key, when the provider has a page for it. */
   keyPage?: string;
   /** Model IDs offered as suggestions for each role, without the provider prefix. */
@@ -15,13 +13,6 @@ interface ModelProvider {
 }
 
 export const modelProviders: ModelProvider[] = [
-  {
-    id: "chatgpt",
-    label: "ChatGPT",
-    signIn: true,
-    // ChatGPT names its models per account; the signed-in list replaces these.
-    suggestions: { agent: [], fast: [], embedding: [] },
-  },
   {
     id: "anthropic",
     label: "Anthropic",

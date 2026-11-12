@@ -46,7 +46,8 @@ export function LoadingScreen({
       className={cn(
         "h-full min-h-0 w-full flex-1 overflow-hidden bg-charcoal-bg",
         className,
-        fullScreen && "fixed inset-0 z-50 grid place-items-center",
+        // The lowest named layer: over the app's content, still under its floating chrome.
+        fullScreen && "fixed inset-0 layer-agent-surface grid place-items-center",
         fading && "misty-loading-screen-leaving",
       )}
       role={fullScreen && !leaving ? "status" : undefined}

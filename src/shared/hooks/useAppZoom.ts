@@ -3,9 +3,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 const APP_ZOOM_STORAGE_KEY = "misty.app.zoom";
 export const appZoomDefault = 1;
-/** 100% maps one CSS pixel to whole device pixels (2 on Retina). Fractional
- * baselines such as 1.1 put lines and icon edges between device pixels. */
-export const appZoomBaseline = 1;
+/** 100% renders at 1.1: the person found the type, controls and rows read best a step up from
+ * the raw CSS sizes, so that step is the default and every percentage is relative to it. */
+export const appZoomBaseline = 1.1;
 /** UI percentages are relative to the product baseline. */
 export function appZoomRenderScale(zoom: number): number {
   return Math.round(zoom * appZoomBaseline * 1000) / 1000;

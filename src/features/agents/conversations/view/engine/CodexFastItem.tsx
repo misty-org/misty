@@ -1,6 +1,7 @@
+import { Zap } from "lucide-react";
 import { useEffect, useState } from "react";
 import { invoke } from "@/native/invoke";
-import { DropdownMenuCheckboxItem, DropdownMenuSeparator } from "@/shared/ui";
+import { MenuCheckItem, MenuSeparator } from "@/shared/ui";
 
 /** This device's engine settings, as native code keeps them in misty.db. */
 interface EngineSettings {
@@ -26,10 +27,8 @@ export function CodexFastItem({ engine }: { engine?: string }) {
   };
   return (
     <>
-      <DropdownMenuSeparator />
-      <DropdownMenuCheckboxItem checked={fast} onCheckedChange={(on) => toggle(on === true)}>
-        Fast
-      </DropdownMenuCheckboxItem>
+      <MenuSeparator />
+      <MenuCheckItem icon={Zap} label="Fast" checked={fast} onCheckedChange={toggle} />
     </>
   );
 }

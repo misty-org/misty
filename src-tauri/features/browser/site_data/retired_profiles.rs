@@ -5,12 +5,7 @@ use file_access::fs;
 
 /// Present once the retired profiles were erased on this device.
 fn marker() -> Option<std::path::PathBuf> {
-    let home = file_access::paths::misty_home_dir()?;
-    let name = match std::env::var("MISTY_PROFILE") {
-        Ok(dev) if !dev.is_empty() => format!("retired-device-profiles-{dev}"),
-        _ => "retired-device-profiles".into(),
-    };
-    Some(home.join(name))
+    Some(file_access::paths::misty_home_dir()?.join("retired-device-profiles"))
 }
 
 fn retired(id: &str) -> bool {

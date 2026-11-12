@@ -43,7 +43,6 @@ export function WelcomeNav() {
         {socialAccounts.map(({ label, icon: Icon, href }) => (
           <IconButton
             key={label}
-            size="sm"
             label={`Misty on ${label}`}
             disabled={!href}
             onClick={href ? () => void openUrl(href) : undefined}

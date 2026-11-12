@@ -45,9 +45,9 @@ export function PersonaMakeAgent({ id }: { id: string }) {
   };
   return (
     <Button
-      variant="ghost"
-      size="xs"
-      className="shrink-0 text-2xs text-cream-muted"
+      variant="quiet"
+      size="sm"
+      className="shrink-0 text-micro text-cream-muted"
       onPointerDown={make}
       disabled={state === "working"}
     >

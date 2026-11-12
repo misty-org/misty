@@ -1,13 +1,11 @@
 import {
+  ChoiceGroup,
   cn,
-  SegmentedControl,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  OptionSelect,
   Slider,
   Switch,
+  type MenuIcon,
+  type SelectOption,
 } from "@/shared/ui";
 import { useContext } from "react";
 
@@ -33,39 +31,52 @@ export function SelectControl(props: {
   );
 }
 
-/** Shared checkmarked dropdown for longer lists of choices. */
+/** One option of a settings dropdown or segmented choice. */
+export interface DropdownOption {
+  value: string;
+  label: string;
+  /** The row's icon in a dropdown; settings rows without one draw their label alone. */
+  icon?: MenuIcon;
+  disabled?: boolean;
+  /** Why a disabled option can't be picked, shown in a tooltip. */
+  title?: string;
+}
+
+/** Shared checkmarked dropdown for longer lists of choices. An empty value is a real choice. */
 export function DropdownControl(props: {
   value: string;
   label?: string;
-  options: { value: string; label: string; disabled?: boolean }[];
+  options: DropdownOption[];
   disabled?: boolean;
   className?: string;
   onValueChange(value: string): void;
 }) {
   const label = useSettingsControlLabel("Setting");
   return (
-    <Select value={props.value} disabled={props.disabled} onValueChange={props.onValueChange}>
-      <SelectTrigger
-        aria-label={props.label ?? label}
-        className={cn("w-[200px] max-w-full", props.className)}
-      >
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent>
-        {props.options.map((option) => (
-          <SelectItem key={option.value} value={option.value} disabled={option.disabled}>
-            {option.label}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+    <OptionSelect
+      aria-label={props.label ?? label}
+      className={cn("w-[200px] max-w-full", props.className)}
+      value={props.value}
+      // Main's settings dropdowns list words alone; an option may still bring its icon.
+      options={props.options.map((option): SelectOption => ({
+        value: option.value,
+        label: option.label,
+        icon: option.icon as MenuIcon,
+        disabled: option.disabled,
+        reason: option.title,
+      }))}
+      disabled={props.disabled}
+      onValueChange={props.onValueChange}
+    />
   );
 }
+
+const emptyChoice = "__settings_empty_choice__";
 
 /** Up to four short options render as a segmented control; anything longer is a dropdown. */
 export function ChoiceControl(props: {
   value: string;
-  options: { value: string; label: string; disabled?: boolean; title?: string }[];
+  options: DropdownOption[];
   disabled: boolean;
   onValueChange(value: string): void;
 }) {
@@ -73,12 +84,18 @@ export function ChoiceControl(props: {
   const labelLength = props.options.reduce((total, option) => total + option.label.length, 0);
   if (props.options.length <= 4 && labelLength <= 24) {
     return (
-      <SegmentedControl
+      <ChoiceGroup
         label={ariaLabel}
-        value={props.value}
-        options={props.options}
+        // Radix keeps "" for "nothing chosen", so an empty option stands in under another value.
+        value={props.value || emptyChoice}
+        options={props.options.map((option) => ({
+          value: option.value || emptyChoice,
+          label: option.label,
+          disabled: option.disabled,
+          reason: option.title,
+        }))}
         disabled={props.disabled}
-        onChange={props.onValueChange}
+        onChange={(value) => props.onValueChange(value === emptyChoice ? "" : value)}
       />
     );
   }

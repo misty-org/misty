@@ -1,6 +1,13 @@
 import type { LibraryItemViewerProps } from "./library-viewer/libraryViewerTypes";
 import type { SpaceLibraryItem } from "../api/dto/entities";
-import { cn, Dialog, DialogContent, DialogDescription, DialogTitle } from "@/shared/ui";
+import {
+  cn,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+  OverflowFadeText,
+} from "@/shared/ui";
 import { useState } from "react";
 import { copyLibraryItemsToClipboard } from "./libraryClipboard";
 import { libraryMediaKind } from "./library-viewer/libraryMediaKind";
@@ -15,8 +22,11 @@ import { useLibraryViewerKeyboard } from "./library-viewer/useLibraryViewerKeybo
 import { useLibraryViewerPlayback } from "./library-viewer/useLibraryViewerPlayback";
 import { libraryItemMIME } from "./SpaceLibraryPrimitives";
 import { libraryEditStyle, normalizeLibraryEdit } from "./SpaceLibraryViewerUtils";
-const dialogClass =
-  "grid h-[min(860px,calc(100dvh-32px))] min-h-0 w-[min(1320px,calc(100vw-32px))] max-w-none grid-cols-[minmax(0,1fr)_minmax(300px,340px)] grid-rows-[56px_minmax(0,1fr)] gap-0 overflow-hidden rounded-xl border-charcoal-border/80 bg-charcoal-bg p-0 shadow-lg sm:max-w-none [&>button]:hidden";
+const dialogClass = [
+  "grid h-[min(860px,calc(100dvh-32px))] min-h-0 w-[min(1320px,calc(100vw-32px))] max-w-none",
+  "grid-cols-[minmax(0,1fr)_minmax(300px,340px)] grid-rows-[56px_minmax(0,1fr)] gap-0 overflow-hidden",
+  "rounded-xl border-charcoal-border/80 bg-charcoal-bg p-0 shadow-lg sm:max-w-none [&>button]:hidden",
+].join(" ");
 export function SpaceLibraryViewer(props: LibraryItemViewerProps) {
   if (!props.item) return null;
   return <LibraryItemViewerContent {...props} item={props.item} />;
@@ -128,7 +138,9 @@ function LibraryItemViewerContent(
           )}
         >
           <div className="min-w-0">
-            <DialogTitle className="truncate text-sm font-medium">{item.display_name}</DialogTitle>
+            <DialogTitle className="text-sm font-medium">
+              <OverflowFadeText full>{item.display_name}</OverflowFadeText>
+            </DialogTitle>
             <DialogDescription className="sr-only">
               Preview and edit {item.display_name}.
             </DialogDescription>

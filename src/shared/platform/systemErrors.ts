@@ -1,6 +1,6 @@
-import { ErrorNotification } from "@/shared/ui";
+import { notify } from "@/shared/ui";
 import { redactText } from "./redaction";
-import { createElement, useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 interface SystemErrorInput {
   /** Background refresh and app diagnostics render nothing. */
@@ -47,7 +47,7 @@ export function clearSystemErrors(): void {
   diagnostics = [];
 }
 
-/** Foreground failures show as a notification; background reports stay renderless. */
+/** Foreground failures show as an error notice; background reports stay renderless. */
 export function SystemErrorNotice({
   intent,
   body,
@@ -57,17 +57,22 @@ export function SystemErrorNotice({
   onRetry,
 }: SystemErrorInput) {
   const message = body?.trim() || systemErrorMessage(error);
+  const retry = useRef(onRetry);
+  retry.current = onRetry;
+  const canRetry = Boolean(onRetry);
 
   useEffect(() => {
-    reportSystemError({ intent, body: message, scope, title });
-  }, [intent, message, scope, title]);
+    const id = reportSystemError({ intent, body: message, scope, title });
+    if (intent === "background") return;
+    notify({
+      id,
+      message: `${title}. ${systemErrorMessage(message)}`,
+      tone: "error",
+      action: canRetry ? { label: "Retry", onSelect: () => retry.current?.() } : undefined,
+    });
+  }, [intent, message, scope, title, canRetry]);
 
-  if (intent === "background") return null;
-  return createElement(
-    ErrorNotification,
-    { message: `${title}. ${systemErrorMessage(message)}` },
-    onRetry ? createElement("button", { type: "button", onClick: onRetry }, "Retry") : null,
-  );
+  return null;
 }
 
 export function systemErrorMessage(error: unknown): string {

@@ -34,7 +34,7 @@ export function SpaceSetupCards({
         ) : null}
       </div>
       <div className="flex flex-wrap gap-2">
-        <Button asChild size="sm" variant="outline">
+        <Button asChild variant="secondary">
           <Link to={`/spaces/${encodeURIComponent(spaceId)}/settings/members?invite=1`}>
             <UserPlus size={14} /> Invite people
           </Link>

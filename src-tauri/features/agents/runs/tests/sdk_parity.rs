@@ -9,7 +9,7 @@ mod support;
 use std::{fs, path::PathBuf};
 
 use futures_util::StreamExt;
-use agent_runs::model_calls::{resolve_model, testing, CallOptions, Credential, ModelError, ModelRoute, ProviderId};
+use agent_runs::model_calls::{resolve_model, CallOptions, Credential, ModelError, ModelRoute, ProviderId};
 use serde::Deserialize;
 use serde_json::{json, Value};
 
@@ -133,15 +133,7 @@ async fn replay(path: &PathBuf) {
         .unwrap_or_else(|error| panic!("{name}: options didn't parse: {error}"));
     let _ = rustls::crypto::ring::default_provider().install_default();
     let client = reqwest::Client::new();
-    let (model, options) = if fixture.credential_provider == ProviderId::Chatgpt {
-        // ChatGPT's address is fixed, and the SDK's was pointed at the mock the same way.
-        let mut options = options;
-        options.reasoning = fixture.reasoning.clone().filter(|value| !value.is_empty()).or(options.reasoning);
-        let model_name = fixture.model_id.trim_start_matches("chatgpt/");
-        testing::chatgpt_model(&client, &server.base_url, "test-key-parity", model_name, options)
-    } else {
-        resolve_model(&fixture.model_id, options, &route, &client).unwrap()
-    };
+    let (model, options) = resolve_model(&fixture.model_id, options, &route, &client).unwrap();
     let started = model.stream(options).await;
 
     let captured = server.captured.lock().unwrap().clone();
@@ -214,13 +206,6 @@ async fn google_matches_the_sdk() {
 #[tokio::test]
 async fn gateway_matches_the_sdk() {
     for path in fixtures_for("gateway") {
-        replay(&path).await;
-    }
-}
-
-#[tokio::test]
-async fn chatgpt_matches_the_sdk() {
-    for path in fixtures_for("chatgpt") {
         replay(&path).await;
     }
 }

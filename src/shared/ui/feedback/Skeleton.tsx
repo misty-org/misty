@@ -1,11 +1,15 @@
 import { cn } from "../classNames";
 
+/**
+ * One placeholder block. Its fill is the control wash (text at 10%), so it shows on every surface
+ * it lands on: the window, the sidebar, a settings card or a dialog.
+ */
 function Skeleton({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
   return (
     <div
       data-slot="skeleton"
       aria-hidden="true"
-      className={cn("misty-skeleton rounded-md bg-charcoal-card", className)}
+      className={cn("misty-skeleton rounded-md bg-control-hover", className)}
       {...props}
     />
   );
@@ -15,13 +19,14 @@ const titleWidths = ["w-2/3", "w-1/2", "w-3/5", "w-2/5"];
 
 /**
  * Placeholder rows shaped like the list that will replace them. Use instead of
- * "Loading…" text; `label` names what is loading for screen readers.
+ * "Loading…" text; `label` names what is loading for screen readers. The defaults draw 32px
+ * text-first rows; a list of ListRows uses ListRowSkeleton, which matches them exactly.
  */
 function SkeletonList({
   label,
   rows = 3,
-  leading = "icon",
-  lines = 2,
+  leading = "none",
+  lines = 1,
   trailing = false,
   rowClassName,
   className,
@@ -53,7 +58,7 @@ function SkeletonList({
             <Skeleton className={cn("h-3", titleWidths[index % titleWidths.length])} />
             {lines === 2 && <Skeleton className="h-2.5 w-1/3" />}
           </div>
-          {trailing && <Skeleton className="h-7 w-16 shrink-0 rounded-md" />}
+          {trailing && <Skeleton className="h-6 w-16 shrink-0 rounded-md" />}
         </div>
       ))}
     </div>

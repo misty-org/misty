@@ -12,12 +12,9 @@ import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 // A window title does not name a Dock item. Give the dev executable a real
-// bundle, with one stable path per profile, so macOS can resolve its app name.
-export function prepareDevelopmentBundle(binary: string, profile?: string) {
-  if (profile !== undefined && !/^[a-z0-9-]{1,32}$/.test(profile)) {
-    throw new Error("Invalid desktop development profile name.");
-  }
-  const name = profile ?? "Misty";
+// bundle, at one stable path, so macOS can resolve its app name.
+export function prepareDevelopmentBundle(binary: string) {
+  const name = "Misty";
   const bundle = join(dirname(binary), "misty-dev-apps", `${name}.app`);
   const contents = join(bundle, "Contents");
   const executable = join(contents, "MacOS", "misty-desktop");
@@ -34,8 +31,8 @@ export function prepareDevelopmentBundle(binary: string, profile?: string) {
       rmSync(join(dirname(executable), entry), { force: true });
     }
   }
-  // Copy instead of linking: signing or rebuilding one profile must not mutate
-  // another running profile's executable. Rename avoids writing a running file.
+  // Copy instead of linking: signing the bundle must not mutate the build output.
+  // Rename avoids writing a running file.
   const temporary = `${executable}.${process.pid}.tmp`;
   try {
     copyFileSync(binary, temporary, constants.COPYFILE_FICLONE);
@@ -54,7 +51,7 @@ export function prepareDevelopmentBundle(binary: string, profile?: string) {
     CFBundleName: name,
     CFBundleDisplayName: name,
     CFBundleExecutable: "misty-desktop",
-    CFBundleIdentifier: profile ? `com.misty.desktop.${profile}` : "com.misty.desktop",
+    CFBundleIdentifier: "com.misty.desktop",
     CFBundlePackageType: "APPL",
     CFBundleInfoDictionaryVersion: "6.0",
     CFBundleVersion: "1",

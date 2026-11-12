@@ -6,7 +6,11 @@ export {
   CollectionSearch,
   CollectionFilters,
   CollectionViewToggle,
+  type CollectionFilterTab,
+  type CollectionHeadingProps,
 } from "./collection/CollectionToolbar";
 export { CollectionCardTitle, CollectionCardMetadata } from "./collection/CollectionCards";
+export { CollectionItemActions } from "./collection/CollectionItemActions";
 export { CollectionItems } from "./collection/CollectionItems";
 export { CollectionSkeleton } from "./collection/CollectionSkeleton";
+export type { CollectionColumn, CollectionItem } from "./collection/collectionItemTypes";

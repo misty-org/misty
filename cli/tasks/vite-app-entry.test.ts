@@ -16,24 +16,24 @@ test("retired application targets are rejected by Vite", async () => {
   }
 });
 
-test("simultaneous desktop profiles do not rewrite each other's dependency cache", () => {
+test("dev servers on different ports do not rewrite each other's dependency cache", () => {
   const configFile = join(import.meta.dirname, "../../.config/vite.config.ts");
   const script = `
     import { resolveConfig } from "vite";
     const config = await resolveConfig({ configFile: ${JSON.stringify(configFile)}, mode: "desktop", logLevel: "silent" }, "serve");
     console.log(JSON.stringify({ cache: config.cacheDir, port: config.server.port }));
   `;
-  const configuration = (profile, port) => JSON.parse(execFileSync(
+  const configuration = (port) => JSON.parse(execFileSync(
     process.execPath,
     ["--input-type=module", "-e", script],
-    { encoding: "utf8", env: { ...process.env, MISTY_PROFILE: profile, MISTY_DESKTOP_DEV_PORT: String(port) } },
+    { encoding: "utf8", env: { ...process.env, MISTY_DESKTOP_DEV_PORT: String(port) } },
   ));
-  const first = configuration("dev1", 5173);
-  const second = configuration("dev2", 5174);
+  const first = configuration(5173);
+  const second = configuration(5174);
   assert.equal(first.port, 5173);
   assert.equal(second.port, 5174);
   assert.notEqual(first.cache, second.cache);
-  assert.deepEqual(configuration("dev1", 5173), first);
+  assert.deepEqual(configuration(5173), first);
 });
 
 test("the app dependency scan succeeds before Drawings is opened", { timeout: 60000 }, async () => {

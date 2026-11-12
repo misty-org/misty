@@ -1,16 +1,16 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
-import { Check, Plus, Trash2 } from "lucide-react";
+import { AppWindow, Check, Plus, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuSeparator,
-  ErrorNotification,
   IconButton,
   MenuItem,
   MenuSubmenu,
   MenuTrigger,
   Skeleton,
+  useNotice,
 } from "@/shared/ui";
 import { useFolderSettings } from "../folders/folderSettings";
 import { useFilesStore } from "../files/filesStore";
@@ -50,8 +50,9 @@ export function openInPath(
 
 /**
  * "Open in" for the panel's head: one button that opens the file shown in the editor (or the
- * folder, when none is) in the app chosen last for the folder, and a menu of every app on this computer (the chosen one checked), the person's own
- * programs, and a way to add one through the system's file dialog.
+ * folder, when none is) in the app chosen last for the folder, and a menu of every app on this
+ * computer (the chosen one checked), the person's own programs, and a way to add one through the
+ * system's file dialog.
  */
 export function OpenInMenu({ folder }: { folder: string }) {
   const icons = useOpenApps((s) => s.icons);
@@ -60,6 +61,7 @@ export function OpenInMenu({ folder }: { folder: string }) {
   const saved = useFolderSettings((s) => s.byFolder[folder]?.openIn);
   const activeFilePath = useFilesStore((s) => s.activeFilePath);
   const [error, setError] = useState("");
+  useNotice(Boolean(error), { message: error, tone: "error", onDismiss: () => setError("") });
 
   useEffect(() => {
     void useOpenApps
@@ -106,20 +108,13 @@ export function OpenInMenu({ folder }: { folder: string }) {
     <div className="open-app" role="group" aria-label="Open in">
       <IconButton
         label={`Open in ${chosen.label}`}
-        size="sm"
         className="open-app-main"
         onClick={() => open(chosen)}
       >
         <TargetIcon target={chosen} icon={icons[chosen.id]?.icon} />
       </IconButton>
       <DropdownMenu>
-        <MenuTrigger
-          iconOnly
-          showChevron
-          label="Open in another app"
-          className="open-app-more"
-          icon={null}
-        />
+        <MenuTrigger iconOnly chevron label="Open in another app" className="open-app-more" />
         <DropdownMenuContent align="end" className="w-60">
           {targets.map((target) => (
             <MenuItem
@@ -140,12 +135,12 @@ export function OpenInMenu({ folder }: { folder: string }) {
           ))}
           <DropdownMenuSeparator />
           {programs.length ? (
-            <MenuSubmenu icon={<Trash2 className="size-4" />} label="Remove a program">
+            <MenuSubmenu icon={Trash2} label="Remove a program">
               {programs.map((program) => (
                 <MenuItem
                   key={program.id}
+                  icon={AppWindow}
                   label={program.name}
-                  title={program.path}
                   onSelect={() =>
                     void useOpenApps
                       .getState()
@@ -156,10 +151,9 @@ export function OpenInMenu({ folder }: { folder: string }) {
               ))}
             </MenuSubmenu>
           ) : null}
-          <MenuItem icon={<Plus className="size-4" />} label="Add a program" onSelect={add} />
+          <MenuItem icon={Plus} label="Add a program" onSelect={add} />
         </DropdownMenuContent>
       </DropdownMenu>
-      <ErrorNotification message={error} onDismiss={() => setError("")} />
     </div>
   );
 }

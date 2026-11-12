@@ -23,10 +23,9 @@ import { GrantCards } from "./grants/GrantCard";
 import { RunMeta } from "./meta/RunMeta";
 import { AgentSubagents } from "./AgentSubagents";
 import { EngineTurnParts } from "./engine/EngineTurnParts";
-import { EngineForkButton } from "./engine/EngineChatContext";
 import { CollapsibleText, EarlierReply, MistyAvatar } from "./AgentTranscriptParts";
 import { visibleConversationContent } from "./conversationTurns";
-import { splitFailure } from "./failureSummary";
+import { currentFailureWords, splitFailure } from "./failureSummary";
 import { splitReplyQuote } from "./replyQuote";
 
 type AgentMessageProps = {
@@ -41,6 +40,8 @@ type AgentMessageProps = {
   onLedgerChange?: (messageId: string, rows: LedgerRow[]) => void;
   onEdit?: (text: string) => void;
   onReply?: (quote: string) => void;
+  /** The last message in the chat, whose actions stay shown. */
+  latest?: boolean;
 };
 
 /**
@@ -62,7 +63,8 @@ export const AgentMessage = memo(AgentMessageView, (previous, next) => {
 function AgentMessageView(props: AgentMessageProps) {
   const message = props.message;
   const progress = useMessageProgress(message);
-  const visible = visibleConversationContent(message.content, message.role);
+  const shown = visibleConversationContent(message.content, message.role);
+  const visible = message.state === "failed" ? currentFailureWords(shown) : shown;
   const ledger = useMemo(
     () => (message.role === "assistant" ? splitLedger(message.content).rows : []),
     [message.content, message.role],
@@ -104,6 +106,7 @@ function AgentMessageView(props: AgentMessageProps) {
     return (
       <div
         className="agent-message-user group/message flex flex-col items-end gap-1.5"
+        data-message
         data-message-id={message.id}
         data-anchor-id={message.id}
       >
@@ -120,20 +123,22 @@ function AgentMessageView(props: AgentMessageProps) {
           <CollapsibleText text={reply.body} />
         </div>
         <AgentMessageActions
+          conversationId={props.conversationId}
           message={message}
           text={content}
           working={props.working}
+          latest={props.latest}
           resendable={content === message.content.trim() && !message.attachments?.length}
           onRetry={props.onRetry}
           onEdit={props.onEdit}
         />
-        <EngineForkButton messageId={message.id} />
       </div>
     );
   }
   return (
     <article
       className="agent-message-assistant group/message flex items-start gap-3.5"
+      data-message
       data-state={message.state}
       data-message-id={message.id}
     >
@@ -201,7 +206,7 @@ function AgentMessageView(props: AgentMessageProps) {
         {message.citations?.length ? (
           <div className="mt-3 flex flex-wrap gap-1.5">
             {message.citations.map((citation) => (
-              <Button key={citation.id} asChild variant="chip" size="chip" className="font-normal">
+              <Button key={citation.id} asChild size="sm" className="font-normal">
                 <Link to={citation.href}>{citation.title}</Link>
               </Button>
             ))}
@@ -231,9 +236,11 @@ function AgentMessageView(props: AgentMessageProps) {
         ) : null}
         {message.state === "completed" ? <RunMeta message={message} /> : null}
         <AgentMessageActions
+          conversationId={props.conversationId}
           message={message}
           text={content}
           working={props.working}
+          latest={props.latest}
           retryPrompt={props.retryPrompt}
           retryFrom={props.retryFrom}
           onRetry={props.onRetry}

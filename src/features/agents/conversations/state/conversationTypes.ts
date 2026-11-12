@@ -80,6 +80,8 @@ export interface GlobalAiMessage {
   durationMs?: number;
   /** Folders the engine was refused during this reply, each offered to the person to allow. */
   folderGrants?: FolderGrant[];
+  /** The person's rating of this reply, kept with the chat on this device. */
+  rating?: "good" | "bad";
 }
 
 /** A folder an engine was refused (`permission.denied`), and what the person did about it. */

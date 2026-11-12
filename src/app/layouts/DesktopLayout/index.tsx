@@ -13,11 +13,7 @@ import {
 import { NavigationNamesBoundary } from "@/features/app-windows";
 import { blockIfUnsaved } from "@/features/settings";
 import { setBrowserWebviewsSuspended } from "@/features/app-windows";
-import { windowChromeChangedEvent } from "@/features/browser";
 import { useWindowDockingLayout } from "@/features/app-windows";
-import { windowChromeBackground } from "@/features/app-windows";
-import { useProfileWindowStore } from "@/features/app-windows";
-import { ProfileDialogs } from "@/features/app-windows";
 import { appZoomRenderScale, useAppZoomValue } from "@/shared/hooks/useAppZoom";
 import { cn } from "@/shared/ui";
 import { useEffect, useRef, useState } from "react";
@@ -29,7 +25,7 @@ import { DeferUntilIdle } from "./DeferUntilIdle";
 import { DesktopShellOverlays } from "./DesktopShellOverlays";
 import { FramePacingOverlay } from "./FramePacingOverlay";
 import { AccountIsland } from "./AccountIsland";
-import { AppNoticePublisher, RouteNotice } from "./RouteNotices";
+import { AppNoticePublisher } from "./RouteNotices";
 import { StandaloneRouteSurface } from "./StandaloneRouteSurface";
 import * as styles from "./styles";
 import { useDesktopBootstrap } from "./useDesktopBootstrap";
@@ -52,8 +48,9 @@ import { WorkspaceCanvas } from "./WorkspaceCanvas";
 export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab }) {
   useStrayBrowserPages();
   const { user, refreshUser, transitioning, sessionExpired } = useAuth();
-  const { location, navigate, lastAppRoute, lastNonSettingsRouteRef, routeId } =
-    useDesktopBootstrap({ getRouteId: props.getRouteId });
+  const { location, navigate, lastAppRoute, lastNonSettingsRouteRef } = useDesktopBootstrap({
+    getRouteId: props.getRouteId,
+  });
   const {
     shouldShowWindowsTitlebarControls,
     isWindowMaximized,
@@ -129,18 +126,6 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
   useOtherWindowsHiddenWhileAddingAccount(
     isAuthRoute && Boolean((location.state as { addingAccount?: boolean } | null)?.addingAccount),
   );
-  // The window takes its profile's color, which tints everything around the content region.
-  const windowChrome = useProfileWindowStore((state) =>
-    windowChromeBackground(state.profile.color),
-  );
-  useEffect(() => {
-    const shell = shellRef.current;
-    if (windowChrome && !isAuthRoute)
-      shell?.style.setProperty("--misty-window-chrome", windowChrome);
-    else shell?.style.removeProperty("--misty-window-chrome");
-    // Pages smooth their rounded corners with this color; let them measure it again.
-    window.dispatchEvent(new Event(windowChromeChangedEvent));
-  }, [windowChrome, isAuthRoute]);
   const stripAccount = !isAuthRoute ? (
     <AccountIsland
       open={accountMenuOpen}
@@ -222,7 +207,6 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
           data-misty-route-shell
         >
           {!isAuthRoute ? <AppNoticePublisher /> : null}
-          {!isAuthRoute ? <RouteNotice routeId={routeId} /> : null}
 
           <>
             {isAuthRoute ? (
@@ -256,7 +240,6 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
         <AccountSuspendedNotice />
         <AccountClosingNotice />
         {!isAuthRoute && user ? <ServerAlertsNotice /> : null}
-        {!isAuthRoute ? <ProfileDialogs /> : null}
         {!isAuthRoute ? <HelpDialog /> : null}
         {!isAuthRoute ? (
           <DesktopShellOverlays

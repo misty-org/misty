@@ -1,38 +1,57 @@
 import {
   forwardRef,
+  useCallback,
   useContext,
   useId,
   useState,
   type ComponentProps,
   type ReactNode,
 } from "react";
-import { Columns3, LayoutGrid, List } from "lucide-react";
+import { Columns3, LayoutGrid, List, ListFilter } from "lucide-react";
 import { usePointerReorder, reorderIds } from "@/shared/hooks/usePointerReorder";
-import { Button } from "../../controls/Button";
+import { ChoiceGroup } from "../../controls/ChoiceGroup";
+import { FilterChip } from "../../controls/FilterChip";
+import { IconButton } from "../../controls/IconButton";
 import { SearchField } from "../../controls/SearchField";
-import { NavIsland, NavIslandItem } from "../../navigation/NavIsland";
-import { Toolbar, ToolbarGroup } from "../../layout/Toolbar";
+import { ActionBar, type ActionBarItem, type IconSource } from "../../layout/ActionBar";
+import { PageHeader } from "../../layout/PageHeader";
 import { Separator } from "../../layout/Separator";
 import { cn } from "../../classNames";
 import { CollectionColumnChooser, CollectionColumnsContext } from "./CollectionColumns";
 
+export type CollectionHeadingProps = {
+  /** The page's name, or a node that stands for it, such as a Space switcher menu. */
+  title: ReactNode;
+  /** The page's actions. They give way like any ActionBar once the title has faded. */
+  actions?: ReadonlyArray<ActionBarItem>;
+  /** Accessible name of the actions toolbar. Default "Page actions". */
+  actionsLabel?: string;
+  /** Always shown after the actions and never folds, such as the collection's search field. */
+  end?: ReactNode;
+};
+
+// The band stays put while the page scrolls under it, edge to edge across CollectionPage's padding.
+const stickyClass = "sticky top-0 z-10 -mx-4 bg-inherit";
+
 /**
- * A collection page's top band: as tall as the sidebar's head and every other page's bar, closed
- * by the same hairline, and it stays put while the page scrolls under it.
+ * A collection page's top band: a PageHeader, as tall as every other page's bar and closed by the
+ * same hairline. The title fades first, then the actions give way; it never wraps. The title may
+ * be a node, such as a Space switcher, with the same bar items beside it.
+ *
+ * ```tsx
+ * <CollectionHeading title="Library" end={<CollectionSearch … />}
+ *   actions={[{ id: "upload", icon: Upload, label: "Upload", priority: 2, onSelect: upload }]} />
+ * ```
  */
-export function CollectionHeading({ title, actions }: { title: ReactNode; actions?: ReactNode }) {
+export function CollectionHeading({ title, actions, actionsLabel, end }: CollectionHeadingProps) {
   return (
-    <header
-      className={cn(
-        "sticky top-0 z-10 -mx-4 flex min-h-12 shrink-0 flex-wrap items-center gap-3",
-        "justify-between border-b border-charcoal-border bg-inherit px-4 sm:-mx-6 sm:px-6",
-      )}
-    >
-      <h1 className="flex min-w-0 items-center truncate text-sm font-semibold text-cream-bright">
-        {title}
-      </h1>
-      <div className="flex min-w-0 flex-wrap items-center gap-2">{actions}</div>
-    </header>
+    <PageHeader
+      className={stickyClass}
+      title={title}
+      actions={actions}
+      actionsLabel={actionsLabel}
+      end={end}
+    />
   );
 }
 
@@ -43,6 +62,52 @@ export const CollectionSearch = forwardRef<HTMLInputElement, ComponentProps<type
 );
 CollectionSearch.displayName = "CollectionSearch";
 
+export type CollectionFilterTab = {
+  value: string;
+  label: string;
+  /** Shown beside the label once the tab has folded into the bar's ⋯ menu. */
+  icon?: IconSource;
+};
+
+/**
+ * One section tab. The ActionBar also draws every item out of sight to measure it; only the
+ * copy in the bar itself may be a reorder target, or a drag would land on the hidden one.
+ */
+function SectionChip({
+  option,
+  pressed,
+  reorderable,
+  onChange,
+}: {
+  option: CollectionFilterTab;
+  pressed: boolean;
+  reorderable: boolean;
+  onChange: (value: string) => void;
+}) {
+  const [inBar, setInBar] = useState(false);
+  const attach = useCallback((node: HTMLButtonElement | null) => {
+    if (node) setInBar(Boolean(node.closest("[data-action-bar-item]")));
+  }, []);
+  return (
+    <FilterChip
+      ref={attach}
+      label={option.label}
+      pressed={pressed}
+      // Pressing the open section again keeps it open: there is always one.
+      onPressedChange={() => onChange(option.value)}
+      data-reorder-item={inBar ? option.value : undefined}
+      data-reorder-handle={inBar && reorderable ? "" : undefined}
+      aria-keyshortcuts={reorderable ? "Alt+Shift+ArrowLeft Alt+Shift+ArrowRight" : undefined}
+    />
+  );
+}
+
+/**
+ * A collection's control row: its section tabs as filter chips, then its utilities (filter menu,
+ * column chooser) and actions (view toggle) at the end. It is one ActionBar, so it never wraps:
+ * when it runs out of room the tabs fold into a ⋯ menu, the open one last, while the utilities
+ * and actions stay.
+ */
 export function CollectionFilters({
   options,
   value,
@@ -52,12 +117,16 @@ export function CollectionFilters({
   utilities,
   onReorder,
 }: {
-  options: { value: string; label: string }[];
+  options: CollectionFilterTab[];
   value: string;
   onChange: (value: string) => void;
+  /** Controls at the far end, after a divider, such as CollectionViewToggle. */
   actions?: ReactNode;
+  /** The collection's filter menu, such as `useCollectionRefinement().control`. */
   filterControl?: ReactNode;
+  /** More utilities beside the filter menu and column chooser. */
   utilities?: ReactNode;
+  /** Makes the tabs reorderable by drag and with Alt+Shift+Left/Right. */
   onReorder?: (ids: string[]) => void;
 }) {
   const scope = useId();
@@ -81,50 +150,51 @@ export function CollectionFilters({
   });
   const columnContext = useContext(CollectionColumnsContext);
   const hasUtilities = Boolean(filterControl || utilities || columnContext?.schema);
-  return (
-    <Toolbar variant="bare" wrap label="Collection controls" className="justify-between gap-3">
-      {/* Section tabs are shared chips: outlined until pressed, then filled. */}
-      <div
-        {...reorder}
-        role="navigation"
-        aria-label="Filter items"
-        className="flex min-w-0 flex-wrap items-center gap-1.5"
-      >
-        {options.map((option) => (
-          <Button
-            key={option.value}
-            variant="chip"
-            size="sm"
-            className="font-normal"
-            data-reorder-item={option.value}
-            data-reorder-handle={onReorder ? "" : undefined}
-            title={onReorder ? "Drag to reorder · Alt+Shift+Left/Right" : undefined}
-            aria-keyshortcuts={onReorder ? "Alt+Shift+ArrowLeft Alt+Shift+ArrowRight" : undefined}
-            aria-pressed={value === option.value}
-            onClick={() => onChange(option.value)}
-          >
-            {option.label}
-          </Button>
-        ))}
-      </div>
-      <span className="sr-only" role="status">
-        {announcement}
-      </span>
-      <ToolbarGroup className="gap-3">
+  const items: ActionBarItem[] = options.map((option) => ({
+    id: option.value,
+    icon: option.icon ?? ListFilter,
+    label: option.label,
+    // The open section folds last.
+    priority: option.value === value ? 2 : 1,
+    pressed: option.value === value,
+    onSelect: () => onChange(option.value),
+    render: () => (
+      <SectionChip
+        option={option}
+        pressed={option.value === value}
+        reorderable={Boolean(onReorder)}
+        onChange={onChange}
+      />
+    ),
+  }));
+  const end =
+    hasUtilities || actions ? (
+      <>
         {hasUtilities && (
-          <NavIsland aria-label="Collection utilities">
+          <div className="flex items-center gap-1">
             {filterControl}
             <CollectionColumnChooser />
             {utilities}
-          </NavIsland>
+          </div>
         )}
-        {hasUtilities && actions && <Separator orientation="vertical" className="h-4" />}
+        {hasUtilities && actions && <Separator orientation="vertical" className="mx-1 h-4" />}
         {actions}
-      </ToolbarGroup>
-    </Toolbar>
+      </>
+    ) : undefined;
+  return (
+    <div {...reorder} className="min-w-0 shrink-0">
+      <ActionBar label="Collection controls" items={items} end={end} />
+      <span className="sr-only" role="status">
+        {announcement}
+      </span>
+    </div>
   );
 }
 
+/**
+ * Grid or list, as one ChoiceGroup of icons. The board is another page rather than a third way to
+ * draw this one, so it is a separate button beside the choice.
+ */
 export function CollectionViewToggle({
   value,
   onChange,
@@ -137,37 +207,22 @@ export function CollectionViewToggle({
   disabled?: boolean;
 }) {
   return (
-    <NavIsland aria-label="View layout">
-      {(
-        [
-          { value: "grid", label: "Grid view", icon: LayoutGrid },
-          { value: "list", label: "List view", icon: List },
-        ] as const
-      ).map(({ value: option, label, icon: Icon }) => (
-        <NavIslandItem
-          key={option}
-          aria-label={label}
-          title={label}
-          active={value === option}
-          aria-pressed={value === option}
-          disabled={disabled}
-          className="size-8 p-0"
-          onClick={() => onChange(option)}
-        >
-          <Icon className="size-4" />
-        </NavIslandItem>
-      ))}
+    <div className="flex items-center gap-1">
+      <ChoiceGroup
+        label="View layout"
+        value={value}
+        disabled={disabled}
+        onChange={onChange}
+        options={[
+          { value: "grid", label: "Grid view", icon: LayoutGrid, iconOnly: true },
+          { value: "list", label: "List view", icon: List, iconOnly: true },
+        ]}
+      />
       {onBoardView && (
-        <NavIslandItem
-          aria-label="Board view"
-          title="Board view"
-          disabled={disabled}
-          className="size-8 p-0"
-          onClick={onBoardView}
-        >
-          <Columns3 className="size-4" />
-        </NavIslandItem>
+        <IconButton label="Board view" disabled={disabled} onClick={onBoardView}>
+          <Columns3 />
+        </IconButton>
       )}
-    </NavIsland>
+    </div>
   );
 }

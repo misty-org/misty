@@ -17,9 +17,9 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  ErrorNotification,
   Input,
   Skeleton,
+  useNotice,
 } from "@/shared/ui";
 import { FileTreeContextMenu } from "./FileTreeContextMenu";
 import { TreeRow } from "./FileTreeRow";
@@ -104,10 +104,10 @@ function NameDialog(props: {
             onChange={(event) => setName(event.target.value)}
           />
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={props.onCancel}>
+            <Button type="button" size="lg" onClick={props.onCancel}>
               Cancel
             </Button>
-            <Button type="submit" disabled={!name.trim()}>
+            <Button type="submit" size="lg" disabled={!name.trim()}>
               {props.prompt?.kind === "rename" ? "Rename" : "Create"}
             </Button>
           </DialogFooter>
@@ -133,6 +133,11 @@ const rowSkeletons = (
 export function FileTree() {
   const { parentRef, virtualizer, visible } = useFileTreeVirtualList();
   const ops = useFileTreeOperations();
+  useNotice(Boolean(ops.notice), {
+    message: ops.notice ?? "",
+    tone: "error",
+    onDismiss: ops.dismissNotice,
+  });
   const root = useFilesStore((state) => state.root);
   const dirErrors = useFilesStore((state) => state.dirErrors);
   const loadingDirs = useFilesStore((state) => state.loadingDirs);
@@ -163,7 +168,7 @@ export function FileTree() {
     body = (
       <div className="file-tree-error">
         <p>{rootError}</p>
-        <Button size="xs" variant="outline" onClick={() => void ensureDir(root)}>
+        <Button size="sm" variant="secondary" onClick={() => void ensureDir(root)}>
           Try again
         </Button>
       </div>
@@ -288,7 +293,6 @@ export function FileTree() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-      <ErrorNotification message={ops.notice ?? ""} onDismiss={ops.dismissNotice} />
     </div>
   );
 }

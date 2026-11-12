@@ -126,14 +126,13 @@ export function EngineQuestionCard({ runId, ask }: { runId: string; ask: EngineA
       ) : (
         <div className="engine-question-actions">
           <Button
-            size="sm"
             variant="primary"
             disabled={!answered || sending}
             onClick={() => void send(false)}
           >
             Send answer
           </Button>
-          <Button size="sm" variant="ghost" disabled={sending} onClick={() => void send(true)}>
+          <Button variant="quiet" disabled={sending} onClick={() => void send(true)}>
             Skip
           </Button>
         </div>

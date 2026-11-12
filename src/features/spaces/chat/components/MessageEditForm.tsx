@@ -35,16 +35,15 @@ export function MessageEditForm({
       />
       <div className="mt-2 flex justify-end gap-2">
         <Button
-          variant="ghost"
-          size="sm"
+          variant="quiet"
           type="button"
           disabled={saving}
           onClick={() => onCancel(message.id)}
         >
           Cancel
         </Button>
-        <Button size="sm" type="submit" disabled={saving || !text.trim()}>
-          {saving ? "Saving…" : "Save"}
+        <Button type="submit" loading={saving} disabled={!text.trim()}>
+          Save
         </Button>
       </div>
     </form>

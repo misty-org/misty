@@ -21,8 +21,8 @@ function typeInto(input: HTMLInputElement, text: string) {
 }
 
 /**
- * Misty's one search box: a filled field with no hairline, cornered like the buttons beside it.
- * It brightens under the pointer and takes a soft neutral ring while typing in it. A clear button
+ * Misty's one search box: a filled field with no hairline, cornered like the other fields.
+ * It brightens under the pointer and takes a soft neutral edge while typing in it. A clear button
  * shows once there is text, and Escape clears it too.
  */
 const SearchField = React.forwardRef<HTMLInputElement, SearchFieldProps>(
@@ -40,9 +40,9 @@ const SearchField = React.forwardRef<HTMLInputElement, SearchFieldProps>(
         role="search"
         data-slot="search-field"
         className={cn(
-          "group/search flex min-w-0 items-center gap-2 rounded-md text-cream-muted",
-          "bg-cream/[0.055] ring-1 ring-transparent transition-[background-color,box-shadow]",
-          "hover:bg-cream/[0.075] focus-within:bg-cream/[0.08] focus-within:ring-cream/[0.14]",
+          "group/search flex min-w-0 items-center gap-2 rounded-lg text-cream-muted",
+          "border border-transparent bg-cream/5 transition-colors",
+          "hover:bg-cream/8 focus-within:border-cream/14 focus-within:bg-cream/8",
           size === "sm" ? "h-8 pl-2.5 pr-1" : "h-9 pl-3 pr-1.5",
           props.disabled && "pointer-events-none opacity-50",
           containerClassName,
@@ -50,10 +50,7 @@ const SearchField = React.forwardRef<HTMLInputElement, SearchFieldProps>(
       >
         <Search
           aria-hidden="true"
-          className={cn(
-            "shrink-0 transition-colors group-focus-within/search:text-cream",
-            size === "sm" ? "size-3.5" : "size-4",
-          )}
+          className="size-4 shrink-0 transition-colors group-focus-within/search:text-cream"
         />
         <input
           ref={inner}
@@ -62,7 +59,7 @@ const SearchField = React.forwardRef<HTMLInputElement, SearchFieldProps>(
           spellCheck={false}
           data-slot="search-field-input"
           className={cn(
-            "h-full w-full min-w-0 bg-transparent text-ui text-cream-bright outline-none",
+            "h-full w-full min-w-0 bg-transparent text-control text-cream-bright outline-none",
             "placeholder:text-cream-muted [&::-webkit-search-cancel-button]:appearance-none",
             className,
           )}
@@ -78,7 +75,8 @@ const SearchField = React.forwardRef<HTMLInputElement, SearchFieldProps>(
         />
         {filled ? (
           <IconButton
-            size="xs"
+            size="sm"
+            variant="quiet"
             label="Clear search"
             className="shrink-0"
             // Keeps the caret in the box while it clears.

@@ -23,6 +23,7 @@ vi.mock("../export/AccountExportDialog", () => ({
   },
 }));
 
+import { NoticeViewport } from "@/shared/ui";
 import { AccountClosingNotice } from "./AccountClosingNotice";
 
 describe("AccountClosingNotice", () => {
@@ -50,7 +51,14 @@ describe("AccountClosingNotice", () => {
 
   it("says the account is read-only until the date and opens the export", async () => {
     useAccountClosing.setState({ deleteAt: "2026-12-01T15:00:00Z" });
-    act(() => root.render(<AccountClosingNotice />));
+    act(() =>
+      root.render(
+        <>
+          <NoticeViewport />
+          <AccountClosingNotice />
+        </>,
+      ),
+    );
     expect(document.body.textContent).toContain("read-only");
     expect(document.body.textContent).toContain("2026");
     const exportButton = [...document.querySelectorAll("button")].find(

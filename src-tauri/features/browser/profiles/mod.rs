@@ -47,12 +47,9 @@ fn hashed(value: impl AsRef<[u8]>) -> String {
     hex::encode(Sha256::digest(value))
 }
 
-/// The account's folder. A development profile has its own, even for the same account.
+/// The account's folder.
 fn account_identity(scope: &str) -> String {
-    match std::env::var("MISTY_PROFILE") {
-        Ok(dev) if !dev.is_empty() => hashed(format!("{scope}\0{dev}")),
-        _ => hashed(scope),
-    }
+    hashed(scope)
 }
 
 pub(crate) fn account_dir(scope: &str) -> Result<PathBuf, String> {

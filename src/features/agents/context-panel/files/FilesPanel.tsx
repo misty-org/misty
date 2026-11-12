@@ -13,6 +13,7 @@ import {
   IconButton,
   Pressable,
   Skeleton,
+  Tooltip,
 } from "@/shared/ui";
 import { FileSearchOverlay } from "./FileSearchOverlay";
 import { FileTree } from "./FileTree";
@@ -45,7 +46,6 @@ function FileTabs({ onClose }: { onClose(path: string): void }) {
         role="tab"
         className="file-tab"
         aria-selected={active === null}
-        title="Files"
         onClick={() => activateFile(null)}
       >
         <FolderTree size={14} aria-hidden />
@@ -76,16 +76,18 @@ function FileTabs({ onClose }: { onClose(path: string): void }) {
             if (event.button === 1) onClose(path);
           }}
         >
-          <Pressable className="file-tab-main" title={path} onClick={() => activateFile(path)}>
-            <span
-              className="file-tree-icon"
-              aria-hidden
-              dangerouslySetInnerHTML={{ __html: getFileTreeIconSvg(fileName(path), false) }}
-            />
-            <span className="file-tab-name">{fileName(path)}</span>
-            {dirty[path] ? <span className="file-tab-dirty" aria-label="Unsaved" /> : null}
-          </Pressable>
-          <IconButton label={`Close ${fileName(path)}`} size="2xs" onClick={() => onClose(path)}>
+          <Tooltip content={path}>
+            <Pressable className="file-tab-main" onClick={() => activateFile(path)}>
+              <span
+                className="file-tree-icon"
+                aria-hidden
+                dangerouslySetInnerHTML={{ __html: getFileTreeIconSvg(fileName(path), false) }}
+              />
+              <span className="file-tab-name">{fileName(path)}</span>
+              {dirty[path] ? <span className="file-tab-dirty" aria-label="Unsaved" /> : null}
+            </Pressable>
+          </Tooltip>
+          <IconButton label={`Close ${fileName(path)}`} size="sm" onClick={() => onClose(path)}>
             <X aria-hidden />
           </IconButton>
         </div>

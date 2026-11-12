@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Pencil } from "lucide-react";
 import type { AgentProfile, AgentProfileInput } from "@/shared/schemas";
-import { Button, Input, Pressable, Toggle } from "@/shared/ui";
+import { Button, ChoiceTile, Input, Pressable } from "@/shared/ui";
 import { AgentAvatar, AgentCloudImage } from "./AgentAvatar";
 import { agentCloudAvatar, agentCloudVariants } from "./agentCloudAvatars";
 
@@ -43,9 +43,8 @@ export function AgentAvatarPicker({
         </Pressable>
         <div className="flex-1 min-w-0">
           <Button
-            variant="ghost"
+            variant="quiet"
             type="button"
-            size="sm"
             className="h-auto p-0 text-sm"
             onClick={() => setAvatarEditing(!avatarEditing)}
           >
@@ -57,7 +56,7 @@ export function AgentAvatarPicker({
         <div className="rounded-xl border border-charcoal-border/70 bg-charcoal-bg/50 p-4 space-y-4">
           <div>
             <div className="text-xs font-medium text-cream-muted mb-2">Cloud avatar</div>
-            <div className="grid grid-cols-2 gap-2">
+            <div role="group" aria-label="Cloud avatar" className="grid grid-cols-2 gap-2">
               {agentCloudVariants.map((variant) => {
                 const chosen =
                   !avatar?.emoji &&
@@ -68,20 +67,20 @@ export function AgentAvatarPicker({
                     system_managed: profile?.system_managed ?? false,
                   }).id === variant.id;
                 return (
-                  <Toggle
+                  <ChoiceTile
                     key={variant.id}
-                    variant="outline"
-                    aria-label={`${variant.name}, ${variant.expression}`}
-                    pressed={chosen}
+                    look="outline"
+                    label={`${variant.name}, ${variant.expression}`}
+                    selected={chosen}
                     disabled={busy}
-                    onPressedChange={() =>
+                    onSelect={() =>
                       onChange({
                         ...avatar,
                         emoji: "",
                         cloudVariant: variant.id,
                       })
                     }
-                    className="h-auto flex-col gap-1 whitespace-normal rounded-lg p-2.5 text-center text-cream-muted data-[state=on]:border-cream-bright/80"
+                    className="gap-1 whitespace-normal p-2.5 text-center"
                   >
                     <div className="size-14 shrink-0 flex items-center justify-center">
                       <AgentCloudImage variant={variant} />
@@ -89,10 +88,10 @@ export function AgentAvatarPicker({
                     <span className="text-xs font-medium text-cream leading-none">
                       {variant.name}
                     </span>
-                    <span className="text-ui text-cream-muted leading-tight">
+                    <span className="text-meta text-cream-muted leading-tight">
                       {variant.expression}
                     </span>
-                  </Toggle>
+                  </ChoiceTile>
                 );
               })}
             </div>

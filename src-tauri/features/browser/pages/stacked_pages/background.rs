@@ -85,23 +85,8 @@ async fn host_exempt(app: &AppHandle, id: &str, webview: &Webview) -> bool {
 }
 
 /// How long a tab stays hidden before it is backgrounded, and how often a
-/// stacked tab's exemptions are checked again after that, in seconds. The
-/// person chooses it (Settings › Performance); 0 never backgrounds a tab.
-static BACKGROUND_AFTER_SECS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
-
+/// stacked tab's exemptions are checked again after that. The setting that chose
+/// it is gone, so hidden tabs keep drawing (`None` never backgrounds a tab).
 fn background_after() -> Option<std::time::Duration> {
-    match BACKGROUND_AFTER_SECS.load(std::sync::atomic::Ordering::Relaxed) {
-        0 => None,
-        seconds => Some(std::time::Duration::from_secs(seconds)),
-    }
-}
-
-/// Sets how long hidden tabs keep drawing (`BACKGROUND_AFTER_SECS`). Pages
-/// hidden from now on follow it; a tab already asleep wakes when shown.
-#[tauri::command]
-pub fn browser_set_hidden_tab_sleep(seconds: u64) {
-    BACKGROUND_AFTER_SECS.store(
-        seconds.min(24 * 60 * 60),
-        std::sync::atomic::Ordering::Relaxed,
-    );
+    None
 }

@@ -1,4 +1,4 @@
-import { cn, EmptyState, Pressable, Skeleton } from "@/shared/ui";
+import { cn, EmptyState, OverflowFadeText, Pressable, Skeleton, Tooltip } from "@/shared/ui";
 import { dayKey, monthDays, type CalendarEntry } from "./calendarDates";
 
 type ViewProps = {
@@ -69,25 +69,28 @@ export function CalendarMonth({ anchor, entries, onOpen, onNew }: ViewProps) {
               {entries ? (
                 <>
                   {items.slice(0, 3).map((entry) => (
-                    <Pressable
-                      key={`${entry.kind}:${entry.id}`}
-                      type="button"
-                      title={entryLabel(entry)}
-                      className={cn(
-                        "flex min-w-0 items-center gap-1 rounded px-1.5 py-0.5 text-left text-2xs hover:bg-charcoal-hover",
-                        entry.kind === "task"
-                          ? "border border-dashed border-charcoal-border text-cream-muted"
-                          : entry.kind === "connected"
-                            ? "border border-charcoal-border text-cream"
-                            : "bg-charcoal-card text-cream",
-                      )}
-                      onClick={() => onOpen(entry)}
-                    >
-                      {entry.time ? (
-                        <span className="shrink-0 tabular-nums text-cream-muted">{entry.time}</span>
-                      ) : null}
-                      <span className="truncate">{entry.title}</span>
-                    </Pressable>
+                    <Tooltip key={`${entry.kind}:${entry.id}`} content={entryLabel(entry)}>
+                      <Pressable
+                        type="button"
+                        className={cn(
+                          "flex min-w-0 items-center gap-1 rounded px-1.5 py-0.5 text-left text-2xs",
+                          "hover:bg-charcoal-hover",
+                          entry.kind === "task"
+                            ? "border border-dashed border-charcoal-border text-cream-muted"
+                            : entry.kind === "connected"
+                              ? "border border-charcoal-border text-cream"
+                              : "bg-charcoal-card text-cream",
+                        )}
+                        onClick={() => onOpen(entry)}
+                      >
+                        {entry.time ? (
+                          <span className="shrink-0 tabular-nums text-cream-muted">
+                            {entry.time}
+                          </span>
+                        ) : null}
+                        <OverflowFadeText>{entry.title}</OverflowFadeText>
+                      </Pressable>
+                    </Tooltip>
                   ))}
                   {items.length > 3 ? (
                     <span className="px-1.5 text-2xs text-cream-muted">
@@ -119,8 +122,7 @@ export function CalendarAgenda({ anchor, entries, onOpen, onNew }: ViewProps) {
   const days = monthDays(anchor).filter(
     (day) => day.getMonth() === anchor.getMonth() && entries.has(dayKey(day)),
   );
-  if (!days.length)
-    return <EmptyState className="h-full" title="Nothing on the calendar this month" />;
+  if (!days.length) return <EmptyState title="Nothing on the calendar this month" />;
   return (
     <div className="h-full min-h-0 overflow-y-auto">
       <div className="mx-auto grid w-full max-w-2xl gap-5 p-6">
@@ -151,11 +153,13 @@ export function CalendarAgenda({ anchor, entries, onOpen, onNew }: ViewProps) {
                 <span className="w-20 shrink-0 text-xs tabular-nums text-cream-muted">
                   {entry.kind === "task" ? "Due" : entry.time || "All day"}
                 </span>
-                <span className="min-w-0 flex-1 truncate text-cream">{entry.title}</span>
+                <OverflowFadeText full className="min-w-0 flex-1 text-cream">
+                  {entry.title}
+                </OverflowFadeText>
                 {entryLocation(entry) ? (
-                  <span className="max-w-40 truncate text-xs text-cream-muted">
+                  <OverflowFadeText full className="max-w-40 text-xs text-cream-muted">
                     {entryLocation(entry)}
-                  </span>
+                  </OverflowFadeText>
                 ) : null}
               </Pressable>
             ))}

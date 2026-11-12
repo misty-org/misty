@@ -1,6 +1,6 @@
 import { accountApi } from "../api/api";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { BrandIcon, Button, cn, ErrorNotification, Input, Label } from "@/shared/ui";
+import { BrandIcon, Button, cn, Input, Label, useNotice } from "@/shared/ui";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "../AuthContext";
@@ -100,6 +100,12 @@ export default function GoogleSignInButton({
     }
   }
 
+  useNotice(Boolean(codeError), {
+    message: codeError,
+    tone: "error",
+    onDismiss: () => setCodeError(""),
+  });
+
   // The "or" rule belongs to the button: with Google sign-in off, nothing dangles under the form.
   if (!available) return null;
   return (
@@ -111,7 +117,7 @@ export default function GoogleSignInButton({
       </div>
       <Button
         type="button"
-        variant="outline"
+        variant="secondary"
         size="lg"
         className={cn(authFormButtonClass, "gap-2.5")}
         // The form is busy while Google is open, but this is how to leave it.
@@ -141,10 +147,9 @@ export default function GoogleSignInButton({
             }}
             className="h-11 bg-transparent px-3.5 text-cream placeholder:text-cream-muted"
           />
-          <ErrorNotification message={codeError} onDismiss={() => setCodeError("")} />
           <Button
             type="button"
-            variant="outline"
+            variant="secondary"
             size="lg"
             className={authFormButtonClass}
             onClick={submitCode}

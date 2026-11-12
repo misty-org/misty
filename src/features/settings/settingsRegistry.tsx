@@ -99,8 +99,6 @@ const block = (
 /** The blocks of each page, in page order; blocks of one page are adjacent. */
 const settingsBlocks: readonly SettingsBlock[] = [
   block("general", "general", "Startup"),
-  block("general", "browser-tabs", "Agent pages"),
-  block("general", "browser-downloads", "Downloads"),
   block("general", "updates", "Updates"),
   block("account", "account", "Profile", "resource"),
   block("server", "server", "Server"),

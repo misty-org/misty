@@ -11,7 +11,6 @@ use super::{
     prompt::{Message, OutputItem, ToolOutput, ToolResultPart, UserPart},
     providers::{
         anthropic::AnthropicModel,
-        chatgpt::{self, ChatGptModel},
         gateway::{self, GatewayModel},
         google::{self, GoogleModel},
         openai_compatible::OpenAiCompatibleModel,
@@ -31,7 +30,6 @@ pub enum ProviderId {
     Ollama,
     OllamaCloud,
     OpenaiCompatible,
-    Chatgpt,
     Elevenlabs,
     Soniox,
 }
@@ -48,7 +46,6 @@ impl ProviderId {
             Self::Ollama => "ollama",
             Self::OllamaCloud => "ollama-cloud",
             Self::OpenaiCompatible => "openai-compatible",
-            Self::Chatgpt => "chatgpt",
             Self::Elevenlabs => "elevenlabs",
             Self::Soniox => "soniox",
         }
@@ -66,7 +63,6 @@ impl ProviderId {
             "ollama" => Self::Ollama,
             "ollama-cloud" => Self::OllamaCloud,
             "openai-compatible" => Self::OpenaiCompatible,
-            "chatgpt" => Self::Chatgpt,
             "elevenlabs" => Self::Elevenlabs,
             "soniox" => Self::Soniox,
             _ => return None,
@@ -308,11 +304,6 @@ pub fn resolve_model(
                 Arc::new(AnthropicModel::new(client.clone(), base_url.as_deref(), &api_key, &anthropic_model_name(model))),
                 options,
             ))
-        }
-        ProviderId::Chatgpt => {
-            without_gateway_options(&mut options);
-            let options = chatgpt::prepared_options(options);
-            Ok((Arc::new(ChatGptModel::new(client.clone(), chatgpt::API_URL, &api_key, model)), options))
         }
     }
 }

@@ -4,7 +4,7 @@ import { openSignInSheet, useAuth } from "@/features/account";
 import { useWorkspaceViewFocused } from "@/features/app-windows";
 import type { WorkspaceView } from "@/features/app-windows/core";
 import { SpaceOverviewProvider } from "./useSpaceOverview";
-import { Button, CollectionSkeleton, ErrorNotification, Skeleton } from "@/shared/ui";
+import { Button, CollectionSkeleton, Skeleton, useNotice } from "@/shared/ui";
 import { GlobalCreateSpaceDialog } from "../create/GlobalCreateSpaceDialog";
 import { SpaceSectionView } from "./SpaceSectionView";
 import { preferredDefaultSpace, windowSpace } from "../routes/defaultSpace";
@@ -31,6 +31,16 @@ export function SpaceWorkspaceSurface({ tab }: { tab: WorkspaceView }) {
   // Any Space opens here, in this tab; a bare route lands on the window's current one.
   const fallback = hasTauriInternals() ? windowSpace(spaces) : preferredDefaultSpace(spaces);
   const [inviteError, setInviteError] = useState("");
+  useNotice(Boolean(user) && !ready && Boolean(error), {
+    message: "Spaces could not be loaded.",
+    tone: "error",
+    action: { label: "Retry", onSelect: () => void load({ force: true }) },
+  });
+  useNotice(Boolean(inviteError), {
+    message: inviteError,
+    tone: "error",
+    onDismiss: () => setInviteError(""),
+  });
   useEffect(() => {
     if (!route.activeSpaceId && ready && fallback) {
       navigate(defaultSpaceRoute(fallback.id), { replace: true });
@@ -51,7 +61,9 @@ export function SpaceWorkspaceSurface({ tab }: { tab: WorkspaceView }) {
         <p className="text-sm text-cream-muted">
           Collaborate on projects with chat, planning, and shared materials.
         </p>
-        <Button onClick={() => openSignInSheet("space")}>Sign in</Button>
+        <Button size="lg" onClick={() => openSignInSheet("space")}>
+          Sign in
+        </Button>
       </div>
     );
 
@@ -66,16 +78,6 @@ export function SpaceWorkspaceSurface({ tab }: { tab: WorkspaceView }) {
         <div className="flex min-w-0 flex-1 flex-col p-6">
           <CollectionSkeleton label="Spaces" view="grid" />
         </div>
-        <ErrorNotification message={error ? "Spaces could not be loaded." : ""}>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => void load({ force: true })}
-          >
-            Retry
-          </Button>
-        </ErrorNotification>
       </div>
     );
 
@@ -98,8 +100,9 @@ export function SpaceWorkspaceSurface({ tab }: { tab: WorkspaceView }) {
                 );
               }}
             />
-            <ErrorNotification message={inviteError} onDismiss={() => setInviteError("")} />
-            <Button onClick={create}>Create Space</Button>
+            <Button size="lg" onClick={create}>
+              Create Space
+            </Button>
           </div>
         )}
       </GlobalCreateSpaceDialog>

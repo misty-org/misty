@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { Button, ErrorNotification, Input, Skeleton } from "@/shared/ui";
+import { Button, Input, OverflowFadeText, Skeleton, useNotice } from "@/shared/ui";
 import { useSpacesStore } from "../list/useSpacesStore";
 import {
   activeClaims,
@@ -32,6 +32,8 @@ export function WorkingOn({ spaceId, me }: { spaceId: string; me: string }) {
     const timer = window.setInterval(() => setNow(Date.now()), 60_000);
     return () => window.clearInterval(timer);
   }, []);
+
+  useNotice(Boolean(error), { message: error, tone: "error", onDismiss: () => setError("") });
 
   const claims = useMemo(() => activeClaims(messages ?? [], now), [messages, now]);
   const overlap = useMemo(() => overlappingClaim(draft, claims, me), [draft, claims, me]);
@@ -74,19 +76,18 @@ export function WorkingOn({ spaceId, me }: { spaceId: string; me: string }) {
         <ul className="m-0 grid list-none p-0">
           {claims.map((claim) => (
             <li key={claim.id} className="flex min-h-9 min-w-0 items-center gap-2 px-2.5 py-1">
-              <span className="min-w-0 flex-1 truncate text-sm text-cream-muted">
+              <OverflowFadeText full className="min-w-0 flex-1 text-sm text-cream-muted">
                 <span className="text-cream">{claim.userId === me ? "You" : claim.name}</span>
                 {" · "}
                 {claim.text}
-              </span>
+              </OverflowFadeText>
               <span className="shrink-0 text-xs text-cream-muted">
                 {postedAgo(claim.createdAt, now)}
               </span>
               {claim.userId === me && !readOnly ? (
                 <Button
                   type="button"
-                  variant="ghost"
-                  size="sm"
+                  variant="quiet"
                   disabled={busy === claim.id}
                   onClick={() => void release(claim.id)}
                 >
@@ -107,7 +108,7 @@ export function WorkingOn({ spaceId, me }: { spaceId: string; me: string }) {
             maxLength={claimMaxLength}
             onChange={(event) => setDraft(event.target.value)}
           />
-          <Button type="submit" variant="outline" size="sm" disabled={!draft.trim() || busy !== ""}>
+          <Button type="submit" variant="secondary" disabled={!draft.trim() || busy !== ""}>
             Post
           </Button>
         </form>
@@ -117,7 +118,6 @@ export function WorkingOn({ spaceId, me }: { spaceId: string; me: string }) {
           {overlap.name} is working on “{overlap.text}”. You can still post yours.
         </p>
       ) : null}
-      <ErrorNotification message={error} onDismiss={() => setError("")} />
     </OverviewCard>
   );
 }

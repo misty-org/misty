@@ -4,7 +4,7 @@ import { PrivateLabel, VisibilityMenu } from "../../components/VisibilityMenu";
 import { AgentAvatar } from "@/features/agents";
 import { useAuth } from "@/features/account";
 import type { AgentProfile } from "@/shared/schemas";
-import { IconButton, cn } from "@/shared/ui";
+import { IconButton, OverflowFadeText, cn } from "@/shared/ui";
 import { X } from "lucide-react";
 import { agentOwnerLabel } from "./useSpaceAgentMembers";
 
@@ -44,13 +44,17 @@ export function SpaceAgentRow({
         />
       </span>
       <div className="min-w-0 flex-1">
-        <p className={cn("m-0 truncate font-medium text-cream", compact ? "text-xs" : "text-sm")}>
+        <OverflowFadeText
+          as="p"
+          full
+          className={cn("m-0 font-medium text-cream", compact ? "text-xs" : "text-sm")}
+        >
           {agent.agent_name}
           <span className="font-normal text-cream-muted">
             {" "}
             · {agentOwnerLabel(agent, user?.id)}
           </span>
-        </p>
+        </OverflowFadeText>
       </div>
       {agent.visibility === "private" ? <PrivateLabel /> : null}
       {onVisibilityChange ? (
@@ -61,11 +65,7 @@ export function SpaceAgentRow({
         />
       ) : null}
       {onRemove ? (
-        <IconButton
-          size="sm"
-          label={`Remove ${agent.agent_name} from this Space`}
-          onClick={onRemove}
-        >
+        <IconButton label={`Remove ${agent.agent_name} from this Space`} onClick={onRemove}>
           <X className="size-3.5" />
         </IconButton>
       ) : null}

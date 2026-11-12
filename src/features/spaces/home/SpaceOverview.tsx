@@ -16,7 +16,7 @@ import {
   usePersonalAgentsStore,
   useTutorChatIds,
 } from "@/features/agents";
-import { Button } from "@/shared/ui";
+import { Button, OverflowFadeText } from "@/shared/ui";
 import { HomeSectionHead } from "./HomeSection";
 import {
   OverviewCard,
@@ -63,8 +63,7 @@ export function SpaceOverview({ spaceId }: { spaceId: string }) {
   );
 
   const newChat = (
-    <Button type="button" variant="ghost" size="sm" onClick={() => navigate("/agents")}>
-      <Plus aria-hidden="true" />
+    <Button type="button" variant="quiet" icon={Plus} onClick={() => navigate("/agents")}>
       New chat
     </Button>
   );
@@ -80,7 +79,7 @@ export function SpaceOverview({ spaceId }: { spaceId: string }) {
               title={run.title}
               detail={
                 <>
-                  <span className="truncate">{name(run.agentId)}</span>
+                  <OverflowFadeText full>{name(run.agentId)}</OverflowFadeText>
                   <span aria-hidden="true">·</span>
                   <span className="overview-status" data-status="needs-you">
                     {run.asks}
@@ -123,7 +122,7 @@ export function SpaceOverview({ spaceId }: { spaceId: string }) {
                 title={chatTitle(chat.title)}
                 detail={
                   <>
-                    <span className="truncate">{name(chat.agentId)}</span>
+                    <OverflowFadeText full>{name(chat.agentId)}</OverflowFadeText>
                     <OverviewStatus status={statuses[chat.id]} />
                   </>
                 }

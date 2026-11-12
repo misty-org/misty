@@ -1,5 +1,6 @@
-import { ModelKeyNeededButton, needsModelKey } from "../models/ModelKeyNeeded";
-import { Button, ErrorNotification } from "@/shared/ui";
+import { needsModelKey } from "../models/ModelKeyNeeded";
+import { openModelSettings } from "../models/modelKeys";
+import { ErrorNotice } from "../conversations/ErrorNotice";
 import { AgentWorkspaceConversation } from "../conversations/view/AgentWorkspaceConversation";
 import { AgentConversationHeading } from "./AgentConversationHeading";
 import type { AgentsPageActions, AgentsPageView } from "./agentsPageActions";
@@ -37,20 +38,14 @@ export function AgentsTaskContent({ state, actions, view }: AgentsTaskContentPro
       <div className="agents-main">
         <div className="agents-body">
           <div className="agents-chat">
-            <ErrorNotification message={error}>
-              {needsModelKey(error) ? (
-                <ModelKeyNeededButton />
-              ) : (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => void load(user?.id ?? "")}
-                >
-                  Retry
-                </Button>
-              )}
-            </ErrorNotification>
+            <ErrorNotice
+              message={error}
+              action={
+                needsModelKey(error)
+                  ? { label: "Open Models settings", onSelect: openModelSettings }
+                  : { label: "Retry", onSelect: () => void load(user?.id ?? "") }
+              }
+            />
             <AgentConversationHeading
               workspace={showWorkspace}
               conversation={conversation}

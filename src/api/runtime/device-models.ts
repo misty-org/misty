@@ -11,7 +11,6 @@ type DeviceModelCall =
   | "day-summary"
   | "voice-notes"
   | "transcribe-diarized"
-  | "model-test"
   | "follow-up";
 
 /**

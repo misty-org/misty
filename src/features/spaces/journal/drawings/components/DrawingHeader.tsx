@@ -1,4 +1,4 @@
-import { BackButton, Button, ErrorNotification, Input, cn } from "@/shared/ui";
+import { BackButton, Button, Input, cn, useNotice } from "@/shared/ui";
 import { useEffect, useState } from "react";
 import type { SpaceDrawing } from "../drawingTypes";
 
@@ -16,6 +16,11 @@ export function DrawingHeader({ reportError, drawing, onBack, onRename }: Drawin
   const [saving, setSaving] = useState(false);
   const [saveFailed, setSaveFailed] = useState(false);
   const titleChanged = title !== savedTitle;
+  useNotice(saveFailed, {
+    message: "Title not saved. Press Enter in the title to retry.",
+    tone: "error",
+    onDismiss: () => setSaveFailed(false),
+  });
 
   useEffect(() => {
     setTitle(drawing.title);
@@ -90,7 +95,6 @@ export function DrawingHeader({ reportError, drawing, onBack, onRename }: Drawin
         {inputActive && drawing.role !== "viewer" ? (
           <Button
             type="button"
-            size="sm"
             className="h-8 shrink-0 px-3 text-xs"
             disabled={!titleChanged || saving}
             aria-label="Save drawing title"
@@ -100,10 +104,6 @@ export function DrawingHeader({ reportError, drawing, onBack, onRename }: Drawin
           </Button>
         ) : null}
       </div>
-      <ErrorNotification
-        message={saveFailed ? "Title not saved. Press Enter in the title to retry." : ""}
-        onDismiss={() => setSaveFailed(false)}
-      />
     </header>
   );
 }

@@ -65,10 +65,10 @@ export function SignOutSheet() {
           </span>
         </label>
         <div className="flex justify-end gap-2">
-          <Button variant="outline" onClick={close}>
+          <Button variant="secondary" size="lg" onClick={close}>
             Cancel
           </Button>
-          <Button variant="primary" onClick={signOut}>
+          <Button variant="primary" size="lg" onClick={signOut}>
             Sign out
           </Button>
         </div>

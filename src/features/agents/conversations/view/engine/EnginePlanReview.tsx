@@ -88,32 +88,26 @@ export function EnginePlanReview(props: {
             />
             <div className="engine-plan-actions">
               <Button
-                size="sm"
                 variant="primary"
                 disabled={busy || !feedback.trim()}
                 onClick={() => void decide("request_changes")}
               >
                 Send changes
               </Button>
-              <Button size="sm" variant="ghost" disabled={busy} onClick={() => setChanging(false)}>
+              <Button variant="quiet" disabled={busy} onClick={() => setChanging(false)}>
                 Cancel
               </Button>
             </div>
           </div>
         ) : (
           <div className="engine-plan-actions">
-            <Button
-              size="sm"
-              variant="primary"
-              disabled={busy}
-              onClick={() => void decide("approve")}
-            >
+            <Button variant="primary" disabled={busy} onClick={() => void decide("approve")}>
               Approve and run in Auto
             </Button>
-            <Button size="sm" variant="outline" disabled={busy} onClick={() => setChanging(true)}>
+            <Button disabled={busy} onClick={() => setChanging(true)}>
               Request changes
             </Button>
-            <Button size="sm" variant="ghost" disabled={busy} onClick={() => void decide("defer")}>
+            <Button variant="quiet" disabled={busy} onClick={() => void decide("defer")}>
               Not now
             </Button>
           </div>

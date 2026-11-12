@@ -88,7 +88,7 @@ export function NoteEditorToolbar(props: {
       </ToolbarGroup>
       <ToolbarRule />
       <ToolbarGroup>
-        <Button variant="toolbar" size="sm" className="gap-1.5 px-2" onClick={props.onAddImage}>
+        <Button variant="quiet" className="gap-1.5 px-2" onClick={props.onAddImage}>
           <ImagePlus size={17} />
           Add
         </Button>

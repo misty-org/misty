@@ -1,5 +1,5 @@
 import { openSignInSheet, useAuth } from "@/features/account";
-import { Button, EmptyState, PermissionState } from "@/shared/ui";
+import { EmptyState } from "@/shared/ui";
 import { lazy, Suspense, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
@@ -105,22 +105,16 @@ export function SpaceSectionView(props: {
   if (!user) {
     const returnPath = `${location.pathname}${location.search}${location.hash}`;
     return (
-      <PermissionState
-        className="h-full"
+      <EmptyState
         title="Log in to view this Space"
-        description="Sign in to your Misty account to open Spaces and see their content."
-        action={
-          <Button
-            type="button"
-            onClick={() =>
-              accounts.length > 0
-                ? navigate("/signin", { state: { from: returnPath } })
-                : openSignInSheet("space")
-            }
-          >
-            {accounts.length > 0 ? "Switch account" : "Log in"}
-          </Button>
-        }
+        line="Sign in to your Misty account to open Spaces and see their content."
+        action={{
+          label: accounts.length > 0 ? "Switch account" : "Log in",
+          onClick: () =>
+            accounts.length > 0
+              ? navigate("/signin", { state: { from: returnPath } })
+              : openSignInSheet("space"),
+        }}
       />
     );
   }
@@ -143,9 +137,8 @@ export function SpaceSectionView(props: {
   if (!space) {
     return (
       <EmptyState
-        className="h-full"
         title="This Space isn’t available"
-        description="This Space may have been removed, or you may no longer have access."
+        line="This Space may have been removed, or you may no longer have access."
       />
     );
   }
@@ -178,9 +171,8 @@ export function SpaceSectionView(props: {
           <Chat spaceId={spaceId} spaceName={space.name} workspaceTabId={props.workspaceTabId} />
         ) : (
           <EmptyState
-            className="h-full"
             title="This Space view isn’t available"
-            description="Choose a Space tool from the sidebar."
+            line="Choose a Space tool from the sidebar."
           />
         )}
       </Suspense>

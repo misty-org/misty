@@ -6,7 +6,7 @@ import {
   type SandboxPermission,
 } from "@/native/sandbox";
 import { confirmAction } from "@/shared/lib/confirmAction";
-import { Button, ErrorNotification, SkeletonList } from "@/shared/ui";
+import { Button, useNotice, SkeletonList } from "@/shared/ui";
 import { DesktopSettingsRow as Row, DesktopSettingsSection as Section } from "@/features/settings";
 import { SwitchControl } from "../../settings/SettingsControls";
 
@@ -49,10 +49,11 @@ export function SandboxPermissionsSection() {
     )
       await change(downloadsGrantId, false);
   };
+  useNotice(Boolean(error), { message: error, tone: "error", onDismiss: () => setError("") });
   if (rows === null)
     return (
       <Section title="This computer">
-        <SkeletonList label="This computer" rows={5} leading="none" trailing />
+        <SkeletonList lines={2} label="This computer" rows={5} leading="none" trailing />
       </Section>
     );
   return (
@@ -62,11 +63,7 @@ export function SandboxPermissionsSection() {
         .map((row) =>
           row.id === downloadsGrantId ? (
             <Row key={row.id} label={row.label}>
-              <Button
-                variant="outline"
-                disabled={working !== ""}
-                onClick={() => void revokeDownloads()}
-              >
+              <Button disabled={working !== ""} onClick={() => void revokeDownloads()}>
                 Revoke
               </Button>
             </Row>
@@ -80,7 +77,6 @@ export function SandboxPermissionsSection() {
             </Row>
           ),
         )}
-      <ErrorNotification message={error} onDismiss={() => setError("")} />
     </Section>
   );
 }

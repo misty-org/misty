@@ -1,32 +1,58 @@
 import { Fragment, useEffect, useState } from "react";
-import { ListFilter } from "lucide-react";
+import {
+  ArrowDownAZ,
+  ArrowDownNarrowWide,
+  ArrowDownWideNarrow,
+  ArrowDownZA,
+  ArrowUpDown,
+  CalendarClock,
+  CalendarDays,
+  CalendarRange,
+  ListFilter,
+  RotateCcw,
+} from "lucide-react";
 import { IconButton } from "../controls/IconButton";
 import { Badge } from "../display/Badge";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "../overlays/DropdownMenu";
 import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuLabel,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuSeparator,
-  DropdownMenuItem,
-  DropdownMenuSub,
-  DropdownMenuSubTrigger,
-  DropdownMenuSubContent,
-} from "../overlays/DropdownMenu";
+  MenuItem,
+  MenuLabel,
+  MenuRadioGroup,
+  MenuRadioItem,
+  MenuSeparator,
+  MenuSubmenu,
+  type MenuIcon,
+} from "../overlays/MenuItem";
 
-type CollectionFilterGroup = {
+export type CollectionFilterOption = {
+  value: string;
   label: string;
+  /** The row's 16px icon; the group's icon when left out. */
+  icon?: MenuIcon;
+};
+
+export type CollectionFilterGroup = {
+  label: string;
+  /** Shows the group as a submenu row instead of a labelled section. */
   submenu?: boolean;
   kind?: "filter" | "sort";
+  /** The group's icon: its submenu row's, and its options' when they have none of their own. */
+  icon?: MenuIcon;
   defaultValue?: string;
   value: string;
-  options: { value: string; label: string }[];
+  options: CollectionFilterOption[];
   onChange: (value: string) => void;
 };
 
-/** One consistent filter trigger; selection indicators come from the shared menu. */
+/** Every row starts with an icon; a group without its own uses the one for its kind. */
+function groupIcon(group: CollectionFilterGroup): MenuIcon {
+  return group.icon ?? (group.kind === "sort" ? ArrowUpDown : ListFilter);
+}
+
+/**
+ * The one filter trigger for a collection: an icon button with a count of the filters that
+ * narrow the list (sorting doesn't count), opening a menu whose picks are checkmarked.
+ */
 export function CollectionFilterMenu({
   label,
   groups,
@@ -54,8 +80,9 @@ export function CollectionFilterMenu({
           <ListFilter />
           {filterCount > 0 && (
             <Badge
+              variant="count"
               aria-hidden="true"
-              className="pointer-events-none absolute -right-1 -top-1 h-4 min-w-4 justify-center rounded-full px-1 text-3xs leading-none"
+              className="pointer-events-none absolute -right-1 -top-1"
             >
               {filterCount}
             </Badge>
@@ -65,44 +92,39 @@ export function CollectionFilterMenu({
       <DropdownMenuContent align="end">
         {groups.map((group, index) => (
           <Fragment key={group.label}>
-            {index > 0 && <DropdownMenuSeparator />}
+            {index > 0 && <MenuSeparator />}
             {group.submenu ? (
-              <DropdownMenuSub>
-                <DropdownMenuSubTrigger>{group.label}</DropdownMenuSubTrigger>
-                <DropdownMenuSubContent>
-                  <FilterOptions group={group} />
-                </DropdownMenuSubContent>
-              </DropdownMenuSub>
+              <MenuSubmenu icon={groupIcon(group)} label={group.label}>
+                <FilterOptions group={group} />
+              </MenuSubmenu>
             ) : (
               <>
-                <DropdownMenuLabel>{group.label}</DropdownMenuLabel>
+                <MenuLabel>{group.label}</MenuLabel>
                 <FilterOptions group={group} />
               </>
             )}
           </Fragment>
         ))}
-        <DropdownMenuSeparator />
-        <DropdownMenuItem disabled={!active} onSelect={onReset}>
-          Reset filters
-        </DropdownMenuItem>
+        <MenuSeparator />
+        <MenuItem icon={RotateCcw} label="Reset filters" disabled={!active} onSelect={onReset} />
       </DropdownMenuContent>
     </DropdownMenu>
   );
 }
 
 function FilterOptions({ group }: { group: CollectionFilterGroup }) {
+  const fallback = groupIcon(group);
   return (
-    <DropdownMenuRadioGroup
-      aria-label={group.label}
-      value={group.value}
-      onValueChange={group.onChange}
-    >
+    <MenuRadioGroup aria-label={group.label} value={group.value} onValueChange={group.onChange}>
       {group.options.map((option) => (
-        <DropdownMenuRadioItem key={option.value} value={option.value}>
-          {option.label}
-        </DropdownMenuRadioItem>
+        <MenuRadioItem
+          key={option.value}
+          icon={option.icon ?? fallback}
+          value={option.value}
+          label={option.label}
+        />
       ))}
-    </DropdownMenuRadioGroup>
+    </MenuRadioGroup>
   );
 }
 
@@ -160,7 +182,8 @@ export function useCollectionRefinement<T>(
     requestedFacet?: string;
     facet?: {
       label: string;
-      options: { value: string; label: string }[];
+      /** Options may carry their own icons; otherwise each row gets the filter icon. */
+      options: CollectionFilterOption[];
       value: (item: T) => string;
     };
   },
@@ -191,11 +214,12 @@ export function useCollectionRefinement<T>(
     groups.push({
       label: options.dateLabel ?? "Last activity",
       submenu: true,
+      icon: CalendarClock,
       value: state.period,
       options: [
-        { value: "all", label: "Any time" },
-        { value: "7", label: "Last 7 days" },
-        { value: "30", label: "Last 30 days" },
+        { value: "all", label: "Any time", icon: CalendarRange },
+        { value: "7", label: "Last 7 days", icon: CalendarDays },
+        { value: "30", label: "Last 30 days", icon: CalendarDays },
       ],
       onChange: (period) => setState((old) => ({ ...old, period })),
     });
@@ -205,11 +229,11 @@ export function useCollectionRefinement<T>(
     submenu: true,
     value: state.sort,
     options: [
-      { value: "default", label: options.defaultOrderLabel ?? "Default order" },
-      { value: "recent", label: "Newest first" },
-      { value: "oldest", label: "Oldest first" },
-      { value: "name", label: "Name A–Z" },
-      { value: "name-desc", label: "Name Z–A" },
+      { value: "default", label: options.defaultOrderLabel ?? "Default order", icon: ArrowUpDown },
+      { value: "recent", label: "Newest first", icon: ArrowDownWideNarrow },
+      { value: "oldest", label: "Oldest first", icon: ArrowDownNarrowWide },
+      { value: "name", label: "Name A–Z", icon: ArrowDownAZ },
+      { value: "name-desc", label: "Name Z–A", icon: ArrowDownZA },
     ],
     onChange: (sort) => setState((old) => ({ ...old, sort })),
   });

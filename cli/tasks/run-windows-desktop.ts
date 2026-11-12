@@ -5,8 +5,8 @@ import { basename, dirname, join, resolve } from "node:path";
 // Windows refuses to overwrite or delete a running executable, and Cargo links
 // `target/debug/misty-desktop.exe` on every native reload. Run a private copy
 // so the build output is never locked, whether Tauri or an agent rebuilds it.
-export function prepareDevelopmentCopy(binary: string, profile?: string) {
-  const directory = join(dirname(binary), "misty-dev-run", profile ?? "default");
+export function prepareDevelopmentCopy(binary: string) {
+  const directory = join(dirname(binary), "misty-dev-run");
   mkdirSync(directory, { recursive: true });
   // Earlier runs are still locked while alive; removal of those simply fails.
   for (const entry of readdirSync(directory)) {
@@ -31,10 +31,7 @@ if (process.argv[1] && basename(process.argv[1]) === "run-windows-desktop.ts") {
     if (basename(binary) !== "misty-desktop.exe") {
       throw new Error("The Misty development runner only runs misty-desktop.exe.");
     }
-    const copy = prepareDevelopmentCopy(
-      binary,
-      process.env.MISTY_PROFILE,
-    );
+    const copy = prepareDevelopmentCopy(binary);
     const child = spawn(copy, args, { stdio: "inherit" });
     // Windows cannot exec in place, so end the copy with this wrapper when
     // Tauri stops it for a native reload.

@@ -24,6 +24,7 @@ import {
   Input,
   Skeleton,
   IconButton,
+  OverflowFadeText,
 } from "@/shared/ui";
 import { notifyCliConfigChanged } from "../channels/providers";
 import { ENGINE_NAMES, type EngineId } from "../channels/engines";
@@ -80,9 +81,7 @@ function PathDialog({
               setError("");
             }}
           />
-          <Button variant="secondary" onClick={() => void choose()}>
-            Choose
-          </Button>
+          <Button onClick={() => void choose()}>Choose</Button>
         </div>
         {error ? (
           <p role="alert" className="text-sm text-cream-muted">
@@ -91,13 +90,11 @@ function PathDialog({
         ) : null}
         <div className="flex justify-end gap-2">
           {current ? (
-            <Button variant="secondary" disabled={saving} onClick={() => void commit(null)}>
+            <Button disabled={saving} onClick={() => void commit(null)}>
               Clear
             </Button>
           ) : null}
-          <Button variant="secondary" onClick={onClose}>
-            Cancel
-          </Button>
+          <Button onClick={onClose}>Cancel</Button>
           <Button
             variant="primary"
             disabled={saving || !draft.trim() || draft.trim() === (current ?? "")}
@@ -129,9 +126,7 @@ function ProgramPathRow({
       <span className={pathText} title={current ?? undefined}>
         {current ?? "Found on PATH"}
       </span>
-      <Button size="sm" variant="secondary" onClick={() => setOpen(true)}>
-        {current ? "Change" : "Set"}
-      </Button>
+      <Button onClick={() => setOpen(true)}>{current ? "Change" : "Set"}</Button>
       {open ? (
         <PathDialog
           title={title}
@@ -163,9 +158,7 @@ function CodexHomeRow({ settings, save }: { settings: EngineSettings; save: Save
       <span className={pathText} title={current ?? undefined}>
         {current ?? "~/.codex"}
       </span>
-      <Button size="sm" variant="secondary" onClick={() => setOpen(true)}>
-        {current ? "Change" : "Set"}
-      </Button>
+      <Button onClick={() => setOpen(true)}>{current ? "Change" : "Set"}</Button>
       {open ? (
         <PathDialog
           title="Codex home"
@@ -236,10 +229,11 @@ function CustomModelsDialog({
               key={model}
               className="flex items-center gap-2 rounded-lg border border-charcoal-border px-3 py-1.5"
             >
-              <span className="min-w-0 flex-1 truncate font-mono text-xs text-cream">{model}</span>
+              <OverflowFadeText full className="min-w-0 flex-1 font-mono text-xs text-cream">
+                {model}
+              </OverflowFadeText>
               <IconButton
-                size="xs"
-                variant="ghost"
+                size="sm"
                 label={`Remove ${model}`}
                 onClick={() => setDraft((list) => list.filter((item) => item !== model))}
               >
@@ -264,7 +258,7 @@ function CustomModelsDialog({
                 }
               }}
             />
-            <Button variant="secondary" disabled={!adding.trim()} onClick={add}>
+            <Button disabled={!adding.trim()} onClick={add}>
               Add
             </Button>
           </div>
@@ -275,9 +269,7 @@ function CustomModelsDialog({
           </p>
         ) : null}
         <div className="flex justify-end gap-2">
-          <Button variant="secondary" onClick={onClose}>
-            Cancel
-          </Button>
+          <Button onClick={onClose}>Cancel</Button>
           <Button variant="primary" disabled={saving} onClick={() => void commit()}>
             Save
           </Button>
@@ -301,13 +293,11 @@ function CustomModelsRow({
   return (
     <DesktopSettingsRow label="Custom models">
       {models.length ? (
-        <span className="flex h-5 min-w-5 items-center justify-center rounded-sm bg-charcoal-hover px-1.5 text-2xs text-cream-muted">
+        <span className="flex h-5 min-w-5 items-center justify-center rounded-sm bg-charcoal-hover px-1.5 text-micro text-cream-muted">
           {models.length}
         </span>
       ) : null}
-      <Button size="sm" variant="secondary" onClick={() => setOpen(true)}>
-        Edit
-      </Button>
+      <Button onClick={() => setOpen(true)}>Edit</Button>
       {open ? (
         <CustomModelsDialog
           engine={engine}

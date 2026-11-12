@@ -12,11 +12,13 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  ErrorNotification,
+  FilterChip,
   IconButton,
   SearchField,
   Skeleton,
   Switch,
+  useNotice,
+  OverflowFadeText,
 } from "@/shared/ui";
 import {
   disabledPersonas,
@@ -90,7 +92,9 @@ export function PersonaCatalogSection() {
     );
   }, [catalog, division, query]);
 
-  if (!catalog) return error ? <ErrorNotification message={error} /> : <CatalogSkeleton />;
+  useNotice(Boolean(error), { message: error, tone: "error", onDismiss: () => setError("") });
+
+  if (!catalog) return error ? null : <CatalogSkeleton />;
 
   const divisions = new Map(catalog.divisions.map((entry) => [entry.id, entry]));
   const enabledIn = (id: string | null) =>
@@ -133,35 +137,25 @@ export function PersonaCatalogSection() {
   return (
     <div className="grid gap-3">
       <div className="flex flex-wrap items-center gap-1.5" aria-label="Divisions">
-        <Button
-          variant="chip"
-          size="chip"
-          aria-pressed={division === null}
-          onClick={() => setDivision(null)}
-        >
-          All
-          <span className="text-cream-muted">
-            {enabledIn(null)}/{catalog.agents.length}
-          </span>
-        </Button>
+        <FilterChip
+          label={`All ${enabledIn(null)}/${catalog.agents.length}`}
+          pressed={division === null}
+          onPressedChange={() => setDivision(null)}
+        />
         {catalog.divisions.map((entry) => (
-          <Button
+          <FilterChip
             key={entry.id}
-            variant="chip"
-            size="chip"
-            aria-pressed={division === entry.id}
-            onClick={() => setDivision(division === entry.id ? null : entry.id)}
-          >
-            <span
-              aria-hidden
-              className="size-1.5 rounded-full"
-              style={{ backgroundColor: entry.color ?? undefined }}
-            />
-            {entry.label}
-            <span className="text-cream-muted">
-              {enabledIn(entry.id)}/{entry.count}
-            </span>
-          </Button>
+            label={`${entry.label} ${enabledIn(entry.id)}/${entry.count}`}
+            icon={
+              <span
+                aria-hidden
+                className="size-1.5 rounded-full"
+                style={{ backgroundColor: entry.color ?? undefined }}
+              />
+            }
+            pressed={division === entry.id}
+            onPressedChange={() => setDivision(division === entry.id ? null : entry.id)}
+          />
         ))}
       </div>
       <div className="flex items-center gap-2">
@@ -176,8 +170,6 @@ export function PersonaCatalogSection() {
         {division ? (
           <span className="ml-auto flex gap-1">
             <Button
-              variant="secondary"
-              size="sm"
               disabled={pending}
               onClick={() =>
                 void toggle(
@@ -189,8 +181,6 @@ export function PersonaCatalogSection() {
               Turn on all
             </Button>
             <Button
-              variant="secondary"
-              size="sm"
               disabled={pending}
               onClick={() =>
                 void toggle(
@@ -212,7 +202,7 @@ export function PersonaCatalogSection() {
               key={persona.id}
               className="group flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-charcoal-hover"
             >
-              <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-charcoal-card">
+              <span className="flex size-9 shrink-0 items-center justify-center">
                 {persona.icon ? (
                   <span className="text-base leading-none" aria-hidden>
                     {persona.icon}
@@ -223,9 +213,9 @@ export function PersonaCatalogSection() {
               </span>
               <div className="grid min-w-0 flex-1 gap-0.5">
                 <p className="m-0 flex items-center gap-2 text-sm text-cream">
-                  <span className="truncate">{persona.name}</span>
+                  <OverflowFadeText full>{persona.name}</OverflowFadeText>
                   {group ? (
-                    <span className="inline-flex shrink-0 items-center gap-1 text-2xs text-cream-muted">
+                    <span className="inline-flex shrink-0 items-center gap-1 text-micro text-cream-muted">
                       <span
                         aria-hidden
                         className="size-1.5 rounded-full"
@@ -235,15 +225,14 @@ export function PersonaCatalogSection() {
                     </span>
                   ) : null}
                 </p>
-                <p className="m-0 truncate text-xs text-cream-muted" title={persona.description}>
+                <OverflowFadeText as="p" full className="m-0 text-xs text-cream-muted">
                   {persona.description}
-                </p>
+                </OverflowFadeText>
               </div>
-              <IconButton size="sm" label={`Read ${persona.name}`} onClick={() => view(persona)}>
+              <IconButton label={`Read ${persona.name}`} onClick={() => view(persona)}>
                 <Eye className="size-4" />
               </IconButton>
               <IconButton
-                size="sm"
                 label={made.has(persona.id) ? "Agent made" : "Make an agent from this"}
                 disabled={made.has(persona.id)}
                 onClick={() => void make(persona)}
@@ -276,7 +265,6 @@ export function PersonaCatalogSection() {
         </a>
         , {catalog.provider.license} license
       </p>
-      <ErrorNotification message={error} onDismiss={() => setError("")} />
       <Dialog open={Boolean(viewing)} onOpenChange={(open) => !open && setViewing(undefined)}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>

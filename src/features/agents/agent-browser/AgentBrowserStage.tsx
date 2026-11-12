@@ -52,9 +52,10 @@ export function AgentBrowserStage({
     };
   }, [scopeId, blank]);
 
-  useAgentPageGeometry(ref, viewId);
+  useAgentPageGeometry(ref, viewId, { handoff: true });
 
-  // While the agent acts, its page takes no input from the person; Misty's pulsing mist over the page marks it; the tab strip and toolbar stay the person's.
+  // While the agent acts, its page takes no input from the person; Misty's pulsing mist over the
+  // page marks it. The tab strip and toolbar stay the person's.
   useEffect(() => {
     if (!viewId) return;
     void invoke("browser_agent_set_locked", {

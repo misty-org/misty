@@ -105,3 +105,42 @@
     }
   }
 }
+
+/* Long text shortens with a fade at its end, never an ellipsis (OverflowFadeText, Text). The fade
+   is set only while the text overflows, so a label that fits stays crisp to its last letter.
+   It sits at the end the text runs to, which is the left in right-to-left text. */
+@utility fade-end {
+  -webkit-mask-image: linear-gradient(to right, black calc(100% - 18px), transparent);
+  mask-image: linear-gradient(to right, black calc(100% - 18px), transparent);
+
+  &:where([dir="rtl"], [dir="rtl"] *) {
+    -webkit-mask-image: linear-gradient(to left, black calc(100% - 18px), transparent);
+    mask-image: linear-gradient(to left, black calc(100% - 18px), transparent);
+  }
+}
+
+/* Two-line text that runs past its second line: the first line stays whole and the second fades
+   at its end. The element is exactly two lines tall while this is set. */
+@utility fade-end-2 {
+  -webkit-mask-image:
+    linear-gradient(black, black), linear-gradient(to right, black calc(100% - 18px), transparent);
+  mask-image:
+    linear-gradient(black, black), linear-gradient(to right, black calc(100% - 18px), transparent);
+  -webkit-mask-size: 100% 50%;
+  mask-size: 100% 50%;
+  -webkit-mask-position:
+    top left,
+    bottom left;
+  mask-position:
+    top left,
+    bottom left;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+
+  &:where([dir="rtl"], [dir="rtl"] *) {
+    -webkit-mask-image:
+      linear-gradient(black, black), linear-gradient(to left, black calc(100% - 18px), transparent);
+    mask-image:
+      linear-gradient(black, black), linear-gradient(to left, black calc(100% - 18px), transparent);
+  }
+}

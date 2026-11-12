@@ -152,6 +152,7 @@ import { notifyAccountScopeReset } from "@/features/account/sessions/accountEven
 import { useNavigationNames } from "@/features/app-windows/navigation-names/store";
 import { useSettingsStore } from "@/features/settings";
 import { useMistyPanelStore } from "@/features/agents";
+import { NoticeViewport } from "@/shared/ui";
 import { DesktopLayout } from "./index";
 
 describe("DesktopLayout on Auth Routes", () => {
@@ -196,13 +197,17 @@ describe("DesktopLayout on Auth Routes", () => {
     });
     await act(async () => {
       root.render(
-        <MemoryRouter initialEntries={["/signin"]}>
-          <Routes>
-            <Route element={<DesktopLayout getRouteId={() => "signin" as any} />}>
-              <Route path="/signin" element={<SignIn />} />
-            </Route>
-          </Routes>
-        </MemoryRouter>,
+        <>
+          {/* App mounts the notices' viewport; errors show there. */}
+          <NoticeViewport />
+          <MemoryRouter initialEntries={["/signin"]}>
+            <Routes>
+              <Route element={<DesktopLayout getRouteId={() => "signin" as any} />}>
+                <Route path="/signin" element={<SignIn />} />
+              </Route>
+            </Routes>
+          </MemoryRouter>
+        </>,
       );
     });
     await act(async () => {

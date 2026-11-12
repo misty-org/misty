@@ -1,5 +1,5 @@
 import type { PreviewErrorComponent } from "./previewTypes";
-import { IconButton, Skeleton } from "@/shared/ui";
+import { IconButton, OverflowFadeText, Skeleton } from "@/shared/ui";
 import { Minus, Plus } from "lucide-react";
 import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -89,9 +89,9 @@ export default function PdfViewerView({
     <div className="flex h-full w-full flex-col bg-charcoal-card">
       {compact ? null : (
         <div className="flex h-12 flex-none items-center justify-between gap-3 border-b border-charcoal-border bg-charcoal-bg px-3 text-cream ">
-          <span className="min-w-0 truncate text-sm font-medium" title={name}>
+          <OverflowFadeText full className="text-sm font-medium">
             {name}
-          </span>
+          </OverflowFadeText>
           <div className="flex flex-none items-center gap-3">
             <span className="text-xs tabular-nums text-cream-muted">
               {numPages ? `Page ${currentPage} of ${numPages}` : "—"}

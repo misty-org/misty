@@ -1,16 +1,26 @@
-import { GripVertical, Plus, Trash2 } from "lucide-react";
+import {
+  CircleAlert,
+  Eye,
+  FilePen,
+  GripVertical,
+  OctagonAlert,
+  PencilLine,
+  Plus,
+  Trash2,
+} from "lucide-react";
 import { useState } from "react";
 import { reorderIds, usePointerReorder } from "@/shared/hooks/usePointerReorder";
-import { Button, ErrorNotification, IconButton, Input, OptionSelect, Textarea } from "@/shared/ui";
+import { Button, IconButton, Input, OptionSelect, Textarea, type SelectOption } from "@/shared/ui";
+import { ErrorNotice } from "../conversations/ErrorNotice";
 import { useCollaborationStore } from "./store";
 import type { AgentPlan, AgentPlanStep, PlanRisk } from "./planTypes";
 
-const riskOptions: Array<{ value: PlanRisk; label: string }> = [
-  { value: "read", label: "Reads" },
-  { value: "draft", label: "Drafts" },
-  { value: "write", label: "Changes" },
-  { value: "consequential", label: "Asks first" },
-  { value: "dangerous", label: "Risky" },
+const riskOptions: SelectOption[] = [
+  { value: "read", label: "Reads", icon: Eye },
+  { value: "draft", label: "Drafts", icon: FilePen },
+  { value: "write", label: "Changes", icon: PencilLine },
+  { value: "consequential", label: "Asks first", icon: CircleAlert },
+  { value: "dangerous", label: "Risky", icon: OctagonAlert },
 ];
 const maxSteps = 12;
 const moveStepShortcuts = "Alt+Shift+ArrowUp Alt+Shift+ArrowDown";
@@ -98,7 +108,7 @@ export function AgentPlanEditor({
             className="agent-plan-edit-step"
           >
             <IconButton
-              size="xs"
+              size="sm"
               label={`Move step ${index + 1}`}
               data-reorder-handle
               aria-keyshortcuts={moveStepShortcuts}
@@ -129,7 +139,7 @@ export function AgentPlanEditor({
               onValueChange={(value) => update(step.id, { risk: value as PlanRisk })}
             />
             <IconButton
-              size="xs"
+              size="sm"
               label={`Remove step ${index + 1}`}
               disabled={steps.length === 1}
               onClick={() => setSteps((current) => current.filter((item) => item.id !== step.id))}
@@ -139,16 +149,16 @@ export function AgentPlanEditor({
           </div>
         ))}
       </div>
-      <Button variant="ghost" size="sm" disabled={steps.length >= maxSteps} onClick={addStep}>
+      <Button variant="quiet" disabled={steps.length >= maxSteps} onClick={addStep}>
         <Plus aria-hidden="true" />
         Add step
       </Button>
-      <ErrorNotification message={error} onDismiss={() => setError("")} />
+      <ErrorNotice message={error} onDismiss={() => setError("")} />
       <div className="agent-plan-actions">
-        <Button variant="primary" size="sm" disabled={!valid || busy} onClick={() => void save()}>
+        <Button variant="primary" disabled={!valid || busy} onClick={() => void save()}>
           {busy ? "Saving…" : "Save as new version"}
         </Button>
-        <Button variant="ghost" size="sm" disabled={busy} onClick={onCancel}>
+        <Button variant="quiet" disabled={busy} onClick={onCancel}>
           Cancel
         </Button>
       </div>

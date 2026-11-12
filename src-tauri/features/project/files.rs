@@ -80,8 +80,17 @@ async fn blocking<T: Send + 'static>(
         .map_err(|error| error.to_string())?
 }
 
-/// One folder's entries, folders first. With `ignore_root` each entry carries its Git-ignore
-/// state, bounded by the tree's root (see `git_ignore.rs`); other callers skip the Git work.
+/// Files the operating system leaves in folders for itself: Finder's view settings, Explorer's
+/// thumbnail cache and folder settings. Nobody made them, so no listing shows them.
+fn is_os_junk(name: &str) -> bool {
+    [".DS_Store", "Thumbs.db", "desktop.ini"]
+        .iter()
+        .any(|junk| name.eq_ignore_ascii_case(junk))
+}
+
+/// One folder's entries, folders first, without the system's own junk files. With `ignore_root`
+/// each entry carries its Git-ignore state, bounded by the tree's root (see `git_ignore.rs`);
+/// other callers skip the Git work.
 pub(crate) fn list_dir_blocking(
     dir: &Path,
     ignore_root: Option<&Path>,
@@ -90,12 +99,9 @@ pub(crate) fn list_dir_blocking(
         .map_err(|error| format!("Couldn't read {}: {error}", dir.display()))?;
     let raw: Vec<(String, Option<std::fs::Metadata>)> = entries
         .flatten()
-        .map(|entry| {
-            (
-                entry.file_name().to_string_lossy().to_string(),
-                file_access::fs::metadata(entry.path()).ok(),
-            )
-        })
+        .map(|entry| (entry.file_name().to_string_lossy().to_string(), entry))
+        .filter(|(name, _)| !is_os_junk(name))
+        .map(|(name, entry)| (name, file_access::fs::metadata(entry.path()).ok()))
         .collect();
     let is_dir = |meta: &Option<std::fs::Metadata>| meta.as_ref().is_some_and(|m| m.is_dir());
     let ignored = match ignore_root {

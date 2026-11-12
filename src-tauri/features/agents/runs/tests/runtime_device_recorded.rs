@@ -39,31 +39,6 @@ fn device(case: &Value, base_url: &str) -> Device {
     }
 }
 
-fn capable(body: &Value) -> Value {
-    let messages = body["messages"].as_array().unwrap();
-    if body["messages"].to_string().contains("image_url") {
-        return json!({ "content": "Red." });
-    }
-    if !messages.iter().any(|message| message["role"] == "tool") {
-        return json!({ "tool_calls": [{ "id": "call_1", "type": "function", "function": { "name": "stock", "arguments": r#"{"store":"North","product":"blue kettle"}"# } }] });
-    }
-    json!({ "content": "The North store has 37." })
-}
-
-fn weak(body: &Value) -> Value {
-    let messages = body["messages"].as_array().unwrap();
-    if body["messages"].to_string().contains("image_url") {
-        return json!({ "content": "Blue." });
-    }
-    let call = |id: &str, name: &str, arguments: &str| json!({ "tool_calls": [{ "id": id, "type": "function", "function": { "name": name, "arguments": arguments } }] });
-    // Each tool message is one result, whichever the conversation has reached.
-    match messages.iter().filter(|message| message["role"] == "tool").count() {
-        0 => call("call_1", "stock", r#"{"store":"North"}"#),
-        1 => call("call_2", "other", "{}"),
-        count => call(&format!("call_{}", count + 1), "stock", r#"{"store":"South","product":"x","extra":1}"#),
-    }
-}
-
 /// Each case's input as it was written, because a parsed `Value` would sort its keys.
 fn raw_inputs() -> Vec<String> {
     #[derive(serde::Deserialize)]
@@ -132,18 +107,12 @@ async fn every_recorded_call_asks_and_answers_the_same() {
     let mut checked = 0;
     for (index, case) in fixture["cases"].as_array().unwrap().iter().enumerate() {
         let label = format!("case {index} {}", case["name"]);
-        let replies = case["replies"].as_array().cloned();
-        let model_tests_seen = fixture["cases"].as_array().unwrap()[..index].iter().filter(|earlier| earlier["name"] == "model-test").count();
+        let replies = case["replies"].as_array().cloned().unwrap_or_else(|| panic!("{label}: no replies"));
         let served = Arc::new(AtomicUsize::new(0));
         let counter = served.clone();
-        let server = provider(move |request: &Seen| {
+        let server = provider(move |_: &Seen| {
             let next = counter.fetch_add(1, Ordering::SeqCst);
-            let message = match &replies {
-                Some(replies) => replies[next.min(replies.len() - 1)].clone(),
-                None if model_tests_seen == 0 => capable(&request.json()),
-                None => weak(&request.json()),
-            };
-            Answer::completion(&message)
+            Answer::completion(&replies[next.min(replies.len() - 1)])
         })
         .await;
         let models: Arc<dyn DeviceModels> = Arc::new(device(case, &server.base_url));
@@ -157,7 +126,7 @@ async fn every_recorded_call_asks_and_answers_the_same() {
         }
         let mut sent: Vec<String> = server.requests().iter().map(|request| asked(&request.json()).to_string()).collect();
         let mut expected: Vec<String> = case["requests"].as_array().unwrap().iter().map(|request| asked(request).to_string()).collect();
-        // The two model checks run at once, so their requests can come in either order.
+        // Calls made at once can reach the provider in either order.
         sent.sort();
         expected.sort();
         assert_eq!(sent.len(), expected.len(), "{label}");

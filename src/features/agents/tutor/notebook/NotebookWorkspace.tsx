@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
 import { confirmAction } from "@/shared/lib/confirmAction";
-import { ErrorNotification } from "@/shared/ui";
+import { useNotice } from "@/shared/ui";
 import type { TutorActions } from "../TutorPage";
 import { jobTitle, notebookContext } from "../tutorPrompts";
 import { startJob } from "../tutorRuns";
@@ -135,6 +135,7 @@ export function NotebookWorkspace({
   actions: TutorActions;
 }) {
   const [error, setError] = useState("");
+  useNotice(Boolean(error), { message: error, tone: "error", onDismiss: () => setError("") });
   const [adding, setAdding] = useState(false);
   const [customizing, setCustomizing] = useState(false);
   const [opened, setOpened] = useState<Opened | { kind: "new-note" }>();
@@ -261,7 +262,6 @@ export function NotebookWorkspace({
               onError={setError}
             />
           )}
-          <ErrorNotification message={error} onDismiss={() => setError("")} />
         </div>
         <StudioPanel
           notebook={notebook}
@@ -285,7 +285,7 @@ export function NotebookWorkspace({
           <PaneHandle
             side="right"
             at={right}
-            label="Resize studio"
+            label="Resize Create"
             onDrag={(width) => resize("right", width)}
             onDone={keepWidths}
           />

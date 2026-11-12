@@ -1,5 +1,5 @@
 import { useState, type ComponentProps } from "react";
-import { CollectionFilters, ErrorNotification } from "@/shared/ui";
+import { CollectionFilters, useNotice } from "@/shared/ui";
 import { useDevicePreferences } from "./device-preferences/store";
 import { resolveSetting } from "./device-preferences/settingResolution";
 
@@ -44,6 +44,11 @@ export function OrderedCollectionFilters({
   const ready = useDevicePreferences((store) => store.ready);
   const edit = useDevicePreferences((store) => store.edit);
   const [failure, setFailure] = useState<string>();
+  useNotice(Boolean(failure), {
+    message: failure ?? "",
+    tone: "error",
+    onDismiss: () => setFailure(undefined),
+  });
   return (
     <>
       <CollectionFilters
@@ -62,7 +67,6 @@ export function OrderedCollectionFilters({
             : undefined
         }
       />
-      <ErrorNotification message={failure} onDismiss={() => setFailure(undefined)} />
     </>
   );
 }

@@ -41,11 +41,8 @@ export function ChatEmojiPicker({
           {matches.map(([emoji, name]) => (
             <IconButton
               key={name}
-              variant="ghost"
-              size="md"
               className="text-xl"
               label={name}
-              tooltip={false}
               onClick={() => {
                 onSelect(emoji);
                 setOpen(false);

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { accountApi } from "../api/api";
 import { accountClosingMessage, useAccountClosing } from "@/api/client/accountLimits";
-import { Button, Notification } from "@/shared/ui";
+import { useNotice } from "@/shared/ui";
 import { AccountExportDialog } from "../export/AccountExportDialog";
 import { useAuth } from "../sessions/authState";
 
@@ -17,7 +17,6 @@ export function AccountClosingNotice() {
   const [dismissed, setDismissed] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const [google, setGoogle] = useState(false);
-  if (!deleteAt || !user) return null;
   const openExport = () => {
     setExporting(true);
     // A Google account confirms with Google instead of a password.
@@ -26,17 +25,14 @@ export function AccountClosingNotice() {
       .then((me) => setGoogle(me.provider === "google"))
       .catch(() => undefined);
   };
+  useNotice(Boolean(deleteAt && user) && dismissed !== deleteAt, {
+    message: deleteAt ? accountClosingMessage(deleteAt) : "",
+    action: { label: "Export", onSelect: openExport },
+    onDismiss: () => setDismissed(deleteAt),
+  });
+  if (!deleteAt || !user) return null;
   return (
     <>
-      {dismissed === deleteAt ? null : (
-        <Notification onDismiss={() => setDismissed(deleteAt)}>
-          {accountClosingMessage(deleteAt)}
-          <br />
-          <Button type="button" variant="ghost" size="sm" onClick={openExport}>
-            Export
-          </Button>
-        </Notification>
-      )}
       <AccountExportDialog
         open={exporting}
         onOpenChange={setExporting}

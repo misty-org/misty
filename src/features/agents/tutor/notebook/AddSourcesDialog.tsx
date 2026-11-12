@@ -129,7 +129,7 @@ export function AddSourcesDialog({
             onChange={(event) => setQuery(event.target.value)}
           />
           <IconButton label="Find sources" type="submit" disabled={!query.trim() || busy}>
-            <ArrowRight size={16} />
+            <ArrowRight />
           </IconButton>
         </form>
 
@@ -144,10 +144,10 @@ export function AddSourcesDialog({
               onChange={(event) => setLinks(event.target.value)}
             />
             <div className="flex justify-end gap-1.5">
-              <Button variant="ghost" size="sm" onClick={() => setMode("choose")}>
+              <Button variant="quiet" onClick={() => setMode("choose")}>
                 Back
               </Button>
-              <Button size="sm" disabled={!links.trim()} onClick={addLinks}>
+              <Button disabled={!links.trim()} onClick={addLinks}>
                 Add
               </Button>
             </div>
@@ -169,11 +169,10 @@ export function AddSourcesDialog({
               onChange={(event) => setPasted(event.target.value)}
             />
             <div className="flex justify-end gap-1.5">
-              <Button variant="ghost" size="sm" onClick={() => setMode("choose")}>
+              <Button variant="quiet" onClick={() => setMode("choose")}>
                 Back
               </Button>
               <Button
-                size="sm"
                 disabled={!pasted.trim()}
                 onClick={() => {
                   addText(notebook.id, title.trim() || "Pasted text", pasted);
@@ -188,27 +187,25 @@ export function AddSourcesDialog({
           <>
             <div className="tutor-add-kinds">
               <Button
-                variant="outline"
                 disabled={busy}
+                size="lg"
                 onClick={() => run(() => addPickedFiles(notebook.id))}
+                icon={Upload}
               >
-                <Upload size={16} />
                 Upload files
               </Button>
               <Button
-                variant="outline"
                 disabled={busy}
+                size="lg"
                 onClick={() => run(() => addRecordings(notebook.id).then(report))}
+                icon={Mic}
               >
-                <Mic size={16} />
                 Recordings
               </Button>
-              <Button variant="outline" onClick={() => setMode("links")}>
-                <Link2 size={16} />
+              <Button size="lg" onClick={() => setMode("links")} icon={Link2}>
                 Websites and videos
               </Button>
-              <Button variant="outline" onClick={() => setMode("text")}>
-                <Clipboard size={16} />
+              <Button size="lg" onClick={() => setMode("text")} icon={Clipboard}>
                 Copied text
               </Button>
             </div>

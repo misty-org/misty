@@ -1,4 +1,5 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
+import { GitBranchPlus, RotateCw } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -9,18 +10,27 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   Button,
+  EmptyState,
+  ErrorState,
   Textarea,
 } from "@/shared/ui";
 
-/** A folder outside any repository: says so, and offers `git init` right there. */
+/**
+ * A folder outside any repository: says so, and offers `git init` right there. Nothing else in
+ * the panel applies to it, so this is all the panel shows.
+ */
 export function NotRepoState({ busy, onInit }: { busy: boolean; onInit: () => void }) {
   return (
-    <div className="git-empty">
-      <p>This folder isn't a Git repository.</p>
-      <Button size="sm" variant="secondary" disabled={busy} aria-busy={busy} onClick={onInit}>
-        Initialize repository
-      </Button>
-    </div>
+    <EmptyState
+      title="Not a Git repository"
+      line="Make this folder a repository to see and commit its changes here."
+      action={{
+        label: "Initialize repository",
+        icon: GitBranchPlus,
+        disabled: busy,
+        onClick: onInit,
+      }}
+    />
   );
 }
 
@@ -28,18 +38,18 @@ export function NotRepoState({ busy, onInit }: { busy: boolean; onInit: () => vo
  * lives here rather than in the dismissible notice, so dismissing it never leaves a blank body. */
 export function StatusErrorState(props: { message: string; busy: boolean; onRetry: () => void }) {
   return (
-    <div className="git-empty" data-error>
-      <p role="alert">{props.message}</p>
-      <Button
-        size="sm"
-        variant="secondary"
-        disabled={props.busy}
-        aria-busy={props.busy}
-        onClick={props.onRetry}
-      >
-        Try again
-      </Button>
-    </div>
+    <ErrorState
+      title="Couldn't read the changes"
+      line={props.message}
+      action={{ label: "Try again", icon: RotateCw, disabled: props.busy, onClick: props.onRetry }}
+    />
+  );
+}
+
+/** A repository whose files all match their last commit. */
+export function NoChangesState() {
+  return (
+    <EmptyState title="No changes" line="Everything in this folder matches its last commit." />
   );
 }
 
@@ -69,7 +79,7 @@ export function CommitFooter(props: {
           }
         }}
       />
-      <Button size="sm" disabled={disabled} onClick={props.onCommitSelected}>
+      <Button loading={props.busy} disabled={disabled} onClick={props.onCommitSelected}>
         {props.selectedCount > 0 ? `Commit (${props.selectedCount})` : "Commit"}
       </Button>
     </div>

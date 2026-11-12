@@ -127,7 +127,7 @@ pub fn resolve_embedding_model(
                 .unwrap_or_default();
             Ok(style(base, Some(target.provider.as_str().to_owned())))
         }
-        ProviderId::Anthropic | ProviderId::Chatgpt | ProviderId::Elevenlabs | ProviderId::Soniox => {
+        ProviderId::Anthropic | ProviderId::Elevenlabs | ProviderId::Soniox => {
             Err(ModelError::unsupported_model("This provider has no embedding models."))
         }
     }

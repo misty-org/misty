@@ -7,7 +7,7 @@ import {
 } from "@/features/settings";
 import { confirmAction } from "@/shared/lib/confirmAction";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { Button, ErrorNotification, SkeletonList } from "@/shared/ui";
+import { Button, SkeletonList, useNotice } from "@/shared/ui";
 import { DropdownControl, SwitchControl } from "../settings/SettingsControls";
 import type { PetSummary } from "./petAtlas";
 import { normalizePetScale, PET_SCALE_OPTIONS } from "./petScale";
@@ -19,6 +19,7 @@ function usePets() {
   const [pets, setPets] = useState<PetSummary[] | null>(null);
   const [settings, setSettings] = useState<PetSettings | null>(null);
   const [error, setError] = useState("");
+  useNotice(Boolean(error), { message: error, tone: "error", onDismiss: () => setError("") });
   const [busy, setBusy] = useState(false);
 
   const reload = useCallback(
@@ -58,7 +59,7 @@ function usePets() {
     }
   };
 
-  return { pets, settings, error, setError, busy, act };
+  return { pets, settings, busy, act };
 }
 
 /**
@@ -66,7 +67,7 @@ function usePets() {
  * package (a folder with `pet.json` and its spritesheet) and follows what the person's agents do.
  */
 export function PetsSection(_props: SettingsContentProps) {
-  const { pets, settings, error, setError, busy, act } = usePets();
+  const { pets, settings, busy, act } = usePets();
   if (!hasTauriInternals()) return null;
   if (!pets || !settings) {
     return (
@@ -88,7 +89,6 @@ export function PetsSection(_props: SettingsContentProps) {
   };
   return (
     <Section title="Pet">
-      {error ? <ErrorNotification message={error} onDismiss={() => setError("")} /> : null}
       <Row label="Show pet">
         <SwitchControl
           checked={settings.enabled && Boolean(selected)}
@@ -107,16 +107,11 @@ export function PetsSection(_props: SettingsContentProps) {
               onValueChange={(id) => void act(() => petsApi.select(id))}
             />
           ) : null}
-          <Button variant="outline" size="sm" disabled={busy} onClick={() => void importPet()}>
+          <Button disabled={busy} onClick={() => void importPet()}>
             Import
           </Button>
           {selected ? (
-            <Button
-              variant="ghost"
-              size="sm"
-              disabled={busy}
-              onClick={() => void removePet(selected)}
-            >
+            <Button variant="quiet" disabled={busy} onClick={() => void removePet(selected)}>
               Remove
             </Button>
           ) : null}

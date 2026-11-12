@@ -42,16 +42,22 @@ pub(super) fn with_history(prompt: String, history: &Value) -> String {
     )
 }
 
+/// What a turn with the Browser attachment adds after the prompt.
+const BROWSER_HINT: &str = "\n\n(Use Misty's browser for this, through the misty MCP server: open a tab with \
+screen_open, read it with browser_snapshot and act with browser_steps. I can watch it and take over.)";
+
 /// The prompt an engine gets. With the Browser attachment it is told to work in Misty's browser,
 /// whose tools the Space's MCP server offers only then (mcp.rs).
 pub(super) fn with_browser_hint(prompt: &str, browser: bool) -> String {
     if !browser {
         return prompt.to_string();
     }
-    format!(
-        "{prompt}\n\n(Use Misty's browser for this, through the misty MCP server: open a tab with \
-screen_open, read it with browser_snapshot and act with browser_steps. I can watch it and take over.)"
-    )
+    format!("{prompt}{BROWSER_HINT}")
+}
+
+/// A sent prompt without the browser hint, for matching it to what the person wrote.
+pub(super) fn without_browser_hint(prompt: &str) -> &str {
+    prompt.strip_suffix(BROWSER_HINT).unwrap_or(prompt).trim_end()
 }
 
 /// The pictures among a request's attachments, saved where the engine layer reads pasted

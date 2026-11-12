@@ -135,25 +135,6 @@ fn openrouter_ids_keep_their_nested_model_path() {
 }
 
 #[test]
-fn a_chatgpt_token_reaches_the_runtime_document() {
-    let settings = json!({ "agent_model": "chatgpt/gpt-6.1-sol", "embedding_model": "ollama-cloud/nomic-embed-text" });
-    let runtime_keys = |provider: &str| match provider {
-        "chatgpt" => Some("chatgpt-access".to_owned()),
-        "ollama-cloud" => Some("ollama-key".to_owned()),
-        _ => None,
-    };
-    let doc = document(&settings, &runtime_keys).unwrap();
-    assert_eq!(
-        doc["providers"]["chatgpt"],
-        json!({ "apiKey": "chatgpt-access" })
-    );
-    assert_eq!(
-        doc["providers"]["ollama-cloud"],
-        json!({ "apiKey": "ollama-key" })
-    );
-}
-
-#[test]
 fn carries_the_web_search_key_of_the_chosen_provider() {
     let chosen =
         json!({ "agent_model": "anthropic/claude-sonnet-5-5", "search_provider": "serper" });

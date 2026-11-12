@@ -1,5 +1,5 @@
 import type { MessageAttachment, SpaceLibraryItem } from "../../api/dto/entities";
-import { Button } from "@/shared/ui";
+import { Button, OverflowFadeText } from "@/shared/ui";
 import { LibraryBig, X } from "lucide-react";
 
 /** Removable chips for uploads and Library picks staged on the current draft. */
@@ -23,30 +23,28 @@ export function ChatAttachmentChips({
       {pendingAttachments.map((attachment) => (
         <Button
           variant="secondary"
-          size="sm"
           className="h-7 max-w-full"
           type="button"
           key={attachment.id}
+          iconEnd={X}
           onClick={() => onRemoveAttachment(attachment.id)}
         >
-          <span className="truncate">{attachment.display_name}</span>
-          <X />
+          <OverflowFadeText full>{attachment.display_name}</OverflowFadeText>
         </Button>
       ))}
       {selectedLibraryIds.map((id) => (
         <Button
           variant="secondary"
-          size="sm"
           className="h-7 max-w-full"
           type="button"
           key={id}
+          icon={LibraryBig}
+          iconEnd={X}
           onClick={() => onRemoveLibraryItem(id)}
         >
-          <LibraryBig />
-          <span className="truncate">
+          <OverflowFadeText full>
             {libraryItems.find((item) => item.id === id)?.display_name ?? "Library item"}
-          </span>
-          <X />
+          </OverflowFadeText>
         </Button>
       ))}
     </div>

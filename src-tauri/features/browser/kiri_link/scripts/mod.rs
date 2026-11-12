@@ -1,5 +1,4 @@
 use serde::Serialize;
-use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::{AppHandle, Emitter};
 
 /// The top document's page script; `browser_viewport_script` fills its placeholders.
@@ -61,25 +60,11 @@ pub(in crate::browser) fn browser_viewport_script(
         .replace("__MISTY_INITIAL_SHORTCUTS_PLACEHOLDER__", &bindings_json)
 }
 
-static STATUS_BUBBLE_ENABLED: AtomicBool = AtomicBool::new(true);
-
-/// Whether pages show the hovered-link and loading bubble. Misty's settings
-/// push the user's preference; pages created afterwards start with it.
-pub(in crate::browser) fn set_status_bubble_enabled(enabled: bool) {
-    STATUS_BUBBLE_ENABLED.store(enabled, Ordering::Relaxed);
-}
-
 /// The tab's token authenticates the Escape-to-stop report on Kiri's host channel.
 pub(in crate::browser) fn browser_status_script(shortcut_token: &str) -> String {
     include_str!("status.js")
-        .replace(
-            "__MISTY_STATUS_ENABLED_PLACEHOLDER__",
-            if STATUS_BUBBLE_ENABLED.load(Ordering::Relaxed) {
-                "true"
-            } else {
-                "false"
-            },
-        )
+        // Pages always show the hovered-link and loading bubble.
+        .replace("__MISTY_STATUS_ENABLED_PLACEHOLDER__", "true")
         .replace(
             "__KIRI_HOST_SENDER_PLACEHOLDER__",
             kiri::channel::sender_script(),

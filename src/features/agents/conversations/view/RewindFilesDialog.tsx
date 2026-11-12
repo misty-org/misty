@@ -9,6 +9,7 @@ import {
   AlertDialogTitle,
   Button,
   Checkbox,
+  OverflowFadeText,
 } from "@/shared/ui";
 import {
   chosenByDefault,
@@ -67,9 +68,9 @@ export function RewindFilesDialog({
                     checked={chosen.has(key)}
                     onCheckedChange={(state) => toggle(key, state === true)}
                   />
-                  <span className="min-w-0 flex-1 truncate font-mono text-xs" title={name}>
+                  <OverflowFadeText className="min-w-0 flex-1 font-mono text-xs" full>
                     {name}
-                  </span>
+                  </OverflowFadeText>
                   <span className="shrink-0 text-xs text-cream-muted">
                     {file.changedByYou
                       ? "Changed since"
@@ -89,9 +90,7 @@ export function RewindFilesDialog({
         ) : null}
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <Button variant="outline" onClick={() => onChoose({ kind: "keep" })}>
-            Keep files
-          </Button>
+          <Button onClick={() => onChoose({ kind: "keep" })}>Keep files</Button>
           <AlertDialogAction
             disabled={!chosen.size}
             onClick={() =>

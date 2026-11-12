@@ -97,7 +97,7 @@ export function SetupPage() {
           {step === "engines" ? (
             <>
               {ready.length === 0 ? (
-                <Button variant="ghost" onClick={() => setStep("apps")}>
+                <Button variant="quiet" onClick={() => setStep("apps")}>
                   Skip for now
                 </Button>
               ) : null}

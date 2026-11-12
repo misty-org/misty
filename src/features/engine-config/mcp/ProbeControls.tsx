@@ -16,7 +16,7 @@ import { probeStateFor, useMcpProbeStore } from "./probe-store";
 import type { McpConfigEntry } from "./types";
 
 const BADGE =
-  "inline-flex h-5 shrink-0 items-center gap-1 rounded-sm border px-1.5 text-2xs leading-none";
+  "inline-flex h-5 shrink-0 items-center gap-1 rounded-sm border px-1.5 text-micro leading-none";
 // A working connection is the one state that carries color; the rest stay neutral.
 const TONE = {
   connected: "border-emerald-500/30 bg-emerald-500/10 text-emerald-300",
@@ -76,9 +76,8 @@ export function ProbeActionButton({
   const probe = useMcpProbeStore((state) => state.probe);
   return (
     <IconButton
-      size="sm"
       label={copy.probeCheck(entry.name)}
-      tooltip={copy.probeHint}
+      hint={copy.probeHint}
       disabled={pending}
       onClick={() => void probe(entry, workspacePath)}
     >
@@ -118,8 +117,7 @@ export function ProbeDetail({
         <ProbeStatusChip entry={entry} />
         <Button
           type="button"
-          size="xs"
-          variant="secondary"
+          size="sm"
           title={copy.probeHint}
           disabled={pending}
           onClick={() => void probe(entry, workspacePath)}

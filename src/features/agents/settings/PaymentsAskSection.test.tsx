@@ -1,4 +1,5 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { NoticeViewport, resetNotices } from "@/shared/ui";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const api = vi.hoisted(() => ({
@@ -18,6 +19,7 @@ describe("PaymentsAskSection", () => {
 
   afterEach(() => {
     cleanup();
+    act(() => resetNotices());
   });
 
   it("loads the saved choice and saves a change through the server", async () => {
@@ -34,7 +36,13 @@ describe("PaymentsAskSection", () => {
 
   it("shows a plain notice when saving fails", async () => {
     api.updatePaymentsAsk.mockRejectedValue(new Error("pq: raw server failure"));
-    render(<PaymentsAskSection />);
+    // The failure is a notice, drawn where the app draws them.
+    render(
+      <>
+        <NoticeViewport />
+        <PaymentsAskSection />
+      </>,
+    );
 
     const toggle = await screen.findByRole("switch");
     await waitFor(() => expect(toggle.hasAttribute("disabled")).toBe(false));

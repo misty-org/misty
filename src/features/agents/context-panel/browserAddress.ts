@@ -1,6 +1,6 @@
 /**
- * What the browser panel's address field makes of what was typed: a web address as it is, a bare
- * name like `example.com` with `https://`, and anything else as a search.
+ * What an address field makes of what was typed: a web address as it is, a bare name like
+ * `example.com` with `https://`, and anything else as a Google search.
  */
 export function browserAddress(input: string): string | null {
   const typed = input.trim();
@@ -23,20 +23,18 @@ export function browserAddress(input: string): string | null {
       return null;
     }
   }
-  return `https://duckduckgo.com/?q=${encodeURIComponent(typed)}`;
+  return `https://www.google.com/search?q=${encodeURIComponent(typed)}`;
 }
-
-export const homeAddress = "https://duckduckgo.com/";
 
 const storageKey = (space: string) => `misty.browser-panel.url:${space || "personal"}`;
 
-/** The page this Space's browser panel last showed, on this device. */
+/** The page this Space's browser panel last showed on this device, or "" for a blank page. */
 export function rememberedAddress(space: string): string {
   try {
     const saved = localStorage.getItem(storageKey(space));
-    return saved && /^https?:\/\//i.test(saved) ? saved : homeAddress;
+    return saved && /^https?:\/\//i.test(saved) ? saved : "";
   } catch {
-    return homeAddress;
+    return "";
   }
 }
 
@@ -44,6 +42,6 @@ export function rememberAddress(space: string, url: string): void {
   try {
     localStorage.setItem(storageKey(space), url);
   } catch {
-    // Without storage the panel starts at the home page next time.
+    // Without storage the panel starts on a blank page next time.
   }
 }

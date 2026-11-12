@@ -14,7 +14,7 @@
  * page only learns whether one is saved. Choosing a channel never writes the CLI's own files: it
  * applies to each new chat's start.
  */
-import { Download, FileUp, Plus } from "lucide-react";
+import { Bot, Download, FileUp, Plus } from "lucide-react";
 import { useState, type DragEvent } from "react";
 import { EngineMark, hasEngineMark } from "../EngineMark";
 import {
@@ -33,8 +33,8 @@ import {
   Button,
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuTrigger,
+  MenuItem,
   Select,
   SelectContent,
   SelectItem,
@@ -42,6 +42,7 @@ import {
   SelectValue,
   SkeletonList,
   Switch,
+  OverflowFadeText,
 } from "@/shared/ui";
 import { EngineSetupSections } from "../engine-setup/EngineSetupSections";
 import { channelsApi } from "./api";
@@ -92,12 +93,12 @@ export function EnginePicker({
       </SelectTrigger>
       <SelectContent>
         {ENGINE_IDS.map((id) => (
-          <SelectItem key={id} value={id}>
-            <span className="flex items-center gap-2">
-              {hasEngineMark(id) ? <EngineMark engine={id} size={14} /> : null}
-              {ENGINE_NAMES[id]}
-            </span>
-          </SelectItem>
+          <SelectItem
+            key={id}
+            value={id}
+            icon={hasEngineMark(id) ? <EngineMark engine={id} size={14} /> : Bot}
+            label={ENGINE_NAMES[id]}
+          />
         ))}
       </SelectContent>
     </Select>
@@ -108,20 +109,21 @@ function CcSwitchImportMenu({ cli }: { cli: CliConfigState }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm" disabled={cli.busy}>
-          <Download />
+        <Button icon={Download} disabled={cli.busy}>
           Import from CC Switch
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuItem onSelect={() => void cli.syncCcSwitch(cli.engine)}>
-          <Download />
-          Import or update from CC Switch
-        </DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => void cli.importCcSwitchFile()}>
-          <FileUp />
-          Choose a CC Switch file
-        </DropdownMenuItem>
+        <MenuItem
+          icon={Download}
+          label="Import or update from CC Switch"
+          onSelect={() => void cli.syncCcSwitch(cli.engine)}
+        />
+        <MenuItem
+          icon={FileUp}
+          label="Choose a CC Switch file"
+          onSelect={() => void cli.importCcSwitchFile()}
+        />
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -188,23 +190,22 @@ function ChannelsBody({ cli }: { cli: CliConfigState }) {
                 }
               }}
             >
-              <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-charcoal-card">
+              <span className="flex size-8 shrink-0 items-center justify-center">
                 {hasEngineMark(engine) ? <EngineMark engine={engine} size={16} /> : null}
               </span>
               <div className="flex min-w-0 flex-1 flex-col">
                 <p className="flex items-center gap-1.5 text-sm text-cream-bright">
-                  <span className="truncate">{name}'s own config</span>
+                  <OverflowFadeText full>{name}'s own config</OverflowFadeText>
                   <Pill>Built in</Pill>
                 </p>
-                <p className="truncate text-xs text-cream-muted">
+                <OverflowFadeText as="p" full className="text-xs text-cream-muted">
                   Its own sign-in and config files
-                </p>
+                </OverflowFadeText>
               </div>
               {OFFICIAL_EDITABLE_ENGINES.includes(engine) ? (
                 <Button
                   type="button"
-                  variant="outline"
-                  size="xs"
+                  size="sm"
                   disabled={busy}
                   onClick={(event) => {
                     event.stopPropagation();
@@ -229,15 +230,10 @@ function ChannelsBody({ cli }: { cli: CliConfigState }) {
 
           <section aria-label="Channels" className="mb-8">
             <div className="mb-3 flex items-center justify-between gap-3">
-              <h2 className="text-md font-semibold text-cream-bright">Channels</h2>
+              <h2 className="text-body font-semibold text-cream-bright">Channels</h2>
               <div className="flex shrink-0 items-center gap-2">
                 {CC_SWITCH_ENGINES.includes(engine) ? <CcSwitchImportMenu cli={cli} /> : null}
-                <Button
-                  size="sm"
-                  variant="primary"
-                  disabled={busy}
-                  onClick={() => cli.setDialog({})}
-                >
+                <Button variant="primary" disabled={busy} onClick={() => cli.setDialog({})}>
                   <Plus />
                   Add channel
                 </Button>
@@ -285,11 +281,8 @@ export function ChannelsSection() {
         <DesktopSettingsNotice
           action={
             <div className="flex gap-2">
-              <Button size="sm" variant="secondary" onClick={cli.dismissCcSwitch}>
-                Later
-              </Button>
+              <Button onClick={cli.dismissCcSwitch}>Later</Button>
               <Button
-                size="sm"
                 variant="primary"
                 disabled={cli.busy}
                 onClick={() => void cli.syncCcSwitch("all")}
@@ -309,7 +302,7 @@ export function ChannelsSection() {
       {cli.sections ? (
         <ChannelsBody cli={cli} />
       ) : cli.error ? null : (
-        <SkeletonList label="Reading channels" rows={3} leading="tile" />
+        <SkeletonList lines={2} label="Reading channels" rows={3} leading="tile" />
       )}
 
       {cli.dialog ? (

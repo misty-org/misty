@@ -22,7 +22,7 @@ describe("device settings", () => {
       portableValues({
         general: {
           startup_view_index: 2,
-          browser_download_directory: "/private",
+          preferred_workspace_root: "/private",
           launch_on_login: true,
         },
         ai: { api_key: "secret" },
@@ -30,18 +30,18 @@ describe("device settings", () => {
       }),
     ).toEqual({
       "app.startup.view": "agents",
-      "browser.downloads.directory": "/private",
+      "files.startingFolder": "/private",
       "app.startup.login": true,
     });
   });
   it("projects shared settings and preserves unknown namespaces", () => {
     const next = projectPreferences(
-      { general: { browser_download_directory: "/old" }, plugin: { future: true } },
+      { general: { preferred_workspace_root: "/old" }, plugin: { future: true } },
       { "app.startup.view": "agents", "app.zoom": 2 },
     );
     expect(next.general).toMatchObject({
       startup_view_index: 2,
-      browser_download_directory: "",
+      preferred_workspace_root: "",
     });
     expect(next.plugin).toEqual({ future: true });
     expect(next.appearance).toMatchObject({ app_zoom: 2 });
@@ -68,11 +68,11 @@ describe("device settings", () => {
     const migrated = migratePreferencesState(
       {
         version: 2,
-        profile: { values: { "app.zoom": 2, "browser.homepage": "https://old.example" } },
+        profile: { values: { "app.zoom": 2, "files.startingFolder": "/old" } },
         seed: {},
         outbox: [
           { id: "retired", set: { "files.hidden": true }, unset: [] },
-          { id: "mixed", set: { "app.zoom": 1.25 }, unset: ["browser.homepage"] },
+          { id: "mixed", set: { "app.zoom": 1.25 }, unset: ["files.startingFolder"] },
         ],
       },
       {},

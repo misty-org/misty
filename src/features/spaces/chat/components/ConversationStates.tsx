@@ -1,42 +1,30 @@
-import { Button, EmptyState, ErrorState, LoadingState } from "@/shared/ui";
+import { EmptyState, ErrorState, LoadingScreen, OverflowFadeText } from "@/shared/ui";
 
 /** An open conversation that is still loading, or failed to. */
 export function ConversationLoadState(props: { error: string; onRetry: () => void }) {
   if (!props.error)
-    return (
-      <LoadingState
-        className="h-full bg-charcoal-bg"
-        label="Opening conversation"
-        title="Opening conversation"
-      />
-    );
+    return <LoadingScreen className="h-full bg-charcoal-bg" label="Opening conversation" />;
   return (
-    <ErrorState
-      className="h-full bg-charcoal-bg"
-      title="Conversation couldn’t load"
-      description={props.error}
-      action={
-        <Button type="button" variant="outline" onClick={props.onRetry}>
-          Try again
-        </Button>
-      }
-    />
+    <div className="h-full bg-charcoal-bg">
+      <ErrorState
+        title="Conversation couldn’t load"
+        line={props.error}
+        action={{ label: "Try again", onClick: props.onRetry, variant: "secondary" }}
+      />
+    </div>
   );
 }
 
 /** A conversation the person can no longer open. */
 export function ConversationUnavailable(props: { onBack: () => void }) {
   return (
-    <EmptyState
-      className="h-full bg-charcoal-bg"
-      title="Conversation isn’t available"
-      description="Choose another conversation from Chat."
-      action={
-        <Button type="button" variant="outline" onClick={props.onBack}>
-          Back to Chat
-        </Button>
-      }
-    />
+    <div className="h-full bg-charcoal-bg">
+      <EmptyState
+        title="Conversation isn’t available"
+        line="Choose another conversation from Chat."
+        action={{ label: "Back to Chat", onClick: props.onBack, variant: "secondary" }}
+      />
+    </div>
   );
 }
 
@@ -44,9 +32,13 @@ export function ConversationUnavailable(props: { onBack: () => void }) {
 export function ChatTitleBar(props: { title: string }) {
   return (
     <header className="flex min-h-12 shrink-0 items-center gap-2 bg-charcoal-bg px-3 py-1.5">
-      <h1 className="m-0 min-w-0 flex-1 truncate px-1 text-sm font-medium text-cream-bright">
+      <OverflowFadeText
+        as="h1"
+        full
+        className="m-0 min-w-0 flex-1 px-1 text-sm font-medium text-cream-bright"
+      >
         {props.title}
-      </h1>
+      </OverflowFadeText>
     </header>
   );
 }

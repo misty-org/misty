@@ -10,9 +10,9 @@ import {
   AlertDialogFooter,
   AlertDialogTitle,
   Button,
-  ErrorNotification,
-  Notification,
+  notify,
 } from "@/shared/ui";
+import { ErrorNotice } from "../conversations/ErrorNotice";
 import { useContextPanel } from "../context-panel/contextPanelStore";
 import { folderName } from "../engines/enginesApi";
 import { usePersonalAgentsStore } from "../personal/personalAgentsStore";
@@ -47,7 +47,6 @@ export function MultirunCompare({
   const agents = usePersonalAgentsStore((state) => state.agents);
   const [busy, setBusy] = useState(false);
   const [confirming, setConfirming] = useState(false);
-  const [kept, setKept] = useState(0);
   const [error, setError] = useState("");
   const act = (work: Promise<unknown>) => {
     setBusy(true);
@@ -58,7 +57,19 @@ export function MultirunCompare({
       useMultirunStore
         .getState()
         .keep(space, run.id, lane.index)
-        .then(() => setKept((count) => count + 1)),
+        .then(() =>
+          notify({
+            message: `Its changes are staged in ${folderName(run.folder)}, not committed.`,
+            id: "multirun-kept",
+            action: {
+              label: "Review changes",
+              onSelect: () => {
+                useContextPanel.getState().show("changes");
+                onReview();
+              },
+            },
+          }),
+        ),
     );
   const discard = () =>
     void act(
@@ -78,17 +89,11 @@ export function MultirunCompare({
         <span className="flex-none pt-1 text-xs text-cream-muted" title={run.folder}>
           {folderName(run.folder)}
         </span>
-        <Button type="button" size="sm" variant="ghost" onClick={onNew}>
+        <Button type="button" variant="quiet" onClick={onNew}>
           <Plus size={14} />
           New multi-run
         </Button>
-        <Button
-          type="button"
-          size="sm"
-          variant="ghost"
-          disabled={busy}
-          onClick={() => setConfirming(true)}
-        >
+        <Button type="button" variant="quiet" disabled={busy} onClick={() => setConfirming(true)}>
           <Trash2 size={14} />
           Discard all
         </Button>
@@ -120,24 +125,7 @@ export function MultirunCompare({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-      <Notification key={kept} active={kept > 0} tone="success">
-        <span className="grid gap-2">
-          Its changes are staged in {folderName(run.folder)}, not committed.
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            className="justify-self-start"
-            onClick={() => {
-              useContextPanel.getState().show("changes");
-              onReview();
-            }}
-          >
-            Review changes
-          </Button>
-        </span>
-      </Notification>
-      <ErrorNotification message={error} onDismiss={() => setError("")} />
+      <ErrorNotice message={error} onDismiss={() => setError("")} />
     </div>
   );
 }

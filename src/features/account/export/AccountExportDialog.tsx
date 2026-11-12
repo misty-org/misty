@@ -8,8 +8,8 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  ErrorNotification,
   Input,
+  useNotice,
 } from "@/shared/ui";
 import GoogleSignInButton from "../components/GoogleSignInButton";
 import {
@@ -32,6 +32,7 @@ export function AccountExportDialog(props: {
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  useNotice(Boolean(error), { message: error, tone: "error", onDismiss: () => setError("") });
   const [password, setPassword] = useState("");
   const [saved, setSaved] = useState("");
   useEffect(() => {
@@ -83,7 +84,6 @@ export function AccountExportDialog(props: {
             onChange={(event) => setPassword(event.target.value)}
           />
         )}
-        <ErrorNotification message={error} onDismiss={() => setError("")} />
         {!error && saved ? (
           <p className="m-0 text-sm text-cream-muted" role="status">
             Saved {saved} to your downloads.

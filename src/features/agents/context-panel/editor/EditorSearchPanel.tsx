@@ -10,8 +10,9 @@ import {
 import { EditorSelection } from "@codemirror/state";
 import type { EditorView } from "@codemirror/view";
 import { findNext, findPrevious, replaceAll, replaceNext } from "@codemirror/search";
-import { ChevronDown, ChevronRight, ChevronUp, TextSelect, X } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import { Button, IconButton, Input } from "@/shared/ui";
+import { FindSteps, FindToggles, keepFindInputFocus } from "./FindControls";
 import {
   EDITOR_SEARCH_MATCH_LIMIT,
   EMPTY_EDITOR_SEARCH_MATCH_INFO,
@@ -389,7 +390,7 @@ export function EditorSearchPanel({
         {!readOnly ? (
           <IconButton
             label={showReplace ? "Hide replace" : "Show replace"}
-            size="xs"
+            size="sm"
             aria-expanded={showReplace}
             onMouseDown={keepFindInputFocus}
             onClick={() => onShowReplaceChange(!showReplace)}
@@ -417,36 +418,18 @@ export function EditorSearchPanel({
             placeholder="Find"
             aria-label="Find"
           />
-          <IconButton
-            label="Match case"
-            size="xs"
-            className="editor-find-toggle"
-            aria-pressed={caseSensitive}
-            onMouseDown={keepFindInputFocus}
-            onClick={() => setCaseSensitive((value) => !value)}
-          >
-            Aa
-          </IconButton>
-          <IconButton
-            label="Whole word"
-            size="xs"
-            className="editor-find-toggle"
-            aria-pressed={wholeWord}
-            onMouseDown={keepFindInputFocus}
-            onClick={() => setWholeWord((value) => !value)}
-          >
-            W
-          </IconButton>
-          <IconButton
-            label="Regular expression"
-            size="xs"
-            className="editor-find-toggle font-mono"
-            aria-pressed={useRegex}
-            onMouseDown={keepFindInputFocus}
-            onClick={() => setUseRegex((value) => !value)}
-          >
-            .*
-          </IconButton>
+          <FindToggles
+            caseSensitive={caseSensitive}
+            wholeWord={wholeWord}
+            regexp={useRegex}
+            onToggle={(option) =>
+              (option === "caseSensitive"
+                ? setCaseSensitive
+                : option === "wholeWord"
+                  ? setWholeWord
+                  : setUseRegex)((value) => !value)
+            }
+          />
         </div>
         <span
           role="status"
@@ -456,41 +439,12 @@ export function EditorSearchPanel({
         >
           {statusText}
         </span>
-        <IconButton
-          label="Select all matches"
-          size="xs"
+        <FindSteps
           disabled={!hasQuery || matchInfo.total === 0}
-          onMouseDown={keepFindInputFocus}
-          onClick={selectAllMatches}
-        >
-          <TextSelect />
-        </IconButton>
-        <IconButton
-          label="Previous match (Shift+Enter)"
-          size="xs"
-          disabled={!hasQuery || matchInfo.total === 0}
-          onMouseDown={keepFindInputFocus}
-          onClick={() => goToMatch("prev")}
-        >
-          <ChevronUp />
-        </IconButton>
-        <IconButton
-          label="Next match (Enter)"
-          size="xs"
-          disabled={!hasQuery || matchInfo.total === 0}
-          onMouseDown={keepFindInputFocus}
-          onClick={() => goToMatch("next")}
-        >
-          <ChevronDown />
-        </IconButton>
-        <IconButton
-          label="Close (Esc)"
-          size="xs"
-          onMouseDown={keepFindInputFocus}
-          onClick={onClose}
-        >
-          <X />
-        </IconButton>
+          onSelectAll={selectAllMatches}
+          onStep={goToMatch}
+          onClose={onClose}
+        />
       </div>
       {showReplace && !readOnly ? (
         <div className="editor-find-row">
@@ -517,7 +471,7 @@ export function EditorSearchPanel({
           </div>
           <Button
             variant="secondary"
-            size="xs"
+            size="sm"
             disabled={!canReplace}
             onMouseDown={keepFindInputFocus}
             onClick={replaceCurrent}
@@ -526,7 +480,7 @@ export function EditorSearchPanel({
           </Button>
           <Button
             variant="secondary"
-            size="xs"
+            size="sm"
             disabled={!canReplace}
             onMouseDown={keepFindInputFocus}
             onClick={replaceEvery}
@@ -537,9 +491,4 @@ export function EditorSearchPanel({
       ) : null}
     </div>
   );
-}
-
-/** A press on the card's buttons keeps focus in its field, so typing carries on. */
-export function keepFindInputFocus(event: { preventDefault(): void }) {
-  event.preventDefault();
 }

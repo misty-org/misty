@@ -1,4 +1,4 @@
-import { BookmarkCheck } from "lucide-react";
+import { BookmarkCheck, MessageSquare } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import {
   AgentAvatar,
@@ -17,9 +17,9 @@ import {
   DialogTitle,
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
-  ErrorNotification,
+  MenuItem,
   MenuTrigger,
+  useNotice,
 } from "@/shared/ui";
 import { notesApi } from "../journal/notes/api/api";
 import { OverviewCard, OverviewEmpty, OverviewRow, OverviewRowsSkeleton } from "./OverviewCard";
@@ -87,6 +87,8 @@ export function PickUpsCard({
     [chats],
   );
 
+  useNotice(Boolean(error), { message: error, tone: "error", onDismiss: () => setError("") });
+
   const pickUp = async (note: PickUpNote, agentId: string) => {
     setPicking(undefined);
     setError("");
@@ -98,12 +100,15 @@ export function PickUpsCard({
 
   const save = finished.length ? (
     <DropdownMenu>
-      <MenuTrigger variant="ghost" label="Save where it left off" />
+      <MenuTrigger label="Save where it left off" />
       <DropdownMenuContent align="end">
         {finished.map((chat) => (
-          <DropdownMenuItem key={chat.id} onSelect={() => setSaving(chat)}>
-            <span className="truncate">{chatTitle(chat.title)}</span>
-          </DropdownMenuItem>
+          <MenuItem
+            key={chat.id}
+            icon={MessageSquare}
+            label={chatTitle(chat.title)}
+            onSelect={() => setSaving(chat)}
+          />
         ))}
       </DropdownMenuContent>
     </DropdownMenu>
@@ -127,7 +132,6 @@ export function PickUpsCard({
       ) : (
         <OverviewEmpty>Nothing to pick up</OverviewEmpty>
       )}
-      <ErrorNotification message={error} onDismiss={() => setError("")} />
       {saving && (
         <PickUpDialog
           open

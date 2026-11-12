@@ -1,7 +1,7 @@
 import { LogOut, Pencil, Plus, Trash2, UserPlus, UsersRound } from "lucide-react";
 import type { Space } from "../../api/dto/entities";
 import { switchSpaceWindow } from "@/features/app-windows";
-import { DropdownMenuCheckboxItem, DropdownMenuSeparator, MenuItem } from "@/shared/ui";
+import { DropdownMenuSeparator, MenuCheckItem, MenuItem } from "@/shared/ui";
 import {
   canManageSpaceLifecycle,
   preferredDefaultSpace,
@@ -30,20 +30,22 @@ export function SpaceMenuItems(props: {
         const isPersonal = item.id === personal?.id;
         const here = item.id === space.id;
         return (
-          <DropdownMenuCheckboxItem
+          <MenuCheckItem
             key={item.id}
             checked={here}
+            closeOnSelect
             onSelect={() => {
               if (!here) switchSpaceWindow(item.id, isPersonal);
             }}
-          >
-            <SpaceAvatar
-              space={item}
-              className="size-5 rounded-md"
-              fallbackClassName="text-3xs font-semibold"
-            />
-            <span className="min-w-0 flex-1 truncate">{spaceNavigationName(item)}</span>
-          </DropdownMenuCheckboxItem>
+            icon={
+              <SpaceAvatar
+                space={item}
+                className="size-5 rounded-md"
+                fallbackClassName="text-3xs font-semibold"
+              />
+            }
+            label={spaceNavigationName(item)}
+          />
         );
       })}
     </>

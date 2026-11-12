@@ -29,18 +29,12 @@ describe("a window's native identity", () => {
   it("reads who it is before anything renders", async () => {
     openedAs({
       windowId: "w-1",
-      profile: { id: "work", name: "Work", color: "pink", order: 2, sites: ["a.test"] },
+      profile: { id: "work", name: "Work", order: 2 },
       space: "space_1",
     });
     const window = await import("./profileWindow");
     expect(window.currentWindowId()).toBe("w-1");
-    expect(window.currentProfile()).toEqual({
-      id: "work",
-      name: "Work",
-      color: "pink",
-      order: 2,
-      sites: ["a.test"],
-    });
+    expect(window.currentProfile()).toEqual({ id: "work", name: "Work", order: 2 });
     expect(native.invoke).not.toHaveBeenCalled();
     const space = await import("../tabs/spaceWindow");
     expect(space.spaceWindow()).toMatchObject({ key: "space_1", spaceId: "space_1" });
@@ -53,9 +47,9 @@ describe("a window's native identity", () => {
     expect(space.spaceWindow()).toMatchObject({ key: "personal", personal: true, spaceId: null });
   });
 
-  it("drops a color that isn't one of the profile colors", async () => {
+  it("refuses a profile without an id and a name", async () => {
     const { parseProfileEntry } = await import("./profileWindow");
-    expect(parseProfileEntry({ id: "a", name: "A", color: "javascript:1" })?.color).toBeUndefined();
+    expect(parseProfileEntry({ id: "a", name: "A" })).toEqual({ id: "a", name: "A", order: 0 });
     expect(parseProfileEntry({ id: 1, name: "A" })).toBeNull();
   });
 
@@ -68,51 +62,27 @@ describe("a window's native identity", () => {
           profile: { id: "work", name: "Work", order: 1 },
           space: null,
         };
-      if (command === "profiles_list")
-        return [
-          { id: "work", name: "Work", order: 1 },
-          { id: "personal", name: "Personal", order: 0 },
-        ];
       return null;
     });
     const window = await import("./profileWindow");
     window.startProfileWindow();
     await vi.waitFor(() => expect(window.currentWindowId()).toBe("w-3"));
-    await vi.waitFor(() =>
-      expect(window.useProfileWindowStore.getState().profiles.map((item) => item.id)).toEqual([
-        "personal",
-        "work",
-      ]),
-    );
     native.listeners.get("misty://profile-window")?.({
-      payload: { id: "work", name: "Renamed", color: "blue", order: 1 },
+      payload: { id: "work", name: "Renamed", order: 1 },
     });
-    expect(window.currentProfile()).toMatchObject({ name: "Renamed", color: "blue" });
+    expect(window.currentProfile()).toMatchObject({ name: "Renamed" });
     native.listeners.get("misty://profile-window")?.({
       payload: { id: "someone-else", name: "Other", order: 3 },
     });
     expect(window.currentProfile().id).toBe("work");
   });
 
-  it("names every window and profile command as the native side does", async () => {
-    native.invoke.mockResolvedValue({ id: "new", name: "New", order: 1 });
+  it("names every window command as the native side does", async () => {
+    native.invoke.mockResolvedValue(null);
     const window = await import("./profileWindow");
     await window.openNewWindow();
     await window.closeWindow();
-    await window.openProfile("work");
-    await window.createProfile("New", "blue");
-    await window.renameProfile("new", "Newer");
-    await window.setProfileColor("new", "red");
-    await window.deleteProfile("new");
-    expect(native.invoke.mock.calls).toEqual([
-      ["profile_window_new"],
-      ["profile_window_close"],
-      ["profile_open", { id: "work" }],
-      ["profile_create", { name: "New", color: "blue" }],
-      ["profile_rename", { id: "new", name: "Newer" }],
-      ["profile_set_color", { id: "new", color: "red" }],
-      ["profile_delete", { id: "new" }],
-    ]);
+    expect(native.invoke.mock.calls).toEqual([["profile_window_new"], ["profile_window_close"]]);
   });
 });
 

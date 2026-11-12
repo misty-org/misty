@@ -1,5 +1,6 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { NoticeViewport } from "@/shared/ui";
 import { UpdateNotices } from "./UpdateNotices";
 
 const mocks = vi.hoisted(() => ({ check: vi.fn(), enabled: true, native: true, apps: vi.fn() }));
@@ -35,7 +36,12 @@ it("still checks for Misty releases and opens update settings", async () => {
   const openSettings = vi.fn();
   window.addEventListener("misty:open-settings", openSettings);
   try {
-    render(<UpdateNotices accountScope="account" />);
+    render(
+      <>
+        <NoticeViewport />
+        <UpdateNotices accountScope="account" />
+      </>,
+    );
     const notice = await screen.findByRole("status");
     expect(notice.textContent).toContain("Misty 2.0.0 is available");
     // Registered as a notice, so it shows over a page in that corner.
@@ -45,14 +51,19 @@ it("still checks for Misty releases and opens update settings", async () => {
     expect(openSettings).toHaveBeenCalledWith(
       expect.objectContaining({ detail: { section: "updates" } }),
     );
-    expect(screen.queryByRole("status")).toBeNull();
+    await waitFor(() => expect(screen.queryByRole("status")).toBeNull());
   } finally {
     window.removeEventListener("misty:open-settings", openSettings);
   }
 });
-it("preserves unsaved-work notices independently of update checks", () => {
+it("preserves unsaved-work notices independently of update checks", async () => {
   mocks.enabled = false;
-  render(<UpdateNotices accountScope="account" />);
+  render(
+    <>
+      <NoticeViewport />
+      <UpdateNotices accountScope="account" />
+    </>,
+  );
   act(() =>
     window.dispatchEvent(
       new CustomEvent("misty:workspace-notice", {
@@ -62,8 +73,8 @@ it("preserves unsaved-work notices independently of update checks", () => {
   );
   expect(screen.getByRole("status").textContent).toContain("Save your changes");
   expect(screen.queryByRole("button", { name: "View release" })).toBeNull();
-  fireEvent.click(screen.getByRole("button", { name: "Dismiss notification" }));
-  expect(screen.queryByRole("status")).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
+  await waitFor(() => expect(screen.queryByRole("status")).toBeNull());
   expect(mocks.check).not.toHaveBeenCalled();
 });
 it("does not check without an account or outside the native app", () => {

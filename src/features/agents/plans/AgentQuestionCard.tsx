@@ -1,6 +1,7 @@
 import { Check, ChevronDown, ChevronUp, MessageCircleQuestion } from "lucide-react";
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
-import { BackButton, Button, ErrorNotification, IconButton, Input, Pressable } from "@/shared/ui";
+import { BackButton, Button, IconButton, Input, Pressable } from "@/shared/ui";
+import { ErrorNotice } from "../conversations/ErrorNotice";
 import { useCollaborationStore } from "./store";
 import type { AgentQuestionAnswer, AgentQuestionSet } from "./planTypes";
 import "./collaboration.css";
@@ -101,7 +102,7 @@ export function AgentQuestionCard({
           {questions.length === 1 ? "1 question" : `${questions.length} questions`} from {agentName}{" "}
           waiting
         </span>
-        <Button variant="ghost" size="sm" onClick={() => setCollapsed(false)}>
+        <Button variant="quiet" onClick={() => setCollapsed(false)}>
           <ChevronUp aria-hidden="true" />
           Answer
         </Button>
@@ -120,7 +121,7 @@ export function AgentQuestionCard({
         <span className="agent-question-count" aria-live="polite">
           {questions.length > 1 ? `${index + 1} of ${questions.length}` : `${agentName} is asking`}
         </span>
-        <IconButton size="xs" label="Collapse questions" onClick={() => setCollapsed(true)}>
+        <IconButton size="sm" label="Collapse questions" onClick={() => setCollapsed(true)}>
           <ChevronDown />
         </IconButton>
       </div>
@@ -159,15 +160,14 @@ export function AgentQuestionCard({
           onChange={(event) => update({ ...answer, other: event.target.value })}
         />
       </div>
-      <ErrorNotification message={error} onDismiss={() => setError("")} />
+      <ErrorNotice message={error} onDismiss={() => setError("")} />
       <div className="agent-question-actions">
         <span className="agent-question-hint">
           {question.multiSelect ? "Choose any that apply" : "Choose one"} · Esc to hide
         </span>
         {index > 0 && <BackButton onClick={() => setIndex(index - 1)} />}
         <Button
-          variant={last ? "primary" : "outline"}
-          size="sm"
+          variant={last ? "primary" : "secondary"}
           disabled={busy || !answered(answer) || (last && !answers.every(answered))}
           onClick={advance}
         >

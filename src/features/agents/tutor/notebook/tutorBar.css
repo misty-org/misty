@@ -160,8 +160,6 @@
   width: 52px;
   height: 52px;
   place-items: center;
-  border-radius: var(--radius-md);
-  background: var(--color-control-hover);
   color: var(--color-cream-bright);
 }
 .tutor-library-new .tutor-library-card-title {

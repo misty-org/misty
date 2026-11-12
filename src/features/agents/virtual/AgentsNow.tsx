@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Pressable, Skeleton } from "@/shared/ui";
+import { OverflowFadeText, Pressable, Skeleton, Tooltip } from "@/shared/ui";
 import { AgentAvatar } from "../personal/AgentAvatar";
 import { claimedByOthers, fileName, type TeammateAgent, useTeammateAgents } from "./teammates";
 import { useStudioAgents } from "./useStudioAgents";
@@ -10,7 +10,7 @@ function Doing({ state, doing }: { state: string; doing: string }) {
   return (
     <span className="agents-now-doing">
       {state !== "resting" && <span className="agents-now-dot" aria-hidden="true" />}
-      <span className="truncate">{doing || "Idle"}</span>
+      <OverflowFadeText>{doing || "Idle"}</OverflowFadeText>
     </span>
   );
 }
@@ -20,21 +20,25 @@ function Claim({ files, teammates }: { files: string[]; teammates: TeammateAgent
   const clash = claimedByOthers(files, teammates)[0];
   if (clash) {
     return (
-      <span className="agents-now-claim" data-clash="true" title={clash.file}>
-        <span className="truncate">
-          {clash.by.owner}'s {clash.by.name} is on {fileName(clash.file)}
+      <Tooltip content={clash.file}>
+        <span className="agents-now-claim" data-clash="true">
+          <OverflowFadeText>
+            {clash.by.owner}'s {clash.by.name} is on {fileName(clash.file)}
+          </OverflowFadeText>
         </span>
-      </span>
+      </Tooltip>
     );
   }
   if (!files.length) return null;
   return (
-    <span className="agents-now-claim" title={files.join("\n")}>
-      <span className="truncate">
-        {fileName(files[0]!)}
-        {files.length > 1 ? ` and ${files.length - 1} more` : ""}
+    <Tooltip content={files.join(", ")}>
+      <span className="agents-now-claim">
+        <OverflowFadeText>
+          {fileName(files[0]!)}
+          {files.length > 1 ? ` and ${files.length - 1} more` : ""}
+        </OverflowFadeText>
       </span>
-    </span>
+    </Tooltip>
   );
 }
 
@@ -78,7 +82,9 @@ export function AgentsNow(props: {
               >
                 <AgentAvatar agent={agent} />
                 <span className="grid min-w-0 gap-0.5 text-left">
-                  <span className="truncate text-sm font-medium text-cream">{agent.name}</span>
+                  <OverflowFadeText className="text-sm font-medium text-cream">
+                    {agent.name}
+                  </OverflowFadeText>
                   <Doing state={state} doing={doing} />
                   <Claim files={files} teammates={teammates} />
                 </span>
@@ -89,9 +95,9 @@ export function AgentsNow(props: {
           <div key={mate.key} className="agents-now-card" data-state={mate.state}>
             <AgentAvatar />
             <span className="grid min-w-0 gap-0.5 text-left">
-              <span className="truncate text-sm font-medium text-cream">
+              <OverflowFadeText className="text-sm font-medium text-cream">
                 {mate.name} · {mate.owner}
-              </span>
+              </OverflowFadeText>
               <Doing state={mate.state} doing={mate.doing} />
               <Claim files={mate.files} teammates={[]} />
             </span>

@@ -2,14 +2,7 @@ import { accountApi } from "../api/api";
 import type { AccountMeResponse } from "../api/accountTypes";
 import { useAccountAvatarUrl } from "../hooks/useAccountAvatarUrl";
 import { useUserStore } from "../sessions/useUserStore";
-import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-  Button,
-  ErrorNotification,
-  FileInput,
-} from "@/shared/ui";
+import { Avatar, AvatarFallback, AvatarImage, Button, FileInput, useNotice } from "@/shared/ui";
 import { useRef, useState } from "react";
 import { DesktopSettingsRow as Row } from "@/features/settings";
 
@@ -54,6 +47,7 @@ export function AccountPictureRow({ account }: { account: AccountMeResponse }) {
   const [working, setWorking] = useState(false);
   const [error, setError] = useState("");
   const avatarUrl = useAccountAvatarUrl(account.id, account.avatar_version);
+  useNotice(Boolean(error), { message: error, tone: "error", onDismiss: () => setError("") });
   const upload = async (file: File | undefined) => {
     if (!file) return;
     setError("");
@@ -83,10 +77,9 @@ export function AccountPictureRow({ account }: { account: AccountMeResponse }) {
         aria-label="Profile picture"
         onChange={(event) => void upload(event.target.files?.[0])}
       />
-      <Button variant="outline" size="sm" disabled={working} onClick={() => input.current?.click()}>
+      <Button variant="secondary" disabled={working} onClick={() => input.current?.click()}>
         {working ? "Uploading…" : "Change"}
       </Button>
-      <ErrorNotification message={error} onDismiss={() => setError("")} />
     </Row>
   );
 }

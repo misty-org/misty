@@ -1,4 +1,6 @@
-import { ModelKeyNeededButton, needsModelKey } from "../models/ModelKeyNeeded";
+import { needsModelKey } from "../models/ModelKeyNeeded";
+import { openModelSettings } from "../models/modelKeys";
+import { ErrorNotice } from "../conversations/ErrorNotice";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
@@ -8,7 +10,7 @@ import {
   pauseLocalExecution,
   useLocalExecution,
 } from "../runs/local-execution/localExecution";
-import { Button, ErrorNotification, ViewportLayer } from "@/shared/ui";
+import { Button, ViewportLayer } from "@/shared/ui";
 import { AgentControlIsland } from "./AgentControlIsland";
 
 import { TaskArtifacts } from "../artifacts/TaskArtifactList";
@@ -105,8 +107,6 @@ export function AgentExecutionSurface() {
               {execution.context.map((view, index) => (
                 <Button
                   key={view.id}
-                  variant="outline"
-                  size="sm"
                   aria-pressed={active === index}
                   onClick={() => setActive(index)}
                 >
@@ -116,9 +116,15 @@ export function AgentExecutionSurface() {
             </nav>
           </div>
         </div>
-        <ErrorNotification message={error} onDismiss={() => setError("")}>
-          {needsModelKey(error) && <ModelKeyNeededButton />}
-        </ErrorNotification>
+        <ErrorNotice
+          message={error}
+          action={
+            needsModelKey(error)
+              ? { label: "Open Models settings", onSelect: openModelSettings }
+              : undefined
+          }
+          onDismiss={() => setError("")}
+        />
       </ViewportLayer>
       <AgentControlIsland />
     </>

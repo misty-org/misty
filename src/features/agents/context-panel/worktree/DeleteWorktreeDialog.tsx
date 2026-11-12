@@ -10,6 +10,7 @@ import {
   AlertDialogTitle,
   Checkbox,
   Skeleton,
+  Tooltip,
 } from "@/shared/ui";
 import { currentSpaceKey, folderOf, useSpaceFolders } from "../../engines/enginesApi";
 import { useMistyStore } from "../../conversations/state/useMistyStore";
@@ -157,9 +158,9 @@ export function DeleteWorktreeDialog({
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent>
         <AlertDialogTitle>Remove worktree {name}?</AlertDialogTitle>
-        <p className="worktree-path" title={worktree.path}>
-          {worktree.path}
-        </p>
+        <Tooltip content={worktree.path}>
+          <p className="worktree-path">{worktree.path}</p>
+        </Tooltip>
         {worktree.locked ? (
           <p role="alert" className="worktree-warning">
             <TriangleAlert size={15} aria-hidden="true" />

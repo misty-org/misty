@@ -15,8 +15,8 @@ import {
 import { EngineMark, hasEngineMark } from "../EngineMark";
 import {
   Button,
+  ChoiceGroup,
   Progress,
-  SegmentedControl,
   Skeleton,
   SkeletonList,
   Table,
@@ -122,7 +122,7 @@ function LimitsBlock(props: { onError: (error: string | null) => void }) {
   return (
     <DesktopSettingsSection title="Plan limits">
       {providers === null ? (
-        <SkeletonList label="Plan limits" rows={2} trailing />
+        <SkeletonList leading="icon" lines={2} label="Plan limits" rows={2} trailing />
       ) : (
         providers.map((limits) => (
           <ProviderRow
@@ -181,13 +181,7 @@ function ProviderRow(props: {
         ) : null}
         {props.onRefresh ? (
           <div>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={props.refreshing}
-              onClick={props.onRefresh}
-            >
+            <Button type="button" disabled={props.refreshing} onClick={props.onRefresh}>
               Check again
             </Button>
           </div>
@@ -231,14 +225,14 @@ function UsageBlock(props: { onError: (error: string | null) => void }) {
   return (
     <DesktopSettingsSection title="Usage">
       <div className="flex flex-wrap items-center justify-between gap-3 py-3">
-        <SegmentedControl label="Range" value={range} options={ranges} onChange={setRange} />
-        <SegmentedControl label="Group by" value={group} options={groups} onChange={setGroup} />
+        <ChoiceGroup label="Range" value={range} options={ranges} onChange={setRange} />
+        <ChoiceGroup label="Group by" value={group} options={groups} onChange={setGroup} />
       </div>
       {result === null ? (
         <div role="status" aria-label="Usage" aria-busy="true" className="grid gap-3 py-3">
           <Skeleton className="h-6 w-1/3" />
           <Skeleton className="h-28 w-full" />
-          <SkeletonList label="Usage" rows={3} lines={1} trailing />
+          <SkeletonList leading="icon" label="Usage" rows={3} lines={1} trailing />
         </div>
       ) : (
         <div className="grid gap-4 py-3">
@@ -371,7 +365,7 @@ function SourcesBlock(props: { onError: (error: string | null) => void }) {
   return (
     <DesktopSettingsSection title="Logs and prices">
       {sources === null ? (
-        <SkeletonList label="Logs" rows={3} lines={1} trailing />
+        <SkeletonList leading="icon" label="Logs" rows={3} lines={1} trailing />
       ) : (
         sources.map((source) => (
           <DesktopSettingsRow
@@ -389,13 +383,7 @@ function SourcesBlock(props: { onError: (error: string | null) => void }) {
         ))
       )}
       <DesktopSettingsRow label="Read every log again">
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={busy !== null}
-          onClick={() => void run("rescan")}
-        >
+        <Button type="button" disabled={busy !== null} onClick={() => void run("rescan")}>
           Read again
         </Button>
       </DesktopSettingsRow>
@@ -407,13 +395,7 @@ function SourcesBlock(props: { onError: (error: string | null) => void }) {
             : undefined
         }
       >
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={busy !== null}
-          onClick={() => void run("prices")}
-        >
+        <Button type="button" disabled={busy !== null} onClick={() => void run("prices")}>
           Update prices
         </Button>
       </DesktopSettingsRow>

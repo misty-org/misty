@@ -283,7 +283,7 @@ pub(crate) async fn start(app: &AppHandle, run_id: String, body: Value) -> Resul
         .filter(|id| super::is_engine(id))
         .ok_or("That engine has no adapter.")?
         .to_string();
-    let state = support::state().ok_or("The engines aren't ready yet.")?;
+    let state = support::state().ok_or_else(super::not_ready)?;
     let facts = RunFacts::of_request(&run_id, &body);
     let named = body["engine"]["folder"].as_str().unwrap_or("").to_string();
     // A chat with no linked folder works in Misty's own workspace folder. Only native code picks

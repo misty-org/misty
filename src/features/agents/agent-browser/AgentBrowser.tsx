@@ -3,11 +3,12 @@ import { Hand, PictureInPicture2, Play, X } from "lucide-react";
 import { useState } from "react";
 import { aiSurfaceApi } from "../runs/invocations/api";
 import { BrowserNavigationButtons } from "@/features/browser";
-import { Button, IconButton, Input } from "@/shared/ui";
+import { Button, IconButton, Input, Tooltip } from "@/shared/ui";
 import "./agentBrowser.css";
 import { AgentBrowserStage } from "./AgentBrowserStage";
 import { AgentBrowserTabs } from "./AgentBrowserTabs";
 import { AgentViewSwitcher } from "./AgentViewSwitcher";
+import { browserAddress } from "../context-panel/browserAddress";
 import { hostAddress } from "./hostAddress";
 import { openPersonTab } from "../tabs/agentPersonTabs";
 import { agentTab } from "../tabs/agentTabs";
@@ -65,8 +66,7 @@ export function AgentBrowser({ conversationId }: { conversationId?: string }) {
         </IconButton>
       )}
       {takenOver && (
-        <Button size="sm" variant="primary" onClick={() => void hold(false)}>
-          <Play aria-hidden="true" />
+        <Button variant="primary" icon={Play} onClick={() => void hold(false)}>
           Resume
         </Button>
       )}
@@ -78,28 +78,26 @@ export function AgentBrowser({ conversationId }: { conversationId?: string }) {
       {blank ? (
         <Input
           autoFocus
-          placeholder="Open a URL for the agent to use"
+          placeholder="Search Google or type an address for the agent"
           aria-label="Page address"
           variant="address"
           className="h-8 min-w-0 flex-1 rounded-lg px-3 text-left text-sm"
           onKeyDown={(event) => {
-            const value = event.currentTarget.value.trim();
-            if (event.key !== "Enter" || !value) return;
-            void openPersonTab(
-              view.shownScope,
-              /^[a-z][a-z0-9+.-]*:/i.test(value) ? value : `https://${value}`,
-            );
+            if (event.key !== "Enter") return;
+            const address = browserAddress(event.currentTarget.value);
+            if (address) void openPersonTab(view.shownScope, address);
           }}
         />
       ) : (
-        <Input
-          readOnly
-          value={shown?.url ? hostAddress(shown.url) : ""}
-          title={shown?.url}
-          aria-label="Page address"
-          variant="address"
-          className="h-8 min-w-0 flex-1 rounded-lg px-3 text-left text-sm"
-        />
+        <Tooltip content={shown?.url}>
+          <Input
+            readOnly
+            value={shown?.url ? hostAddress(shown.url) : ""}
+            aria-label="Page address"
+            variant="address"
+            className="h-8 min-w-0 flex-1 rounded-lg px-3 text-left text-sm"
+          />
+        </Tooltip>
       )}
     </>
   );

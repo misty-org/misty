@@ -15,10 +15,6 @@
 @utility layer-notification {
   z-index: 2147482900;
 }
-/* A notice above another notice */
-@utility layer-notification-raised {
-  z-index: 2147482910;
-}
 /* Dialog and sheet backdrops */
 @utility layer-dialog-backdrop {
   z-index: 2147483000;
@@ -43,10 +39,6 @@
 @utility layer-menu {
   z-index: 2147483400;
 }
-/* Inline editors raised over menus */
-@utility layer-menu-raised {
-  z-index: 2147483401;
-}
 /* Popovers and select lists */
 @utility layer-popover {
   z-index: 2147483420;
@@ -67,29 +59,4 @@
   pointer-events: none;
   background-color: var(--misty-night-light);
   mix-blend-mode: multiply;
-}
-
-/* The edge fades of sliding text (OverflowFadeText marquee) animate, so they are typed lengths. */
-@property --marquee-fade-left {
-  syntax: "<length>";
-  inherits: false;
-  initial-value: 0px;
-}
-@property --marquee-fade-right {
-  syntax: "<length>";
-  inherits: false;
-  initial-value: 0px;
-}
-
-/* A playback position that advances by itself (PlaybackClock): the clock text and the bar both read
-   the animated number, so nothing in script has to tick. */
-@property --playback-position {
-  syntax: "<number>";
-  inherits: true;
-  initial-value: 0;
-}
-@property --playback-length {
-  syntax: "<number>";
-  inherits: true;
-  initial-value: 1;
 }

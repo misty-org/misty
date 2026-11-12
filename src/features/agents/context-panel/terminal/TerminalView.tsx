@@ -1,7 +1,9 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 import type { IDisposable, Terminal } from "@xterm/xterm";
 import type { FitAddon } from "@xterm/addon-fit";
+import { RotateCw } from "lucide-react";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
+import { ErrorState, Skeleton } from "@/shared/ui";
 import { errorText } from "../projectApi";
 import {
   TERMINAL_FONT_SIZE,
@@ -61,6 +63,10 @@ export const TerminalView = memo(function TerminalView({
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const [error, setError] = useState<string | null>(null);
+  // Until the shell answers, lines stand in for its first output; a tab with kept output has it.
+  const [ready, setReady] = useState(() => Boolean(terminalBacklog(id)));
+  // Trying again builds the view and asks for the shell once more.
+  const [attempt, setAttempt] = useState(0);
   const [xterm, setXterm] = useState<XtermModules | null>(null);
   // The live xterm, for the context menu outside the setup effect.
   const liveTermRef = useRef<Terminal | null>(null);
@@ -180,6 +186,7 @@ export const TerminalView = memo(function TerminalView({
             // The font may have refitted while the shell was starting: send the latest size.
             schedulePtyResize();
             setError(null);
+            setReady(true);
           })
           .catch((reason: unknown) => {
             if (!disposed) setError(errorText(reason));
@@ -239,16 +246,36 @@ export const TerminalView = memo(function TerminalView({
         liveTermRef.current = null;
       }
     };
-  }, [xterm, id, cwd]);
+  }, [xterm, id, cwd, attempt]);
 
   return (
     <TerminalContextMenu getTerminal={getTerminal} cwd={cwd} onCloseTab={onCloseTab}>
       <div className="terminal-view">
-        <div ref={hostRef} className="terminal-host" data-testid="terminal-host" />
+        <div
+          ref={hostRef}
+          className="terminal-host"
+          data-testid="terminal-host"
+          hidden={Boolean(error)}
+        />
         {error ? (
-          <p className="terminal-error" role="alert">
-            The terminal could not start: {error}
-          </p>
+          <ErrorState
+            title="The terminal couldn't start"
+            line={error}
+            action={{
+              label: "Try again",
+              icon: RotateCw,
+              onClick: () => {
+                setError(null);
+                setAttempt((value) => value + 1);
+              },
+            }}
+          />
+        ) : !ready ? (
+          <div className="grid gap-2 p-3" aria-hidden="true">
+            <Skeleton className="h-4 w-2/5" />
+            <Skeleton className="h-4 w-3/5" />
+            <Skeleton className="h-4 w-1/3" />
+          </div>
         ) : null}
       </div>
     </TerminalContextMenu>

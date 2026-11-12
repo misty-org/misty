@@ -1,4 +1,23 @@
-import { ChevronRight } from "lucide-react";
+import {
+  AppWindow,
+  Archive,
+  ArchiveRestore,
+  ChevronRight,
+  Folder,
+  FolderInput,
+  FolderPlus,
+  GitFork,
+  Mail,
+  MailOpen,
+  MessagesSquare,
+  PanelBottom,
+  PanelRight,
+  Pencil,
+  Pin,
+  PinOff,
+  SquareArrowOutUpRight,
+  Trash2,
+} from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import {
   AgentAvatar,
@@ -23,17 +42,15 @@ import {
   AlertDialogTitle,
   Button,
   ContextMenu,
-  ContextMenuAction,
   ContextMenuContent,
-  ContextMenuRadioGroup,
-  ContextMenuRadioItem,
-  ContextMenuSeparator,
-  ContextMenuSub,
-  ContextMenuSubContent,
-  ContextMenuSubTrigger,
   ContextMenuTrigger,
-  ErrorNotification,
+  MenuItem,
+  MenuRadioGroup,
+  MenuRadioItem,
+  MenuSeparator,
+  MenuSubmenu,
   Pressable,
+  useNotice,
 } from "@/shared/ui";
 import { ChatRow, pressMenuKey, RenameRow, SectionNameDialog } from "./SidebarChatRows";
 import type { OpenPlace } from "./spaceNavigation";
@@ -87,6 +104,7 @@ export function SidebarChats(props: {
   const [archivedOpen, setArchivedOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  useNotice(Boolean(error), { message: error, tone: "error", onDismiss: () => setError("") });
   const anchor = useRef<string | null>(null);
   // A menu item that hands focus to a field or dialog keeps the menu from taking it back.
   const keepFocus = useRef(false);
@@ -223,30 +241,30 @@ export function SidebarChats(props: {
           keepFocus.current = false;
         }}
       >
-        <ContextMenuSub>
-          <ContextMenuSubTrigger disabled={many || !agent}>Open in</ContextMenuSubTrigger>
-          <ContextMenuSubContent>
-            <ContextMenuAction label="New tab" onSelect={() => openIn("tab")} />
-            <ContextMenuAction label="Split right" onSelect={() => openIn("right")} />
-            <ContextMenuAction label="Split down" onSelect={() => openIn("down")} />
-          </ContextMenuSubContent>
-        </ContextMenuSub>
-        <ContextMenuSeparator />
+        <MenuSubmenu icon={SquareArrowOutUpRight} label="Open in" disabled={many || !agent}>
+          <MenuItem icon={AppWindow} label="New tab" onSelect={() => openIn("tab")} />
+          <MenuItem icon={PanelRight} label="Split right" onSelect={() => openIn("right")} />
+          <MenuItem icon={PanelBottom} label="Split down" onSelect={() => openIn("down")} />
+        </MenuSubmenu>
+        <MenuSeparator />
         {archived ? null : (
-          <ContextMenuAction
+          <MenuItem
+            icon={allPinned ? PinOff : Pin}
             label={allPinned ? `Unpin${count}` : `Pin${count}`}
             shortcut="P"
             data-menu-key="p"
             onSelect={() => setChatsPinned(ids, !allPinned)}
           />
         )}
-        <ContextMenuAction
+        <MenuItem
+          icon={allUnread ? MailOpen : Mail}
           label={allUnread ? "Mark as read" : "Mark as unread"}
           shortcut="U"
           data-menu-key="u"
           onSelect={() => setChatsUnread(ids, !allUnread)}
         />
-        <ContextMenuAction
+        <MenuItem
+          icon={Pencil}
           label="Rename"
           shortcut="R"
           data-menu-key="r"
@@ -257,7 +275,8 @@ export function SidebarChats(props: {
             setRenaming(chat.id);
           }}
         />
-        <ContextMenuAction
+        <MenuItem
+          icon={GitFork}
           label="Fork"
           shortcut="F"
           data-menu-key="f"
@@ -267,35 +286,34 @@ export function SidebarChats(props: {
             if (fork && agent) props.onOpen(agent, fork);
           }}
         />
-        <ContextMenuSeparator />
+        <MenuSeparator />
         {archived ? null : (
-          <ContextMenuSub>
-            <ContextMenuSubTrigger>Move to section</ContextMenuSubTrigger>
-            <ContextMenuSubContent className="min-w-44">
-              <ContextMenuRadioGroup
-                value={place ?? "mixed"}
-                onValueChange={(next) => fileChats(ids, next)}
-              >
-                <ContextMenuRadioItem value={unfiled}>Chats</ContextMenuRadioItem>
-                {sections.map((section) => (
-                  <ContextMenuRadioItem key={section.id} value={section.id}>
-                    <span className="min-w-0 flex-1 truncate">{section.name}</span>
-                  </ContextMenuRadioItem>
-                ))}
-              </ContextMenuRadioGroup>
-              <ContextMenuSeparator />
-              <ContextMenuAction
-                label="New section…"
-                onSelect={() => {
-                  keepFocus.current = true;
-                  setNaming({ ids });
-                }}
-              />
-            </ContextMenuSubContent>
-          </ContextMenuSub>
+          <MenuSubmenu icon={FolderInput} label="Move to section">
+            <MenuRadioGroup value={place ?? "mixed"} onValueChange={(next) => fileChats(ids, next)}>
+              <MenuRadioItem icon={MessagesSquare} value={unfiled} label="Chats" />
+              {sections.map((section) => (
+                <MenuRadioItem
+                  key={section.id}
+                  icon={Folder}
+                  value={section.id}
+                  label={section.name}
+                />
+              ))}
+            </MenuRadioGroup>
+            <MenuSeparator />
+            <MenuItem
+              icon={FolderPlus}
+              label="New section…"
+              onSelect={() => {
+                keepFocus.current = true;
+                setNaming({ ids });
+              }}
+            />
+          </MenuSubmenu>
         )}
-        {archived ? null : <ContextMenuSeparator />}
-        <ContextMenuAction
+        {archived ? null : <MenuSeparator />}
+        <MenuItem
+          icon={archived ? ArchiveRestore : Archive}
           label={archived ? `Unarchive${count}` : `Archive${count}`}
           shortcut="A"
           data-menu-key="a"
@@ -304,11 +322,12 @@ export function SidebarChats(props: {
             setSelected([]);
           }}
         />
-        <ContextMenuAction
+        <MenuItem
+          icon={Trash2}
           label={`Delete${count}`}
           shortcut="D"
           data-menu-key="d"
-          destructive
+          danger
           onSelect={() => {
             keepFocus.current = true;
             setDeleting(ids);
@@ -351,7 +370,8 @@ export function SidebarChats(props: {
             keepFocus.current = false;
           }}
         >
-          <ContextMenuAction
+          <MenuItem
+            icon={Pencil}
             label="Rename section"
             shortcut="R"
             data-menu-key="r"
@@ -360,11 +380,12 @@ export function SidebarChats(props: {
               setNaming({ section });
             }}
           />
-          <ContextMenuAction
+          <MenuItem
+            icon={Trash2}
             label="Delete section"
             shortcut="D"
             data-menu-key="d"
-            destructive
+            danger
             onSelect={() =>
               void useChatSectionsStore
                 .getState()
@@ -385,7 +406,6 @@ export function SidebarChats(props: {
         if (event.key === "Escape" && picked.length) setSelected([]);
       }}
     >
-      {error ? <ErrorNotification message={error} onDismiss={() => setError("")} /> : null}
       {groups.map((group) => (
         <section key={group.id} aria-label={group.name}>
           {head(group)}
@@ -439,13 +459,16 @@ export function SidebarChats(props: {
           </AlertDialogTitle>
           <AlertDialogDescription className="break-words">
             {deletingChats.length > 1
-              ? "These chats and their messages will be deleted from this computer. This can't be undone."
-              : `“${deletingChats[0]?.title || "New conversation"}” and its messages will be deleted from this computer. This can't be undone.`}
+              ? "These chats and their messages will be deleted from this computer. " +
+                "This can't be undone."
+              : `“${deletingChats[0]?.title || "New conversation"}” and its messages will be ` +
+                "deleted from this computer. This can't be undone."}
           </AlertDialogDescription>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
             <Button
-              variant="destructive"
+              variant="danger"
+              size="lg"
               disabled={busy}
               onClick={() => void remove(deletingChats.map((chat) => chat.id))}
             >

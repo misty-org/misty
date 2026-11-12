@@ -1,4 +1,4 @@
-import { Pressable } from "@/shared/ui";
+import { OverflowFadeText, Pressable } from "@/shared/ui";
 import { settingSearchEntries } from "../device-preferences/registry";
 import {
   preferenceSection,
@@ -73,11 +73,13 @@ export function SettingsSearchResults(props: {
             className="grid gap-0.5 rounded-md px-2.5 py-1.5 text-left hover:bg-charcoal-hover focus-visible:bg-charcoal-hover"
             onClick={() => props.onSelect(result)}
           >
-            <span className="truncate text-sm text-cream">
+            <OverflowFadeText className="text-sm text-cream" full={result.label}>
               <Highlighted text={result.label} query={props.query} />
-            </span>
+            </OverflowFadeText>
             {result.focus ? (
-              <span className="truncate text-2xs text-cream-muted">{settingsPageTitle(page)}</span>
+              <OverflowFadeText className="text-2xs text-cream-muted">
+                {settingsPageTitle(page)}
+              </OverflowFadeText>
             ) : null}
           </Pressable>
         );

@@ -174,7 +174,7 @@ it("leaves the legacy record alone in another profile's window", async () => {
   const h = await context();
   const { useProfileWindowStore } = await import("./profileWindow");
   useProfileWindowStore.setState({
-    profile: { id: "work", name: "Work", order: 1, sites: [] },
+    profile: { id: "work", name: "Work", order: 1 },
   });
   await h.restoreNativeWorkspace("a");
   await h.flushNativeWorkspace("a");

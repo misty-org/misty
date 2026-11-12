@@ -74,14 +74,3 @@
 .terminal-host .xterm-viewport {
   background: transparent !important;
 }
-.terminal-error {
-  position: absolute;
-  inset: 0 0 auto;
-  z-index: 1;
-  margin: 0;
-  padding: 6px 12px;
-  border-bottom: 1px solid color-mix(in srgb, var(--misty-theme-text) 8%, transparent);
-  background: var(--color-charcoal-card);
-  font-size: 12px;
-  color: var(--tone-failed);
-}

@@ -1,75 +1,87 @@
-import { LoadingScreen } from "./LoadingScreen";
+import type { LucideIcon } from "lucide-react";
 import { cn } from "../classNames";
-import * as React from "react";
+import { Button } from "../controls/Button";
 
-const toneClasses: Record<StateTone, string> = {
-  empty: "text-cream",
-  error: "text-cream-bright",
-  permission: "text-cream",
-  loading: "text-cream",
+/** The one button an empty or error state may offer. */
+export type EmptyStateAction = {
+  label: string;
+  icon?: LucideIcon;
+  onClick: () => void;
+  /**
+   * Defaults to `primary`: an empty state's button is the surface's call to action. `secondary`
+   * when the surface already has its primary button elsewhere.
+   */
+  variant?: "primary" | "secondary";
+  disabled?: boolean;
 };
 
-/**
- * Empty, error, and permission states are text only.
- *
- * These used to lead with a tinted icon tile above the heading. It carried no
- * information the heading did not already state, and it pushed the actual
- * message down the page, so it was removed everywhere rather than per screen.
- */
-function StateView({
-  action,
-  className,
-  compact = false,
-  description,
+/** An empty state: centered in its pane, a title, one muted line and at most one button. */
+export type EmptyStateProps = {
+  title: string;
+  /** The one muted line under the title. Leave it out when the title says it all. */
+  line?: string;
+  action?: EmptyStateAction;
+  /**
+   * Sits in the flow instead of filling the pane: inside a dialog, a list or a section, with its
+   * own room above and below. Don't wrap it in a sized box.
+   */
+  inline?: boolean;
+};
+
+function PaneState({
   title,
-  tone,
-  ...props
-}: StateViewProps & { tone: StateTone }) {
+  line,
+  action,
+  inline = false,
+  role,
+}: Pick<EmptyStateProps, "title" | "line" | "action" | "inline"> & { role?: "alert" }) {
   return (
     <div
+      data-slot="empty-state"
+      data-inline={inline || undefined}
+      role={role}
       className={cn(
-        "mx-auto flex w-full max-w-md flex-col items-center justify-center px-6 py-12 text-center",
-        compact && "max-w-sm px-4 py-6",
-        className,
+        "grid min-w-0 place-items-center overflow-hidden",
+        inline ? "w-full px-4 py-8" : "size-full min-h-0 p-6",
       )}
-      {...props}
     >
-      <h2 className={cn("text-sm font-semibold", toneClasses[tone])}>{title}</h2>
-      {description ? (
-        <p className="mt-1.5 max-w-sm text-sm leading-5 text-cream-muted">{description}</p>
-      ) : null}
-      {action ? <div className="mt-5 flex items-center gap-2">{action}</div> : null}
+      <div className="flex max-w-sm flex-col items-center text-center">
+        <h2 className="text-page font-semibold text-cream-bright text-balance">{title}</h2>
+        {line ? <p className="mt-1 text-body text-cream-muted text-balance">{line}</p> : null}
+        {action ? (
+          <Button
+            type="button"
+            size="lg"
+            variant={action.variant ?? "primary"}
+            icon={action.icon}
+            disabled={action.disabled}
+            onClick={action.onClick}
+            className="mt-5"
+          >
+            {action.label}
+          </Button>
+        ) : null}
+      </div>
     </div>
   );
 }
 
-function EmptyState(props: StateViewProps) {
-  return <StateView tone="empty" {...props} />;
+/**
+ * Says a pane has nothing in it yet, centered in that pane: a title, one muted line, and one
+ * button when there is something to do about it.
+ *
+ * `<EmptyState title="No notes yet" line="Notes you write here are shared with the Space."
+ *   action={{ label: "New note", icon: Plus, onClick: create }} />`
+ *
+ * Inside a dialog, a list or a section, pass `inline` so it takes only the room it needs.
+ */
+function EmptyState(props: EmptyStateProps) {
+  return <PaneState {...props} />;
 }
 
-function ErrorState(props: StateViewProps) {
-  return <StateView role="alert" tone="error" {...props} />;
+/** Says a pane couldn't load, with the same shape as EmptyState; offer `{ label: "Try again" }`. */
+function ErrorState(props: EmptyStateProps) {
+  return <PaneState role="alert" {...props} />;
 }
 
-function PermissionState(props: StateViewProps) {
-  return <StateView tone="permission" {...props} />;
-}
-
-function LoadingState({ label = "Loading", className }: LoadingStateProps) {
-  return <LoadingScreen label={label} className={className} />;
-}
-export { EmptyState, ErrorState, LoadingState, PermissionState };
-
-type StateViewProps = Omit<React.HTMLAttributes<HTMLDivElement>, "title"> & {
-  title: React.ReactNode;
-  description?: React.ReactNode;
-  action?: React.ReactNode;
-  compact?: boolean;
-};
-
-type StateTone = "empty" | "error" | "permission" | "loading";
-
-type LoadingStateProps = Omit<StateViewProps, "title"> & {
-  title?: React.ReactNode;
-  label?: string;
-};
+export { EmptyState, ErrorState };

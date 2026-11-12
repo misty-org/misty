@@ -5,9 +5,9 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  ErrorNotification,
   Input,
   Label,
+  useNotice,
 } from "@/shared/ui";
 import { useEffect, useState } from "react";
 
@@ -27,6 +27,11 @@ export function NewDrawingDialog({
   const [title, setTitle] = useState("");
   const [failed, setFailed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  useNotice(failed, {
+    message: "Drawing could not be created. Your title is saved here; try Create drawing again.",
+    tone: "error",
+    onDismiss: () => setFailed(false),
+  });
 
   useEffect(() => {
     if (!open) return;
@@ -76,19 +81,11 @@ export function NewDrawingDialog({
             }}
           />
         </div>
-        <ErrorNotification
-          message={
-            failed
-              ? "Drawing could not be created. Your title is saved here; try Create drawing again."
-              : ""
-          }
-          onDismiss={() => setFailed(false)}
-        />
         <DialogFooter>
-          <Button type="button" variant="ghost" size="sm" onClick={() => onOpenChange(false)}>
+          <Button type="button" variant="quiet" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button type="button" size="sm" disabled={submitting} onClick={() => void submit()}>
+          <Button type="button" disabled={submitting} onClick={() => void submit()}>
             {submitting ? "Creating…" : "Create drawing"}
           </Button>
         </DialogFooter>

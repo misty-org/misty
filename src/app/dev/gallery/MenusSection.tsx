@@ -1,109 +1,141 @@
 import {
   ContextMenu,
-  ContextMenuAction,
   ContextMenuContent,
-  ContextMenuSeparator,
   ContextMenuTrigger,
   DropdownMenu,
-  DropdownMenuCheckboxItem,
   DropdownMenuContent,
-  DropdownMenuLabel,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuSeparator,
+  MenuCheckItem,
+  MenuGroup,
   MenuItem,
+  MenuLabel,
+  MenuRadioGroup,
+  MenuRadioItem,
+  MenuSeparator,
   MenuSubmenu,
   MenuTrigger,
-  toolbarIconProps,
+  OverflowFadeText,
+  RowActions,
+  Text,
 } from "@/shared/ui";
 import {
   AppWindow,
   Brain,
   Copy,
+  Eye,
   FilePlus,
+  Folder,
+  FolderInput,
   FolderPlus,
-  History,
-  MoreVertical,
+  GitFork,
+  MoreHorizontal,
   Pencil,
+  Pin,
   Plus,
-  QrCode,
-  Share2,
+  Rabbit,
   Trash2,
-  VenetianMask,
+  Turtle,
 } from "lucide-react";
 import { useState } from "react";
 import { GalleryRow, GallerySection } from "./GalleryLayout";
 
+const sections = [
+  { id: "today", name: "Today" },
+  { id: "later", name: "Later" },
+  { id: "archive", name: "Archive" },
+];
+
+// RowActions finds its row by the group/row class.
+const tileClass = "group/row flex h-8 w-72 items-center gap-2 px-2 text-control";
+
+/** One tree of rows, rendered in a dropdown, a right-click menu and a row's ⋯ alike. */
+function ItemMenuRows() {
+  const [pinned, setPinned] = useState(true);
+  const [section, setSection] = useState("today");
+  return (
+    <>
+      <MenuItem icon={Pencil} label="Rename" shortcut="R" onSelect={() => {}} />
+      <MenuItem icon={Copy} label="Duplicate" shortcut="⌘D" onSelect={() => {}} />
+      <MenuItem icon={GitFork} label="Fork" disabled reason="Wait for the run to finish" />
+      <MenuCheckItem icon={Pin} label="Pinned" checked={pinned} onCheckedChange={setPinned} />
+      <MenuSubmenu icon={FolderInput} label="Move to section">
+        <MenuRadioGroup value={section} onValueChange={setSection}>
+          {sections.map((item) => (
+            <MenuRadioItem key={item.id} icon={Folder} value={item.id} label={item.name} />
+          ))}
+        </MenuRadioGroup>
+      </MenuSubmenu>
+      <MenuSeparator />
+      <MenuItem icon={Trash2} label="Delete" danger onSelect={() => {}} />
+    </>
+  );
+}
+
 export function MenusSection() {
-  const [model, setModel] = useState("fast");
+  const [mode, setMode] = useState("fast");
   const [showHidden, setShowHidden] = useState(false);
   return (
-    <GallerySection
-      title="Menus"
-      note="Rows are MenuItem (icon · label · shortcut). Labeled triggers get a chevron that flips open; icon-only triggers never do."
-    >
-      <GalleryRow label="Icon-only trigger">
+    <GallerySection title="Menus">
+      <GalleryRow label="Dropdown">
         <DropdownMenu modal={false}>
-          <MenuTrigger iconOnly label="More" icon={<MoreVertical {...toolbarIconProps} />} />
-          <DropdownMenuContent align="end" width="lg">
-            <MenuItem icon={<Plus />} label="New tab" shortcut="⌘T" onSelect={() => {}} />
-            <MenuItem icon={<AppWindow />} label="New window" shortcut="⌘N" onSelect={() => {}} />
-            <MenuItem icon={<VenetianMask />} label="New private tab" shortcut="⇧⌘N" />
-            <DropdownMenuSeparator />
-            <MenuSubmenu icon={<History />} label="History">
-              <MenuItem label="Show full history" shortcut="⌘Y" onSelect={() => {}} />
-              <MenuItem label="Clear browsing data…" onSelect={() => {}} />
-            </MenuSubmenu>
-            <MenuSubmenu icon={<Share2 />} label="Share">
-              <MenuItem icon={<Copy />} label="Copy link" onSelect={() => {}} />
-              <MenuItem icon={<QrCode />} label="QR code…" onSelect={() => {}} />
-            </MenuSubmenu>
-            <DropdownMenuSeparator />
-            <MenuItem icon={<Trash2 />} label="Delete" destructive onSelect={() => {}} />
-            <MenuItem icon={<Pencil />} label="Disabled row" disabled />
+          <MenuTrigger iconOnly label="More" icon={MoreHorizontal} />
+          <DropdownMenuContent align="start" width="md">
+            <ItemMenuRows />
           </DropdownMenuContent>
         </DropdownMenu>
-      </GalleryRow>
-      <GalleryRow label="Labeled trigger">
         <DropdownMenu modal={false}>
-          <MenuTrigger label="New" icon={<Plus />} />
+          <MenuTrigger label="New" icon={Plus} />
           <DropdownMenuContent width="md">
-            <DropdownMenuLabel>Create in this folder</DropdownMenuLabel>
-            <MenuItem icon={<FolderPlus />} label="Folder" shortcut="⇧⌘N" onSelect={() => {}} />
-            <MenuItem icon={<FilePlus />} label="File" onSelect={() => {}} />
+            <MenuGroup>
+              <MenuLabel>Create in this folder</MenuLabel>
+              <MenuItem icon={FolderPlus} label="Folder" shortcut="⇧⌘N" onSelect={() => {}} />
+              <MenuItem icon={FilePlus} label="File" onSelect={() => {}} />
+              <MenuItem icon={AppWindow} label="Page" onSelect={() => {}} />
+            </MenuGroup>
           </DropdownMenuContent>
         </DropdownMenu>
         <DropdownMenu modal={false}>
           <MenuTrigger
             label="Thinking mode"
-            icon={<Brain />}
-            value={model === "fast" ? "Fast" : "Deep"}
-            variant="outline"
+            icon={Brain}
+            value={mode === "fast" ? "Fast" : "Deep"}
+            variant="secondary"
           />
           <DropdownMenuContent width="sm">
-            <DropdownMenuRadioGroup value={model} onValueChange={setModel}>
-              <DropdownMenuRadioItem value="fast">Fast</DropdownMenuRadioItem>
-              <DropdownMenuRadioItem value="deep">Deep</DropdownMenuRadioItem>
-            </DropdownMenuRadioGroup>
-            <DropdownMenuSeparator />
-            <DropdownMenuCheckboxItem checked={showHidden} onCheckedChange={setShowHidden}>
-              Show hidden files
-            </DropdownMenuCheckboxItem>
+            <MenuRadioGroup value={mode} onValueChange={setMode}>
+              <MenuRadioItem icon={Rabbit} value="fast" label="Fast" />
+              <MenuRadioItem icon={Turtle} value="deep" label="Deep" />
+            </MenuRadioGroup>
+            <MenuSeparator />
+            <MenuCheckItem
+              icon={Eye}
+              label="Show hidden files"
+              checked={showHidden}
+              onCheckedChange={setShowHidden}
+            />
           </DropdownMenuContent>
         </DropdownMenu>
       </GalleryRow>
-      <GalleryRow label="Context menu">
+      <GalleryRow label="Right-click">
         <ContextMenu>
-          <ContextMenuTrigger className="grid h-20 w-72 place-items-center rounded-md border border-dashed border-charcoal-border text-xs text-cream-muted">
-            Right-click here
+          <ContextMenuTrigger className="grid h-20 w-72 place-items-center">
+            <Text size="meta" tone="muted">
+              Right-click here
+            </Text>
           </ContextMenuTrigger>
           <ContextMenuContent width="md">
-            <ContextMenuAction icon={<Copy />} label="Copy" shortcut="⌘C" onSelect={() => {}} />
-            <ContextMenuAction icon={<Pencil />} label="Rename" onSelect={() => {}} />
-            <ContextMenuSeparator />
-            <ContextMenuAction icon={<Trash2 />} label="Delete" destructive onSelect={() => {}} />
+            <ItemMenuRows />
           </ContextMenuContent>
         </ContextMenu>
+      </GalleryRow>
+      <GalleryRow label="RowActions">
+        <div className={tileClass}>
+          <OverflowFadeText className="flex-1" full>
+            A tile with one ⋯ and the same menu on right-click
+          </OverflowFadeText>
+          <RowActions label="Tile actions">
+            <ItemMenuRows />
+          </RowActions>
+        </div>
       </GalleryRow>
     </GallerySection>
   );

@@ -94,8 +94,7 @@ function EditorStatus(props: {
             />
           )}
           <IconButton
-            size="lg"
-            variant="default"
+            variant="secondary"
             label="Close editor"
             className="mt-2"
             onClick={props.onClose}

@@ -1,7 +1,8 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, expect, it, vi } from "vitest";
 import type { WorkspaceView } from "@/features/app-windows/core";
+import { NoticeViewport, resetNotices } from "@/shared/ui";
 import { SpaceWorkspaceSurface } from "./SpaceWorkspaceSurface";
 const state = vi.hoisted(() => ({
   user: { id: "one" } as { id: string } | null,
@@ -31,11 +32,13 @@ function mount() {
   return render(
     <MemoryRouter initialEntries={[tab.route]}>
       <SpaceWorkspaceSurface tab={tab} />
+      <NoticeViewport />
     </MemoryRouter>,
   );
 }
 afterEach(() => {
   cleanup();
+  act(() => resetNotices());
   state.user = { id: "one" };
   state.snapshotReady = true;
   state.error = null;
@@ -58,7 +61,7 @@ it("asks signed-out users to sign in", () => {
   expect(screen.getByRole("button", { name: "Sign in" })).toBeTruthy();
   expect(screen.queryByRole("textbox")).toBeNull();
 });
-it("shows the load failure and lets users retry a failed snapshot", () => {
+it("shows the load failure and lets users retry a failed snapshot", async () => {
   state.snapshotReady = false;
   state.error = "Offline";
   mount();

@@ -26,7 +26,7 @@
   {
     "id": "app.tabs.startPage",
     "label": "New tabs and splits",
-    "page": "browser-tabs",
+    "page": "general",
     "section": "general",
     "key": "workspace_default_tab_index",
     "default": "agents",
@@ -182,31 +182,6 @@
     "platforms": ["desktop"]
   },
   {
-    "id": "browser.hiddenTabSleep",
-    "label": "Sleep hidden tabs",
-    "keywords": ["performance", "memory", "battery", "background", "tabs", "sleep"],
-    "page": "browser-tabs",
-    "section": "general",
-    "key": "browser_hidden_tab_sleep_seconds",
-    "default": 0,
-    "owner": "device",
-    "type": "number",
-    "min": 0,
-    "max": 1800,
-    "platforms": ["desktop"]
-  },
-  {
-    "id": "browser.homepage",
-    "label": "Homepage",
-    "page": "browser-tabs",
-    "section": "general",
-    "key": "browser_homepage",
-    "default": "",
-    "owner": "device",
-    "type": "string",
-    "platforms": ["desktop"]
-  },
-  {
     "id": "browser.linkPreviews",
     "label": "Link previews",
     "keywords": ["thumbnail", "unfurl", "embed", "link card", "images in chat"],
@@ -214,39 +189,6 @@
     "section": "general",
     "key": "browser_link_previews",
     "default": true,
-    "owner": "device",
-    "type": "boolean",
-    "platforms": ["desktop"]
-  },
-  {
-    "id": "browser.statusBubble",
-    "label": "Link and loading status",
-    "page": "browser-appearance",
-    "section": "general",
-    "key": "browser_status_bubble",
-    "default": true,
-    "owner": "device",
-    "type": "boolean",
-    "platforms": ["desktop"]
-  },
-  {
-    "id": "browser.downloads.directory",
-    "label": "Download location",
-    "page": "browser-downloads",
-    "section": "general",
-    "key": "browser_download_directory",
-    "default": "",
-    "owner": "device",
-    "type": "string",
-    "platforms": ["desktop"]
-  },
-  {
-    "id": "browser.downloads.prompt",
-    "label": "Ask where to save each file",
-    "page": "browser-downloads",
-    "section": "general",
-    "key": "browser_download_prompt",
-    "default": false,
     "owner": "device",
     "type": "boolean",
     "platforms": ["desktop"]

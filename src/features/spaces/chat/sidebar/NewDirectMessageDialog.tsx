@@ -2,7 +2,15 @@ import { useState } from "react";
 import { spacesApi } from "../../api/api";
 import type { SpaceConversation, SpaceMember } from "../../api/dto/entities";
 import { SystemErrorNotice } from "@/shared/platform/systemErrors";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, Pressable } from "@/shared/ui";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  cn,
+  OverflowFadeText,
+  Pressable,
+} from "@/shared/ui";
 
 /** Opens the DM with another person in the Space, starting it if there isn't one yet. */
 export function NewDirectMessageDialog({
@@ -48,9 +56,14 @@ export function NewDirectMessageDialog({
                 key={member.user_id}
                 disabled={opening}
                 onClick={() => void openWith(member.user_id)}
-                className="flex min-h-10 items-center rounded-md px-3 text-left text-sm text-cream hover:bg-charcoal-hover"
+                className={cn(
+                  "flex min-h-10 items-center rounded-md px-3 text-left text-sm text-cream",
+                  "hover:bg-charcoal-hover",
+                )}
               >
-                <span className="min-w-0 truncate">{member.name}</span>
+                <OverflowFadeText full className="min-w-0">
+                  {member.name}
+                </OverflowFadeText>
               </Pressable>
             ))
           ) : (

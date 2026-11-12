@@ -1,18 +1,13 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowUpRight, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
-import {
-  ContextMenuAction,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-  IconButton,
-  MenuItem,
-  CollectionItemDialog,
-} from "@/shared/ui";
+import { ArrowUpRight, Pencil, Trash2 } from "lucide-react";
+import { MenuItem, RenameItemDialog, useConfirmDelete } from "@/shared/ui";
 import { notifyDrawingListChanged, closeDrawingCollaborationSession } from "../journal";
 import { useSpacesStore } from "../list/useSpacesStore";
 import type { SpaceOverviewItem } from "./useSpaceOverview";
+
+const changedError =
+  "This item changed or you no longer have permission. Close this dialog and refresh.";
 
 export function useSpaceOverviewActions(
   accountId: string,
@@ -23,11 +18,8 @@ export function useSpaceOverviewActions(
   const navigate = useNavigate();
   const readOnly = useSpacesStore((state) => state.referenceOnly);
   const scope = `${accountId}:${spaceId}`;
-  const [target, setTarget] = useState<{
-    scope: string;
-    item: SpaceOverviewItem;
-    action: "rename" | "remove";
-  }>();
+  const [renaming, setRenaming] = useState<{ scope: string; item: SpaceOverviewItem }>();
+  const { confirm, dialog: deleteDialog } = useConfirmDelete();
   const sourceId = (item: SpaceOverviewItem) => item.id.slice(item.id.indexOf(":") + 1);
   const changed = (item: SpaceOverviewItem) => {
     if (item.kind === "drawing") notifyDrawingListChanged(spaceId);
@@ -40,81 +32,79 @@ export function useSpaceOverviewActions(
   };
   const removeLabel = (item: SpaceOverviewItem) =>
     item.kind === "file" ? "Move to Trash" : "Delete";
-  const menu = (item: SpaceOverviewItem, context = false) => {
-    const Action = context ? ContextMenuAction : MenuItem;
+  // Check the latest list capabilities before sending a mutation.
+  const latest = (target: SpaceOverviewItem, can: "rename" | "remove") => {
+    const item = items.find((candidate) => candidate.id === target.id);
+    if (readOnly || !item || !item[can]) throw new Error(changedError);
+    return item;
+  };
+  const remove = (target: SpaceOverviewItem) =>
+    void confirm({
+      title: `${removeLabel(target)}?`,
+      what:
+        target.kind === "file"
+          ? `“${target.title}” will move to Trash, where it can be restored.`
+          : `“${target.title}” will be permanently deleted for everyone. This cannot be undone.`,
+      confirmLabel: removeLabel(target),
+      onConfirm: async () => {
+        const item = latest(target, "remove");
+        await item.remove!();
+        if (item.kind === "drawing") closeDrawingCollaborationSession(spaceId, sourceId(item));
+        changed(item);
+      },
+    });
+  // The same rows open from the item's ⋯ and from a right-click on it.
+  const menu = (item: SpaceOverviewItem) => {
     const renameDisabled = readOnly || (!item.rename && !item.renameRoute);
     const removeDisabled = readOnly || !item.remove;
     return (
       <>
-        <Action icon={<ArrowUpRight />} label="Open" onSelect={() => navigate(item.route)} />
-        <Action
-          icon={<Pencil />}
+        <MenuItem icon={ArrowUpRight} label="Open" onSelect={() => navigate(item.route)} />
+        <MenuItem
+          icon={Pencil}
           label="Rename"
           disabled={renameDisabled}
-          title={
-            renameDisabled ? "Renaming is unavailable with your access to this item." : undefined
-          }
+          reason="Renaming is unavailable with your access to this item."
           onSelect={() => {
             if (item.renameRoute) navigate(item.renameRoute);
-            else setTarget({ scope, item, action: "rename" });
+            else setRenaming({ scope, item });
           }}
         />
-        <Action
-          icon={<Trash2 />}
+        <MenuItem
+          icon={Trash2}
           label={removeLabel(item)}
-          destructive
+          danger
           disabled={removeDisabled}
-          title={removeDisabled ? "You do not have permission to remove this item." : undefined}
-          onSelect={() => setTarget({ scope, item, action: "remove" })}
+          reason="You do not have permission to remove this item."
+          onSelect={() => remove(item)}
         />
       </>
     );
   };
-  const active = target?.scope === scope ? target : undefined;
+  const active = renaming?.scope === scope ? renaming : undefined;
   return {
     forItem: (item: SpaceOverviewItem) => ({
-      contextMenu: menu(item, true),
-      actions: (
-        <DropdownMenu modal={false}>
-          <DropdownMenuTrigger asChild>
-            <IconButton label={`More actions for ${item.title}`}>
-              <MoreHorizontal />
-            </IconButton>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">{menu(item)}</DropdownMenuContent>
-        </DropdownMenu>
-      ),
+      menu: menu(item),
+      menuLabel: `More actions for ${item.title}`,
     }),
     error: "",
-    dialog: active && (
-      <CollectionItemDialog
-        key={`${scope}:${active.item.id}:${active.action}`}
-        title={active.action === "rename" ? "Rename item" : `${removeLabel(active.item)}?`}
-        initialName={active.action === "rename" ? active.item.title : undefined}
-        description={
-          active.action === "rename"
-            ? undefined
-            : active.item.kind === "file"
-              ? `“${active.item.title}” will move to Trash, where it can be restored.`
-              : `“${active.item.title}” will be permanently deleted for everyone. This cannot be undone.`
-        }
-        actionLabel={active.action === "rename" ? "Save" : removeLabel(active.item)}
-        onClose={() => setTarget(undefined)}
-        onConfirm={async (name) => {
-          // Check the latest list capabilities before sending a mutation.
-          const item = items.find((item) => item.id === active.item.id);
-          if (readOnly || !item || !(active.action === "rename" ? item.rename : item.remove))
-            throw new Error(
-              "This item changed or you no longer have permission. Close this dialog and refresh.",
-            );
-          if (active.action === "rename") await item.rename!(name);
-          else {
-            await item.remove!();
-            if (item.kind === "drawing") closeDrawingCollaborationSession(spaceId, sourceId(item));
-          }
-          changed(item);
-        }}
-      />
+    dialog: (
+      <>
+        {active && (
+          <RenameItemDialog
+            key={`${scope}:${active.item.id}:rename`}
+            title="Rename item"
+            initialName={active.item.title}
+            onClose={() => setRenaming(undefined)}
+            onConfirm={async (name) => {
+              const item = latest(active.item, "rename");
+              await item.rename!(name);
+              changed(item);
+            }}
+          />
+        )}
+        {deleteDialog}
+      </>
     ),
   };
 }

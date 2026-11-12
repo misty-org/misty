@@ -1,7 +1,7 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 import { ChevronDown, ChevronRight, Folder, FolderOpen, Minus, Plus, Undo2 } from "lucide-react";
 import { memo, useMemo, type CSSProperties, type ReactNode } from "react";
-import { Checkbox, IconButton, Pressable } from "@/shared/ui";
+import { Checkbox, IconButton, Pressable, Tooltip } from "@/shared/ui";
 import { getFileTreeIconSvg } from "../files/fileIcons";
 import type { GitTreeDirNode } from "./git-tree";
 import type { GitFileEntry } from "./gitApi";
@@ -64,29 +64,30 @@ function FileNameCell(props: {
         aria-hidden="true"
         dangerouslySetInnerHTML={{ __html: icon }}
       />
-      <Pressable
-        className="git-name"
-        title={props.path}
-        aria-label={props.isNew ? `${props.path} (new)` : props.path}
-        onClick={() => props.onOpen(props.path)}
-      >
-        {props.displayName ? (
-          <span className="git-name-file" data-git-status={props.status}>
-            {props.displayName}
-          </span>
-        ) : (
-          <>
-            {folder ? (
-              <span className="git-name-dir">
-                <bdo dir="ltr">{folder}</bdo>
-              </span>
-            ) : null}
+      <Tooltip content={props.path}>
+        <Pressable
+          className="git-name"
+          aria-label={props.isNew ? `${props.path} (new)` : props.path}
+          onClick={() => props.onOpen(props.path)}
+        >
+          {props.displayName ? (
             <span className="git-name-file" data-git-status={props.status}>
-              {name}
+              {props.displayName}
             </span>
-          </>
-        )}
-      </Pressable>
+          ) : (
+            <>
+              {folder ? (
+                <span className="git-name-dir">
+                  <bdo dir="ltr">{folder}</bdo>
+                </span>
+              ) : null}
+              <span className="git-name-file" data-git-status={props.status}>
+                {name}
+              </span>
+            </>
+          )}
+        </Pressable>
+      </Tooltip>
     </>
   );
 }
@@ -117,7 +118,7 @@ function RowActions(props: {
       {props.discardLabel !== undefined && props.onDiscard ? (
         <IconButton
           label={props.discardLabel}
-          size="xs"
+          size="sm"
           disabled={props.actionBusy}
           onClick={props.onDiscard}
         >
@@ -127,7 +128,7 @@ function RowActions(props: {
       {props.actionLabel !== undefined && props.onAction ? (
         <IconButton
           label={props.actionLabel}
-          size="xs"
+          size="sm"
           disabled={props.actionBusy}
           onClick={props.onAction}
         >
@@ -245,10 +246,12 @@ export const DirectoryRow = memo(function DirectoryRow({
       <span className="git-row-icon" data-folder aria-hidden="true">
         <FolderIcon size={15} />
       </span>
-      <Pressable className="git-name" title={node.path} onClick={() => onToggleOpen(node.id)}>
-        <span className="git-name-file">{node.name}</span>
-        <span className="git-name-count">({node.allPaths.length})</span>
-      </Pressable>
+      <Tooltip content={node.path}>
+        <Pressable className="git-name" onClick={() => onToggleOpen(node.id)}>
+          <span className="git-name-file">{node.name}</span>
+          <span className="git-name-count">({node.allPaths.length})</span>
+        </Pressable>
+      </Tooltip>
       <RowActions
         paths={node.allPaths}
         actionLabel={actionLabel}

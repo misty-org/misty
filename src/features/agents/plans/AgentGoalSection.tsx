@@ -3,18 +3,20 @@ import {
   CircleAlert,
   CirclePause,
   Flag,
+  Gauge,
   Hourglass,
   MessageCircleQuestion,
 } from "lucide-react";
 import { useState } from "react";
-import { Button, ErrorNotification, OptionSelect, Progress, Textarea } from "@/shared/ui";
+import { Button, OptionSelect, Progress, Textarea, type SelectOption } from "@/shared/ui";
+import { ErrorNotice } from "../conversations/ErrorNotice";
 import { pendingQuestionSet, useCollaborationStore } from "./store";
 import type { AgentGoal, ConversationCollaboration } from "./planTypes";
 
-const budgets = [
-  { value: "500000", label: "Small · 500K tokens" },
-  { value: "1500000", label: "Standard · 1.5M tokens" },
-  { value: "5000000", label: "Large · 5M tokens" },
+const budgets: SelectOption[] = [
+  { value: "500000", label: "Small · 500K tokens", icon: Gauge },
+  { value: "1500000", label: "Standard · 1.5M tokens", icon: Gauge },
+  { value: "5000000", label: "Large · 5M tokens", icon: Gauge },
 ];
 
 const format = new Intl.NumberFormat(undefined, { notation: "compact", maximumFractionDigits: 1 });
@@ -119,12 +121,12 @@ export function AgentGoalSection({
           options={budgets}
           onValueChange={setBudget}
         />
-        <ErrorNotification message={error} onDismiss={() => setError("")} />
+        <ErrorNotice message={error} onDismiss={() => setError("")} />
         <div className="agent-plan-actions">
-          <Button variant="primary" size="sm" disabled={busy || !objective.trim()} onClick={start}>
+          <Button variant="primary" disabled={busy || !objective.trim()} onClick={start}>
             Start goal
           </Button>
-          <Button variant="ghost" size="sm" disabled={busy} onClick={() => setEditing(false)}>
+          <Button variant="quiet" disabled={busy} onClick={() => setEditing(false)}>
             Cancel
           </Button>
         </div>
@@ -140,7 +142,7 @@ export function AgentGoalSection({
             : "Start a conversation, then set a goal. You can also type /goal and the objective."}
         </p>
         {conversationId && (
-          <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
+          <Button onClick={() => setEditing(true)}>
             <Flag aria-hidden="true" />
             Set a goal
           </Button>
@@ -203,12 +205,10 @@ export function AgentGoalSection({
           )}
         </div>
       )}
-      <ErrorNotification message={error} onDismiss={() => setError("")} />
+      <ErrorNotice message={error} onDismiss={() => setError("")} />
       <div className="agent-plan-actions">
         {goal.status === "pursuing" && (
           <Button
-            variant="outline"
-            size="sm"
             disabled={busy}
             onClick={() =>
               void run(() => useCollaborationStore.getState().controlGoal(goal, "paused"))
@@ -220,8 +220,6 @@ export function AgentGoalSection({
         {(goal.status === "paused" || goal.status === "unmet") &&
           goal.usedTokens < goal.budgetTokens && (
             <Button
-              variant="outline"
-              size="sm"
               disabled={busy}
               onClick={() =>
                 void run(() => useCollaborationStore.getState().controlGoal(goal, "pursuing"))
@@ -233,8 +231,6 @@ export function AgentGoalSection({
         {(goal.status === "budget_limited" || goal.usedTokens >= goal.budgetTokens) &&
           goal.status !== "achieved" && (
             <Button
-              variant="outline"
-              size="sm"
               disabled={busy || goal.budgetTokens * 2 > 50_000_000}
               onClick={() =>
                 void run(() =>
@@ -248,8 +244,7 @@ export function AgentGoalSection({
             </Button>
           )}
         <Button
-          variant="ghost"
-          size="sm"
+          variant="quiet"
           disabled={busy}
           onClick={() =>
             void run(() => useCollaborationStore.getState().controlGoal(goal, "cleared"))
@@ -258,7 +253,7 @@ export function AgentGoalSection({
           {goal.status === "achieved" ? "Done" : "Clear goal"}
         </Button>
         {goal.status !== "pursuing" && goal.status !== "paused" && (
-          <Button variant="ghost" size="sm" disabled={busy} onClick={() => setEditing(true)}>
+          <Button variant="quiet" disabled={busy} onClick={() => setEditing(true)}>
             New goal
           </Button>
         )}

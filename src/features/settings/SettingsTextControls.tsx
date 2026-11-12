@@ -1,4 +1,4 @@
-import { Button, cn, Input, Textarea } from "@/shared/ui";
+import { Button, cn, Input, OverflowFadeText, Textarea, Tooltip } from "@/shared/ui";
 import { open } from "@tauri-apps/plugin-dialog";
 import { useState, type ChangeEvent } from "react";
 
@@ -103,30 +103,29 @@ export function FilePathControl(props: {
 
   return (
     <div className="grid w-[240px] min-w-0 max-w-full justify-items-end gap-2">
-      <span
+      <OverflowFadeText
+        full
         className={cn(
-          "max-w-full overflow-hidden text-ellipsis whitespace-nowrap text-right text-md",
+          "max-w-full text-right text-md",
           props.disabled || !props.value ? "text-cream-muted" : "text-cream",
         )}
-        title={props.value || props.emptyLabel || "None"}
       >
         {props.value || props.emptyLabel || "None"}
-      </span>
+      </OverflowFadeText>
       <div className="flex items-center gap-2">
+        <Tooltip content={props.title}>
+          <Button
+            variant="secondary"
+            type="button"
+            className={settingsControlButtonCompactClass}
+            disabled={props.disabled || choosing}
+            onClick={() => void chooseFile()}
+          >
+            {choosing ? "Choosing…" : "Choose"}
+          </Button>
+        </Tooltip>
         <Button
-          variant="outline"
-          size="sm"
-          type="button"
-          className={settingsControlButtonCompactClass}
-          disabled={props.disabled || choosing}
-          title={props.title}
-          onClick={() => void chooseFile()}
-        >
-          {choosing ? "Choosing…" : "Choose"}
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
+          variant="secondary"
           type="button"
           className={settingsControlButtonCompactClass}
           disabled={props.disabled || !props.value}

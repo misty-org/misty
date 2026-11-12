@@ -49,7 +49,7 @@ describe("MistyPicker", () => {
 
     const dialog = document.body.querySelector<HTMLElement>('[data-slot="dialog-content"]');
     const libraryButton = Array.from(
-      document.body.querySelectorAll<HTMLButtonElement>('[data-slot="toggle-group-item"]'),
+      document.body.querySelectorAll<HTMLButtonElement>('[role="radio"]'),
     ).find((button) => button.textContent?.includes("Library"));
     expect(document.body.querySelectorAll('[data-slot="dialog-content"]')).toHaveLength(1);
     expect(document.body.querySelector('[data-testid="files-panel"]')).not.toBeNull();

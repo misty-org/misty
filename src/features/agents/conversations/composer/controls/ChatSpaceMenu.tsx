@@ -1,4 +1,4 @@
-import { House } from "lucide-react";
+import { House, Layers } from "lucide-react";
 import { useEffect } from "react";
 import {
   preferredDefaultSpace,
@@ -7,14 +7,7 @@ import {
   useSpaceWindowStore,
   useSpacesDirectory,
 } from "@/features/app-windows";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuLabel,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  MenuTrigger,
-} from "@/shared/ui";
+import { MenuLabel, MenuRadioGroup, MenuRadioItem, type PathLineSegment } from "@/shared/ui";
 import { chatSpaceId } from "../../state/conversationSpace";
 import { useMistyStore } from "../../state/useMistyStore";
 
@@ -53,46 +46,45 @@ export function moveChatToSpace(conversationId: string | undefined, spaceId: str
 }
 
 /**
- * The composer's Space chip: the one Space this chat works in, as an engine's chat works in one
- * project. Every agent can work in every Space; each chat picks one at a time.
+ * The Space part of the composer's path line: the one Space this chat works in, as an engine's
+ * chat works in one project, with the others to move it to. Every agent can work in every Space;
+ * each chat picks one at a time. While a reply runs the chat stays where it is.
  */
-export function ChatSpaceMenu(props: { conversationId?: string; disabled?: boolean }) {
+export function useSpaceSegment(
+  conversationId: string | undefined,
+  locked: boolean,
+): PathLineSegment | null {
   const spaces = useSpacesDirectory((state) => state.spaces);
-  const current = useChatSpace(props.conversationId);
+  const current = useChatSpace(conversationId);
   useEffect(() => {
     if (!spacesSnapshot().spaces.length) void spacesSnapshot().load();
   }, []);
-  const shown = spaces.find((space) => space.id === current);
-  const personal = preferredDefaultSpace(spaces);
   if (!spaces.length) return null;
-  const name = shown?.name ?? "No Space";
-  return (
-    <DropdownMenu>
-      <MenuTrigger
-        label="Space"
-        icon={<House aria-hidden className="size-4 shrink-0" />}
-        value={name}
-        title={`Space: ${name}`}
-        chevron={false}
-        disabled={props.disabled}
-        className="agent-strip-chip max-w-44"
-      />
-      <DropdownMenuContent align="start" className="w-64" data-misty-layer-portal>
-        <DropdownMenuLabel>Space</DropdownMenuLabel>
-        <DropdownMenuRadioGroup
+  const personal = preferredDefaultSpace(spaces);
+  const shown = spaces.find((space) => space.id === current);
+  return {
+    id: "space",
+    icon: shown && shown.id === personal?.id ? House : Layers,
+    label: shown?.name ?? "No Space",
+    menu: (
+      <>
+        <MenuLabel>Space</MenuLabel>
+        <MenuRadioGroup
           value={current}
-          onValueChange={(next) => moveChatToSpace(props.conversationId, next)}
+          onValueChange={(next) => moveChatToSpace(conversationId, next)}
         >
           {spaces.map((space) => (
-            <DropdownMenuRadioItem key={space.id} value={space.id}>
-              <span className="min-w-0 flex-1 truncate">{space.name}</span>
-              {space.id === personal?.id ? (
-                <span className="text-xs text-cream-muted">Personal</span>
-              ) : null}
-            </DropdownMenuRadioItem>
+            <MenuRadioItem
+              key={space.id}
+              icon={space.id === personal?.id ? House : Layers}
+              value={space.id}
+              label={space.name}
+              disabled={locked && space.id !== current}
+              reason={locked ? "Wait for the reply to finish" : undefined}
+            />
           ))}
-        </DropdownMenuRadioGroup>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
+        </MenuRadioGroup>
+      </>
+    ),
+  };
 }

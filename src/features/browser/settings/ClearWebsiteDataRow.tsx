@@ -21,8 +21,7 @@ export function ClearWebsiteDataRow() {
       }
     >
       <Button
-        variant="outline"
-        size="sm"
+        variant="secondary"
         disabled={!native}
         onClick={() => {
           setCleared(false);

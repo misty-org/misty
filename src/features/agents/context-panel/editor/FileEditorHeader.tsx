@@ -1,6 +1,6 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 import { RotateCw, Save, Search, WrapText } from "lucide-react";
-import { Button, IconButton, SegmentedControl } from "@/shared/ui";
+import { Button, ChoiceGroup, IconButton, Tooltip } from "@/shared/ui";
 import type { EditorViewMode } from "./editorViewMode";
 
 /** The bar over an open file: its name, whether it has unsaved edits, the edit and preview
@@ -44,23 +44,23 @@ export function FileEditorHeader({
 }) {
   return (
     <div className="editor-head">
-      <span className="editor-head-name" title={path}>
-        {name}
-      </span>
+      <Tooltip content={path}>
+        <span className="editor-head-name">{name}</span>
+      </Tooltip>
       {dirty ? <span className="editor-head-badge">Unsaved</span> : null}
       {readOnly ? (
         <span className="editor-head-note">Too long to edit; the start is shown</span>
       ) : null}
       <div className="flex-1" />
       {isHtml && viewMode === "preview" ? (
-        <IconButton label="Reload preview" size="xs" onClick={onReloadPreview}>
+        <IconButton label="Reload preview" size="sm" onClick={onReloadPreview}>
           <RotateCw />
         </IconButton>
       ) : null}
       {isMarkdown && viewMode === "preview" ? (
         <IconButton
           label="Find in document"
-          size="xs"
+          size="sm"
           aria-pressed={searchOpen}
           onClick={onToggleSearch}
         >
@@ -68,9 +68,9 @@ export function FileEditorHeader({
         </IconButton>
       ) : null}
       {canPreview ? (
-        <SegmentedControl<EditorViewMode>
+        <ChoiceGroup<EditorViewMode>
           label="View"
-          size="xs"
+          size="sm"
           value={viewMode}
           options={[
             { value: "edit", label: "Edit" },
@@ -80,13 +80,18 @@ export function FileEditorHeader({
         />
       ) : null}
       {viewMode === "edit" ? (
-        <IconButton label="Word wrap" size="xs" aria-pressed={wordWrap} onClick={onToggleWordWrap}>
+        <IconButton label="Word wrap" size="sm" aria-pressed={wordWrap} onClick={onToggleWordWrap}>
           <WrapText />
         </IconButton>
       ) : null}
       {!readOnly ? (
-        <Button size="xs" variant="secondary" disabled={!dirty || saving} onClick={onSave}>
-          <Save />
+        <Button
+          size="sm"
+          variant="secondary"
+          icon={Save}
+          disabled={!dirty || saving}
+          onClick={onSave}
+        >
           Save
         </Button>
       ) : null}

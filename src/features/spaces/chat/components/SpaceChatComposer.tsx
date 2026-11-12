@@ -6,10 +6,10 @@ import {
   MessageComposer,
   MessageComposerSend,
   messageComposerTextClass,
-  InputGroupText,
   Popover,
   PopoverAnchor,
   PopoverTrigger,
+  Text,
 } from "@/shared/ui";
 import { AtSign, Plus, Smile } from "lucide-react";
 import { useId, useMemo, useRef, type FormEvent, type KeyboardEvent } from "react";
@@ -193,35 +193,30 @@ export function SpaceChatComposer(props: SpaceChatComposerProps) {
                     overlayRef.current.scrollTop = event.currentTarget.scrollTop;
                 },
               }}
-              footer={
-                draft.text.length >= MESSAGE_LENGTH_WARNING_THRESHOLD ? (
-                  <InputGroupText className="ml-auto tabular-nums">
-                    {draft.text.length}/{MAX_MESSAGE_LENGTH}
-                  </InputGroupText>
-                ) : undefined
+              items={
+                props.canUploadAttachments || props.canBrowseLibrary
+                  ? [
+                      {
+                        id: "attach",
+                        icon: Plus,
+                        label: "Add files or Library items",
+                        priority: 1,
+                        disabled: draft.attachmentUploading || draft.attachmentSlotsLeft === 0,
+                        onSelect: () =>
+                          props.onOpenPicker(props.canUploadAttachments ? "files" : "library"),
+                      },
+                    ]
+                  : []
               }
-              leading={
-                props.canUploadAttachments || props.canBrowseLibrary ? (
-                  <IconButton
-                    variant="toolbar"
-                    size="sm"
-                    type="button"
-                    disabled={draft.attachmentUploading || draft.attachmentSlotsLeft === 0}
-                    onClick={() =>
-                      props.onOpenPicker(props.canUploadAttachments ? "files" : "library")
-                    }
-                    label="Add files or Library items"
-                  >
-                    <Plus />
-                  </IconButton>
-                ) : null
-              }
-              actions={
+              end={
                 <>
+                  {draft.text.length >= MESSAGE_LENGTH_WARNING_THRESHOLD ? (
+                    <Text size="meta" tone="muted" className="px-1 tabular-nums">
+                      {`${draft.text.length}/${MAX_MESSAGE_LENGTH}`}
+                    </Text>
+                  ) : null}
                   <PopoverTrigger asChild>
                     <IconButton
-                      variant="toolbar"
-                      size="sm"
                       type="button"
                       onClick={() => {
                         input.beginMention();
@@ -238,11 +233,10 @@ export function SpaceChatComposer(props: SpaceChatComposerProps) {
                       focusCaretToEnd();
                     }}
                   >
-                    <IconButton variant="toolbar" size="sm" type="button" label="Insert emoji">
+                    <IconButton type="button" label="Insert emoji">
                       <Smile />
                     </IconButton>
                   </ChatEmojiPicker>
-
                   <MessageComposerSend
                     type="submit"
                     label="Send message"

@@ -1,6 +1,7 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 // See NOTICE.
 
+import { Folder, Globe } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import {
   Button,
@@ -82,7 +83,7 @@ export function PromptEditorDialog({
           <div className="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-2">
             <Field
               label="Name"
-              hint={nameInvalid ? "Use a name without spaces or slashes." : undefined}
+              error={nameInvalid ? "Use a name without spaces or slashes." : undefined}
             >
               <Input
                 value={name}
@@ -102,8 +103,8 @@ export function PromptEditorDialog({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="workspace">This folder</SelectItem>
-                    <SelectItem value="global">Everywhere</SelectItem>
+                    <SelectItem value="workspace" icon={Folder} label="This folder" />
+                    <SelectItem value="global" icon={Globe} label="Everywhere" />
                   </SelectContent>
                 </Select>
               </Field>
@@ -135,10 +136,10 @@ export function PromptEditorDialog({
             />
           </Field>
           <DialogFooter>
-            <Button type="button" variant="secondary" onClick={onCancel}>
+            <Button size="lg" type="button" onClick={onCancel}>
               Cancel
             </Button>
-            <Button type="submit" disabled={!valid}>
+            <Button size="lg" type="submit" disabled={!valid}>
               {initial ? "Save" : "Create"}
             </Button>
           </DialogFooter>

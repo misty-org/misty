@@ -8,13 +8,14 @@ import {
 import { reportSystemError } from "@/shared/platform/systemErrors";
 import { routes } from "@/app/shell";
 import { useNativeSessionStore } from "@/features/account";
-import { ProfileMenuItems } from "@/features/app-windows";
 import {
   DropdownMenuContent,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   MenuItem,
   MenuSubmenu,
+  OverflowFadeText,
+  Spinner,
 } from "@/shared/ui";
 import { ShortcutText } from "@/features/shortcuts/runtime";
 import { Check, LifeBuoy, LogIn, LogOut, Plus, Repeat2, Settings, UserCircle } from "lucide-react";
@@ -32,8 +33,8 @@ function Initials(props: { children: string }) {
   );
 }
 
-/** The account menu's rows: Settings, this window's profile and the account's other profiles,
- * account actions, a submenu to switch saved accounts, and Help. */
+/** The account menu's rows: Settings, account actions, a submenu to switch saved accounts, and
+ * Help. */
 function AccountMenuItems(props: {
   onClose: () => void;
   onOpenAccountSettings: () => void;
@@ -94,8 +95,8 @@ function AccountMenuItems(props: {
 
   return (
     <>
-      <DropdownMenuLabel className="truncate py-1.5 text-xs font-medium text-cream">
-        {email || "Not signed in"}
+      <DropdownMenuLabel className="py-1.5 text-xs font-medium text-cream">
+        <OverflowFadeText>{email || "Not signed in"}</OverflowFadeText>
       </DropdownMenuLabel>
       <DropdownMenuSeparator />
       {props.onOpenSettings ? (
@@ -109,7 +110,6 @@ function AccountMenuItems(props: {
           <DropdownMenuSeparator />
         </>
       ) : null}
-      <ProfileMenuItems />
       {!account ? (
         <MenuItem icon={<LogIn />} label="Sign in" onSelect={() => openSignInSheet("account")} />
       ) : (
@@ -129,14 +129,13 @@ function AccountMenuItems(props: {
             {accounts.map((saved) => (
               <MenuItem
                 key={saved.id}
-                title={saved.email}
                 disabled={busy}
                 icon={<Initials>{initialsForProfile(saved.username, saved.email)}</Initials>}
-                label={
-                  switchingAccountId === saved.id ? "Switching…" : saved.username || saved.email
-                }
+                label={saved.username || saved.email}
                 shortcut={
-                  saved.id === account?.id ? (
+                  switchingAccountId === saved.id ? (
+                    <Spinner size="sm" label="Switching account" />
+                  ) : saved.id === account?.id ? (
                     <Check className="size-3.5 text-cream-bright" aria-label="Active account" />
                   ) : undefined
                 }

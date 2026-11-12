@@ -6,7 +6,7 @@
  */
 import { RefreshCw } from "lucide-react";
 import { useMemo, useState } from "react";
-import { Badge, Button, Spinner } from "@/shared/ui";
+import { Badge, Button, Spinner, OverflowFadeText } from "@/shared/ui";
 import { EmptyLine, InlineError, SkillListSkeleton } from "./components";
 import { t } from "./strings";
 import type { SkillActivityEntry, SkillUsageResult } from "./types";
@@ -118,9 +118,9 @@ function ActivityBody({
             <Badge variant="outline">
               {t(`activity.action.${ACTION_KEYS[entry.action] ?? "other"}`)}
             </Badge>
-            <span className="truncate text-sm text-cream">
+            <OverflowFadeText full className="text-sm text-cream">
               {entry.name || entry.directory || ""}
-            </span>
+            </OverflowFadeText>
           </span>
           <span className="shrink-0 text-xs text-cream-muted">
             {timeFormat.format(new Date(entry.ts))}
@@ -149,12 +149,7 @@ export function SkillUsagePane() {
       <section className="flex flex-col gap-2">
         <div className="flex items-center justify-between gap-2">
           <h3 className="text-sm font-medium text-cream-bright">{t("usage.invocations")}</h3>
-          <Button
-            variant="secondary"
-            size="sm"
-            disabled={usage.usageLoading || refreshing}
-            onClick={refresh}
-          >
+          <Button disabled={usage.usageLoading || refreshing} onClick={refresh}>
             {refreshing ? <Spinner size="sm" label={false} /> : <RefreshCw aria-hidden />}
             {t("common.refresh")}
           </Button>

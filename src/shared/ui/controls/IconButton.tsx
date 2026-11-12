@@ -1,25 +1,27 @@
 import * as React from "react";
-import { Button, type ButtonProps } from "./Button";
+
 import { cn } from "../classNames";
+import { Spinner } from "../feedback/Spinner";
+import { Tooltip, type TooltipSide } from "../overlays/Tooltip";
+import { Button, type ButtonLook, type ButtonProps } from "./Button";
 
-const iconButtonSizes = {
-  // Inline closers inside tabs and menu rows.
-  // Width and height stay separate classes so a caller's `w-auto` replaces the width
-  // outright instead of racing `size-*` in the stylesheet.
-  "2xs": "h-5 w-5 [&_svg:not([class*='size-'])]:size-3",
-  xs: "h-6 w-6 [&_svg:not([class*='size-'])]:size-3.5",
-  sm: "h-8 w-8",
-  md: "h-9 w-9",
-  lg: "h-10 w-10",
-} as const;
+/** sm 24 for inline closers inside rows and tabs, md 32 (the default) for toolbars. */
+export type IconButtonSize = "sm" | "md";
 
-/** Glyph geometry for icons inside toolbar-sized icon buttons. */
-export const toolbarIconProps = { size: 18, strokeWidth: 1.75, "aria-hidden": true } as const;
+/** Button's roles, plus `overlay` for controls drawn over images, video and the Studio only. */
+export type IconButtonVariant = ButtonLook;
+
+const sizeClass: Record<IconButtonSize, string> = {
+  // Width and height stay separate classes so a caller's `w-auto` replaces the width outright
+  // instead of racing `size-*` in the stylesheet.
+  sm: "h-6 w-6",
+  md: "h-8 w-8",
+};
 
 /**
- * The one icon-only button. Defaults to the browser chrome's toolbar look at 32px;
- * `label` is required and doubles as the native title unless `tooltip` says otherwise. With `asChild` it
- * styles its child, such as a router Link. `shape="round"` is for tab closers and media controls.
+ * The one icon-only button. Its label is its accessible name and its Tooltip, with the shortcut
+ * after it while shortcut hints are on; it never uses the system title. The icon is its child and
+ * draws at 16px. With `asChild` it styles its child, such as a router Link.
  */
 const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(
   (
@@ -28,40 +30,65 @@ const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(
       children,
       className,
       label,
-      shape: _shape = "square",
-      size = "sm",
-      tooltip = label,
+      hint,
+      shortcut,
+      tooltipSide,
+      loading = false,
+      size,
       type = "button",
-      variant = "toolbar",
+      variant,
       ...props
     },
     ref,
   ) => {
-    // The tooltip is the browser's own title, so there is nothing to wrap.
+    const resolvedSize = size ?? "md";
     return (
-      <Button
-        ref={ref}
-        type={type}
-        variant={variant}
-        size="none"
-        aria-label={ariaLabel ?? label}
-        data-icon-size={size}
-        title={tooltip === false ? label : tooltip}
-        className={cn("shrink-0 p-0 shadow-none", iconButtonSizes[size], className)}
-        {...props}
-      >
-        {children}
-      </Button>
+      <Tooltip content={hint || label} shortcut={shortcut} side={tooltipSide}>
+        <Button
+          ref={ref}
+          type={type}
+          variant={variant ?? "quiet"}
+          size={resolvedSize}
+          aria-label={ariaLabel ?? label}
+          aria-busy={loading || undefined}
+          className={cn(
+            "shrink-0 justify-center gap-0 p-0 shadow-none",
+            sizeClass[resolvedSize],
+            loading && "pointer-events-none",
+            className,
+          )}
+          {...props}
+        >
+          {loading ? <Spinner label={false} /> : children}
+        </Button>
+      </Tooltip>
     );
   },
 );
 IconButton.displayName = "IconButton";
 export { IconButton };
 
-export type IconButtonProps = Omit<ButtonProps, "size"> & {
+export type IconButtonProps = Omit<
+  ButtonProps,
+  "size" | "variant" | "icon" | "iconEnd" | "loading" | "title"
+> & {
+  /** The icon, at 16px. */
   children: React.ReactNode;
+  /** What it does, in sentence case: its accessible name and its tooltip. */
   label: string;
-  tooltip?: string | false;
-  size?: keyof typeof iconButtonSizes;
-  shape?: "square" | "round";
+  /**
+   * The tooltip's text when it says more than the label: what a check does, or why a toggle
+   * can't change here. The label stays the accessible name.
+   */
+  hint?: string;
+  /** The command's shortcut as it reads, such as "⌘N", shown after the label while hints are on. */
+  shortcut?: string;
+  /** Which side of the button the tooltip opens on. Defaults to top, flipping when there's no room. */
+  tooltipSide?: TooltipSide;
+  /** Defaults to quiet. */
+  variant?: IconButtonVariant | null;
+  /** Defaults to md (32). */
+  size?: IconButtonSize | null;
+  /** Working on the click: a spinner replaces the icon and clicks wait. */
+  loading?: boolean;
 };

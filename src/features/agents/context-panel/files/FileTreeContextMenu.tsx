@@ -14,7 +14,7 @@ import {
   TextSearch,
   Trash2,
 } from "lucide-react";
-import { ContextMenuAction, ContextMenuContent, ContextMenuSeparator } from "@/shared/ui";
+import { ContextMenuContent, ContextMenuSeparator, MenuItem } from "@/shared/ui";
 import { canOpenInBrowser } from "../editor/editorViewMode";
 import { parentPath } from "./filesStore";
 import type { FileTreeMenuTarget } from "./useFileTreeOperations";
@@ -67,83 +67,37 @@ export function FileTreeContextMenu({
   onTrash(): void;
 }) {
   const dir = target.isDir ? target.path : parentPath(target.path);
-  const icon = "size-4";
   return (
     <ContextMenuContent className="w-56" aria-label={target.path}>
-      <ContextMenuAction
-        icon={<FilePlus className={icon} />}
-        label="New file"
-        onSelect={() => onNewFile(dir)}
-      />
-      <ContextMenuAction
-        icon={<FolderPlus className={icon} />}
-        label="New folder"
-        onSelect={() => onNewFolder(dir)}
-      />
-      <ContextMenuAction
-        icon={<Search className={icon} />}
-        label="Search files"
-        onSelect={() => onSearchFiles(dir)}
-      />
-      <ContextMenuAction
-        icon={<TextSearch className={icon} />}
-        label="Search in files"
-        onSelect={() => onSearchText(dir)}
-      />
+      <MenuItem icon={FilePlus} label="New file" onSelect={() => onNewFile(dir)} />
+      <MenuItem icon={FolderPlus} label="New folder" onSelect={() => onNewFolder(dir)} />
+      <MenuItem icon={Search} label="Search files" onSelect={() => onSearchFiles(dir)} />
+      <MenuItem icon={TextSearch} label="Search in files" onSelect={() => onSearchText(dir)} />
       <ContextMenuSeparator />
-      <ContextMenuAction icon={<Copy className={icon} />} label="Copy" onSelect={onCopy} />
-      <ContextMenuAction
-        icon={<ClipboardPaste className={icon} />}
+      <MenuItem icon={Copy} label="Copy" onSelect={onCopy} />
+      <MenuItem
+        icon={ClipboardPaste}
         label="Paste"
         disabled={pasteDisabled}
         onSelect={() => onPaste(dir)}
       />
       {!isRoot ? (
         <>
-          <ContextMenuAction
-            icon={<CopyPlus className={icon} />}
-            label="Duplicate"
-            onSelect={onDuplicate}
-          />
-          <ContextMenuAction
-            icon={<Pencil className={icon} />}
-            label="Rename"
-            onSelect={onRename}
-          />
+          <MenuItem icon={CopyPlus} label="Duplicate" onSelect={onDuplicate} />
+          <MenuItem icon={Pencil} label="Rename" onSelect={onRename} />
         </>
       ) : null}
       <ContextMenuSeparator />
-      <ContextMenuAction
-        icon={<Link2 className={icon} />}
-        label="Copy path"
-        onSelect={onCopyPath}
-      />
-      <ContextMenuAction
-        icon={<MessageSquarePlus className={icon} />}
-        label="Send to chat"
-        onSelect={onSendPath}
-      />
+      <MenuItem icon={Link2} label="Copy path" onSelect={onCopyPath} />
+      <MenuItem icon={MessageSquarePlus} label="Send to chat" onSelect={onSendPath} />
       {!target.isDir && canOpenInBrowser(target.path) ? (
-        <ContextMenuAction
-          icon={<Globe className={icon} />}
-          label="Open in browser"
-          onSelect={onOpenInBrowser}
-        />
+        <MenuItem icon={Globe} label="Open in browser" onSelect={onOpenInBrowser} />
       ) : null}
-      <ContextMenuAction
-        icon={<FolderOpen className={icon} />}
-        label={revealLabel}
-        onSelect={onReveal}
-      />
+      <MenuItem icon={FolderOpen} label={revealLabel} onSelect={onReveal} />
       {!isRoot ? (
         <>
           <ContextMenuSeparator />
-          <ContextMenuAction
-            icon={<Trash2 className={icon} />}
-            label="Move to trash"
-            destructive
-            onSelect={onTrash}
-          />
+          <MenuItem icon={Trash2} label="Move to trash" danger onSelect={onTrash} />
         </>
       ) : null}
     </ContextMenuContent>

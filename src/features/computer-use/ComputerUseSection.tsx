@@ -7,7 +7,7 @@
 import { Check } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { DesktopSettingsRow } from "@/features/settings";
-import { Button, ErrorNotification, Skeleton } from "@/shared/ui";
+import { Button, useNotice, Skeleton } from "@/shared/ui";
 import { computerUseApi, type ComputerUsePermissions } from "./computerUseAttachment";
 
 function Grant(props: { label: string; granted: boolean | undefined; onOpen(): void }) {
@@ -21,9 +21,7 @@ function Grant(props: { label: string; granted: boolean | undefined; onOpen(): v
           Allowed
         </span>
       ) : (
-        <Button variant="secondary" size="sm" onClick={props.onOpen}>
-          Open System Settings
-        </Button>
+        <Button onClick={props.onOpen}>Open System Settings</Button>
       )}
     </DesktopSettingsRow>
   );
@@ -43,6 +41,7 @@ export function ComputerUseSection() {
   }, [load]);
   const open = (kind: "accessibility" | "screenRecording") =>
     computerUseApi.openSettings(kind).catch(() => setError("System Settings couldn't open."));
+  useNotice(Boolean(error), { message: error, tone: "error", onDismiss: () => setError("") });
   if (status && !status.osPermissionsRequired) {
     return (
       <DesktopSettingsRow label="Permissions">
@@ -64,14 +63,11 @@ export function ComputerUseSection() {
       />
       <DesktopSettingsRow label="Stop screen control">
         <Button
-          variant="secondary"
-          size="sm"
           onClick={() => void computerUseApi.stop().catch(() => setError("Couldn't stop it."))}
         >
           Stop
         </Button>
       </DesktopSettingsRow>
-      <ErrorNotification message={error} onDismiss={() => setError("")} />
     </>
   );
 }

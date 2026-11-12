@@ -368,7 +368,7 @@ fn build_unix_extra_search_paths() -> Vec<PathBuf> {
     paths
 }
 
-/// The PATH the person's login shell builds, asked once with a short time limit.
+/// The login shell's PATH, asked once with a time limit and read back from a file, never a pipe.
 #[cfg(not(windows))]
 fn login_shell_path() -> Option<String> {
     static ASKED: std::sync::OnceLock<Option<String>> = std::sync::OnceLock::new();
@@ -377,15 +377,14 @@ fn login_shell_path() -> Option<String> {
 
 #[cfg(not(windows))]
 fn ask_login_shell_path() -> Option<String> {
-    if cfg!(test) {
-        return None;
-    }
     const MARK: &str = "__MISTY_PATH__";
     let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".into());
+    // Never in tests. A pipe could be held open forever by a program the shell leaves running.
+    let mut output = (!cfg!(test)).then(tempfile::tempfile)?.ok()?;
     let mut child = std::process::Command::new(shell)
         .args(["-l", "-i", "-c", &format!("echo '{MARK}'\"$PATH\"")])
         .stdin(std::process::Stdio::null())
-        .stdout(std::process::Stdio::piped())
+        .stdout(output.try_clone().ok()?)
         .stderr(std::process::Stdio::null())
         .spawn()
         .ok()?;
@@ -402,8 +401,8 @@ fn ask_login_shell_path() -> Option<String> {
             Err(_) => return None,
         }
     }
-    let output = child.wait_with_output().ok()?;
-    let text = String::from_utf8_lossy(&output.stdout);
+    std::io::Seek::rewind(&mut output).ok()?;
+    let text = std::io::read_to_string(std::io::Read::take(output, 1 << 20)).ok()?;
     let path = text.rsplit(MARK).next()?.lines().next()?.trim().to_string();
     (!path.is_empty()).then_some(path)
 }

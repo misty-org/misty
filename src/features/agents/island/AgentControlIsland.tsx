@@ -1,5 +1,6 @@
 import { useEffect } from "react";
-import { ErrorNotification } from "@/shared/ui";
+import { OverflowFadeText } from "@/shared/ui";
+import { ErrorNotice } from "../conversations/ErrorNotice";
 import { interventionLabels } from "../interventions/api";
 import { useAgentInterventions } from "../interventions/store";
 import { useMistyStore } from "../conversations/state/useMistyStore";
@@ -80,15 +81,16 @@ export function AgentControlIsland() {
     <aside aria-label="Agent control" className={islandClass}>
       <AgentActionQuestions />
       <div className="flex min-w-0 items-center gap-2 px-2 pt-1">
-        <p
-          className={`min-w-0 flex-1 truncate text-sm ${running && !questions ? "misty-shimmer" : ""}`}
+        <OverflowFadeText
+          as="p"
+          className={`min-w-0 flex-1 text-sm ${running && !questions ? "misty-shimmer" : ""}`}
           role="status"
         >
           {status}
-        </p>
+        </OverflowFadeText>
         {meta && <span className="shrink-0 text-xs text-cream-muted">{meta}</span>}
       </div>
-      <ErrorNotification message={error} onDismiss={() => setError("")} />
+      <ErrorNotice message={error} onDismiss={() => setError("")} />
       {!error && notice && <p className="px-2 text-xs text-cream-muted">{notice}</p>}
       {takesMessages && (
         <AgentControlComposer

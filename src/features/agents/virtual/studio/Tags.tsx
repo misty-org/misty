@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { useMemo } from "react";
 import { Vector3 } from "three";
-import { Pressable } from "@/shared/ui";
+import { Pressable, OverflowFadeText } from "@/shared/ui";
 import { EngineMark, hasEngineMark } from "@/features/engine-config/EngineMark";
 import type { Actor } from "./behaviour";
 import { spreadLabels, type Label } from "./spread";
@@ -125,12 +125,12 @@ export function ActorTag(props: {
     >
       <span className="virtual-studio-tag-name">
         {hasEngineMark(actor.engine) ? <EngineMark engine={actor.engine} size={11} /> : null}
-        <span className="truncate">{props.name}</span>
+        <OverflowFadeText>{props.name}</OverflowFadeText>
       </span>
       {line ? (
         <span className="virtual-studio-tag-line">
           {Icon ? <Icon size={11} strokeWidth={2.4} aria-hidden="true" /> : null}
-          <span className="truncate">{line}</span>
+          <OverflowFadeText>{line}</OverflowFadeText>
         </span>
       ) : null}
     </Pressable>

@@ -15,14 +15,6 @@ export const workspaceCommands: ShortcutCommandDefinition[] = [
     allowInEditable: true,
     nativeMenu: true,
   }),
-  command("workspace.new_profile", "New profile", {
-    description: "Add a profile, with its own tabs and website sign-ins.",
-    category: "Windows",
-    scope: "workspace",
-    aliases: ["add profile", "create profile"],
-    allowInEditable: true,
-    nativeMenu: true,
-  }),
   command("workspace.close_window", "Close window", {
     description: "Close this window. Its tabs stay in the profile.",
     category: "Windows",

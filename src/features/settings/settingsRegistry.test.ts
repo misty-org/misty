@@ -81,9 +81,7 @@ describe("settings routing", () => {
       expect(blockIds.has(section), `${definition.id} → ${section}`).toBe(true);
     }
     expect(preferenceSection("app.diagnostics.framePacing", "about")).toBe("advanced");
-    expect(preferenceSection("browser.downloads.prompt", "browser-downloads")).toBe(
-      "browser-downloads",
-    );
+    expect(preferenceSection("browser.linkPreviews", "browser-appearance")).toBe("advanced");
   });
 });
 

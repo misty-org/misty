@@ -1,4 +1,4 @@
-import { ErrorNotification } from "@/shared/ui";
+import { useNotice } from "@/shared/ui";
 import { useEffect, useState } from "react";
 import { aiSurfaceApi } from "../runs/invocations/api";
 import { type ScreenLocation } from "../runs/invocations/aiSettingsTypes";
@@ -60,6 +60,7 @@ export function ScreenLocationSection() {
       setWorking(false);
     }
   };
+  useNotice(Boolean(error), { message: error, tone: "error", onDismiss: () => setError("") });
   return (
     <DesktopSettingsSection title="Screens">
       <DesktopSettingsRow
@@ -83,7 +84,6 @@ export function ScreenLocationSection() {
           onChange={(value) => void changeKeepAwake(value)}
         />
       </DesktopSettingsRow>
-      <ErrorNotification message={error} onDismiss={() => setError("")} />
     </DesktopSettingsSection>
   );
 }

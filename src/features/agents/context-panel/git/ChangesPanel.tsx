@@ -6,7 +6,13 @@ import { resolveWorkspaceRepository } from "../files/repositorySelection";
 import { ChangesFileMenu } from "./ChangesFileContextMenu";
 import { ChangesSummary, GroupSection } from "./ChangesGroupSection";
 import { ChangesPanelHeader } from "./ChangesPanelHeader";
-import { CommitFooter, ConfirmDialog, NotRepoState, StatusErrorState } from "./ChangesStates";
+import {
+  CommitFooter,
+  ConfirmDialog,
+  NoChangesState,
+  NotRepoState,
+  StatusErrorState,
+} from "./ChangesStates";
 import { useChangesSelection, useGitViewMode, useRefreshWhileWorking } from "./changesHooks";
 import { DiffView } from "./DiffView";
 import type { GitFileEntry } from "./gitApi";
@@ -90,6 +96,9 @@ export function ChangesPanel({ folder }: { folder: string }) {
     );
   }
 
+  const total = status
+    ? status.staged.length + status.unstaged.length + status.untracked.length
+    : 0;
   const menu = (actionKind: "stage" | "unstage", onDiscard?: (path: string) => void) =>
     function wrap(entry: GitFileEntry, row: ReactNode) {
       return (
@@ -133,10 +142,8 @@ export function ChangesPanel({ folder }: { folder: string }) {
                 <Skeleton className="h-4 w-2/3" />
                 <Skeleton className="h-4 w-1/2" />
               </div>
-            ) : status.staged.length + status.unstaged.length + status.untracked.length === 0 ? (
-              <div className="git-empty">
-                <p>No changes</p>
-              </div>
+            ) : total === 0 ? (
+              <NoChangesState />
             ) : (
               <>
                 <ChangesSummary status={status} selectedCount={selection.selectedFiles.size} />
@@ -206,13 +213,16 @@ export function ChangesPanel({ folder }: { folder: string }) {
               </>
             )}
           </div>
-          <CommitFooter
-            selectedCount={selection.selectedFiles.size}
-            busy={actions.pending.commit === true}
-            commitMsg={actions.commitMsg}
-            onCommitMsgChange={actions.setCommitMsg}
-            onCommitSelected={actions.commitSelected}
-          />
+          {/* Nothing to commit, nothing to write a message for. */}
+          {total > 0 ? (
+            <CommitFooter
+              selectedCount={selection.selectedFiles.size}
+              busy={actions.pending.commit === true}
+              commitMsg={actions.commitMsg}
+              onCommitMsgChange={actions.setCommitMsg}
+              onCommitSelected={actions.commitSelected}
+            />
+          ) : null}
         </>
       )}
       <ConfirmDialog

@@ -2,11 +2,13 @@ import { useEffect, useRef, useState } from "react";
 import type { SpaceLibraryItem } from "../../api/dto/entities";
 import {
   ContextMenu,
-  ContextMenuAction,
   ContextMenuContent,
   ContextMenuLabel,
   ContextMenuSeparator,
   ContextMenuTrigger,
+  MenuItem,
+  MenuSeparator,
+  OverflowFadeText,
 } from "@/shared/ui";
 import {
   ArchiveRestore,
@@ -23,13 +25,12 @@ export interface LibraryItemMenuState {
   top: number;
 }
 
-export function LibraryItemContextMenu(props: {
-  state: LibraryItemMenuState;
+/** What can be done with one Library item, and how. */
+export interface LibraryItemMenuActions {
   item: SpaceLibraryItem;
   canCopy: boolean;
   canEdit: boolean;
   deleted: boolean;
-  onClose: () => void;
   onCopy: () => void;
   onDuplicate: () => void;
   onRename: () => void;
@@ -38,7 +39,45 @@ export function LibraryItemContextMenu(props: {
   onRestore: () => void;
   /** Offered for audio and video when voice notes are on. */
   onTranscribe?: () => void;
-}) {
+}
+
+/** Whether the item's menu has any rows: a viewer looking at Trash can do nothing with it. */
+export function hasLibraryItemMenuRows(actions: LibraryItemMenuActions) {
+  return !actions.deleted || actions.canEdit;
+}
+
+/** The rows of a Library item's menu, the same in its right-click menu and a list row's ⋯. */
+export function LibraryItemMenuRows(props: LibraryItemMenuActions) {
+  if (props.deleted)
+    return props.canEdit ? (
+      <MenuItem icon={<ArchiveRestore />} label="Restore" onSelect={props.onRestore} />
+    ) : null;
+  return (
+    <>
+      {props.canCopy ? (
+        <MenuItem icon={<ClipboardCopy />} label="Copy" onSelect={props.onCopy} />
+      ) : null}
+      {props.onTranscribe ? (
+        <MenuItem icon={<AudioLines />} label="Transcribe" onSelect={props.onTranscribe} />
+      ) : null}
+      {props.canCopy && props.canEdit ? (
+        <MenuItem icon={<Copy />} label="Duplicate" onSelect={props.onDuplicate} />
+      ) : null}
+      {props.canEdit ? (
+        <>
+          <MenuItem icon={<Pencil />} label="Rename" onSelect={props.onRename} />
+          <MenuItem icon={<Tags />} label="Edit tags" onSelect={props.onEditTags} />
+          <MenuSeparator />
+          <MenuItem danger icon={<Trash2 />} label="Delete" onSelect={props.onTrash} />
+        </>
+      ) : null}
+    </>
+  );
+}
+
+export function LibraryItemContextMenu(
+  props: LibraryItemMenuActions & { state: LibraryItemMenuState; onClose: () => void },
+) {
   const triggerRef = useRef<HTMLSpanElement>(null);
   const onCloseRef = useRef(props.onClose);
   const [open, setOpen] = useState(false);
@@ -82,49 +121,11 @@ export function LibraryItemContextMenu(props: {
         aria-label={`Actions for ${props.item.display_name}`}
         onCloseAutoFocus={(event) => event.preventDefault()}
       >
-        <ContextMenuLabel className="truncate text-xs font-medium text-cream-muted">
-          {props.item.display_name}
+        <ContextMenuLabel className="text-xs font-medium text-cream-muted">
+          <OverflowFadeText>{props.item.display_name}</OverflowFadeText>
         </ContextMenuLabel>
         <ContextMenuSeparator />
-
-        {props.deleted ? (
-          props.canEdit ? (
-            <ContextMenuAction
-              icon={<ArchiveRestore />}
-              label="Restore"
-              onSelect={props.onRestore}
-            />
-          ) : null
-        ) : (
-          <>
-            {props.canCopy ? (
-              <ContextMenuAction icon={<ClipboardCopy />} label="Copy" onSelect={props.onCopy} />
-            ) : null}
-            {props.onTranscribe ? (
-              <ContextMenuAction
-                icon={<AudioLines />}
-                label="Transcribe"
-                onSelect={props.onTranscribe}
-              />
-            ) : null}
-            {props.canCopy && props.canEdit ? (
-              <ContextMenuAction icon={<Copy />} label="Duplicate" onSelect={props.onDuplicate} />
-            ) : null}
-            {props.canEdit ? (
-              <>
-                <ContextMenuAction icon={<Pencil />} label="Rename" onSelect={props.onRename} />
-                <ContextMenuAction icon={<Tags />} label="Edit tags" onSelect={props.onEditTags} />
-                <ContextMenuSeparator />
-                <ContextMenuAction
-                  destructive
-                  icon={<Trash2 />}
-                  label="Delete"
-                  onSelect={props.onTrash}
-                />
-              </>
-            ) : null}
-          </>
-        )}
+        <LibraryItemMenuRows {...props} />
       </ContextMenuContent>
     </ContextMenu>
   );

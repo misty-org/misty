@@ -189,13 +189,7 @@ function ReplyImage({ src, alt }: { src: string; alt: string }) {
   const host = remoteImageHost(src);
   if (!host || shown) return <img src={src} alt={alt} loading="lazy" />;
   return (
-    <Button
-      type="button"
-      variant="outline"
-      size="sm"
-      className="misty-markdown-remote-image"
-      onClick={() => setShown(true)}
-    >
+    <Button type="button" className="misty-markdown-remote-image" onClick={() => setShown(true)}>
       <ImageIcon aria-hidden="true" />
       <span>{alt ? `Show image "${alt}" from ${host}` : `Show image from ${host}`}</span>
     </Button>
@@ -413,7 +407,7 @@ function CodeBlock({ language, children }: { language?: string; children: ReactN
       <div className="misty-markdown-code-header">
         <span>{language ?? "Code"}</span>
         <IconButton
-          size="xs"
+          size="sm"
           label={copied ? "Copied" : "Copy code"}
           onClick={() =>
             void navigator.clipboard

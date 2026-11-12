@@ -4,7 +4,7 @@ import { confirmAction } from "@/shared/lib/confirmAction";
 import { openExternalLink } from "@/shared/platform/openExternalLink";
 import {
   Button,
-  ErrorNotification,
+  useNotice,
   IconButton,
   Popover,
   PopoverContent,
@@ -174,6 +174,7 @@ export function ConnectedAppsCatalog({ find = "" }: { find?: string } = {}) {
     onReconnect: (item: ConnectedApp) => void connect(item),
     onDisconnect: (item: ConnectedApp, label: string) => void disconnect(item, label),
   };
+  useNotice(Boolean(error), { message: error, tone: "error" });
   return (
     <>
       <section aria-labelledby="direct-apps-heading" className="agent-integrations-section">
@@ -182,13 +183,10 @@ export function ConnectedAppsCatalog({ find = "" }: { find?: string } = {}) {
         </header>
         <DirectApps find={find} />
       </section>
-      <ErrorNotification message={error} />
       {!available ? (
         <div className="agent-integrations-description grid justify-items-start gap-2">
           <p>Add a Composio key for apps that don’t offer a direct sign-in, such as Gmail.</p>
-          <Button variant="outline" size="sm" onClick={openModelSettings}>
-            Open Models
-          </Button>
+          <Button onClick={openModelSettings}>Open Models</Button>
         </div>
       ) : !available ? (
         <p className="agent-integrations-description">
@@ -246,7 +244,7 @@ export function ConnectedAppsCatalog({ find = "" }: { find?: string } = {}) {
                 >
                   <PopoverTrigger asChild>
                     <Button
-                      variant="ghost"
+                      variant="quiet"
                       className="agent-integrations-tile agent-integrations-tile-button"
                       aria-label={`${group.name}, ${accountSummary(group)}. Show accounts`}
                     >

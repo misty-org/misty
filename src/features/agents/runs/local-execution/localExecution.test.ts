@@ -34,7 +34,7 @@ describe("native task authority", () => {
     const execution = await startLocalExecution("owner", "agent");
     const create = mocks.invoke.mock.calls.find(([name]) => name === "browser_webview_create")![1]
       .request;
-    expect(create.url).toBe("https://www.google.com");
+    expect(create.url).toBe("about:blank");
     expect(create).not.toHaveProperty("profileId");
     expect(create).not.toHaveProperty("providerId");
     expect(mocks.request.mock.calls.every(([path]) => !path.includes("/apps"))).toBe(true);

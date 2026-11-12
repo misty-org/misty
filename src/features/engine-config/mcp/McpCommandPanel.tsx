@@ -85,26 +85,17 @@ function PanelBody() {
             {copy.panelHeading(label)}
           </DialogTitle>
           <Button
-            size="sm"
-            variant="secondary"
             title={copy.probeHint}
             disabled={store.loading || probingAll || probeableCount === 0}
             onClick={() => void probeAll(engine?.config.entries ?? [], workspacePath)}
           >
             {copy.probeCheckAll}
           </Button>
-          <Button
-            size="sm"
-            variant="secondary"
-            disabled={store.loading || refreshing}
-            onClick={handleRefresh}
-          >
+          <Button disabled={store.loading || refreshing} onClick={handleRefresh}>
             <RefreshCw className={cn(refreshing && "animate-spin")} aria-hidden />
             {copy.refresh}
           </Button>
           <Button
-            size="sm"
-            variant="secondary"
             onClick={() => {
               closePanel();
               // The Settings block id the MCP servers section is registered under.
@@ -119,7 +110,7 @@ function PanelBody() {
         </div>
         <div className="grid min-h-0 flex-1 gap-3 overflow-y-auto pr-1">
           {store.loading && !store.inventory ? (
-            <SkeletonList label="MCP servers" rows={3} leading="none" trailing />
+            <SkeletonList lines={2} label="MCP servers" rows={3} leading="none" trailing />
           ) : null}
           {alerts.map((alert) => (
             <p key={alert} role="alert" className="text-sm text-cream-bright">

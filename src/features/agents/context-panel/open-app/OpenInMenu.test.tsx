@@ -8,6 +8,7 @@ vi.mock("../../personal/agentAccount", () => ({ agentAccountId: () => "me" }));
 
 import { useFolderSettings } from "../folders/folderSettings";
 import { availableTargets, chosenTarget, useOpenApps } from "./openApp";
+import { NoticeViewport } from "@/shared/ui";
 import { OpenInMenu } from "./OpenInMenu";
 
 afterEach(cleanup);
@@ -54,7 +55,12 @@ describe("OpenInMenu", () => {
 
   it("opens the folder in VS Code by default and reports a failure", async () => {
     nativeComputer();
-    render(<OpenInMenu folder="/repo/app" />);
+    render(
+      <>
+        <OpenInMenu folder="/repo/app" />
+        <NoticeViewport />
+      </>,
+    );
     const button = await screen.findByRole("button", { name: "Open in VS Code" });
     native.invoke.mockRejectedValueOnce(new Error("not found"));
     fireEvent.click(button);

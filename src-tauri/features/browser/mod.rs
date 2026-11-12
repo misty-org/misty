@@ -6,10 +6,7 @@ use serde_json::{json, Value};
 use std::{
     collections::{HashMap, HashSet},
     path::{Path, PathBuf},
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Mutex, OnceLock,
-    },
+    sync::{Mutex, OnceLock},
     time::Duration,
 };
 use tauri::{
@@ -43,13 +40,6 @@ use menus::popups::provider_popup;
 
 #[cfg(windows)]
 use pages::stacked_pages::{is_stacked, place_beneath, stack_windows_webview, unstack, wake};
-
-/// Hidden tabs sleep on their own elsewhere: a hidden view stops drawing.
-#[cfg(not(windows))]
-#[tauri::command]
-pub fn browser_set_hidden_tab_sleep(seconds: u64) {
-    let _ = seconds;
-}
 
 /// Pages switch by stacking order only on Windows; elsewhere the engine shows
 /// and hides views in one frame on its own.
@@ -94,7 +84,7 @@ use crate::browser::input::shortcuts::{
 };
 use crate::browser::kiri_link::scripts::{
     browser_captions_script, browser_status_script, browser_status_update_script,
-    browser_viewport_script, emit_browser_pointer, set_status_bubble_enabled,
+    browser_viewport_script, emit_browser_pointer,
     BROWSER_COMPATIBILITY_SCRIPT, BROWSER_FAVICON_SCRIPT,
 };
 #[cfg(target_os = "macos")]

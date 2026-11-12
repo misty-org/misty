@@ -1,7 +1,7 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 import { ChevronsDown, ChevronsUp, Plus, RotateCw, Search } from "lucide-react";
 import { memo, useCallback, useMemo, type MouseEvent } from "react";
-import { IconButton, Pressable, Spinner } from "@/shared/ui";
+import { IconButton, Pressable, Spinner, Tooltip } from "@/shared/ui";
 import type { RepositorySummary } from "./filesApi";
 import { getFileTreeIconSvg } from "./fileIcons";
 import { useFilesStore } from "./filesStore";
@@ -23,7 +23,7 @@ function TreeRootRefreshButton() {
   return (
     <IconButton
       label="Refresh"
-      size="2xs"
+      size="sm"
       className="file-tree-row-action"
       disabled={refreshing}
       onClick={(event) => {
@@ -43,7 +43,7 @@ function TreeRootViewActions({ root }: { root: string }) {
     <>
       <IconButton
         label="Search files"
-        size="2xs"
+        size="sm"
         className="file-tree-row-action"
         onClick={(event) => {
           event.stopPropagation();
@@ -54,8 +54,8 @@ function TreeRootViewActions({ root }: { root: string }) {
       </IconButton>
       <IconButton
         label="Expand loaded folders"
-        tooltip="Expand loaded folders (⌥⇧→)"
-        size="2xs"
+        hint="Expand loaded folders (⌥⇧→)"
+        size="sm"
         className="file-tree-row-action"
         aria-keyshortcuts="Alt+Shift+ArrowRight"
         onClick={(event) => {
@@ -67,8 +67,8 @@ function TreeRootViewActions({ root }: { root: string }) {
       </IconButton>
       <IconButton
         label="Collapse all folders"
-        tooltip="Collapse all folders (⌥⇧←)"
-        size="2xs"
+        hint="Collapse all folders (⌥⇧←)"
+        size="sm"
         className="file-tree-row-action"
         aria-keyshortcuts="Alt+Shift+ArrowLeft"
         onClick={(event) => {
@@ -128,53 +128,55 @@ export const TreeRow = memo(function TreeRow({
       style={{ paddingLeft: 8 + node.depth * 14 }}
       onContextMenu={(event) => onContextMenu(event, node)}
     >
-      <Pressable
-        className="file-tree-row-main"
-        data-ignored={node.ignored || undefined}
-        aria-expanded={node.isDir ? node.expanded : undefined}
-        title={node.path}
-        onClick={handleClick}
-      >
-        {node.loading ? (
-          <Spinner className="file-tree-icon" label={false} size="sm" />
-        ) : (
-          <span
-            className="file-tree-icon"
-            data-folder={node.isDir || undefined}
-            aria-hidden
-            dangerouslySetInnerHTML={{ __html: iconSvg }}
-          />
-        )}
-        <span className="file-tree-name" data-color={node.color}>
-          {node.name}
-        </span>
-        {node.repository ? (
-          <span
-            className="file-tree-repo"
-            data-clean={clean || undefined}
-            title={repositoryLabel(node.repository)}
-            aria-label={repositoryLabel(node.repository)}
-          >
-            <span className="file-tree-repo-branch">{node.repository.branch}</span>
-            {clean ? (
-              <span aria-hidden>✓</span>
-            ) : (
-              <>
-                {node.repository.changed > 0 ? (
-                  <span data-kind="changed" aria-hidden>
-                    M{node.repository.changed}
-                  </span>
-                ) : null}
-                {node.repository.untracked > 0 ? (
-                  <span data-kind="new" aria-hidden>
-                    ?{node.repository.untracked}
-                  </span>
-                ) : null}
-              </>
-            )}
+      <Tooltip content={node.path}>
+        <Pressable
+          className="file-tree-row-main"
+          data-ignored={node.ignored || undefined}
+          aria-expanded={node.isDir ? node.expanded : undefined}
+          onClick={handleClick}
+        >
+          {node.loading ? (
+            <Spinner className="file-tree-icon" label={false} size="sm" />
+          ) : (
+            <span
+              className="file-tree-icon"
+              data-folder={node.isDir || undefined}
+              aria-hidden
+              dangerouslySetInnerHTML={{ __html: iconSvg }}
+            />
+          )}
+          <span className="file-tree-name" data-color={node.color}>
+            {node.name}
           </span>
-        ) : null}
-      </Pressable>
+          {node.repository ? (
+            <Tooltip content={repositoryLabel(node.repository)}>
+              <span
+                className="file-tree-repo"
+                data-clean={clean || undefined}
+                aria-label={repositoryLabel(node.repository)}
+              >
+                <span className="file-tree-repo-branch">{node.repository.branch}</span>
+                {clean ? (
+                  <span aria-hidden>✓</span>
+                ) : (
+                  <>
+                    {node.repository.changed > 0 ? (
+                      <span data-kind="changed" aria-hidden>
+                        M{node.repository.changed}
+                      </span>
+                    ) : null}
+                    {node.repository.untracked > 0 ? (
+                      <span data-kind="new" aria-hidden>
+                        ?{node.repository.untracked}
+                      </span>
+                    ) : null}
+                  </>
+                )}
+              </span>
+            </Tooltip>
+          ) : null}
+        </Pressable>
+      </Tooltip>
       {isRoot ? (
         <>
           <TreeRootRefreshButton />
@@ -183,7 +185,7 @@ export const TreeRow = memo(function TreeRow({
       ) : null}
       <IconButton
         label="Add to chat"
-        size="2xs"
+        size="sm"
         className="file-tree-row-action"
         onClick={(event) => {
           event.stopPropagation();

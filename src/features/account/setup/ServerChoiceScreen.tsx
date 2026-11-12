@@ -1,5 +1,5 @@
 import { Pressable, Spinner } from "@/shared/ui";
-import { Cloud, Globe, Server } from "lucide-react";
+import { Cloud, Laptop, Server } from "lucide-react";
 import type { ReactNode } from "react";
 
 export type ServerChoiceTarget = "cloud" | "own" | "browse";
@@ -29,7 +29,7 @@ export function ServerOption(props: {
   );
 }
 
-/** The wizard's first step: sign in on Misty Pro, a server you run, or the browser alone. */
+/** The wizard's first step: sign in on Misty Pro, a server you run, or this computer alone. */
 export function ServerChoiceScreen(props: {
   busy?: boolean;
   onChoose: (target: ServerChoiceTarget) => void;
@@ -49,8 +49,8 @@ export function ServerChoiceScreen(props: {
         onSelect={() => props.onChoose("own")}
       />
       <ServerOption
-        icon={<Globe />}
-        label="Just browse"
+        icon={<Laptop />}
+        label="Only this computer"
         disabled={props.busy}
         onSelect={() => props.onChoose("browse")}
       />

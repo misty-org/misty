@@ -76,59 +76,6 @@
   > div:last-child:not(:has(textarea)) {
   padding: 4px 8px 8px;
 }
-/* When the controls don't fit on one line they wrap: the right group (mode, model, voice, send)
-   moves under the left one, still at the right edge, and nothing is clipped or spills out of the box. */
-.misty-composer-toolbar {
-  display: flex;
-  flex: 1;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 4px 8px;
-  min-width: 0;
-}
-.misty-composer-toolbar-start,
-.misty-composer-toolbar-end {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 2px;
-  min-width: 0;
-}
-.misty-composer-toolbar-start {
-  flex: 1 1 auto;
-}
-.misty-composer-toolbar-end {
-  flex: 0 0 auto;
-  margin-left: auto;
-  flex-wrap: nowrap;
-}
-.misty-composer-toolbar :is(.composer-icon, .composer-chip, .agent-strip-chip) {
-  color: var(--color-cream-muted);
-}
-.misty-composer-toolbar .composer-icon {
-  width: 30px;
-  height: 30px;
-}
-.misty-composer-toolbar :is(.composer-chip, .agent-strip-chip) {
-  height: 30px;
-  gap: 6px;
-  padding-inline: 8px;
-  font-size: 13px;
-  font-weight: 400;
-  border-radius: var(--radius-lg);
-}
-.misty-composer-toolbar
-  :is(.composer-icon, .composer-chip, .agent-strip-chip):is(:hover, [data-state="open"]) {
-  color: var(--color-cream);
-  background: var(--color-charcoal-hover);
-}
-.misty-composer-toolbar .composer-icon[data-active="true"] {
-  color: var(--color-cream);
-}
-.misty-composer-toolbar :is(.composer-chip, .agent-strip-chip) > span.truncate {
-  max-width: 160px;
-}
 .composer-meter {
   display: inline-grid;
   place-items: center;
@@ -144,16 +91,6 @@
   z-index: 30;
   max-height: 280px;
   overflow-y: auto;
-}
-/* In a narrow composer the chips show only their icons; each keeps its name for assistive
-   technology, its title and its menu. */
-@container agent-studio (max-width: 640px) {
-  .misty-composer-toolbar :is(.composer-chip, .agent-strip-chip) {
-    padding-inline: 7px;
-  }
-  .misty-composer-toolbar :is(.composer-chip, .agent-strip-chip) > span.truncate {
-    display: none;
-  }
 }
 /* A non-file attachment (Misty's browser): a quiet pill in the attachment row. */
 .composer-attached-chip {

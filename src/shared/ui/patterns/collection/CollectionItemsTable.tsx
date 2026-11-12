@@ -1,26 +1,36 @@
 import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 import type { MouseEvent } from "react";
-import { Button } from "../../controls/Button";
+import { Pressable } from "../../controls/Pressable";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../display/Table";
+import { OverflowFadeText } from "../../layout/OverflowFadeText";
 import { cn } from "../../classNames";
-import { CollectionItemSurface } from "./CollectionCards";
+import { CollectionItemActions } from "./CollectionItemActions";
 import {
   collectionIconTone,
-  collectionUtilityReveal,
   type CollectionColumn,
   type CollectionItem,
 } from "./collectionItemTypes";
 
 export type CollectionSort = { key: string; descending: boolean };
 
+// 32px rows like every other list row. The wash is a gradient laid over each cell's own
+// background, so a sticky actions cell keeps its opaque fill under the highlight while the table
+// scrolls beneath it.
 const rowClass = cn(
-  "group/collection-item [&>td]:px-4 [&>td]:py-2.5 cursor-pointer border-0 transition-none",
-  "[&>td:first-child]:rounded-l-lg [&>td:last-child]:rounded-r-lg",
-  "[--collection-row-highlight:transparent]",
-  "hover:[--collection-row-highlight:var(--color-control-hover)] focus-within:[--collection-row-highlight:var(--color-control-hover)]",
-  "data-[state=open]:[--collection-row-highlight:var(--color-control-hover)] has-[[data-state=open]]:[--collection-row-highlight:var(--color-control-hover)]",
-  "[&>td]:bg-[image:linear-gradient(var(--collection-row-highlight),var(--collection-row-highlight))]",
+  "group/row h-8 cursor-pointer border-0 transition-none",
+  "[&>td]:h-8 [&>td]:px-2 [&>td]:py-0",
+  "[&>td:first-child]:rounded-l-md [&>td:last-child]:rounded-r-md",
+  "[--row-wash:transparent]",
+  "hover:[--row-wash:var(--color-control-hover)] focus-within:[--row-wash:var(--color-control-hover)]",
+  "data-[state=open]:[--row-wash:var(--color-control-hover)]",
+  "has-[[data-state=open]]:[--row-wash:var(--color-control-hover)]",
+  "has-[[data-context-open]]:[--row-wash:var(--color-control-hover)]",
+  "data-[selected]:[--row-wash:var(--color-control-active)]",
+  "[&>td]:bg-[image:linear-gradient(var(--row-wash),var(--row-wash))]",
 );
+
+// Rows that start with an icon are taller, so the icon and a two-line title fit.
+const iconRowClass = "h-auto [&>td]:h-auto [&>td]:py-0";
 
 function SortHeader({
   column,
@@ -35,19 +45,21 @@ function SortHeader({
   const Icon = selected ? (sort.descending ? ArrowDown : ArrowUp) : ArrowUpDown;
   return (
     <TableHead
-      className={column.key === "name" ? "w-full min-w-64 px-2" : "min-w-28 whitespace-nowrap px-2"}
+      className={column.key === "name" ? "w-full min-w-64" : "min-w-28 whitespace-nowrap"}
       aria-sort={selected ? (sort.descending ? "descending" : "ascending") : "none"}
     >
-      <Button
-        variant="ghost"
-        size="none"
-        justify="start"
-        className="group/sort min-h-8 w-full gap-1.5 rounded-sm px-2 py-1 text-ui text-inherit font-medium"
+      <Pressable
+        className={cn(
+          "group/sort flex h-6 w-full min-w-0 items-center gap-1 rounded-sm px-2",
+          "font-medium text-cream-muted hover:bg-control-hover hover:text-cream",
+          // Focus rings are off app-wide, so keyboard focus shows as the hover wash.
+          "focus-visible:bg-control-hover focus-visible:text-cream",
+        )}
         onClick={() =>
           onSort(selected && sort.descending ? null : { key: column.key, descending: selected })
         }
       >
-        {column.label}
+        <OverflowFadeText>{column.label}</OverflowFadeText>
         <Icon
           aria-hidden="true"
           className={cn(
@@ -56,8 +68,17 @@ function SortHeader({
               "opacity-0 group-hover/sort:opacity-100 group-focus-visible/sort:opacity-100",
           )}
         />
-      </Button>
+      </Pressable>
     </TableHead>
+  );
+}
+
+/** Clicks that belong to a control inside the row, or to a menu portaled out of it. */
+function ownClick(event: MouseEvent<HTMLElement>) {
+  const target = event.target as HTMLElement;
+  if (!event.currentTarget.contains(target)) return false;
+  return !target.closest(
+    "button, a, input, [role=menuitem], [role=menuitemcheckbox], [role=menuitemradio]",
   );
 }
 
@@ -67,6 +88,7 @@ export function CollectionItemsTable({
   metadataColumns,
   hasActions,
   stickyActions = false,
+  icons = false,
   sort,
   onSort,
   selectedIds = [],
@@ -79,6 +101,8 @@ export function CollectionItemsTable({
   metadataColumns: CollectionColumn[];
   hasActions: boolean;
   stickyActions?: boolean;
+  /** Rows start with the item's icon, bare, and the title may take two lines. */
+  icons?: boolean;
   sort: CollectionSort | null;
   onSort: (sort: CollectionSort | null) => void;
   selectedIds?: string[];
@@ -86,16 +110,16 @@ export function CollectionItemsTable({
 }) {
   return (
     <div className="min-w-0 shrink-0 overflow-x-auto">
-      <Table unwrapped className="border-separate border-spacing-x-0 border-spacing-y-1">
+      <Table unwrapped className="border-separate border-spacing-x-0 border-spacing-y-0.5">
         <TableHeader>
-          <TableRow className="[&>th]:border-b [&>th]:border-charcoal-border [&>th]:px-2">
+          <TableRow className="[&>th]:border-b [&>th]:border-charcoal-border [&>th]:px-0">
             {columns.map((column) => (
               <SortHeader key={column.key} column={column} sort={sort} onSort={onSort} />
             ))}
             {hasActions && (
               <TableHead
                 className={cn(
-                  "w-12",
+                  "w-10",
                   stickyActions && "sticky right-0 z-10 bg-charcoal-workspace text-right",
                 )}
               >
@@ -105,80 +129,69 @@ export function CollectionItemsTable({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {items.map((item) => (
-            <CollectionItemSurface key={item.id} item={item}>
+          {items.map((item) => {
+            const open = (event: MouseEvent) => {
+              if (item.selectable && onSelect) onSelect(event, item.id, item.onOpen);
+              else item.onOpen();
+            };
+            return (
               <TableRow
-                className={cn(rowClass, selectedIds.includes(item.id) && "bg-charcoal-active")}
+                key={item.id}
+                data-selected={selectedIds.includes(item.id) || undefined}
+                className={cn(rowClass, icons && iconRowClass)}
                 onClick={(event) => {
-                  if (
-                    !(event.target as HTMLElement).closest(
-                      "button, a, [role=menuitem], [data-collection-actions]",
-                    )
-                  ) {
-                    if (item.selectable && onSelect) onSelect(event, item.id, item.onOpen);
-                    else item.onOpen();
-                  }
+                  if (ownClick(event)) open(event);
                 }}
               >
                 <TableCell>
-                  <Button
-                    variant="ghost"
-                    size="none"
-                    justify="start"
+                  <Pressable
                     aria-label={item.title}
                     className={cn(
-                      "min-h-8 w-full gap-3 whitespace-normal border-0 p-0 text-left font-normal",
-                      "hover:bg-transparent focus-visible:ring-inset",
+                      "flex w-full min-w-0 items-center text-cream",
+                      icons ? "min-h-12 gap-3 py-2" : "h-8 gap-2",
                     )}
-                    onClick={(event) => {
-                      if (item.selectable && onSelect) onSelect(event, item.id, item.onOpen);
-                      else item.onOpen();
-                    }}
+                    onClick={open}
                   >
-                    <span
-                      className={cn(
-                        "grid size-8 shrink-0 place-items-center rounded-lg border",
-                        "border-charcoal-border",
-                        collectionIconTone(item),
-                        "group-hover/collection-item:border-cream-muted group-focus-within/collection-item:border-cream-muted",
-                        "group-data-[state=open]/collection-item:border-cream-muted group-has-[[data-state=open]]/collection-item:border-cream-muted",
-                      )}
-                    >
-                      {item.icon}
-                    </span>
-                    <span className="min-w-0">
-                      <span className="line-clamp-2 break-words">{item.title}</span>
-                    </span>
+                    {icons && item.icon ? (
+                      <span
+                        aria-hidden="true"
+                        data-slot="collection-row-icon"
+                        className={cn(
+                          "grid size-8 shrink-0 place-items-center",
+                          "[&_img]:size-5 [&_img]:object-contain [&_svg]:size-5",
+                          collectionIconTone(item),
+                        )}
+                      >
+                        {item.icon}
+                      </span>
+                    ) : null}
+                    <OverflowFadeText full lines={icons ? 2 : 1} className="flex-1">
+                      {item.title}
+                    </OverflowFadeText>
                     {item.marker}
-                  </Button>
+                  </Pressable>
                 </TableCell>
                 {metadataColumns.map((column) => (
-                  <TableCell
-                    key={column.key}
-                    className="text-ui text-cream-muted whitespace-nowrap"
-                  >
+                  <TableCell key={column.key} className="whitespace-nowrap text-cream-muted">
                     {column.render(item)}
                   </TableCell>
                 ))}
                 {hasActions && (
                   <TableCell
                     className={cn(
-                      "w-12 whitespace-nowrap text-right [&_button:focus-visible]:ring-inset",
+                      "w-10 whitespace-nowrap text-right",
                       stickyActions && "sticky right-0 z-10 bg-charcoal-workspace",
                     )}
-                    data-collection-actions
                     onClick={(event) => event.stopPropagation()}
                   >
-                    <div
-                      className={cn("flex justify-end", !stickyActions && collectionUtilityReveal)}
-                    >
-                      {item.actions}
+                    <div className="flex justify-end">
+                      <CollectionItemActions item={item} />
                     </div>
                   </TableCell>
                 )}
               </TableRow>
-            </CollectionItemSurface>
-          ))}
+            );
+          })}
         </TableBody>
       </Table>
     </div>

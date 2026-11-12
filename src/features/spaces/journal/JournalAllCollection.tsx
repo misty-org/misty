@@ -11,14 +11,14 @@ import { OrderedCollectionFilters } from "@/features/settings/OrderedCollectionF
 import {
   Button,
   CollectionPage,
-  ContextMenuAction,
   CollectionHeading,
   CollectionSearch,
   CollectionItems,
   CollectionViewToggle,
   CollectionSkeleton,
-  ErrorNotification,
+  MenuItem,
   useCollectionRefinement,
+  useNotice,
   itemTones,
 } from "@/shared/ui";
 import { useRangeSelection } from "@/shared/hooks/useRangeSelection";
@@ -50,6 +50,16 @@ export function JournalAllCollection(props: {
   const [view, setView] = useState<"list" | "grid">("list");
   const [bulkBusy, setBulkBusy] = useState(false);
   const [bulkError, setBulkError] = useState("");
+  useNotice(data.failed, {
+    message: "Some items couldn’t load.",
+    tone: "error",
+    action: { label: "Retry", onSelect: data.retry },
+  });
+  useNotice(Boolean(bulkError), {
+    message: bulkError,
+    tone: "error",
+    onDismiss: () => setBulkError(""),
+  });
   const refinement = useCollectionRefinement(
     journal.filter((item) =>
       item.title.toLocaleLowerCase().includes(props.query.trim().toLocaleLowerCase()),
@@ -110,7 +120,7 @@ export function JournalAllCollection(props: {
     <CollectionPage>
       <CollectionHeading
         title="Journal"
-        actions={
+        end={
           <>
             <CollectionSearch
               aria-label="Search journal"
@@ -120,8 +130,7 @@ export function JournalAllCollection(props: {
             />
             {!props.readOnly && <CaptureMenu />}
             {!props.readOnly && (
-              <Button variant="primary" className="px-4" onClick={props.onCreate}>
-                <Plus />
+              <Button variant="primary" icon={Plus} onClick={props.onCreate}>
                 New note
               </Button>
             )}
@@ -136,13 +145,6 @@ export function JournalAllCollection(props: {
         filterControl={refinement.control}
         actions={<CollectionViewToggle value={view} onChange={setView} />}
       />
-      <ErrorNotification message={data.failed ? "Some items couldn’t load." : ""}>
-        <Button type="button" variant="ghost" size="sm" onClick={data.retry}>
-          Retry
-        </Button>
-      </ErrorNotification>
-      <ErrorNotification message={actions.error} />
-      <ErrorNotification message={bulkError} onDismiss={() => setBulkError("")} />
       {actions.dialog}
       {data.loading ? (
         <CollectionSkeleton label="Loading journal" view={view} />
@@ -153,21 +155,22 @@ export function JournalAllCollection(props: {
           view={view}
           sortResetKey={refinement.sortKey}
           categoryLabel="Type"
+          listIcons
           items={refinement.items.map((item) => ({
             ...item,
             ...actions.forItem(item),
             ...(selection.menuTargets(item.id).length > 1 && {
-              contextMenu: (
-                <ContextMenuAction
-                  icon={<Trash2 />}
+              menu: (
+                <MenuItem
+                  icon={Trash2}
                   label={`Delete ${selection.selectedIds.length} items`}
-                  destructive
+                  danger
                   disabled={bulkBusy}
                   onSelect={() => void deleteSelected()}
                 />
               ),
             }),
-            onContextMenuOpen: () => selection.pickForMenu(item.id),
+            onMenuOpen: () => selection.pickForMenu(item.id),
             selectable: !props.readOnly && Boolean(item.remove),
             icon: item.kind === "note" ? <FileText /> : <PencilRuler />,
             tone: item.kind === "note" ? itemTones.note : itemTones.drawing,

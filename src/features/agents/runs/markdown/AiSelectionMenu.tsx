@@ -5,7 +5,7 @@ import {
   MenuItem,
   MenuTrigger,
 } from "@/shared/ui";
-import { MessageCircle } from "lucide-react";
+import { MessageCircle, Sparkles } from "lucide-react";
 import type { ReactNode } from "react";
 import type { AiSuggestedAction } from "../invocations/invocationTypes";
 
@@ -24,16 +24,16 @@ export function AiSelectionMenu({
       {trigger ? (
         <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
       ) : (
-        <MenuTrigger
-          label="Ask an agent"
-          variant="secondary"
-          icon={<MessageCircle className="size-3.5" />}
-          className="h-7 text-xs"
-        />
+        <MenuTrigger label="Ask an agent" variant="secondary" size="sm" icon={MessageCircle} />
       )}
       <DropdownMenuContent align="start" width="md">
         {actions.map((action) => (
-          <MenuItem key={action.id} label={action.label} onSelect={() => onAction(action)} />
+          <MenuItem
+            key={action.id}
+            icon={Sparkles}
+            label={action.label}
+            onSelect={() => onAction(action)}
+          />
         ))}
       </DropdownMenuContent>
     </DropdownMenu>

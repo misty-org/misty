@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { accountApi, AccountApiError } from "../api/api";
 import type { ServerAlert } from "../api/accountTypes";
-import { Notification } from "@/shared/ui";
+import { useNotice } from "@/shared/ui";
 import { useAuth } from "../sessions/authState";
 
 const refreshEvery = 5 * 60 * 1000;
@@ -47,17 +47,11 @@ export function ServerAlertsNotice() {
   }, [userId]);
 
   const key = alerts.map((alert) => `${alert.probe}:${alert.opened_at}`).join("|");
-  if (!alerts.length || dismissed === key) return null;
-  return (
-    <Notification title="Your server needs a look" onDismiss={() => setDismissed(key)}>
-      <ul className="m-0 grid list-none gap-1 p-0">
-        {alerts.map((alert) => (
-          <li key={alert.probe}>
-            <span className="text-cream">{alert.title}.</span> {alert.detail}
-          </li>
-        ))}
-      </ul>
-      <p className="m-0 mt-1">Each clears here once the server checks it is fixed.</p>
-    </Notification>
-  );
+  // A notice is one message: the title, each problem in turn, then how it clears.
+  const problems = alerts.map((alert) => `${alert.title}. ${alert.detail}`).join(" ");
+  useNotice(alerts.length > 0 && dismissed !== key, {
+    message: `Your server needs a look. ${problems} Each clears here once the server checks it is fixed.`,
+    onDismiss: () => setDismissed(key),
+  });
+  return null;
 }

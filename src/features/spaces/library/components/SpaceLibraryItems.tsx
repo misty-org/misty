@@ -1,5 +1,4 @@
-import { Button, IconButton, CollectionItems, Skeleton, SkeletonList } from "@/shared/ui";
-import { EllipsisVertical, RotateCcw } from "lucide-react";
+import { Button, CollectionItems, Skeleton, SkeletonList } from "@/shared/ui";
 import { Fragment, type MouseEvent as ReactMouseEvent } from "react";
 import {
   formatBytes,
@@ -13,6 +12,8 @@ import { useAgentArtifactCredits } from "../library-data/useAgentArtifactCredits
 import { useSpaceLibraryContext } from "../SpaceLibraryContext";
 import { libraryFileTypeLabel } from "../SpaceLibraryPrimitives";
 import { ITEM_ACTION_MENU_WIDTH, LibraryItemCard } from "./LibraryItemCard";
+import { hasLibraryItemMenuRows, LibraryItemMenuRows } from "./LibraryItemContextMenu";
+import { useLibraryItemMenuActions } from "./useLibraryItemMenuActions";
 import { useRangeSelection } from "@/shared/hooks/useRangeSelection";
 const ITEM_ACTION_MENU_HEIGHT = 336;
 const GRID_COLUMN_WIDTHS = [172, 224, 300] as const;
@@ -33,7 +34,6 @@ export function SpaceLibraryItems() {
   const {
     data: {
       spaceId,
-      canEditLibrary,
       collection,
       setSelectedItemId,
       setSelectedItemIds,
@@ -44,13 +44,13 @@ export function SpaceLibraryItems() {
       libraryItemScale,
       selectedItemIds,
       setItemMenu,
-      itemMenu,
       nextAfter,
       loadingMore,
       reloadKey,
     },
-    itemActions: { loadMore, restoreItem },
+    itemActions: { loadMore },
   } = useSpaceLibraryContext();
+  const menuActions = useLibraryItemMenuActions();
   const personName = useSpaceItemCreator(spaceId);
   const agentCredits = useAgentArtifactCredits(spaceId, reloadKey);
   const selection = useRangeSelection(
@@ -87,6 +87,7 @@ export function SpaceLibraryItems() {
           sortResetKey={`${collection}:${sort}:${direction}`}
           categoryLabel="Type"
           creatorLabel="Added by"
+          listIcons
           items={displayItems.map((item) => ({
             id: item.id,
             title: item.display_name,
@@ -121,37 +122,24 @@ export function SpaceLibraryItems() {
             updated: formatTime(item.updated_at || item.added_at),
             onOpen: () => setSelectedItemId(item.id),
             selectable: true,
-            actions:
-              collection === "deleted" && canEditLibrary ? (
-                <Button variant="outline" size="sm" onClick={() => void restoreItem(item)}>
-                  <RotateCcw />
-                  Restore
-                </Button>
-              ) : (
-                <IconButton
-                  label={`More actions for ${item.display_name}`}
-                  data-state={itemMenu?.itemId === item.id ? "open" : "closed"}
-                  onClick={(event) => {
-                    const rect = event.currentTarget.getBoundingClientRect();
-                    showItemMenu(
-                      item.id,
-                      rect.right - ITEM_ACTION_MENU_WIDTH,
-                      rect.bottom + 4,
-                      event.currentTarget,
-                    );
-                  }}
-                >
-                  <EllipsisVertical />
-                </IconButton>
-              ),
+            ...(hasLibraryItemMenuRows(menuActions(item)) && {
+              menu: <LibraryItemMenuRows {...menuActions(item)} />,
+              menuLabel: `More actions for ${item.display_name}`,
+            }),
           }))}
           selectedIds={selectedItemIds}
           onSelect={selection.select}
         />
         {nextAfter && loadingMore ? (
-          <SkeletonList label="More items" rows={3} leading="tile" className="mt-1 px-4" />
+          <SkeletonList
+            label="More items"
+            rows={3}
+            leading="tile"
+            lines={2}
+            className="mt-1 px-4"
+          />
         ) : nextAfter ? (
-          <Button variant="outline" className="mx-auto mt-4 flex" onClick={() => void loadMore()}>
+          <Button variant="secondary" className="mx-auto mt-4 flex" onClick={() => void loadMore()}>
             Load more
           </Button>
         ) : null}
@@ -198,7 +186,7 @@ export function SpaceLibraryItems() {
         : null}
       {nextAfter && !loadingMore ? (
         <div className="col-span-full grid place-items-center pt-3">
-          <Button size="sm" variant="outline" type="button" onClick={() => void loadMore()}>
+          <Button variant="secondary" type="button" onClick={() => void loadMore()}>
             Load more
           </Button>
         </div>

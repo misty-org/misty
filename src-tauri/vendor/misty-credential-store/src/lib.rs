@@ -143,9 +143,9 @@ pub(crate) fn private_directory(path: &Path) -> io::Result<()> {
     Ok(())
 }
 
-/// The profile that scopes a secret: the development profile, else "default".
+/// The profile that scopes a secret. Misty has one; the column stays for stores that exist.
 pub(crate) fn profile() -> String {
-    std::env::var("MISTY_PROFILE").unwrap_or_else(|_| "default".to_owned())
+    "default".to_owned()
 }
 
 const LAYOUT_TABLE: &str =

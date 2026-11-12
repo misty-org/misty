@@ -109,18 +109,11 @@ export function StudioBox(props: {
             <SuggestionItem
               key={item.agent.id}
               selected={item === chosen}
+              icon={<AgentAvatar agent={item.agent} compact />}
+              label={props.names.get(item.agent.id) ?? item.agent.name}
+              detail={item.agent.role || undefined}
               onPointerDown={() => choose(item.agent)}
-            >
-              <AgentAvatar agent={item.agent} compact />
-              <span className="min-w-0 flex-1 truncate">
-                {props.names.get(item.agent.id) ?? item.agent.name}
-              </span>
-              {item.agent.role ? (
-                <span className="max-w-[45%] truncate text-xs text-cream-muted">
-                  {item.agent.role}
-                </span>
-              ) : null}
-            </SuggestionItem>
+            />
           ))}
         </SuggestionList>
       ) : null}
@@ -167,7 +160,7 @@ export function StudioBox(props: {
             void send();
           }}
         />
-        <IconButton label="Send" size="xs" type="submit" disabled={sending || !draft.trim()}>
+        <IconButton label="Send" size="sm" type="submit" disabled={sending || !draft.trim()}>
           <ArrowUp aria-hidden="true" />
         </IconButton>
       </div>

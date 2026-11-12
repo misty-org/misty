@@ -129,32 +129,30 @@ export function NetworkSection() {
             <Skeleton className="h-5 w-9 rounded-full" />
           )}
         </DesktopSettingsRow>
-        <DesktopSettingsRow
-          label="Proxy address"
-          description="http, https or socks5. SOCKS reaches the engines only."
-        >
-          <div className="flex items-center gap-2">
-            <Input
-              aria-label="Proxy address"
-              className="w-64"
-              value={urlDraft}
-              placeholder={DEFAULT_PROXY_URL}
-              disabled={!settings}
-              onChange={(event) => {
-                setUrlDraft(event.target.value);
-                setError(null);
-              }}
-            />
-            <Button
-              size="sm"
-              variant="primary"
-              disabled={!settings || saving || !dirty}
-              onClick={onSave}
-            >
-              Save
-            </Button>
-          </div>
-        </DesktopSettingsRow>
+        {/* The address only applies while the proxy is on, so it shows only then. */}
+        {enabledDraft ? (
+          <DesktopSettingsRow
+            label="Proxy address"
+            description="http, https or socks5. SOCKS reaches the engines only."
+          >
+            <div className="flex items-center gap-2">
+              <Input
+                aria-label="Proxy address"
+                className="w-64"
+                value={urlDraft}
+                placeholder={DEFAULT_PROXY_URL}
+                disabled={!settings}
+                onChange={(event) => {
+                  setUrlDraft(event.target.value);
+                  setError(null);
+                }}
+              />
+              <Button variant="primary" disabled={!settings || saving || !dirty} onClick={onSave}>
+                Save
+              </Button>
+            </div>
+          </DesktopSettingsRow>
+        ) : null}
       </Section>
     </>
   );

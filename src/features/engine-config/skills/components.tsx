@@ -71,14 +71,21 @@ function TargetEngineButton({
   return (
     <IconButton
       label={label}
-      tooltip={locked ? `${label} · ${t("row.localCopyLocked")}` : label}
-      size="xs"
+      hint={locked ? `${label} · ${t("row.localCopyLocked")}` : label}
+      size="sm"
       aria-pressed={state === "synced"}
       data-target={target.id}
       data-target-state={state}
-      disabled={disabled || busy || locked || !onToggleTarget}
-      onClick={() => onToggleTarget?.(skill, target.id as SkillTargetId, state !== "synced")}
-      className="relative size-7 disabled:cursor-not-allowed disabled:opacity-100"
+      // aria-disabled rather than disabled while locked: a disabled button gets no hover, so the
+      // reason in its hint would never show.
+      aria-disabled={locked || undefined}
+      disabled={disabled || busy || !onToggleTarget}
+      onClick={
+        locked
+          ? undefined
+          : () => onToggleTarget?.(skill, target.id as SkillTargetId, state !== "synced")
+      }
+      className="relative size-7 disabled:cursor-not-allowed disabled:opacity-100 aria-disabled:cursor-not-allowed"
     >
       {busy ? (
         <Spinner size="sm" label={false} />
@@ -166,7 +173,9 @@ export function FeedbackLine({ feedback }: { feedback: Feedback }) {
 
 /** First-load placeholder shaped like a list of skill rows. */
 export function SkillListSkeleton({ label, rows = 4 }: { label: string; rows?: number }) {
-  return <SkeletonList label={label} rows={rows} leading="none" trailing rowClassName="px-2" />;
+  return (
+    <SkeletonList lines={2} label={label} rows={rows} leading="none" trailing rowClassName="px-2" />
+  );
 }
 
 /** A failure inside a pane: the message and a way to try again. */

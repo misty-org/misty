@@ -1,6 +1,6 @@
 import { LayoutPanelLeft } from "lucide-react";
 import { useLayoutEditor } from "@/features/app-windows";
-import { IconButton, toolbarIconProps } from "@/shared/ui";
+import { IconButton } from "@/shared/ui";
 
 /** Turns layout mode on or off: split and join the window's pages over the live page. */
 export function LayoutButton() {
@@ -11,7 +11,7 @@ export function LayoutButton() {
       aria-pressed={active}
       onClick={() => useLayoutEditor.getState().toggle()}
     >
-      <LayoutPanelLeft {...toolbarIconProps} className="size-4" />
+      <LayoutPanelLeft />
     </IconButton>
   );
 }

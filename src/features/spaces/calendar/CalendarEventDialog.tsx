@@ -119,17 +119,29 @@ export function CalendarEventDialog(props: {
           </Field>
           <DialogFooter className="sm:justify-between">
             {props.onDelete ? (
-              <Button type="button" variant="ghost" disabled={props.busy} onClick={props.onDelete}>
+              <Button
+                type="button"
+                variant="quiet"
+                size="lg"
+                disabled={props.busy}
+                onClick={props.onDelete}
+              >
                 Delete
               </Button>
             ) : (
               <span />
             )}
             <div className="flex gap-2">
-              <Button type="button" variant="ghost" disabled={props.busy} onClick={props.onClose}>
+              <Button
+                type="button"
+                variant="quiet"
+                size="lg"
+                disabled={props.busy}
+                onClick={props.onClose}
+              >
                 Cancel
               </Button>
-              <Button type="submit" disabled={!title.trim() || !times || props.busy}>
+              <Button type="submit" size="lg" disabled={!title.trim() || !times || props.busy}>
                 {event ? "Save" : "Create"}
               </Button>
             </div>

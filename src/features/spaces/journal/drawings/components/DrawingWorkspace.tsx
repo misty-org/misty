@@ -146,9 +146,8 @@ export function DrawingWorkspace(props: {
               "Drawing collaboration failed",
             )}
             <EmptyState
-              className="h-full"
               title="Could not join this drawing"
-              description="The live canvas couldn't be opened. Try again later."
+              line="The live canvas couldn't be opened. Try again later."
             />
           </>
         ) : room.session && room.synced ? (

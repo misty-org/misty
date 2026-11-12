@@ -62,6 +62,10 @@ Every visible thing is built from `src/shared/ui`. A feature puts shared compone
 colors, borders, corners, sizes or spacing, or adds a stylesheet of its own. When a feature needs a look the shared set
 doesn't have, add it to `src/shared/ui` first, then use it. `src/tests/architecture/uiRules.ts` enforces this.
 
+The protocol governs the pieces, not the pages. A page's layout, hierarchy, sections, cards, icons and color are its
+own and change only when the person asks for that page to change. Moving a page onto shared components keeps it
+looking as it did.
+
 - Nothing wraps into ragged rows or spills past its edge. Every bar declares what gives way first: labels turn into
   icons, then the longest name shortens, then items move into a ⋯ menu.
 - Long text (names, models, paths, branches) shortens with a fade-out edge (`OverflowFadeText`), never an ellipsis.
@@ -77,6 +81,26 @@ doesn't have, add it to `src/shared/ui` first, then use it. `src/tests/architect
 - A saved secret is one field the size of the empty one that says it's saved, with Replace and Remove in its ⋯ menu.
 - A shortcut is recorded in an ordinary field, one per command, cleared with its ×.
 - Settings keep their sections and rows as they are, and list only what exists today.
+- Type follows the scale in `src/styles/theme.css`: 14px in controls, 15px body, 16px page text. One font everywhere,
+  the system font; monospace only inside code itself (code blocks, the editor, diffs, the terminal), never for URLs,
+  paths, IDs, model names or shortcuts.
+- Every menu item (dropdowns and right-click) starts with a 16px icon, and the selection is a checkmark.
+- Icons, logos and engine marks stand bare, never inside a box: no fill, border or rounded tile behind them. Only an
+  avatar (a person's picture or initial) has a shape of its own.
+- Labels never get cut off. When tiles or buttons are too narrow for their labels, the grid drops a column first.
+- The agent browser opens on a blank page and searches with Google, never DuckDuckGo.
+- A row's state sits at its right end: a spinner while an agent works, an amber dot when it waits on the person, a
+  dot when unread, otherwise the time.
+- A row's actions are one ⋯ at its right end on hover, opening the same menu as right-click.
+- Pages have no title bar: the sidebar names the page. A page's top bar holds only its controls.
+- An empty state is centered in its pane: a title, one muted line, one button (`EmptyState`). The page's top bar
+  doesn't repeat that button while it shows.
+- Deleting always asks first in a small dialog: what goes, then Cancel (quiet) and Delete (danger).
+- Notices stack at the bottom right, carry at most one action and leave on their own. Errors in a form show next to
+  the field.
+- Tooltips are Misty's own (`Tooltip`), quick, with the shortcut when shortcut hints are on, never the system title.
+- The Studio and Tutor are in full color. The Studio's panels float over the office as translucent panels; it and
+  settings are the only places with floating panels.
 
 # Decided, not built
 

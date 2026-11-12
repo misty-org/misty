@@ -7,7 +7,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { Pressable } from "@/shared/ui";
+import { OverflowFadeText, Pressable } from "@/shared/ui";
 import { preloadSpaceSection } from "../overview/SpaceSectionView";
 import { HomeSection } from "./HomeSection";
 
@@ -39,7 +39,7 @@ export function SpacePlaces({ spaceId }: { spaceId: string }) {
             <span className="home-place-icon" aria-hidden>
               <Icon className="size-4" />
             </span>
-            <span className="truncate">{label}</span>
+            <OverflowFadeText>{label}</OverflowFadeText>
           </Pressable>
         ))}
       </div>

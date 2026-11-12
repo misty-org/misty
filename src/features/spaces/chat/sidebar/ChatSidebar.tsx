@@ -6,9 +6,10 @@ import {
   Button,
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuTrigger,
   IconButton,
+  MenuItem,
+  OverflowFadeText,
   Pressable,
   SkeletonList,
   WorkspaceSidebar,
@@ -67,21 +68,22 @@ export function ChatSidebar(props: {
             <DropdownMenuTrigger asChild>
               <IconButton
                 label={`More for ${label}`}
-                size="xs"
-                className="opacity-0 group-hover/row:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100 [&_svg]:size-3.5"
+                size="sm"
+                className={cn(
+                  "opacity-0 group-hover/row:opacity-100 focus-visible:opacity-100",
+                  "data-[state=open]:opacity-100 [&_svg]:size-3.5",
+                )}
               >
                 <MoreHorizontal />
               </IconButton>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-44">
-              <DropdownMenuItem onSelect={() => props.onEdit(conversation)}>
-                <Pencil />
-                Rename
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => props.onDelete(conversation)}>
-                <Trash2 />
-                Delete
-              </DropdownMenuItem>
+              <MenuItem icon={Pencil} label="Rename" onSelect={() => props.onEdit(conversation)} />
+              <MenuItem
+                icon={Trash2}
+                label="Delete"
+                onSelect={() => props.onDelete(conversation)}
+              />
             </DropdownMenuContent>
           </DropdownMenu>
         ) : undefined
@@ -96,16 +98,16 @@ export function ChatSidebar(props: {
         <div className="mx-1 mb-2 flex items-center gap-2 rounded-lg bg-charcoal-card px-2 py-1.5">
           <span className="text-xs">{props.selectedIds.length} selected</span>
           <Button
-            variant="ghost"
-            size="xs"
+            variant="quiet"
+            size="sm"
             className="ml-auto"
             onClick={() => props.onDeleteMany(props.selectedIds)}
           >
             Delete
           </Button>
           <Button
-            variant="ghost"
-            size="xs"
+            variant="quiet"
+            size="sm"
             className="text-cream-muted"
             onClick={props.onClearSelection}
           >
@@ -119,7 +121,7 @@ export function ChatSidebar(props: {
         onToggle={() => toggleSection("channels")}
         action={
           props.canWrite && (
-            <IconButton label="New channel" size="xs" onClick={props.onNewConversation}>
+            <IconButton label="New channel" size="sm" onClick={props.onNewConversation}>
               <Plus />
             </IconButton>
           )
@@ -127,7 +129,7 @@ export function ChatSidebar(props: {
       >
         {channelRow("everyone", "everyone")}
         {props.loading && props.conversations.length === 0 ? (
-          <SkeletonList label="Channels" rows={3} lines={1} />
+          <SkeletonList label="Channels" rows={3} leading="icon" lines={1} />
         ) : (
           channels.conversations.map((conversation) =>
             channelRow(
@@ -144,7 +146,7 @@ export function ChatSidebar(props: {
         onToggle={() => toggleSection("dms")}
         action={
           props.canWrite && (
-            <IconButton label="New direct message" size="xs" onClick={props.onNewDirectMessage}>
+            <IconButton label="New direct message" size="sm" onClick={props.onNewDirectMessage}>
               <Plus />
             </IconButton>
           )
@@ -184,7 +186,7 @@ function Section(props: {
             "text-cream-muted hover:text-cream",
           )}
         >
-          <span className="truncate">{props.title}</span>
+          <OverflowFadeText>{props.title}</OverflowFadeText>
           <ChevronDown
             aria-hidden
             className={cn(
@@ -193,7 +195,12 @@ function Section(props: {
             )}
           />
         </Pressable>
-        <span className="opacity-0 group-hover/section:opacity-100 focus-within:opacity-100 has-[[data-state=open]]:opacity-100 [&_svg]:size-3.5">
+        <span
+          className={cn(
+            "opacity-0 group-hover/section:opacity-100 focus-within:opacity-100",
+            "has-[[data-state=open]]:opacity-100 [&_svg]:size-3.5",
+          )}
+        >
           {props.action}
         </span>
       </div>
@@ -252,7 +259,9 @@ function Row(props: {
         >
           {props.icon}
         </span>
-        <span className="min-w-0 flex-1 truncate">{props.children}</span>
+        <OverflowFadeText full className="min-w-0 flex-1">
+          {props.children}
+        </OverflowFadeText>
       </Pressable>
       {props.trailing}
     </div>

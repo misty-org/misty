@@ -1,5 +1,5 @@
 import { confirmAction } from "@/shared/lib/confirmAction";
-import { Button, ErrorNotification, SearchField } from "@/shared/ui";
+import { Button, EmptyState, SearchField, useNotice } from "@/shared/ui";
 import { Plus } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
@@ -75,44 +75,56 @@ export function SpacePlanner({ spaceId }: { spaceId: string }) {
     if (!(await confirmAction(`Delete “${task.title}”? This can’t be undone.`))) return;
     if (await planner.archive(task)) setEditing(undefined);
   };
+  useNotice(Boolean(planner.error), { message: planner.error, tone: "error" });
+  // With no tasks at all, the empty state offers New task, so the bar doesn't repeat it.
+  const empty = planner.tasks?.length === 0;
+  const newTask = () => {
+    setNewStatus("todo");
+    setEditing(null);
+  };
 
   return (
     <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] bg-charcoal-bg">
-      {/* Search and New task; the page has no title, since the sidebar and the tab name it. */}
+      {/* Search and New task; the page has no title, since the sidebar and the tab name it.
+          While the board is empty its empty state offers New task, so the bar holds neither. */}
       <div
         role="toolbar"
         aria-label="Planner"
         className="flex min-h-12 items-center gap-3 px-4 py-1.5"
       >
-        <SearchField
-          containerClassName="ml-auto w-56"
-          aria-label="Search tasks"
-          placeholder="Search tasks"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-        />
-        <Button
-          type="button"
-          size="sm"
-          onClick={() => {
-            setNewStatus("todo");
-            setEditing(null);
-          }}
-        >
-          <Plus aria-hidden="true" />
-          New task
-        </Button>
+        {empty ? null : (
+          <>
+            <SearchField
+              containerClassName="ml-auto w-56"
+              aria-label="Search tasks"
+              placeholder="Search tasks"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+            />
+            <Button type="button" icon={Plus} onClick={newTask}>
+              New task
+            </Button>
+          </>
+        )}
       </div>
 
-      <SpaceTaskBoard
-        spaceId={spaceId}
-        tasks={shown}
-        busy={planner.busy}
-        assigneeName={(task) => names.get(assigneeValue(task)) ?? ""}
-        onOpen={setEditing}
-        onMove={(task, status, before) => void planner.move(task, status, before)}
-        onCreate={(title, status) => planner.create({ title, status })}
-      />
+      {empty ? (
+        <EmptyState
+          title="No tasks yet"
+          line="Tasks you and your agents add to this Space show up here."
+          action={{ label: "New task", icon: Plus, onClick: newTask }}
+        />
+      ) : (
+        <SpaceTaskBoard
+          spaceId={spaceId}
+          tasks={shown}
+          busy={planner.busy}
+          assigneeName={(task) => names.get(assigneeValue(task)) ?? ""}
+          onOpen={setEditing}
+          onMove={(task, status, before) => void planner.move(task, status, before)}
+          onCreate={(title, status) => planner.create({ title, status })}
+        />
+      )}
 
       {editing !== undefined ? (
         <SpaceTaskDialog
@@ -128,7 +140,6 @@ export function SpacePlanner({ spaceId }: { spaceId: string }) {
           onDelete={editing ? () => void remove(editing) : undefined}
         />
       ) : null}
-      <ErrorNotification message={planner.error} />
     </div>
   );
 }

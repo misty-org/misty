@@ -26,12 +26,6 @@ vi.mock("@/app/shell", async (importOriginal) => ({
   publishNavigatorLayout: vi.fn(),
   configureStartupPreference: vi.fn(),
 }));
-vi.mock("@/features/browser/webviews/browserRuntime", async (importOriginal) => ({
-  ...(await importOriginal<Record<string, unknown>>()),
-  setBrowserDownloadDirectory: vi.fn(),
-  setBrowserDownloadPrompt: vi.fn(),
-  setBrowserStatusBubbleEnabled: vi.fn(),
-}));
 import { registerPreferenceWriter } from "../device-preferences/bridge";
 import { useSettingsStore as store } from "./useSettingsStore";
 import { useDockingLayoutStore } from "@/app/shell/dockingLayout";
@@ -48,11 +42,9 @@ beforeEach(() => {
 describe("server preference runtime projection", () => {
   it("stages formerly device-only settings for the page's Save changes", () => {
     store.getState().updateSetting("appearance", "app_zoom", 1.5);
-    store.getState().updateSetting("general", "browser_download_directory", "/downloads");
+    store.getState().updateSetting("general", "reopen_last_session", false);
     expect(native.writer).toHaveBeenCalledWith("app.zoom", 1.5, { stage: true });
-    expect(native.writer).toHaveBeenCalledWith("browser.downloads.directory", "/downloads", {
-      stage: true,
-    });
+    expect(native.writer).toHaveBeenCalledWith("app.startup.restore", false, { stage: true });
     expect(native.save).not.toHaveBeenCalled();
   });
   it("applies received launch, shortcut, preset and Open With preferences", async () => {

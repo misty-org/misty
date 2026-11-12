@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { LibraryEntryHeader } from "./LibraryEntryHeader";
+import { SpaceLibraryEmptyState } from "./SpaceLibraryEmptyState";
 import { SpaceLibraryItems } from "./SpaceLibraryItems";
 const fixture = vi.hoisted(() => ({
   data: {} as Record<string, unknown>,
@@ -40,11 +41,20 @@ beforeEach(() => {
         id: "file",
         display_name: "Reading.pdf",
         added_at: "2026-09-30T00:00:00Z",
+        tags: [],
         file: { original_filename: "Reading.pdf", intrinsic_metadata: {} },
       },
     ],
   };
 });
+const emptyProps = {
+  collection: "recent",
+  searching: false,
+  uploadAvailable: true,
+  uploading: false,
+  uploadDisabled: false,
+  onUpload: vi.fn(),
+};
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
@@ -65,8 +75,21 @@ it("restores a trashed item through the existing mutation", () => {
     </>,
   );
   expect(screen.queryByRole("button", { name: "Upload files" })).toBeNull();
-  fireEvent.click(screen.getByRole("button", { name: "Restore" }));
+  fireEvent.contextMenu(screen.getByRole("button", { name: "Reading.pdf" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "Restore" }));
   expect(fixture.restore).toHaveBeenCalledWith((fixture.data.displayItems as unknown[])[0]);
+});
+it("leaves Upload to the empty state while the Library has no files", () => {
+  fixture.data.displayItems = [];
+  render(<LibraryEntryHeader />);
+  expect(screen.queryByRole("button", { name: "Upload files" })).toBeNull();
+});
+it("shows the Library's empty state with Upload when it has no files", () => {
+  fixture.data.displayItems = [];
+  render(<SpaceLibraryEmptyState {...emptyProps} />);
+  fireEvent.click(screen.getByRole("button", { name: "Upload files" }));
+  expect(emptyProps.onUpload).toHaveBeenCalled();
+  expect(screen.getByRole("heading", { name: "No files yet" })).toBeTruthy();
 });
 it("hides upload while the Library is read-only", () => {
   fixture.data.canUploadLibrary = false;

@@ -60,8 +60,7 @@ export function LibraryAdvancedAdjustments({
       <CollapsibleTrigger asChild>
         <Button
           className="group h-7 w-full justify-between px-0 text-3xs text-cream-muted"
-          size="sm"
-          variant="ghost"
+          variant="quiet"
         >
           Advanced adjustments
           <ChevronDown className="transition-transform group-data-[state=open]:rotate-180" />
@@ -222,9 +221,34 @@ export function libraryEditStyle(definition: LibraryEditDefinition) {
                 ? "grayscale(1) contrast(1.35) brightness(.96)"
                 : "";
   const enhance = definition.auto_enhance ? "contrast(1.05) saturate(1.08) brightness(1.02)" : "";
+  const brightness =
+    definition.brightness +
+    definition.exposure * 0.125 +
+    definition.brilliance * 0.05 -
+    definition.black_point * 0.04;
+  const contrast =
+    definition.contrast *
+    (1 + definition.highlights * 0.18 - definition.shadows * 0.08 + definition.black_point * 0.16);
+  const filter = [
+    `brightness(${brightness})`,
+    `contrast(${contrast})`,
+    `saturate(${definition.saturation * (1 + definition.vibrance * 0.5)})`,
+    `grayscale(${definition.grayscale})`,
+    `sepia(${Math.max(0, definition.warmth) * 0.08})`,
+    `hue-rotate(${definition.tint * 8 - definition.warmth * 4}deg)`,
+    `blur(${definition.noise_reduction * 0.35}px)`,
+    `drop-shadow(0 0 ${definition.vignette * 16}px rgba(0,0,0,${definition.vignette * 0.6}))`,
+    enhance,
+    preset,
+  ].join(" ");
+  const rotation = definition.rotation + definition.straighten;
   return {
-    filter: `brightness(${definition.brightness + definition.exposure * 0.125 + definition.brilliance * 0.05 - definition.black_point * 0.04}) contrast(${definition.contrast * (1 + definition.highlights * 0.18 - definition.shadows * 0.08 + definition.black_point * 0.16)}) saturate(${definition.saturation * (1 + definition.vibrance * 0.5)}) grayscale(${definition.grayscale}) sepia(${Math.max(0, definition.warmth) * 0.08}) hue-rotate(${definition.tint * 8 - definition.warmth * 4}deg) blur(${definition.noise_reduction * 0.35}px) drop-shadow(0 0 ${definition.vignette * 16}px rgba(0,0,0,${definition.vignette * 0.6})) ${enhance} ${preset}`,
-    transform: `rotate(${definition.rotation + definition.straighten}deg) scaleX(${definition.flip_horizontal ? -1 : 1}) scaleY(${definition.flip_vertical ? -1 : 1})`,
+    filter,
+    transform: [
+      `rotate(${rotation}deg)`,
+      `scaleX(${definition.flip_horizontal ? -1 : 1})`,
+      `scaleY(${definition.flip_vertical ? -1 : 1})`,
+    ].join(" "),
     clipPath: crop
       ? `inset(${crop.y * 100}% ${(1 - crop.x - crop.width) * 100}% ${(1 - crop.y - crop.height) * 100}% ${crop.x * 100}%)`
       : undefined,

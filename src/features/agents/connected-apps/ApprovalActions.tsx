@@ -26,26 +26,20 @@ export function ApprovalActions({
   return (
     <div className="grid gap-2">
       <div className="flex flex-wrap gap-2">
-        <Button size="sm" variant="outline" disabled={busy} onClick={() => onDecide("deny")}>
+        <Button disabled={busy} onClick={() => onDecide("deny")}>
           Deny
         </Button>
-        <Button size="sm" variant="primary" disabled={busy} onClick={() => onDecide("continue")}>
+        <Button variant="primary" disabled={busy} onClick={() => onDecide("continue")}>
           <Check className="size-3.5" aria-hidden="true" /> Accept and continue
         </Button>
         {remember ? (
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-7"
-            disabled={busy}
-            onClick={() => onDecide("remember")}
-          >
+          <Button className="h-7" disabled={busy} onClick={() => onDecide("remember")}>
             Accept and remember
           </Button>
         ) : null}
       </div>
       {remember ? (
-        <p className="text-2xs leading-4 text-cream-muted">
+        <p className="text-micro leading-4 text-cream-muted">
           Remember: {scope}
           {request.paymentCap ? ` (each payment up to ${formatCap(request.paymentCap)})` : ""}.
           {request.permissionMode === "ask"

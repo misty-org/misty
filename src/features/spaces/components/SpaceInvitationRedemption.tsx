@@ -5,7 +5,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { openSignInSheet, useAuth } from "@/features/account";
 import { spacesApi } from "../api/api";
 import type { SpaceInvitationPreview } from "../api/dto/entities";
-import { Button, Card, ErrorNotification, Spinner } from "@/shared/ui";
+import { Button, Card, Spinner, useNotice } from "@/shared/ui";
 import { useSpacesStore } from "../list/useSpacesStore";
 
 export function SpaceInvitationRedemption() {
@@ -17,6 +17,8 @@ export function SpaceInvitationRedemption() {
   const [loading, setLoading] = useState(true);
   const [joining, setJoining] = useState(false);
   const [error, setError] = useState("");
+
+  useNotice(Boolean(error), { message: error, tone: "error", onDismiss: () => setError("") });
 
   useEffect(() => {
     let active = true;
@@ -75,9 +77,8 @@ export function SpaceInvitationRedemption() {
             </p>
             {user ? (
               <div className="mt-5 grid gap-2">
-                <Button type="button" disabled={joining} onClick={() => void join()}>
-                  {joining ? <Spinner label={false} /> : null}
-                  {joining ? "Joining…" : "Join Space"}
+                <Button type="button" loading={joining} onClick={() => void join()}>
+                  Join Space
                 </Button>
                 <p className="m-0 text-xs text-cream-muted">Signed in as {user.email}</p>
               </div>
@@ -90,7 +91,6 @@ export function SpaceInvitationRedemption() {
             )}
           </>
         ) : null}
-        <ErrorNotification message={error} onDismiss={() => setError("")} />
       </Card>
     </div>
   );

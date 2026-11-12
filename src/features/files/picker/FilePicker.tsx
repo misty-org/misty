@@ -75,7 +75,7 @@ export function MistyFilePicker({
   if (!embedded) return null;
   return (
     <div className="grid min-h-0 place-items-center p-6">
-      <Button variant="outline" onClick={() => void choose()}>
+      <Button variant="secondary" onClick={() => void choose()}>
         {chooseLabel(mode, multiple)}
       </Button>
     </div>

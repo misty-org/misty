@@ -12,17 +12,12 @@ import {
   useCollectionRefinement,
   CollectionItems,
   CollectionViewToggle,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
   MenuItem,
-  ContextMenuAction,
-  ErrorNotification,
-  IconButton,
   itemTones,
+  useNotice,
 } from "@/shared/ui";
 import { useRangeSelection } from "@/shared/hooks/useRangeSelection";
-import { MoreHorizontal, Pencil, PencilRuler, Plus, Trash2 } from "lucide-react";
+import { Pencil, PencilRuler, Plus, Trash2 } from "lucide-react";
 
 export function DrawingCollection(props: {
   spaceId: string;
@@ -56,6 +51,7 @@ export function DrawingCollection(props: {
       value: (drawing) => (props.readOnly || drawing.role === "viewer" ? "viewer" : "editable"),
     },
   });
+  useNotice(Boolean(props.bulkError), { message: props.bulkError ?? "", tone: "error" });
   const drawings = refinement.items;
   const selection = useRangeSelection(
     drawings
@@ -66,7 +62,7 @@ export function DrawingCollection(props: {
     <CollectionPage>
       <CollectionHeading
         title="Journal"
-        actions={
+        end={
           <>
             <CollectionSearch
               aria-label="Search drawings"
@@ -74,8 +70,7 @@ export function DrawingCollection(props: {
               value={props.query}
               onChange={(e) => props.onQuery(e.target.value)}
             />
-            <Button variant="primary" className="px-4" onClick={props.onCreate}>
-              <Plus />
+            <Button variant="primary" icon={Plus} onClick={props.onCreate}>
               New drawing
             </Button>
           </>
@@ -96,7 +91,6 @@ export function DrawingCollection(props: {
           <CollectionViewToggle value={view} onChange={setView} disabled={!drawings.length} />
         }
       />
-      <ErrorNotification message={props.bulkError} />
       {
         <CollectionItems
           columnSetId="drawings"
@@ -104,6 +98,7 @@ export function DrawingCollection(props: {
           sortResetKey={refinement.sortKey}
           categoryLabel="Type"
           view={view}
+          listIcons
           items={drawings.map((d) => ({
             id: d.id,
             title: d.title || "Untitled drawing",
@@ -123,31 +118,20 @@ export function DrawingCollection(props: {
             }),
             onOpen: () => props.onOpen(d),
             selectable: !props.readOnly && d.can_delete,
-            contextMenu:
+            menu:
               selection.menuTargets(d.id).length > 1 ? (
-                <ContextMenuAction
+                <MenuItem
                   icon={<Trash2 />}
                   label={`Delete ${selection.selectedIds.length} drawings`}
-                  destructive
+                  danger
                   disabled={props.bulkBusy}
                   onSelect={() => props.onDeleteMany(selection.selectedIds)}
                 />
               ) : (
-                <DrawingActions drawing={d} props={props} context />
+                <DrawingActions drawing={d} props={props} />
               ),
-            onContextMenuOpen: () => selection.pickForMenu(d.id),
-            actions: (
-              <DropdownMenu modal={false}>
-                <DropdownMenuTrigger asChild>
-                  <IconButton label={`More actions for ${d.title || "Untitled drawing"}`}>
-                    <MoreHorizontal />
-                  </IconButton>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DrawingActions drawing={d} props={props} />
-                </DropdownMenuContent>
-              </DropdownMenu>
-            ),
+            menuLabel: `More actions for ${d.title || "Untitled drawing"}`,
+            onMenuOpen: () => selection.pickForMenu(d.id),
           }))}
           selectedIds={selection.selectedIds}
           onSelect={selection.select}
@@ -160,32 +144,29 @@ export function DrawingCollection(props: {
 function DrawingActions({
   drawing,
   props,
-  context = false,
 }: {
   drawing: SpaceDrawing;
   props: ComponentProps<typeof DrawingCollection>;
-  context?: boolean;
 }) {
-  const Action = context ? ContextMenuAction : MenuItem;
   return (
     <>
-      <Action
+      <MenuItem
         icon={<Pencil />}
         label="Rename"
         disabled={props.readOnly || drawing.role === "viewer"}
-        title={
+        reason={
           props.readOnly || drawing.role === "viewer"
             ? "You have view-only access to this drawing."
             : undefined
         }
         onSelect={() => props.onRename(drawing)}
       />
-      <Action
+      <MenuItem
         icon={<Trash2 />}
-        destructive
+        danger
         label="Delete"
         disabled={props.readOnly || !drawing.can_delete}
-        title={
+        reason={
           props.readOnly
             ? "This Space is read-only."
             : !drawing.can_delete

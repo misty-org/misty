@@ -2,7 +2,7 @@ import { personalAgentsApi } from "./personalAgentsApi";
 import { AgentPermissionsField } from "./AgentPermissionsField";
 import { AgentEngineField } from "../engines/AgentEngineField";
 import type { AgentProfile, AgentProfileInput } from "@/shared/schemas";
-import { Button, ErrorNotification, Field, Input, Textarea } from "@/shared/ui";
+import { Button, useNotice, Field, Input, Textarea } from "@/shared/ui";
 import { Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { AgentAvatarPicker } from "./AgentAvatarPicker";
@@ -115,6 +115,7 @@ export function AgentEditor({
       setBusy(false);
     }
   }
+  useNotice(Boolean(error), { message: error, tone: "error", onDismiss: () => setError("") });
   return (
     <form
       className="agent-profile-form"
@@ -183,7 +184,6 @@ export function AgentEditor({
           <AgentBotFields draft={draft} onChange={update} />
         </div>
       </details>
-      <ErrorNotification message={error} onDismiss={() => setError("")} />
       <div className="flex flex-wrap gap-3 empty:hidden">
         {(!profile || dirty) && (
           <Button disabled={busy || !draft.name.trim()} type="submit">
@@ -193,7 +193,6 @@ export function AgentEditor({
         {profile && !dirty ? <ExportBotButton agent={profile} /> : null}
         {profile && !profile.system_managed && (
           <Button
-            variant="outline"
             type="button"
             className="ml-auto"
             disabled={busy}
@@ -210,13 +209,11 @@ export function AgentEditor({
             Delete {profile?.name}? Active work will stop. Existing conversation history is
             retained.
           </p>
-          <Button variant="outline" type="button" size="sm" onClick={() => setConfirmDelete(false)}>
+          <Button type="button" onClick={() => setConfirmDelete(false)}>
             Keep agent
           </Button>{" "}
           <Button
-            variant="outline"
             type="button"
-            size="sm"
             disabled={busy}
             onClick={() => {
               setBusy(true);

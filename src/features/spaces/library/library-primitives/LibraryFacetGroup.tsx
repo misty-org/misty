@@ -20,8 +20,7 @@ export function LibraryFacetGroup({
       <span className="mr-0.5 text-3xs font-semibold capitalize text-cream-muted">{label}</span>
       {facets.slice(0, MAX_VISIBLE_FACETS).map((facet) => (
         <Button
-          size="sm"
-          variant="outline"
+          variant="secondary"
           type="button"
           key={`${facet.value}:${facet.label}`}
           onClick={() => onSelect(facet)}

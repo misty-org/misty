@@ -112,31 +112,19 @@ function SpaceLibrarySelectionToolbar({
     <div className="mb-4 flex min-h-10 flex-wrap items-center gap-2 rounded-xl bg-charcoal-card px-3 py-2">
       <span className="mr-1 text-xs font-medium">{selectedCount} selected</span>
       {collection !== "deleted" ? (
-        <Button size="sm" variant="outline" type="button" disabled={bulkSaving} onClick={onCopy}>
+        <Button variant="secondary" type="button" disabled={bulkSaving} onClick={onCopy}>
           <ClipboardCopy size={12} />
           Copy
         </Button>
       ) : null}
       {canEdit ? (
         collection === "deleted" ? (
-          <Button
-            size="sm"
-            variant="outline"
-            type="button"
-            disabled={bulkSaving}
-            onClick={onRestore}
-          >
+          <Button variant="secondary" type="button" disabled={bulkSaving} onClick={onRestore}>
             Restore
           </Button>
         ) : (
           <>
-            <Button
-              size="sm"
-              variant="outline"
-              type="button"
-              disabled={bulkSaving}
-              onClick={onTrash}
-            >
+            <Button variant="secondary" type="button" disabled={bulkSaving} onClick={onTrash}>
               <Trash2 size={12} />
               Delete
             </Button>

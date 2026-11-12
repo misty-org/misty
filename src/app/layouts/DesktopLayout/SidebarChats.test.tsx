@@ -36,6 +36,7 @@ vi.mock("@/features/agents", () => ({
   },
 }));
 
+import { NoticeViewport } from "@/shared/ui";
 import { SidebarChats } from "./SidebarChats";
 
 const agent = { id: "a1", name: "Codex" } as AgentProfile;
@@ -49,15 +50,18 @@ const onOpenIn = vi.fn();
 const onOpenGone = vi.fn();
 const show = (openChat: string | null = null, chats = base) =>
   render(
-    <SidebarChats
-      chats={chats}
-      agentOf={() => agent}
-      statuses={{}}
-      openChat={openChat}
-      onOpen={onOpen}
-      onOpenIn={onOpenIn}
-      onOpenGone={onOpenGone}
-    />,
+    <>
+      <NoticeViewport />
+      <SidebarChats
+        chats={chats}
+        agentOf={() => agent}
+        statuses={{}}
+        openChat={openChat}
+        onOpen={onOpen}
+        onOpenIn={onOpenIn}
+        onOpenGone={onOpenGone}
+      />
+    </>,
   );
 const row = (name: string) => screen.getByRole("button", { name: new RegExp(name) });
 const menu = (name: string) => {

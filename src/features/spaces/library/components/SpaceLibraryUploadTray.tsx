@@ -1,7 +1,14 @@
 import { Upload, X } from "lucide-react";
 import { SystemErrorNotice } from "@/shared/platform/systemErrors";
 
-import { IconButton, Popover, PopoverContent, PopoverTrigger, Progress } from "@/shared/ui";
+import {
+  IconButton,
+  OverflowFadeText,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+  Progress,
+} from "@/shared/ui";
 import type { LibraryUploadJob } from "../hook-signatures/useSpaceLibraryData";
 
 /**
@@ -33,13 +40,11 @@ export function SpaceLibraryUploadTray({
     <Popover>
       <PopoverTrigger asChild>
         <IconButton
-          shape="round"
           label={
             uploading
               ? `${active.length} upload${active.length === 1 ? "" : "s"} in progress`
               : `${jobs.length} upload${jobs.length === 1 ? "" : "s"} finished`
           }
-          tooltip={false}
           className="relative"
         >
           <Upload className={uploading ? "animate-pulse" : ""} size={15} aria-hidden="true" />
@@ -72,7 +77,9 @@ export function SpaceLibraryUploadTray({
           {jobs.map((job) => (
             <li className="border-b px-3 py-2 last:border-b-0" key={job.id}>
               <div className="flex items-baseline justify-between gap-2">
-                <span className="min-w-0 flex-1 truncate text-xs">{job.name}</span>
+                <OverflowFadeText full className="flex-1 text-xs">
+                  {job.name}
+                </OverflowFadeText>
                 <span className="shrink-0 text-3xs text-cream-muted">
                   {job.stage === "failed"
                     ? "Failed"

@@ -50,7 +50,12 @@ export function WelcomePage() {
             <Button variant="primary" className={authButtonClass} size="lg" onClick={signIn}>
               Sign in
             </Button>
-            <Button variant="outline" className={authButtonClass} size="lg" onClick={createAccount}>
+            <Button
+              variant="secondary"
+              className={authButtonClass}
+              size="lg"
+              onClick={createAccount}
+            >
               Create account
             </Button>
           </div>
@@ -59,7 +64,7 @@ export function WelcomePage() {
             <Button variant="primary" className={authButtonClass} size="lg" onClick={getStarted}>
               Get started
             </Button>
-            <Button variant="outline" className={authButtonClass} size="lg" onClick={signIn}>
+            <Button variant="secondary" className={authButtonClass} size="lg" onClick={signIn}>
               Sign in
             </Button>
           </div>

@@ -1,4 +1,4 @@
-import { Check } from "lucide-react";
+import { Hash, User, Users } from "lucide-react";
 import { useState } from "react";
 import type { SpaceConversation } from "../api/dto/entities";
 import {
@@ -29,10 +29,14 @@ export function ChatPanelPicker(props: {
   const current = props.conversations.find((item) => item.id === props.selected);
   const title = current ? conversationName(current, props.currentUserId) : "Everyone";
   const rows = [
-    { id: "", name: "Everyone" },
+    { id: "", name: "Everyone", icon: Users },
     ...[...props.conversations]
       .sort((a, b) => b.updated_at.localeCompare(a.updated_at))
-      .map((item) => ({ id: item.id, name: conversationName(item, props.currentUserId) })),
+      .map((item) => ({
+        id: item.id,
+        name: conversationName(item, props.currentUserId),
+        icon: item.kind === "dm" ? User : Hash,
+      })),
   ];
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -52,14 +56,14 @@ export function ChatPanelPicker(props: {
                 <CommandItem
                   key={row.id || "everyone"}
                   value={`${row.id}:${row.name}`}
+                  icon={row.icon}
+                  label={row.name}
+                  checked={row.id === props.selected}
                   onSelect={() => {
                     setOpen(false);
                     props.onSelect(row.id);
                   }}
-                >
-                  <span className="min-w-0 flex-1 truncate">{row.name}</span>
-                  {row.id === props.selected ? <Check aria-label="Open chat" /> : null}
-                </CommandItem>
+                />
               ))}
             </CommandGroup>
           </CommandList>

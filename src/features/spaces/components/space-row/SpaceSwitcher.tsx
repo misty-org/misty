@@ -30,8 +30,7 @@ export function SpaceSwitcher({ space }: { space: Space }) {
               <DropdownMenu>
                 <MenuTrigger
                   label={`${name}, switch Space`}
-                  value={<span className="min-w-0 truncate text-left">{name}</span>}
-                  variant="ghost"
+                  value={name}
                   className="-ml-2 h-8 max-w-full gap-2 px-2 text-sm font-semibold text-cream-bright"
                   icon={
                     <SpaceAvatar

@@ -6,14 +6,15 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  ErrorNotification,
   Input,
+  useNotice,
 } from "@/shared/ui";
 import { DialogField } from "./DialogField";
 
 /** The shared one-or-two-field prompt used for folder, memory and item renames. */
 export function TextDialog({ model }: { model: TextDialogModel }) {
   const state = model.state;
+  useNotice(Boolean(state && model.error), { message: model.error ?? "", tone: "error" });
   const missingPrimary = state ? state.kind !== "edit-tags" && !state.primaryValue.trim() : false;
   const missingSecondary = state
     ? Boolean(state.secondaryLabel && !state.secondaryValue?.trim())
@@ -53,10 +54,14 @@ export function TextDialog({ model }: { model: TextDialogModel }) {
                 />
               </DialogField>
             ) : null}
-            <ErrorNotification message={model.error} />
 
             <DialogFooter>
-              <Button type="button" variant="outline" disabled={model.saving} onClick={model.close}>
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={model.saving}
+                onClick={model.close}
+              >
                 Cancel
               </Button>
               <Button type="submit" disabled={model.saving || missingPrimary || missingSecondary}>

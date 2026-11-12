@@ -1,4 +1,4 @@
-import { ErrorNotification } from "@/shared/ui";
+import { useNotice } from "@/shared/ui";
 import { useEffect, useState, type ReactNode } from "react";
 import { aiSurfaceApi } from "../runs/invocations/api";
 import { type AiUserSettings } from "../runs/invocations/aiSettingsTypes";
@@ -34,6 +34,7 @@ export function AgentSitesSection(props: { children?: ReactNode }) {
     }
   };
   const sites = settings?.agent_blocked_sites ?? [];
+  useNotice(Boolean(error), { message: error, tone: "error", onDismiss: () => setError("") });
   return (
     <DesktopSettingsSection title="Limits">
       {props.children}
@@ -63,7 +64,6 @@ export function AgentSitesSection(props: { children?: ReactNode }) {
           }
         />
       </DesktopSettingsRow>
-      <ErrorNotification message={error} onDismiss={() => setError("")} />
     </DesktopSettingsSection>
   );
 }

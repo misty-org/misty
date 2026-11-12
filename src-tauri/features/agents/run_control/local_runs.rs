@@ -83,6 +83,13 @@ fn follow_state(events: &[Value], live: bool) -> String {
     }
 }
 
+/// Whether a run is going in this app now, asked without starting Misty's own runtime: a runtime
+/// that isn't running runs nothing.
+pub(super) fn is_going(run_id: &str) -> bool {
+    crate::engines::runs::is_live(run_id)
+        || super::current().is_some_and(|running| running.runtime.local_run_live(run_id))
+}
+
 /// Whether a run began a write and nobody saw it end, or it ended uncertain.
 pub(super) fn has_unconfirmed(store: &Store, run_id: &str) -> bool {
     let check = || -> rusqlite::Result<bool> {
@@ -208,10 +215,20 @@ pub async fn agent_run_start(
     // The folder the turn works in is saved first, so a rewind can put its files back.
     super::turn_rewind::before_run(&app, &run_id, &body).await;
     // A request that names an outside engine goes to its adapter, and reports the same events.
-    if crate::engines::runs::wants(&body) {
-        return crate::engines::runs::start(&app, run_id, body).await;
+    let started = if crate::engines::runs::wants(&body) {
+        crate::engines::runs::start(&app, run_id.clone(), body).await
+    } else {
+        start_on_runtime(&app, run_id.clone(), body).await
+    };
+    // A run that never started has no events to end its row, which would say it is going for good.
+    if started.is_err() {
+        super::run_ledger::note_event(&app, &run_id, &json!({ "type": "invocation.failed" }));
     }
-    let running = super::ensure(&app).await?;
+    started
+}
+
+async fn start_on_runtime(app: &AppHandle, run_id: String, body: Value) -> Result<(), String> {
+    let running = super::ensure(app).await?;
     super::contained(async move { running.runtime.start_local(&run_id, body).await })
         .await?
         .map_err(|error| error.code().to_owned())

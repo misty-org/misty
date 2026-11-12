@@ -32,7 +32,18 @@ export function agentPageHostShown(host: HTMLElement): boolean {
  * host shows it through, so nothing here hides it for one. Off screen the page keeps painting for
  * the agent.
  */
-export function useAgentPageGeometry(hostRef: RefObject<HTMLDivElement | null>, viewId: string) {
+export function useAgentPageGeometry(
+  hostRef: RefObject<HTMLDivElement | null>,
+  viewId: string,
+  options: {
+    /**
+     * The host shows one of several pages in turn (the agent browser's tabs): switching keeps the
+     * old page up until the next is presented. Without it the page goes as soon as it is left.
+     */
+    handoff?: boolean;
+  } = {},
+) {
+  const handoff = options.handoff === true;
   useLayoutEffect(() => {
     if (!viewId) return;
     let disposed = false;
@@ -102,9 +113,13 @@ export function useAgentPageGeometry(hostRef: RefObject<HTMLDivElement | null>, 
       window.visualViewport?.removeEventListener("resize", schedule);
       window.visualViewport?.removeEventListener("scroll", schedule);
       document.removeEventListener("visibilitychange", schedule);
-      // Switching tabs keeps this page up until the next is presented, as the browser's own tabs do;
-      // closing the whole agent browser removes the host, and then nothing takes its place.
-      queueMicrotask(() => void hideAdoptedBrowserPage(viewId, host?.isConnected ? 120 : 0));
+      // Switching tabs keeps this page up until the next is presented, as the browser's own tabs
+      // do. Anything else takes it off at once: the host was removed, or hidden because the person
+      // went to another page, where nothing takes its place and the page would sit over it.
+      queueMicrotask(() => {
+        const switching = handoff && host?.isConnected === true && agentPageHostShown(host);
+        void hideAdoptedBrowserPage(viewId, switching ? 120 : 0);
+      });
     };
-  }, [hostRef, viewId]);
+  }, [hostRef, viewId, handoff]);
 }

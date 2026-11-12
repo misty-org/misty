@@ -1,5 +1,5 @@
 import type { SpaceLibraryItem } from "../../api/dto/entities";
-import { cn, Pressable } from "@/shared/ui";
+import { cn, OverflowFadeText, Pressable } from "@/shared/ui";
 import { Check } from "lucide-react";
 import { MistyLibraryPickerThumbnail } from "./MistyLibraryPickerThumbnail";
 
@@ -34,10 +34,12 @@ export function MistyLibraryPickerTile({
         <MistyLibraryPickerThumbnail spaceId={spaceId} item={item} />
       </span>
       <span className="block min-w-0 px-2.5 py-2">
-        <span className="block truncate text-xs font-medium">{item.display_name}</span>
-        <span className="mt-0.5 block truncate text-2xs font-normal text-cream-muted">
+        <OverflowFadeText full className="text-xs font-medium">
+          {item.display_name}
+        </OverflowFadeText>
+        <OverflowFadeText full className="mt-0.5 text-2xs font-normal text-cream-muted">
           {item.file.original_filename}
-        </span>
+        </OverflowFadeText>
       </span>
       {selected ? (
         <span className="absolute right-2 top-2 grid size-5 place-items-center rounded-md bg-charcoal-active text-cream-bright shadow-xs">

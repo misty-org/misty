@@ -1,8 +1,11 @@
 import {
+  Button,
   Checkbox,
   Field,
+  FieldError,
   Input,
   Label,
+  OptionSelect,
   Select,
   SelectContent,
   SelectItem,
@@ -10,84 +13,98 @@ import {
   SelectValue,
   Slider,
   Switch,
-  SegmentedControl,
   Textarea,
-  Toggle,
-  ToggleGroup,
-  ToggleGroupItem,
 } from "@/shared/ui";
-import { Bold, Grid2x2, Italic, List } from "lucide-react";
-import { useState } from "react";
+import { LayoutGrid, List, Rows3 } from "lucide-react";
+import { useId, useState } from "react";
 import { GalleryRow, GallerySection } from "./GalleryLayout";
 
+const takenNames = new Set(["projects", "notes"]);
+
+function nameError(name: string) {
+  if (!name.trim()) return "Give the folder a name.";
+  if (takenNames.has(name.trim().toLowerCase())) return "A folder with this name already exists.";
+  return "";
+}
+
 export function FormsSection() {
-  const [name, setName] = useState("Quarterly plan");
-  const [view, setView] = useState<"board" | "list" | "timeline">("board");
+  const [name, setName] = useState("Projects");
+  const [error, setError] = useState(nameError("Projects"));
+  const [layout, setLayout] = useState("list");
+  const [sync, setSync] = useState(true);
+  const customErrorId = useId();
   return (
-    <GallerySection
-      title="Forms"
-      note="Field wires label, hint, and error to any single control. Stacked for text, inline for switches and selects."
-    >
-      <div className="grid max-w-md gap-4">
-        <Field label="Name" hint="Shown in the sidebar and tab title.">
-          <Input value={name} onChange={(event) => setName(event.target.value)} />
-        </Field>
-        <Field label="Folder" error="A folder with this name already exists.">
-          <Input defaultValue="Projects" />
+    <GallerySection title="Forms">
+      <form
+        className="grid max-w-md gap-4"
+        onSubmit={(event) => {
+          event.preventDefault();
+          setError(nameError(name));
+        }}
+      >
+        <Field label="Folder name" error={error}>
+          <Input
+            value={name}
+            onChange={(event) => {
+              setName(event.target.value);
+              setError("");
+            }}
+          />
         </Field>
         <Field label="Notes">
           <Textarea placeholder="Optional" rows={3} />
         </Field>
-        <Field label="Sync automatically" hint="Uploads changes as you save." layout="inline">
-          <Switch defaultChecked />
+        <Field label="Sync automatically" layout="inline">
+          <Switch checked={sync} onCheckedChange={setSync} />
         </Field>
         <Field label="Default view" layout="inline">
-          <Select defaultValue="list">
+          <Select value={layout} onValueChange={setLayout}>
             <SelectTrigger className="w-36">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="list">List</SelectItem>
-              <SelectItem value="grid">Grid</SelectItem>
+              <SelectItem value="list" icon={List} label="List" />
+              <SelectItem value="grid" icon={LayoutGrid} label="Grid" />
+              <SelectItem value="rows" icon={Rows3} label="Rows" disabled reason="Coming later" />
             </SelectContent>
           </Select>
         </Field>
-      </div>
-      <GalleryRow label="Choices">
-        <Label className="flex items-center gap-2 text-cream">
-          <Checkbox defaultChecked /> Checkbox
+        <Field label="Layout, as OptionSelect" layout="inline">
+          <OptionSelect
+            value={layout}
+            onValueChange={setLayout}
+            options={[
+              { value: "list", label: "List", icon: List },
+              { value: "grid", label: "Grid", icon: LayoutGrid },
+            ]}
+          />
+        </Field>
+        <div className="grid gap-1">
+          <Label htmlFor={`${customErrorId}-input`}>Custom control with FieldError</Label>
+          <Input
+            id={`${customErrorId}-input`}
+            defaultValue="not an address"
+            aria-invalid
+            aria-describedby={customErrorId}
+          />
+          <FieldError id={customErrorId} message="Enter an address like name@example.com." />
+        </div>
+        <div className="flex justify-end">
+          <Button type="submit" variant="primary">
+            Create folder
+          </Button>
+        </div>
+      </form>
+      <GalleryRow label="Checkbox">
+        <Label className="flex items-center gap-2">
+          <Checkbox defaultChecked /> Include subfolders
+        </Label>
+        <Label className="flex items-center gap-2">
+          <Checkbox disabled /> Unavailable
         </Label>
       </GalleryRow>
       <GalleryRow label="Slider">
         <Slider defaultValue={[40]} max={100} className="w-60" aria-label="Volume" />
-      </GalleryRow>
-      <GalleryRow label="Toggles">
-        <Toggle aria-label="Bold">
-          <Bold />
-        </Toggle>
-        <Toggle aria-label="Italic" defaultPressed>
-          <Italic />
-        </Toggle>
-        <ToggleGroup type="single" defaultValue="list" variant="outline">
-          <ToggleGroupItem value="list" aria-label="List view">
-            <List />
-          </ToggleGroupItem>
-          <ToggleGroupItem value="grid" aria-label="Grid view">
-            <Grid2x2 />
-          </ToggleGroupItem>
-        </ToggleGroup>
-      </GalleryRow>
-      <GalleryRow label="Segmented">
-        <SegmentedControl
-          label="View"
-          value={view}
-          options={[
-            { value: "board", label: "Board" },
-            { value: "list", label: "List" },
-            { value: "timeline", label: "Timeline" },
-          ]}
-          onChange={setView}
-        />
       </GalleryRow>
     </GallerySection>
   );

@@ -26,6 +26,7 @@ import type { MistyGet, MistySet } from "../state/mistyStoreUpdates";
 import { chatSpaceId } from "../state/conversationSpace";
 import { submissionEpoch } from "./mistySubmissionEpoch";
 import { finishNeverStarted } from "./turnExecution";
+import { answerNotStarted } from "../view/failureSummary";
 import { turnStreamHandlers } from "./turnStream";
 import type { GlobalAiMessage } from "../state/conversationTypes";
 
@@ -220,7 +221,7 @@ export async function startInvocation(set: MistySet, get: MistyGet, turn: Prepar
   } catch (error) {
     if (get().accountId !== accountId || epoch !== submissionEpoch()) return;
     patchConversationMessage(set, get, conversationId, assistantMessage.id, {
-      content: "Misty could not start this answer. Ordinary search is still available.",
+      content: answerNotStarted,
       state: "failed",
       retryable: true,
       activity: undefined,
@@ -230,7 +231,7 @@ export async function startInvocation(set: MistySet, get: MistyGet, turn: Prepar
       error: globalMistyError(error),
     });
     // A refused start ends its local task and closes its windows: left paused, the task
-    // looked as if it were still running next to "Misty could not start this answer".
+    // looked as if it were still running next to the reply that didn't start.
     if (executionTaskId) void finishNeverStarted(executionTaskId);
   }
 }

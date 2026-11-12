@@ -30,15 +30,14 @@ export function LibraryViewerToolbar(props: LibraryViewerToolbarProps) {
   return (
     <div className="flex min-w-0 shrink-0 items-center gap-1 overflow-x-auto py-1">
       {canEdit && activeEdit ? (
-        <Button size="sm" variant="outline" type="button" onClick={props.onCopyEdit}>
+        <Button variant="secondary" type="button" onClick={props.onCopyEdit}>
           <Copy size={12} />
           Copy edits
         </Button>
       ) : null}
       {canEdit ? (
         <Button
-          size="sm"
-          variant="outline"
+          variant="secondary"
           type="button"
           disabled={props.editSaving}
           onClick={props.onSaveAsCopy}
@@ -48,19 +47,19 @@ export function LibraryViewerToolbar(props: LibraryViewerToolbarProps) {
         </Button>
       ) : null}
       {canEdit && props.editing ? (
-        <Button size="sm" type="button" disabled={props.editSaving} onClick={props.onSaveEdit}>
+        <Button type="button" disabled={props.editSaving} onClick={props.onSaveEdit}>
           {props.editSaving ? "Saving…" : "Save"}
         </Button>
       ) : null}
       {canEdit && props.editingAvailable ? (
-        <IconButton size="md" variant="outline" label="Edit" onClick={props.onBeginEditing}>
+        <IconButton size="md" variant="secondary" label="Edit" onClick={props.onBeginEditing}>
           <SlidersHorizontal size={15} />
         </IconButton>
       ) : null}
       {canCopy ? (
         <IconButton
           size="md"
-          variant="outline"
+          variant="secondary"
           label={copyLabel}
           disabled={Boolean(activeEdit) && !renditionReady}
           onClick={props.onCopyItem}
@@ -71,7 +70,7 @@ export function LibraryViewerToolbar(props: LibraryViewerToolbarProps) {
       {canEdit ? (
         <IconButton
           size="md"
-          variant="outline"
+          variant="secondary"
           label="Move to Recently Deleted"
           onClick={props.onTrash}
         >
@@ -79,7 +78,7 @@ export function LibraryViewerToolbar(props: LibraryViewerToolbarProps) {
         </IconButton>
       ) : null}
       <DialogClose asChild>
-        <IconButton size="md" variant="outline" label="Close" tooltip={false}>
+        <IconButton size="md" variant="secondary" label="Close">
           <X size={15} />
         </IconButton>
       </DialogClose>

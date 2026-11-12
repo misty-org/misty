@@ -28,12 +28,12 @@ export function AgentControlTaskControls({
   return (
     <div className="flex items-center gap-1" role="group" aria-label="Task controls">
       {running ? (
-        <Button size="sm" variant="outline" disabled={pending} onClick={takeOver}>
+        <Button disabled={pending} onClick={takeOver}>
           <Hand className="size-3.5" aria-hidden="true" /> Take over
         </Button>
       ) : (
         !finished && (
-          <Button size="sm" variant="primary" disabled={pending} onClick={resume}>
+          <Button variant="primary" disabled={pending} onClick={resume}>
             {execution.state === "waiting" ? (
               <Check className="size-3.5" aria-hidden="true" />
             ) : (
@@ -50,16 +50,11 @@ export function AgentControlTaskControls({
         </kbd>
       )}
       {finished || stopped ? (
-        <Button
-          size="sm"
-          variant="primary"
-          disabled={pending}
-          onClick={() => act(finishLocalExecution)}
-        >
+        <Button variant="primary" disabled={pending} onClick={() => act(finishLocalExecution)}>
           <Check className="size-3.5" aria-hidden="true" /> Done
         </Button>
       ) : (
-        <Button size="sm" variant="outline" disabled={pending} onClick={stop}>
+        <Button disabled={pending} onClick={stop}>
           <Square className="size-3.5" aria-hidden="true" /> Stop
         </Button>
       )}

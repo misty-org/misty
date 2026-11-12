@@ -42,12 +42,7 @@ export function AgentActivitySettings() {
                 : "Each run's steps and page pictures, kept on this computer for 90 days."
         }
       >
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={!native || state === "clearing"}
-          onClick={() => void clear()}
-        >
+        <Button disabled={!native || state === "clearing"} onClick={() => void clear()}>
           {state === "clearing" ? "Clearing" : "Clear steps"}
         </Button>
       </DesktopSettingsRow>

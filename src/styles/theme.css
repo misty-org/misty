@@ -24,17 +24,34 @@
   --ui-header: 48px;
 }
 
-/* Type. One system face for the whole interface and one monospace face for code, URLs and
-   codes. Sizes are a fixed scale: 3xs 10 · 2xs 11 · xs 12 · ui 13 (controls) · sm 14 ·
-   md 15 (page text) · base 16 · lg 18 · xl 20 · 2xl 24 · 3xl 30. Use these, never `text-[Npx]`.
-   The added steps set only the size, so line height still comes from `leading-*` or the parent. */
+/* Type. One face for the whole interface, the system font. Monospace (`font-mono`) is for code
+   itself: code blocks, the editor, diffs and the terminal, never URLs, paths, IDs, model names or
+   shortcuts. Sizes come from roles, each with its own line height, and never `text-[Npx]`:
+     micro 11 · caption 12 (badges, shortcut text) · meta 13 (times, counts, the path line,
+     descriptions) · control 14 (every button, field, menu row, tab and list row) · body 15
+     (messages, notes, prose) · page 16 (page text, reading) · title 18 · display 24.
+   Tailwind's own steps (`text-xs` to `text-3xl`, `text-base`) are not used: use the roles. */
 @theme {
   --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
   --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
-  --text-3xs: 10px;
-  --text-2xs: 11px;
-  --text-ui: 13px;
-  --text-md: 15px;
+
+  --text-micro: 11px;
+  --text-micro--line-height: 14px;
+  --text-caption: 12px;
+  --text-caption--line-height: 16px;
+  --text-meta: 13px;
+  --text-meta--line-height: 18px;
+  --text-control: 14px;
+  --text-control--line-height: 20px;
+  --text-body: 15px;
+  --text-body--line-height: 22px;
+  --text-page: 16px;
+  --text-page--line-height: 24px;
+  --text-title: 18px;
+  --text-title--line-height: 24px;
+  --text-display: 24px;
+  --text-display--line-height: 30px;
+
   /* Corners, after OpenChamber's scale: 4 for marks and chips inside rows, 7 for controls and
      rows, 9 for fields and menus, 12 for panels and dialogs. */
   --radius-sm: 4px;
@@ -45,8 +62,11 @@
 
 @theme inline {
   --color-charcoal-workspace: var(--misty-theme-workspace);
-  /* The title bar's own colour; signed-out pages paint everything in it. */
-  --color-window-chrome: var(--misty-window-chrome, var(--misty-theme-workspace));
+  /* The shell's three surfaces: the window around everything (the title bar's colour; signed-out
+     pages paint everything in it), the sidebar, and the pane every page sits on. */
+  --color-window-chrome: var(--misty-theme-workspace);
+  --color-sidebar: var(--misty-theme-sidebar);
+  --color-pane: var(--misty-theme-bg);
   --color-charcoal-bg: var(--misty-theme-bg);
   --color-charcoal-sidebar: var(--misty-theme-sidebar);
   --color-charcoal-card: var(--misty-theme-card);
@@ -66,7 +86,15 @@
   /* Shared interaction fills stay visible on both dark and light themes. */
   --color-control-hover: color-mix(in srgb, var(--misty-theme-text) 10%, transparent);
   --color-control-active: color-mix(in srgb, var(--misty-theme-text) 16%, transparent);
+  /* Danger marks what deletes or has failed: the danger button and menu item, and an error next
+     to the field it belongs to. The wash is its faint hover fill. */
+  --color-danger: var(--misty-theme-danger);
+  --color-danger-wash: color-mix(in srgb, var(--misty-theme-danger) 14%, transparent);
+  /* Deprecated: the same color as danger, under the name it had before buttons used it. */
   --color-notification-red: var(--misty-theme-danger);
+  /* The dim behind a dialog, a sheet or a workspace overlay. Lighter on light themes, where black
+     at the dark theme's strength reads as a gray wall. */
+  --color-scrim: light-dark(rgb(0 0 0 / 0.28), rgb(0 0 0 / 0.45));
   /* Ink for text on a colored chip (a tab group's label and swatches), dark on every theme. */
   --color-ink-on-color: #202124;
 
@@ -101,15 +129,37 @@
 }
 
 /* What the tones mean where color carries meaning: an agent's state, a Git change, a kind of
-   file. They follow the theme with the tones they are made from. */
+   file. They follow the theme with the tones they are made from. Every state color in the app is
+   one of these; App.css's --misty-status-* names point here. */
 :root {
+  --tone-idle: color-mix(in srgb, var(--misty-theme-text-muted) 70%, transparent);
   --tone-working: var(--color-tone-blue);
   --tone-waiting: var(--color-tone-amber);
   --tone-failed: var(--color-tone-red);
+  --tone-done: var(--color-tone-green);
   --tone-added: var(--color-tone-green);
   --tone-code: var(--color-tone-amber);
   --tone-style: var(--color-tone-violet);
   --tone-data: var(--color-tone-teal);
   --tone-doc: var(--color-tone-blue);
   --tone-image: var(--color-tone-orange);
+}
+
+/* The state tones as utilities (`bg-state-waiting`, `text-state-failed`) for shared components:
+   a list row's waiting dot, a run's failed mark. */
+@theme inline {
+  --color-state-idle: var(--tone-idle);
+  --color-state-working: var(--tone-working);
+  --color-state-waiting: var(--tone-waiting);
+  --color-state-failed: var(--tone-failed);
+  --color-state-done: var(--tone-done);
+}
+
+/* What a pointer drag draws over everything, at the layers.css stack: the shield that holds the
+   grabbing cursor at the menu layer, the preview that follows the pointer at the tooltip layer and
+   its drop line just above it. For stylesheets; components use the layer-* utilities. */
+:root {
+  --layer-drag-shield: 2147483400;
+  --layer-drag-preview: 2147483500;
+  --layer-drag-indicator: 2147483501;
 }

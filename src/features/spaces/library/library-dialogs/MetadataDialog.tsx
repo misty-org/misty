@@ -87,7 +87,7 @@ export function MetadataDialog({ model }: { model: MetadataDialogModel }) {
           )}
 
           <DialogFooter>
-            <Button type="button" variant="outline" disabled={model.saving} onClick={model.close}>
+            <Button type="button" variant="secondary" disabled={model.saving} onClick={model.close}>
               Cancel
             </Button>
             <Button type="submit" disabled={model.saving}>

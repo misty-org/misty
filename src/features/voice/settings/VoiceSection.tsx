@@ -1,3 +1,4 @@
+import { AudioLines, Keyboard, Languages, Mic, MonitorSpeaker } from "lucide-react";
 import { voiceSettings } from "../voiceSettings";
 import {
   DesktopSettingsRow as SettingsRow,
@@ -12,34 +13,35 @@ import {
 import type { SettingsContentProps } from "../../settings/settingsTypes";
 
 const isMac = typeof navigator !== "undefined" && /Mac/i.test(navigator.platform);
+// The empty value is the platform's own dictation key.
 const shortcuts = [
-  { value: "", label: isMac ? "Fn / Globe" : "Right Alt" },
+  { value: "", label: isMac ? "Fn / Globe" : "Right Alt", icon: Keyboard },
   ...(isMac
     ? [
-        { value: "RightOption", label: "Right Option" },
-        { value: "RightCommand", label: "Right Command" },
+        { value: "RightOption", label: "Right Option", icon: Keyboard },
+        { value: "RightCommand", label: "Right Command", icon: Keyboard },
       ]
-    : [{ value: "RightControl", label: "Right Ctrl" }]),
+    : [{ value: "RightControl", label: "Right Ctrl", icon: Keyboard }]),
 ];
 const languages = [
-  { value: "auto", label: "Detect automatically" },
-  { value: "en", label: "English" },
-  { value: "es", label: "Spanish" },
-  { value: "fr", label: "French" },
-  { value: "de", label: "German" },
-  { value: "it", label: "Italian" },
-  { value: "pt", label: "Portuguese" },
-  { value: "nl", label: "Dutch" },
-  { value: "ja", label: "Japanese" },
-  { value: "ko", label: "Korean" },
-  { value: "zh", label: "Chinese" },
-  { value: "hi", label: "Hindi" },
-  { value: "ru", label: "Russian" },
+  { value: "auto", label: "Detect automatically", icon: Languages },
+  { value: "en", label: "English", icon: Languages },
+  { value: "es", label: "Spanish", icon: Languages },
+  { value: "fr", label: "French", icon: Languages },
+  { value: "de", label: "German", icon: Languages },
+  { value: "it", label: "Italian", icon: Languages },
+  { value: "pt", label: "Portuguese", icon: Languages },
+  { value: "nl", label: "Dutch", icon: Languages },
+  { value: "ja", label: "Japanese", icon: Languages },
+  { value: "ko", label: "Korean", icon: Languages },
+  { value: "zh", label: "Chinese", icon: Languages },
+  { value: "hi", label: "Hindi", icon: Languages },
+  { value: "ru", label: "Russian", icon: Languages },
 ];
 const sources = [
-  { value: "mic", label: "Microphone" },
-  { value: "mic-system", label: "Microphone and system audio" },
-  { value: "system", label: "System audio only" },
+  { value: "mic", label: "Microphone", icon: Mic },
+  { value: "mic-system", label: "Microphone and system audio", icon: AudioLines },
+  { value: "system", label: "System audio only", icon: MonitorSpeaker },
 ];
 
 /** Settings › Voice: dictation everywhere and voice captures. Device-only. */
@@ -57,11 +59,7 @@ export function VoiceSection(props: SettingsContentProps) {
             onChange={(value) => set("dictation_enabled", value)}
           />
         </SettingsRow>
-        <SettingsRow
-          label="Dictation shortcut"
-
-          muted={!voice.dictation}
-        >
+        <SettingsRow label="Dictation shortcut" muted={!voice.dictation}>
           <DropdownControl
             value={voice.shortcut}
             options={shortcuts}

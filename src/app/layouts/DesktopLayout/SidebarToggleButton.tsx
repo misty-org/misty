@@ -1,5 +1,5 @@
 import { PanelLeft, PanelRight } from "lucide-react";
-import { IconButton, toolbarIconProps } from "@/shared/ui";
+import { IconButton } from "@/shared/ui";
 import { setBrowserWebviewsSuspended } from "@/features/app-windows";
 import { useSidebarCollapsedStore } from "../../shell/sidebarCollapsed";
 
@@ -10,9 +10,8 @@ export function SidebarToggleButton({ side = "left" }: { side?: "left" | "right"
   return (
     <IconButton
       label={collapsed ? "Show sidebar" : "Hide sidebar"}
-      size="xs"
+      size="sm"
       className="size-7"
-      tooltip={false}
       onClick={() => {
         // Native pages sit above the app, so they step aside while the drawer slides.
         setBrowserWebviewsSuspended(true, "sidebar-toggle");
@@ -20,9 +19,7 @@ export function SidebarToggleButton({ side = "left" }: { side?: "left" | "right"
         useSidebarCollapsedStore.getState().toggle();
       }}
     >
-      {/* Panel glyphs fill their box, so they take the sidebar's 18px optical size (see
-          browserToolbar.css); without a size class the xs button shrinks them to 14px. */}
-      <Icon {...toolbarIconProps} className="size-4.5" />
+      <Icon />
     </IconButton>
   );
 }

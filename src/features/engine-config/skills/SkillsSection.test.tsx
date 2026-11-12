@@ -282,9 +282,8 @@ describe("InstalledPane", () => {
     expect(detailDialog()).toBeNull();
     // An unmanaged local skill's own copy can't be turned off from the row (the backend wouldn't delete it).
     const betaRow = document.querySelector('[aria-label="Show beta"]')?.parentElement;
-    expect(
-      betaRow?.querySelector<HTMLButtonElement>('button[data-target="claude"]')?.disabled,
-    ).toBe(true);
+    const betaCopy = betaRow?.querySelector<HTMLButtonElement>('button[data-target="claude"]');
+    expect(betaCopy?.getAttribute("aria-disabled")).toBe("true");
   });
 
   it("shows only engines that hold a copy in the row strip", async () => {
@@ -344,8 +343,9 @@ describe("InstalledPane", () => {
     const betaRow = document.querySelector('[aria-label="Show beta"]')?.parentElement;
     const localCopy = betaRow?.querySelector<HTMLButtonElement>('button[data-target="claude"]');
     expect(localCopy?.dataset.targetState).toBe("synced");
-    expect(localCopy?.disabled).toBe(true);
-    expect(localCopy?.getAttribute("title")).toContain("Misty never deletes it");
+    expect(localCopy?.getAttribute("aria-disabled")).toBe("true");
+    await act(async () => localCopy?.click());
+    expect(api.setTargets).not.toHaveBeenCalled();
 
     await act(async () => {
       buttonExact("Import local skill").click();

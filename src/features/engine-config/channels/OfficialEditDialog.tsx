@@ -128,12 +128,7 @@ export function OfficialEditDialog({ cli }: { cli: CliConfigState }) {
                     {file.path}
                   </code>
                   {file.format === "json" ? (
-                    <Button
-                      type="button"
-                      size="xs"
-                      variant="outline"
-                      onClick={() => formatJson(file.path)}
-                    >
+                    <Button type="button" size="sm" onClick={() => formatJson(file.path)}>
                       Format
                     </Button>
                   ) : null}
@@ -164,7 +159,7 @@ export function OfficialEditDialog({ cli }: { cli: CliConfigState }) {
           ) : null}
         </div>
         <div className="flex justify-end gap-2">
-          <Button type="button" variant="secondary" onClick={close}>
+          <Button type="button" onClick={close}>
             Cancel
           </Button>
           <Button

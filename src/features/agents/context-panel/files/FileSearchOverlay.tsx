@@ -1,7 +1,7 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 import { Search, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { IconButton, Input, SegmentedControl, SkeletonList } from "@/shared/ui";
+import { IconButton, Input, ChoiceGroup, SkeletonList } from "@/shared/ui";
 import { errorText } from "../projectApi";
 import { filesApi, type SearchHit } from "./filesApi";
 import { useFileIndex, type IndexEntry } from "./fileIndex";
@@ -171,9 +171,9 @@ export function FileSearchOverlay({ searchRoot }: { searchRoot: string }) {
             setActiveIndex(0);
           }}
         />
-        <SegmentedControl<SearchMode>
+        <ChoiceGroup<SearchMode>
           label="Search by"
-          size="xs"
+          size="sm"
           value={mode}
           options={[
             { value: "files", label: "Names" },
@@ -184,7 +184,7 @@ export function FileSearchOverlay({ searchRoot }: { searchRoot: string }) {
             setActiveIndex(0);
           }}
         />
-        <IconButton label="Close search" size="xs" onClick={closeSearch}>
+        <IconButton label="Close search" size="sm" onClick={closeSearch}>
           <X aria-hidden />
         </IconButton>
       </div>
@@ -195,7 +195,7 @@ export function FileSearchOverlay({ searchRoot }: { searchRoot: string }) {
         className="file-search-list"
       >
         {searching ? (
-          <SkeletonList label="Searching" rows={5} lines={1} />
+          <SkeletonList label="Searching" rows={5} leading="icon" lines={1} />
         ) : rows.length === 0 ? (
           query.trim() ? (
             <p className="file-search-empty">No matches.</p>

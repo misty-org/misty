@@ -86,8 +86,6 @@ async fn providers_without_these_models_say_so() {
         ModelError::Setup { code, .. } => code,
         other => panic!("expected a setup error, got {other}"),
     };
-    // ChatGPT sign-in has language models only.
-    assert_eq!(code(resolve_embedding_model("chatgpt/text-embedding-3-small", &route(ProviderId::Chatgpt), &client).err().unwrap()), "model_unsupported");
     assert_eq!(code(resolve_embedding_model("elevenlabs/x", &route(ProviderId::Elevenlabs), &client).err().unwrap()), "model_unsupported");
     assert_eq!(code(resolve_speech_model("google/x", &route(ProviderId::Google), &client).err().unwrap()), "model_unsupported");
     assert_eq!(code(resolve_transcription_model("nvidia/x", &route(ProviderId::Nvidia), &client).err().unwrap()), "model_unsupported");

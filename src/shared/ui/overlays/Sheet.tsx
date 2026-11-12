@@ -3,6 +3,7 @@ import * as SheetPrimitive from "@radix-ui/react-dialog";
 import { cva, type VariantProps } from "class-variance-authority";
 import { X } from "lucide-react";
 import * as React from "react";
+import { IconButton } from "../controls/IconButton";
 
 const Sheet = SheetPrimitive.Root;
 
@@ -15,7 +16,7 @@ const SheetOverlay = React.forwardRef<
   <SheetPrimitive.Overlay
     data-slot="sheet-overlay"
     className={cn(
-      "fixed inset-0 layer-dialog-backdrop bg-black/45 duration-200",
+      "fixed inset-0 layer-dialog-backdrop bg-scrim duration-200",
       "data-[state=open]:animate-in data-[state=closed]:animate-out",
       "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
       "data-[state=closed]:pointer-events-none",
@@ -29,7 +30,7 @@ SheetOverlay.displayName = SheetPrimitive.Overlay.displayName;
 
 const sheetVariants = cva(
   [
-    "fixed layer-dialog gap-4 bg-charcoal-card p-6 text-cream shadow-xl",
+    "fixed layer-dialog gap-4 bg-charcoal-card p-6 text-body text-cream shadow-xl",
     "transition ease-out data-[state=closed]:duration-200",
     "data-[state=open]:duration-300 data-[state=open]:animate-in",
     "data-[state=closed]:animate-out data-[state=closed]:pointer-events-none",
@@ -85,17 +86,15 @@ const SheetContent = React.forwardRef<
           {...props}
         >
           {showCloseButton ? (
-            <SheetPrimitive.Close
-              data-slot="sheet-close"
-              className={cn(
-                "absolute right-4 top-4 grid size-8 place-items-center rounded-md",
-                "text-cream-muted outline-none transition-colors hover:bg-charcoal-card",
-                "hover:text-cream focus-visible:ring-[3px]",
-                "focus-visible:ring-charcoal-active/40 disabled:pointer-events-none",
-              )}
-            >
-              <X className="h-4 w-4" />
-              <span className="sr-only">Close</span>
+            <SheetPrimitive.Close asChild>
+              <IconButton
+                label="Close"
+                variant="quiet"
+                data-slot="sheet-close"
+                className="absolute right-4 top-4"
+              >
+                <X />
+              </IconButton>
             </SheetPrimitive.Close>
           ) : null}
           {children}
@@ -119,7 +118,7 @@ const SheetTitle = React.forwardRef<
   <SheetPrimitive.Title
     ref={ref}
     data-slot="sheet-title"
-    className={cn("font-heading text-lg font-medium text-cream", className)}
+    className={cn("text-title font-semibold text-cream-bright", className)}
     {...props}
   />
 ));
@@ -132,7 +131,7 @@ const SheetDescription = React.forwardRef<
   <SheetPrimitive.Description
     ref={ref}
     data-slot="sheet-description"
-    className={cn("text-sm text-cream-muted", className)}
+    className={cn("text-body text-cream-muted", className)}
     {...props}
   />
 ));

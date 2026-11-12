@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  MenuKindContext,
   menuContentClass,
   menuIndicatorClass,
   menuIndicatorItemClass,
@@ -10,6 +11,7 @@ import {
   menuWidthClass,
   type MenuWidth,
 } from "./popupStyles";
+import type { MenuItemVariant } from "./DropdownMenu";
 
 import * as ContextMenuPrimitive from "@radix-ui/react-context-menu";
 import { Check, ChevronRight } from "lucide-react";
@@ -17,29 +19,46 @@ import * as React from "react";
 
 import { cn } from "../classNames";
 
+/*
+ * Radix's right-click menu with the same rows as the dropdown. Features put MenuItem,
+ * MenuCheckItem, MenuRadioGroup/MenuRadioItem and MenuSubmenu inside ContextMenuContent; those
+ * read the menu kind from it, so the same tree also works inside a DropdownMenu.
+ */
+
+const contextViewportClass =
+  "max-h-[min(24rem,var(--radix-context-menu-content-available-height))] max-w-[var(--radix-context-menu-content-available-width)]";
+
 const ContextMenu = ContextMenuPrimitive.Root;
 
 const ContextMenuTrigger = ContextMenuPrimitive.Trigger;
 
 const ContextMenuSub = ContextMenuPrimitive.Sub;
 
-const ContextMenuRadioGroup = ContextMenuPrimitive.RadioGroup;
+const ContextMenuGroup = ContextMenuPrimitive.Group;
+
+const ContextMenuRadioGroup = React.forwardRef<
+  React.ElementRef<typeof ContextMenuPrimitive.RadioGroup>,
+  React.ComponentPropsWithoutRef<typeof ContextMenuPrimitive.RadioGroup>
+>(({ className, ...props }, ref) => (
+  <ContextMenuPrimitive.RadioGroup ref={ref} className={cn("grid gap-1", className)} {...props} />
+));
+ContextMenuRadioGroup.displayName = ContextMenuPrimitive.RadioGroup.displayName;
 
 const ContextMenuSubTrigger = React.forwardRef<
   React.ElementRef<typeof ContextMenuPrimitive.SubTrigger>,
   React.ComponentPropsWithoutRef<typeof ContextMenuPrimitive.SubTrigger> & {
-    inset?: boolean;
+    variant?: MenuItemVariant;
   }
->(({ className, inset, children, ...props }, ref) => (
+>(({ className, variant = "default", children, ...props }, ref) => (
   <ContextMenuPrimitive.SubTrigger
     ref={ref}
     data-slot="context-menu-sub-trigger"
-    data-inset={inset}
+    data-variant={variant}
     className={cn(menuItemClass, className)}
     {...props}
   >
     {children}
-    <ChevronRight className="ml-auto" />
+    <ChevronRight className="ml-auto text-cream-muted" />
   </ContextMenuPrimitive.SubTrigger>
 ));
 ContextMenuSubTrigger.displayName = ContextMenuPrimitive.SubTrigger.displayName;
@@ -47,15 +66,17 @@ ContextMenuSubTrigger.displayName = ContextMenuPrimitive.SubTrigger.displayName;
 const ContextMenuSubContent = React.forwardRef<
   React.ElementRef<typeof ContextMenuPrimitive.SubContent>,
   React.ComponentPropsWithoutRef<typeof ContextMenuPrimitive.SubContent>
->(({ className, ...props }, ref) => (
+>(({ className, children, ...props }, ref) => (
   <ContextMenuPrimitive.Portal>
     <ContextMenuPrimitive.SubContent
       ref={ref}
       data-slot="context-menu-sub-content"
       collisionPadding={8}
-      className={cn(menuContentClass, className)}
+      className={cn(menuContentClass, contextViewportClass, className)}
       {...props}
-    />
+    >
+      <MenuKindContext.Provider value="context">{children}</MenuKindContext.Provider>
+    </ContextMenuPrimitive.SubContent>
   </ContextMenuPrimitive.Portal>
 ));
 ContextMenuSubContent.displayName = ContextMenuPrimitive.SubContent.displayName;
@@ -63,14 +84,22 @@ ContextMenuSubContent.displayName = ContextMenuPrimitive.SubContent.displayName;
 const ContextMenuContent = React.forwardRef<
   React.ElementRef<typeof ContextMenuPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof ContextMenuPrimitive.Content> & { width?: MenuWidth }
->(({ className, width, ...props }, ref) => (
+>(({ className, width, children, collisionPadding = 8, ...props }, ref) => (
   <ContextMenuPrimitive.Portal>
     <ContextMenuPrimitive.Content
       ref={ref}
       data-slot="context-menu-content"
-      className={cn(menuContentClass, width && menuWidthClass[width], className)}
+      collisionPadding={collisionPadding}
+      className={cn(
+        menuContentClass,
+        contextViewportClass,
+        width && menuWidthClass[width],
+        className,
+      )}
       {...props}
-    />
+    >
+      <MenuKindContext.Provider value="context">{children}</MenuKindContext.Provider>
+    </ContextMenuPrimitive.Content>
   </ContextMenuPrimitive.Portal>
 ));
 ContextMenuContent.displayName = ContextMenuPrimitive.Content.displayName;
@@ -78,20 +107,38 @@ ContextMenuContent.displayName = ContextMenuPrimitive.Content.displayName;
 const ContextMenuItem = React.forwardRef<
   React.ElementRef<typeof ContextMenuPrimitive.Item>,
   React.ComponentPropsWithoutRef<typeof ContextMenuPrimitive.Item> & {
-    inset?: boolean;
-    variant?: "default" | "destructive";
+    variant?: MenuItemVariant;
   }
->(({ className, inset, variant = "default", ...props }, ref) => (
+>(({ className, variant = "default", ...props }, ref) => (
   <ContextMenuPrimitive.Item
     ref={ref}
     data-slot="context-menu-item"
-    data-inset={inset}
     data-variant={variant}
     className={cn(menuItemClass, className)}
     {...props}
   />
 ));
 ContextMenuItem.displayName = ContextMenuPrimitive.Item.displayName;
+
+const ContextMenuCheckboxItem = React.forwardRef<
+  React.ElementRef<typeof ContextMenuPrimitive.CheckboxItem>,
+  React.ComponentPropsWithoutRef<typeof ContextMenuPrimitive.CheckboxItem>
+>(({ className, children, ...props }, ref) => (
+  <ContextMenuPrimitive.CheckboxItem
+    ref={ref}
+    data-slot="context-menu-checkbox-item"
+    className={cn(menuIndicatorItemClass, className)}
+    {...props}
+  >
+    {children}
+    <span className={menuIndicatorClass}>
+      <ContextMenuPrimitive.ItemIndicator>
+        <Check />
+      </ContextMenuPrimitive.ItemIndicator>
+    </span>
+  </ContextMenuPrimitive.CheckboxItem>
+));
+ContextMenuCheckboxItem.displayName = ContextMenuPrimitive.CheckboxItem.displayName;
 
 const ContextMenuRadioItem = React.forwardRef<
   React.ElementRef<typeof ContextMenuPrimitive.RadioItem>,
@@ -103,26 +150,23 @@ const ContextMenuRadioItem = React.forwardRef<
     className={cn(menuIndicatorItemClass, className)}
     {...props}
   >
+    {children}
     <span className={menuIndicatorClass}>
       <ContextMenuPrimitive.ItemIndicator>
         <Check />
       </ContextMenuPrimitive.ItemIndicator>
     </span>
-    {children}
   </ContextMenuPrimitive.RadioItem>
 ));
 ContextMenuRadioItem.displayName = ContextMenuPrimitive.RadioItem.displayName;
 
 const ContextMenuLabel = React.forwardRef<
   React.ElementRef<typeof ContextMenuPrimitive.Label>,
-  React.ComponentPropsWithoutRef<typeof ContextMenuPrimitive.Label> & {
-    inset?: boolean;
-  }
->(({ className, inset, ...props }, ref) => (
+  React.ComponentPropsWithoutRef<typeof ContextMenuPrimitive.Label>
+>(({ className, ...props }, ref) => (
   <ContextMenuPrimitive.Label
     ref={ref}
     data-slot="context-menu-label"
-    data-inset={inset}
     className={cn(menuLabelClass, className)}
     {...props}
   />
@@ -144,7 +188,9 @@ ContextMenuSeparator.displayName = ContextMenuPrimitive.Separator.displayName;
 
 export {
   ContextMenu,
+  ContextMenuCheckboxItem,
   ContextMenuContent,
+  ContextMenuGroup,
   ContextMenuItem,
   ContextMenuLabel,
   ContextMenuRadioGroup,

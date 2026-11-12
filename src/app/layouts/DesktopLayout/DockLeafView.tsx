@@ -14,7 +14,7 @@ import {
   type WorkspacePane,
   type WorkspaceView,
 } from "@/features/app-windows";
-import { cn } from "@/shared/ui";
+import { OverflowFadeText, cn } from "@/shared/ui";
 import { memo, useMemo, useRef, useState, type DragEvent } from "react";
 import { EmptyWorkspacePane, WorkspaceSurface } from "./WorkspaceSurface";
 import { AiPaneHost } from "@/features/agents";
@@ -230,7 +230,7 @@ export function DockLeafView(props: WorkspaceDockTreeProps & { pane: WorkspacePa
         data-misty-window-titlebar-region="true"
         className="min-w-0 bg-charcoal-workspace text-xs text-cream-muted"
       >
-        <span className="truncate">{activeTab?.title || "New tab"}</span>
+        <OverflowFadeText>{activeTab?.title || "New tab"}</OverflowFadeText>
       </header>
       <div
         className="grid min-h-0 min-w-0 grid-cols-[minmax(0,1fr)] grid-rows-[minmax(0,1fr)] overflow-hidden"

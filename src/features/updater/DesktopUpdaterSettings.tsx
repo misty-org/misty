@@ -134,14 +134,13 @@ export function DesktopUpdaterSettings() {
               />
             ) : null}
             {state === "available" ? (
-              <Button size="sm" type="button" onClick={() => void installUpdate()}>
+              <Button type="button" onClick={() => void installUpdate()}>
                 Install and restart
               </Button>
             ) : (
               <Button
-                size="sm"
                 type="button"
-                variant="outline"
+                variant="secondary"
                 disabled={!supported || state === "checking" || state === "installing"}
                 onClick={() => void checkForUpdates()}
               >

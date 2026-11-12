@@ -12,7 +12,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { useCallback, useEffect, useState, type KeyboardEvent } from "react";
 import { DesktopSettingsRow, DesktopSettingsSection as Section } from "@/features/settings";
-import { Button, cn, Input, Skeleton, Switch } from "@/shared/ui";
+import { Button, cn, Input, Skeleton, Switch, OverflowFadeText } from "@/shared/ui";
 import { CliUpdateDialog } from "../clis/CliUpdateDialog";
 import { useCliUpdateFlow } from "../clis/useCliUpdateFlow";
 import { binKey, dshHostApi, useEngineSettings, type DshHostStatus } from "./api";
@@ -121,12 +121,7 @@ function HostCard({
     (fact): fact is string => typeof fact === "string" && fact.length > 0,
   );
   const recheck = (
-    <Button
-      size="sm"
-      variant="secondary"
-      disabled={busy !== null}
-      onClick={() => void probe.refresh(true)}
-    >
+    <Button disabled={busy !== null} onClick={() => void probe.refresh(true)}>
       Check again
     </Button>
   );
@@ -142,7 +137,7 @@ function HostCard({
           <code className="text-xs text-cream-muted">{origin}</code>
         ) : null}
         {status?.ownership === "adopted" ? (
-          <span className="rounded-sm border border-cream/10 bg-charcoal-hover px-1.5 text-2xs text-cream-muted">
+          <span className="rounded-sm border border-cream/10 bg-charcoal-hover px-1.5 text-micro text-cream-muted">
             Already running
           </span>
         ) : null}
@@ -154,16 +149,11 @@ function HostCard({
       <div className="flex items-center justify-end gap-2">
         {hostState === "connected" ? (
           <>
-            <Button size="sm" variant="primary" onClick={openPage}>
+            <Button variant="primary" onClick={openPage}>
               Open its page
             </Button>
             {status?.ownership === "spawned" ? (
-              <Button
-                size="sm"
-                variant="secondary"
-                disabled={busy !== null}
-                onClick={() => void probe.stop()}
-              >
+              <Button disabled={busy !== null} onClick={() => void probe.stop()}>
                 Stop
               </Button>
             ) : null}
@@ -171,27 +161,20 @@ function HostCard({
           </>
         ) : hostState === "down" ? (
           <>
-            <Button
-              size="sm"
-              variant="primary"
-              disabled={busy !== null}
-              onClick={() => void probe.start()}
-            >
+            <Button variant="primary" disabled={busy !== null} onClick={() => void probe.start()}>
               Start now
             </Button>
             {recheck}
           </>
         ) : hostState === "missing" ? (
           <>
-            <Button size="sm" variant="primary" disabled={busy !== null} onClick={onInstall}>
+            <Button variant="primary" disabled={busy !== null} onClick={onInstall}>
               Install
             </Button>
             {recheck}
           </>
         ) : (
-          <Button size="sm" variant="secondary" disabled>
-            {TITLES[hostState]}
-          </Button>
+          <Button disabled>{TITLES[hostState]}</Button>
         )}
       </div>
     </div>
@@ -294,17 +277,15 @@ export function DshHostSection() {
         {settings ? (
           <>
             <DesktopSettingsRow label="Program path">
-              <span
-                className="min-w-0 max-w-[220px] truncate font-mono text-xs text-cream-muted"
-                title={bin || undefined}
+              <OverflowFadeText
+                full={bin || undefined}
+                className="min-w-0 max-w-[220px] font-mono text-xs text-cream-muted"
               >
                 {bin || "Found on PATH"}
-              </span>
-              <Button size="sm" variant="secondary" onClick={() => void chooseBin()}>
-                Choose
-              </Button>
+              </OverflowFadeText>
+              <Button onClick={() => void chooseBin()}>Choose</Button>
               {bin ? (
-                <Button size="sm" variant="ghost" onClick={clearBin}>
+                <Button variant="quiet" onClick={clearBin}>
                   Clear
                 </Button>
               ) : null}

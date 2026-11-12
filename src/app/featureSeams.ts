@@ -1,4 +1,3 @@
-import { lazy } from "react";
 import { accountResets, deviceDataErasers, setupFlow } from "@/features/account";
 import {
   MistyMarkdown,
@@ -48,15 +47,10 @@ deviceDataErasers.listen(async () => {
   await browserLibrary.clearWebsiteData({ kinds: ["cookies", "cache"], since: 0 });
 });
 
-const ModelSetupPanel = lazy(async () => ({
-  default: (await import("@/features/agents/models/modelSetup")).ModelSetupPanel,
-}));
-
 setupFlow.provide({
   stepCopy: setupStepCopy,
   useSteps: useSetupSteps,
   StepBody: SetupStepBody,
-  ModelSetupPanel,
 });
 
 spacesDirectory.provide(useSpacesStore);

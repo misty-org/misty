@@ -3,6 +3,7 @@ import { act, cleanup, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import macosConfig from "../../../src-tauri/tauri.macos.conf.json";
 import { App } from "../App";
+import { appZoomRenderScale } from "@/shared/hooks/useAppZoom";
 import { DesktopWindowReady } from "./DesktopWindowReady";
 const mocks = vi.hoisted(() => ({
   reveal: vi.fn(),
@@ -12,6 +13,8 @@ const mocks = vi.hoisted(() => ({
   theme: "#131313",
 }));
 vi.mock("@/features/settings", () => ({
+  settingsBoolean: () => true,
+  useSettingsStore: (select: (state: { settings: null }) => unknown) => select({ settings: null }),
   workspaceDefaultViewIndex: 3,
   appThemeChangedEvent: "misty://app-theme-changed",
   appThemeSnapshot: () => ({
@@ -80,7 +83,7 @@ describe("main window readiness", () => {
     await act(async () => {
       await vi.runAllTimersAsync();
     });
-    expect(mocks.zoom).toHaveBeenCalledWith(1.4);
+    expect(mocks.zoom).toHaveBeenCalledWith(appZoomRenderScale(1.4));
     expect(mocks.reveal).toHaveBeenCalledTimes(1);
   });
   it("matches the native background on launch and theme changes, then cleans up", async () => {
@@ -128,7 +131,7 @@ describe("main window readiness", () => {
     await act(async () => {
       fontsReady();
     });
-    expect(mocks.zoom).toHaveBeenCalledWith(1.4);
+    expect(mocks.zoom).toHaveBeenCalledWith(appZoomRenderScale(1.4));
     expect(mocks.reveal).not.toHaveBeenCalled();
     expect(onZoom).not.toHaveBeenCalled();
     await act(async () => {

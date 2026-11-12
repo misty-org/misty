@@ -37,6 +37,8 @@ pub struct PermissionStatus {
     pub screen_recording: bool,
     /// False where the OS has no grant to give, so Settings says nothing is needed.
     pub os_permissions_required: bool,
+    /// Some run is working the screen now, so Settings offers to stop it.
+    pub active: bool,
 }
 
 pub fn permission_status() -> PermissionStatus {
@@ -44,6 +46,7 @@ pub fn permission_status() -> PermissionStatus {
         accessibility: driver::accessibility_granted(),
         screen_recording: driver::screen_recording_granted(),
         os_permissions_required: cfg!(target_os = "macos"),
+        active: !active().is_empty(),
     }
 }
 

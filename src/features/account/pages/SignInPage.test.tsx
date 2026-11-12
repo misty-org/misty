@@ -43,6 +43,7 @@ vi.mock("../sessions/useAccountStore", () => ({
   accountSignIn: mocks.accountSignIn,
 }));
 
+import { NoticeViewport } from "@/shared/ui";
 import SignIn from "./SignInPage";
 import { SavedAccountSessionUnavailableError } from "../sessions/sessionErrors";
 
@@ -216,9 +217,12 @@ describe("SignInPage", () => {
       );
       await act(async () => {
         root.render(
-          <MemoryRouter>
-            <SignIn />
-          </MemoryRouter>,
+          <>
+            <NoticeViewport />
+            <MemoryRouter>
+              <SignIn />
+            </MemoryRouter>
+          </>,
         );
       });
       const account = [...container.querySelectorAll("button")].find((button) =>
@@ -301,16 +305,19 @@ describe("SignInPage", () => {
 
     await act(async () => {
       root.render(
-        <MemoryRouter
-          initialEntries={[
-            {
-              pathname: "/signin",
-              state: { addingAccount: true, reauthenticateEmail: "alice@example.com" },
-            },
-          ]}
-        >
-          <SignIn />
-        </MemoryRouter>,
+        <>
+          <NoticeViewport />
+          <MemoryRouter
+            initialEntries={[
+              {
+                pathname: "/signin",
+                state: { addingAccount: true, reauthenticateEmail: "alice@example.com" },
+              },
+            ]}
+          >
+            <SignIn />
+          </MemoryRouter>
+        </>,
       );
     });
 

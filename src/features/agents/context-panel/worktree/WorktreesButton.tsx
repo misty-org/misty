@@ -5,11 +5,12 @@ import {
   Button,
   IconButton,
   MenuTrigger,
-  Notification,
   Popover,
   PopoverContent,
   Pressable,
   Skeleton,
+  Tooltip,
+  useNotice,
 } from "@/shared/ui";
 import { currentSpaceKey, useSpaceFolders } from "../../engines/enginesApi";
 import { DeleteWorktreeDialog } from "./DeleteWorktreeDialog";
@@ -43,6 +44,11 @@ export function WorktreesButton({ folder }: { folder: string }) {
   const revision = useWorktreeStore((s) => s.revision);
   const notice = useWorktreeStore((s) => s.notice);
   const noticeTone = useWorktreeStore((s) => s.noticeTone);
+  useNotice(Boolean(notice), {
+    message: notice,
+    tone: noticeTone,
+    onDismiss: () => useWorktreeStore.getState().clearNotice(),
+  });
   const pending = useWorktreeStore((s) => s.pending);
   const [open, setOpen] = useState(false);
   const [listing, setListing] = useState<WorktreeListing | null>(null);
@@ -84,8 +90,7 @@ export function WorktreesButton({ folder }: { folder: string }) {
           kind="popover"
           iconOnly
           label="Worktrees"
-          tooltip="Worktrees"
-          icon={<FolderGit2 size={16} strokeWidth={1.75} aria-hidden="true" />}
+          icon={FolderGit2}
           data-active={mine.length > 0 || undefined}
         />
         <PopoverContent align="end" className="worktree-menu">
@@ -105,40 +110,43 @@ export function WorktreesButton({ folder }: { folder: string }) {
                     role="listitem"
                     className="worktree-row worktree-row--item"
                   >
-                    <Pressable
-                      className="worktree-row-main"
-                      disabled={!isLinked || current || worktree.prunable}
-                      title={
+                    <Tooltip
+                      content={
                         worktree.prunable
                           ? "Its folder is gone"
                           : isLinked
                             ? worktree.path
                             : "Not linked to this Space"
                       }
-                      onClick={() => choose(worktree.path)}
                     >
-                      {current ? (
-                        <Check size={15} aria-hidden="true" className="shrink-0" />
-                      ) : (
-                        <span className="size-4 shrink-0" />
-                      )}
-                      <span className="worktree-row-name">{name}</span>
-                      {worktree.isMain && worktree.branch ? (
-                        <span className="worktree-branch-tag">{worktree.branch}</span>
-                      ) : null}
-                      {worktree.prunable ? (
-                        <span className="worktree-branch-tag">Missing</span>
-                      ) : null}
-                    </Pressable>
+                      <Pressable
+                        className="worktree-row-main"
+                        disabled={!isLinked || current || worktree.prunable}
+                        onClick={() => choose(worktree.path)}
+                      >
+                        {current ? (
+                          <Check size={15} aria-hidden="true" className="shrink-0" />
+                        ) : (
+                          <span className="size-4 shrink-0" />
+                        )}
+                        <span className="worktree-row-name">{name}</span>
+                        {worktree.isMain && worktree.branch ? (
+                          <span className="worktree-branch-tag">{worktree.branch}</span>
+                        ) : null}
+                        {worktree.prunable ? (
+                          <span className="worktree-branch-tag">Missing</span>
+                        ) : null}
+                      </Pressable>
+                    </Tooltip>
                     {!worktree.isMain ? (
                       <IconButton
                         label={`Remove ${name}`}
-                        size="xs"
+                        size="sm"
                         disabled={worktree.locked}
-                        tooltip={worktree.locked ? "Locked by Git" : `Remove ${name}`}
+                        hint={worktree.locked ? "Locked by Git" : undefined}
                         onClick={() => setRemoving(worktree)}
                       >
-                        <Trash2 size={14} aria-hidden="true" />
+                        <Trash2 />
                       </IconButton>
                     ) : null}
                   </div>
@@ -152,15 +160,14 @@ export function WorktreesButton({ folder }: { folder: string }) {
           <div className="worktree-menu-foot">
             <Button
               type="button"
-              variant="ghost"
-              size="sm"
+              variant="quiet"
+              icon={Plus}
               disabled={!listing}
               onClick={() => {
                 setCreating(true);
                 setOpen(false);
               }}
             >
-              <Plus size={15} aria-hidden="true" />
               New worktree
             </Button>
           </div>
@@ -182,15 +189,6 @@ export function WorktreesButton({ folder }: { folder: string }) {
           open={removing != null}
           onOpenChange={(next) => !next && setRemoving(null)}
         />
-      ) : null}
-      {notice ? (
-        <Notification
-          key={notice}
-          tone={noticeTone}
-          onDismiss={() => useWorktreeStore.getState().clearNotice()}
-        >
-          {notice}
-        </Notification>
       ) : null}
     </>
   );

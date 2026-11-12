@@ -1,7 +1,8 @@
 import { Flag } from "lucide-react";
 import { useState } from "react";
 import { useMistyStore } from "../conversations/state/useMistyStore";
-import { Button, ErrorNotification } from "@/shared/ui";
+import { Button } from "@/shared/ui";
+import { ErrorNotice } from "../conversations/ErrorNotice";
 import { statusText, StepIcon } from "./ChecklistStatus";
 import { PlanRiskTag } from "./PlanRiskTag";
 import { useCollaborationStore } from "./store";
@@ -80,8 +81,7 @@ export function AgentPlanChecklist({
       </ol>
       {plan.state === "approved" && !activeGoal && (
         <Button
-          variant="ghost"
-          size="sm"
+          variant="quiet"
           className="justify-self-start"
           disabled={busy}
           onClick={() => void setAsGoal()}
@@ -90,7 +90,7 @@ export function AgentPlanChecklist({
           Set as goal
         </Button>
       )}
-      <ErrorNotification message={error} onDismiss={() => setError("")} />
+      <ErrorNotice message={error} onDismiss={() => setError("")} />
     </section>
   );
 }

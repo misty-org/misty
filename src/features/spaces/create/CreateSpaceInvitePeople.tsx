@@ -1,8 +1,17 @@
 import { useState } from "react";
-import { Check, Plus, X } from "lucide-react";
+import { Plus, X } from "lucide-react";
 import type { SpacePerson } from "../api/dto/entities";
 import { avatarColorClass, avatarInkClass } from "@/shared/lib/avatarPalette";
-import { Avatar, AvatarFallback, Button, Input, cn } from "@/shared/ui";
+import {
+  Avatar,
+  AvatarFallback,
+  Button,
+  FilterChip,
+  IconButton,
+  Input,
+  Tooltip,
+  cn,
+} from "@/shared/ui";
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -70,38 +79,32 @@ export function CreateSpaceInvitePeople({
             const email = person.email.toLowerCase();
             const picked = invites.includes(email);
             return (
-              <Button
-                key={person.user_id}
-                type="button"
-                variant="chip"
-                size="sm"
-                aria-pressed={picked}
-                title={person.email}
-                disabled={disabled}
-                className="gap-1.5 pl-1 pr-2.5 font-normal"
-                onClick={() => toggle(email)}
-              >
-                <PersonAvatar label={person.name || person.email} />
-                {(person.name || person.email).split(" ")[0]}
-                {picked ? <Check aria-hidden="true" className="size-3.5" /> : null}
-              </Button>
+              <Tooltip key={person.user_id} content={person.email}>
+                <FilterChip
+                  pressed={picked}
+                  label={(person.name || person.email).split(" ")[0]}
+                  icon={<PersonAvatar label={person.name || person.email} />}
+                  disabled={disabled}
+                  className="pl-1 font-normal"
+                  onPressedChange={() => toggle(email)}
+                />
+              </Tooltip>
             );
           })}
           {extra.map((email) => (
             <Button
               key={email}
               type="button"
-              variant="chip"
-              size="sm"
+              variant="secondary"
               aria-pressed
               aria-label={`Remove ${email}`}
               disabled={disabled}
-              className="gap-1.5 pl-1 pr-2 font-normal"
+              icon={<PersonAvatar label={email} />}
+              iconEnd={X}
+              className="pl-1 pr-2 font-normal"
               onClick={() => toggle(email)}
             >
-              <PersonAvatar label={email} />
               {email}
-              <X aria-hidden="true" className="size-3.5 text-cream-muted" />
             </Button>
           ))}
         </div>
@@ -121,15 +124,15 @@ export function CreateSpaceInvitePeople({
             add();
           }}
         />
-        <Button
+        <IconButton
           type="button"
-          variant="outline"
-          aria-label="Add"
+          variant="secondary"
+          label="Add"
           disabled={disabled || !draftValid}
           onClick={add}
         >
           <Plus aria-hidden="true" />
-        </Button>
+        </IconButton>
       </div>
       <span className="font-normal">Invitations send once the Space exists.</span>
     </div>

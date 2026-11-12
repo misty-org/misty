@@ -84,33 +84,27 @@ function DesktopIsland() {
             placeholder="Tell Misty what to change, or ask for something new"
             aria-label="Message for Misty"
           />
-          <Button type="submit" variant="secondary" size="sm">
+          <Button type="submit" variant="secondary">
             Send
           </Button>
-          <Button type="button" variant="secondary" size="sm" onClick={() => submit("queue")()}>
+          <Button type="button" variant="secondary" onClick={() => submit("queue")()}>
             New task
           </Button>
         </form>
       )}
       <div className="desktop-island-row">
         {!island.waiting && (
-          <Button type="button" variant="secondary" size="sm" onClick={() => press("takeover")}>
+          <Button type="button" variant="secondary" onClick={() => press("takeover")}>
             Take over
           </Button>
         )}
         <span className="desktop-island-hint">Esc stops</span>
         {island.waiting && (
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            autoFocus
-            onClick={() => press("done")}
-          >
+          <Button type="button" variant="secondary" autoFocus onClick={() => press("done")}>
             Done
           </Button>
         )}
-        <Button type="button" variant="secondary" size="sm" onClick={() => press("stop")}>
+        <Button type="button" variant="secondary" onClick={() => press("stop")}>
           Stop
         </Button>
       </div>

@@ -8,7 +8,7 @@ import {
   DesktopSettingsRow as Row,
   DesktopSettingsSection as Section,
 } from "@/features/settings";
-import { Button, Skeleton, Textarea } from "@/shared/ui";
+import { Button, CodeBlock, Skeleton } from "@/shared/ui";
 import { SwitchControl } from "../../settings/SettingsControls";
 import { exportPerformanceReport } from "./export";
 import { appVersion, performanceApi } from "./nativeApi";
@@ -141,29 +141,24 @@ export function PerformanceSection() {
               {report === null ? (
                 <Skeleton className="h-52 w-full" aria-label="Report" />
               ) : (
-                <Textarea
+                // Copying stays with the buttons under it, so the block draws no copy of its own.
+                <CodeBlock
                   aria-label="Performance summary"
-                  readOnly
-                  value={text}
-                  spellCheck={false}
-                  rows={10}
-                  className="h-52 resize-y font-mono text-xs text-cream-muted"
+                  code={text}
+                  copy={false}
+                  className="max-h-52 overflow-y-auto"
                 />
               )}
               <div className="flex flex-wrap justify-end gap-2">
-                <Button variant="secondary" disabled={collecting} onClick={collect}>
+                <Button disabled={collecting} onClick={collect}>
                   <RefreshCw />
                   Refresh
                 </Button>
-                <Button variant="secondary" disabled={!text} onClick={copy}>
+                <Button disabled={!text} onClick={copy}>
                   {copied ? <Check /> : <Copy />}
                   {copied ? "Copied" : "Copy summary"}
                 </Button>
-                <Button
-                  variant="secondary"
-                  disabled={!report || exporting || saving}
-                  onClick={() => void exportFile()}
-                >
+                <Button disabled={!report || exporting || saving} onClick={() => void exportFile()}>
                   <Download />
                   Save full report
                 </Button>

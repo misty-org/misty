@@ -228,7 +228,6 @@ fn build_menu<R: Runtime>(
                 "New Window",
                 "Cmd+N",
             )?,
-            &plain_command_item(manager, "workspace.new_profile", "Add Profile…")?,
             &command_item(
                 manager,
                 snapshot,

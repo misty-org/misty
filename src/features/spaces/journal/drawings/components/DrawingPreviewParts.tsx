@@ -27,7 +27,6 @@ export function BackgroundChoices(props: { value: string; onChange: (value: stri
       <CustomColorSwatch
         value={props.value}
         label="Custom preview background"
-        title="Choose a custom preview background"
         onChange={props.onChange}
       />
     </div>

@@ -18,6 +18,7 @@ import {
   DropdownMenuTrigger,
   IconButton,
   MenuItem,
+  OverflowFadeText,
   Skeleton,
 } from "@/shared/ui";
 import { Ellipsis, Mail, ShieldCheck, Trash2, Users } from "lucide-react";
@@ -68,11 +69,14 @@ export function MemberList({
               </Avatar>
               <div className="min-w-0 flex-1">
                 <div className="flex min-w-0 items-center gap-2">
-                  <p className="m-0 truncate text-sm font-medium text-cream">{member.name}</p>
+                  <OverflowFadeText as="p" full className="m-0 text-sm font-medium text-cream">
+                    {member.name}
+                  </OverflowFadeText>
                   {member.user_id === currentUserId ? <Badge variant="secondary">You</Badge> : null}
                 </div>
-                <p className="mb-0 mt-0.5 flex items-center gap-1.5 truncate text-xs text-cream-muted">
-                  <Mail className="size-3 shrink-0" /> {member.email}
+                <p className="mb-0 mt-0.5 flex min-w-0 items-center gap-1.5 text-xs text-cream-muted">
+                  <Mail className="size-3 shrink-0" />
+                  <OverflowFadeText full>{member.email}</OverflowFadeText>
                 </p>
               </div>
               <Badge className="hidden capitalize sm:inline-flex" variant="outline">
@@ -124,7 +128,7 @@ function MemberActionsMenu({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <IconButton size="md" label={`Actions for ${member.name}`} tooltip={false}>
+        <IconButton label={`Actions for ${member.name}`}>
           <Ellipsis className="size-4" />
         </IconButton>
       </DropdownMenuTrigger>
@@ -142,7 +146,7 @@ function MemberActionsMenu({
         <MenuItem
           icon={<Trash2 className="size-4" />}
           label="Remove member"
-          destructive
+          danger
           onSelect={() => onAction({ kind: "remove", member })}
         />
       </DropdownMenuContent>

@@ -3,8 +3,9 @@ import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuTrigger,
+  OverflowFadeText,
   Pressable,
-  TooltipHint,
+  Tooltip,
   cn,
   itemToneClass,
 } from "@/shared/ui";
@@ -73,13 +74,15 @@ export function SpaceItemCard(props: {
           </span>
         </span>
         <span className="block px-4 pb-3.5 pt-7">
-          <span className="block truncate text-base text-cream-bright">{item.title}</span>
+          <OverflowFadeText full className="text-base text-cream-bright">
+            {item.title}
+          </OverflowFadeText>
           <span className="mt-1.5 flex items-center gap-1.5 text-sm text-cream-muted">
-            <TooltipHint content={access}>
+            <Tooltip content={access}>
               <Access aria-label={access} className="size-4 shrink-0" />
-            </TooltipHint>
+            </Tooltip>
             <span aria-hidden>·</span>
-            <span className="truncate">Edited {editedLabel(item.updatedAt)}</span>
+            <OverflowFadeText>Edited {editedLabel(item.updatedAt)}</OverflowFadeText>
           </span>
         </span>
       </Pressable>

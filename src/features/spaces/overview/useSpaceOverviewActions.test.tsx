@@ -1,6 +1,8 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import { MemoryRouter, useLocation } from "react-router-dom";
+import { MoreHorizontal } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, IconButton } from "@/shared/ui";
 import { useSpaceOverviewActions } from "./useSpaceOverviewActions";
 import type { SpaceOverviewItem } from "./useSpaceOverview";
 const access = vi.hoisted(() => ({ referenceOnly: false }));
@@ -19,9 +21,17 @@ afterEach(() => {
 function Harness({ item, refresh = () => {} }: { item: SpaceOverviewItem; refresh?: () => void }) {
   const actions = useSpaceOverviewActions("user", "space", [item], refresh);
   const location = useLocation();
+  const { menu, menuLabel } = actions.forItem(item);
   return (
     <>
-      {actions.forItem(item).actions}
+      <DropdownMenu modal={false}>
+        <DropdownMenuTrigger asChild>
+          <IconButton label={menuLabel}>
+            <MoreHorizontal />
+          </IconButton>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">{menu}</DropdownMenuContent>
+      </DropdownMenu>
       {actions.dialog}
       <output>
         {location.pathname}
@@ -57,7 +67,7 @@ it("renames from the menu, preserves a failed draft and retries", async () => {
   fireEvent.click(screen.getByRole("menuitem", { name: "Rename" }));
   fireEvent.change(screen.getByLabelText("Name"), { target: { value: "New sketch" } });
   fireEvent.click(screen.getByRole("button", { name: "Save" }));
-  await screen.findByRole("alert");
+  await screen.findByText("Offline");
   expect((screen.getByLabelText("Name") as HTMLInputElement).value).toBe("New sketch");
   fireEvent.click(screen.getByRole("button", { name: "Save" }));
   await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());

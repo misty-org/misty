@@ -1,6 +1,7 @@
 import { useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useRef } from "react";
 import { PerspectiveCamera, Vector3, type Group } from "three";
+import { typingIn } from "./keys";
 import { GRID, cellCenter, cellOf, facing, type Point } from "./grid";
 import { studioSounds } from "../studioSounds";
 import { turnToward } from "./motion";
@@ -145,10 +146,6 @@ export function nearestAhead(
   }
   return best;
 }
-
-const typingIn = (target: EventTarget | null) =>
-  target instanceof HTMLElement &&
-  (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName));
 
 /**
  * Walk mode: the person is a figure in the room, played over the shoulder. Dragging turns the

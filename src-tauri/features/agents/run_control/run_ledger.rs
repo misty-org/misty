@@ -32,6 +32,24 @@ fn store(app: &AppHandle) -> Store {
         .store()
 }
 
+/// When this launch of the app first touched the ledger: before any run it starts is written.
+fn session_started() -> i64 {
+    static AT: std::sync::OnceLock<i64> = std::sync::OnceLock::new();
+    *AT.get_or_init(now_ms)
+}
+
+/// A row from an earlier launch that still says its run is going, when nothing in this app runs
+/// it: the app closed under it (an outside engine's CLI goes with the app), so its end was never
+/// written. It reads as stopped, or it would show as working for good.
+fn settle_cut_off(rows: &mut [LedgerRow], session_started: i64, going: impl Fn(&str) -> bool) {
+    for row in rows {
+        let open = matches!(row.state.as_str(), "running" | "needs-you");
+        if open && row.started_at < session_started && !going(&row.run_id) {
+            row.state = "canceled".to_owned();
+        }
+    }
+}
+
 /// The database, once the app has set up its runtime. A run that resumes as the app starts can
 /// report before that, and those reports only leave a gap.
 fn store_if_ready(app: &AppHandle) -> Option<Store> {
@@ -199,6 +217,7 @@ fn in_order(job: impl FnOnce() + Send + 'static) {
 /// Notes a run's start, off the caller's thread. A row that can't be written only leaves a gap in
 /// the timeline.
 pub(super) fn note_start(app: &AppHandle, run_id: &str, body: &Value) {
+    session_started();
     let Some(store) = store_if_ready(app) else { return };
     let (run_id, body) = (run_id.to_owned(), body.clone());
     let parent = RunFacts::of_request(&run_id, &body).parent_run_id;
@@ -299,13 +318,16 @@ pub async fn agent_run_timeline(
     }
     let account = account_of_window(webview.label()).unwrap_or_default();
     let store = store(&app);
-    tokio::task::spawn_blocking(move || {
+    let started = session_started();
+    let mut found = tokio::task::spawn_blocking(move || {
         let connection = store.connect().map_err(|error| error.to_string())?;
         rows(&connection, &account, &conversation_ids, limit.unwrap_or(30))
             .map_err(|error| error.to_string())
     })
     .await
-    .map_err(|error| error.to_string())?
+    .map_err(|error| error.to_string())??;
+    settle_cut_off(&mut found, started, super::local_runs::is_going);
+    Ok(found)
 }
 
 #[cfg(test)]

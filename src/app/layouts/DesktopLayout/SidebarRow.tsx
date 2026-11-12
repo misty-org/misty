@@ -1,5 +1,5 @@
 import { forwardRef, type ComponentPropsWithoutRef, type ReactNode } from "react";
-import { Pressable } from "@/shared/ui";
+import { OverflowFadeText, Pressable } from "@/shared/ui";
 
 /** One row of the sidebar's places: an icon, a label and, for some, a key hint. */
 export const SidebarRow = forwardRef<
@@ -23,7 +23,7 @@ export const SidebarRow = forwardRef<
       {...props}
     >
       {icon ? <span className="misty-space-nav-icon">{icon}</span> : null}
-      <span className="truncate">{label}</span>
+      <OverflowFadeText>{label}</OverflowFadeText>
       {shortcut ? (
         <kbd className="misty-space-nav-key">{shortcut.replace("Meta+", "⌘")}</kbd>
       ) : null}

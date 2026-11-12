@@ -122,7 +122,6 @@ function LibraryItemActions({
     >
       <IconButton
         label={`More actions for ${item.display_name}`}
-        tooltip={false}
         aria-haspopup="menu"
         onClick={(event) => {
           const rect = event.currentTarget.getBoundingClientRect();

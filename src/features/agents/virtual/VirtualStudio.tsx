@@ -1,5 +1,5 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
-import { Skeleton } from "@/shared/ui";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ErrorState, Skeleton, OverflowFadeText } from "@/shared/ui";
 import { useMistyStore } from "../conversations/state/useMistyStore";
 import { currentSpaceKey } from "../engines/enginesApi";
 import { listenForActionQuestions, useActionQuestions } from "../island/actionQuestions";
@@ -8,7 +8,9 @@ import { BuildPanel } from "./BuildPanel";
 import { HirePanel } from "./HireAgent";
 import { modeForKey, StudioDock, TeamPanel, type StudioMode } from "./StudioHud";
 import { CustomizePanel } from "./CustomizePanel";
+import { typingIn } from "./studio/keys";
 import { assignDesk, deskOwners } from "./studio/layout";
+import { canDrawRoom, SceneBoundary } from "./studio/SceneBoundary";
 import { useStudioLooks } from "./studioLooks";
 import type { Actor } from "./studio/behaviour";
 import { useStudioLayout } from "./studio/layoutStore";
@@ -21,7 +23,9 @@ import { useTeammateAgents } from "./teammates";
 import { useStudioAgents, type StudioAgent } from "./useStudioAgents";
 import "./virtualStudio.css";
 
-const StudioScene = lazy(() => import("./studio/StudioScene"));
+/** three.js is big, so the room's code is fetched while the agents and the layout load. */
+const loadScene = () => import("./studio/StudioScene");
+const StudioScene = lazy(loadScene);
 
 /** How long a finished or failed run stays marked when the person hasn't looked at its agent. */
 const OUTCOME_MS = 30 * 60_000;
@@ -34,10 +38,6 @@ function StudioSkeleton() {
     </div>
   );
 }
-
-const typingIn = (target: EventTarget | null) =>
-  target instanceof HTMLElement &&
-  (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName));
 
 /**
  * The Space's agents as a studio to look into and talk in: each has a desk and types at it while
@@ -79,7 +79,11 @@ export function VirtualStudio(props: {
   /** The free desk Hire was opened for, if any. */
   const [hireDesk, setHireDesk] = useState<string | undefined>();
   const building = mode === "build";
+  /** Bumped by "Try again" after the room failed to draw, which mounts the scene afresh. */
+  const [sceneKey, setSceneKey] = useState(0);
+  const drawable = useMemo(canDrawRoom, []);
 
+  useEffect(() => void loadScene().catch(() => undefined), []);
   useEffect(() => listenForActionQuestions(), []);
   useEffect(() => {
     const store = useMistyStore.getState();
@@ -177,22 +181,25 @@ export function VirtualStudio(props: {
     [setSelected],
   );
 
-  // 1, 2 and 3 pick a mode; V switches between looking over the room and walking in it.
+  // 1, 2 and 3 pick a mode; V switches between looking over the room and walking in it. The
+  // handler reads the latest state through a ref, so it is added once.
+  const keyState = useRef({ building, switchMode });
+  keyState.current = { building, switchMode };
   useEffect(() => {
     const keys = (event: KeyboardEvent) => {
       if (typingIn(event.target) || event.metaKey || event.ctrlKey || event.altKey) return;
       const next = modeForKey(event.code);
       if (next) {
         event.preventDefault();
-        switchMode(next);
-      } else if (event.code === "KeyV" && !building) {
+        keyState.current.switchMode(next);
+      } else if (event.code === "KeyV" && !keyState.current.building) {
         event.preventDefault();
         setWalking((known) => !known);
       }
     };
     window.addEventListener("keydown", keys);
     return () => window.removeEventListener("keydown", keys);
-  });
+  }, []);
 
   // Walked up to an agent, E opens the talk panel with the cursor in its box; at a free desk, E
   // hires someone for it.
@@ -219,30 +226,40 @@ export function VirtualStudio(props: {
       data-building={building || undefined}
       data-talking={picked ? true : undefined}
     >
-      <Suspense fallback={<StudioSkeleton />}>
-        {loading || !layout ? (
-          <StudioSkeleton />
-        ) : (
-          <StudioScene
-            actors={actors}
-            layout={layout}
-            selected={selected}
-            onSelect={setSelected}
-            building={building}
-            pickedItem={pickedItem}
-            onPickItem={setPickedItem}
-            onLayout={change}
-            walking={walking}
-            names={names}
-            speech={speech}
-            onNear={setNear}
-            onHireAt={(deskId) => switchMode("hire", deskId)}
-            board={board}
-            looks={looks}
-            footsteps={soundsOn}
-          />
-        )}
-      </Suspense>
+      {!drawable ? (
+        <ErrorState
+          title="Couldn't draw the studio"
+          line="This computer's graphics don't support drawing the room."
+        />
+      ) : (
+        <SceneBoundary onRetry={() => setSceneKey((known) => known + 1)}>
+          <Suspense fallback={<StudioSkeleton />}>
+            {loading || !layout ? (
+              <StudioSkeleton />
+            ) : (
+              <StudioScene
+                key={sceneKey}
+                actors={actors}
+                layout={layout}
+                selected={selected}
+                onSelect={setSelected}
+                building={building}
+                pickedItem={pickedItem}
+                onPickItem={setPickedItem}
+                onLayout={change}
+                walking={walking}
+                names={names}
+                speech={speech}
+                onNear={setNear}
+                onHireAt={(deskId) => switchMode("hire", deskId)}
+                board={board}
+                looks={looks}
+                footsteps={soundsOn}
+              />
+            )}
+          </Suspense>
+        </SceneBoundary>
+      )}
       {mode === "studio" && customizingAgent ? (
         <CustomizePanel
           key={customizingAgent.id}
@@ -290,7 +307,7 @@ export function VirtualStudio(props: {
       {walking && nearName && selected !== near ? (
         <div className="virtual-studio-near" role="status">
           <kbd>E</kbd>
-          <span className="truncate">{nearName}</span>
+          <OverflowFadeText>{nearName}</OverflowFadeText>
         </div>
       ) : walking && !picked ? (
         <div className="virtual-studio-near" aria-hidden="true">

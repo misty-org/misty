@@ -3,10 +3,10 @@ import type { ItemVisibility } from "../api/visibility";
 import {
   cn,
   DropdownMenu,
-  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuTrigger,
   IconButton,
+  MenuCheckItem,
 } from "@/shared/ui";
 
 /** A lock and the word, so the layer never rests on the icon alone. */
@@ -35,22 +35,25 @@ export function VisibilityMenu(props: {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <IconButton label={`${props.label} menu`} size="sm" className={props.className}>
+        <IconButton label={`${props.label} menu`} className={props.className}>
           <MoreHorizontal aria-hidden />
         </IconButton>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-64" data-misty-layer-portal>
-        <DropdownMenuCheckboxItem
+        <MenuCheckItem
+          icon={Lock}
+          closeOnSelect
           checked={props.visibility === "private"}
-          onCheckedChange={(checked) => props.onChange(checked === true ? "private" : "public")}
-        >
-          <span className="flex flex-col">
-            <span>Private</span>
-            <span className="text-xs text-cream-muted">
-              Only you and your agents on your own asks
+          onCheckedChange={(checked) => props.onChange(checked ? "private" : "public")}
+          label={
+            <span className="flex flex-col">
+              <span>Private</span>
+              <span className="text-xs text-cream-muted">
+                Only you and your agents on your own asks
+              </span>
             </span>
-          </span>
-        </DropdownMenuCheckboxItem>
+          }
+        />
       </DropdownMenuContent>
     </DropdownMenu>
   );

@@ -345,12 +345,7 @@ export function InstalledPane({ onBrowse }: { onBrowse: () => void }) {
 
       <FeedbackLine feedback={feedback} />
       {restoreId ? (
-        <Button
-          variant="secondary"
-          size="xs"
-          className="self-start"
-          onClick={() => void actions.runRestore(restoreId)}
-        >
+        <Button size="sm" className="self-start" onClick={() => void actions.runRestore(restoreId)}>
           {t("feedback.restoreNow")}
         </Button>
       ) : null}

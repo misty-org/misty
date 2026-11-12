@@ -3,7 +3,14 @@ import { modelKeysChangedEvent, openModelSettings } from "@/features/agents/mode
 import { confirmAction } from "@/shared/lib/confirmAction";
 import { errorText } from "@/shared/lib/format";
 import { openExternalLink } from "@/shared/platform/openExternalLink";
-import { Button, Popover, PopoverContent, PopoverTrigger, Skeleton } from "@/shared/ui";
+import {
+  Button,
+  OverflowFadeText,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+  Skeleton,
+} from "@/shared/ui";
 import { Link2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
@@ -73,8 +80,7 @@ export function CalendarConnections({ onChange }: { onChange?(): void }) {
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button type="button" size="sm" variant="ghost">
-          <Link2 aria-hidden="true" />
+        <Button type="button" variant="quiet" icon={Link2}>
           Connect calendars
         </Button>
       </PopoverTrigger>
@@ -84,7 +90,7 @@ export function CalendarConnections({ onChange }: { onChange?(): void }) {
         ) : !state.available ? (
           <div className="grid justify-items-start gap-2 text-sm text-cream">
             <p className="m-0">Add a Composio key to connect a calendar.</p>
-            <Button type="button" size="sm" variant="outline" onClick={openModelSettings}>
+            <Button type="button" variant="secondary" onClick={openModelSettings}>
               Open Models
             </Button>
           </div>
@@ -94,17 +100,18 @@ export function CalendarConnections({ onChange }: { onChange?(): void }) {
             return (
               <div key={item.app} className="flex min-h-8 items-center gap-3 text-sm">
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-cream">{item.name}</span>
+                  <OverflowFadeText full className="text-cream">
+                    {item.name}
+                  </OverflowFadeText>
                   {account?.account ? (
-                    <span className="block truncate text-xs text-cream-muted">
+                    <OverflowFadeText full className="text-xs text-cream-muted">
                       {account.account}
-                    </span>
+                    </OverflowFadeText>
                   ) : null}
                 </span>
                 <Button
                   type="button"
-                  size="sm"
-                  variant="outline"
+                  variant="secondary"
                   disabled={busy === item.app}
                   onClick={() =>
                     void act(item.app, async () => {

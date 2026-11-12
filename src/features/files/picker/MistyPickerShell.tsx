@@ -2,14 +2,7 @@ import { FolderOpen, LibraryBig } from "lucide-react";
 import { useState, type ComponentType } from "react";
 import type { MistyPickerProps, MistyPickerSource } from "./mistyPickerOptions";
 import { LibraryPickerPanel } from "./LibraryPickerSeam";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  ToggleGroup,
-  ToggleGroupItem,
-} from "@/shared/ui";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, ChoiceGroup } from "@/shared/ui";
 import type { MistyFilePickerProps } from "./FilePicker";
 
 const sharedPickerDialogClassName = [
@@ -58,24 +51,16 @@ export function MistyPickerShell({
   }
 
   const sourceToggle = (
-    <ToggleGroup
-      className="shrink-0 rounded-md bg-charcoal-card p-0.5"
-      type="single"
+    <ChoiceGroup<MistyPickerSource>
+      className="shrink-0"
+      label="Pick from"
       value={source}
-      onValueChange={(value) => {
-        if (value === "files" || value === "library") setSource(value);
-      }}
-      aria-label="Pick from"
-    >
-      <ToggleGroupItem className="h-7 gap-1.5 border-0 px-2.5 text-xs" value="files">
-        <FolderOpen size={14} />
-        Files
-      </ToggleGroupItem>
-      <ToggleGroupItem className="h-7 gap-1.5 border-0 px-2.5 text-xs" value="library">
-        <LibraryBig size={14} />
-        Library
-      </ToggleGroupItem>
-    </ToggleGroup>
+      onChange={setSource}
+      options={[
+        { value: "files", label: "Files", icon: FolderOpen },
+        { value: "library", label: "Library", icon: LibraryBig },
+      ]}
+    />
   );
 
   return (

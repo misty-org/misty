@@ -28,7 +28,7 @@ function CodeBuddySignIn() {
   return (
     <Section title="Account">
       <DesktopSettingsRow label="CodeBuddy account">
-        <Button size="sm" variant="primary" onClick={() => setOpen(true)}>
+        <Button variant="primary" onClick={() => setOpen(true)}>
           <LogIn />
           Sign in
         </Button>

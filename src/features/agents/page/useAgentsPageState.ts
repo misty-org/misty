@@ -92,7 +92,9 @@ export function useAgentsPageState() {
     useMistyStore.setState({ selectedAgentId: linkedAgentId, activeConversationId: resume });
     if (needsLoad && !current.working)
       void useMistyStore.getState().selectConversation(linkedConversationId);
-  }, [linkedAgentId, linkedConversationId, linkedNew]);
+    // The account settles after a reload (signed out scope, then the person's), and switching it
+    // clears the open chat, so the link is applied again for the account that is now in place.
+  }, [accountId, linkedAgentId, linkedConversationId, linkedNew]);
   // The sidebar opens Studio and Tutor by link; a link naming a page wins over the chat.
   // Leaving a page's link for one without a view goes back to the chat.
   const viewed = useRef(linkedView);

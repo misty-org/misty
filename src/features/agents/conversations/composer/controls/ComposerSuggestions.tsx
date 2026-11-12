@@ -1,6 +1,6 @@
 import { File, FileText, Folder, Globe, Plus, Sparkles, Terminal, UserRound } from "lucide-react";
 import { useEffect, useRef, useState, type KeyboardEvent, type RefObject } from "react";
-import { SkeletonList, SuggestionItem, SuggestionList } from "@/shared/ui";
+import { SkeletonList, SuggestionItem, SuggestionList, Text } from "@/shared/ui";
 import { engineCatalog, mistyEngine, type EngineCatalog } from "../../../engines/enginesApi";
 import { matchMentionEntries, mentionIndex, prefetchMentionIndex } from "./mentionFiles";
 import {
@@ -321,36 +321,34 @@ export function useComposerSuggestions(input: {
       }
     >
       {items === undefined ? (
-        <SkeletonList label="Finding matches" rows={3} lines={1} className="p-1" />
+        <SkeletonList label="Finding matches" rows={3} lines={1} leading="icon" className="p-1" />
       ) : items.length ? (
-        items.map((item, index) => {
-          const Icon = icons[item.icon];
-          return (
-            <SuggestionItem
-              key={item.key}
-              selected={index === selected}
-              onPointerDown={() => choose(item)}
-              onPointerEnter={() => setSelected(index)}
-            >
-              <Icon aria-hidden className="size-4 shrink-0 text-cream-muted" />
-              <span className="min-w-0 shrink-0 truncate text-cream">
+        items.map((item, index) => (
+          <SuggestionItem
+            key={item.key}
+            selected={index === selected}
+            onPointerDown={() => choose(item)}
+            onPointerEnter={() => setSelected(index)}
+            icon={icons[item.icon]}
+            label={
+              <>
                 {item.action === "new-prompt" ? item.name : `${prefixes[trigger.kind]}${item.name}`}
-              </span>
-              {item.description ? (
-                <span className="min-w-0 flex-1 truncate text-xs text-cream-muted">
-                  {item.description}
-                </span>
-              ) : (
-                <span className="flex-1" />
-              )}
-              {item.persona && index === selected ? (
+                {item.description ? (
+                  <Text as="span" tone="muted" className="ml-2 inline">
+                    {item.description}
+                  </Text>
+                ) : null}
+              </>
+            }
+            detail={
+              item.persona && index === selected ? (
                 <PersonaMakeAgent id={item.persona} />
-              ) : item.source ? (
-                <span className="shrink-0 text-2xs text-cream-muted">{item.source}</span>
-              ) : null}
-            </SuggestionItem>
-          );
-        })
+              ) : (
+                item.source
+              )
+            }
+          />
+        ))
       ) : (
         <p className="px-3 py-2 text-xs text-cream-muted">
           {trigger.kind === "file" && !folder

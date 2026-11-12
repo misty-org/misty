@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import type { Space } from "../../api/dto/entities";
-import { Button, cn, ErrorNotification, Input, PopoverContent } from "@/shared/ui";
+import { Button, cn, FieldError, Input, PopoverContent } from "@/shared/ui";
 import { SpaceMembers } from "../../members";
 import { LeaveDeleteSpaceDialogs } from "../LeaveDeleteSpaceDialogs";
 import { useSpaceLifecycleActions } from "../useSpaceLifecycleActions";
@@ -94,17 +94,20 @@ function RenameSpace({ space, onDone }: { space: Space; onDone: () => void }) {
       <Input
         autoFocus
         aria-label="Space name"
+        aria-describedby={failed ? "rename-space-error" : undefined}
+        aria-invalid={failed || undefined}
         maxLength={80}
         className="mt-3"
         value={name}
-        onChange={(event) => setName(event.target.value)}
+        onChange={(event) => (setName(event.target.value), setFailed(false))}
       />
-      <ErrorNotification
+      <FieldError
+        id="rename-space-error"
+        className="mt-1.5"
         message={failed ? "The name wasn't saved. Try again." : ""}
-        onDismiss={() => setFailed(false)}
       />
       <div className="mt-3 flex justify-end gap-2">
-        <Button variant="outline" type="button" onClick={onDone}>
+        <Button variant="secondary" type="button" onClick={onDone}>
           Cancel
         </Button>
         <Button type="submit" disabled={saving || !name.trim()}>

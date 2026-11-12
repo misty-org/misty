@@ -1,32 +1,36 @@
 import type { Dispatch, RefObject, SetStateAction } from "react";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Globe, Mic, Square } from "lucide-react";
 import type { useAiVoiceRecorder } from "../../runs/markdown/useAiVoiceRecorder";
 import { MistyComposer } from "../composer/MistyComposer";
 import type { useGlobalMistyAttachments } from "../composer/useGlobalMistyAttachments";
 import { useMistyStore } from "../state/useMistyStore";
 import type { AgentProfile } from "@/shared/schemas";
-import { IconButton, MenuItem, Spinner } from "@/shared/ui";
-import { AgentFolderMenu } from "../../plans/AgentFolderMenu";
+import { IconButton, MenuItem, type ActionBarItem, type PathLineSegment } from "@/shared/ui";
+import { useDeviceFolderSegment } from "../../plans/AgentFolderMenu";
+import { AgentGoalDialog } from "../../plans/AgentGoalDialog";
 import type { usePermissionMode } from "../../plans/permissionMode";
+import { useCollaborationStore } from "../../plans/store";
 import type { useCollaborationComposer } from "../../plans/useCollaborationComposer";
-import { currentSpaceKey, folderOf, mistyEngine, useSpaceFolders } from "../../engines/enginesApi";
+import { currentSpaceKey, mistyEngine } from "../../engines/enginesApi";
 import {
   BrowserChip,
-  CaptureButton,
   captureRegionFile,
-  EffortMenu,
-  GoalButton,
-  ModelMenu,
-  ModeMenu,
-  PermissionMenu,
+  effortItem,
+  goalItem,
+  modeItem,
+  modelItem,
+  permissionItem,
+  useEngineModels,
 } from "../composer/controls/ComposerControls";
 import { useComposerSuggestions } from "../composer/controls/ComposerSuggestions";
-import { BranchMenu } from "../composer/controls/BranchMenu";
-import { ChatSpaceMenu } from "../composer/controls/ChatSpaceMenu";
+import { useBranchSegment } from "../composer/controls/BranchMenu";
+import { useSpaceSegment } from "../composer/controls/ChatSpaceMenu";
+import { useEngineFolder, useEngineFolderSegment } from "../composer/controls/FolderSegment";
 import {
   useBrowserAttached,
   useBrowserAttachment,
+  useChatChoices,
   useComposerChoices,
 } from "../composer/controls/composerChoices";
 import { ContextMeter } from "../composer/controls/ContextMeter";
@@ -53,10 +57,10 @@ const engineNames: Record<string, string> = {
 };
 
 /**
- * The conversation's message box. The text fills the box and one bar beneath it, inside the box,
- * holds every control: attach, capture, permissions, goal, the chat's Space, folder and Git branch
- * on the left; effort, mode,
- * model, context, voice and send (Stop while a reply runs) on the right. `@` mentions a file in
+ * The conversation's message box: the text, then one bar that never wraps (the + menu with attach
+ * and screen capture, permissions, goal, effort, mode and model, giving way in that order), with
+ * the context ring, voice and send (Stop while a reply runs and nothing is typed) at its end.
+ * Where the chat works, Space › folder › branch, is a line under the box. `@` mentions a file in
  * the linked folder, `/` runs a command and `$` uses a skill.
  */
 export function AgentConversationComposer({
@@ -72,6 +76,7 @@ export function AgentConversationComposer({
   permission,
   working,
   send,
+  ensureConversation,
   reportError,
 }: {
   agent?: AgentProfile;
@@ -86,19 +91,14 @@ export function AgentConversationComposer({
   permission: ReturnType<typeof usePermissionMode>;
   working: boolean;
   send: () => void;
+  /** The open conversation's id, made first when there is none yet. */
+  ensureConversation: () => Promise<string>;
   reportError: (message: string) => void;
 }) {
   const { planning } = collaboration;
   const engine = agent?.engine && agent.engine !== mistyEngine ? agent.engine : "";
   const space = currentSpaceKey();
-  const folder = useSpaceFolders((state) => folderOf(state, space));
-  useEffect(() => {
-    if (engine)
-      void useSpaceFolders
-        .getState()
-        .load(space)
-        .catch(() => undefined);
-  }, [engine, space]);
+  const folder = useEngineFolder(space, Boolean(engine));
   useEffect(() => {
     watchContextUsage();
     if (conversationId) void useComposerChoices.getState().load(accountId, conversationId);
@@ -114,7 +114,7 @@ export function AgentConversationComposer({
     setText: setDraft,
     textareaRef,
     engine: engine || mistyEngine,
-    folder: engine ? folder : "",
+    folder,
     onAction: () => attachBrowser(true),
   });
   const history = usePromptHistoryNav({
@@ -134,10 +134,82 @@ export function AgentConversationComposer({
     }
   };
   const allowed = engineOptions(engine).modes;
+  const choices = useChatChoices(conversationId);
+  const models = useEngineModels(engine);
+  const goal = useCollaborationStore((s) =>
+    conversationId ? s.byConversation[conversationId]?.goal : undefined,
+  );
+  // The goal belongs to a chat; pressing Goal in a new one makes the chat first.
+  const [goalFor, setGoalFor] = useState<string>();
+  const openGoal = () => {
+    if (conversationId) return setGoalFor(conversationId);
+    // Making the chat empties the box; what was typed stays for the person to send.
+    const typed = draft;
+    void ensureConversation()
+      .then((id) => {
+        if (typed) setDraft(typed);
+        setGoalFor(id);
+      })
+      .catch((error: unknown) =>
+        reportError(error instanceof Error ? error.message : String(error)),
+      );
+  };
+
+  const items = [
+    permissionItem({ conversationId, permission, engine, disabled }),
+    goalItem({ goal: goal ?? undefined, disabled, onOpen: openGoal }),
+    effortItem({
+      accountId,
+      conversationId,
+      engine,
+      choices,
+      agentEffort: agent?.reasoning_effort,
+      disabled,
+    }),
+    modeItem({ conversationId, mode: collaboration.mode, engine, disabled }),
+    modelItem({
+      accountId,
+      conversationId,
+      engine,
+      engineName: engineNames[engine],
+      models,
+      choices,
+      agentModel: agent?.engine_model,
+      disabled,
+    }),
+  ].filter((item): item is ActionBarItem => Boolean(item));
+
+  const spaceSegment = useSpaceSegment(conversationId, working);
+  const engineFolderSegment = useEngineFolderSegment(space, folder);
+  const deviceFolderSegment = useDeviceFolderSegment(conversationId);
+  const branchSegment = useBranchSegment(engine ? folder : "");
+  const path = [
+    spaceSegment,
+    engine ? engineFolderSegment : deviceFolderSegment,
+    branchSegment,
+  ].filter((segment): segment is PathLineSegment => Boolean(segment));
+
+  // One button: Send while there is something to send, Stop while a reply runs and nothing is typed.
+  const stop =
+    working && !draft.trim() && !attachments.attachments.length ? (
+      <IconButton
+        variant="secondary"
+        label="Stop response"
+        onClick={() => {
+          void useMistyStore
+            .getState()
+            .cancelResponse?.()
+            .catch((e) => reportError(String(e)));
+        }}
+      >
+        <Square fill="currentColor" />
+      </IconButton>
+    ) : undefined;
+  const listening = voice.recording;
+  const voiceBusy = voice.requesting || voice.transcribing;
   return (
     <>
       <MistyComposer
-        layout="toolbar"
         className="agent-toolbar-composer"
         value={draft}
         onChange={setDraft}
@@ -153,12 +225,13 @@ export function AgentConversationComposer({
         attachedChips={
           engine && browserAttached ? <BrowserChip onRemove={() => attachBrowser(false)} /> : null
         }
-        attachMenuItems={
+        addMenuItems={
           engine ? (
             <MenuItem
-              icon={<Globe className="size-4" />}
+              icon={Globe}
               label="Misty's browser"
               disabled={browserAttached}
+              reason={browserAttached ? "Already attached to this message" : undefined}
               onSelect={() => attachBrowser(true)}
             />
           ) : null
@@ -181,88 +254,39 @@ export function AgentConversationComposer({
             if (!attachments.attachments.some((a) => a.state !== "ready")) send();
           }
         }}
+        // One line in the narrowest chat, beside the context panel.
         placeholder={
           planning
-            ? `Plan with ${agent?.name || "Misty"}. @ to mention, / for commands`
+            ? `Plan with ${agent?.name || "Misty"}. @ mention, / commands`
             : engine
-              ? "Plan, build, or ask. @ to mention, $ for skills, / for commands"
-              : `Message ${agent?.name || "Misty"}…`
+              ? "Ask, plan or build. @ mention, / commands"
+              : `Message ${agent?.name || "Misty"}`
         }
         disabled={disabled}
-        busy={working && !draft.trim()}
-        toolbarStart={
-          <>
-            <CaptureButton disabled={disabled} onCapture={() => void capture()} />
-            <PermissionMenu
-              conversationId={conversationId}
-              permission={permission}
-              engine={engine}
-              disabled={disabled}
-            />
-            <GoalButton conversationId={conversationId} disabled={disabled} />
-            <ChatSpaceMenu conversationId={conversationId} disabled={disabled || working} />
-            <AgentFolderMenu conversationId={conversationId} />
-            {engine && folder ? <BranchMenu folder={folder} disabled={disabled} /> : null}
-          </>
-        }
-        toolbarEnd={
+        items={items}
+        path={path}
+        end={
           <>
             <ContextMeter usage={usage} engine={engine || mistyEngine} />
-            <EffortMenu
-              accountId={accountId}
-              conversationId={conversationId}
-              engine={engine}
-              agentEffort={agent?.reasoning_effort}
-              disabled={disabled}
-            />
-            <ModelMenu
-              accountId={accountId}
-              conversationId={conversationId}
-              engine={engine}
-              engineName={engineNames[engine]}
-              agentModel={agent?.engine_model}
-              disabled={disabled}
-            />
-            <ModeMenu
-              conversationId={conversationId}
-              mode={collaboration.mode}
-              engine={engine}
-              disabled={disabled}
-            />
+            <IconButton
+              label={
+                listening ? "Stop recording" : voiceBusy ? "Transcribing" : "Start voice input"
+              }
+              aria-pressed={listening || undefined}
+              loading={voiceBusy}
+              disabled={disabled || working}
+              onClick={() => (listening ? voice.stop() : void voice.start())}
+            >
+              {listening ? <Square /> : <Mic />}
+            </IconButton>
           </>
         }
-        voiceControl={
-          <IconButton
-            label={voice.recording ? "Stop recording" : "Start voice input"}
-            disabled={disabled || working || voice.requesting || voice.transcribing}
-            onClick={() => (voice.recording ? voice.stop() : void voice.start())}
-          >
-            {voice.requesting || voice.transcribing ? (
-              <Spinner size="lg" label={false} />
-            ) : voice.recording ? (
-              <Square size={16} />
-            ) : (
-              <Mic size={18} />
-            )}
-          </IconButton>
-        }
-        trailingControl={
-          working ? (
-            <IconButton
-              variant="outline"
-              className="text-cream-bright"
-              label="Stop response"
-              onClick={() => {
-                void useMistyStore
-                  .getState()
-                  .cancelResponse?.()
-                  .catch((e) => reportError(String(e)));
-              }}
-            >
-              <Square className="size-3.5" fill="currentColor" />
-            </IconButton>
-          ) : undefined
-        }
+        sendControl={stop}
+      />
+      <AgentGoalDialog
+        conversationId={goalFor}
+        open={Boolean(goalFor)}
+        onOpenChange={(open) => !open && setGoalFor(undefined)}
       />
       {/* Working status belongs to the transcript, under the message that started it. */}
       {(voice.recording || voice.transcribing) && (

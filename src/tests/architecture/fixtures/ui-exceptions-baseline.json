@@ -1,1 +1,1283 @@
-{}
+{
+  "rules": [
+    "raw-control",
+    "full-screen-overlay",
+    "portal",
+    "z-index-literal",
+    "popup-class",
+    "popover-menu",
+    "manual-menu-chevron",
+    "popup-animation-off",
+    "popup-surface-override",
+    "icon-only-button",
+    "button-restyle",
+    "unsized-button",
+    "hand-rolled-spinner",
+    "all-caps",
+    "font-size-literal",
+    "hex-color",
+    "ellipsis",
+    "native-title",
+    "tooltip-off",
+    "ragged-wrap",
+    "mono-outside-code",
+    "loading-text",
+    "status-word",
+    "legacy-button-variant",
+    "legacy-button-size",
+    "menu-item-without-icon",
+    "leading-icon-in-list-row",
+    "duckduckgo",
+    "arbitrary-px",
+    "raw-color-class",
+    "feature-stylesheet",
+    "css-font-size",
+    "css-hex",
+    "css-ellipsis",
+    "css-mono",
+    "css-z"
+  ],
+  "files": {
+    "src/app/AppErrorBoundary.tsx": {
+      "raw-color-class": 2
+    },
+    "src/app/layouts/AppPagesLayout.tsx": {
+      "raw-color-class": 2
+    },
+    "src/app/layouts/DesktopLayout/AccountIsland.tsx": {
+      "raw-color-class": 2
+    },
+    "src/app/layouts/DesktopLayout/AccountMenu.tsx": {
+      "raw-color-class": 5
+    },
+    "src/app/layouts/DesktopLayout/DockDropPreview.tsx": {
+      "raw-color-class": 2
+    },
+    "src/app/layouts/DesktopLayout/docking-drawers.css": {
+      "css-z": 3,
+      "feature-stylesheet": 1
+    },
+    "src/app/layouts/DesktopLayout/docking-panes.css": {
+      "feature-stylesheet": 1
+    },
+    "src/app/layouts/DesktopLayout/docking-shell.css": {
+      "css-z": 3,
+      "feature-stylesheet": 1
+    },
+    "src/app/layouts/DesktopLayout/docking-tabs.css": {
+      "css-ellipsis": 1,
+      "css-font-size": 7,
+      "feature-stylesheet": 1
+    },
+    "src/app/layouts/DesktopLayout/docking.css": {
+      "feature-stylesheet": 1
+    },
+    "src/app/layouts/DesktopLayout/DockLeafView.tsx": {
+      "raw-color-class": 3
+    },
+    "src/app/layouts/DesktopLayout/FramePacingOverlay.tsx": {
+      "raw-color-class": 3
+    },
+    "src/app/layouts/DesktopLayout/HelpDialog.tsx": {
+      "raw-color-class": 1
+    },
+    "src/app/layouts/DesktopLayout/index.tsx": {
+      "raw-color-class": 1
+    },
+    "src/app/layouts/DesktopLayout/LayoutPopup.tsx": {
+      "raw-color-class": 17
+    },
+    "src/app/layouts/DesktopLayout/NavRail.tsx": {
+      "raw-color-class": 3
+    },
+    "src/app/layouts/DesktopLayout/PaneSwapMode.tsx": {
+      "raw-color-class": 4
+    },
+    "src/app/layouts/DesktopLayout/search/search.css": {
+      "css-ellipsis": 2,
+      "css-font-size": 12,
+      "feature-stylesheet": 1
+    },
+    "src/app/layouts/DesktopLayout/search/WorkspaceSearch.tsx": {
+      "arbitrary-px": 1
+    },
+    "src/app/layouts/DesktopLayout/SidebarPins.tsx": {
+      "raw-color-class": 4
+    },
+    "src/app/layouts/DesktopLayout/StandaloneRouteSurface.tsx": {
+      "arbitrary-px": 1,
+      "raw-color-class": 4
+    },
+    "src/app/layouts/DesktopLayout/styles.ts": {
+      "arbitrary-px": 4,
+      "raw-color-class": 16
+    },
+    "src/app/layouts/DesktopLayout/TopEdge.tsx": {
+      "raw-color-class": 1
+    },
+    "src/app/layouts/DesktopLayout/WindowsTitlebarControls.tsx": {
+      "native-title": 6,
+      "raw-color-class": 2
+    },
+    "src/app/layouts/DesktopLayout/WorkspaceCanvas.tsx": {
+      "raw-color-class": 1
+    },
+    "src/app/layouts/DesktopLayout/WorkspaceDockTree.tsx": {
+      "raw-color-class": 1
+    },
+    "src/app/layouts/DesktopLayout/WorkspaceSidebar.tsx": {
+      "raw-color-class": 1
+    },
+    "src/app/layouts/DesktopLayout/WorkspaceSurface.tsx": {
+      "raw-color-class": 2
+    },
+    "src/app/layouts/DesktopLayout/WorkspaceViewGroupButton.tsx": {
+      "raw-color-class": 2
+    },
+    "src/app/layouts/RenderErrorBoundary.tsx": {
+      "arbitrary-px": 1,
+      "raw-color-class": 3
+    },
+    "src/app/layouts/RootLayout.tsx": {
+      "raw-color-class": 3
+    },
+    "src/features/account/components/AuthCard.tsx": {
+      "raw-color-class": 5
+    },
+    "src/features/account/components/AuthField.tsx": {
+      "raw-color-class": 3
+    },
+    "src/features/account/components/AuthShell.tsx": {
+      "raw-color-class": 2
+    },
+    "src/features/account/components/GoogleSignInButton.tsx": {
+      "raw-color-class": 6
+    },
+    "src/features/account/components/RegisterForm.tsx": {
+      "loading-text": 1
+    },
+    "src/features/account/components/SignInForm.tsx": {
+      "loading-text": 1,
+      "raw-color-class": 1
+    },
+    "src/features/account/components/WelcomeNav.tsx": {
+      "raw-color-class": 2
+    },
+    "src/features/account/export/AccountDeleteDialog.tsx": {
+      "loading-text": 1
+    },
+    "src/features/account/export/AccountExportDialog.tsx": {
+      "loading-text": 1,
+      "raw-color-class": 1
+    },
+    "src/features/account/pages/RegisterPage.tsx": {
+      "raw-color-class": 1
+    },
+    "src/features/account/pages/SignInPage.tsx": {
+      "loading-text": 2,
+      "raw-color-class": 7
+    },
+    "src/features/account/settings/AccountPictureRow.tsx": {
+      "loading-text": 1
+    },
+    "src/features/account/settings/AccountSection.tsx": {
+      "arbitrary-px": 1,
+      "loading-text": 1,
+      "raw-color-class": 1
+    },
+    "src/features/account/setup/OwnServerScreen.tsx": {
+      "raw-color-class": 1
+    },
+    "src/features/account/setup/ServerChoiceScreen.tsx": {
+      "arbitrary-px": 1,
+      "raw-color-class": 5
+    },
+    "src/features/account/sign-in-sheet/SignInSheet.tsx": {
+      "arbitrary-px": 2,
+      "raw-color-class": 3
+    },
+    "src/features/account/sign-in-sheet/SignOutSheet.tsx": {
+      "arbitrary-px": 1,
+      "raw-color-class": 2
+    },
+    "src/features/agents/activity/activity.css": {
+      "css-ellipsis": 3,
+      "css-font-size": 10,
+      "feature-stylesheet": 1
+    },
+    "src/features/agents/agent-browser/agentBrowser.css": {
+      "css-ellipsis": 1,
+      "css-font-size": 5,
+      "feature-stylesheet": 1
+    },
+    "src/features/agents/agent-browser/AgentBrowserTabs.tsx": {
+      "raw-color-class": 2
+    },
+    "src/features/agents/artifacts/TaskArtifactList.tsx": {
+      "raw-color-class": 2
+    },
+    "src/features/agents/bots/AgentBotFields.tsx": {
+      "mono-outside-code": 1,
+      "raw-color-class": 2
+    },
+    "src/features/agents/connected-apps/ApprovalActions.tsx": {
+      "raw-color-class": 1
+    },
+    "src/features/agents/connected-apps/ConnectedAppRows.tsx": {
+      "raw-color-class": 1
+    },
+    "src/features/agents/connected-apps/ConnectedAppsCatalog.tsx": {
+      "native-title": 1,
+      "raw-color-class": 1
+    },
+    "src/features/agents/connected-apps/DirectAppLogo.tsx": {
+      "raw-color-class": 1
+    },
+    "src/features/agents/connected-apps/DirectApps.tsx": {
+      "native-title": 1,
+      "raw-color-class": 7
+    },
+    "src/features/agents/connected-apps/integrationsApps.css": {
+      "css-ellipsis": 2,
+      "css-font-size": 3,
+      "feature-stylesheet": 1
+    },
+    "src/features/agents/context-panel/contextPanel.css": {
+      "css-ellipsis": 4,
+      "css-font-size": 16,
+      "css-mono": 4,
+      "feature-stylesheet": 1
+    },
+    "src/features/agents/context-panel/files/files.css": {
+      "css-ellipsis": 5,
+      "css-font-size": 17,
+      "css-hex": 1,
+      "css-z": 2,
+      "feature-stylesheet": 1
+    },
+    "src/features/agents/context-panel/files/FileSearchOverlay.tsx": {
+      "raw-color-class": 1
+    },
+    "src/features/agents/context-panel/folders/FolderAvatars.tsx": {
+      "raw-color-class": 1
+    },
+    "src/features/agents/context-panel/git/DiffView.tsx": {
+      "raw-color-class": 1
+    },
+    "src/features/agents/context-panel/git/git.css": {
+      "css-ellipsis": 5,
+      "css-font-size": 17,
+      "css-mono": 5,
+      "css-z": 2,
+      "feature-stylesheet": 1
+    },
+    "src/features/agents/context-panel/launch-script/launchScript.css": {
+      "css-font-size": 2,
+      "css-mono": 1,
+      "feature-stylesheet": 1
+    },
+    "src/features/agents/context-panel/launch-script/LaunchScriptActions.tsx": {
+      "arbitrary-px": 1
+    },
+    "src/features/agents/context-panel/open-app/openApp.css": {
+      "css-font-size": 1,
+      "feature-stylesheet": 1
+    },
+    "src/features/agents/context-panel/terminal/terminal.css": {
+      "css-ellipsis": 1,
+      "css-font-size": 2,
+      "feature-stylesheet": 1
+    },
+    "src/features/agents/context-panel/worktree/BranchCombobox.tsx": {
+      "raw-color-class": 2
+    },
+    "src/features/agents/context-panel/worktree/worktree.css": {
+      "css-ellipsis": 3,
+      "css-font-size": 13,
+      "css-mono": 1,
+      "feature-stylesheet": 1
+    },
+    "src/features/agents/context-panel/worktree/WorktreeProgressRow.tsx": {
+      "raw-color-class": 1
+    },
+    "src/features/agents/conversations/composer/controls/composerControls.css": {
+      "css-font-size": 5,
+      "css-z": 1,
+      "feature-stylesheet": 1
+    },
+    "src/features/agents/conversations/composer/controls/ComposerSuggestions.tsx": {
+      "raw-color-class": 1
+    },
+    "src/features/agents/conversations/composer/controls/ContextMeter.tsx": {
+      "native-title": 1,
+      "raw-color-class": 3
+    },
+    "src/features/agents/conversations/composer/MistyComposer.tsx": {
+      "raw-color-class": 5
+    },
+    "src/features/agents/conversations/composer/MistyContextBar.tsx": {
+      "raw-color-class": 3
+    },
+    "src/features/agents/conversations/composer/MistyMessageAttachments.tsx": {
+      "arbitrary-px": 1,
+      "raw-color-class": 4
+    },
+    "src/features/agents/conversations/state/loadConversations.ts": {
+      "loading-text": 1
+    },
+    "src/features/agents/conversations/state/MistyActivityStatus.tsx": {
+      "raw-color-class": 1
+    },
+    "src/features/agents/conversations/view/AgentConversationComposer.tsx": {
+      "loading-text": 2
+    },
+    "src/features/agents/conversations/view/AgentConversationView.tsx": {
+      "arbitrary-px": 1,
+      "raw-color-class": 2
+    },
+    "src/features/agents/conversations/view/AgentMessage.tsx": {
+      "raw-color-class": 4
+    },
+    "src/features/agents/conversations/view/AgentNotebookCard.tsx": {
+      "raw-color-class": 1
+    },
+    "src/features/agents/conversations/view/AgentTranscriptParts.tsx": {
+      "ellipsis": 1,
+      "native-title": 1,
+      "raw-color-class": 6
+    },
+    "src/features/agents/conversations/view/engine/engineTurn.css": {
+      "css-ellipsis": 2,
+      "css-font-size": 13,
+      "feature-stylesheet": 1
+    },
+    "src/features/agents/conversations/view/engine/EngineTurnParts.tsx": {
+      "native-title": 1
+    },
+    "src/features/agents/conversations/view/grants/grantCard.css": {
+      "css-font-size": 2,
+      "feature-stylesheet": 1
+    },
+    "src/features/agents/conversations/view/meta/runMeta.css": {
+      "css-font-size": 1,
+      "feature-stylesheet": 1
+    },
+    "src/features/agents/conversations/view/navigation/FindPanel.tsx": {
+      "native-title": 1
+    },
+    "src/features/agents/conversations/view/navigation/navigation.css": {
+      "css-font-size": 4,
+      "css-z": 3,
+      "feature-stylesheet": 1
+    },
+    "src/features/agents/conversations/view/RewindFilesDialog.tsx": {
+      "mono-outside-code": 1,
+      "raw-color-class": 2
+    },
+    "src/features/agents/conversations/view/status/runStatus.css": {
+      "css-ellipsis": 2,
+      "css-font-size": 4,
+      "css-z": 1,
+      "feature-stylesheet": 1
+    },
+    "src/features/agents/conversations/view/status/RunStatusStrip.tsx": {
+      "native-title": 3
+    },
+    "src/features/agents/conversations/view/useConversationActions.tsx": {
+      "loading-text": 2
+    },
+    "src/features/agents/desktop-control/desktopOverlay.css": {
+      "css-ellipsis": 1,
+      "css-hex": 4,
+      "feature-stylesheet": 1
+    },
+    "src/features/agents/engines/EngineSetupRow.tsx": {
+      "arbitrary-px": 1,
+      "raw-color-class": 7
+    },
+    "src/features/agents/engines/EnginesStep.tsx": {
+      "raw-color-class": 4
+    },
+    "src/features/agents/engines/NewAgentDialog.tsx": {
+      "arbitrary-px": 1,
+      "raw-color-class": 1
+    },
+    "src/features/agents/island/AgentControlIsland.tsx": {
+      "raw-color-class": 2
+    },
+    "src/features/agents/island/agentControlStatus.ts": {
+      "raw-color-class": 3
+    },
+    "src/features/agents/island/AgentControlTaskControls.tsx": {
+      "raw-color-class": 1,
+      "status-word": 1
+    },
+    "src/features/agents/island/AgentExecutionSurface.tsx": {
+      "raw-color-class": 3
+    },
+    "src/features/agents/methods/agentWorkspaceBar.css": {
+      "css-z": 1,
+      "feature-stylesheet": 1
+    },
+    "src/features/agents/methods/agentWorkspaceCanvas.css": {
+      "css-font-size": 2,
+      "css-z": 1,
+      "feature-stylesheet": 1
+    },
+    "src/features/agents/methods/agentWorkspaceCatalog.css": {
+      "css-font-size": 8,
+      "feature-stylesheet": 1
+    },
+    "src/features/agents/methods/agentWorkspaceComposer.css": {
+      "css-font-size": 1,
+      "css-z": 1,
+      "feature-stylesheet": 1
+    },
+    "src/features/agents/methods/agentWorkspaceFrame.css": {
+      "feature-stylesheet": 1
+    },
+    "src/features/agents/methods/agentWorkspacePolish.css": {
+      "css-font-size": 1,
+      "feature-stylesheet": 1
+    },
+    "src/features/agents/methods/agentWorkspaceRows.css": {
+      "css-ellipsis": 1,
+      "css-font-size": 1,
+      "feature-stylesheet": 1
+    },
+    "src/features/agents/methods/agentWorkspaceSidebar.css": {
+      "css-ellipsis": 1,
+      "css-font-size": 2,
+      "feature-stylesheet": 1
+    },
+    "src/features/agents/methods/agentWorkspaceSidebarFoot.css": {
+      "feature-stylesheet": 1
+    },
+    "src/features/agents/methods/RecentStatusBadge.tsx": {
+      "native-title": 1
+    },
+    "src/features/agents/models/ModelChoiceRows.tsx": {
+      "arbitrary-px": 2
+    },
+    "src/features/agents/multirun/multirun.css": {
+      "css-ellipsis": 1,
+      "css-font-size": 8,
+      "css-mono": 1,
+      "feature-stylesheet": 1
+    },
+    "src/features/agents/multirun/MultirunChanges.tsx": {
+      "raw-color-class": 4
+    },
+    "src/features/agents/multirun/MultirunCompare.tsx": {
+      "ellipsis": 1,
+      "native-title": 2,
+      "raw-color-class": 2
+    },
+    "src/features/agents/multirun/MultirunStartForm.tsx": {
+      "raw-color-class": 1
+    },
+    "src/features/agents/page/AgentConversationHeading.tsx": {
+      "native-title": 1
+    },
+    "src/features/agents/page/agentsConversation.css": {
+      "css-ellipsis": 1,
+      "css-font-size": 8,
+      "feature-stylesheet": 1
+    },
+    "src/features/agents/page/agentsLayout.css": {
+      "feature-stylesheet": 1
+    },
+    "src/features/agents/page/agentsProgress.css": {
+      "css-ellipsis": 2,
+      "css-font-size": 5,
+      "feature-stylesheet": 1
+    },
+    "src/features/agents/page/agentsSettings.css": {
+      "css-font-size": 1,
+      "feature-stylesheet": 1
+    },
+    "src/features/agents/page/agentsWorkspace.css": {
+      "feature-stylesheet": 1
+    },
+    "src/features/agents/panel/mistyPanel.css": {
+      "css-font-size": 1,
+      "css-hex": 1,
+      "css-z": 1,
+      "feature-stylesheet": 1
+    },
+    "src/features/agents/personal/AgentAccess.tsx": {
+      "raw-color-class": 7
+    },
+    "src/features/agents/personal/AgentAvatar.css": {
+      "css-font-size": 4,
+      "css-hex": 2,
+      "feature-stylesheet": 1
+    },
+    "src/features/agents/personal/AgentAvatarPicker.tsx": {
+      "raw-color-class": 9
+    },
+    "src/features/agents/personal/AgentEditor.tsx": {
+      "loading-text": 1
+    },
+    "src/features/agents/personal/AgentPermissionsField.tsx": {
+      "raw-color-class": 1
+    },
+    "src/features/agents/personal/AgentSetup.tsx": {
+      "raw-color-class": 4
+    },
+    "src/features/agents/personas/PersonaCatalogSection.tsx": {
+      "ragged-wrap": 1,
+      "raw-color-class": 9
+    },
+    "src/features/agents/personas/PersonaSuggestions.tsx": {
+      "raw-color-class": 1
+    },
+    "src/features/agents/pickup/PickUpDialog.tsx": {
+      "arbitrary-px": 1,
+      "loading-text": 1,
+      "mono-outside-code": 1
+    },
+    "src/features/agents/plans/AgentGoalSection.tsx": {
+      "raw-color-class": 1
+    },
+    "src/features/agents/plans/AgentPlanChecklist.tsx": {
+      "native-title": 1
+    },
+    "src/features/agents/plans/AgentPlanEditor.tsx": {
+      "loading-text": 1
+    },
+    "src/features/agents/plans/AgentQuestionCard.tsx": {
+      "loading-text": 1
+    },
+    "src/features/agents/plans/collaboration.css": {
+      "feature-stylesheet": 1
+    },
+    "src/features/agents/plans/collaborationPlans.css": {
+      "css-font-size": 18,
+      "feature-stylesheet": 1
+    },
+    "src/features/agents/plans/collaborationQuestions.css": {
+      "css-font-size": 9,
+      "feature-stylesheet": 1
+    },
+    "src/features/agents/plans/PlanRiskTag.tsx": {
+      "native-title": 1
+    },
+    "src/features/agents/preview/PickedElementCard.tsx": {
+      "native-title": 2
+    },
+    "src/features/agents/progress/payload/toolPayload.css": {
+      "css-ellipsis": 2,
+      "css-font-size": 5,
+      "feature-stylesheet": 1
+    },
+    "src/features/agents/progress/payload/ToolPayloadViewer.tsx": {
+      "native-title": 2,
+      "status-word": 1
+    },
+    "src/features/agents/progress/statusTable.css": {
+      "css-font-size": 4,
+      "css-mono": 1,
+      "feature-stylesheet": 1
+    },
+    "src/features/agents/runs/markdown/aiSurface.css": {
+      "css-font-size": 1,
+      "feature-stylesheet": 1
+    },
+    "src/features/agents/runs/markdown/mistyMarkdown.css": {
+      "css-font-size": 9,
+      "feature-stylesheet": 1
+    },
+    "src/features/agents/runs/markdown/MistyMarkdown.tsx": {
+      "status-word": 1
+    },
+    "src/features/agents/tools/space/routing.ts": {
+      "ellipsis": 1
+    },
+    "src/features/agents/tools/space/threads.ts": {
+      "ellipsis": 1
+    },
+    "src/features/agents/tutor/cursor/agentCompanionPanel.css": {
+      "css-font-size": 2,
+      "feature-stylesheet": 1
+    },
+    "src/features/agents/tutor/cursor/CompanionAppearanceSettings.tsx": {
+      "arbitrary-px": 1,
+      "raw-color-class": 1
+    },
+    "src/features/agents/tutor/cursor/cursorCompanion.css": {
+      "css-ellipsis": 1,
+      "css-hex": 4,
+      "feature-stylesheet": 1
+    },
+    "src/features/agents/tutor/cursor/sketchBlock.css": {
+      "css-font-size": 2,
+      "css-hex": 1,
+      "feature-stylesheet": 1
+    },
+    "src/features/agents/tutor/lessons/LessonObjectives.tsx": {
+      "raw-color-class": 1
+    },
+    "src/features/agents/tutor/notebook/notebookWorkspace.css": {
+      "css-font-size": 32,
+      "css-hex": 17,
+      "css-z": 1,
+      "feature-stylesheet": 1
+    },
+    "src/features/agents/tutor/notebook/tutorBar.css": {
+      "css-font-size": 8,
+      "feature-stylesheet": 1
+    },
+    "src/features/agents/tutor/TutorHome.tsx": {
+      "raw-color-class": 1
+    },
+    "src/features/agents/tutor/tutorPage.css": {
+      "css-font-size": 28,
+      "css-hex": 5,
+      "css-z": 1,
+      "feature-stylesheet": 1
+    },
+    "src/features/agents/virtual/agentsNow.css": {
+      "css-font-size": 2,
+      "css-mono": 1,
+      "feature-stylesheet": 1
+    },
+    "src/features/agents/virtual/AgentsNow.tsx": {
+      "raw-color-class": 2
+    },
+    "src/features/agents/virtual/AgentTalk.tsx": {
+      "raw-color-class": 1
+    },
+    "src/features/agents/virtual/BuildPanel.tsx": {
+      "raw-color-class": 3
+    },
+    "src/features/agents/virtual/HireAgent.tsx": {
+      "arbitrary-px": 1
+    },
+    "src/features/agents/virtual/virtualStudio.css": {
+      "css-font-size": 25,
+      "css-hex": 26,
+      "css-z": 8,
+      "feature-stylesheet": 1
+    },
+    "src/features/agents/virtual/VirtualStudio.tsx": {
+      "raw-color-class": 1
+    },
+    "src/features/browser/SavedWebsiteIcon.tsx": {
+      "arbitrary-px": 1
+    },
+    "src/features/browser/settings/ClearWebsiteDataDialog.tsx": {
+      "loading-text": 1,
+      "raw-color-class": 4
+    },
+    "src/features/browser/webviews/browserToolbar.css": {
+      "feature-stylesheet": 1
+    },
+    "src/features/computer-use/ComputerUseSection.tsx": {
+      "raw-color-class": 2
+    },
+    "src/features/engine-config/brands/BrandMark.tsx": {
+      "raw-color-class": 3
+    },
+    "src/features/engine-config/channels/ChannelRow.tsx": {
+      "arbitrary-px": 1,
+      "native-title": 1,
+      "raw-color-class": 12
+    },
+    "src/features/engine-config/channels/ChannelsSection.tsx": {
+      "raw-color-class": 7
+    },
+    "src/features/engine-config/channels/OfficialEditDialog.tsx": {
+      "arbitrary-px": 1,
+      "ellipsis": 1,
+      "mono-outside-code": 2,
+      "raw-color-class": 4
+    },
+    "src/features/engine-config/channels/ProviderDialog.tsx": {
+      "arbitrary-px": 1
+    },
+    "src/features/engine-config/channels/ProviderFormSections.tsx": {
+      "mono-outside-code": 3,
+      "raw-color-class": 22
+    },
+    "src/features/engine-config/clis/ClisSection.tsx": {
+      "arbitrary-px": 1,
+      "native-title": 2,
+      "raw-color-class": 7
+    },
+    "src/features/engine-config/clis/CliUpdateDialog.tsx": {
+      "arbitrary-px": 2,
+      "mono-outside-code": 2,
+      "ragged-wrap": 1,
+      "raw-color-class": 14,
+      "status-word": 1
+    },
+    "src/features/engine-config/clis/SignInDialog.tsx": {
+      "arbitrary-px": 1,
+      "mono-outside-code": 1,
+      "raw-color-class": 5
+    },
+    "src/features/engine-config/engine-setup/DshHostSection.tsx": {
+      "arbitrary-px": 2,
+      "mono-outside-code": 1,
+      "raw-color-class": 15
+    },
+    "src/features/engine-config/engine-setup/EngineProgramSection.tsx": {
+      "arbitrary-px": 3,
+      "ellipsis": 1,
+      "mono-outside-code": 2,
+      "native-title": 2,
+      "raw-color-class": 8
+    },
+    "src/features/engine-config/engine-setup/PiFamilyAuthSection.tsx": {
+      "ellipsis": 2,
+      "native-title": 1,
+      "raw-color-class": 10
+    },
+    "src/features/engine-config/engine-setup/PiFamilyCustomProviders.tsx": {
+      "arbitrary-px": 2,
+      "ellipsis": 1,
+      "mono-outside-code": 3,
+      "raw-color-class": 9
+    },
+    "src/features/engine-config/engine-setup/PiFamilyParts.tsx": {
+      "arbitrary-px": 1,
+      "raw-color-class": 6
+    },
+    "src/features/engine-config/mcp/LaunchControls.tsx": {
+      "native-title": 1,
+      "raw-color-class": 4
+    },
+    "src/features/engine-config/mcp/McpCommandPanel.tsx": {
+      "arbitrary-px": 1,
+      "ellipsis": 1,
+      "mono-outside-code": 1,
+      "native-title": 1,
+      "raw-color-class": 10
+    },
+    "src/features/engine-config/mcp/McpDetailDialog.tsx": {
+      "arbitrary-px": 1,
+      "ellipsis": 1,
+      "mono-outside-code": 5,
+      "raw-color-class": 7
+    },
+    "src/features/engine-config/mcp/McpProbeConfirmHost.tsx": {
+      "mono-outside-code": 1,
+      "raw-color-class": 6
+    },
+    "src/features/engine-config/mcp/McpSection.tsx": {
+      "arbitrary-px": 3,
+      "mono-outside-code": 2,
+      "native-title": 2,
+      "ragged-wrap": 3,
+      "raw-color-class": 21
+    },
+    "src/features/engine-config/mcp/ProbeControls.tsx": {
+      "mono-outside-code": 1,
+      "native-title": 4,
+      "raw-color-class": 13
+    },
+    "src/features/engine-config/performance/PerformanceSection.tsx": {
+      "ragged-wrap": 1,
+      "status-word": 1
+    },
+    "src/features/engine-config/prompts/PromptEditorDialog.tsx": {
+      "mono-outside-code": 1
+    },
+    "src/features/engine-config/prompts/PromptsSection.tsx": {
+      "mono-outside-code": 1,
+      "ragged-wrap": 1,
+      "raw-color-class": 5
+    },
+    "src/features/engine-config/skills/components.tsx": {
+      "ragged-wrap": 1,
+      "raw-color-class": 9
+    },
+    "src/features/engine-config/skills/DiscoverPane.tsx": {
+      "arbitrary-px": 1,
+      "raw-color-class": 6
+    },
+    "src/features/engine-config/skills/InstalledPane.parts.tsx": {
+      "mono-outside-code": 1,
+      "ragged-wrap": 1,
+      "raw-color-class": 4
+    },
+    "src/features/engine-config/skills/SkillDetailDialog.tsx": {
+      "arbitrary-px": 1,
+      "ellipsis": 1,
+      "mono-outside-code": 2,
+      "native-title": 2,
+      "raw-color-class": 18
+    },
+    "src/features/engine-config/skills/SkillDiscoverDialog.tsx": {
+      "arbitrary-px": 1,
+      "ellipsis": 1,
+      "mono-outside-code": 1,
+      "ragged-wrap": 1,
+      "raw-color-class": 6
+    },
+    "src/features/engine-config/skills/SkillImportDialog.tsx": {
+      "arbitrary-px": 1,
+      "raw-color-class": 3
+    },
+    "src/features/engine-config/skills/SkillUsagePane.tsx": {
+      "ellipsis": 1,
+      "native-title": 1,
+      "raw-color-class": 14
+    },
+    "src/features/engine-config/usage/UsageSection.tsx": {
+      "arbitrary-px": 1,
+      "ellipsis": 1,
+      "native-title": 2,
+      "ragged-wrap": 1,
+      "raw-color-class": 10
+    },
+    "src/features/files/link-previews/LinkPreviews.tsx": {
+      "arbitrary-px": 2,
+      "native-title": 1,
+      "raw-color-class": 7
+    },
+    "src/features/files/photo-editor/photoEditor.css": {
+      "css-hex": 9,
+      "feature-stylesheet": 1
+    },
+    "src/features/files/photo-editor/PhotoEditorView.tsx": {
+      "raw-color-class": 2
+    },
+    "src/features/files/picker/FileNameIcon.tsx": {
+      "raw-color-class": 1
+    },
+    "src/features/files/picker/MistyPickerShell.tsx": {
+      "raw-color-class": 3
+    },
+    "src/features/files/preview/EmbeddedUniversalPreviewView.tsx": {
+      "arbitrary-px": 1,
+      "raw-color-class": 5
+    },
+    "src/features/files/preview/PdfViewerView.tsx": {
+      "raw-color-class": 6
+    },
+    "src/features/files/preview/PreviewPrimitives.tsx": {
+      "arbitrary-px": 1,
+      "raw-color-class": 2
+    },
+    "src/features/onboarding/setup-page/AppsStep.tsx": {
+      "arbitrary-px": 2,
+      "raw-color-class": 9
+    },
+    "src/features/onboarding/setup-page/SetupPage.tsx": {
+      "arbitrary-px": 1,
+      "raw-color-class": 3
+    },
+    "src/features/onboarding/setup/SetupPreviews.tsx": {
+      "raw-color-class": 9
+    },
+    "src/features/onboarding/setup/SetupSteps.tsx": {
+      "raw-color-class": 6
+    },
+    "src/features/onboarding/welcome/welcome.css": {
+      "feature-stylesheet": 1
+    },
+    "src/features/onboarding/welcome/WelcomePage.tsx": {
+      "arbitrary-px": 1,
+      "font-size-literal": 1,
+      "ragged-wrap": 3,
+      "raw-color-class": 4
+    },
+    "src/features/pets/petOverlay.css": {
+      "css-ellipsis": 2,
+      "css-font-size": 2,
+      "css-hex": 2,
+      "css-z": 1,
+      "feature-stylesheet": 1
+    },
+    "src/features/settings/components/DesktopSettingsUI.tsx": {
+      "arbitrary-px": 5,
+      "raw-color-class": 15
+    },
+    "src/features/settings/components/SettingsNavigation.tsx": {
+      "arbitrary-px": 1,
+      "raw-color-class": 6
+    },
+    "src/features/settings/components/SettingsSaveBar.tsx": {
+      "raw-color-class": 3
+    },
+    "src/features/settings/components/SettingsSearchResults.tsx": {
+      "raw-color-class": 7
+    },
+    "src/features/settings/settingsConstants.ts": {
+      "raw-color-class": 3
+    },
+    "src/features/settings/SettingsControls.tsx": {
+      "arbitrary-px": 2,
+      "raw-color-class": 4
+    },
+    "src/features/settings/SettingsTextControls.tsx": {
+      "arbitrary-px": 3,
+      "loading-text": 1,
+      "mono-outside-code": 1,
+      "raw-color-class": 2
+    },
+    "src/features/shortcuts/settings/ShortcutsSection.tsx": {
+      "arbitrary-px": 1,
+      "ragged-wrap": 1,
+      "raw-color-class": 1
+    },
+    "src/features/spaces/calendar/CalendarConnections.tsx": {
+      "raw-color-class": 4
+    },
+    "src/features/spaces/calendar/CalendarViews.tsx": {
+      "arbitrary-px": 1,
+      "raw-color-class": 23
+    },
+    "src/features/spaces/calendar/SpaceCalendar.tsx": {
+      "ragged-wrap": 1,
+      "raw-color-class": 2
+    },
+    "src/features/spaces/chat/components/ChatDisplay.tsx": {
+      "raw-color-class": 3
+    },
+    "src/features/spaces/chat/components/ChatEmojiPicker.tsx": {
+      "raw-color-class": 1
+    },
+    "src/features/spaces/chat/components/ChatMessageRow.tsx": {
+      "raw-color-class": 7
+    },
+    "src/features/spaces/chat/components/ChatReadOnlyNotice.tsx": {
+      "raw-color-class": 2
+    },
+    "src/features/spaces/chat/components/ChatReplyBanner.tsx": {
+      "raw-color-class": 3
+    },
+    "src/features/spaces/chat/components/ChatStarters.tsx": {
+      "raw-color-class": 2
+    },
+    "src/features/spaces/chat/components/ChatSuggestionPopover.tsx": {
+      "raw-color-class": 1
+    },
+    "src/features/spaces/chat/components/ChatThreadColumn.tsx": {
+      "raw-color-class": 11
+    },
+    "src/features/spaces/chat/components/ConversationStates.tsx": {
+      "raw-color-class": 5
+    },
+    "src/features/spaces/chat/components/DirectMessageIntro.tsx": {
+      "raw-color-class": 4
+    },
+    "src/features/spaces/chat/components/MessageAttachments.tsx": {
+      "raw-color-class": 1
+    },
+    "src/features/spaces/chat/components/MessageContent.tsx": {
+      "ragged-wrap": 1,
+      "raw-color-class": 4
+    },
+    "src/features/spaces/chat/components/MessageEditForm.tsx": {
+      "raw-color-class": 1
+    },
+    "src/features/spaces/chat/components/MessageHoverActions.tsx": {
+      "raw-color-class": 2
+    },
+    "src/features/spaces/chat/components/MessageReplyPreview.tsx": {
+      "arbitrary-px": 3,
+      "raw-color-class": 9
+    },
+    "src/features/spaces/chat/components/SpaceChatComposer.tsx": {
+      "raw-color-class": 6
+    },
+    "src/features/spaces/chat/sidebar/ChatSidebar.tsx": {
+      "raw-color-class": 9
+    },
+    "src/features/spaces/chat/sidebar/CreateEditConversationDialog.tsx": {
+      "raw-color-class": 1
+    },
+    "src/features/spaces/chat/sidebar/NewDirectMessageDialog.tsx": {
+      "raw-color-class": 3
+    },
+    "src/features/spaces/chat/SpaceChat.tsx": {
+      "raw-color-class": 2
+    },
+    "src/features/spaces/components/LeaveDeleteSpaceDialogs.tsx": {
+      "loading-text": 2,
+      "raw-color-class": 5
+    },
+    "src/features/spaces/components/space-row/SpaceDialogs.tsx": {
+      "raw-color-class": 2
+    },
+    "src/features/spaces/components/space-row/SpaceSwitcher.tsx": {
+      "raw-color-class": 1
+    },
+    "src/features/spaces/components/SpaceInvitationRedemption.tsx": {
+      "raw-color-class": 6
+    },
+    "src/features/spaces/components/SpaceSetupCards.tsx": {
+      "raw-color-class": 3
+    },
+    "src/features/spaces/components/VisibilityMenu.tsx": {
+      "raw-color-class": 2
+    },
+    "src/features/spaces/create/CreateSpaceDialog.tsx": {
+      "arbitrary-px": 1,
+      "raw-color-class": 3
+    },
+    "src/features/spaces/create/CreateSpaceInvitePeople.tsx": {
+      "ragged-wrap": 1,
+      "raw-color-class": 1
+    },
+    "src/features/spaces/create/SpaceInvitationsNotice.tsx": {
+      "raw-color-class": 4
+    },
+    "src/features/spaces/handoffs/HandoffActions.tsx": {
+      "ragged-wrap": 1
+    },
+    "src/features/spaces/handoffs/SpacePostCard.tsx": {
+      "raw-color-class": 6
+    },
+    "src/features/spaces/home/GalleryPreview.tsx": {
+      "ellipsis": 1,
+      "raw-color-class": 2
+    },
+    "src/features/spaces/home/OverviewCard.tsx": {
+      "raw-color-class": 1
+    },
+    "src/features/spaces/home/PickUpsCard.tsx": {
+      "arbitrary-px": 1
+    },
+    "src/features/spaces/home/SpaceActivityLog.tsx": {
+      "raw-color-class": 3
+    },
+    "src/features/spaces/home/SpaceHome.tsx": {
+      "raw-color-class": 1
+    },
+    "src/features/spaces/home/SpaceItemCard.tsx": {
+      "raw-color-class": 13
+    },
+    "src/features/spaces/home/spaceOverview.css": {
+      "css-font-size": 5,
+      "feature-stylesheet": 1
+    },
+    "src/features/spaces/home/SpaceTeamwork.tsx": {
+      "ellipsis": 1,
+      "raw-color-class": 3
+    },
+    "src/features/spaces/home/WorkingOn.tsx": {
+      "raw-color-class": 3
+    },
+    "src/features/spaces/journal/components/JournalAttribution.tsx": {
+      "raw-color-class": 7
+    },
+    "src/features/spaces/journal/components/JournalDeleteDialog.tsx": {
+      "loading-text": 1
+    },
+    "src/features/spaces/journal/drawings/components/collaborativeDrawingCanvas.css": {
+      "feature-stylesheet": 1
+    },
+    "src/features/spaces/journal/drawings/components/CollaborativeDrawingCanvasView.tsx": {
+      "loading-text": 1
+    },
+    "src/features/spaces/journal/drawings/components/DrawingHeader.tsx": {
+      "loading-text": 1,
+      "raw-color-class": 7
+    },
+    "src/features/spaces/journal/drawings/components/DrawingPreviewHeader.tsx": {
+      "loading-text": 1,
+      "raw-color-class": 4
+    },
+    "src/features/spaces/journal/drawings/components/DrawingPreviewParts.tsx": {
+      "raw-color-class": 1
+    },
+    "src/features/spaces/journal/drawings/components/DrawingPreviewView.tsx": {
+      "raw-color-class": 7
+    },
+    "src/features/spaces/journal/drawings/components/DrawingWorkspace.tsx": {
+      "raw-color-class": 4
+    },
+    "src/features/spaces/journal/drawings/components/NewDrawingDialog.tsx": {
+      "arbitrary-px": 1,
+      "loading-text": 1
+    },
+    "src/features/spaces/journal/drawings/SpaceDrawingsView.tsx": {
+      "raw-color-class": 2
+    },
+    "src/features/spaces/journal/notes/components/NewNoteDialogView.tsx": {
+      "arbitrary-px": 1,
+      "loading-text": 1
+    },
+    "src/features/spaces/journal/notes/components/NoteBacklinksPanel.tsx": {
+      "raw-color-class": 10
+    },
+    "src/features/spaces/journal/notes/components/NoteBlockEditorView.tsx": {
+      "raw-color-class": 2
+    },
+    "src/features/spaces/journal/notes/components/NotePreviewView.tsx": {
+      "raw-color-class": 5
+    },
+    "src/features/spaces/journal/notes/components/NoteReadingPaneView.tsx": {
+      "raw-color-class": 5
+    },
+    "src/features/spaces/journal/notes/components/NoteSuggestionMenu.tsx": {
+      "arbitrary-px": 2,
+      "raw-color-class": 2
+    },
+    "src/features/spaces/journal/notes/components/noteTiptapEditor.css": {
+      "css-font-size": 5,
+      "css-hex": 2,
+      "css-z": 2,
+      "feature-stylesheet": 1
+    },
+    "src/features/spaces/journal/notes/components/NoteTitleInput.tsx": {
+      "raw-color-class": 1
+    },
+    "src/features/spaces/journal/notes/SpaceNotesView.tsx": {
+      "raw-color-class": 2
+    },
+    "src/features/spaces/library/components/LibraryEntryHeader.tsx": {
+      "loading-text": 1
+    },
+    "src/features/spaces/library/components/LibraryItemCard.tsx": {
+      "raw-color-class": 10
+    },
+    "src/features/spaces/library/components/LibraryItemContextMenu.tsx": {
+      "raw-color-class": 1
+    },
+    "src/features/spaces/library/components/MistyLibraryPicker.tsx": {
+      "arbitrary-px": 1,
+      "raw-color-class": 5
+    },
+    "src/features/spaces/library/components/MistyLibraryPickerThumbnail.tsx": {
+      "raw-color-class": 1
+    },
+    "src/features/spaces/library/components/MistyLibraryPickerTile.tsx": {
+      "raw-color-class": 7
+    },
+    "src/features/spaces/library/components/SpaceLibraryEmptyState.tsx": {
+      "loading-text": 1,
+      "raw-color-class": 1
+    },
+    "src/features/spaces/library/components/SpaceLibraryItems.tsx": {
+      "raw-color-class": 1
+    },
+    "src/features/spaces/library/components/SpaceLibraryStatus.tsx": {
+      "ragged-wrap": 2,
+      "raw-color-class": 2
+    },
+    "src/features/spaces/library/components/SpaceLibraryUploadTray.tsx": {
+      "raw-color-class": 4
+    },
+    "src/features/spaces/library/library-dialogs/MetadataDialog.tsx": {
+      "loading-text": 1
+    },
+    "src/features/spaces/library/library-dialogs/TextDialog.tsx": {
+      "loading-text": 1
+    },
+    "src/features/spaces/library/library-primitives/LibraryFacetGroup.tsx": {
+      "raw-color-class": 2
+    },
+    "src/features/spaces/library/library-primitives/LibraryItemThumbnail.tsx": {
+      "raw-color-class": 1
+    },
+    "src/features/spaces/library/library-primitives/LibraryTextPreview.tsx": {
+      "ellipsis": 1,
+      "raw-color-class": 8
+    },
+    "src/features/spaces/library/library-viewer/LibraryCropControls.tsx": {
+      "raw-color-class": 1
+    },
+    "src/features/spaces/library/library-viewer/LibraryEditPanel.tsx": {
+      "loading-text": 1,
+      "raw-color-class": 2
+    },
+    "src/features/spaces/library/library-viewer/LibraryMetadataForm.tsx": {
+      "loading-text": 1,
+      "raw-color-class": 1
+    },
+    "src/features/spaces/library/library-viewer/LibraryMetadataList.tsx": {
+      "raw-color-class": 1
+    },
+    "src/features/spaces/library/library-viewer/LibraryVersionList.tsx": {
+      "raw-color-class": 6
+    },
+    "src/features/spaces/library/library-viewer/LibraryVideoTrimControls.tsx": {
+      "raw-color-class": 1
+    },
+    "src/features/spaces/library/library-viewer/LibraryViewerSidebar.tsx": {
+      "raw-color-class": 2
+    },
+    "src/features/spaces/library/library-viewer/LibraryViewerStage.tsx": {
+      "raw-color-class": 1
+    },
+    "src/features/spaces/library/library-viewer/LibraryViewerToolbar.tsx": {
+      "loading-text": 1
+    },
+    "src/features/spaces/library/SpaceLibraryViewer.tsx": {
+      "raw-color-class": 5
+    },
+    "src/features/spaces/library/SpaceLibraryViewerUtils.tsx": {
+      "raw-color-class": 5
+    },
+    "src/features/spaces/members/agents/SpaceAgentRow.tsx": {
+      "raw-color-class": 2
+    },
+    "src/features/spaces/members/components/InviteMemberDialog.tsx": {
+      "mono-outside-code": 1,
+      "raw-color-class": 1
+    },
+    "src/features/spaces/members/components/MemberActionDialog.tsx": {
+      "loading-text": 1
+    },
+    "src/features/spaces/members/components/MemberList.tsx": {
+      "arbitrary-px": 1,
+      "raw-color-class": 7
+    },
+    "src/features/spaces/members/components/PendingInvitationsCard.tsx": {
+      "raw-color-class": 3
+    },
+    "src/features/spaces/members/components/SpaceMembers.tsx": {
+      "ragged-wrap": 2,
+      "raw-color-class": 3
+    },
+    "src/features/spaces/overview/SpaceWorkspaceSurface.tsx": {
+      "raw-color-class": 6
+    },
+    "src/features/spaces/planner/SpacePlanner.tsx": {
+      "raw-color-class": 1
+    },
+    "src/features/spaces/planner/SpaceTaskBoard.tsx": {
+      "ellipsis": 2,
+      "ragged-wrap": 1,
+      "raw-color-class": 13
+    },
+    "src/features/support/SupportFeedbackFields.tsx": {
+      "raw-color-class": 8
+    },
+    "src/features/support/SupportRecoveryParts.tsx": {
+      "arbitrary-px": 2,
+      "raw-color-class": 11
+    },
+    "src/features/support/SupportRecoverySection.tsx": {
+      "loading-text": 2,
+      "ragged-wrap": 1,
+      "raw-color-class": 11
+    },
+    "src/features/updater/DesktopUpdaterSettings.tsx": {
+      "loading-text": 2,
+      "ragged-wrap": 1
+    },
+    "src/features/updater/ReleaseNotesDialog.tsx": {
+      "arbitrary-px": 1,
+      "raw-color-class": 2
+    },
+    "src/features/voice/capture/CapturePanel.tsx": {
+      "ragged-wrap": 1,
+      "raw-color-class": 4
+    },
+    "src/features/voice/pill/dictationPill.css": {
+      "css-ellipsis": 1,
+      "css-font-size": 1,
+      "css-hex": 3,
+      "feature-stylesheet": 1
+    },
+    "src/shared/hooks/pointerReorder.css": {
+      "feature-stylesheet": 1
+    }
+  }
+}

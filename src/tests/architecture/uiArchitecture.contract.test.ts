@@ -1,12 +1,16 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-import { repositoryPath, sourcePath, walk } from "./repositoryPolicy";
+import { repositoryPath, repositoryRoot, sourcePath, walk } from "./repositoryPolicy";
 import {
-  isUiRuleSubject,
+  collectUiViolations,
+  nextUiBaseline,
+  parseUiBaseline,
   uiExceptionsBaselinePath,
-  uiRules,
-  uiViolations,
+  uiRuleGuidance,
+  uiRuleIds,
+  uiViolationCounts,
+  type UiBaseline,
   type UiRuleId,
 } from "./uiRules";
 
@@ -126,26 +130,219 @@ describe("UI architecture contract", () => {
     expect(failures, failures.join("\n")).toEqual([]);
   });
 
-  it("composes shared UI everywhere, with a baseline that only shrinks", () => {
-    const baseline: Record<string, UiRuleId[]> = JSON.parse(
-      readFileSync(sourcePath(uiExceptionsBaselinePath), "utf8"),
+  it("composes shared UI everywhere, with counts that only fall", () => {
+    const baseline = parseUiBaseline(
+      JSON.parse(readFileSync(sourcePath(uiExceptionsBaselinePath), "utf8")),
     );
-    const failures: string[] = [];
-    const seen = new Set<string>();
-    for (const path of walk("src", extensions).map(repositoryPath).filter(isUiRuleSubject)) {
-      seen.add(path);
-      const allowed = new Set(baseline[path] ?? []);
-      const found = uiViolations(path, readFileSync(sourcePath(path), "utf8"));
-      for (const id of found) {
-        if (!allowed.has(id)) failures.push(`${path}: ${uiRules[id].guidance} [${id}]`);
+    const known = new Set(baseline.rules);
+    const fresh = uiRuleIds.filter((id) => !known.has(id));
+    const failures = fresh.map(
+      (id) => `${id}: new rule; record its starting point with --write-baseline`,
+    );
+    const found = collectUiViolations(repositoryRoot);
+    const paths = new Set([...Object.keys(found), ...Object.keys(baseline.files)]);
+    for (const path of [...paths].sort()) {
+      const counts = found[path] ?? {};
+      const allowed = baseline.files[path] ?? {};
+      if (!existsSync(sourcePath(path))) {
+        failures.push(`${path}: gone; remove it from the baseline`);
+        continue;
       }
-      for (const id of allowed) {
-        if (!found.includes(id)) failures.push(`${path}: fixed ${id}; remove it from the baseline`);
+      for (const id of new Set([...Object.keys(counts), ...Object.keys(allowed)])) {
+        if (!uiRuleIds.includes(id as UiRuleId)) {
+          failures.push(`${path}: ${id} is no longer a rule; regenerate the baseline`);
+          continue;
+        }
+        if (fresh.includes(id as UiRuleId)) continue;
+        const now = counts[id as UiRuleId] ?? 0;
+        const before = allowed[id] ?? 0;
+        if (now > before) {
+          failures.push(
+            `${path}: ${uiRuleGuidance(id as UiRuleId)} [${id}: ${now}, baseline ${before}]`,
+          );
+        } else if (now === 0) {
+          // A lower count passes, so work in progress isn't blocked; --write-baseline lowers it.
+          failures.push(`${path}: fixed ${id}; remove it with --write-baseline`);
+        }
       }
-    }
-    for (const path of Object.keys(baseline)) {
-      if (!seen.has(path)) failures.push(`${path}: gone; remove it from the baseline`);
     }
     expect(failures, failures.join("\n")).toEqual([]);
+  });
+});
+
+describe("UI rules", () => {
+  const count = (path: string, text: string) => uiViolationCounts(path, text);
+  const feature = "src/features/example/Example.tsx";
+
+  it("counts every hit, not just whether a file has one", () => {
+    expect(count(feature, `<p className="truncate" /><p className="w-full truncate" />`)).toEqual({
+      ellipsis: 2,
+    });
+  });
+
+  it("reads multi-line tags with arrows and nested elements in their attributes", () => {
+    const text = `
+      <Button
+        onClick={() => go(a > b)}
+        icon={<Mark title="inner" />}
+        variant={busy ? "ghost" : "quiet"}
+        size="xs"
+      >
+        Go
+      </Button>`;
+    expect(count(feature, text)).toMatchObject({
+      "legacy-button-variant": 1,
+      "legacy-button-size": 1,
+    });
+    // The nested Mark is not a component that forwards title.
+    expect(count(feature, text)["native-title"]).toBeUndefined();
+  });
+
+  it("flags the system title on elements and on components that forward it", () => {
+    expect(count(feature, `<span title="Full name">x</span>`)["native-title"]).toBe(1);
+    expect(count(feature, `<Pressable\n  title="Open"\n/>`)["native-title"]).toBe(1);
+    expect(count(feature, `<iframe title="Preview" />`)["native-title"]).toBeUndefined();
+    expect(count(feature, `<Dialog title="Rename" />`)["native-title"]).toBeUndefined();
+  });
+
+  it("allows the new Button and IconButton API", () => {
+    const text = `
+      <Button variant="primary" size="lg">Save</Button>
+      <IconButton label="Close" variant="overlay" size="sm"><X /></IconButton>
+      <MenuTrigger label="Model" variant="quiet" size="md" />`;
+    expect(count(feature, text)).toEqual({});
+    expect(count(feature, `<Button variant="overlay">x</Button>`)).toEqual({
+      "legacy-button-variant": 1,
+    });
+    expect(count(feature, `<IconButton label="x" size="lg"><X /></IconButton>`)).toEqual({
+      "legacy-button-size": 1,
+    });
+  });
+
+  it("asks every menu row for an icon", () => {
+    expect(count(feature, `<MenuItem label="Rename" onSelect={() => rename()} />`)).toEqual({
+      "menu-item-without-icon": 1,
+    });
+    expect(count(feature, `<MenuItem icon={Pencil} label="Rename" />`)).toEqual({});
+    expect(count(feature, `<MenuItem {...item} />`)).toEqual({});
+    expect(count(feature, `<DropdownMenuItem onSelect={go}>Go</DropdownMenuItem>`)).toEqual({
+      "menu-item-without-icon": 1,
+    });
+  });
+
+  it("finds bars that wrap, not chip clouds", () => {
+    expect(count(feature, `<div className="flex flex-wrap items-center gap-2" />`)).toEqual({
+      "ragged-wrap": 1,
+    });
+    expect(count(feature, `<Toolbar wrap label="Tools" />`)).toEqual({ "ragged-wrap": 1 });
+    expect(count(feature, `<div className="mt-2 flex flex-wrap gap-1.5" />`)).toEqual({});
+  });
+
+  it("keeps monospace to code views and DuckDuckGo to the search-site recognizers", () => {
+    expect(count(feature, `<code className="font-mono">{id}</code>`)).toEqual({
+      "mono-outside-code": 1,
+    });
+    const editor = "src/features/agents/context-panel/editor/Editor.tsx";
+    expect(count(editor, `<pre className="font-mono" />`)).toEqual({});
+    expect(count(feature, `const font = "var(--font-mono)";`)).toEqual({});
+    const search = "src/features/agents/context-panel/search.ts";
+    expect(count(search, `const home = "https://duckduckgo.com/";`)).toEqual({ duckduckgo: 1 });
+    const recognizer = "src/features/agents/programs/searchRedirect.ts";
+    expect(count(recognizer, `host.endsWith("duckduckgo.com")`)).toEqual({});
+  });
+
+  it("finds loading text and loose status words", () => {
+    expect(count(feature, `{busy ? "Saving…" : "Save"}`)).toEqual({ "loading-text": 1 });
+    expect(count(feature, `<p>Loading...</p>`)).toEqual({ "loading-text": 1 });
+    expect(count(feature, `<span className="x">Saved</span>`)).toEqual({ "status-word": 1 });
+    expect(count(feature, `<Button onClick={close}>Done</Button>`)).toEqual({});
+  });
+
+  it("finds one-off pixels, raw colors and leading row icons", () => {
+    expect(count(feature, `<div className="w-[320px] md:max-w-[480px] h-8" />`)).toEqual({
+      "arbitrary-px": 2,
+    });
+    expect(count(feature, `<p className="text-cream-muted bg-charcoal-card/50" />`)).toEqual({
+      "raw-color-class": 2,
+    });
+    const row = `import { Folder } from "lucide-react";
+      <ListRow>
+        <Folder aria-hidden />
+        <ListRowButton>Docs</ListRowButton>
+      </ListRow>`;
+    expect(count(feature, row)).toEqual({ "leading-icon-in-list-row": 1 });
+  });
+
+  it("ignores prose in comments", () => {
+    expect(count(feature, `// never truncate here\n/* line-clamp-2 */\nconst a = 1;`)).toEqual({});
+  });
+
+  it("applies the shared subset inside src/shared/ui", () => {
+    const shared = "src/shared/ui/controls/Example.tsx";
+    const text = `<span title="x" className="truncate w-[13px] text-cream bg-[#fff] text-[13px]" />`;
+    expect(count(shared, text)).toEqual({
+      "native-title": 1,
+      ellipsis: 1,
+      "arbitrary-px": 1,
+      "hex-color": 1,
+      "font-size-literal": 1,
+    });
+  });
+
+  it("checks feature stylesheets", () => {
+    const css = `
+      /* font-size: 13px in a comment doesn't count */
+      #root { color: var(--x); }
+      .a { font-size: 13px; color: #fff; text-overflow: ellipsis; z-index: 5; }
+      .b { font-size: var(--text-meta); font-family: var(--font-mono); }`;
+    expect(count("src/features/example/example.css", css)).toEqual({
+      "feature-stylesheet": 1,
+      "css-font-size": 1,
+      "css-hex": 1,
+      "css-ellipsis": 1,
+      "css-mono": 1,
+      "css-z": 1,
+    });
+    expect(count("src/styles/theme.css", css)).toEqual({});
+    expect(count("src/shared/ui/feedback/example.css", css)).toEqual({});
+  });
+});
+
+describe("UI baseline updates", () => {
+  const known = (files: UiBaseline["files"]): UiBaseline => ({ rules: [...uiRuleIds], files });
+
+  it("lowers counts and drops fixed pairs", () => {
+    const update = nextUiBaseline(known({ "src/a.tsx": { ellipsis: 3, "arbitrary-px": 1 } }), {
+      "src/a.tsx": { ellipsis: 2 },
+    });
+    expect(update.baseline.files).toEqual({ "src/a.tsx": { ellipsis: 2 } });
+    expect(update.refused).toEqual([]);
+    expect(update.lowered).toHaveLength(2);
+  });
+
+  it("never adds a pair or raises a count for a rule it already knows", () => {
+    const update = nextUiBaseline(known({ "src/a.tsx": { ellipsis: 1 } }), {
+      "src/a.tsx": { ellipsis: 4 },
+      "src/b.tsx": { "native-title": 1 },
+    });
+    expect(update.baseline.files).toEqual({ "src/a.tsx": { ellipsis: 1 } });
+    expect(update.refused).toEqual([
+      "src/a.tsx: ellipsis 4 (baseline 1)",
+      "src/b.tsx: native-title 1 (baseline 0)",
+    ]);
+  });
+
+  it("records a rule new in this run from today's code", () => {
+    const previous: UiBaseline = {
+      rules: uiRuleIds.filter((id) => id !== "ellipsis"),
+      files: {},
+    };
+    const update = nextUiBaseline(previous, {
+      "src/a.tsx": { ellipsis: 2, "native-title": 1 },
+    });
+    expect(update.newRules).toEqual({ ellipsis: 2 });
+    expect(update.baseline.files).toEqual({ "src/a.tsx": { ellipsis: 2 } });
+    expect(update.baseline.rules).toEqual(uiRuleIds);
+    expect(update.refused).toEqual(["src/a.tsx: native-title 1 (baseline 0)"]);
   });
 });

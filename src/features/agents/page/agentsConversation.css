@@ -137,45 +137,6 @@
   align-items: center;
   min-height: 32px;
 }
-.agent-message-actions {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  height: 28px;
-  color: var(--color-cream-muted);
-  opacity: 0;
-  transition: opacity 120ms ease-out;
-}
-.agent-message-assistant .agent-message-actions {
-  margin-top: 4px;
-}
-.agent-message-actions[data-align="end"] {
-  justify-content: flex-end;
-}
-.agent-message-actions:focus-within,
-:is(.agent-message-assistant, .agent-message-user):hover .agent-message-actions {
-  opacity: 1;
-}
-.agent-message-actions button {
-  color: var(--color-cream-muted);
-}
-.agent-message-actions button:is(:hover, [aria-pressed="true"]) {
-  color: var(--color-cream);
-}
-.agent-message-time {
-  padding-inline: 6px;
-  font-size: 11px;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-.agent-message-actions[data-align="end"] .agent-message-time {
-  order: -1;
-}
-@media (hover: none) {
-  .agent-message-actions {
-    opacity: 1;
-  }
-}
 /* A reply's quote inside the person's bubble, and the target above the composer. */
 .agent-message-quote {
   display: -webkit-box;
@@ -215,7 +176,7 @@
 .agent-reply-target p span {
   color: var(--color-cream);
 }
-.agent-conversation .agent-message-user > div:not(.agent-message-actions) {
+.agent-conversation .agent-message-user > div:not([data-slot="message-actions"]) {
   max-width: min(82%, 72ch);
   padding: 10px 14px;
   border: 0;

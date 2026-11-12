@@ -8,6 +8,7 @@ import { Download, RefreshCw } from "lucide-react";
 import { useMemo, useState } from "react";
 import {
   Button,
+  ChoiceGroup,
   Dialog,
   DialogContent,
   DialogFooter,
@@ -16,11 +17,9 @@ import {
   Input,
   Label,
   ListRow,
-  ListRowButton,
+  OverflowFadeText,
   SearchField,
-  SegmentedControl,
   SkeletonList,
-  Spinner,
 } from "@/shared/ui";
 import {
   EmptyLine,
@@ -49,33 +48,30 @@ function DiscoverRow({
   onOpen: () => void;
   onInstall: () => void;
 }) {
+  // The row opens the details: skills.sh gives only name / repo / installs, and what a skill
+  // does is in its SKILL.md. Install stays at the row's end. A row has one muted line, so the
+  // description, the repository and the installs share it.
+  const details = [
+    skill.description,
+    `${skill.repoOwner}/${skill.repoName}`,
+    typeof skill.installs === "number" ? t("discover.installs", { count: skill.installs }) : "",
+  ].filter(Boolean);
   return (
-    <ListRow className="gap-2">
-      {/* The row opens the details: skills.sh gives only name / repo / installs, and what a skill
-          does is in its SKILL.md. Install is a sibling button. */}
-      <ListRowButton
-        onClick={onOpen}
+    // ListRow is a div; the list item around it keeps the list a list.
+    <li className="list-none">
+      <ListRow
+        label={skill.name}
+        description={details.join(" · ")}
         aria-label={t("discover.open", { name: skill.name })}
-        className="flex-col items-start gap-0.5"
-      >
-        <span className="w-full truncate text-sm font-medium text-cream-bright" title={skill.name}>
-          {skill.name}
-        </span>
-        {skill.description ? (
-          <span className="w-full truncate text-xs text-cream-muted">{skill.description}</span>
-        ) : null}
-        <span className="w-full truncate text-xs text-cream-muted">
-          {skill.repoOwner}/{skill.repoName}
-          {typeof skill.installs === "number"
-            ? ` · ${t("discover.installs", { count: skill.installs })}`
-            : ""}
-        </span>
-      </ListRowButton>
-      <Button variant="secondary" size="xs" disabled={busy || installed} onClick={onInstall}>
-        {busy ? <Spinner size="sm" label={false} /> : <Download aria-hidden />}
-        {installed ? t("discover.installed") : t("discover.install")}
-      </Button>
-    </ListRow>
+        className="gap-2"
+        onOpen={onOpen}
+        trailing={
+          <Button size="sm" icon={Download} loading={busy} disabled={installed} onClick={onInstall}>
+            {installed ? t("discover.installed") : t("discover.install")}
+          </Button>
+        }
+      />
+    </li>
   );
 }
 
@@ -109,11 +105,10 @@ function DiscoverSearchBar({
           if (event.key === "Enter") onSearch();
         }}
       />
-      <Button variant="secondary" size="sm" disabled={busy} onClick={onSearch}>
+      <Button disabled={busy} onClick={onSearch}>
         {t("discover.search")}
       </Button>
-      <Button variant="secondary" size="sm" disabled={busy || refreshing} onClick={onRefresh}>
-        {refreshing ? <Spinner size="sm" label={false} /> : <RefreshCw aria-hidden />}
+      <Button icon={RefreshCw} loading={refreshing} disabled={busy} onClick={onRefresh}>
         {t("common.refresh")}
       </Button>
     </div>
@@ -136,7 +131,7 @@ function BrowseModeBar({
 }) {
   return (
     <div className="flex items-center gap-1.5">
-      <SegmentedControl
+      <ChoiceGroup
         label="Browse"
         value={mode}
         onChange={onModeChange}
@@ -146,12 +141,11 @@ function BrowseModeBar({
         ]}
       />
       <span className="flex-1" />
-      <Button variant="secondary" size="xs" onClick={onManageRepos}>
+      <Button size="sm" onClick={onManageRepos}>
         {t("discover.manageRepos")}
       </Button>
       {mode === "repos" ? (
-        <Button variant="secondary" size="xs" disabled={scanning} onClick={onScan}>
-          {scanning ? <Spinner size="sm" label={false} /> : <RefreshCw aria-hidden />}
+        <Button icon={RefreshCw} loading={scanning} onClick={onScan}>
           {t("discover.scan")}
         </Button>
       ) : null}
@@ -164,7 +158,7 @@ function SearchSummaryBar({ totalCount, onClear }: { totalCount: number; onClear
   return (
     <div className="flex items-center justify-between gap-2">
       <p className="text-xs text-cream-muted">{t("discover.resultCount", { count: totalCount })}</p>
-      <Button variant="secondary" size="xs" onClick={onClear}>
+      <Button size="sm" onClick={onClear}>
         {t("discover.clearSearch")}
       </Button>
     </div>
@@ -437,11 +431,11 @@ function RepoDialog({
                 key={`${repo.owner}/${repo.name}`}
                 className="flex items-center justify-between gap-2 border-t border-charcoal-border py-1.5 first:border-t-0"
               >
-                <span className="truncate text-sm text-cream">
+                <OverflowFadeText full className="text-sm text-cream">
                   {repo.owner}/{repo.name}
                   <span className="ml-1 text-cream-muted">@{repo.branch}</span>
-                </span>
-                <Button variant="secondary" size="xs" onClick={() => remove(repo)}>
+                </OverflowFadeText>
+                <Button size="sm" onClick={() => remove(repo)}>
                   {t("repos.remove")}
                 </Button>
               </li>
@@ -472,15 +466,16 @@ function RepoDialog({
           </p>
         ) : null}
         <DialogFooter className="gap-2">
-          <Button variant="secondary" onClick={onClose}>
+          <Button size="lg" onClick={onClose}>
             {t("common.close")}
           </Button>
           <Button
+            size="lg"
             variant="primary"
-            disabled={busy || !owner.trim() || !name.trim()}
+            loading={busy}
+            disabled={!owner.trim() || !name.trim()}
             onClick={() => void add()}
           >
-            {busy ? <Spinner size="sm" label={false} /> : null}
             {t("repos.add")}
           </Button>
         </DialogFooter>

@@ -66,7 +66,7 @@ export default function EditorPane({ path }: { path: string }) {
     return (
       <div className="editor-error">
         <p>{entry.error}</p>
-        <Button size="xs" variant="outline" onClick={() => void reloadFile(path)}>
+        <Button size="sm" variant="secondary" onClick={() => void reloadFile(path)}>
           Try again
         </Button>
       </div>

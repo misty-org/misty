@@ -1,5 +1,5 @@
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { Check, Download, ExternalLink, LogIn, RefreshCw } from "lucide-react";
+import { Check, Download, ExternalLink, Globe, LogIn, MapPin, RefreshCw } from "lucide-react";
 import { useEffect, useState, type KeyboardEvent } from "react";
 import { EngineMark, hasEngineMark } from "@/features/engine-config/EngineMark";
 import { ENGINE_DOCS_URLS, ENGINE_NAMES, type EngineId } from "@/features/engine-config/channels";
@@ -14,8 +14,9 @@ import {
   cn,
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuTrigger,
+  MenuItem,
+  OverflowFadeText,
   Skeleton,
 } from "@/shared/ui";
 
@@ -83,73 +84,68 @@ export function EngineSetupRow({
           }
         : {})}
     >
-      <span className="flex size-9 shrink-0 items-center justify-center rounded-[9px] bg-charcoal-hover text-cream-bright">
+      <span className="flex size-9 shrink-0 items-center justify-center text-cream-bright">
         {hasEngineMark(engine) ? (
           <EngineMark engine={engine} size={18} />
         ) : (
           <span className="text-sm font-semibold">{name.charAt(0)}</span>
         )}
       </span>
-      <p className="min-w-0 flex-1 truncate text-sm font-medium text-cream-bright">{name}</p>
+      <OverflowFadeText full className="flex-1 text-sm font-medium text-cream-bright">
+        {name}
+      </OverflowFadeText>
       {state === "checking" ? (
-        <Skeleton aria-label={`Checking ${name}`} className="h-8 w-[88px] rounded-md" />
+        <Skeleton aria-label={`Checking ${name}`} className="h-8 w-22 rounded-md" />
       ) : state === "failed" ? (
-        <Button size="sm" variant="outline" disabled={view.loading} onClick={view.refresh}>
-          <RefreshCw />
+        <Button icon={RefreshCw} loading={view.loading} onClick={view.refresh}>
           Check again
         </Button>
       ) : state === "install" ? (
         <Button
-          size="sm"
-          variant="outline"
-          disabled={view.updating}
+          icon={Download}
+          loading={view.updating}
           aria-label={`Install ${name}`}
           onClick={() => void flow.begin()}
         >
-          <Download />
           Install
         </Button>
       ) : state === "get" ? (
         <Button
-          size="sm"
-          variant="outline"
+          icon={ExternalLink}
           aria-label={`Get ${name}`}
           onClick={() => void openUrl(ENGINE_DOCS_URLS[engine]).catch(() => {})}
         >
-          <ExternalLink />
           Get it
         </Button>
       ) : state === "sign-in" && engine === "minimax" ? (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button size="sm" variant="outline" aria-label={`Sign in to ${name}`}>
-              <LogIn />
+            <Button icon={LogIn} aria-label={`Sign in to ${name}`}>
               Sign in
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onSelect={() => setSigningIn({ provider: "global" })}>
-              Global account
-            </DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => setSigningIn({ provider: "cn" })}>
-              China account
-            </DropdownMenuItem>
+            <MenuItem
+              icon={Globe}
+              label="Global account"
+              onSelect={() => setSigningIn({ provider: "global" })}
+            />
+            <MenuItem
+              icon={MapPin}
+              label="China account"
+              onSelect={() => setSigningIn({ provider: "cn" })}
+            />
           </DropdownMenuContent>
         </DropdownMenu>
       ) : state === "sign-in" ? (
-        <Button
-          size="sm"
-          variant="outline"
-          aria-label={`Sign in to ${name}`}
-          onClick={() => setSigningIn({})}
-        >
-          <LogIn />
+        <Button icon={LogIn} aria-label={`Sign in to ${name}`} onClick={() => setSigningIn({})}>
           Sign in
         </Button>
       ) : onChoose ? (
-        <span className="inline-flex size-8 items-center justify-center text-cream-bright">
-          {chosen ? <Check className="size-4" aria-hidden="true" /> : null}
-        </span>
+        // A ready engine that can be picked shows the check only once it is the pick.
+        chosen ? (
+          <Check className="size-4 shrink-0 text-cream-bright" aria-label={`${name} chosen`} />
+        ) : null
       ) : (
         <span className="inline-flex h-8 items-center gap-1.5 px-2 text-sm text-cream-bright">
           <Check className="size-4" aria-hidden="true" />

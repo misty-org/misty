@@ -127,7 +127,7 @@ export function RunSteps(props: {
             className="activity-player-picture"
           />
           <div className="activity-player-bar">
-            <IconButton label={playing ? "Pause" : "Play back"} size="sm" onClick={play}>
+            <IconButton label={playing ? "Pause" : "Play back"} onClick={play}>
               {playing ? (
                 <Pause size={15} aria-hidden="true" />
               ) : (
@@ -195,7 +195,7 @@ export function RunSteps(props: {
             {described.hiddenCount} behind-the-scenes{" "}
             {described.hiddenCount === 1 ? "step" : "steps"}
           </span>
-          <Button size="sm" variant="ghost" onClick={() => setShowHidden((value) => !value)}>
+          <Button variant="quiet" onClick={() => setShowHidden((value) => !value)}>
             {showHidden ? "Hide them" : "Show them"}
           </Button>
         </div>

@@ -1,4 +1,4 @@
-import { IconButton, Pressable, Skeleton } from "@/shared/ui";
+import { IconButton, OverflowFadeText, Pressable, Skeleton } from "@/shared/ui";
 import { ChevronRight, FileText, Link2, PanelRightClose } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { UnifiedNote } from "../noteTypes";
@@ -92,7 +92,7 @@ function BacklinksInspector(props: {
                 onClick={() => props.onSelectNote?.(`misty:${backlink.id}`)}
               >
                 <FileText size={15} />
-                <span className="min-w-0 flex-1 truncate">{backlink.title}</span>
+                <OverflowFadeText className="flex-1">{backlink.title}</OverflowFadeText>
                 <ChevronRight size={14} />
               </Pressable>
             ))}

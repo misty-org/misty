@@ -20,3 +20,12 @@ export function splitFailure(text: string): { answer: string; reason: string } {
     reason: reason.length > longest ? `${reason.slice(0, longest - 1).trimEnd()}…` : reason,
   };
 }
+
+/** What a reply that never started says: it can be tried again, and what to do if that fails. */
+export const answerNotStarted =
+  "This answer didn't start. Try again, and if it fails again, quit Misty and open it again.";
+
+/** Replies saved before said only that Misty could not start the answer; they read the same now. */
+export function currentFailureWords(text: string): string {
+  return /could not start this answer/i.test(text) ? answerNotStarted : text;
+}

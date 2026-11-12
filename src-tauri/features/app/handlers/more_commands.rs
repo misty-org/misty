@@ -96,16 +96,9 @@ macro_rules! with_more_commands {
             #[cfg(desktop)]
             crate::browser::commands::browser_webviews_set_pointer_tracking,
             #[cfg(desktop)]
-            crate::browser::commands::browser_webviews_set_status_bubble,
-            #[cfg(desktop)]
             crate::browser::commands::browser_webview_stop,
             #[cfg(desktop)]
             crate::browser::commands::browser_clear_website_data,
-            #[cfg(desktop)]
-            crate::browser::commands::browser_choose_download_directory,
-            crate::browser::commands::browser_set_download_directory,
-            #[cfg(desktop)]
-            crate::browser::commands::browser_set_download_prompt,
             #[cfg(desktop)]
             crate::browser::commands::browser_webview_set_muted,
             #[cfg(desktop)]
@@ -150,10 +143,6 @@ macro_rules! with_more_commands {
             crate::browser::commands::browser_webviews_show_only,
             #[cfg(not(windows))]
             crate::browser::commands::browser_webviews_show_only,
-            #[cfg(windows)]
-            crate::browser::commands::browser_set_hidden_tab_sleep,
-            #[cfg(not(windows))]
-            crate::browser::commands::browser_set_hidden_tab_sleep,
             #[cfg(desktop)]
             crate::browser::commands::browser_webview_close,
             crate::browser::commands::browser_webview_sleep,
@@ -204,15 +193,15 @@ macro_rules! with_more_commands {
             crate::engines::commands::engine_settings_set,
             crate::engines::commands::engine_chat_clear,
             crate::engines::commands::engine_chat_resume,
-            crate::engines::commands::engine_history_list,
-            crate::engines::commands::engine_history_page,
-            crate::engines::commands::engine_history_search,
-            crate::engines::commands::engine_history_rename,
-            crate::engines::commands::engine_history_rescan,
+            crate::engines::history_commands::engine_history_list,
+            crate::engines::history_commands::engine_history_page,
+            crate::engines::history_commands::engine_history_search,
+            crate::engines::history_commands::engine_history_rename,
+            crate::engines::history_commands::engine_history_rescan,
             crate::engines::commands::engine_chat_fork,
-            crate::engines::commands::engine_history_read_file,
-            crate::engines::commands::engine_history_write_file,
-            crate::engines::commands::engine_history_open_file,
+            crate::engines::history_commands::engine_history_read_file,
+            crate::engines::history_commands::engine_history_write_file,
+            crate::engines::history_commands::engine_history_open_file,
             crate::engines::commands::space_folder_list,
             crate::engines::commands::space_folder_link,
             crate::engines::commands::space_folder_unlink,
@@ -345,7 +334,6 @@ macro_rules! with_more_commands {
             crate::project::open_app::project_open_in_browser,
             crate::agent_catalog::agent_catalog_list,
             crate::agent_catalog::agent_catalog_prompt,
-            crate::bots::bot_bundle_import,
             crate::bots::bot_bundle_export,
             #[cfg(any(target_os = "macos", windows, target_os = "linux"))]
             crate::computer_use::computer_use_permission_status,

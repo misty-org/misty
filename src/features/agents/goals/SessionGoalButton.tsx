@@ -36,7 +36,6 @@ export function SessionGoalButton({ conversationId }: { conversationId: string }
         <div className="flex gap-2">
           <Button
             type="button"
-            size="sm"
             disabled={!draft.trim()}
             onClick={() => {
               useSessionGoals.getState().set(conversationId, draft);
@@ -48,8 +47,7 @@ export function SessionGoalButton({ conversationId }: { conversationId: string }
           {goal ? (
             <Button
               type="button"
-              variant="ghost"
-              size="sm"
+              variant="quiet"
               onClick={() => {
                 useSessionGoals.getState().clear(conversationId);
                 setOpen(false);

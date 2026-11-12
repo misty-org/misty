@@ -6,10 +6,8 @@
 //!   SOUL.md     who the assistant is
 //!   AGENTS.md   how it works
 //!
-//! In Misty a bundle is one of the person's own agents: importing one makes an agent (the renderer
-//! saves it in misty.db with the person's other agents), and exporting writes an agent back out as a
-//! bundle. The soul, the per-agent tool, skill and MCP lists and the runtime map onto the agent's
-//! own fields. Memory stays Misty's: a bundle's memory settings are read and written so they
+//! In Misty a bundle is one of the person's own agents, written out by an export. The soul, the
+//! per-agent tool, skill and MCP lists and the runtime map onto the agent's own fields. Memory stays Misty's: a bundle's memory settings are read and written so they
 //! survive a round trip, but Misty's memory decides what is kept. Both dialogs run here, so a
 //! window never names a path of its own.
 
@@ -419,6 +417,7 @@ fn validated(bundle: BotBundle) -> Result<BotBundle, String> {
 
 // ---- files ----
 
+#[cfg(test)]
 fn read_text(path: &Path) -> Result<String, String> {
     if !fs::is_file(path) {
         return Ok(String::new());
@@ -432,8 +431,9 @@ fn file_name(path: &Path) -> String {
         .unwrap_or_default()
 }
 
-/// Reads a bundle folder. Only its three files are opened, each allowed read-only because the
-/// person picked the folder.
+/// Reads a bundle folder back, so the tests can check what an export writes. Only its three files
+/// are opened, each allowed read-only.
+#[cfg(test)]
 fn read_bundle(folder: &Path) -> Result<BotBundle, String> {
     let meta_path = folder.join(META_FILE);
     let soul_path = folder.join(SOUL_FILE);
@@ -537,18 +537,6 @@ async fn pick_folder(app: &AppHandle, title: &str) -> Result<Option<PathBuf>, St
         .into_path()
         .map(Some)
         .map_err(|_| "Choose a folder on this computer.".to_string())
-}
-
-/// Reads the bot folder the person picks, for the renderer to make an agent from. `None` when
-/// they cancel.
-#[tauri::command]
-pub async fn bot_bundle_import(app: AppHandle) -> Result<Option<BotBundle>, String> {
-    let Some(folder) = pick_folder(&app, "Choose a bot folder").await? else {
-        return Ok(None);
-    };
-    tauri::async_runtime::spawn_blocking(move || read_bundle(&folder).map(Some))
-        .await
-        .map_err(|error| error.to_string())?
 }
 
 /// Writes an agent out as a bot folder inside the folder the person picks. Returns the folder's

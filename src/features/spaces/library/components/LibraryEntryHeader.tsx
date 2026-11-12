@@ -9,7 +9,6 @@ import {
   CollectionFilterMenu,
   CollectionViewToggle,
   IconButton,
-  NavIsland,
 } from "@/shared/ui";
 import { Plus, Upload, Minus } from "lucide-react";
 import { useSpaceLibraryContext } from "../SpaceLibraryContext";
@@ -28,7 +27,7 @@ export function LibraryEntryHeader() {
     <>
       <CollectionHeading
         title="Library"
-        actions={
+        end={
           <>
             <CollectionSearch
               aria-label="Search library"
@@ -38,14 +37,13 @@ export function LibraryEntryHeader() {
               onFocus={() => data.setSearchFocused(true)}
               onBlur={() => window.setTimeout(() => data.setSearchFocused(false), 120)}
             />
-            {data.collection !== "deleted" && upload.uploadAvailable && (
+            {data.collection !== "deleted" && upload.inHeader && (
               <Button
                 variant="primary"
-                className="px-4"
+                icon={Upload}
                 disabled={upload.uploadDisabled || upload.uploading}
                 onClick={upload.onUpload}
               >
-                <Upload />
                 {upload.uploading ? "Uploading…" : "Upload files"}
               </Button>
             )}
@@ -95,7 +93,7 @@ export function LibraryEntryHeader() {
         utilities={
           <>
             {data.libraryViewMode === "grid" && (
-              <NavIsland aria-label="Item scale">
+              <div role="group" aria-label="Item scale" className="flex items-center gap-1">
                 <IconButton
                   label="Zoom out"
                   disabled={data.libraryItemScale <= 0}
@@ -110,7 +108,7 @@ export function LibraryEntryHeader() {
                 >
                   <Plus />
                 </IconButton>
-              </NavIsland>
+              </div>
             )}
             <SpaceLibraryUploadTray jobs={data.uploadJobs} onClear={() => data.setUploadJobs([])} />
           </>

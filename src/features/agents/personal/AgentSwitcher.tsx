@@ -1,9 +1,8 @@
 import { useState, type Ref } from "react";
-import { Check, Plus, Settings } from "lucide-react";
+import { Plus, Settings } from "lucide-react";
 import type { AgentProfile } from "@/shared/schemas";
 import type { GlobalAiConversation } from "../conversations/state/conversationTypes";
 import {
-  cn,
   Command,
   CommandGroup,
   CommandItem,
@@ -55,12 +54,12 @@ export function AgentSwitcher({
       <MenuTrigger
         ref={triggerRef}
         kind="popover"
-        className={cn(className, iconOnly && "[&_span.truncate]:sr-only")}
+        className={className}
         label={`Switch agent: ${selectedAgent?.name || "Agents"}`}
         value={selectedAgent?.name || "Agents"}
         icon={<AgentAvatar agent={selectedAgent} />}
+        iconOnly={iconOnly}
         chevron={!iconOnly}
-        title={iconOnly ? selectedAgent?.name || "Agents" : undefined}
         data-agent-navigation-control
       />
       <PopoverContent
@@ -80,49 +79,40 @@ export function AgentSwitcher({
                   key={agent.id}
                   value={`agent:${agent.id}`}
                   disabled={disabled}
-                  className="group"
+                  icon={
+                    <span className="size-6 shrink-0 [&_.agent-avatar]:!size-6">
+                      <AgentAvatar agent={agent} />
+                    </span>
+                  }
+                  label={agent.name}
+                  shortcut={agent.enabled ? undefined : "Disabled"}
+                  checked={agent.id === selectedAgent?.id}
+                  end={
+                    <IconButton
+                      size="sm"
+                      label={`${agent.name} settings`}
+                      disabled={disabled}
+                      onClick={() => choose(() => onSettings(agent.id))}
+                    >
+                      <Settings />
+                    </IconButton>
+                  }
                   onSelect={() =>
                     choose(() => {
                       if (agent.id !== selectedAgent?.id) onSelect(agent.id);
                     })
                   }
-                >
-                  <span className="size-6 shrink-0 [&_.agent-avatar]:!size-6">
-                    <AgentAvatar agent={agent} />
-                  </span>
-                  <span className="min-w-0 flex-1 truncate">{agent.name}</span>
-                  {!agent.enabled && <span className="text-xs text-cream-muted">Disabled</span>}
-                  <span className="relative flex size-6 shrink-0 items-center justify-center">
-                    {agent.id === selectedAgent?.id && (
-                      <Check
-                        aria-label="Current agent"
-                        className="group-hover:invisible group-data-[selected=true]:invisible"
-                      />
-                    )}
-                    <IconButton
-                      label={`${agent.name} settings`}
-                      disabled={disabled}
-                      className={cn(
-                        "absolute inset-0 !h-auto !w-auto opacity-0 focus-visible:opacity-100",
-                        "group-hover:opacity-100 group-data-[selected=true]:opacity-100",
-                      )}
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        choose(() => onSettings(agent.id));
-                      }}
-                    >
-                      <Settings className="size-4" />
-                    </IconButton>
-                  </span>
-                </CommandItem>
+                />
               ))}
             </CommandGroup>
             <CommandSeparator />
             <CommandGroup>
-              <CommandItem disabled={disabled} onSelect={() => choose(() => setCreating(true))}>
-                <Plus />
-                New agent
-              </CommandItem>
+              <CommandItem
+                icon={Plus}
+                label="New agent"
+                disabled={disabled}
+                onSelect={() => choose(() => setCreating(true))}
+              />
             </CommandGroup>
           </CommandList>
         </Command>

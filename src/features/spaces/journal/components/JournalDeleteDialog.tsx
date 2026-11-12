@@ -7,7 +7,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  ErrorNotification,
+  useNotice,
 } from "@/shared/ui";
 import { useEffect, useState } from "react";
 
@@ -23,6 +23,11 @@ export function JournalDeleteDialog(props: {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const label = props.kind === "drawing" ? "drawing" : "note";
+  useNotice(Boolean(error), {
+    message: error ?? "",
+    tone: "error",
+    onDismiss: () => setError(null),
+  });
 
   useEffect(() => {
     setBusy(false);
@@ -59,7 +64,6 @@ export function JournalDeleteDialog(props: {
             undone.
           </AlertDialogDescription>
         </AlertDialogHeader>
-        <ErrorNotification message={error} onDismiss={() => setError(null)} />
         <AlertDialogFooter>
           <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
           <AlertDialogAction

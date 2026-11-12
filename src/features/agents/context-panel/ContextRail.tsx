@@ -44,7 +44,6 @@ export function ContextRail() {
             <IconButton
               key={id}
               label={label}
-              size="sm"
               className="context-rail-button"
               aria-pressed={open === id}
               onClick={() => toggle(id)}

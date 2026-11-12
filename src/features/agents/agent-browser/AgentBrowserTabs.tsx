@@ -1,7 +1,7 @@
 import { Globe, Plus, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { parseBrowserViewState } from "@/features/app-windows";
-import { IconButton, OverflowFadeText, Pressable, Spinner } from "@/shared/ui";
+import { IconButton, OverflowFadeText, Pressable, Spinner, Tooltip } from "@/shared/ui";
 import { addPersonTab } from "../tabs/agentPersonTabs";
 import { closeAgentTab } from "../tabs/agentTabs";
 import {
@@ -85,42 +85,43 @@ export function AgentBrowserTabs({
         const label = agentTabLabel(tab);
         return (
           <div key={scope} className="agent-browser-tab-wrap" data-active={active || undefined}>
-            <Pressable
-              role="tab"
-              aria-selected={active}
-              tabIndex={active ? 0 : -1}
-              title={label}
-              data-scope={scope}
-              className="agent-browser-tab"
-              onClick={() => select(scope)}
-              // A middle click closes a tab, as in Misty's own browser.
-              onAuxClick={(event) => {
-                if (event.button !== 1) return;
-                event.preventDefault();
-                void closeAgentTab(scope);
-              }}
-              onKeyDown={(event) => {
-                const count = view.tabs.length;
-                const next =
-                  event.key === "ArrowRight"
-                    ? (index + 1) % count
-                    : event.key === "ArrowLeft"
-                      ? (index + count - 1) % count
-                      : event.key === "Home"
-                        ? 0
-                        : event.key === "End"
-                          ? count - 1
-                          : -1;
-                if (event.altKey || event.ctrlKey || event.metaKey || next < 0) return;
-                event.preventDefault();
-                select(view.tabs[next]!, true);
-              }}
-            >
-              <AgentTabIcon tab={tab} active={active} />
-              <OverflowFadeText className="min-w-0 flex-1 whitespace-nowrap text-left">
-                {label}
-              </OverflowFadeText>
-            </Pressable>
+            <Tooltip content={label}>
+              <Pressable
+                role="tab"
+                aria-selected={active}
+                tabIndex={active ? 0 : -1}
+                data-scope={scope}
+                className="agent-browser-tab"
+                onClick={() => select(scope)}
+                // A middle click closes a tab, as in Misty's own browser.
+                onAuxClick={(event) => {
+                  if (event.button !== 1) return;
+                  event.preventDefault();
+                  void closeAgentTab(scope);
+                }}
+                onKeyDown={(event) => {
+                  const count = view.tabs.length;
+                  const next =
+                    event.key === "ArrowRight"
+                      ? (index + 1) % count
+                      : event.key === "ArrowLeft"
+                        ? (index + count - 1) % count
+                        : event.key === "Home"
+                          ? 0
+                          : event.key === "End"
+                            ? count - 1
+                            : -1;
+                  if (event.altKey || event.ctrlKey || event.metaKey || next < 0) return;
+                  event.preventDefault();
+                  select(view.tabs[next]!, true);
+                }}
+              >
+                <AgentTabIcon tab={tab} active={active} />
+                <OverflowFadeText className="min-w-0 flex-1 whitespace-nowrap text-left">
+                  {label}
+                </OverflowFadeText>
+              </Pressable>
+            </Tooltip>
             <IconButton
               label={`Close ${label}`}
               className="agent-browser-tab-close"

@@ -12,7 +12,7 @@ import {
   StickyNote,
   Type,
 } from "lucide-react";
-import { Button, Checkbox, IconButton, Input, Pressable } from "@/shared/ui";
+import { Button, Checkbox, IconButton, Input, Pressable, OverflowFadeText } from "@/shared/ui";
 import { jobTitle } from "../tutorPrompts";
 import { startJob } from "../tutorRuns";
 import { researchPrompt } from "../tutorStudio";
@@ -95,10 +95,10 @@ export function SourcesPanel({
     return (
       <aside className="tutor-pane tutor-pane-rail" aria-label="Sources">
         <IconButton label="Show sources" onClick={() => onCollapse(false)}>
-          <PanelLeftOpen size={16} />
+          <PanelLeftOpen />
         </IconButton>
         <IconButton label="Add sources" onClick={onAdd}>
-          <Plus size={16} />
+          <Plus />
         </IconButton>
       </aside>
     );
@@ -108,16 +108,14 @@ export function SourcesPanel({
       <header className="tutor-pane-head">
         <h2>Sources</h2>
         <IconButton label="Hide sources" onClick={() => onCollapse(true)}>
-          <PanelLeftClose size={16} />
+          <PanelLeftClose />
         </IconButton>
       </header>
       <div className="tutor-pane-actions">
-        <Button variant="outline" size="sm" onClick={onAdd}>
-          <Plus size={15} />
+        <Button onClick={onAdd} icon={Plus}>
           Sources
         </Button>
-        <Button variant="outline" size="sm" onClick={onNewNote}>
-          <Plus size={15} />
+        <Button onClick={onNewNote} icon={Plus}>
           Note
         </Button>
       </div>
@@ -131,7 +129,7 @@ export function SourcesPanel({
           onChange={(event) => setQuery(event.target.value)}
         />
         <IconButton label="Find sources" type="submit" disabled={!query.trim()}>
-          <ArrowRight size={15} />
+          <ArrowRight />
         </IconButton>
       </form>
 
@@ -139,9 +137,9 @@ export function SourcesPanel({
         {researching.map((job) => (
           <div key={job.id} className="tutor-source-item" aria-busy="true">
             <Globe size={15} className="tutor-source-icon" />
-            <span className="misty-shimmer truncate">
+            <OverflowFadeText className="misty-shimmer">
               {job.state === "queued" ? "Waiting to search the web" : "Searching the web"}
-            </span>
+            </OverflowFadeText>
           </div>
         ))}
         {notebook.sources.length ? (
@@ -162,9 +160,9 @@ export function SourcesPanel({
               onClick={() => onOpen({ kind: "source", id: source.id })}
             >
               <span className="tutor-source-icon">{sourceIcon(source)}</span>
-              <span className={source.reading ? "truncate misty-shimmer" : "truncate"}>
+              <OverflowFadeText className={source.reading ? "misty-shimmer" : undefined}>
                 {source.title}
-              </span>
+              </OverflowFadeText>
             </Pressable>
             <Checkbox
               aria-label={`Use ${source.title}`}
@@ -188,16 +186,14 @@ export function SourcesPanel({
             <span className="tutor-source-icon">
               <StickyNote size={15} />
             </span>
-            <span className="truncate">{note.title || "Untitled note"}</span>
+            <OverflowFadeText>{note.title || "Untitled note"}</OverflowFadeText>
           </Pressable>
         ))}
         {!notebook.sources.length && !researching.length ? (
           <div className="tutor-pane-empty">
             <FileText size={22} aria-hidden="true" />
             <p>Saved sources will appear here.</p>
-            <Button variant="outline" size="sm" onClick={onAdd}>
-              Add sources
-            </Button>
+            <Button onClick={onAdd}>Add sources</Button>
           </div>
         ) : null}
       </div>

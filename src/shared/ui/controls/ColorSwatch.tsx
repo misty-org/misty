@@ -6,9 +6,11 @@ type SwatchShape = "circle" | "square";
 
 const swatchClass = (shape: SwatchShape) =>
   cn(
-    "size-5 shrink-0 border border-charcoal-border outline-none transition-[box-shadow,transform]",
-    "hover:scale-110 focus-visible:ring-2 focus-visible:ring-cream-muted",
-    "aria-pressed:ring-2 aria-pressed:ring-cream aria-pressed:ring-offset-1 aria-pressed:ring-offset-charcoal-card",
+    "size-5 shrink-0 border border-charcoal-border outline-none transition-[box-shadow,border-color]",
+    "hover:border-cream-muted focus-visible:border-cream",
+    // The selected mark is a shadow, not a ring: the app clears rings on focus, and the swatch
+    // just picked keeps focus.
+    "aria-pressed:shadow-[0_0_0_1px_var(--color-charcoal-card),0_0_0_3px_var(--color-cream)]",
     shape === "circle" ? "rounded-full" : "rounded-md",
   );
 
@@ -40,19 +42,17 @@ ColorSwatch.displayName = "ColorSwatch";
 type CustomColorSwatchProps = {
   value: string;
   label: string;
-  title?: string;
   onChange: (color: string) => void;
 };
 
-/** Opens the system color picker; sits after a row of ColorSwatches. */
-function CustomColorSwatch({ value, label, title, onChange }: CustomColorSwatchProps) {
+/** Opens the system color picker; sits after a row of ColorSwatches, at their size. */
+function CustomColorSwatch({ value, label, onChange }: CustomColorSwatchProps) {
   return (
     <label
       data-slot="custom-color-swatch"
-      title={title ?? label}
       className={cn(
-        "relative grid size-6 shrink-0 cursor-pointer place-items-center rounded-md text-cream-muted",
-        "transition-colors hover:bg-control-hover hover:text-cream focus-within:ring-2 focus-within:ring-cream-muted",
+        "relative grid size-5 shrink-0 cursor-pointer place-items-center rounded-sm text-cream-muted",
+        "transition-colors hover:bg-control-hover hover:text-cream focus-within:bg-control-hover focus-within:text-cream",
       )}
     >
       <Palette className="pointer-events-none size-3.5" />

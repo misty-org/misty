@@ -13,7 +13,7 @@ use super::{
     web_search::{provider::SearchProviderId, search_step::DeviceSearch},
 };
 
-const PROVIDERS: [ProviderId; 12] = [
+const PROVIDERS: [ProviderId; 11] = [
     ProviderId::Openai,
     ProviderId::Anthropic,
     ProviderId::Google,
@@ -23,7 +23,6 @@ const PROVIDERS: [ProviderId; 12] = [
     ProviderId::Ollama,
     ProviderId::OllamaCloud,
     ProviderId::OpenaiCompatible,
-    ProviderId::Chatgpt,
     ProviderId::Elevenlabs,
     ProviderId::Soniox,
 ];

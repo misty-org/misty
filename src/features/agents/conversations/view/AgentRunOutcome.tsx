@@ -49,12 +49,7 @@ export function AgentRunOutcome({
     );
   const retry =
     retryPrompt && message.retryable !== false ? (
-      <Button
-        variant="primary"
-        size="sm"
-        disabled={working}
-        onClick={() => onRetry(retryPrompt, retryFrom)}
-      >
+      <Button variant="primary" disabled={working} onClick={() => onRetry(retryPrompt, retryFrom)}>
         Try again
       </Button>
     ) : undefined;

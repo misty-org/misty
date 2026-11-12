@@ -1,5 +1,12 @@
 import { routes } from "@/app/shell";
-import { Avatar, AvatarFallback, Button, IconButton, Pressable } from "@/shared/ui";
+import {
+  Avatar,
+  AvatarFallback,
+  Button,
+  IconButton,
+  OverflowFadeText,
+  Pressable,
+} from "@/shared/ui";
 import { Trash2, UserPlus } from "lucide-react";
 import { useState } from "react";
 import { Navigate, NavLink, useLocation } from "react-router-dom";
@@ -117,10 +124,12 @@ export default function SignIn() {
                     </AvatarFallback>
                   </Avatar>
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-medium text-cream">
+                    <OverflowFadeText className="text-sm font-medium text-cream">
                       {account.username || account.email}
-                    </span>
-                    <span className="block truncate text-xs text-cream-muted">{account.email}</span>
+                    </OverflowFadeText>
+                    <OverflowFadeText className="text-xs text-cream-muted">
+                      {account.email}
+                    </OverflowFadeText>
                   </span>
                   {busyAccountId === account.id ? (
                     <span className="shrink-0 pr-1 text-xs text-cream-muted">Signing in…</span>
@@ -128,12 +137,12 @@ export default function SignIn() {
                 </Pressable>
                 <IconButton
                   label={`Remove ${account.email}`}
-                  title="Remove from this computer"
+                  hint="Remove from this computer"
                   className="mr-1 shrink-0 opacity-0 transition-opacity focus-visible:opacity-100 group-hover:opacity-100"
                   onClick={() => void handleRemove(account)}
                   disabled={Boolean(busyAccountId) || transitioning}
                 >
-                  <Trash2 size={15} />
+                  <Trash2 />
                 </IconButton>
               </div>
             ))}
@@ -144,7 +153,8 @@ export default function SignIn() {
             ) : null}
             {error ? <AuthMessage tone="error" message={error} /> : null}
             <Button
-              variant="outline"
+              variant="secondary"
+              icon={UserPlus}
               className="mt-1 h-11 justify-start px-3 text-cream-muted"
               disabled={Boolean(busyAccountId) || transitioning}
               onClick={() => {
@@ -153,7 +163,6 @@ export default function SignIn() {
                 setMode("login");
               }}
             >
-              <UserPlus size={16} className="shrink-0" />
               Use another account
             </Button>
           </div>

@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Pressable, Skeleton } from "@/shared/ui";
+import { OverflowFadeText, Pressable, Skeleton, Tooltip } from "@/shared/ui";
 import { HomeSection } from "./HomeSection";
 import "./spaceOverview.css";
 
@@ -48,7 +48,9 @@ export function OverviewRow(props: {
         {props.leading}
       </span>
       <span className="grid min-w-0 flex-1 gap-0.5">
-        <span className="truncate text-sm text-cream">{props.title}</span>
+        <OverflowFadeText full className="text-sm text-cream">
+          {props.title}
+        </OverflowFadeText>
         {props.detail ? <span className="overview-row-detail">{props.detail}</span> : null}
       </span>
       {props.trailing ? <span className="overview-row-end">{props.trailing}</span> : null}
@@ -68,15 +70,11 @@ export function OverviewStatus({ status }: { status: string | undefined }) {
           : "";
   if (!word) return null;
   return (
-    <span
-      className="overview-status"
-      data-status={status}
-      role="img"
-      aria-label={word}
-      title={word}
-    >
-      <span className="overview-dot" data-status={status} />
-    </span>
+    <Tooltip content={word}>
+      <span className="overview-status" data-status={status} role="img" aria-label={word}>
+        <span className="overview-dot" data-status={status} />
+      </span>
+    </Tooltip>
   );
 }
 

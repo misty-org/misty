@@ -23,6 +23,9 @@ const desktopLayoutPromise = import("@/app/layouts/DesktopLayout").then((layout)
   default: layout.DesktopLayout,
 }));
 const DesktopLayout = lazy(() => desktopLayoutPromise);
+/** Half of each of the splash flight's sweeps (3.4s across, 2.6s up and down). */
+const splashStartsCentered =
+  "[&_.misty-fly-x]:[animation-delay:-1.7s] [&_.misty-fly-y]:[animation-delay:-1.3s]";
 
 export function AppFrameLayout() {
   const { user, transitioning } = useAuth();
@@ -74,6 +77,10 @@ export function AppFrameLayout() {
     <LoadingScreen
       key="splash"
       fullScreen
+      // Misty's sweep starts at the left end of her track, so a window that paints its first
+      // frame and then holds it (hidden right after a reload) showed her stuck at the edge. Half a
+      // pass in, she starts in the middle, heading out.
+      className={splashStartsCentered}
       label={splashLabel}
       leaving={!loadingLabel}
       onLeft={clearLeaving}

@@ -103,7 +103,7 @@ export function McpDetailDialog({
             <Row label={copy.detailPath}>
               <span className="flex items-start justify-end gap-1">
                 <span className="break-all font-mono text-xs">{entry.path}</span>
-                <IconButton label={copy.reveal} size="xs" variant="ghost" onClick={reveal}>
+                <IconButton label={copy.reveal} size="sm" onClick={reveal}>
                   <FolderOpen aria-hidden />
                 </IconButton>
               </span>

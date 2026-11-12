@@ -1,4 +1,4 @@
-import { ErrorNotification } from "@/shared/ui";
+import { useNotice } from "@/shared/ui";
 import { useEffect, useState } from "react";
 import { aiSurfaceApi } from "../runs/invocations/api";
 import { DesktopSettingsRow } from "@/features/settings";
@@ -33,6 +33,7 @@ export function PaymentsAskSection() {
       setWorking(false);
     }
   };
+  useNotice(Boolean(error), { message: error, tone: "error", onDismiss: () => setError("") });
   return (
     <>
       <DesktopSettingsRow label="Ask before paying" description="Even while a chat is in Auto.">
@@ -42,7 +43,6 @@ export function PaymentsAskSection() {
           onChange={(value) => void change(value)}
         />
       </DesktopSettingsRow>
-      <ErrorNotification message={error} onDismiss={() => setError("")} />
     </>
   );
 }

@@ -6,6 +6,7 @@ vi.mock("@/features/agents/grants/api", async (original) => ({
   grantsApi: { list: mocks.list, revoke: mocks.revoke, revokeAll: mocks.revokeAll },
 }));
 vi.mock("@/shared/lib/confirmAction", () => ({ confirmAction: vi.fn(async () => true) }));
+import { NoticeViewport } from "@/shared/ui";
 import { AgentGrantsSection } from "./AgentGrantsSection";
 
 afterEach(cleanup);
@@ -51,8 +52,16 @@ it("revokes every grant for an agent", async () => {
 
 it("explains a failed load in plain language", async () => {
   mocks.list.mockRejectedValueOnce(new Error("500 internal"));
-  render(<AgentGrantsSection />);
+  render(
+    <>
+      <NoticeViewport />
+      <AgentGrantsSection />
+    </>,
+  );
   await act(async () => {});
-  expect(screen.getByRole("alert").textContent).toMatch(/couldn’t load your remembered approvals/);
+  // The failure is a notice in the corner.
+  expect((await screen.findByRole("alert")).textContent).toMatch(
+    /couldn’t load your remembered approvals/,
+  );
   expect(screen.queryByText(/500/)).toBeNull();
 });

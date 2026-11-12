@@ -20,13 +20,9 @@ pub mod sync;
 mod voice;
 
 pub fn run() {
-    // Only development builds adjust the context.
-    #[cfg_attr(not(all(desktop, debug_assertions)), allow(unused_mut))]
-    let mut context = tauri::generate_context!();
-    #[cfg(all(desktop, debug_assertions))]
-    database::development_profile::configure(&mut context).expect("invalid development profile");
+    let context = tauri::generate_context!();
     // The credential store lives in the same database as every other store, so both must
-    // resolve the same data root (tests and development profiles can move it).
+    // resolve the same data root (tests can move it).
     if let Some(home) = file_access::paths::misty_home_dir() {
         // Before anything can open the database. Going on after a failed move would start from an
         // empty store and leave the person's real one behind, so Misty stops and tries next launch.

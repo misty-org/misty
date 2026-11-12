@@ -36,6 +36,7 @@ mod codex_provider_env;
 mod codex_read_only;
 mod codex_usage;
 pub mod commands;
+pub mod history_commands;
 pub mod dsh;
 mod dsh_images;
 mod dsh_session;
@@ -478,14 +479,15 @@ pub async fn list() -> Vec<EngineInfo> {
     let found = tauri::async_runtime::spawn_blocking(list_engines_blocking)
         .await
         .unwrap_or_default();
-    let mut engines = Vec::with_capacity(found.len());
-    for (mut info, bin) in found {
+    // Each installed engine is asked for its version at once: one after another, a few slow CLIs
+    // held every list (the agent switcher, Access › Approvals) for their timeouts added up.
+    futures_util::future::join_all(found.into_iter().map(|(mut info, bin)| async move {
         if info.installed {
             info.version = resolve::version_of(&bin).await;
         }
-        engines.push(info);
-    }
-    engines
+        info
+    }))
+    .await
 }
 
 fn list_engines_blocking() -> Vec<(EngineInfo, String)> {
@@ -588,6 +590,18 @@ pub async fn models(engine: &str) -> Vec<EngineModel> {
         .collect()
 }
 
+/// Why the engine layer didn't open at launch, kept so a run can say so instead of only that the
+/// engines aren't ready.
+static INSTALL_ERROR: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+
+/// The reason a run gives when the engine layer isn't open.
+pub(crate) fn not_ready() -> String {
+    match INSTALL_ERROR.get() {
+        Some(error) => format!("The engine layer could not open: {error}"),
+        None => "The engines aren't ready yet.".to_string(),
+    }
+}
+
 /// Opens the engine layer as the app starts: its tables in misty.db, its events to the run
 /// bridge, the gate's decider, then the background work desktop-cc-gui does at launch (stale
 /// staging sweeps, the history scan of the linked folders, the DeepSeek Harness host).
@@ -596,6 +610,7 @@ pub fn start(app: &tauri::App) {
         Ok(state) => state,
         Err(error) => {
             eprintln!("[engines] the engine layer could not open: {error}");
+            let _ = INSTALL_ERROR.set(error);
             return;
         }
     };

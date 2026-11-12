@@ -5,9 +5,8 @@ import {
   DropdownMenu,
   DropdownMenuTrigger,
   IconButton,
-  Notification,
-  toolbarIconProps,
-  TooltipHint,
+  Tooltip,
+  useNotice,
 } from "@/shared/ui";
 import { preloadSettingsWorkspace } from "@/features/settings";
 import { AccountNavButton } from "./NavRail";
@@ -44,6 +43,17 @@ export function AccountIsland(props: {
   useEffect(() => {
     if (!expired) setNoticeDismissed(false);
   }, [expired]);
+  useNotice(expired && !noticeDismissed, {
+    message: "You've been signed out. Sign in to get your Spaces and sync back.",
+    action: {
+      label: "Sign in",
+      onSelect: () => {
+        setNoticeDismissed(true);
+        props.onSignIn(true);
+      },
+    },
+    onDismiss: () => setNoticeDismissed(true),
+  });
   return (
     <div
       className="misty-sidebar-account"
@@ -54,8 +64,7 @@ export function AccountIsland(props: {
     >
       {props.signedOut || expired ? (
         <Button
-          variant="ghost"
-          type="button"
+          variant="quiet"
           className="mr-auto h-7 border-0 px-2 text-cream"
           onClick={() => props.onSignIn(expired)}
         >
@@ -63,7 +72,7 @@ export function AccountIsland(props: {
         </Button>
       ) : (
         <DropdownMenu open={props.open} onOpenChange={props.onOpenChange} modal={false}>
-          <TooltipHint content="Account">
+          <Tooltip content="Account">
             <DropdownMenuTrigger asChild>
               <AccountNavButton
                 open={props.open}
@@ -72,30 +81,13 @@ export function AccountIsland(props: {
                 className={rowButtonClass}
               />
             </DropdownMenuTrigger>
-          </TooltipHint>
+          </Tooltip>
           <AccountMenu
             onClose={() => props.onOpenChange(false)}
             onOpenAccountSettings={props.onOpenAccountSettings}
           />
         </DropdownMenu>
       )}
-      {expired && !noticeDismissed ? (
-        <Notification onDismiss={() => setNoticeDismissed(true)}>
-          You've been signed out. Sign in to get your Spaces and sync back.
-          <br />
-          <Button
-            type="button"
-            variant="link"
-            size="none"
-            onClick={() => {
-              setNoticeDismissed(true);
-              props.onSignIn(true);
-            }}
-          >
-            Sign in
-          </Button>
-        </Notification>
-      ) : null}
       <IconButton
         label="Settings"
         className="ml-auto"
@@ -104,8 +96,7 @@ export function AccountIsland(props: {
         onFocus={() => void preloadSettingsWorkspace().catch(() => undefined)}
         onClick={props.onSettingsClick}
       >
-        {/* A round glyph: the sidebar draws it a size down so it reads like the line icons. */}
-        <Settings {...toolbarIconProps} className="size-4" />
+        <Settings />
       </IconButton>
     </div>
   );

@@ -20,10 +20,7 @@ try {
   if (basename(binary) !== "misty-desktop") {
     throw new Error("The Misty development runner only signs misty-desktop.");
   }
-  const app = prepareDevelopmentBundle(
-    binary,
-    process.env.MISTY_PROFILE,
-  );
+  const app = prepareDevelopmentBundle(binary);
   signDevelopmentBinary(app.bundle, identity);
   const environment = Object.fromEntries(
     Object.entries(process.env).filter(

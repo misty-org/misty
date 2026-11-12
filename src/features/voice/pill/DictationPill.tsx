@@ -66,9 +66,8 @@ export function DictationPill() {
       {listening && (
         <IconButton
           label="Mute and stop dictation"
-          tooltip="Mute"
-          shape="round"
-          size="xs"
+          hint="Mute"
+          size="sm"
           className="dictation-pill-button"
           onClick={() => void emit("misty://dictation-pill-stop", {})}
         >

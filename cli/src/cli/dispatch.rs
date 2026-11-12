@@ -65,8 +65,8 @@ pub fn dispatch(arguments: Cli, settings: Settings) -> Result<()> {
         },
         Command::Build => crate::guide::build(&settings.workspace),
         Command::Desktop(command) => match command.command {
-            DesktopCommand::Dev { profile, route } => {
-                desktop::dev(&settings.workspace, profile.as_deref(), route.as_deref())
+            DesktopCommand::Dev { route } => {
+                desktop::dev(&settings.workspace, route.as_deref())
             }
             DesktopCommand::Clean { apply } => desktop::clean(&settings.workspace, apply),
             DesktopCommand::Icons { command } => match command {

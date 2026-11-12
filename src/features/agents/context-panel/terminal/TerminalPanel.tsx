@@ -91,8 +91,7 @@ export default function TerminalPanel({ folder }: { folder: string }) {
               </Pressable>
               <IconButton
                 label="Close terminal"
-                size="2xs"
-                shape="round"
+                size="sm"
                 className="terminal-tab-close"
                 onClick={() => closeTab(folder, tab.id)}
               >
@@ -101,7 +100,7 @@ export default function TerminalPanel({ folder }: { folder: string }) {
             </div>
           );
         })}
-        <IconButton label="New terminal" size="xs" onClick={() => newTab(folder)}>
+        <IconButton label="New terminal" size="sm" onClick={() => newTab(folder)}>
           <Plus />
         </IconButton>
       </div>

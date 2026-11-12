@@ -63,7 +63,6 @@
   font-size: 14px;
   color: var(--color-cream-bright);
   overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
 }
 .tutor-card-detail {
@@ -221,25 +220,6 @@
 .tutor-row-lead > svg {
   flex: none;
   color: var(--color-cream-muted);
-}
-.tutor-job {
-  padding: 4px 6px 4px 0;
-}
-.tutor-job-open {
-  display: flex;
-  flex: 1;
-  min-width: 0;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 6px 8px 6px 14px;
-  text-align: left;
-}
-.tutor-job[data-state="failed"] .tutor-card-detail {
-  max-width: 50%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 @container agent-studio (max-width: 860px) {

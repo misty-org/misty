@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type { AgentProfile } from "@/shared/schemas";
-import { Pressable } from "@/shared/ui";
+import { OverflowFadeText, Pressable } from "@/shared/ui";
 import { EngineMark, hasEngineMark } from "@/features/engine-config/EngineMark";
 import { listEngines, mistyEngine, type EngineInfo } from "../engines/enginesApi";
 import { MOST_TURNS, useSessionGoals } from "../goals/sessionGoals";
@@ -213,7 +213,7 @@ export function SessionPanel(props: { conversationId: string; agent: AgentProfil
               {hasEngineMark(props.agent.engine) ? (
                 <EngineMark engine={props.agent.engine} size={15} />
               ) : null}
-              <span className="truncate">{props.agent.name}</span>
+              <OverflowFadeText>{props.agent.name}</OverflowFadeText>
             </span>
           }
           value={engineName === props.agent.name ? undefined : engineName}

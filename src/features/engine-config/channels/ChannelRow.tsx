@@ -3,7 +3,7 @@
 
 import { GripVertical, KeyRound, Pencil, Trash2 } from "lucide-react";
 import { useMemo, type DragEvent, type ReactNode } from "react";
-import { cn, Switch, IconButton } from "@/shared/ui";
+import { cn, Switch, IconButton, OverflowFadeText } from "@/shared/ui";
 import type { ProviderEntry } from "./providers";
 
 export const ROW =
@@ -14,7 +14,7 @@ export function Pill({ children }: { children: ReactNode }) {
     <span
       className={[
         "inline-flex h-5 shrink-0 items-center gap-1 rounded-sm border border-cream/10",
-        "bg-charcoal-hover px-1.5 text-2xs leading-none text-cream-muted",
+        "bg-charcoal-hover px-1.5 text-micro leading-none text-cream-muted",
       ].join(" ")}
     >
       {children}
@@ -101,7 +101,7 @@ export function ChannelRow({
       <ChannelAvatar name={entry.name} />
       <div className="flex min-w-0 flex-1 flex-col">
         <p className="flex items-center gap-1.5 text-sm text-cream-bright">
-          <span className="truncate">{entry.name}</span>
+          <OverflowFadeText full>{entry.name}</OverflowFadeText>
           {fromCcSwitch ? <Pill>CC Switch</Pill> : null}
           {entry.hasKey ? (
             <span title="Key saved in the keychain" className="text-cream-muted">
@@ -109,7 +109,11 @@ export function ChannelRow({
             </span>
           ) : null}
         </p>
-        {subtitle ? <p className="truncate text-xs text-cream-muted">{subtitle}</p> : null}
+        {subtitle ? (
+          <OverflowFadeText as="p" full className="text-xs text-cream-muted">
+            {subtitle}
+          </OverflowFadeText>
+        ) : null}
       </div>
       <span onClick={(event) => event.stopPropagation()}>
         <Switch
@@ -121,8 +125,7 @@ export function ChannelRow({
       </span>
       <span aria-hidden className="h-4 w-px shrink-0 bg-charcoal-border" />
       <IconButton
-        variant="ghost"
-        size="xs"
+        size="sm"
         label="Edit"
         disabled={busy}
         onClick={(event) => {
@@ -133,8 +136,7 @@ export function ChannelRow({
         <Pencil />
       </IconButton>
       <IconButton
-        variant="ghost"
-        size="xs"
+        size="sm"
         label="Delete"
         disabled={busy || current}
         onClick={(event) => {

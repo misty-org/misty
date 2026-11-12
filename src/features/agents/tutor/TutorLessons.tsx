@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { useMistyStore } from "../conversations/state/useMistyStore";
 import { shortAgo } from "../page/useChatStatuses";
-import { Pressable } from "@/shared/ui";
+import { Pressable, OverflowFadeText } from "@/shared/ui";
 import { lessonProgress } from "./lessons/lessonRouter";
 import { useLessonStore } from "./lessons/lessonStore";
 import type { Course, Lesson } from "./lessons/lessonTypes";
@@ -123,9 +123,9 @@ export function TutorLessons({
                 className="tutor-card"
                 onClick={() => openEntry(entry)}
               >
-                <span className="tutor-card-title">
+                <OverflowFadeText className="tutor-card-title">
                   {entry.kind === "course" ? entry.course.title : entry.lesson.title}
-                </span>
+                </OverflowFadeText>
                 <span className="tutor-card-detail">{detailOf(entry)}</span>
                 <span className="tutor-meter" aria-hidden>
                   <span style={{ width: `${Math.round(share(entry) * 100)}%` }} />
@@ -146,9 +146,9 @@ export function TutorLessons({
                 className="tutor-row"
                 onClick={() => openEntry(entry)}
               >
-                <span className="truncate">
+                <OverflowFadeText>
                   {entry.kind === "course" ? entry.course.title : entry.lesson.title}
-                </span>
+                </OverflowFadeText>
                 <span className="tutor-card-detail">{shortAgo(entry.updatedAt)}</span>
               </Pressable>
             ))}

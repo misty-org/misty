@@ -47,7 +47,7 @@ describe("DrawingPreviewHeader", () => {
     const openButton = container.querySelector<HTMLButtonElement>(
       'button[aria-label="Open Home Drawing"]',
     );
-    expect(openButton?.dataset.variant).toBe("default");
+    expect(openButton?.dataset.variant).toBe("secondary");
     expect(openButton?.querySelector('[data-icon="inline-end"]')).not.toBeNull();
     await act(async () => openButton?.click());
     expect(onOpen).toHaveBeenCalledOnce();

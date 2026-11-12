@@ -3,10 +3,11 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuTrigger,
-  ErrorNotification,
   IconButton,
   Input,
   MenuItem,
+  OverflowFadeText,
+  useNotice,
 } from "@/shared/ui";
 import { ArrowRight, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -34,6 +35,11 @@ export function DrawingPreviewHeader({
   const inputRef = useRef<HTMLInputElement | null>(null);
   const canRename = drawing.role !== "viewer";
   const hasActions = canRename || drawing.can_delete;
+  useNotice(failed && renaming, {
+    message: "Not saved. Try Save again.",
+    tone: "error",
+    onDismiss: () => setFailed(false),
+  });
 
   useEffect(() => {
     setRenaming(false);
@@ -101,13 +107,12 @@ export function DrawingPreviewHeader({
               }
             }}
           />
-          <Button type="submit" size="sm" className="h-8 shrink-0 px-3 text-xs" disabled={saving}>
+          <Button type="submit" className="h-8 shrink-0 px-3 text-xs" disabled={saving}>
             {saving ? "Saving…" : "Save"}
           </Button>
           <Button
             type="button"
-            size="sm"
-            variant="ghost"
+            variant="quiet"
             className="h-8 shrink-0 px-2 text-xs text-cream-muted"
             disabled={saving}
             onClick={cancelRename}
@@ -116,19 +121,19 @@ export function DrawingPreviewHeader({
           </Button>
         </form>
       ) : (
-        <h2 className="m-0 min-w-0 flex-1 truncate text-sm font-semibold text-cream-bright">
+        <OverflowFadeText
+          as="h2"
+          full
+          className="m-0 min-w-0 flex-1 text-sm font-semibold text-cream-bright"
+        >
           {title || "Untitled drawing"}
-        </h2>
+        </OverflowFadeText>
       )}
 
-      <ErrorNotification
-        message={failed && renaming ? "Not saved. Try Save again." : ""}
-        onDismiss={() => setFailed(false)}
-      />
       {!renaming && hasActions ? (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <IconButton label={`Actions for ${title || "untitled drawing"}`} tooltip={false}>
+            <IconButton label={`Actions for ${title || "untitled drawing"}`}>
               <MoreHorizontal className="size-4" />
             </IconButton>
           </DropdownMenuTrigger>
@@ -137,7 +142,7 @@ export function DrawingPreviewHeader({
               <MenuItem icon={<Pencil />} label="Rename" onSelect={() => setRenaming(true)} />
             ) : null}
             {drawing.can_delete ? (
-              <MenuItem icon={<Trash2 />} label="Delete" destructive onSelect={onDelete} />
+              <MenuItem icon={<Trash2 />} label="Delete" danger onSelect={onDelete} />
             ) : null}
           </DropdownMenuContent>
         </DropdownMenu>
@@ -146,7 +151,6 @@ export function DrawingPreviewHeader({
       {!renaming ? (
         <Button
           type="button"
-          size="sm"
           className="h-8 shrink-0 gap-1.5 px-2.5 text-xs"
           aria-label={`Open ${title || "Untitled drawing"}`}
           onClick={onOpen}

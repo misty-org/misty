@@ -8,7 +8,7 @@ use crate::app::runtime::MistyRuntime;
 use super::support::EngineState;
 use super::{store, EngineInfo};
 
-fn person_window(webview: &tauri::Webview) -> Result<(), String> {
+pub(super) fn person_window(webview: &tauri::Webview) -> Result<(), String> {
     if crate::browser::app_windows::is_person_window(webview.label()) {
         Ok(())
     } else {
@@ -29,7 +29,7 @@ pub(super) fn space_key(space: &str) -> Result<String, String> {
     })
 }
 
-async fn blocking<T: Send + 'static>(
+pub(super) async fn blocking<T: Send + 'static>(
     work: impl FnOnce() -> Result<T, String> + Send + 'static,
 ) -> Result<T, String> {
     tokio::task::spawn_blocking(work)
@@ -320,118 +320,10 @@ pub async fn engine_chat_resume(
     .await
 }
 
-/// The sessions each engine's own files hold for the folders linked on this computer.
-#[tauri::command]
-pub async fn engine_history_list(
-    webview: tauri::Webview,
-    state: State<'_, EngineState>,
-    runtime: State<'_, MistyRuntime>,
-) -> Result<Vec<super::history::SessionMeta>, String> {
-    person_window(&webview)?;
-    let linked = {
-        let db = runtime.environment.store();
-        blocking(move || store::all_folders(&db)).await?
-    };
-    let sessions = super::history::reader::list_sessions(state).await?;
-    Ok(sessions
-        .into_iter()
-        .filter(|session| linked.iter().any(|folder| std::path::Path::new(&session.workspace_path) == folder))
-        .collect())
-}
-
-/// One page of a session's messages, read from the engine's own file.
-#[tauri::command]
-pub async fn engine_history_page(
-    webview: tauri::Webview,
-    state: State<'_, EngineState>,
-    engine: String,
-    session_id: String,
-    limit: Option<usize>,
-    before_seq: Option<i64>,
-) -> Result<super::history::reader::SessionPage, String> {
-    person_window(&webview)?;
-    super::history::reader::load_session_page(state, engine, session_id, limit, before_seq, None).await
-}
-
-/// Full-text search over every indexed session's messages.
-#[tauri::command]
-pub async fn engine_history_search(
-    webview: tauri::Webview,
-    state: State<'_, EngineState>,
-    query: String,
-    limit: Option<u32>,
-    offset: Option<u32>,
-) -> Result<super::history::search::MessageSearchPage, String> {
-    person_window(&webview)?;
-    super::history::search::search_messages(state, query, limit, offset).await
-}
-
-/// Renames a session, written back where the engine keeps its own title.
-#[tauri::command]
-pub async fn engine_history_rename(
-    webview: tauri::Webview,
-    state: State<'_, EngineState>,
-    engine: String,
-    session_id: String,
-    title: String,
-) -> Result<(), String> {
-    person_window(&webview)?;
-    super::history::reader::rename_session(state, engine, session_id, title)
-        .await
-        .map(|_| ())
-}
-
-/// Scans the engines' session files again.
-#[tauri::command]
-pub fn engine_history_rescan(webview: tauri::Webview, state: State<'_, EngineState>) -> Result<(), String> {
-    person_window(&webview)?;
-    super::history::reader::rescan_sessions(state);
-    Ok(())
-}
-
-/// A session's own file, as text, to read or edit in place.
-#[tauri::command]
-pub async fn engine_history_read_file(
-    webview: tauri::Webview,
-    state: State<'_, EngineState>,
-    engine: String,
-    session_id: String,
-) -> Result<super::history::edit::SessionFileDocument, String> {
-    person_window(&webview)?;
-    super::history::edit::read_session_file(state, engine, session_id, None, None).await
-}
-
-/// Saves an edited session file. Refused while a turn runs on that session, or when the file
-/// changed since it was read (`expected_version`).
-#[tauri::command]
-pub async fn engine_history_write_file(
-    webview: tauri::Webview,
-    state: State<'_, EngineState>,
-    engine: String,
-    session_id: String,
-    content: String,
-    expected_version: String,
-) -> Result<super::history::edit::SessionFileDocument, String> {
-    person_window(&webview)?;
-    super::history::edit::write_session_file(state, engine, session_id, content, expected_version, None, None)
-        .await
-}
-
-/// Opens a session's own file in the person's text editor.
-#[tauri::command]
-pub async fn engine_history_open_file(
-    webview: tauri::Webview,
-    state: State<'_, EngineState>,
-    engine: String,
-    session_id: String,
-) -> Result<(), String> {
-    person_window(&webview)?;
-    super::history::edit::open_session_file_in_default_editor(state, engine, session_id).await
-}
-
-/// Forks a chat's engine session at one of the person's messages into a new chat: the new
-/// chat's next turn resumes a session holding the history before that message, in the engine's
-/// own format. `later_same` counts later messages with the same text, to pick the right one.
+/// Forks a chat's engine session after one of the person's messages into a new chat: the new
+/// chat's next turn resumes a session holding the history through that message's turn, in the
+/// engine's own format. `later_same` counts later messages with the same text, to pick the right
+/// one.
 #[tauri::command]
 pub async fn engine_chat_fork(
     webview: tauri::Webview,
@@ -451,14 +343,66 @@ pub async fn engine_chat_fork(
             .ok_or_else(|| "This chat has no engine session to fork yet.".to_string())
     })
     .await?;
-    let at = user_text.map(|text| super::fork::ForkAnchor {
-        user_text_sha256: super::fork::text_sha256_hex(&text),
-        seq_hint: None,
-        tail_occurrence: later_same,
-    });
+    let at = match user_text {
+        None => None,
+        Some(text) => {
+            let (sessions, engine, session) =
+                (std::sync::Arc::clone(&state.db), engine.clone(), session.clone());
+            let (stored, tail) = blocking(move || {
+                stored_user_text(&sessions, &engine, &session, &text, later_same.unwrap_or(0))
+            })
+            .await?;
+            Some(super::fork::ForkAnchor {
+                user_text_sha256: super::fork::text_sha256_hex(&stored),
+                seq_hint: None,
+                tail_occurrence: Some(tail),
+            })
+        }
+    };
     let plan = super::fork::fork_session(state, engine.clone(), session, at).await?;
     let (target, folder) = (plan.target_session_id.clone(), plan.workspace_path.clone());
     blocking(move || store::keep_session(&db, &account, &new_conversation, &engine, &folder, &target))
         .await?;
     Ok(plan)
+}
+
+/// The person's message as the engine's own transcript holds it, and how many later messages hold
+/// exactly that text. A turn reaches the engine wrapped at times: a shared Space's note about
+/// teammates' files before it, a fresh session's earlier turns before it, the browser hint after
+/// it. The chat keeps only what the person wrote, so a transcript message is theirs when it is that
+/// text, or ends with it after a blank line, once a known hint is taken off its end. `later_same`
+/// counts the chat's later messages with the same text, newest last.
+fn stored_user_text(
+    db: &super::support::db::Db,
+    engine: &str,
+    session: &str,
+    text: &str,
+    later_same: u32,
+) -> Result<(String, u32), String> {
+    let wanted = text.trim();
+    let meta = super::history::reader::session_meta_by_id(db, engine, session)?
+        .ok_or("This chat's engine session isn't on this computer any more.")?;
+    let (accepted, _) = db.accepted_internal_frames(engine, session)?;
+    let parsed =
+        super::history::parse_session_file(engine, std::path::Path::new(&meta.file_path), &accepted)?;
+    let users: Vec<&str> = parsed
+        .messages
+        .iter()
+        .filter(|message| message.role == "user")
+        .map(|message| message.text.as_str())
+        .collect();
+    let theirs = |stored: &str| {
+        let body = super::run_prompt::without_browser_hint(stored.trim());
+        body == wanted || body.ends_with(&format!("\n\n{wanted}"))
+    };
+    let hits: Vec<usize> = (0..users.len()).filter(|&index| theirs(users[index])).collect();
+    let picked = hits
+        .len()
+        .checked_sub(1 + later_same as usize)
+        .map(|position| hits[position])
+        .or_else(|| hits.last().copied())
+        .ok_or("Couldn't find this message in the engine's own copy of the chat.")?;
+    let stored = users[picked].to_string();
+    let tail = users[picked + 1..].iter().filter(|other| **other == stored).count() as u32;
+    Ok((stored, tail))
 }

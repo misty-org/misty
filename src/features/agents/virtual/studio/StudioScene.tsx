@@ -268,7 +268,10 @@ export default function StudioScene(props: StudioSceneProps) {
       <Canvas
         shadows="percentage"
         dpr={[1, 2]}
-        frameloop={hidden ? "never" : "always"}
+        // Always on: the browser already stops animation frames for a page out of sight. With
+        // "never" while document.hidden, not even the first frame was drawn, so a web view that
+        // reported the page hidden as the room opened left it blank until it was shown again.
+        frameloop="always"
         camera={{ fov: 30, near: 0.5, far: 400, position: [16, 17, 19] }}
         gl={{ antialias: true, alpha: true }}
         onPointerMissed={() => (building ? undefined : props.onSelect(null))}

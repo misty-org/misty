@@ -12,24 +12,25 @@
  * says that rather than pretending there are no servers. Misty's own server is listed by the
  * session but never offered for editing.
  */
-import { Activity, FolderOpen, RefreshCw } from "lucide-react";
+import { Activity, Bot, Folder, FolderMinus, FolderOpen, RefreshCw } from "lucide-react";
 import { useMemo, useState } from "react";
 import { EngineMark, hasEngineMark } from "../EngineMark";
 import { folderName, useLinkedFolders } from "../host";
 import { DesktopSettingsNotice, DesktopSettingsSection as Section } from "@/features/settings";
 import {
   Button,
+  ChoiceGroup,
   cn,
   IconButton,
   Pressable,
   SearchField,
-  SegmentedControl,
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
   SkeletonList,
+  OverflowFadeText,
 } from "@/shared/ui";
 import { mcpApi } from "./api";
 import { McpDetailDialog } from "./McpDetailDialog";
@@ -54,7 +55,7 @@ type KindFilter = "all" | "config" | "runtime";
 const NO_FOLDER = "__none__";
 
 const pill =
-  "inline-flex h-5 shrink-0 items-center rounded-sm border border-cream/10 bg-charcoal-hover px-1.5 text-2xs leading-none text-cream-muted";
+  "inline-flex h-5 shrink-0 items-center rounded-sm border border-cream/10 bg-charcoal-hover px-1.5 text-micro leading-none text-cream-muted";
 
 const timeFormat = new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit" });
 
@@ -93,16 +94,16 @@ function ConfigRow({
       >
         <span className="grid min-w-0 flex-1 gap-0.5">
           <span className="flex min-w-0 items-center gap-2">
-            <span className="truncate text-md font-medium text-cream-bright" title={entry.name}>
+            <OverflowFadeText full className="text-body font-medium text-cream-bright">
               {entry.name}
-            </span>
+            </OverflowFadeText>
             <span className={pill}>{sourceLabel(entry.source)}</span>
             {!entry.enabled ? <span className={pill}>{copy.disabled}</span> : null}
           </span>
-          <span className="truncate text-sm text-cream-muted" title={meta}>
+          <OverflowFadeText full className="text-sm text-cream-muted">
             {entry.transport ? `${entry.transport} · ` : ""}
             {meta}
-          </span>
+          </OverflowFadeText>
         </span>
         {/* The badge is still inside the button, so clicking it opens the details too. */}
         <ProbeStatusChip entry={entry} />
@@ -154,7 +155,9 @@ function RuntimeEntryRow({ entry }: { entry: McpRuntimeEntry }) {
   return (
     <li className="flex min-h-11 items-center gap-2 py-2">
       <span className="flex min-w-0 flex-1 items-center gap-2">
-        <span className="truncate text-md text-cream-bright">{entry.name}</span>
+        <OverflowFadeText full className="text-body text-cream-bright">
+          {entry.name}
+        </OverflowFadeText>
         {entry.builtin ? <span className={pill}>{copy.builtin}</span> : null}
       </span>
       <span className="shrink-0 text-sm text-cream-muted">
@@ -242,8 +245,7 @@ export function McpSourceHint({
           {!info.exists ? <span className="shrink-0">({copy.sourceMissing})</span> : null}
           <IconButton
             label={copy.reveal}
-            size="2xs"
-            variant="ghost"
+            size="sm"
             className="self-center"
             onClick={() => void mcpApi.reveal(info.path, workspacePath).catch(() => undefined)}
           >
@@ -299,20 +301,24 @@ function EngineChoice({
       </SelectTrigger>
       <SelectContent>
         {engines.map((item) => (
-          <SelectItem key={item.id} value={item.id}>
-            <span className="flex items-center gap-2">
-              {hasEngineMark(item.id) ? <EngineMark engine={item.id} size={14} /> : null}
-              {engineLabel(item.id)}
-              {item.config.entries.length > 0 ? (
-                <span
-                  className="text-cream-muted"
-                  title={copy.tabCount(item.config.entries.length)}
-                >
-                  {item.config.entries.length}
-                </span>
-              ) : null}
-            </span>
-          </SelectItem>
+          <SelectItem
+            key={item.id}
+            value={item.id}
+            icon={hasEngineMark(item.id) ? <EngineMark engine={item.id} size={14} /> : Bot}
+            label={
+              <>
+                {engineLabel(item.id)}
+                {item.config.entries.length > 0 ? (
+                  <span
+                    className="ml-2 text-cream-muted"
+                    aria-label={copy.tabCount(item.config.entries.length)}
+                  >
+                    {item.config.entries.length}
+                  </span>
+                ) : null}
+              </>
+            }
+          />
         ))}
       </SelectContent>
     </Select>
@@ -337,11 +343,9 @@ function FolderChoice({
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
-        <SelectItem value={NO_FOLDER}>{copy.folderNone}</SelectItem>
+        <SelectItem value={NO_FOLDER} icon={FolderMinus} label={copy.folderNone} />
         {folders.map((folder) => (
-          <SelectItem key={folder} value={folder} title={folder}>
-            {folderName(folder)}
-          </SelectItem>
+          <SelectItem key={folder} value={folder} icon={Folder} label={folderName(folder)} />
         ))}
       </SelectContent>
     </Select>
@@ -434,7 +438,7 @@ export function McpSection() {
       {loadError ? (
         <DesktopSettingsNotice
           action={
-            <Button size="xs" variant="secondary" onClick={() => void store.reload()}>
+            <Button size="sm" onClick={() => void store.reload()}>
               {copy.refresh}
             </Button>
           }
@@ -465,7 +469,7 @@ export function McpSection() {
           />
         </div>
         <div className="flex flex-wrap items-center gap-2 pb-3">
-          <SegmentedControl
+          <ChoiceGroup
             label="Show"
             size="sm"
             value={kind}
@@ -476,10 +480,10 @@ export function McpSection() {
               { value: "runtime", label: copy.filterRuntime },
             ]}
           />
-          <span className="min-w-0 flex-1 truncate text-sm text-cream-muted">{counts}</span>
+          <OverflowFadeText full className="min-w-0 flex-1 text-sm text-cream-muted">
+            {counts}
+          </OverflowFadeText>
           <Button
-            size="sm"
-            variant="secondary"
             title={copy.probeHint}
             disabled={store.loading || probingAll || probeableCount === 0}
             onClick={() => void probeAll(engine?.config.entries ?? [], workspace, { force: true })}
@@ -487,12 +491,7 @@ export function McpSection() {
             <Activity aria-hidden />
             {copy.probeCheckAll}
           </Button>
-          <Button
-            size="sm"
-            variant="secondary"
-            disabled={store.loading || refreshing}
-            onClick={handleRefresh}
-          >
+          <Button disabled={store.loading || refreshing} onClick={handleRefresh}>
             <RefreshCw className={cn(refreshing && "animate-spin")} aria-hidden />
             {copy.refresh}
           </Button>
@@ -500,7 +499,7 @@ export function McpSection() {
       </Section>
       {store.loading && !store.inventory ? (
         <Section title={copy.configTitle}>
-          <SkeletonList label="MCP servers" rows={3} leading="none" trailing className="py-2" />
+          <SkeletonList lines={2} label="MCP servers" rows={3} leading="none" trailing />
         </Section>
       ) : null}
       {engine ? <EngineNotices engine={engine} /> : null}

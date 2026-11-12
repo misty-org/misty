@@ -32,6 +32,7 @@ import {
   DialogDescription,
   DialogTitle,
   IconButton,
+  OverflowFadeText,
 } from "@/shared/ui";
 import { DockDropPreview } from "./DockDropPreview";
 import { dropZoneAt } from "./dockSplitFit";
@@ -72,18 +73,20 @@ function DraftPane(props: {
       )}
     >
       <ViewIcon tab={view?.placeholder ? undefined : view} icon={Blocks} size={22} />
-      <span className="line-clamp-2 max-w-full text-sm text-cream-bright">
+      <OverflowFadeText lines={2} className="max-w-full text-sm text-cream-bright">
         {paneViewLabel(view)}
-      </span>
+      </OverflowFadeText>
       <IconButton
         label={`Remove ${paneViewLabel(view)} from the layout`}
-        size="xs"
-        tooltip={false}
+        size="sm"
         onPointerDown={contained}
         onClick={() => props.onRemove(view.id)}
-        className="absolute right-1.5 top-1.5 text-cream-muted opacity-0 hover:text-cream-bright focus-visible:opacity-100 group-hover:opacity-100"
+        className={cn(
+          "absolute right-1.5 top-1.5 text-cream-muted opacity-0 hover:text-cream-bright",
+          "focus-visible:opacity-100 group-hover:opacity-100",
+        )}
       >
-        <X size={14} aria-hidden="true" />
+        <X aria-hidden="true" />
       </IconButton>
       {props.zone ? <DockDropPreview zone={props.zone} /> : null}
     </div>
@@ -290,7 +293,7 @@ export function LayoutPopup(props: { onApplied: () => void }) {
                     )}
                   >
                     <ViewIcon tab={view.placeholder ? undefined : view} icon={Blocks} />
-                    <span className="min-w-0 flex-1 truncate">{paneViewLabel(view)}</span>
+                    <OverflowFadeText className="flex-1">{paneViewLabel(view)}</OverflowFadeText>
                     {placed.has(view.id) ? <Check size={14} aria-hidden="true" /> : null}
                   </div>
                 </li>
@@ -335,12 +338,12 @@ export function LayoutPopup(props: { onApplied: () => void }) {
         {dragging ? (
           <div
             className={cn(
-              "pointer-events-none absolute z-50 max-w-56 truncate rounded-md border",
+              "pointer-events-none absolute z-50 max-w-56 rounded-md border",
               "border-charcoal-border bg-charcoal-card px-2 py-1 text-sm text-cream-bright shadow-lg",
             )}
             style={{ left: dragging.x + 12, top: dragging.y + 12 }}
           >
-            {dragging.label}
+            <OverflowFadeText>{dragging.label}</OverflowFadeText>
           </div>
         ) : null}
       </DialogContent>

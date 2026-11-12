@@ -1,7 +1,7 @@
 use rusqlite::Connection;
 use serde_json::json;
 
-use super::{record_event, record_start, rows};
+use super::{record_event, record_start, rows, settle_cut_off};
 
 fn database() -> Connection {
     let mut connection = Connection::open_in_memory().unwrap();
@@ -75,4 +75,30 @@ fn old_rows_go_when_a_run_starts() {
     record_start(&connection, "new", &json!({ "account": "me", "conversation_id": "c1" }), 91 * day).unwrap();
     let found = rows(&connection, "me", &chats(&["c1"]), 10).unwrap();
     assert_eq!(found.iter().map(|row| row.run_id.as_str()).collect::<Vec<_>>(), vec!["new"]);
+}
+
+#[test]
+fn a_run_cut_off_by_an_earlier_launch_reads_as_stopped() {
+    let connection = database();
+    let start = |run: &str, at: i64| {
+        let body = json!({ "account": "me", "conversation_id": "c1" });
+        record_start(&connection, run, &body, at).unwrap();
+    };
+    start("old", 10);
+    start("resumed", 11);
+    start("done", 12);
+    record_event(&connection, "done", &json!({ "type": "invocation.completed" }), 13).unwrap();
+    start("new", 100);
+
+    let mut found = rows(&connection, "me", &chats(&["c1"]), 10).unwrap();
+    settle_cut_off(&mut found, 50, |run| run == "resumed");
+    let state = |run: &str| {
+        let row = found.iter().find(|row| row.run_id == run).unwrap();
+        row.state.clone()
+    };
+    assert_eq!(state("old"), "canceled");
+    assert_eq!(state("resumed"), "running");
+    assert_eq!(state("done"), "completed");
+    // Started in this launch: its engine may not have come up yet.
+    assert_eq!(state("new"), "running");
 }

@@ -8,7 +8,8 @@ import {
   Pencil,
   X,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useShallow } from "zustand/react/shallow";
 import {
   Button,
   Dialog,
@@ -20,12 +21,13 @@ import {
   DropdownMenuContent,
   DropdownMenuLabel,
   DropdownMenuSeparator,
-  ErrorNotification,
   Input,
   MenuItem,
   MenuSubmenu,
   MenuTrigger,
+  OverflowFadeText,
   Skeleton,
+  useNotice,
 } from "@/shared/ui";
 import {
   currentSpaceKey,
@@ -38,18 +40,35 @@ import {
 import { errorText } from "./projectApi";
 import { FolderAvatar } from "./folders/FolderAvatars";
 
-/** The Space's linked folders, and which one the panels and engines work in. */
-export function useProjectFolder(): { space: string; folder: string; loaded: boolean } {
+/**
+ * The Space's linked folders, and which one the panels and engines work in. `failed` says the
+ * list couldn't be read; `retry` reads it again.
+ */
+export function useProjectFolder(): {
+  space: string;
+  folder: string;
+  loaded: boolean;
+  failed: boolean;
+  retry(): void;
+} {
   const space = currentSpaceKey();
   const folder = useSpaceFolders((state) => folderOf(state, space));
   const loaded = useSpaceFolders((state) => state.folders[space] !== undefined);
+  const [failed, setFailed] = useState(false);
+  const [round, setRound] = useState(0);
   useEffect(() => {
+    let live = true;
+    setFailed(false);
     void useSpaceFolders
       .getState()
       .load(space)
-      .catch(() => undefined);
-  }, [space]);
-  return { space, folder, loaded };
+      .catch(() => live && setFailed(true));
+    return () => {
+      live = false;
+    };
+  }, [space, round]);
+  const retry = useCallback(() => setRound((value) => value + 1), []);
+  return { space, folder, loaded, failed: failed && !loaded, retry };
 }
 
 /** Names a folder in the Space's lists. */
@@ -96,10 +115,12 @@ function RenameFolderDialog(props: {
             onChange={(event) => setName(event.target.value)}
           />
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={props.onClose}>
+            <Button type="button" size="lg" onClick={props.onClose}>
               Cancel
             </Button>
-            <Button type="submit">Rename</Button>
+            <Button type="submit" size="lg">
+              Rename
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>
@@ -116,12 +137,15 @@ function RenameFolderDialog(props: {
  */
 export function FolderPicker({ compact = false }: { compact?: boolean }) {
   const { space, folder, loaded } = useProjectFolder();
-  const active = useSpaceFolders((state) => spaceFolderList(state, space));
-  const all = useSpaceFolders((state) => spaceFolderList(state, space, true));
+  // Each read builds a new list, so the store compares them by their items; a fresh array every
+  // time would make React render again forever ("Maximum update depth exceeded").
+  const active = useSpaceFolders(useShallow((state) => spaceFolderList(state, space)));
+  const all = useSpaceFolders(useShallow((state) => spaceFolderList(state, space, true)));
   const label = useSpaceFolders((state) => (folder ? folderLabel(state, space, folder) : ""));
   const labels = useSpaceFolders((state) => state.prefs[space]?.names);
   const [renaming, setRenaming] = useState<string | null>(null);
   const [error, setError] = useState("");
+  useNotice(Boolean(error), { message: error, tone: "error", onDismiss: () => setError("") });
   const store = useSpaceFolders.getState;
   const report = (work: Promise<unknown>) =>
     void work.catch((reason) => setError(errorText(reason)));
@@ -131,7 +155,7 @@ export function FolderPicker({ compact = false }: { compact?: boolean }) {
   const rowLabel = (path: string) => (
     <span className="flex min-w-0 items-center gap-2">
       <FolderAvatar path={path} />
-      <span className="min-w-0 truncate">{name(path)}</span>
+      <OverflowFadeText className="min-w-0">{name(path)}</OverflowFadeText>
     </span>
   );
 
@@ -141,15 +165,13 @@ export function FolderPicker({ compact = false }: { compact?: boolean }) {
       <>
         <Button
           type="button"
-          variant={compact ? "ghost" : "outline"}
-          size="sm"
+          variant={compact ? "quiet" : "secondary"}
+          icon={compact ? undefined : FolderPlus}
           className={compact ? "folder-picker-compact" : undefined}
           onClick={() => report(store().link(space))}
         >
-          {compact ? null : <FolderPlus size={15} />}
           Link a folder
         </Button>
-        <ErrorNotification message={error} onDismiss={() => setError("")} />
       </>
     );
   return (
@@ -157,9 +179,7 @@ export function FolderPicker({ compact = false }: { compact?: boolean }) {
       <DropdownMenu>
         <MenuTrigger
           label="Project folder"
-          value={<span className="truncate">{folder ? label : "No folder"}</span>}
-          variant="ghost"
-          title={folder}
+          value={folder ? label : "No folder"}
           chevron={!compact}
           className={compact ? "folder-picker-compact" : "min-w-0"}
         />
@@ -169,7 +189,6 @@ export function FolderPicker({ compact = false }: { compact?: boolean }) {
               key={path}
               icon={path === folder ? <Check className="size-4" /> : <span className="size-4" />}
               label={rowLabel(path)}
-              title={path}
             >
               <MenuItem
                 icon={<Check className="size-4" />}
@@ -212,12 +231,7 @@ export function FolderPicker({ compact = false }: { compact?: boolean }) {
               <DropdownMenuSeparator />
               <DropdownMenuLabel>Archived</DropdownMenuLabel>
               {archived.map((path) => (
-                <MenuSubmenu
-                  key={path}
-                  icon={<span className="size-4" />}
-                  label={rowLabel(path)}
-                  title={path}
-                >
+                <MenuSubmenu key={path} icon={<span className="size-4" />} label={rowLabel(path)}>
                   <MenuItem
                     icon={<ArchiveRestore className="size-4" />}
                     label="Restore"
@@ -246,7 +260,6 @@ export function FolderPicker({ compact = false }: { compact?: boolean }) {
         onClose={() => setRenaming(null)}
         onError={setError}
       />
-      <ErrorNotification message={error} onDismiss={() => setError("")} />
     </>
   );
 }

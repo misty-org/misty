@@ -4,6 +4,7 @@ import { useMistyStore } from "@/features/agents/conversations/state/useMistySto
 import type { AgentProfile } from "@/shared/schemas";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
+import { NoticeViewport } from "@/shared/ui";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { initialCompanionPresentation, useCompanionState } from "../../tutor/cursor/companionState";
 import { AgentCompanionPanel } from "../../tutor/cursor/AgentCompanionPanel";
@@ -51,6 +52,7 @@ const renderWorkspace = (profile = agent) =>
         accountId="owner"
         onCreate={() => {}}
       />
+      <NoticeViewport />
     </MemoryRouter>,
   );
 beforeEach(() => {

@@ -1,4 +1,4 @@
-import { cn, Pressable } from "@/shared/ui";
+import { cn, OverflowFadeText, Pressable } from "@/shared/ui";
 import type { LucideIcon } from "lucide-react";
 export interface DesktopSettingsNavEntry<Id extends string = string> {
   id: Id;
@@ -54,7 +54,7 @@ export function SettingsNavigation<Id extends string>(props: {
                       className={cn("size-[18px] shrink-0", !active && "text-cream-muted")}
                     />
                   ) : null}
-                  <span className="min-w-0 flex-1 truncate">{entry.label}</span>
+                  <OverflowFadeText className="flex-1">{entry.label}</OverflowFadeText>
                 </Pressable>
               );
             })}

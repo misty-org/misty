@@ -5,7 +5,7 @@ import {
   DialogContent,
   DialogTitle,
   Input,
-  SegmentedControl,
+  ChoiceGroup,
   Textarea,
 } from "@/shared/ui";
 import { useTutorStore } from "../tutorStore";
@@ -103,7 +103,7 @@ function CustomizeForm({ notebook, onClose }: { notebook: Notebook; onClose(): v
       </label>
       <div className="tutor-customize-group">
         <span>Conversational style</span>
-        <SegmentedControl
+        <ChoiceGroup
           label="Conversational style"
           value={style.goal}
           options={goals}
@@ -124,7 +124,7 @@ function CustomizeForm({ notebook, onClose }: { notebook: Notebook; onClose(): v
       </div>
       <div className="tutor-customize-group">
         <span>Response length</span>
-        <SegmentedControl
+        <ChoiceGroup
           label="Response length"
           value={style.length}
           options={lengths}
@@ -132,12 +132,10 @@ function CustomizeForm({ notebook, onClose }: { notebook: Notebook; onClose(): v
         />
       </div>
       <div className="tutor-customize-foot">
-        <Button type="button" variant="ghost" size="sm" onClick={onClose}>
+        <Button type="button" variant="quiet" onClick={onClose}>
           Cancel
         </Button>
-        <Button type="submit" size="sm">
-          Save
-        </Button>
+        <Button type="submit">Save</Button>
       </div>
     </form>
   );

@@ -4,12 +4,14 @@ import {
   Button,
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuSeparator,
   IconButton,
+  MenuRadioGroup,
+  MenuRadioItem,
+  MenuSeparator,
   MenuTrigger,
+  Spinner,
   Textarea,
+  OverflowFadeText,
 } from "@/shared/ui";
 import type { GlobalAiConversation } from "../conversations/state/conversationTypes";
 import { useMistyStore } from "../conversations/state/useMistyStore";
@@ -61,7 +63,6 @@ function Questions(props: { agentId: string; name: string }) {
           <div className="flex gap-2">
             <Button
               variant="primary"
-              size="sm"
               className="flex-1"
               disabled={busy === question.id}
               onClick={() => answer(question.id, true)}
@@ -69,8 +70,6 @@ function Questions(props: { agentId: string; name: string }) {
               Allow
             </Button>
             <Button
-              variant="outline"
-              size="sm"
               className="flex-1"
               disabled={busy === question.id}
               onClick={() => answer(question.id, false)}
@@ -107,11 +106,10 @@ function ChatSwitcher(props: {
     <DropdownMenu>
       <MenuTrigger
         label={props.chat ? props.chat.title || "Untitled chat" : "New chat"}
-        variant="ghost"
         className="virtual-studio-talk-chat"
       />
       <DropdownMenuContent align="start" className="virtual-studio-talk-chats">
-        <DropdownMenuRadioGroup
+        <MenuRadioGroup
           value={props.chat?.id ?? "new"}
           onValueChange={(id) => {
             if (id === "new") startFresh(props.agentId);
@@ -119,20 +117,23 @@ function ChatSwitcher(props: {
             props.onPicked();
           }}
         >
-          <DropdownMenuRadioItem value="new">
-            <SquarePen aria-hidden="true" />
-            New chat
-          </DropdownMenuRadioItem>
-          {own.length ? <DropdownMenuSeparator /> : null}
+          <MenuRadioItem icon={SquarePen} value="new" label="New chat" />
+          {own.length ? <MenuSeparator /> : null}
           {own.map((chat) => (
-            <DropdownMenuRadioItem key={chat.id} value={chat.id}>
-              <span className="min-w-0 flex-1 truncate">{chat.title || "Untitled chat"}</span>
-              {isAnswering(props.conversations, chat.id) ? (
-                <span className="virtual-studio-talk-busy" aria-label="Answering" />
-              ) : null}
-            </DropdownMenuRadioItem>
+            <MenuRadioItem
+              key={chat.id}
+              value={chat.id}
+              icon={
+                isAnswering(props.conversations, chat.id) ? (
+                  <Spinner size="sm" label="Answering" />
+                ) : (
+                  MessageSquare
+                )
+              }
+              label={chat.title || "Untitled chat"}
+            />
           ))}
-        </DropdownMenuRadioGroup>
+        </MenuRadioGroup>
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -216,9 +217,9 @@ export function AgentTalk(props: {
     >
       <header className="virtual-studio-talk-head">
         <AgentAvatar agent={agent} compact />
-        <h3 className="min-w-0 truncate text-sm font-medium text-cream-bright">
+        <OverflowFadeText as="h3" className="text-sm font-medium text-cream-bright">
           {actor.guest ? `${name} · ${actor.owner}` : name}
-        </h3>
+        </OverflowFadeText>
         <span className="virtual-studio-state" data-state={actor.state}>
           {stateWords[actor.state]}
         </span>
@@ -226,16 +227,16 @@ export function AgentTalk(props: {
           {agent ? (
             <>
               {props.onCustomize ? (
-                <IconButton label="Customize" size="xs" onClick={props.onCustomize}>
+                <IconButton label="Customize" size="sm" onClick={props.onCustomize}>
                   <Shirt aria-hidden="true" />
                 </IconButton>
               ) : null}
-              <IconButton label="Open chat" size="xs" onClick={open}>
+              <IconButton label="Open chat" size="sm" onClick={open}>
                 <MessageSquare aria-hidden="true" />
               </IconButton>
             </>
           ) : null}
-          <IconButton label="Close" size="xs" onClick={props.onClose}>
+          <IconButton label="Close" size="sm" onClick={props.onClose}>
             <X aria-hidden="true" />
           </IconButton>
         </span>
@@ -251,9 +252,7 @@ export function AgentTalk(props: {
       {now ? <p className="virtual-studio-talk-now">{now}</p> : null}
       {agent ? <Questions agentId={agent.id} name={name} /> : null}
       {agent && actor.state === "needs-you" && !answering ? (
-        <Button variant="outline" size="sm" onClick={open}>
-          Answer in chat
-        </Button>
+        <Button onClick={open}>Answer in chat</Button>
       ) : null}
       {shown.length ? (
         <div className="virtual-studio-talk-log" ref={scroll} aria-live="polite">
@@ -312,7 +311,7 @@ export function AgentTalk(props: {
           {answering && !steerable && chat ? (
             <IconButton
               label="Stop"
-              size="xs"
+              size="sm"
               type="button"
               onClick={() =>
                 void stopAnswering(chat.id).catch((reason: unknown) =>
@@ -323,7 +322,7 @@ export function AgentTalk(props: {
               <Square aria-hidden="true" />
             </IconButton>
           ) : (
-            <IconButton label="Send" size="xs" type="submit" disabled={sending || !draft.trim()}>
+            <IconButton label="Send" size="sm" type="submit" disabled={sending || !draft.trim()}>
               <ArrowUp aria-hidden="true" />
             </IconButton>
           )}

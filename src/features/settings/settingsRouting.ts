@@ -15,6 +15,8 @@ const retiredSections: Partial<Record<SettingsSection, SettingsSection>> = {
   "browser-links": "general",
   "browser-extensions": "general",
   "browser-appearance": "advanced",
+  "browser-tabs": "general",
+  "browser-downloads": "general",
   layout: "appearance",
   "browser-privacy": "privacy",
   "browser-signins": "privacy",
@@ -47,7 +49,6 @@ const preferenceRowSection: Readonly<Record<string, SettingsSection>> = {
   "app.appearance.dim_inactive_panes": "advanced",
   "app.appearance.pane_dim_strength": "advanced",
   "app.appearance.compact_mode_enabled": "advanced",
-  "browser.hiddenTabSleep": "advanced",
 };
 
 /** The block that shows a preference's row. */

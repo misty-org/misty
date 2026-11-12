@@ -171,6 +171,10 @@ describe("ChangesPanel", () => {
   it("offers to initialize a folder that isn't a repository", async () => {
     setStatus(undefined, { notRepoByWorkspace: { "/repo": true } });
     render(<ChangesPanel folder="/repo" />);
+    // Nothing Git does applies yet, so the head shows none of it.
+    expect(screen.queryByRole("button", { name: /View as/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Refresh" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Pull" })).toBeNull();
     await act(async () =>
       fireEvent.click(screen.getByRole("button", { name: "Initialize repository" })),
     );

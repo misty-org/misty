@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import type { TabSide } from "@/app/shell/dockingLayout";
-import { ProfileSwitcher, type WorkspaceView } from "@/features/app-windows";
+import type { WorkspaceView } from "@/features/app-windows";
 import { OverlaySideProvider, inwardSide } from "@/shared/ui";
 import { SidebarNav } from "./SidebarNav";
 import { SidebarToggleButton } from "./SidebarToggleButton";
@@ -39,11 +39,7 @@ export function WorkspaceSidebar(props: {
             </div>
           </div>
           <SpaceNavigator onOpen={props.onOpen} />
-          <div className="misty-sidebar-foot" data-misty-window-drag-block="true">
-            <div className="flex min-w-0 flex-1 justify-center" data-browser-toolbar data-sidebar>
-              <ProfileSwitcher />
-            </div>
-          </div>
+          <div className="misty-sidebar-foot" data-misty-window-drag-block="true" />
           {props.account}
         </div>
       </header>

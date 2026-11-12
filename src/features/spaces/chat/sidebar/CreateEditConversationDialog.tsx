@@ -86,10 +86,10 @@ export function CreateEditConversationDialog({
             />
           ) : null}
           <DialogFooter className="mt-5">
-            <Button variant="outline" type="button" disabled={saving} onClick={close}>
+            <Button variant="secondary" size="lg" type="button" disabled={saving} onClick={close}>
               Cancel
             </Button>
-            <Button type="submit" disabled={!canSave}>
+            <Button type="submit" size="lg" disabled={!canSave}>
               {conversation ? "Save" : "Create"}
             </Button>
           </DialogFooter>

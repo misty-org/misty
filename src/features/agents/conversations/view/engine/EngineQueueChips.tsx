@@ -35,7 +35,6 @@ export function EngineQueueChips(props: {
           <span className="engine-queue-text">{message.text}</span>
           <IconButton
             label="Edit queued message"
-            variant="toolbar"
             onClick={() => {
               useEngineQueue.getState().remove(conversationId, message.id);
               props.onEdit(message.text);
@@ -45,7 +44,6 @@ export function EngineQueueChips(props: {
           </IconButton>
           <IconButton
             label="Remove queued message"
-            variant="toolbar"
             onClick={() => useEngineQueue.getState().remove(conversationId, message.id)}
           >
             <X className="size-3.5" />

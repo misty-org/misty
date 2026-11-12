@@ -91,12 +91,10 @@ export function SketchBlock({ source }: { source: string }) {
       </div>
       <div className="misty-sketch-actions">
         <Button
-          variant="outline"
-          size="sm"
+          icon={PenLine}
           disabled={!sketch.done || !count || saving}
           onClick={() => void save()}
         >
-          <PenLine size={14} aria-hidden="true" />
           Save as drawing
         </Button>
         {notice && (

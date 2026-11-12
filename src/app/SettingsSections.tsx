@@ -9,8 +9,8 @@ import {
   ModelsSection,
   PersonaCatalogSection,
 } from "@/features/agents";
-import { AdvancedSection, AppearanceSection, TabsSettings } from "@/features/app-windows";
-import { BrowserPermissionSettings, DownloadsSettings, PrivacySection } from "@/features/browser";
+import { AdvancedSection, AppearanceSection } from "@/features/app-windows";
+import { BrowserPermissionSettings, PrivacySection } from "@/features/browser";
 import { ChannelsSection } from "@/features/engine-config/channels";
 import { ClisSection } from "@/features/engine-config/clis";
 import { FontsSection } from "@/features/engine-config/fonts";
@@ -38,8 +38,6 @@ import { PetsSection } from "@/features/pets";
  */
 const sections: Partial<Record<SettingsSection, ComponentType<SettingsContentProps>>> = {
   general: GeneralSection,
-  "browser-tabs": TabsSettings,
-  "browser-downloads": DownloadsSettings,
   updates: UpdatesSection,
   account: AccountSection,
   server: ServerSection,

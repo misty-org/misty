@@ -171,6 +171,18 @@ describe("a Space's planner and calendar", () => {
     expect(column("In progress").textContent).toContain("Ship");
   });
 
+  it("offers New task once, in the empty board's centered state", async () => {
+    api.tasks.mockResolvedValue({ tasks: [] });
+    act(() => root.render(routed(<SpacePlanner spaceId="space-1" />)));
+    await settle();
+    const newTask = [...host.querySelectorAll("button")].filter(
+      (button) => button.textContent === "New task",
+    );
+    expect(newTask).toHaveLength(1);
+    expect(host.querySelector('[data-slot="empty-state"]')?.textContent).toContain("No tasks yet");
+    expect(host.querySelector('[aria-label="Search tasks"]')).toBeNull();
+  });
+
   it("opens the task a link names", async () => {
     act(() => root.render(routed(<SpacePlanner spaceId="space-1" />, "/?task=task-1")));
     await settle();

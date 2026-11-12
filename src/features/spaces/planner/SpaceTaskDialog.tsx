@@ -10,6 +10,18 @@ import {
   OptionSelect,
   Textarea,
 } from "@/shared/ui";
+import {
+  ArrowDown,
+  ArrowUp,
+  Bot,
+  CircleCheck,
+  CircleDashed,
+  CircleDot,
+  CircleSlash,
+  Minus,
+  User,
+  type LucideIcon,
+} from "lucide-react";
 import { useState, type FormEvent } from "react";
 import type { SpaceTask, SpaceTaskInput, SpaceTaskPriority, SpaceTaskStatus } from "./api";
 import { taskKey } from "./taskOrdering";
@@ -25,8 +37,24 @@ export const assigneeValue = (task: Pick<SpaceTask, "assignee_user_id" | "assign
       ? `agent:${task.assignee_agent_id}`
       : "";
 
-const options = <T extends string>(labels: Record<T, string>) =>
-  (Object.keys(labels) as T[]).map((value) => ({ value, label: labels[value] }));
+const statusIcon: Record<SpaceTaskStatus, LucideIcon> = {
+  todo: CircleDashed,
+  in_progress: CircleDot,
+  done: CircleCheck,
+  canceled: CircleSlash,
+};
+const priorityIcon: Record<SpaceTaskPriority, LucideIcon> = {
+  high: ArrowUp,
+  medium: Minus,
+  low: ArrowDown,
+};
+
+const options = <T extends string>(labels: Record<T, string>, icons: Record<T, LucideIcon>) =>
+  (Object.keys(labels) as T[]).map((value) => ({
+    value,
+    label: labels[value],
+    icon: icons[value],
+  }));
 
 /** One task, new or open for editing. `task` is `null` for a new one. */
 export function SpaceTaskDialog(props: {
@@ -92,21 +120,27 @@ export function SpaceTaskDialog(props: {
             <Field label="Status">
               <OptionSelect
                 value={status}
-                options={options(statusLabel)}
+                options={options(statusLabel, statusIcon)}
                 onValueChange={(value) => setStatus(value as SpaceTaskStatus)}
               />
             </Field>
             <Field label="Priority">
               <OptionSelect
                 value={priority}
-                options={options(priorityLabel)}
+                options={options(priorityLabel, priorityIcon)}
                 onValueChange={(value) => setPriority(value as SpaceTaskPriority)}
               />
             </Field>
             <Field label="Assigned to">
               <OptionSelect
                 value={assignee}
-                options={[{ value: "", label: "No one" }, ...props.assignees]}
+                options={[
+                  { value: "", label: "No one", icon: CircleSlash },
+                  ...props.assignees.map((assignee) => ({
+                    ...assignee,
+                    icon: assignee.value.startsWith("agent:") ? Bot : User,
+                  })),
+                ]}
                 onValueChange={setAssignee}
               />
             </Field>
@@ -116,17 +150,29 @@ export function SpaceTaskDialog(props: {
           </div>
           <DialogFooter className="sm:justify-between">
             {props.onDelete ? (
-              <Button type="button" variant="ghost" disabled={props.busy} onClick={props.onDelete}>
+              <Button
+                type="button"
+                variant="quiet"
+                size="lg"
+                disabled={props.busy}
+                onClick={props.onDelete}
+              >
                 Delete
               </Button>
             ) : (
               <span />
             )}
             <div className="flex gap-2">
-              <Button type="button" variant="ghost" disabled={props.busy} onClick={props.onClose}>
+              <Button
+                type="button"
+                variant="quiet"
+                size="lg"
+                disabled={props.busy}
+                onClick={props.onClose}
+              >
                 Cancel
               </Button>
-              <Button type="submit" disabled={!title.trim() || props.busy}>
+              <Button type="submit" size="lg" disabled={!title.trim() || props.busy}>
                 {task ? "Save" : "Create"}
               </Button>
             </div>

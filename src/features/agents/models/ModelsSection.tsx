@@ -1,11 +1,10 @@
-import { DesktopSettingsNotice, DesktopSettingsSection as Section } from "@/features/settings";
+import { DesktopSettingsSection as Section } from "@/features/settings";
+import { useNotice } from "@/shared/ui";
 import { useState } from "react";
 import { ModelKeyRow } from "./ModelKeyRow";
 import { ModelDropdownRow, ModelTextRow, useModelSetting } from "./ModelChoiceRows";
-import { useChatgptAccount, useProviderModels, type AddedKey } from "./modelAccounts";
+import { useProviderModels, type AddedKey } from "./modelAccounts";
 import { useSavedModelKeys } from "./modelKeys";
-import { ModelSignInRows } from "./ModelSignInRows";
-import { ModelTestRow } from "./ModelTestRow";
 import { ConnectedAppsKeySection, WebSearchSection } from "./WebSearchSection";
 import {
   defaultAgentModel,
@@ -19,22 +18,22 @@ import {
 } from "./modelProviders";
 
 /**
- * Settings › Models. Agents run on this computer, on a model account you bring: Sign in with
- * ChatGPT, OpenRouter's sign-in, or a key from any provider (its provider is found from the
- * key). Keys and sign-ins go to the keychain through the native app; the model choices are
- * device settings, and each model names its provider (`anthropic/claude-sonnet-5-5`). A web
- * search key is kept the same way (WebSearchSection).
+ * Settings › Models. Engines do the agents' thinking; these are the raw models Misty calls on the
+ * person's own keys for the work that isn't an engine's (Tutor, reading the screen, notes, video,
+ * voice). A key from any provider is pasted here (its provider is found from the key) and goes to
+ * the keychain through the native app; the model choices are device settings, and each model
+ * names its provider (`anthropic/claude-haiku-5-5`). A web search key is kept the same way
+ * (WebSearchSection).
  */
+const unshown = "It can’t be shown again once saved.";
+
 export function ModelsSection() {
   const keys = useSavedModelKeys();
-  const chatgpt = useChatgptAccount();
   const provider = useModelSetting("models.provider");
-  const agent = useModelSetting("models.agent_model");
+  const main = useModelSetting("models.agent_model");
   const [listRevision, setListRevision] = useState(0);
-  const selected = providerById(provider.value) ?? modelProviders[0];
-  const ready = selected.signIn
-    ? Boolean(chatgpt.status?.planUsage)
-    : Boolean(selected.keyOptional || keys.saved?.includes(selected.id));
+  const selected = providerById(provider.value) ?? modelProviders[0]!;
+  const ready = Boolean(selected.keyOptional || keys.saved?.includes(selected.id));
   const listed = useProviderModels(selected.id, ready, listRevision);
   const suggest = (role: "agent" | "fast" | "embedding") =>
     modelSuggestions(selected, role, listed);
@@ -42,27 +41,19 @@ export function ModelsSection() {
   const savedLabels = modelProviders
     .filter((item) => keys.saved?.includes(item.id))
     .map((item) => item.label);
-  // A new account's provider becomes the one shown, and gives the agent a model when it has none.
-  const adopt = (providerId: string, added?: AddedKey) => {
-    if (providerId !== provider.value) provider.set(providerId);
+  useNotice(keys.unreadable, {
+    message: "Saved keys couldn't be read from the keychain. Restart Misty and try again.",
+    tone: "error",
+  });
+  // A new key's provider becomes the one shown, and gives the main model one when it has none.
+  const adopt = (added: AddedKey) => {
+    if (added.provider !== provider.value) provider.set(added.provider);
     setListRevision((value) => value + 1);
-    const first = added ? defaultAgentModel(providerId, added.models) : "";
-    if (first && !agent.value) agent.set(first);
-  };
-  const saveKey = async (_providerId: string, key: string) => {
-    const added = await keys.add(key, selected.id);
-    if (added) adopt(added.provider, added);
-    return Boolean(added);
+    const first = defaultAgentModel(added.provider, added.models);
+    if (first && !main.value) main.set(first);
   };
   return (
     <>
-      {keys.error ? <DesktopSettingsNotice>{keys.error}</DesktopSettingsNotice> : null}
-      <Section
-        title="Sign-ins"
-        description="Use a plan or account you already have. The sign-in stays on this computer."
-      >
-        <ModelSignInRows keys={keys} chatgpt={chatgpt} onSignedIn={adopt} />
-      </Section>
       <Section
         title="Provider"
         description="Keys stay in this computer’s keychain and go only to the provider."
@@ -77,22 +68,20 @@ export function ModelsSection() {
           }
           options={modelProviders.map((item) => ({ value: item.id, label: item.label }))}
         />
-        {selected.signIn ? null : (
-          <ModelKeyRow
-            label="API key"
-            description={
-              selected.keyOptional
-                ? `${selected.label} works without a key unless it asks for one.`
-                : selected.keyPage
-                  ? `Paste a key from ${selected.keyPage.replace(/^https:\/\//, "")}. It can’t be shown again once saved.`
-                  : "Paste a key from any provider; Misty finds which one it’s for. It can’t be shown again once saved."
-            }
-            providerId={selected.id}
-            saved={keys.saved}
-            onSave={saveKey}
-            onRemove={keys.remove}
-          />
-        )}
+        <ModelKeyRow
+          label="API key"
+          keyName={`${selected.label} key`}
+          description={
+            selected.keyOptional
+              ? `${selected.label} works without a key unless it asks for one.`
+              : selected.keyPage
+                ? `Paste a key from ${selected.keyPage.replace(/^https:\/\//, "")}. ${unshown}`
+                : `Paste a key from any provider; Misty finds which one it’s for. ${unshown}`
+          }
+          providerId={selected.id}
+          keys={keys}
+          onSave={async (key) => adopt(await keys.add(key, selected.id))}
+        />
         {selected.baseUrlSetting ? (
           <ModelTextRow
             id={selected.baseUrlSetting}
@@ -110,25 +99,27 @@ export function ModelsSection() {
       >
         <ModelTextRow
           id="models.agent_model"
-          label="Agent model"
-          description="Thinks, plans and reads screens. AI stays off until this is set."
+          label="Main model"
+          description="Reads the screen for screen control and Tutor's pointer, and writes notes from recordings."
           placeholder={suggest("agent")[0] ?? `${selected.id}/model`}
           suggestions={suggest("agent")}
           normalize={qualify}
         />
-        <ModelTestRow disabled={!agent.value} />
         <ModelTextRow
           id="models.fast_model"
           label="Fast model"
-          description="Routing, cleanup and summaries. Optional; the agent model does these when empty."
-          placeholder="Same as agent model"
+          description={
+            "Tutor's live conversation, chat titles and summaries. " +
+            "Optional; the main model does these when empty."
+          }
+          placeholder="Same as main model"
           suggestions={suggest("fast")}
           normalize={qualify}
         />
         <ModelTextRow
           id="models.embedding_model"
           label="Embedding model"
-          description="Searches memory and the library. Optional; that search is off when empty. ChatGPT has none."
+          description="Searches memory and the library. Optional; that search is off when empty."
           placeholder="Off"
           suggestions={suggest("embedding")}
           normalize={qualify}
@@ -144,7 +135,7 @@ export function ModelsSection() {
         <ModelDropdownRow
           id="models.reasoning"
           label="Reasoning effort"
-          description="How long the agent model thinks before answering. Higher is slower and costs more."
+          description="How long these models think before answering. Higher is slower and costs more."
           options={reasoningLevels}
         />
       </Section>
@@ -164,9 +155,7 @@ export function ModelsSection() {
                   : "Transcribes dictation and voice messages."
               }
               providerId={voice.id}
-              saved={keys.saved}
-              onSave={keys.save}
-              onRemove={keys.remove}
+              keys={keys}
             />
             <ModelTextRow
               id={voice.role === "speech" ? "models.speech_model" : "models.transcription_model"}

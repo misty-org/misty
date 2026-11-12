@@ -11,8 +11,7 @@
     [data-slot="select-content"],
     [data-slot="workspace-overlay-panel"],
     [role="menu"],
-    [data-popup-surface],
-    [id="browser-omnibox-suggestions"]
+    [data-popup-surface]
   ) {
   border: 1px solid color-mix(in srgb, currentColor 24%, transparent);
   --tw-ring-shadow: 0 0 #0000;
@@ -35,8 +34,7 @@
       [data-slot="select-content"],
       [data-slot="workspace-overlay-panel"],
       [role="menu"],
-      [data-popup-surface],
-      [id="browser-omnibox-suggestions"]
+      [data-popup-surface]
     ) {
     /* Not `clip`: with this border and radius, WebView2 drops ClearType for the
        popup's text, which reads as blur on 1x displays. */

@@ -1,6 +1,6 @@
 import type { SpaceChatMessagesProps } from "./ChatMessages";
 import type { SpaceMessage } from "../../api/dto/entities";
-import { Avatar, AvatarFallback, AvatarImage, Button, ErrorNotification } from "@/shared/ui";
+import { Avatar, AvatarFallback, AvatarImage, Button, useNotice } from "@/shared/ui";
 import { Bot } from "lucide-react";
 import { Fragment, memo, type FormEvent } from "react";
 import { ChatDateDivider, formatChatMessageTime } from "./ChatDisplay";
@@ -98,6 +98,12 @@ function ChatMessageRowView({
   const agentAuthored = isAgentAuthoredMessage(message);
   // A handoff or a claim a person posted is drawn as a card.
   const post = readSpacePost(message);
+  const { onRetry } = props;
+  useNotice(message.local_delivery_state === "failed", {
+    message: "Message couldn’t be sent.",
+    tone: "error",
+    action: onRetry ? { label: "Retry", onSelect: () => onRetry(message) } : undefined,
+  });
 
   return (
     <Fragment>
@@ -186,28 +192,12 @@ function ChatMessageRowView({
 
           {replyCount > 0 ? (
             <Button
-              variant="ghost"
-              size="sm"
+              variant="quiet"
               className="mt-1 -ml-2"
               onClick={() => useChatSidePanel.getState().openThread(message.id)}
             >
               Show replies ({replyCount})
             </Button>
-          ) : null}
-
-          {message.local_delivery_state === "failed" ? (
-            <ErrorNotification message="Message couldn’t be sent.">
-              {props.onRetry && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => props.onRetry?.(message)}
-                >
-                  Retry
-                </Button>
-              )}
-            </ErrorNotification>
           ) : null}
 
           <MessageAttachments

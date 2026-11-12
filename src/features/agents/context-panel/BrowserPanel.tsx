@@ -6,7 +6,7 @@ import { usePresentedPageHost } from "@/features/browser";
 import { invoke } from "@/native/invoke";
 import { openExternalLink } from "@/shared/platform/openExternalLink";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { ErrorNotification, IconButton, Input, SkeletonDocument } from "@/shared/ui";
+import { EmptyState, IconButton, Input, SkeletonDocument, useNotice } from "@/shared/ui";
 import { agentPageKey, useAgentPageGeometry } from "../agent-browser/useAgentPageGeometry";
 import { useMistyStore } from "../conversations/state/useMistyStore";
 import { currentSpaceKey } from "../engines/enginesApi";
@@ -17,20 +17,24 @@ import { browserAddress, rememberAddress, rememberedAddress } from "./browserAdd
 
 /**
  * A plain browser beside the chat, for the person: an address field, back, forward and reload,
- * on one of Misty's native pages with the person's signed-in sites. Agents don't drive it; to
- * have an agent work in a browser, the person attaches Misty's browser to a message.
+ * on one of Misty's native pages with the person's signed-in sites. It opens on a blank page
+ * until an address is typed, and what isn't an address is searched with Google. Agents don't
+ * drive it; to have an agent work in a browser, the person attaches Misty's browser to a message.
  */
 export default function BrowserPanel() {
   const space = currentSpaceKey();
-  const [start] = useState(() => rememberedAddress(space));
-  const [url, setUrl] = useState(start);
-  const [typed, setTyped] = useState(start);
+  const [url, setUrl] = useState(() => rememberedAddress(space));
+  const [typed, setTyped] = useState(url);
+  // The native page opens on the first address; until then the stage is a blank page.
+  const [start, setStart] = useState(url);
   const [editing, setEditing] = useState(false);
   const [viewId, setViewId] = useState("");
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => Boolean(url));
   const [error, setError] = useState("");
   const [added, setAdded] = useState(false);
   const host = useRef<HTMLDivElement>(null);
+  const field = useRef<HTMLInputElement>(null);
+  useNotice(Boolean(error), { message: error, tone: "error", onDismiss: () => setError("") });
 
   // Opened the first time the panel is on screen, and kept while the chat is open.
   const inView = useHostInView(host);
@@ -40,7 +44,11 @@ export default function BrowserPanel() {
   }, [inView]);
 
   useEffect(() => {
-    if (!seen) return;
+    if (!start) field.current?.focus();
+  }, [start]);
+
+  useEffect(() => {
+    if (!seen || !start) return;
     let live = true;
     let opened = "";
     void previewApi
@@ -95,11 +103,14 @@ export default function BrowserPanel() {
   const go = (event: FormEvent) => {
     event.preventDefault();
     const address = browserAddress(typed);
-    if (!address || !viewId) return;
+    if (!address) return;
     setEditing(false);
+    field.current?.blur();
     setUrl(address);
+    setAdded(false);
     rememberAddress(space, address);
-    void previewApi.navigate(viewId, address).catch((reason) => setError(errorText(reason)));
+    if (!viewId) setStart(address);
+    else void previewApi.navigate(viewId, address).catch((reason) => setError(errorText(reason)));
   };
   const step = (command: "browser_webview_back" | "browser_webview_forward") =>
     viewId &&
@@ -119,27 +130,28 @@ export default function BrowserPanel() {
     <div className="preview-panel">
       <form className="preview-bar" onSubmit={go} noValidate>
         <IconButton label="Back" disabled={!viewId} onClick={() => step("browser_webview_back")}>
-          <ArrowLeft size={15} />
+          <ArrowLeft />
         </IconButton>
         <IconButton
           label="Forward"
           disabled={!viewId}
           onClick={() => step("browser_webview_forward")}
         >
-          <ArrowRight size={15} />
+          <ArrowRight />
         </IconButton>
         <IconButton
           label="Reload"
           disabled={!viewId}
           onClick={() => viewId && void previewApi.reload(viewId).catch(() => undefined)}
         >
-          <RotateCw size={15} />
+          <RotateCw />
         </IconButton>
         <Input
+          ref={field}
           variant="address"
           className="preview-address"
           aria-label="Address"
-          placeholder="Search or enter an address"
+          placeholder="Search Google or type an address"
           spellCheck={false}
           autoCapitalize="off"
           autoCorrect="off"
@@ -154,16 +166,17 @@ export default function BrowserPanel() {
         />
         <IconButton
           label={added ? "Added to your message" : "Add this page to your message"}
-          disabled={added}
+          disabled={added || !url}
           onClick={addToMessage}
         >
-          <MessageSquarePlus size={15} />
+          <MessageSquarePlus />
         </IconButton>
         <IconButton
           label="Open in my browser"
+          disabled={!url}
           onClick={() => void openExternalLink(url).catch((reason) => setError(errorText(reason)))}
         >
-          <ExternalLink size={15} />
+          <ExternalLink />
         </IconButton>
       </form>
       <div className="preview-stage">
@@ -174,10 +187,15 @@ export default function BrowserPanel() {
           data-browser-page-awaiting={placedId && !presented ? "" : undefined}
           data-browser-page-presented={placedId && presented ? "" : undefined}
         >
-          {presented ? null : <SkeletonDocument label="Page" className="preview-skeleton" />}
+          {presented ? null : start ? (
+            <SkeletonDocument label="Page" className="preview-skeleton" />
+          ) : (
+            <div className="preview-skeleton">
+              <EmptyState title="Blank page" line="Search Google or type an address above." />
+            </div>
+          )}
         </div>
       </div>
-      <ErrorNotification message={error} onDismiss={() => setError("")} />
     </div>
   );
 }

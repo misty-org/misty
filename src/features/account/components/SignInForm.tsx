@@ -67,7 +67,7 @@ export default function SignInForm(props: {
         />
         <Button
           type="button"
-          variant="link"
+          variant="quiet"
           className="h-auto self-start p-0 text-sm text-cream"
           onClick={() => void openUrl(`${mistyWebsite()}/sign-in`)}
         >

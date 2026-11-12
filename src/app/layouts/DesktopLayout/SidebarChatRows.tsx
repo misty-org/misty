@@ -15,6 +15,7 @@ import {
   DialogTitle,
   Input,
   Pressable,
+  Tooltip,
 } from "@/shared/ui";
 import type { SidebarChat } from "./SidebarChats";
 
@@ -54,9 +55,11 @@ export function ChatRow(props: {
       <span className="misty-space-chat-title">{props.chat.title || "New conversation"}</span>
       {word ? (
         // The color says the state; the word stays for screen readers and the tooltip.
-        <span className="misty-space-chat-status" role="img" aria-label={word} title={word}>
-          <span className="misty-space-chat-dot" />
-        </span>
+        <Tooltip content={word}>
+          <span className="misty-space-chat-status" role="img" aria-label={word}>
+            <span className="misty-space-chat-dot" />
+          </span>
+        </Tooltip>
       ) : (
         <span className="misty-space-chat-meta">
           {props.unread ? <span className="misty-space-chat-unread" aria-label="Unread" /> : null}
@@ -152,10 +155,10 @@ export function SectionNameDialog(props: {
             onChange={(event) => setName(event.target.value)}
           />
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={props.onClose}>
+            <Button variant="secondary" size="lg" onClick={props.onClose}>
               Cancel
             </Button>
-            <Button type="submit" disabled={!name.trim()}>
+            <Button type="submit" size="lg" disabled={!name.trim()}>
               {props.renaming ? "Save" : "Create"}
             </Button>
           </DialogFooter>

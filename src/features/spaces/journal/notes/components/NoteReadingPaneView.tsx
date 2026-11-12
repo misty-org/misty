@@ -1,4 +1,12 @@
-import { BackButton, Button, cn, EmptyState, Skeleton, SkeletonDocument } from "@/shared/ui";
+import {
+  BackButton,
+  Button,
+  cn,
+  EmptyState,
+  OverflowFadeText,
+  Skeleton,
+  SkeletonDocument,
+} from "@/shared/ui";
 import { Link2 } from "lucide-react";
 import { Suspense, useEffect, useState, type ComponentType } from "react";
 import type { UnifiedNote } from "../noteTypes";
@@ -30,20 +38,14 @@ export function NoteReadingPaneView(
       <div className={paneClass}>
         <div className="row-span-2 grid place-items-center">
           <EmptyState
+            inline
             title={props.hasNotes ? "Select a note" : "No notes yet"}
-            description={
+            line={
               props.hasNotes
                 ? "Choose a note from the list to open it."
                 : "Create a note to keep this Space's work close by."
             }
-            className="max-w-sm px-6 py-8"
-            action={
-              props.hasNotes ? undefined : (
-                <Button type="button" onClick={props.onNewNote}>
-                  New note
-                </Button>
-              )
-            }
+            action={props.hasNotes ? undefined : { label: "New note", onClick: props.onNewNote }}
           />
         </div>
       </div>
@@ -71,14 +73,15 @@ export function NoteReadingPaneView(
               onRenameHandled={props.onRenameHandled}
             />
           ) : (
-            <h1 className="m-0 truncate text-sm font-semibold text-cream-bright">{note.title}</h1>
+            <OverflowFadeText as="h1" full className="m-0 text-sm font-semibold text-cream-bright">
+              {note.title}
+            </OverflowFadeText>
           )}
         </div>
         <div className="ml-auto flex items-center gap-1.5">
           <Button
             type="button"
-            size="sm"
-            variant={inspector === "backlinks" ? "secondary" : "ghost"}
+            variant={inspector === "backlinks" ? "secondary" : "quiet"}
             className={cn("gap-1.5", "h-8")}
             aria-label="Backlinks"
             onClick={() =>

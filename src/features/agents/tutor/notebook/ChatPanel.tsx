@@ -155,14 +155,12 @@ export function ChatPanel({
               <Skeleton className="h-3.5 w-[60%]" />
             </div>
           ) : notebook.sources.length ? (
-            <Button variant="ghost" size="sm" onClick={onBrief}>
-              <RotateCcw size={14} />
+            <Button variant="quiet" onClick={onBrief} icon={RotateCcw}>
               Write the overview
             </Button>
           ) : (
             <div className="tutor-cover-start">
-              <Button onClick={onAdd}>
-                <Plus size={15} />
+              <Button onClick={onAdd} icon={Plus}>
                 Add sources
               </Button>
             </div>
@@ -179,7 +177,7 @@ export function ChatPanel({
                   actions.onChat(conversation.agentId ?? actions.agentId, conversation.id)
                 }
               >
-                <ExternalLink size={15} />
+                <ExternalLink />
               </IconButton>
               <IconButton
                 label="New conversation"
@@ -190,7 +188,7 @@ export function ChatPanel({
                   }))
                 }
               >
-                <SquarePen size={15} />
+                <SquarePen />
               </IconButton>
             </div>
             {messages.map((message) => {
@@ -259,7 +257,7 @@ export function ChatPanel({
           className="tutor-composer-send"
           disabled={!question.trim() || asking}
         >
-          <ArrowUp size={16} />
+          <ArrowUp />
         </IconButton>
       </form>
     </section>

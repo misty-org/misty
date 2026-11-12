@@ -64,18 +64,6 @@ fn reads_each_providers_model_list() {
         "ollama-cloud/gpt-oss:120b"
     );
     assert!(parse("ollama", &ollama)[1].embedding);
-    let chatgpt = json!({"models": [
-        {"slug": "gpt-6.1-sol", "display_name": "GPT-6.1 Sol", "visibility": "list"},
-        {"slug": "internal", "display_name": "Hidden", "visibility": "hide"},
-    ]});
-    assert_eq!(
-        parse("chatgpt", &chatgpt),
-        vec![ModelInfo {
-            id: "chatgpt/gpt-6.1-sol".into(),
-            label: "GPT-6.1 Sol".into(),
-            embedding: false
-        }]
-    );
     let gateway = json!({"data": [{"id": "openai/text-embedding-3-small", "name": "Embedding", "type": "embedding"}]});
     assert!(parse("gateway", &gateway)[0].embedding);
 }

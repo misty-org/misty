@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { NoticeViewport } from "@/shared/ui";
 const native = vi.hoisted(() => ({
   listener: undefined as undefined | ((event: { payload: typeof menu }) => Promise<void>),
   invoke: vi.fn(async () => {}),
@@ -109,7 +110,12 @@ it("grants menu focus to the local host without granting remote pages native acc
 
 it("releases the page if native focus fails and allows the next menu to open", async () => {
   native.focus.mockRejectedValueOnce(new Error("Focus unavailable"));
-  render(<BrowserContextMenuBridge />);
+  render(
+    <>
+      <BrowserContextMenuBridge />
+      <NoticeViewport />
+    </>,
+  );
   await act(async () => {
     await native.listener!({ payload: menu });
   });

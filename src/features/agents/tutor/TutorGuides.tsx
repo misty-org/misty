@@ -10,7 +10,7 @@ import {
   X,
 } from "lucide-react";
 import { confirmAction } from "@/shared/lib/confirmAction";
-import { Button, ErrorNotification, IconButton, Pressable, Skeleton } from "@/shared/ui";
+import { Button, IconButton, Pressable, Skeleton, useNotice, OverflowFadeText } from "@/shared/ui";
 import { MistyMarkdown } from "../runs/markdown/MistyMarkdown";
 import { deckPrompt, jobTitle, quizPrompt } from "./tutorPrompts";
 import { startJob } from "./tutorRuns";
@@ -43,6 +43,7 @@ export function GuideView({
   onClose(): void;
 }) {
   const [error, setError] = useState("");
+  useNotice(Boolean(error), { message: error, tone: "error", onDismiss: () => setError("") });
   const remove = async () => {
     if (!(await confirmAction(`Delete “${guide.title}”? This can’t be undone.`))) return;
     useTutorStore.getState().removeGuide(guide.id);
@@ -51,35 +52,32 @@ export function GuideView({
   return (
     <>
       <div className="tutor-lead">
-        <IconButton label="Back to the studio" onClick={onClose}>
-          <ArrowLeft size={16} />
+        <IconButton label="Back to Create" onClick={onClose}>
+          <ArrowLeft />
         </IconButton>
         <span className="tutor-actions">
           <Button
-            variant="ghost"
-            size="sm"
+            variant="quiet"
             onClick={() => {
               void fromGuide(guide, "deck", actions.agentId);
               onClose();
             }}
+            icon={Layers}
           >
-            <Layers size={15} />
             Flashcards
           </Button>
           <Button
-            variant="ghost"
-            size="sm"
+            variant="quiet"
             onClick={() => {
               void fromGuide(guide, "quiz", actions.agentId);
               onClose();
             }}
+            icon={ListChecks}
           >
-            <ListChecks size={15} />
             Quiz me
           </Button>
           <Button
-            variant="ghost"
-            size="sm"
+            variant="quiet"
             onClick={() => actions.onLearn(`Teach me “${guide.title}”, step by step.`)}
           >
             Teach me
@@ -89,7 +87,7 @@ export function GuideView({
               label="Open the chat that wrote it"
               onClick={() => actions.onChat(actions.agentId, guide.conversationId!)}
             >
-              <MessageSquare size={15} />
+              <MessageSquare />
             </IconButton>
           ) : null}
           <ShareToSpace
@@ -98,11 +96,10 @@ export function GuideView({
             onError={setError}
           />
           <IconButton label="Delete guide" onClick={() => void remove()}>
-            <Trash2 size={15} />
+            <Trash2 />
           </IconButton>
         </span>
       </div>
-      <ErrorNotification message={error} onDismiss={() => setError("")} />
       <article className="tutor-guide">
         <MistyMarkdown>{guide.body}</MistyMarkdown>
       </article>
@@ -113,6 +110,7 @@ export function GuideView({
 /** Every question at once; Check marks them and keeps the score. */
 export function QuizView({ quiz, onClose }: { quiz: Guide; onClose(): void }) {
   const [error, setError] = useState("");
+  useNotice(Boolean(error), { message: error, tone: "error", onDismiss: () => setError("") });
   const questions = quiz.questions ?? [];
   const [picked, setPicked] = useState<Record<number, number>>({});
   const [checked, setChecked] = useState(false);
@@ -131,10 +129,10 @@ export function QuizView({ quiz, onClose }: { quiz: Guide; onClose(): void }) {
   return (
     <>
       <div className="tutor-lead">
-        <IconButton label="Back to the studio" onClick={onClose}>
-          <ArrowLeft size={16} />
+        <IconButton label="Back to Create" onClick={onClose}>
+          <ArrowLeft />
         </IconButton>
-        <span className="tutor-card-title">{quiz.title}</span>
+        <OverflowFadeText className="tutor-card-title">{quiz.title}</OverflowFadeText>
         <span className="tutor-actions">
           {checked ? (
             <span className="tutor-card-detail" role="status">
@@ -147,11 +145,10 @@ export function QuizView({ quiz, onClose }: { quiz: Guide; onClose(): void }) {
             onError={setError}
           />
           <IconButton label="Delete quiz" onClick={() => void remove()}>
-            <Trash2 size={15} />
+            <Trash2 />
           </IconButton>
         </span>
       </div>
-      <ErrorNotification message={error} onDismiss={() => setError("")} />
       <ol className="tutor-quiz">
         {questions.map((question, index) => (
           <li key={index}>
@@ -192,8 +189,6 @@ export function QuizView({ quiz, onClose }: { quiz: Guide; onClose(): void }) {
       <div className="tutor-lead">
         {checked ? (
           <Button
-            size="sm"
-            variant="outline"
             onClick={() => {
               setPicked({});
               setChecked(false);
@@ -202,11 +197,7 @@ export function QuizView({ quiz, onClose }: { quiz: Guide; onClose(): void }) {
             Try again
           </Button>
         ) : (
-          <Button
-            size="sm"
-            disabled={Object.keys(picked).length < questions.length}
-            onClick={check}
-          >
+          <Button disabled={Object.keys(picked).length < questions.length} onClick={check}>
             Check answers
           </Button>
         )}
@@ -221,6 +212,13 @@ export function QuizView({ quiz, onClose }: { quiz: Guide; onClose(): void }) {
  */
 export function OverviewView({ overview, onClose }: { overview: Guide; onClose(): void }) {
   const [error, setError] = useState("");
+  const shownError =
+    error || (overview.audio?.state === "failed" ? (overview.audio.error ?? "") : "");
+  useNotice(Boolean(shownError), {
+    message: shownError,
+    tone: "error",
+    onDismiss: () => setError(""),
+  });
   const [url, setUrl] = useState<string>();
   const ready = overview.audio?.state === "ready";
   useEffect(() => {
@@ -249,18 +247,17 @@ export function OverviewView({ overview, onClose }: { overview: Guide; onClose()
   return (
     <>
       <div className="tutor-lead">
-        <IconButton label="Back to the studio" onClick={onClose}>
-          <ArrowLeft size={16} />
+        <IconButton label="Back to Create" onClick={onClose}>
+          <ArrowLeft />
         </IconButton>
-        <span className="tutor-card-title">{overview.title}</span>
+        <OverflowFadeText className="tutor-card-title">{overview.title}</OverflowFadeText>
         <span className="tutor-actions">
           <Button
-            variant="ghost"
-            size="sm"
+            variant="quiet"
             disabled={overview.audio?.state === "making"}
             onClick={() => void makeOverviewAudio(overview.id)}
+            icon={RotateCcw}
           >
-            <RotateCcw size={15} />
             {ready ? "Speak again" : "Make audio"}
           </Button>
           <ShareToSpace
@@ -269,14 +266,10 @@ export function OverviewView({ overview, onClose }: { overview: Guide; onClose()
             onError={setError}
           />
           <IconButton label="Delete overview" onClick={() => void remove()}>
-            <Trash2 size={15} />
+            <Trash2 />
           </IconButton>
         </span>
       </div>
-      <ErrorNotification
-        message={error || (overview.audio?.state === "failed" ? (overview.audio.error ?? "") : "")}
-        onDismiss={() => setError("")}
-      />
       <div className="tutor-player">
         {overview.audio?.state === "making" ? (
           <span className="tutor-card-detail misty-shimmer">Speaking the script</span>

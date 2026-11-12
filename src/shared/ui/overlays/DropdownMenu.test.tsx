@@ -1,4 +1,5 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { Bookmark, BookmarkPlus } from "lucide-react";
 import { afterEach, expect, it, vi } from "vitest";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "./DropdownMenu";
 import { MenuItem, MenuSubmenu } from "./MenuItem";
@@ -11,8 +12,8 @@ it("keeps submenus outside the scrolling parent and preserves keyboard selection
     <DropdownMenu modal={false}>
       <DropdownMenuTrigger>Browser menu</DropdownMenuTrigger>
       <DropdownMenuContent aria-label="Browser menu" style={{ maxHeight: 120 }}>
-        <MenuSubmenu label="Bookmarks">
-          <MenuItem label="Bookmark manager" onSelect={select} />
+        <MenuSubmenu icon={Bookmark} label="Bookmarks">
+          <MenuItem icon={BookmarkPlus} label="Bookmark manager" onSelect={select} />
         </MenuSubmenu>
       </DropdownMenuContent>
     </DropdownMenu>,

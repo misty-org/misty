@@ -1,16 +1,17 @@
-import { Check, ChevronDown, Plus } from "lucide-react";
+import { Check, ChevronDown, Plus, Unplug } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { openExternalLink } from "@/shared/platform/openExternalLink";
 import {
   Button,
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuTrigger,
-  ErrorNotification,
   IconButton,
+  MenuItem,
   SearchField,
   Skeleton,
+  useNotice,
+  OverflowFadeText,
 } from "@/shared/ui";
 import { DirectAppLogo } from "./DirectAppLogo";
 import {
@@ -184,9 +185,9 @@ export function DirectApps({ limit, find = "" }: { limit?: number; find?: string
   const notShown = offered.length - shown.length + Math.max(0, total - loadedShipped);
   const loading = catalog === null || connections === null;
 
+  useNotice(Boolean(error), { message: error, tone: "error" });
   return (
     <div className="grid gap-2">
-      <ErrorNotification message={error} />
       <SearchField
         size="md"
         value={query}
@@ -214,9 +215,13 @@ export function DirectApps({ limit, find = "" }: { limit?: number; find?: string
               name={connection.name}
               icon={byUrl.get(connection.url)?.icon}
             />
-            <p className="min-w-0 flex-1 truncate text-sm font-medium text-cream-bright">
+            <OverflowFadeText
+              as="p"
+              full
+              className="min-w-0 flex-1 text-sm font-medium text-cream-bright"
+            >
               {connection.name}
-            </p>
+            </OverflowFadeText>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <IconButton label={`${connection.name} connected`}>
@@ -224,9 +229,11 @@ export function DirectApps({ limit, find = "" }: { limit?: number; find?: string
                 </IconButton>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onSelect={() => void disconnect(connection)}>
-                  Disconnect
-                </DropdownMenuItem>
+                <MenuItem
+                  icon={Unplug}
+                  label="Disconnect"
+                  onSelect={() => void disconnect(connection)}
+                />
               </DropdownMenuContent>
             </DropdownMenu>
           </li>
@@ -234,9 +241,13 @@ export function DirectApps({ limit, find = "" }: { limit?: number; find?: string
         {shown.map((app) => (
           <li key={app.url} className={tileClass} title={app.description || undefined}>
             <AppTileLogo app={app.app} name={app.name} icon={app.icon} />
-            <p className="min-w-0 flex-1 truncate text-sm font-medium text-cream-bright">
+            <OverflowFadeText
+              as="p"
+              full
+              className="min-w-0 flex-1 text-sm font-medium text-cream-bright"
+            >
               {app.name}
-            </p>
+            </OverflowFadeText>
             <IconButton
               label={`Connect ${app.name}`}
               disabled={pending?.url === app.url}
@@ -263,8 +274,7 @@ export function DirectApps({ limit, find = "" }: { limit?: number; find?: string
       ) : null}
       {notShown > 0 && !loading ? (
         <Button
-          variant="ghost"
-          size="sm"
+          variant="quiet"
           className="justify-self-start text-cream-muted"
           disabled={loadingMore}
           onClick={() => {
@@ -282,8 +292,8 @@ export function DirectApps({ limit, find = "" }: { limit?: number; find?: string
 
 function AppTileLogo({ app, name, icon }: { app: string; name: string; icon?: string }) {
   return (
-    <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-charcoal-hover">
-      <DirectAppLogo app={app} name={name} icon={icon} size={16} />
+    <span className="flex size-7 shrink-0 items-center justify-center">
+      <DirectAppLogo app={app} name={name} icon={icon} size={20} />
     </span>
   );
 }

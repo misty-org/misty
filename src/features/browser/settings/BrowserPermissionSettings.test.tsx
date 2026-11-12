@@ -2,6 +2,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type * as SitePermissionModule from "@/features/browser/sitePermissions";
+import { NoticeViewport } from "@/shared/ui";
 import { BrowserPermissionSettings } from "./BrowserPermissionSettings";
 const invoke = vi.hoisted(() => vi.fn());
 vi.mock("@tauri-apps/api/core", () => ({ invoke }));
@@ -53,7 +54,14 @@ describe("saved website permissions", () => {
       .mockResolvedValueOnce([entry])
       .mockRejectedValueOnce("Permission saved, but stopping capture timed out.")
       .mockResolvedValueOnce([]);
-    await act(async () => root.render(<BrowserPermissionSettings />));
+    await act(async () =>
+      root.render(
+        <>
+          <NoticeViewport />
+          <BrowserPermissionSettings />
+        </>,
+      ),
+    );
     await act(async () =>
       container
         .querySelector<HTMLButtonElement>(

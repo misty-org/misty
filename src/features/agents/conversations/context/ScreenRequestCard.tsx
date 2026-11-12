@@ -78,21 +78,16 @@ export function ScreenRequestCard({
     stalled || asking ? (
       <>
         {stalled ? (
-          <Button
-            size="sm"
-            variant="primary"
-            onClick={() => choose(screenChoice(request.location))}
-          >
+          <Button variant="primary" onClick={() => choose(screenChoice(request.location))}>
             Continue
           </Button>
         ) : (
           <>
-            <Button size="sm" variant="primary" disabled={working} onClick={() => choose("window")}>
+            <Button variant="primary" disabled={working} onClick={() => choose("window")}>
               <AppWindow className="size-3.5" /> New tab
             </Button>
             <Button
-              size="sm"
-              variant="ghost"
+              variant="quiet"
               onClick={() =>
                 conversationId &&
                 declineScreenRequest(

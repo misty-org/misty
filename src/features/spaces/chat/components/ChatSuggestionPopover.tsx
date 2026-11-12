@@ -45,16 +45,20 @@ export function ChatSuggestionPopover(props: ChatSuggestionPopoverProps) {
         <CommandList id={props.listId}>
           <CommandGroup heading="Add to message">
             {props.canBrowseLibrary ? (
-              <CommandItem onSelect={props.onBrowseLibrary}>
-                <LibraryBig />
-                <AddActionLabel title="Browse Library" detail="Select one or more shared items" />
-              </CommandItem>
+              <CommandItem
+                icon={LibraryBig}
+                label="Browse Library"
+                description="Select one or more shared items"
+                onSelect={props.onBrowseLibrary}
+              />
             ) : null}
             {props.canUploadAttachments ? (
-              <CommandItem onSelect={props.onUploadFiles}>
-                <Paperclip />
-                <AddActionLabel title="Upload files" detail="Choose with Misty’s file picker" />
-              </CommandItem>
+              <CommandItem
+                icon={Paperclip}
+                label="Upload files"
+                description="Choose with Misty’s file picker"
+                onSelect={props.onUploadFiles}
+              />
             ) : null}
           </CommandGroup>
           <CommandSeparator />
@@ -68,21 +72,16 @@ export function ChatSuggestionPopover(props: ChatSuggestionPopoverProps) {
                 value={`${suggestion.kind}:${suggestion.id}`}
                 onMouseEnter={() => props.onHoverIndex(index)}
                 onSelect={() => props.onSelect(suggestion)}
-              >
-                {suggestion.kind === "member" ? (
-                  <Users />
-                ) : suggestion.kind === "agent" ? (
-                  <Bot />
-                ) : (
-                  <LibraryBig />
-                )}
-                <span className="min-w-0">
-                  <span className="block truncate">{suggestion.label}</span>
-                  <span className="block truncate text-xs text-cream-muted">
-                    {suggestion.detail}
-                  </span>
-                </span>
-              </CommandItem>
+                icon={
+                  suggestion.kind === "member"
+                    ? Users
+                    : suggestion.kind === "agent"
+                      ? Bot
+                      : LibraryBig
+                }
+                label={suggestion.label}
+                description={suggestion.detail}
+              />
             ))}
           </CommandGroup>
           {showEmpty ? (
@@ -93,6 +92,7 @@ export function ChatSuggestionPopover(props: ChatSuggestionPopoverProps) {
               label="Library suggestions"
               rows={3}
               leading="icon"
+              lines={2}
               className="p-2"
               rowClassName="px-2"
             />
@@ -107,14 +107,5 @@ export function ChatSuggestionPopover(props: ChatSuggestionPopoverProps) {
         </CommandList>
       </Command>
     </PopoverContent>
-  );
-}
-
-function AddActionLabel({ title, detail }: { title: string; detail: string }) {
-  return (
-    <span>
-      <span className="block">{title}</span>
-      <span className="block text-xs text-cream-muted">{detail}</span>
-    </span>
   );
 }

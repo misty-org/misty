@@ -5,7 +5,7 @@ import {
   Dialog,
   DialogContent,
   DialogTitle,
-  ErrorNotification,
+  useNotice,
   Field,
   Input,
   Label,
@@ -77,6 +77,7 @@ export function NewAgentDialog({
     }
   };
 
+  useNotice(Boolean(error), { message: error, tone: "error", onDismiss: () => setError("") });
   return (
     <Dialog open onOpenChange={(open) => (open ? undefined : onClose())}>
       <DialogContent
@@ -84,7 +85,6 @@ export function NewAgentDialog({
         className="flex max-h-[86vh] w-[560px] max-w-[94vw] flex-col gap-4 overflow-y-auto p-5"
       >
         <DialogTitle className="pr-10 text-base">New agent</DialogTitle>
-        <ErrorNotification message={error} onDismiss={() => setError("")} />
         <Field label="Name">
           <Input
             maxLength={80}
@@ -102,9 +102,7 @@ export function NewAgentDialog({
           </div>
         </div>
         <div className="flex justify-end gap-2">
-          <Button variant="secondary" onClick={onClose}>
-            Cancel
-          </Button>
+          <Button onClick={onClose}>Cancel</Button>
           <Button variant="primary" disabled={!engine || busy} onClick={() => void create()}>
             Create
           </Button>

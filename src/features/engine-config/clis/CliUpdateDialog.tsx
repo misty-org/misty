@@ -185,9 +185,7 @@ function DialogFooter({ state, flow }: { state: CliUpdateFlowState; flow: CliUpd
     if (state.terminalOk === null) {
       return (
         <div className={footer}>
-          <Button variant="secondary" onClick={flow.close}>
-            Stop
-          </Button>
+          <Button onClick={flow.close}>Stop</Button>
         </div>
       );
     }
@@ -202,9 +200,7 @@ function DialogFooter({ state, flow }: { state: CliUpdateFlowState; flow: CliUpd
   const plan = state.plan;
   return (
     <div className={footer}>
-      <Button variant="secondary" onClick={flow.close}>
-        Cancel
-      </Button>
+      <Button onClick={flow.close}>Cancel</Button>
       {state.status === "error" ? (
         <Button
           variant="primary"
@@ -257,8 +253,8 @@ function PlanCommand({ label, command }: { label: string; command: string }) {
         <p className="text-sm font-medium text-cream-muted">{label}</p>
         <Button
           type="button"
-          size="xs"
-          variant="ghost"
+          size="sm"
+          variant="quiet"
           aria-label={`Copy: ${label}`}
           onClick={() => {
             void navigator.clipboard.writeText(command).then(() => {

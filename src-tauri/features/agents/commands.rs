@@ -164,18 +164,9 @@ pub(crate) use crate::agents::live_pages_memory::{
     __cmd__system_memory_pressure, __tauri_command_name_system_memory_pressure,
     system_memory_pressure,
 };
-pub(crate) use crate::agents::models::chatgpt::{
-    __cmd__model_keys_chatgpt_sign_in, __cmd__model_keys_chatgpt_sign_out,
-    __cmd__model_keys_chatgpt_status, __tauri_command_name_model_keys_chatgpt_sign_in,
-    __tauri_command_name_model_keys_chatgpt_sign_out,
-    __tauri_command_name_model_keys_chatgpt_status, model_keys_chatgpt_sign_in,
-    model_keys_chatgpt_sign_out, model_keys_chatgpt_status,
-};
 pub(crate) use crate::agents::models::keys::{
-    __cmd__model_keys_add, __cmd__model_keys_models, __cmd__model_keys_openrouter_sign_in,
-    __tauri_command_name_model_keys_add, __tauri_command_name_model_keys_models,
-    __tauri_command_name_model_keys_openrouter_sign_in, model_keys_add, model_keys_models,
-    model_keys_openrouter_sign_in,
+    __cmd__model_keys_add, __cmd__model_keys_models, __tauri_command_name_model_keys_add,
+    __tauri_command_name_model_keys_models, model_keys_add, model_keys_models,
 };
 pub(crate) use crate::agents::models::{
     __cmd__model_keys_remove, __cmd__model_keys_save, __cmd__model_keys_saved,

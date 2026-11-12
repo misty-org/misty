@@ -1,7 +1,7 @@
 import type { GlobalAiMessage } from "../state/conversationTypes";
-import { IconButton } from "@/shared/ui";
+import { useMistyStore } from "../state/useMistyStore";
+import { MessageActions, Tooltip, type MessageAction } from "@/shared/ui";
 import {
-  Check,
   Copy,
   Forward,
   PencilLine,
@@ -13,7 +13,7 @@ import {
   ThumbsUp,
   Volume2,
 } from "lucide-react";
-import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSpaceWindowStore } from "@/features/app-windows";
 import { spacesGateway } from "../../spaces-gateway/spacesGateway";
 import { HandOffDialog } from "./HandOffDialog";
@@ -22,14 +22,18 @@ const timeFormat = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute:
 const fullFormat = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" });
 
 /**
- * The row under each message, revealed on hover or focus. Answers share one set of actions
- * whether they finished or failed; Try again joins them only on a retryable failure.
+ * The one action bar under each message, aligned to its edge: shown on hover and always on the
+ * latest message. Answers share one set of actions whether they finished or failed; Try again
+ * joins them only on a retryable failure.
  */
 export function AgentMessageActions(props: {
+  conversationId?: string;
   message: GlobalAiMessage;
   /** The message text as shown, without private context envelopes. */
   text: string;
   working: boolean;
+  /** The last message in the chat: its bar stays shown. */
+  latest?: boolean;
   retryPrompt?: string;
   /** The prompt message a retry starts from. */
   retryFrom?: string;
@@ -41,137 +45,136 @@ export function AgentMessageActions(props: {
 }) {
   const { message } = props;
   const state = message.state ?? "completed";
-  if (state === "pending" || state === "streaming") return null;
   const user = message.role === "user";
+  const [handOff, setHandOff] = useState(false);
+  // Re-read when the window shows another Space.
+  useSpaceWindowStore((store) => store.identity.key);
+  const space = !user ? spacesGateway.maybe()?.sharedWindowSpace() : undefined;
+  const speech = useReadAloud(props.text);
+  if (state === "pending" || state === "streaming") return null;
   const canRetry = state === "failed" && message.retryable && props.retryPrompt;
+  const actions: MessageAction[] = [];
+  if (props.text)
+    actions.push({
+      id: "copy",
+      icon: Copy,
+      label: "Copy",
+      onSelect: () => navigator.clipboard.writeText(props.text),
+    });
+  if (user && props.onEdit)
+    actions.push({
+      id: "edit",
+      icon: PencilLine,
+      label: "Edit as new message",
+      onSelect: () => props.onEdit?.(props.text),
+    });
+  if (user && props.resendable)
+    actions.push({
+      id: "again",
+      icon: RefreshCw,
+      label: "Ask again",
+      disabled: props.working,
+      onSelect: () => props.onRetry(props.text, message.id),
+    });
+  if (!user && props.onReply && props.text)
+    actions.push({
+      id: "reply",
+      icon: Reply,
+      label: "Reply",
+      onSelect: (event) => props.onReply?.(selectedText(event.currentTarget) || props.text),
+    });
+  if (!user && props.text && space)
+    actions.push({
+      id: "handoff",
+      icon: Forward,
+      label: "Hand off",
+      onSelect: () => setHandOff(true),
+    });
+  if (!user && message.invocationId && props.conversationId && state === "completed") {
+    const rate = (rating: "good" | "bad") =>
+      rateMessage(
+        props.conversationId!,
+        message.id,
+        message.rating === rating ? undefined : rating,
+      );
+    actions.push(
+      {
+        id: "good",
+        icon: ThumbsUp,
+        label: "Good response",
+        pressed: message.rating === "good",
+        onSelect: () => rate("good"),
+      },
+      {
+        id: "bad",
+        icon: ThumbsDown,
+        label: "Bad response",
+        pressed: message.rating === "bad",
+        onSelect: () => rate("bad"),
+      },
+    );
+  }
+  if (!user && props.text && speech)
+    actions.push({
+      id: "read",
+      icon: speech.speaking ? Square : Volume2,
+      label: speech.speaking ? "Stop reading" : "Read aloud",
+      onSelect: speech.toggle,
+    });
+  if (canRetry)
+    actions.push({
+      id: "retry",
+      icon: RotateCcw,
+      label: "Try again",
+      disabled: props.working,
+      onSelect: () => props.onRetry(props.retryPrompt!, props.retryFrom),
+    });
   return (
-    <div className="agent-message-actions" data-align={user ? "end" : "start"}>
-      {props.text ? <CopyAction text={props.text} /> : null}
-      {user && props.onEdit ? (
-        <Action label="Edit as new message" onClick={() => props.onEdit?.(props.text)}>
-          <PencilLine />
-        </Action>
+    <>
+      <MessageActions
+        align={user ? "end" : "start"}
+        alwaysVisible={props.latest}
+        actions={actions}
+        className={user ? undefined : "mt-1"}
+        trailing={<MessageTime message={message} />}
+      />
+      {handOff && space ? (
+        <HandOffDialog space={space} draft={props.text} onClose={() => setHandOff(false)} />
       ) : null}
-      {user && props.resendable ? (
-        <Action
-          label="Ask again"
-          disabled={props.working}
-          onClick={() => props.onRetry(props.text, message.id)}
-        >
-          <RefreshCw />
-        </Action>
-      ) : null}
-      {!user && props.onReply && props.text ? (
-        <Action
-          label="Reply"
-          onClick={(event) => props.onReply?.(selectedText(event.currentTarget) || props.text)}
-        >
-          <Reply />
-        </Action>
-      ) : null}
-      {!user && props.text ? <HandOffAction text={props.text} /> : null}
-      {!user && message.invocationId ? (
-        <FeedbackActions invocationId={message.invocationId} />
-      ) : null}
-
-      {!user && props.text ? <ReadAloudAction text={props.text} /> : null}
-      {canRetry ? (
-        <Action
-          label="Try again"
-          disabled={props.working}
-          onClick={() => props.onRetry(props.retryPrompt!, props.retryFrom)}
-        >
-          <RotateCcw />
-        </Action>
-      ) : null}
-      <MessageTime value={message.createdAt} />
-    </div>
+    </>
   );
+}
+
+/**
+ * Keeps the person's rating with the reply, in the chat this device saves. It isn't sent
+ * anywhere: runs have no server to report to.
+ */
+function rateMessage(conversationId: string, messageId: string, rating?: "good" | "bad") {
+  useMistyStore.setState((state) => ({
+    conversations: state.conversations.map((conversation) =>
+      conversation.id === conversationId
+        ? {
+            ...conversation,
+            messages: conversation.messages.map((item) =>
+              item.id === messageId ? { ...item, rating } : item,
+            ),
+          }
+        : conversation,
+    ),
+  }));
 }
 
 /** Text the person highlighted inside this answer, so Reply can quote just that part. */
 function selectedText(button: HTMLElement) {
   const selection = window.getSelection();
-  const message = button.closest(".agent-message-assistant");
+  const message = button.closest("[data-message]");
   if (!selection || selection.isCollapsed || !message) return "";
   const range = selection.getRangeAt(0);
   return message.contains(range.commonAncestorContainer) ? selection.toString().trim() : "";
 }
 
-function Action(props: {
-  label: string;
-  pressed?: boolean;
-  disabled?: boolean;
-  onClick: (event: MouseEvent<HTMLButtonElement>) => void;
-  children: ReactNode;
-}) {
-  return (
-    <IconButton
-      size="xs"
-      label={props.label}
-      aria-pressed={props.pressed}
-      disabled={props.disabled}
-      onClick={props.onClick}
-    >
-      {props.children}
-    </IconButton>
-  );
-}
-
-function CopyAction({ text }: { text: string }) {
-  const [copied, setCopied] = useState(false);
-  useEffect(() => {
-    if (!copied) return;
-    const timer = window.setTimeout(() => setCopied(false), 1500);
-    return () => window.clearTimeout(timer);
-  }, [copied]);
-  return (
-    <Action
-      label={copied ? "Copied" : "Copy"}
-      onClick={() => void navigator.clipboard.writeText(text).then(() => setCopied(true))}
-    >
-      {copied ? <Check /> : <Copy />}
-    </Action>
-  );
-}
-
-/**
- * Hands the reply to another member of a shared Space. It opens a draft the person edits and
- * sends themselves; in a Space of one there is nobody to hand to, so it isn't offered.
- */
-function HandOffAction({ text }: { text: string }) {
-  const [open, setOpen] = useState(false);
-  // Re-read when the window shows another Space.
-  useSpaceWindowStore((state) => state.identity.key);
-  const space = spacesGateway.maybe()?.sharedWindowSpace();
-  if (!space) return null;
-  return (
-    <>
-      <Action label="Hand off" onClick={() => setOpen(true)}>
-        <Forward />
-      </Action>
-      {open ? <HandOffDialog space={space} draft={text} onClose={() => setOpen(false)} /> : null}
-    </>
-  );
-}
-
-/** A rating shows on the reply and goes nowhere: runs have no server to report to. */
-function FeedbackActions(_props: { invocationId: string }) {
-  const [rating, setRating] = useState<-1 | 1>();
-  const rate = (value: -1 | 1) => setRating(value);
-  return (
-    <>
-      <Action label="Good response" pressed={rating === 1} onClick={() => rate(1)}>
-        <ThumbsUp fill={rating === 1 ? "currentColor" : "none"} />
-      </Action>
-      <Action label="Bad response" pressed={rating === -1} onClick={() => rate(-1)}>
-        <ThumbsDown fill={rating === -1 ? "currentColor" : "none"} />
-      </Action>
-    </>
-  );
-}
-
-function ReadAloudAction({ text }: { text: string }) {
+/** Reads the reply aloud with the system's voice, and stops it. Nothing without speech. */
+function useReadAloud(text: string) {
   const [speaking, setSpeaking] = useState(false);
   // Only this message's own utterance is stopped on unmount, never another message's.
   const utterance = useRef<SpeechSynthesisUtterance>(undefined);
@@ -183,34 +186,31 @@ function ReadAloudAction({ text }: { text: string }) {
     [speech],
   );
   if (!speech) return null;
-  return (
-    <Action
-      label={speaking ? "Stop reading" : "Read aloud"}
-      onClick={() => {
-        speech.cancel();
-        if (speaking) return setSpeaking(false);
-        const next = new SpeechSynthesisUtterance(plainText(text));
-        next.onend = next.onerror = () => {
-          if (utterance.current === next) utterance.current = undefined;
-          setSpeaking(false);
-        };
-        utterance.current = next;
-        speech.speak(next);
-        setSpeaking(true);
-      }}
-    >
-      {speaking ? <Square /> : <Volume2 />}
-    </Action>
-  );
+  return {
+    speaking,
+    toggle: () => {
+      speech.cancel();
+      if (speaking) return setSpeaking(false);
+      const next = new SpeechSynthesisUtterance(plainText(text));
+      next.onend = next.onerror = () => {
+        if (utterance.current === next) utterance.current = undefined;
+        setSpeaking(false);
+      };
+      utterance.current = next;
+      speech.speak(next);
+      setSpeaking(true);
+    },
+  };
 }
 
-function MessageTime({ value }: { value: string }) {
-  const date = new Date(value);
+/** When the message was sent; its tooltip has the full date. */
+function MessageTime({ message }: { message: GlobalAiMessage }) {
+  const date = new Date(message.createdAt);
   if (Number.isNaN(date.getTime())) return null;
   return (
-    <time className="agent-message-time" dateTime={value} title={fullFormat.format(date)}>
-      {timeFormat.format(date)}
-    </time>
+    <Tooltip content={fullFormat.format(date)}>
+      <time dateTime={message.createdAt}>{timeFormat.format(date)}</time>
+    </Tooltip>
   );
 }
 

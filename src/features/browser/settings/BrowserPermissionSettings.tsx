@@ -62,6 +62,7 @@ export function BrowserPermissionSettings() {
           label="Permissions"
           rows={3}
           leading="none"
+          lines={2}
           trailing
           className="gap-4"
           rowClassName="py-3"
@@ -88,8 +89,7 @@ export function BrowserPermissionSettings() {
               >
                 <Button
                   type="button"
-                  variant="outline"
-                  size="sm"
+                  variant="secondary"
                   disabled={busy}
                   aria-label={`Reset permissions for ${entry.origin}`}
                   onClick={() => void reset(entry)}
@@ -104,13 +104,7 @@ export function BrowserPermissionSettings() {
       {error ? (
         <DesktopSettingsNotice
           action={
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={busy}
-              onClick={() => void load()}
-            >
+            <Button type="button" variant="secondary" disabled={busy} onClick={() => void load()}>
               Try again
             </Button>
           }

@@ -53,7 +53,7 @@ function useCopied() {
 function CopyButton({ text, label }: { text: string; label: string }) {
   const { copied, copy } = useCopied();
   return (
-    <IconButton size="xs" label={copied ? "Copied" : label} onClick={() => copy(text)}>
+    <IconButton size="sm" label={copied ? "Copied" : label} onClick={() => copy(text)}>
       {copied ? <Check /> : <Copy />}
     </IconButton>
   );

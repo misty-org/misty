@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { openExternalLink } from "@/shared/platform/openExternalLink";
-import { Pressable, Skeleton } from "@/shared/ui";
+import { OverflowFadeText, Pressable, Skeleton } from "@/shared/ui";
 import { knownLinkPreview, loadLinkPreview, type LinkPreview } from "./api";
 import { extractLinks } from "./links";
 import { useLinkPreviewSetting } from "./settings";
@@ -68,13 +68,20 @@ function LinkPreviewCard({ url }: { url: string }) {
         ) : null}
         <span className="grid min-w-0 content-center gap-0.5 py-2 pl-3 pr-3">
           {preview.siteName ? (
-            <span className="truncate text-xs text-cream-muted">{preview.siteName}</span>
+            <OverflowFadeText className="text-xs text-cream-muted">
+              {preview.siteName}
+            </OverflowFadeText>
           ) : null}
-          <span className="line-clamp-2 text-sm font-medium leading-snug text-cream-bright">
+          <OverflowFadeText
+            lines={2}
+            className="text-sm font-medium leading-snug text-cream-bright"
+          >
             {preview.title || url}
-          </span>
+          </OverflowFadeText>
           {preview.description ? (
-            <span className="line-clamp-1 text-xs text-cream-muted">{preview.description}</span>
+            <OverflowFadeText className="text-xs text-cream-muted">
+              {preview.description}
+            </OverflowFadeText>
           ) : null}
         </span>
       </Pressable>

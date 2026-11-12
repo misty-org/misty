@@ -5,9 +5,8 @@ import {
   Dialog,
   DialogContent,
   DialogTitle,
-  ErrorNotification,
+  FieldError,
   Input,
-  Spinner,
   cn,
 } from "@/shared/ui";
 import { avatarColorClass, avatarInkClass } from "@/shared/lib/avatarPalette";
@@ -59,10 +58,11 @@ export function CreateSpaceDialog({ dialog }: { dialog: ReturnType<typeof useCre
           </div>
 
           <footer className="flex items-center justify-end gap-2 border-t border-charcoal-border px-6 py-3">
-            <ErrorNotification message={dialog.createError} />
+            <FieldError className="mr-auto min-w-0" message={dialog.createError} />
             <Button
               type="button"
-              variant="outline"
+              variant="secondary"
+              size="lg"
               disabled={dialog.creating}
               onClick={dialog.close}
             >
@@ -70,10 +70,10 @@ export function CreateSpaceDialog({ dialog }: { dialog: ReturnType<typeof useCre
             </Button>
             <Button
               type="submit"
-              aria-busy={dialog.creating}
-              disabled={dialog.creating || !dialog.name.trim()}
+              size="lg"
+              loading={dialog.creating}
+              disabled={!dialog.name.trim()}
             >
-              {dialog.creating ? <Spinner size="sm" label={false} /> : null}
               Create Space
             </Button>
           </footer>

@@ -7,7 +7,7 @@ export function WorkspaceSidebar({ className, ...props }: ComponentProps<"aside"
     <aside
       className={cn(
         "flex h-full min-h-0 w-56 shrink-0 flex-col gap-2 overflow-y-auto border-r",
-        "border-charcoal-border bg-charcoal-sidebar p-2 misty-transient-scrollbar",
+        "border-charcoal-border bg-charcoal-sidebar p-2",
         className,
       )}
       {...props}

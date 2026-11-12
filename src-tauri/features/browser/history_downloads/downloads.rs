@@ -6,7 +6,7 @@ use file_access::{self, fs};
 #[cfg(target_os = "macos")]
 pub(crate) mod macos;
 mod settings;
-pub use settings::*;
+use settings::browser_download_directory;
 
 pub(in crate::browser) fn handle_download_event(
     app: &AppHandle,
@@ -39,21 +39,16 @@ pub(in crate::browser) fn handle_download_event(
                 );
                 return false;
             };
-            #[cfg(any(target_os = "macos", windows))]
-            let asks_each_time = !agent_download && ask_download_location();
-            #[cfg(not(any(target_os = "macos", windows)))]
-            let asks_each_time = false;
-            // A folder is only for saving into when nothing else names the file. Downloads
-            // through the save dialog are that one file's grant, so they don't need the folder.
-            if !agent_download && !asks_each_time && !may_save_to_download_folder(app) {
+            // The Downloads folder asks the first time. WebKit and WebView2 ask for a
+            // destination on the main thread and expect an answer before returning, so the
+            // wait happens here, in place.
+            if !agent_download && !permissions::ensure_downloads_folder(app) {
                 emit_download_failure(app, &state, tab_id, &url, DOWNLOADS_NOT_ALLOWED);
                 return false;
             }
             if let Err(error) = fs::create_dir_all(&download_dir) {
-                if !asks_each_time {
-                    emit_download_failure(app, &state, tab_id, &url, &error.to_string());
-                    return false;
-                }
+                emit_download_failure(app, &state, tab_id, &url, &error.to_string());
+                return false;
             }
             let suggested = destination
                 .file_name()
@@ -65,28 +60,6 @@ pub(in crate::browser) fn handle_download_event(
                 .unwrap_or("download");
             let path =
                 reserve_download_path(&state, &download_dir, &sanitize_download_name(suggested));
-            #[cfg(any(target_os = "macos", windows))]
-            let path = if asks_each_time {
-                if let Ok(mut reserved) = state.reserved_downloads.lock() {
-                    reserved.remove(&path);
-                }
-                let Some(chosen) = crate::browser::pages::macos::ask_download_destination(&path)
-                else {
-                    return false;
-                };
-                file_access::allow_picked_file(&chosen, file_access::Access::Write);
-                // The save dialog already confirmed replacing an existing file,
-                // and the engine will not write over one.
-                if fs::is_file(&chosen) {
-                    let _ = fs::remove_file(&chosen);
-                }
-                if let Ok(mut reserved) = state.reserved_downloads.lock() {
-                    reserved.insert(chosen.clone());
-                }
-                chosen
-            } else {
-                path
-            };
             // Finishing this one mustn't depend on the folder's grant staying as it is now.
             file_access::allow_recorded_download(&path);
             *destination = path.clone();
@@ -140,16 +113,6 @@ pub(in crate::browser) fn handle_download_event(
         }
         _ => true,
     }
-}
-
-/// Whether downloads can go to the usual folder: a folder the person chose counts as granted, and
-/// the Downloads folder asks the first time. WebKit and WebView2 ask for a destination on the main
-/// thread and expect an answer before returning, so the wait happens here, in place.
-fn may_save_to_download_folder(app: &AppHandle) -> bool {
-    let chosen = user_download_directory()
-        .lock()
-        .is_ok_and(|directory| directory.is_some());
-    chosen || permissions::ensure_downloads_folder(app)
 }
 
 const DOWNLOADS_NOT_ALLOWED: &str =

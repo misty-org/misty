@@ -8,7 +8,7 @@ import {
   DesktopSettingsRow as Row,
   DesktopSettingsSection as Section,
 } from "@/features/settings";
-import { Button, Input, Skeleton } from "@/shared/ui";
+import { Button, Input, Skeleton, OverflowFadeText } from "@/shared/ui";
 import { DropdownControl } from "../../settings/SettingsControls";
 import {
   applyFontPreferences,
@@ -142,11 +142,11 @@ function FontFamilyRow({
       ) : null}
       {mode === "custom" ? (
         <Row label={`${label} file`} description="TTF, OTF, TTC, WOFF or WOFF2." indent>
-          <Button variant="secondary" disabled={busy} onClick={() => void onPickFile()}>
+          <Button disabled={busy} onClick={() => void onPickFile()}>
             <Upload />
-            <span className="block max-w-56 truncate" title={filePath || undefined}>
+            <OverflowFadeText full={filePath || undefined} className="block max-w-56">
               {filePath ? fileName(filePath) : "Choose font file"}
-            </span>
+            </OverflowFadeText>
           </Button>
         </Row>
       ) : null}

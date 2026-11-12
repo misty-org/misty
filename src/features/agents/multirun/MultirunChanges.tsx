@@ -1,6 +1,6 @@
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { Pressable, Skeleton } from "@/shared/ui";
+import { OverflowFadeText, Pressable, Skeleton } from "@/shared/ui";
 import { diffSteps, type DiffStep } from "../context-panel/git/diffSteps";
 import "../context-panel/contextPanel.css";
 import { errorText, multirunApi, type LaneFile } from "./multirunApi";
@@ -64,9 +64,9 @@ function FileRow({ file }: { file: LaneFile }) {
     <>
       <Pressable className="multirun-file" aria-expanded={open} onClick={() => setOpen(!open)}>
         <Chevron size={14} className="flex-none text-cream-muted" aria-hidden="true" />
-        <span className="min-w-0 flex-1 truncate" title={file.path}>
+        <OverflowFadeText className="min-w-0 flex-1" full>
           {file.path}
-        </span>
+        </OverflowFadeText>
         <span className="context-status" data-status={file.status}>
           {statusWords[file.status]}
         </span>

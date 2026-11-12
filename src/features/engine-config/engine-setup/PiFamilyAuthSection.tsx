@@ -17,7 +17,7 @@
  * Read when the page opens and after each change here, never on a timer. Every change tells the
  * model menus to read again, since the CLIs list models by the credentials they hold.
  */
-import { Eye, EyeOff, LogIn, LogOut } from "lucide-react";
+import { LogIn, LogOut } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { DesktopSettingsSection as Section } from "@/features/settings";
 import {
@@ -30,10 +30,10 @@ import {
   AlertDialogTitle,
   Button,
   cn,
-  IconButton,
-  Input,
   SearchField,
+  SecretField,
   SkeletonList,
+  OverflowFadeText,
 } from "@/shared/ui";
 import { BrandTile } from "../brands/BrandMark";
 import { notifyCliConfigChanged } from "../channels/providers";
@@ -42,7 +42,6 @@ import type { SignInRequest } from "../clis/signInApi";
 import {
   piFamilyApi,
   type PiFamilyAuthListResult,
-  type PiFamilyAuthProviderSnapshot,
   type PiFamilyModelsConfigReadResult,
 } from "./api";
 
@@ -77,16 +76,15 @@ function OauthRows({
           return (
             <div className={ROW} key={provider.id}>
               <BrandTile mark={provider.mark} />
-              <p
-                className="min-w-0 flex-1 truncate text-sm text-cream-bright"
-                title={provider.detail}
+              <OverflowFadeText
+                as="p"
+                full={provider.detail}
+                className="min-w-0 flex-1 text-sm text-cream-bright"
               >
                 {provider.name}
-              </p>
+              </OverflowFadeText>
               <State on={signedIn} label={signedIn ? "Signed in" : "Signed out"} />
               <Button
-                size="sm"
-                variant="secondary"
                 title={
                   engine === "pi"
                     ? `pi /login ${provider.loginArg}`
@@ -98,7 +96,7 @@ function OauthRows({
                 Sign in
               </Button>
               {signedIn ? (
-                <Button size="sm" variant="ghost" onClick={() => onSignOut(provider)}>
+                <Button variant="quiet" onClick={() => onSignOut(provider)}>
                   <LogOut />
                   Sign out
                 </Button>
@@ -113,89 +111,19 @@ function OauthRows({
 
 // ── API keys ────────────────────────────────────────────────────────────────
 
-function KeyEditor({
-  provider,
-  snap,
-  saving,
-  error,
-  onSave,
-  onClose,
-}: {
-  provider: PiFamilyAuthUiProvider;
-  snap: PiFamilyAuthProviderSnapshot | undefined;
-  saving: boolean;
-  error: string | null;
-  onSave: (key: string) => void;
-  onClose: () => void;
-}) {
-  const [draft, setDraft] = useState("");
-  const [visible, setVisible] = useState(false);
-  const focus = useCallback((element: HTMLInputElement | null) => element?.focus(), []);
-  return (
-    <div className="grid gap-2 border-b border-charcoal-border px-3 py-3 last:border-b-0">
-      <div className="flex items-center gap-2">
-        <Input
-          ref={focus}
-          aria-label={`${provider.name} API key`}
-          type={visible ? "text" : "password"}
-          value={draft}
-          autoComplete="off"
-          spellCheck={false}
-          placeholder={
-            snap?.state === "configured"
-              ? `${snap.maskedKey ?? ""} (empty keeps it)`
-              : `Paste ${snap?.envVar ?? "the API key"}`
-          }
-          onChange={(event) => setDraft(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter") onSave(draft);
-            else if (event.key === "Escape") onClose();
-          }}
-        />
-        <IconButton
-          size="xs"
-          variant="ghost"
-          label={visible ? "Hide the key" : "Show the key"}
-          onClick={() => setVisible((shown) => !shown)}
-        >
-          {visible ? <EyeOff /> : <Eye />}
-        </IconButton>
-      </div>
-      {error ? (
-        <p role="alert" className="text-sm text-cream-muted">
-          {error}
-        </p>
-      ) : null}
-      <div className="flex justify-end gap-2">
-        <Button size="sm" variant="secondary" onClick={onClose}>
-          Cancel
-        </Button>
-        <Button size="sm" variant="primary" disabled={saving} onClick={() => onSave(draft)}>
-          {saving ? "Saving" : "Save"}
-        </Button>
-      </div>
-    </div>
-  );
-}
-
 function ApiKeyRows({
   engine,
   snapshot,
   loadError,
   onChanged,
-  onDelete,
 }: {
   engine: PiEngine;
   snapshot: PiFamilyAuthListResult | null;
   loadError: string | null;
   onChanged: () => Promise<void>;
-  onDelete: (provider: PiFamilyAuthUiProvider) => void;
 }) {
   const [query, setQuery] = useState("");
   const [showAll, setShowAll] = useState(false);
-  const [editing, setEditing] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const byId = useMemo(
     () => new Map((snapshot?.providers ?? []).map((item) => [item.id, item])),
     [snapshot],
@@ -214,30 +142,29 @@ function ApiKeyRows({
     });
   }, [query, showAll, byId]);
 
+  const name = engine === "pi" ? "Pi" : "Oh My Pi";
+  // A key goes straight into the CLI's own store; the field shows a failure under itself.
+  const changed = async () => {
+    notifyCliConfigChanged();
+    await onChanged();
+  };
   const save = async (provider: PiFamilyAuthUiProvider, key: string) => {
-    if (!key.trim()) {
-      // Empty leaves the key as it is.
-      setEditing(null);
-      return;
-    }
-    setSaving(true);
-    setError(null);
-    try {
-      await piFamilyApi.setApiKey(engine, provider.id, key.trim());
-      notifyCliConfigChanged();
-      setEditing(null);
-      await onChanged();
-    } catch (reason) {
-      setError(errorText(reason));
-    } finally {
-      setSaving(false);
-    }
+    await piFamilyApi.setApiKey(engine, provider.id, key).catch((reason: unknown) => {
+      throw new Error(errorText(reason));
+    });
+    await changed();
+  };
+  const remove = async (provider: PiFamilyAuthUiProvider) => {
+    await piFamilyApi.deleteCredential(engine, provider.id).catch((reason: unknown) => {
+      throw new Error(errorText(reason));
+    });
+    await changed();
   };
 
   return (
     <section aria-label="API keys" className="mb-8">
       <div className="mb-3 flex items-center justify-between gap-3">
-        <h2 className="text-md font-semibold text-cream-bright">API keys</h2>
+        <h2 className="text-body font-semibold text-cream-bright">API keys</h2>
         <SearchField
           containerClassName="w-56"
           aria-label="Filter providers"
@@ -253,56 +180,40 @@ function ApiKeyRows({
           </div>
         ) : null}
         {!snapshot && !loadError ? (
-          <SkeletonList label="Reading keys" rows={4} leading="tile" />
+          <SkeletonList lines={2} label="Reading keys" rows={4} leading="tile" />
         ) : (
           visible.map((provider) => {
             const snap = byId.get(provider.id);
-            const configured = snap?.state === "configured";
-            const open = editing === provider.id;
             return (
-              <div key={provider.id}>
-                <div className={cn(ROW, open && "border-b-0")}>
-                  <BrandTile mark={provider.mark} />
-                  <div className="flex min-w-0 flex-1 items-center gap-2">
-                    <p className="truncate text-sm text-cream-bright">{provider.name}</p>
-                    {snap?.envVar ? (
-                      <code className="truncate rounded border border-dashed border-charcoal-border px-1 text-2xs text-cream-muted">
-                        {snap.envVar}
-                      </code>
-                    ) : null}
-                  </div>
-                  <State on={configured} label={configured ? "Saved" : "Not set"} />
-                  {configured && snap?.maskedKey ? (
-                    <code className="shrink-0 rounded bg-charcoal-hover px-1.5 py-0.5 text-2xs text-cream-muted">
-                      {snap.maskedKey}
+              <div key={provider.id} className={ROW}>
+                <BrandTile mark={provider.mark} />
+                <div className="flex min-w-0 flex-1 items-center gap-2">
+                  <OverflowFadeText as="p" full className="text-sm text-cream-bright">
+                    {provider.name}
+                  </OverflowFadeText>
+                  {snap?.envVar ? (
+                    <code
+                      className={cn(
+                        "truncate rounded border border-dashed border-charcoal-border px-1",
+                        "text-micro text-cream-muted",
+                      )}
+                    >
+                      {snap.envVar}
                     </code>
                   ) : null}
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={() => {
-                      setError(null);
-                      setEditing(open ? null : provider.id);
-                    }}
-                  >
-                    {open ? "Close" : configured ? "Replace" : "Set key"}
-                  </Button>
-                  {configured ? (
-                    <Button size="sm" variant="ghost" onClick={() => onDelete(provider)}>
-                      Remove
-                    </Button>
-                  ) : null}
                 </div>
-                {open ? (
-                  <KeyEditor
-                    provider={provider}
-                    snap={snap}
-                    saving={saving}
-                    error={error}
-                    onSave={(key) => void save(provider, key)}
-                    onClose={() => setEditing(null)}
-                  />
-                ) : null}
+                <SecretField
+                  label={`${provider.name} key`}
+                  className="w-60 max-w-full"
+                  saved={snap ? snap.state === "configured" : null}
+                  placeholder={snap?.envVar ? `Paste ${snap.envVar}` : undefined}
+                  savedText={
+                    snap?.maskedKey ? `Saved, ${snap.maskedKey}` : `In ${name}'s key store`
+                  }
+                  removeWhat={`It's deleted from ${name}'s own key store and can't be recovered.`}
+                  onSave={(key) => save(provider, key)}
+                  onRemove={() => remove(provider)}
+                />
               </div>
             );
           })
@@ -312,8 +223,7 @@ function ApiKeyRows({
         ) : null}
         {snapshot && !query.trim() ? (
           <Button
-            variant="ghost"
-            size="sm"
+            variant="quiet"
             className="w-full text-cream-muted"
             onClick={() => setShowAll((all) => !all)}
           >
@@ -321,7 +231,7 @@ function ApiKeyRows({
           </Button>
         ) : null}
         {snapshot ? (
-          <div className="flex items-center gap-2 px-3 py-2 text-2xs text-cream-muted">
+          <div className="flex items-center gap-2 px-3 py-2 text-micro text-cream-muted">
             <code className="min-w-0 truncate">{snapshot.store.path}</code>
             <span className="shrink-0 rounded bg-charcoal-hover px-1">0600</span>
           </div>
@@ -338,9 +248,7 @@ export function PiFamilyAuthSection({ engine }: { engine: PiEngine }) {
   const [snapshot, setSnapshot] = useState<PiFamilyAuthListResult | null>(null);
   const [models, setModels] = useState<PiFamilyModelsConfigReadResult | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
   const [signIn, setSignIn] = useState<SignInRequest | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<PiFamilyAuthUiProvider | null>(null);
   const [signOutTarget, setSignOutTarget] = useState<PiFamilyOauthProvider | null>(null);
 
   const refresh = useCallback(async () => {
@@ -365,19 +273,6 @@ export function PiFamilyAuthSection({ engine }: { engine: PiEngine }) {
 
   const active = useMemo(() => new Set(snapshot?.oauthProviders ?? []), [snapshot]);
 
-  const removeKey = async () => {
-    const target = deleteTarget;
-    setDeleteTarget(null);
-    if (!target) return;
-    try {
-      await piFamilyApi.deleteCredential(engine, target.id);
-      notifyCliConfigChanged();
-      await refresh();
-    } catch (reason) {
-      setNotice(errorText(reason));
-    }
-  };
-
   const signOut = () => {
     const target = signOutTarget;
     setSignOutTarget(null);
@@ -390,24 +285,13 @@ export function PiFamilyAuthSection({ engine }: { engine: PiEngine }) {
 
   return (
     <>
-      {notice ? (
-        <p role="status" className="mb-4 text-sm text-cream-muted">
-          {notice}
-        </p>
-      ) : null}
       <OauthRows
         engine={engine}
         active={active}
         onSignIn={(provider) => setSignIn({ engine, provider: provider.loginArg })}
         onSignOut={setSignOutTarget}
       />
-      <ApiKeyRows
-        engine={engine}
-        snapshot={snapshot}
-        loadError={loadError}
-        onChanged={refresh}
-        onDelete={setDeleteTarget}
-      />
+      <ApiKeyRows engine={engine} snapshot={snapshot} loadError={loadError} onChanged={refresh} />
       <CustomProviders engine={engine} config={models} onChanged={refresh} />
 
       <SignInDialog
@@ -418,20 +302,6 @@ export function PiFamilyAuthSection({ engine }: { engine: PiEngine }) {
           void refresh().then(notifyCliConfigChanged);
         }}
       />
-      <AlertDialog
-        open={deleteTarget != null}
-        onOpenChange={(open) => (open ? undefined : setDeleteTarget(null))}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Remove the {deleteTarget?.name} key?</AlertDialogTitle>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={() => void removeKey()}>Remove</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
       <AlertDialog
         open={signOutTarget != null}
         onOpenChange={(open) => (open ? undefined : setSignOutTarget(null))}

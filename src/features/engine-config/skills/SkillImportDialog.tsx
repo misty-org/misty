@@ -89,9 +89,7 @@ export function SkillImportDialog({
               onChange={(event) => setDirectory(event.target.value)}
               className="flex-1"
             />
-            <Button variant="secondary" onClick={() => void pick()}>
-              {t("import.pick")}
-            </Button>
+            <Button onClick={() => void pick()}>{t("import.pick")}</Button>
           </div>
           {pickerError ? (
             <p role="alert" className="whitespace-pre-line text-xs text-cream-bright">
@@ -116,10 +114,11 @@ export function SkillImportDialog({
           ))}
         </div>
         <DialogFooter className="gap-2">
-          <Button variant="secondary" onClick={onClose}>
+          <Button size="lg" onClick={onClose}>
             {t("common.cancel")}
           </Button>
           <Button
+            size="lg"
             variant="primary"
             disabled={!canImport}
             onClick={() => onImport(trimmed, selected)}

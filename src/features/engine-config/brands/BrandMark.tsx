@@ -45,13 +45,13 @@ function Mark({ mark, size }: { mark: Mark; size: number }) {
 }
 
 /**
- * A provider's mark in the 32px tile rows use; a globe when it has no public mark, never a letter
- * tile dressed up as a brand.
+ * A provider's mark in the 32px slot rows use, bare; a globe when it has no public mark, never a
+ * letter dressed up as a brand.
  */
 export function BrandTile({ mark, size = 20 }: { mark: string | null | undefined; size?: number }) {
   const found = mark ? marks[mark] : undefined;
   return (
-    <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-charcoal-card text-cream">
+    <span className="flex size-8 shrink-0 items-center justify-center text-cream">
       {found ? (
         <Mark mark={found} size={size} />
       ) : (

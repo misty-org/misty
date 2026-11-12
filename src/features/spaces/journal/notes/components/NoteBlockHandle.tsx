@@ -53,7 +53,7 @@ export function NoteBlockHandle(props: {
       </DragHandleButton>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <DragHandleButton label="Block actions" title="Drag or open block actions">
+          <DragHandleButton label="Block actions" hint="Drag or open block actions">
             <GripVertical />
           </DragHandleButton>
         </DropdownMenuTrigger>
@@ -126,7 +126,7 @@ export function NoteBlockHandle(props: {
             icon={<Trash2 />}
             label="Delete"
             disabled={!range}
-            destructive
+            danger
             onSelect={() => range && editor.chain().focus().deleteRange(range).run()}
           />
         </DropdownMenuContent>

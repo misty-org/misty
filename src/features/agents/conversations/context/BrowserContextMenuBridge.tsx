@@ -1,4 +1,6 @@
-import { ModelKeyNeededButton, needsModelKey } from "../../models/ModelKeyNeeded";
+import { needsModelKey } from "../../models/ModelKeyNeeded";
+import { openModelSettings } from "../../models/modelKeys";
+import { ErrorNotice } from "../ErrorNotice";
 import { useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { invoke } from "@tauri-apps/api/core";
@@ -21,7 +23,6 @@ import {
   DropdownMenuContent,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-  ErrorNotification,
   MenuItem,
   Portal,
 } from "@/shared/ui";
@@ -238,11 +239,21 @@ export function BrowserContextMenuBridge() {
   return (
     <>
       {menu ? <BrowserContextMenuView key={menu.key} menu={menu} onSelect={select} /> : null}
-      <ErrorNotification message={error} onDismiss={() => setError(null)}>
-        {error && needsModelKey(error) ? (
-          <ModelKeyNeededButton onOpen={() => setError(null)} />
-        ) : null}
-      </ErrorNotification>
+      <ErrorNotice
+        message={error}
+        action={
+          needsModelKey(error)
+            ? {
+                label: "Open Models settings",
+                onSelect: () => {
+                  setError(null);
+                  openModelSettings();
+                },
+              }
+            : undefined
+        }
+        onDismiss={() => setError(null)}
+      />
     </>
   );
 }

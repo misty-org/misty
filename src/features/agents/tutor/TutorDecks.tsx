@@ -38,8 +38,8 @@ export function DeckView({
   return (
     <>
       <div className="tutor-lead">
-        <IconButton label="Back to the studio" onClick={onClose}>
-          <ArrowLeft size={16} />
+        <IconButton label="Back to Create" onClick={onClose}>
+          <ArrowLeft />
         </IconButton>
         <Input
           className="tutor-title-input"
@@ -50,11 +50,11 @@ export function DeckView({
             title.trim() && title !== deck.title && store.saveDeck({ ...deck, title: title.trim() })
           }
         />
-        <Button size="sm" disabled={!due} onClick={onReview}>
+        <Button disabled={!due} onClick={onReview}>
           {due ? `Review ${due}` : "Nothing due"}
         </Button>
         <IconButton label="Delete deck" onClick={() => void remove()}>
-          <Trash2 size={15} />
+          <Trash2 />
         </IconButton>
       </div>
       <form className="tutor-card-form" onSubmit={add}>
@@ -72,7 +72,7 @@ export function DeckView({
           value={back}
           onChange={(event) => setBack(event.target.value)}
         />
-        <Button type="submit" size="sm" variant="outline" disabled={!front.trim() || !back.trim()}>
+        <Button type="submit" disabled={!front.trim() || !back.trim()}>
           Add card
         </Button>
       </form>
@@ -94,10 +94,10 @@ export function DeckView({
                 <span className="tutor-flashcard-side tutor-muted">{card.back}</span>
                 <span className="tutor-card-detail">{dueText(card)}</span>
                 <IconButton label="Edit card" onClick={() => setEditing(card.id)}>
-                  <Pencil size={14} />
+                  <Pencil />
                 </IconButton>
                 <IconButton label="Delete card" onClick={() => store.removeCard(deck.id, card.id)}>
-                  <Trash2 size={14} />
+                  <Trash2 />
                 </IconButton>
               </div>
             ),
@@ -141,10 +141,8 @@ function CardEditor({
       />
       <Textarea rows={2} aria-label="Back" value={back} onChange={(e) => setBack(e.target.value)} />
       <div className="flex gap-1.5">
-        <Button type="submit" size="sm">
-          Save
-        </Button>
-        <Button type="button" size="sm" variant="ghost" onClick={() => onDone()}>
+        <Button type="submit">Save</Button>
+        <Button type="button" variant="quiet" onClick={() => onDone()}>
           Cancel
         </Button>
       </div>
@@ -216,9 +214,7 @@ export function ReviewSession({ decks, onDone }: { decks: Deck[]; onDone(): void
             ? `Reviewed ${reviewed} ${reviewed === 1 ? "card" : "cards"}.`
             : "Nothing is due."}
         </p>
-        <Button size="sm" onClick={onDone}>
-          Done
-        </Button>
+        <Button onClick={onDone}>Done</Button>
       </div>
     );
   const now = new Date();
@@ -226,7 +222,7 @@ export function ReviewSession({ decks, onDone }: { decks: Deck[]; onDone(): void
     <div className="tutor-review">
       <div className="tutor-lead">
         <IconButton label="End review" onClick={onDone}>
-          <ArrowLeft size={16} />
+          <ArrowLeft />
         </IconButton>
         <span className="tutor-card-detail">{queue.length} left</span>
       </div>
@@ -237,7 +233,7 @@ export function ReviewSession({ decks, onDone }: { decks: Deck[]; onDone(): void
       {shown ? (
         <div className="tutor-grades" role="group" aria-label="How well did you know it?">
           {grades.map((item) => (
-            <Button key={item.value} variant="outline" onClick={() => grade(item.value)}>
+            <Button key={item.value} onClick={() => grade(item.value)}>
               <span>{item.label}</span>
               <span className="tutor-card-detail">{nextLabel(card.review, item.value, now)}</span>
             </Button>

@@ -3,16 +3,8 @@ import { isAuthPath, routes } from "@/app/shell/routes";
 import { setupFlow, type SetupStep } from "../setup/setupFlow";
 import { useSetupStore } from "../setup/useSetupStore";
 import { setBrowserWebviewsSuspended } from "@/features/app-windows";
-import {
-  BackButton,
-  Button,
-  Dialog,
-  DialogContent,
-  DialogTitle,
-  ErrorNotification,
-  Skeleton,
-} from "@/shared/ui";
-import { Suspense, useEffect, useRef, useState } from "react";
+import { BackButton, Button, Dialog, DialogContent, DialogTitle, useNotice } from "@/shared/ui";
+import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import RegisterForm from "../components/RegisterForm";
 import SignInForm from "../components/SignInForm";
@@ -26,8 +18,7 @@ import { useServerSwitch } from "../setup/useServerSwitch";
 import { useTabSidePrompt } from "./useTabSidePrompt";
 import { isSetupReason, setupReasonTitle, useSignInSheetStore } from "./signInSheetStore";
 
-type Screen =
-  "server" | "cloud" | "password" | "own" | "signin" | "register" | "models" | "rerun" | SetupStep;
+type Screen = "server" | "cloud" | "password" | "own" | "signin" | "register" | "rerun" | SetupStep;
 
 const screenTitle: Partial<Record<Screen, string>> = {
   cloud: "Use a sign-in link",
@@ -35,12 +26,11 @@ const screenTitle: Partial<Record<Screen, string>> = {
   own: "Your own server",
   signin: "Sign in",
   register: "Create an account",
-  models: "Choose a model",
   rerun: "Run setup again?",
 };
 
 /**
- * The setup wizard: the model step, then the side the sidebar sits on. It follows a first sign-in
+ * The setup wizard: the side the sidebar sits on. It follows a first sign-in
  * on this device, and any later sign-in offers it again. Help › Run setup again runs only the
  * computer's part. Settings opens it on choosing a server, and a setup link on the sign-in link
  * step. Not now goes back to the page.
@@ -50,7 +40,6 @@ const screenTitle: Partial<Record<Screen, string>> = {
  * done or the person goes back.
  */
 export function SignInSheet() {
-  const ModelSetupPanel = setupFlow.get().ModelSetupPanel;
   const reason = useSignInSheetStore((state) => state.reason);
   const initialEmail = useSignInSheetStore((state) => state.email);
   const close = useSignInSheetStore((state) => state.close);
@@ -68,7 +57,13 @@ export function SignInSheet() {
   const [email, setEmail] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  // Whether this opening went through choosing a server, so sign-in leads on to models.
+  // The server step's own failure; the sign-in form shows its error itself.
+  useNotice(screen === "server" && Boolean(error), {
+    message: error,
+    tone: "error",
+    onDismiss: () => setError(""),
+  });
+  // Whether this opening went through choosing a server, so the title names it.
   const settingUp = useRef(false);
   // Whether this opening is the wizard that follows signing in.
   const afterSignIn = useRef(false);
@@ -113,7 +108,7 @@ export function SignInSheet() {
         : setupReason === "device"
           ? firstSetupStep
           : setupReason === "wizard"
-            ? "models"
+            ? firstSetupStep
             : setupReason === "rerun"
               ? "rerun"
               : linked
@@ -146,8 +141,7 @@ export function SignInSheet() {
   };
   const signedIn = () => {
     done.current = true;
-    if (settingUp.current || setupReason === "wizard") setScreen("models");
-    else if (setupReason === "rerun") setScreen("rerun");
+    if (setupReason === "rerun") setScreen("rerun");
     else afterAccount();
   };
   const setupStepCopy = setupFlow.get().stepCopy;
@@ -227,15 +221,6 @@ export function SignInSheet() {
             />
           ) : screen === "register" ? (
             <RegisterForm onSuccess={signedIn} />
-          ) : (
-            <Suspense
-              fallback={<Skeleton aria-label="Model sign-ins" className="h-40 w-full rounded-lg" />}
-            >
-              <ModelSetupPanel />
-            </Suspense>
-          )}
-          {screen === "server" ? (
-            <ErrorNotification message={error} onDismiss={() => setError("")} />
           ) : null}
         </div>
         {setupStep ? (
@@ -245,7 +230,7 @@ export function SignInSheet() {
             ) : (
               <span />
             )}
-            <Button variant="primary" size="sm" onClick={nextSetupStep}>
+            <Button variant="primary" onClick={nextSetupStep}>
               {lastSetupStep ? "Done" : "Continue"}
             </Button>
           </footer>
@@ -254,34 +239,30 @@ export function SignInSheet() {
             {screen === "cloud" || screen === "own" ? (
               <BackButton disabled={busy} onClick={() => setScreen("server")} />
             ) : screen === "server" ? (
-              <Button variant="ghost" size="sm" disabled={busy} onClick={() => setScreen("cloud")}>
+              <Button variant="quiet" disabled={busy} onClick={() => setScreen("cloud")}>
                 Use a sign-in link
               </Button>
             ) : screen === "signin" ? (
-              <Button variant="ghost" size="sm" onClick={() => setScreen("register")}>
+              <Button variant="quiet" onClick={() => setScreen("register")}>
                 Create account
               </Button>
             ) : screen === "register" ? (
-              <Button variant="ghost" size="sm" onClick={() => setScreen("signin")}>
+              <Button variant="quiet" onClick={() => setScreen("signin")}>
                 Sign in instead
               </Button>
             ) : screen === "rerun" ? (
-              <Button variant="ghost" size="sm" onClick={() => setScreen("models")}>
+              <Button variant="quiet" onClick={() => setScreen(firstSetupStep)}>
                 Run setup
               </Button>
             ) : (
               <span />
             )}
-            {screen === "models" ? (
-              <Button variant="primary" size="sm" onClick={afterAccount}>
-                {firstRun || afterSignIn.current ? "Continue" : "Done"}
-              </Button>
-            ) : screen === "rerun" ? (
-              <Button variant="primary" size="sm" onClick={finish}>
+            {screen === "rerun" ? (
+              <Button variant="primary" onClick={finish}>
                 Continue
               </Button>
             ) : (
-              <Button variant="outline" size="sm" disabled={busy} onClick={finish}>
+              <Button variant="secondary" disabled={busy} onClick={finish}>
                 Not now
               </Button>
             )}

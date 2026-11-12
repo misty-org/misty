@@ -1,5 +1,6 @@
 import { useOverlaySide } from "./OverlaySide";
 import {
+  MenuKindContext,
   menuContentClass,
   menuIndicatorClass,
   menuIndicatorItemClass,
@@ -15,14 +16,25 @@ import * as React from "react";
 
 import { cn } from "../classNames";
 
+/*
+ * Radix's dropdown parts with Misty's look. Features build rows with MenuItem, MenuCheckItem,
+ * MenuRadioGroup/MenuRadioItem and MenuSubmenu (MenuItem.tsx); the raw Item, CheckboxItem,
+ * RadioItem and SubTrigger below stay for those components and for code not yet moved.
+ */
+
 const dropdownViewportClass =
   "max-h-[min(24rem,var(--radix-dropdown-menu-content-available-height))] max-w-[var(--radix-dropdown-menu-content-available-width)]";
+
+/** `danger` paints the row red, for deleting. */
+type MenuItemVariant = "default" | "danger";
 
 const DropdownMenu = DropdownMenuPrimitive.Root;
 
 const DropdownMenuTrigger = DropdownMenuPrimitive.Trigger;
 
 const DropdownMenuSub = DropdownMenuPrimitive.Sub;
+
+const DropdownMenuGroup = DropdownMenuPrimitive.Group;
 
 const DropdownMenuRadioGroup = React.forwardRef<
   React.ElementRef<typeof DropdownMenuPrimitive.RadioGroup>,
@@ -35,20 +47,18 @@ DropdownMenuRadioGroup.displayName = DropdownMenuPrimitive.RadioGroup.displayNam
 const DropdownMenuSubTrigger = React.forwardRef<
   React.ElementRef<typeof DropdownMenuPrimitive.SubTrigger>,
   React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.SubTrigger> & {
-    inset?: boolean;
-    variant?: "default" | "destructive";
+    variant?: MenuItemVariant;
   }
->(({ className, inset, children, variant = "default", ...props }, ref) => (
+>(({ className, children, variant = "default", ...props }, ref) => (
   <DropdownMenuPrimitive.SubTrigger
     ref={ref}
     data-slot="dropdown-menu-sub-trigger"
-    data-inset={inset}
     data-variant={variant}
     className={cn(menuItemClass, className)}
     {...props}
   >
     {children}
-    <ChevronRight className="ml-auto" />
+    <ChevronRight className="ml-auto text-cream-muted" />
   </DropdownMenuPrimitive.SubTrigger>
 ));
 DropdownMenuSubTrigger.displayName = DropdownMenuPrimitive.SubTrigger.displayName;
@@ -56,7 +66,7 @@ DropdownMenuSubTrigger.displayName = DropdownMenuPrimitive.SubTrigger.displayNam
 const DropdownMenuSubContent = React.forwardRef<
   React.ElementRef<typeof DropdownMenuPrimitive.SubContent>,
   React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.SubContent>
->(({ className, ...props }, ref) => (
+>(({ className, children, ...props }, ref) => (
   <DropdownMenuPrimitive.Portal>
     <DropdownMenuPrimitive.SubContent
       ref={ref}
@@ -64,7 +74,9 @@ const DropdownMenuSubContent = React.forwardRef<
       collisionPadding={8}
       className={cn(menuContentClass, dropdownViewportClass, className)}
       {...props}
-    />
+    >
+      <MenuKindContext.Provider value="dropdown">{children}</MenuKindContext.Provider>
+    </DropdownMenuPrimitive.SubContent>
   </DropdownMenuPrimitive.Portal>
 ));
 DropdownMenuSubContent.displayName = DropdownMenuPrimitive.SubContent.displayName;
@@ -72,7 +84,7 @@ DropdownMenuSubContent.displayName = DropdownMenuPrimitive.SubContent.displayNam
 const DropdownMenuContent = React.forwardRef<
   React.ElementRef<typeof DropdownMenuPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Content> & { width?: MenuWidth }
->(({ className, align = "start", side, sideOffset = 4, width, ...props }, ref) => {
+>(({ className, align = "start", side, sideOffset = 4, width, children, ...props }, ref) => {
   const placement = useOverlaySide();
   return (
     <DropdownMenuPrimitive.Portal>
@@ -90,7 +102,9 @@ const DropdownMenuContent = React.forwardRef<
           className,
         )}
         {...props}
-      />
+      >
+        <MenuKindContext.Provider value="dropdown">{children}</MenuKindContext.Provider>
+      </DropdownMenuPrimitive.Content>
     </DropdownMenuPrimitive.Portal>
   );
 });
@@ -99,14 +113,12 @@ DropdownMenuContent.displayName = DropdownMenuPrimitive.Content.displayName;
 const DropdownMenuItem = React.forwardRef<
   React.ElementRef<typeof DropdownMenuPrimitive.Item>,
   React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Item> & {
-    inset?: boolean;
-    variant?: "default" | "destructive";
+    variant?: MenuItemVariant;
   }
->(({ className, inset, variant = "default", ...props }, ref) => (
+>(({ className, variant = "default", ...props }, ref) => (
   <DropdownMenuPrimitive.Item
     ref={ref}
     data-slot="dropdown-menu-item"
-    data-inset={inset}
     data-variant={variant}
     className={cn(menuItemClass, className)}
     {...props}
@@ -116,61 +128,52 @@ DropdownMenuItem.displayName = DropdownMenuPrimitive.Item.displayName;
 
 const DropdownMenuCheckboxItem = React.forwardRef<
   React.ElementRef<typeof DropdownMenuPrimitive.CheckboxItem>,
-  React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.CheckboxItem> & {
-    inset?: boolean;
-  }
->(({ className, children, checked, inset, ...props }, ref) => (
+  React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.CheckboxItem>
+>(({ className, children, checked, ...props }, ref) => (
   <DropdownMenuPrimitive.CheckboxItem
     ref={ref}
     data-slot="dropdown-menu-checkbox-item"
-    data-inset={inset}
     className={cn(menuIndicatorItemClass, className)}
     checked={checked}
     {...props}
   >
+    {children}
     <span data-slot="dropdown-menu-checkbox-item-indicator" className={menuIndicatorClass}>
       <DropdownMenuPrimitive.ItemIndicator>
         <Check />
       </DropdownMenuPrimitive.ItemIndicator>
     </span>
-    {children}
   </DropdownMenuPrimitive.CheckboxItem>
 ));
 DropdownMenuCheckboxItem.displayName = DropdownMenuPrimitive.CheckboxItem.displayName;
 
 const DropdownMenuRadioItem = React.forwardRef<
   React.ElementRef<typeof DropdownMenuPrimitive.RadioItem>,
-  React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.RadioItem> & {
-    inset?: boolean;
-  }
->(({ className, children, inset, ...props }, ref) => (
+  React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.RadioItem>
+>(({ className, children, ...props }, ref) => (
   <DropdownMenuPrimitive.RadioItem
     ref={ref}
     data-slot="dropdown-menu-radio-item"
-    data-inset={inset}
     className={cn(menuIndicatorItemClass, className)}
     {...props}
   >
+    {children}
     <span data-slot="dropdown-menu-radio-item-indicator" className={menuIndicatorClass}>
       <DropdownMenuPrimitive.ItemIndicator>
         <Check />
       </DropdownMenuPrimitive.ItemIndicator>
     </span>
-    {children}
   </DropdownMenuPrimitive.RadioItem>
 ));
 DropdownMenuRadioItem.displayName = DropdownMenuPrimitive.RadioItem.displayName;
 
 const DropdownMenuLabel = React.forwardRef<
   React.ElementRef<typeof DropdownMenuPrimitive.Label>,
-  React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Label> & {
-    inset?: boolean;
-  }
->(({ className, inset, ...props }, ref) => (
+  React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Label>
+>(({ className, ...props }, ref) => (
   <DropdownMenuPrimitive.Label
     ref={ref}
     data-slot="dropdown-menu-label"
-    data-inset={inset}
     className={cn(menuLabelClass, className)}
     {...props}
   />
@@ -194,6 +197,7 @@ export {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuRadioGroup,
@@ -204,3 +208,4 @@ export {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 };
+export type { MenuItemVariant };

@@ -1,10 +1,15 @@
 import { Reply, X } from "lucide-react";
 import type { GlobalAiConversation } from "../state/conversationTypes";
 import { useMistyStore } from "../state/useMistyStore";
-import { ModelKeyNeededButton, needsModelKey } from "../../models/ModelKeyNeeded";
-import { Button, ErrorNotification, IconButton } from "@/shared/ui";
+import { needsModelKey } from "../../models/ModelKeyNeeded";
+import { openModelSettings } from "../../models/modelKeys";
+import { IconButton } from "@/shared/ui";
+import { ErrorNotice } from "../ErrorNotice";
 
-/** The conversation's last error above the composer; a lost running task can reconnect. */
+/**
+ * The conversation's last error as a notice that stays while it holds, with the one way out it
+ * has: adding a model key, or reconnecting to a running task the window lost.
+ */
 export function AgentComposeError({
   error,
   reconnect,
@@ -15,19 +20,20 @@ export function AgentComposeError({
   dismiss: () => void;
 }) {
   return (
-    <ErrorNotification message={error} onDismiss={dismiss}>
-      {needsModelKey(error ?? "") && <ModelKeyNeededButton />}
-      {reconnect && (
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={() => void useMistyStore.getState().loadConversations(true)}
-        >
-          Reconnect to task
-        </Button>
-      )}
-    </ErrorNotification>
+    <ErrorNotice
+      message={error}
+      action={
+        needsModelKey(error)
+          ? { label: "Open Models settings", onSelect: openModelSettings }
+          : reconnect
+            ? {
+                label: "Reconnect to task",
+                onSelect: () => void useMistyStore.getState().loadConversations(true),
+              }
+            : undefined
+      }
+      onDismiss={dismiss}
+    />
   );
 }
 
@@ -48,7 +54,7 @@ export function AgentReplyTarget({
       <p>
         <span>Replying to {agentName}</span> {reply}
       </p>
-      <IconButton size="xs" label="Cancel reply" onClick={cancel}>
+      <IconButton size="sm" label="Cancel reply" onClick={cancel}>
         <X />
       </IconButton>
     </div>

@@ -2,7 +2,7 @@
 import { useVirtualizer, type Virtualizer } from "@tanstack/react-virtual";
 import { ArrowLeft, ChevronLeft, ChevronRight, FileText } from "lucide-react";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
-import { IconButton, Pressable, SegmentedControl, Skeleton } from "@/shared/ui";
+import { ChoiceGroup, IconButton, Pressable, Skeleton, Tooltip } from "@/shared/ui";
 import { absoluteOf, openChangedFile } from "./ChangesFileContextMenu";
 import { diffSteps, type DiffStep } from "./diffSteps";
 import {
@@ -134,17 +134,17 @@ export function DiffView(props: {
   return (
     <div className="git-panel">
       <div className="git-diff-head">
-        <IconButton label="Back to changes" size="xs" onClick={props.onBack}>
+        <IconButton label="Back to changes" size="sm" onClick={props.onBack}>
           <ArrowLeft />
         </IconButton>
-        <span className="git-diff-path" title={target.file}>
-          {target.file}
-        </span>
+        <Tooltip content={target.file}>
+          <span className="git-diff-path">{target.file}</span>
+        </Tooltip>
         <span>{target.staged ? "Staged" : "Unstaged"}</span>
         {!isImage && steps && steps.length > 1 ? (
-          <SegmentedControl
+          <ChoiceGroup
             label="How to read these changes"
-            size="xs"
+            size="sm"
             value={view}
             options={[
               { value: "all", label: "All" },
@@ -156,7 +156,7 @@ export function DiffView(props: {
         {entry?.status !== "deleted" ? (
           <IconButton
             label="Open file"
-            size="xs"
+            size="sm"
             onClick={() => openChangedFile(absoluteOf(workspacePath, target.file))}
           >
             <FileText />

@@ -3,7 +3,8 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useBrowserRuntimeStore } from "@/features/app-windows";
 import { usePresentedPageHost } from "@/features/browser";
 import { openExternalLink } from "@/shared/platform/openExternalLink";
-import { Button, ErrorNotification, IconButton, Input, SkeletonDocument } from "@/shared/ui";
+import { Button, IconButton, Input, SkeletonDocument } from "@/shared/ui";
+import { ErrorNotice } from "../conversations/ErrorNotice";
 import { agentPageKey, useAgentPageGeometry } from "../agent-browser/useAgentPageGeometry";
 import { errorText } from "../context-panel/projectApi";
 import { useMistyStore } from "../conversations/state/useMistyStore";
@@ -164,8 +165,6 @@ export default function PreviewPanel() {
         </IconButton>
         <Button
           type="button"
-          variant={picking ? "secondary" : "outline"}
-          size="sm"
           aria-pressed={picking}
           disabled={status !== "ready"}
           onClick={togglePick}
@@ -208,7 +207,7 @@ export default function PreviewPanel() {
           }}
         />
       ) : null}
-      <ErrorNotification message={error} onDismiss={() => setError("")} />
+      <ErrorNotice message={error} onDismiss={() => setError("")} />
     </div>
   );
 }

@@ -1,19 +1,29 @@
 import { useState } from "react";
-import { EllipsisVertical, Plus, Settings2 } from "lucide-react";
+import {
+  ArrowDownAZ,
+  CalendarPlus,
+  Clock,
+  EllipsisVertical,
+  Plus,
+  Settings2,
+  Trash2,
+  type LucideIcon,
+} from "lucide-react";
 import { confirmAction } from "@/shared/lib/confirmAction";
 import {
   Button,
   CollectionViewToggle,
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
   DropdownMenuTrigger,
-  ErrorNotification,
   IconButton,
+  MenuItem,
+  MenuRadioGroup,
+  MenuRadioItem,
+  OverflowFadeText,
   Pressable,
   Skeleton,
+  useNotice,
 } from "@/shared/ui";
 import { shortAgo } from "../page/useChatStatuses";
 import { companionAvailable } from "./cursor/companionOn";
@@ -25,11 +35,12 @@ import type { TutorActions } from "./TutorPage";
 import { useTutorStore } from "./tutorStore";
 import type { Notebook } from "./tutorTypes";
 
-const sorts = [
-  { value: "recent", label: "Most recent" },
-  { value: "title", label: "Title" },
-  { value: "created", label: "Date created" },
-] as const;
+const sorts: readonly { value: "recent" | "title" | "created"; label: string; icon: LucideIcon }[] =
+  [
+    { value: "recent", label: "Most recent", icon: Clock },
+    { value: "title", label: "Title", icon: ArrowDownAZ },
+    { value: "created", label: "Date created", icon: CalendarPlus },
+  ];
 type Sort = (typeof sorts)[number]["value"];
 
 function ordered(notebooks: Notebook[], sort: Sort): Notebook[] {
@@ -60,13 +71,11 @@ function NotebookMenu({ notebook, className }: { notebook: Notebook; className?:
           className={className}
           onClick={(event) => event.stopPropagation()}
         >
-          <EllipsisVertical size={16} />
+          <EllipsisVertical />
         </IconButton>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" data-misty-layer-portal>
-        <DropdownMenuItem variant="destructive" onSelect={() => void remove()}>
-          Delete notebook
-        </DropdownMenuItem>
+        <MenuItem icon={Trash2} label="Delete notebook" danger onSelect={() => void remove()} />
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -82,6 +91,7 @@ export function TutorHome({ actions }: { actions: TutorActions }) {
   const [view, setView] = useState<"grid" | "list">("grid");
   const [sort, setSort] = useState<Sort>("recent");
   const [error, setError] = useState("");
+  useNotice(Boolean(error), { message: error, tone: "error", onDismiss: () => setError("") });
   const list = ordered(Object.values(notebooks), sort);
   const open = (notebook: Notebook) => actions.open(`notebook:${notebook.id}`);
   const create = () => open(useTutorStore.getState().createNotebook("Untitled notebook"));
@@ -94,25 +104,28 @@ export function TutorHome({ actions }: { actions: TutorActions }) {
           <CollectionViewToggle value={view} onChange={setView} />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm">
+              <Button variant="quiet">
                 {sorts.find((option) => option.value === sort)?.label}
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" data-misty-layer-portal>
-              <DropdownMenuRadioGroup value={sort} onValueChange={(next) => setSort(next as Sort)}>
+              <MenuRadioGroup value={sort} onValueChange={(next) => setSort(next as Sort)}>
                 {sorts.map((option) => (
-                  <DropdownMenuRadioItem key={option.value} value={option.value}>
-                    {option.label}
-                  </DropdownMenuRadioItem>
+                  <MenuRadioItem
+                    key={option.value}
+                    value={option.value}
+                    icon={option.icon}
+                    label={option.label}
+                  />
                 ))}
-              </DropdownMenuRadioGroup>
+              </MenuRadioGroup>
             </DropdownMenuContent>
           </DropdownMenu>
           {companionAvailable() && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <IconButton label="Tutor settings">
-                  <Settings2 size={16} />
+                  <Settings2 />
                 </IconButton>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" data-misty-layer-portal>
@@ -120,13 +133,11 @@ export function TutorHome({ actions }: { actions: TutorActions }) {
               </DropdownMenuContent>
             </DropdownMenu>
           )}
-          <Button variant="primary" size="sm" className="tutor-bar-create" onClick={create}>
-            <Plus size={15} />
+          <Button variant="primary" className="tutor-bar-create" onClick={create} icon={Plus}>
             Create new
           </Button>
         </div>
       </div>
-      <ErrorNotification message={error} onDismiss={() => setError("")} />
 
       <h2>Notebooks</h2>
       {view === "grid" ? (
@@ -174,7 +185,9 @@ export function TutorHome({ actions }: { actions: TutorActions }) {
               <div key={notebook.id} className="relative" role="listitem">
                 <Pressable className="tutor-library-row w-full" onClick={() => open(notebook)}>
                   <span aria-hidden="true">{notebook.emoji ?? "📓"}</span>
-                  <span className="truncate text-cream-bright">{notebook.title}</span>
+                  <OverflowFadeText className="text-cream-bright">
+                    {notebook.title}
+                  </OverflowFadeText>
                   <span className="tutor-card-detail">{sourcesLabel(notebook.sources.length)}</span>
                   <span className="tutor-card-detail">{shortAgo(notebook.updatedAt)}</span>
                   <span />

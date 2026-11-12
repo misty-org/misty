@@ -27,8 +27,7 @@ export function LibraryVersionList(props: LibraryVersionListProps) {
         {canEdit ? (
           <Button
             className={!activeEdit ? "text-cream" : undefined}
-            size="sm"
-            variant="outline"
+            variant="secondary"
             type="button"
             disabled={editSaving || !activeEdit}
             onClick={() => props.onSelect()}
@@ -69,8 +68,7 @@ export function LibraryVersionList(props: LibraryVersionListProps) {
             {canEdit &&
             (version.rendition_state === "none" || version.rendition_state === "failed") ? (
               <Button
-                size="sm"
-                variant="outline"
+                variant="secondary"
                 type="button"
                 disabled={editSaving}
                 onClick={() => props.onRender(version.id)}
@@ -80,7 +78,7 @@ export function LibraryVersionList(props: LibraryVersionListProps) {
             ) : null}
             {canEdit && !version.is_current ? (
               <IconButton
-                size="xs"
+                size="sm"
                 label={`Delete edit ${version.version_number}`}
                 disabled={editSaving}
                 onClick={() => props.onDelete(version.id)}

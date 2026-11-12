@@ -6,7 +6,11 @@ interface BrandIconProps {
   size?: number;
   className?: string;
   style?: CSSProperties;
-  title?: string;
+  /**
+   * The brand's name, for a mark that stands alone: its accessible name. Leave it out when a
+   * label beside the mark already says it. To show the name on hover, wrap it in a Tooltip.
+   */
+  label?: string;
   "aria-hidden"?: boolean;
 }
 
@@ -33,7 +37,14 @@ const adaptiveMarks = new Set([
 ]);
 
 /** Shared original SVG artwork; never inherit an inactive row's foreground color. */
-export function BrandIcon({ brand, size = 24, className, style, title, ...aria }: BrandIconProps) {
+export function BrandIcon({
+  brand,
+  size = 24,
+  className,
+  style,
+  label: name,
+  ...aria
+}: BrandIconProps) {
   const asset = brandIconAsset(brand);
   if (!asset) return null;
   // Embedded SVG media queries can follow the OS rather than the surrounding
@@ -43,10 +54,9 @@ export function BrandIcon({ brand, size = 24, className, style, title, ...aria }
     return (
       <span
         {...aria}
-        role={title ? "img" : undefined}
-        aria-label={title}
-        aria-hidden={aria["aria-hidden"] ?? !title}
-        title={title}
+        role={name ? "img" : undefined}
+        aria-label={name}
+        aria-hidden={aria["aria-hidden"] ?? !name}
         className={className}
         data-brand-icon={asset.id}
         data-social-provider-icon={asset.id === "x" ? "x" : undefined}
@@ -68,9 +78,8 @@ export function BrandIcon({ brand, size = 24, className, style, title, ...aria }
     <img
       {...aria}
       src={asset.src}
-      alt={title ?? ""}
-      aria-hidden={aria["aria-hidden"] ?? !title}
-      title={title}
+      alt={name ?? ""}
+      aria-hidden={aria["aria-hidden"] ?? !name}
       width={size}
       height={size}
       draggable={false}

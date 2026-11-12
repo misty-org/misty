@@ -3,16 +3,15 @@ import type { AgentProfile, AgentProfileInput } from "@/shared/schemas";
 import {
   BackButton,
   Button,
-  ErrorNotification,
+  ChoiceGroup,
+  ChoiceTile,
   Field,
   Input,
-  NavIsland,
-  NavIslandItem,
   Popover,
   PopoverContent,
   PopoverTrigger,
   Textarea,
-  Toggle,
+  useNotice,
 } from "@/shared/ui";
 import { Laptop, MessageSquare, Check } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -86,6 +85,7 @@ export function AgentSetup(props: {
     }
   };
   const titles = ["Meet your agent", "Give it context", "Choose where to begin"];
+  useNotice(Boolean(error), { message: error, tone: "error", onDismiss: () => setError("") });
   return (
     <form
       className="grid gap-6"
@@ -105,44 +105,41 @@ export function AgentSetup(props: {
           {titles[step]}
         </h2>
       </header>
-      <NavIsland aria-label="Agent setup steps" className="justify-self-center">
-        {["Identity", "Context", "Start"].map((label, index) => (
-          <NavIslandItem
-            key={label}
-            active={step === index}
-            disabled={busy || (index > 0 && !draft.name.trim())}
-            onClick={() => setStep(index)}
-          >
-            {label}
-          </NavIslandItem>
-        ))}
-      </NavIsland>
+      <ChoiceGroup
+        label="Agent setup steps"
+        className="justify-self-center"
+        value={String(step)}
+        onChange={(next) => setStep(Number(next))}
+        options={["Identity", "Context", "Start"].map((label, index) => ({
+          value: String(index),
+          label,
+          disabled: busy || (index > 0 && !draft.name.trim()),
+          reason: busy ? undefined : "Name your agent first",
+        }))}
+      />
       <fieldset disabled={busy} className="grid min-w-0 gap-4">
         {step === 0 && (
           <>
             <Popover>
               <PopoverTrigger asChild>
-                <Button type="button" variant="outline" size="sm" className="justify-self-center">
+                <Button type="button" className="justify-self-center">
                   Change avatar
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-72">
-                <div className="grid grid-cols-3 gap-2">
+                <div role="group" aria-label="Avatar" className="grid grid-cols-3 gap-2">
                   {agentCloudVariants.map((variant) => (
-                    <Toggle
+                    <ChoiceTile
                       key={variant.id}
-                      aria-label={variant.name}
-                      pressed={draft.avatar.cloudVariant === variant.id}
-                      className="h-auto flex-col p-2"
-                      onPressedChange={() =>
-                        setDraft({ ...draft, avatar: { cloudVariant: variant.id } })
-                      }
+                      label={variant.name}
+                      caption={variant.name}
+                      selected={draft.avatar.cloudVariant === variant.id}
+                      onSelect={() => setDraft({ ...draft, avatar: { cloudVariant: variant.id } })}
                     >
                       <span className="size-12">
                         <AgentCloudImage variant={variant} />
                       </span>
-                      <span className="text-xs">{variant.name}</span>
-                    </Toggle>
+                    </ChoiceTile>
                   ))}
                 </div>
               </PopoverContent>
@@ -184,7 +181,6 @@ export function AgentSetup(props: {
             <div role="group" aria-label="Start with">
               <Button
                 type="button"
-                variant="outline"
                 aria-pressed={!companion}
                 justify="start"
                 className="mb-3 h-auto w-full gap-3 whitespace-normal p-4 text-left"
@@ -201,7 +197,6 @@ export function AgentSetup(props: {
               </Button>
               <Button
                 type="button"
-                variant="outline"
                 aria-pressed={companion}
                 disabled={!desktop}
                 justify="start"
@@ -227,15 +222,20 @@ export function AgentSetup(props: {
           </>
         )}
       </fieldset>
-      <ErrorNotification message={error} onDismiss={() => setError("")} />
       <div className="flex items-center justify-between gap-3">
         {step > 0 ? (
-          <BackButton size="default" disabled={busy} onClick={() => setStep(step - 1)} />
+          <BackButton size="lg" disabled={busy} onClick={() => setStep(step - 1)} />
         ) : (
           <span />
         )}
-        <Button type="submit" variant="primary" disabled={busy || !draft.name.trim()}>
-          {busy ? "Creating…" : step === 2 ? "Create agent" : "Continue"}
+        <Button
+          type="submit"
+          variant="primary"
+          size="lg"
+          loading={busy}
+          disabled={!draft.name.trim()}
+        >
+          {step === 2 ? "Create agent" : "Continue"}
         </Button>
       </div>
     </form>

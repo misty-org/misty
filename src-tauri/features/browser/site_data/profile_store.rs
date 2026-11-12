@@ -31,12 +31,7 @@ pub(crate) fn store_home(
     let name = store
         .filter(|value| *value != original_store_identity())
         .unwrap_or("default");
-    // A development copy keeps its own website data beside the others.
-    let folder = match std::env::var("MISTY_PROFILE") {
-        Ok(dev) if !dev.is_empty() => format!("{dev}-{name}"),
-        _ => name.to_owned(),
-    };
-    Ok(home.join("profiles").join(folder).join("webview"))
+    Ok(home.join("profiles").join(name).join("webview"))
 }
 
 /// On macOS, WebKit keeps a store at

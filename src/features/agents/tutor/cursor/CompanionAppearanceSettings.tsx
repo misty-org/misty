@@ -1,5 +1,5 @@
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { Button, ErrorNotification, Slider } from "@/shared/ui";
+import { Button, Slider, useNotice } from "@/shared/ui";
 import { useState } from "react";
 import { DesktopSettingsRow, DesktopSettingsSection } from "@/features/settings";
 import {
@@ -13,6 +13,7 @@ import { companionControl, useCompanionState, type CompanionControl } from "./co
 export function CompanionAppearanceSettings() {
   const { presentation, control } = useCompanionState();
   const [error, setError] = useState("");
+  useNotice(Boolean(error), { message: error, tone: "error", onDismiss: () => setError("") });
   if (!hasTauriInternals() || !/Mac|Win/.test(navigator.platform)) return null;
   const size = normalizeCompanionSize(presentation.size);
   const change = (value: CompanionControl) => {
@@ -36,8 +37,7 @@ export function CompanionAppearanceSettings() {
           />
           <span className="w-10 text-right text-sm tabular-nums text-cream-muted">{size}%</span>
           <Button
-            variant="ghost"
-            size="sm"
+            variant="quiet"
             disabled={!control || size === companionSizeDefault}
             onClick={() => change({ kind: "size", size: companionSizeDefault })}
           >
@@ -45,7 +45,6 @@ export function CompanionAppearanceSettings() {
           </Button>
         </div>
       </DesktopSettingsRow>
-      <ErrorNotification message={error} onDismiss={() => setError("")} />
     </DesktopSettingsSection>
   );
 }

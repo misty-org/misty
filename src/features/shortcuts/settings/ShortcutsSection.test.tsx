@@ -97,7 +97,7 @@ describe("ShortcutsSection", () => {
   it("records conflicts and offers one atomic reassignment", async () => {
     await render();
     const slot = container.querySelector<HTMLButtonElement>(
-      'button[aria-label="Primary shortcut: unbound"]',
+      'button[data-slot="shortcut-field-record"][aria-label="Second action"]',
     );
     expect(slot).not.toBeNull();
 

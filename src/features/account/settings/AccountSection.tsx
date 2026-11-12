@@ -4,7 +4,7 @@ import { AccountDeleteDialog } from "../export/AccountDeleteDialog";
 import { useAuth } from "../sessions/authState";
 import { openSignInSheet } from "../setup/serverSetup";
 import { useUserStore } from "../sessions/useUserStore";
-import { Button, ErrorNotification, Input, SkeletonList } from "@/shared/ui";
+import { Button, Input, SkeletonList, useNotice } from "@/shared/ui";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import {
   DesktopSettingsNotice,
@@ -18,6 +18,7 @@ function UsernameRow({ account }: { account: AccountMeResponse }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const next = username.trim();
+  useNotice(Boolean(error), { message: error, tone: "error", onDismiss: () => setError("") });
   const save = async (event: FormEvent) => {
     event.preventDefault();
     if (saving || !next || next === account.username) return;
@@ -46,14 +47,12 @@ function UsernameRow({ account }: { account: AccountMeResponse }) {
         />
         <Button
           type="submit"
-          variant="outline"
-          size="sm"
+          variant="secondary"
           disabled={saving || !next || next === account.username}
         >
           {saving ? "Saving…" : "Save"}
         </Button>
       </form>
-      <ErrorNotification message={error} onDismiss={() => setError("")} />
     </Row>
   );
 }
@@ -90,7 +89,7 @@ function SignedInAccount({ account }: { account: AccountMeResponse }) {
 
       <Section title="Danger">
         <Row label="Delete account" description="Removed after 30 days.">
-          <Button variant="outline" size="sm" onClick={() => setDeleting(true)}>
+          <Button variant="secondary" onClick={() => setDeleting(true)}>
             Delete…
           </Button>
           <AccountDeleteDialog
@@ -129,7 +128,7 @@ export function AccountSection() {
     return (
       <Section title="Details">
         <Row label="Not signed in">
-          <Button variant="outline" size="sm" onClick={() => openSignInSheet("account")}>
+          <Button variant="secondary" onClick={() => openSignInSheet("account")}>
             Sign in
           </Button>
         </Row>
@@ -140,7 +139,7 @@ export function AccountSection() {
     return (
       <DesktopSettingsNotice
         action={
-          <Button variant="ghost" size="sm" onClick={load}>
+          <Button variant="quiet" onClick={load}>
             Retry
           </Button>
         }
@@ -150,7 +149,7 @@ export function AccountSection() {
     );
   return (
     <Section title="Details">
-      <SkeletonList label="Details" rows={5} leading="none" trailing />
+      <SkeletonList label="Details" rows={5} leading="none" lines={2} trailing />
     </Section>
   );
 }

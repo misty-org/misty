@@ -17,10 +17,10 @@ import {
   AlertDialogTitle,
   Button,
   cn,
+  FilterChip,
   ListRow,
-  ListRowButton,
   SearchField,
-  Spinner,
+  Tooltip,
 } from "@/shared/ui";
 import {
   EmptyLine,
@@ -69,12 +69,10 @@ export function InstalledToolbar({
         value={query}
         onChange={(event) => onQueryChange(event.target.value)}
       />
-      <Button variant="secondary" size="sm" disabled={loading || refreshing} onClick={onRefresh}>
-        {refreshing ? <Spinner size="sm" label={false} /> : <RefreshCw aria-hidden />}
+      <Button icon={RefreshCw} loading={refreshing} disabled={loading} onClick={onRefresh}>
         {t("refresh")}
       </Button>
-      <Button variant="secondary" size="sm" disabled={loading} onClick={onOpenImport}>
-        <Plus aria-hidden />
+      <Button icon={Plus} disabled={loading} onClick={onOpenImport}>
         {t("actions.importLocal")}
       </Button>
     </div>
@@ -93,21 +91,20 @@ export function EngineFilterChips({
 }) {
   return (
     <div className="flex flex-wrap items-center gap-1.5">
-      <Button variant="chip" size="chip" aria-pressed={value === ""} onClick={() => onChange("")}>
-        {t("filter.allEngines")}
-      </Button>
+      <FilterChip
+        label={t("filter.allEngines")}
+        pressed={value === ""}
+        onPressedChange={() => onChange("")}
+      />
       {chips.map((target) => (
-        <Button
-          key={target.id}
-          variant="chip"
-          size="chip"
-          aria-pressed={value === target.id}
-          onClick={() => onChange(target.id as SkillTargetId)}
-          title={target.path}
-        >
-          <EngineGlyph engine={target.id} label={target.label} size={12} />
-          {target.label}
-        </Button>
+        <Tooltip key={target.id} content={target.path}>
+          <FilterChip
+            label={target.label}
+            icon={<EngineGlyph engine={target.id} label={target.label} size={12} />}
+            pressed={value === target.id}
+            onPressedChange={() => onChange(target.id as SkillTargetId)}
+          />
+        </Tooltip>
       ))}
     </div>
   );
@@ -154,35 +151,33 @@ function SkillRowItem({
   onUpdate: () => void;
 }) {
   return (
-    <ListRow className={cn("gap-2", pending && "opacity-60")}>
-      <ListRowButton
-        onClick={onOpen}
+    // ListRow is a div; the list item around it keeps the list a list.
+    <li className="list-none">
+      <ListRow
+        label={skill.name}
+        description={skill.description || skill.directory}
+        badge={<SourceBadge skill={skill} />}
         aria-label={t("row.open", { name: skill.name })}
-        className="flex-col items-start gap-0.5"
-      >
-        <span className="flex w-full min-w-0 items-center gap-2">
-          <span className="truncate text-sm font-medium text-cream-bright" title={skill.name}>
-            {skill.name}
-          </span>
-          <SourceBadge skill={skill} />
-        </span>
-        <span className="w-full truncate text-xs text-cream-muted">
-          {skill.description || skill.directory}
-        </span>
-      </ListRowButton>
-      <TargetEngines
-        skill={skill}
-        targets={targets}
-        busyTarget={busyTarget}
-        disabled={pending}
-        onToggleTarget={onToggleTarget}
+        className={cn("gap-2", pending && "opacity-60")}
+        onOpen={onOpen}
+        trailing={
+          <>
+            <TargetEngines
+              skill={skill}
+              targets={targets}
+              busyTarget={busyTarget}
+              disabled={pending}
+              onToggleTarget={onToggleTarget}
+            />
+            {hasUpdate ? (
+              <Button variant="primary" size="sm" disabled={pending} onClick={onUpdate}>
+                {t("actions.update")}
+              </Button>
+            ) : null}
+          </>
+        }
       />
-      {hasUpdate ? (
-        <Button variant="primary" size="xs" disabled={pending} onClick={onUpdate}>
-          {t("actions.update")}
-        </Button>
-      ) : null}
-    </ListRow>
+    </li>
   );
 }
 
@@ -224,11 +219,7 @@ export function InstalledListArea({
     return (
       <InlineError
         message={error}
-        action={
-          <Button variant="secondary" size="sm" onClick={onRefresh}>
-            {t("common.refresh")}
-          </Button>
-        }
+        action={<Button onClick={onRefresh}>{t("common.refresh")}</Button>}
       />
     );
   }
@@ -237,11 +228,7 @@ export function InstalledListArea({
       <EmptyLine
         text={totalSkills === 0 ? t("empty.none") : t("empty.filtered")}
         action={
-          totalSkills === 0 ? (
-            <Button variant="secondary" size="sm" onClick={onBrowse}>
-              {t("empty.browse")}
-            </Button>
-          ) : undefined
+          totalSkills === 0 ? <Button onClick={onBrowse}>{t("empty.browse")}</Button> : undefined
         }
       />
     );

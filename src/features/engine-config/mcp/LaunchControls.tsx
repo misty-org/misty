@@ -46,12 +46,11 @@ export function EnableToggle({
   const Icon = entry.enabled ? Power : PowerOff;
   return (
     <IconButton
-      size="sm"
       label={copy.toggle(entry.name)}
       aria-pressed={entry.enabled}
       // aria-disabled rather than disabled: a disabled button gets no hover, so no reason shows.
       aria-disabled={readonlyReason !== null || undefined}
-      tooltip={
+      hint={
         readonlyReason ??
         (entry.enabled ? copy.enableHintOn(entry.name) : copy.enableHintOff(entry.name))
       }
@@ -86,11 +85,10 @@ export function LaunchModeToggle({
   const Icon = onDemand ? Hourglass : Zap;
   return (
     <IconButton
-      size="sm"
       label={copy.launchToggle(entry.name)}
       aria-pressed={onDemand}
       aria-disabled={locked || undefined}
-      tooltip={
+      hint={
         locked
           ? (blocked ?? copy.launchToggle(entry.name))
           : onDemand

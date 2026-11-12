@@ -35,11 +35,10 @@ export function WebSearchSection({ keys }: { keys: SavedModelKeys }) {
       />
       <ModelKeyRow
         label="Search key"
+        keyName={`${selected.label} key`}
         description={`${selected.keyHelp} Without a key, agents read pages but don’t search. It can’t be shown again once saved.`}
         providerId={selected.id}
-        saved={keys.saved}
-        onSave={keys.save}
-        onRemove={keys.remove}
+        keys={keys}
       />
     </Section>
   );
@@ -57,9 +56,7 @@ export function ConnectedAppsKeySection({ keys }: { keys: SavedModelKeys }) {
         label="Composio key"
         description="Goes only to Composio. Without it, agents use each app’s web page."
         providerId="composio"
-        saved={keys.saved}
-        onSave={keys.save}
-        onRemove={keys.remove}
+        keys={keys}
       />
     </Section>
   );

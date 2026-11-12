@@ -1,10 +1,9 @@
-import { Check, Ellipsis, GripVertical, type LucideIcon } from "lucide-react";
+import { ArrowUpDown, Check, Ellipsis, GripVertical, type LucideIcon } from "lucide-react";
 import { useId, useRef, useState, type KeyboardEvent } from "react";
 import { reorderIds, usePointerReorder } from "@/shared/hooks/usePointerReorder";
 import {
   Checkbox,
   ContextMenu,
-  ContextMenuAction,
   ContextMenuContent,
   ContextMenuTrigger,
   DragHandleButton,
@@ -13,9 +12,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
   MenuItem,
+  OverflowFadeText,
   Popover,
   PopoverAnchor,
   PopoverContent,
+  cn,
 } from "@/shared/ui";
 import { SidebarRow } from "./SidebarRow";
 import { useSidebarPins, type SidebarPlaceId } from "./sidebarPinsStore";
@@ -65,7 +66,7 @@ export function SidebarMore({ places }: { places: Record<SidebarPlaceId, Sidebar
             </ContextMenuTrigger>
           </PopoverAnchor>
           <ContextMenuContent className="min-w-44" onCloseAutoFocus={afterMenu}>
-            <ContextMenuAction label="Reorder pins" onSelect={startReordering} />
+            <MenuItem icon={ArrowUpDown} label="Reorder pins" onSelect={startReordering} />
           </ContextMenuContent>
         </ContextMenu>
         <DropdownMenuContent side="right" className="min-w-48" onCloseAutoFocus={afterMenu}>
@@ -82,7 +83,7 @@ export function SidebarMore({ places }: { places: Record<SidebarPlaceId, Sidebar
             );
           })}
           {rest.length ? <DropdownMenuSeparator /> : null}
-          <MenuItem label="Reorder pins" onSelect={startReordering} />
+          <MenuItem icon={ArrowUpDown} label="Reorder pins" onSelect={startReordering} />
         </DropdownMenuContent>
       </DropdownMenu>
       <PopoverContent side="right" align="start" className="w-56 p-1">
@@ -130,7 +131,10 @@ function ReorderPins({ places }: { places: Record<SidebarPlaceId, SidebarPlace> 
             data-reorder-item={id}
             data-reorder-handle=""
             data-reorder-preview=""
-            className="flex h-8 cursor-grab items-center gap-2 rounded-md pl-2 text-sm text-cream hover:bg-charcoal-hover active:cursor-grabbing"
+            className={cn(
+              "flex h-8 cursor-grab items-center gap-2 rounded-md pl-2 text-sm text-cream",
+              "hover:bg-charcoal-hover active:cursor-grabbing",
+            )}
           >
             <label className="flex min-w-0 flex-1 items-center gap-2">
               <Checkbox
@@ -139,12 +143,15 @@ function ReorderPins({ places }: { places: Record<SidebarPlaceId, SidebarPlace> 
                 onCheckedChange={(on) => toggle(id, on === true)}
               />
               <Icon className="size-4 shrink-0 text-cream-muted" aria-hidden="true" />
-              <span className="truncate">{label}</span>
+              <OverflowFadeText>{label}</OverflowFadeText>
             </label>
             <DragHandleButton
               label={`Move ${label}`}
-              title="Drag, or use the arrow keys"
-              className="h-7 cursor-grab touch-none hover:bg-transparent hover:text-cream-muted active:cursor-grabbing"
+              hint="Drag, or use the arrow keys"
+              className={cn(
+                "h-7 cursor-grab touch-none hover:bg-transparent hover:text-cream-muted",
+                "active:cursor-grabbing",
+              )}
               onKeyDown={nudge(id)}
             >
               <GripVertical aria-hidden="true" />

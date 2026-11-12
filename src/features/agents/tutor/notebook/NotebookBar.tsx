@@ -1,16 +1,26 @@
 import { useEffect, useState } from "react";
-import { ArrowLeft, EllipsisVertical, Plus, Settings2 } from "lucide-react";
+import {
+  ArrowLeft,
+  EllipsisVertical,
+  MousePointer2,
+  Plus,
+  RotateCcw,
+  Settings2,
+  Share2,
+  SlidersHorizontal,
+  Trash2,
+} from "lucide-react";
 import { useSpaceWindowStore, useSpacesDirectory, windowSpace } from "@/features/app-windows";
 import {
   Button,
   DropdownMenu,
-  DropdownMenuCheckboxItem,
   DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
   IconButton,
   Input,
+  MenuCheckItem,
+  MenuItem,
+  MenuSeparator,
 } from "@/shared/ui";
 import { companionAvailable, setCompanionOn, useCompanionOn } from "../cursor/companionOn";
 import { shareNotebook } from "../tutorShare";
@@ -23,15 +33,15 @@ export function CursorMenuItem({ onError }: { onError(message: string): void }) 
   const on = useCompanionOn();
   if (!companionAvailable()) return null;
   return (
-    <DropdownMenuCheckboxItem
+    <MenuCheckItem
+      icon={MousePointer2}
+      label="Cursor tutor"
       checked={on === true}
       disabled={on === undefined}
       onCheckedChange={(next) =>
         void setCompanionOn(next).catch((reason: unknown) => onError(String(reason)))
       }
-    >
-      Cursor tutor
-    </DropdownMenuCheckboxItem>
+    />
   );
 }
 
@@ -86,7 +96,7 @@ export function NotebookBar({
   return (
     <header className="tutor-bar">
       <IconButton label="Back to Tutor" onClick={onBack}>
-        <ArrowLeft size={16} />
+        <ArrowLeft />
       </IconButton>
       <span className="tutor-bar-emoji" aria-hidden="true">
         {notebook.emoji ?? "📓"}
@@ -106,39 +116,39 @@ export function NotebookBar({
         }}
       />
       <div className="tutor-bar-actions">
-        <Button variant="outline" size="sm" className="tutor-bar-create" onClick={onCreate}>
-          <Plus size={15} />
+        <Button className="tutor-bar-create" onClick={onCreate} icon={Plus}>
           Create notebook
         </Button>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <IconButton label="Notebook settings">
-              <Settings2 size={16} />
+              <Settings2 />
             </IconButton>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" data-misty-layer-portal>
-            <DropdownMenuItem onSelect={onCustomize}>Customize notebook</DropdownMenuItem>
-            {companionAvailable() && <DropdownMenuSeparator />}
+            <MenuItem icon={SlidersHorizontal} label="Customize notebook" onSelect={onCustomize} />
+            {companionAvailable() && <MenuSeparator />}
             <CursorMenuItem onError={onError} />
           </DropdownMenuContent>
         </DropdownMenu>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <IconButton label="Notebook actions">
-              <EllipsisVertical size={16} />
+              <EllipsisVertical />
             </IconButton>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" data-misty-layer-portal>
             {space && (
-              <DropdownMenuItem disabled={sharing} onSelect={share}>
-                {sharedHere ? `Update in ${space.name}` : `Share to ${space.name}`}
-              </DropdownMenuItem>
+              <MenuItem
+                icon={Share2}
+                label={sharedHere ? `Update in ${space.name}` : `Share to ${space.name}`}
+                disabled={sharing}
+                onSelect={share}
+              />
             )}
-            <DropdownMenuItem onSelect={onRebrief}>Write the overview again</DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem variant="destructive" onSelect={onDelete}>
-              Delete notebook
-            </DropdownMenuItem>
+            <MenuItem icon={RotateCcw} label="Write the overview again" onSelect={onRebrief} />
+            <MenuSeparator />
+            <MenuItem icon={Trash2} label="Delete notebook" danger onSelect={onDelete} />
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

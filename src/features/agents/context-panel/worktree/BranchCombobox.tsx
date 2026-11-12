@@ -1,7 +1,7 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 import { Check, GitBranch, Search } from "lucide-react";
 import { useMemo, useState } from "react";
-import { Input, MenuTrigger, Popover, PopoverContent, Pressable } from "@/shared/ui";
+import { Input, MenuTrigger, Popover, PopoverContent, Pressable, Tooltip } from "@/shared/ui";
 import type { BranchInfo } from "./worktreeApi";
 import "./worktree.css";
 
@@ -35,9 +35,9 @@ export function BranchCombobox({
     <Popover open={open} onOpenChange={setOpen}>
       <MenuTrigger
         kind="popover"
-        variant="outline"
+        variant="secondary"
         label={label}
-        icon={<GitBranch size={15} aria-hidden="true" />}
+        icon={GitBranch}
         value={value ?? <span className="text-cream-muted">{placeholder}</span>}
         className="worktree-branch-trigger"
       />
@@ -61,16 +61,13 @@ export function BranchCombobox({
             const key = `${branch.isRemote ? "r" : "l"}:${branch.name}`;
             if (blocked?.has(branch.name)) {
               return (
-                <div
-                  key={key}
-                  className="worktree-branch-row"
-                  aria-disabled="true"
-                  title={blockedReason}
-                >
-                  <span className="size-4 shrink-0" />
-                  <span className="worktree-row-name">{branch.name}</span>
-                  <span className="worktree-branch-tag">{blockedReason}</span>
-                </div>
+                <Tooltip key={key} content={blockedReason ?? ""}>
+                  <div className="worktree-branch-row" aria-disabled="true">
+                    <span className="size-4 shrink-0" />
+                    <span className="worktree-row-name">{branch.name}</span>
+                    <span className="worktree-branch-tag">{blockedReason}</span>
+                  </div>
+                </Tooltip>
               );
             }
             return (

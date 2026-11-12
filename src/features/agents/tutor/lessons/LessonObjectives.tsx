@@ -74,7 +74,7 @@ export function LessonObjectives({ conversationId }: { conversationId: string })
       actions={
         next ? (
           <>
-            <Button size="sm" disabled={starting} onClick={() => void start()}>
+            <Button disabled={starting} onClick={() => void start()}>
               Next lesson: {next.part.title}
             </Button>
             {notice && (

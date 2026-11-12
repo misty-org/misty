@@ -1,5 +1,4 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
-import { ChevronDown, ChevronUp, X } from "lucide-react";
 import {
   memo,
   useDeferredValue,
@@ -9,11 +8,11 @@ import {
   type MouseEvent as ReactMouseEvent,
 } from "react";
 import { openExternalLink } from "@/shared/platform/openExternalLink";
-import { IconButton, Input } from "@/shared/ui";
+import { Input } from "@/shared/ui";
 import { MistyMarkdown } from "../../runs/markdown/MistyMarkdown";
 import { filesApi } from "../files/filesApi";
 import { useFilesStore } from "../files/filesStore";
-import { keepFindInputFocus } from "./EditorSearchPanel";
+import { FindSteps, FindToggles } from "./FindControls";
 import {
   clearMarkdownSearchHighlights,
   findMarkdownMatches,
@@ -235,36 +234,17 @@ export function MarkdownPreview({
                   setCursor(0);
                 }}
               />
-              <IconButton
-                label="Match case"
-                size="xs"
-                className="editor-find-toggle"
-                aria-pressed={caseSensitive}
-                onMouseDown={keepFindInputFocus}
-                onClick={() => (setCaseSensitive(!caseSensitive), setCursor(0))}
-              >
-                Aa
-              </IconButton>
-              <IconButton
-                label="Whole word"
-                size="xs"
-                className="editor-find-toggle"
-                aria-pressed={wholeWord}
-                onMouseDown={keepFindInputFocus}
-                onClick={() => (setWholeWord(!wholeWord), setCursor(0))}
-              >
-                W
-              </IconButton>
-              <IconButton
-                label="Regular expression"
-                size="xs"
-                className="editor-find-toggle font-mono"
-                aria-pressed={useRegex}
-                onMouseDown={keepFindInputFocus}
-                onClick={() => (setUseRegex(!useRegex), setCursor(0))}
-              >
-                .*
-              </IconButton>
+              <FindToggles
+                caseSensitive={caseSensitive}
+                wholeWord={wholeWord}
+                regexp={useRegex}
+                onToggle={(option) => {
+                  if (option === "caseSensitive") setCaseSensitive(!caseSensitive);
+                  else if (option === "wholeWord") setWholeWord(!wholeWord);
+                  else setUseRegex(!useRegex);
+                  setCursor(0);
+                }}
+              />
             </div>
             <span
               role="status"
@@ -273,27 +253,11 @@ export function MarkdownPreview({
             >
               {matchCount > 0 ? `${safeCursor + 1}/${matchCount}` : "No results"}
             </span>
-            <IconButton
-              label="Previous match (Shift+Enter)"
-              size="xs"
+            <FindSteps
               disabled={matchCount === 0}
-              onMouseDown={keepFindInputFocus}
-              onClick={() => step(-1)}
-            >
-              <ChevronUp />
-            </IconButton>
-            <IconButton
-              label="Next match (Enter)"
-              size="xs"
-              disabled={matchCount === 0}
-              onMouseDown={keepFindInputFocus}
-              onClick={() => step(1)}
-            >
-              <ChevronDown />
-            </IconButton>
-            <IconButton label="Close (Esc)" size="xs" onClick={() => onSearchOpenChange?.(false)}>
-              <X />
-            </IconButton>
+              onStep={(direction) => step(direction === "prev" ? -1 : 1)}
+              onClose={() => onSearchOpenChange?.(false)}
+            />
           </div>
         </div>
       ) : null}

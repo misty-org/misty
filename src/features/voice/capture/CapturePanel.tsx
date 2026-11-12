@@ -1,6 +1,15 @@
 import { FileText, ListChecks, MessageSquare, Mic, MicOff, Square, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { Button, IconButton, Input, Notification, Skeleton, Textarea } from "@/shared/ui";
+import {
+  Button,
+  IconButton,
+  Input,
+  OverflowFadeText,
+  Skeleton,
+  Textarea,
+  Tooltip,
+  useNotice,
+} from "@/shared/ui";
 import type { VoiceNoteMode } from "./captureApi";
 import { openCapturedNote, askAboutCapturedNote } from "./openNote";
 import { speakersOf } from "./transcriptTurns";
@@ -23,13 +32,9 @@ export function CapturePanel() {
   const close = store.close;
   const end = useRef<HTMLDivElement>(null);
   useEffect(() => end.current?.scrollIntoView({ block: "end" }), [store.turns.length]);
-  if (store.phase === "idle" && !notice) return null;
-  if (store.phase === "idle")
-    return (
-      <Notification key={notice} onDismiss={close}>
-        {notice}
-      </Notification>
-    );
+  // Once the capture is over, what is left to say is a notice in the corner.
+  useNotice(store.phase === "idle" && Boolean(notice), { message: notice ?? "", onDismiss: close });
+  if (store.phase === "idle") return null;
   const listening = store.phase === "live" || store.phase === "starting";
   const busy = store.phase === "working" || store.phase === "saving";
   const make = (mode: VoiceNoteMode) => void store.makeNote(mode);
@@ -42,7 +47,9 @@ export function CapturePanel() {
     >
       <header className="flex items-center gap-2">
         <div className="min-w-0 flex-1">
-          <div className="truncate text-sm font-medium">{store.title || "Listening"}</div>
+          <OverflowFadeText as="div" className="text-sm font-medium">
+            {store.title || "Listening"}
+          </OverflowFadeText>
           <div className="text-xs text-cream-muted">
             {store.source ? sourceLabel[store.source.kind] : "Transcript"}
             {store.phase === "live" ? " · Listening" : store.phase === "saving" ? " · Saving" : ""}
@@ -58,8 +65,7 @@ export function CapturePanel() {
               {store.muted ? <MicOff /> : <Mic />}
             </IconButton>
             <Button
-              size="sm"
-              variant="ghost"
+              variant="quiet"
               disabled={store.phase !== "live"}
               onClick={() => void store.stop()}
             >
@@ -88,25 +94,24 @@ export function CapturePanel() {
       />
       {!listening && store.transcriptId && (
         <footer className="flex flex-wrap gap-2">
-          <Button size="sm" variant="primary" disabled={busy} onClick={() => make("notes")}>
+          <Button variant="primary" disabled={busy} onClick={() => make("notes")}>
             <FileText /> {store.noteId ? "Redo notes" : "Turn into notes"}
           </Button>
-          <Button size="sm" variant="ghost" disabled={busy} onClick={() => make("summary")}>
+          <Button variant="quiet" disabled={busy} onClick={() => make("summary")}>
             Summarize
           </Button>
-          <Button size="sm" variant="ghost" disabled={busy} onClick={() => make("actions")}>
+          <Button variant="quiet" disabled={busy} onClick={() => make("actions")}>
             <ListChecks /> Action items
           </Button>
           <Button
-            size="sm"
-            variant="ghost"
+            variant="quiet"
             disabled={busy || !store.noteId}
             onClick={() => void askAboutCapturedNote()}
           >
             <MessageSquare /> Ask about it
           </Button>
           {store.noteId && (
-            <Button size="sm" variant="ghost" onClick={openCapturedNote}>
+            <Button variant="quiet" onClick={openCapturedNote}>
               Open note
             </Button>
           )}
@@ -148,16 +153,15 @@ function Lanes() {
               }}
             />
           ) : (
-            <Button
-              key={speaker}
-              size="sm"
-              variant="ghost"
-              className="h-6 px-2 text-xs"
-              title="Rename"
-              onClick={() => setEditing(speaker)}
-            >
-              {speakers[speaker] ?? speaker}
-            </Button>
+            <Tooltip key={speaker} content="Rename">
+              <Button
+                variant="quiet"
+                className="h-6 px-2 text-xs"
+                onClick={() => setEditing(speaker)}
+              >
+                {speakers[speaker] ?? speaker}
+              </Button>
+            </Tooltip>
           ),
         )}
       </div>

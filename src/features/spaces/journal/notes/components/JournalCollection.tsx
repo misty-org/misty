@@ -2,7 +2,7 @@ import { OrderedCollectionFilters as CollectionFilters } from "@/features/settin
 import { useState, type ComponentProps } from "react";
 import { JournalAllCollection, journalSections } from "../../JournalAllCollection";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { FileText, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
+import { FileText, Pencil, Plus, Trash2 } from "lucide-react";
 import {
   Button,
   CollectionPage,
@@ -11,15 +11,10 @@ import {
   useCollectionRefinement,
   CollectionItems,
   CollectionViewToggle,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
   MenuItem,
-  ContextMenuAction,
-  ErrorNotification,
-  IconButton,
   CollectionSkeleton,
   itemTones,
+  useNotice,
 } from "@/shared/ui";
 import { useRangeSelection } from "@/shared/hooks/useRangeSelection";
 import type { UnifiedNote } from "../noteTypes";
@@ -72,6 +67,15 @@ export function JournalCollection(props: {
       value: (note) => (props.readOnly || note.role === "viewer" ? "viewer" : "editable"),
     },
   });
+  useNotice(filter !== "all" && Boolean(props.bulkError), {
+    message: props.bulkError ?? "",
+    tone: "error",
+  });
+  useNotice(filter !== "all" && props.error, {
+    message: "Notes couldn’t load.",
+    tone: "error",
+    action: { label: "Retry", onSelect: props.onRetry },
+  });
   const notes = refinement.items;
   const selectableIds = notes
     .filter((note) => !props.readOnly && note.canDelete)
@@ -83,7 +87,7 @@ export function JournalCollection(props: {
     <CollectionPage>
       <CollectionHeading
         title="Journal"
-        actions={
+        end={
           <>
             <CollectionSearch
               aria-label="Search notes"
@@ -92,8 +96,7 @@ export function JournalCollection(props: {
               onChange={(event) => props.onQueryChange(event.target.value)}
             />
             {!props.readOnly && (
-              <Button variant="primary" className="px-4" onClick={props.onCreate}>
-                <Plus />
+              <Button variant="primary" icon={Plus} onClick={props.onCreate}>
                 New note
               </Button>
             )}
@@ -108,12 +111,6 @@ export function JournalCollection(props: {
         filterControl={refinement.control}
         actions={<CollectionViewToggle value={view} onChange={setView} disabled={!notes.length} />}
       />
-      <ErrorNotification message={props.bulkError} />
-      <ErrorNotification message={props.error ? "Notes couldn’t load." : ""}>
-        <Button type="button" variant="ghost" size="sm" onClick={props.onRetry}>
-          Retry
-        </Button>
-      </ErrorNotification>
       {props.loading ? (
         <CollectionSkeleton label="Loading notes" view={view} />
       ) : (
@@ -123,6 +120,7 @@ export function JournalCollection(props: {
           sortResetKey={refinement.sortKey}
           categoryLabel="Type"
           view={view}
+          listIcons
           items={notes.map((note) => ({
             id: note.id,
             title: note.title || "Untitled note",
@@ -144,30 +142,19 @@ export function JournalCollection(props: {
             }),
             onOpen: () => props.onOpen(note),
             selectable: !props.readOnly && note.canDelete,
-            contextMenu:
+            menu:
               selection.menuTargets(note.id).length > 1 ? (
-                <ContextMenuAction
+                <MenuItem
                   icon={<Trash2 />}
                   label={`Delete ${selection.selectedIds.length} notes`}
-                  destructive
+                  danger
                   onSelect={() => props.onDeleteMany?.(selection.selectedIds)}
                 />
               ) : (
-                <NoteActions note={note} props={props} context />
+                <NoteActions note={note} props={props} />
               ),
-            onContextMenuOpen: () => selection.pickForMenu(note.id),
-            actions: (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <IconButton label={`More actions for ${note.title || "Untitled note"}`}>
-                    <MoreHorizontal />
-                  </IconButton>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <NoteActions note={note} props={props} />
-                </DropdownMenuContent>
-              </DropdownMenu>
-            ),
+            menuLabel: `More actions for ${note.title || "Untitled note"}`,
+            onMenuOpen: () => selection.pickForMenu(note.id),
           }))}
           selectedIds={selection.selectedIds}
           onSelect={selection.select}
@@ -180,32 +167,29 @@ export function JournalCollection(props: {
 function NoteActions({
   note,
   props,
-  context = false,
 }: {
   note: UnifiedNote;
   props: ComponentProps<typeof JournalCollection>;
-  context?: boolean;
 }) {
-  const Action = context ? ContextMenuAction : MenuItem;
   return (
     <>
-      <Action
+      <MenuItem
         icon={<Pencil />}
         label="Rename"
         disabled={props.readOnly || note.role === "viewer"}
-        title={
+        reason={
           props.readOnly || note.role === "viewer"
             ? "You have view-only access to this note."
             : undefined
         }
         onSelect={() => props.onRename(note)}
       />
-      <Action
+      <MenuItem
         icon={<Trash2 />}
         label="Delete"
-        destructive
+        danger
         disabled={props.readOnly || !note.canDelete}
-        title={
+        reason={
           props.readOnly
             ? "This Space is read-only."
             : !note.canDelete

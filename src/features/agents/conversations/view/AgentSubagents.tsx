@@ -53,8 +53,6 @@ export function AgentSubagents({ subagents }: { subagents: AgentSubagent[] }) {
               actions={
                 running.has(subagent.state) && !stoppingNow ? (
                   <Button
-                    size="sm"
-                    variant="outline"
                     aria-label={`Stop sub-agent: ${subagent.goal}`}
                     onClick={() => void stop(subagent.invocationId)}
                   >

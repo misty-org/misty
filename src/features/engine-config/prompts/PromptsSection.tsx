@@ -1,7 +1,17 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 // See NOTICE.
 
-import { FileText, FolderInput, FolderOpen, Pencil, Plus, Trash2 } from "lucide-react";
+import {
+  FileText,
+  Folder,
+  FolderInput,
+  FolderOpen,
+  Globe,
+  Layers,
+  Pencil,
+  Plus,
+  Trash2,
+} from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { folderName, useLinkedFolders } from "../host";
 import { DesktopSettingsNotice, DesktopSettingsSection as Section } from "@/features/settings";
@@ -17,10 +27,11 @@ import {
   Badge,
   Button,
   DropdownMenu,
-  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuTrigger,
   IconButton,
+  MenuCheckItem,
+  OverflowFadeText,
   SearchField,
   Select,
   SelectContent,
@@ -67,40 +78,41 @@ function PromptRow({
     <div className="flex min-h-14 items-center gap-3 py-2.5">
       <FileText aria-hidden className="size-4 shrink-0 text-cream-muted" />
       <div className="grid min-w-0 flex-1 gap-0.5">
-        <p className="flex min-w-0 items-center gap-2 text-md font-medium text-cream-bright">
-          <span className="truncate font-mono">!{entry.name}</span>
+        <p className="flex min-w-0 items-center gap-2 text-body font-medium text-cream-bright">
+          <OverflowFadeText full className="font-mono">{`!${entry.name}`}</OverflowFadeText>
           <Badge variant="secondary">{scopeLabel(entry.scope)}</Badge>
         </p>
         {entry.description || entry.argumentHint ? (
-          <p className="truncate text-sm text-cream-muted">
+          <OverflowFadeText as="p" full className="text-sm text-cream-muted">
             {[entry.description, entry.argumentHint].filter(Boolean).join(" · ")}
-          </p>
+          </OverflowFadeText>
         ) : null}
       </div>
-      <IconButton label="Edit" variant="ghost" onClick={onEdit}>
+      <IconButton label="Edit" onClick={onEdit}>
         <Pencil />
       </IconButton>
       {folderAvailable ? (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <IconButton label="Move" variant="ghost">
+            <IconButton label="Move">
               <FolderInput />
             </IconButton>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             {(["workspace", "global"] as const).map((scope) => (
-              <DropdownMenuCheckboxItem
+              <MenuCheckItem
                 key={scope}
+                icon={scope === "global" ? Globe : Folder}
+                label={scopeLabel(scope)}
                 checked={entry.scope === scope}
-                onSelect={() => entry.scope !== scope && onMove(scope)}
-              >
-                {scopeLabel(scope)}
-              </DropdownMenuCheckboxItem>
+                closeOnSelect
+                onCheckedChange={() => entry.scope !== scope && onMove(scope)}
+              />
             ))}
           </DropdownMenuContent>
         </DropdownMenu>
       ) : null}
-      <IconButton label="Delete" variant="ghost" onClick={onDelete}>
+      <IconButton label="Delete" onClick={onDelete}>
         <Trash2 />
       </IconButton>
     </div>
@@ -190,9 +202,9 @@ export function PromptsSection() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All</SelectItem>
-                <SelectItem value="workspace">This folder</SelectItem>
-                <SelectItem value="global">Everywhere</SelectItem>
+                <SelectItem value="all" icon={Layers} label="All" />
+                <SelectItem value="workspace" icon={Folder} label="This folder" />
+                <SelectItem value="global" icon={Globe} label="Everywhere" />
               </SelectContent>
             </Select>
           ) : null}
@@ -204,7 +216,7 @@ export function PromptsSection() {
             value={query}
             onChange={(event) => setQuery(event.target.value)}
           />
-          <Button variant="secondary" onClick={openFolder}>
+          <Button onClick={openFolder}>
             <FolderOpen />
             Open folder
           </Button>

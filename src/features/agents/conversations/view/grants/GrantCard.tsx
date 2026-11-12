@@ -81,17 +81,12 @@ function GrantCard({
       {grant.status === "pending" ? (
         <div className="agent-grant-actions">
           {grant.path ? (
-            <Button size="sm" disabled={busy} onClick={() => void allow()}>
+            <Button disabled={busy} onClick={() => void allow()}>
               <Check aria-hidden="true" />
               Allow folder
             </Button>
           ) : null}
-          <Button
-            size="sm"
-            variant="secondary"
-            disabled={busy}
-            onClick={() => patch({ status: "declined" })}
-          >
+          <Button variant="secondary" disabled={busy} onClick={() => patch({ status: "declined" })}>
             <X aria-hidden="true" />
             {grant.path ? "Decline" : "Dismiss"}
           </Button>
@@ -101,7 +96,6 @@ function GrantCard({
           <span className="agent-grant-done">Agents can now work in this folder.</span>
           {retryPrompt ? (
             <Button
-              size="sm"
               variant="secondary"
               disabled={working}
               onClick={() => onRetry(retryPrompt, retryFrom)}

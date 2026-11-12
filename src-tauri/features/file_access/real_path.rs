@@ -112,3 +112,22 @@ fn without_dots(components: Vec<Component<'_>>) -> PathBuf {
     }
     result
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn network_and_device_paths_are_never_local() {
+        assert!(is_local_path(Path::new("/Users/me/Downloads")));
+        assert!(is_local_path(Path::new("relative")));
+        #[cfg(windows)]
+        {
+            assert!(is_local_path(Path::new(r"C:\Users\me\Downloads")));
+            assert!(is_local_path(Path::new(r"\\?\C:\Users\me")));
+            assert!(!is_local_path(Path::new(r"\\server\share\folder")));
+            assert!(!is_local_path(Path::new(r"\\?\UNC\server\share")));
+            assert!(!is_local_path(Path::new(r"\\.\pipe\name")));
+        }
+    }
+}

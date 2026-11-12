@@ -1,6 +1,7 @@
+import { RotateCw } from "lucide-react";
 import { lazy, Suspense } from "react";
 import type { AgentProfile } from "@/shared/schemas";
-import { Skeleton } from "@/shared/ui";
+import { ErrorState, Skeleton } from "@/shared/ui";
 import type { ContextPanelTab } from "./contextPanelStore";
 import { FilesPanel } from "./files/FilesPanel";
 import { FolderPicker, useProjectFolder } from "./FolderPicker";
@@ -16,6 +17,14 @@ const TerminalPanel = lazy(() => import("./terminal/TerminalPanel"));
 const PreviewPanel = lazy(() => import("../preview/PreviewPanel"));
 const BrowserPanel = lazy(() => import("./BrowserPanel"));
 
+/** What a panel shows while its code or its first read is on the way, never a blank box. */
+const panelSkeleton = (
+  <div className="grid gap-2 p-3" aria-hidden="true">
+    <Skeleton className="h-4 w-40" />
+    <Skeleton className="h-4 w-56" />
+  </div>
+);
+
 /**
  * The panel beside a chat: the chat's session at a glance, or the Space's linked project folder
  * as files, as Git changes, or as a terminal; the folder is chosen in the session card. Agents on
@@ -28,7 +37,7 @@ export function AgentContextPanel(props: {
   conversationId: string;
   agent: AgentProfile;
 }) {
-  const { folder, loaded } = useProjectFolder();
+  const { folder, loaded, failed, retry } = useProjectFolder();
   if (props.tab === "session") {
     return <SessionPanel conversationId={props.conversationId} agent={props.agent} />;
   }
@@ -44,18 +53,21 @@ export function AgentContextPanel(props: {
         </div>
       ) : null}
       {props.tab === "browser" ? (
-        <Suspense fallback={<div className="min-h-0 flex-1" />}>
+        <Suspense fallback={panelSkeleton}>
           <BrowserPanel />
         </Suspense>
       ) : props.tab === "preview" ? (
-        <Suspense fallback={<div className="min-h-0 flex-1" />}>
+        <Suspense fallback={panelSkeleton}>
           <PreviewPanel />
         </Suspense>
+      ) : failed ? (
+        <ErrorState
+          title="Couldn't read the Space's folders"
+          line="Something went wrong on this computer. Try again in a moment."
+          action={{ label: "Try again", icon: RotateCw, onClick: retry }}
+        />
       ) : !loaded ? (
-        <div className="grid gap-2 p-3" aria-hidden="true">
-          <Skeleton className="h-4 w-40" />
-          <Skeleton className="h-4 w-56" />
-        </div>
+        panelSkeleton
       ) : !folder ? (
         <div className="context-empty">
           <p>Link a project folder to this Space to see its files here.</p>
@@ -66,7 +78,7 @@ export function AgentContextPanel(props: {
       ) : props.tab === "changes" ? (
         <ChangesPanel folder={folder} />
       ) : (
-        <Suspense fallback={<div className="min-h-0 flex-1" />}>
+        <Suspense fallback={panelSkeleton}>
           <TerminalPanel folder={folder} />
         </Suspense>
       )}

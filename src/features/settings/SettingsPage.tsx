@@ -146,8 +146,7 @@ export const SettingsWorkspace = memo(function SettingsWorkspace(props: Settings
           <DesktopSettingsNotice
             action={
               <Button
-                variant="ghost"
-                size="sm"
+                variant="quiet"
                 onClick={() =>
                   void (preferences.ready ? preferences.refresh() : store.load()).catch(() => {})
                 }

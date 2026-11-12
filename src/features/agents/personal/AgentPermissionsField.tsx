@@ -1,4 +1,4 @@
-import { Field, SegmentedControl } from "@/shared/ui";
+import { ChoiceGroup, Field } from "@/shared/ui";
 
 type PermissionMode = "ask" | "auto";
 
@@ -19,12 +19,11 @@ export function AgentPermissionsField(props: {
   return (
     <Field label="Default permissions">
       <div className="grid gap-1.5">
-        <SegmentedControl
+        <ChoiceGroup
           label="Default permissions"
           value={props.value}
           options={options}
           onChange={props.onChange}
-          size="sm"
         />
         <span className="text-xs text-cream-muted">
           {props.value === "ask"

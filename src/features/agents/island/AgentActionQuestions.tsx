@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Button, ErrorNotification } from "@/shared/ui";
+import { Button } from "@/shared/ui";
+import { ErrorNotice } from "../conversations/ErrorNotice";
 import {
   actionQuestionHasDetails,
   actionQuestionText,
@@ -46,7 +47,6 @@ export function AgentActionQuestions() {
             actions={
               <>
                 <Button
-                  size="sm"
                   variant="primary"
                   disabled={closed}
                   onClick={() => answer(question.id, true)}
@@ -54,21 +54,11 @@ export function AgentActionQuestions() {
                   Accept and continue
                 </Button>
                 {question.rememberable && question.origin ? (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={closed}
-                    onClick={() => answer(question.id, true, true)}
-                  >
+                  <Button disabled={closed} onClick={() => answer(question.id, true, true)}>
                     Accept and remember
                   </Button>
                 ) : null}
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={closed}
-                  onClick={() => answer(question.id, false)}
-                >
+                <Button disabled={closed} onClick={() => answer(question.id, false)}>
                   Deny
                 </Button>
               </>
@@ -81,7 +71,8 @@ export function AgentActionQuestions() {
                 [
                   question.reason,
                   question.rememberable && question.origin
-                    ? `Remember: ${actionQuestionVerb(question)} on ${question.origin}. Applies when the chat is in Auto.`
+                    ? `Remember: ${actionQuestionVerb(question)} on ${question.origin}. ` +
+                      "Applies when the chat is in Auto."
                     : "",
                 ]
                   .filter(Boolean)
@@ -98,7 +89,7 @@ export function AgentActionQuestions() {
           </StatusTable>
         );
       })}
-      <ErrorNotification message={error} onDismiss={() => setError("")} />
+      <ErrorNotice message={error} onDismiss={() => setError("")} />
     </div>
   );
 }

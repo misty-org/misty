@@ -1,15 +1,12 @@
 import { createContext, useContext, useMemo, useState, type ComponentProps } from "react";
-import { TableProperties } from "lucide-react";
+import { Columns3, RotateCcw, TableProperties } from "lucide-react";
 import { IconButton } from "../../controls/IconButton";
 import {
   DropdownMenu,
-  DropdownMenuCheckboxItem,
   DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "../../overlays/DropdownMenu";
+import { MenuCheckItem, MenuItem, MenuLabel, MenuSeparator } from "../../overlays/MenuItem";
 import { cn } from "../../classNames";
 
 type ColumnSchema = { id: string; columns: { key: string; label: string }[] };
@@ -29,7 +26,7 @@ export function CollectionPage({ className, ...props }: ComponentProps<"div">) {
       <div
         className={cn(
           "flex h-full min-h-0 min-w-0 flex-col gap-4 overflow-y-auto bg-charcoal-workspace",
-          "px-4 pb-5 sm:px-6 text-cream misty-transient-scrollbar",
+          "px-4 pb-5 text-cream",
           className,
         )}
         {...props}
@@ -51,13 +48,15 @@ export function CollectionColumnChooser() {
         </IconButton>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuLabel>Columns</DropdownMenuLabel>
+        <MenuLabel>Columns</MenuLabel>
         {schema.columns.map((column) => (
-          <DropdownMenuCheckboxItem
+          <MenuCheckItem
             key={column.key}
+            icon={Columns3}
+            label={column.label}
             checked={!excluded.includes(column.key)}
+            // The name says which row is which, so it can't be hidden.
             disabled={column.key === "name"}
-            onSelect={(event) => event.preventDefault()}
             onCheckedChange={(checked) =>
               setHidden((current) => ({
                 ...current,
@@ -66,17 +65,15 @@ export function CollectionColumnChooser() {
                   : [...(current[schema.id] ?? []), column.key],
               }))
             }
-          >
-            {column.label}
-          </DropdownMenuCheckboxItem>
+          />
         ))}
-        <DropdownMenuSeparator />
-        <DropdownMenuItem
+        <MenuSeparator />
+        <MenuItem
+          icon={RotateCcw}
+          label="Reset columns"
           disabled={!excluded.length}
           onSelect={() => setHidden((current) => ({ ...current, [schema.id]: [] }))}
-        >
-          Reset columns
-        </DropdownMenuItem>
+        />
       </DropdownMenuContent>
     </DropdownMenu>
   );

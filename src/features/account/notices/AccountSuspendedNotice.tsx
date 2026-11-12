@@ -4,7 +4,7 @@ import {
   useAccountSuspension,
 } from "@/api/client/accountLimits";
 import { currentApiBase, mistyCloudServer, mistyWebsite } from "@/api/deployment/serverChoice";
-import { Button, Notification } from "@/shared/ui";
+import { useNotice } from "@/shared/ui";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { useEffect, useState } from "react";
 import { useAuth } from "../sessions/authState";
@@ -41,7 +41,8 @@ export function AccountSuspendedNotice() {
   const notSetUp = useAccountNotSetUp((state) => state.notSetUp);
   const { user } = useAuth();
   const accountId = user?.id;
-  const [dismissed, setDismissed] = useState(false);
+  // Read at once, so a notice already dismissed on this computer never flashes up.
+  const [dismissed, setDismissed] = useState(() => (accountId ? wasDismissed(accountId) : false));
   useEffect(() => {
     if (!accountId) return;
     setDismissed(wasDismissed(accountId));
@@ -50,38 +51,24 @@ export function AccountSuspendedNotice() {
   useEffect(() => {
     if (accountId && hasDevices) rememberDismissed(accountId, false);
   }, [accountId, hasDevices]);
-  if (!user) return null;
   const dismiss = () => {
-    rememberDismissed(user.id, true);
+    if (accountId) rememberDismissed(accountId, true);
     setDismissed(true);
   };
-  if (!suspended) {
-    if (!notSetUp || dismissed) return null;
-    return currentApiBase() === mistyCloudServer() ? (
-      <Notification onDismiss={dismiss}>
-        This account doesn&apos;t have Misty Pro.
-        <br />
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={() => void openUrl(`${mistyWebsite()}/pricing`)}
-        >
-          Get Misty Pro
-        </Button>
-      </Notification>
-    ) : (
-      <Notification onDismiss={dismiss}>
-        This account isn&apos;t set up yet. Ask whoever runs your Misty server.
-      </Notification>
-    );
-  }
-  return (
-    <Notification
-      tone="error"
-      onDismiss={() => useAccountSuspension.setState({ suspended: false })}
-    >
-      {accountLimitMessages.account_suspended}
-    </Notification>
-  );
+  const onCloud = currentApiBase() === mistyCloudServer();
+  useNotice(Boolean(user) && !suspended && notSetUp && !dismissed, {
+    message: onCloud
+      ? "This account doesn't have Misty Pro."
+      : "This account isn't set up yet. Ask whoever runs your Misty server.",
+    action: onCloud
+      ? { label: "Get Misty Pro", onSelect: () => void openUrl(`${mistyWebsite()}/pricing`) }
+      : undefined,
+    onDismiss: dismiss,
+  });
+  useNotice(Boolean(user) && suspended, {
+    message: accountLimitMessages.account_suspended,
+    tone: "error",
+    onDismiss: () => useAccountSuspension.setState({ suspended: false }),
+  });
+  return null;
 }

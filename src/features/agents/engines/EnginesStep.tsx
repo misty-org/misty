@@ -44,8 +44,7 @@ export function EnginesStep({
         {first.map(row)}
       </ul>
       <Button
-        variant="ghost"
-        size="sm"
+        variant="quiet"
         className="justify-self-start text-cream-muted"
         aria-expanded={more}
         onClick={() => setMore((open) => !open)}

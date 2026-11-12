@@ -66,14 +66,8 @@ fn recovery_directory(
     deployment: &str,
     account: &str,
 ) -> Result<std::path::PathBuf, String> {
-    // A development profile has its own recovery, even for the same account.
-    let profile = std::env::var("MISTY_PROFILE").ok();
     let identity = hex::encode(Sha256::digest(
-        match &profile {
-            Some(profile) => serde_json::to_vec(&(deployment, account, profile)),
-            None => serde_json::to_vec(&(deployment, account)),
-        }
-        .map_err(|_| "Invalid workspace identity")?,
+        serde_json::to_vec(&(deployment, account)).map_err(|_| "Invalid workspace identity")?,
     ));
     // Under Misty's data folder with everything else. (A recovery database from an
     // earlier layout was sealed with a key that no longer exists, so it is not reused.)

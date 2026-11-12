@@ -1,5 +1,6 @@
 import type { LibraryEditDefinition } from "../../api/dto/common";
 import { Button, Input } from "@/shared/ui";
+import { Gauge } from "lucide-react";
 import type { Dispatch, SetStateAction } from "react";
 import { LibrarySelect } from "../SpaceLibraryPrimitives";
 
@@ -63,13 +64,13 @@ export function LibraryVideoTrimControls({
             onChange((current) => ({ ...current, playback_speed: Number(value) }))
           }
           label="Speed"
+          icon={Gauge}
           options={speedOptions}
         />
       </label>
       <Button
         className="self-end"
-        size="sm"
-        variant="outline"
+        variant="secondary"
         type="button"
         onClick={() => onChange((current) => ({ ...current, mute: !current.mute }))}
       >

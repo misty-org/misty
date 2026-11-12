@@ -72,8 +72,6 @@ const app = {
       env: {
         ...process.env,
         MISTY_DATA_ROOT: dataRoot,
-        MISTY_PROFILE: "smoke",
-        MISTY_DESKTOP_PROFILE: "smoke",
         MISTY_DESKTOP_DEV_PORT: "5199",
         MISTY_BROWSER_EVAL_BRIDGE_PORT: "47123",
         // Until a server is chosen, a dev build talks to this one, never the shared dev stack.

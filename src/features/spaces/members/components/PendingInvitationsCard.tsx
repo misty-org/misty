@@ -1,6 +1,6 @@
 import { spacesApi } from "../../api/api";
 import type { SpaceInvitation } from "../../api/dto/entities";
-import { Button, Card, IconButton } from "@/shared/ui";
+import { Button, Card, IconButton, OverflowFadeText } from "@/shared/ui";
 import { Link2, XCircle } from "lucide-react";
 import { useState } from "react";
 
@@ -44,15 +44,17 @@ export function PendingInvitationsCard({
           key={invitation.id}
         >
           <div className="min-w-0 flex-1">
-            <p className="m-0 truncate text-sm">{invitation.invited_email}</p>
+            <OverflowFadeText as="p" full className="m-0 text-sm">
+              {invitation.invited_email}
+            </OverflowFadeText>
             <p className="mb-0 mt-0.5 text-xs text-cream-muted">
               {expiresLabel(invitation.expires_at)}
             </p>
           </div>
           <Button
-            size="sm"
-            variant="outline"
+            variant="secondary"
             type="button"
+            icon={Link2}
             disabled={Boolean(busyAction)}
             onClick={() =>
               run(`link:${invitation.id}`, () =>
@@ -63,11 +65,9 @@ export function PendingInvitationsCard({
               )
             }
           >
-            <Link2 className="size-3.5" />
             New link
           </Button>
           <IconButton
-            size="md"
             label={`Revoke invitation for ${invitation.invited_email}`}
             disabled={Boolean(busyAction)}
             onClick={() =>

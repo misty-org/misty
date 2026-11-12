@@ -1,8 +1,8 @@
-import { isReservedShortcut, shortcutFromEvent } from "@/shared/shortcuts/bindings";
-import type { ReassignShortcutRequest, UpdateShortcutRequest } from "@/native/ipc";
+import type { UpdateShortcutRequest } from "@/native/ipc";
 import { Button, SearchField, SkeletonList } from "@/shared/ui";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Keyboard } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import {
   DesktopSettingsNotice,
   DesktopSettingsRow as SettingsRow,
@@ -10,21 +10,30 @@ import {
 } from "@/features/settings";
 import { booleanSetting, DropdownControl, SwitchControl } from "../../settings/SettingsControls";
 import type { SettingsContentProps } from "../../settings/settingsTypes";
-import { type CaptureTarget, ShortcutCommandRow } from "./ShortcutCommandRow";
+import { ShortcutCommandRow, type ShortcutConflict } from "./ShortcutCommandRow";
 import { findShortcutConflict, groupShortcutsByCategory } from "./shortcutSettingsModel";
 import { settingsDisabledControlClass } from "../../settings/settingsConstants";
 
-interface PendingConflict extends ReassignShortcutRequest {
+/** A recorded shortcut that another command already uses, waiting for Reassign. */
+interface PendingConflict {
+  commandId: string;
+  value: string;
+  conflictingCommandId: string;
+  conflictingSlot: "primary" | "alternate";
   message: string;
+}
+
+/** While a shortcut is recorded, the app's own shortcuts stand aside (runtime.tsx reads this). */
+function holdAppShortcuts(recording: boolean) {
+  if (recording) document.documentElement.dataset.shortcutCapture = "true";
+  else delete document.documentElement.dataset.shortcutCapture;
 }
 
 export function ShortcutsSection(props: SettingsContentProps) {
   const snapshot = props.shortcuts;
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("");
-  const [capture, setCapture] = useState<CaptureTarget | null>(null);
-  const [captureError, setCaptureError] = useState<string | null>(null);
-  const [pendingConflict, setPendingConflict] = useState<PendingConflict | null>(null);
+  const [conflict, setConflict] = useState<PendingConflict | null>(null);
   const [lastUndo, setLastUndo] = useState<UpdateShortcutRequest[] | null>(null);
 
   const definitions = useMemo(
@@ -56,95 +65,62 @@ export function ShortcutsSection(props: SettingsContentProps) {
     });
   }, [bindingsById, definitions, query]);
 
-  useEffect(
-    () => () => {
-      delete document.documentElement.dataset.shortcutCapture;
-    },
-    [],
-  );
+  useEffect(() => () => holdAppShortcuts(false), []);
 
-  const stopCapture = () => {
-    delete document.documentElement.dataset.shortcutCapture;
-    setCapture(null);
-    setCaptureError(null);
-    setPendingConflict(null);
-  };
-
-  const beginCapture = (target: CaptureTarget) => {
-    document.documentElement.dataset.shortcutCapture = "true";
-    setCapture(target);
-    setCaptureError(null);
-    setPendingConflict(null);
-  };
-
-  const updateBinding = async (request: UpdateShortcutRequest) => {
-    const current = bindingsById.get(request.commandId);
-    setLastUndo(
-      current
-        ? [{ commandId: request.commandId, slot: request.slot, value: current[request.slot] }]
-        : null,
-    );
-    stopCapture();
-    await props.onShortcutChange(request);
-  };
-
-  const record = (event: KeyboardEvent, target: CaptureTarget) => {
-    // A modifier on its own is the start of a chord, not a mistake.
-    if (["Meta", "Control", "Alt", "Shift"].includes(event.key)) return;
-    if (event.key === "Escape") {
-      stopCapture();
-      return;
-    }
-    if (event.key === "Backspace" || event.key === "Delete") {
-      void updateBinding({ ...target, value: null });
-      return;
-    }
-    const value = shortcutFromEvent(event);
-    if (!value) {
-      setCaptureError("Add a non-modifier key to finish the shortcut.");
-      return;
-    }
-    const reserved = isReservedShortcut(value, snapshot?.detectedPlatform ?? "linux");
-    if (reserved) {
-      setCaptureError(reserved);
-      return;
-    }
-
-    const conflict = findShortcutConflict(target, value, definitions, bindingsById);
-    if (conflict) {
-      setPendingConflict({
-        ...target,
+  /** Each command has one shortcut, recorded in its field; the field already left recording. */
+  const record = (commandId: string, value: string | null) => {
+    const previous = bindingsById.get(commandId)?.primary ?? null;
+    if (value) {
+      const clash = findShortcutConflict(
+        { commandId, slot: "primary" },
         value,
-        conflictingCommandId: conflict.commandId,
-        conflictingSlot: conflict.slot,
-        message: `${value} is already used by ${conflict.label} in ${conflict.scope}.`,
-      });
-      setCaptureError(null);
-      return;
+        definitions,
+        bindingsById,
+      );
+      if (clash) {
+        setConflict({
+          commandId,
+          value,
+          conflictingCommandId: clash.commandId,
+          conflictingSlot: clash.slot,
+          message: `${value} is already used by ${clash.label} in ${clash.scope}.`,
+        });
+        return;
+      }
     }
-    void updateBinding({ ...target, value });
+    setConflict(null);
+    setLastUndo([{ commandId, slot: "primary", value: previous }]);
+    void props.onShortcutChange({ commandId, slot: "primary", value });
   };
 
-  // Listen on the window while a shortcut is being recorded. A button does not
-  // take focus when clicked in every webview, and Settings closes on Escape from
-  // the window, so recording must see each key first and keep it to itself.
-  const recordRef = useRef(record);
-  recordRef.current = record;
-  const conflictOpen = useRef(false);
-  conflictOpen.current = pendingConflict !== null;
-  useEffect(() => {
-    if (!capture) return;
-    const onKeyDown = (event: KeyboardEvent) => {
-      // With a conflict showing, only Escape is recording's: Tab and Enter must
-      // still reach the Reassign and Cancel buttons.
-      if (conflictOpen.current && event.key !== "Escape") return;
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      recordRef.current(event, capture);
-    };
-    window.addEventListener("keydown", onKeyDown, true);
-    return () => window.removeEventListener("keydown", onKeyDown, true);
-  }, [capture]);
+  const reassign = (pending: PendingConflict) => {
+    const conflicting = bindingsById.get(pending.conflictingCommandId);
+    setLastUndo([
+      {
+        commandId: pending.commandId,
+        slot: "primary",
+        value: bindingsById.get(pending.commandId)?.primary ?? null,
+      },
+      {
+        commandId: pending.conflictingCommandId,
+        slot: pending.conflictingSlot,
+        value: conflicting?.[pending.conflictingSlot] ?? null,
+      },
+    ]);
+    setConflict(null);
+    void props.onShortcutReassign({
+      commandId: pending.commandId,
+      slot: "primary",
+      value: pending.value,
+      conflictingCommandId: pending.conflictingCommandId,
+      conflictingSlot: pending.conflictingSlot,
+    });
+  };
+
+  const conflictFor = (commandId: string): ShortcutConflict | null =>
+    conflict?.commandId === commandId
+      ? { message: conflict.message, onReassign: () => reassign(conflict) }
+      : null;
 
   const categories = useMemo(
     () => groupShortcutsByCategory(definitions).map(([name]) => name),
@@ -155,34 +131,6 @@ export function ShortcutsSection(props: SettingsContentProps) {
   const shown = query.trim()
     ? filtered
     : filtered.filter((definition) => definition.category === shownCategory);
-  const problemFor = (commandId: string) => {
-    if (capture?.commandId !== commandId) return null;
-    if (pendingConflict)
-      return {
-        message: pendingConflict.message,
-        onCancel: stopCapture,
-        onReassign: () => {
-          const { message: _message, ...request } = pendingConflict;
-          const targetBinding = bindingsById.get(request.commandId);
-          const conflictBinding = bindingsById.get(request.conflictingCommandId);
-          setLastUndo([
-            {
-              commandId: request.commandId,
-              slot: request.slot,
-              value: targetBinding?.[request.slot] ?? null,
-            },
-            {
-              commandId: request.conflictingCommandId,
-              slot: request.conflictingSlot,
-              value: conflictBinding?.[request.conflictingSlot] ?? null,
-            },
-          ]);
-          stopCapture();
-          void props.onShortcutReassign(request);
-        },
-      };
-    return captureError ? { message: captureError } : null;
-  };
 
   return (
     <>
@@ -209,13 +157,12 @@ export function ShortcutsSection(props: SettingsContentProps) {
             label="Shortcut category"
             value={shownCategory}
             disabled={!snapshot || Boolean(query.trim())}
-            options={categories.map((name) => ({ value: name, label: name }))}
+            options={categories.map((name) => ({ value: name, label: name, icon: Keyboard }))}
             onValueChange={setCategory}
           />
           <Button
             type="button"
-            variant="outline"
-            size="sm"
+            variant="secondary"
             className={settingsDisabledControlClass}
             disabled={props.working || !snapshot?.overrides?.length}
             onClick={() => {
@@ -231,8 +178,7 @@ export function ShortcutsSection(props: SettingsContentProps) {
             action={
               <Button
                 type="button"
-                variant="ghost"
-                size="sm"
+                variant="quiet"
                 onClick={() => {
                   const requests = lastUndo;
                   setLastUndo(null);
@@ -263,11 +209,13 @@ export function ShortcutsSection(props: SettingsContentProps) {
                 definition={definition}
                 binding={binding}
                 platform={snapshot.detectedPlatform}
-                capture={capture}
-                problem={problemFor(definition.id)}
+                conflict={conflictFor(definition.id)}
                 disabled={props.working}
-                onBegin={beginCapture}
-                onClear={(target) => void updateBinding({ ...target, value: null })}
+                onRecordingChange={(recording) => {
+                  holdAppShortcuts(recording);
+                  if (recording) setConflict(null);
+                }}
+                onChange={(value) => record(definition.id, value)}
                 onRestore={() => void props.onResetShortcuts({ commandId: definition.id })}
               />
             );

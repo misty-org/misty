@@ -1,130 +1,176 @@
-import { readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
 
+import {
+  nextUiBaseline,
+  parseUiBaseline,
+  uiExceptionsBaselinePath,
+  uiRuleTotals,
+} from "./uiBaseline.ts";
+import {
+  allRules,
+  cssRules,
+  sharedUiRuleIds,
+  uiRules,
+  type AppUiRuleId,
+  type CssRuleId,
+  type UiRule,
+  type UiRuleId,
+  type UiViolationCounts,
+  type UiViolationMap,
+} from "./uiRuleDefinitions.ts";
+
 /**
- * App-wide UI rules. Code outside src/shared/ui composes shared components instead of
- * restyling or re-implementing them. Existing debt is listed in ui-exceptions-baseline.json,
- * which may only shrink.
+ * The design protocol in AGENTS.md, as lint. Code outside src/shared/ui composes shared components
+ * instead of restyling or re-implementing them, and shared UI itself keeps to the type scale, the
+ * tokens and Misty's tooltip. Existing debt is counted per file and rule in
+ * ui-exceptions-baseline.json, and those counts may only go down.
+ *
+ * The rules are in uiRuleDefinitions.ts (with their counters in uiRuleCounters.ts and the JSX tag
+ * scanner in uiRuleJsx.ts), the baseline in uiBaseline.ts. This file decides which files get which
+ * rules, counts them, and is the command that rewrites the baseline.
+ *
+ * It runs under plain Node (`--write-baseline`), so these files import nothing but Node itself.
  */
-export const uiRules = {
-  "raw-control": {
-    pattern: /<(?:button|input|select|textarea)\b/,
-    guidance: "use Button, IconButton, Input, Select, or Textarea from @/shared/ui",
-  },
-  "full-screen-overlay": {
-    pattern: /\bfixed\s+inset-0\b/,
-    guidance: "use Dialog, Sheet, or WorkspaceOverlay",
-  },
-  portal: {
-    pattern: /\bcreatePortal\s*\(/,
-    guidance: "let the overlay primitive own its portal",
-  },
-  "z-index-literal": {
-    pattern: /\bz-\[\d{4,}\]/,
-    guidance: "use a named layer token",
-  },
-  "popup-class": {
-    pattern:
-      /\b(?:menu(?:Item|List|Label|Shortcut|Content|Indicator|IndicatorItem|Separator)Class|popup(?:Surface|Motion)Class|popoverContentClass)\b/,
-    guidance: "build rows with MenuItem inside a DropdownMenu instead of popup class strings",
-  },
-  "popover-menu": {
-    pattern: /<PopoverContent\b(?:(?!<\/PopoverContent>)[\s\S])*?role="menu"/,
-    guidance: "a popup that lists actions is a DropdownMenu, not a Popover",
-  },
-  "manual-menu-chevron": {
-    pattern:
-      /<(DropdownMenuTrigger|PopoverTrigger)\b(?:(?!<\/\1>)[\s\S])*?<Chevron(?:Down|Up|sUpDown)\b/,
-    guidance: "use MenuTrigger; it owns the chevron",
-  },
-  "popup-animation-off": {
-    // motion-reduce:animate-none is an accessibility preference, not a disabled popup.
-    pattern: /(?<!motion-reduce:)\banimate-none\b/,
-    guidance: "popups keep the shared open/close motion",
-  },
-  "popup-surface-override": {
-    pattern: new RegExp(
-      "<(?:DropdownMenuContent|DropdownMenuSubContent|ContextMenuContent|ContextMenuSubContent" +
-        "|PopoverContent|SelectContent)\\b[^>]*className=[^>]*\\b(?:bg-|rounded-|shadow-|ring-|border-)",
-    ),
-    guidance: "popup surfaces are fixed; set width, height, or alignment only",
-  },
-  "icon-only-button": {
-    pattern: /<Button\b(?:[^>]|=>)*?\bsize="icon/,
-    guidance: "use IconButton for icon-only buttons",
-  },
-  "button-restyle": {
-    // Surfaces whose look is their content (cards, rows, tabs) use Pressable instead.
-    pattern:
-      /<(?:Button|IconButton)\b(?:[^>]|=>)*?className=(?:"|\{[^}]*")[^"]*(?<![\w[-])(?:[a-z-]+:)*(?:bg-|rounded|shadow-|ring-|border-(?!0\b))/,
-    guidance: "pick a Button or IconButton variant, size, or shape; use Pressable for surfaces",
-  },
-  "unsized-button": {
-    pattern: /<Button\b(?![^>]*variant="link")(?:[^>]|=>)*?\bsize="none"/,
-    guidance: "use a Button size, IconButton, or Pressable; only links drop the size",
-  },
-  "hand-rolled-spinner": {
-    pattern: /<(?:Loader2|LoaderCircle)\b[^>]*animate-spin/,
-    guidance: "use Spinner",
-  },
-  "all-caps": {
-    // A class token inside a string on one line, so prose that says "uppercase" is fine.
-    pattern: /["'`](?:[^"'`\n]*\s)?(?:[a-z-]+:)*(?:uppercase|small-caps)(?=[\s"'`])/,
-    guidance: "write sentence case; keep only real acronyms in capitals",
-  },
-  "font-size-literal": {
-    pattern: /\btext-\[\d+(?:\.\d+)?px\]/,
-    guidance: "use the type scale in src/styles/theme.css (text-3xs to text-3xl)",
-  },
-  "hex-color": {
-    pattern: /-\[#[0-9a-fA-F]{3,8}\]/,
-    guidance: "use theme color tokens instead of hex values",
-  },
-} as const;
 
-export type UiRuleId = keyof typeof uiRules;
+export { attributeValue, jsxOpeningTags } from "./uiRuleJsx.ts";
+export {
+  cssRules,
+  sharedUiRuleIds,
+  uiRuleGuidance,
+  uiRuleIds,
+  uiRules,
+  type AppUiRuleId,
+  type CssRuleId,
+  type UiRuleId,
+  type UiViolationCounts,
+  type UiViolationMap,
+} from "./uiRuleDefinitions.ts";
+export {
+  nextUiBaseline,
+  parseUiBaseline,
+  uiExceptionsBaselinePath,
+  uiRuleTotals,
+  type BaselineUpdate,
+  type UiBaseline,
+} from "./uiBaseline.ts";
 
-/** Theme palettes are data, not styling, and may spell out hex colors. */
-const themeData = /(?:settings\/store\/appTheme)\.ts$/;
+// ---------------------------------------------------------------------------------------------
+// Which files get which rules.
 
-export function uiViolations(path: string, text: string): UiRuleId[] {
-  return (Object.keys(uiRules) as UiRuleId[]).filter((id) => {
-    if (id === "hex-color" && themeData.test(path)) return false;
-    return uiRules[id].pattern.test(text);
-  });
+export type UiRuleScope = "app" | "shared" | "css";
+
+export function uiRuleScope(path: string): UiRuleScope | null {
+  if (/\.test\.tsx?$/.test(path) || path.endsWith(".d.ts") || path.startsWith("src/tests/")) {
+    return null;
+  }
+  if (path.endsWith(".css")) {
+    if (!path.startsWith("src/") || path.startsWith("src/styles/")) return null;
+    return path.startsWith("src/shared/ui/") ? null : "css";
+  }
+  if (!/^src\/.*\.tsx?$/.test(path)) return null;
+  return path.startsWith("src/shared/ui/") ? "shared" : "app";
 }
 
+/** Kept for callers of the old API: true for app code that the tsx rules cover. */
 export function isUiRuleSubject(path: string): boolean {
-  return (
-    /^src\/.*\.tsx?$/.test(path) &&
-    !path.startsWith("src/shared/ui/") &&
-    !path.startsWith("src/tests/") &&
-    !/\.test\.tsx?$/.test(path) &&
-    !path.endsWith(".d.ts")
-  );
+  return uiRuleScope(path) === "app";
 }
 
-export const uiExceptionsBaselinePath =
-  "src/tests/architecture/fixtures/ui-exceptions-baseline.json";
+function rulesFor(scope: UiRuleScope): UiRuleId[] {
+  if (scope === "css") return Object.keys(cssRules) as CssRuleId[];
+  if (scope === "shared") return [...sharedUiRuleIds];
+  return Object.keys(uiRules) as AppUiRuleId[];
+}
 
-function collect(root: string, directory: string, found: Record<string, UiRuleId[]>) {
+/**
+ * Block comments and whole-line or trailing `//` comments, so prose about a rule ("never
+ * truncate") doesn't count against it. A `//` right after a colon (`https://`) is kept.
+ */
+function withoutComments(text: string, css: boolean): string {
+  const blank = (part: string) => part.replace(/[^\n]/g, " ");
+  const blocks = text.replace(/\/\*[\s\S]*?\*\//g, blank);
+  return css ? blocks : blocks.replace(/(?<=^|\s)\/\/[^\n]*/gm, blank);
+}
+
+function countRule(rule: UiRule, text: string, path: string): number {
+  if (rule.allow?.some((allowed) => allowed.test(path))) return 0;
+  if (rule.jsx && !path.endsWith(".tsx")) return 0;
+  if (rule.count) return rule.count(text, path);
+  if (!rule.pattern) return 0;
+  return text.match(rule.pattern)?.length ?? 0;
+}
+
+/** How many times each rule fires in one file; rules that don't fire are left out. */
+export function uiViolationCounts(path: string, text: string): UiViolationCounts {
+  const scope = uiRuleScope(path);
+  if (!scope) return {};
+  const source = withoutComments(text, scope === "css");
+  const counts: UiViolationCounts = {};
+  for (const id of rulesFor(scope)) {
+    const count = countRule(allRules[id], source, path);
+    if (count > 0) counts[id] = count;
+  }
+  return counts;
+}
+
+/** The rule ids that fire in one file. */
+export function uiViolations(path: string, text: string): UiRuleId[] {
+  return Object.keys(uiViolationCounts(path, text)) as UiRuleId[];
+}
+
+function walkSource(root: string, directory: string, paths: string[]) {
   for (const entry of readdirSync(directory, { withFileTypes: true })) {
     if (entry.name.startsWith(".") || entry.name === "node_modules") continue;
     const absolute = join(directory, entry.name);
-    if (entry.isDirectory()) collect(root, absolute, found);
-    const path = relative(root, absolute).split("\\").join("/");
-    if (!entry.isFile() || !isUiRuleSubject(path)) continue;
-    const violations = uiViolations(path, readFileSync(absolute, "utf8"));
-    if (violations.length) found[path] = violations;
+    if (entry.isDirectory()) walkSource(root, absolute, paths);
+    else if (entry.isFile()) paths.push(relative(root, absolute).split("\\").join("/"));
+  }
+  return paths;
+}
+
+/** Every rule subject under src with its counts, sorted by path. */
+export function collectUiViolations(root: string): UiViolationMap {
+  const found: UiViolationMap = {};
+  const paths = walkSource(root, join(root, "src"), []).filter((path) => uiRuleScope(path));
+  for (const path of paths.sort()) {
+    const counts = uiViolationCounts(path, readFileSync(join(root, path), "utf8"));
+    if (Object.keys(counts).length) found[path] = counts;
   }
   return found;
 }
 
-/** Regenerate the baseline: `node src/tests/architecture/uiRules.ts --write-baseline` from the repo root. */
+/**
+ * Regenerate the baseline: `node src/tests/architecture/uiRules.ts --write-baseline` from the
+ * repo root. Lowered counts are written; rises in known rules are printed and refused (the
+ * command then exits 1); a rule new in this run starts from what it finds today.
+ */
 if (process.argv.includes("--write-baseline")) {
   const root = process.cwd();
-  const found = collect(root, join(root, "src"), {});
-  const sorted = Object.fromEntries(Object.entries(found).sort(([a], [b]) => a.localeCompare(b)));
-  writeFileSync(join(root, uiExceptionsBaselinePath), `${JSON.stringify(sorted, null, 2)}\n`);
-  console.log(`${Object.keys(sorted).length} files with UI exceptions`);
+  const baselineFile = join(root, uiExceptionsBaselinePath);
+  const previous = parseUiBaseline(
+    existsSync(baselineFile) ? JSON.parse(readFileSync(baselineFile, "utf8")) : {},
+  );
+  const update = nextUiBaseline(previous, collectUiViolations(root));
+  writeFileSync(baselineFile, `${JSON.stringify(update.baseline, null, 2)}\n`);
+
+  const newIds = Object.keys(update.newRules);
+  if (newIds.length) {
+    console.log(`New rules, recorded from today's code:`);
+    for (const id of newIds) console.log(`  ${id}: ${update.newRules[id as UiRuleId]}`);
+  }
+  if (update.lowered.length) {
+    console.log(`Lowered (${update.lowered.length}):`);
+    for (const line of update.lowered) console.log(`  ${line}`);
+  }
+  console.log("Per rule (hits in files):");
+  for (const [id, total] of Object.entries(uiRuleTotals(update.baseline.files))) {
+    console.log(`  ${id}: ${total.hits} in ${total.files}`);
+  }
+  console.log(`${Object.keys(update.baseline.files).length} files with UI exceptions`);
+  if (update.refused.length) {
+    console.error(`Refused, above the baseline (fix these; the baseline never grows):`);
+    for (const line of update.refused) console.error(`  ${line}`);
+    process.exitCode = 1;
+  }
 }

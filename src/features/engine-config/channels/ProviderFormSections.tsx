@@ -4,7 +4,7 @@
 import { ChevronDown, Cloud, Globe } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { EngineMark, hasEngineMark } from "../EngineMark";
-import { Button, cn, Input, Textarea, Pressable } from "@/shared/ui";
+import { Button, cn, Input, Textarea, Pressable, OverflowFadeText } from "@/shared/ui";
 import { BrandMark } from "../brands/BrandMark";
 import type { EngineId } from "./engines";
 import {
@@ -47,7 +47,7 @@ function Labelled({ label, children }: { label: string; children: ReactNode }) {
 function PresetMark({ preset }: { preset: ProviderPreset }) {
   if (preset.mark) return <BrandMark mark={preset.mark} size={16} />;
   return (
-    <span className="flex size-4 shrink-0 items-center justify-center rounded bg-cream/10 text-3xs font-semibold text-cream">
+    <span className="flex size-4 shrink-0 items-center justify-center rounded bg-cream/10 text-micro font-semibold text-cream">
       {preset.name.charAt(0).toUpperCase()}
     </span>
   );
@@ -72,7 +72,7 @@ function OfficialPresetSection({
         onClick={onSelect}
         className={cn(choice(official), "w-full gap-3 p-3")}
       >
-        <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-charcoal-card">
+        <span className="flex size-8 shrink-0 items-center justify-center">
           {hasEngineMark(engine) ? (
             <EngineMark engine={engine} size={16} />
           ) : (
@@ -118,7 +118,7 @@ function RelayPresetSection({
           className={choice(!official && !matchedPreset)}
         >
           <Globe className="size-4 shrink-0" aria-hidden />
-          <span className="truncate">Custom</span>
+          <OverflowFadeText full>Custom</OverflowFadeText>
         </Pressable>
         {presets.map((preset) => (
           <Pressable
@@ -128,7 +128,7 @@ function RelayPresetSection({
             className={choice(matchedPreset?.name === preset.name)}
           >
             <PresetMark preset={preset} />
-            <span className="truncate">{preset.name}</span>
+            <OverflowFadeText full>{preset.name}</OverflowFadeText>
           </Pressable>
         ))}
       </div>
@@ -152,19 +152,13 @@ function FetchModelsControl({
 }) {
   return (
     <div className="flex min-w-0 items-center gap-2">
-      <Button
-        type="button"
-        size="xs"
-        variant="outline"
-        onClick={onFetch}
-        disabled={fetching || disabled}
-      >
+      <Button type="button" size="sm" onClick={onFetch} disabled={fetching || disabled}>
         {fetching ? "Fetching models" : "Fetch models"}
       </Button>
       {error ? (
-        <span className="truncate text-xs text-cream-muted" role="alert">
+        <OverflowFadeText full role="alert" className="text-xs text-cream-muted">
           {error}
-        </span>
+        </OverflowFadeText>
       ) : count > 0 ? (
         <span className="text-xs text-cream-muted">
           {count === 1 ? "1 model" : `${count} models`}
@@ -325,8 +319,8 @@ export function ClaudeFormSections({ engine, form }: { engine: EngineId; form: P
         <div className="flex items-center justify-between gap-2">
           <Button
             type="button"
-            variant="ghost"
-            size="xs"
+            variant="quiet"
+            size="sm"
             aria-expanded={jsonOpen}
             onClick={() => setJsonOpen((open) => !open)}
             className="-ml-2 text-sm text-cream"
@@ -337,7 +331,7 @@ export function ClaudeFormSections({ engine, form }: { engine: EngineId; form: P
             />
             JSON config
           </Button>
-          <Button type="button" size="xs" variant="outline" onClick={form.handleFormatJson}>
+          <Button type="button" size="sm" onClick={form.handleFormatJson}>
             Format
           </Button>
         </div>
@@ -414,7 +408,7 @@ export function CodexFormSections({
       <div className="grid gap-2">
         <div className="flex items-center justify-between gap-2">
           <p className={sectionLabel}>auth.json</p>
-          <Button type="button" size="xs" variant="outline" onClick={form.handleFormatAuthJson}>
+          <Button type="button" size="sm" onClick={form.handleFormatAuthJson}>
             Format
           </Button>
         </div>

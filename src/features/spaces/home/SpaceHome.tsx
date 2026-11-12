@@ -6,16 +6,15 @@ import { setItemVisibility, type ItemVisibility } from "../api/visibility";
 import { useAuth } from "@/features/account";
 import { OrderedCollectionFilters } from "@/features/settings/OrderedCollectionFilters";
 import {
-  Button,
   CollectionHeading,
   CollectionItems,
   CollectionPage,
   CollectionSearch,
   CollectionSkeleton,
   CollectionViewToggle,
-  ErrorNotification,
-  ContextMenuAction,
+  MenuItem,
   useCollectionRefinement,
+  useNotice,
 } from "@/shared/ui";
 import { useRangeSelection } from "@/shared/hooks/useRangeSelection";
 import { confirmAction } from "@/shared/lib/confirmAction";
@@ -168,10 +167,10 @@ export function SpaceHome({ space, journal = false }: { space: Space; journal?: 
       .map((key) => refinement.items.find((candidate) => candidate.key === key))
       .filter((candidate): candidate is GalleryItem => Boolean(candidate?.remove));
     return (
-      <ContextMenuAction
-        icon={<Trash2 />}
+      <MenuItem
+        icon={Trash2}
         label={removalLabel(targets)}
-        destructive
+        danger
         disabled={deleting}
         onSelect={() => void removeItems(targets)}
       />
@@ -201,12 +200,28 @@ export function SpaceHome({ space, journal = false }: { space: Space; journal?: 
     }
   };
 
+  useNotice(Boolean(deleteError), {
+    message: deleteError,
+    tone: "error",
+    onDismiss: () => setDeleteError(""),
+  });
+  useNotice(Boolean(openError), {
+    message: openError,
+    tone: "error",
+    onDismiss: () => setOpenError(""),
+  });
+  useNotice(showItems && gallery.failed.length > 0, {
+    message: `Couldn't load ${gallery.failed.join(" and ")}. The rest is shown.`,
+    tone: "error",
+    action: { label: "Retry", onSelect: gallery.reload },
+  });
+
   return (
     <CollectionPage className="bg-charcoal-bg">
       <CollectionHeading
         title={journal ? "Journal" : <SpaceSwitcher space={space} />}
-        actions={
-          <>
+        end={
+          <div className="flex min-w-0 items-center gap-2">
             <CollectionSearch
               aria-label={journal ? "Search the journal" : "Search this Space"}
               placeholder="Search"
@@ -219,7 +234,7 @@ export function SpaceHome({ space, journal = false }: { space: Space; journal?: 
               only={journal ? journalKinds : undefined}
             />
             {!journal && <SpaceOptionsMenu space={space} />}
-          </>
+          </div>
         }
       />
       {!showItems && (
@@ -250,19 +265,6 @@ export function SpaceHome({ space, journal = false }: { space: Space; journal?: 
               />
             }
           />
-          <ErrorNotification message={deleteError} onDismiss={() => setDeleteError("")} />
-          <ErrorNotification message={openError} onDismiss={() => setOpenError("")} />
-          <ErrorNotification
-            message={
-              gallery.failed.length > 0
-                ? `Couldn't load ${gallery.failed.join(" and ")}. The rest is shown.`
-                : ""
-            }
-          >
-            <Button type="button" variant="ghost" size="sm" onClick={gallery.reload}>
-              Retry
-            </Button>
-          </ErrorNotification>
           {gallery.loading ? (
             <CollectionSkeleton label="Space contents" view={view} />
           ) : view === "grid" ? (
@@ -290,6 +292,7 @@ export function SpaceHome({ space, journal = false }: { space: Space; journal?: 
             </div>
           ) : (
             <CollectionItems
+              listIcons
               columnSetId="space-home"
               view={view}
               sortResetKey={refinement.sortKey}
@@ -308,8 +311,8 @@ export function SpaceHome({ space, journal = false }: { space: Space; journal?: 
                   ),
                   category: label,
                   selectable: Boolean(item.remove),
-                  contextMenu: itemMenu(item),
-                  onContextMenuOpen: () => selection.pickForMenu(item.key),
+                  menu: itemMenu(item),
+                  onMenuOpen: () => selection.pickForMenu(item.key),
                   creator: maker(item.creatorId || undefined),
                   updatedAt: item.updatedAt,
                   updated: editedLabel(item.updatedAt),

@@ -12,7 +12,7 @@ import {
 import type { ReactNode } from "react";
 import {
   ContextMenu,
-  ContextMenuAction,
+  MenuItem,
   ContextMenuContent,
   ContextMenuSeparator,
   ContextMenuTrigger,
@@ -64,53 +64,47 @@ export function ChangesFileMenu(props: {
     <ContextMenu modal={false}>
       <ContextMenuTrigger asChild>{props.children}</ContextMenuTrigger>
       <ContextMenuContent aria-label={props.entry.path} width="md">
-        <ContextMenuAction
-          icon={<FileText className="size-4" />}
+        <MenuItem
+          icon={FileText}
           label="Open file"
           disabled={deleted}
           onSelect={() => openChangedFile(path)}
         />
         {HTML_RE.test(path) ? (
-          <ContextMenuAction
-            icon={<Globe className="size-4" />}
+          <MenuItem
+            icon={Globe}
             label="Open in browser"
             disabled={deleted}
             onSelect={() => props.run("open-in-browser", () => filesApi.openInBrowser(path))}
           />
         ) : null}
         <ContextMenuSeparator />
-        <ContextMenuAction
-          icon={
-            props.actionKind === "stage" ? (
-              <Plus className="size-4" />
-            ) : (
-              <Minus className="size-4" />
-            )
-          }
+        <MenuItem
+          icon={props.actionKind === "stage" ? Plus : Minus}
           label={props.actionKind === "stage" ? "Stage" : "Unstage"}
           onSelect={() => props.onAction(props.entry.path)}
         />
         {props.onDiscard ? (
-          <ContextMenuAction
-            icon={<Undo2 className="size-4" />}
+          <MenuItem
+            icon={Undo2}
             label="Discard changes"
-            destructive
+            danger
             onSelect={() => props.onDiscard?.(props.entry.path)}
           />
         ) : null}
         <ContextMenuSeparator />
-        <ContextMenuAction
-          icon={<Link2 className="size-4" />}
+        <MenuItem
+          icon={Link2}
           label="Copy path"
           onSelect={() => props.run("copy-path", () => navigator.clipboard.writeText(path))}
         />
-        <ContextMenuAction
-          icon={<MessageSquarePlus className="size-4" />}
+        <MenuItem
+          icon={MessageSquarePlus}
           label="Send to chat"
           onSelect={() => sendPathToComposer(props.folder, path, false)}
         />
-        <ContextMenuAction
-          icon={<FolderOpen className="size-4" />}
+        <MenuItem
+          icon={FolderOpen}
           label={revealLabel()}
           disabled={deleted}
           onSelect={() => props.run("reveal", () => filesApi.reveal(path))}

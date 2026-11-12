@@ -1,5 +1,6 @@
 import { Html } from "@react-three/drei";
 import { Check, Loader, X } from "lucide-react";
+import { OverflowFadeText } from "@/shared/ui";
 import type { BoardRow } from "../studioTalk";
 import { Box, Cyl } from "./parts";
 
@@ -40,7 +41,7 @@ export function Whiteboard(props: {
             return (
               <li key={row.agentId} data-state={row.state}>
                 <Icon size={14} strokeWidth={2.6} aria-hidden="true" />
-                <span>{props.names.get(row.agentId) ?? "An agent"}</span>
+                <OverflowFadeText>{props.names.get(row.agentId) ?? "An agent"}</OverflowFadeText>
               </li>
             );
           })}

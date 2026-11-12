@@ -12,7 +12,7 @@ export function RecoveryAction(props: {
   const Icon = props.icon;
   return (
     <div className="grid min-h-[76px] grid-cols-[36px_minmax(0,1fr)_auto] items-center gap-3 bg-charcoal-card p-4 max-[680px]:grid-cols-[36px_minmax(0,1fr)]">
-      <span className="grid size-9 place-items-center rounded-md bg-charcoal-bg text-cream-muted">
+      <span className="grid size-9 place-items-center text-cream-muted">
         <Icon className="size-4" />
       </span>
       <span className="min-w-0">
@@ -21,7 +21,8 @@ export function RecoveryAction(props: {
       </span>
       <Button
         className="min-w-32 max-[680px]:col-span-2 max-[680px]:w-full"
-        variant={props.emphasized ? "default" : "outline"}
+        // Armed for a second click, it fills, so the confirm reads as the step to take.
+        variant={props.emphasized ? "primary" : "secondary"}
         onClick={props.onClick}
       >
         {props.action}

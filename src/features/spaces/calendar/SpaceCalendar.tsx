@@ -1,5 +1,5 @@
 import { confirmAction } from "@/shared/lib/confirmAction";
-import { Button, ErrorNotification, IconButton, SegmentedControl } from "@/shared/ui";
+import { Button, ChoiceGroup, IconButton, useNotice } from "@/shared/ui";
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { openExternalLink } from "@/shared/platform/openExternalLink";
 import { useEffect, useMemo, useState } from "react";
@@ -86,6 +86,8 @@ export function SpaceCalendar({ spaceId }: { spaceId: string }) {
     if (await calendar.remove(event)) setEditing(undefined);
   };
   const View = view === "month" ? CalendarMonth : CalendarAgenda;
+  const error = calendar.error || planner.error || connected.error;
+  useNotice(Boolean(error), { message: error, tone: "error" });
 
   return (
     <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] bg-charcoal-bg">
@@ -104,10 +106,10 @@ export function SpaceCalendar({ spaceId }: { spaceId: string }) {
         <span className="min-w-32 text-sm text-cream" aria-live="polite">
           {monthTitle(anchor)}
         </span>
-        <Button type="button" size="sm" variant="ghost" onClick={() => setAnchor(new Date())}>
+        <Button type="button" variant="quiet" onClick={() => setAnchor(new Date())}>
           Today
         </Button>
-        <SegmentedControl
+        <ChoiceGroup
           className="ml-auto"
           label="Calendar view"
           value={view}
@@ -118,8 +120,7 @@ export function SpaceCalendar({ spaceId }: { spaceId: string }) {
           onChange={setView}
         />
         <CalendarConnections onChange={connected.reload} />
-        <Button type="button" size="sm" onClick={() => newEvent(dayKey(new Date()))}>
-          <Plus aria-hidden="true" />
+        <Button type="button" icon={Plus} onClick={() => newEvent(dayKey(new Date()))}>
           New event
         </Button>
       </div>
@@ -150,7 +151,6 @@ export function SpaceCalendar({ spaceId }: { spaceId: string }) {
           onSave={async (input) => Boolean(await planner.update(task, input))}
         />
       ) : null}
-      <ErrorNotification message={calendar.error || planner.error || connected.error} />
     </div>
   );
 }

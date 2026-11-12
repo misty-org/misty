@@ -17,6 +17,7 @@ vi.mock("../sessions/useAccountStore", () => ({
 vi.mock("./useServerSwitch", () => ({ useServerSwitch: () => ({ moveTo: mocks.moveTo }) }));
 
 import { useServerChoice } from "@/api/deployment/serverChoice";
+import { NoticeViewport } from "@/shared/ui";
 import { CloudScreen } from "./CloudScreen";
 import { useSetupLinkStore } from "./setupLinkStore";
 
@@ -25,7 +26,12 @@ const answer = { user_id: "account-a", username: "ada", email: "ada@misty.exampl
 
 async function submit(address: string) {
   const onRedeemed = vi.fn();
-  render(<CloudScreen onRedeemed={onRedeemed} onBusy={vi.fn()} />);
+  render(
+    <>
+      <NoticeViewport />
+      <CloudScreen onRedeemed={onRedeemed} onBusy={vi.fn()} />
+    </>,
+  );
   fireEvent.change(screen.getByLabelText("Sign-in link"), { target: { value: address } });
   fireEvent.change(screen.getByLabelText("Setup key"), { target: { value: key } });
   await act(async () => fireEvent.click(screen.getByRole("button", { name: "Continue" })));
@@ -52,7 +58,7 @@ it("stays on the current server when the new one refuses the key", async () => {
   expect(mocks.redeemOn).toHaveBeenCalledWith("https://other.misty.example/v1", key);
   expect(mocks.moveTo).not.toHaveBeenCalled();
   expect(onRedeemed).not.toHaveBeenCalled();
-  expect(screen.getByText("This setup key is not valid.")).toBeTruthy();
+  expect(await screen.findByText("This setup key is not valid.")).toBeTruthy();
 });
 
 it("stays on the current server when the new one doesn't answer", async () => {

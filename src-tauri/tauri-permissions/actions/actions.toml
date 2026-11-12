@@ -156,10 +156,6 @@ permissions = [
   "allow-browser-downloads-remove",
   "allow-browser-retired-profiles-erase",
   "allow-browser-runtime-for-scope",
-  "allow-browser-choose-download-directory",
-  "allow-browser-set-download-directory",
-  "allow-browser-set-download-prompt",
-  "allow-browser-set-hidden-tab-sleep",
   "allow-browser-set-night-light",
   "allow-browser-shortcuts-update",
   "allow-browser-site-icon",
@@ -190,7 +186,6 @@ permissions = [
   "allow-browser-webviews-set-notice-rects",
   "allow-browser-webviews-set-overlay-active",
   "allow-browser-webviews-set-pointer-tracking",
-  "allow-browser-webviews-set-status-bubble",
   "allow-browser-webviews-show-only",
 ]
 
@@ -263,11 +258,7 @@ identifier = "action-model-keys"
 description = "Save and remove model keys"
 permissions = [
   "allow-model-keys-add",
-  "allow-model-keys-chatgpt-sign-in",
-  "allow-model-keys-chatgpt-sign-out",
-  "allow-model-keys-chatgpt-status",
   "allow-model-keys-models",
-  "allow-model-keys-openrouter-sign-in",
   "allow-model-keys-remove",
   "allow-model-keys-save",
   "allow-model-keys-saved",
@@ -513,7 +504,6 @@ permissions = [
   "allow-agent-catalog-list",
   "allow-agent-catalog-prompt",
   "allow-bot-bundle-export",
-  "allow-bot-bundle-import",
   "allow-computer-use-open-permission-settings",
   "allow-computer-use-permission-status",
   "allow-computer-use-stop",

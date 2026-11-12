@@ -63,10 +63,10 @@ export function PickedElementCard({
         )}
       </dl>
       <div className="preview-card-actions">
-        <Button type="button" variant="ghost" size="sm" onClick={onClear}>
+        <Button type="button" variant="quiet" onClick={onClear}>
           Clear
         </Button>
-        <Button type="button" size="sm" onClick={onSend} disabled={sent}>
+        <Button type="button" onClick={onSend} disabled={sent}>
           {sent ? <Check size={14} /> : <SendHorizontal size={14} />}
           <span>{sent ? "Added to your message" : "Send to agent"}</span>
         </Button>

@@ -52,12 +52,7 @@ export function LedgerTable({
     onResume(next, [id]);
   };
   const retryAll = (
-    <Button
-      variant="primary"
-      size="sm"
-      disabled={working || !open.length}
-      onClick={() => onResume(rows)}
-    >
+    <Button variant="primary" disabled={working || !open.length} onClick={() => onResume(rows)}>
       Retry unfinished
     </Button>
   );
@@ -88,15 +83,10 @@ export function LedgerTable({
                   placeholder="A link, a detail, or what to try"
                   onChange={(event) => setHint(event.target.value)}
                 />
-                <Button type="submit" size="sm" variant="primary" disabled={working}>
+                <Button type="submit" variant="primary" disabled={working}>
                   Send
                 </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => setAsking(undefined)}
-                >
+                <Button type="button" variant="quiet" onClick={() => setAsking(undefined)}>
                   Cancel
                 </Button>
               </form>
@@ -110,7 +100,6 @@ export function LedgerTable({
                 {row.needs === "takeover" || taken.has(row.id) ? (
                   taken.has(row.id) ? (
                     <Button
-                      size="sm"
                       variant="primary"
                       disabled={working}
                       onClick={() => onResume(rows, [row.id])}
@@ -119,8 +108,7 @@ export function LedgerTable({
                     </Button>
                   ) : (
                     <Button
-                      size="sm"
-                      variant="ghost"
+                      variant="quiet"
                       onClick={() => {
                         if (conversationId) setBrowserExpanded(conversationId, true);
                         setTaken(new Set(taken).add(row.id));
@@ -130,25 +118,14 @@ export function LedgerTable({
                     </Button>
                   )
                 ) : null}
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  disabled={working}
-                  onClick={() => onResume(rows, [row.id])}
-                >
+                <Button variant="quiet" disabled={working} onClick={() => onResume(rows, [row.id])}>
                   Retry
                 </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  disabled={working}
-                  onClick={() => setAsking(row.id)}
-                >
+                <Button variant="quiet" disabled={working} onClick={() => setAsking(row.id)}>
                   Retry with a hint
                 </Button>
                 <Button
-                  size="sm"
-                  variant="ghost"
+                  variant="quiet"
                   disabled={working}
                   onClick={() =>
                     onChange(change(row.id, { state: "skipped", reason: "Skipped by you." }))

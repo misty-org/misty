@@ -1,9 +1,11 @@
 import { useContext, useEffect, useState, type MouseEvent } from "react";
-import { CollectionItemsGrid } from "./CollectionCards";
+import { OverflowFadeText } from "../../layout/OverflowFadeText";
+import { CollectionCreator, CollectionItemsGrid } from "./CollectionCards";
 import { CollectionColumnsContext } from "./CollectionColumns";
 import { CollectionItemsTable, type CollectionSort } from "./CollectionItemsTable";
 import {
   compareCollectionValues,
+  hasItemActions,
   type CollectionColumn,
   type CollectionItem,
 } from "./collectionItemTypes";
@@ -20,6 +22,8 @@ export function CollectionItems({
   sortResetKey = "",
   stickyActions = false,
   gridLayout = "preview",
+  listIcons = false,
+  cardTitleLines = 1,
   selectedIds = [],
   onSelect,
 }: {
@@ -38,10 +42,17 @@ export function CollectionItems({
   stickyActions?: boolean;
   /** Compact cards suit icon-based catalogs; preview cards emphasize artwork. */
   gridLayout?: "preview" | "compact";
+  /**
+   * List rows start with the item's icon in a framed tile, in its tone, and the title may take
+   * two lines. Off, rows are 32px and start with their text.
+   */
+  listIcons?: boolean;
+  /** How many lines a compact card's title may take before it fades. */
+  cardTitleLines?: 1 | 2;
   selectedIds?: string[];
   onSelect?: (event: MouseEvent, id: string, onOpen: () => void) => void;
 }) {
-  const hasActions = items.some((item) => item.actions);
+  const hasActions = items.some(hasItemActions);
   const hasCreators = items.some((item) => item.creator !== undefined);
   const scope = [
     columnSetId ?? "",
@@ -69,9 +80,9 @@ export function CollectionItems({
             key: "creator",
             label: creatorLabel,
             render: (item: CollectionItem) => (
-              <span title={item.creatorDescription} className="block max-w-48 truncate">
+              <CollectionCreator description={item.creatorDescription} className="max-w-48">
                 {item.creator || "Unknown"}
-              </span>
+              </CollectionCreator>
             ),
             sortValue: (item: CollectionItem) => item.creator,
           },
@@ -80,7 +91,7 @@ export function CollectionItems({
     {
       key: "updated",
       label: "Last activity",
-      render: (item) => <span className="text-xs">{item.updated}</span>,
+      render: (item) => <span className="text-meta">{item.updated}</span>,
       sortValue: (item) => (item.updatedAt ? Date.parse(item.updatedAt) : undefined),
     },
   ];
@@ -88,9 +99,9 @@ export function CollectionItems({
     key: `metadata:${label}`,
     label,
     render: (item) => (
-      <span className="block max-w-48 truncate" title={String(item.metadata?.[label] ?? "")}>
-        {item.metadata?.[label] ?? "—"}
-      </span>
+      <OverflowFadeText full className="max-w-48">
+        {String(item.metadata?.[label] ?? "—")}
+      </OverflowFadeText>
     ),
     sortValue: (item) => item.sortValues?.[label] ?? item.metadata?.[label],
   }));
@@ -134,6 +145,7 @@ export function CollectionItems({
         hasCreators={hasCreators}
         creatorLabel={creatorLabel}
         layout={gridLayout}
+        titleLines={cardTitleLines}
         selectedIds={selectedIds}
         onSelect={onSelect}
       />
@@ -145,6 +157,7 @@ export function CollectionItems({
       metadataColumns={visibleMetadataColumns}
       hasActions={hasActions}
       stickyActions={stickyActions}
+      icons={listIcons}
       sort={activeSort}
       onSort={(next: CollectionSort | null) => setSort(next && { ...next, scope })}
       selectedIds={selectedIds}

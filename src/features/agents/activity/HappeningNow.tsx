@@ -1,7 +1,7 @@
 import { Eye, Hand, Square } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type { AgentProfile } from "@/shared/schemas";
-import { Button } from "@/shared/ui";
+import { Button, OverflowFadeText } from "@/shared/ui";
 import { useContextPanel } from "../context-panel/contextPanelStore";
 import type { GlobalAiConversation } from "../conversations/state/conversationTypes";
 import { AgentAvatar } from "../personal/AgentAvatar";
@@ -169,32 +169,27 @@ export function HappeningNow(props: {
               <div className="activity-now-body">
                 <h3 className="activity-now-title">{chat?.title?.trim() || "New chat"}</h3>
                 <p className="activity-now-line">
-                  <span className="truncate">{line}</span>
+                  <OverflowFadeText full>{line}</OverflowFadeText>
                   <Elapsed since={run.startedAt} />
                 </p>
                 <p className="activity-now-agent">
                   <AgentAvatar agent={agent} compact />
-                  <span className="truncate">{agent?.name ?? "Agent"}</span>
+                  <OverflowFadeText full>{agent?.name ?? "Agent"}</OverflowFadeText>
                 </p>
                 <div className="activity-now-actions">
                   {waiting ? (
-                    <Button size="sm" onClick={() => open(run, onBrowser ? "browser" : "steps")}>
+                    <Button onClick={() => open(run, onBrowser ? "browser" : "steps")}>
                       <Hand aria-hidden="true" />
                       Help now
                     </Button>
                   ) : (
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onClick={() => open(run, onBrowser ? "browser" : "steps")}
-                    >
+                    <Button onClick={() => open(run, onBrowser ? "browser" : "steps")}>
                       <Eye aria-hidden="true" />
                       Watch
                     </Button>
                   )}
                   <Button
-                    size="sm"
-                    variant="ghost"
+                    variant="quiet"
                     disabled={stopping.has(run.runId)}
                     onClick={() => void stop(run)}
                   >

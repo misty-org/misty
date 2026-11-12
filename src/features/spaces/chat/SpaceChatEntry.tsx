@@ -17,7 +17,7 @@ import {
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogTitle,
-  ErrorNotification,
+  useNotice,
 } from "@/shared/ui";
 import { useSpaceConversations } from "./sidebar/useSpaceConversations";
 import { SpaceChat } from "./SpaceChat";
@@ -57,6 +57,11 @@ export function SpaceChatEntry(props: React.ComponentProps<typeof SpaceChat>) {
     [data.conversations, isOwner],
   );
   const selection = useRangeSelection(deletableConversationIds);
+  useNotice(Boolean(deleteError), {
+    message: deleteError,
+    tone: "error",
+    onDismiss: () => setDeleteError(""),
+  });
   const confirmDelete = async () => {
     if (!deleting) return;
     try {
@@ -72,7 +77,8 @@ export function SpaceChatEntry(props: React.ComponentProps<typeof SpaceChat>) {
     if (bulkDeleting || !isOwner || !ids.length) return;
     if (
       !(await confirmAction(
-        `Delete ${ids.length} selected ${ids.length === 1 ? "channel" : "channels"} and their messages for everyone? This can't be undone.`,
+        `Delete ${ids.length} selected ${ids.length === 1 ? "channel" : "channels"} and their ` +
+          "messages for everyone? This can't be undone.",
       ))
     )
       return;
@@ -136,7 +142,6 @@ export function SpaceChatEntry(props: React.ComponentProps<typeof SpaceChat>) {
         <AlertDialogContent>
           <AlertDialogTitle>Delete this channel?</AlertDialogTitle>
           <AlertDialogDescription>Its messages are deleted for everyone.</AlertDialogDescription>
-          <ErrorNotification message={deleteError} onDismiss={() => setDeleteError("")} />
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
