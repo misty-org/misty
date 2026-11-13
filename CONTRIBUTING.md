@@ -8,7 +8,7 @@
 | `src-tauri/` | The Tauri app in Rust. Each feature, with its macOS, Windows and Linux code, tests and worker programs, is in `src-tauri/features/<feature>/`. |
 | `src-tauri/features/kiri/` | Kiri, the native layer that adds the web APIs the system webviews leave out. |
 | `tasks/` | The dev runner behind `npm run tauri` and the Node tests for the scripts the app injects into pages. |
-| `.githooks/` | The commit checks. There is no hosted CI. |
+| `.githooks/` | The public-history guard the pre-push hook runs. The commit checks themselves live in misty-cli; there is no hosted CI. |
 
 ## Prerequisites
 
@@ -35,16 +35,18 @@ To run a server and the rest of the stack locally, check out
 [misty-cli](https://github.com/misty-org/misty-cli) beside this repository. misty-cli's README
 covers setup, the local server stack and releases.
 
-Turn on the git hooks once per clone:
+Turn on the git hooks once, with the misty CLI from
+[misty-cli](https://github.com/misty-org/misty-cli). It installs them in every checkout beside this
+one:
 
 ```sh
-git config core.hooksPath .githooks
+misty hook install
 ```
 
 ## Checks
 
 Every commit runs a secret scan of the staged changes and the test suites the change touches. Run
-them by hand with `.githooks/checks.sh frontend|scripts|rust-desktop|all`.
+them by hand with `misty hook run frontend|scripts|rust-desktop|all`.
 
 - `npm run check` covers formatting, types, lint, the frontend tests, the script tests and the
   dependency audit.
