@@ -2,7 +2,7 @@ import { routes } from "@/app/shell";
 import { useNativeSessionStore } from "@/features/account";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { useEffect } from "react";
-import { Outlet, useLocation } from "react-router";
+import { Outlet, useLocation } from "react-router-dom";
 
 const appPageTitles = new Map<string, string>([
   [routes.spaces, "Misty - Spaces"],

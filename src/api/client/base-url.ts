@@ -1,7 +1,7 @@
 /**
- * API configuration values are full API bases. Versioned paths such as
- * /api/v2 and /v1 are preserved verbatim. Origin-only values remain supported
- * for older desktop settings and receive the legacy /api default.
+ * API configuration values are full API bases, such as https://api.mistysys.com/v1. A server
+ * answers only under /v1, so older settings that saved the bare origin or the retired /api
+ * prefix get /v1 instead.
  */
 export function normalizeApiBaseUrl(value: unknown): string | null {
   if (typeof value !== "string") return null;
@@ -11,7 +11,7 @@ export function normalizeApiBaseUrl(value: unknown): string | null {
 
 export function withDefaultApiPath(base: string | null): string {
   if (!base) return "";
-  return /\/(?:api(?:\/v\d+)?|v\d+)$/i.test(base) ? base : `${base}/api`;
+  return /\/v\d+$/i.test(base) ? base : `${base.replace(/\/api$/i, "")}/v1`;
 }
 
 /**

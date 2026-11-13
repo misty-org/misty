@@ -37,7 +37,7 @@ export type ClaudeModelSlot = (typeof CLAUDE_MODEL_SLOTS)[number]["slot"];
 /** The default settings.json template for a new Claude Code channel. A start passes only its
  *  `model`, `alwaysThinkingEnabled` and `env` to the CLI; the rest is kept for the person's own
  *  reference and for CC Switch round trips. */
-export function buildDefaultClaudeSettings(): Record<string, unknown> & {
+function buildDefaultClaudeSettings(): Record<string, unknown> & {
   env: Record<string, string>;
 } {
   return {

@@ -20,7 +20,7 @@ export type ChoiceRowProps = {
  * One answer to choose: its words, a line about it, and a checkmark at the right once chosen.
  * Rows live in a ChoiceList, which gives them their group and hairlines.
  */
-export function ChoiceRow({
+function ChoiceRow({
   selected,
   multiple,
   label,

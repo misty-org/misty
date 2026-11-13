@@ -12,7 +12,7 @@ import tseslint from "typescript-eslint";
  * mutually opaque: they talk to each other through `index.ts` only.
  *
  * Architectural, state-safety, and readability rules are release-blocking.
- * The reset has no migration-warning baseline: every finding is an error.
+ * There is no warning baseline: every finding is an error.
  */
 const REFACTOR = "error";
 
@@ -68,14 +68,10 @@ export default tseslint.config(
       "**/.output/**",
       "vendor/**",
       "src-tauri/**",
-      // Tooling and scratch trees that are not application source.
+      // Tooling that is not application source.
       ".config/**",
-      ".agents/**",
-      ".claude/**",
-      ".codex/**",
-      ".impeccable/**",
       "docs/**",
-      "cli/tasks/**",
+      "tasks/**",
       "*.config.js",
       "*.config.ts",
       // Vendored, minified third-party bundles.

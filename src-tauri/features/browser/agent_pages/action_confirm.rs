@@ -1,4 +1,4 @@
-//! Stop before paying, sending, deleting or posting (roadmap C2). The agent's
+//! Stop before paying, sending, deleting or posting. The agent's
 //! page step waits here, natively, until the person allows or refuses it in
 //! the control island. In Auto, a send, delete or publish on a site the person
 //! remembered for this agent continues; payments always ask, since the device

@@ -73,7 +73,7 @@ export function initialWorkspaceWindow(): WorkspaceWindowsState {
 }
 
 /** This OS window as agents see it, named after its profile. */
-export function currentWindow(state: WorkspaceWindowsState): WorkspaceWindow {
+function currentWindow(state: WorkspaceWindowsState): WorkspaceWindow {
   const { profile } = useProfileWindowStore.getState();
   return {
     id: state.activeWindowId,

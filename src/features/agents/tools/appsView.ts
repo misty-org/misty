@@ -6,9 +6,9 @@ import type { ActiveAccount, ComposioSearch } from "./appsTools";
  */
 
 /** The model sees at most this much of one app result. */
-export const appsResultLimit = 48 << 10;
+const appsResultLimit = 48 << 10;
 
-export function truncated(value: string, limit: number) {
+function truncated(value: string, limit: number) {
   const characters = Array.from(value);
   if (characters.length <= limit) return value;
   return `${characters

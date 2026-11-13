@@ -4,7 +4,7 @@ import type { StudioState } from "./useStudioAgents";
 /** How long an agent stays at its desk after its run stops, in case another follows at once. */
 export const LINGER_MS = 10_000;
 
-export interface Shown {
+interface Shown {
   state: StudioState;
   doing: string;
   doingCode: string;

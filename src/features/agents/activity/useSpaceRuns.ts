@@ -7,7 +7,7 @@ import { activityApi, type RunRow } from "./activityApi";
 import { useRunEvents } from "./useRunSteps";
 
 /** The chats of the window's Space that hold the person's own work: Tutor's live in Tutor. */
-export function useSpaceChats(): GlobalAiConversation[] {
+function useSpaceChats(): GlobalAiConversation[] {
   const conversations = useMistyStore((state) => state.conversations);
   const tutorChats = useTutorChatIds();
   return useMemo(

@@ -21,7 +21,7 @@ export function fold(text: string): string {
   return out;
 }
 
-export function queryWords(query: string): string[] {
+function queryWords(query: string): string[] {
   return fold(query).split(/\s+/).filter(Boolean);
 }
 

@@ -7,7 +7,7 @@ import { hasTauriInternals } from "@/shared/platform/tauri";
  * out they file under this fixed scope; an account that signs in on this computer can take over what's
  * there once its person agrees (`adoptSignedOutAgents`), so signing in need lose no chat.
  */
-export const signedOutAgentAccount = "local";
+const signedOutAgentAccount = "local";
 
 export const agentAccountId = (): string => useUserStore.getState().me?.id ?? signedOutAgentAccount;
 

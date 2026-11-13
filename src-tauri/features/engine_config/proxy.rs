@@ -6,7 +6,8 @@
 //
 // desktop-cc-gui applies the proxy to its own process environment, so every child inherits it.
 // Misty never changes its process environment (other threads read it while it runs): the engines
-// get the variables through `env_for`, and Misty's clients through `apply_to_client`.
+// get the variables through `engines::channels::env_for`, and Misty's clients through
+// `apply_to_client`.
 
 use std::collections::HashMap;
 

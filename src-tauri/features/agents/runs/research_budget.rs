@@ -106,7 +106,7 @@ fn stage_for(cost: usize, scale: usize) -> ResearchStage {
 /// A long request earns a longer budget: one base allowance for every step of the run's own
 /// checklist (log_work_checklist) or every requirement listed from the request, whichever is more,
 /// never less than one nor more than twenty. A quick question has no checklist and keeps the base
-/// budget; a six-part task gets about 36 lookups before the wrap-up note
+/// budget; a six-part task gets about 36 lookups before the wrap-up note.
 pub(crate) fn budget_scale(messages: &[Message]) -> usize {
     let mut steps = HashSet::new();
     // The requirements Misty listed from a long request (`requirements_review.rs`) count too: a run

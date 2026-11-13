@@ -21,7 +21,7 @@ export function terminalFontFamily(): string {
 }
 
 /** xterm reads only hex and rgb() colors; anything else (color-mix, oklch) is passed over. */
-export function xtermColor(value: string): string | undefined {
+function xtermColor(value: string): string | undefined {
   const color = value.trim();
   return /^#(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(color) || /^rgba?\(/i.test(color)
     ? color

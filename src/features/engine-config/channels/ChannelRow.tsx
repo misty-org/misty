@@ -32,7 +32,7 @@ function hostOf(url: string): string {
 }
 
 /** A neutral monogram for a channel. */
-export function ChannelAvatar({ name }: { name: string }) {
+function ChannelAvatar({ name }: { name: string }) {
   return (
     <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-charcoal-card text-xs font-semibold text-cream">
       {name.charAt(0).toUpperCase() || "?"}

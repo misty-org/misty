@@ -83,7 +83,7 @@ const weights: Record<string, number> = {
   Apps: 0.7,
 };
 
-export interface SearchContext {
+interface SearchContext {
   query: SearchQuery;
   kind: SearchKind;
   /** Opens a page of the window in the focused pane. */
@@ -91,7 +91,7 @@ export interface SearchContext {
   onNewChat(): void;
 }
 
-export interface SearchResults {
+interface SearchResults {
   /** Ranked, best first. */
   hits: SearchHit[];
   /** Sources still answering, so the list can show where more is coming. */

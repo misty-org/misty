@@ -24,7 +24,7 @@ const MOST_CHATS = 6;
  * are working or waiting on the person, and opens one here when the person picks it there. Only
  * macOS has the panel. Mounted once per main window.
  */
-export function useTrayAgents(onOpenChat: (agentId: string, chatId: string) => void): void {
+function useTrayAgents(onOpenChat: (agentId: string, chatId: string) => void): void {
   const statuses = useChatStatuses();
   const conversations = useMistyStore((state) => state.conversations);
   const agents = usePersonalAgentsStore((state) => state.agents);

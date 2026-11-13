@@ -7,7 +7,7 @@ import { captureApi, type VoiceNoteMode, type VoiceSourceKind, type VoiceTurn } 
 import { savedTurns } from "./transcriptTurns";
 
 /** What to listen to. */
-export interface CaptureSource {
+interface CaptureSource {
   kind: Exclude<VoiceSourceKind, "library_item" | "tab">;
   title: string;
   url?: string;
@@ -59,7 +59,7 @@ interface Running {
 
 let running: Running | undefined;
 
-export function decodePcm(base64: string) {
+function decodePcm(base64: string) {
   const binary = atob(base64);
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);

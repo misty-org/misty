@@ -1,6 +1,6 @@
-//! Running JavaScript in a person's own app window (debug builds only), for the smoke test in
-//! `evals/smoke/`. It reaches the app's real modules the way the interface does, so sign-in, keys
-//! and messages take their real paths. Website tabs are refused: `/evaluate` is the way into those.
+//! Running JavaScript in a person's own app window (debug builds only), for the acceptance specs.
+//! It reaches the app's real modules the way the interface does, so sign-in, keys and messages
+//! take their real paths. Website tabs are refused.
 use super::*;
 
 const MAX_WAIT: Duration = Duration::from_secs(600);
@@ -19,24 +19,6 @@ struct WindowEval {
     window: Option<String>,
     #[serde(default)]
     timeout_ms: Option<u64>,
-}
-
-/// Lists the person's windows, so a caller can name one.
-pub(super) async fn windows(
-    AxumState(bridge): AxumState<Bridge>,
-    headers: HeaderMap,
-    body: Bytes,
-) -> Response {
-    if let Err(response) = request::<Value>(&bridge, &headers, &body) {
-        return response;
-    }
-    let labels: Vec<String> = bridge
-        .app
-        .webviews()
-        .into_keys()
-        .filter(|label| is_person_window(label))
-        .collect();
-    reply(Ok(json!({ "windows": labels })))
 }
 
 /// Runs the script and answers with what it returned, once its promise settles.

@@ -44,7 +44,7 @@ const removalVerb = (items: GalleryItem[]) => {
 };
 
 /** The menu's label: "Delete", or with a count when it acts on several ("Delete 3 items"). */
-export function removalLabel(items: GalleryItem[]): string {
+function removalLabel(items: GalleryItem[]): string {
   const verb = removalVerb(items);
   if (items.length < 2) return verb;
   const count = `${items.length} items`;
@@ -52,7 +52,7 @@ export function removalLabel(items: GalleryItem[]): string {
 }
 
 /** What the person is asked before anything is removed. */
-export function removalQuestion(items: GalleryItem[]): string {
+function removalQuestion(items: GalleryItem[]): string {
   const what = items.length === 1 ? `“${items[0].title}”` : `${items.length} items`;
   switch (removalVerb(items)) {
     case "Delete":

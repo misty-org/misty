@@ -25,7 +25,8 @@ const describePlan = (plan: ActionBarPlan) =>
     `shrink:${plan.shrinkWidth ?? "-"}`,
   ].join(" ");
 
-const planAt = (available: number, list = items) => planActionBar({ available, items: list, more, end });
+const planAt = (available: number, list = items) =>
+  planActionBar({ available, items: list, more, end });
 
 describe("ActionBar give-way order", () => {
   it("is lowest priority first, the rightmost first among equals", () => {
@@ -42,16 +43,15 @@ describe("ActionBar give-way order", () => {
 
   it("does not depend on the order the items are listed in memory", () => {
     const first = actionBarGiveWayOrder(items);
-    for (let round = 0; round < 5; round += 1) expect(actionBarGiveWayOrder([...items])).toEqual(first);
+    for (let round = 0; round < 5; round += 1)
+      expect(actionBarGiveWayOrder([...items])).toEqual(first);
   });
 });
 
 describe("planActionBar", () => {
   it("gives way in the fixed order: labels, then the shrink item, then folding", () => {
     // Full row: 80 + 160 + 70 + 90 + 32 and four gaps of 4 = 448.
-    expect(describePlan(planAt(448))).toBe(
-      "attach:full model:full mode:full engine:full shrink:-",
-    );
+    expect(describePlan(planAt(448))).toBe("attach:full model:full mode:full engine:full shrink:-");
     // Labels go lowest priority first; the shrink item keeps its label.
     expect(describePlan(planAt(447))).toBe("attach:full model:full mode:icon engine:full shrink:-");
     expect(describePlan(planAt(389))).toBe("attach:full model:full mode:icon engine:icon shrink:-");
@@ -59,8 +59,12 @@ describe("planActionBar", () => {
     // Every label is gone but the shrink item's: it fades down to its minimum.
     // Others: 32 * 3 + 32 + four gaps = 144.
     expect(describePlan(planAt(304))).toBe("attach:icon model:full mode:icon engine:icon shrink:-");
-    expect(describePlan(planAt(303))).toBe("attach:icon model:full mode:icon engine:icon shrink:159");
-    expect(describePlan(planAt(224))).toBe("attach:icon model:full mode:icon engine:icon shrink:80");
+    expect(describePlan(planAt(303))).toBe(
+      "attach:icon model:full mode:icon engine:icon shrink:159",
+    );
+    expect(describePlan(planAt(224))).toBe(
+      "attach:icon model:full mode:icon engine:icon shrink:80",
+    );
     // Below that, items fold into ⋯ lowest priority first. Folding mode alone gains nothing,
     // since ⋯ takes its place, so engine folds with it and the shrink item grows back.
     expect(describePlan(planAt(223))).toBe(
@@ -166,7 +170,16 @@ describe("ActionBar", () => {
           : measure?.endsWith(":full")
             ? 100
             : 0;
-      return { width, height: 32, top: 0, left: 0, right: width, bottom: 32, x: 0, y: 0 } as DOMRect;
+      return {
+        width,
+        height: 32,
+        top: 0,
+        left: 0,
+        right: width,
+        bottom: 32,
+        x: 0,
+        y: 0,
+      } as DOMRect;
     });
     render(
       <ActionBar
@@ -181,7 +194,9 @@ describe("ActionBar", () => {
     const bar = screen.getByRole("toolbar", { name: "Note actions" });
     const modes = () =>
       ["a", "b", "c"].map(
-        (id) => bar.querySelector(`[data-action-bar-item="${id}"]`)?.getAttribute("data-mode") ?? "folded",
+        (id) =>
+          bar.querySelector(`[data-action-bar-item="${id}"]`)?.getAttribute("data-mode") ??
+          "folded",
       );
     // 100 + 32 + 32 and two gaps fit in 200; a second label doesn't.
     expect(modes()).toEqual(["full", "icon", "icon"]);

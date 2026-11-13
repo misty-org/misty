@@ -1,4 +1,4 @@
-//! web.search runs here, on the person's device, on the search key they keep in Settings › Models
+//! web.search runs here, on the person's device, on the search key they keep in Settings › Models.
 //! One provider is chosen per device; every provider takes the same request
 //! and answers with the same hits, and says which kinds of search it offers. The Misty server holds
 //! no search key, makes no search call and counts no searches.

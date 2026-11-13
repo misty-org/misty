@@ -29,7 +29,7 @@ export function tutorModel(
 }
 
 /** The providers with a saved key, read again whenever a key changes in this window. */
-export function useSavedKeyIds(): string[] | null {
+function useSavedKeyIds(): string[] | null {
   const [saved, setSaved] = useState<string[] | null>(null);
   useEffect(() => {
     let live = true;

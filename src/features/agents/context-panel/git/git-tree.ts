@@ -11,7 +11,7 @@ export interface GitTreeDirNode {
   allPaths: string[];
 }
 
-export interface GitTreeFileNode {
+interface GitTreeFileNode {
   type: "file";
   id: string;
   name: string;
@@ -62,7 +62,6 @@ export function buildGitTree(entries: GitFileEntry[], baseDepth = 0): GitTreeNod
   function convertDir(raw: RawDir, parentPath: string, depth: number): GitTreeNode[] {
     const result: GitTreeNode[] = [];
 
-    // Sort directory names alphabetically
     const dirEntries = Array.from(raw.dirs.entries()).sort(([a], [b]) => a.localeCompare(b));
 
     for (const [name, subDir] of dirEntries) {

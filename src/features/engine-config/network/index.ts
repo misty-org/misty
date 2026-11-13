@@ -2,4 +2,3 @@
 // See NOTICE.
 
 export { NetworkSection } from "./NetworkSection";
-export { proxyApi, type ProxySettings } from "./api";

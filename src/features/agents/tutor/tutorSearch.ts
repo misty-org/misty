@@ -11,7 +11,7 @@ import type { Notebook } from "./tutorTypes";
  * Without one it matches words.
  */
 
-export interface Passage {
+interface Passage {
   /** Where it is: a source or a note of a notebook. */
   notebookId: string;
   kind: "source" | "note";
@@ -59,7 +59,7 @@ export function passagesOf(text: string): string[] {
   return out.filter(Boolean);
 }
 
-export function notebookPassages(notebook: Notebook): Passage[] {
+function notebookPassages(notebook: Notebook): Passage[] {
   const passages: Passage[] = [];
   for (const source of notebook.sources) {
     const text =

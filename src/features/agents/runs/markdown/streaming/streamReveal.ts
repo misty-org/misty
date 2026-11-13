@@ -212,7 +212,7 @@ export class StreamReveal {
 }
 
 /** `Intl.Segmenter`, which the ES2020 library types don't declare yet. */
-export interface GraphemeSegments extends Iterable<{ index: number; segment: string }> {
+interface GraphemeSegments extends Iterable<{ index: number; segment: string }> {
   containing(index: number): { index: number } | undefined;
 }
 type GraphemeSegmenter = new (

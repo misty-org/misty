@@ -55,9 +55,7 @@ export const FilterChip = React.forwardRef<HTMLButtonElement, FilterChipProps>(
       {...props}
     >
       {renderIcon(icon)}
-      <OverflowFadeText>
-        {label}
-      </OverflowFadeText>
+      <OverflowFadeText>{label}</OverflowFadeText>
     </TogglePrimitive.Root>
   ),
 );

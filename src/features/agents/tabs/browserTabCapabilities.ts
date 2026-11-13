@@ -3,7 +3,7 @@
  * accessibility tree, act on it by ref, wait without acting, and fall back to
  * browser_act's screen agent for visual work.
  */
-export const browserTabAgentCapabilities = [
+const browserTabAgentCapabilities = [
   "browser.inspect",
   "browser.visual",
   "browser.navigate",

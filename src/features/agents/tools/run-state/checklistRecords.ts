@@ -4,7 +4,7 @@ import { RunStateError } from "./documents";
 
 /** The live checklist: the concrete steps one run is working through. A delegated run's nests under its parent's. */
 
-export const maxChecklistItems = 20;
+const maxChecklistItems = 20;
 const keepChecklists = 40;
 
 const statuses = new Set(["pending", "in_progress", "done", "skipped", "blocked"]);
@@ -20,7 +20,7 @@ export interface ChecklistUpdate {
 }
 
 /** `replace` swaps the whole list; otherwise known ids change in place and new ids are appended in order. */
-export function mergeChecklist(
+function mergeChecklist(
   current: ChecklistItem[],
   updates: ChecklistUpdate[],
   replace: boolean,

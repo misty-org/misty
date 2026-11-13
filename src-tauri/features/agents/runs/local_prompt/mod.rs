@@ -1,4 +1,4 @@
-//! A run's prompt and tools, built on the computer (docs/agents/runtime.md). Ported from the Go server's
+//! A run's prompt and tools, built on the computer. Ported from the Go server's
 //! prompt and toolbox, and tuned against benchmarks. `catalog.json` and `fixtures/` were exported from
 //! that code when it was removed and are now the source of truth: the tests compare against them byte
 //! for byte, and a change to the prompt or the tools changes them by hand.

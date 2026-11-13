@@ -1,9 +1,9 @@
-import { publicAppEnv } from "../cli/tasks/app-env.ts";
-import { defineConfig } from "vite";
+import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { whenStranded } from "../tasks/stranded.ts";
 
 const nodeShims: Record<string, string> = {
   fs: "fs",
@@ -20,6 +20,30 @@ const nodeShims: Record<string, string> = {
   string_decoder: "other",
 };
 
+// Only VITE_ names reach the renderer, so private settings stay out of the bundle.
+function publicAppEnv(env: NodeJS.ProcessEnv) {
+  return Object.fromEntries(
+    Object.entries(env)
+      .filter(([key, value]) => key.startsWith("VITE_") && value !== undefined)
+      .map(([key, value]) => [`import.meta.env.${key}`, JSON.stringify(value)]),
+  );
+}
+
+// A terminal, the Tauri CLI or a preview that is killed outright sends nothing on, and the server
+// would keep its port. Vite watches the processes above it and stops once one of them is gone.
+function stopWhenStranded(): Plugin {
+  const watch = (server: { close(): Promise<void> }) =>
+    whenStranded(() => {
+      void server.close().finally(() => process.exit(1));
+      setTimeout(() => process.exit(1), 5_000).unref();
+    });
+  return {
+    name: "misty-stop-when-stranded",
+    configureServer: watch,
+    configurePreviewServer: watch,
+  };
+}
+
 export default defineConfig(({ command, mode }) => {
   const env = process.env;
   if (
@@ -27,7 +51,7 @@ export default defineConfig(({ command, mode }) => {
     (env.VITE_MISTY_TARGET?.trim() && env.VITE_MISTY_TARGET.trim().toLowerCase() !== "desktop")
   ) {
     throw new Error(
-      "Misty only supports the desktop app target. Use misty desktop dev or npm run build:desktop.",
+      "Misty only supports the desktop app target. Use npm run tauri dev or npm run build.",
     );
   }
   const tauriDevHost = env.TAURI_DEV_HOST;
@@ -44,7 +68,7 @@ export default defineConfig(({ command, mode }) => {
     root: resolve(process.cwd(), "src/app"),
     publicDir: false,
     envDir: false,
-    plugins: [react(), tailwindcss()],
+    plugins: [react(), tailwindcss(), stopWhenStranded()],
     define: {
       "import.meta.env.MISTY_SHELL_MACOS": JSON.stringify(
         ["darwin", "macos"].includes(process.env.TAURI_ENV_PLATFORM || process.platform),
@@ -64,9 +88,9 @@ export default defineConfig(({ command, mode }) => {
       command === "serve" ? `misty-${mode}-${desktopDevPort}` : `misty-${mode}`,
     ),
     optimizeDeps: {
-      // Scan the real app (including its lazy imports), not standalone HTML
-      // probes in cli/tasks/. A probe-only unresolved import aborts Vite's scan;
-      // opening Explorer then discovers dependencies late and reloads the host.
+      // Scan the real app (including its lazy imports), not stray HTML elsewhere in the
+      // repository. An unresolved import there aborts Vite's scan; opening Explorer then
+      // discovers dependencies late and reloads the host.
       entries: ["index.html"],
       // Photon (Midscene's screenshot resizer) loads its .wasm next to its own
       // module; pre-bundling moves the module and the file is no longer found.

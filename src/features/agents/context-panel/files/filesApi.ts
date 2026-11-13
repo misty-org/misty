@@ -21,12 +21,12 @@ export interface FileContent {
 }
 
 /** What duplicating or pasting made. */
-export interface FileOpResult {
+interface FileOpResult {
   path: string;
   isDir: boolean;
 }
 
-export interface PasteClipboardResult {
+interface PasteClipboardResult {
   created: FileOpResult[];
   failed: string[];
 }
@@ -59,13 +59,13 @@ export interface RepositorySummary {
 
 export type FileTreeColor = "modified" | "untracked" | "repository";
 
-export interface GitTreeLevel {
+interface GitTreeLevel {
   path: string;
   files: string[];
   directories: string[];
 }
 
-export interface GitTreeStatus {
+interface GitTreeStatus {
   repositories: RepositorySummary[];
   /** Listed folder → entry name → its Git color. */
   fileColors: Record<string, Record<string, FileTreeColor>>;

@@ -39,7 +39,7 @@ pub async fn device_sign_run_grants(
     sign_run_grants(&state, grants).await
 }
 
-/// One signing path for chats and for the debug-only eval bridge.
+/// The one signing path chats use.
 pub(crate) async fn sign_run_grants(
     state: &MistyRuntime,
     grants: Vec<RunGrantRequest>,

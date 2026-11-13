@@ -17,7 +17,7 @@ export * from "./tabs/workspaceDefaultView";
 export * from "./tabs/workspaceViewOperations";
 export * from "./tabs/WorkspaceViewRouteScope";
 
-// Public surface used by other features (generated from their imports).
+// What other features import from here.
 export { StablePaneLayout } from "./panes/StablePaneLayout";
 export { dockLeaves, dockTreeViews } from "./panes/dockTree";
 export {
@@ -87,13 +87,12 @@ export {
   type SpaceWindowIdentity,
 } from "./tabs/spaceWindow";
 export { useWorkspaceStore } from "./tabs/useWorkspaceStore";
-export { configureWorkspaceDefaultView } from "./tabs/workspaceDefaultView";
 
-// Public surface used by other features (generated from their imports).
+// What other features import from here.
 export { AdvancedSection } from "./settings/AdvancedSection";
 export { AppearanceSection } from "./settings/AppearanceSection";
 
-// Public surface used by other features (generated from their imports).
+// What other features import from here.
 export {
   browserBlockingOverlayOpen,
   browserNoticeRects,
@@ -132,10 +131,10 @@ export {
 } from "./page-runtime/browserSwitchHandoff";
 export { type BrowserBounds, type BrowserTheme } from "./page-runtime/pageRuntimeTypes";
 
-// Public surface used by other features (generated from their imports).
+// What other features import from here.
 export { startProfileWindow } from "./profiles/profileWindow";
 
-// Public surface used by other features (generated from their imports).
+// What other features import from here.
 export { browserHomeUrl } from "./addresses/browserHome";
 export {
   preferredDefaultSpace,

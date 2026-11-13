@@ -11,7 +11,7 @@ import { watchAllRunEvents } from "../runs/local-run/localRunEvents";
 /** A claim ends this long after the run last reported, even if the run never says it ended. */
 export const claimIdleMs = 30 * 60 * 1000;
 /** The server keeps at most this many files per agent. */
-export const maxClaimedFiles = 5;
+const maxClaimedFiles = 5;
 
 export interface RunWork {
   /** The tool the run started last; empty before its first one. */

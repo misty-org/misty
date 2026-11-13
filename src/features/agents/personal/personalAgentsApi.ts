@@ -253,7 +253,7 @@ export async function newAgentOn(account: string, engine: EngineInfo, name = "")
   return agent;
 }
 
-export class AgentConflict extends Error {
+class AgentConflict extends Error {
   constructor() {
     super("This agent changed since it was opened. Open it again and retry.");
   }

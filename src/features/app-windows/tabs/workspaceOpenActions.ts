@@ -12,7 +12,7 @@ import {
   lastUsedUpdatesForView,
   nextWorkspaceFocusTimestamp,
 } from "./workspaceViewOperations";
-import { createBlankWorkspaceView } from "./workspaceDefaultView";
+import { createDefaultWorkspaceView } from "./workspaceDefaultView";
 import type { StoreApi } from "zustand";
 import type { WorkspaceStore } from "./useWorkspaceStore";
 import { withLayout } from "./workspaceLayoutUpdate";
@@ -118,7 +118,7 @@ export function workspaceOpenActions(
     addSurface: (request) => get().openSurface({ ...request, forceNew: true }),
     newTab: () => {
       const current = get(),
-        view = createBlankWorkspaceView();
+        view = createDefaultWorkspaceView();
       set(withLayout(current, appendTab(current.layout, singleViewTab(view))));
       return view;
     },

@@ -12,7 +12,7 @@ import { usePersonalAgentsStore } from "../../personal/personalAgentsStore";
 import { watchAllRunEvents } from "../local-run/localRunEvents";
 import { RunNoticeTracker, noticeRoute, noticeTitle, type RunNotice } from "./runNotices";
 
-export const RUN_NOTICES_SETTING = "agents.run_notifications";
+const RUN_NOTICES_SETTING = "agents.run_notifications";
 const openEvent = "misty://agent-run-notice-open";
 
 function noticesOn(): boolean {

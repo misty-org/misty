@@ -1,4 +1,4 @@
-// Unterdrücke Warnings von veralteten Cocoa APIs
+// The cocoa crate's AppKit bindings are deprecated in favor of objc2.
 #![allow(unexpected_cfgs)]
 #![allow(deprecated)]
 

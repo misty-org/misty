@@ -68,8 +68,6 @@ pub(crate) fn probe_target(
 /// lock, keeps Misty's own concurrent writes from overwriting each other. Claude/Codex (config)
 /// and the other engines (sources) share it.
 pub(super) static WRITE_LOCK: parking_lot::Mutex<()> = parking_lot::Mutex::new(());
-// The engines call `runtime` from their event pipeline (register/record/end).
-pub use runtime::{mark_run_ended, record_from_run, register_run};
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]

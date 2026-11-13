@@ -10,9 +10,9 @@ import type { AgentProfile } from "@/shared/schemas";
 /** SOUL and AGENTS share this budget; the editor warns above it. */
 export const PROSE_LIMIT = 10_000;
 
-export type PromptBlockId = "identity" | "soul" | "instructions";
+type PromptBlockId = "identity" | "soul" | "instructions";
 
-export interface PromptBlock {
+interface PromptBlock {
   id: PromptBlockId;
   title: string;
   text: string;
@@ -22,7 +22,7 @@ export interface PromptBlock {
   preview: string;
 }
 
-export interface AssembledPrompt {
+interface AssembledPrompt {
   blocks: PromptBlock[];
   text: string;
   totalChars: number;
@@ -40,7 +40,7 @@ const firstLine = (text: string) =>
     .find((line) => line.length > 0) ?? "";
 
 /** Who the agent is: what it reads to know itself. Only the parts it has are listed. */
-export function identityText(agent: Pick<AgentProfile, "name" | "role" | "description">) {
+function identityText(agent: Pick<AgentProfile, "name" | "role" | "description">) {
   const lines = [`You are ${agent.name}.`];
   if (agent.role?.trim()) lines.push(`Title: ${agent.role.trim()}`);
   if (agent.description?.trim()) lines.push(`About: ${agent.description.trim()}`);

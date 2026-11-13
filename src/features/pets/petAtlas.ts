@@ -1,7 +1,7 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 export const PET_CELL_WIDTH = 192;
 export const PET_CELL_HEIGHT = 208;
-export const PET_COLUMNS = 8;
+const PET_COLUMNS = 8;
 /** The pet window's logical width, which leaves room for the status bubble. */
 export const PET_BUBBLE_WIDTH = 420;
 /** The fixed logical space above the sprite for the two-line status bubble. */
@@ -11,7 +11,7 @@ export type PetStatus = "idle" | "running" | "waiting" | "failed" | "review";
 export type PetAnimation = PetStatus | "stand" | "rest" | "lay" | "jump";
 
 /** Codex v2 action rows, for how the pet moves on its own. */
-export const PET_ANIMATION_ROWS: Record<Exclude<PetAnimation, "idle">, number> = {
+const PET_ANIMATION_ROWS: Record<Exclude<PetAnimation, "idle">, number> = {
   running: 7,
   waiting: 6,
   failed: 5,
@@ -35,7 +35,7 @@ export interface PetPackage extends PetSummary {
   frameCounts: number[];
 }
 
-export function atlasFrame(
+function atlasFrame(
   status: PetAnimation,
   frame: number,
   lookDirection = 0,

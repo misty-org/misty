@@ -74,7 +74,7 @@ export interface WorktreeCreateProgress {
   path?: string;
 }
 
-export interface WorktreeRemoveResult {
+interface WorktreeRemoveResult {
   orphanDirectory: boolean;
   branchDeleted: boolean;
   branchKeptReason?: "checked_out_elsewhere" | "unknown";

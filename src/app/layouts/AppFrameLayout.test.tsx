@@ -227,9 +227,8 @@ describe("AppFrameLayout", () => {
       );
     });
 
-    // Renders DesktopLayout (for the auth route)
     expect(container.querySelector('[data-testid="desktop-layout"]')).not.toBeNull();
-    // Does NOT render background app panels
+    // The auth route renders no background app panels.
     expect(container.querySelector('[data-testid="update-notices"]')).toBeNull();
   });
 

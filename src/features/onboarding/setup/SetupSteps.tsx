@@ -7,8 +7,6 @@ import { TabsPreview } from "./SetupPreviews";
 
 import type { SetupStep } from "@/features/account";
 
-export type { SetupStep };
-
 /** This computer's setup, the step that ends the wizard that follows signing in. */
 export const setupStepCopy: Record<SetupStep, string> = {
   tabs: "Where do you want the sidebar?",

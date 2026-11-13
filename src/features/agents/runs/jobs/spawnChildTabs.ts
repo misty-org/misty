@@ -75,7 +75,7 @@ export async function spawnChildTabs(
       // Parked out of sight rather than hidden, so it keeps painting for its sub-agent.
       await invoke("browser_webview_hide", { request: { id, keepLive: true } });
       // It sleeps when its sub-agent moves on, and wakes for its next step (agentTabs.ts).
-      // Each sub-agent works in a view of its own in the parent's chat (agent-browser BRIEF).
+      // Each sub-agent works in a view of its own in the parent's chat.
       trackAgentTab({
         scopeId,
         viewId: id,

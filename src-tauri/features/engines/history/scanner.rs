@@ -66,6 +66,7 @@ fn scan_with_sink(
 }
 
 /// The scan itself, decoupled from the event sink for testing.
+#[cfg(test)]
 pub fn scan_with(
     db: &crate::engines::support::db::Db,
     on_changed: impl Fn(),
@@ -75,6 +76,7 @@ pub fn scan_with(
 }
 
 /// Deletion keeps this guard until both the file and database rows are gone.
+#[cfg(test)]
 pub(super) fn scan_with_guard(
     db: &crate::engines::support::db::Db,
     on_changed: impl Fn(),
@@ -1243,7 +1245,6 @@ pub(super) mod tests {
             .map_err(|e| e.to_string())?;
         assert_eq!(title, "updated second title");
 
-        drop(workspace_for);
         drop(db);
         std::fs::remove_dir_all(&home).ok();
         Ok(())
@@ -1960,7 +1961,7 @@ pub(super) mod tests {
             std::fs::write(&path, text).map_err(|e| e.to_string())?;
             Ok(path)
         };
-        let keep = rollout("keep")?;
+        rollout("keep")?;
         let gone = rollout("gone")?;
         scan_with(&db, || {})?;
         assert_eq!(session_count(&db, "codex", "keep"), 1);

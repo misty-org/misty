@@ -1,5 +1,5 @@
-/* Misty's desktop control overlays on Windows: monochrome, as the approved
-   palette asks; status is carried by text, not color. */
+/* Misty's desktop control overlays on Windows: monochrome, like the rest of
+   the app; status is carried by text, not color. */
 .desktop-island {
   box-sizing: border-box;
   display: flex;

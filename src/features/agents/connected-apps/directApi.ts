@@ -33,7 +33,7 @@ export interface DirectConnection {
 /** What signing in to a server takes. Only `keyless` is offered. */
 export type DirectAccess = "keyless" | "open" | "needs_app" | "unreachable";
 
-export const DIRECT_APPS_CHANGED_EVENT = "direct-apps://changed";
+const DIRECT_APPS_CHANGED_EVENT = "direct-apps://changed";
 
 async function call<T>(command: string, args?: Record<string, unknown>): Promise<T> {
   try {

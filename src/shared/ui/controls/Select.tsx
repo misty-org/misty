@@ -11,10 +11,8 @@ import {
   menuIndicatorClass,
   menuIndicatorItemClass,
   menuItemExplainedClass,
-  menuLabelClass,
   menuLabelTextClass,
   menuListClass,
-  menuSeparatorClass,
   popupMotionClass,
   popupSurfaceClass,
 } from "../overlays/popupStyles";
@@ -30,8 +28,6 @@ import { cn } from "../classNames";
 const Select = SelectPrimitive.Root;
 
 const SelectValue = SelectPrimitive.Value;
-
-const SelectGroup = SelectPrimitive.Group;
 
 const SelectTrigger = React.forwardRef<
   React.ElementRef<typeof SelectPrimitive.Trigger>,
@@ -183,30 +179,4 @@ function SelectItem({ className, icon, label, reason, disabled, ref, ...props }:
   );
 }
 
-const SelectLabel = React.forwardRef<
-  React.ElementRef<typeof SelectPrimitive.Label>,
-  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Label>
->(({ className, ...props }, ref) => (
-  <SelectPrimitive.Label ref={ref} className={cn(menuLabelClass, className)} {...props} />
-));
-SelectLabel.displayName = SelectPrimitive.Label.displayName;
-
-const SelectSeparator = React.forwardRef<
-  React.ElementRef<typeof SelectPrimitive.Separator>,
-  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Separator>
->(({ className, ...props }, ref) => (
-  <SelectPrimitive.Separator ref={ref} className={cn(menuSeparatorClass, className)} {...props} />
-));
-SelectSeparator.displayName = SelectPrimitive.Separator.displayName;
-
-export {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectSeparator,
-  SelectTrigger,
-  SelectValue,
-};
-export type { SelectItemProps };
+export { Select, SelectContent, SelectItem, SelectTrigger, SelectValue };

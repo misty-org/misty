@@ -1658,7 +1658,7 @@ mod tests {
 
         // Wait for the drain task to see EOF and flush the second line.
         let deadline = Instant::now() + Duration::from_secs(5);
-        let mut logged = String::new();
+        let mut logged;
         loop {
             logged = std::fs::read_to_string(&path).unwrap_or_default();
             if logged.contains("ready on") || Instant::now() > deadline {

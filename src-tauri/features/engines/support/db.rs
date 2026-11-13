@@ -62,6 +62,7 @@ impl Db {
     }
 
     /// A standalone database file, for tests.
+    #[cfg(test)]
     pub fn open_at(path: &std::path::Path) -> rusqlite::Result<Self> {
         Self::open_store(&database::store::Store::at(path))
     }

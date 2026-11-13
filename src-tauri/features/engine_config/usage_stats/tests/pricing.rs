@@ -103,7 +103,7 @@ fn bundled_snapshot_prices_the_engines_models() {
         assert!(t.price(model).is_some(), "{model} should be priced");
     }
     // Variants missing from the snapshot stay unpriced instead of borrowing
-    // their base model's price (found by review against the real table).
+    // their base model's price (checked against the real table).
     for model in ["kimi-k2-turbo", "qwen3-coder-plus", "gpt-5.3-codex-spark"] {
         let resolved = t.resolve(model);
         assert!(

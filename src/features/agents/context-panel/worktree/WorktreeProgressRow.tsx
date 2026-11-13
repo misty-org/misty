@@ -25,7 +25,7 @@ const ERROR_TEXT: Record<string, string> = {
 };
 
 /** Why a creation failed: the native wording where the code alone says too little. */
-export function failureReason(pending: PendingCreation): string {
+function failureReason(pending: PendingCreation): string {
   if (pending.stage === "canceled") return "Cancelled";
   const ownWords = ["add_failed", "repo_open_failed", "fetch_failed"];
   if ((!pending.errorKind || ownWords.includes(pending.errorKind)) && pending.error) {

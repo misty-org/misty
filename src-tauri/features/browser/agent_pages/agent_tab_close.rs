@@ -20,7 +20,7 @@ pub async fn browser_webview_sleep(
 }
 
 /// Waits for a new agent tab's first page to load before the agent reads it
-/// (browser_page/mod.rs, `first_load`). True once it loaded; false after the wait ran out.
+/// (page_agent/navigation.rs, `first_load`). True once it loaded; false after the wait ran out.
 #[tauri::command]
 pub async fn browser_webview_await_load(
     app: AppHandle,

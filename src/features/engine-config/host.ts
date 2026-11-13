@@ -5,7 +5,7 @@ import { createPort } from "@/shared/lib/seams";
  * What engine settings need from the agents that use the engines, filled in once by the app
  * (`app/featureSeams.ts`). Agents sit above engine settings, so engine settings never import them.
  */
-export interface EngineConfigHost {
+interface EngineConfigHost {
   /** This window's Space's linked folders and the one picked, read on first use. */
   useLinkedFolders(): { folders: string[]; picked?: string };
   /** Markdown drawn the way chats draw it. */

@@ -2,11 +2,4 @@
 // See NOTICE.
 
 export { FontsSection } from "./FontsSection";
-export {
-  FONT_CHANGE_EVENT,
-  applyFontPreferences,
-  applySavedFonts,
-  codeFontStack,
-  uiFontStack,
-  type FontPreferences,
-} from "./font";
+export { applySavedFonts } from "./font";

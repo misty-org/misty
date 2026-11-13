@@ -216,7 +216,7 @@ pub(crate) struct PlanStepProgress {
     pub(crate) status: String,
 }
 
-/// The chat's newest plan (`AgentPlan` in `src/features/agents/collaboration/types.ts`).
+/// The chat's newest plan (`AgentPlan` in `src/features/agents/plans/planTypes.ts`).
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(default)]
 pub(crate) struct PlanState {

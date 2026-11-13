@@ -3,7 +3,7 @@ import { RegisterPage, SignInPage, useAuth } from "@/features/account";
 import { useSetupStore } from "@/features/account";
 import { SetupPage, WelcomePage } from "@/features/onboarding";
 import { SpaceInvitationRedemption } from "@/features/spaces";
-import { createBrowserRouter, Navigate } from "react-router";
+import { createBrowserRouter, Navigate } from "react-router-dom";
 import { AppFrameLayout } from "../layouts/AppFrameLayout";
 import { AppPagesLayout } from "../layouts/AppPagesLayout";
 import { RootLayout } from "../layouts/RootLayout";

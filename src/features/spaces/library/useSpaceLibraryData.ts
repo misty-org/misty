@@ -12,9 +12,9 @@ import type { LibraryUploadJob } from "./hook-signatures/useSpaceLibraryData";
 export { libraryCollectionKinds } from "./library-data/libraryCollectionKinds";
 
 /**
- * All Library state for one Space, assembled from the slices in `libraryData/`.
+ * All Library state for one Space, assembled from the slices in `library-data/`.
  *
- * This hook owns nothing but the pieces that cross slice boundaries — the
+ * It owns nothing but the pieces that cross slice boundaries — the
  * reload key, upload jobs and the shared error — and flattens everything into
  * a single object, which is the shape every Library surface already consumes.
  * Every member can do everything here; only reconnecting makes it read-only.

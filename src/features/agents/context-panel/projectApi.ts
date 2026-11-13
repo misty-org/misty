@@ -2,7 +2,7 @@ import { invoke } from "@/native/invoke";
 import { agentAccountId } from "../personal/agentAccount";
 import { gitApi, isNotARepo, type GitFileEntry } from "./git/gitApi";
 
-export interface ProjectEntry {
+interface ProjectEntry {
   name: string;
   path: string;
   isDir: boolean;
@@ -11,7 +11,7 @@ export interface ProjectEntry {
   heavy: boolean;
 }
 
-export interface ProjectFile {
+interface ProjectFile {
   kind: "text" | "binary";
   text: string;
   /** Longer than what was read: it opens read-only, since saving would cut it short. */

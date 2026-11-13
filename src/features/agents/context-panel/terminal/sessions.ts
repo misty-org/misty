@@ -32,7 +32,7 @@ export function receiveTerminalOutput(chunks: TerminalOutputChunk[]): void {
 }
 
 /** A shell ended on its own: its next input opens a fresh one. */
-export function receiveTerminalClosed(id: string): void {
+function receiveTerminalClosed(id: string): void {
   if (!openSessions.has(id)) return;
   openSessions.delete(id);
   receiveTerminalOutput([{ id, data: "\r\n[The shell ended]\r\n" }]);

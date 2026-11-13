@@ -143,15 +143,6 @@ pub(crate) fn derived_store(scope: &str, profile: &str) -> Option<String> {
     Some(hex::encode(Sha256::digest(bytes)))
 }
 
-/// The 128-bit id the engine knows a temporary session by: pages opened in one keep nothing
-/// once it ends. Only the eval bridge's test pages use one.
-pub fn temporary_store_id(session: &str) -> [u8; 16] {
-    let digest = Sha256::digest(format!("misty.incognito-session.v1:{session}").as_bytes());
-    let mut id = [0; 16];
-    id.copy_from_slice(&digest[..16]);
-    id
-}
-
 /// The profile a page-opening window belongs to.
 pub fn profile_for_owner(label: &str) -> Option<String> {
     profile_for_window(label)

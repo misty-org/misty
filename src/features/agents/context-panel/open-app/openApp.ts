@@ -10,7 +10,7 @@ export interface OpenAppTarget {
 }
 
 /** The apps "Open in" offers when they are installed. Finder is always there. */
-export const OPEN_APP_TARGETS: readonly OpenAppTarget[] = [
+const OPEN_APP_TARGETS: readonly OpenAppTarget[] = [
   { id: "vscode", label: "VS Code" },
   { id: "cursor", label: "Cursor" },
   { id: "idea", label: "IntelliJ IDEA" },
@@ -21,7 +21,7 @@ export const OPEN_APP_TARGETS: readonly OpenAppTarget[] = [
   { id: "finder", label: finderLabel() },
 ];
 
-export const DEFAULT_OPEN_APP_ID = "vscode";
+const DEFAULT_OPEN_APP_ID = "vscode";
 
 function finderLabel(): string {
   const platform = typeof navigator === "undefined" ? "" : navigator.platform;
@@ -31,13 +31,13 @@ function finderLabel(): string {
 }
 
 /** A program the person added; kept natively and opened by id. */
-export interface CustomProgram {
+interface CustomProgram {
   id: string;
   name: string;
   path: string;
 }
 
-export interface ProgramIcon {
+interface ProgramIcon {
   installed: boolean;
   icon?: string;
 }
@@ -49,7 +49,7 @@ interface CustomResult {
 
 const account = () => agentAccountId();
 
-export const openAppApi = {
+const openAppApi = {
   openIn: (path: string, target: string) =>
     invoke<void>("project_open_in", { account: account(), path, target }),
   icon: (target: string) => invoke<ProgramIcon>("project_program_icon", { target }),

@@ -4,7 +4,7 @@ import { createVisibleTextReader, type StreamReveal } from "./streamReveal";
 
 /** Subscribe to the reveal cursor for one text range. The server-render /
  * remount fallback shows everything: history must never animate in. */
-export function useRevealed(controller: StreamReveal, start: number, length: number) {
+function useRevealed(controller: StreamReveal, start: number, length: number) {
   const subscribe = useCallback(
     (notify: () => void) => controller.subscribe(start, length, notify),
     [controller, start, length],

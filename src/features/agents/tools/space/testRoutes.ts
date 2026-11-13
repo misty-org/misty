@@ -3,7 +3,7 @@ import { ApiRequestError, apiRequest } from "@/api/client";
 import type { LocalToolHandler } from "../host";
 
 /** Fakes the server for these tools' tests. Test files mock `@/api/client` so this reaches them. */
-export interface Call {
+interface Call {
   method: string;
   path: string;
   body?: unknown;

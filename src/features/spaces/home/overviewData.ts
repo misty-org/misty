@@ -8,7 +8,7 @@ type Run = Pick<
 >;
 
 /** A run that stopped to ask its person, with the chat to open for it. */
-export interface WaitingRun {
+interface WaitingRun {
   id: string;
   conversationId: string;
   agentId: string;
@@ -18,7 +18,7 @@ export interface WaitingRun {
   updatedAt: string;
 }
 
-export const needsPerson = (state: string) =>
+const needsPerson = (state: string) =>
   state === "awaiting_approval" || state === "awaiting_intervention";
 
 export const chatTitle = (title: string | undefined) => title?.trim() || "New chat";

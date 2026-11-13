@@ -20,7 +20,7 @@ pub fn register(builder: Builder<Wry>) -> Builder<Wry> {
         }
     }));
 
-    // Web APIs that website tabs reach natively; see features/kiri/README.md.
+    // Web APIs that website tabs reach natively; see features/kiri/src/lib.rs.
     #[cfg(desktop)]
     let builder = builder.plugin(crate::browser::kiri_link::kiri_host::plugin());
 

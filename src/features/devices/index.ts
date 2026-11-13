@@ -1,2 +1,2 @@
-// Public surface used by other features (generated from their imports).
+// Public surface used by other features.
 export { devicesNative } from "./api/native-devices";

@@ -73,13 +73,14 @@ vi.mock("@/features/agents/conversations/ask/handoff", () => ({ openMisty: async
 vi.mock("../virtual/VirtualStudio", () => ({
   VirtualStudio: (props: { onAgentSettings(agentId: string): void }) => (
     <div>
-      {[fixture.agent, ...(fixture.includeSecond ? [{ id: "research", name: "Research" }] : [])].map(
-        (agent) => (
-          <Button key={agent.id} onClick={() => props.onAgentSettings(agent.id)}>
-            {`${agent.name} settings`}
-          </Button>
-        ),
-      )}
+      {[
+        fixture.agent,
+        ...(fixture.includeSecond ? [{ id: "research", name: "Research" }] : []),
+      ].map((agent) => (
+        <Button key={agent.id} onClick={() => props.onAgentSettings(agent.id)}>
+          {`${agent.name} settings`}
+        </Button>
+      ))}
     </div>
   ),
 }));

@@ -1,7 +1,7 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 import { parseUsage } from "./usage";
 
-export type UsagePartKind = "input" | "output" | "cacheRead" | "cacheWrite" | "total";
+type UsagePartKind = "input" | "output" | "cacheRead" | "cacheWrite" | "total";
 
 export const USAGE_PART_LABELS: Record<UsagePartKind, string> = {
   input: "Input",
@@ -11,7 +11,7 @@ export const USAGE_PART_LABELS: Record<UsagePartKind, string> = {
   total: "Tokens",
 };
 
-export interface UsageBreakdown {
+interface UsageBreakdown {
   /** Tokens held in the context. */
   used: number;
   /** Share of the window, or undefined when the window isn't known. */

@@ -3,10 +3,10 @@ import { liveAcceptanceEnabled } from "./liveEnv";
 import { defaultAgentId, MistyClient, seedSpaceMember, type InvocationRun } from "./mistyClient";
 import { writeAcceptanceReport } from "./report";
 
-// Phases 1–3, live: the acceptance prompts
-// BRIEF.md, sent to the local development server (its runtime, model and
-// Composio project) as a fresh account with known notes and a team chat.
-// Phase 4 runs separately in screenAct.acceptance.ts.
+// Phases 1–3 of the live acceptance prompts, sent to the local development
+// server (its runtime, model and Composio project) as a fresh account with
+// known notes and a team chat. Phase 4 runs separately in
+// src/features/agents/desktop-control/screenAct.acceptance.ts.
 
 const refusal =
   /\b(I can(?:'|’|no)t|I(?:'m|’m| am) (?:unable|not able)|I don(?:'|’)t have (?:access|the ability))\b/i;

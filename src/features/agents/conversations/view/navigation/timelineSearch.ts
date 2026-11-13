@@ -25,7 +25,7 @@ export function messageSearchText(message: GlobalAiMessage): string {
   return parts.join("\n");
 }
 
-export interface TimelineMatch {
+interface TimelineMatch {
   /** The message the match is in, which its element carries as `data-message-id`. */
   messageId: string;
   messageIndex: number;

@@ -4,7 +4,7 @@ import type { useChangesSelection } from "./changesHooks";
 import { gitErrorText, type GitStatus } from "./gitApi";
 import { useGitStore } from "./store";
 
-export interface CommitPlan {
+interface CommitPlan {
   message: string;
   toStage: string[];
   toUnstage: string[];

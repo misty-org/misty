@@ -55,7 +55,7 @@ export function windowName(window: LimitWindow): string {
   return window.label ? `${base} · ${window.label}` : base;
 }
 
-export const engineNames: Record<string, string> = {
+const engineNames: Record<string, string> = {
   claude: "Claude Code",
   codex: "Codex",
   pi: "Pi",
@@ -84,7 +84,7 @@ export function limitsStatusText(limits: ProviderLimits): string | null {
 
 export type UsageGroup = "engine" | "model" | "project";
 
-export interface GroupTotals {
+interface GroupTotals {
   key: string;
   requests: number;
   tokens: number;
@@ -125,7 +125,7 @@ export function groupRows(rows: UsageStatRow[], group: UsageGroup): GroupTotals[
   return [...groups.values()].sort((a, b) => b.tokens - a.tokens || a.key.localeCompare(b.key));
 }
 
-export interface DayTotals {
+interface DayTotals {
   day: string;
   tokens: number;
   cost: number;

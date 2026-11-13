@@ -17,13 +17,7 @@ import type {
 } from "../invocations/invocationTypes";
 import "./aiSurface.css";
 
-export type {
-  AiArtifact,
-  AiContextReference,
-  AiSuggestedAction,
-  AiSurfaceAdapter,
-  AiSurfaceId,
-} from "../invocations/invocationTypes";
+export type { AiSurfaceId } from "../invocations/invocationTypes";
 
 interface AiPaneContextValue {
   paneId: string;

@@ -4,7 +4,7 @@
   if (window[key]) return;
   let host, control, ring, timer, placed = false;
   // A ring pulses where the agent acts. The glowing frame around the page the
-  // agent holds is drawn natively (MistyAgentRing.m), so page captures leave it out.
+  // agent holds is drawn natively (agents/cursor/macos/ring_views.rs), so page captures leave it out.
   const showControl = (x, y, reduced) => {
     if (!control?.isConnected) {
       control = document.createElement("misty-agent-control");

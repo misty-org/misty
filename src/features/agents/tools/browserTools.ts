@@ -42,7 +42,7 @@ const localSuffixes = [
 ];
 
 /** A name to look up: not an address, and not one that only a local network knows. */
-export function hostToCheck(raw: string): string | null {
+function hostToCheck(raw: string): string | null {
   let host: string;
   try {
     host = new URL(raw.trim()).hostname.toLowerCase().replace(/\.$/, "");

@@ -7,7 +7,7 @@ import type { RunContextOfChat as RunContext } from "../runContexts";
  * share one. The server also mirrored the findings to a note in the personal Space; no signed-in route
  * can write a note's text, so here they stay on this computer.
  */
-export interface Notebook {
+interface Notebook {
   id: string;
   plan: string;
   findings: string;
@@ -15,7 +15,7 @@ export interface Notebook {
 }
 
 const limits = { plan: 20_000, findings: 100_000 };
-export const notebookFull = "the notebook section is full; replace it with a shorter version";
+const notebookFull = "the notebook section is full; replace it with a shorter version";
 
 const bytes = (value: string) => new TextEncoder().encode(value).length;
 const blank = (id: string): Notebook => ({ id, plan: "", findings: "", updatedAt: "" });

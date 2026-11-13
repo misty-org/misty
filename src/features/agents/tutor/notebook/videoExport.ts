@@ -8,8 +8,8 @@ import type { Guide, VideoScene } from "../tutorTypes";
  * caption, the narration mixed under it, recorded as it plays. Everything happens on this computer.
  */
 
-export const width = 1280;
-export const height = 720;
+const width = 1280;
+const height = 720;
 const fade = 0.45;
 
 /** How long a scene runs: its narration, or reading pace when it has no voice. */
@@ -33,7 +33,7 @@ function loadImage(source: string): Promise<HTMLImageElement | null> {
 }
 
 /** Lines of `text` that fit in `max` pixels at the context's font. */
-export function wrap(context: CanvasRenderingContext2D, text: string, max: number): string[] {
+function wrap(context: CanvasRenderingContext2D, text: string, max: number): string[] {
   const lines: string[] = [];
   let line = "";
   for (const word of text.split(/\s+/).filter(Boolean)) {

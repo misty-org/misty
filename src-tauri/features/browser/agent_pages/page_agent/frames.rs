@@ -1,4 +1,4 @@
-//! The page layer inside a tab's cross-origin frames (../browser_frames.rs): snapshots,
+//! The page layer inside a tab's cross-origin frames (agent_pages/frames.rs): snapshots,
 //! page text and waits include embedded widgets, such as a class schedule, a booking
 //! calendar or a document editor, under the iframe that shows them. Each frame a snapshot
 //! reads takes a slot, and its refs come from that slot's range (slot 1 is e1000001 and

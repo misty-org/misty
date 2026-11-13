@@ -767,7 +767,7 @@ fn read_skill_content_reads_engine_copy_and_rejects_traversal() {
     );
 }
 
-/// The phase 2 acceptance case (all in scratch folders): import → sync two engines → remove one copy
+/// The full local lifecycle (all in scratch folders): import → sync two engines → remove one copy
 /// → uninstall → restore; the person's own local source folder is never harmed.
 #[test]
 fn local_lifecycle_import_sync_remove_uninstall_restore() {

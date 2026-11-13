@@ -6,7 +6,7 @@ import { LocalToolRejected, LocalToolUncertain, type LocalToolRequest } from "..
  * server checks it like any other request of theirs. The words here are the ones these tools gave the
  * model when the server ran them, so a run sees the same answers.
  */
-export const NOT_COMPLETED = "Misty could not complete this tool call.";
+const NOT_COMPLETED = "Misty could not complete this tool call.";
 export const NOT_ALLOWED = "This tool call is not allowed for the current run.";
 export const BAD_SCHEMA = "The arguments do not match this tool's input schema.";
 const BAD_VALUES = "The tool arguments are invalid.";

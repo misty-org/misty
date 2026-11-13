@@ -24,7 +24,7 @@ import { MenuRadioGroup, MenuRadioItem } from "../../overlays/MenuItem";
 import { cn } from "../../classNames";
 import { CollectionColumnChooser, CollectionColumnsContext } from "./CollectionColumns";
 
-export type CollectionHeadingProps = {
+type CollectionHeadingProps = {
   /** The page's name, or a node that stands for it, such as a Space switcher menu. */
   title: ReactNode;
   /** The page's actions. They give way like any ActionBar once the title has faded. */
@@ -67,7 +67,7 @@ export const CollectionSearch = forwardRef<HTMLInputElement, ComponentProps<type
 );
 CollectionSearch.displayName = "CollectionSearch";
 
-export type CollectionFilterTab = {
+type CollectionFilterTab = {
   value: string;
   label: string;
   /** Shown beside the label once the tab has folded into the bar's ⋯ menu. */
@@ -238,7 +238,7 @@ export function CollectionViewToggle({
   );
 }
 
-export type CollectionSortOption<T extends string> = {
+type CollectionSortOption<T extends string> = {
   value: T;
   label: string;
   icon: IconSource;

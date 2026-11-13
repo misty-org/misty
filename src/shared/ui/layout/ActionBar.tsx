@@ -248,13 +248,7 @@ function DefaultItem({
       className={shrinking ? "min-w-0 max-w-full" : undefined}
       onClick={item.onSelect}
     >
-      {shrinking ? (
-        <OverflowFadeText full>
-          {item.label}
-        </OverflowFadeText>
-      ) : (
-        item.label
-      )}
+      {shrinking ? <OverflowFadeText full>{item.label}</OverflowFadeText> : item.label}
     </Button>
   );
 }
@@ -421,7 +415,9 @@ export function ActionBar({
             data-action-bar-item={item.id}
             data-mode={placement}
             className={cn("flex items-center", shrinking ? "min-w-0 shrink" : "shrink-0")}
-            style={shrinking ? { width: plan.shrinkWidth!, maxWidth: plan.shrinkWidth! } : undefined}
+            style={
+              shrinking ? { width: plan.shrinkWidth!, maxWidth: plan.shrinkWidth! } : undefined
+            }
           >
             <ItemBody item={item} mode={placement} size={size} shrinking={shrinking} />
           </div>
@@ -442,7 +438,11 @@ export function ActionBar({
         </DropdownMenu>
       ) : null}
       {end ? (
-        <div ref={endRef} data-action-bar-end="" className="ml-auto flex shrink-0 items-center gap-1">
+        <div
+          ref={endRef}
+          data-action-bar-end=""
+          className="ml-auto flex shrink-0 items-center gap-1"
+        >
           {end}
         </div>
       ) : null}

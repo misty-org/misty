@@ -11,9 +11,9 @@ import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@/native/invoke";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 
-export type UsageBucket = "day" | "hour";
+type UsageBucket = "day" | "hour";
 
-export interface UsageQuery {
+interface UsageQuery {
   /** Local `YYYY-MM-DD`, inclusive. */
   from: string;
   /** Local `YYYY-MM-DD`, inclusive. */
@@ -60,7 +60,7 @@ export interface UsageSource {
   lastScanAt: number | null;
 }
 
-export interface UsageScanSummary {
+interface UsageScanSummary {
   filesScanned: number;
   eventsAdded: number;
   durationMs: number;
@@ -106,7 +106,7 @@ export interface ProviderLimits {
   source: string;
 }
 
-export interface LimitsResult {
+interface LimitsResult {
   providers: ProviderLimits[];
 }
 
@@ -125,7 +125,7 @@ function parseDay(value: string, name: string): Date {
 }
 
 /** Minutes east of UTC on the given local day (noon avoids DST edges). */
-export function tzOffsetForDay(date: Date): number {
+function tzOffsetForDay(date: Date): number {
   return -date.getTimezoneOffset();
 }
 

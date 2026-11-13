@@ -6,7 +6,7 @@ import { hasTauriInternals } from "@/shared/platform/tauri";
 import { startTellingNativeTheAccount } from "../personal/agentAccount";
 
 /**
- * Stop before paying, sending, deleting or posting (roadmap C2). The desktop
+ * Stop before paying, sending, deleting or posting. The desktop
  * pauses an agent's page step natively and asks here; the control island shows
  * the question until the person answers or it times out.
  */

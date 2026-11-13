@@ -6,8 +6,6 @@ import type { PerformanceContext } from "./diagnostics";
 import { initializePerformancePreference } from "./preference";
 
 export { PerformanceSection } from "./PerformanceSection";
-/** Where the chat can time its renders; engine, tool and text events are counted here already. */
-export { performanceRecorder, type PerformanceContext } from "./diagnostics";
 
 /** No session or message counts are wired in yet; non-finite counts mark the context as
  *  unavailable. */

@@ -203,6 +203,9 @@ permissions = [
   "allow-cursor-companion-snapshot",
   "allow-cursor-companion-tray",
   "allow-tray-agents",
+  "allow-tray-panel-fit",
+  "allow-tray-panel-press",
+  "allow-tray-panel-state",
   "allow-cursor-companion-watch-clicks",
 ]
 

@@ -25,7 +25,7 @@ const cursorScript = readFileSync(
   "utf8",
 );
 
-export function chromiumBinary(): string | undefined {
+function chromiumBinary(): string | undefined {
   if (process.env.MISTY_ACCEPTANCE_CHROMIUM) return process.env.MISTY_ACCEPTANCE_CHROMIUM;
   const cache = join(homedir(), "Library/Caches/ms-playwright");
   if (!existsSync(cache)) return undefined;

@@ -7,13 +7,14 @@ channel. Email **security@mistysys.com** or use GitHub's private vulnerability r
 repository (Security › Report a vulnerability).
 
 Include what you found, the steps to reproduce it, the version or commit you tested, and the
-impact you expect. We will acknowledge the report and keep you informed until it is fixed. Please give us a reasonable time to ship a fix before you disclose it.
+impact you expect. We will acknowledge the report and keep you informed until it is fixed. Please
+give us a reasonable time to ship a fix before you disclose it.
 
 ## Scope
 
-In scope: the desktop app (`src/`, `src-tauri/`), the `misty` CLI (`cli/`) and the server
-([misty-server](https://github.com/misty-org/misty-server)), including sync encryption, device admission, agent permissions and the browser's
-handling of untrusted pages.
+In scope: the desktop app (`src/`, `src-tauri/`) and the server
+([misty-server](https://github.com/misty-org/misty-server)), including sign-in, agent permissions,
+keys kept on the device and the browser's handling of untrusted pages.
 
 Out of scope: findings that need an already compromised device or account, social engineering,
 and denial of service through volume alone.

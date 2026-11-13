@@ -1,6 +1,6 @@
 //! Retirement of settings keys that no longer have a reader.
 //!
-//! Kept separate from the defaults in `settings.rs` because the two pull in
+//! Kept separate from the defaults in `defaults.rs` because the two pull in
 //! opposite directions: that file describes the settings that exist, this one
 //! describes the ones that used to.
 

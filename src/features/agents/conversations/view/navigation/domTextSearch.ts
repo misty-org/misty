@@ -9,14 +9,14 @@
  * never mutated and React's memoized output stays valid.
  */
 
-export interface TextMatch {
+interface TextMatch {
   node: Text;
   /** Character offsets into `node.nodeValue`. */
   start: number;
   end: number;
 }
 
-export interface TextMatchRange {
+interface TextMatchRange {
   /** Character offsets into the searched string. */
   start: number;
   end: number;

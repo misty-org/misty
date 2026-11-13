@@ -2,8 +2,7 @@ import { Channel, invoke } from "@tauri-apps/api/core";
 
 type SessionMessage = { kind: "message"; data: string } | { kind: "closed" };
 
-export type RuntimeSession =
-  { kind: "voice" } | { kind: "live"; channels: string[]; language: string };
+type RuntimeSession = { kind: "voice" } | { kind: "live"; channels: string[]; language: string };
 
 const CONNECTING = 0;
 export const OPEN = 1;

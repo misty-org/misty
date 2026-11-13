@@ -1,4 +1,4 @@
-// Public surface used by other features (generated from their imports).
+// Public surface used by other features.
 export { LinkPreviews } from "./link-previews/LinkPreviews";
 export { configureLinkPreviews } from "./link-previews/settings";
 export { PhotoEditor } from "./photo-editor";

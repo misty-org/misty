@@ -2,7 +2,7 @@ import { mentionOf } from "../../conversations/composer/controls/composerTrigger
 import { useMistyStore } from "../../conversations/state/useMistyStore";
 
 /** `path` relative to `folder`, with `/` between names, or null when it lies outside. */
-export function relativeToFolder(folder: string, path: string): string | null {
+function relativeToFolder(folder: string, path: string): string | null {
   const base = folder.replace(/\\/g, "/").replace(/\/+$/, "");
   const target = path.replace(/\\/g, "/").replace(/\/+$/, "");
   if (target === base) return "";

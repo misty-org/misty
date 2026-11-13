@@ -103,7 +103,7 @@ export function asContext(context: AiInvocationDeviceContext, now: number): RunD
   };
 }
 
-export type RunOwnership = Pick<RunEntry, "account" | "voice" | "parentRunId" | "notebookKey">;
+type RunOwnership = Pick<RunEntry, "account" | "voice" | "parentRunId" | "notebookKey">;
 
 /** Records a run as it starts, under the grants this computer signed for it. */
 export async function rememberRun(

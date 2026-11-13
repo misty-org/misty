@@ -24,10 +24,9 @@ export type CalendarEntry =
     }
   | { kind: "task"; id: string; day: string; title: string; time: string; task: SpaceTask };
 
-export const startOfDay = (date: Date) =>
-  new Date(date.getFullYear(), date.getMonth(), date.getDate());
+const startOfDay = (date: Date) => new Date(date.getFullYear(), date.getMonth(), date.getDate());
 
-export function startOfWeek(date: Date): Date {
+function startOfWeek(date: Date): Date {
   const result = startOfDay(date);
   result.setDate(result.getDate() - result.getDay());
   return result;
@@ -88,7 +87,7 @@ export function eventDayKey(
   }
 }
 
-export const timeLabel = (value: string) =>
+const timeLabel = (value: string) =>
   new Date(value).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 
 /** Events and due tasks as one list, grouped by day and ordered within each. */

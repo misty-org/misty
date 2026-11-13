@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 export type ServerChoiceTarget = "cloud" | "own" | "browse";
 
 /** One server to choose, as a full-width row. */
-export function ServerOption(props: {
+function ServerOption(props: {
   icon: ReactNode;
   label: string;
   busy?: boolean;

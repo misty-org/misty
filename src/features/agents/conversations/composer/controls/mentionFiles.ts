@@ -8,7 +8,7 @@ import { useFileIndex, type IndexEntry } from "../../../context-panel/files/file
  */
 
 /** Most rows the `@` menu shows. */
-export const MENTION_MENU_LIMIT = 50;
+const MENTION_MENU_LIMIT = 50;
 
 /** Starts loading a folder's index, so the first `@` is instant. */
 export const prefetchMentionIndex = (root: string) => {

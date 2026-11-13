@@ -8,10 +8,10 @@ import { startRun } from "../tutor/tutorRuns";
  * it in its own chat, the person reads and edits it, and only then is it sent to the Space as a
  * note, so nothing a model wrote reaches the server unapproved. A note is a pick-up by its title.
  */
-export const pickUpMark = "Pick up:";
+const pickUpMark = "Pick up:";
 
 /** What the agent is asked for. It answers in its chat, where the person sees it being written. */
-export const pickUpPrompt = [
+const pickUpPrompt = [
   "Write a pick-up note for whoever continues this work next. It may be another agent on a",
   "different engine with none of this chat, so be concrete. Don't change any files or run",
   "anything. Answer with only the note, in Markdown, under these headings:",
@@ -40,7 +40,7 @@ export function pickUpTopic(title: string): string | undefined {
   return trimmed.slice(pickUpMark.length).trim() || "Untitled work";
 }
 
-export interface PickUpOrigin {
+interface PickUpOrigin {
   agentName: string;
   /** The engine's name as people know it ("Claude Code", "Codex"), or empty for Misty's own. */
   engine: string;

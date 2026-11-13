@@ -4,9 +4,8 @@ import type { GlobalAiConversation } from "./conversationTypes";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 
 /**
- * Agent chats live on this device, like Claude Code and Codex
- * each conversation, with its messages and
- * timelines, is one document in misty.db, and so is each folder. Each turn's run reads the
+ * Agent chats live on this device, as Claude Code's and Codex's do: each conversation, with its
+ * messages and timelines, is one document in misty.db, and so is each folder. Each turn's run reads the
  * history kept here.
  */
 

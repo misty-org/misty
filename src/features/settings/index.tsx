@@ -24,7 +24,7 @@ export { blockIfUnsaved, useDevicePreferences } from "./device-preferences/store
 export { resolveSetting } from "./device-preferences/settingResolution";
 export { openSettings, openSettingsEvent, type OpenSettingsDetail } from "./openSettings";
 
-// Public surface used by other features (generated from their imports).
+// Public surface used by other features.
 export {
   DesktopSettingsNotice,
   DesktopSettingsRow,
@@ -37,4 +37,4 @@ export { useSettingsStore } from "./preferences/useSettingsStore";
 export { GeneralSection } from "./sections/GeneralSection";
 export { registerSettingsSections } from "./settingsRegistry";
 export type { SettingsContentProps } from "./settingsTypes";
-export { searchSettings, type SettingsSearchResult } from "./components/SettingsSearchResults";
+export { searchSettings } from "./components/SettingsSearchResults";

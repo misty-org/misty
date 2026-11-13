@@ -3,7 +3,7 @@ import { followLocalRunEvents } from "../local-run/localRunEvents";
 import { runIdOfFollowAddress } from "../local-run/runIdentity";
 import type { AiInvocationEvent } from "./invocationTypes";
 
-export interface RunFollow {
+interface RunFollow {
   state: string;
   events: AiInvocationEvent[];
 }

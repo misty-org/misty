@@ -6,6 +6,7 @@ use serde_json::Value;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+#[cfg(test)]
 const FLUSH_INTERVAL: Duration = Duration::from_millis(32);
 // Chat already coalesces updates per animation frame and budgets Markdown
 // parsing separately. Keep IPC batching, but don't add two frames of waiting.
@@ -54,6 +55,7 @@ impl EventSink {
     }
 
     /// Batched sink emitting under a custom event name (e.g. terminal output).
+    #[cfg(test)]
     pub fn with_name(emitter: Arc<dyn Emit>, name: &'static str) -> Arc<Self> {
         Self::with_interval(emitter, name, FLUSH_INTERVAL)
     }

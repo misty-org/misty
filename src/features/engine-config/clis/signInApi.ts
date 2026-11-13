@@ -6,8 +6,8 @@ import type { UnlistenFn } from "@tauri-apps/api/event";
 import { invoke } from "@/native/invoke";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 
-export const SIGN_IN_OUTPUT_EVENT = "engine-cli://sign-in-output";
-export const SIGN_IN_CLOSED_EVENT = "engine-cli://sign-in-closed";
+const SIGN_IN_OUTPUT_EVENT = "engine-cli://sign-in-output";
+const SIGN_IN_CLOSED_EVENT = "engine-cli://sign-in-closed";
 
 /** What to start: an engine's own sign-in, or its sign-out; `provider` picks Pi's or Oh My Pi's
  *  provider, or MiniMax Code's region (`global` or `cn`). */

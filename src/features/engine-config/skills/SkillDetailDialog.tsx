@@ -35,7 +35,7 @@ import type {
 } from "./types";
 import { daysSince, relevantTargets, sourceKindOf } from "./utils";
 
-export interface SkillContentState {
+interface SkillContentState {
   path: string;
   markdown: string;
   truncated: boolean;

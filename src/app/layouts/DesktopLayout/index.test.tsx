@@ -103,11 +103,6 @@ vi.mock("@/features/account/AuthContext", async (importOriginal) => ({
   }),
 }));
 
-vi.mock("@/features/onboarding/setup", async (importOriginal) => ({
-  ...(await importOriginal<Record<string, unknown>>()),
-  useSetupStore: { getState: () => ({ finishWelcome: vi.fn() }) },
-}));
-
 vi.mock("./AccountMenu", () => ({ AccountMenu: () => null }));
 vi.mock("./SettingsOverlays", () => ({ RemotesOverlay: () => null, SettingsOverlay: () => null }));
 vi.mock("./FramePacingOverlay", () => ({ FramePacingOverlay: () => null }));
@@ -294,9 +289,7 @@ describe("DesktopLayout on Auth Routes", () => {
     });
 
     expect(container.querySelector('[data-testid="auth-outlet"]')).not.toBeNull();
-    // Workspace canvas must be suppressed
     expect(container.querySelector('[data-testid="workspace-canvas"]')).toBeNull();
-    // No history back/forward buttons
     expect(container.querySelector('button[aria-label="Go back"]')).toBeNull();
     expect(container.querySelector('button[aria-label="Go forward"]')).toBeNull();
   });

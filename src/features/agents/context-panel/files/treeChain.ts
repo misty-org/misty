@@ -2,7 +2,7 @@
 import type { DirEntry, RepositorySummary } from "./filesApi";
 
 /** The tree state a single-child chain is decided from. */
-export interface ChainState {
+interface ChainState {
   children: Record<string, DirEntry[]>;
   loadingDirs: Record<string, true>;
   dirErrors: Record<string, string>;

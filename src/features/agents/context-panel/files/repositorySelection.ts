@@ -39,7 +39,7 @@ function parentDirectory(path: string): string {
   return idx > 0 ? trimmed.slice(0, idx) : trimmed;
 }
 
-export interface RepositorySelectionInput {
+interface RepositorySelectionInput {
   /** Selected tree node path (file or directory), or null. */
   selectedPath: string | null;
   /** Repository root paths (file store `repositories` keys). */

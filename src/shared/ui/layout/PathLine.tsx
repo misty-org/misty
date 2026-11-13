@@ -133,11 +133,7 @@ export function PathLine({ segments, label, className }: PathLineProps) {
         const body = (
           <>
             {renderIcon(segment.icon)}
-            <OverflowFadeText
-              data-path-label=""
-              full
-              style={labelStyle}
-            >
+            <OverflowFadeText data-path-label="" full style={labelStyle}>
               {segment.label}
             </OverflowFadeText>
           </>

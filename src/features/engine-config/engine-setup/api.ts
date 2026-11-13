@@ -23,7 +23,7 @@ export interface EngineSettings {
 export const binKey = (engine: string) =>
   `${engine.replace(/-([a-z])/g, (_, letter: string) => letter.toUpperCase())}Bin`;
 
-export const engineSettingsApi = {
+const engineSettingsApi = {
   get: () => invoke<EngineSettings>("engine_settings_get"),
   /** Applies `change` to a fresh read, never to a page's older copy, and stores it. Native code
    *  checks each program path and the Codex home before keeping them. */

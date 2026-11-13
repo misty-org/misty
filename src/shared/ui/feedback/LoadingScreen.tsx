@@ -32,7 +32,7 @@ export function useSplashShowing(): boolean {
 }
 
 /** Loading surface for initial loads and route transitions. Full screen it is the startup
- * splash: Misty flying along her track over the window color, with no loading text (AGENTS.md);
+ * splash: Misty flying along her track over the window color, with no loading text;
  * inline it is a skeleton. A full-screen one that is `leaving` lets Misty finish the pass she is
  * on, so she is never cut off mid-flight, then fades out over what replaced it and calls
  * `onLeft`. */

@@ -46,9 +46,9 @@ export interface MistyState {
   selectConversation: (conversationId: string) => void;
   deleteConversation: (conversationId: string) => Promise<void>;
   renameConversation: (conversationId: string, title: string) => Promise<void>;
-  /** Drops a message and everything after it, so a prompt can be sent again from there. */
   /** Replaces an answer's text (its ledger changed). */
   setMessageLedger: (conversationId: string, messageId: string, content: string) => void;
+  /** Drops a message and everything after it, so a prompt can be sent again from there. */
   rewindConversation: (conversationId: string, messageId: string) => void;
   submit: () => Promise<void>;
   cancelResponse?: () => Promise<void>;
@@ -77,7 +77,6 @@ export interface MistyState {
       collaborationMode?: "teach" | "act";
       /** The Space the turn runs in; absent is the window's. */
       spaceId?: string;
-      /** Opens a tab in this window for the task, at this page when given. */
       /** The turn continues on a browser screen it asked for, so it starts no desktop control. */
       openScreen?: boolean;
     },

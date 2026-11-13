@@ -31,7 +31,7 @@ pub(super) fn page_load(
         })
         .unwrap_or(false);
     let _ = apply_agent_input_lock(&webview, locked);
-    // An agent's page answers its cookie banner as it loads (browser_page/mod.rs).
+    // An agent's page answers its cookie banner as it loads (page_agent/consent.rs).
     if matches!(payload.event(), tauri::webview::PageLoadEvent::Finished)
         && page_app
             .state::<BrowserSessionState>()

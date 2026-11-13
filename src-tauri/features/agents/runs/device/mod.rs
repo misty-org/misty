@@ -1,4 +1,4 @@
-//! Model calls the desktop makes outside agent runs, on the runtime on its own computer
+//! Model calls the desktop makes outside agent runs, on the runtime on its own computer:
 //! the desktop has the input, so the server is never asked. Each call runs
 //! on the device's model for its role and key for that model's provider.
 //!

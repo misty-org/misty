@@ -8,7 +8,7 @@ import { resolveSetting, useDevicePreferences, useSettingsStore } from "@/featur
  * (Settings → Agents, or the dock); the choice belongs to this computer.
  */
 
-export const SOUND_SETTING = "agents.studio_sounds";
+const SOUND_SETTING = "agents.studio_sounds";
 
 /** Whether studio sounds are on, as this computer's settings say. */
 export function useStudioSoundsOn(): boolean {

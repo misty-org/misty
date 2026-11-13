@@ -13,7 +13,7 @@ export interface EngineSession {
   messageCount: number;
 }
 
-export interface EngineSearchHit {
+interface EngineSearchHit {
   engine: string;
   sessionId: string;
   workspacePath: string;

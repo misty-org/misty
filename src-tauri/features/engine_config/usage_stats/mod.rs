@@ -25,7 +25,7 @@ mod types;
 #[cfg(test)]
 mod tests;
 
-pub use types::{PriceInfo, QueryRequest, QueryResponse, ScanSummary, SourceStatus, UsageStatRow};
+pub use types::{PriceInfo, QueryRequest, QueryResponse, ScanSummary, SourceStatus};
 
 use scan::{ScanMode, ScanProgress};
 use std::collections::HashMap;

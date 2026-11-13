@@ -1,4 +1,4 @@
-//! Counts the request asks for, checked against the answer without a model call
+//! Counts the request asks for, checked against the answer without a model call.
 //! A run reported "completed" with 8 of the 10 pediatricians
 //! asked for, and the model review let it stand (Odysseys, October 20).
 //!

@@ -13,7 +13,7 @@ const TITLE_LIMIT = 60;
 const DESCRIPTION_LIMIT = 160;
 
 /** Whether a message is one the person typed, which is what the rail marks. */
-export function isAnchorMessage(message: GlobalAiMessage): boolean {
+function isAnchorMessage(message: GlobalAiMessage): boolean {
   return message.role === "user" && !message.source && Boolean(message.content.trim());
 }
 

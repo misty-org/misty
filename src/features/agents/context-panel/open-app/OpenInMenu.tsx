@@ -49,11 +49,7 @@ function TargetIcon({ target, icon }: { target: OpenAppTarget; icon?: string }) 
 
 /** What a target opens: the file shown in the editor, except in the file manager, which shows
  * the folder. */
-export function openInPath(
-  target: OpenAppTarget,
-  folder: string,
-  activeFilePath: string | null,
-): string {
+function openInPath(target: OpenAppTarget, folder: string, activeFilePath: string | null): string {
   if (target.id === "finder") return folder;
   return activeFilePath && isWithinDirectory(folder, activeFilePath) ? activeFilePath : folder;
 }

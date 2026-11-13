@@ -12,7 +12,7 @@ import { openSettings, type SettingsSection } from "@/features/settings";
 import { applyTrigger, filterItems, mentionOf, triggerAt, type Trigger } from "./composerTriggers";
 import { PersonaMakeAgent, personaSuggestions } from "../../../personas/PersonaSuggestions";
 
-export interface Suggestion {
+interface Suggestion {
   key: string;
   name: string;
   description: string;

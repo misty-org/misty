@@ -23,7 +23,7 @@ export function skipJsonTrivia(text: string, start: number): number {
   }
 }
 
-export function readJsonString(text: string, start: number): { value: string; end: number } | null {
+function readJsonString(text: string, start: number): { value: string; end: number } | null {
   if (text[start] !== '"') {
     return null;
   }
@@ -63,7 +63,7 @@ export function readJsonString(text: string, start: number): { value: string; en
   return null;
 }
 
-export function skipJsonValue(text: string, start: number): number | null {
+function skipJsonValue(text: string, start: number): number | null {
   const first = text[start];
   if (first === '"') {
     return readJsonString(text, start)?.end ?? null;

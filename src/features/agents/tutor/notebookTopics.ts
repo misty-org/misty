@@ -15,7 +15,7 @@ import {
  * from, what the agent looks for first, and a cover. Starting from one makes an ordinary notebook.
  * Verticals never get sections of their own.
  */
-export interface NotebookTopic {
+interface NotebookTopic {
   id: string;
   label: string;
   icon: LucideIcon;

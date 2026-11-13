@@ -74,7 +74,7 @@ function SignInPill({ signedIn, detail }: { signedIn: boolean | null; detail: st
   );
 }
 
-export function CliRow({ engine }: { engine: EngineId }) {
+function CliRow({ engine }: { engine: EngineId }) {
   const { status, signIn, loading, error, updating, refresh } = useCliVersionStatus(engine);
   const flow = useCliUpdateFlow(engine);
   const name = ENGINE_NAMES[engine];

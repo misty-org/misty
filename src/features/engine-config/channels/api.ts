@@ -30,7 +30,7 @@ export interface OfficialConfigDraft {
   content: string;
 }
 
-export interface ProviderModelList {
+interface ProviderModelList {
   models: string[];
   endpoint: string;
 }

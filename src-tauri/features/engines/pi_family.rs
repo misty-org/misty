@@ -42,7 +42,6 @@ fn attach_context_window(mut usage: Value) -> Value {
 /// frames we can answer over stdin.
 pub struct PiFamilyEngine {
     pub id: &'static str,
-    pub home_dir_name: &'static str, // ".pi" | ".omp"
     /// The reassembly buffer for omp rpc-ui v2 large frames: chunkId → chunks. pi's json mode doesn't use it.
     rpc_chunks: std::sync::Mutex<std::collections::HashMap<String, RpcChunkAcc>>,
     /// This run's served-model sidecar, set before the reader starts and only
@@ -387,7 +386,6 @@ fn ensure_pi_ask_bridge() -> Result<String, String> {
 pub fn pi() -> PiFamilyEngine {
     PiFamilyEngine {
         id: "pi",
-        home_dir_name: ".pi",
         rpc_chunks: std::sync::Mutex::new(std::collections::HashMap::new()),
         served_models_file: std::sync::OnceLock::new(),
     }
@@ -396,7 +394,6 @@ pub fn pi() -> PiFamilyEngine {
 pub fn omp() -> PiFamilyEngine {
     PiFamilyEngine {
         id: "omp",
-        home_dir_name: ".omp",
         rpc_chunks: std::sync::Mutex::new(std::collections::HashMap::new()),
         served_models_file: std::sync::OnceLock::new(),
     }

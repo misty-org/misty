@@ -3,7 +3,7 @@
  * shapes and prompts the model reads are in the crate's `local_prompt/artifact_specs.rs`.
  */
 
-export interface ArtifactSpec {
+interface ArtifactSpec {
   title: string;
   risk: string;
   approvalPolicy: string;

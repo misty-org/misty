@@ -221,7 +221,7 @@ mod confinement {
     }
 }
 
-/// Reports what a read costs. Run with `--ignored --nocapture`; numbers go in the plan.
+/// Reports what a read costs. Run with `--ignored --nocapture`.
 #[tokio::test]
 #[ignore]
 async fn how_long_a_read_takes() {

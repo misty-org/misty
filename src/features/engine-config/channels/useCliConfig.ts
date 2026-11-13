@@ -32,7 +32,7 @@ type DialogState = { entry?: ProviderEntry } | null;
 
 const errorText = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
-export const syncedText = (result: CcSwitchImportResult) =>
+const syncedText = (result: CcSwitchImportResult) =>
   `Imported: ${result.added} added, ${result.updated} updated, ${result.removed} removed`;
 
 export interface CliConfigState {

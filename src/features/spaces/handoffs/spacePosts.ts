@@ -4,8 +4,8 @@ import type { SpaceMessage } from "../api/dto/entities";
  * Handoffs and claims travel as ordinary Space chat messages a person sends. The server has no
  * field for a message's kind, so the first words mark it and the chat draws it as a card.
  */
-export const handoffMark = "Handoff:";
-export const claimMark = "Working on:";
+const handoffMark = "Handoff:";
+const claimMark = "Working on:";
 
 /** A claim stops showing a day after it was posted, released or not. */
 export const claimLifetimeMs = 24 * 60 * 60 * 1000;
@@ -111,7 +111,7 @@ export function pendingHandoffs(
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
-export interface Claim {
+interface Claim {
   id: string;
   userId: string;
   name: string;
@@ -120,7 +120,7 @@ export interface Claim {
 }
 
 /** Whether something posted at `createdAt` is still inside a claim's day. */
-export function claimIsFresh(createdAt: string, now: number): boolean {
+function claimIsFresh(createdAt: string, now: number): boolean {
   const posted = Date.parse(createdAt);
   return Number.isFinite(posted) && now - posted < claimLifetimeMs;
 }

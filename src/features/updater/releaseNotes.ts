@@ -25,7 +25,7 @@ function normalizeVersion(version: string): string {
 /** `a` newer than `b` is positive, older negative, the same (or not comparable) 0. Parts are
  *  compared as numbers, missing parts count as 0, and anything else (a pre-release suffix)
  *  counts as not comparable: better to skip the notes once than call a downgrade new. */
-export function compareVersions(a: string, b: string): number {
+function compareVersions(a: string, b: string): number {
   const parts = (version: string) =>
     normalizeVersion(version)
       .split(".")

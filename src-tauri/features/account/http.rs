@@ -1,7 +1,6 @@
 //! Streaming HTTP for account requests. Only native code sees JWTs: this layer adds the bearer,
-//! takes tokens from responses and strips them before the renderer reads the headers. Only this
-//! layer adds the device's model keys (`X-Misty-Models`); the renderer can neither set nor read
-//! that header.
+//! takes tokens from responses and strips them before the renderer reads the headers. It also
+//! drops any `X-Misty-Models` header, so model keys never leave this computer.
 use super::session::{self, AccountClient, Captured, RefreshAnswer};
 use serde::{Deserialize, Serialize};
 use std::{

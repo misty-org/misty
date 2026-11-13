@@ -141,4 +141,4 @@ function Tooltip({ content, shortcut, side, align, children }: TooltipProps) {
   );
 }
 
-export { Tooltip, TooltipProvider, useShortcutHints };
+export { Tooltip, TooltipProvider };

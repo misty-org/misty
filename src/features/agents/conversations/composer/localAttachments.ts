@@ -8,7 +8,7 @@ import type { MistyImageAttachment } from "../state/conversationTypes";
  */
 
 /** What a turn's run reads, in the shape `companion_images.rs` reads. */
-export interface RunAttachment {
+interface RunAttachment {
   id: string;
   name: string;
   mime_type: string;
@@ -34,7 +34,7 @@ export function dataUrl(bytes: ArrayBuffer, mimeType: string): string {
   return `data:${mimeType};base64,${btoa(binary)}`;
 }
 
-export function blobOfDataUrl(url: string, mimeType: string): Blob {
+function blobOfDataUrl(url: string, mimeType: string): Blob {
   const binary = atob(url.slice(url.indexOf(",") + 1));
   const bytes = new Uint8Array(binary.length);
   for (let index = 0; index < binary.length; index++) bytes[index] = binary.charCodeAt(index);

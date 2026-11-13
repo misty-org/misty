@@ -87,14 +87,10 @@ export * from "./feedback/StateView";
 // Named; resetNotices is for tests, which import it through this barrel too.
 export {
   NoticeViewport,
-  dismissNotice,
   notify,
   resetNotices,
   useNotice,
   type NoticeAction,
-  type NoticeHandle,
-  type NoticeOptions,
-  type NoticeTone,
 } from "./feedback/notices";
 
 // navigation

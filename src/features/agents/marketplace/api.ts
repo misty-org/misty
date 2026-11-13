@@ -66,7 +66,7 @@ export function kindsFor(engine: string): MarketKind[] {
   ];
 }
 
-export interface SuggestedMarketplace {
+interface SuggestedMarketplace {
   /** What the engine's `plugin marketplace add` takes. */
   source: string;
   name: string;
@@ -104,7 +104,7 @@ const hashicorp: SuggestedMarketplace = {
   line: "Terraform and Packer, from HashiCorp",
 };
 
-export const suggestedMarketplaces: Record<MarketEngine, SuggestedMarketplace[]> = {
+const suggestedMarketplaces: Record<MarketEngine, SuggestedMarketplace[]> = {
   claude: [anthropicSkills, workflows, superpowers, hashicorp],
   codex: [workflows, hashicorp],
   // Oh My Pi reads Claude Code's marketplace format, and starts with none of its own.
@@ -158,7 +158,7 @@ export interface EngineMarket {
   error: string | null;
 }
 
-export type InstallOutcome =
+type InstallOutcome =
   | { result: "installed" }
   | { result: "confirmCommand"; command: { command: string; sha256: string } };
 

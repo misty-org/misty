@@ -56,7 +56,7 @@ export const engineCatalog = (engine: string, folder: string) =>
   invoke<EngineCatalog>("engine_catalog", { account: agentAccountId(), engine, folder });
 
 /** A file or folder inside a linked folder, for the composer's `@` menu. */
-export interface FoundFile {
+interface FoundFile {
   path: string;
   relative: string;
   isDir: boolean;
@@ -74,7 +74,7 @@ export const currentSpaceKey = () => spaceWindow().spaceId ?? "";
  * out of the way). Adapted from desktop-cc-gui's workspace grouping (MIT, Copyright (c) 2026
  * zhukunpenglinyutong).
  */
-export interface SpaceFolderPrefs {
+interface SpaceFolderPrefs {
   chosen?: string;
   names?: Record<string, string>;
   order?: string[];

@@ -18,7 +18,7 @@ import { ActionBar, type ActionBarItem } from "../layout/ActionBar";
 import { iconBarItem, type IconBarItemOptions } from "../layout/IconBarItem";
 
 /** A press on the bar's buttons keeps focus in its field, so typing carries on. */
-export function keepFindInputFocus(event: { preventDefault(): void }) {
+function keepFindInputFocus(event: { preventDefault(): void }) {
   event.preventDefault();
 }
 

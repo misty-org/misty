@@ -55,7 +55,7 @@ export function buildDeviceJob(args: {
   };
 }
 
-export type JobOutcome =
+type JobOutcome =
   | { ok: true; output: Record<string, unknown> }
   /** `stopped`: its time ran out or its run stopped, so nobody saw how it ended. */
   | { ok: false; error: unknown; stopped: boolean };
@@ -84,7 +84,7 @@ export async function settleDeviceJob(job: Job, signal: AbortSignal): Promise<Jo
   }
 }
 
-export interface AccountAgentSettings {
+interface AccountAgentSettings {
   screen_location?: string;
 }
 

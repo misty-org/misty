@@ -1,15 +1,9 @@
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import {
-  configureWorkspaceDefaultView,
-  dockLeaves,
-  useLayoutEditor,
-  useWorkspaceStore,
-} from "@/features/app-windows";
+import { dockLeaves, useLayoutEditor, useWorkspaceStore } from "@/features/app-windows";
 import { LayoutPopup } from "./LayoutPopup";
 
 beforeEach(() => {
-  configureWorkspaceDefaultView(3);
   useWorkspaceStore.getState().reset();
   // Two tabs: the window shows the second, so the first list row is the one not yet placed.
   useWorkspaceStore.getState().newTab();

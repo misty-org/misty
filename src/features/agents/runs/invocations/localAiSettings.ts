@@ -30,7 +30,7 @@ const defaults: AiUserSettings = {
 
 const snapshot = () => invoke<Snapshot>("settings_session_state", { scope });
 
-export function settingsOf(state: Partial<Stored> | null | undefined): AiUserSettings {
+function settingsOf(state: Partial<Stored> | null | undefined): AiUserSettings {
   return { ...defaults, ...state?.settings };
 }
 

@@ -1,7 +1,7 @@
 import { defineConfig } from "vitest/config";
 
 // Live acceptance runs: real models, the local dev server and a headless
-// browser. Opt in with MISTY_ACCEPTANCE=1 (npm run acceptance does).
+// browser. Opt in with MISTY_ACCEPTANCE=1 (misty check acceptance in misty-cli does).
 export default defineConfig({
   envDir: false,
   resolve: {

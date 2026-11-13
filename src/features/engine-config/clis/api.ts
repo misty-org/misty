@@ -29,7 +29,7 @@ export interface CliUpdatePlan {
   platform: string;
 }
 
-export interface CliUpdateResult {
+interface CliUpdateResult {
   ok: boolean;
   version: string | null;
 }
@@ -42,7 +42,7 @@ export interface CliSignInStatus {
   detail: string | null;
 }
 
-export interface CliUpdateProgressEvent {
+interface CliUpdateProgressEvent {
   runId: string;
   engine: string;
   phase: "started" | "stdout" | "stderr" | "finished";
@@ -50,7 +50,7 @@ export interface CliUpdateProgressEvent {
   exitOk: boolean | null;
 }
 
-export const CLI_UPDATE_PROGRESS_EVENT = "engine-cli://update-progress";
+const CLI_UPDATE_PROGRESS_EVENT = "engine-cli://update-progress";
 
 export const cliApi = {
   status: (engine: string) => invoke<CliVersionStatus>("engine_cli_status", { engine }),

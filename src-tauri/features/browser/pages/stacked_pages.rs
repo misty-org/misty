@@ -12,7 +12,7 @@
 //! A stacked page still counts as on screen to the engine, so it would keep
 //! drawing. After a while hidden (a minute unless the person chose otherwise)
 //! it is asked to behave as a background tab
-//! (`browser/scripts/background_tab.js`): it reads as hidden and stops drawing, with
+//! (`kiri_link/scripts/background_tab.js`): it reads as hidden and stops drawing, with
 //! its last frame kept. Tabs playing sound, in picture in picture, capturing,
 //! downloading or driven by an agent keep running. Showing the tab undoes it
 //! at once. The engine's own freeze is not used: a page it unfreezes stays

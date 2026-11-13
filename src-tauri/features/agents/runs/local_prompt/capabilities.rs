@@ -29,9 +29,9 @@ pub(super) fn agent_capability_guidance(tools: &[String], desktop_control: bool,
     if has("web.search") {
         out.push_str("\n\nWeb: for research, news, current facts or anything outside the user's own data, call web_search; it needs no app or sign-in. Search more than once when a task needs several angles, prefer primary and reputable sources, and cite the links you use.");
         if has(WEB_FETCH_TOOL) {
-            // The routing note (docs/agents/harness.md, Reading without a screen): reading never needs a screen.
+            // Reading never needs a screen.
             if own {
-                // An agent with its own window works where the person watches (docs/agents/cursor-companion.md, "Agent windows").
+                // An agent with its own window works where the person watches.
                 out.push_str(" A few searches and the pages they point to are usually enough. Work the pages your answer relies on in your own browser tab, where the person watches you: open them there, read them with browser_snapshot, and click, toggle, filter and scroll with browser_steps as a person would. Keep web_fetch for a quick look at a page you will not rely on.");
             } else {
                 out.push_str(" When a result's excerpt doesn't hold the answer, read the page with web_fetch instead of searching again; a few searches and the pages they point to are usually enough. Answer from search and fetched pages; open a browser or screen only to click, sign in or act, or for a page web_fetch could not read.");
@@ -59,7 +59,7 @@ pub(super) fn agent_capability_guidance(tools: &[String], desktop_control: bool,
         }
         out.push_str(" Never enter passwords or MFA codes. Include source URLs when saving or sharing research. Report facts as the pages you read show them, with their conditions (such as billed yearly or monthly); if a page did not show something, open it or say you could not confirm it rather than filling it in from memory.");
         if has("browser.run") {
-            // docs/agents/harness.md, browser_run: a program per call instead of a turn per step.
+            // browser_run: a program per call instead of a turn per step.
             out.push_str(" Work pages with browser_run: one program opens pages, searches, clicks through results and reads many items in one call, so a list of ten is a loop, not ten turns. Its targets are words, locators or refs, never a documentId. Keep each program to one stretch of work (a site, a search), return what it found, and read the result before the next. The single-step page tools below load with agent_tool_use browse, for what a program cannot do (a page skill, the screen agent).");
         }
         if has("browser.snapshot") && has("browser.steps") || own {
@@ -83,8 +83,7 @@ pub(super) fn agent_capability_guidance(tools: &[String], desktop_control: bool,
         out.push_str("\n\nWaiting for the user: when the screen needs the person (a sign-in, a password or code, a CAPTCHA or verification, choosing an account, a permission dialog), or browser_act stops for one, call browser_request_user_action with that screen's scopeId and say in the reason exactly what they need to do. Misty hands them control, shows a Waiting for you card in the conversation and continues this run when they are done; do not end your response or ask in text instead. Afterwards look at the screen again before acting.");
     }
     if own {
-        // How a good browser agent works a page (docs/agents/harness.md, Page layer, after
-        // browser-use's rules). Across 116 Odysseys runs the agent read pages but rarely used them:
+        // How a good browser agent works a page, after browser-use's rules. Across 116 Odysseys runs the agent read pages but rarely used them:
         // directory searches never filled, results never clicked into, sizes never chosen.
         out.push_str("\n\nWorking a page:");
         for rule in [

@@ -20,14 +20,14 @@ function fileValues(): Record<string, string> {
   return values;
 }
 
-export function liveEnv(name: string): string {
+function liveEnv(name: string): string {
   return (process.env[name] ?? fileValues()[name] ?? "").trim();
 }
 
 export const liveAcceptanceEnabled = process.env.MISTY_ACCEPTANCE === "1";
 
 /** The run's model: what the local server meters screen calls against. */
-export const liveModel = () =>
+const liveModel = () =>
   liveEnv("MISTY_ACCEPTANCE_MODEL") || liveEnv("MISTY_AGENT_MODEL") || "openai/gpt-6-astra";
 
 /**

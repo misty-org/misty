@@ -11,14 +11,7 @@ import { createAgentsPageActions, deriveAgentsPageView } from "./agentsPageActio
 import { useAgentsPageState } from "./useAgentsPageState";
 import { useCollaborationStore } from "../plans/store";
 
-/*
- * THESIS: Agents opens straight into a conversation with the selected agent.
- * OWN-WORLD: Misty monochrome shared controls, 6px buttons, 8px islands, existing cloud avatars.
- * STORY: Start a task or resume recent work.
- * FIRST VIEWPORT: The New task composer and what the agent can reach.
- * FORM: Polar's page columns and catalog density inside Misty; no Spaces navigation.
- * SIGNATURE: The conversation stays mounted across catalogs.
- */
+/* Agents opens straight into a conversation with the selected agent, which stays mounted across catalogs. */
 export default function NativeAgentsPage() {
   return <AgentsWorkspacePage />;
 }
@@ -130,11 +123,7 @@ function AgentsWorkspacePage() {
           />
         )}
       </AgentSettingsModal>
-      <AgentDiscardDialog
-        open={guard.pending}
-        onCancel={guard.cancel}
-        onDiscard={guard.discard}
-      />
+      <AgentDiscardDialog open={guard.pending} onCancel={guard.cancel} onDiscard={guard.discard} />
     </main>
   );
 }

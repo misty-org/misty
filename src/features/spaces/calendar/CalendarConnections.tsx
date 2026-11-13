@@ -20,13 +20,13 @@ import { useCallback, useEffect, useState } from "react";
  * a Misty server. Notion Calendar has no connection of its own; it shows a Google Calendar account
  * and Notion's dated pages, which are these two.
  */
-export const calendarApps = [
+const calendarApps = [
   { app: "googlecalendar", name: "Google Calendar" },
   { app: "notion", name: "Notion" },
 ] as const;
 
 /** The account a calendar app is connected as, when it is. */
-export function connectedCalendar(
+function connectedCalendar(
   apps: ConnectedApp[] | undefined,
   app: string,
 ): ConnectedApp | undefined {

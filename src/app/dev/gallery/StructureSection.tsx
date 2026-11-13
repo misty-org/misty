@@ -142,7 +142,7 @@ function DialogSample({ size }: { size: DialogSize }) {
   );
 }
 
-/** Wave 2 structure pieces: marks, headings, properties, choices, prose and dialog sizes. */
+/** Structure pieces: marks, headings, properties, choices, prose and dialog sizes. */
 export function StructureSection() {
   return (
     <GallerySection title="Structure">

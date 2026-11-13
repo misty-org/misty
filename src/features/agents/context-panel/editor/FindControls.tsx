@@ -7,7 +7,7 @@ export function keepFindInputFocus(event: { preventDefault(): void }) {
   event.preventDefault();
 }
 
-export type FindOption = "caseSensitive" | "wholeWord" | "regexp";
+type FindOption = "caseSensitive" | "wholeWord" | "regexp";
 
 /** How the query matches, inside the find field: case, whole words, a regular expression. */
 export function FindToggles(props: {

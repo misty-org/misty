@@ -13,7 +13,7 @@ import { isUnder, joinPath, treeLineage } from "./paths";
 import { nextChainDir } from "./treeChain";
 import { useTreePreferences } from "./treePreferences";
 
-export { fileName, joinPath, parentPath, treeLineage } from "./paths";
+export { fileName, joinPath, parentPath } from "./paths";
 
 export const treeKey = (root: string) => `misty.fileTree:${root}`;
 export const tabsKey = (root: string) => `misty.editorTabs:${root}`;
@@ -126,7 +126,7 @@ export interface TreeClipboard {
   osChangeCount?: number | null;
 }
 
-export interface OpenFileState {
+interface OpenFileState {
   path: string;
   /** Null until the first read lands. */
   content: FileContent | null;

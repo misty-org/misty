@@ -12,17 +12,10 @@
 # value. A server's files live in ~/.misty/.env/server/, outside the repository.
 
 **/.venv
-.windows-test/
 
 **/.cache/
 **/.DS_Store
 **/.vscode
-# Personal agent tools and generated design-review metadata stay local.
-**/.agents/
-**/.claude
-**/.codex
-**/.cursor/
-**/.impeccable/
 **/.zed
 **.log
 *.tmp
@@ -41,7 +34,6 @@ artifacts/
 # Source folders whose names match the rules above.
 !src/features/account/sessions/
 !src/features/agents/artifacts/
-.demo/
 
 # Images and large binary artifacts
 *.png
@@ -150,7 +142,7 @@ artifacts/
 !src/shared/assets/agents/*.png
 !src/shared/assets/agents/*.svg
 
-# Live acceptance evidence (npm run acceptance)
+# Live acceptance evidence (misty check acceptance)
 /.misty/acceptance/
 
 # Feature source assets and native service build outputs.
@@ -161,8 +153,6 @@ artifacts/
 
 # Midscene run logs.
 midscene_run/
-
-# The agent runtime's Node sidecar, copied in by the release build.
 
 # Tauri generates one permission file per app command at build.
 src-tauri/permissions/

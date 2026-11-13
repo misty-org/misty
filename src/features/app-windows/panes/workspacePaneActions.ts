@@ -20,7 +20,7 @@ import {
 } from "./dockTree";
 import { canCloseWorkspaceView, removeDockView } from "../tabs/workspaceViewOperations";
 import { maxWorkspacePanes, type WorkspaceLayout } from "../tabs/workspaceViews";
-import { createDefaultWorkspaceView, createBlankWorkspaceView } from "../tabs/workspaceDefaultView";
+import { createDefaultWorkspaceView } from "../tabs/workspaceDefaultView";
 import type { StoreApi } from "zustand";
 import type { WorkspaceStore } from "../tabs/useWorkspaceStore";
 import { withLayout } from "../tabs/workspaceLayoutUpdate";
@@ -190,7 +190,7 @@ export function workspacePaneActions(
       if (dockLeaves(current.layout.root).length >= maxWorkspacePanes) return null;
       const pane = findDockLeaf(current.layout.root, paneId);
       if (!pane || !splitKeepsGrid(current.layout.root, paneId, direction)) return null;
-      const leaf = createDockLeaf([createBlankWorkspaceView()]);
+      const leaf = createDockLeaf([createDefaultWorkspaceView()]);
       set({
         ...withLayout(current, {
           ...current.layout,

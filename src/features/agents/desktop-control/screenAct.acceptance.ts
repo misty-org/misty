@@ -4,7 +4,7 @@ import { launchChromiumDevice, type ChromiumDevice } from "@/tests/acceptance/ch
 import { screenModelPassThrough, liveAcceptanceEnabled } from "@/tests/acceptance/liveEnv";
 import { writeAcceptanceReport } from "@/tests/acceptance/report";
 
-// Phase 4, live: the shipped screen loop and Midscene planner against a real
+// Live: the shipped screen loop and Midscene planner against a real
 // model, with headless Chromium as the device. Model calls go straight to the
 // deployment's provider in the exact shape the server pass-through forwards.
 const device = vi.hoisted(() => ({

@@ -33,7 +33,7 @@ export function absoluteOf(repository: string, relative: string) {
 const isMac = () => typeof navigator !== "undefined" && navigator.platform.includes("Mac");
 const isWindows = () => typeof navigator !== "undefined" && navigator.platform.includes("Win");
 
-export const revealLabel = () =>
+const revealLabel = () =>
   isMac() ? "Reveal in Finder" : isWindows() ? "Show in Explorer" : "Show in file manager";
 
 /** Opens a changed file in the files panel's editor. */

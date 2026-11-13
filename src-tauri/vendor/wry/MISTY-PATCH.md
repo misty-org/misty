@@ -30,10 +30,8 @@ fallback when its custom-protocol IPC is blocked, so Misty's own windows are
 unaffected; on a page that both blocks that protocol and declares `ipc`, Kiri's
 page features report an error instead of the whole site failing.
 
-Regression verification: with the browser eval bridge running (see
-`docs/agents/evals/odysseys.md`), a new sheet at
-`https://docs.google.com/spreadsheets/create` gets its own address and enabled
-controls.
+Regression verification: open `https://docs.google.com/spreadsheets/create` in a
+Misty tab; the new sheet gets its own address and enabled controls.
 
 Remove this patch when upstream defines the property so pages can redeclare it.
 
@@ -71,4 +69,8 @@ site in one; the other is signed in, an incognito window of another Space is not
 and after closing every incognito window of the first Space a new one starts
 signed out.
 
-Remove this patch when upstream supports more than one private session.
+No current Misty feature opens an incognito webview: the app has no incognito
+windows, and the last caller (a debug-only temporary session for benchmark runs)
+is gone, so the steps above need a build that opens one. Remove this patch when
+upstream supports more than one private session, or when Misty decides it no
+longer needs private sessions.

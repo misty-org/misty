@@ -12,7 +12,7 @@ export interface Label {
   up?: boolean;
 }
 
-export interface Placed {
+interface Placed {
   /** How far it was moved from its point to keep clear of the labels before it. */
   dy: number;
   hidden: boolean;

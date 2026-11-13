@@ -445,7 +445,7 @@ describe("Clicky capture ordering and shared entry points", () => {
         conversationId: "conversation",
       }),
     );
-    // Every request at the cursor carries the screens (agent-harness plan, phase 4).
+    // Every request at the cursor carries the screens.
     expect(mocks.invoke).toHaveBeenCalledWith("cursor_companion_capture", expect.anything());
     mocks.state.working = false;
     await act(async () =>

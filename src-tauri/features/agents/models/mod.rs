@@ -40,15 +40,9 @@ fn saved_providers() -> Vec<String> {
         .collect()
 }
 
-/// This device's model choices and keys, for the agent runtime on this computer. None when
-/// no agent model has a usable provider and no Soniox key is saved.
-#[cfg(debug_assertions)]
-pub async fn current_document(app: &tauri::AppHandle) -> Option<Value> {
-    device_document(app).await.ok().flatten()
-}
-
-/// The same, where it matters why there is none: an error is settings or a keychain that couldn't be
-/// read, and `None` is a person with no models. Telling the runtime a passing failure means no models
+/// This device's model choices and keys, for the agent runtime on this computer. An error is
+/// settings or a keychain that couldn't be read, and `None` is a person with no models: no agent
+/// model has a usable provider and no Soniox key is saved. Telling the runtime a passing failure means no models
 /// would fail every run it resumed with `model_key_needed`.
 pub async fn device_document(app: &tauri::AppHandle) -> Result<Option<Value>, String> {
     const UNREADABLE: &str = "Misty couldn't read this device's models.";

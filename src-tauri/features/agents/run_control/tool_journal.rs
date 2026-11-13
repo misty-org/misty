@@ -55,39 +55,6 @@ pub(super) fn write_receipts(store: &Store, account: &str, run_ids: &[String]) -
     read().unwrap_or_default()
 }
 
-/// Every call a run made, oldest first, for the judge's action history (debug builds only).
-#[cfg(debug_assertions)]
-pub(crate) fn run_record(store: &Store, run_id: &str) -> Vec<Value> {
-    let read = || -> rusqlite::Result<Vec<Value>> {
-        let connection = store.connect()?;
-        let mut statement = connection.prepare(
-            "SELECT call_id, name, outcome FROM agent_tool_journal WHERE run_id = ?1 ORDER BY updated_at",
-        )?;
-        let rows = statement.query_map([run_id], |row| {
-            Ok((
-                row.get::<_, String>(0)?,
-                row.get::<_, String>(1)?,
-                row.get::<_, Option<String>>(2)?,
-            ))
-        })?;
-        rows.map(|row| {
-            let (call, name, outcome) = row?;
-            // The journal keys a call by its turn too (`journal_call_id`); the transcript doesn't.
-            let call = call
-                .split_once(':')
-                .map_or(call.as_str(), |(_, id)| id)
-                .to_owned();
-            let output = outcome
-                .and_then(|text| serde_json::from_str::<Value>(&text).ok())
-                .map(|value| value.get("result").cloned().unwrap_or(value))
-                .unwrap_or(Value::Null);
-            Ok(json!({ "tool_call_id": call, "tool_name": name, "output": output }))
-        })
-        .collect()
-    };
-    read().unwrap_or_default()
-}
-
 /// What the journal knew about a call as it began.
 #[derive(Debug, PartialEq)]
 pub(super) enum Begun {

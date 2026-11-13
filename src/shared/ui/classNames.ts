@@ -22,7 +22,7 @@ const layers = [
 // The type roles in theme.css. They are font sizes, not text colors: without this,
 // `cn("text-control", "text-cream")` would drop the size as a conflicting color, and
 // `cn("text-meta", "text-control")` would keep both.
-export const typeRoles = [
+const typeRoles = [
   "micro",
   "caption",
   "meta",

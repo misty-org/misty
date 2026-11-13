@@ -70,7 +70,7 @@ function requestOwners(paths: Iterable<string>) {
 }
 
 /** The GitHub owner of a folder's `origin`, or null when it has none or isn't known yet. */
-export function useFolderOwner(path: string | undefined): string | null {
+function useFolderOwner(path: string | undefined): string | null {
   const subscribePath = useCallback((onChange: () => void) => subscribe(path, onChange), [path]);
   const read = useCallback(() => (path ? (owners.get(path) ?? null) : null), [path]);
   const owner = useSyncExternalStore(subscribePath, read, read);

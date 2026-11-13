@@ -20,7 +20,7 @@ type SelectedState = "all" | "some" | "none";
 const checkedOf = (state: SelectedState) =>
   state === "all" ? true : state === "some" ? "indeterminate" : false;
 
-export interface FileRowProps {
+interface FileRowProps {
   entry: GitFileEntry;
   style?: CSSProperties;
   indent?: number;
@@ -195,7 +195,7 @@ export const FileRow = memo(function FileRow({
   return <>{menu ? menu(entry, row) : row}</>;
 });
 
-export interface DirectoryRowProps {
+interface DirectoryRowProps {
   node: GitTreeDirNode;
   style?: CSSProperties;
   indent?: number;

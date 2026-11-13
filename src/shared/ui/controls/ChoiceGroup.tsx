@@ -1,5 +1,4 @@
 import * as RadioGroupPrimitive from "@radix-ui/react-radio-group";
-import * as React from "react";
 import { cn } from "../classNames";
 import { renderIcon, type IconSource } from "../layout/ActionBar";
 import { OverflowFadeText } from "../layout/OverflowFadeText";

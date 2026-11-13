@@ -7,7 +7,7 @@
 import { invoke } from "@/native/invoke";
 import type { AgentProfile } from "@/shared/schemas";
 
-export interface BotAvatar {
+interface BotAvatar {
   type: "generated" | "emoji" | "image";
   value?: string;
   foldShape?: string;
@@ -17,7 +17,7 @@ export interface BotAvatar {
   lightness?: number;
 }
 
-export interface BotBundle {
+interface BotBundle {
   id: string;
   slug: string;
   name: string;
@@ -42,7 +42,7 @@ const engineToRuntime = (engine?: string) =>
   !engine || engine === "misty" ? "direct" : engine === "claude" ? "claude-code" : engine;
 
 /** The bundle an agent writes out as. */
-export function bundleFromAgent(agent: AgentProfile): BotBundle {
+function bundleFromAgent(agent: AgentProfile): BotBundle {
   const saved = (agent.avatar as { bot?: BotAvatar; kind?: string; value?: string }) ?? {};
   const avatar: BotAvatar = saved.bot
     ? saved.bot

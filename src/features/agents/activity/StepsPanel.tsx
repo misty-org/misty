@@ -8,7 +8,7 @@ import { RunStateBadge, runWhen } from "./RunLabels";
 import { useRunEvents, useRunSteps } from "./useRunSteps";
 
 /** This chat's runs on this computer, newest first, kept current while one goes on. */
-export function useChatRuns(conversationId: string): RunRow[] | null {
+function useChatRuns(conversationId: string): RunRow[] | null {
   const [runs, setRuns] = useState<RunRow[] | null>(null);
   const [round, setRound] = useState(0);
   const reload = useMemo(() => () => setRound((value) => value + 1), []);

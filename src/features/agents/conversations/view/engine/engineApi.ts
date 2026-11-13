@@ -13,7 +13,7 @@ export const answerEngineQuestion = (
 
 export type PlanDecision = "approve" | "request_changes" | "defer";
 
-export interface PlanDecided {
+interface PlanDecided {
   review: EnginePlanReview;
   /** The engine carries the plan out in the turn that is still waiting. */
   native: boolean;

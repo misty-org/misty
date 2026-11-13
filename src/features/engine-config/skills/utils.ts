@@ -22,7 +22,7 @@ export function sourceKindOf(skill: Pick<SkillRow, "managed" | "sourceKind">): S
   return skill.managed ? "managed" : "local";
 }
 
-export interface SkillFilter {
+interface SkillFilter {
   query: string;
   /** "" = all engines. */
   target: SkillTargetId | "";
@@ -127,7 +127,7 @@ export function daysSince(iso: string | null | undefined, now = Date.now()): num
   return Math.max(0, Math.floor((now - then) / 86_400_000));
 }
 
-export interface TargetResultSummary {
+interface TargetResultSummary {
   allOk: boolean;
   failed: { target: string; error: string | null }[];
 }

@@ -84,7 +84,7 @@ export type AiInvocationEvent =
     }
   | {
       id: string;
-      /** A run's answer that becomes a proposal; `localRun/artifacts.ts` ends the run from here. */
+      /** A run's answer that becomes a proposal; `local-run/artifacts.ts` ends the run from here. */
       type: "local.artifact_answer";
       text: string;
     }

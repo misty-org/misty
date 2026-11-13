@@ -10,7 +10,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { skillsHubApi } from "./api";
 import type { SkillActivityEntry, SkillUsageResult } from "./types";
 
-export interface SkillUsageStore {
+interface SkillUsageStore {
   usage: SkillUsageResult | null;
   usageLoading: boolean;
   usageError: string | null;

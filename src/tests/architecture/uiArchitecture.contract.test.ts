@@ -78,7 +78,7 @@ describe("UI architecture contract", () => {
     const failures = walk("src", new Set([".tsx"]))
       .map(repositoryPath)
       .filter((path) => !/\.test\.tsx$/.test(path))
-      // AGENTS.md requires this single navigation registry at its stable path.
+      // The single settings navigation registry keeps its stable path.
       .filter((path) => path !== "src/features/settings/settingsRegistry.tsx")
       .filter((path) => {
         const name = path

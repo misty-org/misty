@@ -1,4 +1,4 @@
-//! `test/model-calls.test.ts` and `device-routing.test.ts`, and the routes'
+//! The model-call and device-routing cases from the TypeScript runtime's tests, and the routes'
 //! edges, against a local provider.
 #[path = "runtime_device_support/mod.rs"]
 mod support;

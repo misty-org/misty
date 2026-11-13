@@ -46,7 +46,7 @@ export function schedule(review: CardReview, grade: Grade, now: Date): CardRevie
   };
 }
 
-export function isDue(card: Flashcard, now: Date): boolean {
+function isDue(card: Flashcard, now: Date): boolean {
   return Date.parse(card.review.due) <= now.getTime();
 }
 

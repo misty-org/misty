@@ -5,7 +5,7 @@ import { invoke } from "@/native/invoke";
  * on their own search key. The renderer never sees the key, and nothing goes to Misty's server.
  * Failures throw one plain sentence the person can act on, such as where to add a missing key.
  */
-export interface NewsItem {
+interface NewsItem {
   title: string;
   url: string;
   source?: string;

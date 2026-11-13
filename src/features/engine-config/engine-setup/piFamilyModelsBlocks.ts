@@ -8,9 +8,9 @@
  */
 import { findJsonObjectProperty, skipJsonTrivia } from "./piFamilyJsonScan";
 
-export type ModelsConfigFormat = "json" | "yaml";
+type ModelsConfigFormat = "json" | "yaml";
 
-export interface ProviderBlock {
+interface ProviderBlock {
   /** Character offset of the provider property in the original document. */
   start: number;
   /** Character offset just past the provider property value. */

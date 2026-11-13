@@ -9,8 +9,8 @@ import { RunStateError } from "./documents";
 
 /** Plans an agent proposes in Plan mode, their versions and step progress. */
 
-export const maxPlanSteps = 12;
-export const maxGoalCriteria = 10;
+const maxPlanSteps = 12;
+const maxGoalCriteria = 10;
 const keepPlans = 20;
 
 const risks = new Set(["read", "write", "draft", "consequential", "dangerous"]);
@@ -21,7 +21,7 @@ const bytes = (value: string) => new TextEncoder().encode(value).length;
 const invalid = () => new RunStateError("invalid");
 
 /** Trims a list and drops blanks, refusing one too long. */
-export function trimmedList(values: string[] | null | undefined, most: number, longest: number) {
+function trimmedList(values: string[] | null | undefined, most: number, longest: number) {
   const list = values ?? [];
   if (list.length > most) throw invalid();
   return list.flatMap((value) => {
@@ -32,7 +32,7 @@ export function trimmedList(values: string[] | null | undefined, most: number, l
 }
 
 /** Step ids are unique and stable so progress can follow them; missing ids are assigned in order. */
-export function normalizePlan(plan: AgentPlanPayload): AgentPlanPayload {
+function normalizePlan(plan: AgentPlanPayload): AgentPlanPayload {
   const title = plan.title.trim();
   const summary = plan.summary.trim();
   if (

@@ -18,7 +18,7 @@ import type { DiffTarget } from "./store";
 const DIFF_TRUNCATE_LINES = 2000;
 const DIFF_VIRTUALIZE_LINES = 500;
 
-export interface AnnotatedLine {
+interface AnnotatedLine {
   text: string;
   oldNo: number | null;
   newNo: number | null;

@@ -139,7 +139,7 @@ pub(crate) struct TurnState {
     pub(crate) saw_done: bool,
     pub(crate) saw_error: bool,
     attempt_error: Option<String>,
-    // NOTE: TurnState lives for the whole process (one run_reader per
+    // TurnState lives for the whole process (one run_reader per
     // spawn), so once saw_error is set every later event in this process
     // is suppressed. That is correct for the current one-process-per-turn
     // engines (omp --print, codex exec); a future multi-turn-per-process
@@ -1225,7 +1225,6 @@ pub(crate) async fn run_reader(stdout: ChildStdout, ctx: RunContext) {
         }
     }
 
-    // Wait for exit
     let status = {
         let mut guard = ctx.child.lock().await;
         guard.wait().await.ok()

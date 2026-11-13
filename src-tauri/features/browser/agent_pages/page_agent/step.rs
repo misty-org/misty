@@ -92,7 +92,7 @@ async fn prepare(
     Ok(prepared)
 }
 
-/// How long the cursor glides to a control (browser/scripts/agent_cursor.js) before the click.
+/// How long the cursor glides to a control (kiri_link/scripts/agent_cursor.js) before the click.
 pub(crate) const CURSOR_GLIDE_MS: u64 = 320;
 
 fn cursor_script(prepared: &Value) -> Option<String> {

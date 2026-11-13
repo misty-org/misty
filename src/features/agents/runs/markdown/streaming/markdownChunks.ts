@@ -10,7 +10,7 @@ export interface MarkdownChunk {
  *  time-slice the transition and one pathological reply cannot monopolize a
  *  frame. The target stays well below the measured ~500 ms parse cost of
  *  50k units. */
-export const MARKDOWN_CHUNK_TARGET = 8_000;
+const MARKDOWN_CHUNK_TARGET = 8_000;
 
 /** Syntax that only works when the whole document is parsed at once. Huge
  *  replies using link/footnote definitions keep one tree. */

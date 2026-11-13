@@ -9,7 +9,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
  * latest one's generated credentials are kept in the git-ignored acceptance
  * folder for inspecting its data afterwards.
  */
-export const acceptanceApi = (process.env.MISTY_ACCEPTANCE_API ?? "http://127.0.0.1:8081").replace(
+const acceptanceApi = (process.env.MISTY_ACCEPTANCE_API ?? "http://127.0.0.1:8081").replace(
   /\/$/,
   "",
 );
@@ -29,14 +29,6 @@ export function seedSpaceMember(spaceId: string, userId: string) {
   runAcceptanceSQL(
     [spaceId, userId],
     `INSERT INTO space_members(space_id,user_id,role) VALUES ('${spaceId}','${userId}','member')`,
-  );
-}
-
-/** Brings an agent into a space under its owner, as the agent's own tool does. */
-export function seedSpaceAgent(spaceId: string, agentId: string, ownerId: string) {
-  runAcceptanceSQL(
-    [spaceId, agentId, ownerId],
-    `INSERT INTO space_agents(space_id,agent_id,owner_user_id) VALUES ('${spaceId}','${agentId}','${ownerId}')`,
   );
 }
 
@@ -63,7 +55,7 @@ function runAcceptanceSQL(ids: string[], sql: string) {
  * development database: AI needs a verified email, and these accounts have no
  * inbox to confirm from.
  */
-export function verifyAcceptanceEmail(userId: string) {
+function verifyAcceptanceEmail(userId: string) {
   if (!/^[A-Za-z0-9_-]+$/.test(userId)) throw new Error("unexpected id format");
   execFileSync("docker", [
     "exec",
@@ -117,7 +109,7 @@ export async function runStateOf(runId: string): Promise<string> {
   return (await bridgeCall<{ state: string }>("/run-follow", { runId })).state;
 }
 
-export interface InvocationEvent {
+interface InvocationEvent {
   id?: string;
   type: string;
   [key: string]: unknown;

@@ -43,7 +43,7 @@ export interface EditorSearchFocusRequest {
   token: number;
 }
 
-export interface EditorSearchPanelProps {
+interface EditorSearchPanelProps {
   view: EditorView | null;
   open: boolean;
   showReplace: boolean;

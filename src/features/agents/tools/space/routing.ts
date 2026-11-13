@@ -19,9 +19,9 @@ export interface SpaceRow {
   role: string;
 }
 
-export type SpaceToolKind = "read" | "create" | "change";
+type SpaceToolKind = "read" | "create" | "change";
 
-export type SpaceToolRun = (request: LocalToolRequest, space: SpaceRow) => Promise<unknown>;
+type SpaceToolRun = (request: LocalToolRequest, space: SpaceRow) => Promise<unknown>;
 
 /** The Spaces this run may reach: its chat's one Space, or every Space for a run in none. */
 export async function listSpaces(

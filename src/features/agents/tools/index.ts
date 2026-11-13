@@ -16,7 +16,7 @@ import { spaceTools } from "./spaceTools";
  * Space change after that like any request of theirs.
  */
 
-export const allLocalTools: Record<string, LocalToolHandler> = {
+const allLocalTools: Record<string, LocalToolHandler> = {
   ...deviceTools,
   ...runStateTools,
   ...appsTools,

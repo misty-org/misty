@@ -1,7 +1,7 @@
 import { create } from "zustand";
 
 /** A message the person sent while an engine's turn was running, waiting for it to end. */
-export interface QueuedMessage {
+interface QueuedMessage {
   id: string;
   text: string;
 }

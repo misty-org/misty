@@ -6,7 +6,7 @@ import {
 import { hasTauriInternals } from "@/shared/platform/tauri";
 
 /** The device setting that turns the cursor tutor on or off. On unless the person turns it off. */
-export const companionOnSetting = "agents.companion.on";
+const companionOnSetting = "agents.companion.on";
 
 /** Whether this device can run the cursor tutor at all: Misty for macOS or Windows. */
 export const companionAvailable = () =>

@@ -1,5 +1,4 @@
-//! Recording a new page's request in its session, adopting a page that already exists,
-//! and the debug-only ephemeral session for benchmark runs.
+//! Recording a new page's request in its session and adopting a page that already exists.
 use super::*;
 
 /// Stores what the request says about the page in its session.
@@ -42,13 +41,4 @@ pub(super) fn adopt_existing(
     apply_browser_pointer_tracking(&webview, renderer(webview.window().label()).tracking)?;
     set_webview_bounds_if_changed(app, &webview, position, size)?;
     present_macos_webview(&webview)
-}
-
-/// Debug builds only: with `MISTY_EVAL_EPHEMERAL_PAGES=1` every page opens in one temporary
-/// session for this run of the app, so benchmarks browse the live web with no saved
-/// sign-ins while the app itself stays signed in.
-pub(super) fn eval_ephemeral_session() -> Option<String> {
-    let enabled = cfg!(debug_assertions)
-        && std::env::var("MISTY_EVAL_EPHEMERAL_PAGES").is_ok_and(|value| value == "1");
-    enabled.then(|| format!("eval-ephemeral#{}", std::process::id()))
 }

@@ -1,8 +1,7 @@
 import { cn, Input, Textarea } from "@/shared/ui";
 import { type ChangeEvent } from "react";
 
-import {
-  settingsDisabledControlClass } from "./settingsConstants";
+import { settingsDisabledControlClass } from "./settingsConstants";
 
 import { useSettingsControlLabel } from "./SettingsControls";
 

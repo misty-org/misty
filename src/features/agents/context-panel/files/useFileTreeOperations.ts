@@ -20,7 +20,7 @@ export interface PromptState {
   isDir: boolean;
 }
 
-export interface FileTreeOperations {
+interface FileTreeOperations {
   /** Paste has something to paste, decided as Paste decides (`choosePasteSource`) from the
    * snapshot read when the menu opened: the tree's item while it is the newest copy, otherwise
    * the system clipboard's files. Before that read lands, or when it fails, the tree's item alone

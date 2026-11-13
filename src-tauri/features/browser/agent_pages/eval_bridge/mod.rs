@@ -1,18 +1,12 @@
-//! The browser benchmark's way into Misty's own browser (debug builds only).
-//!
-//! The Odysseys eval runs a real
-//! model against real pages through it. With this bridge each task runs in a Misty tab, in the system
-//! webview (WKWebView on macOS, WebView2 on Windows), through the same agent
-//! path production uses: a native task lease, a grant for the tab, and
-//! `browser_agent_execute` with its page layer, site checks and input rules.
-//! Tabs use the browser's normal profile, so live tasks see what the person
-//! signed in to in Misty.
+//! A debug-only bridge into a running Misty for the live acceptance specs
+//! (`src/tests/acceptance/mistyClient.ts`). It runs scripts in a person's app
+//! window (`/window-eval`) and follows or cancels a run (`/run-follow`,
+//! `/run-cancel`), so the specs drive the app through its real paths.
 //!
 //! Start the app with `MISTY_BROWSER_EVAL_BRIDGE_PORT` and
 //! `MISTY_BROWSER_EVAL_BRIDGE_TOKEN` set. The bridge listens on 127.0.0.1
 //! only, answers only requests carrying the token, and is not compiled into
 //! release builds.
-use crate::agents::task_scopes::{self, AgentWorkspaceState};
 use crate::browser::*;
 use axum::{
     body::Bytes,
@@ -23,78 +17,15 @@ use axum::{
     Router,
 };
 use serde::de::DeserializeOwned;
-use std::collections::HashMap;
 use std::sync::Arc;
 
 mod grants;
-mod models;
-mod pages;
-mod processes;
 mod window_eval;
-
-mod open;
-use open::*;
-mod requests;
-use requests::*;
-
-const AGENT: &str = "browser-eval";
-const ACCOUNT: &str = "browser-eval";
-/// Every page tool the benchmark offers the model.
-const CAPABILITIES: &[&str] = &[
-    "browser.snapshot",
-    "browser.find",
-    "browser.extract",
-    "browser.wait_for",
-    "browser.steps",
-    "browser.fill_form",
-    "browser.skill",
-    "browser.navigate",
-    "browser.inspect",
-    "browser.visual",
-    // Native input, such as drawing on a canvas.
-    "browser.interact",
-];
-
-struct Tab {
-    id: String,
-    task: String,
-    renew: tauri::async_runtime::JoinHandle<()>,
-}
 
 #[derive(Clone)]
 struct Bridge {
     app: AppHandle,
     token: Arc<String>,
-    tabs: Arc<tokio::sync::Mutex<HashMap<String, Tab>>>,
-}
-
-#[derive(Deserialize)]
-struct OpenTab {
-    url: String,
-    #[serde(default)]
-    visible: bool,
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct Execute {
-    scope_id: String,
-    operation: String,
-    #[serde(default)]
-    input: Value,
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct Evaluate {
-    scope_id: String,
-    expression: String,
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct Scoped {
-    scope_id: String,
 }
 
 /// Starts the bridge when the environment asks for it; a no-op otherwise.
@@ -116,26 +47,12 @@ pub(crate) fn start_if_requested(app: &AppHandle) {
     let bridge = Bridge {
         app: app.clone(),
         token: Arc::new(token),
-        tabs: Arc::default(),
     };
     tauri::async_runtime::spawn(async move {
         let router = Router::new()
-            .route("/tab", post(open_tab))
-            .route("/execute", post(execute))
-            .route("/evaluate", post(evaluate))
-            .route("/close", post(close))
-            .route("/pages", post(pages::pages))
-            .route("/processes", post(processes::processes))
-            .route("/capture", post(pages::capture))
-            .route("/run-grants", post(grants::run_grants))
-            .route("/run-follow", post(grants::run_follow))
-            .route("/run-record", post(grants::run_record))
-            .route("/run-cancel", post(grants::run_cancel))
-            .route("/share-folder", post(grants::share_folder))
-            .route("/allow-folder-changes", post(grants::allow_folder_changes))
-            .route("/models", post(models::models))
-            .route("/windows", post(window_eval::windows))
             .route("/window-eval", post(window_eval::window_eval))
+            .route("/run-follow", post(grants::run_follow))
+            .route("/run-cancel", post(grants::run_cancel))
             .with_state(bridge);
         match tokio::net::TcpListener::bind(("127.0.0.1", port)).await {
             Ok(listener) => {
@@ -194,15 +111,6 @@ fn request<T: DeserializeOwned>(
 
 fn denied() -> Response {
     (StatusCode::UNAUTHORIZED, "unauthorized").into_response()
-}
-
-fn main_view(app: &AppHandle) -> Result<Webview, String> {
-    crate::browser::app_windows::primary_webview(app)
-        .ok_or_else(|| "No Misty window is open.".to_owned())
-}
-
-fn lease(task: &str, renew: bool) -> Value {
-    json!({"accountId": ACCOUNT, "agentId": AGENT, "spaceId": "", "taskId": task, "renew": renew})
 }
 
 #[cfg(test)]

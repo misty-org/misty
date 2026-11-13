@@ -14,7 +14,7 @@ export const CARD = "overflow-hidden rounded-xl border border-charcoal-border bg
 export const errorText = (error: unknown) =>
   error instanceof Error ? error.message : String(error);
 
-export function StatusDot({ on }: { on: boolean }) {
+function StatusDot({ on }: { on: boolean }) {
   return (
     <span
       aria-hidden

@@ -8,7 +8,7 @@
 //!
 //! Three things aren't covered: file access in other crates (`browser_data`, Kiri, the
 //! engines), processes confined by their own OS profile (the shell, the document workers), and a
-//! memory bug in this process. See "What this doesn't cover" in the plan.
+//! memory bug in this process.
 #![allow(clippy::disallowed_methods, clippy::disallowed_types)]
 
 pub mod autostart_entry;

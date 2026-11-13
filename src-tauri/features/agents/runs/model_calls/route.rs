@@ -55,7 +55,7 @@ impl ProviderId {
         Some(match prefix {
             "openai" => Self::Openai,
             "anthropic" => Self::Anthropic,
-            // Older names kept so existing model IDs keep working: `gemini/` judges, `nim/` evals.
+            // Older prefixes kept so existing model IDs keep working.
             "google" | "gemini" => Self::Google,
             "openrouter" => Self::Openrouter,
             "gateway" => Self::Gateway,

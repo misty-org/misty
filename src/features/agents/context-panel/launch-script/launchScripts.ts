@@ -33,7 +33,7 @@ function normalize(value: unknown): LaunchScriptEntry | null {
   };
 }
 
-export function readEntries(stored: unknown): LaunchScriptEntry[] {
+function readEntries(stored: unknown): LaunchScriptEntry[] {
   const entries = (stored as Partial<Stored> | null)?.entries;
   return Array.isArray(entries)
     ? entries.map(normalize).filter((entry): entry is LaunchScriptEntry => entry !== null)

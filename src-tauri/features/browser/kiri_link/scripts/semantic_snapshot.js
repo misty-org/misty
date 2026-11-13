@@ -1,5 +1,5 @@
-// Provider DOM adapters v1. Missing/ambiguous observations remain unknown. This
-// function is host code; neither page content nor invocation input supplies code.
+// Provider DOM adapters v1. Missing/ambiguous observations remain unknown. The
+// host supplies this code; neither page content nor invocation input does.
 function () {
   const visible = e => e && e.getClientRects().length && getComputedStyle(e).visibility !== "hidden";
   const all = (selector, root = document) => Array.from(root.querySelectorAll(selector)).filter(visible);

@@ -42,7 +42,7 @@ export function deleteOverviewAudio(guideId: string): Promise<void> {
 }
 
 /** The audio file of one scene of a video overview. */
-export const sceneAudioId = (guideId: string, index: number) => `${guideId}-s${index}`;
+const sceneAudioId = (guideId: string, index: number) => `${guideId}-s${index}`;
 
 /**
  * A video overview's narration, one file per scene, spoken on this computer's speech key or its

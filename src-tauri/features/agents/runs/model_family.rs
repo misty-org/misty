@@ -1,6 +1,5 @@
-//! A short note for one model family. Every model gets the
-//! same harness; this line only corrects a habit the family showed in the evals. It names the run it
-//! came from, so it can be dropped once the evals no longer need it.
+//! A short note for one model family. Every model gets the same harness; this line only corrects
+//! a habit the family showed in test runs, and can go once the family no longer has it.
 use std::sync::LazyLock;
 
 use regex::Regex;

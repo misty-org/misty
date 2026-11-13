@@ -26,7 +26,7 @@ export const trousers = ["#39424e", "#4a4e69", "#5c4b3c", "#2f3e46", "#6b705c"];
 export const skins = ["#f6d3b3", "#eebd94", "#d9a074", "#b97b52", "#8d5a3b"];
 export const hairs = ["#2b211c", "#4a3323", "#7a4b27", "#c9963f", "#d8d3c8", "#a34a2a", "#1f2a44"];
 
-export interface CharacterLook {
+interface CharacterLook {
   shirt: string;
   trousers: string;
   skin: string;

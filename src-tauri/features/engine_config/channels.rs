@@ -400,7 +400,7 @@ pub fn resolve_provider_env(
         .unwrap_or_else(|| Ok(HashMap::new()))
 }
 
-/// The provider channel's environment for `engine`, for `env_for`. Includes what
+/// The provider channel's environment for `engine`. Includes what
 /// [`channel_launch`] would add to the environment. An engine that is turned off, or a channel
 /// that can't be read, gives nothing here; [`ensure_engine_enabled`] is the gate for that.
 pub fn channel_env(engine: &str) -> HashMap<String, String> {

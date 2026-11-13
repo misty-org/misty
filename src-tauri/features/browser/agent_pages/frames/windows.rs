@@ -1,8 +1,8 @@
-//! Cross-origin frames on Windows (browser_frames.rs). The tab's DevTools session attaches
+//! Cross-origin frames on Windows (../frames.rs). The tab's DevTools session attaches
 //! to each out-of-process frame, and each of those to its own (`Target.setAutoAttach` with
 //! `flatten`). The frame trees of the tab and of those sessions say which frames are
 //! cross-origin to the top document and which session runs each, so the page layer can
-//! run in an isolated world of every one (browser_content_world.rs).
+//! run in an isolated world of every one (pages/content_world.rs).
 use crate::browser::agent_pages::frames::Frame;
 use crate::browser::pages::windows::webview2::{cdp, cdp_in_session, owned_string};
 use serde_json::{json, Value};

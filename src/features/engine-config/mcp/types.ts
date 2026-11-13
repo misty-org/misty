@@ -94,7 +94,7 @@ export interface McpConfigEntry {
   version: string;
 }
 
-export interface McpSourceError {
+interface McpSourceError {
   source: string;
   path: string;
   message: string;

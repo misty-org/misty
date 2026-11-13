@@ -5,7 +5,7 @@ use super::{request::RunRequest, teach::SKETCH_PROMPT};
 
 // The cursor's voice and pointing rules (agent.entry.cursor).
 const TEACH_PROMPT: &str = include_str!("companion_teach_prompt.txt");
-// The map of Misty's own interface. src/features/agents/companion/mistyGuide.test.ts names its controls.
+// The map of Misty's own interface. src/features/agents/tutor/cursor/mistyGuide.test.ts names its controls.
 const MISTY_GUIDE: &str = include_str!("companion_misty_guide.md");
 const COMPANION_TURN: &str = include_str!("companion_turn.txt");
 const WINDOW_CAPTURE: &str = "window1";

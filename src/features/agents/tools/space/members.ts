@@ -25,7 +25,7 @@ const sanitized = (members: Member[]) =>
   members.map(({ user_id, name, role }) => ({ user_id, name, role }));
 
 /** Lowercase, plain quotes and dashes, single spaces: names written two ways still match. */
-export function normalizeName(value: string): string {
+function normalizeName(value: string): string {
   return value
     .trim()
     .toLowerCase()

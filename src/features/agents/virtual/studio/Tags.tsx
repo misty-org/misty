@@ -85,7 +85,7 @@ export const FREE_DESK_PRIORITY = 4;
  * none, so a room of idle agents is just their names. How its last run ended isn't a line: its
  * name takes that state's color, as a chat row's mark does.
  */
-export function tagLine(actor: Actor): string {
+function tagLine(actor: Actor): string {
   if (actor.state === "needs-you") return "Needs you";
   if (actor.guest) return `${actor.owner}'s agent`;
   if (actor.state === "working") return actor.task || actor.doing || "Working";

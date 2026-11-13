@@ -140,7 +140,6 @@ const signedOutPaths = new Set([
   "/register",
   "/auth/google",
   "/auth/google/complete",
-  "/instance",
   "/health",
   "/setup-keys/redeem",
 ]);

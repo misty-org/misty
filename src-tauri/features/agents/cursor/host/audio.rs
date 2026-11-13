@@ -71,7 +71,7 @@ impl Recording {
         (self.sequence, pcm, duration)
     }
     /// Audio captured since the last call, as 24 kHz mono PCM16 bytes. The
-    /// resampler keeps its phase across calls, so chunks join seamlessly.
+    /// resampler keeps its phase across calls, so chunks join without a click.
     fn pending(&mut self) -> Option<Vec<u8>> {
         let fresh: Vec<i16> = {
             let samples = self.samples.lock().ok()?;

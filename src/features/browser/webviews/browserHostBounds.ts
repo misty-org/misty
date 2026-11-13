@@ -106,7 +106,7 @@ function clipCornerRadii(clip: HTMLElement, rect: DOMRect): [number, number, num
   }) as [number, number, number, number];
 }
 
-export function browserBoundsAtAppZoom(bounds: BrowserBounds, appZoom: number): BrowserBounds {
+function browserBoundsAtAppZoom(bounds: BrowserBounds, appZoom: number): BrowserBounds {
   const zoom = Number.isFinite(appZoom) && appZoom > 0 ? appZoom : 1;
   return quantizeBrowserBounds({
     x: bounds.x * zoom,

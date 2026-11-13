@@ -7,11 +7,11 @@ import { Button } from "../controls/Button";
 import { IconButton } from "../controls/IconButton";
 import { TooltipProvider } from "../overlays/Tooltip";
 
-export type NoticeTone = "neutral" | "error";
+type NoticeTone = "neutral" | "error";
 
 export type NoticeAction = { label: string; onSelect: () => void };
 
-export type NoticeOptions = {
+type NoticeOptions = {
   message: string;
   tone?: NoticeTone;
   /** At most one action, drawn as a small quiet button. Choosing it also dismisses the notice. */
@@ -23,7 +23,7 @@ export type NoticeOptions = {
   onDismiss?: () => void;
 };
 
-export type NoticeHandle = { id: string; dismiss: () => void };
+type NoticeHandle = { id: string; dismiss: () => void };
 
 /** How many notices show at once; older timed ones give way to newer ones. */
 const MAX_VISIBLE = 3;
@@ -137,11 +137,6 @@ export function notify(options: NoticeOptions): NoticeHandle {
     onDismiss: options.onDismiss,
   });
   return { id, dismiss: () => remove(id, "dismissed") };
-}
-
-/** Takes a notice down, as if its × was pressed. */
-export function dismissNotice(id: string) {
-  remove(id, "dismissed");
 }
 
 /**

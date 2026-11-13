@@ -10,15 +10,6 @@ pub(super) fn start(app: AppHandle, state: Arc<CursorCompanionState>) {
     let events_state = state.clone();
     std::thread::spawn(move || {
         while let Ok(event) = rx.recv() {
-            // TEMP: chasing "the shortcut works once". Remove with the other [companion] lines.
-            if let Shortcut::Held(held) = &event {
-                eprintln!(
-                    "[companion] shortcut held={held} enabled={} hostHeld={} turn={}",
-                    events_state.enabled.load(Ordering::SeqCst),
-                    events_state.held.load(Ordering::SeqCst),
-                    events_state.turn.load(Ordering::SeqCst)
-                );
-            }
             if !events_state.enabled.load(Ordering::SeqCst) {
                 continue;
             }

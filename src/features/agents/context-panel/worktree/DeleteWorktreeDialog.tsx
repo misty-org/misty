@@ -22,7 +22,7 @@ import { useWorktreeStore } from "./worktreeStore";
 import "./worktree.css";
 
 /** What removing would lose, read before the dialog offers to: `null` while it is read. */
-export interface Preflight {
+interface Preflight {
   uncommitted: number;
   samples: string[];
   unpushed: number;
@@ -61,7 +61,7 @@ const samePath = (a: string, b: string) => a.replace(/[\\/]+$/, "") === b.replac
  * Whether something works in the worktree now: a chat's reply running there (a multi-run lane's,
  * or any chat while the worktree is the Space's folder), or a terminal open in it.
  */
-export function useWorktreeBusy(path: string, open: boolean): boolean {
+function useWorktreeBusy(path: string, open: boolean): boolean {
   const terminals = useTerminalStore((s) =>
     Object.values(s.tabsByChat).some((tabs) => tabs.some((tab) => samePath(tab.folder, path))),
   );

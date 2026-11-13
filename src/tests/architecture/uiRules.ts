@@ -21,7 +21,7 @@ import {
 } from "./uiRuleDefinitions.ts";
 
 /**
- * The design protocol in AGENTS.md, as lint. Code outside src/shared/ui composes shared components
+ * The UI rules in CONTRIBUTING.md, as lint. Code outside src/shared/ui composes shared components
  * instead of restyling or re-implementing them, and shared UI itself keeps to the type scale, the
  * tokens and Misty's tooltip. Existing debt is counted per file and rule in
  * ui-exceptions-baseline.json, and those counts may only go down.
@@ -33,34 +33,20 @@ import {
  * It runs under plain Node (`--write-baseline`), so these files import nothing but Node itself.
  */
 
-export { attributeValue, jsxOpeningTags } from "./uiRuleJsx.ts";
-export {
-  cssRules,
-  sharedUiRuleIds,
-  uiRuleGuidance,
-  uiRuleIds,
-  uiRules,
-  type AppUiRuleId,
-  type CssRuleId,
-  type UiRuleId,
-  type UiViolationCounts,
-  type UiViolationMap,
-} from "./uiRuleDefinitions.ts";
+export { uiRuleGuidance, uiRuleIds, type UiRuleId } from "./uiRuleDefinitions.ts";
 export {
   nextUiBaseline,
   parseUiBaseline,
   uiExceptionsBaselinePath,
-  uiRuleTotals,
-  type BaselineUpdate,
   type UiBaseline,
 } from "./uiBaseline.ts";
 
 // ---------------------------------------------------------------------------------------------
 // Which files get which rules.
 
-export type UiRuleScope = "app" | "shared" | "css";
+type UiRuleScope = "app" | "shared" | "css";
 
-export function uiRuleScope(path: string): UiRuleScope | null {
+function uiRuleScope(path: string): UiRuleScope | null {
   if (/\.test\.tsx?$/.test(path) || path.endsWith(".d.ts") || path.startsWith("src/tests/")) {
     return null;
   }
@@ -70,11 +56,6 @@ export function uiRuleScope(path: string): UiRuleScope | null {
   }
   if (!/^src\/.*\.tsx?$/.test(path)) return null;
   return path.startsWith("src/shared/ui/") ? "shared" : "app";
-}
-
-/** Kept for callers of the old API: true for app code that the tsx rules cover. */
-export function isUiRuleSubject(path: string): boolean {
-  return uiRuleScope(path) === "app";
 }
 
 function rulesFor(scope: UiRuleScope): UiRuleId[] {
@@ -112,11 +93,6 @@ export function uiViolationCounts(path: string, text: string): UiViolationCounts
     if (count > 0) counts[id] = count;
   }
   return counts;
-}
-
-/** The rule ids that fire in one file. */
-export function uiViolations(path: string, text: string): UiRuleId[] {
-  return Object.keys(uiViolationCounts(path, text)) as UiRuleId[];
 }
 
 function walkSource(root: string, directory: string, paths: string[]) {

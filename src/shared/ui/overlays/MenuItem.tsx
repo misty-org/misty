@@ -28,14 +28,12 @@ import {
   DropdownMenuSubTrigger,
 } from "./DropdownMenu";
 import {
-  MenuKindContext,
   menuIconClass,
   menuItemExplainedClass,
   menuLabelTextClass,
   menuShortcutClass,
   menuWidthClass,
   useMenuKind,
-  type MenuKind,
   type MenuWidth,
 } from "./popupStyles";
 import { Tooltip } from "./Tooltip";
@@ -406,33 +404,15 @@ function MenuGroup(props: React.ComponentPropsWithoutRef<typeof DropdownMenuGrou
   return <Group {...props} />;
 }
 
-/**
- * Sets the kind of menu for rows rendered outside DropdownMenuContent or ContextMenuContent,
- * which set it themselves. Rarely needed.
- */
-function MenuKindProvider({ kind, children }: { kind: MenuKind; children: React.ReactNode }) {
-  return <MenuKindContext.Provider value={kind}>{children}</MenuKindContext.Provider>;
-}
-
 export {
   MenuCheckItem,
   MenuGroup,
   MenuIconSlot,
   MenuItem,
-  MenuKindProvider,
   MenuLabel,
   MenuRadioGroup,
   MenuRadioItem,
   MenuSeparator,
   MenuSubmenu,
-  useMenuKind,
 };
-export type {
-  MenuCheckItemProps,
-  MenuIcon,
-  MenuItemProps,
-  MenuKind,
-  MenuRadioGroupProps,
-  MenuRadioItemProps,
-  MenuSubmenuProps,
-};
+export type { MenuIcon };

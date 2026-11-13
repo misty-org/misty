@@ -19,7 +19,7 @@ interface ManagedAiErrorPayload {
 /** What AI surfaces say when no model key is set; they pair it with a button to Settings › Models. */
 const modelKeyNeededMessage = "Add a model key in Settings → Models.";
 
-export class ManagedAiRequestError extends Error {
+class ManagedAiRequestError extends Error {
   constructor(
     message: string,
     readonly status: number,

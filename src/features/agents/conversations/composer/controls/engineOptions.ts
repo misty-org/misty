@@ -5,7 +5,7 @@ import { listEngines, mistyEngine } from "../../../engines/enginesApi";
  * choose) and the modes it can honour. Native code still decides what a mode means for each
  * engine (`src-tauri/features/engines`); this only hides choices an engine would refuse.
  */
-export interface EngineOptions {
+interface EngineOptions {
   efforts: string[];
   /** Manual, Auto, Plan and Bypass, by Misty's names. */
   modes: EngineMode[];
@@ -13,7 +13,7 @@ export interface EngineOptions {
   skillPrefix?: "/" | "$";
 }
 
-export type EngineMode = "ask" | "auto" | "plan" | "bypass";
+type EngineMode = "ask" | "auto" | "plan" | "bypass";
 
 /** Misty's own agent has no skip-permissions mode. */
 const all: EngineMode[] = ["ask", "auto", "plan"];

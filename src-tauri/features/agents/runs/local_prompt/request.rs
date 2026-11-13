@@ -1,4 +1,4 @@
-//! The run's request: the JSON the app sends to start a run (`src/features/ai-surface/serverInvocation.ts`),
+//! The run's request: the JSON the app sends to start a run (`src/features/agents/runs/invocations/serverInvocation.ts`),
 //! cleaned the way `validateAIInvocationInput` cleans it. The server refused a malformed request at
 //! admission; here the person's own app sent it, so a bad part is dropped instead of failing the run.
 use serde::de::DeserializeOwned;
@@ -18,7 +18,7 @@ const MAX_HISTORY_TURNS: usize = 200;
 ///
 /// The app's request carries most of it. The chat's own state came from the server's database and now
 /// lives on the computer: `collaboration` in the JSON is what `collaborationOf` gives the chat
-/// (`src/features/agents/localTools/runState/conversationState.ts`), and its `plan` and `mode` are
+/// (`src/features/agents/tools/run-state/conversationState.ts`), and its `plan` and `mode` are
 /// read here; a `goal` an older build saved is ignored. `agent`, `resolved_context`, `prior_write_receipts` and `conversation_title` are keys of
 /// the same names.
 #[derive(Clone, Debug, Default)]

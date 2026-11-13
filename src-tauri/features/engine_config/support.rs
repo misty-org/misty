@@ -319,13 +319,6 @@ pub fn save_value<T: Serialize + ?Sized>(key: &str, value: &T) -> Result<(), Str
         .map_err(|e| e.to_string())
 }
 
-pub fn delete_value(key: &str) -> Result<(), String> {
-    connect()?
-        .execute("DELETE FROM engine_config_values WHERE key = ?1", [key])
-        .map(|_| ())
-        .map_err(|e| e.to_string())
-}
-
 pub fn now_ms() -> i64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)

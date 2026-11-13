@@ -27,7 +27,7 @@ const set = useMistyStore.setState;
 const get = useMistyStore.getState;
 
 /** A task given to several agents at once from the studio. */
-export interface Huddle {
+interface Huddle {
   id: string;
   /** What they were all given, as the person typed it. */
   task: string;
@@ -240,7 +240,7 @@ export function huddledAgents(
  * for a little while after it ended (`endedAt`). While it is still talking the newest words show;
  * once done, the start.
  */
-export const SPEECH_MS = 15_000;
+const SPEECH_MS = 15_000;
 export function speechOf(
   conversations: readonly GlobalAiConversation[],
   chatId: string | undefined,

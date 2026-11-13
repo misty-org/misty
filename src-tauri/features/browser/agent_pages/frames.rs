@@ -3,7 +3,7 @@
 //! neither read nor reach. Every frame of a tab announces itself from a private content
 //! world, so pages cannot forge or see it, and Misty keeps each cross-origin frame's
 //! handle to run the page layer inside it. On Windows the frame trees of the tab's
-//! DevTools sessions say the same (browser_frames_windows.rs). On WebKitGTK each frame keeps a
+//! DevTools sessions say the same (frames/windows.rs). On WebKitGTK each frame keeps a
 //! request open with Misty from that world instead (frames/linux.rs).
 #[cfg(target_os = "linux")]
 pub(crate) mod linux;

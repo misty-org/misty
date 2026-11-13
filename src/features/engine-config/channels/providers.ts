@@ -6,8 +6,6 @@
 import type { ChannelView, EngineChannels } from "./api";
 import type { EngineId } from "./engines";
 
-export { ENGINE_IDS, type EngineId } from "./engines";
-
 export const PSEUDO_LOCAL = "__local_settings_json__";
 export const PSEUDO_DISABLED = "__disabled__";
 
@@ -38,7 +36,7 @@ const ENV_MODEL_KEY: Partial<Record<EngineId, string>> = {
  * Model id for the picker: the flat `model` field first, then the legacy
  * imported shape (`settingsConfig.env.<ENGINE_MODEL_VAR>` / `env.<…>`).
  */
-export function providerModel(engine: EngineId, raw: unknown): string {
+function providerModel(engine: EngineId, raw: unknown): string {
   const o = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
   const flat = asString(o.model).trim();
   if (flat) return flat;
@@ -177,7 +175,7 @@ function channelBaseUrl(engine: EngineId, raw: unknown): string {
 }
 
 /** Sent after any channel change, so model pickers that cache the channels read them again. */
-export const CLI_CONFIG_CHANGED_EVENT = "misty:engine-channels-changed";
+const CLI_CONFIG_CHANGED_EVENT = "misty:engine-channels-changed";
 
 export function notifyCliConfigChanged() {
   window.dispatchEvent(new Event(CLI_CONFIG_CHANGED_EVENT));

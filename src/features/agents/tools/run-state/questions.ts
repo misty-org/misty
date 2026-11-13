@@ -4,10 +4,10 @@ import { RunStateError } from "./documents";
 
 /** Structured questions an agent asks inside a run, and the answers to them. */
 
-export const maxQuestions = 4;
-export const maxQuestionOptions = 4;
+const maxQuestions = 4;
+const maxQuestionOptions = 4;
 /** The asking run waits this long inside its call, then hands off: an answer after that starts a new turn. */
-export const questionWaitMs = 45_000;
+const questionWaitMs = 45_000;
 const questionTtlMs = 7 * 24 * 60 * 60 * 1000;
 const keepSets = 20;
 
@@ -34,7 +34,7 @@ export function confirmationQuestion(question: Question): boolean {
 }
 
 /** The limits mirror what the composer card can show. */
-export function normalizeQuestions(questions: Question[]): Question[] {
+function normalizeQuestions(questions: Question[]): Question[] {
   if (questions.length < 1 || questions.length > maxQuestions) throw invalid();
   return questions.map((question) => {
     const header = question.header.trim();

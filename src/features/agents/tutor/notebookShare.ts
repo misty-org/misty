@@ -16,7 +16,7 @@ import type { Notebook, NotebookNote, NotebookSource } from "./tutorTypes";
  * word for word whenever the owner's notebook writes the rest of the doc again.
  */
 export const NOTEBOOK_DOC_PREFIX = "Notebook: ";
-export const SPACE_NOTES_HEADING = "## Space notes";
+const SPACE_NOTES_HEADING = "## Space notes";
 const SPACE_NOTES_HINT =
   "_Anyone here can add to this section. It stays when the notebook updates._";
 const note = (text: string) => text.replace(/\r\n/g, "\n").trim();

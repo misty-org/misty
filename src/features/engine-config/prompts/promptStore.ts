@@ -25,10 +25,10 @@ import {
 } from "./promptsApi";
 
 /** Sent after any prompt change; the detail carries the folder. */
-export const PROMPTS_CHANGED_EVENT = "misty:prompts-changed";
+const PROMPTS_CHANGED_EVENT = "misty:prompts-changed";
 
 /** Listens for prompt changes; `folder` is the affected folder, null when none was given. */
-export function subscribePromptsChanged(listener: (folder: string | null) => void): () => void {
+function subscribePromptsChanged(listener: (folder: string | null) => void): () => void {
   const handler = (event: Event) => {
     const detail = (event as CustomEvent<{ root?: string }>).detail;
     listener(detail?.root ?? null);
@@ -42,7 +42,7 @@ function notifyPromptsChanged(root: string): void {
 }
 
 /** One folder's cached prompts. */
-export interface RootPrompts {
+interface RootPrompts {
   entries: CustomPromptEntry[];
   status: "loading" | "ready" | "error";
   fetchedAt: number;

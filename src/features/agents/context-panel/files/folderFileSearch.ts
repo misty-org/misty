@@ -3,7 +3,7 @@ import { useSpaceFolders } from "../../engines/enginesApi";
 import { useFileIndex, type IndexEntry } from "./fileIndex";
 import { joinPath, useFilesStore } from "./filesStore";
 
-export interface FolderFileHit {
+interface FolderFileHit {
   folder: string;
   /** Where it is on disk. */
   path: string;

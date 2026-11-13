@@ -17,7 +17,7 @@ interface ChoiceEngine {
 }
 
 /** An agent in the start dialog's checklist, and why it can't be chosen when it can't. */
-export interface LaneChoice<Agent> {
+interface LaneChoice<Agent> {
   agent: Agent;
   reason: string;
 }

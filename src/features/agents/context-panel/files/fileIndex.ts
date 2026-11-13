@@ -24,7 +24,7 @@ export interface IndexEntry {
 export const SEARCH_RESULT_LIMIT = 50;
 const FRESH_FOR_MS = 60_000;
 
-export function buildEntries(raw: FileIndexEntry[]): IndexEntry[] {
+function buildEntries(raw: FileIndexEntry[]): IndexEntry[] {
   const entries = raw.map(({ rel, isDir }) => {
     const slash = rel.lastIndexOf("/");
     return {

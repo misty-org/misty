@@ -21,7 +21,7 @@
 import { mcpApi } from "./api";
 import type { McpConfigEntry, McpProbePlan } from "./types";
 
-export interface ProbeConfirmItem {
+interface ProbeConfirmItem {
   entry: McpConfigEntry;
   /** null: the plan could not be read; the dialog says so. */
   plan: McpProbePlan | null;

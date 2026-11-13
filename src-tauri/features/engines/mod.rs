@@ -75,7 +75,7 @@ pub(crate) use events::{
     safe_prompt_arg, tool_call_message, tool_call_message_with_id, tool_call_patch_with_id,
     tool_path_arg, tool_result_patch, tool_result_patch_with_id,
 };
-pub use events::{EngineEvent, TodoItem, TodosPayload};
+pub use events::{EngineEvent, TodosPayload};
 pub use plan_review::{PlanApproval, PlanReview, PlanReviewKind};
 // Live child-process registry (registry.rs).
 pub(crate) use registry::{kill_process_group, next_virtual_pid};
@@ -522,17 +522,6 @@ pub fn engine_name(id: &str) -> &'static str {
 /// Whether Misty drives this engine.
 pub fn is_engine(id: &str) -> bool {
     crate::engines::support::config::ENGINES.contains(&id)
-}
-
-/// The program that runs this engine on this computer, if there is one.
-pub fn find(id: &str) -> Option<PathBuf> {
-    let settings = crate::engines::support::settings::read_settings().unwrap_or_default();
-    let bin = engine_bin(&settings, id);
-    let path = PathBuf::from(&bin);
-    if path.is_absolute() && path.exists() {
-        return Some(path);
-    }
-    resolve::find_cli_binary(cli_binary_name(id), None)
 }
 
 /// A model an engine can be asked for, as the composer and the agent editor list it.

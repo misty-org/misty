@@ -1,5 +1,5 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
-export interface ParsedUsage {
+interface ParsedUsage {
   input: number;
   output: number;
   cacheRead: number;

@@ -310,18 +310,3 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
-
-/* A link to a local file (proseFileLink): opens it rather than a page. Stronger than the prose's
-   own links, which it sits among. */
-.misty-prose a[data-prose-link="file"],
-[data-prose-link="file"] {
-  color: inherit;
-  text-decoration: underline dotted;
-  text-decoration-color: var(--color-cream-muted);
-  text-underline-offset: 3px;
-  cursor: pointer;
-
-  &:hover {
-    text-decoration-color: var(--color-cream);
-  }
-}

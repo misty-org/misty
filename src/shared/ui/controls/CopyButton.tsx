@@ -12,7 +12,7 @@ export const copyConfirmationMs = 1500;
  * Counts confirmations and clears them after `copyConfirmationMs`, so a second copy restarts the
  * check's time instead of ending it early. `confirm` does nothing once the button has unmounted.
  */
-export function useCopyConfirmation() {
+function useCopyConfirmation() {
   const [count, setCount] = React.useState(0);
   const alive = React.useRef(true);
   React.useEffect(() => {

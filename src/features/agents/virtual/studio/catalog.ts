@@ -17,14 +17,14 @@ export const furnitureKinds = [
 export type FurnitureKind = (typeof furnitureKinds)[number];
 
 /** A place to sit that comes with a piece, measured from the middle of its footprint before turning. */
-export interface Seat extends Point {
+interface Seat extends Point {
   /** Height of the seat's top. */
   y: number;
   /** The way the sitter looks, before the piece is turned. */
   yaw: number;
 }
 
-export interface FurnitureSpec {
+interface FurnitureSpec {
   label: string;
   /** Cells across and deep before turning. */
   w: number;

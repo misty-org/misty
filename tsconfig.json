@@ -22,22 +22,17 @@
       "react-router-dom": ["./node_modules/react-router-dom/dist/index.d.mts"],
       "lucide-react": ["./node_modules/lucide-react/dist/lucide-react.d.ts"],
       "vitest": ["./node_modules/vitest/dist/index.d.ts"],
-      "@xyflow/react": ["./node_modules/@xyflow/react/dist/esm/index.d.ts"],
       "react-markdown": ["./node_modules/react-markdown/index.d.ts"],
       "@testing-library/react": ["./node_modules/@testing-library/react/types/index.d.ts"],
       "zustand/react/shallow": ["./node_modules/zustand/esm/react/shallow.d.mts"],
       "@tauri-apps/api/core": ["./node_modules/@tauri-apps/api/core.d.ts"],
       "zustand": ["./node_modules/zustand/esm/index.d.mts"],
-      "@tauri-apps/plugin-clipboard-manager": [
-        "./node_modules/@tauri-apps/plugin-clipboard-manager/dist-js/index.d.ts"
-      ],
       "@tauri-apps/api/event": ["./node_modules/@tauri-apps/api/event.d.ts"],
       "zustand/middleware": ["./node_modules/zustand/esm/middleware.d.mts"],
       "cmdk": ["./node_modules/cmdk/dist/index.d.ts"],
       "react-resizable-panels": [
         "./node_modules/react-resizable-panels/dist/react-resizable-panels.cjs.d.mts"
       ],
-      "qrcode.react": ["./node_modules/qrcode.react/lib/index.d.mts"],
       "react-pdf": ["./node_modules/react-pdf/dist/esm/index.d.ts"],
       "@tauri-apps/plugin-dialog": ["./node_modules/@tauri-apps/plugin-dialog/dist-js/index.d.ts"],
       "@tauri-apps/plugin-opener": ["./node_modules/@tauri-apps/plugin-opener/dist-js/index.d.ts"],

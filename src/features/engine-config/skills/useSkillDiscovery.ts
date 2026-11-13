@@ -9,7 +9,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { skillsHubApi } from "./api";
 import type { DiscoveredSkill, SkillRepo, SkillTargetId } from "./types";
 
-export interface SkillDiscoveryStore {
+interface SkillDiscoveryStore {
   repos: SkillRepo[];
   reposLoading: boolean;
   discover: DiscoveredSkill[];

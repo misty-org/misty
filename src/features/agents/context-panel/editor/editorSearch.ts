@@ -61,7 +61,7 @@ export function clearEditorSearchQuery(view: EditorView) {
   });
 }
 
-export interface EditorSearchMatch {
+interface EditorSearchMatch {
   from: number;
   to: number;
 }
@@ -217,7 +217,7 @@ export function editorSearchKeyBindings(
 
 /** Stable source so the keymap is built once while still reading the latest
  *  React callbacks. */
-export interface EditorSearchActionSource {
+interface EditorSearchActionSource {
   current: EditorSearchKeymapActions;
 }
 

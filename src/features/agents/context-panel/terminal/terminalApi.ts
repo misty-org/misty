@@ -13,7 +13,7 @@ export interface TerminalOutputChunk {
   data: string;
 }
 
-export interface TerminalHostInfo {
+interface TerminalHostInfo {
   platform: string;
   shellPath: string;
 }

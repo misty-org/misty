@@ -17,7 +17,7 @@ import { Button, Input, Skeleton, Switch } from "@/shared/ui";
 import { proxyApi, type ProxySettings } from "./api";
 
 /** The draft when no proxy has been set yet. */
-export const DEFAULT_PROXY_URL = "http://127.0.0.1:7890";
+const DEFAULT_PROXY_URL = "http://127.0.0.1:7890";
 
 const errorText = (error: unknown) => (error instanceof Error ? error.message : String(error));
 

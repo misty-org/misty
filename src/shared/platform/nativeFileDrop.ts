@@ -9,7 +9,7 @@ import { hasTauriInternals } from "./tauri";
  * registered zone is under the pointer, lights it while files hover, and on drop reads the files
  * back through `dropped_file_read`, which only reads paths the system itself just dropped.
  */
-export interface FileDropZone {
+interface FileDropZone {
   element: HTMLElement;
   /** Whether the zone takes files right now; a disabled zone is passed over. */
   enabled(): boolean;
@@ -43,13 +43,13 @@ const mimeTypes: Record<string, string> = {
 };
 
 /** A file's type from its name, as a browser would give it for a picked file. */
-export function mimeTypeForName(name: string): string {
+function mimeTypeForName(name: string): string {
   const ending = name.split(".").pop()?.toLowerCase() ?? "";
   return mimeTypes[ending] ?? "";
 }
 
 /** A path's last part, with either kind of slash. */
-export function fileNameOf(path: string): string {
+function fileNameOf(path: string): string {
   return path.split(/[\\/]/).filter(Boolean).pop() ?? path;
 }
 
@@ -58,7 +58,7 @@ export function fileNameOf(path: string): string {
  * Windows in its pixels; dividing by the window's size in the same unit and multiplying by the
  * page's size also takes the app's zoom into account.
  */
-export function pagePoint(
+function pagePoint(
   position: { x: number; y: number },
   window: { innerWidth: number; innerHeight: number },
   reported: { width: number; height: number },
@@ -71,7 +71,7 @@ export function pagePoint(
 }
 
 /** The registered zone under a page point: the innermost one holding what's drawn there. */
-export function zoneAt(point: { x: number; y: number }): FileDropZone | null {
+function zoneAt(point: { x: number; y: number }): FileDropZone | null {
   const hit = document.elementFromPoint(point.x, point.y);
   if (!hit) return null;
   let found: FileDropZone | null = null;

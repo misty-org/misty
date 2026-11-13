@@ -29,7 +29,7 @@ export function engineLabel(id: string): string {
   return engineNames[id] ?? id;
 }
 
-export const sourceLabels: Record<McpConfigSource, string> = {
+const sourceLabels: Record<McpConfigSource, string> = {
   claude_user: "User config",
   claude_local: "Workspace-local",
   claude_project: "Project .mcp.json",

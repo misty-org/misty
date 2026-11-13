@@ -8,7 +8,7 @@ import type { SpaceLibraryData } from "./hook-signatures/useSpaceLibraryData";
 /**
  * Everything the Library can do to *items*, as opposed to collections.
  *
- * Each concern lives in its own hook under `libraryItems/`; this file wires
+ * Each concern lives in its own hook under `library-items/`; this file wires
  * them together and flattens the result for the Library surfaces.
  */
 export function useSpaceLibraryItemActions(data: SpaceLibraryData) {

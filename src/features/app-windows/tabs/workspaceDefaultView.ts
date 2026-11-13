@@ -21,10 +21,3 @@ function createTab(placeholder: boolean): WorkspaceView {
 export function createDefaultWorkspaceView(): WorkspaceView {
   return createTab(true);
 }
-export const createBlankWorkspaceView = createDefaultWorkspaceView;
-
-/**
- * The retired "New tabs and splits" setting's hook. Every tab opens Agents now, so it changes
- * nothing; it stays only until the last test that calls it drops the call.
- */
-export function configureWorkspaceDefaultView(_index: number): void {}

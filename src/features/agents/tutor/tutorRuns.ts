@@ -407,7 +407,7 @@ export function interrupted(error?: string): boolean {
  * What a failed reply says went wrong. A reply cut off part way (it began its answer) failed
  * because its run stopped, not with a message of its own.
  */
-export function failureOf(content: string): string {
+function failureOf(content: string): string {
   const text = content.trim();
   if (!text || text.startsWith("```") || text.startsWith("{") || text.length > 400)
     return "This run stopped before it finished.";

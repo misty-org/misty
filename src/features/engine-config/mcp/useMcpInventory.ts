@@ -13,7 +13,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { mcpApi, McpHubError } from "./api";
 import type { McpConfigEntry, McpInventory } from "./types";
 
-export interface McpInventoryStore {
+interface McpInventoryStore {
   inventory: McpInventory | null;
   loading: boolean;
   error: McpHubError | string | null;

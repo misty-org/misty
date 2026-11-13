@@ -22,11 +22,11 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     crate::app::macos_window_effects::mac_live_resize::install();
     #[cfg(target_os = "macos")]
     crate::app::macos_window_effects::mac_traffic_lights::install();
-    // Debug-only: the browser benchmark runs its tasks in Misty's own
-    // tabs when asked to; see browser/eval_bridge/mod.rs.
+    // Debug-only: a bridge for the live acceptance specs when asked to;
+    // see browser/agent_pages/eval_bridge/mod.rs.
     #[cfg(all(desktop, debug_assertions))]
     crate::browser::agent_pages::eval_bridge::start_if_requested(app.handle());
-    // Debug-only end-to-end check of Kiri; see browser/kiri_probe.rs.
+    // Debug-only end-to-end check of Kiri; see browser/kiri_link/kiri_probe.rs.
     #[cfg(all(debug_assertions, target_os = "macos"))]
     if std::env::var_os("MISTY_KIRI_PROBE").is_some() {
         let handle = app.handle().clone();

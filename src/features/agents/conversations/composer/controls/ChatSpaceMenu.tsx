@@ -12,7 +12,7 @@ import { chatSpaceId } from "../../state/conversationSpace";
 import { useMistyStore } from "../../state/useMistyStore";
 
 /** The Space a chat works in, or a new chat would: its own, the one picked for it, or the window's. */
-export function useChatSpace(conversationId?: string): string {
+function useChatSpace(conversationId?: string): string {
   const chat = useMistyStore((state) =>
     conversationId ? state.conversations.find((item) => item.id === conversationId) : undefined,
   );

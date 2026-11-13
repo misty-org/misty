@@ -5,7 +5,7 @@ import { readDeviceState, updateDeviceState } from "./deviceState";
 /** What a person set for one linked folder on this device. Every field is optional. Launch
  * scripts keep their own list (launch-script/launchScripts.ts), and added programs are kept
  * natively, where no window can name one. */
-export interface FolderSettings {
+interface FolderSettings {
   /** The app the "Open in" button opens the folder in, by its id. */
   openIn?: string;
 }

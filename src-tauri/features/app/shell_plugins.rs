@@ -77,6 +77,7 @@ mod tests {
     fn plugin_scripts_preserve_website_apis_and_shell_integrations() {
         let opener = ShellScriptPlugin(tauri_plugin_opener::init::<tauri::Wry>());
         assert_eq!(opener.name(), "opener");
+        #[cfg_attr(target_os = "macos", allow(unused_mut))]
         let mut scripts = serde_json::json!({
             "windows": cfg!(windows),
             "opener": opener.initialization_script_2().unwrap().script,
@@ -97,7 +98,7 @@ mod tests {
         let mut child = Command::new("node")
             .arg(concat!(
                 env!("CARGO_MANIFEST_DIR"),
-                "/../cli/tasks/tauri-shell-plugins.fixture.ts"
+                "/../tasks/tauri-shell-plugins.fixture.ts"
             ))
             .stdin(Stdio::piped())
             .spawn()

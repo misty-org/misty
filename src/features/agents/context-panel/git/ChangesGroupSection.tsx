@@ -41,7 +41,7 @@ export const ChangesSummary = memo(function ChangesSummary(props: {
   );
 });
 
-export interface GroupSectionProps {
+interface GroupSectionProps {
   scrollElement: HTMLDivElement | null;
   scrollOffset: RefObject<number>;
   title: string;

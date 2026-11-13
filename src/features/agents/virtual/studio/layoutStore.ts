@@ -22,7 +22,7 @@ function takeOldLayout(space: string): StudioLayout | null {
   }
 }
 
-export async function loadLayout(account: string, space: string): Promise<StudioLayout> {
+async function loadLayout(account: string, space: string): Promise<StudioLayout> {
   if (!localDocuments.available()) return defaultLayout();
   const saved = parseLayout(await localDocuments.get(account, "studio", idOf(space)));
   if (saved) return saved;

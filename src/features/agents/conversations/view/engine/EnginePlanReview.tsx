@@ -7,7 +7,7 @@ import { Button, Textarea } from "@/shared/ui";
 import { respondToPlan, type PlanDecision } from "./engineApi";
 
 /** What the chat sends the engine once the person approves its plan, in Auto. */
-export const PLAN_APPROVED_PROMPT = "The plan is approved. Go ahead and carry it out.";
+const PLAN_APPROVED_PROMPT = "The plan is approved. Go ahead and carry it out.";
 
 const settledLabel: Record<string, string> = {
   approved: "Approved",

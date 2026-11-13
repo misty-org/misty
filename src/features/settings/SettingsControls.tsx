@@ -32,7 +32,7 @@ export function SelectControl(props: {
 }
 
 /** One option of a settings dropdown or segmented choice. */
-export interface DropdownOption {
+interface DropdownOption {
   value: string;
   label: string;
   /** The row's icon in a dropdown; settings rows without one draw their label alone. */

@@ -14,7 +14,7 @@ import {
 } from "./workerBrowserJobs";
 
 /** The native lease a browser job's execution runs under: its own id, the job's deadline. */
-export function browserExecutionControl(
+function browserExecutionControl(
   job: ClaimedWorkflowNodeJob["job"],
   leaseExpiresAt: string | null | undefined,
 ) {

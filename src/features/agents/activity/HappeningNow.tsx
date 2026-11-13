@@ -71,7 +71,7 @@ function Elapsed({ since }: { since: number }) {
   return <span className="activity-muted tabular-nums">{text}</span>;
 }
 
-export interface OpenChatRequest {
+interface OpenChatRequest {
   agentId: string | undefined;
   conversationId: string;
 }

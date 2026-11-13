@@ -6,7 +6,7 @@ use crate::browser::*;
 mod events;
 mod setup;
 use events::{new_window, page_load};
-use setup::{adopt_existing, eval_ephemeral_session, record_request};
+use setup::{adopt_existing, record_request};
 
 #[tauri::command]
 // Keep this command asynchronous. WebView2 child creation needs the Windows
@@ -33,10 +33,8 @@ pub async fn browser_webview_create(
     let owner = caller.window().label().to_owned();
     let profile =
         app_windows::profile_for_owner(&owner).ok_or("Only a profile's window can open pages.")?;
-    // No window is private. Only the eval bridge's test pages open in a temporary session.
-    let temporary =
-        eval_ephemeral_session().map(|session| app_windows::temporary_store_id(&session));
-    request.private = temporary.is_some();
+    // No window is private.
+    request.private = false;
     // Holds the account steady until the view has finished opening.
     let page_store = crate::browser::profiles::page_store(&profile).await?;
     trace_create("lease acquired");
@@ -113,12 +111,7 @@ pub async fn browser_webview_create(
     // page draws, so it would cover Misty's saved sign-ins (`PasswordFillMenu`).
     #[cfg(windows)]
     let builder = builder.general_autofill_enabled(false);
-    // A temporary view joins the temporary session (see vendor/wry's MISTY-PATCH.md): the
-    // identifier names the session, never a persistent store.
-    let builder = match temporary {
-        Some(session) => builder.incognito(true).data_store_identifier(session),
-        None => builder.data_store_identifier(store_identifier),
-    };
+    let builder = builder.data_store_identifier(store_identifier);
     // Bare WKWebView omits Safari's Version/Safari tokens, which makes sites
     // such as Google serve their legacy compatibility UI. Derive the desktop
     // Safari identity from the installed Safari bundle instead of pinning a

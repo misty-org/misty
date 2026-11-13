@@ -3,9 +3,9 @@ import type { LucideIcon } from "lucide-react";
 import * as React from "react";
 import { cn } from "../classNames";
 
-export type ProseSize = "meta" | "control" | "body" | "page";
+type ProseSize = "meta" | "control" | "body" | "page";
 
-export type ProseProps = {
+type ProseProps = {
   children?: React.ReactNode;
   /** The text role. Leave it out to keep the surrounding size, as a chat message sets it. */
   size?: ProseSize;
@@ -102,9 +102,3 @@ export const ProseCode = React.forwardRef<
   </div>
 ));
 ProseCode.displayName = "ProseCode";
-
-/**
- * Spread on a link inside prose that opens a local file rather than a page: dotted underline,
- * the surrounding color. `<a {...proseFileLink} href={href}>…</a>`
- */
-export const proseFileLink = { "data-prose-link": "file" } as const;

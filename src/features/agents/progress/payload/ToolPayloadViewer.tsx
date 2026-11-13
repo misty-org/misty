@@ -13,7 +13,7 @@ import {
   type EditArgs,
 } from "./editLineStats";
 
-export interface ToolPayloadViewerProps {
+interface ToolPayloadViewerProps {
   toolName: string;
   path?: string | null;
   args?: unknown;
@@ -60,7 +60,7 @@ function CopyButton({ text, label }: { text: string; label: string }) {
 }
 
 /** A file change as a diff, with line numbers on both sides and its +/- counts. */
-export const FileDiffViewer = memo(function FileDiffViewer({
+const FileDiffViewer = memo(function FileDiffViewer({
   filePath,
   oldString,
   newString,
@@ -159,7 +159,7 @@ function parseBashArgs(args: unknown): BashArgs | null {
 }
 
 /** A tool's result as text, and whether it reads as a failure. */
-export function formatExecutionResult(result: unknown): { text: string; isError: boolean } | null {
+function formatExecutionResult(result: unknown): { text: string; isError: boolean } | null {
   if (result == null) return null;
   if (typeof result === "string") {
     const trimmed = result.trim();
@@ -207,7 +207,7 @@ function ResultToggle({
 }
 
 /** A shell command as a terminal shows it: the prompt line, then what it printed. */
-export const BashCommandViewer = memo(function BashCommandViewer({
+const BashCommandViewer = memo(function BashCommandViewer({
   toolName,
   command,
   description,
@@ -257,7 +257,7 @@ export const BashCommandViewer = memo(function BashCommandViewer({
 });
 
 /** Any other tool: its raw parameters, then its raw result. */
-export const GenericToolViewer = memo(function GenericToolViewer({
+const GenericToolViewer = memo(function GenericToolViewer({
   args,
   result,
 }: {

@@ -19,7 +19,7 @@ import { canOpenInBrowser } from "../editor/editorViewMode";
 import { parentPath } from "./filesStore";
 import type { FileTreeMenuTarget } from "./useFileTreeOperations";
 
-export const revealLabel = navigator.platform.includes("Mac")
+const revealLabel = navigator.platform.includes("Mac")
   ? "Reveal in Finder"
   : navigator.platform.includes("Win")
     ? "Reveal in Explorer"

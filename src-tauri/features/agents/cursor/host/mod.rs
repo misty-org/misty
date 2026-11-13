@@ -86,10 +86,6 @@ pub async fn cursor_companion_configure(
 ) -> Result<u64, String> {
     require_main(&webview)?;
     let state = host_state(&app);
-    eprintln!(
-        "[companion] configure account_empty={}",
-        account_id.is_empty()
-    );
     stop(&app);
     if account_id.is_empty() {
         return Ok(state.turn.load(Ordering::SeqCst));
@@ -113,7 +109,6 @@ pub fn stop(app: &AppHandle) {
     };
     let state = managed.inner().clone();
     state.enabled.store(false, Ordering::SeqCst);
-    eprintln!("[companion] stop (account boundary or reconfigure)");
     state.held.store(false, Ordering::SeqCst);
     state.watch_clicks.store(false, Ordering::SeqCst);
     let turn = state.turn.fetch_add(1, Ordering::SeqCst) + 1;
@@ -150,7 +145,6 @@ pub fn cursor_companion_interrupt(
         .turn
         .compare_exchange(expected, expected + 1, Ordering::SeqCst, Ordering::SeqCst)
         .map_err(|_| "Companion already interrupted")?;
-    eprintln!("[companion] interrupt expected={expected}");
     state.held.store(false, Ordering::SeqCst);
     state.watch_clicks.store(false, Ordering::SeqCst);
     if let Ok(mut data) = state.data.lock() {

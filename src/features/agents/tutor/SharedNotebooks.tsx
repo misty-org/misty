@@ -159,7 +159,7 @@ export function SharedNotebooks({ onOpen }: { onOpen(notebookId: string): void }
 }
 
 /** Asks before stopping, since friends keep the last copy but stop seeing updates. */
-export async function confirmStopSharing(notebook: Notebook) {
+async function confirmStopSharing(notebook: Notebook) {
   return confirmAction(
     `Stop sharing “${notebook.title}”? The copy in ${notebook.shared?.spaceName ?? "the Space"} stays as it is now.`,
     "Stop sharing",

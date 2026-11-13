@@ -1,5 +1,5 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
-export interface InputQueueOptions {
+interface InputQueueOptions {
   /** Write one chunk to the live PTY. */
   write: (data: string) => Promise<void>;
   /** (Re)open the PTY session; idempotent on the backend. */
@@ -8,7 +8,7 @@ export interface InputQueueOptions {
   isSessionGone: (error: unknown) => boolean;
 }
 
-export interface TerminalInputQueue {
+interface TerminalInputQueue {
   /** Queue terminal input; resolves once everything queued so far is written. */
   send: (data: string) => Promise<void>;
 }
@@ -45,7 +45,7 @@ export function createInputQueue({
             await reopen();
             await write(chunk);
           } catch {
-            // The shell could not be restarted; the chunk is dropped, as before.
+            // The shell could not be restarted; the chunk is dropped.
           }
         }
       }

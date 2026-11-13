@@ -49,8 +49,6 @@ export function SummarizedDivider() {
   );
 }
 
-/** Who is answering in the open chat: the engine's own mark for an agent on an outside engine,
- * and Misty's cloud for one on Misty's own. */
 /** Who is answering, beside its reply: the engine's own mark, an initial, or a plain cloud for
  * Misty. Nothing sits behind it, and the animated cloud stays with the companion. */
 export function MistyAvatar() {

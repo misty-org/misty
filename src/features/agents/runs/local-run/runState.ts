@@ -11,7 +11,7 @@ import type {
 
 /** A run as its kept events tell it: its state, and how the reply got its answer. */
 
-export interface RunProgress {
+interface RunProgress {
   items: AiProgressItem[];
   citations?: AiCitation[];
   notebook?: AgentNotebook;

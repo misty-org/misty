@@ -40,14 +40,13 @@ desktop-cc-gui (https://github.com/zhukunpenglinyutong/desktop-cc-gui)
   provider channels and CC Switch import, the network proxy, fonts and the performance panel,
   and Pi's per-provider editor (piFamilyModelsBlocks.ts). The notes shown after an update follow
   its upgrade announcement (src/features/updater).
-  The safety scan on what an engine writes into memory follows its memory scan
-  (src-tauri/features/memory/scan.rs).
-  Also adapted: bot bundles and the bot prompt (src-tauri/features/bots, src/features/bots), the
-  persona catalog and the composer's `#` menu (src-tauri/features/agent_catalog,
-  src/features/agent-catalog), computer use for outside engines and its virtual cursor
-  (src-tauri/features/computer_use, src/features/computer-use, src/app/computer-cursor.html),
-  desktop pets (src-tauri/features/pets, src/features/pets), and pruning the AppImage's bundled
-  Wayland libraries (cli/src/release/appimage.rs).
+  The safety scan on what an engine wrote into Misty's memory, since removed, followed its memory
+  scan.
+  Also adapted: bot bundles and the bot prompt (src-tauri/features/bots, src/features/agents/bots),
+  the persona catalog and the composer's `#` menu (src-tauri/features/agent_catalog,
+  src/features/agents/personas), computer use for outside engines and its virtual cursor
+  (src-tauri/features/computer_use, src/features/computer-use, src/app/computer-cursor.html) and
+  desktop pets (src-tauri/features/pets, src/features/pets).
 
   MIT License
 

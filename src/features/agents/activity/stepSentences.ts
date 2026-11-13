@@ -100,14 +100,14 @@ const housekeeping = new Set([
   "readmcpresourcetool",
 ]);
 
-export function isHousekeeping(tool: string): boolean {
+function isHousekeeping(tool: string): boolean {
   const key = toolKey(tool);
   return housekeeping.has(key) || key.startsWith("browser.downloads");
 }
 
 const httpAddress = (text: string) => /^https?:\/\//i.test(text);
 
-export function hostOf(address: string): string {
+function hostOf(address: string): string {
   try {
     return new URL(address).hostname.replace(/^www\./, "");
   } catch {
@@ -206,10 +206,7 @@ export function verbOf(tool: string): StepVerb {
 }
 
 /** One step as a past-tense sentence. `page` is the page the run was on, for calls that name none. */
-export function describeStep(
-  step: RunStep,
-  options: { folder?: string; page?: string } = {},
-): string {
+function describeStep(step: RunStep, options: { folder?: string; page?: string } = {}): string {
   const key = toolKey(step.tool);
   const page = pageLabel(step) || options.page || "a page";
   const file =

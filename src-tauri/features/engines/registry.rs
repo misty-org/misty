@@ -167,8 +167,8 @@ impl ProcessRegistry {
     }
 
     /// Number of in-flight runs, ignoring the run-id/session-id alias
-    /// duplication. The macOS quit guard asks this before letting Cmd+Q /
-    /// AppleScript `quit` take the app down mid-turn.
+    /// duplication.
+    #[cfg(test)]
     pub fn active_run_count(&self) -> usize {
         match self.0.lock() {
             Ok(map) => active_run_count(&map),

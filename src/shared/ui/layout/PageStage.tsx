@@ -1,17 +1,7 @@
 import type { ReactNode, RefObject } from "react";
 import { cn } from "../classNames";
-import "./pageStage.css";
 
-/**
- * Spread on a surface that paints behind a PageStage (a panel's host): it goes clear while the
- * page is on screen, so the page shows through a menu or dialog opened over it (pageStage.css).
- */
-export const pageSurfaceProps = { "data-page-surface": "" } as const;
-
-/** Spread on a bar over a PageStage, so it keeps its color while the surface under it is clear. */
-export const pageChromeProps = { "data-page-chrome": "" } as const;
-
-export interface PageStageProps {
+interface PageStageProps {
   hostRef: RefObject<HTMLDivElement | null>;
   /** The native page placed over the host, if one is. */
   placed: boolean;

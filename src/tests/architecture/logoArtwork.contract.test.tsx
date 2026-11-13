@@ -16,8 +16,8 @@ import { BrandIcon, adaptiveMarks, logoPlates } from "@/shared/ui";
 import { repositoryRoot } from "./repositoryPolicy";
 
 /**
- * Every third-party logo is the brand's own artwork, reads on both themes, and is never blank
- * (AGENTS.md). A logo that fails here needs its brand's colored or theme variant, and only when the
+ * Every third-party logo is the brand's own artwork, reads on both themes, and is never blank.
+ * A logo that fails here needs its brand's colored or theme variant, and only when the
  * brand has none, an entry in `logoPlates`.
  */
 

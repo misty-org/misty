@@ -22,7 +22,7 @@ function withoutFragment(url: URL) {
 }
 
 /** The absolute links a page's markdown holds, resolved against its address. */
-export function pageLinks(markdown: string, base: string): Set<string> {
+function pageLinks(markdown: string, base: string): Set<string> {
   const links = new Set<string>();
   const add = (raw: string) => {
     const url = parse(raw.replace(/[.,;]+$/, ""), base || undefined);
@@ -49,7 +49,7 @@ function linkLike(text: string, base: string): string | null {
 }
 
 /** The Levenshtein distance, giving up once it passes `cap`. */
-export function editDistance(a: string, b: string, cap: number): number {
+function editDistance(a: string, b: string, cap: number): number {
   let previous = Array.from({ length: b.length + 1 }, (_, index) => index);
   let current = new Array<number>(b.length + 1).fill(0);
   for (let i = 1; i <= a.length; i++) {
@@ -86,7 +86,7 @@ function nearestLink(link: string, links: Set<string>): string | null {
 }
 
 /** Checks each link-like string in `data` against the page's links. */
-export function verifyExtractedLinks(data: unknown, markdown: string, base: string) {
+function verifyExtractedLinks(data: unknown, markdown: string, base: string) {
   const links = pageLinks(markdown, base);
   let corrected = 0;
   const removed: string[] = [];

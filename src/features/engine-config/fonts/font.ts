@@ -24,28 +24,27 @@ export const emptyFontPreferences: FontPreferences = {
 };
 
 /** Sent after fonts are applied and after a picked face finishes loading; the terminal re-reads. */
-export const FONT_CHANGE_EVENT = "misty:font-change";
+const FONT_CHANGE_EVENT = "misty:font-change";
 
 /** The stored family that means "the picked file". */
 export const CUSTOM_FONT_VALUE = "custom";
 
 /** Misty's own stacks (src/styles/theme.css), kept after a chosen family as its fallbacks. */
-export const UI_SYSTEM_STACK =
+const UI_SYSTEM_STACK =
   '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif';
-export const CODE_SYSTEM_STACK =
-  'ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace';
+const CODE_SYSTEM_STACK = 'ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace';
 
 /** Names for picked files: one per row, so one file picked for both registers twice, and stable
  * across launches so the saved stack keeps pointing at the right face. */
-export const CUSTOM_UI_FONT_FAMILY = "Misty Custom UI Font";
+const CUSTOM_UI_FONT_FAMILY = "Misty Custom UI Font";
 export const CUSTOM_CODE_FONT_FAMILY = "Misty Custom Code Font";
 
-export type CustomFontRole = "ui" | "code";
+type CustomFontRole = "ui" | "code";
 export type FontField = "fontFamily" | "codeFontFamily";
 
 const CACHE_KEY = "misty.fonts:v1";
 
-export function normalizeFontFamily(value: string | null | undefined): string {
+function normalizeFontFamily(value: string | null | undefined): string {
   return (value ?? "").trim();
 }
 
@@ -73,7 +72,7 @@ export function fontRole(field: FontField): CustomFontRole {
   return field === "fontFamily" ? "ui" : "code";
 }
 
-export function customFontFamily(role: CustomFontRole): string {
+function customFontFamily(role: CustomFontRole): string {
   return role === "ui" ? CUSTOM_UI_FONT_FAMILY : CUSTOM_CODE_FONT_FAMILY;
 }
 

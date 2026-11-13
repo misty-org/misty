@@ -6,7 +6,7 @@
  * Runs under plain Node with uiRules.ts, so it imports nothing but Node itself.
  */
 
-export interface JsxTag {
+interface JsxTag {
   name: string;
   /** Index of the `<` in the scanned text. */
   start: number;
@@ -130,15 +130,6 @@ export function literalValues(value: string | undefined): string[] {
 
 export function hasAttribute(tag: JsxTag, attribute: string): boolean {
   return attributeValue(tag, attribute) !== undefined;
-}
-
-/** A spread such as `{...props}` may carry any attribute, so attribute-absence rules skip it. */
-export function spreadsProps(tag: JsxTag): boolean {
-  for (let index = tag.flat.indexOf("{"); index >= 0; index = tag.flat.indexOf("{", index + 1)) {
-    if (/=\s*$/.test(tag.flat.slice(0, index))) continue;
-    if (/^\{\s*\.\.\./.test(tag.raw.slice(index))) return true;
-  }
-  return false;
 }
 
 export function countTags(text: string, names: RegExp, test: (tag: JsxTag) => boolean): number {

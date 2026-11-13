@@ -26,7 +26,7 @@ export function parseUiBaseline(json: unknown): UiBaseline {
   return { rules: [], files: {} };
 }
 
-export interface BaselineUpdate {
+interface BaselineUpdate {
   baseline: UiBaseline;
   /** Rules recorded for the first time, with how many hits each starts from. */
   newRules: Partial<Record<UiRuleId, number>>;

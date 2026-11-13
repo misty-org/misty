@@ -8,7 +8,7 @@ import { useFilesStore } from "./filesStore";
 import type { VisibleNode } from "./visibleNodes";
 
 /** The badge's words for a repository: `branch, clean` or `branch, 2 changed, 1 new`. */
-export function repositoryLabel(repo: RepositorySummary): string {
+function repositoryLabel(repo: RepositorySummary): string {
   if (repo.changed + repo.untracked === 0) return `${repo.branch}, no changes`;
   const parts = [repo.branch];
   if (repo.changed > 0) parts.push(`${repo.changed} changed`);

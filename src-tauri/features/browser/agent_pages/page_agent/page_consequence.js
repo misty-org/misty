@@ -127,7 +127,7 @@
   };
 
   // The four kinds that always stop for the person in Misty, whatever the
-  // model asked for (roadmap C2). Other consequential steps keep the
+  // model asked for. Other consequential steps keep the
   // allowConsequential rule.
   /** "payment", "send", "delete", "publish" or "" for acting on el. */
   P.consequenceKind = (el, action, commit = false) => {

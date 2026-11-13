@@ -2,19 +2,5 @@
 // See NOTICE.
 
 export { PromptsSection } from "./PromptsSection";
-export {
-  PROMPTS_SETTINGS_SECTION,
-  listPrompts,
-  type CustomPromptEntry,
-  type PromptScope,
-} from "./promptsApi";
-export {
-  createPrompt,
-  deletePrompt,
-  matchPrompts,
-  movePrompt,
-  promptsFor,
-  subscribePromptsChanged,
-  updatePrompt,
-  usePromptStore,
-} from "./promptStore";
+export { PROMPTS_SETTINGS_SECTION } from "./promptsApi";
+export { matchPrompts, promptsFor } from "./promptStore";

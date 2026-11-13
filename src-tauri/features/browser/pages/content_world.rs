@@ -16,7 +16,7 @@ pub(crate) async fn evaluate_in_content_world(
 }
 
 /// Runs `function_body` in the named world of one cross-origin frame the tab announced
-/// (browser_frames.rs). A frame that no longer answers is forgotten.
+/// (agent_pages/frames.rs). A frame that no longer answers is forgotten.
 #[cfg(target_os = "macos")]
 pub(crate) async fn evaluate_in_frame(
     webview: Webview,
@@ -34,7 +34,7 @@ pub(crate) async fn evaluate_in_frame(
 }
 
 /// Runs `function_body` in the named isolated world of one cross-origin frame the tab
-/// listed (browser_frames_windows.rs), through the session that runs the frame. A frame
+/// listed (agent_pages/frames/windows.rs), through the session that runs the frame. A frame
 /// that no longer answers is forgotten.
 #[cfg(windows)]
 pub(crate) async fn evaluate_in_frame(

@@ -10,7 +10,7 @@ import type { Notebook, NotebookFollow } from "./tutorTypes";
  */
 
 /** News older than this is looked for again when the notebook opens. */
-export const followStaleAfterMs = 30 * 60 * 1000;
+const followStaleAfterMs = 30 * 60 * 1000;
 /** New stories taken in one look. */
 const perLook = 6;
 /** News sources a notebook keeps; the oldest go first. */

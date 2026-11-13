@@ -17,7 +17,7 @@ interface ContextUsageState {
   byRun: Record<string, ContextUsage>;
 }
 
-export const useContextUsageStore = create<ContextUsageState>(() => ({ byRun: {} }));
+const useContextUsageStore = create<ContextUsageState>(() => ({ byRun: {} }));
 
 let watching = false;
 

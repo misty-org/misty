@@ -166,49 +166,6 @@ fn probe_menu_collapses_variants_and_leads_with_the_default() {
     assert!(models_from_config_options(&json!({ "configOptions": [] })).is_empty());
 }
 
-/// Keeps the raw event JSON: parking is only observable through what the
-/// frontend receives and what the registry holds for the answer.
-struct CollectingEmitter(std::sync::Mutex<Vec<String>>);
-
-impl crate::engines::support::event_sink::Emit for CollectingEmitter {
-    fn emit_json(&self, _name: &str, raw_json: &str) {
-        self.0.lock().unwrap().push(raw_json.to_string());
-    }
-}
-
-fn test_core() -> (
-    TurnCore,
-    Arc<crate::engines::ProcessRegistry>,
-    Arc<CollectingEmitter>,
-) {
-    use crate::engines::registry::ChildEntry;
-    use crate::engines::support::event_sink::EventSink;
-    let emitter = Arc::new(CollectingEmitter(std::sync::Mutex::new(Vec::new())));
-    let registry = Arc::new(crate::engines::ProcessRegistry::default());
-    registry.insert(
-        "test-run".to_string(),
-        ChildEntry {
-            child: None,
-            pid: 4_000_000_421,
-            run_id: "test-run".to_string(),
-            killed: Arc::new(AtomicBool::new(false)),
-            reader_abort: Arc::new(std::sync::OnceLock::new()),
-            stdin: None,
-            questions: Arc::new(Mutex::new(HashMap::new())),
-            plans: Arc::new(Mutex::new(HashMap::new())),
-        },
-    );
-    let core = TurnCore {
-        sink: EventSink::new(emitter.clone()),
-        registry: Arc::clone(&registry),
-        engine_id: "minimax".to_string(),
-        run_id: "test-run".to_string(),
-        db: None,
-        followup: None,
-    };
-    (core, registry, emitter)
-}
-
 #[test]
 fn rpc_error_recovery_keeps_code_and_message() {
     let raw = "rpc:session/set_config_option:-32601:Method not found";

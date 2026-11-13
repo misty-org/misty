@@ -19,7 +19,7 @@ const observationReads = new Set([
 ]);
 
 /** Observations have no effect, so an interrupted one can be retried and is never uncertain. */
-export const browserObservation = (operation: string) => observationReads.has(operation);
+const browserObservation = (operation: string) => observationReads.has(operation);
 
 export const notAllowed = () =>
   new LocalToolRejected("tool_not_allowed", "This tool call is not allowed for the current run.");

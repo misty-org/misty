@@ -1,7 +1,7 @@
 /** Where a dev server usually is. */
 export const defaultPreviewUrl = "http://localhost:3000";
 
-export type PreviewAddress = { ok: true; url: string } | { ok: false; message: string };
+type PreviewAddress = { ok: true; url: string } | { ok: false; message: string };
 
 const refusal =
   "The preview shows only your own app on this computer. Use an address like http://localhost:3000.";

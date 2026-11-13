@@ -13,7 +13,7 @@ export const sidebarPlaceIds = [
 export type SidebarPlaceId = (typeof sidebarPlaceIds)[number];
 
 /** Every row in the person's order, and which of them are pinned. */
-export interface SidebarPins {
+interface SidebarPins {
   order: SidebarPlaceId[];
   pinned: SidebarPlaceId[];
 }

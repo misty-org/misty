@@ -10,8 +10,6 @@ import { currentSpaceKey, useSpaceFolders } from "../engines/enginesApi";
 import { doingOf, stepsOf, wordsOf } from "./doing";
 import { claimedFiles, followRunWork, type RunWork, useRunWork } from "./runWork";
 
-export { doingOf };
-
 /** Where an agent is in the room: at its desk working, at the door asking for its person, or resting. */
 export type StudioState = "working" | "needs-you" | "resting";
 
@@ -40,20 +38,20 @@ export interface StudioAgent {
 /** How a run ended, as the room shows it: a finished one is cheered, a failed one is slumped over. */
 export type Outcome = "done" | "failed" | "";
 
-export function outcomeOf(state: string | undefined): Outcome {
+function outcomeOf(state: string | undefined): Outcome {
   if (state === "completed") return "done";
   if (state === "failed") return "failed";
   return "";
 }
 
-export function studioStateOf(state: string | undefined): StudioState {
+function studioStateOf(state: string | undefined): StudioState {
   if (state === "running" || state === "queued") return "working";
   if (state === "awaiting_approval" || state === "awaiting_intervention") return "needs-you";
   return "resting";
 }
 
 /** Each agent's newest run, and where that puts it in the room. */
-export function placeAgents(
+function placeAgents(
   agents: AgentProfile[],
   entries: MistyActivityEntry[],
   runs: Record<string, RunWork> = {},
