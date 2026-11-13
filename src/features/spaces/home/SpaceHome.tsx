@@ -268,7 +268,12 @@ export function SpaceHome({ space, journal = false }: { space: Space; journal?: 
             space={space}
             wroteDoc={gallery.items.some((item) => item.kind === "note" && item.creatorId === me)}
           />
-          <SpaceOverview spaceId={space.id} items={gallery.items} itemsLoading={gallery.loading} />
+          <SpaceOverview
+            spaceId={space.id}
+            solo={space.member_count <= 1}
+            items={gallery.items}
+            itemsLoading={gallery.loading}
+          />
           {space.is_shared && <SpaceTeamwork spaceId={space.id} />}
         </div>
       )}

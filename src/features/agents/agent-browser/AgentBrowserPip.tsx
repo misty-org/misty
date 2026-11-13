@@ -42,7 +42,8 @@ export function AgentBrowserPip({
     conversationId ? state.chats[conversationId] : undefined,
   );
   const corner = usePipCorner((state) => state.value.corner);
-  if (!chat?.views.length || chat.hidden || chat.expanded) return null;
+  // Only a browser the person detached floats here.
+  if (!chat?.views.length || chat.hidden || chat.expanded || !chat.detached) return null;
   const index = Math.max(
     0,
     chat.views.findIndex((view) => view.id === chat.shownView),

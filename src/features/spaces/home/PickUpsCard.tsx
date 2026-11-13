@@ -43,9 +43,12 @@ const shown = 5;
  */
 export function PickUpsCard({
   spaceId,
+  solo,
   chats,
 }: {
   spaceId: string;
+  /** Only the person is in this Space, so a saved pick-up is theirs alone. */
+  solo: boolean;
   chats: GlobalAiConversation[];
 }) {
   const now = useNow();
@@ -124,6 +127,7 @@ export function PickUpsCard({
           open
           onOpenChange={(open) => !open && setSaving(undefined)}
           spaceId={spaceId}
+          solo={solo}
           conversationId={saving.id}
           chatTitle={chatTitle(saving.title)}
           agent={agentOf(agents, saving.agentId)}

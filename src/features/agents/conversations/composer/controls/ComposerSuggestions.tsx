@@ -1,4 +1,53 @@
-import { File, FileText, Folder, Globe, Plus, ScrollText, Terminal, UserRound } from "lucide-react";
+import {
+  Activity,
+  Bot,
+  Brain,
+  Bug,
+  ChartColumn,
+  CircleArrowUp,
+  CircleHelp,
+  ClipboardList,
+  Code,
+  Coins,
+  Cpu,
+  DoorOpen,
+  Download,
+  Eraser,
+  File,
+  FileCode,
+  FilePlus,
+  FileText,
+  FoldVertical,
+  Folder,
+  FolderPlus,
+  Gauge,
+  GitBranch,
+  GitPullRequest,
+  Globe,
+  History,
+  Keyboard,
+  KeyRound,
+  ListTodo,
+  LogIn,
+  LogOut,
+  MessageSquareText,
+  Monitor,
+  Newspaper,
+  Palette,
+  PanelBottom,
+  Plus,
+  ScrollText,
+  Server,
+  Settings,
+  ShieldAlert,
+  SquarePen,
+  SquareSlash,
+  Stethoscope,
+  Undo2,
+  UserRound,
+  Webhook,
+  type LucideIcon,
+} from "lucide-react";
 import { useEffect, useRef, useState, type KeyboardEvent, type RefObject } from "react";
 import { SkeletonList, SuggestionItem, SuggestionList, Text } from "@/shared/ui";
 import { engineCatalog, mistyEngine, type EngineCatalog } from "../../../engines/enginesApi";
@@ -210,13 +259,66 @@ function rememberList(key: string, list: Suggestion[]) {
 const icons = {
   file: File,
   folder: Folder,
-  command: Terminal,
+  command: SquareSlash,
   skill: ScrollText,
   browser: Globe,
   prompt: FileText,
   new: Plus,
   persona: UserRound,
 };
+
+/** Each command wears its own subject's icon, by the name the engine (or Misty) gives it. */
+const commandIcons: Record<string, LucideIcon> = {
+  computer: Monitor,
+  plan: ClipboardList,
+  new: SquarePen,
+  clear: Eraser,
+  resume: History,
+  mcp: Server,
+  compact: FoldVertical,
+  context: Gauge,
+  cost: Coins,
+  usage: ChartColumn,
+  init: FilePlus,
+  review: GitPullRequest,
+  "security-review": ShieldAlert,
+  "pr-comments": MessageSquareText,
+  "release-notes": Newspaper,
+  todos: ListTodo,
+  agents: Bot,
+  model: Cpu,
+  memory: Brain,
+  config: Settings,
+  settings: Settings,
+  help: CircleHelp,
+  status: Activity,
+  login: LogIn,
+  logout: LogOut,
+  doctor: Stethoscope,
+  export: Download,
+  permissions: KeyRound,
+  hooks: Webhook,
+  "add-dir": FolderPlus,
+  bug: Bug,
+  feedback: Bug,
+  vim: Keyboard,
+  ide: Code,
+  rewind: Undo2,
+  "output-style": Palette,
+  statusline: PanelBottom,
+  upgrade: CircleArrowUp,
+  exit: DoorOpen,
+  "install-github-app": GitBranch,
+};
+
+function iconOf(item: Suggestion): LucideIcon {
+  if (item.icon !== "command") return icons[item.icon];
+  const known = commandIcons[item.name.toLowerCase()];
+  if (known) return known;
+  // A command written as a file in the person's or project's folders.
+  if (item.source === "Yours" || item.source === "Project") return FileCode;
+  return icons.command;
+}
 
 const prefixes = { file: "", command: "/", skill: "$", prompt: "!", persona: "#" };
 
@@ -352,7 +454,7 @@ export function useComposerSuggestions(input: {
             selected={index === selected}
             onPointerDown={() => choose(item)}
             onPointerEnter={() => setSelected(index)}
-            icon={icons[item.icon]}
+            icon={iconOf(item)}
             label={
               <>
                 {item.action === "new-prompt" ? item.name : `${prefixes[trigger.kind]}${item.name}`}

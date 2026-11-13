@@ -37,8 +37,11 @@ export interface AgentBrowserChat {
   conversationId: string;
   views: AgentBrowserView[];
   shownView: string;
-  /** The full split, or the PiP at the top of the chat. */
+  /** Open in the panel beside the chat. */
   expanded: boolean;
+  /** Detached by the person into the picture floating over the chat. Only that shows the PiP:
+   * the browser giving its panel to another view, or the agent opening a page, shows none. */
+  detached?: boolean;
   /** Put away by the person; the agent opening another page brings it back. */
   hidden?: boolean;
 }
@@ -67,7 +70,7 @@ export function hydrateAgentBrowser(raw: string | null): AgentBrowserState {
     if (!saved || typeof saved.chats !== "object" || typeof saved.tabs !== "object") return empty;
     const chats: Record<string, AgentBrowserChat> = {};
     for (const [id, chat] of Object.entries(saved.chats ?? {}))
-      // A reload comes back as the PiP, whatever the chat had open.
+      // A reload comes back with the panel shut (a detached browser stays the PiP).
       chats[id] = {
         ...chat,
         expanded: false,
@@ -153,7 +156,7 @@ export function addBrowserTab(
   tab: AgentBrowserTab,
 ) {
   set((state) => {
-    // A chat's agent browser starts as the PiP; the person opens the full split by clicking it.
+    // A chat's agent browser starts put aside; the person opens it from the rail or the status.
     const chat = state.chats[conversationId] ?? {
       conversationId,
       views: [],
@@ -186,7 +189,7 @@ export function addBrowserTab(
           lastActed: Date.now(),
         });
     return {
-      // Another page brings a browser the person put away back, as the PiP.
+      // Another page brings a browser the person put away back where it was (the PiP only if detached).
       chats: { ...state.chats, [conversationId]: { ...chat, views, hidden: false } },
       tabs: { ...state.tabs, [tab.scopeId]: tab },
     };
@@ -366,7 +369,27 @@ export const setBrowserExpanded = (conversationId: string, expanded: boolean) =>
             [conversationId]: {
               ...state.chats[conversationId]!,
               expanded,
+              // Opening or giving up the panel is never a detach.
+              detached: false,
               ...(expanded ? { hidden: false } : {}),
+            },
+          },
+        }
+      : {},
+  );
+
+/** The person detached the browser from its panel into the picture floating over the chat. */
+export const detachAgentBrowser = (conversationId: string) =>
+  set((state) =>
+    state.chats[conversationId]
+      ? {
+          chats: {
+            ...state.chats,
+            [conversationId]: {
+              ...state.chats[conversationId]!,
+              expanded: false,
+              detached: true,
+              hidden: false,
             },
           },
         }
@@ -380,7 +403,12 @@ export const closeAgentBrowser = (conversationId: string) =>
       ? {
           chats: {
             ...state.chats,
-            [conversationId]: { ...state.chats[conversationId]!, expanded: false, hidden: true },
+            [conversationId]: {
+              ...state.chats[conversationId]!,
+              expanded: false,
+              detached: false,
+              hidden: true,
+            },
           },
         }
       : {},

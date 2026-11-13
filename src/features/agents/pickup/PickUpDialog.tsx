@@ -3,6 +3,7 @@ import {
   Button,
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -31,6 +32,8 @@ export function PickUpDialog(props: {
   open: boolean;
   onOpenChange(open: boolean): void;
   spaceId: string;
+  /** Only the person is in this Space: the note is saved private, not shared with members. */
+  solo: boolean;
   conversationId: string;
   chatTitle: string;
   agent: AgentProfile | undefined;
@@ -98,6 +101,12 @@ export function PickUpDialog(props: {
       <DialogContent className="max-w-140">
         <DialogHeader>
           <DialogTitle className="text-sm">Save where it left off</DialogTitle>
+          {/* Sending saves a Space doc, which takes the Space's default layer: say who sees it. */}
+          <DialogDescription>
+            {props.solo
+              ? "Saved as a doc only you can see."
+              : "Saved as a doc everyone in the Space can see and pick up."}
+          </DialogDescription>
         </DialogHeader>
         {/* The title is known at once; only the note waits on the agent writing it. */}
         <div className="grid gap-3">

@@ -57,12 +57,9 @@ function useOnePanel(conversationId: string, tab: ContextPanelSurface | null, br
 
 // How the panel and the card give way on a narrow Agents page (its `agent-studio` container).
 // Important, since the shared panel's own geometry is in its stylesheet.
-/** Too narrow for three columns: the card floats at the edge over the panel, under its header. */
-const besidePanelCardClass = cn(
-  "@max-[1200px]/agent-studio:absolute! @max-[1200px]/agent-studio:top-13!",
-  "@max-[1200px]/agent-studio:right-3! @max-[1200px]/agent-studio:m-0!",
-  "@max-[1200px]/agent-studio:max-h-[calc(100%-var(--spacing)*16)]!",
-);
+/** Too narrow for three columns: the card steps aside while a panel is open, never floating
+ * over the browser, preview or terminal behind it, and comes back when the panel closes. */
+const besidePanelCardClass = "@max-[1200px]/agent-studio:hidden!";
 /** On a narrow page the open panel covers the chat instead of squeezing it… */
 const narrowPanelClass = cn(
   "@max-[761px]/agent-studio:absolute!",
@@ -70,7 +67,7 @@ const narrowPanelClass = cn(
   "@max-[761px]/agent-studio:w-auto! @max-[761px]/agent-studio:max-w-none!",
   "@max-[761px]/agent-studio:m-0!",
 );
-/** …and the card floats at the edge. */
+/** …and the card, with no panel open, floats at the edge over the chat. */
 const narrowCardClass = cn(
   "@max-[761px]/agent-studio:absolute! @max-[761px]/agent-studio:top-2!",
   "@max-[761px]/agent-studio:right-1! @max-[761px]/agent-studio:m-0!",
@@ -79,8 +76,8 @@ const narrowCardClass = cn(
 /**
  * The right side of a chat, after the chat column and before the rail: the floating side panel
  * (the agent browser, the preview, steps, or the project folder's changes, files and terminal),
- * then the session card, a narrow glance at the chat's usage and where it works that can stay
- * open beside any of them.
+ * then the session card, a narrow glance at the chat's usage and where it works that stays open
+ * beside any of them when the page has room for both, and steps aside for them when it hasn't.
  */
 export function ChatSidePanels(props: { conversationId: string; agent: AgentProfile }) {
   const tab = useContextPanel((state) => state.tab);

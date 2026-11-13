@@ -11,7 +11,7 @@ import { browserAddress } from "../context-panel/browserAddress";
 import { hostAddress } from "./hostAddress";
 import { navigateShownTab } from "../tabs/agentPersonTabs";
 import { agentTab } from "../tabs/agentTabs";
-import { setBrowserExpanded, useAgentBrowser } from "./agentBrowserStore";
+import { detachAgentBrowser, useAgentBrowser } from "./agentBrowserStore";
 
 /**
  * The agent browser in the chat's side panel: a small copy of Misty's own browser beside the
@@ -92,7 +92,7 @@ export function AgentBrowser({ conversationId }: { conversationId?: string }) {
   const foot = (
     <IconButton
       label="Shrink to a picture"
-      onClick={() => setBrowserExpanded(chat.conversationId, false)}
+      onClick={() => detachAgentBrowser(chat.conversationId)}
     >
       <PictureInPicture2 />
     </IconButton>

@@ -41,10 +41,13 @@ import { useNow } from "@/shared/hooks/useNow";
  */
 export function SpaceOverview({
   spaceId,
+  solo,
   items,
   itemsLoading,
 }: {
   spaceId: string;
+  /** Only the person is in this Space, so what they save in it is private. */
+  solo: boolean;
   /** The Space's docs, drawings and files, for the recently edited panel. */
   items: GalleryItem[];
   itemsLoading: boolean;
@@ -151,7 +154,7 @@ export function SpaceOverview({
             <OverviewEmpty>No chats yet</OverviewEmpty>
           )}
         </OverviewCard>
-        <PickUpsCard spaceId={spaceId} chats={recent} />
+        <PickUpsCard spaceId={spaceId} solo={solo} chats={recent} />
         {/* Panels come in pairs: the folders sit beside what was edited last, never alone
             across the whole row. */}
         <ProjectFoldersCard />

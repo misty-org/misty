@@ -53,12 +53,12 @@ export function StepsPanel({ conversationId }: { conversationId: string }) {
   const { folder } = useProjectFolder();
   const [open, setOpen] = useState<Set<string>>(new Set());
   const latest = runs?.[0]?.runId ?? "";
+  const now = useNow();
 
   if (!runs) return <StepsSkeleton />;
   if (!runs.length) {
     return <RunStepsEmpty>Each step the agent takes shows here, as it happens.</RunStepsEmpty>;
   }
-  const now = useNow();
   return (
     <Text as="div" bare tone="default" className="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
       {runs.map((run) => {
