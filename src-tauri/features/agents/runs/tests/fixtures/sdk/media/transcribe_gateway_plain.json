@@ -1,0 +1,54 @@
+{
+  "name": "transcribe_gateway_plain",
+  "kind": "transcribe",
+  "modelId": "gateway/openai/whisper-1",
+  "credentialProvider": "gateway",
+  "input": {
+    "audioBase64": "//uQAAEC",
+    "providerOptions": {
+      "openai": {
+        "language": "en"
+      }
+    }
+  },
+  "replies": [
+    {
+      "status": 200,
+      "contentType": "application/json",
+      "body": "{\"text\":\"Hello.\"}"
+    }
+  ],
+  "unorderedRequests": false,
+  "sent": [
+    {
+      "method": "POST",
+      "path": "/v1/transcription-model",
+      "headers": {
+        "accept": "*/*",
+        "ai-gateway-auth-method": "api-key",
+        "ai-gateway-protocol-version": "0.0.1",
+        "ai-model-id": "openai/whisper-1",
+        "ai-transcription-model-specification-version": "4",
+        "authorization": "Bearer test-key-parity",
+        "content-type": "application/json"
+      },
+      "body": {
+        "audio": "//uQAAEC",
+        "mediaType": "audio/mpeg",
+        "providerOptions": {
+          "openai": {
+            "language": "en"
+          }
+        }
+      }
+    }
+  ],
+  "result": {
+    "text": "Hello.",
+    "segments": [],
+    "language": null,
+    "durationInSeconds": null,
+    "warnings": [],
+    "providerMetadata": {}
+  }
+}

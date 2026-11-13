@@ -1,0 +1,90 @@
+import type { MistyPickerSource } from "@/features/files";
+import type { SpaceMessage } from "../../api/dto/entities";
+import type { RefObject, UIEventHandler } from "react";
+import type { ChatSuggestionsState } from "../hooks/useChatSuggestions";
+import type { MessageEditingState } from "../hooks/useMessageEditing";
+import type { useSpaceChatScope, useSpaceChatStore } from "../hooks/useSpaceChatData";
+import type { useSpaceChatMessageActions } from "../hooks/useSpaceChatMessageActions";
+import type { SpaceChatAccess } from "../hooks/useSpaceChatAccess";
+import { SpaceChatMessages } from "./ChatMessages";
+
+export interface SpaceChatThreadProps {
+  spaceId: string;
+  access: SpaceChatAccess;
+  scope: ReturnType<typeof useSpaceChatScope>;
+  store: ReturnType<typeof useSpaceChatStore>;
+  editing: MessageEditingState;
+  actions: ReturnType<typeof useSpaceChatMessageActions>;
+  suggestions: ChatSuggestionsState;
+  currentUserId: string | undefined;
+  error: string;
+  setError: (message: string) => void;
+  loading: boolean;
+  endRef: RefObject<HTMLDivElement | null>;
+  scrollRef: RefObject<HTMLDivElement | null>;
+  onScroll: UIEventHandler<HTMLDivElement>;
+  /** Older messages may still be on the server, before the first one shown. */
+  hasOlderMessages: boolean;
+  /** Brings a message that isn't drawn yet into view, reading further back for it. */
+  onJumpToMessage: (messageId: string) => void;
+  onOpenPicker: (source: MistyPickerSource) => void;
+  onBeginMention: () => void;
+  onReply: (messageId: string) => void;
+  onDelete: (message: SpaceMessage) => void;
+  onReload: () => void;
+}
+
+/** The scrolling message list, wired to the Space's data and message actions. */
+export function SpaceChatThread(props: SpaceChatThreadProps) {
+  const { spaceId, access, scope, store, editing, actions, suggestions } = props;
+
+  return (
+    <SpaceChatMessages
+      error={props.error}
+      loading={props.loading}
+      messages={scope.messages}
+      currentUserId={props.currentUserId}
+      isOwner={access.isOwner}
+      canWrite={access.canWriteMessages}
+      editingMessageId={editing.editingMessageId}
+      editingText={editing.editingText}
+      editSaving={editing.editSaving}
+      nodes={scope.nodes}
+      libraryItems={suggestions.libraryItems}
+      spaceId={spaceId}
+      directRecipient={scope.directRecipient}
+      onStarter={(starter) => {
+        if (starter === "files" || starter === "library") return props.onOpenPicker(starter);
+        props.onBeginMention();
+      }}
+      endRef={props.endRef}
+      scrollRef={props.scrollRef}
+      onScroll={props.onScroll}
+      hasOlderMessages={props.hasOlderMessages}
+      onJumpToMessage={props.onJumpToMessage}
+      onEditingText={editing.setEditingText}
+      onCancelEditing={editing.cancel}
+      onSaveEdited={(event, message) => void actions.saveEdited(event, message)}
+      onReply={props.onReply}
+      onRetry={access.canWriteMessages ? (message) => void actions.retry(message) : undefined}
+      onToggleReaction={(message, emoji, reacted) =>
+        void actions.toggleReaction(message, emoji, reacted)
+      }
+      onBeginEditing={editing.begin}
+      onDelete={props.onDelete}
+      onOpenNode={(nodeId) => {
+        void store.openNode(spaceId, nodeId).catch((error: unknown) => {
+          props.setError(error instanceof Error ? error.message : "This file could not be opened.");
+        });
+      }}
+      onError={props.setError}
+      onLibraryItem={(item) =>
+        suggestions.setLibraryItems((current) => [
+          ...current.filter((candidate) => candidate.id !== item.id),
+          item,
+        ])
+      }
+      onReload={props.onReload}
+    />
+  );
+}

@@ -1,0 +1,36 @@
+[package]
+name = "agent-runs"
+version = "0.1.0"
+description = "Misty's agent runtime and the model clients it runs on"
+edition = "2021"
+license = "AGPL-3.0-or-later"
+publish = false
+rust-version = "1.80"
+
+[lib]
+name = "agent_runs"
+path = "lib.rs"
+
+[dependencies]
+base64 = "0.22"
+chrono = { version = "0.4", default-features = false, features = ["std"] }
+futures-util = "0.3"
+hex = "0.4"
+brotli-decompressor = "5"
+flate2 = { version = "1", default-features = false, features = ["rust_backend"] }
+# Reading a page, and the JavaScript string and regex rules it shares with the runtime.
+page_text = { path = "../../browser/page_text" }
+rand = "0.8"
+regex = "1"
+reqwest = { version = "0.13.4", default-features = false, features = ["json", "rustls-no-provider", "stream"] }
+serde = { version = "1", features = ["derive"] }
+# `raw_value` keeps tool schemas and call inputs in their original key order (`model_calls/raw_json.rs`).
+serde_json = { version = "1", features = ["raw_value"] }
+thiserror = "1"
+url = "2"
+tokio = { version = "1", features = ["macros", "net", "rt", "sync", "time"] }
+tokio-tungstenite = { version = "0.30", default-features = false, features = ["connect", "rustls-tls-native-roots"] }
+
+[dev-dependencies]
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+tokio = { version = "1", features = ["io-util", "macros", "net", "rt-multi-thread", "test-util"] }

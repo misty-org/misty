@@ -1,0 +1,194 @@
+/* SidePanel and SideCard: cards docked beside a page's column, on the window's own surface.
+   Geometry: 8px from the column, from the top and from the bottom, 4px from what follows (a rail's
+   own 4px inset makes that 8px too). They wear the sidebar's surface, so the window's two sides
+   match, with a hairline edge drawn as an outline (content such as a terminal never covers it)
+   and a soft two-layer shadow. */
+
+.misty-side-panel {
+  position: relative;
+  display: flex;
+  /* Its width, giving way down to its minimum when the column before it reaches its own. */
+  flex: 0 1 auto;
+  flex-direction: column;
+  width: var(--side-panel-width, 440px);
+  min-width: 320px;
+  /* Never more than leaves the column before it its `keep`. */
+  max-width: max(320px, calc(100% - var(--side-panel-keep, 360px) - 12px));
+  min-height: 0;
+  margin: 8px 4px 8px 8px;
+  border-radius: var(--radius-xl);
+  background: var(--color-charcoal-sidebar);
+  color: var(--color-cream);
+  outline: 0.5px solid color-mix(in srgb, var(--misty-theme-text) 9%, transparent);
+  outline-offset: -0.5px;
+  box-shadow:
+    0 2px 4px rgb(0 0 0 / 0.22),
+    0 1px 2px rgb(0 0 0 / 0.22);
+}
+.misty-side-panel[data-expanded] {
+  flex: 1 1 auto;
+  width: auto;
+  max-width: none;
+}
+/* Expanded, it covers the column before it: that column stays mounted (a chat keeps its draft and
+   scroll) but gives up its room. */
+:has(+ .misty-side-panel[data-expanded]) {
+  display: none;
+}
+/* A page set into the panel (PageStage `inset`) sits beneath the renderer while a menu or dialog
+   is open. Once it is on screen the panel's fill drops away so the page shows through; the header
+   keeps the fill, and the view paints the rest of itself (the stage its margin). */
+.misty-side-panel:has([data-page-stage="inset"] [data-browser-page-presented]) {
+  background: transparent;
+}
+.misty-side-panel:has([data-page-stage="inset"] [data-browser-page-presented])
+  > .misty-side-panel-head {
+  background: var(--color-charcoal-sidebar);
+}
+
+/* The resize edge: the whole 8px gap on the panel's leading side. Nothing paints at rest; a
+   hairline shows on hover, focus and while dragging. */
+.misty-side-panel-resize {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -8px;
+  width: 8px;
+  cursor: col-resize;
+  touch-action: none;
+  outline: none;
+}
+.misty-side-panel-resize::after {
+  content: "";
+  position: absolute;
+  top: 12px;
+  bottom: 12px;
+  left: 3.5px;
+  width: 1px;
+  border-radius: 1px;
+  background: transparent;
+  transition: background-color 120ms ease;
+}
+.misty-side-panel-resize:hover::after,
+.misty-side-panel-resize:focus-visible::after,
+.misty-side-panel-resize[data-dragging]::after {
+  background: var(--color-charcoal-border-strong);
+}
+.misty-side-panel[data-expanded] .misty-side-panel-resize {
+  display: none;
+}
+
+/* The header row: the open view's controls (or the panel's name), then expand and close. One
+   hairline under it is the panel's only line. */
+.misty-side-panel-head {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  height: 40px;
+  padding: 0 4px 0 12px;
+  border-bottom: 0.5px solid color-mix(in srgb, var(--misty-theme-text) 7%, transparent);
+}
+/* A header that opens with a control (SidePanelLead) starts it 4px in, where the rows below start
+   their wash, and the control's text 8px inside that, where their icons and names start. */
+.misty-side-panel-head:has(> .misty-side-panel-slot [data-side-panel-lead]) {
+  padding-left: 4px;
+}
+[data-side-panel-lead] > [data-slot="button"] {
+  padding-left: 8px;
+}
+.misty-side-panel-name {
+  display: flex;
+  flex: 0 1 auto;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+  white-space: nowrap;
+  font-size: var(--text-control);
+  font-weight: 500;
+  color: var(--color-cream-bright);
+}
+.misty-side-panel-name > svg {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  color: var(--color-cream-muted);
+}
+.misty-side-panel-slot {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  align-items: center;
+  gap: 4px;
+}
+.misty-side-panel-slot:empty {
+  display: none;
+}
+/* The open view's own controls replace the name; trailing tools (marked
+   `data-side-panel-trailing`) sit at the row's end and leave it. */
+.misty-side-panel-head:has(> .misty-side-panel-slot > :not([data-side-panel-trailing]))
+  > .misty-side-panel-name {
+  display: none;
+}
+.misty-side-panel-slot > [data-side-panel-trailing] {
+  order: 2;
+  margin-left: auto;
+}
+.misty-side-panel-end {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+}
+.misty-side-panel-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: 0 0 var(--radius-xl) var(--radius-xl);
+}
+
+/* The glance card: narrow, only as tall as what it holds, its own scroll past the window. */
+.misty-side-card {
+  position: relative;
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-self: flex-start;
+  width: 288px;
+  max-height: calc(100% - 16px);
+  margin: 8px 4px 8px 8px;
+  border-radius: var(--radius-xl);
+  background: var(--color-charcoal-sidebar);
+  color: var(--color-cream);
+  outline: 0.5px solid color-mix(in srgb, var(--misty-theme-text) 9%, transparent);
+  outline-offset: -0.5px;
+  box-shadow:
+    0 2px 4px rgb(0 0 0 / 0.22),
+    0 1px 2px rgb(0 0 0 / 0.22);
+}
+.misty-side-card-corner {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 1;
+}
+.misty-side-card-body {
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: none;
+  padding: 8px;
+}
+.misty-side-card-body::-webkit-scrollbar {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .misty-side-panel-resize::after {
+    transition: none;
+  }
+}

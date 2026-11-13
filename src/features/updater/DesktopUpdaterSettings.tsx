@@ -1,0 +1,169 @@
+import { reserveMistyUpdate } from "@/features/app-windows";
+import { getVersion } from "@tauri-apps/api/app";
+import { relaunch } from "@/shared/platform/relaunch";
+import { check, type Update } from "@tauri-apps/plugin-updater";
+import { useCallback, useEffect, useRef, useState } from "react";
+
+import { DesktopSettingsRow } from "@/features/settings/desktop";
+import { SystemErrorNotice } from "@/shared/platform/systemErrors";
+import { hasTauriInternals } from "@/shared/platform/tauri";
+import { Button, Progress } from "@/shared/ui";
+import { rememberReleaseNotes } from "./releaseNotes";
+import { onUpdateCheckRequest } from "./updateCheckRequest";
+import {
+  applyUpdateProgress,
+  EMPTY_UPDATE_PROGRESS,
+  isNoReleaseError,
+  readableUpdateError,
+  type UpdateProgress,
+} from "./updateProgress";
+
+type UpdateState =
+  "idle" | "checking" | "available" | "current" | "noRelease" | "installing" | "error";
+
+export function DesktopUpdaterSettings() {
+  const updateRef = useRef<Update | null>(null);
+  const busyRef = useRef(false);
+  const [version, setVersion] = useState("0.1.0");
+  const [state, setState] = useState<UpdateState>("idle");
+  const [availableVersion, setAvailableVersion] = useState("");
+  const [error, setError] = useState("");
+  const [progress, setProgress] = useState<UpdateProgress>(EMPTY_UPDATE_PROGRESS);
+  const supported = hasTauriInternals();
+
+  const releaseUpdate = useCallback(async () => {
+    const update = updateRef.current;
+    updateRef.current = null;
+    if (update) await update.close().catch(() => undefined);
+  }, []);
+
+  const checkForUpdates = useCallback(async () => {
+    if (!supported || busyRef.current) return;
+    busyRef.current = true;
+    await releaseUpdate();
+    setState("checking");
+    setError("");
+    try {
+      const nextUpdate = await check({ timeout: 30_000 });
+      if (!nextUpdate) {
+        setAvailableVersion("");
+        setState("current");
+        return;
+      }
+      updateRef.current = nextUpdate;
+      setAvailableVersion(nextUpdate.version);
+      setState("available");
+    } catch (cause) {
+      if (isNoReleaseError(cause)) {
+        setState("noRelease");
+        return;
+      }
+      setError(readableUpdateError(cause));
+      setState("error");
+    } finally {
+      busyRef.current = false;
+    }
+  }, [releaseUpdate, supported]);
+
+  // "Check for Updates" in the menu bar opens this row and checks here.
+  useEffect(() => onUpdateCheckRequest(() => void checkForUpdates()), [checkForUpdates]);
+
+  useEffect(() => {
+    if (!supported) return;
+    void getVersion()
+      .then(setVersion)
+      .catch(() => undefined);
+    // The launch check belongs to UpdateNotices; this row only checks when asked, so opening
+    // Settings never waits on the network.
+    return () => {
+      void releaseUpdate();
+    };
+  }, [releaseUpdate, supported]);
+
+  async function installUpdate() {
+    const update = updateRef.current;
+    if (!update || busyRef.current) return;
+    busyRef.current = true;
+    setState("installing");
+    setError("");
+    setProgress(EMPTY_UPDATE_PROGRESS);
+    let releaseUpdate = () => {};
+    try {
+      releaseUpdate = reserveMistyUpdate();
+      // Its notes wait for the restart, to be shown once the new version runs.
+      rememberReleaseNotes(update);
+      await update.downloadAndInstall((event) => {
+        setProgress((current) => applyUpdateProgress(current, event));
+      });
+      await relaunch();
+    } catch (cause) {
+      setError(readableUpdateError(cause));
+      setState("error");
+      busyRef.current = false;
+    } finally {
+      releaseUpdate();
+    }
+  }
+
+  // While it checks or installs, the button spins and the progress bar fills; no status text.
+  const status =
+    state === "checking"
+      ? ""
+      : state === "current"
+        ? "You’re up to date"
+        : state === "noRelease"
+          ? "No release has been published yet"
+          : state === "available" || state === "installing"
+            ? `Version ${availableVersion} is ready`
+            : state === "error"
+              ? "The last check failed"
+              : "Not checked";
+  const updateNote = supported ? status : "Updates come with packaged builds";
+
+  return (
+    <>
+      <DesktopSettingsRow
+        label="Version"
+        description={updateNote ? `${version} · ${updateNote}` : version}
+      >
+        <div className="grid w-full max-w-sm justify-items-end gap-2 max-[760px]:justify-items-start">
+          <div className="flex min-w-0 items-center justify-end gap-2">
+            {state === "error" ? (
+              <SystemErrorNotice
+                error={error}
+                scope="settings:updates"
+                title="Misty update needs attention"
+              />
+            ) : null}
+            {state === "available" || state === "installing" ? (
+              <Button
+                type="button"
+                loading={state === "installing"}
+                onClick={() => void installUpdate()}
+              >
+                Install and restart
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={!supported}
+                loading={state === "checking"}
+                onClick={() => void checkForUpdates()}
+              >
+                Check now
+              </Button>
+            )}
+          </div>
+          {state === "installing" && progress.percent !== null ? (
+            <Progress
+              aria-label="Update download progress"
+              className="h-1.5 w-full"
+              value={progress.percent}
+            />
+          ) : null}
+        </div>
+      </DesktopSettingsRow>
+    </>
+  );
+}

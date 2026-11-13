@@ -1,0 +1,205 @@
+//! Creates and maintains `~/.misty` on every launch.
+//!
+//! The home lives outside the app bundle, so installing or updating Misty never
+//! replaces it. This module only ever adds what is missing and tightens
+//! permissions; it never deletes. Paths retired by an earlier layout are moved
+//! to the Trash (the Recycle Bin on Windows) so the user can still recover
+//! them.
+use file_access::fs;
+use file_access::paths;
+use serde::Deserialize;
+use std::{
+    io,
+    path::{Path, PathBuf},
+};
+
+const LAYOUT_JSON: &str = include_str!("misty-home-layout.json");
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct Layout {
+    layout_version: u32,
+    directories: Vec<String>,
+    /// Owner-only files; Windows keeps the whole home private instead.
+    #[cfg(unix)]
+    private_files: Vec<String>,
+    retired: Vec<String>,
+}
+
+#[derive(Debug, Default)]
+pub struct HomeReport {
+    pub created: Vec<String>,
+    pub retired: Vec<String>,
+    /// Retired paths that could not be moved and were left in place.
+    pub kept: Vec<String>,
+}
+
+fn layout() -> Layout {
+    serde_json::from_str(LAYOUT_JSON).expect("misty-home-layout.json is valid")
+}
+
+/// Ensures the signed-in user's Misty home exists and matches the current layout.
+pub fn ensure_misty_home() -> io::Result<HomeReport> {
+    let root = paths::misty_home_dir()
+        .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "no home directory"))?;
+    ensure_at(&root, &Trash::for_this_system())
+}
+
+fn ensure_at(root: &Path, trash: &Trash) -> io::Result<HomeReport> {
+    let layout = layout();
+    let mut report = HomeReport::default();
+    secure_dir(root, &mut report, "")?;
+
+    if manifest_version(root) < layout.layout_version {
+        retire(root, &layout.retired, trash, &mut report)?;
+        // Holds nothing once its old folders have gone; refused if it still holds anything.
+        let _ = fs::remove_dir(root.join(".local"));
+    }
+    for relative in &layout.directories {
+        secure_dir(&root.join(relative), &mut report, relative)?;
+    }
+    #[cfg(unix)]
+    for relative in &layout.private_files {
+        use std::os::unix::fs::PermissionsExt;
+        let path = root.join(relative);
+        if fs::is_file(&path) {
+            fs::set_permissions(&path, fs::Permissions::from_mode(0o600))?;
+        }
+    }
+    if manifest_version(root) != layout.layout_version {
+        misty_credential_store::set_layout_version(root, layout.layout_version)?;
+    }
+    Ok(report)
+}
+
+fn manifest_version(root: &Path) -> u32 {
+    misty_credential_store::layout_version(root)
+        .ok()
+        .flatten()
+        .unwrap_or(0)
+}
+
+fn retire(
+    root: &Path,
+    retired: &[String],
+    trash: &Trash,
+    report: &mut HomeReport,
+) -> io::Result<()> {
+    let present: Vec<&String> = retired
+        .iter()
+        .filter(|relative| fs::symlink_metadata(root.join(relative)).is_ok())
+        .collect();
+    if present.is_empty() {
+        return Ok(());
+    }
+    let batch = format!(
+        "Misty retired files {}",
+        chrono::Local::now().format("%Y-%m-%d %H.%M.%S")
+    );
+    for relative in present {
+        match trash.take(&root.join(relative), &batch, relative) {
+            Ok(()) => report.retired.push(relative.clone()),
+            Err(_) => report.kept.push(relative.clone()),
+        }
+    }
+    Ok(())
+}
+
+/// Where retired paths go, so the person can still recover them.
+pub(crate) enum Trash {
+    // Windows retires to the Recycle Bin; its tests still use a folder.
+    #[cfg_attr(all(windows, not(test)), allow(dead_code))]
+    Folder(PathBuf),
+    #[cfg(windows)]
+    RecycleBin,
+}
+
+impl Trash {
+    /// Moves `path` to the Trash, as `<batch>/<relative>` where the Trash is a folder.
+    pub(crate) fn take(&self, path: &Path, batch: &str, relative: &str) -> io::Result<()> {
+        match self {
+            Self::Folder(folder) => {
+                let target = folder.join(batch).join(relative);
+                // A cross-volume Trash cannot take a rename; the path stays
+                // rather than user data being copied and deleted.
+                target
+                    .parent()
+                    .map_or(Ok(()), fs::create_dir_all)
+                    .and_then(|_| fs::rename(path, &target))
+            }
+            #[cfg(windows)]
+            Self::RecycleBin => recycle(path),
+        }
+    }
+
+    pub(crate) fn for_this_system() -> Self {
+        #[cfg(windows)]
+        {
+            Self::RecycleBin
+        }
+        #[cfg(not(windows))]
+        {
+            let home = paths::misty_data_root().unwrap_or_default();
+            if cfg!(target_os = "macos") {
+                Self::Folder(home.join(".Trash"))
+            } else {
+                // Linux has no portable user Trash without a desktop service;
+                // retired paths stay inside the home, recoverable and out of
+                // the live layout.
+                Self::Folder(home.join(".misty").join(".retired"))
+            }
+        }
+    }
+}
+
+/// Moves `path` to the Recycle Bin, where the person can restore it.
+#[cfg(windows)]
+fn recycle(path: &Path) -> io::Result<()> {
+    use std::os::windows::ffi::OsStrExt;
+    use windows_sys::Win32::UI::Shell::{
+        SHFileOperationW, FOF_ALLOWUNDO, FOF_NOCONFIRMATION, FOF_NOERRORUI, FOF_SILENT, FO_DELETE,
+        SHFILEOPSTRUCTW,
+    };
+    // A double-NUL-terminated list of one path.
+    let from: Vec<u16> = path.as_os_str().encode_wide().chain([0, 0]).collect();
+    // SAFETY: zeroed input, then the fields the operation reads.
+    let mut operation: SHFILEOPSTRUCTW = unsafe { std::mem::zeroed() };
+    operation.wFunc = FO_DELETE;
+    operation.pFrom = from.as_ptr();
+    operation.fFlags = (FOF_ALLOWUNDO | FOF_NOCONFIRMATION | FOF_NOERRORUI | FOF_SILENT) as u16;
+    // SAFETY: `from` outlives the call; nothing is shown to the person.
+    let status = unsafe { SHFileOperationW(&mut operation) };
+    if status != 0 || operation.fAnyOperationsAborted != 0 {
+        return Err(io::Error::other(format!(
+            "Recycle Bin refused {}",
+            path.display()
+        )));
+    }
+    Ok(())
+}
+
+fn secure_dir(path: &Path, report: &mut HomeReport, relative: &str) -> io::Result<()> {
+    if !fs::is_dir(path) {
+        fs::create_dir_all(path)?;
+        if !relative.is_empty() {
+            report.created.push(relative.to_owned());
+        }
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(path, fs::Permissions::from_mode(0o700))?;
+    }
+    // The home's own DACL admits only its owner and SYSTEM; everything
+    // inside inherits it.
+    #[cfg(windows)]
+    if relative.is_empty() {
+        misty_credential_store::restrict_private_directory(path)?;
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+// Tests build their fixtures directly, outside the file gate.
+#[allow(clippy::disallowed_methods, clippy::disallowed_types)]
+mod tests;

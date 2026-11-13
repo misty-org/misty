@@ -1,0 +1,190 @@
+{
+  "name": "transcribe_soniox_with_speakers",
+  "kind": "transcribe",
+  "modelId": "soniox/stt-async-v4",
+  "credentialProvider": "soniox",
+  "input": {
+    "audioBase64": "UklGRiQAAABXQVZFZm10IAAAAAAAAAAA",
+    "providerOptions": {
+      "soniox": {
+        "enableSpeakerDiarization": true,
+        "enableLanguageIdentification": true,
+        "languageHints": [
+          "en",
+          "de"
+        ],
+        "context": {
+          "text": "A talk.",
+          "terms": [
+            "Misty"
+          ]
+        }
+      }
+    }
+  },
+  "replies": [
+    {
+      "status": 200,
+      "contentType": "application/json",
+      "body": "{\"id\":\"file-1\"}"
+    },
+    {
+      "status": 200,
+      "contentType": "application/json",
+      "body": "{\"id\":\"job-1\",\"status\":\"queued\"}"
+    },
+    {
+      "status": 200,
+      "contentType": "application/json",
+      "body": "{\"id\":\"job-1\",\"status\":\"completed\",\"audio_duration_ms\":1500}"
+    },
+    {
+      "status": 200,
+      "contentType": "application/json",
+      "body": "{\"id\":\"job-1\",\"text\":\"Hello there.\",\"tokens\":[{\"text\":\"Hello\",\"start_ms\":0,\"end_ms\":500,\"confidence\":0.9,\"speaker\":\"1\",\"language\":\"en\",\"extra\":\"dropped\"},{\"text\":\" there.\",\"start_ms\":500,\"end_ms\":1000,\"confidence\":0.8,\"speaker\":2,\"language\":\"de\"},{\"text\":\" there\",\"start_ms\":1000,\"end_ms\":1200,\"language\":\"de\",\"translation_status\":\"none\"},{\"text\":\"<end>\"}]}"
+    },
+    {
+      "status": 204,
+      "contentType": "text/plain",
+      "body": ""
+    }
+  ],
+  "unorderedRequests": false,
+  "sent": [
+    {
+      "method": "POST",
+      "path": "/v1/files",
+      "headers": {
+        "accept": "*/*",
+        "authorization": "Bearer test-key-parity",
+        "content-type": "multipart/form-data"
+      },
+      "body": {
+        "multipart": [
+          {
+            "name": "file",
+            "filename": "audio.wav",
+            "contentType": "audio/wav",
+            "base64": "UklGRiQAAABXQVZFZm10IAAAAAAAAAAA"
+          }
+        ]
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/v1/transcriptions",
+      "headers": {
+        "accept": "*/*",
+        "authorization": "Bearer test-key-parity",
+        "content-type": "application/json"
+      },
+      "body": {
+        "model": "stt-async-v4",
+        "file_id": "file-1",
+        "language_hints": [
+          "en",
+          "de"
+        ],
+        "enable_language_identification": true,
+        "enable_speaker_diarization": true,
+        "context": {
+          "text": "A talk.",
+          "terms": [
+            "Misty"
+          ]
+        }
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/v1/transcriptions/job-1",
+      "headers": {
+        "accept": "*/*",
+        "authorization": "Bearer test-key-parity"
+      },
+      "body": null
+    },
+    {
+      "method": "GET",
+      "path": "/v1/transcriptions/job-1/transcript",
+      "headers": {
+        "accept": "*/*",
+        "authorization": "Bearer test-key-parity"
+      },
+      "body": null
+    },
+    {
+      "method": "DELETE",
+      "path": "/v1/transcriptions/job-1",
+      "headers": {
+        "accept": "*/*",
+        "authorization": "Bearer test-key-parity"
+      },
+      "body": null
+    },
+    {
+      "method": "DELETE",
+      "path": "/v1/files/file-1",
+      "headers": {
+        "accept": "*/*",
+        "authorization": "Bearer test-key-parity"
+      },
+      "body": null
+    }
+  ],
+  "result": {
+    "text": "Hello there.",
+    "segments": [
+      {
+        "text": "Hello",
+        "startSecond": 0,
+        "endSecond": 0.5
+      },
+      {
+        "text": " there.",
+        "startSecond": 0.5,
+        "endSecond": 1
+      },
+      {
+        "text": " there",
+        "startSecond": 1,
+        "endSecond": 1.2
+      }
+    ],
+    "language": "de",
+    "durationInSeconds": 1.5,
+    "warnings": [],
+    "providerMetadata": {
+      "soniox": {
+        "tokens": [
+          {
+            "text": "Hello",
+            "start_ms": 0,
+            "end_ms": 500,
+            "confidence": 0.9,
+            "speaker": "1",
+            "language": "en"
+          },
+          {
+            "text": " there.",
+            "start_ms": 500,
+            "end_ms": 1000,
+            "confidence": 0.8,
+            "speaker": 2,
+            "language": "de"
+          },
+          {
+            "text": " there",
+            "start_ms": 1000,
+            "end_ms": 1200,
+            "language": "de",
+            "translation_status": "none"
+          },
+          {
+            "text": "<end>"
+          }
+        ]
+      }
+    }
+  }
+}

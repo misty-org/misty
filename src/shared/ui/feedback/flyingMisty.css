@@ -1,0 +1,35 @@
+/* Misty's flight: a loop around the middle of its box (the welcome heading, an empty pane). The
+   sweeps run at slightly different periods, so the path keeps changing shape and the direction of
+   travel flips now and then. Container units keep it inside whatever box it flies in; on the
+   full-window welcome screen they match the old viewport reach. */
+.misty-fly-area {
+  container-type: size;
+}
+.misty-fly-x {
+  animation: misty-fly-x 6s cubic-bezier(0.37, 0, 0.63, 1) infinite alternate;
+}
+.misty-fly-y {
+  animation: misty-fly-y 4.5s cubic-bezier(0.37, 0, 0.63, 1) -1.1s infinite alternate;
+}
+@keyframes misty-fly-x {
+  from {
+    transform: translateX(calc(min(40cqw, 560px) * -1));
+  }
+  to {
+    transform: translateX(min(40cqw, 560px));
+  }
+}
+@keyframes misty-fly-y {
+  from {
+    transform: translateY(calc(min(30cqh, 120px) * -1)) rotate(-8deg);
+  }
+  to {
+    transform: translateY(min(35cqh, 150px)) rotate(8deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .misty-fly-x,
+  .misty-fly-y {
+    animation: none;
+  }
+}

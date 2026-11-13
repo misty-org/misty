@@ -1,0 +1,56 @@
+{
+  "name": "error_echoing_the_key_before_any_output",
+  "modelId": "anthropic/claude-sonnet-4-6",
+  "credentialProvider": "anthropic",
+  "options": {
+    "prompt": [
+      {
+        "role": "user",
+        "content": [
+          {
+            "type": "text",
+            "text": "Hi."
+          }
+        ]
+      }
+    ]
+  },
+  "status": 200,
+  "contentType": "text/event-stream",
+  "response": "event: error\ndata: {\"type\":\"error\",\"error\":{\"type\":\"api_error\",\"message\":\"Bad key test-key-parity here\"}}\n\n",
+  "sent": [
+    {
+      "method": "POST",
+      "path": "/v1/messages",
+      "headers": {
+        "accept": "*/*",
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+        "x-api-key": "test-key-parity"
+      },
+      "body": {
+        "model": "claude-sonnet-4-6",
+        "max_tokens": 128000,
+        "messages": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "Hi."
+              }
+            ]
+          }
+        ],
+        "stream": true
+      }
+    }
+  ],
+  "parts": [],
+  "thrown": {
+    "name": "AI_APICallError",
+    "message": "Bad key [redacted] here",
+    "statusCode": 500,
+    "isRetryable": false
+  }
+}

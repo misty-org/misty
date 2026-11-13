@@ -1,0 +1,55 @@
+import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { dirname, extname, join, relative, resolve } from "node:path";
+
+export const repositoryRoot = process.cwd();
+
+export function sourcePath(path: string): string {
+  return resolve(repositoryRoot, path);
+}
+
+export function repositoryPath(path: string): string {
+  return relative(repositoryRoot, path).split("\\").join("/");
+}
+
+export function lineCount(path: string): number {
+  const text = readFileSync(path, "utf8");
+  return text.length === 0 ? 0 : text.split(/\r?\n/).length - (text.endsWith("\n") ? 1 : 0);
+}
+
+export function walk(
+  root: string,
+  extensions: ReadonlySet<string>,
+  ignoredDirectories = new Set(["build", "dist", "gen", "node_modules", "target"]),
+): string[] {
+  const directory = sourcePath(root);
+  if (!existsSync(directory)) return [];
+  const paths: string[] = [];
+  for (const entry of readdirSync(directory, { withFileTypes: true })) {
+    if (entry.name.startsWith(".") || (entry.isDirectory() && ignoredDirectories.has(entry.name))) {
+      continue;
+    }
+    const path = resolve(directory, entry.name);
+    if (entry.isDirectory())
+      paths.push(...walk(repositoryPath(path), extensions, ignoredDirectories));
+    else if (entry.isFile() && extensions.has(extname(entry.name))) paths.push(path);
+  }
+  return paths;
+}
+
+/**
+ * The app crate's sources under `src-tauri/features`, leaving out the crates and workers that sit
+ * in feature folders beside its modules (any folder with a Cargo.toml): they are their own packages.
+ */
+export function walkAppCrate(root: string, extensions: ReadonlySet<string>): string[] {
+  const insideOtherPackage = (path: string) => {
+    for (
+      let folder = dirname(path);
+      folder.startsWith(sourcePath(root));
+      folder = dirname(folder)
+    ) {
+      if (existsSync(join(folder, "Cargo.toml"))) return true;
+    }
+    return false;
+  };
+  return walk(root, extensions).filter((path) => !insideOtherPackage(path));
+}

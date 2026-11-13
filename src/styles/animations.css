@@ -1,0 +1,69 @@
+/*
+ * Every keyframe animation in Misty, by what it shows. A component plays one with Tailwind's
+ * `animate-[name_duration_easing_iteration]` (for example `animate-[misty-pulse_1.4s_ease-in-out_infinite]`).
+ * Feature stylesheets have none of their own: add the keyframes here, named for the motion, not
+ * for the feature, and reuse one that already says the same thing.
+ */
+
+/* Something appearing: it fades in from clear. */
+@keyframes misty-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* A mark's dark halo breathing stronger and back (screenMarkClass.targetPulse). */
+@keyframes misty-halo-pulse {
+  50% {
+    box-shadow:
+      0 0 14px rgb(0 0 0 / 0.75),
+      inset 0 0 8px rgb(0 0 0 / 0.55);
+  }
+}
+
+/* A white ring breathing around something an agent is working in (FloatingPip while active). */
+@keyframes misty-ring-pulse {
+  0%,
+  100% {
+    box-shadow:
+      inset 0 0 0 1.5px rgb(255 255 255 / 0.9),
+      inset 0 0 0 0 rgb(255 255 255 / 0);
+  }
+  50% {
+    box-shadow:
+      inset 0 0 0 1.5px rgb(255 255 255 / 0.45),
+      inset 0 0 18px 2px rgb(255 255 255 / 0.22);
+  }
+}
+
+/* One of a row of dots lighting up in turn, dim the rest of the time: someone typing. Each dot
+   starts a little later than the one before it (`[animation-delay:…]`). */
+@keyframes misty-dot-blink {
+  0%,
+  60%,
+  100% {
+    opacity: 0.3;
+  }
+  30% {
+    opacity: 1;
+  }
+}
+
+/* Something at work breathing: it dims halfway and comes back (StepDot while working). */
+@keyframes misty-breathe {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+/* A circle's ring spreading out from its center once and fading (an SVG circle's radius). */
+@keyframes misty-ripple {
+  from {
+    r: 2;
+    opacity: 1;
+  }
+  to {
+    r: 22;
+    opacity: 0;
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "name": "transcribe_realtime_model_refused",
+  "kind": "transcribe",
+  "modelId": "openai/gpt-realtime-whisper",
+  "credentialProvider": "openai",
+  "input": {
+    "audioBase64": "UklGRiQAAABXQVZFZm10IAAAAAAAAAAA"
+  },
+  "replies": [
+    {
+      "status": 200,
+      "contentType": "application/json",
+      "body": "{\"text\":\"\"}"
+    }
+  ],
+  "unorderedRequests": false,
+  "sent": [],
+  "thrown": {
+    "name": "AI_UnsupportedFunctionalityError",
+    "message": "'non-streaming transcription with gpt-realtime-whisper' functionality not supported."
+  }
+}

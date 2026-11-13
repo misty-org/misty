@@ -1,0 +1,55 @@
+{
+  "name": "stream_with_no_events",
+  "modelId": "anthropic/claude-sonnet-4-6",
+  "credentialProvider": "anthropic",
+  "options": {
+    "prompt": [
+      {
+        "role": "user",
+        "content": [
+          {
+            "type": "text",
+            "text": "Hi."
+          }
+        ]
+      }
+    ]
+  },
+  "status": 200,
+  "contentType": "text/event-stream",
+  "response": "",
+  "sent": [
+    {
+      "method": "POST",
+      "path": "/v1/messages",
+      "headers": {
+        "accept": "*/*",
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+        "x-api-key": "test-key-parity"
+      },
+      "body": {
+        "model": "claude-sonnet-4-6",
+        "max_tokens": 128000,
+        "messages": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "Hi."
+              }
+            ]
+          }
+        ],
+        "stream": true
+      }
+    }
+  ],
+  "parts": [
+    {
+      "type": "stream-start",
+      "warnings": []
+    }
+  ]
+}

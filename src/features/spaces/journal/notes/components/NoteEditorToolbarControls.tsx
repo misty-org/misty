@@ -1,0 +1,197 @@
+import {
+  ColorSwatch,
+  DropdownMenu,
+  DropdownMenuContent,
+  IconButton,
+  MenuItem,
+  MenuTrigger,
+  Popover,
+  PopoverBody,
+  PopoverContent,
+  PopoverHeader,
+  PopoverTrigger,
+} from "@/shared/ui";
+import type { Editor } from "@tiptap/react";
+import {
+  Bold,
+  Braces,
+  Code2,
+  Heading,
+  Highlighter,
+  Italic,
+  Link2,
+  List,
+  ListChecks,
+  ListOrdered,
+  Pilcrow,
+  Quote,
+  Redo2,
+  Strikethrough,
+  Underline,
+  Undo2,
+  type LucideIcon,
+  Heading1,
+  Heading2,
+  Heading3,
+  Heading4,
+} from "lucide-react";
+
+/** Each heading level its own mark, so the menu's rows are told apart by more than a number. */
+const headingIcons = [Heading1, Heading2, Heading3, Heading4] as const;
+
+export function NoteToolbarStructureControls({ editor }: { editor: Editor }) {
+  return (
+    <>
+      <ToolbarGroup>
+        <ToolButton label="Undo" Icon={Undo2} onClick={() => editor.chain().focus().undo().run()} />
+        <ToolButton label="Redo" Icon={Redo2} onClick={() => editor.chain().focus().redo().run()} />
+      </ToolbarGroup>
+      <ToolbarGroup>
+        <DropdownMenu>
+          <MenuTrigger iconOnly label="Headings" size="md" icon={<Heading />} />
+          <DropdownMenuContent align="start">
+            <MenuItem
+              icon={<Pilcrow />}
+              label="Text"
+              onSelect={() => editor.chain().focus().setParagraph().run()}
+            />
+            {headingIcons.map((LevelIcon, index) => {
+              const level = index + 1;
+              return (
+                <MenuItem
+                  icon={<LevelIcon />}
+                  label={<>Heading {level}</>}
+                  key={level}
+                  onSelect={() =>
+                    editor
+                      .chain()
+                      .focus()
+                      .toggleHeading({ level: level as 1 | 2 | 3 | 4 })
+                      .run()
+                  }
+                />
+              );
+            })}
+          </DropdownMenuContent>
+        </DropdownMenu>
+        <DropdownMenu>
+          <MenuTrigger iconOnly label="Lists" size="md" icon={<List />} />
+          <DropdownMenuContent align="start">
+            <MenuItem
+              icon={<List />}
+              label="Bullet list"
+              onSelect={() => editor.chain().focus().toggleBulletList().run()}
+            />
+            <MenuItem
+              icon={<ListOrdered />}
+              label="Numbered list"
+              onSelect={() => editor.chain().focus().toggleOrderedList().run()}
+            />
+            <MenuItem
+              icon={<ListChecks />}
+              label="To-do list"
+              onSelect={() => editor.chain().focus().toggleTaskList().run()}
+            />
+          </DropdownMenuContent>
+        </DropdownMenu>
+        <ToolButton
+          label="Blockquote"
+          Icon={Quote}
+          active={editor.isActive("blockquote")}
+          onClick={() => editor.chain().focus().toggleBlockquote().run()}
+        />
+        <ToolButton
+          label="Code block"
+          Icon={Braces}
+          active={editor.isActive("codeBlock")}
+          onClick={() => editor.chain().focus().toggleCodeBlock().run()}
+        />
+      </ToolbarGroup>
+    </>
+  );
+}
+
+export function NoteToolbarInlineControls({ editor }: { editor: Editor }) {
+  const link = () => {
+    const previous = editor.getAttributes("link").href as string | undefined;
+    const href = window.prompt("Link URL", previous ?? "https://");
+    if (href === null) return;
+    if (!href.trim()) editor.chain().focus().unsetLink().run();
+    else editor.chain().focus().extendMarkRange("link").setLink({ href: href.trim() }).run();
+  };
+  return (
+    <ToolbarGroup>
+      <ToolButton
+        label="Bold"
+        Icon={Bold}
+        active={editor.isActive("bold")}
+        onClick={() => editor.chain().focus().toggleBold().run()}
+      />
+      <ToolButton
+        label="Italic"
+        Icon={Italic}
+        active={editor.isActive("italic")}
+        onClick={() => editor.chain().focus().toggleItalic().run()}
+      />
+      <ToolButton
+        label="Strikethrough"
+        Icon={Strikethrough}
+        active={editor.isActive("strike")}
+        onClick={() => editor.chain().focus().toggleStrike().run()}
+      />
+      <ToolButton
+        label="Inline code"
+        Icon={Code2}
+        active={editor.isActive("code")}
+        onClick={() => editor.chain().focus().toggleCode().run()}
+      />
+      <ToolButton
+        label="Underline"
+        Icon={Underline}
+        active={editor.isActive("underline")}
+        onClick={() => editor.chain().focus().toggleUnderline().run()}
+      />
+      <Popover>
+        <PopoverTrigger asChild>
+          <IconButton size="md" label="Highlight">
+            <Highlighter />
+          </IconButton>
+        </PopoverTrigger>
+        <PopoverContent size="sm">
+          <PopoverHeader title="Highlight" />
+          <PopoverBody>
+            <div className="flex gap-1">
+              {["#7255d9", "#d7a928", "#3f8e72", "#b95656"].map((color) => (
+                <ColorSwatch
+                  key={color}
+                  color={color}
+                  label={`Highlight ${color}`}
+                  className="size-6"
+                  onClick={() => editor.chain().focus().toggleHighlight({ color }).run()}
+                />
+              ))}
+            </div>
+          </PopoverBody>
+        </PopoverContent>
+      </Popover>
+      <ToolButton label="Link" Icon={Link2} active={editor.isActive("link")} onClick={link} />
+    </ToolbarGroup>
+  );
+}
+
+function ToolbarGroup({ children }: { children: React.ReactNode }) {
+  return <div className="flex shrink-0 items-center gap-0.5">{children}</div>;
+}
+
+export function ToolButton(props: {
+  label: string;
+  Icon: LucideIcon;
+  active?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <IconButton size="md" label={props.label} aria-pressed={props.active} onClick={props.onClick}>
+      <props.Icon size={17} />
+    </IconButton>
+  );
+}

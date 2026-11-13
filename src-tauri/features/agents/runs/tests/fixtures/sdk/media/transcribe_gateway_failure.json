@@ -1,0 +1,43 @@
+{
+  "name": "transcribe_gateway_failure",
+  "kind": "transcribe",
+  "modelId": "gateway/x/y",
+  "credentialProvider": "gateway",
+  "input": {
+    "audioBase64": "UklGRiQAAABXQVZFZm10IAAAAAAAAAAA"
+  },
+  "replies": [
+    {
+      "status": 404,
+      "contentType": "application/json",
+      "body": "{\"error\":{\"message\":\"No model.\",\"type\":\"model_not_found\"}}"
+    }
+  ],
+  "unorderedRequests": false,
+  "sent": [
+    {
+      "method": "POST",
+      "path": "/v1/transcription-model",
+      "headers": {
+        "accept": "*/*",
+        "ai-gateway-auth-method": "api-key",
+        "ai-gateway-protocol-version": "0.0.1",
+        "ai-model-id": "x/y",
+        "ai-transcription-model-specification-version": "4",
+        "authorization": "Bearer test-key-parity",
+        "content-type": "application/json"
+      },
+      "body": {
+        "audio": "UklGRiQAAABXQVZFZm10IAAAAAAAAAAA",
+        "mediaType": "audio/wav",
+        "providerOptions": {}
+      }
+    }
+  ],
+  "thrown": {
+    "name": "GatewayModelNotFoundError",
+    "message": "No model.",
+    "statusCode": 404,
+    "isRetryable": false
+  }
+}

@@ -1,0 +1,50 @@
+{
+  "src/features/agents/context-panel/files/fileIcons.ts": [
+    {
+      "length": 196,
+      "hash": "2daaa5da9d485358"
+    },
+    {
+      "length": 250,
+      "hash": "db0e74da49fd633f"
+    },
+    {
+      "length": 404,
+      "hash": "9cbbf1540ecba891"
+    },
+    {
+      "length": 204,
+      "hash": "e96014bfd6906948"
+    },
+    {
+      "length": 367,
+      "hash": "3e6a5910b825cd1b"
+    },
+    {
+      "length": 250,
+      "hash": "ee35ba00c19445e8"
+    },
+    {
+      "length": 332,
+      "hash": "faa08f88bc56a8b0"
+    },
+    {
+      "length": 264,
+      "hash": "2c0f8bf21c0eff40"
+    },
+    {
+      "length": 208,
+      "hash": "b44390637c9fa0fa"
+    }
+  ],
+  "src/features/engine-config/mcp/copy.ts": [
+    {
+      "length": 424,
+      "hash": "0fe50303765a3108"
+    },
+    {
+      "length": 331,
+      "hash": "c66baa0df0a11bc2"
+    }
+  ]
+}

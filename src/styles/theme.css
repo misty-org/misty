@@ -1,0 +1,234 @@
+/* Semantic charcoal/cream palette. Utilities resolve through these variables
+   so the Themes extension can preview and persist one coherent app palette. */
+:root {
+  /* The window around the pages: the pages' own color, so the whole window reads as one sheet. */
+  --misty-theme-workspace: #131313;
+  /* Active tab and browser toolbar. Darker than the Polar reference so the
+     chrome sits closer to the black tab strip. */
+  --workspace-tab-surface-top: #1c1c1c;
+  --workspace-tab-surface: #171717;
+  --workspace-tab-text: #c5c5c5;
+  --workspace-tab-muted: #ababab;
+  --misty-theme-bg: #131313;
+  --misty-theme-sidebar: #161616;
+  --misty-theme-card: #191919;
+  --misty-theme-border: #262626;
+  /* Edges of fields people type into or pick from: stronger than the row hairline. */
+  --misty-theme-border-strong: #3c3c3c;
+  --misty-theme-hover: #2b2b2b;
+  --misty-theme-active: #3e3e3e;
+  --misty-theme-text: #e0e0e0;
+  --misty-theme-text-bright: #f1f1f1;
+  --misty-theme-text-muted: #8c8c8c;
+  --misty-theme-danger: #c94747;
+  /* The top band every surface shares: the sidebar's head, a page's bar, a panel's title row. */
+  --ui-header: 48px;
+}
+
+/* Type. One face for the whole interface, the system font. Monospace (`font-mono`) is for code
+   itself: code blocks, the editor, diffs and the terminal, never URLs, paths, IDs, model names or
+   shortcuts. Sizes come from roles, each with its own line height, and never `text-[Npx]`:
+     micro 11 · caption 12 (badges, shortcut text) · meta 13 (times, counts, the path line,
+     descriptions) · control 14 (every button, field, menu row, tab and list row) · body 15
+     (messages, notes, prose) · page 16 (page text, reading) · title 18 · display 24.
+   Tailwind's own steps (`text-xs` to `text-3xl`, `text-base`) are not used: use the roles. */
+@theme {
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+
+  --text-micro: 11px;
+  --text-micro--line-height: 14px;
+  --text-caption: 12px;
+  --text-caption--line-height: 16px;
+  --text-meta: 13px;
+  --text-meta--line-height: 18px;
+  --text-control: 14px;
+  --text-control--line-height: 20px;
+  --text-body: 15px;
+  --text-body--line-height: 22px;
+  --text-page: 16px;
+  --text-page--line-height: 24px;
+  --text-title: 18px;
+  --text-title--line-height: 24px;
+  --text-display: 24px;
+  --text-display--line-height: 30px;
+
+  /* Corners, after OpenChamber's scale: 4 for marks and chips inside rows, 7 for controls and
+     rows, 9 for fields and menus, 12 for panels and dialogs. */
+  --radius-sm: 4px;
+  --radius-md: 7px;
+  --radius-lg: 9px;
+  --radius-xl: 12px;
+}
+
+@theme inline {
+  --color-charcoal-workspace: var(--misty-theme-workspace);
+  /* The shell's three surfaces: the window around everything (the title bar's colour; signed-out
+     pages paint everything in it), the sidebar, and the pane every page sits on. */
+  --color-window-chrome: var(--misty-theme-workspace);
+  --color-sidebar: var(--misty-theme-sidebar);
+  --color-pane: var(--misty-theme-bg);
+  --color-charcoal-bg: var(--misty-theme-bg);
+  --color-charcoal-sidebar: var(--misty-theme-sidebar);
+  --color-charcoal-card: var(--misty-theme-card);
+  --color-charcoal-border: var(--misty-theme-border);
+  --color-charcoal-border-strong: var(--misty-theme-border-strong);
+  --color-charcoal-hover: var(--misty-theme-hover);
+  --color-charcoal-active: var(--misty-theme-active);
+
+  --color-cream: var(--misty-theme-text);
+  --color-cream-bright: var(--misty-theme-text-bright);
+  --color-cream-action-hover: color-mix(
+    in srgb,
+    var(--misty-theme-text-bright) 85%,
+    var(--misty-theme-bg)
+  );
+  --color-cream-muted: var(--misty-theme-text-muted);
+  /* Shared interaction fills stay visible on both dark and light themes. */
+  --color-control-hover: color-mix(in srgb, var(--misty-theme-text) 10%, transparent);
+  --color-control-active: color-mix(in srgb, var(--misty-theme-text) 16%, transparent);
+  /* Rows you pick from, tabs and sidebar rows alike: a lighter wash than a control's, so a list
+     of them stays quiet. */
+  --color-row-hover: color-mix(in srgb, var(--misty-theme-text) 5%, transparent);
+  --color-row-active: color-mix(in srgb, var(--misty-theme-text) 9%, transparent);
+  /* Danger marks what deletes or has failed: the danger button and menu item, and an error next
+     to the field it belongs to. The wash is its faint hover fill. */
+  --color-danger: var(--misty-theme-danger);
+  --color-danger-wash: color-mix(in srgb, var(--misty-theme-danger) 14%, transparent);
+  /* Deprecated: the same color as danger, under the name it had before buttons used it. */
+  --color-notification-red: var(--misty-theme-danger);
+  /* The dim behind a dialog, a sheet or a workspace overlay. Lighter on light themes, where black
+     at the dark theme's strength reads as a gray wall. */
+  --color-scrim: light-dark(rgb(0 0 0 / 0.28), rgb(0 0 0 / 0.45));
+  /* Ink for text on a colored chip (a tab group's label and swatches), dark on every theme. */
+  --color-ink-on-color: #202124;
+  /* Full-color art: the Studio, Tutor's cursor, pets and the desktop overlay draw over any
+     content in either theme, so their colors stay fixed. Features use these names, never hex. */
+  --color-art-white: #ffffff;
+  --color-art-paper: #f2f2f2;
+  --color-art-gray: #d6d6d6;
+  --color-art-muted: #555555;
+  --color-art-ink: #1c1c1c;
+  --color-art-navy: #23324a;
+  --color-art-green: #5fe36b;
+  --color-art-green-ink: #1f7a3a;
+  --color-art-amber: #ffb703;
+  --color-art-red: #e05252;
+  --color-art-red-ink: #b42323;
+  --color-art-blue: #2f6fd1;
+
+  /* Item-type glyph tones (see src/shared/ui/icons/itemTones.ts). Mixed toward
+     the theme text so they soften on dark themes and deepen on light ones. */
+  --color-tone-blue: color-mix(in srgb, #4f86e8 72%, var(--misty-theme-text));
+  --color-tone-red: color-mix(in srgb, #e5533d 72%, var(--misty-theme-text));
+  --color-tone-green: color-mix(in srgb, #3fa463 72%, var(--misty-theme-text));
+  --color-tone-orange: color-mix(in srgb, #e8833a 72%, var(--misty-theme-text));
+  --color-tone-violet: color-mix(in srgb, #8b5cf6 72%, var(--misty-theme-text));
+  --color-tone-pink: color-mix(in srgb, #e0559b 72%, var(--misty-theme-text));
+  --color-tone-amber: color-mix(in srgb, #d9a21b 72%, var(--misty-theme-text));
+  --color-tone-teal: color-mix(in srgb, #14a39a 72%, var(--misty-theme-text));
+  --color-tone-sand: color-mix(in srgb, #a88a5a 72%, var(--misty-theme-text));
+
+  /* Gruvbox-inspired pastels, deterministically assigned per person so the
+     app doesn't read as entirely monochrome. Kept soft (no neon) — these are
+     backgrounds behind dark ink text, not accents on the dark UI itself. */
+  --color-avatar-red: #eab7ab;
+  --color-avatar-orange: #f0c38e;
+  --color-avatar-yellow: #f0d58c;
+  --color-avatar-green: #c5cf8e;
+  --color-avatar-blue: #a0c4d4;
+  --color-avatar-purple: #d3b3c9;
+  --color-avatar-gray: #d5c9b8;
+  --color-avatar-ink: #3c3836;
+
+  /* One consistent look for every @mention, in the composer and in sent
+     messages: a neutral gray tag, so a mention stands out by contrast and
+     weight rather than colour. */
+  --color-mention-bg: #8a8a8a;
+}
+
+/* What the tones mean where color carries meaning: an agent's state, a Git change, a kind of
+   file. They follow the theme with the tones they are made from. Every state color in the app is
+   one of these; App.css's --misty-status-* names point here. */
+:root {
+  --tone-idle: color-mix(in srgb, var(--misty-theme-text-muted) 70%, transparent);
+  --tone-working: var(--color-tone-blue);
+  --tone-waiting: var(--color-tone-amber);
+  --tone-failed: var(--color-tone-red);
+  --tone-done: var(--color-tone-green);
+  --tone-added: var(--color-tone-green);
+  --tone-code: var(--color-tone-amber);
+  --tone-style: var(--color-tone-violet);
+  --tone-data: var(--color-tone-teal);
+  --tone-doc: var(--color-tone-blue);
+  --tone-image: var(--color-tone-orange);
+}
+
+/* What a made thing is, by color: an audio overview, a mind map, a report, flashcards and the
+   rest, on the tiles that make them, on what was made and in a mind map's nodes. One kind keeps
+   one color on every surface that shows it (Surface's and Text's `tint`). */
+:root {
+  --tint-audio: var(--color-tone-blue);
+  --tint-video: var(--color-tone-red);
+  --tint-infographic: var(--color-tone-sand);
+  --tint-map: var(--color-tone-violet);
+  --tint-report: var(--color-tone-pink);
+  --tint-cards: var(--color-tone-amber);
+  --tint-quiz: var(--color-tone-teal);
+  --tint-slides: var(--color-tone-orange);
+  --tint-table: var(--color-tone-green);
+  --tint-lesson: var(--color-tone-blue);
+}
+
+/* The state tones as utilities (`bg-state-waiting`, `text-state-failed`) for shared components:
+   a list row's waiting dot, a run's failed mark. */
+@theme inline {
+  --color-state-idle: var(--tone-idle);
+  --color-state-working: var(--tone-working);
+  --color-state-waiting: var(--tone-waiting);
+  --color-state-failed: var(--tone-failed);
+  --color-state-done: var(--tone-done);
+}
+
+/* What a pointer drag draws over everything, at the layers.css stack: the shield that holds the
+   grabbing cursor at the menu layer, the preview that follows the pointer at the tooltip layer and
+   its drop line just above it. For stylesheets; components use the layer-* utilities. */
+:root {
+  /* Stacking inside one component or pane (its own stacking context), lowest to highest, so the
+     order stays in one place. The window-wide layers are layers.css. */
+  --stack-above: 1;
+  --stack-above-2: 2;
+  --stack-above-3: 3;
+  --stack-raised: 5;
+  --stack-sticky: 10;
+  --stack-float: 20;
+  --stack-overlay: 30;
+  --stack-overlay-raised: 40;
+  --stack-overlay-top: 45;
+  --stack-pane-top: 50;
+  /* The panes' rounded corners and seams, drawn over everything inside a pane. */
+  --layer-pane-corners: 2147483646;
+  --layer-pane-seams: 2147483647;
+  /* A lit room: the Studio's floor, brightest a little above its middle (Surface tone="stage"). */
+  --surface-stage: radial-gradient(
+    ellipse at 50% 45%,
+    color-mix(in srgb, var(--misty-theme-text) 13%, var(--color-charcoal-workspace)) 0%,
+    var(--color-charcoal-workspace) 72%
+  );
+  /* Long text in a stylesheet fades at its end like OverflowFadeText, never an ellipsis. */
+  --mask-fade-end: linear-gradient(to right, black calc(100% - 18px), transparent);
+  --layer-drag-shield: 2147483400;
+  --layer-drag-preview: 2147483500;
+  --layer-drag-indicator: 2147483501;
+}
+
+/* Find in a rendered document (a Markdown preview) paints its matches as CSS custom highlights,
+   so the document itself never changes: every match in a light amber, the current one deeper,
+   with the page's color on it. */
+::highlight(misty-md-search) {
+  background-color: color-mix(in srgb, var(--tone-waiting) 35%, transparent);
+}
+::highlight(misty-md-search-current) {
+  background-color: color-mix(in srgb, var(--tone-waiting) 70%, transparent);
+  color: var(--misty-theme-bg);
+}

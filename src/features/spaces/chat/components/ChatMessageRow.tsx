@@ -1,0 +1,254 @@
+import type { SpaceChatMessagesProps } from "./ChatMessages";
+import type { SpaceMessage } from "../../api/dto/entities";
+import { Avatar, AvatarFallback, AvatarImage, Button, Surface, Text, useNotice } from "@/shared/ui";
+import { AgentMark } from "@/features/agents";
+import { Fragment, memo, type FormEvent } from "react";
+import { ChatDateDivider, formatChatMessageTime } from "./ChatDisplay";
+import { MessageAttachments } from "./MessageAttachments";
+import { MessageContent, MessageHeader, messageText } from "./MessageContent";
+import { LinkPreviews } from "@/features/files";
+import { useChatSidePanel } from "../chatSidePanelStore";
+import { MessageEditForm } from "./MessageEditForm";
+import { MessageHoverActions } from "./MessageHoverActions";
+import { MessageReactions } from "./MessageReactions";
+import { MessageReplyPreview } from "./MessageReplyPreview";
+import { initials, isAgentAuthoredMessage } from "./messageText";
+import { SpacePostCard } from "../../handoffs/SpacePostCard";
+import { readSpacePost } from "../../handoffs/spacePosts";
+
+interface ChatMessageRowProps {
+  message: SpaceMessage;
+  compact: boolean;
+  dateLabel: string | undefined;
+  avatarUrl: string;
+  repliedToMessage: SpaceMessage | undefined;
+  repliedToAvatarUrl: string;
+  /** How many messages reply to this one; above zero it gets a Show replies button. */
+  replyCount?: number;
+  props: SpaceChatMessagesProps;
+}
+
+/**
+ * One message: optional reply preview, gutter, body, attachments and actions.
+ *
+ * Consecutive messages from the same sender render `compact`, dropping the
+ * avatar and header for a timestamp that only appears on hover.
+ */
+/** The list fields a row renders; anything else on the list props never reaches a row. */
+const rowFields = [
+  "canWrite",
+  "currentUserId",
+  "isOwner",
+  "libraryItems",
+  "nodes",
+  "spaceId",
+  "onRetry",
+  "onEditingText",
+  "onCancelEditing",
+  "onSaveEdited",
+  "onReply",
+  "onToggleReaction",
+  "onBeginEditing",
+  "onDelete",
+  "onOpenNode",
+  "onError",
+  "onLibraryItem",
+  "onReload",
+  "onJumpToMessage",
+  "hasOlderMessages",
+  "directRecipient",
+] as const satisfies readonly (keyof SpaceChatMessagesProps)[];
+
+/**
+ * Memoized so typing in the composer does not re-render the whole history. The edit draft
+ * only matters to the row being edited.
+ */
+export const ChatMessageRow = memo(ChatMessageRowView, (previous, next) => {
+  if (
+    previous.message !== next.message ||
+    previous.compact !== next.compact ||
+    previous.dateLabel !== next.dateLabel ||
+    previous.avatarUrl !== next.avatarUrl ||
+    previous.repliedToMessage !== next.repliedToMessage ||
+    previous.repliedToAvatarUrl !== next.repliedToAvatarUrl ||
+    previous.replyCount !== next.replyCount ||
+    rowFields.some((field) => previous.props[field] !== next.props[field])
+  )
+    return false;
+  const id = next.message.id;
+  const wasEditing = previous.props.editingMessageId === id;
+  const editing = next.props.editingMessageId === id;
+  return (
+    wasEditing === editing &&
+    (!editing ||
+      (previous.props.editingText === next.props.editingText &&
+        previous.props.editSaving === next.props.editSaving))
+  );
+});
+
+function ChatMessageRowView({
+  message,
+  compact,
+  dateLabel,
+  avatarUrl,
+  repliedToMessage,
+  repliedToAvatarUrl,
+  replyCount = 0,
+  props,
+}: ChatMessageRowProps) {
+  const rowClass = message.reply_to_message_id ? "row-start-2" : "row-start-1";
+  const agentAuthored = isAgentAuthoredMessage(message);
+  // A handoff or a claim a person posted is drawn as a card.
+  const post = readSpacePost(message);
+  const { onRetry } = props;
+  useNotice(message.local_delivery_state === "failed", {
+    message: "Message couldn’t be sent.",
+    tone: "error",
+    action: onRetry ? { label: "Retry", onSelect: () => onRetry(message) } : undefined,
+  });
+
+  return (
+    <Fragment>
+      {dateLabel ? <ChatDateDivider label={dateLabel} /> : null}
+      <Surface
+        as="article"
+        tone="none"
+        wash="control"
+        className={[
+          "group/chat-message relative -mx-3 grid min-h-10 grid-cols-[44px_minmax(0,1fr)] gap-x-4 rounded-md px-3 py-1",
+          "focus-visible:outline-none",
+          // `first:` covers the message that opens a thread with no date
+          // divider above it, whose top margin would double the scroller's.
+          compact ? "" : "mt-4 first:mt-0",
+        ].join(" ")}
+        id={`message-${message.id}`}
+        tabIndex={0}
+        aria-label={`Message from ${message.sender_name}`}
+      >
+        {message.reply_to_message_id ? (
+          <MessageReplyPreview
+            avatarUrl={repliedToAvatarUrl}
+            message={repliedToMessage}
+            earlier={!repliedToMessage && props.hasOlderMessages}
+            onOpen={() => {
+              const parentId = message.reply_to_message_id ?? "";
+              const parent = document.getElementById(`message-${parentId}`);
+              // Not drawn: it may be further back than the chat has read.
+              if (parent) parent.scrollIntoView({ block: "center" });
+              else if (parentId && props.hasOlderMessages) props.onJumpToMessage?.(parentId);
+            }}
+          />
+        ) : null}
+
+        <div className={`col-start-1 flex justify-end ${rowClass}`}>
+          {compact ? (
+            <Text
+              bare
+              as="time"
+              tone="muted"
+              className={
+                "pt-1 text-3xs tabular-nums opacity-0 " +
+                "group-hover/chat-message:opacity-100 group-focus-within/chat-message:opacity-100"
+              }
+            >
+              {formatChatMessageTime(message.created_at)}
+            </Text>
+          ) : (
+            <Avatar className="mt-0.5 size-10">
+              {avatarUrl ? <AvatarImage src={avatarUrl} alt="" /> : null}
+              <AvatarFallback className="text-xs font-semibold">
+                {agentAuthored ? (
+                  <AgentMark agentId={message.sender_agent_id} />
+                ) : (
+                  initials(message.sender_name)
+                )}
+              </AvatarFallback>
+            </Avatar>
+          )}
+        </div>
+
+        <div className={`col-start-2 min-w-0 ${rowClass}`}>
+          {!compact ? <MessageHeader message={message} /> : null}
+
+          {props.editingMessageId === message.id ? (
+            <MessageEditForm
+              message={message}
+              text={props.editingText}
+              saving={props.editSaving}
+              onText={props.onEditingText}
+              onCancel={props.onCancelEditing}
+              onSubmit={(event: FormEvent, target) => props.onSaveEdited(event, target)}
+            />
+          ) : post ? (
+            <SpacePostCard
+              message={message}
+              post={post}
+              spaceId={props.spaceId}
+              direct={Boolean(props.directRecipient)}
+              onError={props.onError}
+            />
+          ) : (
+            <Text
+              bare
+              as="p"
+              tone="default"
+              className="whitespace-pre-wrap [overflow-wrap:anywhere] text-md leading-6"
+            >
+              {message.content.map((span, index) => (
+                <MessageContent key={index} span={span} highlightPlainMentions={agentAuthored} />
+              ))}
+              {message.edited_at ? (
+                <Text bare tone="muted" className="ml-1 text-3xs">
+                  (edited)
+                </Text>
+              ) : null}
+            </Text>
+          )}
+          {props.editingMessageId === message.id ? null : (
+            <LinkPreviews text={messageText(message.content)} />
+          )}
+
+          {replyCount > 0 ? (
+            <Button
+              variant="quiet"
+              className="mt-1 -ml-2"
+              onClick={() => useChatSidePanel.getState().openThread(message.id)}
+            >
+              Show replies ({replyCount})
+            </Button>
+          ) : null}
+
+          <MessageAttachments
+            message={message}
+            nodes={props.nodes}
+            libraryItems={props.libraryItems}
+            spaceId={props.spaceId}
+            onOpenNode={props.onOpenNode}
+            onError={props.onError}
+            onLibraryItem={props.onLibraryItem}
+            onReload={props.onReload}
+          />
+          <MessageReactions
+            message={message}
+            canWrite={props.canWrite}
+            onToggle={props.onToggleReaction}
+          />
+        </div>
+
+        {!message.local_delivery_state && props.editingMessageId !== message.id ? (
+          <MessageHoverActions
+            message={message}
+            canWrite={props.canWrite}
+            onError={props.onError}
+            currentUserId={props.currentUserId}
+            isOwner={props.isOwner}
+            onReply={props.onReply}
+            onToggleReaction={props.onToggleReaction}
+            onBeginEditing={props.onBeginEditing}
+            onDelete={props.onDelete}
+          />
+        ) : null}
+      </Surface>
+    </Fragment>
+  );
+}

@@ -1,0 +1,42 @@
+{
+  "name": "speech_gateway_failure",
+  "kind": "speech",
+  "modelId": "gateway/x/y",
+  "credentialProvider": "gateway",
+  "input": {
+    "text": "Hello."
+  },
+  "replies": [
+    {
+      "status": 429,
+      "contentType": "application/json",
+      "body": "{\"error\":{\"message\":\"Slow down.\",\"type\":\"rate_limit_exceeded\"}}"
+    }
+  ],
+  "unorderedRequests": false,
+  "sent": [
+    {
+      "method": "POST",
+      "path": "/v1/speech-model",
+      "headers": {
+        "accept": "*/*",
+        "ai-gateway-auth-method": "api-key",
+        "ai-gateway-protocol-version": "0.0.1",
+        "ai-model-id": "x/y",
+        "ai-speech-model-specification-version": "4",
+        "authorization": "Bearer test-key-parity",
+        "content-type": "application/json"
+      },
+      "body": {
+        "text": "Hello.",
+        "providerOptions": {}
+      }
+    }
+  ],
+  "thrown": {
+    "name": "GatewayRateLimitError",
+    "message": "Slow down.",
+    "statusCode": 429,
+    "isRetryable": true
+  }
+}

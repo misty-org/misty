@@ -1,0 +1,89 @@
+import { currentProfile } from "@/features/app-windows";
+import type { AiInvocationRequest, AiContextReference } from "./invocationTypes";
+
+/** The run's request as the crate reads it (`local_prompt/request.rs`): snake_case, captures flattened. */
+export function toServerInvocation(input: AiInvocationRequest) {
+  return {
+    mode: input.mode,
+    surface_id: input.surfaceId,
+    trigger: input.trigger,
+    prompt: input.prompt,
+    context: input.context.map(toServerContextReference),
+    selection: input.selection,
+    companion_mode: input.companionMode,
+    collaboration_mode: input.collaborationMode,
+    lesson: input.lesson,
+    lesson_index: input.lessonIndex,
+    permission_mode: input.permissionMode,
+    display_captures: input.displayCaptures?.map((c) => ({
+      id: c.id,
+      name: c.name,
+      mime_type: c.mimeType,
+      data_url: c.dataUrl,
+      width: c.width,
+      height: c.height,
+      content_hash: c.contentHash,
+      screen: c.screen,
+      primary: c.primary,
+      captured_at: c.capturedAt,
+      display_id: c.display.id,
+      source: c.source,
+      controls: c.controls,
+    })),
+    capture: input.capture
+      ? {
+          id: input.capture.id,
+          name: input.capture.name,
+          mime_type: input.capture.mimeType,
+          data_url: input.capture.dataUrl,
+          width: input.capture.width,
+          height: input.capture.height,
+          content_hash: input.capture.contentHash,
+        }
+      : undefined,
+    attachment_ids: input.attachmentIds,
+    agent_id: input.agentId,
+    task_id: input.taskId,
+    execution_mode: input.executionMode,
+    window_label: input.windowLabel,
+    current_tab: input.currentTab,
+    // Its agent's home Space (`local-run/runSpace.ts`), never the window's.
+    space_id: input.spaceId || undefined,
+    profile: input.profile ?? currentProfile().id,
+    origin_device_id: input.originDeviceId,
+    history_turns: input.historyTurns?.length ? input.historyTurns : undefined,
+    history_notes: input.historyNotes,
+    device_contexts: input.deviceContexts?.map((context) => ({
+      device_id: context.deviceId,
+      kind: context.kind,
+      opaque_ref: context.opaqueRef,
+      display_name: context.displayName,
+      capabilities: context.capabilities,
+      metadata: context.metadata,
+      run_grant: context.runGrant,
+    })),
+    thinking_mode: input.thinkingMode,
+    model_id: input.modelId,
+    reasoning_effort: input.reasoningEffort,
+    requested_artifact_kind: input.requestedArtifactKind,
+    conversation_id: input.conversationId,
+    idempotency_key: input.idempotencyKey,
+    delegated_from: input.delegatedFrom,
+    timezone: input.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone ?? "UTC",
+  };
+}
+
+function toServerContextReference(reference: AiContextReference) {
+  return {
+    kind: reference.kind,
+    id: reference.id,
+    title: reference.title,
+    privacy: reference.privacy,
+    space_id: reference.spaceId,
+    href: reference.href,
+    revision: reference.revision,
+    opaque_scope_id: reference.opaqueScopeId,
+    attached: reference.attached,
+    metadata: reference.metadata,
+  };
+}

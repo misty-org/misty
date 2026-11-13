@@ -1,0 +1,117 @@
+import { parseRetryAfter } from "./errors";
+import { resolveApiBase } from "@/api/deployment/api";
+import { addRequestCorrelation } from "@/shared/platform/requestCorrelation";
+import { ApiRequestError, decodeApiError } from "./errors";
+import { httpRequest } from "./http";
+import { deleteApiCachePrefix, mutationScope } from "@/api/cache/api-cache";
+import {
+  apiRequestCredentials,
+  isApiSessionTransitioning,
+  notifyApiSessionInvalid,
+  readApiAccountId,
+  readApiAuthToken,
+  readApiSessionGeneration,
+} from "./session";
+
+const inFlightGetRequests = new Map<string, Promise<unknown>>();
+
+/** Authenticated request primitive for every Misty server domain. */
+export async function apiRequest<T = void>(path: string, init: RequestInit = {}): Promise<T> {
+  const method = (init.method || "GET").toUpperCase();
+  const canDeduplicate = method === "GET" && !init.body && !init.signal;
+
+  if (canDeduplicate) {
+    const generation = readApiSessionGeneration();
+    const dedupKey = `${generation}:${path}`;
+    const inFlight = inFlightGetRequests.get(dedupKey);
+    if (inFlight) {
+      return inFlight as Promise<T>;
+    }
+
+    const promise = (async () => {
+      const { response, accountGeneration } = await authenticatedResponse(path, init);
+      if (response.status === 204) return undefined as T;
+
+      const result = (await response.json()) as T;
+      assertStableApiSession(accountGeneration);
+      return result;
+    })().finally(() => {
+      if (inFlightGetRequests.get(dedupKey) === promise) {
+        inFlightGetRequests.delete(dedupKey);
+      }
+    });
+
+    inFlightGetRequests.set(dedupKey, promise);
+    return promise;
+  }
+
+  const { response, accountGeneration } = await authenticatedResponse(path, init);
+  // A change makes the saved copies around it out of date; they are revalidated on next read.
+  if (method !== "GET" && method !== "HEAD") {
+    const account = readApiAccountId();
+    if (account) void deleteApiCachePrefix(account, mutationScope(path));
+  }
+  if (response.status === 204) return undefined as T;
+
+  const result = (await response.json()) as T;
+  assertStableApiSession(accountGeneration);
+  return result;
+}
+
+async function authenticatedResponse(
+  path: string,
+  init: RequestInit,
+): Promise<{ response: Response; accountGeneration: number }> {
+  const accountGeneration = readApiSessionGeneration();
+  assertStableApiSession(accountGeneration);
+  const [base, token] = await Promise.all([resolveRequiredApiBase(), readApiAuthToken(path)]);
+  assertStableApiSession(accountGeneration);
+
+  const headers = new Headers(init.headers);
+  addRequestCorrelation(headers);
+  const isFormData = typeof FormData !== "undefined" && init.body instanceof FormData;
+  if (init.body && !isFormData && !headers.has("Content-Type"))
+    headers.set("Content-Type", "application/json");
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+
+  let response: Response;
+  try {
+    response = await httpRequest(`${base}${path}`, {
+      credentials: apiRequestCredentials(),
+      ...init,
+      headers,
+    });
+  } catch (error) {
+    assertStableApiSession(accountGeneration);
+    throw error;
+  }
+  assertStableApiSession(accountGeneration);
+
+  if (!response.ok) {
+    const text = await response.text();
+    assertStableApiSession(accountGeneration);
+    if (response.status === 401 && !token && apiRequestCredentials() !== "omit")
+      notifyApiSessionInvalid();
+    const decoded = decodeApiError(text);
+    throw new ApiRequestError(
+      decoded.message,
+      response.status,
+      decoded.code,
+      text,
+      parseRetryAfter(response.headers.get("Retry-After")),
+    );
+  }
+  return { response, accountGeneration };
+}
+
+export async function resolveRequiredApiBase(): Promise<string> {
+  const base = await resolveApiBase();
+  if (!base) throw new Error("Misty server URL is not configured.");
+  return base;
+}
+
+export function assertStableApiSession(generation: number): void {
+  if (isApiSessionTransitioning() || generation !== readApiSessionGeneration()) {
+    throw new ApiRequestError("Wait for the account switch to finish.", 409, "account_changed");
+  }
+}

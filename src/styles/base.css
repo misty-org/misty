@@ -1,0 +1,176 @@
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  /* Tailwind v4 resolves an uncolored `border-*` utility to currentColor, which
+     paints bright text-coloured rules across this dark theme. Anchor the
+     default to the theme border so only a deliberate `border-<color>` stands
+     out. */
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-charcoal-border);
+  }
+
+  html,
+  body,
+  #root {
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+  }
+
+  html {
+    color-scheme: dark;
+    overflow: hidden;
+  }
+
+  body {
+    margin: 0;
+    overflow: hidden;
+    background-color: var(--misty-theme-bg);
+    color: var(--misty-theme-text);
+    font-family: var(--font-sans);
+    font-size: var(--text-body);
+  }
+
+  #root {
+    overflow: hidden;
+    background-color: var(--misty-theme-bg);
+  }
+
+  /* Keep the native Browser's transparent path stable while a page is on
+     screen. Toggling these full-window ancestors for every popup forced WebKit
+     to clear and repaint its backing store, which appeared as a dark flash, so
+     overlays never change it; it follows only whether some page is presented.
+     Hidden tabs keep their hosts mounted and, on Windows, their pages in place
+     beneath the renderer, so with no page presented (Home, Agents) the window
+     is opaque and covers them. Opaque tool surfaces and Browser chrome still
+     paint their own backgrounds normally.
+     The page hosts set `data-browser-page-presented` on the root themselves
+     (`usePresentedPageHost`). Reading it with `html:has(...)` restyled the
+     whole window every time it changed, which is every switch between a
+     browser tab and any other tab. Every selector below ends in an attribute
+     or id, so the change restyles only the elements they name. */
+  html[data-browser-page-presented],
+  html[data-browser-page-presented] body,
+  html[data-browser-page-presented] #root,
+  html[data-browser-page-presented] [data-misty-desktop-frame],
+  html[data-browser-page-presented] [data-misty-route-shell],
+  html[data-browser-page-presented] [data-workspace-panes],
+  html[data-browser-page-presented] [data-workspace-pane]:has([data-browser-page-host]),
+  html[data-browser-page-presented]
+    [data-workspace-pane]:has([data-browser-page-host])
+    > [data-pane-layer],
+  html[data-browser-page-presented] [data-browser-page-host] {
+    background-color: transparent !important;
+  }
+
+  /* While a renderer overlay is open the native page sits beneath the
+     renderer. Keep the host transparent so the page remains visible. */
+  html[data-browser-overlay-active] [data-browser-page-host] {
+    background-color: transparent !important;
+  }
+
+  /* The renderer is transparent, so a host whose page is not on screen yet
+     (a new tab before its first paint, a switch in progress) would show
+     straight through the window. It paints the page's color until the page
+     is presented, then stays transparent through every overlay. */
+  html [data-browser-page-host][data-browser-page-awaiting] {
+    background-color: var(--browser-page-background, var(--misty-theme-bg)) !important;
+  }
+
+  /* Browser chrome is application UI, not selectable page content. Prevent a
+     stray drag or focus transfer elsewhere in Misty from painting selection
+     or tap-highlight layers behind the native child view. */
+  [data-browser-page-host] {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  [data-browser-page-host]::selection {
+    background: transparent;
+  }
+
+  /* WebView2 adds its own reveal button to password fields; `Input` already draws one. */
+  input::-ms-reveal {
+    display: none;
+  }
+
+  button,
+  input,
+  textarea,
+  select {
+    font: inherit;
+  }
+
+  button {
+    cursor: pointer;
+  }
+
+  button:disabled,
+  input:disabled,
+  textarea:disabled,
+  select:disabled {
+    cursor: not-allowed;
+    opacity: 0.58;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6,
+  p {
+    margin: 0;
+  }
+
+  ::selection {
+    background-color: var(--misty-theme-active);
+    color: var(--misty-theme-text-bright);
+  }
+
+  /* A site icon that wouldn't show on this theme: a black glyph on a dark one, a white glyph on a
+     light one. It gets a small backing in the theme's brightest text color (`siteIconLoader.ts`). */
+  .dark .misty-site-icon[data-tone="dark"],
+  :root:not(.dark) .misty-site-icon[data-tone="light"] {
+    box-sizing: border-box;
+    padding: 1px;
+    border-radius: 3px;
+    background-color: var(--misty-theme-text-bright);
+  }
+}
+
+/* Keyboard focus is one neutral ring in the muted text color, on :focus-visible only, so a click
+   never draws it. It sits outside the layers, so it shows on controls whose utilities say
+   `outline-none` (Button, Pressable, a list row's open target) and needs no class of its own. */
+:focus-visible {
+  outline: 2px solid var(--misty-theme-text-muted);
+  outline-offset: 1px;
+}
+/* Where focus already shows itself: the caret and edge of a field, the highlight of a menu or
+   list row, and the containers that code focuses so the keyboard can start there. */
+:is(
+  input:not([type="checkbox"], [type="radio"], [type="range"], [type="button"], [type="submit"]),
+  textarea,
+  select,
+  [contenteditable]:not([contenteditable="false"]),
+  [role="menu"],
+  [role="menuitem"],
+  [role="menuitemcheckbox"],
+  [role="menuitemradio"],
+  [role="option"],
+  [role="listbox"],
+  [role="dialog"],
+  [role="alertdialog"],
+  [cmdk-item],
+  [tabindex="-1"]
+):focus-visible {
+  outline: none;
+}

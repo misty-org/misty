@@ -1,0 +1,68 @@
+import type { AppSnapshot } from "@/native/ipc";
+
+import { invoke } from "./invoke";
+export function revealMainWindow(): Promise<void> {
+  return invoke("reveal_main_window");
+}
+
+/** Where the window buttons sit relative to their usual spot (20pt from the left, 19pt down):
+ * the vertical sidebar moves them onto its panel. Every call to the window style carries the
+ * current value, so the order the shell and the sidebar mount in never undoes it. */
+type TrafficLightOffset = { x: number; y: number };
+/** Where the vertical sidebar's content starts, from the window's left edge: the strip's 8pt
+ * padding, the panel's 1pt border and its 10pt padding (SidebarDrawer.tsx). The window buttons start
+ * here too, so the red one lines up with the address bar. */
+const sidebarContentLeft = 19;
+const trafficLightRestX = 20;
+export const trafficLightRestY = 19;
+export const sideTabTrafficLightNudgeX = 2;
+/** AppKit draws each button's circle about 2pt above the middle of the button's frame, and the
+ * native side centers the frame. Lowered by this much, the circles' centers sit on the line of
+ * the icons beside them. */
+export const trafficLightGlyphDrop = 2;
+export const trafficLightOffsetDefault: TrafficLightOffset = {
+  x: sidebarContentLeft - trafficLightRestX,
+  y: trafficLightGlyphDrop,
+};
+let trafficLightOffset = trafficLightOffsetDefault;
+let pendingWindowStyle: Promise<void> | null = null;
+
+/** `offset`, when given, becomes the new position; omitted, the current one is kept. Calls made
+ * in one React commit (the shell and the sidebar both place the buttons) go out as one, with the
+ * last offset, so the buttons never stop at an earlier caller's spot on the way. */
+export function enableModernWindowStyle(
+  window: unknown,
+  offset?: TrafficLightOffset,
+): Promise<void> {
+  if (offset) trafficLightOffset = offset;
+  pendingWindowStyle ??= Promise.resolve().then(() => {
+    pendingWindowStyle = null;
+    return invoke("enable_modern_window_style", {
+      window,
+      offsetX: trafficLightOffset.x,
+      offsetY: trafficLightOffset.y,
+    });
+  });
+  return pendingWindowStyle;
+}
+
+/** They move with the bar that holds them over `durationMs`: `distance` points sideways with the
+ * sidebar, or `rise` points up with the Space bar. They never fade: away, they sit off the window. */
+export function setTrafficLightsVisible(
+  visible: boolean,
+  distance = 0,
+  durationMs = 0,
+  rise = 0,
+): Promise<void> {
+  return invoke("set_traffic_lights_visible", { visible, distance, rise, durationMs });
+}
+
+export function appSnapshot(): Promise<AppSnapshot> {
+  return invoke("app_snapshot");
+}
+
+export function clipboardWriteFileBytes(
+  items: Array<{ name: string; bytes: number[] }>,
+): Promise<boolean> {
+  return invoke("clipboard_write_file_bytes", { items });
+}

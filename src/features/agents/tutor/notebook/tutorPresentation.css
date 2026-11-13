@@ -1,0 +1,86 @@
+/*
+ * Presented media: a slide and a video overview's scene, drawn at 16:9 and scaled with their
+ * stage or the screen when presented full screen. Their type and colors belong to the slide or the
+ * video frame, like a drawing's or code's, not to Misty's interface, so the UI rules for type
+ * size and color leave this file alone (src/tests/architecture/uiRuleDefinitions.ts,
+ * presentedMedia). Controls around them stay in notebookWorkspace.css and follow the rules.
+ */
+
+/* Slides: one at a time, at 16:9, and full screen when presented. */
+.tutor-slide-stage {
+  display: flex;
+  aspect-ratio: 16 / 9;
+  align-items: center;
+  justify-content: center;
+  padding: 28px 34px;
+  overflow: auto;
+  border: 1px solid var(--color-charcoal-border);
+  border-radius: var(--radius-xl);
+  background: var(--color-charcoal-bg);
+}
+.tutor-slide-stage:fullscreen {
+  padding: 8vh 10vw;
+  border: 0;
+  border-radius: 0;
+  font-size: 1.6em;
+}
+.tutor-slide {
+  width: 100%;
+  font-size: var(--text-body);
+  line-height: 1.6;
+  color: var(--color-cream);
+}
+.tutor-slide h1 {
+  font-size: 1.8em;
+  letter-spacing: -0.02em;
+}
+
+/* A video overview: the scene at 16:9 with its caption, then the scenes as a strip. */
+.tutor-video-stage {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border: 1px solid var(--color-charcoal-border);
+  border-radius: var(--radius-xl);
+  background: #141414;
+}
+.tutor-video-stage:fullscreen {
+  border: 0;
+  border-radius: 0;
+}
+.tutor-video-art {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.tutor-video-fallback {
+  display: flex;
+  height: 100%;
+  flex-direction: column;
+  justify-content: center;
+  gap: 14px;
+  padding: 0 9% 17%;
+  color: #f2efe9;
+}
+.tutor-video-fallback h3 {
+  margin: 0;
+  font-size: clamp(18px, 3.4vw, 40px);
+  font-weight: 600;
+}
+.tutor-video-fallback ul {
+  margin: 0;
+  padding-left: 1.2em;
+  font-size: clamp(12px, 1.8vw, 22px);
+  color: #a8a49c;
+}
+.tutor-video-caption {
+  position: absolute;
+  inset: auto 0 0;
+  margin: 0;
+  padding: 10px 6% 12px;
+  background: rgb(10 10 10 / 0.78);
+  font-size: clamp(11px, 1.5vw, 18px);
+  line-height: 1.45;
+  color: #f2efe9;
+}

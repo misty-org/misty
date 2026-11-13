@@ -1,0 +1,52 @@
+{
+  "name": "transcribe_gpt_model_mp3",
+  "kind": "transcribe",
+  "modelId": "openai/gpt-4o-transcribe",
+  "credentialProvider": "openai",
+  "input": {
+    "audioBase64": "//uQAAEC"
+  },
+  "replies": [
+    {
+      "status": 200,
+      "contentType": "application/json",
+      "body": "{\"text\":\"Hello.\"}"
+    }
+  ],
+  "unorderedRequests": false,
+  "sent": [
+    {
+      "method": "POST",
+      "path": "/v1/audio/transcriptions",
+      "headers": {
+        "accept": "*/*",
+        "authorization": "Bearer test-key-parity",
+        "content-type": "multipart/form-data"
+      },
+      "body": {
+        "multipart": [
+          {
+            "name": "model",
+            "filename": null,
+            "contentType": null,
+            "base64": "Z3B0LTRvLXRyYW5zY3JpYmU="
+          },
+          {
+            "name": "file",
+            "filename": "audio.mp3",
+            "contentType": "audio/mpeg",
+            "base64": "//uQAAEC"
+          }
+        ]
+      }
+    }
+  ],
+  "result": {
+    "text": "Hello.",
+    "segments": [],
+    "language": null,
+    "durationInSeconds": null,
+    "warnings": [],
+    "providerMetadata": {}
+  }
+}

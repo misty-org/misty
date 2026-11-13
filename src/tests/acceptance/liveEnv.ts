@@ -1,0 +1,58 @@
+import { existsSync, readFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
+
+/**
+ * Live acceptance runs read the benchmark keys, without printing them. Process
+ * variables take precedence.
+ */
+const envFiles = [join(homedir(), ".misty/.env/client/agents.env")];
+
+function fileValues(): Record<string, string> {
+  const values: Record<string, string> = {};
+  for (const file of envFiles) {
+    if (!existsSync(file)) continue;
+    for (const line of readFileSync(file, "utf8").split("\n")) {
+      const match = /^([A-Z0-9_]+)=(.*)$/.exec(line.trim());
+      if (match) values[match[1]] = match[2].replace(/^(['"])(.*)\1$/, "$2");
+    }
+  }
+  return values;
+}
+
+function liveEnv(name: string): string {
+  return (process.env[name] ?? fileValues()[name] ?? "").trim();
+}
+
+export const liveAcceptanceEnabled = process.env.MISTY_ACCEPTANCE === "1";
+
+/** The run's model: what the local server meters screen calls against. */
+const liveModel = () =>
+  liveEnv("MISTY_ACCEPTANCE_MODEL") || liveEnv("MISTY_AGENT_MODEL") || "openai/gpt-6-astra";
+
+/**
+ * Sends one screen-planner call exactly as `POST /me/screen-model/{jobID}`
+ * forwards it (screen_model_provider.go): the AI Gateway, the run's model, the
+ * same output cap and no temperature override.
+ */
+export async function screenModelPassThrough(messages: unknown, signal?: AbortSignal) {
+  const url = `${(liveEnv("AI_GATEWAY_BASE_URL") || "https://ai-gateway.vercel.sh/v1").replace(/\/$/, "")}/chat/completions`;
+  const key = liveEnv("AI_GATEWAY_API_KEY");
+  if (!key) throw new Error("No AI_GATEWAY_API_KEY for the acceptance run.");
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: liveModel(),
+      messages,
+      max_completion_tokens: 6000,
+      stream: false,
+    }),
+    signal,
+  });
+  if (!response.ok)
+    throw new Error(
+      `AI Gateway status ${response.status}: ${(await response.text()).slice(0, 300)}`,
+    );
+  return response.json();
+}

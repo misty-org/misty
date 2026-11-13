@@ -1,0 +1,92 @@
+import { flushWorkspaceRecovery } from "@/features/app-windows";
+import { useNativeSessionStore } from "../native-session";
+import { routes } from "@/app/shell";
+import { deviceDataErasers } from "../accountSeams";
+import {
+  localAccountScope,
+  removeAccountWorkspace,
+  restoreAccountWorkspace,
+  saveAccountWorkspace,
+} from "@/features/app-windows";
+import { reportSystemError } from "@/shared/platform/systemErrors";
+import { useCallback } from "react";
+import { useNavigate } from "react-router-dom";
+import { resetAccountScopedState } from "../sessions/authSession";
+import { accountLogout } from "../sessions/useAccountStore";
+import {
+  deactivateActiveAccount,
+  listSavedAccountSessions,
+  removeSavedAccountSession,
+} from "../sessions/useAuthTokenStore";
+import type { AccountStateSetters } from "./providerTypes";
+
+// Signs out the active account without silently jumping to another saved account, and goes to
+// sign in: Misty needs an account. The window's tabs stay the account's, and none are handed to
+// whoever signs in next. Other saved accounts stay listed; ending the session (logging out) also
+// removes the account itself.
+// Saving the workspace and clearing native identity are best-effort: a failed
+// cleanup step is reported, but never leaves the person signed in.
+/** "Also remove my browsing data from this device": this window's profile's history, downloads,
+ * website sign-ins and cached files, and any windows and tabs an earlier version kept for no
+ * account. */
+async function eraseDeviceBrowsingData() {
+  await deviceDataErasers.runAsync();
+  await removeAccountWorkspace(localAccountScope);
+}
+
+export function useDeactivateToChooser(
+  activeUserId: string | undefined,
+  { setUserState, setAccounts }: AccountStateSetters,
+) {
+  const signOut = useNativeSessionStore((state) => state.signOut);
+  const navigate = useNavigate();
+  return useCallback(
+    async ({
+      endSession = false,
+      removeData = false,
+    }: {
+      endSession?: boolean;
+      /** Erase this device's browsing data too. The account keeps its synced copy. */
+      removeData?: boolean;
+    } = {}) => {
+      const accountId = activeUserId ?? "";
+      const failures: unknown[] = [];
+      const attempt = async (step: () => unknown) => {
+        try {
+          await step();
+        } catch (error) {
+          failures.push(error);
+        }
+      };
+      await attempt(flushWorkspaceRecovery);
+      if (accountId && !endSession) await attempt(() => saveAccountWorkspace(accountId));
+      if (removeData) await attempt(eraseDeviceBrowsingData);
+      // Signing out ends the server session and removes the account from this device;
+      // adding it again needs its password.
+      if (endSession && accountId) await attempt(() => accountLogout(accountId));
+      await attempt(deactivateActiveAccount);
+      if (endSession && accountId) {
+        await attempt(async () => {
+          if (!(await removeSavedAccountSession(accountId)))
+            throw new Error("Could not remove the saved account.");
+          await removeAccountWorkspace(accountId);
+        });
+      }
+      await attempt(signOut);
+      resetAccountScopedState(accountId);
+      // The window empties for whoever signs in next.
+      await attempt(() => restoreAccountWorkspace(localAccountScope));
+      setUserState(null);
+      setAccounts(listSavedAccountSessions());
+      navigate(routes.signIn, { replace: true });
+      for (const error of failures) {
+        reportSystemError({
+          scope: "account:sign-out",
+          title: "Part of signing out did not finish",
+          error,
+        });
+      }
+    },
+    [activeUserId, navigate, signOut, setUserState, setAccounts],
+  );
+}

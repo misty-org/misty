@@ -1,0 +1,120 @@
+{
+  "name": "chunk_of_the_wrong_shape",
+  "modelId": "google/gemini-2.5-flash",
+  "credentialProvider": "google",
+  "options": {
+    "prompt": [
+      {
+        "role": "user",
+        "content": [
+          {
+            "type": "text",
+            "text": "Go."
+          }
+        ]
+      }
+    ]
+  },
+  "status": 200,
+  "contentType": "text/event-stream",
+  "response": "data: {\"responseId\":\"resp-google-1\",\"candidates\":[{\"content\":{\"role\":\"model\",\"parts\":[{\"text\":\"Fine\"}]},\"index\":0}]}\n\ndata: {\"candidates\":\"nope\"}\n\ndata: {\"responseId\":\"resp-google-1\",\"candidates\":[{\"content\":{\"role\":\"model\",\"parts\":[]},\"finishReason\":\"STOP\",\"index\":0}],\"usageMetadata\":{\"promptTokenCount\":12,\"candidatesTokenCount\":3,\"totalTokenCount\":15}}\n\n",
+  "sent": [
+    {
+      "method": "POST",
+      "path": "/v1/models/gemini-2.5-flash:streamGenerateContent?alt=sse",
+      "headers": {
+        "accept": "*/*",
+        "content-type": "application/json",
+        "x-goog-api-key": "test-key-parity"
+      },
+      "body": {
+        "generationConfig": {},
+        "contents": [
+          {
+            "role": "user",
+            "parts": [
+              {
+                "text": "Go."
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "parts": [
+    {
+      "type": "stream-start",
+      "warnings": []
+    },
+    {
+      "type": "response-metadata",
+      "id": "resp-google-1"
+    },
+    {
+      "type": "text-start",
+      "id": "0"
+    },
+    {
+      "type": "text-delta",
+      "id": "0",
+      "delta": "Fine"
+    },
+    {
+      "type": "error",
+      "error": {
+        "name": "AI_TypeValidationError",
+        "cause": {
+          "name": "ZodError",
+          "message": "[\n  {\n    \"expected\": \"array\",\n    \"code\": \"invalid_type\",\n    \"path\": [\n      \"candidates\"\n    ],\n    \"message\": \"Invalid input: expected array, received string\"\n  }\n]"
+        },
+        "value": {
+          "candidates": "nope"
+        }
+      }
+    },
+    {
+      "type": "text-end",
+      "id": "0"
+    },
+    {
+      "type": "finish",
+      "finishReason": {
+        "unified": "stop",
+        "raw": "STOP"
+      },
+      "usage": {
+        "inputTokens": {
+          "total": 12,
+          "noCache": 12,
+          "cacheRead": 0
+        },
+        "outputTokens": {
+          "total": 3,
+          "text": 3,
+          "reasoning": 0
+        },
+        "raw": {
+          "promptTokenCount": 12,
+          "candidatesTokenCount": 3,
+          "totalTokenCount": 15
+        }
+      },
+      "providerMetadata": {
+        "google": {
+          "promptFeedback": null,
+          "groundingMetadata": null,
+          "urlContextMetadata": null,
+          "safetyRatings": null,
+          "usageMetadata": {
+            "promptTokenCount": 12,
+            "candidatesTokenCount": 3,
+            "totalTokenCount": 15
+          },
+          "finishMessage": null,
+          "serviceTier": null
+        }
+      }
+    }
+  ]
+}

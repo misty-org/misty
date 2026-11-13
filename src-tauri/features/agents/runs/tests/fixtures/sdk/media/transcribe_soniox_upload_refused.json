@@ -1,0 +1,44 @@
+{
+  "name": "transcribe_soniox_upload_refused",
+  "kind": "transcribe",
+  "modelId": "soniox/stt-async-v4",
+  "credentialProvider": "soniox",
+  "input": {
+    "audioBase64": "UklGRiQAAABXQVZFZm10IAAAAAAAAAAA"
+  },
+  "replies": [
+    {
+      "status": 401,
+      "contentType": "application/json",
+      "body": "{\"status_code\":401,\"error_type\":\"unauthorized\",\"message\":\"Bad key.\"}"
+    }
+  ],
+  "unorderedRequests": false,
+  "sent": [
+    {
+      "method": "POST",
+      "path": "/v1/files",
+      "headers": {
+        "accept": "*/*",
+        "authorization": "Bearer test-key-parity",
+        "content-type": "multipart/form-data"
+      },
+      "body": {
+        "multipart": [
+          {
+            "name": "file",
+            "filename": "audio.wav",
+            "contentType": "audio/wav",
+            "base64": "UklGRiQAAABXQVZFZm10IAAAAAAAAAAA"
+          }
+        ]
+      }
+    }
+  ],
+  "thrown": {
+    "name": "AI_APICallError",
+    "message": "Bad key.",
+    "statusCode": 401,
+    "isRetryable": false
+  }
+}

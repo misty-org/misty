@@ -1,0 +1,251 @@
+import { noteAccountResponse } from "./accountLimits";
+import { nativeAccountFetch } from "./native-account-fetch";
+import { invoke } from "@tauri-apps/api/core";
+import { hasTauriInternals } from "@/shared/platform/tauri";
+import { resolveApiBase, resolveHostedApiBase } from "@/api/deployment/api";
+import { isApiSignedOut, readApiSessionGeneration } from "./session";
+
+const refreshes = new Map<string, Promise<boolean>>();
+const refreshResults = new Map<string, { generation: number; revision: number; valid: boolean }>();
+let refreshRevision = 0;
+const sessionLocks = new Map<string, Promise<unknown>>();
+
+let sessionChannel: BroadcastChannel | undefined;
+function shareSessionChange(base?: string): void {
+  // Another same-origin window can establish valid cookies without changing
+  // this window's account generation. Its hint only clears cached rejection;
+  // the next real request still has to authenticate with the server.
+  if (
+    !sessionChannel &&
+    typeof window !== "undefined" &&
+    typeof window.BroadcastChannel === "function"
+  ) {
+    try {
+      sessionChannel = new window.BroadcastChannel("misty:cookie-session");
+      sessionChannel.onmessage = ({ data }: MessageEvent<unknown>) => {
+        if (typeof data === "string") refreshResults.delete(data);
+      };
+    } catch {
+      /* Sandboxed windows can disallow channels. */
+    }
+  }
+  if (base) sessionChannel?.postMessage(base);
+}
+function clearRefreshResult(base: string): void {
+  refreshResults.delete(base);
+  shareSessionChange(base);
+}
+
+async function withSessionLock<T>(base: string, operation: () => Promise<T>): Promise<T> {
+  if (typeof navigator !== "undefined" && navigator.locks) {
+    return await navigator.locks.request(`misty-session:${base}`, operation);
+  }
+  const previous = sessionLocks.get(base) ?? Promise.resolve();
+  const next = previous.catch(() => undefined).then(operation);
+  sessionLocks.set(base, next);
+  try {
+    return await next;
+  } finally {
+    if (sessionLocks.get(base) === next) sessionLocks.delete(base);
+  }
+}
+
+export async function captureAccountCookies(base: string, accountId?: string): Promise<void> {
+  await persistAccountCookies(base, accountId);
+  clearRefreshResult(base);
+}
+
+async function persistAccountCookies(base: string, accountId?: string): Promise<void> {
+  if (!hasTauriInternals()) return;
+  await invoke("auth_session_capture", { apiBase: base, accountId: accountId ?? null });
+}
+
+export async function restoreAccountCookies(
+  base: string,
+  accountId: string | null,
+): Promise<boolean> {
+  if (!hasTauriInternals()) return true;
+  return withSessionLock(base, async () => {
+    const restored = await invoke<boolean>("auth_session_restore", { apiBase: base, accountId });
+    clearRefreshResult(base);
+    return restored;
+  });
+}
+
+export async function forgetAccountCookies(base: string, accountId: string): Promise<void> {
+  if (!hasTauriInternals()) return;
+  await invoke("auth_session_forget", { apiBase: base, accountId });
+}
+
+// Refresh is shared by simultaneous requests. Web Locks also serialize browser
+// tabs so one tab does not replay a refresh cookie consumed by another tab.
+async function refresh(base: string, generation: number, revision: number): Promise<boolean> {
+  assertGeneration(generation);
+  const key = `${generation}:${base}`;
+  const pending = refreshes.get(key);
+  if (pending) return pending;
+  const run = async () => {
+    // An old response must never rotate cookies belonging to a new account.
+    assertGeneration(generation);
+    const previous = refreshResults.get(base);
+    if (previous?.generation === generation && (!previous.valid || previous.revision > revision)) {
+      return previous.valid;
+    }
+    // The lock is shared across tabs, but refreshResults is not. Recheck the
+    // current cookies after acquiring it: another tab may already have rotated
+    // them while this request's expired response was in flight. A resource's
+    // own 401 also does not necessarily mean the account session has expired.
+    const current = await accountFetch(`${base}/me`, {
+      credentials: "include",
+      headers: { "X-Misty-CSRF": "1" },
+    });
+    await current.body?.cancel();
+    assertGeneration(generation);
+    if (current.ok) {
+      refreshResults.set(base, { generation, revision: ++refreshRevision, valid: true });
+      return true;
+    }
+    if (current.status !== 401) throw new Error("Session validation is temporarily unavailable.");
+    const response = await accountFetch(`${base}/auth/refresh`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "X-Misty-CSRF": "1" },
+    });
+    await response.body?.cancel();
+    assertGeneration(generation);
+    if (response.status === 401 || response.status === 403) {
+      refreshResults.set(base, { generation, revision: ++refreshRevision, valid: false });
+      return false;
+    }
+    if (!response.ok) throw new Error("Session refresh is temporarily unavailable.");
+    await persistAccountCookies(base);
+    assertGeneration(generation);
+    shareSessionChange(base);
+    refreshResults.set(base, { generation, revision: ++refreshRevision, valid: true });
+    return true;
+  };
+  const promise = withSessionLock(base, run).finally(() => refreshes.delete(key));
+  refreshes.set(key, promise);
+  return promise;
+}
+
+function assertGeneration(generation: number): void {
+  if (readApiSessionGeneration() !== generation) throw new Error("The active account changed.");
+}
+
+// Routes that work without a session, used by sign-in and registration while
+// no account is active.
+const signedOutPaths = new Set([
+  "/login",
+  "/register",
+  "/auth/google",
+  "/auth/google/complete",
+  "/health",
+  "/setup-keys/redeem",
+]);
+
+export async function cookieSessionFetch(
+  input: RequestInfo | URL,
+  init: RequestInit,
+): Promise<Response> {
+  shareSessionChange();
+  const generation = readApiSessionGeneration();
+  const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+  const bases = [await resolveApiBase(), resolveHostedApiBase()].filter(Boolean);
+  const base = bases.find((candidate) => url.startsWith(`${candidate}/`));
+  if (!base) return fetch(input, init);
+  const headers = new Headers(
+    init.headers ?? (input instanceof Request ? input.headers : undefined),
+  );
+  headers.set("X-Misty-CSRF", "1");
+  const options: RequestInit = { credentials: "include", ...init, headers };
+  const revision = refreshRevision;
+  const path = url.slice(base.length).split("?")[0];
+  // A signed-out desktop holds no session. Answer account requests
+  // locally instead of sending them, and never try to refresh a session.
+  const signedOut = isApiSignedOut();
+  if (signedOut && !signedOutPaths.has(path)) {
+    return new Response(JSON.stringify({ code: "not_authenticated" }), {
+      status: 401,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+  // /me and refresh have both rejected this generation. Keep background
+  // producers local until a successful login/cookie restore or account switch.
+  // Explicit bearer/device credentials are independent of the account session.
+  const rejected = refreshResults.get(base);
+  if (
+    rejected?.generation === generation &&
+    !rejected.valid &&
+    !headers.has("Authorization") &&
+    options.credentials !== "omit" &&
+    !signedOutPaths.has(path) &&
+    path !== "/logout"
+  ) {
+    assertGeneration(generation);
+    return new Response(JSON.stringify({ code: "not_authenticated" }), {
+      status: 401,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+  const changesSession = ["/auth/google/complete", "/login", "/register", "/logout"].includes(path);
+  const send = async () => {
+    assertGeneration(generation);
+    const response = await accountFetch(input instanceof Request ? input.clone() : input, options);
+    if (changesSession && response.ok) clearRefreshResult(base);
+    return response;
+  };
+  const response = await (changesSession ? withSessionLock(base, send) : send());
+  if (
+    response.status !== 401 ||
+    signedOut ||
+    headers.has("Authorization") ||
+    options.credentials === "omit" ||
+    [
+      "/login",
+      "/register",
+      "/logout",
+      "/auth/refresh",
+      "/auth/google",
+      "/auth/google/complete",
+      // A refused setup key says nothing about this device's session.
+      "/setup-keys/redeem",
+    ].includes(path)
+  )
+    return response;
+  let refreshed: boolean;
+  try {
+    refreshed = await refresh(base, generation, revision);
+  } catch (error) {
+    await response.body?.cancel();
+    throw error;
+  }
+  if (!refreshed) return response;
+  // Retrying discards the first body. Release its native stream/HTTP request.
+  await response.body?.cancel();
+  return send();
+}
+
+/**
+ * A request to a server this device has not moved to yet, through that server's own native
+ * client. It involves no session of this device, so nothing here refreshes or signs out.
+ */
+export async function otherServerFetch(url: string, init: RequestInit): Promise<Response> {
+  const headers = new Headers(init.headers);
+  headers.set("X-Misty-CSRF", "1");
+  return accountFetch(url, { credentials: "include", ...init, headers });
+}
+
+async function accountFetch(input: RequestInfo | URL, init: RequestInit): Promise<Response> {
+  // Desktop account tokens live in Rust, not the WebView. Login, normal requests,
+  // refresh and retries all go through that native client, which adds the bearer.
+  // Scoped app credentials and explicitly anonymous requests must never inherit it.
+  const usesAccountCookies =
+    init.credentials !== "omit" && !new Headers(init.headers).has("Authorization");
+  const response = await (hasTauriInternals() && usesAccountCookies
+    ? nativeAccountFetch(input, init)
+    : fetch(input, init));
+  // A suspended account is told so wherever it is signed in (accountLimits.ts).
+  noteAccountResponse(input, response);
+  return response;
+}

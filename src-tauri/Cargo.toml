@@ -1,0 +1,221 @@
+[package]
+name = "misty-native"
+version = "0.1.0-beta.1"
+description = "Misty native application shell"
+authors = ["Misty Contributors"]
+edition = "2021"
+license = "AGPL-3.0-or-later"
+default-run = "misty-desktop"
+
+[lib]
+name = "misty_native"
+path = "features/lib.rs"
+crate-type = ["lib"]
+
+[[bin]]
+name = "misty-desktop"
+path = "features/main.rs"
+
+[[test]]
+name = "webview_url"
+path = "features/browser/pages/tests/webview_url.rs"
+# AppKit and WKWebView must be exercised on the process's main thread.
+harness = false
+
+[[test]]
+name = "browser_native_input"
+path = "features/browser/input/tests/browser_native_input.rs"
+# Real WKWebView events need the main thread and a window server.
+harness = false
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+aes-gcm = "0.10"
+regex = "1"
+# A small local HTTP server: routing, state/path extractors and raw responses.
+axum = { version = "0.8", default-features = false, features = ["http1", "tokio"] }
+arboard = "3.6.1"
+base64 = "0.22"
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+dirs = "6.0.0"
+hex = "0.4"
+misty-credential-store = { path = "vendor/misty-credential-store" }
+browser_data = { path = "features/sync/browser_data" }
+agent-runs = { path = "features/agents/runs" }
+page_text = { path = "features/browser/page_text" }
+kiri = { path = "features/kiri" }
+file_access = { path = "features/file_access" }
+database = { path = "features/database" }
+settings = { path = "features/settings" }
+permissions = { path = "features/permissions" }
+documents = { path = "features/documents" }
+libc = "0.2"
+rand = "0.8"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+tempfile = "3"
+tauri = { version = "2", features = ["protocol-asset", "macos-private-api", "tray-icon", "image-png", "unstable"] }
+tauri-plugin-dialog = "2"
+tauri-plugin-opener = "2"
+thiserror = "1"
+tokio = { version = "1", features = ["fs", "io-util", "macros", "net", "process", "rt-multi-thread", "sync", "time"] }
+reqwest = { version = "0.13.4", default-features = false, features = ["json", "query", "rustls-no-provider", "socks", "stream"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+rusqlite = { version = "0.32", features = ["bundled"] }
+uuid = { version = "1", features = ["v4"] }
+# The terminal panel beside a chat runs the person's shell on a real pseudo-terminal (MIT).
+portable-pty = "0.8"
+# The panels beside a chat, adapted from desktop-cc-gui (MIT): libgit2 for reading a folder's
+# Git state and writing its index (MIT/Apache-2.0 bindings; libgit2 is GPL-2.0 with the linking
+# exception), ripgrep's walker for .gitignore-aware search (MIT/Unlicense) and the OS trash (MIT).
+git2 = { version = "0.20", default-features = false, features = ["vendored-libgit2"] }
+ignore = "0.4"
+trash = "5"
+zeroize = "1"
+url = "2"
+image = { version = "0.25.10", default-features = false, features = ["hdr", "png", "pnm", "jpeg", "webp"] }
+ed25519-dalek = "2"
+# Devices: the control channel socket.
+futures-util = { version = "0.3", features = ["sink"] }
+tokio-tungstenite = { version = "0.30", default-features = false, features = ["connect", "rustls-tls-native-roots"] }
+zstd = { version = "0.13", default-features = false }
+tauri-plugin-keystore = { path = "vendor/tauri-plugin-keystore" }
+tauri-plugin-deep-link = "2"
+percent-encoding = "2"
+# desktop-cc-gui's engine layer (features/engines) and engine settings (features/engine_config):
+# the CLIs' TOML and YAML configs, a lock for live registries and caches, process trees and
+# figures for the performance panel, and program lookup. All MIT or Apache-2.0.
+parking_lot = "0.12"
+toml = "0.8"
+toml_edit = "0.25"
+serde_yaml = "0.9"
+sysinfo = "0.36.1"
+which = "7"
+
+[target.'cfg(any(target_os = "macos", windows, target_os = "linux"))'.dependencies]
+# Confined helpers: Seatbelt on macOS, an AppContainer and Job object on Windows, Landlock,
+# seccomp and namespaces on Linux.
+sandbox = { path = "features/sandbox" }
+# Microphone, system and per-process capture for dictation, live transcription and recording.
+voice_capture = { path = "features/voice/capture" }
+# Screen capture for computer use and captures (X11 and PipeWire on Linux).
+xcap = "0.9"
+# Computer use: mouse and keyboard input for an outside engine's screen control (MIT; X11 on Linux).
+enigo = "0.6"
+tauri-plugin-single-instance = { version = "2.4.3", features = ["deep-link"] }
+tauri-plugin-updater = "2.10.1"
+
+[target.'cfg(not(target_os = "macos"))'.dependencies]
+# Run notices on Windows and Linux; macOS uses mac-notification-sys.
+tauri-plugin-notification = "2.3.3"
+image = { version = "0.25.10", default-features = false, features = ["bmp", "gif", "jpeg", "tga", "webp"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+# System notices that open their chat when clicked (agents/run_control/run_notices.rs).
+mac-notification-sys = "0.6.15"
+block2 = "0.6.2"
+cocoa = "0.26"
+core-graphics = "0.24"
+core-foundation = "0.10"
+objc = "0.2.7"
+objc2 = "0.6.4"
+dispatch2 = "0.3.1"
+objc2-app-kit = { version = "0.3.2", default-features = false, features = ["std", "NSAppearance", "NSApplication", "NSBitmapImageRep", "NSImageRep", "NSEvent", "NSPasteboard", "NSResponder", "NSScrollView", "NSTrackingArea", "NSView", "NSWindow", "NSPopover", "NSScreen", "NSMenu", "NSMenuItem", "NSImage", "NSGraphics", "NSControl", "NSWindowController", "NSPanel", "NSTextField", "NSTextFieldCell", "NSButton", "NSButtonCell", "NSBezierPath", "NSColor", "NSAnimationContext", "NSWorkspace", "NSRunningApplication", "NSFont", "NSText", "NSCell", "NSTextInputClient", "NSAnimation", "block2", "objc2-core-graphics", "objc2-core-image", "objc2-core-foundation", "NSAccessibility", "NSPasteboardItem", "NSParagraphStyle", "NSFontDescriptor", "NSLayoutConstraint", "NSGraphicsContext"] }
+objc2-foundation = { version = "0.3.2", default-features = false, features = ["std", "NSArray", "NSData", "NSBundle", "NSDictionary", "NSError", "NSObject", "NSProcessInfo", "NSUserDefaults", "NSUUID", "NSString", "NSURL", "NSURLResponse", "NSHTTPCookie", "NSDate", "NSSet", "NSJSONSerialization", "NSNotification", "NSNull", "NSFileHandle", "NSFileManager", "NSPathUtilities", "NSRegularExpression", "NSLocale", "NSCharacterSet", "NSRange", "NSValue", "NSOrderedSet", "NSTask", "NSURLRequest", "NSThread", "NSRunLoop", "NSGeometry", "NSEnumerator", "NSTimer", "NSOperation", "block2", "NSObjCRuntime"] }
+objc2-web-kit = { version = "0.3.2", default-features = false, features = ["WKSecurityOrigin", "WKSnapshotConfiguration", "objc2-core-foundation", "WKContentWorld", "WKFrameInfo", "WKScriptMessage", "WKScriptMessageHandler", "objc2-app-kit", "WKWebView", "WKWebViewConfiguration", "WKUserContentController", "WKUserScript", "WKNavigationResponse", "WKNavigationDelegate", "WKHTTPCookieStore", "WKWebsiteDataStore", "block2", "WKNavigationAction", "WKNavigation", "WKWebsiteDataRecord", "WKDownload", "WKUIDelegate", "WKWindowFeatures", "WKError"] }
+# Agent pointer, mist, desktop control and capture (features/agents/*/macos).
+objc2-screen-capture-kit = "0.3.2"
+objc2-quartz-core = "0.3.2"
+objc2-core-graphics = "0.3.2"
+objc2-core-image = "0.3.2"
+objc2-core-media = "0.3.2"
+objc2-core-video = "0.3.2"
+objc2-core-foundation = "0.3.2"
+objc2-application-services = "0.3.2"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+# Agent page captures on WebKitGTK (features/browser/pages/linux.rs). The same versions kiri and
+# Tauri's wry resolve to; they move with Tauri.
+gtk = "0.18"
+webkit2gtk = { version = "=2.0", features = ["v2_40"] }
+# Dictation's keys, pointer, front window and paste on X11 (MIT or Apache-2.0; enigo already
+# builds it with these extensions).
+x11rb = { version = "0.13", features = ["xtest"] }
+# Script worlds and frame messages for agent pages on WebKitGTK (MIT; the version webkit2gtk uses).
+javascriptcore-rs = "=1.1"
+# Computer use on Wayland: the RemoteDesktop and ScreenCast portals, which the person approves (MIT).
+ashpd = { version = "0.13", default-features = false, features = ["tokio", "remote_desktop", "screencast"] }
+# Loads gtk-layer-shell when the compositor has it, for overlays above every window (ISC).
+libloading = "0.8"
+
+[target.'cfg(windows)'.dependencies]
+# The engine layer reads the live User/Machine PATH from the registry (MIT).
+winreg = "0.55"
+# Plain paths, not \\?\ ones, for the Grok sessions junction.
+dunce = "1"
+# Confined helpers and agent commands (AppContainer and Job objects).
+webview2-com = "0.38.2"
+windows = { version = "0.61", features = ["Foundation", "Graphics", "Graphics_Capture", "Graphics_DirectX", "Graphics_DirectX_Direct3D11", "Win32_Foundation", "Win32_Graphics_Direct3D", "Win32_Graphics_Direct3D11", "Win32_Graphics_Dxgi", "Win32_Graphics_Dxgi_Common", "Win32_Graphics_Gdi", "Win32_Media_MediaFoundation", "Win32_Security", "Win32_Security_Cryptography", "Win32_Storage_FileSystem", "Win32_System_Com", "Win32_System_Com_StructuredStorage", "Win32_System_JobObjects", "Win32_System_Ole", "Win32_System_Threading", "Win32_System_Variant", "Win32_System_WinRT", "Win32_System_WinRT_Direct3D11", "Win32_System_WinRT_Graphics_Capture", "Win32_UI_Accessibility", "Win32_UI_WindowsAndMessaging"] }
+windows-sys = { version = "0.59", features = ["Wdk_Storage_FileSystem", "Win32_Devices_DeviceAndDriverInstallation", "Win32_Foundation", "Win32_Graphics_Dwm", "Win32_Graphics_Gdi", "Win32_NetworkManagement_WNet", "Win32_Security", "Win32_Security_Isolation", "Win32_Storage_FileSystem", "Win32_System_Com", "Win32_System_DataExchange", "Win32_System_Diagnostics_Debug", "Win32_System_Diagnostics_ToolHelp", "Win32_System_IO", "Win32_System_Ioctl", "Win32_System_JobObjects", "Win32_System_LibraryLoader", "Win32_System_Memory", "Win32_System_Power", "Win32_System_Registry", "Win32_System_SystemInformation", "Win32_System_SystemServices", "Win32_System_Threading", "Win32_System_WindowsProgramming", "Win32_UI_Accessibility", "Win32_UI_HiDpi", "Win32_UI_Input_KeyboardAndMouse", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging"] }
+
+[features]
+custom-protocol = ["tauri/custom-protocol"]
+
+# Local desktop builds: line-level debug info for Misty's own code, none for
+# dependencies (they rarely need stepping into and dominate link time), and
+# incremental builds so an edit recompiles only what changed. The incremental
+# cache costs disk space under target/; Release builds are unaffected.
+[profile.dev]
+debug = 1
+incremental = true
+
+[profile.dev.package."*"]
+debug = false
+
+# Optimize the shipped host independently of its optional app packages.
+# Keep unwinding: a failed agent run has to end its own task and leave the browser running, and
+# document processing still uses catch_unwind for recovery. agents/run_control refuses to build
+# with panic=abort.
+[profile.release]
+codegen-units = 1
+lto = "fat"
+opt-level = "s"
+strip = "symbols"
+
+# Build-time proc macros are never shipped; keep their loader symbols intact.
+[profile.release.build-override]
+strip = false
+
+[dev-dependencies]
+ctor = "0.8"
+# The engine layer's tests drive commands on Tauri's mock runtime and pause tokio's clock.
+tauri = { version = "2", features = ["test"] }
+tokio = { version = "1", features = ["test-util"] }
+file_access = { path = "features/file_access", features = ["test-fixtures"] }
+# Build fixtures/reference decoders without shipping these codecs in the macOS host.
+image = { version = "0.25.10", default-features = false, features = ["bmp", "gif", "jpeg", "tga", "webp"] }
+
+[target.'cfg(target_os = "macos")'.dev-dependencies]
+# The vendored copy (see [patch.crates-io]); the webview URL test compiles its URL reader.
+wry = { version = "=0.55.1", default-features = false }
+
+[patch.crates-io]
+# Preserve the clipboard API while using AppKit instead of a bundled TIFF decoder on macOS.
+arboard = { path = "vendor/arboard" }
+# Hands out the menu the menu bar icon opens, so its items can show SF Symbols (app/tray.rs).
+tray-icon = { path = "vendor/tray-icon" }
+
+# Honor focused(false) for background WebKit views on macOS, and let pages
+# declare their own global `ipc` (see vendor/wry/MISTY-PATCH.md).
+wry = { path = "vendor/wry" }
+
+# Hold runtime messages that arrive while a webview is being created, so a
+# nested create or close can't wait on its own thread on Windows (see
+# vendor/tauri-runtime-wry/MISTY-PATCH.md).
+tauri-runtime-wry = { path = "vendor/tauri-runtime-wry" }
+
+# Backport the upstream VariantStrIter soundness fix to Tauri's GTK3-compatible GLib.
+glib = { path = "vendor/glib" }

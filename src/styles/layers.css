@@ -1,0 +1,62 @@
+/* Named stacking layers. Use these instead of z-[number] so the order stays in one place. */
+/* Agent execution surface over workspace content */
+@utility layer-agent-surface {
+  z-index: 2147482400;
+}
+/* Floating app chrome: global Misty panel, layout controls */
+@utility layer-chrome {
+  z-index: 2147482500;
+}
+/* Overlays scoped to the workspace */
+@utility layer-workspace-overlay {
+  z-index: 2147482600;
+}
+/* Toasts and notices */
+@utility layer-notification {
+  z-index: 2147482900;
+}
+/* Dialog and sheet backdrops */
+@utility layer-dialog-backdrop {
+  z-index: 2147483000;
+}
+/* Dialogs, sheets, and pointer drags over them */
+@utility layer-dialog {
+  z-index: 2147483100;
+}
+/* Blocking screens and alert-dialog backdrops */
+@utility layer-blocking-backdrop {
+  z-index: 2147483200;
+}
+/* Blocking screen content */
+@utility layer-blocking {
+  z-index: 2147483201;
+}
+/* Alert dialogs and popups opened over blocking screens */
+@utility layer-blocking-popup {
+  z-index: 2147483300;
+}
+/* Menus and drag previews */
+@utility layer-menu {
+  z-index: 2147483400;
+}
+/* Popovers and select lists */
+@utility layer-popover {
+  z-index: 2147483420;
+}
+/* Tooltips and the drag ghost, always on top */
+@utility layer-tooltip {
+  z-index: 2147483500;
+}
+
+/* Night light (Settings › Interface): a warm multiply layer over the whole
+   window, above tooltips, that never takes the pointer. Browser pages are
+   native views on top of this one and get the same layer injected. */
+:root[data-night-light]::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 2147483647;
+  pointer-events: none;
+  background-color: var(--misty-night-light);
+  mix-blend-mode: multiply;
+}

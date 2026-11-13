@@ -1,0 +1,45 @@
+{
+  "name": "embed_gateway_failure",
+  "kind": "embed",
+  "modelId": "gateway/x/y",
+  "credentialProvider": "gateway",
+  "input": {
+    "values": [
+      "one"
+    ]
+  },
+  "replies": [
+    {
+      "status": 403,
+      "contentType": "application/json",
+      "body": "{\"error\":{\"message\":\"No.\",\"type\":\"forbidden\"}}"
+    }
+  ],
+  "unorderedRequests": false,
+  "sent": [
+    {
+      "method": "POST",
+      "path": "/v1/embedding-model",
+      "headers": {
+        "accept": "*/*",
+        "ai-embedding-model-specification-version": "4",
+        "ai-gateway-auth-method": "api-key",
+        "ai-gateway-protocol-version": "0.0.1",
+        "ai-model-id": "x/y",
+        "authorization": "Bearer test-key-parity",
+        "content-type": "application/json"
+      },
+      "body": {
+        "values": [
+          "one"
+        ]
+      }
+    }
+  ],
+  "thrown": {
+    "name": "GatewayForbiddenError",
+    "message": "No.",
+    "statusCode": 403,
+    "isRetryable": false
+  }
+}

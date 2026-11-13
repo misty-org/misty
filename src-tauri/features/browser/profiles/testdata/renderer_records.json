@@ -1,0 +1,29 @@
+{
+  "tabs": [
+    {
+      "id": "layout:one",
+      "fields": {
+        "order": 0,
+        "title": "Named",
+        "tree": {
+          "type": "leaf",
+          "id": "pane-layout:one",
+          "active": "view-layout:one",
+          "views": [
+            {
+              "id": "view-layout:one",
+              "surface": "agents",
+              "group_key": "tool:agents",
+              "instance_key": "view-layout:one",
+              "title": "Agents",
+              "route": "/agents?chat=one",
+              "sidebar": true,
+              "state": null,
+              "created_at": 1700000000000
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

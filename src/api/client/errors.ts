@@ -1,0 +1,80 @@
+import { accountLimitMessage } from "./accountLimits";
+
+export class ApiRequestError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly code?: string,
+    readonly responseText = "",
+    readonly retryAfterMs?: number,
+  ) {
+    super(message);
+    this.name = "ApiRequestError";
+  }
+}
+
+function apiErrorMessage(code: string | undefined, fallback: string): string {
+  const messages: Record<string, string> = {
+    not_authenticated: "Your Misty session is unavailable. Sign out, then sign in again.",
+    forbidden: "You do not have permission to perform that action.",
+    not_found: "That Misty resource no longer exists.",
+    account_changed: "Wait for the account switch to finish.",
+    invalid_request: "Misty could not validate that request.",
+    internal_error: "Misty could not complete that request. Try again in a moment.",
+    model_key_needed: "Add a model key in Settings → Models.",
+    mail_provider_mailbox_unavailable:
+      "This Microsoft account has no Outlook mailbox. Use it in Files for OneDrive, or connect an Outlook.com or Microsoft 365 mailbox.",
+    mail_provider_authorization_failed: "Reconnect this email account.",
+    mail_capability_required: "Reconnect this account to grant email permissions.",
+    reauthorization_required: "Reconnect this email account.",
+    refresh_failed: "Session expired. Reconnect this email account.",
+    mail_provider_rate_limited: "Email provider rate limit reached. Try again in a moment.",
+    mail_provider_unavailable:
+      "Email provider is temporarily unavailable. Try refreshing in a moment.",
+    voice_unavailable: "Voice transcription is not available on this Misty server.",
+    voice_recording_required: "Misty did not receive a voice recording.",
+    voice_recording_too_large: "That voice recording is too large. Keep it under one minute.",
+    voice_duration_invalid: "That voice recording could not be read. Please try again.",
+    voice_transcription_failed: "Misty could not transcribe that recording. Please try again.",
+    speech_model_unavailable:
+      "The configured speech model is unavailable on this server. Your answer is saved in the conversation.",
+    speech_generation_failed:
+      "Speech generation failed. Your answer is saved in the conversation. Please try speech again later.",
+    speech_reply_unavailable:
+      "Speech is available only for a completed answer. Review the conversation for the current result.",
+    speech_rate_limited:
+      "Speech is temporarily rate limited. Your answer is saved in the conversation.",
+    voice_speech_failed: "Misty could not generate speech for that response.",
+  };
+  const limit = accountLimitMessage(code);
+  if (limit) return limit;
+  return code && messages[code] ? messages[code] : fallback.trim() || "The Misty request failed.";
+}
+
+export function decodeApiError(text: string): { code?: string; message: string } {
+  try {
+    const decoded = JSON.parse(text) as {
+      code?: unknown;
+      message?: unknown;
+      error?: unknown;
+    };
+    const code = typeof decoded.code === "string" ? decoded.code : undefined;
+    const message =
+      typeof decoded.message === "string"
+        ? decoded.message
+        : typeof decoded.error === "string"
+          ? decoded.error
+          : "";
+    return { code, message: apiErrorMessage(code, message) };
+  } catch {
+    return { message: apiErrorMessage(undefined, text) };
+  }
+}
+
+export function parseRetryAfter(value: string | null): number | undefined {
+  if (!value?.trim()) return undefined;
+  const seconds = Number(value);
+  if (Number.isFinite(seconds)) return Math.max(0, seconds * 1000);
+  const date = Date.parse(value);
+  return Number.isFinite(date) ? Math.max(0, date - Date.now()) : undefined;
+}

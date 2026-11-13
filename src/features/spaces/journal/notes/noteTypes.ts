@@ -1,0 +1,41 @@
+export type NoteSource = "misty";
+
+export type NoteBodyFormat = "markdown" | "tiptap-json" | "html";
+
+type NoteSyncStatus = "synced" | "syncing" | "error" | "conflict" | "local-only";
+
+export type UnifiedNote = {
+  id: string;
+  source: NoteSource;
+  sourceId: string;
+  title: string;
+  body: string;
+  bodyFormat: NoteBodyFormat;
+  /** Plain markdown projection for search, previews, publishing, and legacy readers. */
+  bodyMarkdown?: string;
+  preview: string;
+  spaceId?: string;
+  spaceName?: string;
+  creatorUserId?: string;
+  role?: "creator" | "editor" | "viewer";
+  tags: string[];
+  backlinks: string[];
+  updatedAt: string;
+  createdAt: string;
+  /** Server projection revision used to reject stale AI and collaboration patches. */
+  collaborationRevision?: number;
+  /** Number of accessible native notes that link to this note. */
+  backlinkCount?: number;
+  syncStatus: NoteSyncStatus;
+  /** Server-authoritative delete access for the current user. */
+  canDelete?: boolean;
+};
+
+/**
+ * Left-rail groupings. These are views over the merged note set, not folders.
+ * "space" is the default lens inside a Space; the rest stay cross-Space so loose
+ * notes can be found and filed without leaving the section.
+ */
+export type NoteGroupId = "space";
+
+export type NotesLoadPhase = "idle" | "loading" | "ready" | "error";

@@ -1,0 +1,72 @@
+{
+  "name": "embed_google_single_image",
+  "kind": "embed",
+  "modelId": "google/gemini-embedding-2",
+  "credentialProvider": "google",
+  "input": {
+    "values": [
+      "caption"
+    ],
+    "providerOptions": {
+      "google": {
+        "outputDimensionality": 8,
+        "content": [
+          [
+            {
+              "inlineData": {
+                "mimeType": "image/png",
+                "data": "iVBORw0KGgo="
+              }
+            }
+          ]
+        ]
+      }
+    }
+  },
+  "replies": [
+    {
+      "status": 200,
+      "contentType": "application/json",
+      "body": "{\"embedding\":{\"values\":[0.1]}}"
+    }
+  ],
+  "unorderedRequests": false,
+  "sent": [
+    {
+      "method": "POST",
+      "path": "/v1/models/gemini-embedding-2:embedContent",
+      "headers": {
+        "accept": "*/*",
+        "content-type": "application/json",
+        "x-goog-api-key": "test-key-parity"
+      },
+      "body": {
+        "model": "models/gemini-embedding-2",
+        "content": {
+          "parts": [
+            {
+              "text": "caption"
+            },
+            {
+              "inlineData": {
+                "mimeType": "image/png",
+                "data": "iVBORw0KGgo="
+              }
+            }
+          ]
+        },
+        "outputDimensionality": 8
+      }
+    }
+  ],
+  "result": {
+    "embeddings": [
+      [
+        0.1
+      ]
+    ],
+    "tokens": null,
+    "warnings": [],
+    "providerMetadata": null
+  }
+}

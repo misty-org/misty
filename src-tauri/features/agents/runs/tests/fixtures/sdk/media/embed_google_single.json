@@ -1,0 +1,72 @@
+{
+  "name": "embed_google_single",
+  "kind": "embed",
+  "modelId": "google/gemini-embedding-001",
+  "credentialProvider": "google",
+  "input": {
+    "values": [
+      "one"
+    ],
+    "providerOptions": {
+      "openai": {
+        "dimensions": 64
+      },
+      "openai-compatible": {
+        "dimensions": 64
+      },
+      "openrouter": {
+        "dimensions": 64
+      },
+      "nvidia": {
+        "dimensions": 64
+      },
+      "ollama": {
+        "dimensions": 64
+      },
+      "google": {
+        "outputDimensionality": 64
+      }
+    }
+  },
+  "replies": [
+    {
+      "status": 200,
+      "contentType": "application/json",
+      "body": "{\"embedding\":{\"values\":[0.1,0.2]}}"
+    }
+  ],
+  "unorderedRequests": false,
+  "sent": [
+    {
+      "method": "POST",
+      "path": "/v1/models/gemini-embedding-001:embedContent",
+      "headers": {
+        "accept": "*/*",
+        "content-type": "application/json",
+        "x-goog-api-key": "test-key-parity"
+      },
+      "body": {
+        "model": "models/gemini-embedding-001",
+        "content": {
+          "parts": [
+            {
+              "text": "one"
+            }
+          ]
+        },
+        "outputDimensionality": 64
+      }
+    }
+  ],
+  "result": {
+    "embeddings": [
+      [
+        0.1,
+        0.2
+      ]
+    ],
+    "tokens": null,
+    "warnings": [],
+    "providerMetadata": null
+  }
+}

@@ -1,0 +1,60 @@
+{
+  "name": "transcribe_gateway",
+  "kind": "transcribe",
+  "modelId": "gateway/openai/whisper-1",
+  "credentialProvider": "gateway",
+  "input": {
+    "audioBase64": "UklGRiQAAABXQVZFZm10IAAAAAAAAAAA"
+  },
+  "replies": [
+    {
+      "status": 200,
+      "contentType": "application/json",
+      "body": "{\"text\":\"Hello.\",\"segments\":[{\"text\":\"Hello.\",\"startSecond\":0,\"endSecond\":1}],\"language\":\"en\",\"durationInSeconds\":1,\"warnings\":[{\"type\":\"other\",\"message\":\"Careful.\"}],\"providerMetadata\":{\"gateway\":{\"cost\":\"0.1\"}}}"
+    }
+  ],
+  "unorderedRequests": false,
+  "sent": [
+    {
+      "method": "POST",
+      "path": "/v1/transcription-model",
+      "headers": {
+        "accept": "*/*",
+        "ai-gateway-auth-method": "api-key",
+        "ai-gateway-protocol-version": "0.0.1",
+        "ai-model-id": "openai/whisper-1",
+        "ai-transcription-model-specification-version": "4",
+        "authorization": "Bearer test-key-parity",
+        "content-type": "application/json"
+      },
+      "body": {
+        "audio": "UklGRiQAAABXQVZFZm10IAAAAAAAAAAA",
+        "mediaType": "audio/wav",
+        "providerOptions": {}
+      }
+    }
+  ],
+  "result": {
+    "text": "Hello.",
+    "segments": [
+      {
+        "text": "Hello.",
+        "startSecond": 0,
+        "endSecond": 1
+      }
+    ],
+    "language": "en",
+    "durationInSeconds": 1,
+    "warnings": [
+      {
+        "type": "other",
+        "message": "Careful."
+      }
+    ],
+    "providerMetadata": {
+      "gateway": {
+        "cost": "0.1"
+      }
+    }
+  }
+}

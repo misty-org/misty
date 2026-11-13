@@ -1,0 +1,77 @@
+{
+  "name": "embed_google_batch",
+  "kind": "embed",
+  "modelId": "gemini/gemini-embedding-001",
+  "credentialProvider": "google",
+  "input": {
+    "values": [
+      "one",
+      "two"
+    ],
+    "providerOptions": {
+      "google": {
+        "taskType": "RETRIEVAL_DOCUMENT"
+      }
+    }
+  },
+  "replies": [
+    {
+      "status": 200,
+      "contentType": "application/json",
+      "body": "{\"embeddings\":[{\"values\":[0.1]},{\"values\":[0.2]}]}"
+    }
+  ],
+  "unorderedRequests": false,
+  "sent": [
+    {
+      "method": "POST",
+      "path": "/v1/models/gemini-embedding-001:batchEmbedContents",
+      "headers": {
+        "accept": "*/*",
+        "content-type": "application/json",
+        "x-goog-api-key": "test-key-parity"
+      },
+      "body": {
+        "requests": [
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "one"
+                }
+              ]
+            },
+            "taskType": "RETRIEVAL_DOCUMENT"
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "two"
+                }
+              ]
+            },
+            "taskType": "RETRIEVAL_DOCUMENT"
+          }
+        ]
+      }
+    }
+  ],
+  "result": {
+    "embeddings": [
+      [
+        0.1
+      ],
+      [
+        0.2
+      ]
+    ],
+    "tokens": null,
+    "warnings": [],
+    "providerMetadata": null
+  }
+}

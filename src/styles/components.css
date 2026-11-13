@@ -1,0 +1,190 @@
+/* Shared component motion and touch targets. */
+@layer components {
+  @keyframes collapsible-down {
+    from {
+      height: 0;
+      opacity: 0;
+    }
+    to {
+      height: var(--radix-collapsible-content-height);
+      opacity: 1;
+    }
+  }
+
+  @keyframes collapsible-up {
+    from {
+      height: var(--radix-collapsible-content-height);
+      opacity: 1;
+    }
+    to {
+      height: 0;
+      opacity: 0;
+    }
+  }
+
+  /* Monochrome loading placeholder: a soft highlight sweeps across the block. */
+  .misty-skeleton {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+  }
+
+  .misty-skeleton::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      color-mix(in oklab, var(--color-cream) 7%, transparent) 50%,
+      transparent 100%
+    );
+    animation: misty-skeleton-sweep 1.6s ease-in-out infinite;
+  }
+
+  /* Live work reads as a gray highlight sweeping left to right across its text. */
+  .misty-shimmer {
+    background: linear-gradient(
+      90deg,
+      var(--color-cream-muted) 40%,
+      var(--color-cream-bright) 50%,
+      var(--color-cream-muted) 60%
+    );
+    background-size: 250% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    animation: misty-shimmer-sweep 2s linear infinite;
+  }
+
+  @keyframes misty-shimmer-sweep {
+    from {
+      background-position: 100% 0;
+    }
+    to {
+      background-position: -150% 0;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .misty-shimmer {
+      animation: none;
+      background: none;
+      color: var(--color-cream);
+    }
+  }
+
+  @keyframes misty-skeleton-sweep {
+    to {
+      transform: translateX(100%);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .misty-skeleton::after {
+      animation: none;
+      display: none;
+    }
+  }
+
+  .animate-collapsible-down {
+    animation: collapsible-down 180ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .animate-collapsible-up {
+    animation: collapsible-up 150ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .animate-collapsible-down,
+    .animate-collapsible-up {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+/* Long text shortens with a fade at its end, never an ellipsis (OverflowFadeText, Text). The fade
+   is set only while the text overflows, so a label that fits stays crisp to its last letter.
+   It sits at the end the text runs to, which is the left in right-to-left text. */
+@utility fade-end {
+  -webkit-mask-image: linear-gradient(to right, black calc(100% - 18px), transparent);
+  mask-image: linear-gradient(to right, black calc(100% - 18px), transparent);
+
+  &:where([dir="rtl"], [dir="rtl"] *) {
+    -webkit-mask-image: linear-gradient(to left, black calc(100% - 18px), transparent);
+    mask-image: linear-gradient(to left, black calc(100% - 18px), transparent);
+  }
+}
+
+/* Two-line text that runs past its second line: the first line stays whole and the second fades
+   at its end. The element is exactly two lines tall while this is set. */
+/* Any number of lines: every line but the last stays whole, and the last fades at its end. */
+@utility fade-end-lines {
+  -webkit-mask-image:
+    linear-gradient(black, black), linear-gradient(to right, black calc(100% - 18px), transparent);
+  mask-image:
+    linear-gradient(black, black), linear-gradient(to right, black calc(100% - 18px), transparent);
+  -webkit-mask-size:
+    100% calc(100% - 1lh),
+    100% 1lh;
+  mask-size:
+    100% calc(100% - 1lh),
+    100% 1lh;
+  -webkit-mask-position:
+    top left,
+    bottom left;
+  mask-position:
+    top left,
+    bottom left;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+
+  &:where([dir="rtl"], [dir="rtl"] *) {
+    -webkit-mask-image:
+      linear-gradient(black, black), linear-gradient(to left, black calc(100% - 18px), transparent);
+    mask-image:
+      linear-gradient(black, black), linear-gradient(to left, black calc(100% - 18px), transparent);
+  }
+}
+
+@utility fade-end-2 {
+  -webkit-mask-image:
+    linear-gradient(black, black), linear-gradient(to right, black calc(100% - 18px), transparent);
+  mask-image:
+    linear-gradient(black, black), linear-gradient(to right, black calc(100% - 18px), transparent);
+  -webkit-mask-size: 100% 50%;
+  mask-size: 100% 50%;
+  -webkit-mask-position:
+    top left,
+    bottom left;
+  mask-position:
+    top left,
+    bottom left;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+
+  &:where([dir="rtl"], [dir="rtl"] *) {
+    -webkit-mask-image:
+      linear-gradient(black, black), linear-gradient(to left, black calc(100% - 18px), transparent);
+    mask-image:
+      linear-gradient(black, black), linear-gradient(to left, black calc(100% - 18px), transparent);
+  }
+}
+
+/* A file drop area (`useFileDropZone` with `area`) lights up as a whole while files hover over it. */
+[data-file-drop-area] {
+  position: relative;
+}
+[data-file-drop-area][data-file-dragging]::after {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  z-index: 40;
+  border: 1px dashed var(--color-cream-muted);
+  border-radius: var(--radius-xl);
+  background: color-mix(in srgb, var(--color-charcoal-hover) 60%, transparent);
+  pointer-events: none;
+}

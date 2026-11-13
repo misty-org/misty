@@ -1,0 +1,362 @@
+import "@/app/featureSeams";
+import { act } from "react";
+import { createRoot, type Root } from "react-dom/client";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+
+// The layout waits for Misty's opening flight, a timer started when the module loads.
+vi.hoisted(() => vi.useFakeTimers({ toFake: ["setTimeout"] }));
+
+const mocks = vi.hoisted(() => ({
+  user: null as { id: string; email: string } | null,
+  transitioning: false,
+  nativeRecovery: false,
+}));
+vi.mock("@/features/app-windows/recovery/workspaceRecoveryPlatform", async (original) => ({
+  ...(await original<object>()),
+  nativeWorkspaceRecoveryEnabled: () => mocks.nativeRecovery,
+}));
+
+vi.mock("@/features/account", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useAuth: () => ({
+    user: mocks.user,
+    transitioning: mocks.transitioning,
+    accounts: mocks.user ? [{ id: mocks.user.id, email: mocks.user.email, name: "Test" }] : [],
+  }),
+}));
+
+vi.mock("@/features/spaces", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useSpacesStore: (selector: (state: { spaces: unknown[]; snapshotReady: boolean }) => unknown) =>
+    selector({ spaces: [], snapshotReady: true }),
+}));
+
+vi.mock("@/features/spaces/routes/defaultSpace", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  preferredDefaultSpace: () => null,
+}));
+
+vi.mock("@/app/layouts/DesktopLayout", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  DesktopLayout: () => <div data-testid="desktop-layout">Desktop Layout Content</div>,
+}));
+
+vi.mock("@/features/agents/island/AgentExecutionSurface", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  AgentExecutionSurface: () => null,
+}));
+
+vi.mock("@/features/spaces/SpacesRealtimeBridge", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  SpacesRealtimeBridge: () => null,
+}));
+
+vi.mock("@/features/updater/UpdateNotices", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  UpdateNotices: () => <div data-testid="update-notices" />,
+}));
+
+import { AppFrameLayout } from "./AppFrameLayout";
+
+beforeAll(async () => {
+  await vi.advanceTimersByTimeAsync(2_000);
+  vi.useRealTimers();
+});
+import { useWorkspaceRecoveryState } from "@/features/app-windows/recovery/nativeWorkspaceRecovery";
+import { useSetupStore } from "@/features/account/setup/useSetupStore";
+
+/** The shell keeps its splash up for at least a second (`useMinimumSplash`); wait it out. */
+async function waitOutSplash() {
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 1_050));
+  });
+}
+
+function LocationProbe() {
+  const location = useLocation();
+  return (
+    <div data-testid="location-probe">
+      {location.pathname}
+      <span data-testid="location-state">{JSON.stringify(location.state)}</span>
+    </div>
+  );
+}
+
+describe("AppFrameLayout", () => {
+  let container: HTMLDivElement;
+  let root: Root;
+
+  // AppFrameLayout holds the layout back until a two second opening flight, started when the
+  // module loads, has finished. Wait it out once so no test depends on how quickly it runs.
+  beforeAll(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 2_100));
+  }, 5_000);
+
+  beforeEach(() => {
+    (
+      globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
+    ).IS_REACT_ACT_ENVIRONMENT = true;
+    container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+    mocks.user = null;
+    mocks.transitioning = false;
+    mocks.nativeRecovery = false;
+    // Past the first-run welcome, as every later launch is.
+    useSetupStore.setState({ welcomed: true });
+    useWorkspaceRecoveryState.setState({
+      accountId: null,
+      ready: false,
+      usable: false,
+      issue: null,
+    });
+    vi.clearAllMocks();
+  });
+
+  afterEach(async () => {
+    await act(async () => {
+      root.unmount();
+    });
+    container.remove();
+  });
+
+  it("shows the welcome once, on first run, before the window", async () => {
+    mocks.user = null;
+    useSetupStore.setState({ welcomed: false });
+
+    await act(async () => {
+      root.render(
+        <MemoryRouter initialEntries={["/"]}>
+          <Routes>
+            <Route path="/welcome" element={<LocationProbe />} />
+            <Route element={<AppFrameLayout />}>
+              <Route path="/" element={<div>Browser content</div>} />
+            </Route>
+          </Routes>
+        </MemoryRouter>,
+      );
+    });
+
+    expect(container.querySelector('[data-testid="location-probe"]')?.textContent).toContain(
+      "/welcome",
+    );
+    expect(container.querySelector('[data-testid="desktop-layout"]')).toBeNull();
+  });
+
+  it.each(["/agents", "/new", "/agents?view=lab", "/agents?view=studio", "/spaces/one/home"])(
+    "sends signed-out people from %s to sign in, to come back after",
+    async (path) => {
+      mocks.user = null;
+
+      await act(async () => {
+        root.render(
+          <MemoryRouter initialEntries={[path]}>
+            <Routes>
+              <Route path="/signin" element={<LocationProbe />} />
+              <Route element={<AppFrameLayout />}>
+                <Route path="*" element={<div>App content</div>} />
+              </Route>
+            </Routes>
+          </MemoryRouter>,
+        );
+      });
+
+      expect(container.querySelector('[data-testid="location-probe"]')?.textContent).toContain(
+        "/signin",
+      );
+      expect(container.querySelector('[data-testid="location-state"]')?.textContent).toBe(
+        JSON.stringify({ from: path }),
+      );
+      expect(container.querySelector('[data-testid="desktop-layout"]')).toBeNull();
+    },
+  );
+
+  it("sets up a first sign-in before the app opens", async () => {
+    mocks.user = { id: "user-1", email: "user@example.com" };
+    useSetupStore.setState({ welcomed: false });
+
+    await act(async () => {
+      root.render(
+        <MemoryRouter initialEntries={["/spaces"]}>
+          <Routes>
+            <Route path="/setup" element={<LocationProbe />} />
+            <Route element={<AppFrameLayout />}>
+              <Route path="/spaces" element={<div>Spaces content</div>} />
+            </Route>
+          </Routes>
+        </MemoryRouter>,
+      );
+    });
+
+    expect(container.querySelector('[data-testid="location-probe"]')?.textContent).toContain(
+      "/setup",
+    );
+    expect(container.querySelector('[data-testid="location-state"]')?.textContent).toBe(
+      JSON.stringify({ from: "/spaces" }),
+    );
+  });
+
+  it("keeps the route and hook order stable while an account transition restores identity", async () => {
+    mocks.transitioning = true;
+    const view = () => (
+      <MemoryRouter initialEntries={["/spaces"]}>
+        <Routes>
+          <Route path="/signin" element={<LocationProbe />} />
+          <Route element={<AppFrameLayout />}>
+            <Route path="/spaces" element={<div>Spaces content</div>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>
+    );
+    await act(async () => {
+      root.render(view());
+    });
+    expect(container.querySelector('[data-testid="location-probe"]')).toBeNull();
+    expect(container.querySelector('[data-testid="desktop-layout"]')).toBeNull();
+    const loading = container.querySelector('[role="status"][aria-label="Restoring account"]');
+    expect(loading).not.toBeNull();
+    mocks.user = { id: "user-1", email: "user@example.com" };
+    await act(async () => {
+      root.render(view());
+    });
+    expect(container.querySelector('[data-testid="desktop-layout"]')).toBeNull();
+    mocks.transitioning = false;
+    await act(async () => {
+      root.render(view());
+    });
+    await waitOutSplash();
+    expect(container.querySelector('[data-testid="desktop-layout"]')).not.toBeNull();
+    expect(container.querySelector('[data-testid="location-probe"]')).toBeNull();
+  });
+
+  it("allows unauthenticated access to /signin without redirection and isolates auth route", async () => {
+    mocks.user = null;
+
+    await act(async () => {
+      root.render(
+        <MemoryRouter initialEntries={["/signin"]}>
+          <Routes>
+            <Route element={<AppFrameLayout />}>
+              <Route path="/signin" element={<div>Sign In Screen</div>} />
+            </Route>
+          </Routes>
+        </MemoryRouter>,
+      );
+    });
+
+    await waitOutSplash();
+    expect(container.querySelector('[data-testid="desktop-layout"]')).not.toBeNull();
+    // The auth route renders no background app panels.
+    expect(container.querySelector('[data-testid="update-notices"]')).toBeNull();
+  });
+
+  it("allows unauthenticated access to /register without redirection and isolates auth route", async () => {
+    mocks.user = null;
+
+    await act(async () => {
+      root.render(
+        <MemoryRouter initialEntries={["/register"]}>
+          <Routes>
+            <Route element={<AppFrameLayout />}>
+              <Route path="/register" element={<div>Register Screen</div>} />
+            </Route>
+          </Routes>
+        </MemoryRouter>,
+      );
+    });
+
+    await waitOutSplash();
+    expect(container.querySelector('[data-testid="desktop-layout"]')).not.toBeNull();
+    expect(container.querySelector('[data-testid="update-notices"]')).toBeNull();
+  });
+
+  it("sends a signed-out invite link to sign in, to come back to it", async () => {
+    mocks.user = null;
+
+    await act(async () => {
+      root.render(
+        <MemoryRouter initialEntries={["/invite/token-123"]}>
+          <Routes>
+            <Route path="/signin" element={<LocationProbe />} />
+            <Route element={<AppFrameLayout />}>
+              <Route path="/invite/:token" element={<div>Invite Preview</div>} />
+            </Route>
+          </Routes>
+        </MemoryRouter>,
+      );
+    });
+
+    expect(container.querySelector('[data-testid="location-state"]')?.textContent).toBe(
+      JSON.stringify({ from: "/invite/token-123" }),
+    );
+    expect(container.querySelector('[data-testid="desktop-layout"]')).toBeNull();
+  });
+
+  it("renders full app frame with services when user is authenticated", async () => {
+    mocks.user = { id: "user-1", email: "user@example.com" };
+
+    await act(async () => {
+      root.render(
+        <MemoryRouter initialEntries={["/spaces"]}>
+          <Routes>
+            <Route element={<AppFrameLayout />}>
+              <Route path="/spaces" element={<div>Spaces Page</div>} />
+            </Route>
+          </Routes>
+        </MemoryRouter>,
+      );
+    });
+
+    await waitOutSplash();
+    expect(container.querySelector('[data-testid="desktop-layout"]')).not.toBeNull();
+    expect(container.querySelector('[data-testid="update-notices"]')).not.toBeNull();
+  });
+
+  it("resets the workspace only when the account changes", async () => {
+    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+    const view = () => (
+      <MemoryRouter initialEntries={["/browser"]}>
+        <AppFrameLayout />
+      </MemoryRouter>
+    );
+    mocks.user = { id: "account-a", email: "a@example.test" };
+    await act(async () => root.render(view()));
+    await waitOutSplash();
+    const original = container.querySelector('[data-testid="desktop-layout"]');
+    expect(original).not.toBeNull();
+    await act(async () => root.render(view()));
+    expect(container.querySelector('[data-testid="desktop-layout"]')).toBe(original);
+    mocks.user = { id: "account-b", email: "b@example.test" };
+    await act(async () => root.render(view()));
+    await waitOutSplash();
+    const switched = container.querySelector('[data-testid="desktop-layout"]');
+    expect(switched).not.toBeNull();
+    expect(switched).not.toBe(original);
+    expect(container.querySelectorAll('[data-testid="desktop-layout"]')).toHaveLength(1);
+    expect(errors.mock.calls.filter((args) => args.join(" ").includes("same key"))).toEqual([]);
+  });
+
+  it("keeps the signed-in browser mounted during local recovery failures", async () => {
+    mocks.user = { id: "user-1", email: "user@example.com" };
+    mocks.nativeRecovery = true;
+    useWorkspaceRecoveryState.setState({
+      accountId: "user-1",
+      ready: false,
+      usable: true,
+      issue: "Keychain unavailable",
+    });
+    await act(async () => {
+      root.render(
+        <MemoryRouter initialEntries={["/browser"]}>
+          <AppFrameLayout />
+        </MemoryRouter>,
+      );
+    });
+    await waitOutSplash();
+    expect(container.querySelector('[data-testid="desktop-layout"]')).not.toBeNull();
+    expect(container.textContent).not.toContain("Local saving is unavailable");
+    expect(container.textContent).not.toContain("Your workspace could not be restored");
+    expect(container.querySelector('[role="dialog"]')).toBeNull();
+  });
+});

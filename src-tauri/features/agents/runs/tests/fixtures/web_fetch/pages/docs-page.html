@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head><title>Configuring the client - Docs</title></head>
+<body>
+<nav class="sidebar"><ul><li><a href="/a">Getting started</a><ul><li><a href="/b">Install</a></li></ul></li></ul></nav>
+<main role="main">
+<h1 id="config">Configuring the client</h1>
+<p>Set options with <code>client.configure()</code>. See <a href="#opts">options</a>.</p>
+<h2>Options</h2>
+<table>
+<caption>Client options</caption>
+<thead><tr><th>Name</th><th>Type</th><th>Default</th></tr></thead>
+<tbody>
+<tr><td><code>timeout</code></td><td>number</td><td>30</td></tr>
+<tr><td><code>retries</code></td><td>number</td><td>3</td></tr>
+</tbody>
+<tfoot><tr><td colspan="3">All values are optional</td></tr></tfoot>
+</table>
+<h3>Example</h3>
+<pre><code class="language-js">const client = new Client({
+  timeout: 10,   // seconds
+  retries: 1 &lt; 2 ? 1 : 2,
+});
+</code></pre>
+<h4>Notes</h4>
+<dl>
+  <dt>timeout</dt><dd>Seconds to wait.</dd>
+  <dt>retries</dt><dd>Times to try again.</dd>
+</dl>
+<details open><summary>Advanced</summary><p>Use <kbd>Ctrl</kbd>+<kbd>C</kbd> to stop.</p></details>
+<h5>Fine print</h5><h6>Finer print</h6>
+<hr>
+<label for="x">Search docs</label><input id="x" value="ignored"><button type="submit">Go</button>
+<form action="/f"><fieldset><legend>Feedback</legend><label>Helpful? <input type="checkbox"></label><textarea name="t">Say more &amp; more</textarea></fieldset></form>
+<address>Written by the docs team</address>
+</main>
+<footer>Edit this page</footer>
+</body>
+</html>

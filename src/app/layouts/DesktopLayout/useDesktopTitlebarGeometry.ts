@@ -1,0 +1,71 @@
+import { isAuthPath } from "@/app/shell";
+import type { useWindowDockingLayout } from "@/features/app-windows";
+import { useLayoutEffect, useRef, useState, type RefObject } from "react";
+import { useSidebarWidthStore } from "@/app/shell/sidebarWidth";
+import { dockingGeometry } from "./dockingGeometry";
+import { standaloneWorkspaceRouteTitle } from "./StandaloneRouteSurface";
+import * as styles from "./styles";
+import { useMergedTitlebar } from "./useMergedTitlebar";
+
+/** Titlebar insets and docking geometry for the current route and docking layout. */
+export function useDesktopTitlebarGeometry(options: {
+  shellRef: RefObject<HTMLElement | null>;
+  pathname: string;
+  docking: ReturnType<typeof useWindowDockingLayout>;
+  focusMode: boolean;
+  shouldShowWindowsControls: boolean;
+  /** The caption buttons sit inside the sidebar, so the window's corner reserves nothing. */
+  captionInline: boolean;
+  appZoom: number;
+}) {
+  const {
+    shellRef,
+    pathname,
+    docking,
+    focusMode,
+    shouldShowWindowsControls,
+    captionInline,
+    appZoom,
+  } = options;
+  const isAuthRoute = isAuthPath(pathname);
+  const standaloneRouteTitle = standaloneWorkspaceRouteTitle(pathname);
+  const windowsTitlebarControlsRef = useRef<HTMLDivElement>(null);
+  const [windowsTitlebarControlsWidth, setWindowsTitlebarControlsWidth] = useState(0);
+  useLayoutEffect(() => {
+    const windowsControls = windowsTitlebarControlsRef.current;
+    const measure = () => {
+      setWindowsTitlebarControlsWidth(windowsControls?.offsetWidth ?? 0);
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    if (windowsControls) observer.observe(windowsControls);
+    return () => observer.disconnect();
+  }, [isAuthRoute, shouldShowWindowsControls]);
+  // The caption buttons sit on the left, where macOS puts its traffic lights, so both platforms
+  // share one layout.
+  const titlebarNavigationGeometry = styles.desktopTitlebarNavigationGeometry(
+    appZoom,
+    shouldShowWindowsControls
+      ? captionInline
+        ? 0
+        : windowsTitlebarControlsWidth || styles.windowsTitlebarControlsFallbackWidth
+      : styles.desktopTitlebarNavigationInset,
+  );
+  const sideTabsWidth = useSidebarWidthStore((state) => state.width);
+  const geometry = dockingGeometry({ sideTabsWidth, ...docking });
+  useMergedTitlebar(
+    shellRef,
+    `${docking.navigation}:${docking.tabs}:${focusMode}`,
+    !isAuthRoute,
+    titlebarNavigationGeometry.left,
+    0,
+  );
+
+  return {
+    isAuthRoute,
+    standaloneRouteTitle,
+    windowsTitlebarControlsRef,
+    titlebarNavigationGeometry,
+    geometry,
+  };
+}

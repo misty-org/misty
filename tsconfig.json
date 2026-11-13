@@ -1,0 +1,97 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "useDefineForClassFields": true,
+    "lib": ["DOM", "DOM.Iterable", "ES2020"],
+    "allowJs": false,
+    "allowImportingTsExtensions": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "strict": true,
+    "forceConsistentCasingInFileNames": true,
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "paths": {
+      "@/*": ["./src/*"],
+      "react": ["./node_modules/@types/react"],
+      "react/*": ["./node_modules/@types/react/*"],
+      "react-dom": ["./node_modules/@types/react-dom"],
+      "react-dom/*": ["./node_modules/@types/react-dom/*"],
+      "react-dom/client": ["./node_modules/@types/react-dom/client.d.ts"],
+      "react-router-dom": ["./node_modules/react-router-dom/dist/index.d.mts"],
+      "lucide-react": ["./node_modules/lucide-react/dist/lucide-react.d.ts"],
+      "vitest": ["./node_modules/vitest/dist/index.d.ts"],
+      "react-markdown": ["./node_modules/react-markdown/index.d.ts"],
+      "@testing-library/react": ["./node_modules/@testing-library/react/types/index.d.ts"],
+      "zustand/react/shallow": ["./node_modules/zustand/esm/react/shallow.d.mts"],
+      "@tauri-apps/api/core": ["./node_modules/@tauri-apps/api/core.d.ts"],
+      "zustand": ["./node_modules/zustand/esm/index.d.mts"],
+      "@tauri-apps/api/event": ["./node_modules/@tauri-apps/api/event.d.ts"],
+      "zustand/middleware": ["./node_modules/zustand/esm/middleware.d.mts"],
+      "cmdk": ["./node_modules/cmdk/dist/index.d.ts"],
+      "react-resizable-panels": [
+        "./node_modules/react-resizable-panels/dist/react-resizable-panels.cjs.d.mts"
+      ],
+      "react-pdf": ["./node_modules/react-pdf/dist/esm/index.d.ts"],
+      "@tauri-apps/plugin-dialog": ["./node_modules/@tauri-apps/plugin-dialog/dist-js/index.d.ts"],
+      "@tauri-apps/plugin-opener": ["./node_modules/@tauri-apps/plugin-opener/dist-js/index.d.ts"],
+      "@excalidraw/excalidraw/element/types": [
+        "./node_modules/@excalidraw/excalidraw/dist/types/excalidraw/element/types.d.ts"
+      ],
+      "y-partyserver/provider": ["./node_modules/y-partyserver/dist/provider/index.d.ts"],
+      "yjs": ["./node_modules/yjs/dist/src/index.d.ts"],
+      "@excalidraw/excalidraw/types": [
+        "./node_modules/@excalidraw/excalidraw/dist/types/excalidraw/types.d.ts"
+      ],
+      "@excalidraw/excalidraw": [
+        "./node_modules/@excalidraw/excalidraw/dist/types/excalidraw/index.d.ts"
+      ],
+      "@excalidraw/excalidraw/data/reconcile": [
+        "./node_modules/@excalidraw/excalidraw/dist/types/excalidraw/data/reconcile.d.ts"
+      ],
+      "@tiptap/extension-collaboration": [
+        "./node_modules/@tiptap/extension-collaboration/dist/index.d.ts"
+      ],
+      "@tiptap/extension-collaboration-caret": [
+        "./node_modules/@tiptap/extension-collaboration-caret/dist/index.d.ts"
+      ],
+      "@tiptap/extension-drag-handle-react": [
+        "./node_modules/@tiptap/extension-drag-handle-react/dist/index.d.ts"
+      ],
+      "@tiptap/extension-find-and-replace": [
+        "./node_modules/@tiptap/extension-find-and-replace/dist/index.d.ts"
+      ],
+      "@tiptap/extension-highlight": ["./node_modules/@tiptap/extension-highlight/dist/index.d.ts"],
+      "@tiptap/extension-image": ["./node_modules/@tiptap/extension-image/dist/index.d.ts"],
+      "@tiptap/extension-list": ["./node_modules/@tiptap/extension-list/dist/index.d.ts"],
+      "@tiptap/extension-subscript": ["./node_modules/@tiptap/extension-subscript/dist/index.d.ts"],
+      "@tiptap/extension-superscript": [
+        "./node_modules/@tiptap/extension-superscript/dist/index.d.ts"
+      ],
+      "@tiptap/extension-text-align": [
+        "./node_modules/@tiptap/extension-text-align/dist/index.d.ts"
+      ],
+      "@tiptap/extension-typography": [
+        "./node_modules/@tiptap/extension-typography/dist/index.d.ts"
+      ],
+      "@tiptap/extension-unique-id": ["./node_modules/@tiptap/extension-unique-id/dist/index.d.ts"],
+      "@tiptap/markdown": ["./node_modules/@tiptap/markdown/dist/index.d.ts"],
+      "@tiptap/react": ["./node_modules/@tiptap/react/dist/index.d.ts"],
+      "@tiptap/starter-kit": ["./node_modules/@tiptap/starter-kit/dist/index.d.ts"],
+      "y-protocols/awareness": ["./node_modules/y-protocols/awareness.d.ts"],
+      "@tiptap/core": ["./node_modules/@tiptap/core/dist/index.d.ts"],
+      "mammoth": ["./node_modules/mammoth/lib/index.d.ts"],
+      "jszip": ["./node_modules/jszip/index.d.ts"],
+      "@tauri-apps/api/webview": ["./node_modules/@tauri-apps/api/webview.d.ts"],
+      "@tauri-apps/api/window": ["./node_modules/@tauri-apps/api/window.d.ts"],
+    },
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "jsx": "react-jsx"
+  },
+  "include": ["src"],
+  "references": [],
+  "compileOnSave": false
+}

@@ -1,0 +1,46 @@
+{
+  "name": "embed_google_rejected",
+  "kind": "embed",
+  "modelId": "google/gemini-embedding-001",
+  "credentialProvider": "google",
+  "input": {
+    "values": [
+      "one"
+    ]
+  },
+  "replies": [
+    {
+      "status": 400,
+      "contentType": "application/json",
+      "body": "{\"error\":{\"code\":400,\"message\":\"Bad.\",\"status\":\"INVALID_ARGUMENT\"}}"
+    }
+  ],
+  "unorderedRequests": false,
+  "sent": [
+    {
+      "method": "POST",
+      "path": "/v1/models/gemini-embedding-001:embedContent",
+      "headers": {
+        "accept": "*/*",
+        "content-type": "application/json",
+        "x-goog-api-key": "test-key-parity"
+      },
+      "body": {
+        "model": "models/gemini-embedding-001",
+        "content": {
+          "parts": [
+            {
+              "text": "one"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "thrown": {
+    "name": "AI_APICallError",
+    "message": "Bad.",
+    "statusCode": 400,
+    "isRetryable": false
+  }
+}

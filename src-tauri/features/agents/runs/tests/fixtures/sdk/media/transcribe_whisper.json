@@ -1,0 +1,64 @@
+{
+  "name": "transcribe_whisper",
+  "kind": "transcribe",
+  "modelId": "openai/whisper-1",
+  "credentialProvider": "openai",
+  "input": {
+    "audioBase64": "UklGRiQAAABXQVZFZm10IAAAAAAAAAAA"
+  },
+  "replies": [
+    {
+      "status": 200,
+      "contentType": "application/json",
+      "body": "{\"text\":\"Hello.\",\"language\":\"english\",\"duration\":1.5,\"segments\":[{\"id\":0,\"seek\":0,\"start\":0,\"end\":1.5,\"text\":\"Hello.\",\"tokens\":[1],\"temperature\":0,\"avg_logprob\":0,\"compression_ratio\":1,\"no_speech_prob\":0}]}"
+    }
+  ],
+  "unorderedRequests": false,
+  "sent": [
+    {
+      "method": "POST",
+      "path": "/v1/audio/transcriptions",
+      "headers": {
+        "accept": "*/*",
+        "authorization": "Bearer test-key-parity",
+        "content-type": "multipart/form-data"
+      },
+      "body": {
+        "multipart": [
+          {
+            "name": "model",
+            "filename": null,
+            "contentType": null,
+            "base64": "d2hpc3Blci0x"
+          },
+          {
+            "name": "file",
+            "filename": "audio.wav",
+            "contentType": "audio/wav",
+            "base64": "UklGRiQAAABXQVZFZm10IAAAAAAAAAAA"
+          },
+          {
+            "name": "response_format",
+            "filename": null,
+            "contentType": null,
+            "base64": "dmVyYm9zZV9qc29u"
+          }
+        ]
+      }
+    }
+  ],
+  "result": {
+    "text": "Hello.",
+    "segments": [
+      {
+        "text": "Hello.",
+        "startSecond": 0,
+        "endSecond": 1.5
+      }
+    ],
+    "language": "en",
+    "durationInSeconds": 1.5,
+    "warnings": [],
+    "providerMetadata": {}
+  }
+}

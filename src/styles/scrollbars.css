@@ -1,0 +1,67 @@
+:root {
+  /* Fixed logical pixels keep the same thickness at every viewport size. The thumb is a pill
+     inset by --misty-scrollbar-inset inside this track, so no scrollbar touches an edge. */
+  --misty-scrollbar-size: 12px;
+  --misty-scrollbar-inset: 3px;
+}
+
+@layer base {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--misty-theme-active, #737373) var(--misty-theme-bg, transparent);
+  }
+
+  /* WebKit/Blink standard scrollbar properties override custom sizing.
+     Use their pixel-sized track; other engines retain the thin fallback.
+     Base-layer defaults let deliberately hidden scrollbars stay hidden. */
+  @supports selector(::-webkit-scrollbar) {
+    * {
+      scrollbar-width: auto;
+      scrollbar-color: auto;
+    }
+  }
+
+  ::-webkit-scrollbar {
+    width: var(--misty-scrollbar-size);
+    height: var(--misty-scrollbar-size);
+  }
+
+  /* No painted track: the scroller's own surface shows, so a rounded panel never shows a
+     differently colored strip. The thumb's transparent border keeps the pill off every edge,
+     including the ends, where a corner would otherwise clip it. */
+  ::-webkit-scrollbar-track,
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    border: var(--misty-scrollbar-inset) solid transparent;
+    border-radius: 999px;
+    background-color: var(--misty-theme-active, #737373);
+    background-clip: padding-box;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: var(--misty-theme-text-muted, #999);
+  }
+}
+
+/* A scrollbar that floats inside its pane: no track, a full pill thumb inset from the edge
+   so a rounded panel corner never clips it. Pair with vertical margin on the scroller. */
+@layer components {
+  .misty-scrollbar-floating::-webkit-scrollbar {
+    width: 16px;
+  }
+  .misty-scrollbar-floating::-webkit-scrollbar-track,
+  .misty-scrollbar-floating::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+  .misty-scrollbar-floating::-webkit-scrollbar-thumb {
+    border: 5px solid transparent;
+    background-clip: padding-box;
+    background-color: color-mix(in srgb, var(--misty-theme-active, #737373) 55%, transparent);
+  }
+  .misty-scrollbar-floating::-webkit-scrollbar-thumb:hover {
+    background-color: var(--misty-theme-active, #737373);
+  }
+}

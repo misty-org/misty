@@ -1,0 +1,87 @@
+.misty-ai-pane-host {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  container-type: inline-size;
+}
+
+.misty-ai-pane-content {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .misty-ai-pane-host *,
+  .misty-ai-pane-host *::before,
+  .misty-ai-pane-host *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+.misty-markdown-message {
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.misty-markdown-message > :first-child {
+  margin-top: 0;
+}
+
+.misty-markdown-message > :last-child {
+  margin-bottom: 0;
+}
+
+.misty-markdown-message p,
+.misty-markdown-message ul,
+.misty-markdown-message ol,
+.misty-markdown-message pre,
+.misty-markdown-message blockquote {
+  margin: 0.55rem 0;
+}
+
+.misty-markdown-message ul,
+.misty-markdown-message ol {
+  padding-left: 1.25rem;
+}
+
+.misty-markdown-message ul {
+  list-style: disc;
+}
+
+.misty-markdown-message ol {
+  list-style: decimal;
+}
+
+.misty-markdown-message code {
+  border-radius: 0.25rem;
+  background: rgb(255 255 255 / 7%);
+  padding: 0.08rem 0.25rem;
+  font-size: var(--text-meta);
+}
+
+.misty-markdown-message pre {
+  overflow-x: auto;
+  border-radius: 0.5rem;
+  background: rgb(0 0 0 / 28%);
+  padding: 0.75rem;
+}
+
+.misty-markdown-message pre code {
+  background: transparent;
+  padding: 0;
+}
+
+.misty-markdown-message a {
+  color: var(--color-cream-bright);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}

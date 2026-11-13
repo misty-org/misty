@@ -1,0 +1,92 @@
+{
+  "name": "response_with_no_id_or_model",
+  "modelId": "anthropic/claude-sonnet-4-6",
+  "credentialProvider": "anthropic",
+  "options": {
+    "prompt": [
+      {
+        "role": "user",
+        "content": [
+          {
+            "type": "text",
+            "text": "Hi."
+          }
+        ]
+      }
+    ]
+  },
+  "status": 200,
+  "contentType": "text/event-stream",
+  "response": "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"usage\":{\"input_tokens\":1}}}\n\nevent: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\",\"stop_sequence\":null},\"usage\":{\"output_tokens\":3}}\n\nevent: message_stop\ndata: {\"type\":\"message_stop\"}\n\n",
+  "sent": [
+    {
+      "method": "POST",
+      "path": "/v1/messages",
+      "headers": {
+        "accept": "*/*",
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+        "x-api-key": "test-key-parity"
+      },
+      "body": {
+        "model": "claude-sonnet-4-6",
+        "max_tokens": 128000,
+        "messages": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "Hi."
+              }
+            ]
+          }
+        ],
+        "stream": true
+      }
+    }
+  ],
+  "parts": [
+    {
+      "type": "stream-start",
+      "warnings": []
+    },
+    {
+      "type": "response-metadata"
+    },
+    {
+      "type": "finish",
+      "finishReason": {
+        "unified": "stop",
+        "raw": "end_turn"
+      },
+      "usage": {
+        "inputTokens": {
+          "total": 1,
+          "noCache": 1,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "outputTokens": {
+          "total": 3
+        },
+        "raw": {
+          "input_tokens": 1,
+          "output_tokens": 3
+        }
+      },
+      "providerMetadata": {
+        "anthropic": {
+          "usage": {
+            "input_tokens": 1,
+            "output_tokens": 3
+          },
+          "stopSequence": null,
+          "iterations": null,
+          "container": null,
+          "contextManagement": null
+        }
+      }
+    }
+  ]
+}

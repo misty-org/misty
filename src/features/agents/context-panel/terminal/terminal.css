@@ -1,0 +1,78 @@
+/* The terminal tab: a quiet strip of the folder's shells, then the open one. */
+.terminal-panel {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+}
+/* The strip is the side panel's header row: no inset or line of its own. */
+.terminal-tabs {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  align-items: center;
+  gap: 2px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.terminal-tab {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 2px;
+  height: 26px;
+  padding: 0 4px 0 0;
+  border-radius: var(--radius-md);
+  color: var(--color-cream-muted);
+}
+.terminal-tab:hover {
+  background: var(--color-control-hover);
+  color: var(--color-cream);
+}
+.terminal-tab[data-selected] {
+  background: var(--color-control-active);
+  color: var(--color-cream-bright);
+}
+.terminal-tab-select {
+  display: flex;
+  height: 100%;
+  align-items: center;
+  padding: 0 4px 0 10px;
+  border-radius: var(--radius-md);
+  font-size: var(--text-caption);
+  white-space: nowrap;
+}
+.terminal-tab-title {
+  max-width: 160px;
+  overflow: hidden;
+  -webkit-mask-image: var(--mask-fade-end);
+  mask-image: var(--mask-fade-end);
+}
+.terminal-tab-input {
+  width: 120px;
+  font-size: var(--text-caption);
+}
+.terminal-tab-close {
+  color: var(--color-cream-muted);
+  opacity: 0;
+}
+.terminal-tab:hover .terminal-tab-close,
+.terminal-tab[data-selected] .terminal-tab-close,
+.terminal-tab-close:focus-visible {
+  opacity: 1;
+}
+.terminal-view {
+  position: relative;
+  min-height: 0;
+  flex: 1;
+}
+/* The shell fills the panel's body on the panel's own fill, with no box or margin around it; its
+   text starts where the header's does (12px in), and the last line runs to the bottom edge. */
+.terminal-host {
+  position: absolute;
+  inset: 8px 4px 0 12px;
+}
+.terminal-host .xterm,
+.terminal-host .xterm-viewport {
+  background: transparent !important;
+}

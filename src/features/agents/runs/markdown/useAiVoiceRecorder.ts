@@ -1,0 +1,238 @@
+import { runtimeAgentsApi as agentsApi } from "@/features/agents/AgentsRuntime";
+
+import { useCallback, useEffect, useRef, useState } from "react";
+import { createDeviceSetting } from "@/shared/lib/deviceSetting";
+import { microphoneSettingsHint } from "@/shared/platform/desktopOs";
+
+/** The microphone picked for voice input, kept for the device in misty.db; empty is the default. */
+const savedInputDevice = createDeviceSetting<string>({
+  scope: "voice-input-device",
+  defaults: "",
+  normalize: (stored) => (typeof stored === "string" ? stored.trim() : ""),
+  legacyKey: "misty.voice.input-device",
+});
+
+interface AiVoiceInputDevice {
+  deviceId: string;
+  label: string;
+}
+
+export function useAiVoiceRecorder({
+  onTranscript,
+  onError,
+  onActivityChange,
+  contextKey,
+}: {
+  contextKey?: string;
+  onTranscript: (transcript: string) => void;
+  onError: (message: string) => void;
+  onActivityChange?: (active: boolean) => void;
+}) {
+  const [requesting, setRequesting] = useState(false);
+  const [recording, setRecording] = useState(false);
+  const [transcribing, setTranscribing] = useState(false);
+  const [inputDevices, setInputDevices] = useState<AiVoiceInputDevice[]>([]);
+  const selectedInputDeviceId = savedInputDevice((state) => state.value);
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const startedAtRef = useRef(0);
+  const timeoutRef = useRef<number | null>(null);
+  const generation = useRef(0);
+  const transcription = useRef<AbortController | null>(null);
+  const mountedRef = useRef(true);
+  const discardRecordingRef = useRef(false);
+  const onActivityChangeRef = useRef(onActivityChange);
+
+  useEffect(() => {
+    onActivityChangeRef.current = onActivityChange;
+  }, [onActivityChange]);
+
+  const refreshInputDevices = useCallback(async () => {
+    if (!navigator.mediaDevices?.enumerateDevices) return;
+    try {
+      const available = (await navigator.mediaDevices.enumerateDevices()).filter(
+        (device) => device.kind === "audioinput" && device.deviceId !== "default",
+      );
+      const next = available.map((device, index) => ({
+        deviceId: device.deviceId,
+        label: device.label.trim() || `Microphone ${index + 1}`,
+      }));
+      setInputDevices(next);
+      if (
+        selectedInputDeviceId &&
+        available.every((device) => device.deviceId !== selectedInputDeviceId)
+      ) {
+        saveInputDevice("");
+      }
+    } catch {
+      // Device discovery can be unavailable until microphone permission is granted.
+    }
+  }, [selectedInputDeviceId]);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    setRequesting(false);
+    setRecording(false);
+    setTranscribing(false);
+    const recordingGeneration = generation;
+    return () => {
+      mountedRef.current = false;
+      recordingGeneration.current++;
+      transcription.current?.abort();
+      discardRecordingRef.current = true;
+      if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
+      if (recorderRef.current?.state === "recording") recorderRef.current.stop();
+      streamRef.current?.getTracks().forEach((track) => track.stop());
+      onActivityChangeRef.current?.(false);
+    };
+  }, [contextKey]);
+
+  const start = async () => {
+    if (requesting || recording || transcribing) return;
+    const epoch = ++generation.current;
+    onError("");
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
+      onError("Voice recording is not available on this computer.");
+      return;
+    }
+    setRequesting(true);
+    onActivityChangeRef.current?.(true);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: selectedInputDeviceId ? { deviceId: { exact: selectedInputDeviceId } } : true,
+      });
+      if (!mountedRef.current || epoch !== generation.current) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
+      streamRef.current = stream;
+      void refreshInputDevices();
+      discardRecordingRef.current = false;
+      const mimeType = preferredRecordingMimeType();
+      const recorder = mimeType
+        ? new MediaRecorder(stream, { mimeType })
+        : new MediaRecorder(stream);
+      chunksRef.current = [];
+      startedAtRef.current = Date.now();
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) chunksRef.current.push(event.data);
+      };
+      recorder.onstop = () => {
+        if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+        recorderRef.current = null;
+        streamRef.current = null;
+        stream.getTracks().forEach((track) => track.stop());
+        if (discardRecordingRef.current || !mountedRef.current || epoch !== generation.current)
+          return;
+        setRecording(false);
+        const duration = Math.max(1, Math.min(60_000, Date.now() - startedAtRef.current));
+        const blob = new Blob(chunksRef.current, { type: recorder.mimeType || "audio/webm" });
+        if (blob.size === 0) {
+          onActivityChangeRef.current?.(false);
+          return void onError("No audio was recorded.");
+        }
+        setTranscribing(true);
+        const controller = new AbortController();
+        transcription.current = controller;
+        void agentsApi
+          .transcribeVoice(blob, duration, controller.signal)
+          .then((result) => {
+            if (mountedRef.current && generation.current === epoch) onTranscript(result.transcript);
+          })
+          .catch((reason) => {
+            if (mountedRef.current && generation.current === epoch)
+              onError(reason instanceof Error ? reason.message : "Voice could not be transcribed.");
+          })
+          .finally(() => {
+            if (!mountedRef.current || generation.current !== epoch) return;
+            transcription.current = null;
+            setTranscribing(false);
+            onActivityChangeRef.current?.(false);
+          });
+      };
+      recorderRef.current = recorder;
+      recorder.start(250);
+      setRequesting(false);
+      setRecording(true);
+      timeoutRef.current = window.setTimeout(() => recorder.stop(), 60_000);
+    } catch (reason) {
+      if (!mountedRef.current || generation.current !== epoch) return;
+      setRequesting(false);
+      onActivityChangeRef.current?.(false);
+      onError(microphoneErrorMessage(reason));
+    }
+  };
+
+  const stop = () => {
+    if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
+    timeoutRef.current = null;
+    if (recorderRef.current?.state === "recording") recorderRef.current.stop();
+  };
+
+  const cancel = useCallback(() => {
+    generation.current++;
+    discardRecordingRef.current = true;
+    transcription.current?.abort();
+    transcription.current = null;
+    if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
+    timeoutRef.current = null;
+    if (recorderRef.current?.state === "recording") recorderRef.current.stop();
+    streamRef.current?.getTracks().forEach((track) => track.stop());
+    recorderRef.current = null;
+    streamRef.current = null;
+    setRequesting(false);
+    setRecording(false);
+    setTranscribing(false);
+    onActivityChangeRef.current?.(false);
+  }, []);
+
+  const selectInputDevice = (deviceId: string) => {
+    const normalized = deviceId.trim();
+    saveInputDevice(normalized);
+  };
+
+  return {
+    requesting,
+    recording,
+    transcribing,
+    inputDevices,
+    selectedInputDeviceId,
+    refreshInputDevices,
+    selectInputDevice,
+    start,
+    stop,
+    cancel,
+  };
+}
+
+function saveInputDevice(deviceId: string): void {
+  savedInputDevice.getState().set(deviceId);
+}
+
+function preferredRecordingMimeType(): string | undefined {
+  if (typeof MediaRecorder === "undefined" || !MediaRecorder.isTypeSupported) return undefined;
+  return ["audio/webm;codecs=opus", "audio/mp4;codecs=mp4a.40.2", "audio/mp4", "audio/webm"].find(
+    (mimeType) => MediaRecorder.isTypeSupported(mimeType),
+  );
+}
+
+function microphoneErrorMessage(reason: unknown): string {
+  const name = reason instanceof DOMException ? reason.name : "";
+  if (name === "NotAllowedError" || name === "SecurityError") {
+    return `Microphone access is off. ${microphoneSettingsHint()}`;
+  }
+  if (name === "NotFoundError" || name === "DevicesNotFoundError") {
+    return "Misty could not find a microphone on this computer.";
+  }
+  if (name === "NotReadableError" || name === "TrackStartError") {
+    return "Another app or system setting is preventing Misty from using the microphone.";
+  }
+  if (name === "OverconstrainedError" || name === "ConstraintNotSatisfiedError") {
+    return "The selected microphone is no longer available. Choose another input.";
+  }
+  return reason instanceof Error && reason.message
+    ? reason.message
+    : "Misty could not start voice recording.";
+}

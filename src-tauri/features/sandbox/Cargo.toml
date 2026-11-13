@@ -1,0 +1,28 @@
+[package]
+name = "sandbox"
+version = "0.1.0"
+edition = "2021"
+license = "AGPL-3.0-or-later"
+publish = false
+
+[lib]
+name = "sandbox"
+path = "lib.rs"
+
+# Confined processes on Windows: an AppContainer with no capabilities, a Job
+# object that bounds and ends the process tree, and only chosen handles and
+# environment variables passed on. The counterpart of sandbox-exec on macOS.
+[target.'cfg(windows)'.dependencies]
+file_access = { path = "../file_access" }
+tempfile = "3"
+windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_Security", "Win32_Security_Authorization", "Win32_Security_Isolation", "Win32_Storage_FileSystem", "Win32_System_JobObjects", "Win32_System_Pipes", "Win32_System_Threading", "Win32_UI_Shell"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+libc = "0.2"
+
+# Landlock, seccomp and namespaces, through the system calls themselves.
+[target.'cfg(target_os = "linux")'.dependencies]
+libc = "0.2"
+
+[dev-dependencies]
+tempfile = "3"

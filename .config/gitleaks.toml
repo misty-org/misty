@@ -1,0 +1,18 @@
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Vendored upstream fixtures, and keyboard shortcuts named for assistive technology"
+paths = [
+  '''^vendor/''',
+]
+regexTarget = "line"
+regexes = [
+  '''aria-keyshortcuts="[A-Za-z+ ]+"''',
+]
+
+[[rules]]
+id = "google-service-account-bound-api-key"
+description = "Google API key bound to a service account"
+regex = '''\bAQ\.[A-Za-z0-9_-]{40,}\b'''
+keywords = ["AQ."]

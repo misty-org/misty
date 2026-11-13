@@ -1,0 +1,9 @@
+@import "tailwindcss" source("../../");
+@import "tw-animate-css";
+@import "./scrollbars.css";
+@import "./theme.css";
+@import "./overlays.css";
+@import "./base.css";
+@import "./components.css";
+@import "./layers.css";
+@import "./animations.css";

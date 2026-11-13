@@ -1,0 +1,186 @@
+{
+  "name": "assistant_text_and_reasoning_replayed",
+  "modelId": "google/gemini-2.5-flash",
+  "credentialProvider": "google",
+  "options": {
+    "prompt": [
+      {
+        "role": "user",
+        "content": [
+          {
+            "type": "text",
+            "text": "One."
+          }
+        ]
+      },
+      {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "reasoning",
+            "text": "Thinking.",
+            "providerOptions": {
+              "google": {
+                "thoughtSignature": "sig-r"
+              }
+            }
+          },
+          {
+            "type": "reasoning",
+            "text": "",
+            "providerOptions": {
+              "google": {
+                "thoughtSignature": "sig-empty"
+              }
+            }
+          },
+          {
+            "type": "text",
+            "text": "",
+            "providerOptions": {
+              "google": {
+                "thoughtSignature": "sig-empty"
+              }
+            }
+          },
+          {
+            "type": "text",
+            "text": "Answer.",
+            "providerOptions": {
+              "google": {
+                "thoughtSignature": "sig-t"
+              }
+            }
+          },
+          {
+            "type": "text",
+            "text": "Plain."
+          }
+        ]
+      },
+      {
+        "role": "user",
+        "content": [
+          {
+            "type": "text",
+            "text": "Two."
+          }
+        ]
+      }
+    ]
+  },
+  "status": 200,
+  "contentType": "text/event-stream",
+  "response": "data: {\"responseId\":\"resp-google-1\",\"candidates\":[{\"content\":{\"role\":\"model\",\"parts\":[{\"text\":\"Hi.\"}]},\"index\":0}]}\n\ndata: {\"responseId\":\"resp-google-1\",\"candidates\":[{\"content\":{\"role\":\"model\",\"parts\":[]},\"finishReason\":\"STOP\",\"index\":0}],\"usageMetadata\":{\"promptTokenCount\":12,\"candidatesTokenCount\":3,\"totalTokenCount\":15}}\n\n",
+  "sent": [
+    {
+      "method": "POST",
+      "path": "/v1/models/gemini-2.5-flash:streamGenerateContent?alt=sse",
+      "headers": {
+        "accept": "*/*",
+        "content-type": "application/json",
+        "x-goog-api-key": "test-key-parity"
+      },
+      "body": {
+        "generationConfig": {},
+        "contents": [
+          {
+            "role": "user",
+            "parts": [
+              {
+                "text": "One."
+              }
+            ]
+          },
+          {
+            "role": "model",
+            "parts": [
+              {
+                "text": "Thinking.",
+                "thought": true,
+                "thoughtSignature": "sig-r"
+              },
+              {
+                "text": "Answer.",
+                "thoughtSignature": "sig-t"
+              },
+              {
+                "text": "Plain."
+              }
+            ]
+          },
+          {
+            "role": "user",
+            "parts": [
+              {
+                "text": "Two."
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "parts": [
+    {
+      "type": "stream-start",
+      "warnings": []
+    },
+    {
+      "type": "response-metadata",
+      "id": "resp-google-1"
+    },
+    {
+      "type": "text-start",
+      "id": "0"
+    },
+    {
+      "type": "text-delta",
+      "id": "0",
+      "delta": "Hi."
+    },
+    {
+      "type": "text-end",
+      "id": "0"
+    },
+    {
+      "type": "finish",
+      "finishReason": {
+        "unified": "stop",
+        "raw": "STOP"
+      },
+      "usage": {
+        "inputTokens": {
+          "total": 12,
+          "noCache": 12,
+          "cacheRead": 0
+        },
+        "outputTokens": {
+          "total": 3,
+          "text": 3,
+          "reasoning": 0
+        },
+        "raw": {
+          "promptTokenCount": 12,
+          "candidatesTokenCount": 3,
+          "totalTokenCount": 15
+        }
+      },
+      "providerMetadata": {
+        "google": {
+          "promptFeedback": null,
+          "groundingMetadata": null,
+          "urlContextMetadata": null,
+          "safetyRatings": null,
+          "usageMetadata": {
+            "promptTokenCount": 12,
+            "candidatesTokenCount": 3,
+            "totalTokenCount": 15
+          },
+          "finishMessage": null,
+          "serviceTier": null
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,52 @@
+/*
+ * Code itself in the context panel: a diff's lines, and a picked element's CSS selector and style
+ * values. Monospace belongs here and nowhere else in the panel (the mono-outside-code and
+ * css-mono UI rules, codeStylesheets in src/tests/architecture/uiRuleDefinitions.ts).
+ */
+.context-diff {
+  font-family: var(--font-mono, ui-monospace, Menlo, monospace);
+  font-size: var(--text-caption);
+  line-height: 1.55;
+  padding-bottom: 8px;
+}
+.preview-card-selector {
+  display: block;
+  overflow: hidden;
+  -webkit-mask-image: var(--mask-fade-end);
+  mask-image: var(--mask-fade-end);
+  white-space: nowrap;
+  font-family: var(--font-mono, ui-monospace, Menlo, monospace);
+  font-size: var(--text-caption);
+  color: var(--color-cream);
+}
+.preview-card-styles dd {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 5px;
+  margin: 0;
+  overflow: hidden;
+  -webkit-mask-image: var(--mask-fade-end);
+  mask-image: var(--mask-fade-end);
+  white-space: nowrap;
+  font-family: var(--font-mono, ui-monospace, Menlo, monospace);
+  font-size: var(--text-micro);
+  color: var(--color-cream);
+}
+.git-diff-lines {
+  padding: 4px 0;
+  font-family: var(--font-mono, ui-monospace, Menlo, monospace);
+  font-size: var(--text-caption);
+  line-height: 1.6;
+}
+/* A diff line's fill says what Git says of it: added in green, removed in red, a hunk's header
+   in a faint wash. Its text color is the line's Text tone. */
+.git-diff-line[data-kind="add"] {
+  background: color-mix(in srgb, var(--tone-added) 12%, transparent);
+}
+.git-diff-line[data-kind="del"] {
+  background: color-mix(in srgb, var(--tone-failed) 12%, transparent);
+}
+.git-diff-line[data-kind="hunk"] {
+  background: color-mix(in srgb, var(--misty-theme-text) 4%, transparent);
+}

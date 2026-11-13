@@ -1,0 +1,27 @@
+// Every job an agent can ask this computer to run. A job's name is the action, and anything not on
+// this list is refused natively, however it arrives.
+&[
+    "browser.act",
+    "browser.downloads.list",
+    "browser.extract",
+    "browser.fill_form",
+    "browser.find",
+    "browser.inspect",
+    "browser.navigate",
+    "browser.request_user_action",
+    "browser.run",
+    "browser.session",
+    "browser.skill",
+    "browser.snapshot",
+    "browser.spawn_tabs",
+    "browser.steps",
+    "browser.upload",
+    "browser.visual",
+    "browser.wait_for",
+    "browser.workspace.interact",
+    "browser.workspace.visual",
+    "folder.list",
+    "folder.read",
+    "folder.send",
+    "shell.run",
+]

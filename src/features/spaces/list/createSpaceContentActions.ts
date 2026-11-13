@@ -1,0 +1,171 @@
+import { resolveSpacesApiBase, spacesApi } from "../api/api";
+import { errorText } from "@/shared/lib/format";
+import { openExternalLink } from "@/shared/platform/openExternalLink";
+import { buildMessageSpans, mergeSpaceMessages } from "../chat/useSpaceMessageSpansStore";
+import type { SpacesStore } from "./spacesStoreTypes";
+type SpacesSet = (
+  partial: Partial<SpacesStore> | ((state: SpacesStore) => Partial<SpacesStore>),
+) => void;
+export function createSpaceContentActions(
+  set: SpacesSet,
+  get: () => SpacesStore,
+): Pick<
+  SpacesStore,
+  | "sendMessage"
+  | "updateMessage"
+  | "deleteMessage"
+  | "toggleMessageReaction"
+  | "markRead"
+  | "openNode"
+> {
+  return {
+    sendMessage: async (
+      spaceId,
+      text,
+      fileNodeIds = [],
+      attachmentIds = [],
+      libraryItemIds = [],
+      replyToMessageId = "",
+      optimisticMessage,
+    ) => {
+      const trimmed = text.trim();
+      if (
+        !trimmed &&
+        attachmentIds.length === 0 &&
+        libraryItemIds.length === 0 &&
+        fileNodeIds.length === 0
+      )
+        return;
+      set((state) => ({
+        sending: true,
+        error: null,
+        messagesBySpace: optimisticMessage
+          ? {
+              ...state.messagesBySpace,
+              [spaceId]: mergeSpaceMessages(state.messagesBySpace[spaceId] ?? [], [
+                optimisticMessage,
+              ]),
+            }
+          : state.messagesBySpace,
+      }));
+      try {
+        const spans =
+          optimisticMessage?.content ??
+          (trimmed ? buildMessageSpans(trimmed, get().membersBySpace[spaceId] ?? []) : []);
+        const response = await spacesApi.sendMessage(
+          spaceId,
+          spans,
+          fileNodeIds,
+          attachmentIds,
+          libraryItemIds,
+          replyToMessageId,
+          optimisticMessage?.client_nonce,
+        );
+        if (optimisticMessage?.client_nonce) {
+          response.message.client_nonce ||= optimisticMessage.client_nonce;
+        }
+        set((state) => ({
+          sending: false,
+          error: null,
+          messagesBySpace: {
+            ...state.messagesBySpace,
+            [spaceId]: mergeSpaceMessages(state.messagesBySpace[spaceId] ?? [], [response.message]),
+          },
+        }));
+        return response.message;
+      } catch (error) {
+        set((state) => ({
+          sending: false,
+          error: errorText(error),
+          messagesBySpace: optimisticMessage
+            ? {
+                ...state.messagesBySpace,
+                [spaceId]: (state.messagesBySpace[spaceId] ?? []).map((message) =>
+                  message.client_nonce === optimisticMessage.client_nonce &&
+                  message.local_delivery_state === "sending"
+                    ? {
+                        ...message,
+                        local_delivery_state: "failed" as const,
+                      }
+                    : message,
+                ),
+              }
+            : state.messagesBySpace,
+        }));
+        throw error;
+      }
+    },
+    updateMessage: async (spaceId, messageId, text, fileNodeIds = []) => {
+      set({
+        error: null,
+      });
+      try {
+        const spans = buildMessageSpans(text.trim(), get().membersBySpace[spaceId] ?? []);
+        const saved = await spacesApi.updateMessage(spaceId, messageId, spans, fileNodeIds);
+        set((state) => ({
+          messagesBySpace: {
+            ...state.messagesBySpace,
+            [spaceId]: mergeSpaceMessages(state.messagesBySpace[spaceId] ?? [], [saved]),
+          },
+        }));
+      } catch (error) {
+        set({
+          error: errorText(error),
+        });
+        throw error;
+      }
+    },
+    deleteMessage: async (spaceId, messageId) => {
+      set({
+        error: null,
+      });
+      try {
+        await spacesApi.deleteMessage(spaceId, messageId);
+        set((state) => ({
+          messagesBySpace: {
+            ...state.messagesBySpace,
+            [spaceId]: (state.messagesBySpace[spaceId] ?? []).filter(
+              (item) => item.id !== messageId,
+            ),
+          },
+        }));
+      } catch (error) {
+        set({
+          error: errorText(error),
+        });
+        throw error;
+      }
+    },
+    toggleMessageReaction: async (spaceId, messageId, emoji, reacted) => {
+      set({
+        error: null,
+      });
+      try {
+        const saved = reacted
+          ? await spacesApi.removeMessageReaction(spaceId, messageId, emoji)
+          : await spacesApi.addMessageReaction(spaceId, messageId, emoji);
+        set((state) => ({
+          messagesBySpace: {
+            ...state.messagesBySpace,
+            [spaceId]: mergeSpaceMessages(state.messagesBySpace[spaceId] ?? [], [saved]),
+          },
+        }));
+      } catch (error) {
+        set({
+          error: errorText(error),
+        });
+        throw error;
+      }
+    },
+    markRead: async (spaceId, seq) => {
+      await spacesApi.markRead(spaceId, seq);
+    },
+    openNode: async (spaceId, nodeId, disposition = "open") => {
+      const [ticket, base] = await Promise.all([
+        spacesApi.resolve(spaceId, nodeId, disposition),
+        resolveSpacesApiBase(),
+      ]);
+      await openExternalLink(`${base}${ticket.url}`);
+    },
+  };
+}

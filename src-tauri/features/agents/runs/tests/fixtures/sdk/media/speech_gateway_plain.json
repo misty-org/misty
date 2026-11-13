@@ -1,0 +1,43 @@
+{
+  "name": "speech_gateway_plain",
+  "kind": "speech",
+  "modelId": "gateway/openai/tts-1",
+  "credentialProvider": "gateway",
+  "input": {
+    "text": "Hello."
+  },
+  "replies": [
+    {
+      "status": 200,
+      "contentType": "application/json",
+      "body": "{\"audio\":\"AQIDBAUGBwg=\"}"
+    }
+  ],
+  "unorderedRequests": false,
+  "sent": [
+    {
+      "method": "POST",
+      "path": "/v1/speech-model",
+      "headers": {
+        "accept": "*/*",
+        "ai-gateway-auth-method": "api-key",
+        "ai-gateway-protocol-version": "0.0.1",
+        "ai-model-id": "openai/tts-1",
+        "ai-speech-model-specification-version": "4",
+        "authorization": "Bearer test-key-parity",
+        "content-type": "application/json"
+      },
+      "body": {
+        "text": "Hello.",
+        "providerOptions": {}
+      }
+    }
+  ],
+  "result": {
+    "audioBase64": "AQIDBAUGBwg=",
+    "mediaType": "audio/mp3",
+    "format": "mp3",
+    "warnings": [],
+    "providerMetadata": {}
+  }
+}

@@ -1,0 +1,1 @@
+{"identifier":"dictation-pill","description":"Presentation-only dictation pill: listens for live words from the main window","platforms":["macOS","windows"],"webviews":["misty-dictation-pill"],"permissions":["core:event:default"]}

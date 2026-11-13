@@ -1,0 +1,75 @@
+{
+  "name": "embed_openai",
+  "kind": "embed",
+  "modelId": "openai/text-embedding-3-small",
+  "credentialProvider": "openai",
+  "input": {
+    "values": [
+      "one",
+      "two"
+    ],
+    "providerOptions": {
+      "openai": {
+        "dimensions": 256
+      },
+      "openai-compatible": {
+        "dimensions": 256
+      },
+      "openrouter": {
+        "dimensions": 256
+      },
+      "nvidia": {
+        "dimensions": 256
+      },
+      "ollama": {
+        "dimensions": 256
+      },
+      "google": {
+        "outputDimensionality": 256
+      }
+    }
+  },
+  "replies": [
+    {
+      "status": 200,
+      "contentType": "application/json",
+      "body": "{\"data\":[{\"embedding\":[0.1,0.2]},{\"embedding\":[0.3,1]}],\"usage\":{\"prompt_tokens\":7}}"
+    }
+  ],
+  "unorderedRequests": false,
+  "sent": [
+    {
+      "method": "POST",
+      "path": "/v1/embeddings",
+      "headers": {
+        "accept": "*/*",
+        "authorization": "Bearer test-key-parity",
+        "content-type": "application/json"
+      },
+      "body": {
+        "model": "text-embedding-3-small",
+        "input": [
+          "one",
+          "two"
+        ],
+        "encoding_format": "float",
+        "dimensions": 256
+      }
+    }
+  ],
+  "result": {
+    "embeddings": [
+      [
+        0.1,
+        0.2
+      ],
+      [
+        0.3,
+        1
+      ]
+    ],
+    "tokens": 7,
+    "warnings": [],
+    "providerMetadata": null
+  }
+}

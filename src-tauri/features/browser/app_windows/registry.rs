@@ -1,0 +1,208 @@
+//! The profiles this computer knows, per account, and what its windows showed at quit. Kept
+//! in `misty.db` (`saved`), with nothing secret in it.
+//!
+//! Each account (or nobody signed in, `local`) has its own list. The store a profile's pages
+//! open in comes from here, and stays on this computer. The store this computer has always
+//! browsed in belongs to the first account to ask for it, so nobody is signed out by an upgrade
+//! or by signing in.
+use super::saved::{self, Saved};
+use super::*;
+use serde::Deserialize;
+use std::sync::atomic::AtomicBool;
+
+/// Who is browsing when nobody is signed in.
+pub const LOCAL_SCOPE: &str = "local";
+
+/// What the person sees for a profile in menus and the window's chrome.
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ProfileEntry {
+    pub id: String,
+    pub name: String,
+    #[serde(default)]
+    pub order: f64,
+}
+
+/// A window left open at quit.
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct OpenWindow {
+    pub profile: String,
+    pub window_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub space: Option<String>,
+    /// Where the window was and how big (`window_geometry`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub geometry: Option<super::window_geometry::SavedGeometry>,
+}
+
+#[derive(Default)]
+pub(super) struct Registry {
+    /// The account the windows belong to now.
+    pub(super) scope: String,
+    /// The account whose first profile uses this computer's original browser store.
+    pub(super) legacy_owner: Option<String>,
+    pub(super) profiles: BTreeMap<String, BTreeMap<String, ProfileEntry>>,
+    /// What the last launch left open; the windows this launch restores.
+    pub(super) open: Vec<OpenWindow>,
+    /// Closed windows' saved tabs, by profile, waiting for a window to take them. A closed
+    /// window changes nothing about what is in its profile.
+    pub(super) orphans: BTreeMap<String, Vec<String>>,
+    pub(super) last_focused: Option<String>,
+}
+
+static REGISTRY: Mutex<Option<Registry>> = Mutex::new(None);
+/// Set once quitting starts: windows closing then are remembered as open.
+pub(super) static QUITTING: AtomicBool = AtomicBool::new(false);
+/// The last focused app window; never saved.
+pub(super) static LAST_FOCUSED: Mutex<Option<String>> = Mutex::new(None);
+
+pub(super) struct RegistryGuard(std::sync::MutexGuard<'static, Option<Registry>>);
+impl std::ops::Deref for RegistryGuard {
+    type Target = Registry;
+    fn deref(&self) -> &Registry {
+        self.0.as_ref().expect("registry is initialized")
+    }
+}
+impl std::ops::DerefMut for RegistryGuard {
+    fn deref_mut(&mut self) -> &mut Registry {
+        self.0.as_mut().expect("registry is initialized")
+    }
+}
+
+pub(super) fn lock_registry() -> Result<RegistryGuard, ()> {
+    let mut guard = REGISTRY.lock().map_err(|_| ())?;
+    if guard.is_none() {
+        // A list that can't be read stays unloaded, so the next ask tries again and nothing is
+        // ever saved over it.
+        let loaded = load().map_err(|error| eprintln!("Could not read the profiles: {error}"))?;
+        *guard = Some(loaded);
+    }
+    Ok(RegistryGuard(guard))
+}
+
+fn valid_profile(profile: &ProfileEntry) -> bool {
+    valid_key(&profile.id)
+}
+
+pub(super) fn load() -> Result<Registry, String> {
+    let saved = saved::read()?;
+    Ok(Registry {
+        scope: saved.scope.unwrap_or_else(|| LOCAL_SCOPE.to_owned()),
+        legacy_owner: saved.legacy_owner,
+        profiles: saved
+            .profiles
+            .into_iter()
+            .map(|(scope, profiles)| {
+                let profiles = profiles
+                    .into_iter()
+                    .filter(|(_, profile)| valid_profile(profile))
+                    .collect();
+                (scope, profiles)
+            })
+            .collect(),
+        open: saved
+            .open
+            .into_iter()
+            .filter(|open| valid_key(&open.profile) && valid_key(&open.window_id))
+            .collect(),
+        orphans: saved.orphans,
+        last_focused: None,
+    })
+}
+
+pub(super) fn save(state: &Registry) {
+    let open: Vec<OpenWindow> = current_windows()
+        .into_iter()
+        .filter(|(label, _)| is_person_window(label))
+        .map(|(_, window)| OpenWindow {
+            profile: window.profile,
+            geometry: super::window_geometry::geometry_for(&window.window_id),
+            window_id: window.window_id,
+            space: window.space,
+        })
+        .collect();
+    saved::write(&Saved {
+        scope: Some(state.scope.clone()),
+        legacy_owner: state.legacy_owner.clone(),
+        profiles: state.profiles.clone(),
+        // Before any window opens (or after the last closed), keep what was saved.
+        open: if open.is_empty() {
+            state.open.clone()
+        } else {
+            open
+        },
+        orphans: state.orphans.clone(),
+    });
+}
+
+impl Registry {
+    /// The current account's profiles. Every account has at least the first one.
+    pub(super) fn current(&mut self) -> &mut BTreeMap<String, ProfileEntry> {
+        let scope = self.scope.clone();
+        let profiles = self.profiles.entry(scope).or_default();
+        if !profiles.contains_key(PERSONAL) {
+            profiles.insert(
+                PERSONAL.into(),
+                ProfileEntry {
+                    id: PERSONAL.into(),
+                    name: "Personal".into(),
+                    order: 0.0,
+                },
+            );
+        }
+        profiles
+    }
+
+    /// The store a profile's pages open in; `None` is this computer's original store.
+    pub(super) fn store(&mut self, profile: &str) -> Option<String> {
+        if profile == PERSONAL {
+            // Browsing signed out, then signing in, keeps the same sign-ins: the first account
+            // to sign in takes the original store from nobody. Signed out, it may ask before any
+            // account has been restored at launch, so that claim is only ever provisional.
+            let local_owns = self.legacy_owner.as_deref() == Some(LOCAL_SCOPE);
+            if self.legacy_owner.is_none() || (local_owns && self.scope != LOCAL_SCOPE) {
+                self.legacy_owner = Some(self.scope.clone());
+            }
+            if self.legacy_owner.as_deref() == Some(self.scope.as_str()) {
+                return None;
+            }
+        }
+        derived_store(&self.scope, profile)
+    }
+}
+
+pub fn entry(key: &str) -> Option<ProfileEntry> {
+    let mut state = lock_registry().ok()?;
+    let entry = state.current().get(key).cloned();
+    save(&state);
+    entry
+}
+
+/// The store a profile's pages open in, for the current account. `Err` when the registry is
+/// unavailable, so no caller ever falls back to a store the person didn't choose.
+pub fn store_for_profile(profile: &str) -> Result<Option<String>, String> {
+    let mut state = lock_registry().map_err(|_| "Profiles are unavailable.")?;
+    let store = state.store(profile);
+    save(&state);
+    Ok(store)
+}
+
+/// The account the windows belong to now, as `<server>|<account id>`, or `local`.
+pub fn current_scope() -> String {
+    lock_registry()
+        .map(|state| state.scope.clone())
+        .unwrap_or_else(|_| LOCAL_SCOPE.to_owned())
+}
+
+/// The app window used last in this launch.
+pub(super) fn last_focused_person() -> Option<String> {
+    lock_registry()
+        .ok()
+        .and_then(|state| state.last_focused.clone())
+}
+
+/// The app window used last, even one that has closed since.
+pub(super) fn last_focused_any() -> Option<String> {
+    LAST_FOCUSED.lock().ok().and_then(|last| last.clone())
+}

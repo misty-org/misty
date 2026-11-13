@@ -1,0 +1,74 @@
+.app-pages-root {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.app-pages-root button {
+  cursor: pointer;
+}
+
+.app-pages-root button:disabled {
+  cursor: not-allowed;
+}
+
+.app-pages-root input,
+.app-pages-root textarea {
+  font-variant-ligatures: no-contextual;
+}
+
+/* Sidebar metrics the Agents sidebar's stylesheets still read until they move to ListRow, which
+   has the same 32px rows at the control text size. */
+:root {
+  --misty-sidebar-row-height: 32px;
+  --misty-sidebar-row-padding: 10px;
+  --misty-sidebar-label-size: var(--text-control);
+  --misty-sidebar-icon-size: 16px;
+  --misty-sidebar-badge-size: 7px;
+  /* Deprecated: the agent state tones under their older names (theme.css --tone-*). */
+  --misty-status-idle: var(--tone-idle);
+  --misty-status-attention: var(--tone-waiting);
+  --misty-status-failed: var(--tone-failed);
+}
+
+/* Every glyph in Misty draws at one size and one stroke. Icons take no size of their own (the
+   icon-sizing UI rule); a shared component that needs another size sets it with a class, which
+   wins over this zero-specificity default. A size prop's width and height attributes never do. */
+:where(svg.lucide) {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  stroke-width: 2;
+}
+
+/* Keep UI glyphs on a stable compositing layer in WebKit. At fractional page
+   zoom, repainting a shared layer for an unrelated hover or popup can snap SVG
+   strokes differently even though their layout rectangles have not moved.
+   Use the individual translate property so chevron rotations and loading
+   animations can continue to own transform. Do not promote drawings/charts. */
+@supports (-webkit-backdrop-filter: blur(0)) {
+  svg.lucide,
+  [data-app-icon] {
+    translate: 0 0 0;
+    backface-visibility: hidden;
+  }
+}
+
+[draggable="true"] {
+  -webkit-user-drag: element;
+}
+
+[data-misty-window-drag-block="true"],
+[data-misty-window-drag-block="true"] * {
+  -webkit-app-region: no-drag;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

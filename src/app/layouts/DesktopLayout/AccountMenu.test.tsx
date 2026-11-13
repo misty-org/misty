@@ -1,0 +1,97 @@
+import "@/app/featureSeams";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { DropdownMenu, DropdownMenuTrigger } from "@/shared/ui";
+import { AccountMenu } from "./AccountMenu";
+import { useHelpDialog } from "./HelpDialog";
+
+let mockUser: { id: string; email: string; username: string } | null = {
+  id: "account-1",
+  email: "owner@example.com",
+  username: "Owner",
+};
+let mockAccounts: Array<{ id: string; email: string; username: string }> = [];
+
+vi.mock("@/features/account", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  SavedAccountSessionUnavailableError: class extends Error {},
+  useAuth: () => ({
+    user: mockUser,
+    accounts: mockAccounts,
+    transitioning: false,
+    switchAccount: vi.fn(),
+    logout: vi.fn(async () => {}),
+  }),
+  useUserStore: (selector: (state: { me: null }) => unknown) => selector({ me: null }),
+}));
+
+vi.mock("@/features/account/native-session", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useNativeSessionStore: (selector: (state: { status: null }) => unknown) =>
+    selector({ status: null }),
+}));
+
+function renderMenu() {
+  return render(
+    <MemoryRouter>
+      <DropdownMenu open modal={false}>
+        <DropdownMenuTrigger>Account</DropdownMenuTrigger>
+        <AccountMenu onClose={vi.fn()} onOpenAccountSettings={vi.fn()} />
+      </DropdownMenu>
+    </MemoryRouter>,
+  );
+}
+
+describe("AccountMenu", () => {
+  afterEach(() => {
+    cleanup();
+    mockUser = { id: "account-1", email: "owner@example.com", username: "Owner" };
+    mockAccounts = [];
+  });
+
+  it("lists account actions for a signed-in account", () => {
+    renderMenu();
+    const menu = screen.getByRole("menu", { name: "Account" });
+    expect(menu.textContent).toContain("owner@example.com");
+    for (const label of [/Account settings/, /Switch accounts/, /Help/, /Sign out/]) {
+      expect(screen.getByRole("menuitem", { name: label })).toBeTruthy();
+    }
+    expect(menu.textContent).not.toContain("Report a problem");
+  });
+
+  it("opens Help once the menu has closed", () => {
+    vi.useFakeTimers();
+    const onClose = vi.fn();
+    render(
+      <MemoryRouter>
+        <DropdownMenu open modal={false}>
+          <DropdownMenuTrigger>Account</DropdownMenuTrigger>
+          <AccountMenu onClose={onClose} onOpenAccountSettings={vi.fn()} />
+        </DropdownMenu>
+      </MemoryRouter>,
+    );
+    fireEvent.click(screen.getByRole("menuitem", { name: /Help/ }));
+    expect(onClose).toHaveBeenCalled();
+    expect(useHelpDialog.getState().open).toBe(false);
+    vi.runAllTimers();
+    expect(useHelpDialog.getState().open).toBe(true);
+    useHelpDialog.getState().setOpen(false);
+    vi.useRealTimers();
+  });
+
+  it("switches between saved accounts without extra subtext", () => {
+    mockAccounts = [
+      { id: "account-1", email: "owner@example.com", username: "Owner" },
+      { id: "account-2", email: "second@example.com", username: "Matt" },
+    ];
+    renderMenu();
+    fireEvent.click(screen.getByRole("menuitem", { name: /Switch accounts/ }));
+    const menus = screen.getAllByRole("menu");
+    const chooser = menus[menus.length - 1]!;
+    expect(chooser.textContent).toContain("Owner");
+    expect(chooser.textContent).toContain("Matt");
+    expect(chooser.textContent).toContain("Add another account");
+    expect(chooser.textContent).not.toContain("second@example.com");
+  });
+});

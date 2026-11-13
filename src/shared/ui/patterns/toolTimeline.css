@@ -1,0 +1,227 @@
+/* ToolTimeline: a turn's one fold and its flat step rows. Rows are 32px (a 20px line in 6px
+   padding) with no gap, fill or border; the name is muted and what it acted on is full color, so
+   the eye reads the subject. Color only for failures and line changes. */
+
+.misty-turn-fold {
+  display: flex;
+  max-width: 100%;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px 6px 1px;
+  font-size: var(--text-meta);
+  line-height: 20px;
+  color: var(--color-cream-muted);
+}
+.misty-turn-fold:hover,
+.misty-turn-fold:focus-visible {
+  color: var(--color-cream);
+}
+.misty-turn-fold-icon,
+.misty-turn-fold-chevron {
+  flex: none;
+  width: 14px;
+  height: 14px;
+}
+.misty-turn-fold-chevron {
+  width: 12px;
+  height: 12px;
+  transition: transform 160ms ease;
+}
+.misty-turn-fold[data-open] .misty-turn-fold-chevron {
+  transform: rotate(90deg);
+}
+.misty-turn-fold-label {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  -webkit-mask-image: linear-gradient(to right, black calc(100% - 20px), transparent);
+  mask-image: linear-gradient(to right, black calc(100% - 20px), transparent);
+}
+.misty-turn-fold-more {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+}
+/* Misty's own moving highlight across what is running right now. */
+.misty-turn-fold-live {
+  background: linear-gradient(
+    90deg,
+    var(--color-cream-muted) 40%,
+    var(--color-cream-bright) 50%,
+    var(--color-cream-muted) 60%
+  );
+  background-size: 250% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: misty-turn-sweep 2s linear infinite;
+}
+@keyframes misty-turn-sweep {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -150% 0;
+  }
+}
+
+.misty-tool-list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.misty-tool-list > li {
+  min-width: 0;
+}
+
+.misty-tool-row {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px 6px 1px;
+  font-size: var(--text-meta);
+  line-height: 20px;
+  text-align: left;
+  color: var(--color-cream-muted);
+}
+.misty-tool-row-icon {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  width: 14px;
+  height: 20px;
+  align-items: center;
+}
+.misty-tool-row-glyph,
+.misty-tool-row-chevron {
+  width: 14px;
+  height: 14px;
+  transition:
+    opacity 120ms ease,
+    transform 160ms ease;
+}
+.misty-tool-row-chevron {
+  position: absolute;
+  top: 3px;
+  left: 0;
+  opacity: 0;
+}
+/* A row that opens trades its icon for a chevron on hover and while open. */
+.misty-tool-row[data-expandable]:hover .misty-tool-row-glyph,
+.misty-tool-row[data-expandable]:focus-visible .misty-tool-row-glyph,
+.misty-tool-row[data-open] .misty-tool-row-glyph {
+  opacity: 0;
+}
+.misty-tool-row[data-expandable]:hover .misty-tool-row-chevron,
+.misty-tool-row[data-expandable]:focus-visible .misty-tool-row-chevron,
+.misty-tool-row[data-open] .misty-tool-row-chevron {
+  opacity: 1;
+}
+.misty-tool-row[data-open] .misty-tool-row-chevron {
+  transform: rotate(90deg);
+}
+.misty-tool-row[data-expandable]:hover .misty-tool-row-name {
+  color: var(--color-cream);
+}
+.misty-tool-row-name {
+  flex: none;
+}
+.misty-tool-row-target {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  color: var(--color-cream);
+  -webkit-mask-image: linear-gradient(to right, black calc(100% - 20px), transparent);
+  mask-image: linear-gradient(to right, black calc(100% - 20px), transparent);
+}
+.misty-tool-row-dim {
+  color: var(--color-cream-muted);
+}
+.misty-tool-row-meta {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  padding-left: 8px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.misty-tool-row[data-state="running"] .misty-tool-row-name,
+.misty-tool-row[data-state="running"] .misty-tool-row-target {
+  opacity: 0.7;
+}
+.misty-tool-row[data-state="failed"] .misty-tool-row-icon,
+.misty-tool-row[data-state="failed"] .misty-tool-row-name,
+.misty-tool-row[data-state="failed"] .misty-tool-row-meta {
+  color: var(--tone-failed);
+}
+.misty-tool-lines {
+  display: inline-flex;
+  gap: 4px;
+  font-variant-numeric: tabular-nums;
+}
+.misty-tool-lines [data-tone="added"] {
+  color: var(--tone-added);
+}
+.misty-tool-lines [data-tone="removed"] {
+  color: var(--tone-failed);
+}
+
+/* An opened row's body: a 12px inset from a hairline under the row's icon, 4px above and 8px
+   below. The line is a 12px-wide target that folds the row. */
+.misty-tool-body {
+  position: relative;
+  display: grid;
+  gap: 8px;
+  margin-left: 7px;
+  padding: 4px 0 8px 12px;
+  font-size: var(--text-meta);
+  line-height: 1.55;
+  color: var(--color-cream-muted);
+}
+.misty-tool-body-line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -6px;
+  width: 12px;
+  cursor: pointer;
+}
+.misty-tool-body-line::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 6px;
+  width: 1px;
+  background: color-mix(in srgb, var(--misty-theme-text) 12%, transparent);
+}
+.misty-tool-body-line:hover::after {
+  background: color-mix(in srgb, var(--misty-theme-text) 26%, transparent);
+}
+
+.misty-tool-note {
+  padding: 4px 0;
+  font-size: var(--text-meta);
+  line-height: 1.6;
+  color: var(--color-cream-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .misty-turn-fold-live {
+    animation: none;
+    background: none;
+    color: var(--color-cream);
+  }
+  .misty-turn-fold-chevron,
+  .misty-tool-row-glyph,
+  .misty-tool-row-chevron {
+    transition: none;
+  }
+}

@@ -1,0 +1,28 @@
+[package]
+name = "file_access"
+version = "0.1.0"
+description = "The one gate every file the app touches goes through"
+edition = "2021"
+license = "AGPL-3.0-or-later"
+publish = false
+
+[lib]
+name = "file_access"
+path = "lib.rs"
+
+[dependencies]
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+dirs = "6.0.0"
+libc = "0.2"
+rusqlite = { version = "0.32", features = ["bundled"] }
+tauri = { version = "2", features = ["protocol-asset", "macos-private-api", "tray-icon", "image-png", "unstable"] }
+tempfile = "3"
+tokio = { version = "1", features = ["fs", "io-util", "macros", "net", "process", "rt-multi-thread", "sync", "time"] }
+uuid = { version = "1", features = ["v4"] }
+
+[features]
+# Lets tests build their fixtures anywhere in the temp folder. Only dependents' dev-dependencies turn it on.
+test-fixtures = []
+
+[dev-dependencies]
+ctor = "0.8"

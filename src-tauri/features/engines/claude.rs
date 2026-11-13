@@ -1,0 +1,2139 @@
+// Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong), src-tauri/src/engine/claude.rs.
+use super::{
+    command_for_binary, images, push_session_id, tool_call_message_with_id,
+    tool_call_patch_with_id, BuiltCommand, Engine, EngineEvent, SendRequest,
+};
+use serde_json::Value;
+use std::collections::HashMap;
+use std::sync::Mutex;
+
+#[path = "claude_denials.rs"]
+mod denials;
+
+use denials::{
+    extract_absolute_path, is_question_tool, looks_like_permission_denial, tool_result_block_text,
+    tool_result_error_blocks,
+};
+
+pub struct ClaudeEngine {
+    /// Per-block partial JSON for tool_use inputs. Streamed as
+    /// `input_json_delta` after a name-only `content_block_start`.
+    pending_tool_json: Mutex<HashMap<u64, PendingTool>>,
+    /// tool_use id -> tool name, recorded at `content_block_start` so a
+    /// later `tool_result` (user message) can be attributed to its call.
+    tool_names: Mutex<HashMap<String, String>>,
+    /// tool_use id -> structured path argument, recorded at
+    /// `content_block_stop` once the input JSON is complete. Permission
+    /// denials resolve the real denied path from here instead of scraping
+    /// the free-text error.
+    tool_paths: Mutex<HashMap<String, String>>,
+    /// Post-compaction remaining context tokens from `compact_boundary` event,
+    /// used to report accurate post-compaction usage instead of the turn's billing usage.
+    compact_post_tokens: Mutex<Option<i64>>,
+    /// A `task_notification` with status `stopped` was just seen: a resumed
+    /// process stops its predecessor's background task and reports that as an
+    /// empty zero-turn `result` before it answers the new message. That result
+    /// ends nothing the user asked for.
+    stopped_task_result_pending: Mutex<bool>,
+    /// The engine id its `system/init` report is kept under (`reported.rs`): Claude Code, or
+    /// CodeBuddy, which shares this format.
+    reports_as: &'static str,
+}
+
+struct PendingTool {
+    name: String,
+    id: Option<String>,
+    json: String,
+    tool_call_id: Option<String>,
+}
+
+impl ClaudeEngine {
+    pub fn new() -> Self {
+        Self::reporting_as("claude")
+    }
+
+    pub fn reporting_as(engine: &'static str) -> Self {
+        Self {
+            pending_tool_json: Mutex::new(HashMap::new()),
+            tool_names: Mutex::new(HashMap::new()),
+            tool_paths: Mutex::new(HashMap::new()),
+            compact_post_tokens: Mutex::new(None),
+            stopped_task_result_pending: Mutex::new(false),
+            reports_as: engine,
+        }
+    }
+}
+
+#[path = "claude_sandbox.rs"]
+mod sandbox;
+use sandbox::{extra_dirs, folder_sandbox_runs, folder_sandbox_settings};
+
+/// Claude Code's own permission modes, in its mode switcher's order. `auto` (its classifier)
+/// and `dontAsk` aren't offered: neither is held to the folder.
+const CLAUDE_MODES: &[super::modes::EngineMode] = {
+    use super::modes::{mode, ModeKind::*};
+    &[
+        mode("default", "Manual", Asks, "manual"),
+        mode("acceptEdits", "Accept edits", Edits, "auto"),
+        mode("plan", "Plan", Plans, "plan"),
+        mode(
+            "bypassPermissions",
+            "Bypass permissions",
+            NoAsking,
+            "bypass",
+        ),
+    ]
+};
+
+/// What this Claude Code calls its asking mode: `manual` when its help lists that, else the
+/// older `default`.
+fn manual_mode_value() -> &'static str {
+    match super::modes::reported("claude") {
+        Some(listed) if listed.iter().any(|id| id == "manual") => "manual",
+        _ => "default",
+    }
+}
+
+impl Engine for ClaudeEngine {
+    fn id(&self) -> &'static str {
+        "claude"
+    }
+
+    /// Every assistant snapshot names the model that produced it.
+    fn reports_served(&self) -> bool {
+        true
+    }
+
+    fn supports_images(&self) -> bool {
+        true
+    }
+    fn supports_mcp(&self) -> bool {
+        true
+    }
+    fn supports_effort(&self) -> bool {
+        true
+    }
+    /// Its help lists the modes this install has (`modes::learn_reported`).
+    fn modes_help_flag(&self) -> Option<&'static str> {
+        Some("--permission-mode")
+    }
+    /// Newer Claude Code calls its asking mode `manual`; older builds called it `default`.
+    fn mode_values(&self, id: &'static str) -> Vec<&'static str> {
+        if id == "default" {
+            vec!["manual", "default"]
+        } else {
+            vec![id]
+        }
+    }
+    /// Claude Code's permission modes, by the names its own mode switcher shows (2.1.322:
+    /// `default` "Manual", `acceptEdits`, `plan`, `bypassPermissions`). Bypass permissions runs
+    /// only inside Claude Code's own sandbox, held to the folder (`claude_sandbox.rs`).
+    fn modes(&self) -> &'static [super::modes::EngineMode] {
+        CLAUDE_MODES
+    }
+    fn folder_sandbox(&self) -> bool {
+        folder_sandbox_runs()
+    }
+
+    /// Read-only tool constraints: claude's plan mode refuses every edit and command, with a
+    /// per-call --allowedTools whitelist and an explicit --disallowedTools on top.
+    fn supports_tool_constraints(&self) -> bool {
+        true
+    }
+
+    fn build_command(&self, req: &SendRequest, bin: &str) -> Result<BuiltCommand, String> {
+        let mut cmd = command_for_binary(bin);
+        cmd.arg("-p");
+        cmd.arg("--input-format");
+        cmd.arg("stream-json");
+        cmd.arg("--output-format");
+        cmd.arg("stream-json");
+        cmd.arg("--verbose");
+        cmd.arg("--include-partial-messages");
+        // SDK control protocol over stdin/stdout: permission asks — including
+        // AskUserQuestion, whose dialog is this client's job — arrive as
+        // can_use_tool control_requests. Without the flag the CLI treats
+        // every ask as terminal and never mounts AskUserQuestion at all.
+        cmd.arg("--permission-prompt-tool");
+        cmd.arg("stdio");
+        // Headless -p cannot prompt mid-turn: "manual" maps onto claude's
+        // default mode, where approval-needing tools are denied and the
+        // agent is told to work around them (honest degrade, no fake ask).
+        // Tools pre-approved for this run, emitted as a single --allowedTools
+        // (headless -p cannot prompt mid-turn, so anything not listed here
+        // gets denied outright).
+        let mut preapproved: Vec<&str> = Vec::new();
+        let extra_dirs = extra_dirs(req);
+        if let Some(tools) = req.allowed_tools.as_deref() {
+            // Read-only constraint: plan mode refuses every edit and command, plus the
+            // whitelist; headless -p refuses any tool not in --allowedTools. Known write
+            // tools are also denied explicitly, in case the mode is parsed differently.
+            cmd.arg("--permission-mode");
+            cmd.arg("plan");
+            cmd.arg("--allowedTools");
+            for tool in tools {
+                cmd.arg(tool);
+            }
+            cmd.arg("--disallowedTools");
+            for tool in ["Bash", "Edit", "Write", "NotebookEdit", "Task"] {
+                if !tools.iter().any(|allowed| allowed == tool) {
+                    cmd.arg(tool);
+                }
+            }
+        } else {
+            match self.resolve_permission(req.permission.as_deref()) {
+                "bypass" => {
+                    // No asks, but only inside the folder: the sandbox holds every command to
+                    // it, and the file tools are held to it as well.
+                    cmd.arg("--dangerously-skip-permissions");
+                    cmd.arg("--settings");
+                    cmd.arg(folder_sandbox_settings(&extra_dirs).to_string());
+                }
+                mode => {
+                    cmd.arg("--permission-mode");
+                    cmd.arg(match mode {
+                        // The asking mode by the name this install lists (`manual` on newer
+                        // builds, `default` before).
+                        "manual" => manual_mode_value(),
+                        "plan" => "plan",
+                        _ => "acceptEdits",
+                    });
+                    if mode == "auto" {
+                        // acceptEdits pre-approves file edits only; WebSearch and
+                        // WebFetch still ask, and headless -p cannot prompt, so
+                        // the CLI would deny every web call outright. Pre-approve
+                        // the two read-only network tools in auto mode.
+                        preapproved.extend(["WebSearch", "WebFetch"]);
+                    }
+                }
+            }
+        }
+        // Misty's Space MCP server, one --mcp-config carrying it. Its calls come back through the
+        // permission ask like any tool, and Misty's own gate decides them under the run's mode.
+        let mcp_servers = req
+            .mcp_servers
+            .as_ref()
+            .and_then(Value::as_object)
+            .cloned()
+            .unwrap_or_default();
+        let mut cleanup_files = Vec::new();
+        if !mcp_servers.is_empty() {
+            let config = serde_json::json!({ "mcpServers": mcp_servers });
+            cmd.arg("--mcp-config");
+            if mcp_servers.keys().any(|name| name != "misty") {
+                // An agent's own servers can carry the person's keys in their env or headers:
+                // a private file, as CodeBuddy's adapter stages them, keeps them off argv.
+                let path = super::codebuddy::stage_private_json(
+                    &crate::engines::support::paths::app_home().join("claude-staging"),
+                    "mcp",
+                    &config,
+                )?;
+                cmd.arg(&path);
+                cleanup_files.push(path);
+            } else {
+                cmd.arg(config.to_string());
+            }
+        }
+        if !preapproved.is_empty() {
+            cmd.arg("--allowedTools");
+            for tool in preapproved {
+                cmd.arg(tool);
+            }
+        }
+        if let Some(model) = req.model.as_deref() {
+            cmd.arg("--model");
+            // prepare_launch resolves aliases against the selected channel;
+            // reading native settings here would remap independent channels.
+            cmd.arg(model);
+        }
+        if let Some(effort) = req.effort.as_deref() {
+            cmd.arg("--effort");
+            cmd.arg(effort);
+            cmd.env("CLAUDE_CODE_EFFORT_LEVEL", effort);
+            // The CLI decides what a level means (its thinking budget among it): Misty passes
+            // the level the person picked from the CLI's own list and sets no budget of its own.
+        }
+        // Fast mode, where Claude Code's own catalog offers it for this model.
+        if req.service_tier.as_deref() == Some("fast")
+            && super::models::claude_fast_offered(req.model.as_deref())
+        {
+            cmd.arg("--fast-mode");
+            cmd.arg("on");
+        }
+        // Granted directories ride every launch: the CLI cannot expand its
+        // allowed-dirs mid-process, and each send is a fresh process anyway,
+        // so a grant approved mid-conversation takes effect on the next send.
+        for dir in &extra_dirs {
+            cmd.arg("--add-dir");
+            cmd.arg(dir);
+        }
+        if let Some(session_id) = req.session_id.as_deref() {
+            cmd.arg("--resume");
+            cmd.arg(session_id);
+        }
+        let stdin_payload = images::claude_stdin_message(&req.prompt, &req.images, &req.workspace)?;
+        Ok(BuiltCommand {
+            command: cmd,
+            stdin_payload: Some(stdin_payload),
+            keep_stdin_open: true,
+            cleanup_files,
+            preassigned_session_id: None,
+        })
+    }
+
+    fn parse_line(&self, line: &str, out: &mut Vec<EngineEvent>) {
+        let Ok(value) = serde_json::from_str::<Value>(line) else {
+            return;
+        };
+        // A sub-agent's own lines carry the Task call that started it: its rows nest under it.
+        let parent = value
+            .get("parent_tool_use_id")
+            .and_then(Value::as_str)
+            .filter(|id| !id.is_empty())
+            .map(str::to_string);
+        if let Some(parent) = parent {
+            let mut nested = Vec::new();
+            self.parse_value(&value, &mut nested);
+            if !nested.is_empty() {
+                out.push(EngineEvent::Scope {
+                    parent: Some(parent),
+                });
+                out.append(&mut nested);
+                out.push(EngineEvent::Scope { parent: None });
+            }
+            return;
+        }
+        self.parse_value(&value, out);
+    }
+}
+
+impl ClaudeEngine {
+    fn parse_value(&self, value: &Value, out: &mut Vec<EngineEvent>) {
+        let value = value.clone();
+        let event_type = value.get("type").and_then(Value::as_str).unwrap_or("");
+        if event_type == "rate_limit_event" {
+            // The plan's limits, as Claude Code reports them on its own stream: the only way
+            // Misty learns them, since it never reads the person's sign-in.
+            crate::engine_config::usage_limits::record_claude_rate_limit(&value);
+        }
+        match event_type {
+            "system" => {
+                push_session_id(&value, "session_id", out);
+                let subtype = value.get("subtype").and_then(Value::as_str);
+                if subtype == Some("api_retry") {
+                    // Live progress, not an error: the CLI backs off for
+                    // minutes (10 attempts, 30s+ delays) and then continues.
+                    // The run status line shows "Retrying x of y"; the detail
+                    // rides along for its tooltip.
+                    out.push(EngineEvent::Retry {
+                        attempt: value.get("attempt").and_then(Value::as_u64).unwrap_or(0),
+                        max: value
+                            .get("max_retries")
+                            .and_then(Value::as_u64)
+                            .unwrap_or(0),
+                        message: format_api_retry(&value),
+                    });
+                } else if subtype == Some("init") {
+                    // Its slash commands and skills, as this mode offers them: the `/` menu's
+                    // list for this engine.
+                    super::reported::claude_init(self.reports_as, &value);
+                    // `system/init` is the only place the CLI reports which MCP
+                    // servers it actually loaded. Capture it as an engine event
+                    // (session-scoped snapshot for the MCP settings page); its
+                    // `tools` list lets us attribute `mcp__<server>__<tool>`
+                    // names back to each server.
+                    let servers = value
+                        .get("mcp_servers")
+                        .or_else(|| value.get("mcpServers"))
+                        .and_then(Value::as_array)
+                        .map(|items| {
+                            items
+                                .iter()
+                                .filter_map(|item| {
+                                    let name = item
+                                        .get("name")
+                                        .and_then(Value::as_str)
+                                        .map(str::trim)
+                                        .filter(|name| !name.is_empty())?;
+                                    let status = item
+                                        .get("status")
+                                        .and_then(Value::as_str)
+                                        .map(str::trim)
+                                        .filter(|status| !status.is_empty())
+                                        .map(str::to_string);
+                                    Some((name.to_string(), status))
+                                })
+                                .collect::<Vec<_>>()
+                        })
+                        .unwrap_or_default();
+                    if !servers.is_empty() {
+                        let tools = value
+                            .get("tools")
+                            .and_then(Value::as_array)
+                            .map(|items| {
+                                items
+                                    .iter()
+                                    .filter_map(Value::as_str)
+                                    .map(str::to_string)
+                                    .collect::<Vec<_>>()
+                            })
+                            .unwrap_or_default();
+                        out.push(EngineEvent::McpServers { servers, tools });
+                    }
+                } else if subtype == Some("task_notification") {
+                    if value.get("status").and_then(Value::as_str) == Some("stopped") {
+                        if let Ok(mut lock) = self.stopped_task_result_pending.lock() {
+                            *lock = true;
+                        }
+                    }
+                } else if subtype == Some("background_tasks_changed") {
+                    let pending = value
+                        .get("tasks")
+                        .and_then(Value::as_array)
+                        .map_or(0, Vec::len);
+                    out.push(EngineEvent::BackgroundTasks { pending });
+                } else if subtype == Some("compact_boundary") {
+                    if let Some(post_tokens) = value
+                        .get("compactMetadata")
+                        .and_then(|m| m.get("postTokens").or_else(|| m.get("post_tokens")))
+                        .and_then(Value::as_i64)
+                    {
+                        if let Ok(mut lock) = self.compact_post_tokens.lock() {
+                            *lock = Some(post_tokens);
+                        }
+                        let usage_obj = serde_json::json!({
+                            "input_tokens": post_tokens,
+                            "total_tokens": post_tokens,
+                        });
+                        out.push(EngineEvent::Usage(usage_obj));
+                    }
+                }
+            }
+            "stream_event" => parse_stream_event(
+                &self.pending_tool_json,
+                &self.tool_names,
+                &self.tool_paths,
+                &value,
+                out,
+            ),
+            "assistant" => {
+                // Full message snapshot; used as session-id and actual model source.
+                push_session_id(&value, "session_id", out);
+                let reported_model = value
+                    .get("message")
+                    .and_then(|m| m.get("model"))
+                    .or_else(|| value.get("model"))
+                    .and_then(Value::as_str)
+                    .map(str::trim)
+                    .filter(|s| !s.is_empty())
+                    .map(str::to_string);
+                let reported_effort = value
+                    .get("message")
+                    .and_then(|m| m.get("thinking_effort").or_else(|| m.get("effort")))
+                    .or_else(|| value.get("thinking_effort"))
+                    // Only use effort explicitly present in this streamed assistant
+                    // payload. Local transcript metadata is not response evidence.
+                    .or_else(|| value.get("effort"))
+                    .and_then(Value::as_str)
+                    .map(str::trim)
+                    .filter(|s| !s.is_empty())
+                    .map(str::to_string);
+                if let Some(model) = reported_model.clone() {
+                    out.push(EngineEvent::Model(model));
+                }
+                if let Some(effort) = reported_effort.clone() {
+                    out.push(EngineEvent::Effort(effort));
+                }
+                // The response's own account of what ran. `<synthetic>` marks
+                // messages the CLI fabricated locally (errors, interrupts):
+                // that is not a served model and must not read as one.
+                let served_model = reported_model.filter(|model| !model.starts_with('<'));
+                if served_model.is_some() || reported_effort.is_some() {
+                    out.push(EngineEvent::Served {
+                        model: served_model,
+                        effort: reported_effort,
+                    });
+                }
+            }
+            "user" => {
+                // tool_result blocks carry permission denials as is_error
+                // text (headless cannot prompt). Surface them so the UI can
+                // offer a directory grant instead of letting the model
+                // narrate a terminal prompt that does not exist.
+                for (id, text) in tool_result_error_blocks(&value) {
+                    if !looks_like_permission_denial(&text) {
+                        continue;
+                    }
+                    // The denied call's structured input is authoritative:
+                    // resolve the real path argument by tool_use id and only
+                    // fall back to scraping the free-text error when the call
+                    // was never seen (e.g. resumed transcript) or carries no
+                    // path argument (e.g. Bash).
+                    let tool = id
+                        .as_ref()
+                        .and_then(|id| self.tool_names.lock().ok()?.get(id).cloned());
+                    if is_question_tool(tool.as_deref()) {
+                        continue;
+                    }
+                    let path = id
+                        .as_ref()
+                        .and_then(|id| self.tool_paths.lock().ok()?.get(id).cloned())
+                        .or_else(|| extract_absolute_path(&text));
+                    out.push(EngineEvent::PermissionDenied {
+                        tool,
+                        path,
+                        message: text,
+                        tool_use_id: id,
+                    });
+                }
+                // Tool result output emitted in response to tool_use. The
+                // tool name is resolved from the tool_use_id recorded at
+                // content_block_start, so the result patch lands on the
+                // matching row even when tool calls run in parallel.
+                if let Some(content) = value
+                    .get("message")
+                    .and_then(|m| m.get("content"))
+                    .and_then(Value::as_array)
+                {
+                    for block in content {
+                        if block.get("type").and_then(Value::as_str) == Some("tool_result") {
+                            // Error blocks are surfaced as permission denials
+                            // above (or narrated by the model); denial-shaped
+                            // text without is_error stays silent for the same
+                            // reason. Keep both out of the timeline panel to
+                            // avoid double-reporting.
+                            let block_text = tool_result_block_text(block);
+                            if looks_like_permission_denial(&block_text) {
+                                continue;
+                            }
+                            let tool_call_id = block.get("tool_use_id").and_then(Value::as_str);
+                            // Any other error still settles its row, as a failure.
+                            let errored = block
+                                .get("is_error")
+                                .and_then(Value::as_bool)
+                                .unwrap_or(false)
+                                .then(|| serde_json::json!({ "isError": true, "content": block_text }));
+                            let res = errored
+                                .as_ref()
+                                .or_else(|| value.get("toolUseResult"))
+                                .or_else(|| block.get("content"));
+                            let name = tool_call_id
+                                .and_then(|id| {
+                                    self.tool_names
+                                        .lock()
+                                        .ok()
+                                        .and_then(|map| map.get(id).cloned())
+                                })
+                                .unwrap_or_default();
+                            out.push(super::tool_result_patch_with_id(name, res, tool_call_id));
+                        }
+                    }
+                }
+            }
+            "result" => {
+                let stopped_task_result = self
+                    .stopped_task_result_pending
+                    .lock()
+                    .map(|mut lock| std::mem::take(&mut *lock))
+                    .unwrap_or(false);
+                if stopped_task_result
+                    && value.get("num_turns").and_then(Value::as_u64) == Some(0)
+                    && value.get("is_error").and_then(Value::as_bool) != Some(true)
+                    // Absent or blank: a CLI variant that omits `result` on
+                    // this bookkeeping line must not resurrect the old bug.
+                    && value
+                        .get("result")
+                        .and_then(Value::as_str)
+                        .map_or(true, |text| text.trim().is_empty())
+                {
+                    return;
+                }
+                // Structured fallback: the final result lists every denial
+                // of the turn. The frontend dedupes against the tool_result
+                // signal above (same path), so double-reporting is harmless.
+                if let Some(denials) = value.get("permission_denials").and_then(Value::as_array) {
+                    for denial in denials {
+                        let tool = denial
+                            .get("tool_name")
+                            .and_then(Value::as_str)
+                            .map(str::trim)
+                            .filter(|t| !t.is_empty())
+                            .map(str::to_string);
+                        if is_question_tool(tool.as_deref()) {
+                            continue;
+                        }
+                        let path = denial.get("tool_input").and_then(super::tool_path_arg);
+                        let tool_use_id = denial
+                            .get("tool_use_id")
+                            .and_then(Value::as_str)
+                            .map(str::trim)
+                            .filter(|id| !id.is_empty())
+                            .map(str::to_string);
+                        if tool.is_some() || path.is_some() {
+                            out.push(EngineEvent::PermissionDenied {
+                                tool,
+                                path,
+                                message: String::new(),
+                                tool_use_id,
+                            });
+                        }
+                    }
+                }
+                let session_id = value
+                    .get("session_id")
+                    .and_then(Value::as_str)
+                    .map(str::trim)
+                    .filter(|s| !s.is_empty())
+                    .map(str::to_string);
+                let raw_usage = value.get("usage").cloned();
+                let usage = if let Ok(mut lock) = self.compact_post_tokens.lock() {
+                    match lock.take() {
+                        Some(post_tokens) => Some(compact_usage(post_tokens, raw_usage.as_ref())),
+                        None => raw_usage,
+                    }
+                } else {
+                    raw_usage
+                }
+                .map(|usage| attach_reported_context_window(usage, &value))
+                .map(|mut usage| {
+                    // What the turn cost, as Claude Code reckons it: each turn is its own
+                    // process here, so the total is this turn's.
+                    if let (Some(cost), Some(object)) = (
+                        value.get("total_cost_usd").and_then(Value::as_f64),
+                        usage.as_object_mut(),
+                    ) {
+                        object.insert("cost_usd".to_string(), Value::from(cost));
+                    }
+                    usage
+                });
+                let is_error = value
+                    .get("is_error")
+                    .and_then(Value::as_bool)
+                    .unwrap_or(false);
+                let subtype = value.get("subtype").and_then(Value::as_str).unwrap_or("");
+                if is_error || subtype.starts_with("error") {
+                    let message = value
+                        .get("result")
+                        .and_then(Value::as_str)
+                        .unwrap_or("claude turn failed")
+                        .to_string();
+                    out.push(EngineEvent::Error(message));
+                } else {
+                    out.push(EngineEvent::Done { session_id, usage });
+                }
+            }
+            "control_request" => {
+                // SDK control protocol asks. AskUserQuestion surfaces to the
+                // UI; every other ask is answered in place (deny for tool
+                // permissions, decline for MCP elicitation, error for
+                // anything unrecognized) — every request must get exactly
+                // one response or the CLI parks on it forever.
+                let request = value.get("request");
+                let subtype = request
+                    .and_then(|r| r.get("subtype"))
+                    .and_then(Value::as_str)
+                    .unwrap_or("");
+                let request_id = value
+                    .get("request_id")
+                    .and_then(Value::as_str)
+                    .unwrap_or("");
+                if request_id.is_empty() {
+                    return;
+                }
+                if subtype == "can_use_tool" {
+                    let tool_name = request
+                        .and_then(|r| r.get("tool_name"))
+                        .and_then(Value::as_str)
+                        .unwrap_or("")
+                        .to_string();
+                    if tool_name == "AskUserQuestion" {
+                        out.push(EngineEvent::Question {
+                            request_id: request_id.to_string(),
+                            tool_use_id: request
+                                .and_then(|r| r.get("tool_use_id"))
+                                .and_then(Value::as_str)
+                                .map(str::to_string),
+                            input: request
+                                .and_then(|r| r.get("input"))
+                                .cloned()
+                                .unwrap_or(Value::Null),
+                        });
+                    } else {
+                        out.push(EngineEvent::ControlPermission {
+                            request_id: request_id.to_string(),
+                            tool_name,
+                            input: request
+                                .and_then(|r| r.get("input"))
+                                .cloned()
+                                .unwrap_or(Value::Null),
+                        });
+                    }
+                } else if subtype == "elicitation" {
+                    // MCP elicitation (form input / confirmation from an MCP
+                    // server). No form UI here: decline so the MCP tool call
+                    // settles instead of hanging the turn (issue #1432).
+                    out.push(EngineEvent::ElicitationDecline {
+                        request_id: request_id.to_string(),
+                    });
+                } else {
+                    out.push(EngineEvent::ControlRequestError {
+                        request_id: request_id.to_string(),
+                        subtype: subtype.to_string(),
+                    });
+                }
+            }
+            "control_cancel_request" => {
+                if let Some(request_id) = value.get("request_id").and_then(Value::as_str) {
+                    out.push(EngineEvent::QuestionSettled {
+                        request_id: request_id.to_string(),
+                    });
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+/// Fold the CLI's reported context window into a turn's usage.
+///
+/// Claude's `result` line carries the window per model under `modelUsage`
+/// (`{ "<model>": { contextWindow, maxOutputTokens, … } }`); it never sends
+/// `model_context_window`, which is the key the rest of the app reads. Without
+/// this, every Claude turn fell through to the UI's assumed 200k — wrong for
+/// the 1M `[1m]` variants, and unverifiable for the rest.
+///
+/// A turn can name several models (a subagent on a cheap model, background
+/// work). The one that actually ran the turn is the one with the most tokens,
+/// so its window wins; entries without a usable window are ignored.
+fn attach_reported_context_window(mut usage: Value, source: &Value) -> Value {
+    if usage.get("model_context_window").is_some() {
+        return usage;
+    }
+    let Some(models) = source.get("modelUsage").and_then(Value::as_object) else {
+        return usage;
+    };
+    let busiest = models
+        .values()
+        .filter_map(|model| {
+            let window = model.get("contextWindow").and_then(Value::as_i64)?;
+            if window <= 0 {
+                return None;
+            }
+            let tokens: i64 = [
+                "inputTokens",
+                "outputTokens",
+                "cacheReadInputTokens",
+                "cacheCreationInputTokens",
+            ]
+            .iter()
+            .filter_map(|key| model.get(*key).and_then(Value::as_i64))
+            .sum();
+            Some((tokens, window))
+        })
+        .max_by_key(|(tokens, _)| *tokens);
+    let Some((_, window)) = busiest else {
+        return usage;
+    };
+    if let Some(object) = usage.as_object_mut() {
+        object.insert("model_context_window".to_string(), Value::from(window));
+    }
+    usage
+}
+
+/// Usage snapshot for a compacted turn. Occupancy is the post-compaction
+/// remainder (`post_tokens`), not the turn's billing input, but the turn's
+/// output still enters the context afterwards and the reported context
+/// window is carried over so the breakdown keeps its segments and scale
+/// (total = post_tokens + output_tokens).
+fn compact_usage(post_tokens: i64, raw: Option<&Value>) -> Value {
+    let output = raw
+        .and_then(|u| u.get("output_tokens"))
+        .and_then(Value::as_i64)
+        .unwrap_or(0);
+    let mut usage = serde_json::json!({
+        "input_tokens": post_tokens,
+        "output_tokens": output,
+        "total_tokens": post_tokens + output,
+    });
+    if let (Some(raw), Some(obj)) = (raw, usage.as_object_mut()) {
+        if let Some(window) = raw.get("model_context_window") {
+            obj.insert("model_context_window".to_string(), window.clone());
+        }
+    }
+    usage
+}
+
+/// Human-readable line for a `system/api_retry` event.
+fn format_api_retry(value: &Value) -> String {
+    let attempt = value.get("attempt").and_then(Value::as_u64).unwrap_or(0);
+    let max = value
+        .get("max_retries")
+        .and_then(Value::as_u64)
+        .unwrap_or(0);
+    let delay_ms = value
+        .get("retry_delay_ms")
+        .and_then(Value::as_u64)
+        .unwrap_or(0);
+    let detail = value
+        .get("error")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|e| !e.is_empty() && *e != "unknown");
+    let mut msg = match value.get("error_status").and_then(Value::as_u64) {
+        Some(code) => format!("API error (HTTP {code})"),
+        None => match detail {
+            Some(detail) => format!("API error: {detail}"),
+            None => "API error".to_string(),
+        },
+    };
+    msg.push_str(&format!(
+        "; retrying ({attempt}/{max}) in {:.1}s",
+        delay_ms as f64 / 1000.0
+    ));
+    msg
+}
+
+/// Anthropic SSE wrapped events (requires --include-partial-messages).
+fn parse_stream_event(
+    pending: &Mutex<HashMap<u64, PendingTool>>,
+    tool_names: &Mutex<HashMap<String, String>>,
+    tool_paths: &Mutex<HashMap<String, String>>,
+    value: &Value,
+    out: &mut Vec<EngineEvent>,
+) {
+    let Some(event) = value.get("event") else {
+        return;
+    };
+    match event.get("type").and_then(Value::as_str) {
+        Some("message_start") => out.push(EngineEvent::Generation { active: true }),
+        // Decode window closes after the last block (tool arguments included).
+        Some("message_stop") => out.push(EngineEvent::Generation { active: false }),
+        Some("content_block_delta") => parse_content_block_delta(pending, event, out),
+        // Tool calls surface at block start with `input: {}`; the real
+        // arguments stream in as `input_json_delta` and flush on stop.
+        Some("content_block_start") => {
+            parse_content_block_start(pending, tool_names, tool_paths, event, out)
+        }
+        Some("content_block_stop") => parse_content_block_stop(pending, tool_paths, event, out),
+        _ => {}
+    }
+}
+
+fn parse_content_block_delta(
+    pending: &Mutex<HashMap<u64, PendingTool>>,
+    event: &Value,
+    out: &mut Vec<EngineEvent>,
+) {
+    let Some(delta) = event.get("delta") else {
+        return;
+    };
+    match delta.get("type").and_then(Value::as_str) {
+        Some("text_delta") | Some("thinking_delta") => {
+            let is_thinking = delta.get("type").and_then(Value::as_str) == Some("thinking_delta");
+            let key = if is_thinking { "thinking" } else { "text" };
+            let Some(text) = delta.get(key).and_then(Value::as_str) else {
+                return;
+            };
+            if text.is_empty() {
+                return;
+            }
+            if is_thinking {
+                out.push(EngineEvent::Thinking(text.to_string()));
+            } else {
+                out.push(EngineEvent::Delta(text.to_string()));
+            }
+        }
+        Some("input_json_delta") => {
+            let Some(partial) = delta.get("partial_json").and_then(Value::as_str) else {
+                return;
+            };
+            if partial.is_empty() {
+                return;
+            }
+            let Some(index) = event.get("index").and_then(Value::as_u64) else {
+                return;
+            };
+            if let Ok(mut map) = pending.lock() {
+                if let Some(tool) = map.get_mut(&index) {
+                    tool.json.push_str(partial);
+                }
+            }
+        }
+        _ => {}
+    }
+}
+
+fn parse_content_block_start(
+    pending: &Mutex<HashMap<u64, PendingTool>>,
+    tool_names: &Mutex<HashMap<String, String>>,
+    tool_paths: &Mutex<HashMap<String, String>>,
+    event: &Value,
+    out: &mut Vec<EngineEvent>,
+) {
+    let Some(block) = event.get("content_block") else {
+        return;
+    };
+    if block.get("type").and_then(Value::as_str) != Some("tool_use") {
+        return;
+    }
+    let name = block
+        .get("name")
+        .and_then(Value::as_str)
+        .unwrap_or("tool")
+        .to_string();
+    let input = block.get("input");
+    if let Some(id) = block.get("id").and_then(Value::as_str) {
+        if let Ok(mut map) = tool_names.lock() {
+            map.insert(id.to_string(), name.clone());
+        }
+        // Non-streaming lines carry the full input at block start; record
+        // its path argument immediately (partial streams patch it at stop).
+        if let Some(path) = input.and_then(super::tool_path_arg) {
+            if let Ok(mut map) = tool_paths.lock() {
+                map.insert(id.to_string(), path);
+            }
+        }
+    }
+    let tool_call_id = block.get("id").and_then(Value::as_str).map(str::to_string);
+    if let Some(index) = event.get("index").and_then(Value::as_u64) {
+        if let Ok(mut map) = pending.lock() {
+            map.insert(
+                index,
+                PendingTool {
+                    name: name.clone(),
+                    id: block.get("id").and_then(Value::as_str).map(str::to_string),
+                    json: String::new(),
+                    tool_call_id: tool_call_id.clone(),
+                },
+            );
+        }
+    }
+    // Name-only start so the timeline can show the tool immediately; args
+    // patch in when the JSON stream completes (or if input is already full).
+    out.push(tool_call_message_with_id(
+        name,
+        input,
+        tool_call_id.as_deref(),
+    ));
+}
+
+fn parse_content_block_stop(
+    pending: &Mutex<HashMap<u64, PendingTool>>,
+    tool_paths: &Mutex<HashMap<String, String>>,
+    event: &Value,
+    out: &mut Vec<EngineEvent>,
+) {
+    let Some(index) = event.get("index").and_then(Value::as_u64) else {
+        return;
+    };
+    let Some(tool) = pending.lock().ok().and_then(|mut map| map.remove(&index)) else {
+        return;
+    };
+    let trimmed = tool.json.trim();
+    if trimmed.is_empty() {
+        return;
+    }
+    let Ok(args) = serde_json::from_str::<Value>(trimmed) else {
+        return;
+    };
+    if let (Some(id), Some(path)) = (tool.id.as_ref(), super::tool_path_arg(&args)) {
+        if let Ok(mut map) = tool_paths.lock() {
+            map.insert(id.clone(), path);
+        }
+    }
+    out.push(tool_call_patch_with_id(
+        tool.name,
+        Some(&args),
+        tool.tool_call_id.as_deref(),
+    ));
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn init_event_reports_mcp_servers_and_tools() {
+        let line = serde_json::json!({
+            "type": "system",
+            "subtype": "init",
+            "session_id": "s-1",
+            "mcp_servers": [
+                { "name": "alpha", "status": "connected" },
+                { "name": "broken", "status": "failed" },
+                { "name": "  " }
+            ],
+            "tools": ["Bash", "mcp__alpha__search", 7]
+        })
+        .to_string();
+        let mut out = Vec::new();
+        ClaudeEngine::new().parse_line(&line, &mut out);
+        let (servers, tools) = out
+            .iter()
+            .find_map(|event| match event {
+                EngineEvent::McpServers { servers, tools } => Some((servers, tools)),
+                _ => None,
+            })
+            .expect("init must emit an MCP snapshot event");
+        assert_eq!(
+            servers,
+            &vec![
+                ("alpha".to_string(), Some("connected".to_string())),
+                ("broken".to_string(), Some("failed".to_string())),
+            ]
+        );
+        assert_eq!(
+            tools,
+            &vec!["Bash".to_string(), "mcp__alpha__search".to_string()]
+        );
+
+        // An init without mcp_servers produces no event (no snapshot out of nothing).
+        let mut out = Vec::new();
+        ClaudeEngine::new().parse_line(
+            &serde_json::json!({
+                "type": "system",
+                "subtype": "init",
+                "session_id": "s-2",
+                "mcp_servers": []
+            })
+            .to_string(),
+            &mut out,
+        );
+        assert!(!out
+            .iter()
+            .any(|event| matches!(event, EngineEvent::McpServers { .. })));
+    }
+
+    #[test]
+    fn assistant_snapshot_reports_the_served_selection() {
+        let mut out = Vec::new();
+        ClaudeEngine::new().parse_line(
+            &serde_json::json!({
+                "type": "assistant",
+                "session_id": "s-1",
+                "message": { "model": "claude-opus-4", "thinking_effort": "high" }
+            })
+            .to_string(),
+            &mut out,
+        );
+        assert!(
+            out.iter().any(|e| matches!(
+                e,
+                EngineEvent::Served { model: Some(model), effort: Some(effort) }
+                    if model == "claude-opus-4" && effort == "high"
+            )),
+            "got {out:?}"
+        );
+
+        // `<synthetic>` marks a message the CLI fabricated locally (an error
+        // or an interrupt): not a served model, so no evidence is emitted.
+        let mut out = Vec::new();
+        ClaudeEngine::new().parse_line(
+            &serde_json::json!({
+                "type": "assistant",
+                "message": { "model": "<synthetic>" }
+            })
+            .to_string(),
+            &mut out,
+        );
+        assert!(
+            !out.iter().any(|e| matches!(e, EngineEvent::Served { .. })),
+            "got {out:?}"
+        );
+
+        // A top-level level is accepted only when the streamed assistant
+        // event explicitly carries it.
+        let mut out = Vec::new();
+        ClaudeEngine::new().parse_line(
+            &serde_json::json!({
+                "type": "assistant",
+                "session_id": "s-1",
+                "effort": "max",
+                "message": { "model": "claude-opus-4" }
+            })
+            .to_string(),
+            &mut out,
+        );
+        assert!(
+            out.iter()
+                .any(|e| matches!(e, EngineEvent::Effort(level) if level == "max")),
+            "got {out:?}"
+        );
+        assert!(
+            out.iter().any(|e| matches!(
+                e,
+                EngineEvent::Served { model: Some(_), effort: Some(effort) } if effort == "max"
+            )),
+            "got {out:?}"
+        );
+    }
+
+    #[test]
+    fn assistant_message_reports_actual_thinking_effort() {
+        let line = serde_json::json!({
+            "type": "assistant",
+            "session_id": "s-1",
+            "message": { "model": "claude-opus-4", "thinking_effort": "high" }
+        })
+        .to_string();
+        let mut out = Vec::new();
+        ClaudeEngine::new().parse_line(&line, &mut out);
+        assert!(
+            out.iter()
+                .any(|e| matches!(e, EngineEvent::Effort(level) if level == "high")),
+            "got {out:?}"
+        );
+
+        // Top-level fallback; blank values are ignored.
+        let mut out = Vec::new();
+        ClaudeEngine::new().parse_line(
+            &serde_json::json!({ "type": "assistant", "thinking_effort": " low " }).to_string(),
+            &mut out,
+        );
+        assert!(
+            out.iter()
+                .any(|e| matches!(e, EngineEvent::Effort(level) if level == "low")),
+            "got {out:?}"
+        );
+        let mut out = Vec::new();
+        ClaudeEngine::new().parse_line(
+            &serde_json::json!({ "type": "assistant", "thinking_effort": "  " }).to_string(),
+            &mut out,
+        );
+        assert!(
+            !out.iter().any(|e| matches!(e, EngineEvent::Effort(_))),
+            "got {out:?}"
+        );
+    }
+
+    #[test]
+    fn assistant_snapshot_without_effort_keeps_it_unreported() {
+        let mut out = Vec::new();
+        ClaudeEngine::new().parse_line(
+            &serde_json::json!({
+                "type": "assistant",
+                "session_id": "s-1",
+                "message": { "model": "claude-opus-4" }
+            })
+            .to_string(),
+            &mut out,
+        );
+        assert!(
+            out.iter().any(|event| matches!(
+                event,
+                EngineEvent::Served { model: Some(model), effort: None }
+                    if model == "claude-opus-4"
+            )),
+            "model remains reported while effort stays unknown: {out:?}"
+        );
+        assert!(
+            !out.iter()
+                .any(|event| matches!(event, EngineEvent::Effort(_))),
+            "missing stream effort must not be inferred: {out:?}"
+        );
+    }
+
+    #[test]
+    fn ask_user_question_control_request_emits_question() {
+        let line = serde_json::json!({
+            "type": "control_request",
+            "request_id": "req-1",
+            "request": {
+                "subtype": "can_use_tool",
+                "tool_name": "AskUserQuestion",
+                "tool_use_id": "call_1",
+                "requires_user_interaction": true,
+                "input": { "questions": [ { "question": "Q?", "header": "H",
+                    "options": [ {"label": "A", "description": "a"}, {"label": "B", "description": "b"} ] } ] }
+            }
+        })
+        .to_string();
+        let mut out = Vec::new();
+        ClaudeEngine::new().parse_line(&line, &mut out);
+        assert_eq!(out.len(), 1);
+        match &out[0] {
+            EngineEvent::Question {
+                request_id,
+                tool_use_id,
+                input,
+            } => {
+                assert_eq!(request_id, "req-1");
+                assert_eq!(tool_use_id.as_deref(), Some("call_1"));
+                assert_eq!(input["questions"][0]["header"], "H");
+            }
+            other => panic!("expected question event, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn other_control_asks_go_to_the_gate() {
+        let line = serde_json::json!({
+            "type": "control_request",
+            "request_id": "req-2",
+            "request": { "subtype": "can_use_tool", "tool_name": "Bash", "input": {} }
+        })
+        .to_string();
+        let mut out = Vec::new();
+        ClaudeEngine::new().parse_line(&line, &mut out);
+        match &out[..] {
+            [EngineEvent::ControlPermission {
+                request_id,
+                tool_name,
+                ..
+            }] => {
+                assert_eq!(request_id, "req-2");
+                assert_eq!(tool_name, "Bash");
+            }
+            other => panic!("expected control permission event, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn control_cancel_request_settles_the_question() {
+        let line = serde_json::json!({
+            "type": "control_cancel_request",
+            "request_id": "req-3"
+        })
+        .to_string();
+        let mut out = Vec::new();
+        ClaudeEngine::new().parse_line(&line, &mut out);
+        match &out[..] {
+            [EngineEvent::QuestionSettled { request_id }] => assert_eq!(request_id, "req-3"),
+            other => panic!("expected settled event, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn mcp_elicitation_control_request_declines_in_place() {
+        let line = serde_json::json!({
+            "type": "control_request",
+            "request_id": "req-elicit-1",
+            "request": {
+                "subtype": "elicitation",
+                "mcp_server_name": "elicit-demo",
+                "message": "Continue?",
+                "requested_schema": { "type": "object", "properties": { "ok": { "type": "boolean" } } }
+            }
+        })
+        .to_string();
+        let mut out = Vec::new();
+        ClaudeEngine::new().parse_line(&line, &mut out);
+        match &out[..] {
+            [EngineEvent::ElicitationDecline { request_id }] => {
+                assert_eq!(request_id, "req-elicit-1");
+            }
+            other => panic!("expected elicitation decline event, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn unknown_control_request_subtypes_error_in_place() {
+        let line = serde_json::json!({
+            "type": "control_request",
+            "request_id": "req-unknown-1",
+            "request": { "subtype": "future_ask", "payload": {} }
+        })
+        .to_string();
+        let mut out = Vec::new();
+        ClaudeEngine::new().parse_line(&line, &mut out);
+        match &out[..] {
+            [EngineEvent::ControlRequestError {
+                request_id,
+                subtype,
+            }] => {
+                assert_eq!(request_id, "req-unknown-1");
+                assert_eq!(subtype, "future_ask");
+            }
+            other => panic!("expected control error event, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn control_request_without_id_is_ignored() {
+        let line = serde_json::json!({
+            "type": "control_request",
+            "request": { "subtype": "elicitation", "message": "Continue?" }
+        })
+        .to_string();
+        let mut out = Vec::new();
+        ClaudeEngine::new().parse_line(&line, &mut out);
+        assert!(out.is_empty(), "no request_id, nothing to answer: {out:?}");
+    }
+
+    #[test]
+    fn stream_message_boundaries_open_and_close_the_generation_window() {
+        let engine = ClaudeEngine::new();
+        let start = serde_json::json!({
+            "type": "stream_event",
+            "event": { "type": "message_start", "message": { "id": "msg_1" } }
+        })
+        .to_string();
+        let stop = serde_json::json!({
+            "type": "stream_event",
+            "event": { "type": "message_stop" }
+        })
+        .to_string();
+        let mut out = Vec::new();
+        engine.parse_line(&start, &mut out);
+        engine.parse_line(&stop, &mut out);
+        assert_eq!(out.len(), 2);
+        assert!(matches!(&out[0], EngineEvent::Generation { active: true }));
+        assert!(matches!(&out[1], EngineEvent::Generation { active: false }));
+    }
+
+    #[test]
+    fn tool_use_block_start_emits_tool_message() {
+        let line = serde_json::json!({
+            "type": "stream_event",
+            "event": {
+                "type": "content_block_start",
+                "index": 1,
+                "content_block": { "type": "tool_use", "id": "toolu_1", "name": "Bash", "input": {} }
+            }
+        })
+        .to_string();
+        let mut out = Vec::new();
+        ClaudeEngine::new().parse_line(&line, &mut out);
+        assert_eq!(out.len(), 1);
+        match &out[0] {
+            EngineEvent::Message {
+                role,
+                text,
+                args,
+                tool_call_id,
+                ..
+            } => {
+                assert_eq!(role, "tool");
+                assert_eq!(text, "Bash");
+                assert!(args.is_none());
+                assert_eq!(tool_call_id.as_deref(), Some("toolu_1"));
+            }
+            _ => panic!("expected tool message"),
+        }
+    }
+
+    #[test]
+    fn tool_use_input_json_delta_patches_args() {
+        let engine = ClaudeEngine::new();
+        let start = serde_json::json!({
+            "type": "stream_event",
+            "event": {
+                "type": "content_block_start",
+                "index": 1,
+                "content_block": { "type": "tool_use", "id": "toolu_1", "name": "Read", "input": {} }
+            }
+        })
+        .to_string();
+        let delta = serde_json::json!({
+            "type": "stream_event",
+            "event": {
+                "type": "content_block_delta",
+                "index": 1,
+                "delta": { "type": "input_json_delta", "partial_json": "{\"file_path\":\"src/a.ts\"}" }
+            }
+        })
+        .to_string();
+        let stop = serde_json::json!({
+            "type": "stream_event",
+            "event": { "type": "content_block_stop", "index": 1 }
+        })
+        .to_string();
+        let mut out = Vec::new();
+        engine.parse_line(&start, &mut out);
+        engine.parse_line(&delta, &mut out);
+        assert_eq!(out.len(), 1);
+        out.clear();
+        engine.parse_line(&stop, &mut out);
+        assert_eq!(out.len(), 1);
+        match &out[0] {
+            EngineEvent::Message {
+                text,
+                path,
+                args,
+                patch,
+                tool_call_id,
+                ..
+            } => {
+                assert_eq!(text, "Read");
+                assert_eq!(path.as_deref(), Some("src/a.ts"));
+                assert_eq!(args, &Some(serde_json::json!({"file_path": "src/a.ts"})));
+                assert!(*patch);
+                assert_eq!(tool_call_id.as_deref(), Some("toolu_1"));
+            }
+            _ => panic!("expected patched tool message"),
+        }
+    }
+
+    #[test]
+    fn tool_result_is_attributed_via_tool_use_id() {
+        let engine = ClaudeEngine::new();
+        let start = serde_json::json!({
+            "type": "stream_event",
+            "event": {
+                "type": "content_block_start",
+                "index": 0,
+                "content_block": { "type": "tool_use", "id": "toolu_1", "name": "Bash", "input": {} }
+            }
+        })
+        .to_string();
+        let user = serde_json::json!({
+            "type": "user",
+            "message": {
+                "content": [
+                    { "type": "tool_result", "tool_use_id": "toolu_1", "content": "On branch main" }
+                ]
+            }
+        })
+        .to_string();
+        let mut out = Vec::new();
+        engine.parse_line(&start, &mut out);
+        out.clear();
+        engine.parse_line(&user, &mut out);
+        let patch = out
+            .iter()
+            .find(|e| {
+                matches!(
+                    e,
+                    EngineEvent::Message {
+                        patch: true,
+                        result: Some(_),
+                        ..
+                    }
+                )
+            })
+            .expect("expected a tool result patch");
+        match patch {
+            EngineEvent::Message {
+                text,
+                result,
+                patch,
+                tool_call_id,
+                ..
+            } => {
+                assert_eq!(text, "Bash");
+                assert_eq!(result, &Some(serde_json::json!("On branch main")));
+                assert!(*patch);
+                assert_eq!(tool_call_id.as_deref(), Some("toolu_1"));
+            }
+            _ => unreachable!(),
+        }
+    }
+
+    /// Live wire: TaskCreate and TaskGet both answer with a `toolUseResult`
+    /// of `{task:{id,subject,...}}`. Only the creation names a new todo id;
+    /// reading a task must not patch the list (it used to reset it to pending).
+    #[test]
+    fn task_create_result_carries_the_id_and_task_get_patches_nothing() {
+        let engine = ClaudeEngine::new();
+        let start = |id: &str, name: &str| {
+            serde_json::json!({
+                "type": "stream_event",
+                "event": {
+                    "type": "content_block_start",
+                    "index": 0,
+                    "content_block": { "type": "tool_use", "id": id, "name": name, "input": {} }
+                }
+            })
+            .to_string()
+        };
+        let answer = |id: &str, envelope: Value, text: &str| {
+            serde_json::json!({
+                "type": "user",
+                "message": { "content": [
+                    { "type": "tool_result", "tool_use_id": id, "content": text }
+                ]},
+                "toolUseResult": envelope
+            })
+            .to_string()
+        };
+        let result_todos = |out: &[EngineEvent]| {
+            out.iter()
+                .find_map(|e| match e {
+                    EngineEvent::Message {
+                        patch: true,
+                        result: Some(_),
+                        todos,
+                        ..
+                    } => Some(todos.clone()),
+                    _ => None,
+                })
+                .expect("expected a tool result patch")
+        };
+
+        let mut out = Vec::new();
+        engine.parse_line(&start("toolu_c", "TaskCreate"), &mut out);
+        out.clear();
+        engine.parse_line(
+            &answer(
+                "toolu_c",
+                serde_json::json!({"task": {"id": "1", "subject": "A"}}),
+                "Task #1 created successfully: A",
+            ),
+            &mut out,
+        );
+        let created = result_todos(&out).expect("TaskCreate result is a todo fact");
+        assert_eq!(created.items[0].id.as_deref(), Some("1"));
+        assert_eq!(created.items[0].content, "A");
+
+        out.clear();
+        engine.parse_line(&start("toolu_g", "TaskGet"), &mut out);
+        out.clear();
+        engine.parse_line(
+            &answer(
+                "toolu_g",
+                serde_json::json!({"task": {"id": "1", "subject": "A", "description": "",
+                    "status": "completed", "blocks": [], "blockedBy": []}}),
+                "Task #1: A\nStatus: completed\nDescription: ",
+            ),
+            &mut out,
+        );
+        assert!(
+            result_todos(&out).is_none(),
+            "TaskGet must not patch the todo list"
+        );
+    }
+
+    #[test]
+    fn api_retry_system_event_reports_progress_without_settling() {
+        let line = serde_json::json!({
+            "type": "system",
+            "subtype": "api_retry",
+            "attempt": 3,
+            "max_retries": 10,
+            "retry_delay_ms": 9560,
+            "error_status": 529,
+            "error": "overloaded",
+            "session_id": "s-1"
+        })
+        .to_string();
+        let mut out = Vec::new();
+        ClaudeEngine::new().parse_line(&line, &mut out);
+        assert_eq!(out.len(), 2);
+        match &out[1] {
+            EngineEvent::Retry {
+                attempt,
+                max,
+                message,
+            } => {
+                assert_eq!((*attempt, *max), (3, 10));
+                assert!(message.contains("529"), "{message}");
+                assert!(message.contains("9.6s"), "{message}");
+            }
+            other => panic!("expected retry progress, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn api_retry_without_status_falls_back_to_error_text() {
+        let line = serde_json::json!({
+            "type": "system",
+            "subtype": "api_retry",
+            "attempt": 1,
+            "max_retries": 10,
+            "retry_delay_ms": 1000,
+            "error_status": null,
+            "error": "unknown"
+        })
+        .to_string();
+        let mut out = Vec::new();
+        ClaudeEngine::new().parse_line(&line, &mut out);
+        match &out[0] {
+            EngineEvent::Retry { message, .. } => {
+                assert!(message.starts_with("API error;"), "{message}")
+            }
+            other => panic!("expected retry progress, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn text_block_start_emits_nothing() {
+        let line = serde_json::json!({
+            "type": "stream_event",
+            "event": {
+                "type": "content_block_start",
+                "index": 0,
+                "content_block": { "type": "text", "text": "" }
+            }
+        })
+        .to_string();
+        let mut out = Vec::new();
+        ClaudeEngine::new().parse_line(&line, &mut out);
+        assert!(out.is_empty());
+    }
+
+    #[test]
+    fn tool_result_permission_denial_surfaces_path() {
+        let line = serde_json::json!({
+            "type": "user",
+            "message": {
+                "role": "user",
+                "content": [{
+                    "type": "tool_result",
+                    "tool_use_id": "toolu_1",
+                    "is_error": true,
+                    "content": [{
+                        "type": "text",
+                        "text": "Claude requested permissions to read from C:\\dev\\frontend, but you haven't granted it yet."
+                    }]
+                }]
+            }
+        })
+        .to_string();
+        let mut out = Vec::new();
+        ClaudeEngine::new().parse_line(&line, &mut out);
+        assert_eq!(out.len(), 1);
+        match &out[0] {
+            EngineEvent::PermissionDenied {
+                tool,
+                path,
+                message,
+                ..
+            } => {
+                assert_eq!(*tool, None);
+                assert_eq!(path.as_deref(), Some(r"C:\dev\frontend"));
+                assert!(message.contains("requested permissions"));
+            }
+            _ => panic!("expected permission denial"),
+        }
+    }
+
+    #[test]
+    fn tool_result_denial_resolves_path_from_tool_input() {
+        let engine = ClaudeEngine::new();
+        let start = serde_json::json!({
+            "type": "stream_event",
+            "event": {
+                "type": "content_block_start",
+                "index": 0,
+                "content_block": { "type": "tool_use", "id": "toolu_9", "name": "Read", "input": {} }
+            }
+        })
+        .to_string();
+        let delta = serde_json::json!({
+            "type": "stream_event",
+            "event": {
+                "type": "content_block_delta",
+                "index": 0,
+                "delta": { "type": "input_json_delta", "partial_json": "{\"file_path\":\"/etc/hosts\"}" }
+            }
+        })
+        .to_string();
+        let stop = serde_json::json!({
+            "type": "stream_event",
+            "event": { "type": "content_block_stop", "index": 0 }
+        })
+        .to_string();
+        // Pathless denial text: nothing for extract_absolute_path to find.
+        let denial = serde_json::json!({
+            "type": "user",
+            "message": {
+                "role": "user",
+                "content": [{
+                    "type": "tool_result",
+                    "tool_use_id": "toolu_9",
+                    "is_error": true,
+                    "content": "Claude requested permissions to read this file, but you haven't granted it yet."
+                }]
+            }
+        })
+        .to_string();
+        let mut out = Vec::new();
+        for line in [&start, &delta, &stop, &denial] {
+            engine.parse_line(line, &mut out);
+        }
+        let denial = out
+            .iter()
+            .find(|e| matches!(e, EngineEvent::PermissionDenied { .. }))
+            .expect("expected permission denial");
+        match denial {
+            EngineEvent::PermissionDenied {
+                tool,
+                path,
+                tool_use_id,
+                ..
+            } => {
+                assert_eq!(tool.as_deref(), Some("Read"));
+                assert_eq!(path.as_deref(), Some("/etc/hosts"));
+                assert_eq!(tool_use_id.as_deref(), Some("toolu_9"));
+            }
+            _ => unreachable!(),
+        }
+    }
+
+    #[test]
+    fn tool_result_non_error_and_non_denial_stay_silent() {
+        for (is_error, text) in [(
+            false,
+            "Claude requested permissions to read from /etc, but you haven't granted it yet.",
+        )] {
+            let line = serde_json::json!({
+                "type": "user",
+                "message": {
+                    "role": "user",
+                    "content": [{
+                        "type": "tool_result",
+                        "tool_use_id": "toolu_1",
+                        "is_error": is_error,
+                        "content": text
+                    }]
+                }
+            })
+            .to_string();
+            let mut out = Vec::new();
+            ClaudeEngine::new().parse_line(&line, &mut out);
+            assert!(out.is_empty(), "is_error={is_error} text={text}");
+        }
+    }
+
+    #[test]
+    fn a_failed_tool_result_settles_its_row_as_a_failure() {
+        let line = serde_json::json!({
+            "type": "user",
+            "message": { "role": "user", "content": [{
+                "type": "tool_result",
+                "tool_use_id": "toolu_1",
+                "is_error": true,
+                "content": "file not found: /tmp/missing.txt"
+            }]}
+        })
+        .to_string();
+        let mut out = Vec::new();
+        ClaudeEngine::new().parse_line(&line, &mut out);
+        match &out[..] {
+            [EngineEvent::Message {
+                result: Some(result),
+                patch: true,
+                ..
+            }] => {
+                assert_eq!(result["isError"], true);
+            }
+            other => panic!("expected a failed result patch, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn result_permission_denials_emit_structured_events() {
+        let line = serde_json::json!({
+            "type": "result",
+            "subtype": "success",
+            "is_error": false,
+            "session_id": "s-1",
+            "permission_denials": [{
+                "tool_name": "Read",
+                "tool_use_id": "toolu_1",
+                "tool_input": { "file_path": "/Users/x/secrets/key.pem" }
+            }]
+        })
+        .to_string();
+        let mut out = Vec::new();
+        ClaudeEngine::new().parse_line(&line, &mut out);
+        assert_eq!(out.len(), 2);
+        match &out[0] {
+            // The same call's mid-turn copy carries this id too: the
+            // frontend matches the two by it.
+            EngineEvent::PermissionDenied {
+                tool,
+                path,
+                tool_use_id,
+                ..
+            } => {
+                assert_eq!(tool.as_deref(), Some("Read"));
+                assert_eq!(path.as_deref(), Some("/Users/x/secrets/key.pem"));
+                assert_eq!(tool_use_id.as_deref(), Some("toolu_1"));
+            }
+            _ => panic!("expected permission denial"),
+        }
+        assert!(matches!(out[1], EngineEvent::Done { .. }));
+    }
+
+    /// A declined AskUserQuestion is the user's answer, not a grantable
+    /// permission. CodeBuddy 2.179 lists it in `permission_denials` (shape
+    /// copied from a real run) and its mid-turn result reads "Permission
+    /// denied by SDK"; neither may raise a "permission required" card.
+    #[test]
+    fn declined_question_never_surfaces_as_permission_denial() {
+        let engine = ClaudeEngine::new();
+        let start = serde_json::json!({
+            "type": "stream_event",
+            "event": {
+                "type": "content_block_start",
+                "index": 0,
+                "content_block": {
+                    "type": "tool_use", "id": "call_ask_1", "name": "AskUserQuestion", "input": {}
+                }
+            }
+        })
+        .to_string();
+        let stop = serde_json::json!({
+            "type": "stream_event",
+            "event": { "type": "content_block_stop", "index": 0 }
+        })
+        .to_string();
+        let declined = serde_json::json!({
+            "type": "user",
+            "message": {
+                "role": "user",
+                "content": [{
+                    "type": "tool_result",
+                    "tool_use_id": "call_ask_1",
+                    "is_error": true,
+                    "content": [{ "type": "text", "text": "Permission denied by SDK" }]
+                }]
+            }
+        })
+        .to_string();
+        let result = serde_json::json!({
+            "type": "result",
+            "subtype": "success",
+            "is_error": false,
+            "session_id": "s-1",
+            "permission_denials": [{
+                "tool_name": "AskUserQuestion",
+                "tool_use_id": "call_ask_1",
+                "tool_input": { "questions": [{ "question": "Which color?", "header": "Color" }] }
+            }]
+        })
+        .to_string();
+        let mut out = Vec::new();
+        for line in [&start, &stop, &declined, &result] {
+            engine.parse_line(line, &mut out);
+        }
+        assert!(
+            !out.iter()
+                .any(|e| matches!(e, EngineEvent::PermissionDenied { .. })),
+            "declined question surfaced as a permission denial: {out:?}"
+        );
+        assert!(matches!(out.last(), Some(EngineEvent::Done { .. })));
+    }
+
+    #[test]
+    fn extract_absolute_path_handles_windows_and_posix() {
+        assert_eq!(
+            extract_absolute_path("read from C:\\dev\\proj, but"),
+            Some(r"C:\dev\proj".to_string())
+        );
+        assert_eq!(
+            extract_absolute_path("write to \"/etc/hosts\"."),
+            Some("/etc/hosts".to_string())
+        );
+        assert_eq!(extract_absolute_path("no path here"), None);
+    }
+
+    fn compact_result_line() -> String {
+        serde_json::json!({
+            "type": "result",
+            "subtype": "success",
+            "is_error": false,
+            "session_id": "s-1",
+            "usage": {
+                "input_tokens": 30190,
+                "output_tokens": 1200,
+                "total_tokens": 31390,
+                "model_context_window": 200000
+            }
+        })
+        .to_string()
+    }
+
+    #[test]
+    fn compact_boundary_emits_usage_and_overrides_turn_result_once() {
+        let engine = ClaudeEngine::new();
+        let boundary = serde_json::json!({
+            "type": "system",
+            "subtype": "compact_boundary",
+            "compactMetadata": { "preTokens": 30190, "postTokens": 8038, "durationMs": 4207 }
+        })
+        .to_string();
+        let mut out = Vec::new();
+        engine.parse_line(&boundary, &mut out);
+        assert_eq!(out.len(), 1);
+        match &out[0] {
+            EngineEvent::Usage(usage) => {
+                assert_eq!(usage["input_tokens"], 8038);
+                assert_eq!(usage["total_tokens"], 8038);
+            }
+            _ => panic!("expected usage event"),
+        }
+
+        // The following result's billing usage is replaced by the
+        // post-compaction occupancy, keeping output and the context window.
+        let mut out = Vec::new();
+        engine.parse_line(&compact_result_line(), &mut out);
+        match &out[0] {
+            EngineEvent::Done { usage, .. } => {
+                let usage = usage.as_ref().expect("usage");
+                assert_eq!(usage["input_tokens"], 8038);
+                assert_eq!(usage["output_tokens"], 1200);
+                assert_eq!(usage["total_tokens"], 8038 + 1200);
+                assert_eq!(usage["model_context_window"], 200000);
+            }
+            _ => panic!("expected done event"),
+        }
+
+        // Single-shot: the next turn without a boundary keeps billing usage.
+        let mut out = Vec::new();
+        engine.parse_line(&compact_result_line(), &mut out);
+        match &out[0] {
+            EngineEvent::Done { usage, .. } => {
+                assert_eq!(usage.as_ref().expect("usage")["input_tokens"], 30190);
+            }
+            _ => panic!("expected done event"),
+        }
+    }
+
+    #[test]
+    fn result_without_compact_boundary_keeps_billing_usage() {
+        let mut out = Vec::new();
+        ClaudeEngine::new().parse_line(&compact_result_line(), &mut out);
+        match &out[0] {
+            EngineEvent::Done { usage, .. } => {
+                let usage = usage.as_ref().expect("usage");
+                assert_eq!(usage["input_tokens"], 30190);
+                assert_eq!(usage["total_tokens"], 31390);
+            }
+            _ => panic!("expected done event"),
+        }
+    }
+
+    #[test]
+    fn compact_boundary_without_metadata_stays_silent() {
+        let line = serde_json::json!({
+            "type": "system",
+            "subtype": "compact_boundary"
+        })
+        .to_string();
+        let mut out = Vec::new();
+        ClaudeEngine::new().parse_line(&line, &mut out);
+        assert!(out.is_empty());
+    }
+
+    /// The UI's context gauge divided by a hardcoded 200k because nothing
+    /// read the window the CLI reports per model. The result line carries it
+    /// under `modelUsage`; the model that did the work is the busiest one, so
+    /// a cheap subagent's window must not win a mixed turn.
+    #[test]
+    fn result_reports_the_window_of_the_model_that_did_the_work() {
+        let line = serde_json::json!({
+            "type": "result",
+            "subtype": "success",
+            "is_error": false,
+            "session_id": "s-1",
+            "usage": { "input_tokens": 900000, "output_tokens": 2000, "total_tokens": 902000 },
+            "modelUsage": {
+                "claude-haiku-4-5": {
+                    "inputTokens": 300, "outputTokens": 40, "contextWindow": 200000
+                },
+                "claude-opus-5[1m]": {
+                    "inputTokens": 880000, "outputTokens": 1250, "contextWindow": 1000000
+                }
+            }
+        })
+        .to_string();
+        let mut out = Vec::new();
+        ClaudeEngine::new().parse_line(&line, &mut out);
+        match &out[0] {
+            EngineEvent::Done { usage, .. } => {
+                let usage = usage.as_ref().expect("usage");
+                assert_eq!(usage["model_context_window"], 1_000_000);
+                // The billing figures stay the CLI's own.
+                assert_eq!(usage["input_tokens"], 900000);
+            }
+            _ => panic!("expected done event"),
+        }
+    }
+
+    /// Nothing usable reported ⇒ no key at all, so the UI keeps its own
+    /// explicit fallback instead of this layer inventing a number.
+    #[test]
+    fn result_without_a_reported_window_adds_nothing() {
+        for models in [
+            None,
+            Some(serde_json::json!({})),
+            Some(serde_json::json!({
+                "m": { "inputTokens": 10, "contextWindow": 0 }
+            })),
+        ] {
+            let mut value = serde_json::json!({
+                "type": "result",
+                "subtype": "success",
+                "is_error": false,
+                "session_id": "s-1",
+                "usage": { "input_tokens": 10, "output_tokens": 1, "total_tokens": 11 }
+            });
+            if let Some(models) = models {
+                value["modelUsage"] = models;
+            }
+            let mut out = Vec::new();
+            ClaudeEngine::new().parse_line(&value.to_string(), &mut out);
+            match &out[0] {
+                EngineEvent::Done { usage, .. } => {
+                    assert!(usage
+                        .as_ref()
+                        .expect("usage")
+                        .get("model_context_window")
+                        .is_none());
+                }
+                _ => panic!("expected done event"),
+            }
+        }
+    }
+
+    /// An explicitly reported window is the more specific statement and must
+    /// survive the per-model map.
+    #[test]
+    fn explicit_context_window_beats_the_model_map() {
+        let line = serde_json::json!({
+            "type": "result",
+            "subtype": "success",
+            "is_error": false,
+            "session_id": "s-1",
+            "usage": {
+                "input_tokens": 10, "output_tokens": 1, "total_tokens": 11,
+                "model_context_window": 500000
+            },
+            "modelUsage": { "m": { "inputTokens": 10, "contextWindow": 200000 } }
+        })
+        .to_string();
+        let mut out = Vec::new();
+        ClaudeEngine::new().parse_line(&line, &mut out);
+        match &out[0] {
+            EngineEvent::Done { usage, .. } => {
+                assert_eq!(
+                    usage.as_ref().expect("usage")["model_context_window"],
+                    500000
+                );
+            }
+            _ => panic!("expected done event"),
+        }
+    }
+
+    /// A compacted turn's usage is rebuilt from the boundary, so the window
+    /// has to be re-attached there too — that path dropped it before.
+    #[test]
+    fn compacted_turn_keeps_the_reported_window() {
+        let engine = ClaudeEngine::new();
+        let boundary = serde_json::json!({
+            "type": "system",
+            "subtype": "compact_boundary",
+            "compactMetadata": { "preTokens": 900000, "postTokens": 40000, "durationMs": 1000 }
+        })
+        .to_string();
+        let mut out = Vec::new();
+        engine.parse_line(&boundary, &mut out);
+
+        let result = serde_json::json!({
+            "type": "result",
+            "subtype": "success",
+            "is_error": false,
+            "session_id": "s-1",
+            "usage": { "input_tokens": 900000, "output_tokens": 50, "total_tokens": 900050 },
+            "modelUsage": { "claude-opus-5[1m]": { "inputTokens": 900000, "contextWindow": 1000000 } }
+        })
+        .to_string();
+        let mut out = Vec::new();
+        engine.parse_line(&result, &mut out);
+        match &out[0] {
+            EngineEvent::Done { usage, .. } => {
+                let usage = usage.as_ref().expect("usage");
+                assert_eq!(usage["input_tokens"], 40000);
+                assert_eq!(usage["model_context_window"], 1_000_000);
+            }
+            _ => panic!("expected done event"),
+        }
+    }
+
+    #[test]
+    fn build_command_passes_effort_flag() {
+        let engine = ClaudeEngine::new();
+        let mut request = SendRequest {
+            session_id: None,
+            prompt: "hi".into(),
+            prompt_contributions: vec![],
+            native_compact: false,
+            images: vec![],
+            workspace: std::path::PathBuf::from("/tmp"),
+            model: None,
+            effort: Some("xhigh".into()),
+            service_tier: None,
+            permission: None,
+            additional_dirs: vec![],
+            provider_id: None,
+            mcp_servers: None,
+            allowed_tools: None,
+        };
+        let built = engine.build_command(&request, "claude").unwrap();
+        let args: Vec<String> = built
+            .command
+            .as_std()
+            .get_args()
+            .map(|a| a.to_string_lossy().to_string())
+            .collect();
+        assert!(args.windows(2).any(|w| w == ["--effort", "xhigh"]));
+
+        request.effort = Some("ultra".into());
+        let built = engine.build_command(&request, "claude").unwrap();
+        let args: Vec<String> = built
+            .command
+            .as_std()
+            .get_args()
+            .map(|a| a.to_string_lossy().to_string())
+            .collect();
+        assert!(args.windows(2).any(|w| w == ["--effort", "ultra"]));
+        assert_eq!(
+            built
+                .command
+                .as_std()
+                .get_envs()
+                .find(|(k, _)| *k == "CLAUDE_CODE_EFFORT_LEVEL")
+                .and_then(|(_, v)| v),
+            Some(std::ffi::OsStr::new("ultra"))
+        );
+    }
+
+    /// A read-only run must land in the launch arguments (plan mode + whitelist + write tools
+    /// denied explicitly), not merely be named read-only.
+    #[test]
+    fn read_only_tool_constraints_force_plan_mode_and_whitelist() {
+        let engine = ClaudeEngine::new();
+        assert!(engine.supports_tool_constraints());
+        let request = SendRequest {
+            session_id: None,
+            prompt: "hi".into(),
+            prompt_contributions: Vec::new(),
+            native_compact: false,
+            images: vec![],
+            workspace: std::path::PathBuf::from("/tmp"),
+            model: None,
+            effort: None,
+            service_tier: None,
+            permission: Some("auto".into()),
+            additional_dirs: vec![],
+            provider_id: None,
+            mcp_servers: None,
+            allowed_tools: Some(vec!["Read".into(), "Grep".into()]),
+        };
+        let built = engine.build_command(&request, "claude").unwrap();
+        let args: Vec<String> = built
+            .command
+            .as_std()
+            .get_args()
+            .map(|a| a.to_string_lossy().to_string())
+            .collect();
+        assert!(args.windows(2).any(|w| w == ["--permission-mode", "plan"]));
+        assert!(args.windows(2).any(|w| w == ["--allowedTools", "Read"]));
+        let deny_at = args
+            .iter()
+            .position(|a| a == "--disallowedTools")
+            .expect("deny list");
+        for tool in ["Bash", "Edit", "Write", "NotebookEdit", "Task"] {
+            assert!(
+                args[deny_at + 1..].iter().any(|a| a == tool),
+                "{tool} must be explicitly denied"
+            );
+        }
+        // The ordinary permission flags must not appear as well (no conflicting modes).
+        assert!(!args
+            .windows(2)
+            .any(|w| w == ["--permission-mode", "acceptEdits"]));
+    }
+}

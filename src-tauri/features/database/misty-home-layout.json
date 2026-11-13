@@ -1,0 +1,41 @@
+{
+  "layoutVersion": 7,
+  "directories": [
+    "data",
+    "profiles",
+    "cache"
+  ],
+  "privateFiles": [],
+  "retired": [
+    ".auth",
+    ".cache",
+    ".cache/mail",
+    ".cache/sessions",
+    ".keys",
+    ".local/bin",
+    ".local/bin/misty-proxy",
+    ".profiles",
+    ".release",
+    ".template",
+    ".version",
+    "assets",
+    "cloud",
+    "config",
+    "data/browser-sync",
+    "db",
+    "forms",
+    "home.json",
+    "local",
+    "logs",
+    "mnt",
+    "notes",
+    "plugins",
+    "public",
+    "rclone",
+    "restic",
+    "scripts",
+    "session.json",
+    "tmp",
+    "workflows"
+  ]
+}

@@ -1,0 +1,66 @@
+/*
+ * Pressable's washes (its `wash` prop). Unlayered, so the resting color and fill a surface's own
+ * stylesheet gives it can't hide them. The open item (aria-current) and a disabled one keep their
+ * own look.
+ */
+[data-wash]:is(:hover, :focus-visible, :focus-within, [data-hover]):not(
+    :disabled,
+    [aria-current="page"],
+    [aria-current="true"]
+  ) {
+  color: var(--color-cream);
+}
+[data-wash="row"]:is(:hover, :focus-visible, :focus-within, [data-hover]):not(
+    :disabled,
+    [aria-current="page"],
+    [aria-current="true"]
+  ) {
+  background-color: var(--color-row-hover);
+}
+[data-wash="control"]:is(:hover, :focus-visible, :focus-within, [data-hover]):not(
+    :disabled,
+    [aria-current="page"],
+    [aria-current="true"]
+  ) {
+  background-color: var(--color-control-hover);
+}
+[data-wash="card"]:is(:hover, :focus-visible, :focus-within, [data-hover]):not(
+    :disabled,
+    [aria-current="page"],
+    [aria-current="true"]
+  ) {
+  border-color: var(--color-charcoal-border-strong);
+  background-color: var(--color-charcoal-hover);
+}
+
+/* A `selected` row or control (the item shown now in a list of them) keeps its pressed fill under
+   the pointer too. */
+[data-wash="row"][data-selected],
+[data-wash="row"][data-selected]:is(:hover, :focus-visible, :focus-within, [data-hover]) {
+  background-color: var(--color-row-active);
+}
+[data-wash="control"][data-selected],
+[data-wash="control"][data-selected]:is(:hover, :focus-visible, :focus-within, [data-hover]) {
+  background-color: var(--color-control-active);
+}
+
+/* `strong`: the pressed fill and bright text, for a control that must answer the pointer clearly
+   (the Windows caption buttons). */
+[data-wash="strong"]:is(:hover, :focus-visible, :focus-within, [data-hover]):not(
+    :disabled,
+    [aria-current="page"],
+    [aria-current="true"]
+  ) {
+  background-color: var(--color-charcoal-active);
+  color: var(--color-cream-bright);
+}
+
+/* `tint`: a surface tinted by the kind of thing it makes (Surface's `tint`, which sets
+   --surface-tint) takes more of its color. */
+[data-wash="tint"]:is(:hover, :focus-visible, :focus-within, [data-hover]):not(
+    :disabled,
+    [aria-current="page"],
+    [aria-current="true"]
+  ) {
+  background-color: color-mix(in srgb, var(--surface-tint) 16%, var(--color-charcoal-bg));
+}

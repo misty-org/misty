@@ -1,0 +1,359 @@
+{
+  "name": "options_pass_through_with_routing",
+  "modelId": "gateway/anthropic/claude-test",
+  "credentialProvider": "gateway",
+  "reasoning": "high",
+  "options": {
+    "prompt": [
+      {
+        "role": "system",
+        "content": "Be brief.",
+        "providerOptions": {
+          "anthropic": {
+            "cacheControl": {
+              "type": "ephemeral"
+            }
+          }
+        }
+      },
+      {
+        "role": "user",
+        "content": [
+          {
+            "type": "text",
+            "text": "Look."
+          },
+          {
+            "type": "file",
+            "mediaType": "image/png",
+            "data": {
+              "type": "data",
+              "data": "iVBORw0KGgo="
+            }
+          }
+        ]
+      },
+      {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "reasoning",
+            "text": "Thinking.",
+            "providerOptions": {
+              "anthropic": {
+                "signature": "sig"
+              }
+            }
+          },
+          {
+            "type": "text",
+            "text": "Calling."
+          },
+          {
+            "type": "tool-call",
+            "toolCallId": "a",
+            "toolName": "weather_forecast",
+            "input": {
+              "place": "Oslo"
+            }
+          }
+        ]
+      },
+      {
+        "role": "tool",
+        "content": [
+          {
+            "type": "tool-result",
+            "toolCallId": "a",
+            "toolName": "weather_forecast",
+            "output": {
+              "type": "content",
+              "value": [
+                {
+                  "type": "text",
+                  "text": "Sunny."
+                },
+                {
+                  "type": "file",
+                  "mediaType": "image/png",
+                  "data": {
+                    "type": "data",
+                    "data": "iVBORw0KGgo="
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    ],
+    "tools": [
+      {
+        "type": "function",
+        "name": "weather_forecast",
+        "description": "The forecast for a place.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "place": {
+              "type": "string"
+            },
+            "days": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "place"
+          ],
+          "additionalProperties": false
+        }
+      }
+    ],
+    "toolChoice": {
+      "type": "auto"
+    },
+    "responseFormat": {
+      "type": "json",
+      "name": "out",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "a": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "providerOptions": {
+      "gateway": {
+        "models": [
+          "gateway/openai/gpt-test",
+          "anthropic/claude-test",
+          7
+        ],
+        "order": [
+          "anthropic"
+        ]
+      },
+      "anthropic": {
+        "thinking": {
+          "type": "adaptive"
+        }
+      }
+    }
+  },
+  "status": 200,
+  "contentType": "text/event-stream",
+  "response": "data: {\"type\":\"stream-start\",\"warnings\":[]}\n\ndata: {\"type\":\"response-metadata\",\"id\":\"gen_1\",\"modelId\":\"openai/gpt-test\",\"timestamp\":\"2026-09-21T14:13:20Z\"}\n\ndata: {\"type\":\"text-start\",\"id\":\"t1\"}\n\ndata: {\"type\":\"text-delta\",\"id\":\"t1\",\"delta\":\"Hi.\"}\n\ndata: {\"type\":\"text-end\",\"id\":\"t1\"}\n\ndata: {\"type\":\"finish\",\"finishReason\":{\"unified\":\"stop\",\"raw\":\"stop\"},\"usage\":{\"inputTokens\":{\"total\":5,\"noCache\":5,\"cacheRead\":0},\"outputTokens\":{\"total\":2,\"text\":2,\"reasoning\":0},\"raw\":{\"a\":1}},\"providerMetadata\":{\"gateway\":{\"routing\":{\"originalModelId\":\"openai/gpt-test\"},\"cost\":\"0.001\"}}}\n\n",
+  "sent": [
+    {
+      "method": "POST",
+      "path": "/v1/language-model",
+      "headers": {
+        "accept": "*/*",
+        "ai-gateway-auth-method": "api-key",
+        "ai-gateway-protocol-version": "0.0.1",
+        "ai-language-model-id": "anthropic/claude-test",
+        "ai-language-model-specification-version": "4",
+        "ai-language-model-streaming": "true",
+        "authorization": "Bearer test-key-parity",
+        "content-type": "application/json"
+      },
+      "body": {
+        "prompt": [
+          {
+            "role": "system",
+            "content": "Be brief.",
+            "providerOptions": {
+              "anthropic": {
+                "cacheControl": {
+                  "type": "ephemeral"
+                }
+              }
+            }
+          },
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "Look."
+              },
+              {
+                "type": "file",
+                "mediaType": "image/png",
+                "data": {
+                  "type": "data",
+                  "data": "iVBORw0KGgo="
+                }
+              }
+            ]
+          },
+          {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "reasoning",
+                "text": "Thinking.",
+                "providerOptions": {
+                  "anthropic": {
+                    "signature": "sig"
+                  }
+                }
+              },
+              {
+                "type": "text",
+                "text": "Calling."
+              },
+              {
+                "type": "tool-call",
+                "toolCallId": "a",
+                "toolName": "weather_forecast",
+                "input": {
+                  "place": "Oslo"
+                }
+              }
+            ]
+          },
+          {
+            "role": "tool",
+            "content": [
+              {
+                "type": "tool-result",
+                "toolCallId": "a",
+                "toolName": "weather_forecast",
+                "output": {
+                  "type": "content",
+                  "value": [
+                    {
+                      "type": "text",
+                      "text": "Sunny."
+                    },
+                    {
+                      "type": "file",
+                      "mediaType": "image/png",
+                      "data": {
+                        "type": "data",
+                        "data": "iVBORw0KGgo="
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ],
+        "tools": [
+          {
+            "type": "function",
+            "name": "weather_forecast",
+            "description": "The forecast for a place.",
+            "inputSchema": {
+              "type": "object",
+              "properties": {
+                "place": {
+                  "type": "string"
+                },
+                "days": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "place"
+              ],
+              "additionalProperties": false
+            }
+          }
+        ],
+        "toolChoice": {
+          "type": "auto"
+        },
+        "responseFormat": {
+          "type": "json",
+          "name": "out",
+          "schema": {
+            "type": "object",
+            "properties": {
+              "a": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "providerOptions": {
+          "gateway": {
+            "models": [
+              "openai/gpt-test",
+              "anthropic/claude-test",
+              7
+            ],
+            "order": [
+              "anthropic"
+            ]
+          },
+          "anthropic": {
+            "thinking": {
+              "type": "adaptive"
+            }
+          }
+        },
+        "reasoning": "high"
+      }
+    }
+  ],
+  "parts": [
+    {
+      "type": "stream-start",
+      "warnings": []
+    },
+    {
+      "type": "response-metadata",
+      "id": "gen_1",
+      "modelId": "openai/gpt-test",
+      "timestamp": "2026-09-21T14:13:20.000Z"
+    },
+    {
+      "type": "text-start",
+      "id": "t1"
+    },
+    {
+      "type": "text-delta",
+      "id": "t1",
+      "delta": "Hi."
+    },
+    {
+      "type": "text-end",
+      "id": "t1"
+    },
+    {
+      "type": "finish",
+      "finishReason": {
+        "unified": "stop",
+        "raw": "stop"
+      },
+      "usage": {
+        "inputTokens": {
+          "total": 5,
+          "noCache": 5,
+          "cacheRead": 0
+        },
+        "outputTokens": {
+          "total": 2,
+          "text": 2,
+          "reasoning": 0
+        },
+        "raw": {
+          "a": 1
+        }
+      },
+      "providerMetadata": {
+        "gateway": {
+          "routing": {
+            "originalModelId": "openai/gpt-test"
+          },
+          "cost": "0.001"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,102 @@
+import { describe, expect, it } from "vitest";
+import { normalizeShortcut, scopesOverlap } from "./bindings";
+import { shortcutCommandRegistry, shortcutCommandsById } from "./registry";
+
+describe("shortcut platform defaults", () => {
+  it("registers every command ID exactly once", () => {
+    expect(new Set(shortcutCommandRegistry.map((definition) => definition.id)).size).toBe(
+      shortcutCommandRegistry.length,
+    );
+  });
+
+  it("uses native primary modifiers for shell navigation", () => {
+    const nextTab = shortcutCommandsById.get("workspace.next_tab")!;
+    const companion = shortcutCommandsById.get("misty.contextual_companion")!;
+    expect(companion.defaults.macos.primary).toBe("Cmd+Shift+K");
+    expect(companion.defaults.windows.primary).toBe("Ctrl+Shift+K");
+    expect(nextTab.defaults.macos).toEqual({
+      primary: "Cmd+Shift+RightBracket",
+      alternate: "Ctrl+Tab",
+    });
+    expect(nextTab.defaults.windows).toEqual({
+      primary: "Ctrl+Tab",
+      alternate: "Ctrl+PageDown",
+    });
+  });
+
+  it("scales the app with Cmd+Shift and +, - or 0, and keeps no shortcut for a person's pages", () => {
+    expect(shortcutCommandRegistry.filter((command) => command.id.startsWith("browser."))).toEqual(
+      [],
+    );
+    for (const id of ["search.toggle", "tool.browser", "workspace.search_tabs"])
+      expect(shortcutCommandsById.get(id)).toBeUndefined();
+    expect(shortcutCommandsById.get("app.zoom_in")?.defaults.macos).toEqual({
+      primary: "Cmd+Shift+Plus",
+      alternate: "Ctrl+Shift+Plus",
+    });
+    expect(shortcutCommandsById.get("app.zoom_out")?.defaults.macos).toEqual({
+      primary: "Cmd+Shift+Minus",
+      alternate: "Ctrl+Shift+Minus",
+    });
+    expect(shortcutCommandsById.get("app.zoom_reset")?.defaults.macos).toEqual({
+      primary: "Cmd+Shift+0",
+      alternate: "Ctrl+Shift+0",
+    });
+  });
+
+  it("uses Vim directions for pane focus", () => {
+    expect(shortcutCommandsById.get("workspace.focus_pane_left")?.defaults.macos.primary).toBe(
+      "Option+H",
+    );
+    expect(shortcutCommandsById.get("workspace.focus_pane_down")?.defaults.windows.primary).toBe(
+      "Alt+J",
+    );
+  });
+
+  it("opens and closes windows as Chrome does", () => {
+    expect(shortcutCommandsById.get("workspace.new_window")?.defaults.macos.primary).toBe(
+      "Cmd+Shift+N",
+    );
+    expect(shortcutCommandsById.get("workspace.new_incognito_window")).toBeUndefined();
+    expect(shortcutCommandsById.get("workspace.close_window")?.defaults.windows.primary).toBe(
+      "Ctrl+Shift+W",
+    );
+    expect(shortcutCommandsById.get("workspace.next_virtual_window")).toBeUndefined();
+  });
+
+  it("never assigns Command/Windows-key defaults on Windows or Linux", () => {
+    for (const definition of shortcutCommandRegistry) {
+      for (const platform of ["windows", "linux"] as const) {
+        expect(definition.defaults[platform].primary ?? "").not.toContain("Cmd");
+        expect(definition.defaults[platform].alternate ?? "").not.toContain("Cmd");
+      }
+    }
+  });
+
+  it("has no ambiguous defaults in an overlapping context", () => {
+    for (const platform of ["macos", "windows", "linux"] as const) {
+      const assigned = shortcutCommandRegistry.flatMap((definition) =>
+        [definition.defaults[platform].primary, definition.defaults[platform].alternate]
+          .map(normalizeShortcut)
+          .filter((binding): binding is string => Boolean(binding))
+          .map((binding) => ({ binding, definition })),
+      );
+      for (let leftIndex = 0; leftIndex < assigned.length; leftIndex += 1) {
+        for (let rightIndex = leftIndex + 1; rightIndex < assigned.length; rightIndex += 1) {
+          const left = assigned[leftIndex];
+          const right = assigned[rightIndex];
+          if (left.definition.id === right.definition.id || left.binding !== right.binding)
+            continue;
+          if (!scopesOverlap(left.definition.scope, right.definition.scope)) continue;
+          const contextualShadow =
+            left.definition.scope !== right.definition.scope &&
+            (left.definition.allowShadowing || right.definition.allowShadowing);
+          expect(
+            contextualShadow,
+            `${platform}: ${left.definition.id} / ${right.definition.id}`,
+          ).toBe(true);
+        }
+      }
+    }
+  });
+});

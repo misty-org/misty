@@ -1,0 +1,43 @@
+{
+  "name": "embed_compatible_failure",
+  "kind": "embed",
+  "modelId": "nvidia/nv-embed",
+  "credentialProvider": "nvidia",
+  "input": {
+    "values": [
+      "one"
+    ]
+  },
+  "replies": [
+    {
+      "status": 503,
+      "contentType": "application/json",
+      "body": "{\"error\":{\"message\":\"Down.\"}}"
+    }
+  ],
+  "unorderedRequests": false,
+  "sent": [
+    {
+      "method": "POST",
+      "path": "/v1/embeddings",
+      "headers": {
+        "accept": "*/*",
+        "authorization": "Bearer test-key-parity",
+        "content-type": "application/json"
+      },
+      "body": {
+        "model": "nv-embed",
+        "input": [
+          "one"
+        ],
+        "encoding_format": "float"
+      }
+    }
+  ],
+  "thrown": {
+    "name": "AI_APICallError",
+    "message": "Down.",
+    "statusCode": 503,
+    "isRetryable": true
+  }
+}

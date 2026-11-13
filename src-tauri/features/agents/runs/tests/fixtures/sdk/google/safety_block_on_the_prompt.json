@@ -1,0 +1,77 @@
+{
+  "name": "safety_block_on_the_prompt",
+  "modelId": "google/gemini-2.5-flash",
+  "credentialProvider": "google",
+  "options": {
+    "prompt": [
+      {
+        "role": "user",
+        "content": [
+          {
+            "type": "text",
+            "text": "Bad."
+          }
+        ]
+      }
+    ]
+  },
+  "status": 200,
+  "contentType": "text/event-stream",
+  "response": "data: {\"promptFeedback\":{\"blockReason\":\"SAFETY\",\"safetyRatings\":[{\"category\":\"HARM_CATEGORY_HARASSMENT\",\"probability\":\"HIGH\",\"blocked\":true,\"ignored\":\"dropped\"}]},\"usageMetadata\":{\"promptTokenCount\":3,\"totalTokenCount\":3},\"responseId\":\"resp-google-blocked\"}\n\n",
+  "sent": [
+    {
+      "method": "POST",
+      "path": "/v1/models/gemini-2.5-flash:streamGenerateContent?alt=sse",
+      "headers": {
+        "accept": "*/*",
+        "content-type": "application/json",
+        "x-goog-api-key": "test-key-parity"
+      },
+      "body": {
+        "generationConfig": {},
+        "contents": [
+          {
+            "role": "user",
+            "parts": [
+              {
+                "text": "Bad."
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "parts": [
+    {
+      "type": "stream-start",
+      "warnings": []
+    },
+    {
+      "type": "response-metadata",
+      "id": "resp-google-blocked"
+    },
+    {
+      "type": "finish",
+      "finishReason": {
+        "unified": "other"
+      },
+      "usage": {
+        "inputTokens": {
+          "total": 3,
+          "noCache": 3,
+          "cacheRead": 0
+        },
+        "outputTokens": {
+          "total": 0,
+          "text": 0,
+          "reasoning": 0
+        },
+        "raw": {
+          "promptTokenCount": 3,
+          "totalTokenCount": 3
+        }
+      }
+    }
+  ]
+}

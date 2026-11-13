@@ -1,0 +1,498 @@
+# Actions: what can be done at all, fixed by Misty at build time.
+# Each set groups the permissions Tauri generates for the commands in tauri-permissions/app_commands.in.
+
+[[set]]
+identifier = "action-agent"
+description = "Run and control agents"
+permissions = [
+  "allow-agent-action-confirm",
+  "allow-agent-chats-adopt",
+  "allow-agent-chats-delete",
+  "allow-agent-chats-get",
+  "allow-agent-chats-list",
+  "allow-agent-chats-put",
+  "allow-agent-chats-swap",
+  "allow-agent-host-missing",
+  "allow-agent-run-cancel",
+  "allow-agent-run-contexts",
+  "allow-agent-run-follow",
+  "allow-agent-run-pause",
+  "allow-agent-program-opens",
+  "allow-agent-run-end-proposal",
+  "allow-agent-run-notify",
+  "allow-agent-run-publish",
+  "allow-agent-window-account",
+  "allow-agent-run-receipts",
+  "allow-agent-run-start",
+  "allow-agent-run-steer",
+  "allow-agent-run-timeline",
+  "allow-agent-run-steps",
+  "allow-agent-run-latest-steps",
+  "allow-agent-run-steps-clear",
+  "allow-agent-run-step-picture",
+  "allow-agent-turn-files",
+  "allow-agent-turn-restore",
+  "allow-agent-tool-finish",
+  "allow-agent-tool-host-ready",
+  "allow-composio-apps-catalog",
+  "allow-composio-apps-connect",
+  "allow-composio-apps-disconnect",
+  "allow-composio-apps-list",
+  "allow-composio-calendar-events",
+  "allow-composio-grants-list",
+  "allow-composio-grants-revoke",
+  "allow-composio-request-decide",
+  "allow-composio-request-get",
+  "allow-composio-request-show",
+  "allow-composio-request-link",
+  "allow-composio-tool-connect",
+  "allow-composio-tool-connected",
+  "allow-composio-tool-execute",
+  "allow-composio-tool-schemas",
+  "allow-composio-tool-search",
+  "allow-direct-apps-catalog",
+  "allow-direct-apps-check",
+  "allow-direct-apps-icon",
+  "allow-direct-apps-connect",
+  "allow-direct-apps-disconnect",
+  "allow-direct-apps-list",
+  "allow-agent-control-island",
+  "allow-agent-control-yield",
+  "allow-agent-desktop-island-press",
+  "allow-agent-desktop-overlay-state",
+  "allow-agent-foreground-queue",
+  "allow-agent-runtime-call",
+  "allow-agent-workspace-acquire",
+  "allow-agent-workspace-bind-scope",
+  "allow-agent-workspace-context",
+  "allow-agent-workspace-release",
+  "allow-agents-device-snapshot",
+  "allow-agents-adopt-folder-changes",
+  "allow-agents-allow-folder-changes",
+  "allow-agents-forget-folder",
+  "allow-agents-stop-folder-changes",
+  "allow-agents-forget-workspace",
+  "allow-agents-list-scoped-files",
+  "allow-agents-prepare-scoped-document",
+  "allow-agents-share-folder",
+  "allow-notebook-news",
+  "allow-tutor-overview-audio",
+  "allow-tutor-overview-delete",
+  "allow-tutor-overview-make",
+  "allow-tutor-pick-sources",
+  "allow-tutor-read-dropped",
+  "allow-tutor-read-link",
+  "allow-tutor-save-export",
+  "allow-tutor-transcribe-sources",
+]
+
+[[set]]
+identifier = "action-api-cache"
+description = "Read and clear the encrypted copy of account data"
+permissions = [
+  "allow-api-cache-clear",
+  "allow-api-cache-delete-prefix",
+  "allow-api-cache-get",
+  "allow-api-cache-put",
+]
+
+[[set]]
+identifier = "action-app"
+description = "The app's own basics: its window, system info and links"
+permissions = [
+  "allow-app-quit-confirmed",
+  "allow-app-relaunch",
+  "allow-app-snapshot",
+  "allow-check-system",
+  "allow-enable-modern-window-style",
+  "allow-link-preview-fetch",
+  "allow-misty-workspace-focused",
+  "allow-power-keep-awake",
+  "allow-reveal-main-window",
+  "allow-sandbox-pick-save-file",
+  "allow-save-authenticated-user",
+  "allow-server-host-resolves-public",
+  "allow-set-traffic-lights-visible",
+  "allow-sign-out-misty",
+  "allow-system-memory-pressure",
+  "allow-window-set-maximize-button",
+  "allow-window-show-snap-layouts",
+]
+
+[[set]]
+identifier = "action-auth"
+description = "Sign in and account requests"
+permissions = [
+  "allow-auth-http-cancel",
+  "allow-auth-http-read",
+  "allow-auth-http-start",
+  "allow-auth-session-capture",
+  "allow-auth-session-forget",
+  "allow-auth-session-restore",
+]
+
+[[set]]
+identifier = "action-browser"
+description = "Browse: tabs, pages, downloads and site settings"
+permissions = [
+  "allow-browser-agent-execute",
+  "allow-browser-agent-execute-bounded",
+  "allow-browser-agent-execution-cancel",
+  "allow-browser-agent-grant-register",
+  "allow-browser-agent-grant-revoke",
+  "allow-browser-agent-set-locked",
+  "allow-browser-clear-website-data",
+  "allow-browser-context-menu-select",
+  "allow-browser-tab-download-open",
+  "allow-browser-runtime-for-scope",
+  "allow-browser-shortcuts-update",
+  "allow-browser-site-icon",
+  "allow-browser-webview-await-load",
+  "allow-browser-webview-back",
+  "allow-browser-webview-close",
+  "allow-browser-webview-create",
+  "allow-browser-webview-forward",
+  "allow-browser-webview-held",
+  "allow-browser-webview-hide",
+  "allow-browser-webview-navigate",
+  "allow-browser-webview-picture",
+  "allow-browser-webview-reconcile",
+  "allow-browser-webview-reload",
+  "allow-browser-webview-set-bounds",
+  "allow-browser-webview-show",
+  "allow-browser-webview-sleep",
+  "allow-browser-webview-stop",
+  "allow-browser-webviews-close-except",
+  "allow-browser-webviews-hide-all",
+  "allow-browser-webviews-set-notice-rects",
+  "allow-browser-webviews-set-overlay-active",
+  "allow-browser-webviews-set-pointer-tracking",
+]
+
+[[set]]
+identifier = "action-browser-recovery"
+description = "Restore browsing after a crash"
+permissions = [
+  "allow-browser-recovery-forget",
+  "allow-browser-recovery-open",
+  "allow-browser-recovery-read",
+  "allow-browser-recovery-write",
+]
+
+[[set]]
+identifier = "action-clipboard"
+description = "Read and write the clipboard"
+permissions = [
+  "allow-clipboard-write-file-bytes",
+]
+
+[[set]]
+identifier = "action-cursor-companion"
+description = "The cursor companion"
+permissions = [
+  "allow-cursor-companion-bind-task",
+  "allow-cursor-companion-capture",
+  "allow-cursor-companion-capture-region",
+  "allow-cursor-companion-configure",
+  "allow-cursor-companion-interrupt",
+  "allow-cursor-companion-present",
+  "allow-cursor-companion-snap",
+  "allow-cursor-companion-snapshot",
+  "allow-cursor-companion-tray",
+  "allow-tray-agents",
+  "allow-tray-update",
+  "allow-cursor-companion-watch-clicks",
+]
+
+[[set]]
+identifier = "action-devices"
+description = "This computer's device identity and signed jobs"
+permissions = [
+  "allow-device-read-shared-file",
+  "allow-device-shell-cancel",
+  "allow-device-shell-job",
+  "allow-device-sign-run-grants",
+  "allow-device-verify-job",
+]
+
+[[set]]
+identifier = "action-misty-screen"
+description = "The agent's view of the screen"
+permissions = [
+  "allow-misty-screen-capture",
+  "allow-misty-capture-region",
+  "allow-dropped-file-read",
+  "allow-misty-screen-status",
+]
+
+[[set]]
+identifier = "action-model-keys"
+description = "Save and remove model keys"
+permissions = [
+  "allow-model-keys-add",
+  "allow-model-keys-models",
+  "allow-model-keys-remove",
+  "allow-model-keys-save",
+  "allow-model-keys-saved",
+]
+
+[[set]]
+identifier = "action-profile"
+description = "Browser profiles"
+permissions = [
+  "allow-profile-window-close",
+  "allow-profile-window-info",
+  "allow-profile-window-is-host",
+  "allow-profile-window-link-target",
+  "allow-profile-window-new",
+  "allow-profile-window-set-space",
+  "allow-profile-window-take-orphans",
+]
+
+[[set]]
+identifier = "action-profile-tabs"
+description = "A profile's synced tabs"
+permissions = [
+  "allow-profile-tabs-publish",
+  "allow-profile-tabs-sync",
+]
+
+[[set]]
+identifier = "action-sandbox"
+description = "See and change what Misty is allowed to reach"
+permissions = [
+  "allow-sandbox-permission-set",
+  "allow-sandbox-permissions-list",
+]
+
+[[set]]
+identifier = "action-settings"
+description = "Device settings"
+permissions = [
+  "allow-settings-apply-launch-on-login",
+  "allow-settings-launch-on-login-snapshot",
+  "allow-settings-save",
+  "allow-settings-session-commit",
+  "allow-settings-session-state",
+  "allow-settings-snapshot",
+]
+
+[[set]]
+identifier = "action-shortcuts"
+description = "Keyboard shortcuts"
+permissions = [
+  "allow-shortcuts-replace",
+  "allow-shortcuts-snapshot",
+]
+
+[[set]]
+identifier = "action-voice"
+description = "Dictation and voice"
+permissions = [
+  "allow-agent-runtime-live-open",
+  "allow-agent-runtime-session-close",
+  "allow-agent-runtime-session-send",
+  "allow-agent-runtime-voice-open",
+  "allow-voice-capture-mute",
+  "allow-voice-capture-start",
+  "allow-voice-capture-stop",
+  "allow-voice-dictation-configure",
+  "allow-voice-dictation-insert",
+  "allow-voice-dictation-pill-hide",
+  "allow-voice-dictation-stop",
+]
+
+[[set]]
+identifier = "action-workspace"
+description = "Agent engines, a Space's linked project folders, and the files, changes and terminal panels beside a chat"
+permissions = [
+  "allow-engine-models",
+  "allow-engine-catalog",
+  "allow-engines-list",
+  "allow-engine-answer-question",
+  "allow-engine-plan-respond",
+  "allow-engine-settings-get",
+  "allow-engine-settings-set",
+  "allow-engine-chat-clear",
+  "allow-engine-chat-resume",
+  "allow-engine-history-list",
+  "allow-engine-history-search",
+  "allow-engine-history-rename",
+  "allow-multirun-changes",
+  "allow-multirun-check",
+  "allow-multirun-discard",
+  "allow-multirun-keep",
+  "allow-multirun-list",
+  "allow-multirun-start",
+  "allow-project-create-dir",
+  "allow-project-create-file",
+  "allow-project-rename",
+  "allow-project-trash",
+  "allow-project-duplicate",
+  "allow-project-paste",
+  "allow-project-paste-clipboard",
+  "allow-project-clipboard-change-count",
+  "allow-project-clipboard-snapshot",
+  "allow-project-clipboard-set-files",
+  "allow-project-search-text",
+  "allow-project-file-index",
+  "allow-project-html-preview-open",
+  "allow-project-git-unstage",
+  "allow-project-git-discard",
+  "allow-project-git-diff-images",
+  "allow-project-git-push",
+  "allow-project-git-pull",
+  "allow-project-git-branches",
+  "allow-project-git-owners",
+  "allow-project-git-checkout",
+  "allow-project-git-create-branch",
+  "allow-project-git-init",
+  "allow-project-git-tree-status",
+  "allow-project-terminal-host-info",
+  "allow-project-worktree-list",
+  "allow-project-worktree-create",
+  "allow-project-worktree-create-cancel",
+  "allow-project-worktree-remove",
+  "allow-project-worktree-branch-merged",
+  "allow-project-worktree-resolve-pr",
+  "allow-project-open-in",
+  "allow-project-open-custom",
+  "allow-project-program-icon",
+  "allow-project-reveal",
+  "allow-project-open-in-browser",
+  "allow-project-git-commit",
+  "allow-project-git-diff",
+  "allow-project-git-stage",
+  "allow-project-git-status",
+  "allow-project-list-dir",
+  "allow-project-find-files",
+  "allow-project-preview-cancel-pick",
+  "allow-project-preview-pick",
+  "allow-project-preview-reachable",
+  "allow-project-preview-watch",
+  "allow-project-read-file",
+  "allow-project-reveal-path",
+  "allow-project-terminal-close",
+  "allow-project-terminal-open",
+  "allow-project-terminal-resize",
+  "allow-project-terminal-write",
+  "allow-project-write-file",
+  "allow-agent-folder",
+  "allow-agent-folder-choose",
+  "allow-agent-folder-from-history",
+  "allow-agent-folder-list",
+  "allow-agent-folder-new",
+  "allow-agent-folder-use",
+  "allow-space-folder-grant",
+  "allow-space-folder-grant-scope",
+  "allow-space-folder-link",
+  "allow-space-folder-list",
+  "allow-space-folder-unlink",
+]
+
+[[set]]
+identifier = "action-engine-config"
+description = "Settings for the agent engines themselves: their MCP servers, skills, plugin marketplaces, prompts, usage and plan limits, installing and updating the CLIs, provider channels, each engine's environment variables, the network proxy, fonts and the performance panel"
+permissions = [
+  "allow-engine-cc-switch-check",
+  "allow-engine-cc-switch-dismiss",
+  "allow-engine-cc-switch-import",
+  "allow-engine-cc-switch-import-file",
+  "allow-engine-channels-delete",
+  "allow-engine-channels-list",
+  "allow-engine-channels-models",
+  "allow-engine-channels-official-paths",
+  "allow-engine-channels-official-read",
+  "allow-engine-channels-official-write",
+  "allow-engine-channels-reorder",
+  "allow-engine-channels-set-current",
+  "allow-engine-channels-set-enabled",
+  "allow-engine-channels-upsert",
+  "allow-engine-cli-remove",
+  "allow-engine-cli-sign-in",
+  "allow-engine-cli-sign-in-close",
+  "allow-engine-cli-sign-in-code",
+  "allow-engine-cli-sign-in-resize",
+  "allow-engine-cli-sign-in-write",
+  "allow-engine-cli-signed-in",
+  "allow-engine-cli-status",
+  "allow-engine-cli-update",
+  "allow-engine-cli-update-plan",
+  "allow-engine-env-list",
+  "allow-engine-env-remove",
+  "allow-engine-env-set",
+  "allow-engine-fonts-get",
+  "allow-engine-fonts-pick",
+  "allow-engine-fonts-read",
+  "allow-engine-fonts-set",
+  "allow-engine-market-add-source",
+  "allow-engine-market-connectors",
+  "allow-engine-market-details",
+  "allow-engine-market-install",
+  "allow-engine-market-list",
+  "allow-engine-market-remove",
+  "allow-engine-market-remove-source",
+  "allow-engine-market-set-enabled",
+  "allow-engine-mcp-inventory",
+  "allow-engine-mcp-probe",
+  "allow-engine-mcp-probe-plan",
+  "allow-engine-mcp-reveal",
+  "allow-engine-mcp-set-enabled",
+  "allow-engine-performance-enabled",
+  "allow-engine-performance-export",
+  "allow-engine-performance-report",
+  "allow-engine-performance-set-enabled",
+  "allow-engine-prompts-create",
+  "allow-engine-prompts-delete",
+  "allow-engine-prompts-list",
+  "allow-engine-prompts-move",
+  "allow-engine-prompts-reveal",
+  "allow-engine-prompts-update",
+  "allow-engine-proxy-get",
+  "allow-engine-proxy-set",
+  "allow-engine-skills-mutate",
+  "allow-engine-skills-query",
+  "allow-engine-usage-limits",
+  "allow-engine-usage-prices",
+  "allow-engine-usage-query",
+  "allow-engine-usage-rescan",
+  "allow-engine-usage-sources",
+  "allow-engine-usage-update-prices",
+  "allow-dsh-host-start",
+  "allow-dsh-host-status",
+  "allow-dsh-host-stop",
+  "allow-pi-family-auth-delete-credential",
+  "allow-pi-family-auth-list",
+  "allow-pi-family-auth-set-api-key",
+  "allow-pi-family-models-config-read",
+  "allow-pi-family-models-config-write",
+]
+
+[[set]]
+identifier = "action-agent-extras"
+description = "The bundled persona catalog, bot folders and screen control for outside engines"
+permissions = [
+  "allow-agent-catalog-list",
+  "allow-agent-catalog-prompt",
+  "allow-bot-bundle-export",
+  "allow-computer-use-open-permission-settings",
+  "allow-computer-use-permission-status",
+  "allow-computer-use-stop",
+]
+
+[[set]]
+identifier = "action-pets"
+description = "The desktop pet and its window"
+permissions = [
+  "allow-pet-get-package",
+  "allow-pet-import",
+  "allow-pet-list",
+  "allow-pet-overlay-state",
+  "allow-pet-remove",
+  "allow-pet-save-position",
+  "allow-pet-select",
+  "allow-pet-set-scale",
+  "allow-pet-set-state",
+  "allow-pet-set-visible",
+  "allow-pet-settings",
+]

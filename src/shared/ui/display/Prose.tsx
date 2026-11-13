@@ -1,0 +1,124 @@
+import "./prose.css";
+import type { LucideIcon } from "lucide-react";
+import * as React from "react";
+import { cn } from "../classNames";
+
+type ProseSize = "meta" | "control" | "body" | "page";
+
+type ProseProps = {
+  children?: React.ReactNode;
+  /** The text role. Leave it out to keep the surrounding size, as a chat message sets it. */
+  size?: ProseSize;
+  /** Layout only: margins, height caps, scrolling. */
+  className?: string;
+};
+
+const sizeClass: Record<ProseSize, string> = {
+  meta: "text-meta",
+  control: "text-control",
+  body: "text-body",
+  page: "text-page",
+};
+
+/**
+ * Read-only rich text: paragraphs, lists, headings, quotes, links, tables, code, task lists,
+ * math and footnotes, rendered from Markdown or any HTML of those elements. It sets the spacing
+ * and the monochrome look of each; only code inside it is monospace. MistyMarkdown renders into
+ * it, so a reply, a plan and a preview read alike.
+ *
+ * ```tsx
+ * <Prose size="body"><MistyMarkdown>{reply}</MistyMarkdown></Prose>
+ * ```
+ */
+export function Prose({ children, size, className }: ProseProps) {
+  return (
+    <div data-slot="prose" className={cn("misty-prose", size && sizeClass[size], className)}>
+      {children}
+    </div>
+  );
+}
+
+/**
+ * For the element around rendered text (MistyMarkdown on its own, not inside Prose) whose
+ * numbered citations link to sources on the same page, written `[2]` and pointing at
+ * `#…source-2`: each of those links is a small numbered chip that opens its source.
+ *
+ * ```tsx
+ * <div className={citationChipsClass}><MistyMarkdown>{answer}</MistyMarkdown></div>
+ * ```
+ */
+export const citationChipsClass = [
+  "[&_a[href^='#'][href*='source-']]:mx-px [&_a[href^='#'][href*='source-']]:inline-block",
+  "[&_a[href^='#'][href*='source-']]:min-w-4.5 [&_a[href^='#'][href*='source-']]:px-1.25",
+  "[&_a[href^='#'][href*='source-']]:rounded-md [&_a[href^='#'][href*='source-']]:bg-control-hover",
+  "[&_a[href^='#'][href*='source-']]:text-center [&_a[href^='#'][href*='source-']]:text-micro",
+  "[&_a[href^='#'][href*='source-']]:leading-4.25 [&_a[href^='#'][href*='source-']]:text-cream",
+  "[&_a[href^='#'][href*='source-']]:no-underline [&_a[href^='#'][href*='source-']]:align-[1px]",
+  "[&_a[href^='#'][href*='source-']:hover]:bg-control-active",
+  "[&_a[href^='#'][href*='source-']:hover]:text-cream-bright",
+].join(" ");
+
+/** A table that scrolls sideways inside the prose instead of stretching it, with hairline rules. */
+export function ProseTable({ children }: { children?: React.ReactNode }) {
+  return (
+    <div data-slot="prose-table" className="misty-prose-table">
+      <table>{children}</table>
+    </div>
+  );
+}
+
+/**
+ * A callout (GitHub's `> [!NOTE]`): its kind as an icon and a label over the content, on a
+ * monochrome surface. Warnings and cautions take a stronger edge.
+ */
+export function ProseCallout({
+  kind,
+  label,
+  icon: Icon,
+  children,
+}: {
+  kind: "note" | "tip" | "important" | "warning" | "caution";
+  /** The kind in words, "Note" or "Warning": its title and accessible name. */
+  label: string;
+  icon: LucideIcon;
+  children?: React.ReactNode;
+}) {
+  return (
+    <aside
+      data-slot="prose-callout"
+      data-callout={kind}
+      aria-label={label}
+      className="misty-prose-callout"
+    >
+      <p className="misty-prose-callout-title">
+        <Icon aria-hidden="true" className="size-4 shrink-0" />
+        {label}
+      </p>
+      {children}
+    </aside>
+  );
+}
+
+/**
+ * A code block: a header with the language and the block's actions (Copy), then the code, wrapped
+ * so nothing hides past the edge. The ref is the `pre`, for reading its text.
+ */
+export const ProseCode = React.forwardRef<
+  HTMLPreElement,
+  {
+    /** Shown in the header; defaults to "Code". */
+    language?: string;
+    /** 24px IconButtons at the header's right end, such as Copy code. */
+    actions?: React.ReactNode;
+    children?: React.ReactNode;
+  }
+>(({ language, actions, children }, ref) => (
+  <div data-slot="prose-code" className="misty-prose-code">
+    <div className="misty-prose-code-header">
+      <span>{language || "Code"}</span>
+      {actions}
+    </div>
+    <pre ref={ref}>{children}</pre>
+  </div>
+));
+ProseCode.displayName = "ProseCode";

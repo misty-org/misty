@@ -1,0 +1,42 @@
+/*
+ * PaneFrame's corners and seam (PaneFrame.tsx): each corner is a quarter circle cut out of a
+ * square of chrome, `--pane-corner-*` wide, and the margin is each edge's own inset shadow. The
+ * seam line follows the rounded corners. Both sit above the pane's content, so native pages and
+ * toolbars stay within the curve. A kept (hidden) tab draws neither.
+ */
+.misty-pane-frame::before,
+.misty-pane-frame::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.misty-pane-frame::before {
+  z-index: var(--layer-pane-corners);
+  background:
+    radial-gradient(circle at 100% 100%, transparent 11.5px, var(--pane-chrome) 12px) top left /
+      var(--pane-corner-top-left) var(--pane-corner-top-left) no-repeat,
+    radial-gradient(circle at 0 100%, transparent 11.5px, var(--pane-chrome) 12px) top right /
+      var(--pane-corner-top-right) var(--pane-corner-top-right) no-repeat,
+    radial-gradient(circle at 100% 0, transparent 11.5px, var(--pane-chrome) 12px) bottom left /
+      var(--pane-corner-bottom-left) var(--pane-corner-bottom-left) no-repeat,
+    radial-gradient(circle at 0 0, transparent 11.5px, var(--pane-chrome) 12px) bottom right /
+      var(--pane-corner-bottom-right) var(--pane-corner-bottom-right) no-repeat;
+  box-shadow:
+    inset var(--pane-seam-left, 0px) var(--pane-seam-top, 0px) 0 0 var(--pane-chrome),
+    inset calc(-1 * var(--pane-seam-right, 0px)) calc(-1 * var(--pane-seam-bottom, 0px)) 0 0
+      var(--pane-chrome);
+}
+.misty-pane-frame::after {
+  z-index: var(--layer-pane-seams);
+  border-style: solid;
+  border-color: var(--pane-seam-color, var(--color-charcoal-border));
+  border-width: var(--pane-seam-top) var(--pane-seam-right) var(--pane-seam-bottom)
+    var(--pane-seam-left);
+  border-radius: var(--pane-corner-top-left) var(--pane-corner-top-right)
+    var(--pane-corner-bottom-right) var(--pane-corner-bottom-left);
+}
+.misty-pane-frame[data-tab-kept]::before,
+.misty-pane-frame[data-tab-kept]::after {
+  content: none;
+}

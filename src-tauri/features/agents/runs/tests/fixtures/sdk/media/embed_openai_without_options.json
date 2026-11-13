@@ -1,0 +1,47 @@
+{
+  "name": "embed_openai_without_options",
+  "kind": "embed",
+  "modelId": "openai/text-embedding-3-small",
+  "credentialProvider": "openai",
+  "input": {
+    "values": [
+      "one"
+    ]
+  },
+  "replies": [
+    {
+      "status": 200,
+      "contentType": "application/json",
+      "body": "{\"data\":[{\"embedding\":[0.5]}]}"
+    }
+  ],
+  "unorderedRequests": false,
+  "sent": [
+    {
+      "method": "POST",
+      "path": "/v1/embeddings",
+      "headers": {
+        "accept": "*/*",
+        "authorization": "Bearer test-key-parity",
+        "content-type": "application/json"
+      },
+      "body": {
+        "model": "text-embedding-3-small",
+        "input": [
+          "one"
+        ],
+        "encoding_format": "float"
+      }
+    }
+  ],
+  "result": {
+    "embeddings": [
+      [
+        0.5
+      ]
+    ],
+    "tokens": null,
+    "warnings": [],
+    "providerMetadata": null
+  }
+}

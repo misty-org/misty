@@ -1,0 +1,112 @@
+import { readFileSync } from 'node:fs';
+import { runInNewContext } from 'node:vm';
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+
+const part = (name) => readFileSync(new URL(`../src-tauri/features/browser/kiri_link/scripts/${name}`, import.meta.url), 'utf8');
+// BROWSER_VIEWPORT_SCRIPT in browser/kiri_link/scripts/mod.rs, with its window-drag part.
+const source = `\n${part('viewport.js')}`
+  .replace('__MISTY_WINDOW_DRAG_PLACEHOLDER__', () => part('window_drag.js'));
+const handler = source.slice(source.indexOf('  const handleLinkClick ='), source.indexOf("  document.addEventListener('pointerover'"));
+
+function click(overrides = {}, target = '_blank', href = '/channels/server/thread') {
+  const opened = [];
+  const listeners = {};
+  runInNewContext(handler, {
+    URL,
+    window: { location: { href: 'https://discord.com/channels/server/channel' }, open: (...args) => opened.push(args) },
+    document: { addEventListener: (name, callback, capture) => { assert.ok(!capture); listeners[name] = callback; } },
+  });
+  const event = {
+    isTrusted: true, type: 'click', button: 0,
+    target: { closest: () => ({ getAttribute: (name) => name === 'href' ? href : target }) },
+    preventDefault() { this.defaultPrevented = true; },
+    stopImmediatePropagation() {},
+    ...overrides,
+  };
+  listeners[event.type](event);
+  return { opened, event };
+}
+
+test('ordinary channel links remain owned by the site, including named targets', () => {
+  for (const target of ['', '_blank', '_new', 'channel']) for (const href of ['/channels/server/thread', 'https://accounts.google.com/AccountChooser/signinchooser', 'https://outside-provider.example/']) {
+    const result = click({}, target, href);
+    assert.deepEqual(result.opened, []);
+    assert.ok(!result.event.defaultPrevented);
+  }
+});
+test('site-cancelled and synthetic clicks never open extra windows', () => {
+  assert.deepEqual(click({ metaKey: true, defaultPrevented: true }).opened, []);
+  assert.deepEqual(click({ metaKey: true, isTrusted: false }).opened, []);
+});
+test('explicit new-tab gestures still work', () => {
+  for (const gesture of [{ metaKey: true }, { ctrlKey: true }, { type: 'auxclick', button: 1 }]) {
+    assert.deepEqual(click(gesture).opened, [['https://discord.com/channels/server/thread', '_blank']]);
+  }
+});
+
+// Kiri's host channel sender as WebKit renders it (src-tauri/features/kiri/src/channel/macos.rs).
+const sender = readFileSync(new URL('../src-tauri/features/kiri/src/channel/macos.rs', import.meta.url), 'utf8')
+  .match(/SENDER_SCRIPT: &str = "(.*)";/)[1];
+
+// The script as WebKit renders it: host messages use Kiri's captured native channel.
+function rendered(tracking) {
+  return source
+    .replace('__KIRI_HOST_SENDER_PLACEHOLDER__', sender)
+    .replace('__MISTY_BACKGROUND_PLACEHOLDER__', '')
+    .replace('__MISTY_CARET_PLACEHOLDER__', '')
+    .replace('__MISTY_FULLSCREEN_PLACEHOLDER__', '')
+    .replace('__MISTY_CONTEXT_MENU_PLACEHOLDER__', '')
+    .replace('__MISTY_SHORTCUT_TOKEN_PLACEHOLDER__', '"test-token"')
+    .replace('__MISTY_INITIAL_SHORTCUTS_PLACEHOLDER__', '[]')
+    .replace('__MISTY_POINTER_TRACKING_PLACEHOLDER__', String(tracking));
+}
+
+test('pointer focus reports over native messaging without navigating the page', () => {
+  const listeners = {};
+  const messages = [];
+  const window = {
+    webkit: { messageHandlers: { kiriHost: { postMessage: token => messages.push(token) } } },
+    addEventListener() {},
+  };
+  Object.defineProperty(window, 'location', { get() { throw new Error('Focus must not touch page navigation'); } });
+  runInNewContext(rendered(false), {
+    window, Map, URL,
+    document: { addEventListener: (type, fn) => { const was = listeners[type]; listeners[type] = was ? (event) => { was(event); fn(event); } : fn; } },
+  });
+  listeners.pointerdown({ isTrusted: true });
+  listeners.pointerdown({ isTrusted: false });
+  assert.deepEqual(messages, ['test-token']);
+});
+
+test('companion pointer tracking reports over native messaging without interrupting navigation', () => {
+  const script = rendered(true);
+  const listeners = {};
+  const frames = [];
+  const messages = [];
+  const window = {
+    innerWidth: 800, innerHeight: 600,
+    webkit: { messageHandlers: { kiriHost: { postMessage: body => messages.push(JSON.parse(body)) } } },
+    addEventListener: (type, fn) => { listeners[type] = fn; },
+  };
+  Object.defineProperty(window, 'location', { get() { throw new Error('Pointer tracking must not navigate'); } });
+  runInNewContext(script, {
+    window, Map, URL, URLSearchParams,
+    document: { addEventListener: (type, fn) => { const was = listeners[type]; listeners[type] = was ? (event) => { was(event); fn(event); } : fn; } },
+    performance: { now: () => 100 },
+    requestAnimationFrame: fn => { frames.push(fn); return frames.length; },
+    cancelAnimationFrame: () => {},
+  });
+  listeners.pointermove({ isTrusted: true, clientX: 12.34, clientY: 45.67 });
+  frames.shift()();
+  listeners.pointerout({ relatedTarget: null });
+  assert.deepEqual(messages, [
+    { token: 'test-token', pointer: { x: 12.3, y: 45.7, inside: true } },
+    { token: 'test-token', pointer: { x: 0, y: 0, inside: false } },
+  ]);
+  window.__MISTY_SET_POINTER_TRACKING__(false);
+  listeners.pointermove({ isTrusted: true, clientX: 10, clientY: 10 });
+  listeners.blur();
+  assert.equal(frames.length, 0);
+  assert.equal(messages.length, 2);
+});

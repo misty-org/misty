@@ -1,0 +1,36 @@
+[package]
+name = "browser_data"
+version = "0.1.0"
+edition = "2021"
+license = "AGPL-3.0-or-later"
+publish = false
+
+[dependencies]
+aes-gcm = { version = "0.10", features = ["zeroize"] }
+base64 = "0.22"
+hkdf = "0.12"
+rand = "0.8"
+rusqlite = { version = "0.32", features = ["bundled"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+thiserror = "1"
+url = "2"
+uuid = { version = "1", features = ["v4"] }
+zeroize = "1"
+misty-credential-store = { path = "../../../vendor/misty-credential-store" }
+
+[dev-dependencies]
+tempfile = "3"
+
+# Also keep standalone crate tests within the desktop's development storage policy.
+[profile.dev]
+debug = 1
+incremental = false
+
+# This profile applies only to this crate's own tests (the desktop app builds
+# it with src-tauri's profile). Its tests push megabyte records through AES-GCM
+# and serde, which unoptimized took most of the suite's time. Dependencies are
+# optimized; this crate's own code still builds for debugging.
+[profile.dev.package."*"]
+opt-level = 2

@@ -1,0 +1,102 @@
+{
+  "name": "safety_finish_with_ratings_and_message",
+  "modelId": "google/gemini-2.5-flash",
+  "credentialProvider": "google",
+  "options": {
+    "prompt": [
+      {
+        "role": "user",
+        "content": [
+          {
+            "type": "text",
+            "text": "Bad."
+          }
+        ]
+      }
+    ]
+  },
+  "status": 200,
+  "contentType": "text/event-stream",
+  "response": "data: {\"responseId\":\"resp-google-1\",\"promptFeedback\":{\"blockReason\":null,\"safetyRatings\":[]},\"candidates\":[{\"finishReason\":\"SAFETY\",\"finishMessage\":\"Blocked.\",\"safetyRatings\":[{\"category\":\"HARM_CATEGORY_HATE_SPEECH\",\"probability\":\"MEDIUM\",\"probabilityScore\":0.5,\"severity\":\"HIGH\",\"severityScore\":0.9,\"blocked\":true,\"extra\":\"dropped\"}]}],\"usageMetadata\":{\"promptTokenCount\":3}}\n\n",
+  "sent": [
+    {
+      "method": "POST",
+      "path": "/v1/models/gemini-2.5-flash:streamGenerateContent?alt=sse",
+      "headers": {
+        "accept": "*/*",
+        "content-type": "application/json",
+        "x-goog-api-key": "test-key-parity"
+      },
+      "body": {
+        "generationConfig": {},
+        "contents": [
+          {
+            "role": "user",
+            "parts": [
+              {
+                "text": "Bad."
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "parts": [
+    {
+      "type": "stream-start",
+      "warnings": []
+    },
+    {
+      "type": "response-metadata",
+      "id": "resp-google-1"
+    },
+    {
+      "type": "finish",
+      "finishReason": {
+        "unified": "content-filter",
+        "raw": "SAFETY"
+      },
+      "usage": {
+        "inputTokens": {
+          "total": 3,
+          "noCache": 3,
+          "cacheRead": 0
+        },
+        "outputTokens": {
+          "total": 0,
+          "text": 0,
+          "reasoning": 0
+        },
+        "raw": {
+          "promptTokenCount": 3
+        }
+      },
+      "providerMetadata": {
+        "google": {
+          "promptFeedback": {
+            "blockReason": null,
+            "safetyRatings": []
+          },
+          "groundingMetadata": null,
+          "urlContextMetadata": null,
+          "safetyRatings": [
+            {
+              "category": "HARM_CATEGORY_HATE_SPEECH",
+              "probability": "MEDIUM",
+              "probabilityScore": 0.5,
+              "severity": "HIGH",
+              "severityScore": 0.9,
+              "blocked": true
+            }
+          ],
+          "usageMetadata": {
+            "promptTokenCount": 3
+          },
+          "finishMessage": "Blocked.",
+          "serviceTier": null
+        }
+      }
+    }
+  ]
+}

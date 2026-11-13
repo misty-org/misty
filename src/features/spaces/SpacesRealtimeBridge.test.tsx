@@ -1,0 +1,118 @@
+import { act, StrictMode } from "react";
+import { createRoot, type Root } from "react-dom/client";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { SpacesRealtimeBridge } from "./SpacesRealtimeBridge";
+
+const mocks = vi.hoisted(() => ({
+  auth: {
+    user: { id: "user-1" } as { id: string } | null,
+    transitioning: false,
+  },
+  spaces: {
+    loading: false,
+    snapshotReady: true,
+    error: null as string | null,
+    load: vi.fn(async () => undefined),
+    connectRealtime: vi.fn(async () => undefined),
+    disconnectRealtime: vi.fn(),
+    clearError: vi.fn(),
+  },
+}));
+
+vi.mock("@/features/account", () => ({
+  useAuth: () => mocks.auth,
+}));
+
+vi.mock("./list/SpaceAgentsBroadcast", () => ({ SpaceAgentsBroadcast: () => null }));
+vi.mock("./list/useSpacesStore", () => ({
+  useSpacesStore: Object.assign(
+    (selector: (state: typeof mocks.spaces) => unknown) => selector(mocks.spaces),
+    { getState: () => mocks.spaces },
+  ),
+}));
+
+describe("SpacesRealtimeBridge", () => {
+  let container: HTMLDivElement;
+  let root: Root;
+
+  beforeEach(() => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    vi.useFakeTimers();
+    mocks.auth.user = { id: "user-1" };
+    mocks.auth.transitioning = false;
+    mocks.spaces.loading = false;
+    mocks.spaces.error = null;
+    mocks.spaces.load.mockClear();
+    mocks.spaces.connectRealtime.mockClear();
+    mocks.spaces.disconnectRealtime.mockClear();
+    mocks.spaces.clearError.mockClear();
+    container = document.createElement("div");
+    document.body.append(container);
+    root = createRoot(container);
+  });
+
+  afterEach(async () => {
+    await act(async () => root.unmount());
+    vi.useRealTimers();
+    container.remove();
+  });
+
+  it("pauses Space requests while the account is switching", async () => {
+    mocks.auth.transitioning = true;
+
+    await act(async () => {
+      root.render(<SpacesRealtimeBridge />);
+    });
+
+    expect(mocks.spaces.disconnectRealtime).toHaveBeenCalled();
+    expect(mocks.spaces.connectRealtime).not.toHaveBeenCalled();
+    expect(mocks.spaces.load).not.toHaveBeenCalled();
+  });
+
+  it("keeps reconnect failures out of Activity", async () => {
+    mocks.spaces.error = "Load failed";
+
+    await act(async () => {
+      root.render(<SpacesRealtimeBridge />);
+    });
+    expect(mocks.spaces.clearError).toHaveBeenCalled();
+  });
+
+  it("does not reconnect when auth returns a new object for the same account", async () => {
+    await act(async () => {
+      root.render(<SpacesRealtimeBridge />);
+    });
+    expect(mocks.spaces.connectRealtime).toHaveBeenCalledOnce();
+
+    mocks.auth.user = { id: "user-1" };
+    await act(async () => {
+      root.render(<SpacesRealtimeBridge />);
+    });
+
+    expect(mocks.spaces.connectRealtime).toHaveBeenCalledOnce();
+    expect(mocks.spaces.disconnectRealtime).not.toHaveBeenCalled();
+  });
+
+  it("cancels Strict Mode's transient socket cleanup", async () => {
+    await act(async () => {
+      root.render(
+        <StrictMode>
+          <SpacesRealtimeBridge />
+        </StrictMode>,
+      );
+    });
+    await act(async () => vi.advanceTimersByTimeAsync(1));
+
+    expect(mocks.spaces.disconnectRealtime).not.toHaveBeenCalled();
+  });
+
+  it("silently clears account-switch handoff errors", async () => {
+    mocks.spaces.error = "Wait for the account switch to finish.";
+
+    await act(async () => {
+      root.render(<SpacesRealtimeBridge />);
+    });
+
+    expect(mocks.spaces.clearError).toHaveBeenCalled();
+  });
+});

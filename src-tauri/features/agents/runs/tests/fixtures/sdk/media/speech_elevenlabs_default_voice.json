@@ -1,0 +1,40 @@
+{
+  "name": "speech_elevenlabs_default_voice",
+  "kind": "speech",
+  "modelId": "elevenlabs/eleven_flash_v2_5",
+  "credentialProvider": "elevenlabs",
+  "input": {
+    "text": "Hello.",
+    "outputFormat": "pcm_24000"
+  },
+  "replies": [
+    {
+      "status": 200,
+      "contentType": "application/octet-stream",
+      "bodyBase64": "AQIDBAUGBwg="
+    }
+  ],
+  "unorderedRequests": false,
+  "sent": [
+    {
+      "method": "POST",
+      "path": "/v1/text-to-speech/21m00Tcm4TlvDq8ikWAM?output_format=pcm_24000",
+      "headers": {
+        "accept": "*/*",
+        "content-type": "application/json",
+        "xi-api-key": "test-key-parity"
+      },
+      "body": {
+        "text": "Hello.",
+        "model_id": "eleven_flash_v2_5"
+      }
+    }
+  ],
+  "result": {
+    "audioBase64": "AQIDBAUGBwg=",
+    "mediaType": "audio/mp3",
+    "format": "mp3",
+    "warnings": [],
+    "providerMetadata": {}
+  }
+}

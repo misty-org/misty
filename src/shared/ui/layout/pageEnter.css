@@ -1,0 +1,22 @@
+/* Page transition: a page's content (not the bar) fades and rises into place. Opacity and transform only,
+   so it runs on the compositor; a blur filter made it stutter in WebKit. No `will-change` and no
+   forwards fill: either keeps the layer after the animation ends, and that layer's text loses
+   ClearType, which reads as blur on 1x Windows displays. */
+.misty-page-in {
+  animation: misty-page-in 360ms ease-out backwards;
+}
+@keyframes misty-page-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 8px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .misty-page-in {
+    animation: none;
+  }
+}

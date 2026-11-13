@@ -1,0 +1,80 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Misty",
+  "version": "0.1.0-beta.1",
+  "identifier": "com.misty.desktop",
+  "build": {
+    "beforeDevCommand": "node node_modules/vite/bin/vite.js --mode desktop --config .config/vite.config.ts",
+    "devUrl": "http://127.0.0.1:5173",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "macOSPrivateApi": true,
+    "windows": [
+      {
+        "label": "space-personal",
+        "create": false,
+        "title": "Misty",
+        "width": 1280,
+        "height": 820,
+        "minWidth": 640,
+        "minHeight": 420,
+        "backgroundThrottling": "disabled",
+        "decorations": false,
+        "transparent": true,
+        "shadow": false,
+        "resizable": true,
+        "maximizable": true,
+        "minimizable": true,
+        "closable": true,
+        "dragDropEnabled": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self' customprotocol: asset:; connect-src 'self' ipc: asset: http://asset.localhost http://ipc.localhost http://localhost:* http://127.0.0.1:* http://10.0.2.2:* ws://localhost:* ws://127.0.0.1:* ws://10.0.2.2:* https: wss:; frame-src 'self'; img-src 'self' asset: http://asset.localhost blob: data: https:; media-src 'self' blob: asset: http://asset.localhost http://127.0.0.1:*; font-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; worker-src 'self' blob:",
+      "assetProtocol": {
+        "enable": true,
+        "scope": []
+      }
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": [
+      "app",
+      "dmg"
+    ],
+    "macOS": {
+      "minimumSystemVersion": "14.0",
+      "entitlements": "packaging/Entitlements.plist",
+      "infoPlist": "packaging/Info.plist"
+    },
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "createUpdaterArtifacts": true,
+    "resources": {
+      "resources/agent-catalogs": "agent-catalogs"
+    }
+  },
+  "plugins": {
+    "deep-link": {
+      "desktop": {
+        "schemes": [
+          "misty"
+        ]
+      }
+    },
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEZEOUZENUM4QUJBQTJFNEQKUldSTkxxcXJ5TldmL1VCcFVJQlhsZEh6NWpkQ29FWVNBVk5qYytmblhqcVMxNVg0UlBhRDRWQloK",
+      "endpoints": [
+        "https://github.com/misty-org/misty/releases/latest/download/latest.json"
+      ]
+    }
+  }
+}

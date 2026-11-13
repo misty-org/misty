@@ -1,0 +1,54 @@
+{
+  "name": "error_body_empty",
+  "modelId": "openai/gpt-5.1",
+  "credentialProvider": "openai",
+  "options": {
+    "prompt": [
+      {
+        "role": "user",
+        "content": [
+          {
+            "type": "text",
+            "text": "Hi."
+          }
+        ]
+      }
+    ]
+  },
+  "status": 500,
+  "contentType": "application/json",
+  "response": "",
+  "sent": [
+    {
+      "method": "POST",
+      "path": "/v1/responses",
+      "headers": {
+        "accept": "*/*",
+        "authorization": "Bearer test-key-parity",
+        "content-type": "application/json"
+      },
+      "body": {
+        "model": "gpt-5.1",
+        "input": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "input_text",
+                "text": "Hi."
+              }
+            ]
+          }
+        ],
+        "stream": true
+      }
+    }
+  ],
+  "parts": [],
+  "thrown": {
+    "name": "AI_APICallError",
+    "message": "Internal Server Error",
+    "statusCode": 500,
+    "isRetryable": true
+  }
+}

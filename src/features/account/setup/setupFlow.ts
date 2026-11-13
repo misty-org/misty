@@ -1,0 +1,11 @@
+import type { ComponentType } from "react";
+import { createPort } from "@/shared/lib/seams";
+
+export type SetupStep = "tabs";
+
+/** The first-run steps shown inside the sign-in sheet; onboarding fills them in. */
+export const setupFlow = createPort<{
+  stepCopy: Record<SetupStep, string>;
+  useSteps: () => SetupStep[];
+  StepBody: ComponentType<{ step: SetupStep; onNext(): void }>;
+}>("the first-run setup steps");

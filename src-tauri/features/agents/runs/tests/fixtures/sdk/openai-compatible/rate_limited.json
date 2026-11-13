@@ -1,0 +1,49 @@
+{
+  "name": "rate_limited",
+  "modelId": "nvidia/test-model",
+  "credentialProvider": "nvidia",
+  "options": {
+    "prompt": [
+      {
+        "role": "user",
+        "content": [
+          {
+            "type": "text",
+            "text": "Go."
+          }
+        ]
+      }
+    ]
+  },
+  "status": 429,
+  "contentType": "application/json",
+  "response": "{\"error\":{\"message\":\"Slow down\",\"type\":\"rate_limit\"}}",
+  "sent": [
+    {
+      "method": "POST",
+      "path": "/v1/chat/completions",
+      "headers": {
+        "accept": "*/*",
+        "authorization": "Bearer test-key-parity",
+        "content-type": "application/json"
+      },
+      "body": {
+        "model": "test-model",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Go."
+          }
+        ],
+        "stream": true
+      }
+    }
+  ],
+  "parts": [],
+  "thrown": {
+    "name": "AI_APICallError",
+    "message": "Slow down",
+    "statusCode": 429,
+    "isRetryable": true
+  }
+}

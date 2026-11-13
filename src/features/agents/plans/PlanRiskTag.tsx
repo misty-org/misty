@@ -1,0 +1,24 @@
+import { CircleAlert, Eye, FilePen, OctagonAlert, PencilLine } from "lucide-react";
+import { Text, Tooltip } from "@/shared/ui";
+import type { PlanRisk } from "./planTypes";
+
+/** Risk carries an icon and a word, never a color. */
+const planRisks: Record<PlanRisk, { label: string; Icon: typeof Eye }> = {
+  read: { label: "Reads", Icon: Eye },
+  draft: { label: "Drafts", Icon: FilePen },
+  write: { label: "Changes", Icon: PencilLine },
+  consequential: { label: "Asks first", Icon: CircleAlert },
+  dangerous: { label: "Risky", Icon: OctagonAlert },
+};
+
+export function PlanRiskTag({ risk }: { risk: PlanRisk }) {
+  const { label, Icon } = planRisks[risk] ?? planRisks.read;
+  return (
+    <Tooltip content={`Risk: ${label}`}>
+      <Text bare tone="muted" className="inline-flex items-center gap-1 text-micro">
+        <Icon aria-hidden="true" />
+        {label}
+      </Text>
+    </Tooltip>
+  );
+}

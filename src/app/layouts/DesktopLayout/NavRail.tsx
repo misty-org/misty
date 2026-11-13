@@ -1,0 +1,79 @@
+import { useAccountAvatarUrl, useAuth, useUserStore } from "@/features/account";
+import { useNativeSessionStore } from "@/features/account";
+import { avatarColorClass, avatarInkClass } from "@/shared/lib/avatarPalette";
+import { Avatar, AvatarFallback, AvatarImage, Button, Text, cn } from "@/shared/ui";
+import { UserCircle } from "lucide-react";
+import { forwardRef, memo, type ButtonHTMLAttributes } from "react";
+import { useShallow } from "zustand/react/shallow";
+import { emailName, initialsForProfile } from "./accountMenuText";
+import { profileDockClass } from "./styles";
+
+export const AccountNavButton = memo(
+  forwardRef<
+    HTMLButtonElement,
+    Omit<ButtonHTMLAttributes<HTMLButtonElement>, "className"> & {
+      open: boolean;
+      /** Overrides the rail dock geometry so the navigator can align it to its rows. */
+      className?: string;
+      avatarClassName?: string;
+      label?: string | null;
+      /** Labels the button with the signed-in account's display name. */
+      showAccountName?: boolean;
+    }
+  >(function AccountNavButton(
+    { open, className, avatarClassName, label, showAccountName, ...buttonProps },
+    ref,
+  ) {
+    const props = { open, className, avatarClassName, label, showAccountName };
+    const currentUser = useNativeSessionStore((state) => state.status?.current_user ?? null);
+    const { user } = useAuth();
+    const me = useUserStore(
+      useShallow((state) => ({
+        id: state.me?.id,
+        email: state.me?.email,
+        username: state.me?.username,
+        avatarVersion: state.me?.avatar_version ?? 0,
+      })),
+    );
+    const account = user ?? currentUser;
+    const accountMe = me.id === account?.id ? me : null;
+    const email = accountMe?.email ?? account?.email ?? "";
+    const displayName = accountMe?.username ?? account?.username ?? emailName(email) ?? "Misty";
+    const initials = initialsForProfile(displayName, email);
+    const avatarVersion = accountMe?.avatarVersion ?? user?.avatarVersion ?? 0;
+    const avatarUrl = useAccountAvatarUrl(account?.id, avatarVersion);
+
+    return (
+      <Button
+        ref={ref}
+        className={cn("group/profile", props.className ?? profileDockClass)}
+        variant="quiet"
+        type="button"
+        aria-label="Account"
+        aria-haspopup="menu"
+        aria-expanded={props.open}
+        {...buttonProps}
+      >
+        {account ? (
+          <Avatar shape="tile" className={cn("shrink-0", props.avatarClassName)}>
+            {avatarUrl ? (
+              <AvatarImage src={avatarUrl} alt={`${displayName} profile picture`} />
+            ) : null}
+            <AvatarFallback
+              className={account?.id ? cn(avatarColorClass(account.id), avatarInkClass) : undefined}
+            >
+              {initials}
+            </AvatarFallback>
+          </Avatar>
+        ) : (
+          <UserCircle className="shrink-0 transition-colors" />
+        )}
+        {(props.label ?? (props.showAccountName ? displayName : null)) ? (
+          <Text tone="default" className="flex-1 text-left">
+            {props.label ?? displayName}
+          </Text>
+        ) : null}
+      </Button>
+    );
+  }),
+);

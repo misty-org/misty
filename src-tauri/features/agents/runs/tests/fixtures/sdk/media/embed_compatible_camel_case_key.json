@@ -1,0 +1,57 @@
+{
+  "name": "embed_compatible_camel_case_key",
+  "kind": "embed",
+  "modelId": "ollama/nomic",
+  "credentialProvider": "ollama",
+  "input": {
+    "values": [
+      "one"
+    ],
+    "providerOptions": {
+      "openaiCompatible": {
+        "dimensions": 64
+      },
+      "ollama": {
+        "user": "me"
+      }
+    }
+  },
+  "replies": [
+    {
+      "status": 200,
+      "contentType": "application/json",
+      "body": "{\"data\":[{\"embedding\":[0.5]}]}"
+    }
+  ],
+  "unorderedRequests": false,
+  "sent": [
+    {
+      "method": "POST",
+      "path": "/v1/embeddings",
+      "headers": {
+        "accept": "*/*",
+        "authorization": "Bearer test-key-parity",
+        "content-type": "application/json"
+      },
+      "body": {
+        "model": "nomic",
+        "input": [
+          "one"
+        ],
+        "encoding_format": "float",
+        "dimensions": 64,
+        "user": "me"
+      }
+    }
+  ],
+  "result": {
+    "embeddings": [
+      [
+        0.5
+      ]
+    ],
+    "tokens": null,
+    "warnings": [],
+    "providerMetadata": null
+  }
+}

@@ -1,0 +1,340 @@
+import {
+  FolderOpen,
+  Archive,
+  ArchiveRestore,
+  ArrowDown,
+  ArrowUp,
+  Check,
+  FolderPlus,
+  Pencil,
+  X,
+} from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useShallow } from "zustand/react/shallow";
+import {
+  Button,
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  Input,
+  MenuItem,
+  MenuSubmenu,
+  MenuTrigger,
+  OverflowFadeText,
+  Pressable,
+  Skeleton,
+  Text,
+  useNotice,
+} from "@/shared/ui";
+import {
+  currentSpaceKey,
+  mistyEngine,
+  folderLabel,
+  folderName,
+  folderOf,
+  spaceFolderList,
+  useSpaceFolders,
+} from "../engines/enginesApi";
+import type { AgentProfile } from "@/shared/schemas";
+import { useAgentFolder, useAgentFolders } from "../shared-folders/agentFolder";
+import { errorText } from "./projectApi";
+import { FolderAvatar } from "./folders/FolderAvatars";
+
+/**
+ * The Space's linked folders, and which one the panels and engines work in. `failed` says the
+ * list couldn't be read; `retry` reads it again.
+ */
+export function useProjectFolder(agent?: Pick<AgentProfile, "id" | "engine">): {
+  space: string;
+  folder: string;
+  loaded: boolean;
+  failed: boolean;
+  retry(): void;
+} {
+  const space = currentSpaceKey();
+  const spaceFolder = useSpaceFolders((state) => folderOf(state, space));
+  const spaceLoaded = useSpaceFolders((state) => state.folders[space] !== undefined);
+  // An agent on an outside engine works in its own folder; one it doesn't have yet is the Space's
+  // until its first run decides.
+  const own = useAgentFolder(agent);
+  const folder = own || spaceFolder;
+  const loaded = own !== undefined && (Boolean(own) || spaceLoaded);
+  const [failed, setFailed] = useState(false);
+  const [round, setRound] = useState(0);
+  useEffect(() => {
+    let live = true;
+    setFailed(false);
+    void useSpaceFolders
+      .getState()
+      .load(space)
+      .catch(() => live && setFailed(true));
+    return () => {
+      live = false;
+    };
+  }, [space, round]);
+  const retry = useCallback(() => setRound((value) => value + 1), []);
+  return { space, folder, loaded, failed: failed && !loaded, retry };
+}
+
+/** Names a folder in the Space's lists. */
+function RenameFolderDialog(props: {
+  space: string;
+  path: string | null;
+  onClose(): void;
+  onError(message: string): void;
+}) {
+  const [name, setName] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (props.path) setName(folderLabel(useSpaceFolders.getState(), props.space, props.path));
+  }, [props.path, props.space]);
+  return (
+    <Dialog open={props.path !== null} onOpenChange={(open) => !open && props.onClose()}>
+      <DialogContent
+        className="max-w-sm"
+        onOpenAutoFocus={(event) => {
+          event.preventDefault();
+          inputRef.current?.select();
+        }}
+      >
+        <form
+          className="grid gap-4"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (!props.path) return;
+            void useSpaceFolders
+              .getState()
+              .rename(props.space, props.path, name)
+              .catch((reason) => props.onError(errorText(reason)));
+            props.onClose();
+          }}
+        >
+          <DialogHeader>
+            <DialogTitle>Rename folder</DialogTitle>
+          </DialogHeader>
+          <Input
+            ref={inputRef}
+            aria-label="Name"
+            value={name}
+            placeholder={props.path ? folderName(props.path) : undefined}
+            onChange={(event) => setName(event.target.value)}
+          />
+          <DialogFooter>
+            <Button type="button" size="lg" onClick={props.onClose}>
+              Cancel
+            </Button>
+            <Button type="submit" size="lg">
+              Rename
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/**
+ * The folder the panel shows, as a menu: the Space's linked folders in the person's order, with a
+ * checkmark on the one in use; each can be renamed, moved up or down, archived (still linked, out
+ * of the way) or unlinked, and another can be linked through the system's folder picker. What is
+ * chosen, named and ordered is kept for this device. `compact` draws it as quiet text, for the
+ * session card's Project heading.
+ */
+export function FolderPicker({ compact = false }: { compact?: boolean }) {
+  const { space, folder, loaded } = useProjectFolder();
+  // Each read builds a new list, so the store compares them by their items; a fresh array every
+  // time would make React render again forever ("Maximum update depth exceeded").
+  const active = useSpaceFolders(useShallow((state) => spaceFolderList(state, space)));
+  const all = useSpaceFolders(useShallow((state) => spaceFolderList(state, space, true)));
+  const label = useSpaceFolders((state) => (folder ? folderLabel(state, space, folder) : ""));
+  const labels = useSpaceFolders((state) => state.prefs[space]?.names);
+  const [renaming, setRenaming] = useState<string | null>(null);
+  const [error, setError] = useState("");
+  useNotice(Boolean(error), { message: error, tone: "error", onDismiss: () => setError("") });
+  const store = useSpaceFolders.getState;
+  const report = (work: Promise<unknown>) =>
+    void work.catch((reason) => setError(errorText(reason)));
+  const archived = all.filter((path) => !active.includes(path));
+  const name = (path: string) => labels?.[path] ?? folderName(path);
+  // The row's name after its owner's GitHub avatar, or the folder icon.
+  const rowLabel = (path: string) => (
+    <span className="flex min-w-0 items-center gap-2">
+      <FolderAvatar path={path} />
+      <OverflowFadeText className="min-w-0">{name(path)}</OverflowFadeText>
+    </span>
+  );
+
+  if (!loaded) return <Skeleton className={compact ? "h-3 w-20" : "h-8 w-36 rounded-md"} />;
+  if (!folder && archived.length === 0)
+    return (
+      <>
+        {compact ? (
+          // Quiet text, like the folder menu it stands in for at the row's end.
+          <Text bare size="caption" tone="muted">
+            <Pressable
+              wash="text"
+              className="inline-flex min-w-0 max-w-full items-center px-0.5 whitespace-nowrap"
+              onClick={() => report(store().link(space))}
+            >
+              Link a folder
+            </Pressable>
+          </Text>
+        ) : (
+          <Button
+            type="button"
+            variant="secondary"
+            icon={FolderPlus}
+            onClick={() => report(store().link(space))}
+          >
+            Link a folder
+          </Button>
+        )}
+      </>
+    );
+  return (
+    <>
+      <DropdownMenu>
+        <MenuTrigger
+          label="Project folder"
+          value={folder ? label : "No folder"}
+          chevron={!compact}
+          plain={compact}
+        />
+        <DropdownMenuContent align="start" className="w-72 max-w-[calc(100vw-16px)]">
+          {active.map((path, index) => (
+            <MenuSubmenu
+              key={path}
+              icon={path === folder ? <Check /> : <span className="size-4" />}
+              label={rowLabel(path)}
+            >
+              <MenuItem
+                icon={<Check />}
+                label="Work in this folder"
+                disabled={path === folder}
+                onSelect={() => store().choose(space, path)}
+              />
+              <MenuItem icon={<Pencil />} label="Rename" onSelect={() => setRenaming(path)} />
+              <MenuItem
+                icon={<ArrowUp />}
+                label="Move up"
+                disabled={index === 0}
+                onSelect={() => report(store().move(space, path, index - 1))}
+              />
+              <MenuItem
+                icon={<ArrowDown />}
+                label="Move down"
+                disabled={index === active.length - 1}
+                onSelect={() => report(store().move(space, path, index + 1))}
+              />
+              <DropdownMenuSeparator />
+              <MenuItem
+                icon={<Archive />}
+                label="Archive"
+                onSelect={() => report(store().archive(space, path, true))}
+              />
+              <MenuItem
+                icon={<X />}
+                label="Unlink"
+                onSelect={() => report(store().unlink(space, path))}
+              />
+            </MenuSubmenu>
+          ))}
+          {archived.length > 0 ? (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel>Archived</DropdownMenuLabel>
+              {archived.map((path) => (
+                <MenuSubmenu key={path} icon={<span className="size-4" />} label={rowLabel(path)}>
+                  <MenuItem
+                    icon={<ArchiveRestore />}
+                    label="Restore"
+                    onSelect={() => report(store().archive(space, path, false))}
+                  />
+                  <MenuItem
+                    icon={<X />}
+                    label="Unlink"
+                    onSelect={() => report(store().unlink(space, path))}
+                  />
+                </MenuSubmenu>
+              ))}
+            </>
+          ) : null}
+          <DropdownMenuSeparator />
+          <MenuItem
+            icon={<FolderPlus />}
+            label="Link a folder"
+            onSelect={() => report(store().link(space))}
+          />
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <RenameFolderDialog
+        space={space}
+        path={renaming}
+        onClose={() => setRenaming(null)}
+        onError={setError}
+      />
+    </>
+  );
+}
+
+/**
+ * The agent's own folder, where every chat with it works, as a menu: pick another folder in the
+ * system's dialog or make a new one. For agents on outside engines; `compact` draws it as quiet
+ * text, for the session card's Project heading.
+ */
+export function AgentFolderPicker({
+  agent,
+  compact = false,
+}: {
+  agent: Pick<AgentProfile, "id" | "name" | "engine">;
+  compact?: boolean;
+}) {
+  const { folder, loaded } = useProjectFolder(agent);
+  const [error, setError] = useState("");
+  useNotice(Boolean(error), { message: error, tone: "error", onDismiss: () => setError("") });
+  const report = (work: Promise<unknown>) =>
+    void work.catch((reason) => setError(errorText(reason)));
+  if (!loaded) return <Skeleton className={compact ? "h-3 w-20" : "h-8 w-36 rounded-md"} />;
+  return (
+    <DropdownMenu>
+      <MenuTrigger
+        label={`${agent.name}'s folder`}
+        value={folder ? folderName(folder) : "New folder"}
+        chevron={!compact}
+        plain={compact}
+      />
+      <DropdownMenuContent align="start" className="w-72 max-w-[calc(100vw-16px)]">
+        <MenuItem
+          icon={<FolderOpen />}
+          label="Choose a folder"
+          onSelect={() => report(useAgentFolders.getState().choose(agent.id))}
+        />
+        <MenuItem
+          icon={<FolderPlus />}
+          label="Make a new folder"
+          onSelect={() => report(useAgentFolders.getState().makeNew(agent.id, agent.name))}
+        />
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+const ownsFolder = (agent: Pick<AgentProfile, "engine">) =>
+  Boolean(agent.engine && agent.engine !== mistyEngine);
+
+/** The session card's Project heading: the agent's own folder, or the Space's for Misty's own. */
+export function ProjectFolderPicker({ agent }: { agent: AgentProfile }) {
+  return ownsFolder(agent) ? <AgentFolderPicker agent={agent} compact /> : <FolderPicker compact />;
+}
+
+/** What the session card says when there is no folder yet. */
+export const noFolderLine = (agent: Pick<AgentProfile, "engine">) =>
+  ownsFolder(agent)
+    ? "You'll choose its folder when you send the first message."
+    : "No folder is linked to this Space.";
