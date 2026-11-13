@@ -75,8 +75,9 @@ export function AiPaneHost({
     };
   }, []);
   const summon = useCallback(
-    (anchor?: AiCompanionAnchor) => {
-      if (accountId && adapterRef.current) summonCompanion(accountId, paneId, anchor);
+    (_anchor?: AiCompanionAnchor) => {
+      // Where the person pointed is presentation only; the request carries the pane's context.
+      if (accountId && adapterRef.current) summonCompanion(accountId, paneId);
     },
     [accountId, paneId, summonCompanion],
   );

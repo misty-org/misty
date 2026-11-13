@@ -104,7 +104,11 @@ pub(super) fn record_start(
 
 /// Whether a tool changes the file it names; the same reading the claims use.
 fn writes_file(tool: &str) -> bool {
-    let name = tool.rsplit("__").next().unwrap_or(tool).to_ascii_lowercase();
+    let name = tool
+        .rsplit("__")
+        .next()
+        .unwrap_or(tool)
+        .to_ascii_lowercase();
     [
         "edit",
         "write",
@@ -147,7 +151,9 @@ pub(super) fn record_event(
             let mut files: Vec<String> = serde_json::from_str(&files).unwrap_or_default();
             let tool = event["toolName"].as_str().unwrap_or("");
             if let Some(path) = event["path"].as_str().filter(|path| !path.is_empty()) {
-                if writes_file(tool) && !files.iter().any(|known| known == path) && files.len() < KEPT_FILES
+                if writes_file(tool)
+                    && !files.iter().any(|known| known == path)
+                    && files.len() < KEPT_FILES
                 {
                     files.push(path.to_owned());
                 }
@@ -157,7 +163,11 @@ pub(super) fn record_event(
                 "UPDATE agent_run_ledger SET tools = tools + 1, files = ?2, updated_at = ?3,
                      state = CASE state WHEN 'needs-you' THEN 'running' ELSE state END
                  WHERE run_id = ?1",
-                params![run_id, serde_json::to_string(&files).unwrap_or_default(), now],
+                params![
+                    run_id,
+                    serde_json::to_string(&files).unwrap_or_default(),
+                    now
+                ],
             )?;
         }
         "invocation.completed" | "invocation.failed" | "invocation.canceled" => {
@@ -218,7 +228,9 @@ fn in_order(job: impl FnOnce() + Send + 'static) {
 /// the timeline.
 pub(super) fn note_start(app: &AppHandle, run_id: &str, body: &Value) {
     session_started();
-    let Some(store) = store_if_ready(app) else { return };
+    let Some(store) = store_if_ready(app) else {
+        return;
+    };
     let (run_id, body) = (run_id.to_owned(), body.clone());
     let parent = RunFacts::of_request(&run_id, &body).parent_run_id;
     let app = app.clone();
@@ -240,11 +252,15 @@ pub(super) fn note_event(app: &AppHandle, run_id: &str, event: &Value) {
     if !ledger && !steps {
         return;
     }
-    let Some(store) = store_if_ready(app) else { return };
+    let Some(store) = store_if_ready(app) else {
+        return;
+    };
     let (run_id, event) = (run_id.to_owned(), event.clone());
     let app = app.clone();
     in_order(move || {
-        let Ok(connection) = store.connect() else { return };
+        let Ok(connection) = store.connect() else {
+            return;
+        };
         if ledger {
             let _ = record_event(&connection, &run_id, &event, now_ms());
         }
@@ -321,8 +337,13 @@ pub async fn agent_run_timeline(
     let started = session_started();
     let mut found = tokio::task::spawn_blocking(move || {
         let connection = store.connect().map_err(|error| error.to_string())?;
-        rows(&connection, &account, &conversation_ids, limit.unwrap_or(30))
-            .map_err(|error| error.to_string())
+        rows(
+            &connection,
+            &account,
+            &conversation_ids,
+            limit.unwrap_or(30),
+        )
+        .map_err(|error| error.to_string())
     })
     .await
     .map_err(|error| error.to_string())??;

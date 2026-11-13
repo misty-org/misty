@@ -1,12 +1,6 @@
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it } from "vitest";
-import {
-  clearPromptHistory,
-  findPromptCompletion,
-  getPromptHistory,
-  recordPrompt,
-  setPromptHistoryEnabled,
-} from "./promptHistory";
+import { getPromptHistory, recordPrompt } from "./promptHistory";
 import { usePromptHistoryNav } from "./usePromptHistoryNav";
 
 const key = (name: string) => ({
@@ -20,8 +14,9 @@ const key = (name: string) => ({
 
 describe("prompt history", () => {
   beforeEach(() => {
-    clearPromptHistory();
-    setPromptHistoryEnabled(true);
+    localStorage.clear();
+    // The history is cached in memory; empty the cached list too.
+    getPromptHistory().length = 0;
   });
 
   it("keeps each prompt once, newest last, trimmed", () => {
@@ -29,14 +24,6 @@ describe("prompt history", () => {
     recordPrompt("second");
     recordPrompt("first");
     expect(getPromptHistory()).toEqual(["second", "first"]);
-  });
-
-  it("completes a prefix with the most used prompt", () => {
-    recordPrompt("run the tests");
-    recordPrompt("run the build");
-    recordPrompt("run the build");
-    expect(findPromptCompletion("run")).toBe("run the build");
-    expect(findPromptCompletion("r")).toBeNull();
   });
 
   it("walks back and forth from an empty box and restores the draft", () => {

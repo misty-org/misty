@@ -33,7 +33,6 @@ export async function submitWorkspaceMessage(
     prompt,
     attachments,
     undefined,
-    "workspace",
     [],
     { conversationId, context: handoff?.context ?? [] },
     {

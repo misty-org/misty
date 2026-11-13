@@ -1,5 +1,6 @@
 import { useUserStore } from "@/features/account/core";
 import { spacesApi } from "../api/api";
+import { notesApi } from "../journal/notes/api/api";
 import { useSpacesStore } from "../list/useSpacesStore";
 import { windowSpace } from "../routes/defaultSpace";
 import { handoffBody } from "./spacePosts";
@@ -22,6 +23,30 @@ export const handoffGateway = {
     return members
       .filter((member) => member.user_id !== me)
       .map((member) => ({ userId: member.user_id, name: member.name || member.email }));
+  },
+  windowSpace(): { id: string; name: string } | undefined {
+    const space = windowSpace(useSpacesStore.getState().spaces);
+    return space ? { id: space.id, name: space.name } : undefined;
+  },
+  async saveDoc(spaceId: string, docId: string | undefined, title: string, markdown: string) {
+    const note = docId
+      ? await notesApi.replaceContent(spaceId, docId, title, markdown)
+      : await notesApi.createWithMarkdown(spaceId, title, markdown);
+    window.dispatchEvent(
+      new CustomEvent("misty:space-note-event", { detail: { space_id: spaceId } }),
+    );
+    return { id: note.id };
+  },
+  async listDocs(spaceId: string) {
+    const { notes } = await notesApi.list(spaceId);
+    return notes.map((note) => ({
+      id: note.id,
+      title: note.title,
+      creatorId: note.creator_user_id,
+    }));
+  },
+  async readDoc(spaceId: string, docId: string) {
+    return (await notesApi.get(spaceId, docId)).markdown ?? "";
   },
   /** Sends the text as the person's direct message to one member, marked as a handoff. */
   async sendHandoff(spaceId: string, userId: string, text: string): Promise<void> {

@@ -142,24 +142,6 @@ export const updatePlanSchema: Schema = {
   },
 };
 
-export const updateGoalSchema: Schema = {
-  type: "object",
-  required: ["status", "summary"],
-  properties: {
-    status: { type: "string", enum: ["in_progress", "achieved", "unmet"] },
-    summary: text(2000, 1),
-    evidence: list(
-      {
-        type: "object",
-        required: ["criterion", "proof"],
-        properties: { criterion: text(400, 1), proof: text(1000, 1) },
-      },
-      10,
-    ),
-    next_steps: list(text(400), 10),
-  },
-};
-
 export const checklistSchema: Schema = {
   type: "object",
   required: ["items"],

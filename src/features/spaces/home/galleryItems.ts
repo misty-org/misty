@@ -44,7 +44,7 @@ export const galleryFilters: ReadonlyArray<{
 }> = [
   { id: "all", label: "All" },
   { id: "chats", label: "Chats", kind: "chat" },
-  { id: "notes", label: "Notes", kind: "note" },
+  { id: "notes", label: "Docs", kind: "note" },
   { id: "drawings", label: "Drawings", kind: "drawing" },
   { id: "images", label: "Images", kind: "image" },
   { id: "files", label: "Files", kind: "file" },
@@ -82,7 +82,7 @@ export function noteItem(spaceId: string, note: ServerSpaceNote): GalleryItem {
   return {
     key: `note:${note.id}`,
     kind: "note",
-    title: note.title.trim() || "Untitled note",
+    title: note.title.trim() || "Untitled doc",
     updatedAt: note.updated_at ?? note.created_at ?? "",
     creatorId: note.creator_user_id,
     href: `${base(spaceId)}/notes?note=${encodeURIComponent(note.id)}`,

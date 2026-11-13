@@ -3,7 +3,7 @@
 use crate::browser::*;
 
 mod operations;
-use operations::{request_browser, type_browser, visual_browser};
+use operations::{type_browser, visual_browser};
 
 #[tauri::command]
 pub async fn browser_agent_execute(
@@ -56,7 +56,6 @@ pub(crate) async fn execute_agent_request(
             | "browser.type"
             | "browser.interact"
             | "browser.upload"
-            | "browser.request"
             | "browser.steps"
             | "browser.fill_form"
             | "browser.skill"
@@ -154,7 +153,6 @@ pub(crate) async fn execute_agent_request(
         }
         "browser.click" => click_browser(&app, &state, &id, &agent_id, &request).await,
         "browser.type" => type_browser(&app, &state, &id, &request).await,
-        "browser.request" => request_browser(&app, &state, &id, &request).await,
         "browser.upload" => upload_browser(&app, &state, &id, &request).await,
         "browser.interact" => interact_browser(&app, &state, &id, &request).await,
         "browser.downloads.list" => {

@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 mod policy;
-pub use policy::{DevicePolicy, RunGrant, SharedFolder};
+pub use policy::RunGrant;
 
 /// A signed device record as its exact signed bytes (base64) and signature.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -42,8 +42,7 @@ impl SignedRecord {
     }
 }
 
-/// A server's id is a hyphenated UUID; this computer's own (`agents::storage::device_id`) is its
-/// simple form.
+/// A hyphenated UUID or, for this computer's own id (`agents::storage::device_id`), its simple form.
 pub fn valid_device_id(value: &str) -> bool {
     matches!(value.len(), 39 | 43)
         && value.starts_with("device_")

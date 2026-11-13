@@ -1,12 +1,12 @@
 import { chatDeviceGrants } from "../../personal/deviceGrants";
 import { useCollaborationStore } from "../../plans/agentCollaboration";
-import { admitLocalTurn } from "@/features/agents/localRun";
+import { admitLocalTurn } from "../../localRun";
 import { lessonTurnPayload } from "../../tutor/lessons/lessonRouter";
 import { useLessonStore } from "../../tutor/lessons/lessonStore";
 import {
   runtimeAiApi as aiSurfaceApi,
   subscribeAgentsInvocation as subscribeToAiInvocation,
-} from "@/features/agents/AgentsRuntime";
+} from "../../AgentsRuntime";
 import { useLocalExecution } from "../../runs/local-execution/localExecution";
 import type { AiInvocationDeviceContext, AiSelectionSnapshot } from "../../runs/invocations";
 import type {
@@ -29,6 +29,7 @@ import { finishNeverStarted } from "./turnExecution";
 import { answerNotStarted } from "../view/failureSummary";
 import { turnStreamHandlers } from "./turnStream";
 import type { GlobalAiMessage } from "../state/conversationTypes";
+import { thisComputerDeviceId } from "../../personal/useAgentsStore";
 
 type SubmitArgs = Parameters<MistyState["submitAnswer"]>;
 
@@ -48,7 +49,7 @@ interface PreparedTurn {
   normalized: string;
   attachments: NonNullable<SubmitArgs[1]>;
   selection?: AiSelectionSnapshot;
-  companion: SubmitArgs[6];
+  companion: SubmitArgs[5];
   requestAgentId: string;
   handoff: MistyState["handoff"];
   executionMode: AiInvocationRequest["executionMode"];
@@ -138,8 +139,7 @@ export async function startInvocation(set: MistySet, get: MistyGet, turn: Prepar
       historyTurns: historyTurns(get().conversations.find((c) => c.id === conversationId)),
       historyNotes: get().conversations.find((c) => c.id === conversationId)?.historyNotes,
       // The run works on this computer.
-      originDeviceId: await import("@/features/agents/personal/useAgentsStore")
-        .then(({ thisComputerDeviceId }) => thisComputerDeviceId())
+      originDeviceId: await thisComputerDeviceId()
         .then((id) => id ?? undefined)
         .catch(() => undefined),
       context: invocationContext,
@@ -152,7 +152,6 @@ export async function startInvocation(set: MistySet, get: MistyGet, turn: Prepar
       // Plan turns may think harder (Settings → Agents → Think harder while planning).
       thinkingMode: collaborationMode === "plan" && planDeepThinking() ? "deep" : requestedThinking,
       collaborationMode,
-      ...(companion?.mediaContext ? { mediaContext: companion.mediaContext } : {}),
       ...(collaborationMode === "teach"
         ? lessonTurnPayload(
             useLessonStore.getState().lessons,

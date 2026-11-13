@@ -58,7 +58,6 @@ export function TutorPage({
       open(next) {
         setParams((current) => {
           const updated = new URLSearchParams(current);
-          updated.delete("tutor");
           if (next) updated.set("item", next);
           else updated.delete("item");
           return updated;

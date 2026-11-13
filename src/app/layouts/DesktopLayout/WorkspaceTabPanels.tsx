@@ -33,7 +33,7 @@ export function WorkspaceTabPanels(props: {
             : "hidden"
         }
         role="tabpanel"
-        style={{ gridColumn: props.gridColumn ?? 1, gridRow: 2 }}
+        style={{ gridColumn: props.gridColumn ?? 1, gridRow: 3 }}
         data-tab-kept={kept ? "" : undefined}
         data-browser-corner-clip="seam"
         aria-label={tabLabel(tab)}

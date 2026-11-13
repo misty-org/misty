@@ -13,7 +13,6 @@
 //! the override somehow misses fails rather than reaching the system's DNS.
 use std::{
     net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
-    str::FromStr,
     sync::Arc,
     time::Duration,
 };
@@ -126,8 +125,9 @@ pub fn is_public_ip(address: IpAddr) -> bool {
 }
 
 /// `isPublicAddress`, for an address as text. Anything that isn't an address isn't public.
+#[cfg(test)]
 pub(crate) fn is_public_address(address: &str) -> bool {
-    IpAddr::from_str(address).is_ok_and(is_public_ip)
+    address.parse::<IpAddr>().is_ok_and(is_public_ip)
 }
 
 /// The address as a URL this may connect to, or why not.

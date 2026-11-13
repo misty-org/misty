@@ -166,7 +166,12 @@ mod tests {
             }),
         );
         let report = report_of("test-claude");
-        let commands: Vec<_> = report.commands.unwrap().into_iter().map(|c| c.name).collect();
+        let commands: Vec<_> = report
+            .commands
+            .unwrap()
+            .into_iter()
+            .map(|c| c.name)
+            .collect();
         assert_eq!(commands, ["compact", "context", "review"]);
         assert_eq!(report.skills.unwrap()[0].name, "pdf");
         forget("test-claude");
@@ -187,12 +192,18 @@ mod tests {
         );
         let report = report_of("test-acp");
         let commands = report.commands.unwrap();
-        assert_eq!(commands[0].description, "Analyze the project and write a file");
+        assert_eq!(
+            commands[0].description,
+            "Analyze the project and write a file"
+        );
         assert_eq!(commands[1].name, "memory");
         assert_eq!(commands[1].argument_hint.as_deref(), Some("show | add"));
         assert_eq!(report.skills.unwrap()[0].name, "review-pr");
         // Other updates change nothing.
-        acp_update("test-acp", &json!({"update": {"sessionUpdate": "agent_message_chunk"}}));
+        acp_update(
+            "test-acp",
+            &json!({"update": {"sessionUpdate": "agent_message_chunk"}}),
+        );
         assert_eq!(report_of("test-acp").commands.unwrap().len(), 2);
         forget("test-acp");
     }

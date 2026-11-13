@@ -13,7 +13,7 @@ import type { MistyGet, MistySet } from "../state/mistyStoreUpdates";
 import { submissionEpoch } from "./mistySubmissionEpoch";
 import type { GlobalAiContextRef } from "../state/conversationTypes";
 
-type Companion = Parameters<MistyState["submitAnswer"]>[6];
+type Companion = Parameters<MistyState["submitAnswer"]>[5];
 
 /**
  * Starts the local task an agent turn works in, with the tab it opens when asked. Undefined

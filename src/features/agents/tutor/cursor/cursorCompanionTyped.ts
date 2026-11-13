@@ -111,7 +111,6 @@ export class CursorCompanionTypedTurns {
         request.prompt,
         request.attachments ?? [],
         undefined,
-        "workspace",
         [],
         { conversationId: request.conversationId, context: [] },
         {

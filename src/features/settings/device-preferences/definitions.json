@@ -24,19 +24,6 @@
     "legacyValues": ["browser", "files", "agents"]
   },
   {
-    "id": "app.tabs.startPage",
-    "label": "New tabs and splits",
-    "page": "general",
-    "section": "general",
-    "key": "workspace_default_tab_index",
-    "default": "agents",
-    "owner": "device",
-    "type": "string",
-    "platforms": ["desktop"],
-    "enum": ["browser", "files", "agents"],
-    "legacyValues": ["home", "browser", "files", "agents"]
-  },
-  {
     "id": "app.startup.login",
     "label": "Launch on login",
     "page": "general",
@@ -162,7 +149,7 @@
   {
     "id": "app.updates.automatic",
     "label": "Check for updates automatically",
-    "page": "about",
+    "page": "updates",
     "section": "general",
     "key": "auto_update_enabled",
     "default": true,
@@ -173,7 +160,7 @@
   {
     "id": "app.diagnostics.framePacing",
     "label": "Frame pacing overlay",
-    "page": "about",
+    "page": "advanced",
     "section": "advanced",
     "key": "frame_pacing_overlay_enabled",
     "default": false,
@@ -185,35 +172,12 @@
     "id": "browser.linkPreviews",
     "label": "Link previews",
     "keywords": ["thumbnail", "unfurl", "embed", "link card", "images in chat"],
-    "page": "browser-appearance",
+    "page": "advanced",
     "section": "general",
     "key": "browser_link_previews",
     "default": true,
     "owner": "device",
     "type": "boolean",
-    "platforms": ["desktop"]
-  },
-  {
-    "id": "spaces.openingTool",
-    "label": "Opens on",
-    "page": "spaces-defaults",
-    "section": "spaces",
-    "key": "opening_tool",
-    "default": "home",
-    "owner": "device",
-    "type": "string",
-    "platforms": ["desktop"],
-    "enum": ["home", "chat", "notes", "drawings", "library"]
-  },
-  {
-    "id": "files.startingFolder",
-    "label": "Starting folder",
-    "page": "files-locations",
-    "section": "general",
-    "key": "preferred_workspace_root",
-    "default": "",
-    "owner": "device",
-    "type": "string",
     "platforms": ["desktop"]
   },
   {
@@ -303,7 +267,7 @@
   {
     "id": "app.layout.presets",
     "label": "Saved layouts",
-    "page": "layout",
+    "page": "appearance",
     "section": "appearance",
     "key": "saved_layouts_json",
     "default": "[]",
@@ -315,7 +279,7 @@
   },
   {
     "id": "agents.companion.on",
-    "label": "Cursor tutor",
+    "label": "Tutor",
     "page": "agents-companion",
     "section": "companion",
     "key": "on",
@@ -608,19 +572,6 @@
     "type": "string",
     "platforms": ["desktop"],
     "keywords": ["AI", "memory", "search", "embeddings"],
-    "maxLength": 200
-  },
-  {
-    "id": "models.video_model",
-    "label": "Video model",
-    "page": "models",
-    "section": "models",
-    "key": "video_model",
-    "default": "",
-    "owner": "device",
-    "type": "string",
-    "platforms": ["desktop"],
-    "keywords": ["video", "Tutor", "Gemini Omni", "clips"],
     "maxLength": 200
   },
   {

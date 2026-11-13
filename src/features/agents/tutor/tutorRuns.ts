@@ -4,7 +4,6 @@ import { useMistyStore } from "../conversations/state/useMistyStore";
 import { readRunState } from "../runs/invocations/invocationSubscription";
 import { useCollaborationStore } from "../plans/store";
 import { makeOverviewAudio, makeVideoAudio } from "./tutorAudio";
-import { makeVideoClips } from "./tutorClips";
 import { parseDeck, parseMarkdown, parseOverview, parseQuiz } from "./tutorPrompts";
 import { addLink } from "./tutorSources";
 import {
@@ -63,7 +62,6 @@ export async function startRun(input: {
       input.prompt,
       [],
       undefined,
-      "workspace",
       [],
       { conversationId, context: [] },
       {
@@ -245,9 +243,8 @@ function settle(job: TutorJob, reply: string): string | undefined {
       scenes: video.scenes,
       audio: { state: "making" },
     });
-    // The scenes are kept even without a speech key; they play with captions then. Each is filmed
-    // once its narration is spoken, so the clip runs as long as the voice over it.
-    void makeVideoAudio(id).then(() => makeVideoClips(id));
+    // The scenes are kept even without a speech key; they play with captions then.
+    void makeVideoAudio(id);
     return id;
   }
   if (job.kind === "mindmap") {
@@ -384,7 +381,7 @@ function sweep() {
           : {
               ...job,
               state: "failed",
-              error: "The reply had nothing Tutor could use.",
+              error: "The reply had nothing Misty could use.",
               updatedAt: now,
             },
       );
@@ -459,16 +456,11 @@ export function followTutorJobs(accountId: string): () => void {
     .then(() => {
       void settleOrphans();
       sweep();
-      // Audio that was being spoken, and scenes being filmed, when Misty closed are made again.
+      // Audio that was being spoken when Misty closed is made again.
       const tutor = useTutorStore.getState();
       for (const guide of Object.values(tutor.guides)) {
-        const filming = guide.kind === "video" && guide.clips?.state === "making";
-        if (filming) tutor.saveGuide({ ...guide, clips: undefined });
         if (guide.audio?.state === "making")
-          void (guide.kind === "video"
-            ? makeVideoAudio(guide.id).then(() => makeVideoClips(guide.id))
-            : makeOverviewAudio(guide.id));
-        else if (filming) void makeVideoClips(guide.id);
+          void (guide.kind === "video" ? makeVideoAudio(guide.id) : makeOverviewAudio(guide.id));
       }
     });
   // What changed is read from the store itself, not from the listener's arguments, so a store

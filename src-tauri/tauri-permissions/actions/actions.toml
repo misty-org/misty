@@ -30,7 +30,6 @@ permissions = [
   "allow-agent-run-latest-steps",
   "allow-agent-run-steps-clear",
   "allow-agent-run-step-picture",
-  "allow-agent-run-tools",
   "allow-agent-turn-files",
   "allow-agent-turn-restore",
   "allow-agent-tool-finish",
@@ -76,6 +75,7 @@ permissions = [
   "allow-agents-list-scoped-files",
   "allow-agents-prepare-scoped-document",
   "allow-agents-share-folder",
+  "allow-notebook-news",
   "allow-tutor-overview-audio",
   "allow-tutor-overview-delete",
   "allow-tutor-overview-make",
@@ -84,9 +84,6 @@ permissions = [
   "allow-tutor-read-link",
   "allow-tutor-save-export",
   "allow-tutor-transcribe-sources",
-  "allow-tutor-video-clip",
-  "allow-tutor-video-clip-delete",
-  "allow-tutor-video-clip-make",
 ]
 
 [[set]]
@@ -104,17 +101,14 @@ identifier = "action-app"
 description = "The app's own basics: its window, system info and links"
 permissions = [
   "allow-app-quit-confirmed",
+  "allow-app-relaunch",
   "allow-app-snapshot",
   "allow-check-system",
-  "allow-diagnostic-log",
   "allow-enable-modern-window-style",
   "allow-global-hotkey-signed-out",
-  "allow-host-webview-capture-region",
   "allow-link-preview-fetch",
   "allow-misty-workspace-focused",
-  "allow-navigation-names-snapshot",
   "allow-power-keep-awake",
-  "allow-profiles-list",
   "allow-reveal-main-window",
   "allow-sandbox-pick-save-file",
   "allow-save-authenticated-user",
@@ -136,8 +130,6 @@ permissions = [
   "allow-auth-session-capture",
   "allow-auth-session-forget",
   "allow-auth-session-restore",
-  "allow-google-sign-in-sheet-close",
-  "allow-google-sign-in-sheet-open",
 ]
 
 [[set]]
@@ -153,18 +145,13 @@ permissions = [
   "allow-browser-clear-website-data",
   "allow-browser-context-menu-select",
   "allow-browser-tab-download-open",
-  "allow-browser-downloads-remove",
   "allow-browser-retired-profiles-erase",
   "allow-browser-runtime-for-scope",
-  "allow-browser-set-night-light",
   "allow-browser-shortcuts-update",
   "allow-browser-site-icon",
-  "allow-browser-site-permissions-list",
-  "allow-browser-site-permissions-reset",
   "allow-browser-webview-await-load",
   "allow-browser-webview-back",
   "allow-browser-webview-close",
-  "allow-browser-webview-context-menu-at",
   "allow-browser-webview-create",
   "allow-browser-webview-forward",
   "allow-browser-webview-held",
@@ -174,26 +161,15 @@ permissions = [
   "allow-browser-webview-reconcile",
   "allow-browser-webview-reload",
   "allow-browser-webview-set-bounds",
-  "allow-browser-webview-set-media-hold",
-  "allow-browser-webview-set-muted",
   "allow-browser-webview-show",
   "allow-browser-webview-sleep",
   "allow-browser-webview-stop",
   "allow-browser-webviews-close-except",
   "allow-browser-webviews-hide-all",
   "allow-browser-webviews-hide-except",
-  "allow-browser-webviews-park-all",
   "allow-browser-webviews-set-notice-rects",
   "allow-browser-webviews-set-overlay-active",
   "allow-browser-webviews-set-pointer-tracking",
-  "allow-browser-webviews-show-only",
-]
-
-[[set]]
-identifier = "action-browser-history"
-description = "Read and change browsing history"
-permissions = [
-  "allow-browser-history-clear",
 ]
 
 [[set]]
@@ -225,6 +201,8 @@ permissions = [
   "allow-cursor-companion-present",
   "allow-cursor-companion-snap",
   "allow-cursor-companion-snapshot",
+  "allow-cursor-companion-tray",
+  "allow-tray-agents",
   "allow-cursor-companion-watch-clicks",
 ]
 
@@ -235,13 +213,8 @@ permissions = [
   "allow-device-read-shared-file",
   "allow-device-shell-cancel",
   "allow-device-shell-job",
-  "allow-device-sign-request",
   "allow-device-sign-run-grants",
   "allow-device-verify-job",
-  "allow-devices-publish-folders",
-  "allow-devices-start",
-  "allow-devices-stop",
-  "allow-devices-view",
 ]
 
 [[set]]
@@ -250,6 +223,7 @@ description = "The agent's view of the screen"
 permissions = [
   "allow-misty-screen-capture",
   "allow-misty-capture-region",
+  "allow-dropped-file-read",
   "allow-misty-screen-status",
 ]
 
@@ -268,13 +242,6 @@ permissions = [
 identifier = "action-profile"
 description = "Browser profiles"
 permissions = [
-  "allow-profile-create",
-  "allow-profile-delete",
-  "allow-profile-open",
-  "allow-profile-rename",
-  "allow-profile-set-color",
-  "allow-profile-set-sites",
-  "allow-profile-sites",
   "allow-profile-window-close",
   "allow-profile-window-info",
   "allow-profile-window-is-host",
@@ -346,20 +313,13 @@ permissions = [
   "allow-engines-list",
   "allow-engine-answer-question",
   "allow-engine-plan-respond",
-  "allow-engine-plan-reviews",
   "allow-engine-settings-get",
   "allow-engine-settings-set",
   "allow-engine-chat-clear",
   "allow-engine-chat-resume",
   "allow-engine-history-list",
-  "allow-engine-history-page",
   "allow-engine-history-search",
   "allow-engine-history-rename",
-  "allow-engine-history-rescan",
-  "allow-engine-chat-fork",
-  "allow-engine-history-read-file",
-  "allow-engine-history-write-file",
-  "allow-engine-history-open-file",
   "allow-multirun-changes",
   "allow-multirun-check",
   "allow-multirun-discard",
@@ -428,7 +388,7 @@ permissions = [
 
 [[set]]
 identifier = "action-engine-config"
-description = "Settings for the agent engines themselves: their MCP servers, skills, plugin marketplaces, prompts, usage and plan limits, installing and updating the CLIs, provider channels, the network proxy, fonts and the performance panel"
+description = "Settings for the agent engines themselves: their MCP servers, skills, plugin marketplaces, prompts, usage and plan limits, installing and updating the CLIs, provider channels, each engine's environment variables, the network proxy, fonts and the performance panel"
 permissions = [
   "allow-engine-cc-switch-check",
   "allow-engine-cc-switch-dismiss",
@@ -453,6 +413,9 @@ permissions = [
   "allow-engine-cli-status",
   "allow-engine-cli-update",
   "allow-engine-cli-update-plan",
+  "allow-engine-env-list",
+  "allow-engine-env-remove",
+  "allow-engine-env-set",
   "allow-engine-fonts-get",
   "allow-engine-fonts-pick",
   "allow-engine-fonts-read",
@@ -468,15 +431,12 @@ permissions = [
   "allow-engine-mcp-probe-plan",
   "allow-engine-mcp-reveal",
   "allow-engine-mcp-set-enabled",
-  "allow-engine-mcp-set-launch-mode",
-  "allow-engine-metrics-app",
   "allow-engine-performance-enabled",
   "allow-engine-performance-export",
   "allow-engine-performance-report",
   "allow-engine-performance-set-enabled",
   "allow-engine-prompts-create",
   "allow-engine-prompts-delete",
-  "allow-engine-prompts-dirs",
   "allow-engine-prompts-list",
   "allow-engine-prompts-move",
   "allow-engine-prompts-reveal",
@@ -488,10 +448,8 @@ permissions = [
   "allow-engine-usage-limits",
   "allow-engine-usage-prices",
   "allow-engine-usage-query",
-  "allow-engine-usage-refresh",
   "allow-engine-usage-rescan",
   "allow-engine-usage-sources",
-  "allow-engine-usage-summary",
   "allow-engine-usage-update-prices",
   "allow-dsh-host-start",
   "allow-dsh-host-status",

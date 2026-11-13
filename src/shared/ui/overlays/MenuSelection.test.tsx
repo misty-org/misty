@@ -194,3 +194,31 @@ it("opens the same row actions from the ⋯ and from a right-click", async () =>
   fireEvent.click(screen.getByRole("menuitem", { name: /Rename/ }));
   expect(rename).toHaveBeenCalledOnce();
 });
+
+function Choices({ icons }: { icons: "same" | "own" }) {
+  return (
+    <DropdownMenu open>
+      <DropdownMenuTrigger>Open</DropdownMenuTrigger>
+      <DropdownMenuContent>
+        <MenuRadioGroup value="a" onValueChange={() => {}}>
+          <MenuRadioItem icon={Clock} value="a" label="First" />
+          <MenuRadioItem icon={icons === "same" ? Clock : ArrowDownAZ} value="b" label="Second" />
+        </MenuRadioGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+it("draws a choice list as text when its rows share one icon", () => {
+  render(<Choices icons="same" />);
+  expect(
+    screen.getByRole("menuitemradio", { name: "First" }).querySelector("svg.lucide-clock"),
+  ).toBeNull();
+});
+
+it("keeps a choice list's icons when each row has its own", () => {
+  render(<Choices icons="own" />);
+  expect(
+    screen.getByRole("menuitemradio", { name: "First" }).querySelector("svg.lucide-clock"),
+  ).not.toBeNull();
+});

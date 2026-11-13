@@ -40,13 +40,14 @@ import { LAUNCH_TAB_KEY } from "./runLaunchScript";
 import { useTerminalStore } from "../terminal/terminalStore";
 
 const FOLDER = "/work/app";
+const CHAT = "chat-1";
 const SCOPE = `project-launch:local:${FOLDER}`;
 const savedEntries = () =>
   (mocks.stored.get(SCOPE) as { entries: { label: string; script: string }[] } | undefined)
     ?.entries;
 
 async function renderButton() {
-  render(<LaunchScriptButton folder={FOLDER} />);
+  render(<LaunchScriptButton chat={CHAT} folder={FOLDER} />);
   await screen.findByRole("button", { name: /start command/i });
 }
 
@@ -58,7 +59,7 @@ describe("LaunchScriptButton", () => {
     mocks.close.mockClear();
     mocks.show.mockClear();
     useLaunchScripts.setState({ byFolder: {} });
-    useTerminalStore.setState({ tabsByFolder: {}, activeByFolder: {}, launchTabs: {} });
+    useTerminalStore.setState({ tabsByChat: {}, activeByChat: {}, launchTabs: {} });
   });
   afterEach(cleanup);
 
@@ -73,12 +74,13 @@ describe("LaunchScriptButton", () => {
     expect(await screen.findByRole("button", { name: "Run start command" })).toBeTruthy();
   });
 
-  it("runs the command in the folder's restarted launch tab and shows the terminal", async () => {
+  it("runs the command in the chat's restarted launch tab and shows the terminal", async () => {
     mocks.stored.set(SCOPE, { entries: [{ id: "a", label: "", script: "npm run dev" }] });
     await renderButton();
     fireEvent.click(screen.getByRole("button", { name: "Run start command" }));
     await waitFor(() => expect(mocks.write).toHaveBeenCalled());
-    const launchTab = useTerminalStore.getState().launchTabs[`${FOLDER}\n${LAUNCH_TAB_KEY}`];
+    const launchTab =
+      useTerminalStore.getState().launchTabs[`${CHAT}\n${FOLDER}\n${LAUNCH_TAB_KEY}`];
     expect(mocks.open).toHaveBeenCalledWith(launchTab, FOLDER, 120, 30);
     expect(mocks.write).toHaveBeenCalledWith(launchTab, "npm run dev\n");
     expect(mocks.show).toHaveBeenCalledWith("terminal");
@@ -87,7 +89,7 @@ describe("LaunchScriptButton", () => {
     fireEvent.click(screen.getByRole("button", { name: "Run start command" }));
     await waitFor(() => expect(mocks.close).toHaveBeenCalledWith(launchTab));
     await waitFor(() => expect(mocks.write).toHaveBeenCalledTimes(2));
-    expect(useTerminalStore.getState().tabsByFolder[FOLDER]).toHaveLength(1);
+    expect(useTerminalStore.getState().tabsByChat[CHAT]).toHaveLength(1);
   });
 
   it("keeps the name given to the first command", async () => {

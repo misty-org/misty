@@ -92,7 +92,7 @@ export default function SignIn() {
 
   if (needsServer) {
     return (
-      <AuthShell title="Choose a server">
+      <AuthShell title="Sign in to Misty">
         <AuthCard>
           <ServerStep />
         </AuthCard>

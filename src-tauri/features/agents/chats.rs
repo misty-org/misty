@@ -119,7 +119,10 @@ impl AgentChatsService {
                 )
                 .map_err(|e| e.to_string())?;
             transaction
-                .execute("UPDATE agent_tool_journal SET account = ?2 WHERE account = ?1", rusqlite::params![from, to])
+                .execute(
+                    "UPDATE agent_tool_journal SET account = ?2 WHERE account = ?1",
+                    rusqlite::params![from, to],
+                )
                 .map_err(|e| e.to_string())?;
             transaction.commit().map_err(|e| e.to_string())?;
             Ok(moved as u64)
@@ -397,12 +400,7 @@ mod tests {
         let service = AgentChatsService::new(Store::at(directory.path().join("misty.db")));
         let start = r#"{"state":"idle"}"#;
         service
-            .put(
-                "a".into(),
-                "run".into(),
-                "s1".into(),
-                start.into(),
-            )
+            .put("a".into(), "run".into(), "s1".into(), start.into())
             .await
             .unwrap();
         let racers: Vec<_> = (0..8)

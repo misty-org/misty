@@ -3,7 +3,7 @@
 
 /**
  * The words of Settings › Tools › MCP servers, from desktop-cc-gui's English strings. Kept in one
- * place so the settings block, the `/mcp` panel and the dialogs say the same thing.
+ * place so the settings block and the dialogs say the same thing.
  */
 import type { McpConfigEntry, McpConfigSource, McpRuntimeStatus } from "./types";
 
@@ -91,24 +91,6 @@ export function readonlyReasonText(entry: McpConfigEntry): string {
   return entry.readonlyReason ?? "Read-only";
 }
 
-const launchUnsupported: Record<string, string> = {
-  engine: "This engine has no per-run MCP override yet.",
-  transport: "Only stdio servers can start on demand; a remote server has no process here.",
-  workspace_file:
-    "The entry lives in the workspace .omp/mcp.json and can't be overridden per run. Move it to the user mcp.json.",
-  workspace_env:
-    "OMP takes on-demand entries only through the workspace .omp/mcp.json, so an entry with environment variables (often tokens) would be copied into a project file. Remove its env to use this.",
-  project_trust:
-    "Codex reads .codex/config.toml only in trusted projects, and the on-demand override would skip that check. Move it to the user config.toml.",
-  name: "The name has a dot, quote or similar character Codex overrides can't express, so it keeps starting with the session.",
-  shadowed:
-    "A same-named entry in a scope with higher precedence is the one the engine starts. Set it there instead.",
-};
-
-export function launchUnsupportedText(code: string): string {
-  return launchUnsupported[code] ?? launchUnsupported.engine;
-}
-
 export const runtimeStatusText: Record<McpRuntimeStatus, string> = {
   ready: "From the session running now",
   no_session: "No session is running, so there's nothing to observe",
@@ -122,15 +104,6 @@ export const copy = {
   toggle: (name: string) => `Enable ${name}`,
   enableHintOn: (name: string) => `${name} is on in its config. Click to turn it off.`,
   enableHintOff: (name: string) => `${name} is off in its config. Click to turn it on.`,
-  launchTitle: "Start on demand",
-  launchToggle: (name: string) => `Start ${name} on demand`,
-  launchOnDemandHint: (name: string) =>
-    `${name} starts on its first call. Click to start it with the session.`,
-  launchEagerHint: (name: string) =>
-    `${name} starts with the session. Click to start it on its first call.`,
-  launchDescription:
-    "Sessions Misty starts don't start this server up front: the engine still gets its tool list (from the last run), and the server starts on the first real call. The CLI's own config is unchanged.",
-  launchDisabledEntry: "Turn the entry on to choose how it starts.",
   enabled: "On in config",
   disabled: "Off in config",
   builtin: "Misty",
@@ -173,9 +146,6 @@ export const copy = {
       ? "Reveal in Explorer"
       : "Reveal in file manager",
   detailRestartHint: "Changes apply to new sessions; running sessions keep going as they are.",
-  panelTitle: "MCP",
-  panelHeading: (name: string) => `MCP servers · ${name}`,
-  panelManage: "Manage in Settings",
   folder: "Folder",
   folderNone: "No folder",
   refresh: "Refresh",

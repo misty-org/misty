@@ -16,9 +16,7 @@ export function WorkspaceMistyDock() {
   const views = useMistyPanelViews();
   const side = useMistyPanelSide();
   const chat = useMemo(
-    () => (
-      <SpaceChatPanel side={side} onClose={() => useMistyPanelStore.getState().close("chat")} />
-    ),
+    () => <SpaceChatPanel side={side} onClose={() => useMistyPanelStore.getState().close()} />,
     [side],
   );
   return <MistyPanelDock views={views} side={side} chat={chat} />;

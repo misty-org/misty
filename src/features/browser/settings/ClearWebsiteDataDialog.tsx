@@ -35,7 +35,7 @@ const choices: { id: BrowserWebsiteDataKind; label: string; detail: string }[] =
   },
 ];
 
-/** Clears what websites stored on this computer, for this window's profile. */
+/** Clears what websites stored on this computer for the pages agents open. */
 export function ClearWebsiteDataDialog(props: {
   open: boolean;
   onOpenChange(open: boolean): void;
@@ -74,7 +74,7 @@ export function ClearWebsiteDataDialog(props: {
     <Dialog open={props.open} onOpenChange={props.onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogTitle>Clear website data</DialogTitle>
-        <DialogDescription>Applies to this profile on this computer.</DialogDescription>
+        <DialogDescription>Applies to the pages agents open on this computer.</DialogDescription>
         <Field label="Time range">
           <Select value={String(range)} onValueChange={(value) => setRange(Number(value))}>
             <SelectTrigger className="w-full">
@@ -114,12 +114,6 @@ export function ClearWebsiteDataDialog(props: {
             </label>
           ))}
         </div>
-        {selected.has("cookies") ? (
-          <p className="rounded-md bg-charcoal-card px-3 py-2 text-xs text-cream-muted">
-            If Sync is on, website sign-ins saved from another signed-in session can be restored the
-            next time this computer syncs.
-          </p>
-        ) : null}
         <DialogFooter>
           <Button type="button" variant="quiet" size="lg" onClick={() => props.onOpenChange(false)}>
             Cancel

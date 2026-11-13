@@ -3,7 +3,6 @@ import { SystemErrorNotice } from "@/shared/platform/systemErrors";
 import { MistyFilePicker, readFileFromPath } from "@/features/files";
 import { useAiSurfaceActions, useAiSurfaceAdapter, type AiSurfaceAdapter } from "@/features/agents";
 import { NoteAiSelectionMenuView } from "./NoteAiSelectionMenuView";
-import { useAiSurfaceStore } from "@/features/agents";
 import { useNoteCollaborationRoom } from "../hooks/useNoteCollaborationRoom";
 import { uploadNoteAsset, resolveNoteAssetUrl } from "../noteAssets";
 import {
@@ -27,7 +26,7 @@ const hostNoteEditorRuntime: NoteEditorRuntime = {
   renderImagePicker: ({ onCancel, onSelect }) => (
     <MistyFilePicker
       mode="file"
-      title="Insert image into note"
+      title="Insert image into doc"
       allowedExtensions={["png", "jpg", "jpeg", "webp", "gif", "bmp", "avif", "ico"]}
       onCancel={onCancel}
       onSelect={(path) => {
@@ -45,7 +44,7 @@ const hostNoteEditorRuntime: NoteEditorRuntime = {
     <SystemErrorNotice
       error={error}
       scope={`notes:collaboration:${noteId}`}
-      title="Note collaboration is unavailable"
+      title="Doc collaboration is unavailable"
     />
   ),
   reportError: () => undefined,
@@ -71,7 +70,6 @@ function NoteAiSelectionMenu({
   selection: NoteAiSelection;
 }) {
   const actions = useAiSurfaceActions(adapter);
-  const following = useAiSurfaceStore((state) => state.companion.phase === "following");
   const proposal = actions.proposal;
   const replacement =
     proposal?.kind === "text_patch"
@@ -82,7 +80,6 @@ function NoteAiSelectionMenu({
       selection={selection}
       snapshot={{
         available: Boolean(adapter && actions.available),
-        following,
         ...(proposal
           ? {
               proposal: {

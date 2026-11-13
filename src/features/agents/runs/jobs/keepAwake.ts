@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { hasTauriInternals } from "@/shared/platform/tauri";
+import { aiSurfaceApi } from "../invocations/api";
 
 /**
  * While an agent works on this computer it stays awake, unless the person
@@ -14,8 +15,8 @@ let held = false;
 let applying: Promise<void> = Promise.resolve();
 
 function loadSetting(): Promise<void> {
-  loading ??= import("@/features/agents/runs/invocations/api")
-    .then(({ aiSurfaceApi }) => aiSurfaceApi.settings())
+  loading ??= aiSurfaceApi
+    .settings()
     .then((result) => {
       enabled ??= result.settings.keep_awake_for_agents ?? true;
     })

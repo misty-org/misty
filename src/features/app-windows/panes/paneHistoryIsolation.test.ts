@@ -1,17 +1,14 @@
-import { afterEach, beforeEach, expect, it } from "vitest";
+import { beforeEach, expect, it } from "vitest";
 import { activeLayoutView } from "./layoutTabs";
 import { workspaceSurfaceFromRoute } from "../tabs/routeSurface";
 import { useWorkspaceStore } from "../tabs/useWorkspaceStore";
-import { configureWorkspaceDefaultView } from "../tabs/workspaceDefaultView";
 
 const store = () => useWorkspaceStore.getState();
 const open = (route: string) => store().openDestination(workspaceSurfaceFromRoute(route)!);
 
 beforeEach(() => {
-  configureWorkspaceDefaultView(3);
   store().reset();
 });
-afterEach(() => configureWorkspaceDefaultView(1));
 
 it("keeps each tab's history to itself, so back in one tab never lands in another", () => {
   const home = open("/spaces/one/home");

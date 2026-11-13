@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from "react";
-import { useStudioAgents, useTeammateAgents } from "@/features/agents";
+import { useMistyStore, useStudioAgents, useTeammateAgents } from "@/features/agents";
 import { useWindowSpace } from "../components/space-row/useWindowSpace";
 import { useSpaceItemCreator } from "../overview/useSpaceItemCreator";
 import { sendAgentStatuses } from "./createSpacesRealtimeActions";
@@ -20,16 +20,10 @@ export function SpaceAgentsBroadcast() {
   const { agents } = useStudioAgents();
   const person = useSpaceItemCreator(spaceId);
   const heard = useMemberAgents((state) => state.bySpace[spaceId]);
+  const conversations = useMistyStore((state) => state.conversations);
   const statuses = useMemo(
-    () =>
-      agents.map(({ agent, state, doingCode, files }) => ({
-        id: agent.id,
-        name: agent.name,
-        state,
-        doing: doingCode,
-        ...(files.length ? { files } : {}),
-      })),
-    [agents],
+    () => spaceAgentStatuses(agents, spaceId, conversations),
+    [agents, spaceId, conversations],
   );
   const said = JSON.stringify(statuses);
   useEffect(() => {
@@ -60,4 +54,33 @@ export function SpaceAgentsBroadcast() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `person` is rebuilt every render
   }, [spaceId, heard]);
   return null;
+}
+
+/**
+ * What this person's agents are doing, as told to one Space's members. Agents belong to the
+ * person, not to a Space, so an agent busy with a chat in another Space is told as resting here:
+ * its work and the files it is changing stay with the Space that work is for.
+ */
+export function spaceAgentStatuses(
+  agents: readonly {
+    agent: { id: string; name: string };
+    state: "working" | "needs-you" | "resting";
+    doingCode: string;
+    files: string[];
+    conversationId: string;
+  }[],
+  spaceId: string,
+  conversations: readonly { id: string; spaceId?: string }[],
+) {
+  const spaceOf = new Map(conversations.map((chat) => [chat.id, chat.spaceId]));
+  return agents.map(({ agent, state, doingCode, files, conversationId }) => {
+    const here = state !== "resting" && spaceOf.get(conversationId) === spaceId;
+    return {
+      id: agent.id,
+      name: agent.name,
+      state: here ? state : ("resting" as const),
+      doing: here ? doingCode : "",
+      ...(here && files.length ? { files } : {}),
+    };
+  });
 }

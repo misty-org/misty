@@ -60,7 +60,7 @@ pub(crate) fn configure_browser_webview(
     webview: &Webview,
     native_live_resize: bool,
 ) -> Result<(), String> {
-    crate::browser::site_settings::permissions::install(webview)?;
+    kiri::engine::deny_permission_requests(webview)?;
     use objc2_app_kit::{NSAutoresizingMaskOptions, NSView, NSViewLayerContentsRedrawPolicy};
     webview
         .with_webview(move |platform_webview| unsafe {
@@ -154,7 +154,7 @@ pub(crate) fn configure_browser_webview(
     webview: &Webview,
     _native_live_resize: bool,
 ) -> Result<(), String> {
-    crate::browser::site_settings::permissions::install(webview)
+    kiri::engine::deny_permission_requests(webview)
 }
 
 #[cfg(not(target_os = "macos"))]

@@ -72,18 +72,6 @@ pub(super) fn normalize_settings_document(document: &mut Value) -> bool {
             ("capture_sources", json!("mic-system")),
         ],
     );
-    // Memory: on until the person turns it off; a pause is a time in ms.
-    changed |= ensure_section_defaults(
-        root,
-        "recall",
-        &[
-            ("enabled", json!(true)),
-            ("paused_until", json!(0)),
-            ("excluded_sites", json!("")),
-            ("remember_dictation", json!(true)),
-            ("morning_brief", json!(true)),
-        ],
-    );
     changed |= ensure_section_defaults(
         root,
         "advanced",

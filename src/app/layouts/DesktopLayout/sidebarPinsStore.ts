@@ -2,7 +2,14 @@ import { create } from "zustand";
 import { readDeviceState, updateDeviceState } from "@/features/agents";
 
 /** The sidebar rows a person can pin. Whatever is not pinned waits under More. */
-export const sidebarPlaceIds = ["search", "space", "integrations", "studio", "tutor"] as const;
+export const sidebarPlaceIds = [
+  "search",
+  "agents",
+  "space",
+  "integrations",
+  "studio",
+  "lab",
+] as const;
 export type SidebarPlaceId = (typeof sidebarPlaceIds)[number];
 
 /** Every row in the person's order, and which of them are pinned. */
@@ -14,12 +21,20 @@ export interface SidebarPins {
 const scope = "sidebar-pins";
 const defaults: SidebarPins = {
   order: [...sidebarPlaceIds],
-  pinned: ["search", "space", "integrations"],
+  // The Lab is where someone new learns with their AI, so it is in view from the start. Agents,
+  // where engines are installed and set up, is too.
+  pinned: ["search", "agents", "space", "lab", "integrations"],
 };
 
 const known = (id: unknown): id is SidebarPlaceId => sidebarPlaceIds.includes(id as SidebarPlaceId);
-/** The studio was called the office. */
-const renamed = (ids: unknown[] = []) => ids.map((id) => (id === "office" ? "studio" : id));
+/** The studio was called the office, and the Lab was Tutor, then Notebooks. */
+const formerly: Record<string, SidebarPlaceId> = {
+  office: "studio",
+  tutor: "lab",
+  notebooks: "lab",
+};
+const renamed = (ids: unknown[] = []) =>
+  ids.map((id) => (typeof id === "string" && formerly[id]) || id);
 
 /** Drops rows that no longer exist and puts new ones at the end, pinned when they are by default. */
 function normalize(stored: Partial<SidebarPins> | null): SidebarPins {

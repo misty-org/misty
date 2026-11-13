@@ -1,3 +1,4 @@
+import { usePersonalAgentsStore } from "./personalAgentsStore";
 import { Cloud } from "lucide-react";
 import type { AgentProfile } from "@/shared/schemas";
 import "./AgentAvatar.css";
@@ -61,4 +62,16 @@ export function AgentCloudImage({ variant }: { variant: (typeof agentCloudVarian
       <img src={variant.src} width={512} height={512} alt="" draggable={false} />
     </picture>
   );
+}
+
+/**
+ * An agent known only by its id (a Space message's sender, a mention, a task's assignee), drawn
+ * as `AgentAvatar` draws it: its engine's logo. An agent this device doesn't know shows Misty's
+ * own mark, never a generic agent glyph.
+ */
+export function AgentMark({ agentId }: { agentId?: string }) {
+  const agent = usePersonalAgentsStore((state) =>
+    agentId ? state.agents.find((item) => item.id === agentId) : undefined,
+  );
+  return <AgentAvatar agent={agent} compact />;
 }

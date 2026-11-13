@@ -7,8 +7,9 @@ const identityState = {
 };
 
 const defaults: Record<WorkspaceSurfaceId, DockWidgetDescriptor> = {
-  space: descriptor("space", "per-space", "suspend", 360, 240),
-  agents: descriptor("agents", "singleton", "suspend", 360, 240),
+  space: descriptor("space", "per-space", "suspend", 360, 240, 360),
+  // A chat beside its side panel (terminal, files, changes) needs room for both.
+  agents: descriptor("agents", "singleton", "suspend", 360, 240, 720),
 };
 
 function descriptor(
@@ -17,12 +18,14 @@ function descriptor(
   mountPolicy: DockWidgetDescriptor["mountPolicy"],
   width: number,
   height: number,
+  contentWidth: number,
 ): DockWidgetDescriptor {
   return {
     kind,
     instancePolicy,
     mountPolicy,
     minimumSize: { width, height },
+    contentWidth,
     ...identityState,
   };
 }

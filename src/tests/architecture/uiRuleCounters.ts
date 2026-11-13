@@ -4,7 +4,6 @@ import {
   hasAttribute,
   jsxOpeningTags,
   literalValues,
-  spreadsProps,
 } from "./uiRuleJsx.ts";
 
 /**
@@ -95,19 +94,30 @@ export const countLegacySizes: Counter = (text) =>
     return literalValues(attributeValue(tag, "size")).some((value) => old.includes(value));
   });
 
-const iconedMenuRows = /^(?:MenuItem|ContextMenuAction|MenuSubmenu|MenuCheckItem|MenuRadioItem)$/;
 const rawMenuRows = /^(?:DropdownMenu|ContextMenu)(?:Item|CheckboxItem|RadioItem|SubTrigger)$/;
 const menuRowNames = new RegExp(
   "^(?:MenuItem|ContextMenuAction|MenuSubmenu|MenuCheckItem|MenuRadioItem" +
     "|DropdownMenu\\w+|ContextMenu\\w+)$",
 );
 
-export const countMenuRowsWithoutIcon: Counter = (text) =>
-  countTags(text, menuRowNames, (tag) => {
-    // Raw Radix rows have no icon slot at all.
-    if (rawMenuRows.test(tag.name)) return true;
-    if (!iconedMenuRows.test(tag.name)) return false;
-    return !hasAttribute(tag, "icon") && !spreadsProps(tag);
+/** Raw Radix rows, which skip the shared row's layout, checkmark and state slot. */
+export const countRawMenuRows: Counter = (text) =>
+  countTags(text, menuRowNames, (tag) => rawMenuRows.test(tag.name));
+
+/**
+ * A menu row drawn for each item of a list with one fixed icon (`items.map(… icon={Folder} …)`):
+ * the same mark on every row tells nothing apart, so such a list is text alone.
+ */
+const listRows =
+  /^(?:MenuItem|ContextMenuAction|MenuSubmenu|MenuCheckItem|MenuRadioItem|SelectItem|CommandItem)$/;
+
+export const countRepeatedMenuIcons: Counter = (text) =>
+  countTags(text, listRows, (tag) => {
+    if (!/^\{\s*[A-Z]\w*\s*\}$/.test(attributeValue(tag, "icon") ?? "")) return false;
+    // The row is what the map's callback returns, so there is one per item of the list. A menu
+    // built per item (each card's own Delete) is one action, not a list.
+    const before = text.slice(Math.max(0, tag.start - 200), tag.start);
+    return /\.map\(\s*(?:\([^()]*\)|\w+)\s*=>\s*\(?\s*$/.test(before);
   });
 
 /** Names imported from lucide-react in this file, plus the usual icon and avatar components. */

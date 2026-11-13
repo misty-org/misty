@@ -98,7 +98,6 @@ export class CursorCompanionVoice {
         tool.instruction,
         [],
         undefined,
-        "workspace",
         [],
         { conversationId, context: [] },
         {

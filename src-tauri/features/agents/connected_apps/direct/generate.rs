@@ -36,7 +36,10 @@ async fn registry_pages(http: &reqwest::Client) -> Vec<Value> {
     let mut items = Vec::new();
     let mut cursor = String::new();
     for page in 0..1000 {
-        let mut query = vec![("limit", "100".to_owned()), ("version", "latest".to_owned())];
+        let mut query = vec![
+            ("limit", "100".to_owned()),
+            ("version", "latest".to_owned()),
+        ];
         if !cursor.is_empty() {
             query.push(("cursor", cursor.clone()));
         }
@@ -79,13 +82,18 @@ fn page_icons(html: &str, base: &url::Url) -> Vec<String> {
     let mut found: Vec<(u32, String)> = Vec::new();
     for tag in link.find_iter(html).map(|item| item.as_str()) {
         let rel = attribute(tag, "rel").unwrap_or_default().to_lowercase();
-        if !rel.split_whitespace().any(|word| word == "icon" || word == "apple-touch-icon") {
+        if !rel
+            .split_whitespace()
+            .any(|word| word == "icon" || word == "apple-touch-icon")
+        {
             continue;
         }
         let Some(href) = attribute(tag, "href").filter(|href| !href.starts_with("data:")) else {
             continue;
         };
-        let Ok(resolved) = base.join(&href) else { continue };
+        let Ok(resolved) = base.join(&href) else {
+            continue;
+        };
         if resolved.scheme() != "https" {
             continue;
         }
@@ -117,14 +125,20 @@ async fn is_image(http: &reqwest::Client, url: &str) -> bool {
         .is_some_and(|kind| kind.starts_with("image/"));
     response.status().is_success()
         && image
-        && response.bytes().await.is_ok_and(|bytes| !bytes.is_empty() && bytes.len() <= ICON_LIMIT)
+        && response
+            .bytes()
+            .await
+            .is_ok_and(|bytes| !bytes.is_empty() && bytes.len() <= ICON_LIMIT)
 }
 
 /// The maker's own logo: the icon published with the server, else the one the maker's home page
 /// declares, else its `favicon.ico`.
 async fn official_icon(http: &reqwest::Client, server: &Value, url: &str) -> String {
     for icon in server["icons"].as_array().into_iter().flatten() {
-        if let Some(src) = icon["src"].as_str().filter(|src| src.starts_with("https://")) {
+        if let Some(src) = icon["src"]
+            .as_str()
+            .filter(|src| src.starts_with("https://"))
+        {
             if is_image(http, src).await {
                 return src.to_owned();
             }
@@ -136,7 +150,10 @@ async fn official_icon(http: &reqwest::Client, server: &Value, url: &str) -> Str
     if let Ok(response) = http.get(home.as_str()).send().await {
         let final_url = response.url().clone();
         if let Ok(html) = response.text().await {
-            for candidate in page_icons(&html[..html.len().min(ICON_LIMIT)], &final_url).into_iter().take(3) {
+            for candidate in page_icons(&html[..html.len().min(ICON_LIMIT)], &final_url)
+                .into_iter()
+                .take(3)
+            {
                 if is_image(http, &candidate).await {
                     return candidate;
                 }
@@ -194,8 +211,7 @@ fn tidy(entries: Vec<Entry>) -> Vec<Entry> {
 #[test]
 #[ignore]
 fn tidy_direct_catalog() {
-    let entries: Vec<Entry> =
-        serde_json::from_str(&std::fs::read_to_string(OUT).unwrap()).unwrap();
+    let entries: Vec<Entry> = serde_json::from_str(&std::fs::read_to_string(OUT).unwrap()).unwrap();
     let before = entries.len();
     let list = tidy(entries);
     std::fs::write(OUT, serde_json::to_string_pretty(&list).unwrap()).unwrap();
@@ -285,5 +301,8 @@ async fn generate_direct_catalog() {
     let list = tidy(entries.into_iter().map(|(_, entry)| entry).collect());
     let with_icons = list.iter().filter(|entry| !entry.icon.is_empty()).count();
     std::fs::write(OUT, serde_json::to_string_pretty(&list).unwrap()).unwrap();
-    println!("wrote {} apps, {with_icons} with an official icon", list.len());
+    println!(
+        "wrote {} apps, {with_icons} with an official icon",
+        list.len()
+    );
 }

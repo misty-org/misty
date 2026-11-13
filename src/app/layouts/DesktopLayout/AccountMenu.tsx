@@ -18,7 +18,18 @@ import {
   Spinner,
 } from "@/shared/ui";
 import { ShortcutText } from "@/features/shortcuts/runtime";
-import { Check, LifeBuoy, LogIn, LogOut, Plus, Repeat2, Settings, UserCircle } from "lucide-react";
+import {
+  Check,
+  Compass,
+  LifeBuoy,
+  LogIn,
+  LogOut,
+  Plus,
+  Repeat2,
+  Settings,
+  UserCircle,
+} from "lucide-react";
+import { startTour } from "@/features/onboarding";
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
@@ -160,6 +171,7 @@ function AccountMenuItems(props: {
               }
             />
           </MenuSubmenu>
+          <MenuItem icon={<Compass />} label="Show me around" onSelect={() => startTour()} />
           <MenuItem icon={<LifeBuoy />} label="Help" onSelect={openHelp} />
           <MenuItem
             icon={<LogOut />}

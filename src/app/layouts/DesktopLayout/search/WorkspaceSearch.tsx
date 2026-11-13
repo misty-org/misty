@@ -14,7 +14,7 @@ import "./search.css";
 
 /**
  * ⌘K search: one box for everything in Misty. It finds chats (by what was said in them too),
- * agents, the Space's notes, messages, tasks, events and files, Tutor's notebooks and lessons,
+ * agents, the Space's docs, messages, tasks, events and files, Tutor's notebooks and lessons,
  * apps to connect, settings, commands and pages, and does what the text asks: `@agent …` asks an
  * agent, `task: …` makes a task, ⌘↵ asks the usual agent. With nothing typed it shows what was
  * opened last. Mounted once per window, so ⌘K works with the sidebar hidden.

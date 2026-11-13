@@ -11,9 +11,8 @@ import { type ReactNode, useState } from "react";
 import { Dialog, DialogContent, DialogTitle, IconButton, Switch } from "@/shared/ui";
 import { mcpApi } from "./api";
 import { copy, engineLabel, readonlyReasonText, scopeLabels, sourceLabel } from "./copy";
-import { LaunchModeRow } from "./LaunchControls";
 import { ProbeDetail } from "./ProbeControls";
-import type { McpConfigEntry, McpLaunchMode } from "./types";
+import type { McpConfigEntry } from "./types";
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -29,7 +28,6 @@ export function McpDetailDialog({
   pending,
   workspacePath,
   onToggle,
-  onLaunchMode,
   onClose,
 }: {
   entry: McpConfigEntry;
@@ -37,7 +35,6 @@ export function McpDetailDialog({
   /** The folder a check runs against (project sources are found through it). */
   workspacePath: string | null;
   onToggle: (enabled: boolean) => void;
-  onLaunchMode: (mode: McpLaunchMode) => void;
   onClose: () => void;
 }) {
   const [revealError, setRevealError] = useState<string | null>(null);
@@ -70,7 +67,6 @@ export function McpDetailDialog({
           />
         </div>
         <div className="grid min-h-0 flex-1 gap-3 overflow-y-auto pr-1">
-          <LaunchModeRow entry={entry} pending={pending} onChange={onLaunchMode} />
           <div className="rounded-lg border border-charcoal-border px-3 py-1">
             <Row label={copy.detailEngine}>{engineLabel(entry.engine)}</Row>
             <Row label={copy.detailSource}>{sourceLabel(entry.source)}</Row>

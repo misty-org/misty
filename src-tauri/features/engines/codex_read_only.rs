@@ -55,7 +55,9 @@ pub(super) fn stage(
     staging_root: &Path,
 ) -> Result<(), String> {
     if !cfg!(target_os = "macos") || req.session_id.is_some() {
-        return Err("Codex read-only planning currently requires a fresh local macOS session".into());
+        return Err(
+            "Codex read-only planning currently requires a fresh local macOS session".into(),
+        );
     }
     let workspace = std::fs::canonicalize(&req.workspace)
         .map_err(|_| "Codex read-only workspace must be an existing local directory")?;
@@ -307,7 +309,10 @@ mod tests {
     fn rejects_unaudited_versions_and_unconfirmed_sandbox() {
         assert!(validate_version(&json!({"userAgent":"ccgui/0.154.0 (Mac OS)"})).is_ok());
         // The app-server handshake keeps the CLI's native identity.
-        assert!(validate_version(&json!({"userAgent":"codex_cli_rs/0.154.0 (Mac OS 15.5.0; arm64) unknown"})).is_ok());
+        assert!(validate_version(
+            &json!({"userAgent":"codex_cli_rs/0.154.0 (Mac OS 15.5.0; arm64) unknown"})
+        )
+        .is_ok());
         assert!(validate_version(&json!({"userAgent":"Codex Desktop/0.154.0 (Mac OS)"})).is_ok());
         for version in [
             "ccgui/0.153.0 x",

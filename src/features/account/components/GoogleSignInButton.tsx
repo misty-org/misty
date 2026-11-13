@@ -5,11 +5,6 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "../AuthContext";
 import { deliverGoogleSignInCode } from "../google/googleSignInCode";
-import {
-  closeGoogleSignInSheet,
-  mistyIsDefaultBrowser,
-  openGoogleSignInSheet,
-} from "../google/googleSignInSheet";
 import { accountGoogleSignIn, accountGoogleReauthenticate } from "../sessions/useAccountStore";
 import { authFormButtonClass } from "./authButtonClass";
 
@@ -72,13 +67,8 @@ export default function GoogleSignInButton({
     try {
       const launch = async (url: string) => {
         if (popup) popup.location.replace(url);
-        // The person's default browser. If that is Misty, a tab would be one of our own webviews,
-        // which Google's policy rules out, so macOS's session takes it to another browser.
-        else if (
-          !(await mistyIsDefaultBrowser()) ||
-          !(await openGoogleSignInSheet(url, () => operation.abort()))
-        )
-          await openUrl(url);
+        // The person's default browser.
+        else await openUrl(url);
       };
       const awaiting = () => setAwaitingCode(true);
       if (reauthenticate)
@@ -90,7 +80,6 @@ export default function GoogleSignInButton({
         onError(error instanceof Error ? error.message : "Could not sign in with Google.");
     } finally {
       popup?.close();
-      closeGoogleSignInSheet();
       controller.current = null;
       setAwaitingCode(false);
       setCode("");

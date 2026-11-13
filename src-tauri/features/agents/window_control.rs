@@ -293,11 +293,11 @@ fn validate_action(action: &Value) -> Result<(), String> {
         Err("Invalid workspace action".into())
     }
 }
+#[cfg(target_os = "linux")]
+pub mod linux;
 #[cfg(target_os = "macos")]
 pub(crate) mod macos;
 #[cfg(test)]
 mod tests;
-#[cfg(target_os = "linux")]
-pub mod linux;
 #[cfg(windows)]
 pub mod windows;

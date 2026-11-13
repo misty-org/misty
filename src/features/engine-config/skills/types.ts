@@ -193,25 +193,6 @@ export interface SkillRemoteContent {
   branch: string;
 }
 
-/** Query modes of `engine_skills_query`. */
-export type SkillsQuery =
-  | { mode: "installed" }
-  | { mode: "discover"; force?: boolean }
-  | { mode: "search"; q: string; offset?: number; limit?: number }
-  | { mode: "repos" }
-  | { mode: "popular"; force?: boolean }
-  | { mode: "updates"; force?: boolean }
-  | { mode: "activity"; limit?: number }
-  | { mode: "skill_usage"; force?: boolean }
-  | { mode: "skill_content"; directory: string }
-  | {
-      mode: "remote_skill_content";
-      owner: string;
-      name: string;
-      branch: string;
-      directory: string;
-    };
-
 /** Mutation actions of `engine_skills_mutate`: the action plus everything the
  *  backend reads out of the `payload` it receives. `mutate()` in `api.ts`
  *  splits the two. */

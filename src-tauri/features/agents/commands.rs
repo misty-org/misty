@@ -125,12 +125,13 @@ pub(crate) use crate::agents::connected_apps::commands::{
     composio_tool_schemas, composio_tool_search,
 };
 pub(crate) use crate::agents::connected_apps::direct::commands::{
-    __cmd__direct_apps_catalog, __tauri_command_name_direct_apps_catalog, direct_apps_catalog,
-    __cmd__direct_apps_check, __tauri_command_name_direct_apps_check, direct_apps_check,
-    __cmd__direct_apps_icon, __tauri_command_name_direct_apps_icon, direct_apps_icon,
-    __cmd__direct_apps_connect, __tauri_command_name_direct_apps_connect, direct_apps_connect,
-    __cmd__direct_apps_disconnect, __tauri_command_name_direct_apps_disconnect, direct_apps_disconnect,
-    __cmd__direct_apps_list, __tauri_command_name_direct_apps_list, direct_apps_list,
+    __cmd__direct_apps_catalog, __cmd__direct_apps_check, __cmd__direct_apps_connect,
+    __cmd__direct_apps_disconnect, __cmd__direct_apps_icon, __cmd__direct_apps_list,
+    __tauri_command_name_direct_apps_catalog, __tauri_command_name_direct_apps_check,
+    __tauri_command_name_direct_apps_connect, __tauri_command_name_direct_apps_disconnect,
+    __tauri_command_name_direct_apps_icon, __tauri_command_name_direct_apps_list,
+    direct_apps_catalog, direct_apps_check, direct_apps_connect, direct_apps_disconnect,
+    direct_apps_icon, direct_apps_list,
 };
 #[cfg(any(target_os = "macos", windows, target_os = "linux"))]
 pub(crate) use crate::agents::cursor::{
@@ -196,17 +197,23 @@ pub(crate) use crate::agents::run_control::local_runs::{
     __cmd__agent_run_cancel, __cmd__agent_run_contexts, __cmd__agent_run_end_proposal,
     __cmd__agent_run_follow, __cmd__agent_run_pause, __cmd__agent_run_publish,
     __cmd__agent_run_receipts, __cmd__agent_run_start, __cmd__agent_run_steer,
-    __cmd__agent_run_tools, __tauri_command_name_agent_run_cancel,
-    __tauri_command_name_agent_run_contexts, __tauri_command_name_agent_run_end_proposal,
-    __tauri_command_name_agent_run_follow, __tauri_command_name_agent_run_pause,
-    __tauri_command_name_agent_run_publish, __tauri_command_name_agent_run_receipts,
-    __tauri_command_name_agent_run_start, __tauri_command_name_agent_run_steer,
-    __tauri_command_name_agent_run_tools, agent_run_cancel, agent_run_contexts,
+    __tauri_command_name_agent_run_cancel, __tauri_command_name_agent_run_contexts,
+    __tauri_command_name_agent_run_end_proposal, __tauri_command_name_agent_run_follow,
+    __tauri_command_name_agent_run_pause, __tauri_command_name_agent_run_publish,
+    __tauri_command_name_agent_run_receipts, __tauri_command_name_agent_run_start,
+    __tauri_command_name_agent_run_steer, agent_run_cancel, agent_run_contexts,
     agent_run_end_proposal, agent_run_follow, agent_run_pause, agent_run_publish,
-    agent_run_receipts, agent_run_start, agent_run_steer, agent_run_tools,
+    agent_run_receipts, agent_run_start, agent_run_steer,
+};
+pub(crate) use crate::agents::run_control::local_tools::{
+    __cmd__agent_tool_finish, __cmd__agent_tool_host_ready, __tauri_command_name_agent_tool_finish,
+    __tauri_command_name_agent_tool_host_ready, agent_tool_finish, agent_tool_host_ready,
 };
 pub(crate) use crate::agents::run_control::run_ledger::{
     __cmd__agent_run_timeline, __tauri_command_name_agent_run_timeline, agent_run_timeline,
+};
+pub(crate) use crate::agents::run_control::run_notices::{
+    __cmd__agent_run_notify, __tauri_command_name_agent_run_notify, agent_run_notify,
 };
 pub(crate) use crate::agents::run_control::run_steps::{
     __cmd__agent_run_latest_steps, __cmd__agent_run_steps, __cmd__agent_run_steps_clear,
@@ -217,13 +224,6 @@ pub(crate) use crate::agents::run_control::run_steps::{
 pub(crate) use crate::agents::run_control::step_pictures::{
     __cmd__agent_run_step_picture, __tauri_command_name_agent_run_step_picture,
     agent_run_step_picture,
-};
-pub(crate) use crate::agents::run_control::run_notices::{
-    __cmd__agent_run_notify, __tauri_command_name_agent_run_notify, agent_run_notify,
-};
-pub(crate) use crate::agents::run_control::local_tools::{
-    __cmd__agent_tool_finish, __cmd__agent_tool_host_ready, __tauri_command_name_agent_tool_finish,
-    __tauri_command_name_agent_tool_host_ready, agent_tool_finish, agent_tool_host_ready,
 };
 pub(crate) use crate::agents::run_control::tool_gate::{
     __cmd__agent_program_opens, __tauri_command_name_agent_program_opens, agent_program_opens,

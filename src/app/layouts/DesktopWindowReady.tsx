@@ -4,7 +4,7 @@ import { appZoomChangedEvent, getAppliedAppRenderScale } from "@/shared/hooks/us
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { platform } from "@tauri-apps/plugin-os";
+import { platform } from "@/shared/platform/os";
 import { useEffect } from "react";
 import { windowSurfaceBackground } from "./windowSurfaceBackground";
 

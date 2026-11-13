@@ -620,8 +620,7 @@ impl Engine for PiFamilyEngine {
             // session header frame has no rpc equivalent), then the task; omp first negotiates
             // v2 chunking. Writing early is harmless: the input loop starts once the session is
             // ready, and the pipe buffers these lines.
-            let is_omp_compact =
-                self.id == "omp" && req.native_compact && req.images.is_empty();
+            let is_omp_compact = self.id == "omp" && req.native_compact && req.images.is_empty();
             // OMP handles /compact as a local RPC command. As a plain prompt it would answer
             // agentInvoked:false and command_output but never agent_end, so the host would wait
             // forever for the turn to end. The native command responds once compaction is done.
@@ -695,7 +694,7 @@ impl Engine for PiFamilyEngine {
     }
 
     /// Only a run whose extension writes the sidecar can report what served
-    /// it; WSL, read-only and ACP plan runs have no observer.
+    /// it; read-only and ACP plan runs have no observer.
     fn reports_served(&self) -> bool {
         self.served_models_file.get().is_some()
     }
@@ -755,7 +754,9 @@ fn parse_omp_compact_response(line: &str, out: &mut Vec<EngineEvent>) -> bool {
             .get("error")
             .and_then(Value::as_str)
             .unwrap_or("unknown error");
-        out.push(EngineEvent::Error(format!("omp compaction failed: {error}")));
+        out.push(EngineEvent::Error(format!(
+            "omp compaction failed: {error}"
+        )));
     }
     true
 }
@@ -966,7 +967,9 @@ fn parse_pi_family_line_with_sidecar(
                     .and_then(Value::as_str)
                     .unwrap_or("unknown error");
                 match command {
-                    "prompt" => out.push(EngineEvent::Error(format!("omp couldn't take the task: {error}"))),
+                    "prompt" => out.push(EngineEvent::Error(format!(
+                        "omp couldn't take the task: {error}"
+                    ))),
                     "negotiate_protocol" => {}
                     _ => out.push(EngineEvent::Warn(format!(
                         "omp command {command} failed: {error}"
@@ -1452,7 +1455,9 @@ mod tests {
         let error = omp().build_command(&req, "fake-omp").err().unwrap();
         assert!(error.contains("new session"), "{error}");
         // The auto/bypass paths are unaffected.
-        assert!(omp().build_command(&plan_req(Some("auto")), "fake-omp").is_ok());
+        assert!(omp()
+            .build_command(&plan_req(Some("auto")), "fake-omp")
+            .is_ok());
     }
 
     #[test]
@@ -1890,7 +1895,10 @@ mod tests {
                     input["questions"][0]["options"][0]["label"],
                     "staging (Recommended)"
                 );
-                assert_eq!(input["questions"][0]["options"][0]["description"], "Staging");
+                assert_eq!(
+                    input["questions"][0]["options"][0]["description"],
+                    "Staging"
+                );
                 assert_eq!(input["extui"]["method"], "select");
             }
             other => panic!("expected question event, got {other:?}"),
@@ -1933,7 +1941,10 @@ mod tests {
         parse_pi_family_line(&line, &mut out);
         match &out[..] {
             [EngineEvent::Question { input, .. }] => {
-                assert_eq!(input["questions"][0]["question"], "Continue?\n\nThis deletes files");
+                assert_eq!(
+                    input["questions"][0]["question"],
+                    "Continue?\n\nThis deletes files"
+                );
                 assert_eq!(
                     input["questions"][0]["options"][0]["label"],
                     CONFIRM_YES_LABEL
@@ -1971,8 +1982,11 @@ mod tests {
         assert_eq!(frame["value"], "prod");
 
         // Free text goes in value too.
-        let frame =
-            extension_ui_answer_frame("editor", "r2", Some(&serde_json::json!({ "q": "anything" })));
+        let frame = extension_ui_answer_frame(
+            "editor",
+            "r2",
+            Some(&serde_json::json!({ "q": "anything" })),
+        );
         assert_eq!(frame["value"], "anything");
 
         // confirm maps to the confirmed boolean.

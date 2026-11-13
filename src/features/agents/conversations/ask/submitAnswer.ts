@@ -7,7 +7,6 @@ import { globalMistyError } from "../state/globalMistyActions";
 import { conversationForGlobalPrompt } from "../state/globalMistyConversationScope";
 import type { MistyState } from "../state/mistyState";
 import {
-  announceGlobalPanel,
   globalAiContext,
   replaceActiveGlobalInvocationStream,
   updateConversation,
@@ -21,15 +20,7 @@ import { finishNeverStarted, settlePreviousExecution, startTurnExecution } from 
 
 /** Sends one turn: gathers its context, starts any local task, then streams the answer. */
 export function createSubmitAnswer(set: MistySet, get: MistyGet): MistyState["submitAnswer"] {
-  return async (
-    prompt,
-    attachments = [],
-    selection,
-    presentation = "panel",
-    deviceContexts = [],
-    origin,
-    companion,
-  ) => {
+  return async (prompt, attachments = [], selection, deviceContexts = [], origin, companion) => {
     const preparationStarted = performance.now();
     const markPreparation = (stage: string) => {
       if (companion)
@@ -177,9 +168,7 @@ export function createSubmitAnswer(set: MistySet, get: MistyGet): MistyState["su
         reasoningEffort: thinkingEffort(requestedThinking),
       }),
     );
-    if (presentation === "workspace") announceGlobalPanel(false);
     set({
-      panel: presentation === "workspace" ? "closed" : "answer",
       working: true,
       error: null,
       query: "",

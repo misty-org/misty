@@ -1,5 +1,4 @@
-import mistyLogo from "@/shared/assets/branding/misty-white.png";
-import { AssetIcon, cn } from "@/shared/ui";
+import { MistyMark, cn } from "@/shared/ui";
 
 export function MistyBrandIcon(props: {
   className?: string;
@@ -15,7 +14,7 @@ export function MistyBrandIcon(props: {
       data-social-provider-icon="misty"
       style={{ width: size, height: size }}
     >
-      <AssetIcon src={mistyLogo} size={size} color />
+      <MistyMark size={size} />
     </span>
   );
 }

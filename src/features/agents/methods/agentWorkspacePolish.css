@@ -73,7 +73,12 @@
 /* The context panel floats: a card lifted by a hairline and a soft shadow, with air around it,
    not a column cut off by a line. */
 .agent-studio-body {
+  position: relative;
   gap: 0;
+}
+/* The chat keeps its own stacking inside, so a card floating over it (it comes later) stays on top. */
+.agent-studio-canvas {
+  isolation: isolate;
 }
 .agent-studio-context {
   margin: 8px 0 8px 0;
@@ -93,12 +98,15 @@
   background: transparent;
 }
 
-/* The session card is a glance, not a workspace: narrow, and only as tall as what it holds. */
+/* The session card is a glance, not a workspace: narrow, only as tall as what it holds, and
+   floating over the chat beside the rail rather than taking a column from it. */
 .agent-studio-context[data-panel="session"] {
-  align-self: flex-start;
+  position: absolute;
+  inset: 8px 44px auto auto;
   width: 256px;
   min-width: 0;
   max-height: calc(100% - 16px);
+  margin: 0;
 }
 /* On a narrow page the open panel covers the chat, and the rail stays at its edge. */
 @container agent-studio (max-width: 760px) {

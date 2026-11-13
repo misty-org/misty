@@ -1,8 +1,5 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong), src-tauri/src/engine/grok.rs.
-use super::{
-    command_for_binary, images, safe_prompt_arg, BuiltCommand, Engine, EngineEvent, SendRequest,
-    Transport,
-};
+use super::{command_for_binary, BuiltCommand, Engine, SendRequest};
 use serde_json::Value;
 
 pub struct GrokEngine;
@@ -317,7 +314,9 @@ mod channel_tests {
         let mut built = built();
         built.command = tokio::process::Command::new(binary);
         let provider = serde_json::json!({"model":"probe-model", "apiKey":"fake-probe-key", "baseUrl":"http://127.0.0.1:1"});
-        for (key, value) in crate::engines::support::provider_files::channel_env("grok", &provider).unwrap() {
+        for (key, value) in
+            crate::engines::support::provider_files::channel_env("grok", &provider).unwrap()
+        {
             built.command.env(key, value);
         }
         stage_channel(
@@ -413,56 +412,6 @@ mod channel_tests {
     }
 }
 
-/// Extract and normalize the context-window field so the app can read it.
-fn attach_context_window(mut usage: Value) -> Value {
-    // Already in the standard field: return as is.
-    if usage.get("model_context_window").is_some() {
-        return usage;
-    }
-
-    // Try the field names the window size may come under.
-    let window = usage
-        .get("context_window")
-        .or_else(|| usage.get("contextWindow"))
-        .or_else(|| usage.get("model_context_window"))
-        .and_then(|v| {
-            // A number or a string such as "1M".
-            match v {
-                Value::Number(n) => n.as_i64(),
-                Value::String(s) => {
-                    let s = s.trim();
-                    // Formats such as "1M" and "1000k".
-                    if let Some(captures) = regex::Regex::new(r"^(\d+(?:\.\d+)?)\s*([kKmM]?)$")
-                        .ok()
-                        .and_then(|re| re.captures(s))
-                    {
-                        let num: f64 = captures.get(1)?.as_str().parse().ok()?;
-                        let multiplier = match captures.get(2)?.as_str().to_lowercase().as_str() {
-                            "k" => 1000.0,
-                            "m" => 1_000_000.0,
-                            _ => 1.0,
-                        };
-                        Some((num * multiplier) as i64)
-                    } else {
-                        s.parse().ok()
-                    }
-                }
-                _ => None,
-            }
-        });
-
-    // Found a window size: attach it under the standard field name.
-    if let Some(w) = window {
-        if w > 0 {
-            if let Some(obj) = usage.as_object_mut() {
-                obj.insert("model_context_window".to_string(), Value::Number(w.into()));
-            }
-        }
-    }
-
-    usage
-}
-
 impl Engine for GrokEngine {
     fn id(&self) -> &'static str {
         "grok"
@@ -474,16 +423,6 @@ impl Engine for GrokEngine {
     /// launch never had — there it answered the user's questions itself.
     fn drives_own_transport(&self) -> bool {
         true
-    }
-
-    /// A remote workspace keeps the CLI child path: the ACP driver spawns the
-    /// CLI locally and has no ssh path into the distro.
-    fn transport_for(&self, wsl: bool) -> Transport {
-        if wsl {
-            Transport::Child
-        } else {
-            Transport::Own
-        }
     }
 
     /// The command the ACP driver spawns, carrying the same model/effort and
@@ -549,122 +488,6 @@ impl Engine for GrokEngine {
             reason: "Grok plan review rides ACP x.ai/toggle_plan_mode + x.ai/exit_plan_mode (1.0.40 binary strings), but the ExitPlanModeExtResponse schema is not recoverable from the binary: its 2 field names (decision discriminant and feedback text) and the approve/revise/abandon encoding are unknown, and toggle_plan_mode's enter-plan-mode params encoding is unverified; wiring it without a live frame capture would fabricate the approval reply, and today a plan request would silently degrade to bypassPermissions",
         }
     }
-
-    fn build_command(&self, req: &SendRequest, bin: &str) -> Result<BuiltCommand, String> {
-        let mut cmd = command_for_binary(bin);
-        cmd.arg("--output-format");
-        cmd.arg("streaming-json");
-        // Headless, the CLI would block on an approval prompt nobody can answer, so a remote
-        // (WSL) folder runs Grok only in Bypass, the mode that skips its asks.
-        if self.resolve_permission(req.permission.as_deref()) != "bypass" {
-            return Err("Grok on a WSL folder runs only in Bypass, where it doesn't stop to ask.".into());
-        }
-        cmd.arg("--always-approve");
-        if let Some(model) = req.model.as_deref() {
-            cmd.arg("-m");
-            cmd.arg(model);
-        }
-        if let Some(effort) = req
-            .effort
-            .as_deref()
-            .map(str::trim)
-            .filter(|e| !e.is_empty())
-        {
-            cmd.arg("--effort");
-            cmd.arg(effort);
-        }
-        // `-s` creates a NEW session with a caller-chosen UUID and errors if it
-        // already exists; `-r` resumes. Never both.
-        let preassigned = match req.session_id.as_deref() {
-            Some(existing) => {
-                cmd.arg("-r");
-                cmd.arg(existing);
-                Some(existing.to_string())
-            }
-            None => {
-                let id = uuid::Uuid::new_v4().to_string();
-                cmd.arg("-s");
-                cmd.arg(&id);
-                Some(id)
-            }
-        };
-
-        let mut cleanup_files = Vec::new();
-        match images::grok_prompt_json(&req.prompt, &req.images, &req.workspace)? {
-            Some(prompt_json) => {
-                // Staging file so base64 payloads never hit ARG_MAX.
-                let dir = crate::engines::support::paths::app_home().join("grok-staging");
-                std::fs::create_dir_all(&dir)
-                    .map_err(|e| format!("create grok staging dir: {e}"))?;
-                let path = dir.join(format!("grok-prompt-{}.json", uuid::Uuid::new_v4()));
-                std::fs::write(&path, prompt_json)
-                    .map_err(|e| format!("write grok prompt file: {e}"))?;
-                cmd.arg("--prompt-file");
-                cmd.arg(&path);
-                cleanup_files.push(path);
-            }
-            None => {
-                cmd.arg("-p");
-                cmd.arg(safe_prompt_arg(&req.prompt));
-            }
-        }
-        // Grok 0.2.x has no --no-auto-update flag; disable via env.
-        cmd.env("GROK_DISABLE_AUTOUPDATER", "1");
-        Ok(BuiltCommand {
-            command: cmd,
-            stdin_payload: None,
-            keep_stdin_open: false,
-            cleanup_files,
-            preassigned_session_id: preassigned,
-        })
-    }
-
-    fn parse_line(&self, line: &str, out: &mut Vec<EngineEvent>) {
-        let Ok(value) = serde_json::from_str::<Value>(line) else {
-            return;
-        };
-        let event_type = value.get("type").and_then(Value::as_str).unwrap_or("");
-        match event_type {
-            "text" => {
-                if let Some(text) = value.get("data").and_then(Value::as_str) {
-                    if !text.is_empty() {
-                        out.push(EngineEvent::Delta(text.to_string()));
-                    }
-                }
-            }
-            "thought" => {
-                if let Some(text) = value.get("data").and_then(Value::as_str) {
-                    if !text.is_empty() {
-                        out.push(EngineEvent::Thinking(text.to_string()));
-                    }
-                }
-            }
-            "end" => {
-                let session_id = value
-                    .get("sessionId")
-                    .and_then(Value::as_str)
-                    .map(str::trim)
-                    .filter(|s| !s.is_empty())
-                    .map(str::to_string);
-                let usage = value
-                    .get("usage")
-                    .cloned()
-                    .map(|u| attach_context_window(u));
-                out.push(EngineEvent::Done { session_id, usage });
-            }
-            "error" => {
-                let message = value
-                    .get("message")
-                    .and_then(Value::as_str)
-                    .map(str::trim)
-                    .filter(|s| !s.is_empty())
-                    .unwrap_or("grok error")
-                    .to_string();
-                out.push(EngineEvent::Error(message));
-            }
-            _ => {}
-        }
-    }
 }
 
 #[cfg(test)]
@@ -673,7 +496,7 @@ mod tests {
     use std::path::PathBuf;
 
     #[test]
-    fn build_command_passes_effort_flag() {
+    fn host_command_passes_effort_flag() {
         let req = SendRequest {
             session_id: Some("s1".into()),
             prompt: "hi".into(),
@@ -690,7 +513,7 @@ mod tests {
             mcp_servers: None,
             allowed_tools: None,
         };
-        let built = GrokEngine.build_command(&req, "grok").unwrap();
+        let built = GrokEngine.host_command(&req, "grok").unwrap();
         let args: Vec<String> = built
             .command
             .as_std()

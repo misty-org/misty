@@ -10,11 +10,7 @@ vi.mock("@/features/spaces/api/api", () => ({
 }));
 
 import { uploadDrawingBinaryFile } from "@/features/spaces/journal/drawings/drawingAssets";
-import {
-  clearJournalAssetCache,
-  resolveJournalAssetUrl,
-  uploadJournalAsset,
-} from "@/features/spaces/journal/api/assets";
+import { resolveJournalAssetUrl, uploadJournalAsset } from "@/features/spaces/journal/api/assets";
 
 const pngBytes = new TextEncoder().encode("png fixture");
 const pngSHA256 = "d5057fbbb9b08de9e05cbef10bcf6d8cee42f33995d9ea2e7245d6b75c3988d1";
@@ -27,7 +23,6 @@ describe("Journal binary asset transfer", () => {
     });
     spaceRequestMock.mockReset();
     vi.stubGlobal("fetch", vi.fn());
-    clearJournalAssetCache();
   });
 
   afterEach(() => {

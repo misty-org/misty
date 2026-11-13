@@ -128,7 +128,7 @@ async fn request_tool_execution(deps: &ToolCallDeps<'_>, call_id: &str, name: &s
     let outcome = async {
         let response = match deps.local.filter(|host| host.runs(name)) {
             Some(host) => run_local_tool(host, &deps.identity.misty_run_id, call_id, deps.turn, name, input).await,
-            None => deps.gateway.call(GatewayCall { identity: deps.identity, call_id, name, input, device_hook_token: token }).await?,
+            None => deps.gateway.call(GatewayCall { call_id, name, input, device_hook_token: token }).await?,
         };
         // One line per call for timing; never arguments or results.
         let timing = object([

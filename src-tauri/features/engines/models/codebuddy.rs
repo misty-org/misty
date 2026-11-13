@@ -17,7 +17,6 @@ pub(super) async fn codebuddy_catalog(bin: &str) -> EngineCatalog {
     EngineCatalog {
         models: fallback_catalog(default_model.as_deref()),
         authoritative: false,
-        remote: false,
     }
 }
 

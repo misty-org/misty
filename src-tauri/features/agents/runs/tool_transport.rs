@@ -67,16 +67,6 @@ pub(crate) trait ToolCheckpoints: Send + Sync {
     fn checkpoint(&self, event: HarnessCheckpoint) -> BoxFuture<'_, Result<(), RuntimeError>>;
 }
 
-/// Runs a catalog tool. `None` is a call that returned nothing.
-pub(crate) trait ToolTransport: ToolCheckpoints {
-    fn run<'a>(
-        &'a self,
-        call_id: &'a str,
-        name: &'a str,
-        input: &'a JsValue,
-    ) -> BoxFuture<'a, Result<Option<JsValue>, RuntimeError>>;
-}
-
 pub(crate) fn string(text: impl Into<String>) -> JsValue {
     JsValue::String(text.into())
 }

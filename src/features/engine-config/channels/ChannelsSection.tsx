@@ -14,9 +14,9 @@
  * page only learns whether one is saved. Choosing a channel never writes the CLI's own files: it
  * applies to each new chat's start.
  */
-import { Bot, Download, FileUp, Plus } from "lucide-react";
+import { Download, FileUp, Plus } from "lucide-react";
 import { useState, type DragEvent } from "react";
-import { EngineMark, hasEngineMark } from "../EngineMark";
+import { EngineMark } from "../EngineMark";
 import {
   DesktopSettingsNotice,
   DesktopSettingsRow,
@@ -96,7 +96,7 @@ export function EnginePicker({
           <SelectItem
             key={id}
             value={id}
-            icon={hasEngineMark(id) ? <EngineMark engine={id} size={14} /> : Bot}
+            icon={<EngineMark engine={id} name={ENGINE_NAMES[id]} size={14} />}
             label={ENGINE_NAMES[id]}
           />
         ))}
@@ -191,7 +191,7 @@ function ChannelsBody({ cli }: { cli: CliConfigState }) {
               }}
             >
               <span className="flex size-8 shrink-0 items-center justify-center">
-                {hasEngineMark(engine) ? <EngineMark engine={engine} size={16} /> : null}
+                <EngineMark engine={engine} size={16} name={name} />
               </span>
               <div className="flex min-w-0 flex-1 flex-col">
                 <p className="flex items-center gap-1.5 text-sm text-cream-bright">

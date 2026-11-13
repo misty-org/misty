@@ -40,12 +40,13 @@
   flex-shrink: 0;
 }
 .agent-heading-identity {
+  display: inline-flex;
+  align-items: center;
   gap: 6px;
-  flex: 0 0 auto;
+  flex: 0 1 auto;
   max-width: 60%;
-  /* Sized to its content (avatar, name, chevron); only a long name truncates. */
+  /* Sized to its content (avatar and name); only a long name fades. */
   min-width: 0;
-  font-size: 14px;
 }
 .agent-heading-avatar {
   display: inline-flex;

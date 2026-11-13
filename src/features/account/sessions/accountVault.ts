@@ -10,7 +10,6 @@ export interface SecureAccountSession {
   account: SavedAccountSession;
   /** Non-secret cookie-session:<account-id> handle. JWTs remain in native storage. */
   token: string;
-  deploymentScope?: string;
 }
 
 export interface SecureAccountVault {
@@ -19,13 +18,12 @@ export interface SecureAccountVault {
   sessions: SecureAccountSession[];
 }
 
-export const hostedScope = "hosted";
-const legacyUserKey = "misty_user";
+/** The prefix of the active account's id in the vault, kept from when one device held sessions
+ * for several servers. */
+const vaultScope = "hosted";
 
-export function parseSecureVault(raw: string | null): {
-  vault: SecureAccountVault;
-  migrated: boolean;
-} {
+/** Reads the vault. Sessions an older release saved for a different server are dropped. */
+export function parseSecureVault(raw: string | null): SecureAccountVault {
   if (raw) {
     try {
       const value = JSON.parse(raw) as Partial<SecureAccountVault>;
@@ -34,60 +32,13 @@ export function parseSecureVault(raw: string | null): {
           .map(secureAccountSession)
           .filter(isPresent)
           .filter((session) => session.token.startsWith("cookie-session:"));
-        return {
-          vault: {
-            version: 1,
-            activeAccountId: String(value.activeAccountId ?? ""),
-            sessions,
-          },
-          migrated: false,
-        };
+        return { version: 1, activeAccountId: String(value.activeAccountId ?? ""), sessions };
       }
     } catch {
-      // Existing releases stored the active token directly; migrate it below.
+      // Anything else in the keystore is not a vault: the person signs in again.
     }
   }
-  const legacyAccount = readLegacyAccount();
-  if (raw?.startsWith("cookie-session:") && legacyAccount) {
-    const account = {
-      ...legacyAccount,
-      lastUsedAt: new Date().toISOString(),
-    };
-    return {
-      vault: {
-        version: 1,
-        activeAccountId: vaultAccountId(account.id),
-        sessions: [
-          {
-            account,
-            token: raw,
-            deploymentScope: hostedScope,
-          },
-        ],
-      },
-      migrated: true,
-    };
-  }
-  return {
-    vault: emptyVault(),
-    migrated: false,
-  };
-}
-function readLegacyAccount(): Omit<SavedAccountSession, "lastUsedAt"> | null {
-  try {
-    const raw = localStorage.getItem(legacyUserKey);
-    if (!raw) return null;
-    const value = JSON.parse(raw) as Partial<SavedAccountSession>;
-    if (!value.id || !value.email) return null;
-    return {
-      id: value.id,
-      username: value.username || usernameFromEmail(value.email),
-      email: value.email,
-      accountCreatedAt: value.accountCreatedAt,
-    };
-  } catch {
-    return null;
-  }
+  return emptyVault();
 }
 function usernameFromEmail(email: string): string {
   return email.split("@")[0] ?? email;
@@ -105,29 +56,18 @@ export function savedAccountSession(value: unknown): SavedAccountSession | null 
 }
 function secureAccountSession(value: unknown): SecureAccountSession | null {
   if (!value || typeof value !== "object") return null;
-  const item = value as Partial<SecureAccountSession>;
+  const item = value as Partial<SecureAccountSession> & { deploymentScope?: unknown };
   const account = savedAccountSession(item.account);
-  if (
-    typeof item.token !== "string" ||
-    item.token.length === 0 ||
-    !account ||
-    (item.deploymentScope !== undefined && typeof item.deploymentScope !== "string")
-  )
-    return null;
-  return { ...item, account } as SecureAccountSession;
-}
-/** Misty is hosted only. Sessions saved for a self-hosted server stay in the vault, unused. */
-export function isHostedSession(session: SecureAccountSession): boolean {
-  return (session.deploymentScope || hostedScope) === hostedScope;
-}
-export function hostedSessions(vault: SecureAccountVault): SecureAccountSession[] {
-  return vault.sessions.filter(isHostedSession);
+  if (typeof item.token !== "string" || item.token.length === 0 || !account) return null;
+  // Saved for another server by a release that kept several.
+  if (item.deploymentScope !== undefined && item.deploymentScope !== vaultScope) return null;
+  return { account, token: item.token };
 }
 export function vaultAccountId(accountId: string): string {
-  return `${hostedScope}:${accountId}`;
+  return `${vaultScope}:${accountId}`;
 }
-export function activeHostedAccountId(vault: SecureAccountVault): string {
-  const prefix = `${hostedScope}:`;
+export function activeVaultAccountId(vault: SecureAccountVault): string {
+  const prefix = `${vaultScope}:`;
   if (vault.activeAccountId.startsWith(prefix)) return vault.activeAccountId.slice(prefix.length);
   // Vaults written before deployment namespacing contain a bare Hosted id.
   return vault.activeAccountId.includes(":") ? "" : vault.activeAccountId;

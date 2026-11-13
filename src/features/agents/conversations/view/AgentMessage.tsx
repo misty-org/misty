@@ -20,7 +20,6 @@ import { AgentMessageActions } from "./AgentMessageActions";
 import { AgentNotebookCard } from "./AgentNotebookCard";
 import { AgentRunOutcome } from "./AgentRunOutcome";
 import { GrantCards } from "./grants/GrantCard";
-import { RunMeta } from "./meta/RunMeta";
 import { AgentSubagents } from "./AgentSubagents";
 import { EngineTurnParts } from "./engine/EngineTurnParts";
 import { CollapsibleText, EarlierReply, MistyAvatar } from "./AgentTranscriptParts";
@@ -234,7 +233,6 @@ function AgentMessageView(props: AgentMessageProps) {
             invocationId={message.invocationId}
           />
         ) : null}
-        {message.state === "completed" ? <RunMeta message={message} /> : null}
         <AgentMessageActions
           conversationId={props.conversationId}
           message={message}

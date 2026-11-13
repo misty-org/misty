@@ -1,4 +1,4 @@
-//! Erasing a website data store once its profile is deleted.
+//! Erasing a website data store no profile uses any more.
 use crate::browser::*;
 use file_access::fs;
 
@@ -66,18 +66,4 @@ async fn remove_store_directory(directory: &std::path::Path) -> Result<(), Strin
 fn is_locked(error: &std::io::Error) -> bool {
     // ERROR_ACCESS_DENIED, ERROR_SHARING_VIOLATION, ERROR_LOCK_VIOLATION, ERROR_DIR_NOT_EMPTY
     cfg!(windows) && matches!(error.raw_os_error(), Some(5 | 32 | 33 | 145))
-}
-
-/// Erases a deleted profile's website data. Its windows are already closed; WebKit holds a
-/// store briefly after its last view goes, so this runs a moment later.
-pub(crate) async fn remove_store_data(
-    app: AppHandle,
-    key: String,
-    store: String,
-) -> Result<(), String> {
-    tokio::time::sleep(Duration::from_secs(3)).await;
-    if !crate::browser::app_windows::windows_for_profile(&app, &key).is_empty() {
-        return Err("The profile was opened again before its data could be removed.".into());
-    }
-    remove(app, store).await
 }

@@ -142,7 +142,6 @@ it("delegates only on a tool request with its stable admission key", async () =>
     "Organize my folder",
     [],
     undefined,
-    "workspace",
     [],
     { conversationId: "conversation", context: [] },
     expect.objectContaining({ idempotencyKey: "voice-1:call", turn: 2 }),
@@ -172,12 +171,11 @@ it("sends spoken screen questions with the screens", async () => {
     "Describe the screen without changing anything.",
     [],
     undefined,
-    "workspace",
     [],
     { conversationId: "conversation", context: [] },
     expect.objectContaining({ executionMode: "user", idempotencyKey: "voice-1:screen" }),
   );
-  expect(mocks.submit.mock.calls[0][6]).not.toHaveProperty("displayCaptures");
+  expect(mocks.submit.mock.calls[0][5]).not.toHaveProperty("displayCaptures");
   view.unmount();
 });
 it("stops audio without canceling business actions", async () => {
@@ -306,7 +304,6 @@ it.each(["user", "agent"] as const)(
       instruction,
       [],
       undefined,
-      "workspace",
       [],
       { conversationId: "conversation", context: [] },
       expect.objectContaining({ executionMode: "user", idempotencyKey: "voice-browser:call" }),

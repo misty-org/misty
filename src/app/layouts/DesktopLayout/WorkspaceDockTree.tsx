@@ -7,14 +7,9 @@ import {
   type WorkspaceGroupKey,
   type WorkspaceView,
 } from "@/features/app-windows";
-import { cn } from "@/shared/ui";
+import { SplitHandle } from "@/shared/ui";
 import { useEffect, useRef } from "react";
-import {
-  Panel,
-  PanelGroup,
-  PanelResizeHandle,
-  type ImperativePanelGroupHandle,
-} from "react-resizable-panels";
+import { Panel, PanelGroup, type ImperativePanelGroupHandle } from "react-resizable-panels";
 import { DockLeafView } from "./DockLeafView";
 
 export interface WorkspaceDockTreeProps {
@@ -111,18 +106,13 @@ function DockSplitView(
           paneDirection={props.node.direction === "horizontal" ? "left" : "up"}
         />
       </Panel>
-      <PanelResizeHandle
-        aria-label={
+      <SplitHandle
+        direction={props.node.direction}
+        label={
           props.node.direction === "horizontal"
             ? "Resize panes horizontally"
             : "Resize panes vertically"
         }
-        className={cn(
-          // Panes are separate rounded containers, so the handle is the gap between them.
-          "relative z-20 bg-transparent",
-          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cream-muted/60",
-          props.node.direction === "horizontal" ? "w-2 cursor-col-resize" : "h-2 cursor-row-resize",
-        )}
       />
       <Panel
         id={`${props.node.id}:second`}

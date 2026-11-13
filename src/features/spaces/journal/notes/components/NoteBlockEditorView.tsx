@@ -45,7 +45,7 @@ function CollaborativeNoteEditor(
   if (error) {
     return <>{props.runtime.renderError(error, props.spaceId, props.noteId)}</>;
   }
-  if (!session) return <SkeletonDocument label="Opening note" />;
+  if (!session) return <SkeletonDocument label="Opening doc" />;
   return (
     <div className="relative h-full">
       {notice ? (
@@ -100,7 +100,7 @@ function MistyTipTapEditor(
         autocorrect: "on",
         autocapitalize: "sentences",
         spellcheck: "true",
-        "aria-label": "Note content",
+        "aria-label": "Doc content",
         class: "misty-tiptap-prosemirror",
         "data-misty-window-drag-block": "true",
       },
@@ -175,7 +175,7 @@ function MistyTipTapEditor(
     editor.view.dom.addEventListener("keydown", onKeyDown);
     return () => editor.view.dom.removeEventListener("keydown", onKeyDown);
   }, [editor]);
-  if (!editor) return <SkeletonDocument label="Opening note" />;
+  if (!editor) return <SkeletonDocument label="Opening doc" />;
   const aiAdapter = createNoteAiAdapter(editor, props, aiSelection);
   const uploadImage = async (file?: File) => {
     if (!file) return;

@@ -1,5 +1,7 @@
 import { useSettingsStore } from "@/features/settings";
-import type { MistyPanelSide } from "./MistyPanel";
+
+/** Which edge of the window the side panel sits on. */
+export type MistyPanelSide = "left" | "right";
 
 /** The side chosen in settings (Agents › panel side); right by default. */
 export function useMistyPanelSide(): MistyPanelSide {

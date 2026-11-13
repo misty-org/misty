@@ -7,6 +7,7 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, beforeEach, vi } from "vitest";
 import { MemoryRouter, useNavigate, type NavigateFunction } from "react-router-dom";
 import { useMistyStore } from "@/features/agents/conversations/state/useMistyStore";
+import { Button } from "@/shared/ui";
 import AgentsPage from "./AgentsPage";
 
 const fixture = vi.hoisted(() => ({
@@ -68,6 +69,20 @@ vi.mock("@/features/agents/personal/personalAgentsApi", () => ({
   },
 }));
 vi.mock("@/features/agents/conversations/ask/handoff", () => ({ openMisty: async () => {} }));
+// The room itself is three.js; the page only needs each agent's card and its settings button.
+vi.mock("../virtual/VirtualStudio", () => ({
+  VirtualStudio: (props: { onAgentSettings(agentId: string): void }) => (
+    <div>
+      {[fixture.agent, ...(fixture.includeSecond ? [{ id: "research", name: "Research" }] : [])].map(
+        (agent) => (
+          <Button key={agent.id} onClick={() => props.onAgentSettings(agent.id)}>
+            {`${agent.name} settings`}
+          </Button>
+        ),
+      )}
+    </div>
+  ),
+}));
 
 beforeEach(() => {
   fixture.includeSecond = false;
@@ -105,7 +120,7 @@ export function renderAgentsPage(entry = "/agents") {
 }
 
 /** Follows a link to the page, as the window's sidebar does. */
-export function openPage(page: "studio" | "integrations" | "tutor") {
+export function openPage(page: "studio" | "integrations" | "lab") {
   act(() => void navigateTo?.(`/agents?view=${page}`));
 }
 
@@ -116,15 +131,9 @@ export function openChat(agentId = "communications", conversationId?: string) {
   act(() => void navigateTo?.(`/agents?${params}`));
 }
 
-/** Opens the agent switcher in the sidebar and chooses one of its items. */
-export function chooseFromSwitcher(option: string | RegExp, agent = "Communications") {
-  fireEvent.click(screen.getByRole("button", { name: `Switch agent: ${agent}` }));
-  fireEvent.click(screen.getByRole("option", { name: option }));
-}
-
-/** Each agent's settings button sits on its row in the switcher. */
+/** An agent's settings open from its card in the Studio, never from the chat. */
 export function openAgentSettings(agent = "Communications") {
-  fireEvent.click(screen.getByRole("button", { name: `Switch agent: ${agent}` }));
+  openPage("studio");
   fireEvent.click(screen.getByRole("button", { name: `${agent} settings` }));
 }
 

@@ -47,7 +47,6 @@ mod minimax;
 mod opencode;
 mod pi;
 mod qoder;
-mod wsl;
 
 /// Claude launch-time model resolution: picker alias → the custom id its
 /// ANTHROPIC_DEFAULT_<FAMILY>_MODEL override maps to (pass-through when
@@ -62,14 +61,9 @@ pub(crate) fn claude_comparison_model(
     bin: &str,
     channel_env: Option<&std::collections::HashMap<String, String>>,
     workspace: &std::path::Path,
-    remote: bool,
 ) -> Option<String> {
-    let path = if remote {
-        None
-    } else {
-        super::resolve::find_cli_binary("claude", Some(bin))
-    };
-    claude::comparison_model(selector, path.as_deref(), channel_env, workspace, remote)
+    let path = super::resolve::find_cli_binary("claude", Some(bin));
+    claude::comparison_model(selector, path.as_deref(), channel_env, workspace)
 }
 
 use serde::Serialize;
@@ -125,11 +119,6 @@ pub struct EngineCatalog {
     /// (config/registry/binary-derived). A stored pick outside it cannot
     /// run, so the frontend resets it to the leading entry.
     pub authoritative: bool,
-    /// True when the catalog was produced for a remote workspace (WSL
-    /// distro): the frontend must NOT merge local provider/custom models
-    /// into it — only the distro CLI's own list is runnable there.
-    #[serde(default)]
-    pub remote: bool,
 }
 
 impl EngineCatalog {
@@ -137,59 +126,18 @@ impl EngineCatalog {
         Self {
             models,
             authoritative: true,
-            remote: false,
-        }
-    }
-
-    /// Catalog sourced from inside a remote workspace; even when empty it
-    /// suppresses the frontend's local-config fallback.
-    fn authoritative_remote(models: Vec<EngineModel>) -> Self {
-        Self {
-            models,
-            authoritative: true,
-            remote: true,
         }
     }
 }
 
-pub async fn list_engine_models(
-    state: &crate::engines::support::EngineState,
-    engine: String,
-    workspace: Option<String>,
-) -> Result<EngineCatalog, String> {
+pub async fn list_engine_models(engine: String) -> Result<EngineCatalog, String> {
     // Disabling an engine gates the catalog too: every branch below either
-    // runs the engine's CLI here or asks the distro to (`opencode models`,
+    // runs the engine's CLI or asks it (`opencode models`,
     // `mcode acp`, …), and a user who turned the engine off must not see it
     // launched — the chat picker and the plugin agent catalog already hide
     // disabled engines, so no consumer needs this answer. Same contract as the
     // send path (config::ensure_engine_enabled).
     crate::engines::support::config::ensure_engine_enabled(&engine)?;
-    // A WSL workspace: the model catalog must come from the CLI inside the distro (the probed
-    // bin), not this computer's.
-    if let Some(ws) = workspace.as_deref() {
-        if let Some(transport) =
-            crate::engines::wsl_transport::transport_for_workspace(&state.db, ws)
-        {
-            match engine.as_str() {
-                "pi" | "omp" => {
-                    return Ok(wsl::pi_family_catalog_remote(engine.as_str(), &transport).await);
-                }
-                "codex" => {
-                    return Ok(wsl::codex_catalog_remote(&transport).await);
-                }
-                "kimi" => {
-                    return Ok(wsl::kimi_catalog_remote(&transport).await);
-                }
-                "claude" => {
-                    return Ok(wsl::claude_catalog_remote(&transport).await);
-                }
-                // The other engines have no remote catalog command yet (grok/dsh/agy and the
-                // like are derived locally): an empty catalog with the remote flag, so the
-                // frontend mixes in no local config and the distro's CLI uses its own default.
-                _ => return Ok(EngineCatalog::authoritative_remote(Vec::new())),
-            }
-        }
-    }
     match engine.as_str() {
         "codex" => Ok(codex_catalog().await),
         "kimi" => Ok(kimi_catalog().await),

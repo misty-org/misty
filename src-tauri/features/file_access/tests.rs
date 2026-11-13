@@ -232,7 +232,6 @@ fn grants_for(reach: Reach) -> &'static [&'static str] {
         | Reach::OwnTemp
         | Reach::AutostartEntry
         | Reach::HostnameFile
-        | Reach::ChosenDownloadFolder
         | Reach::RecordedDownload
         | Reach::BenchmarkKeys
         | Reach::EngineConfig
@@ -255,7 +254,6 @@ fn the_list_matches_grants_toml() {
         Reach::AutostartEntry,
         Reach::HostnameFile,
         Reach::DownloadsFolder,
-        Reach::ChosenDownloadFolder,
         Reach::RecordedDownload,
         Reach::SharedFolder,
         Reach::LinkedFolder,

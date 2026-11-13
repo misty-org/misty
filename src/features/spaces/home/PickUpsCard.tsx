@@ -1,4 +1,4 @@
-import { BookmarkCheck, MessageSquare } from "lucide-react";
+import { BookmarkCheck } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import {
   AgentAvatar,
@@ -93,7 +93,7 @@ export function PickUpsCard({
     setPicking(undefined);
     setError("");
     const full = await notesApi.get(spaceId, note.id).catch(() => undefined);
-    if (!full?.markdown) return setError("That note couldn't be read. Try again.");
+    if (!full?.markdown) return setError("That doc couldn't be read. Try again.");
     const problem = draftRequestForAgent(agentId, pickUpRequest(note.topic, full.markdown));
     if (problem) setError(problem);
   };
@@ -103,12 +103,7 @@ export function PickUpsCard({
       <MenuTrigger label="Save where it left off" />
       <DropdownMenuContent align="end">
         {finished.map((chat) => (
-          <MenuItem
-            key={chat.id}
-            icon={MessageSquare}
-            label={chatTitle(chat.title)}
-            onSelect={() => setSaving(chat)}
-          />
+          <MenuItem key={chat.id} label={chatTitle(chat.title)} onSelect={() => setSaving(chat)} />
         ))}
       </DropdownMenuContent>
     </DropdownMenu>

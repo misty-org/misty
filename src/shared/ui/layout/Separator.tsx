@@ -21,4 +21,12 @@ const Separator = React.forwardRef<
 ));
 Separator.displayName = SeparatorPrimitive.Root.displayName;
 
-export { Separator };
+/**
+ * The hairline between two groups of controls in a bar, such as the view toggle and the sort and
+ * filter buttons. Groups sit side by side, never each in a box of its own.
+ */
+function ToolbarDivider({ className }: { className?: string }) {
+  return <Separator orientation="vertical" className={cn("mx-1 h-4", className)} />;
+}
+
+export { Separator, ToolbarDivider };

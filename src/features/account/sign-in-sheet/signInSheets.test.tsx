@@ -10,10 +10,6 @@ const mocks = vi.hoisted(() => ({
   chooseNoServer: vi.fn().mockResolvedValue(undefined),
   switchToMistyCloud: vi.fn().mockResolvedValue(undefined),
 }));
-vi.mock("@/features/browser/webviews/browserRuntime", () => ({
-  setBrowserWebviewsSuspended: mocks.suspend,
-  onBrowserRuntimeClose: () => () => undefined,
-}));
 vi.mock("@/features/app-windows/page-runtime/browserOverlayRuntime", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   setBrowserWebviewsSuspended: mocks.suspend,
@@ -143,7 +139,7 @@ it("starts by choosing a server when this device has none", async () => {
   render(<SignInSheet />);
   act(() => openSignInSheet("setup"));
   expect(screen.getByRole("dialog", { name: "Set up Misty" })).toBeTruthy();
-  expect(screen.getByRole("button", { name: /Misty Pro/ })).toBeTruthy();
+  expect(screen.getByRole("button", { name: /Misty Cloud/ })).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: /Self-hosted/ }));
   expect(screen.getByRole("dialog", { name: "Your own server" })).toBeTruthy();
   expect(screen.getByLabelText("Server address")).toBeTruthy();
@@ -151,7 +147,7 @@ it("starts by choosing a server when this device has none", async () => {
   fireEvent.click(screen.getByRole("button", { name: "Use a sign-in link" }));
   expect(screen.getByLabelText("Sign-in link")).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Back" }));
-  await act(async () => fireEvent.click(screen.getByRole("button", { name: /Misty Pro/ })));
+  await act(async () => fireEvent.click(screen.getByRole("button", { name: /Misty Cloud/ })));
   expect(mocks.switchToMistyCloud).toHaveBeenCalled();
   expect(screen.getByRole("form", { name: "Sign in form" })).toBeTruthy();
 });
@@ -165,7 +161,7 @@ it("stays on choosing a server when Misty Pro can't be reached", async () => {
     </>,
   );
   act(() => openSignInSheet("setup"));
-  await act(async () => fireEvent.click(screen.getByRole("button", { name: /Misty Pro/ })));
+  await act(async () => fireEvent.click(screen.getByRole("button", { name: /Misty Cloud/ })));
   expect((await screen.findByRole("alert")).textContent).toContain("couldn't reach Misty Pro");
   expect(screen.getByRole("button", { name: /Only this computer/ })).toBeTruthy();
 });

@@ -1,6 +1,6 @@
-import { Bot, Cloud, Cpu } from "lucide-react";
+import { Cpu } from "lucide-react";
 import { useEffect, useState } from "react";
-import { EngineMark, hasEngineMark } from "@/features/engine-config/EngineMark";
+import { EngineMark } from "@/features/engine-config/EngineMark";
 import { Field, Input, OptionSelect } from "@/shared/ui";
 import {
   listEngineModels,
@@ -56,16 +56,16 @@ export function AgentEngineField(props: {
   if (props.model && !offered.some((model) => model.id === props.model))
     modelOptions.push({ value: props.model, label: props.model, icon: Cpu });
   const options = [
-    { value: mistyEngine, label: "Misty", icon: Cloud },
+    { value: mistyEngine, label: "Misty", icon: <EngineMark engine="misty" size={16} /> },
     ...engines.map((item) => ({
       value: item.id,
       label: item.installed ? item.name : `${item.name} (not installed)`,
-      icon: hasEngineMark(item.id) ? <EngineMark engine={item.id} size={16} /> : Bot,
+      icon: <EngineMark engine={item.id} name={item.name} size={16} />,
     })),
   ];
   // An engine saved earlier still shows while the list loads, or if its adapter is gone.
   if (!options.some((option) => option.value === engine))
-    options.push({ value: engine, label: engine, icon: Bot });
+    options.push({ value: engine, label: engine, icon: <EngineMark engine={engine} size={16} /> });
   return (
     <>
       <Field label="Engine">

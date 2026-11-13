@@ -1,5 +1,5 @@
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
-import { Folder, GitBranch, Layers, Plus, Sparkles } from "lucide-react";
+import { Cpu, Folder, GitBranch, Layers, Plus } from "lucide-react";
 import { afterEach, expect, it, vi } from "vitest";
 import { MessageComposer, MessageComposerSend } from "./MessageComposer";
 
@@ -13,7 +13,7 @@ it("puts its controls on one bar under the text, with send at the end", () => {
       inputProps={{ "aria-label": "Message", value: "", onChange: () => {} }}
       items={[
         { id: "attach", icon: Plus, label: "Attach", priority: 2, onSelect: attach },
-        { id: "model", icon: Sparkles, label: "A long model name", priority: 1, shrink: true },
+        { id: "model", icon: Cpu, label: "A long model name", priority: 1, shrink: true },
       ]}
       end={<MessageComposerSend label="Send" onClick={onSend} />}
     />,

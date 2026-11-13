@@ -43,7 +43,7 @@ export function NotePreviewView(props: NotePreviewProps & { runtime: NotePreview
       <div
         className="flex min-w-0 items-center gap-1 border-b border-charcoal-border bg-charcoal-card px-2"
         role="toolbar"
-        aria-label="Note preview tools"
+        aria-label="Doc preview tools"
       >
         <Button
           type="button"
@@ -61,7 +61,7 @@ export function NotePreviewView(props: NotePreviewProps & { runtime: NotePreview
         {noteText.trim() ? (
           <Suspense
             fallback={
-              <div className="space-y-3 p-8" aria-label="Preparing note preview">
+              <div className="space-y-3 p-8" aria-label="Preparing doc preview">
                 <Skeleton className="h-3 w-full" />
                 <Skeleton className="h-3 w-5/6" />
                 <Skeleton className="h-3 w-2/3" />
@@ -81,7 +81,7 @@ export function NotePreviewView(props: NotePreviewProps & { runtime: NotePreview
             />
           </Suspense>
         ) : (
-          <EmptyState title="This note is empty" line="Open the note to start writing." />
+          <EmptyState title="This doc is empty" line="Open the doc to start writing." />
         )}
       </div>
     </div>

@@ -7,17 +7,13 @@ vi.mock("@/app/shell", () => ({
   useAppStore: (select: (state: unknown) => unknown) =>
     select({ app: { environment: { homeDir: "/home/me" } } }),
 }));
-vi.mock("@/features/settings", () => ({
-  useSettingsStore: (select: (state: unknown) => unknown) => select({ settings: {} }),
-  selectGeneralPreferences: () => ({ preferredWorkspaceRoot: "~/work" }),
-}));
 
 import { MistyFilePicker } from "./FilePicker";
 
 beforeEach(() => open.mockReset());
 afterEach(cleanup);
 
-it("opens the system dialog once, at the starting folder, with the allowed types", async () => {
+it("opens the system dialog once, in the home folder, with the allowed types", async () => {
   open.mockResolvedValue("/home/me/work/a.png");
   const onSelect = vi.fn();
   const view = render(
@@ -44,7 +40,7 @@ it("opens the system dialog once, at the starting folder, with the allowed types
     title: "Insert image",
     directory: false,
     multiple: false,
-    defaultPath: "/home/me/work",
+    defaultPath: "/home/me",
     filters: [{ name: "Files", extensions: ["png", "jpg"] }],
   });
   expect(view.container.textContent).toBe("");

@@ -12,12 +12,12 @@ import type { AiSurfaceAdapter } from "./invocationTypes";
 
 describe("embodied Misty state", () => {
   beforeEach(() => {
-    // Counts carry over between tests otherwise, and the waits below rely on them.
+    // Calls carry over between tests otherwise, and the waits below rely on them.
     handoff.mockClear();
     useAiSurfaceStore.setState({
       sessions: {},
       registrations: {},
-      companion: { phase: "home", completedCount: 0 },
+      companion: {},
     });
   });
   // Summoning loads Misty on demand. Finish those loads inside the test, so a
@@ -48,53 +48,11 @@ describe("embodied Misty state", () => {
     const stop = useAiSurfaceStore
       .getState()
       .registerPane({ accountId: "account-a", paneId: "pane-a", adapter, element });
-    useAiSurfaceStore.getState().summon("account-a", "pane-a", {
-      kind: "pointer",
-      paneId: "pane-a",
-      x: 20,
-      y: 30,
-    });
+    useAiSurfaceStore.getState().summon("account-a", "pane-a");
     await vi.waitFor(() =>
       expect(handoff).toHaveBeenCalledWith(expect.objectContaining({ paneId: "pane-a" })),
     );
     useAiSurfaceStore.getState().returnHome();
-    expect(useAiSurfaceStore.getState().companion.phase).toBe("home");
-    stop();
-    element.remove();
-  });
-
-  it("keeps legacy follow state from creating another composer", async () => {
-    const element = document.createElement("div");
-    document.body.appendChild(element);
-    const adapter: AiSurfaceAdapter = {
-      surfaceId: "notes",
-      label: "Note",
-      getContext: () => [],
-    };
-    const stop = useAiSurfaceStore
-      .getState()
-      .registerPane({ accountId: "account-a", paneId: "pane-generated", adapter, element });
-
-    useAiSurfaceStore.getState().follow("account-a", "pane-generated", {
-      kind: "pointer",
-      paneId: "pane-generated",
-      x: 20,
-      y: 30,
-    });
-
-    expect(useAiSurfaceStore.getState().companion).toMatchObject({
-      phase: "following",
-      accountId: "account-a",
-      paneId: "pane-generated",
-    });
-
-    // Following already summons. Let that first on-demand load finish: two
-    // first-time loads of a mocked module in one tick can hand one the real Misty.
-    await vi.waitFor(() => expect(handoff).toHaveBeenCalledTimes(1));
-    useAiSurfaceStore.getState().summon("account-a", "pane-generated");
-    await vi.waitFor(() => expect(handoff).toHaveBeenCalledTimes(2));
-    expect(handoff).toHaveBeenLastCalledWith(expect.objectContaining({ paneId: "pane-generated" }));
-    expect(useAiSurfaceStore.getState().companion.phase).toBe("following");
     stop();
     element.remove();
   });
@@ -124,10 +82,8 @@ describe("embodied Misty state", () => {
   it("keeps an in-flight task bound while Misty is dismissed to the island", () => {
     useAiSurfaceStore.setState({
       companion: {
-        phase: "working",
         accountId: "account-a",
         paneId: "pane-a",
-        completedCount: 0,
       },
       sessions: {
         "account-a:pane-a": {
@@ -142,7 +98,6 @@ describe("embodied Misty state", () => {
     });
     useAiSurfaceStore.getState().returnHome();
     expect(useAiSurfaceStore.getState().companion).toMatchObject({
-      phase: "home",
       accountId: "account-a",
       paneId: "pane-a",
     });
@@ -152,10 +107,8 @@ describe("embodied Misty state", () => {
   it("drops a conversation when context crosses a privacy boundary", () => {
     useAiSurfaceStore.setState({
       companion: {
-        phase: "composing",
         accountId: "account-a",
         paneId: "pane-a",
-        completedCount: 0,
       },
       sessions: {
         "account-a:pane-a": {
@@ -178,22 +131,6 @@ describe("embodied Misty state", () => {
     expect(
       useAiSurfaceStore.getState().sessions["account-a:pane-a"]?.conversationId,
     ).toBeUndefined();
-    expect(useAiSurfaceStore.getState().companion.phase).toBe("composing");
-  });
-
-  it("settles a completed interaction back into persistent following", () => {
-    useAiSurfaceStore.setState({
-      companion: {
-        phase: "speaking",
-        accountId: "account-a",
-        paneId: "pane-a",
-        completedCount: 1,
-      },
-    });
-
-    useAiSurfaceStore.getState().settle();
-
-    expect(useAiSurfaceStore.getState().companion.phase).toBe("following");
   });
 
   it("stores a region capture with the originating session", () => {

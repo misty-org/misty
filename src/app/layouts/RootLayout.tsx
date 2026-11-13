@@ -10,7 +10,7 @@ import { PetRuntime } from "@/features/pets";
 import { RunNotifier } from "@/features/agents";
 import { useAppZoom } from "@/shared/hooks/useAppZoom";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { platform as osPlatform } from "@tauri-apps/plugin-os";
+import { platform as osPlatform } from "@/shared/platform/os";
 import { useEffect, useRef } from "react";
 import { Outlet, useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";

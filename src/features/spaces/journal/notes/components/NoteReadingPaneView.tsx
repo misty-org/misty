@@ -39,13 +39,13 @@ export function NoteReadingPaneView(
         <div className="row-span-2 grid place-items-center">
           <EmptyState
             inline
-            title={props.hasNotes ? "Select a note" : "No notes yet"}
+            title={props.hasNotes ? "Select a doc" : "No docs yet"}
             line={
               props.hasNotes
-                ? "Choose a note from the list to open it."
-                : "Create a note to keep this Space's work close by."
+                ? "Choose a doc from the list to open it."
+                : "Create a doc to keep this Space's work close by."
             }
-            action={props.hasNotes ? undefined : { label: "New note", onClick: props.onNewNote }}
+            action={props.hasNotes ? undefined : { label: "New doc", onClick: props.onNewNote }}
           />
         </div>
       </div>
@@ -61,7 +61,7 @@ export function NoteReadingPaneView(
   return (
     <article className={paneClass} aria-label={note.title}>
       <header className={cn(headerClass, false)}>
-        {props.onBack ? <BackButton onClick={props.onBack} aria-label="Back to notes" /> : null}
+        {props.onBack ? <BackButton onClick={props.onBack} aria-label="Back to docs" /> : null}
         <div className="flex min-w-0 flex-1 items-center gap-2">
           {collaborative && note.spaceId ? (
             <NoteTitleInput
@@ -106,7 +106,7 @@ export function NoteReadingPaneView(
         )}
       >
         <div className={cn("misty-scrollbar min-h-0 overflow-auto overscroll-contain", false)}>
-          <Suspense fallback={<SkeletonDocument label="Opening note" />}>
+          <Suspense fallback={<SkeletonDocument label="Opening doc" />}>
             <NoteBlockEditor
               key={note.id}
               editable={collaborative}

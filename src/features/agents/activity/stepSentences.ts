@@ -58,7 +58,6 @@ const namespaces = [
   "app",
   "device",
   "log",
-  "schedule",
   "artifact",
 ];
 
@@ -91,7 +90,6 @@ const housekeeping = new Set([
   "computer.get_app_state",
   "browser.session",
   "browser.wait_for",
-  "device.list",
   "log.work.read",
   "integration.schemas",
   "integration.connected",
@@ -282,7 +280,6 @@ export function describeStep(
   if (key.startsWith("integration."))
     return action.includes("search") ? "Looked for a connected app" : "Used a connected app";
   if (key.startsWith("space.")) return "Worked in the Space";
-  if (key.startsWith("schedule.")) return "Set up a schedule";
   if (key.startsWith("artifact.")) return "Made an artifact";
   switch (verbOf(step.tool)) {
     case "read":
@@ -428,14 +425,4 @@ export function offsetLabel(at: number, startedAt: number): string {
   const minutes = Math.floor((seconds % 3600) / 60);
   const rest = String(seconds % 60).padStart(2, "0");
   return hours ? `${hours}:${String(minutes).padStart(2, "0")}:${rest}` : `${minutes}:${rest}`;
-}
-
-/** How long something took, in a few words. */
-export function tookLabel(ms: number): string {
-  const seconds = Math.round(ms / 1000);
-  if (seconds < 60) return `${Math.max(seconds, 1)}s`;
-  const minutes = Math.round(seconds / 60);
-  if (minutes < 60) return `${minutes} min`;
-  const hours = Math.floor(minutes / 60);
-  return minutes % 60 ? `${hours} h ${minutes % 60} min` : `${hours} h`;
 }

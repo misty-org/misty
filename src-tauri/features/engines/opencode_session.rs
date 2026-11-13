@@ -198,7 +198,10 @@ async fn turn_inner(
     if !matches!(ready, Ok(Ok(true))) {
         core.dispatch_event(
             state,
-            EngineEvent::Warn("The event stream isn't ready; questions asked in this turn may not show.".to_string()),
+            EngineEvent::Warn(
+                "The event stream isn't ready; questions asked in this turn may not show."
+                    .to_string(),
+            ),
         );
     }
     prompt(&origin, &directory, &session_id, req).await?;
@@ -295,11 +298,7 @@ fn parse_context_windows(config: &Value) -> HashMap<String, u64> {
 /// one, keyed as `model_context_window` — the field the rest of the app reads.
 /// The provider/model come off the assistant message, so resumed sessions and
 /// model switches both resolve correctly.
-fn attach_context_window(
-    mut usage: Value,
-    info: &Value,
-    windows: &HashMap<String, u64>,
-) -> Value {
+fn attach_context_window(mut usage: Value, info: &Value, windows: &HashMap<String, u64>) -> Value {
     if usage.get("model_context_window").is_some() {
         return usage;
     }
@@ -392,12 +391,7 @@ async fn commands(origin: &str, directory: &str) -> Vec<String> {
 /// `/compact` through its summarize call; false when the message is an ordinary prompt. The
 /// call answers only once the command is done, so it runs on its own while the event stream
 /// carries the turn.
-async fn run_command(
-    origin: &str,
-    directory: &str,
-    session_id: &str,
-    req: &SendRequest,
-) -> bool {
+async fn run_command(origin: &str, directory: &str, session_id: &str, req: &SendRequest) -> bool {
     if !req.images.is_empty() || req.permission.as_deref() == Some("plan") {
         return false;
     }
@@ -409,8 +403,15 @@ async fn run_command(
         let Some((provider, model)) = model else {
             return false;
         };
-        ("summarize", json!({ "providerID": provider, "modelID": model }))
-    } else if commands(origin, directory).await.iter().any(|known| known == name) {
+        (
+            "summarize",
+            json!({ "providerID": provider, "modelID": model }),
+        )
+    } else if commands(origin, directory)
+        .await
+        .iter()
+        .any(|known| known == name)
+    {
         let mut body = json!({ "command": name, "arguments": arguments });
         if let Some(model) = req.model.as_deref() {
             body["model"] = json!(model);
@@ -478,7 +479,9 @@ async fn prompt(
     if !response.status().is_success() {
         let status = response.status();
         let detail = response.text().await.unwrap_or_default();
-        return Err(format!("OpenCode did not take the prompt ({status}): {detail}"));
+        return Err(format!(
+            "OpenCode did not take the prompt ({status}): {detail}"
+        ));
     }
     Ok(())
 }
@@ -709,8 +712,11 @@ async fn handle_server_event(
                         .get("metadata")
                         .cloned()
                         .unwrap_or_else(|| properties.clone());
-                    let (run_id, origin, directory) =
-                        (core.run_id.clone(), origin.to_string(), directory.to_string());
+                    let (run_id, origin, directory) = (
+                        core.run_id.clone(),
+                        origin.to_string(),
+                        directory.to_string(),
+                    );
                     tokio::spawn(async move {
                         let reply = match crate::engines::gate::ask(&run_id, &tool, input).await {
                             crate::engines::gate::Decision::Allow => json!({ "reply": "once" }),
@@ -718,7 +724,8 @@ async fn handle_server_event(
                                 json!({ "reply": "reject", "message": message })
                             }
                         };
-                        let _ = opencode_server::post(&origin, &path, &directory, Some(reply)).await;
+                        let _ =
+                            opencode_server::post(&origin, &path, &directory, Some(reply)).await;
                     });
                 }
             }

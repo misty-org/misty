@@ -5,7 +5,8 @@ import type { Guide } from "./tutorTypes";
 
 /**
  * An audio overview's sound: native code speaks its script on this computer's speech model and key
- * (ElevenLabs or OpenAI, two voices) and keeps the WAV in Misty's folder. Nothing goes to the server.
+ * (ElevenLabs or OpenAI, two voices), or with the computer's own voices when there is no key, and
+ * keeps the WAV in Misty's folder. Nothing goes to the server.
  */
 export async function makeOverviewAudio(guideId: string): Promise<void> {
   const store = useTutorStore.getState();
@@ -44,9 +45,9 @@ export function deleteOverviewAudio(guideId: string): Promise<void> {
 export const sceneAudioId = (guideId: string, index: number) => `${guideId}-s${index}`;
 
 /**
- * A video overview's narration, one file per scene, spoken on this computer's speech key. Each
- * scene keeps how long it runs, so the player and the saved video follow the voice. Without a
- * speech key the video still plays, with captions, at reading pace.
+ * A video overview's narration, one file per scene, spoken on this computer's speech key or its
+ * own voices. Each scene keeps how long it runs, so the player and the saved video follow the
+ * voice. When no voice can read it, the video still plays, with captions, at reading pace.
  */
 export async function makeVideoAudio(guideId: string): Promise<void> {
   const store = useTutorStore.getState();

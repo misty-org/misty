@@ -1,5 +1,4 @@
-//! The renderer's view of its window and of the profiles: who the window is, opening and
-//! closing windows, and changing the profiles themselves.
+//! The renderer's view of its window: who the window is, and opening and closing windows.
 use super::*;
 
 /// What a window knows about itself when its app starts.
@@ -24,103 +23,6 @@ pub fn profile_window_info(webview: tauri::Webview) -> Result<ProfileWindowInfo,
         profile,
         space: state.space,
     })
-}
-
-#[tauri::command]
-pub fn profiles_list(webview: tauri::Webview) -> Result<Vec<ProfileEntry>, String> {
-    if !is_app_window(webview.label()) {
-        return Err("Only a Misty window can list profiles.".into());
-    }
-    Ok(listed_profiles())
-}
-
-/// Adds a profile and opens its first window.
-#[tauri::command]
-pub fn profile_create(
-    webview: tauri::Webview,
-    app: AppHandle,
-    name: String,
-    color: Option<String>,
-) -> Result<ProfileEntry, String> {
-    if !is_person_window(webview.label()) {
-        return Err("Only a Misty window can add a profile.".into());
-    }
-    create_profile(&app, &name, color.as_deref())
-}
-
-#[tauri::command]
-pub fn profile_rename(
-    webview: tauri::Webview,
-    app: AppHandle,
-    id: String,
-    name: String,
-) -> Result<ProfileEntry, String> {
-    if !is_person_window(webview.label()) {
-        return Err("Only a Misty window can rename a profile.".into());
-    }
-    rename_profile(&app, &id, &name)
-}
-
-#[tauri::command]
-pub fn profile_set_color(
-    webview: tauri::Webview,
-    app: AppHandle,
-    id: String,
-    color: String,
-) -> Result<ProfileEntry, String> {
-    if !is_person_window(webview.label()) {
-        return Err("Only a Misty window can change a profile's color.".into());
-    }
-    set_color(&app, &id, &color)
-}
-
-/// Deletes a profile and everything it keeps on this computer.
-#[tauri::command]
-pub fn profile_delete(webview: tauri::Webview, app: AppHandle, id: String) -> Result<(), String> {
-    if !is_person_window(webview.label()) {
-        return Err("Only a Misty window can delete a profile.".into());
-    }
-    delete_profile(&app, &id)
-}
-
-/// The sites a profile claims for links from other apps.
-#[tauri::command]
-pub fn profile_sites(webview: tauri::Webview, id: String) -> Result<Vec<String>, String> {
-    if !is_person_window(webview.label()) {
-        return Err("Only a Misty window can read a profile's sites.".into());
-    }
-    Ok(entry(&id).ok_or("Unknown profile.")?.sites)
-}
-
-/// Saves the sites a profile claims. Returns them as stored.
-#[tauri::command]
-pub fn profile_set_sites(
-    webview: tauri::Webview,
-    app: AppHandle,
-    id: String,
-    sites: Vec<String>,
-) -> Result<Vec<String>, String> {
-    if !is_person_window(webview.label()) {
-        return Err("Only a Misty window can change a profile's sites.".into());
-    }
-    if sites.len() > 1000 {
-        return Err("That's too many sites for one profile.".into());
-    }
-    let hosts = normalize_sites(&sites);
-    let saved = update_profile(&app, &id, |entry| {
-        entry.sites = hosts;
-        Ok(())
-    })?;
-    Ok(saved.sites)
-}
-
-/// Brings a profile's window forward, opening one if none is open.
-#[tauri::command]
-pub fn profile_open(webview: tauri::Webview, app: AppHandle, id: String) -> Result<(), String> {
-    if !is_app_window(webview.label()) {
-        return Err("Only a Misty window can open a profile.".into());
-    }
-    open_profile(&app, &id)
 }
 
 /// Opens another window of the calling window's profile.

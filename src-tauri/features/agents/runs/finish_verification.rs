@@ -46,6 +46,7 @@ pub(crate) fn may_verify(verified: bool, turn: i64, limit: i64) -> bool {
 }
 
 /// What the checks that need no model call find, in the order the run should fix them.
+#[cfg(test)]
 pub(crate) fn finish_issues(check: &FinishCheck) -> Vec<String> {
     finish_findings(check).0
 }

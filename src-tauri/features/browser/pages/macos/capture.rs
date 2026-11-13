@@ -83,27 +83,3 @@ pub(crate) async fn capture_webview_region_sized(
         .map_err(|_| "Capture timed out.")?
         .map_err(|_| "Capture was cancelled.")?
 }
-
-#[cfg(target_os = "macos")]
-#[tauri::command]
-pub async fn host_webview_capture_region(
-    webview: Webview,
-    x: f64,
-    y: f64,
-    width: f64,
-    height: f64,
-    max_dimension: Option<f64>,
-) -> Result<serde_json::Value, String> {
-    if !crate::browser::app_windows::is_person_window(webview.label()) {
-        return Err("Only the Host can capture its view.".into());
-    }
-    capture_webview_region_sized(
-        webview,
-        x,
-        y,
-        width,
-        height,
-        max_dimension.unwrap_or(640.0).clamp(640.0, 3840.0),
-    )
-    .await
-}

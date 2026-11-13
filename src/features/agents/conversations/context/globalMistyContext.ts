@@ -19,10 +19,3 @@ function globalMistyContextIdentity(item: GlobalAiContextRef): string {
   if (item.href) return `${item.kind}:href:${item.href}`;
   return `${item.kind}:${item.spaceId ?? "account"}:${item.id}`;
 }
-
-export function mergeGlobalMistyContext(
-  current: GlobalAiContextRef[],
-  incoming: GlobalAiContextRef[],
-) {
-  return uniqueGlobalMistyContext([...incoming, ...current]).slice(0, 12);
-}

@@ -461,7 +461,6 @@ describe("Clicky capture ordering and shared entry points", () => {
       "Continue the request above.",
       [],
       undefined,
-      "workspace",
       [],
       { conversationId: "conversation", context: [] },
       expect.objectContaining({ turn: 3, continuation: true, executionMode: "user" }),

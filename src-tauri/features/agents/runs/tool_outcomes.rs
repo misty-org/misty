@@ -15,6 +15,7 @@ pub(crate) const EXECUTION_INSTRUCTIONS: &str = "Execution contract:
 - If any requested part cannot be completed, say exactly what remains incomplete and why.";
 
 /// The model-turn limit a run has unless it says otherwise.
+#[cfg(test)]
 pub(crate) const DEFAULT_TURN_LIMIT: usize = 20;
 
 fn status_text(result: &JsValue) -> Option<String> {
@@ -69,6 +70,7 @@ pub(crate) enum ToolOutcome {
 }
 
 impl ToolOutcome {
+    #[cfg(test)]
     pub(crate) fn kind(&self) -> &'static str {
         match self {
             Self::Confirmed => "confirmed",

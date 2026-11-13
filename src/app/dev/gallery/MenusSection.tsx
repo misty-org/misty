@@ -23,7 +23,6 @@ import {
   Copy,
   Eye,
   FilePlus,
-  Folder,
   FolderInput,
   FolderPlus,
   GitFork,
@@ -60,7 +59,7 @@ function ItemMenuRows() {
       <MenuSubmenu icon={FolderInput} label="Move to section">
         <MenuRadioGroup value={section} onValueChange={setSection}>
           {sections.map((item) => (
-            <MenuRadioItem key={item.id} icon={Folder} value={item.id} label={item.name} />
+            <MenuRadioItem key={item.id} value={item.id} label={item.name} />
           ))}
         </MenuRadioGroup>
       </MenuSubmenu>

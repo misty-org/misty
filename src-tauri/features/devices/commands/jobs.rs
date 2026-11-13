@@ -1,5 +1,4 @@
-//! Device job commands: signing this device's
-//! requests and run grants natively, and checking a job's grant before acting.
+//! Device job commands: signing run grants natively, and checking a job's grant before acting.
 #![cfg(desktop)]
 
 use file_access::fs;
@@ -10,47 +9,12 @@ use tauri::State;
 use crate::app::runtime::MistyRuntime;
 use crate::devices::agent_grants::{self, GrantRequest};
 use crate::devices::agent_jobs;
-use crate::devices::commands::{context, local_device_id, require_device_window};
-use crate::devices::identity::canonical_request;
+use crate::devices::commands::{local_device_id, require_device_window};
 use crate::devices::records::SignedRecord;
 
 /// The largest file a `folder.send` job hands to the Space's Library, the
 /// same limit as any upload from the app.
 const MAX_SENT_FILE_BYTES: u64 = 128 * 1024 * 1024;
-
-/// Signs one of this device's HTTP requests. The private key never leaves
-/// native code; the domain prefix is added here, never by the caller.
-#[tauri::command]
-#[allow(clippy::too_many_arguments)]
-pub async fn device_sign_request(
-    webview: tauri::Webview,
-    state: State<'_, MistyRuntime>,
-    api_base: String,
-    account_id: String,
-    method: String,
-    path: String,
-    timestamp: String,
-    nonce: String,
-    body_digest: String,
-) -> Result<String, String> {
-    require_device_window(&webview)?;
-    if !path.starts_with('/')
-        || path.contains(['?', '#'])
-        || body_digest.len() != 64
-        || nonce.len() > 200
-        || timestamp.len() > 20
-    {
-        return Err("That request can't be signed.".into());
-    }
-    let context = context(&state, &api_base, &account_id).await?;
-    Ok(context.identity.sign_request(&canonical_request(
-        &method,
-        &path,
-        &timestamp,
-        &nonce,
-        &body_digest,
-    )))
-}
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]

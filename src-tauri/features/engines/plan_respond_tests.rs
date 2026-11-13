@@ -9,7 +9,12 @@ use serde_json::json;
 use std::sync::{Arc, Mutex};
 use tauri::Manager;
 
-fn build_state(tag: &str) -> (tauri::App<tauri::test::MockRuntime>, Arc<crate::engines::support::db::Db>) {
+fn build_state(
+    tag: &str,
+) -> (
+    tauri::App<tauri::test::MockRuntime>,
+    Arc<crate::engines::support::db::Db>,
+) {
     let app = tauri::test::mock_builder()
         .build(tauri::test::mock_context(tauri::test::noop_assets()))
         .unwrap();
@@ -128,10 +133,8 @@ fn spawn_frame_sink(
     Arc<tokio::sync::Mutex<Option<tokio::process::ChildStdin>>>,
     std::path::PathBuf,
 ) {
-    let out_path = std::env::temp_dir().join(format!(
-        "ccgui-plan-frames-{tag}-{}",
-        std::process::id()
-    ));
+    let out_path =
+        std::env::temp_dir().join(format!("ccgui-plan-frames-{tag}-{}", std::process::id()));
     let out_file = std::fs::File::create(&out_path).unwrap();
     let mut child = frame_sink_command()
         .stdin(std::process::Stdio::piped())
@@ -148,7 +151,11 @@ async fn drain_frames(
     mut child: tokio::process::Child,
     out_path: &std::path::Path,
 ) -> String {
-    let entry = app.state::<crate::engines::support::EngineState>().processes.get(key).unwrap();
+    let entry = app
+        .state::<crate::engines::support::EngineState>()
+        .processes
+        .get(key)
+        .unwrap();
     if let Some(stdin) = entry.stdin {
         *stdin.lock().await = None;
     }
@@ -182,7 +189,11 @@ async fn approve_delivers_the_native_frame_then_conflicts_on_repeat() {
     assert!(written.contains("\"outcome\":\"approved\""), "{written}");
 
     // The parked context was removed; submitting the same revision again conflicts instead of running twice.
-    let entry = app.state::<crate::engines::support::EngineState>().processes.get("sess-a").unwrap();
+    let entry = app
+        .state::<crate::engines::support::EngineState>()
+        .processes
+        .get("sess-a")
+        .unwrap();
     assert!(entry.plans.lock().unwrap().is_empty());
     let again = respond_plan_review(
         app.state::<crate::engines::support::EngineState>(),
@@ -221,7 +232,10 @@ async fn request_changes_substitutes_feedback_into_the_frame() {
     assert_eq!(review.status, plan_review::PlanStatus::ChangesRequested);
 
     let written = drain_frames(&app, "sess-b", child, &out_path).await;
-    assert!(written.contains("Narrow the scope, leave the auth module alone"), "{written}");
+    assert!(
+        written.contains("Narrow the scope, leave the auth module alone"),
+        "{written}"
+    );
     assert!(!written.contains(PLAN_FEEDBACK_PLACEHOLDER), "{written}");
 }
 
@@ -257,7 +271,11 @@ async fn a_closed_stdin_reverts_to_pending_and_keeps_the_intent() {
     assert!(reverted.decision_intent_at.is_some());
     assert!(reverted.applied_at.is_none());
     // The parked context stays, so the person can retry.
-    let entry = app.state::<crate::engines::support::EngineState>().processes.get("sess-c").unwrap();
+    let entry = app
+        .state::<crate::engines::support::EngineState>()
+        .processes
+        .get("sess-c")
+        .unwrap();
     assert!(entry.plans.lock().unwrap().contains_key("plan-c"));
 }
 

@@ -82,7 +82,10 @@ pub(super) async fn get_repo_tree(
     if !branch.is_empty() && !eq_ignore_case(branch, "head") {
         branches.push(branch.to_string());
     }
-    for fallback in [crate::known_names::DEFAULT_BRANCH, crate::known_names::OLD_DEFAULT_BRANCH] {
+    for fallback in [
+        crate::known_names::DEFAULT_BRANCH,
+        crate::known_names::OLD_DEFAULT_BRANCH,
+    ] {
         if !branches.iter().any(|b| b == fallback) {
             branches.push(fallback.to_string());
         }

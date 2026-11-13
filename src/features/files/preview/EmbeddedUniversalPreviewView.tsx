@@ -12,8 +12,8 @@ import {
 } from "./previewMediaTables";
 import { PreviewMessage } from "./PreviewPrimitives";
 import { cn, SkeletonDocument } from "@/shared/ui";
+import ReactMarkdown from "react-markdown";
 
-const ReactMarkdown = lazy(() => import("react-markdown"));
 const PdfViewer = lazy(() => import("./PdfViewerView"));
 
 export function EmbeddedUniversalPreviewView(props: {
@@ -116,9 +116,7 @@ export function EmbeddedUniversalPreviewView(props: {
   if (resource?.kind === "markdown")
     return (
       <article className="prose prose-invert mx-auto h-full w-full max-w-4xl overflow-auto px-8 py-10">
-        <Suspense fallback={<SkeletonDocument label="Preview" className="px-0 py-0" />}>
-          <ReactMarkdown>{resource.text ?? ""}</ReactMarkdown>
-        </Suspense>
+        <ReactMarkdown>{resource.text ?? ""}</ReactMarkdown>
       </article>
     );
   if (resource?.kind === "text")

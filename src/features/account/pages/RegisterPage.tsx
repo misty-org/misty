@@ -22,7 +22,7 @@ export default function RegisterPage() {
 
   if (needsServer) {
     return (
-      <AuthShell title="Choose a server">
+      <AuthShell title="Create a Misty account">
         <AuthCard>
           <ServerStep />
         </AuthCard>

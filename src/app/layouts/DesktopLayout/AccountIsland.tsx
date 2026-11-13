@@ -61,6 +61,7 @@ export function AccountIsland(props: {
       data-sidebar
       data-misty-window-drag-block="true"
       data-account-island="true"
+      data-tour="account"
     >
       {props.signedOut || expired ? (
         <Button

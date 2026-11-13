@@ -7,9 +7,10 @@
 //!   AGENTS.md   how it works
 //!
 //! In Misty a bundle is one of the person's own agents, written out by an export. The soul, the
-//! per-agent tool, skill and MCP lists and the runtime map onto the agent's own fields. Memory stays Misty's: a bundle's memory settings are read and written so they
-//! survive a round trip, but Misty's memory decides what is kept. Both dialogs run here, so a
-//! window never names a path of its own.
+//! per-agent tool, skill and MCP lists and the runtime map onto the agent's own fields. Misty
+//! keeps no memory of its own, so a bundle carries none; a ccgui bundle's `memory` block is
+//! ignored like any other field Misty doesn't know. The folder dialog runs here, so a window never
+//! names a path of its own.
 
 use std::path::{Path, PathBuf};
 
@@ -91,28 +92,6 @@ impl Default for BotRuntime {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(rename_all = "camelCase")]
-pub struct BotMemoryConfig {
-    pub enabled: bool,
-    pub write_approval: bool,
-    pub memory_char_limit: u32,
-    pub review_enabled: bool,
-    pub review_every_n_turns: u32,
-}
-
-impl Default for BotMemoryConfig {
-    fn default() -> Self {
-        Self {
-            enabled: true,
-            write_approval: false,
-            memory_char_limit: 2200,
-            review_enabled: true,
-            review_every_n_turns: 5,
-        }
-    }
-}
-
 /// `bot.json`: everything but the soul and the instructions, which have their own files.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -132,8 +111,6 @@ struct BotMeta {
     capabilities: BotCapabilities,
     #[serde(default)]
     runtime: BotRuntime,
-    #[serde(default)]
-    memory: BotMemoryConfig,
     #[serde(default = "custom_source")]
     source: String,
     #[serde(default)]
@@ -177,8 +154,6 @@ pub struct BotBundle {
     pub capabilities: BotCapabilities,
     #[serde(default)]
     pub runtime: BotRuntime,
-    #[serde(default)]
-    pub memory: BotMemoryConfig,
     #[serde(default)]
     pub builtin_id: Option<String>,
 }
@@ -250,7 +225,14 @@ fn slug_base(name: &str, id: &str) -> String {
             .filter(char::is_ascii_alphanumeric)
             .take(6)
             .collect();
-        return format!("bot-{}", if suffix.is_empty() { "new".into() } else { suffix });
+        return format!(
+            "bot-{}",
+            if suffix.is_empty() {
+                "new".into()
+            } else {
+                suffix
+            }
+        );
     }
     out.chars().take(SLUG_MAX_CHARS).collect()
 }
@@ -410,63 +392,16 @@ fn validated(bundle: BotBundle) -> Result<BotBundle, String> {
         instructions: validate_prose(bundle.instructions)?,
         capabilities: sanitize_capabilities(&bundle.capabilities),
         runtime: validate_runtime(&bundle.runtime)?,
-        memory: bundle.memory,
         builtin_id: bundle.builtin_id,
     })
 }
 
 // ---- files ----
 
-#[cfg(test)]
-fn read_text(path: &Path) -> Result<String, String> {
-    if !fs::is_file(path) {
-        return Ok(String::new());
-    }
-    fs::read_to_string(path).map_err(|error| format!("Couldn't read {}: {error}", file_name(path)))
-}
-
 fn file_name(path: &Path) -> String {
     path.file_name()
         .map(|name| name.to_string_lossy().into_owned())
         .unwrap_or_default()
-}
-
-/// Reads a bundle folder back, so the tests can check what an export writes. Only its three files
-/// are opened, each allowed read-only.
-#[cfg(test)]
-fn read_bundle(folder: &Path) -> Result<BotBundle, String> {
-    let meta_path = folder.join(META_FILE);
-    let soul_path = folder.join(SOUL_FILE);
-    let instructions_path = folder.join(INSTRUCTIONS_FILE);
-    for path in [&meta_path, &soul_path, &instructions_path] {
-        file_access::allow_picked_file(path, file_access::Access::Read);
-    }
-    if !fs::is_file(&meta_path) {
-        return Err(format!(
-            "This folder isn't a bot: it has no {META_FILE}. A bot folder holds {META_FILE}, \
-{SOUL_FILE} and {INSTRUCTIONS_FILE}."
-        ));
-    }
-    let raw = read_text(&meta_path)?;
-    let meta: BotMeta =
-        serde_json::from_str(&raw).map_err(|error| format!("{META_FILE} isn't valid: {error}"))?;
-    if meta.schema_version > SCHEMA_VERSION {
-        return Err("This bot was made by a newer version and can't be read here.".to_string());
-    }
-    validated(BotBundle {
-        id: meta.id,
-        slug: meta.slug,
-        name: meta.name,
-        title: meta.title,
-        description: meta.description,
-        avatar: meta.avatar,
-        soul: read_text(&soul_path)?,
-        instructions: read_text(&instructions_path)?,
-        capabilities: meta.capabilities,
-        runtime: meta.runtime,
-        memory: meta.memory,
-        builtin_id: meta.builtin_id,
-    })
 }
 
 /// Writes a bundle into `<parent>/<slug>/`. Each path is allowed for writing because the person
@@ -501,15 +436,14 @@ fn write_bundle(parent: &Path, bundle: &BotBundle) -> Result<PathBuf, String> {
         avatar: bundle.avatar.clone(),
         capabilities: bundle.capabilities.clone(),
         runtime: bundle.runtime.clone(),
-        memory: bundle.memory.clone(),
         source: custom_source(),
         builtin_id: bundle.builtin_id.clone(),
         schema_version: SCHEMA_VERSION,
         created_at: now,
         updated_at: now,
     };
-    let meta =
-        serde_json::to_string_pretty(&meta).map_err(|error| format!("Couldn't write the bot: {error}"))?;
+    let meta = serde_json::to_string_pretty(&meta)
+        .map_err(|error| format!("Couldn't write the bot: {error}"))?;
     fs::write(&files[0], format!("{meta}\n"))
         .map_err(|error| format!("Couldn't write {META_FILE}: {error}"))?;
     // The prose files are always written, even empty: an empty SOUL.md reads as "nothing here yet"
@@ -580,7 +514,6 @@ mod tests {
                 mcp_servers: vec![],
             },
             runtime: BotRuntime::default(),
-            memory: BotMemoryConfig::default(),
             builtin_id: None,
         }
     }
@@ -597,22 +530,41 @@ mod tests {
     }
 
     #[test]
+    fn an_older_bundle_with_a_memory_block_still_reads() {
+        let meta: BotMeta = serde_json::from_str(
+            r#"{"name":"Scout","memory":{"enabled":true,"memoryCharLimit":2200}}"#,
+        )
+        .unwrap();
+        assert_eq!(meta.name, "Scout");
+        let bundle: BotBundle =
+            serde_json::from_str(r#"{"name":"Scout","memory":{"enabled":false}}"#).unwrap();
+        assert_eq!(bundle.name, "Scout");
+    }
+
+    #[test]
     fn a_name_without_ascii_still_gets_a_slug() {
         assert_eq!(slug_base("机器人", "personal_ab12cd"), "bot-person");
         assert!(validate_slug("../escape").is_err());
     }
 
     #[test]
-    fn a_bundle_round_trips_through_its_folder() {
+    fn an_export_writes_the_three_files() {
         let parent = std::env::temp_dir().join(format!("misty-bots-{}", std::process::id()));
         let _ = fs::remove_dir_all(&parent);
         fs::create_dir_all(&parent).unwrap();
         let clean = validated(bundle("Scout")).unwrap();
         let folder = write_bundle(&parent, &clean).unwrap();
-        let read = read_bundle(&folder).unwrap();
-        assert_eq!(read.name, "Scout");
-        assert_eq!(read.soul, "You are calm.");
-        assert_eq!(read.instructions, "Work carefully.");
+        let meta: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(folder.join(META_FILE)).unwrap()).unwrap();
+        assert_eq!(meta["name"], "Scout");
+        assert_eq!(
+            fs::read_to_string(folder.join(SOUL_FILE)).unwrap(),
+            "You are calm."
+        );
+        assert_eq!(
+            fs::read_to_string(folder.join(INSTRUCTIONS_FILE)).unwrap(),
+            "Work carefully."
+        );
         // A second export of the same name never overwrites the first.
         let again = write_bundle(&parent, &clean).unwrap();
         assert_ne!(again, folder);

@@ -224,7 +224,11 @@ pub(crate) fn acp_mcp_servers(req: &super::SendRequest, agent: &Value) -> Value 
                     "env": pairs(&server["env"]),
                 }));
             }
-            let transport = if server["type"] == "sse" { "sse" } else { "http" };
+            let transport = if server["type"] == "sse" {
+                "sse"
+            } else {
+                "http"
+            };
             if !can(transport) {
                 return None;
             }

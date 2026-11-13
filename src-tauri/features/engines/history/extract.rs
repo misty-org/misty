@@ -2,9 +2,7 @@
 use super::{content_text, parse_ts_ms_str, Message};
 use base64::Engine as _;
 use serde_json::Value;
-use sha2::{Digest, Sha256};
 use std::collections::HashMap;
-use std::collections::HashSet;
 use std::io::BufRead;
 use std::path::{Path, PathBuf};
 
@@ -14,22 +12,17 @@ pub struct ParsedSession {
 
 /// Parse a native session file into the minimal message list. Bad lines are
 /// skipped individually.
-pub fn parse_session_file(
-    engine: &str,
-    path: &Path,
-    accepted_internal_frames: &HashSet<String>,
-) -> Result<ParsedSession, String> {
+pub fn parse_session_file(engine: &str, path: &Path) -> Result<ParsedSession, String> {
     if engine == "agy" {
-        return Ok(super::agy::parse_agy_session(path, accepted_internal_frames));
+        return Ok(super::agy::parse_agy_session(path));
     }
     if engine == "opencode" {
-        return Ok(parse_opencode_session(path, accepted_internal_frames));
+        return Ok(parse_opencode_session(path));
     }
     let reader = open_line_reader(engine, path)?;
     Ok(collect_session(
         reader,
         &extractor_for(engine, ImageMode::Collect),
-        accepted_internal_frames,
     ))
 }
 
@@ -48,24 +41,19 @@ pub struct ScanSummary {
 /// each row into a bounded accumulator instead of a Vec<Message>. Image-only
 /// user turns (whose data URLs are skipped here) fall out of the count —
 /// the sidebar counts text, and the reader path stays authoritative.
-pub fn scan_summary_file(
-    engine: &str,
-    path: &Path,
-    accepted_internal_frames: &HashSet<String>,
-) -> Result<ScanSummary, String> {
+pub fn scan_summary_file(engine: &str, path: &Path) -> Result<ScanSummary, String> {
     if engine == "agy" {
-        return Ok(super::agy::scan_agy_summary(path, accepted_internal_frames));
+        return Ok(super::agy::scan_agy_summary(path));
     }
     if engine == "opencode" {
-        return Ok(scan_opencode_summary(path, accepted_internal_frames));
+        return Ok(scan_opencode_summary(path));
     }
     let reader = open_line_reader(engine, path)?;
     let mut acc = ScanAcc::default();
     walk_lines(
         reader,
         &extractor_for(engine, ImageMode::SkipDataUrls),
-        accepted_internal_frames,
-        |_, row| {
+        |row| {
             acc.accept(row);
         },
     );
@@ -76,10 +64,8 @@ pub fn scan_summary_file(
 ///
 /// dsh's compression is not optional: `Decoder` concatenates frames up to EOF by default
 /// (`single_frame()` reads only the first), and a real transcript's first frame usually holds
-/// just the header line (measured: 7.4 MB / 3,887 frames / first frame 216 B). Forking reads
-/// this file line by line too (`engine::fork_dsh`), so it is exposed crate-wide: two separate
-/// zstd wrappers would drift apart.
-pub(crate) fn open_line_reader(engine: &str, path: &Path) -> Result<Box<dyn BufRead>, String> {
+/// just the header line (measured: 7.4 MB / 3,887 frames / first frame 216 B).
+fn open_line_reader(engine: &str, path: &Path) -> Result<Box<dyn BufRead>, String> {
     let file = std::fs::File::open(path).map_err(|e| format!("open {}: {e}", path.display()))?;
     if engine == "dsh" {
         let decoder = zstd::stream::read::Decoder::new(std::io::BufReader::new(file))
@@ -197,17 +183,8 @@ fn claude_drop_local_command(value: &Value, open: &mut bool) -> bool {
 
 /// Line-loop skeleton shared by the full parse and the scan summary: decode
 /// one NDJSON line, extract rows, normalize, hand each to `consume`.
-///
-/// `line` is the line's number in the file (from 0), handed to `consume` with each row: a fork
-/// copies the prefix up to the line where the anchor turn ends, and the line number exists only
-/// at this layer (once a row is folded into a `Message` it loses its source position).
-fn walk_lines(
-    reader: impl BufRead,
-    extract: &LineExtractor<'_>,
-    accepted_internal_frames: &HashSet<String>,
-    mut consume: impl FnMut(usize, LineRow),
-) {
-    for (line, text) in reader.lines().enumerate() {
+fn walk_lines(reader: impl BufRead, extract: &LineExtractor<'_>, mut consume: impl FnMut(LineRow)) {
+    for text in reader.lines() {
         let Ok(text) = text else { continue };
         let trimmed = text.trim();
         if trimmed.is_empty() || !trimmed.contains("\"type\"") {
@@ -217,63 +194,17 @@ fn walk_lines(
             continue;
         };
         for row in extract(&value) {
-            let Some(row) = normalize_extracted_row(row, accepted_internal_frames) else {
+            let Some(row) = normalize_extracted_row(row) else {
                 continue;
             };
-            consume(line, row);
+            consume(row);
         }
     }
 }
 
-/// The source line of each user message, for fork cut points, in order; the last element is
-/// `usize::MAX` (the end of the file never starts a message).
-///
-/// Why it exists: a cut point can only come from the parser's own pipeline. A second test of
-/// "does this raw record count as a user message" would drift from the extractor, the "nth user
-/// record" would shift, and a fork would silently copy N turns too few, or only CLI chrome. With
-/// the extractor producing the line numbers, the two can't come apart.
-///
-/// `engine` is one entry point for every engine: any engine on the shared extractor +
-/// `normalize_extracted_row` counts exactly as `parse_session_file` does. Do NOT write another
-/// per-engine "is this raw line a user message" test. Codex once did (counting raw lines with
-/// `codex_line_is_visible_user`), so injected lines the normalizer drops (`# AGENTS.md
-/// instructions`, `<environment_context>`, `<skill>`) were still counted, the index ran past the
-/// anchor, the cut came one turn early, and the branch silently lost the turn the person picked.
-pub(crate) fn user_row_lines(
-    engine: &str,
-    reader: impl BufRead,
-    accepted_internal_frames: &HashSet<String>,
-) -> Vec<usize> {
-    let mut lines = Vec::new();
-    walk_lines(
-        reader,
-        &extractor_for(engine, ImageMode::Collect),
-        accepted_internal_frames,
-        |line, row| {
-            // Dropped rows go through `user_row_is_visible` (the same function as `fold_rows`):
-            // counting a few user rows too many or too few shifts the "nth user record", and a
-            // fork silently cuts a turn early or late. The two sets must match by construction,
-            // not because real data happens to have no empty rows.
-            if row.role == "user" && user_row_is_visible(&row.text, !row.images.is_empty()) {
-                lines.push(line);
-            }
-        },
-    );
-    // End sentinel: when the anchor turn is the last, the cut is here (the whole file), and the
-    // branch still includes that turn.
-    lines.push(usize::MAX);
-    lines
-}
-
-fn collect_session(
-    reader: impl BufRead,
-    extract: &LineExtractor<'_>,
-    accepted_internal_frames: &HashSet<String>,
-) -> ParsedSession {
+fn collect_session(reader: impl BufRead, extract: &LineExtractor<'_>) -> ParsedSession {
     let mut rows = Vec::new();
-    walk_lines(reader, extract, accepted_internal_frames, |_, row| {
-        rows.push(row)
-    });
+    walk_lines(reader, extract, |row| rows.push(row));
     fold_rows(rows)
 }
 
@@ -322,7 +253,9 @@ fn fold_rows(rows: Vec<LineRow>) -> ParsedSession {
                         .rposition(|m| m.role == "tool" && m.result.is_none()),
                 };
                 if let Some(index) = index {
-                    if let Some(todos) = crate::engines::parse_todo_result(&messages[index].text, &res) {
+                    if let Some(todos) =
+                        crate::engines::parse_todo_result(&messages[index].text, &res)
+                    {
                         messages[index].todos = Some(todos);
                     }
                     messages[index].result = Some(res);
@@ -330,8 +263,6 @@ fn fold_rows(rows: Vec<LineRow>) -> ParsedSession {
             }
             continue;
         }
-        // Same predicate as the fork cut's `user_row_lines`: a row dropped here
-        // must be dropped there, or "the n-th user message" drifts by a turn.
         if !user_row_is_visible(&row.text, !row.images.is_empty()) {
             continue;
         }
@@ -437,16 +368,9 @@ impl ScanAcc {
 /// Whether a user row is visible (is folded into a `Message`): a row with no text and no
 /// image is not.
 ///
-/// This is the one definition of a visible user row, shared by three consumers:
-/// 1. `fold_rows`: whether a `Message` is produced;
-/// 2. `user_row_lines` (Claude cut points): which lines enter the "nth user record" table;
-/// 3. `fork_dsh::keep_count` / `fork_keep_count_codex`: mapping "the anchor is the nth visible
-///    user message" back to "which turn it is in".
-///
-/// The first two must agree exactly: a line table longer than `parsed.messages` shifts every
-/// cut. The third decides which turn an anchor lands in when a turn holds several user
-/// messages; separate definitions would silently cut early or late.
-pub(crate) fn user_row_is_visible(text: &str, has_images: bool) -> bool {
+/// This is the one definition of a visible user row, shared by `fold_rows` and the codex
+/// extractor.
+fn user_row_is_visible(text: &str, has_images: bool) -> bool {
     !(text.trim().is_empty() && !has_images)
 }
 
@@ -454,10 +378,7 @@ pub(crate) fn user_row_is_visible(text: &str, has_images: bool) -> bool {
 /// empty text return `None` (that line is not a visible user message).
 ///
 /// This test must have exactly one definition: the extractor (`extract_dsh_line`) uses it to
-/// decide which lines produce visible user messages. Fork cut points no longer call it on their
-/// own; they go through `user_row_lines("dsh", …)`, the parser's own pipeline, so "the nth
-/// visible user message" and "the nth turn" stay consistent (a dsh turn can hold several
-/// visible user messages; the two are not the same thing).
+/// decide which lines produce visible user messages.
 pub(crate) fn dsh_user_message_text(value: &Value) -> Option<String> {
     if type_str(value) != "user/message" {
         return None;
@@ -726,121 +647,8 @@ pub(super) fn strip_internal_prompt_tail(text: &str) -> &str {
         .map_or(text, |index| &text[..index])
 }
 
-fn valid_internal_nonce(nonce: &str) -> bool {
-    (1..=128).contains(&nonce.len())
-        && nonce
-            .bytes()
-            .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_' || byte == b'-')
-}
-
-/// Opening marker of an internal frame. Shared by the recorder (which derives
-/// an identity from one complete frame) and the parser (which hides only the
-/// frames whose identities were recorded), so both agree on what a frame is.
-const INTERNAL_FRAME_OPEN: &str = "<CCGUI_INTERNAL_";
-
-/// Identity of one internal frame: the exact bytes the engine wrote.
-pub fn internal_frame_hash(frame: &str) -> String {
-    format!("{:x}", Sha256::digest(frame.as_bytes()))
-}
-
-/// Largest frame the host will ever record an identity for. A capture may
-/// declare a smaller `maxBytes`; this is the absolute ceiling that keeps a
-/// hostile/buggy caller from filling the table with arbitrary text.
-pub const MAX_RECORDED_FRAME_BYTES: usize = 64 * 1024;
-
-/// Accept `frame` only when it is exactly one complete internal frame with a
-/// JSON payload, and return its identity. The IPC command is reachable by any
-/// enabled plugin, so the host re-derives this instead of trusting the caller.
-pub fn recordable_internal_frame_hash(frame: &str) -> Option<String> {
-    if frame.len() > MAX_RECORDED_FRAME_BYTES {
-        return None;
-    }
-    let rest = frame.strip_prefix(INTERNAL_FRAME_OPEN)?;
-    let open_end = rest.find('>')?;
-    let nonce = &rest[..open_end];
-    if !valid_internal_nonce(nonce) {
-        return None;
-    }
-    let close = format!("</CCGUI_INTERNAL_{nonce}>");
-    let payload = rest[open_end + 1..].strip_suffix(&close)?;
-    // A second close tag inside the payload would make the recorded identity
-    // cover more than the frame the parser will later find.
-    if payload.contains(&close) {
-        return None;
-    }
-    serde_json::from_str::<Value>(payload).ok()?;
-    Some(internal_frame_hash(frame))
-}
-
-/// Hide only those internal frames whose exact identities a live capture
-/// validator accepted. `text` comes back untouched, without allocating, when
-/// no identity is recorded or the row carries no frame marker at all — the
-/// case for every ordinary assistant row the scanner walks.
-pub(super) fn strip_recorded_internal_frames(
-    text: String,
-    accepted_internal_frames: &HashSet<String>,
-) -> String {
-    if accepted_internal_frames.is_empty() || !text.contains(INTERNAL_FRAME_OPEN) {
-        return text;
-    }
-    let mut out = String::with_capacity(text.len());
-    let mut removed = false;
-    let mut rest = text.as_str();
-    while let Some(start) = rest.find(INTERNAL_FRAME_OPEN) {
-        out.push_str(&rest[..start]);
-        let candidate = &rest[start..];
-        let Some(open_end) = candidate.find('>') else {
-            out.push_str(candidate);
-            rest = "";
-            break;
-        };
-        let nonce = &candidate[INTERNAL_FRAME_OPEN.len()..open_end];
-        if !valid_internal_nonce(nonce) {
-            out.push_str(&candidate[..open_end + 1]);
-            rest = &candidate[open_end + 1..];
-            continue;
-        }
-        let close = format!("</CCGUI_INTERNAL_{nonce}>");
-        let payload_start = open_end + 1;
-        let Some(close_offset) = candidate[payload_start..].find(&close) else {
-            out.push_str(candidate);
-            rest = "";
-            break;
-        };
-        let frame_end = payload_start + close_offset + close.len();
-        let frame = &candidate[..frame_end];
-        if accepted_internal_frames.contains(&internal_frame_hash(frame)) {
-            removed = true;
-        } else {
-            out.push_str(frame);
-        }
-        rest = &candidate[frame_end..];
-    }
-    out.push_str(rest);
-    // Only a removed frame can leave the surrounding text padded; a row that
-    // kept everything it had must keep its own spacing too.
-    if !removed {
-        return text;
-    }
-    out.trim().to_string()
-}
-/// Remove host-only prompt tails and only those internal frames whose exact
-/// identities were accepted by a live capture validator.
-fn normalize_extracted_row(
-    mut row: LineRow,
-    accepted_internal_frames: &HashSet<String>,
-) -> Option<LineRow> {
-    if row.role == "assistant" {
-        // Nothing recorded, or no marker in the row: the row stands exactly as
-        // the engine wrote it. Only a row that lost a hidden frame can end up
-        // empty here, and only that row may be dropped — an assistant row the
-        // engine itself left blank is the history's business, not ours.
-        if accepted_internal_frames.is_empty() || !row.text.contains(INTERNAL_FRAME_OPEN) {
-            return Some(row);
-        }
-        row.text = strip_recorded_internal_frames(row.text, accepted_internal_frames);
-        return (!row.text.trim().is_empty() || !row.images.is_empty()).then_some(row);
-    }
+/// Remove host-only prompt tails from the person's rows.
+fn normalize_extracted_row(mut row: LineRow) -> Option<LineRow> {
     if row.role != "user" {
         return Some(row);
     }
@@ -1163,9 +971,10 @@ fn extract_pi_family_line(engine: &str, value: &Value, images: ImageMode) -> Lin
                 other => content_text(other),
             };
             let collected = match (images, content) {
-                (ImageMode::Collect, Some(Value::Array(parts))) => {
-                    parts.iter().filter_map(|part| pi_image_part(part, engine)).collect()
-                }
+                (ImageMode::Collect, Some(Value::Array(parts))) => parts
+                    .iter()
+                    .filter_map(|part| pi_image_part(part, engine))
+                    .collect(),
                 _ => Vec::new(),
             };
             if text.trim().is_empty() && collected.is_empty() {
@@ -1902,24 +1711,14 @@ fn opencode_usage(part: &Value) -> Option<Value> {
 /// per-part reads (scan mode); None reads fully (reader mode). The session is
 /// addressed either by a legacy storage-tree metadata path or by the virtual
 /// SQLite address emitted by `discover_opencode`.
-fn opencode_rows(
-    session_path: &Path,
-    images: ImageMode,
-    part_byte_cap: Option<u64>,
-    accepted_internal_frames: &HashSet<String>,
-) -> LineRows {
+fn opencode_rows(session_path: &Path, images: ImageMode, part_byte_cap: Option<u64>) -> LineRows {
     let messages = match super::split_opencode_db_path(session_path) {
         Some((db, session_id)) => opencode_db_messages(&db, &session_id, part_byte_cap),
         None => opencode_tree_messages(session_path, part_byte_cap),
     };
     let mut out = Vec::new();
     for (message, parts) in messages {
-        out.extend(opencode_message_rows(
-            &message,
-            &parts,
-            images,
-            accepted_internal_frames,
-        ));
+        out.extend(opencode_message_rows(&message, &parts, images));
     }
     out
 }
@@ -1977,15 +1776,14 @@ fn opencode_db_messages(
     session_id: &str,
     part_byte_cap: Option<u64>,
 ) -> Vec<(Value, Vec<Value>)> {
-    let Ok(conn) = rusqlite::Connection::open_with_flags(
-        db,
-        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
-    ) else {
+    let Ok(conn) =
+        rusqlite::Connection::open_with_flags(db, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)
+    else {
         return Vec::new();
     };
-    let Ok(mut stmt) =
-        conn.prepare("SELECT id, data FROM message WHERE session_id=?1 ORDER BY time_created, id LIMIT ?2")
-    else {
+    let Ok(mut stmt) = conn.prepare(
+        "SELECT id, data FROM message WHERE session_id=?1 ORDER BY time_created, id LIMIT ?2",
+    ) else {
         return Vec::new();
     };
     let Ok(rows) = stmt.query_map(
@@ -2001,8 +1799,8 @@ fn opencode_db_messages(
             raw.push((message_id, value));
         }
     }
-    let Ok(mut part_stmt) =
-        conn.prepare("SELECT data FROM part WHERE message_id=?1 ORDER BY time_created, id LIMIT ?2")
+    let Ok(mut part_stmt) = conn
+        .prepare("SELECT data FROM part WHERE message_id=?1 ORDER BY time_created, id LIMIT ?2")
     else {
         return Vec::new();
     };
@@ -2027,12 +1825,7 @@ fn opencode_db_messages(
 
 /// Project one OpenCode `(message, parts)` pair onto extracted rows. Shared by
 /// the tree reader and the SQLite reader.
-fn opencode_message_rows(
-    message: &Value,
-    parts: &[Value],
-    images: ImageMode,
-    accepted_internal_frames: &HashSet<String>,
-) -> LineRows {
+fn opencode_message_rows(message: &Value, parts: &[Value], images: ImageMode) -> LineRows {
     let mut out = Vec::new();
     let role = message.get("role").and_then(Value::as_str).unwrap_or("");
     if role != "user" && role != "assistant" {
@@ -2156,7 +1949,7 @@ fn opencode_message_rows(
         }
     }
     for row in message_rows {
-        let Some(row) = normalize_extracted_row(row, accepted_internal_frames) else {
+        let Some(row) = normalize_extracted_row(row) else {
             continue;
         };
         out.push(row);
@@ -2164,28 +1957,16 @@ fn opencode_message_rows(
     out
 }
 
-fn parse_opencode_session(
-    path: &Path,
-    accepted_internal_frames: &HashSet<String>,
-) -> ParsedSession {
-    fold_rows(opencode_rows(
-        path,
-        ImageMode::Collect,
-        None,
-        accepted_internal_frames,
-    ))
+fn parse_opencode_session(path: &Path) -> ParsedSession {
+    fold_rows(opencode_rows(path, ImageMode::Collect, None))
 }
 
-fn scan_opencode_summary(
-    path: &Path,
-    accepted_internal_frames: &HashSet<String>,
-) -> ScanSummary {
+fn scan_opencode_summary(path: &Path) -> ScanSummary {
     let mut acc = ScanAcc::default();
     for row in opencode_rows(
         path,
         ImageMode::SkipDataUrls,
         Some(SCAN_OPENCODE_PART_BYTES),
-        accepted_internal_frames,
     ) {
         acc.accept(row);
     }
@@ -2204,68 +1985,20 @@ mod tests {
             None,
         );
 
-        let normalized = normalize_extracted_row(row, &HashSet::new()).expect("visible user row");
+        let normalized = normalize_extracted_row(row).expect("visible user row");
         assert_eq!(normalized.text, "visible request");
     }
 
+    /// An assistant row keeps its own bytes, spacing included, and is never dropped for looking
+    /// empty.
     #[test]
-    fn normalization_hides_only_recorded_internal_frames_from_assistant_history() {
-        let accepted = "<CCGUI_INTERNAL_n-1>{\"ok\":true}</CCGUI_INTERNAL_n-1>";
-        let unrecorded = "<CCGUI_INTERNAL_n-2>{\"ok\":true}</CCGUI_INTERNAL_n-2>";
-        let row = LineRow::new(
-            "assistant",
-            format!("visible {accepted} keep {unrecorded}"),
-            None,
-        );
-        let accepted_frames = HashSet::from([internal_frame_hash(accepted)]);
-
-        assert_eq!(
-            normalize_extracted_row(row, &accepted_frames)
-                .expect("visible assistant row")
-                .text,
-            format!("visible  keep {unrecorded}")
-        );
-
-        let malformed = LineRow::new(
-            "assistant",
-            "keep <CCGUI_INTERNAL_n-1>{bad}</CCGUI_INTERNAL_n-1>".into(),
-            None,
-        );
-        assert_eq!(
-            normalize_extracted_row(malformed, &accepted_frames)
-                .expect("unrecorded malformed frame remains visible")
-                .text,
-            "keep <CCGUI_INTERNAL_n-1>{bad}</CCGUI_INTERNAL_n-1>"
-        );
-    }
-
-    /// The overwhelmingly common case: nothing recorded. The frame filter must
-    /// then be invisible — an assistant row keeps its own bytes, spacing
-    /// included, and is never dropped for looking empty. Both are observable
-    /// as sidebar message counts and rendered text, and both regressed when
-    /// the filter trimmed and dropped rows unconditionally.
-    #[test]
-    fn assistant_rows_are_untouched_when_no_frame_identity_is_recorded() {
+    fn assistant_rows_are_untouched() {
         let padded = LineRow::new("assistant", "  spaced reply\n".into(), None);
         assert_eq!(
-            normalize_extracted_row(padded, &HashSet::new())
+            normalize_extracted_row(padded)
                 .expect("assistant row survives")
                 .text,
             "  spaced reply\n"
-        );
-
-        // A frame present but unrecorded is still ordinary text: keeping it is
-        // what leaves the row non-empty.
-        let only_frame = LineRow::new(
-            "assistant",
-            "<CCGUI_INTERNAL_n-1>{\"ok\":true}</CCGUI_INTERNAL_n-1>".into(),
-            None,
-        );
-        assert_eq!(
-            normalize_extracted_row(only_frame, &HashSet::new())
-                .expect("unrecorded frame keeps the row")
-                .text,
-            "<CCGUI_INTERNAL_n-1>{\"ok\":true}</CCGUI_INTERNAL_n-1>"
         );
     }
 
@@ -2345,7 +2078,7 @@ mod tests {
             .join("\n");
         let extractor: LineExtractor<'_> =
             Box::new(|value: &Value| extract_pi_family_line("omp", value, ImageMode::Collect));
-        let parsed = collect_session(std::io::Cursor::new(input), &extractor, &HashSet::new());
+        let parsed = collect_session(std::io::Cursor::new(input), &extractor);
 
         let (first, second) = (&parsed.messages[0], &parsed.messages[1]);
         assert_eq!(
@@ -2389,9 +2122,12 @@ mod tests {
         let input = format!("{}\n{}", call, result);
         let extractor: LineExtractor<'_> =
             Box::new(|value: &Value| extract_pi_family_line("omp", value, ImageMode::Collect));
-        let parsed = collect_session(std::io::Cursor::new(input), &extractor, &HashSet::new());
+        let parsed = collect_session(std::io::Cursor::new(input), &extractor);
         assert_eq!(parsed.messages.len(), 1);
-        let todos = parsed.messages[0].todos.as_ref().expect("todos must be populated");
+        let todos = parsed.messages[0]
+            .todos
+            .as_ref()
+            .expect("todos must be populated");
         assert_eq!(todos.items.len(), 1);
         assert_eq!(todos.items[0].content, "Task 1");
         assert_eq!(todos.items[0].status, "complete");
@@ -2506,13 +2242,21 @@ mod tests {
             .join("\n");
         let extractor: LineExtractor<'_> =
             Box::new(|value: &Value| extract_claude_line(value, ImageMode::Collect));
-        let parsed = collect_session(std::io::Cursor::new(input), &extractor, &HashSet::new());
+        let parsed = collect_session(std::io::Cursor::new(input), &extractor);
 
         assert_eq!(parsed.messages.len(), 2);
         let (first, second) = (&parsed.messages[0], &parsed.messages[1]);
         assert_eq!(first.text, "TaskCreate");
-        assert_eq!(first.result, Some(serde_json::json!("Task #1 created successfully: 实测 Python 版")));
-        assert_eq!(second.result, Some(serde_json::json!("Task #2 created successfully: 打包 exe")));
+        assert_eq!(
+            first.result,
+            Some(serde_json::json!(
+                "Task #1 created successfully: 实测 Python 版"
+            ))
+        );
+        assert_eq!(
+            second.result,
+            Some(serde_json::json!("Task #2 created successfully: 打包 exe"))
+        );
         // The result also teaches the row the id every later TaskUpdate names.
         let first_todos = first.todos.as_ref().expect("create payload");
         assert_eq!(first_todos.items[0].id.as_deref(), Some("1"));
@@ -2541,9 +2285,17 @@ mod tests {
             })
         };
         let lines = vec![
-            call("call-c", "TaskCreate", serde_json::json!({"subject": "A", "description": ""})),
+            call(
+                "call-c",
+                "TaskCreate",
+                serde_json::json!({"subject": "A", "description": ""}),
+            ),
             result("call-c", "Task #1 created successfully: A"),
-            call("call-u", "TaskUpdate", serde_json::json!({"taskId": "1", "status": "completed"})),
+            call(
+                "call-u",
+                "TaskUpdate",
+                serde_json::json!({"taskId": "1", "status": "completed"}),
+            ),
             result("call-u", "Updated task #1 status"),
             call("call-g", "TaskGet", serde_json::json!({"taskId": "1"})),
             result("call-g", "Task #1: A\nStatus: completed\nDescription: "),
@@ -2555,11 +2307,19 @@ mod tests {
             .join("\n");
         let extractor: LineExtractor<'_> =
             Box::new(|value: &Value| extract_claude_line(value, ImageMode::Collect));
-        let parsed = collect_session(std::io::Cursor::new(input), &extractor, &HashSet::new());
+        let parsed = collect_session(std::io::Cursor::new(input), &extractor);
 
         assert_eq!(parsed.messages.len(), 3);
-        assert_eq!(parsed.messages[0].todos.as_ref().unwrap().items[0].id.as_deref(), Some("1"));
-        assert_eq!(parsed.messages[1].todos.as_ref().unwrap().items[0].status, "complete");
+        assert_eq!(
+            parsed.messages[0].todos.as_ref().unwrap().items[0]
+                .id
+                .as_deref(),
+            Some("1")
+        );
+        assert_eq!(
+            parsed.messages[1].todos.as_ref().unwrap().items[0].status,
+            "complete"
+        );
         assert_eq!(parsed.messages[2].text, "TaskGet");
         assert!(parsed.messages[2].todos.is_none());
     }
@@ -2597,7 +2357,7 @@ mod tests {
             .collect::<Vec<_>>()
             .join("\n");
         let extractor = extractor_for("claude", ImageMode::Collect);
-        collect_session(std::io::Cursor::new(input), &extractor, &HashSet::new())
+        collect_session(std::io::Cursor::new(input), &extractor)
             .messages
             .into_iter()
             .map(|m| m.text)
@@ -2622,7 +2382,10 @@ mod tests {
             }),
             claude_user(caveat, true),
             claude_user(login, false),
-            claude_user("<local-command-stdout>Login successful</local-command-stdout>", false),
+            claude_user(
+                "<local-command-stdout>Login successful</local-command-stdout>",
+                false,
+            ),
             claude_user("你能干啥", false),
         ];
         assert_eq!(
@@ -2639,8 +2402,7 @@ mod tests {
         walk_lines(
             std::io::Cursor::new(input),
             &extractor_for("claude", ImageMode::SkipDataUrls),
-            &HashSet::new(),
-            |_, row| acc.accept(row),
+            |row| acc.accept(row),
         );
         assert_eq!(acc.finish().title, "review下本地代码");
     }
@@ -2651,81 +2413,6 @@ mod tests {
         assert_eq!(
             claude_texts(&[claude_user(text, false)]),
             ["/aimax:code-review 审查1772"]
-        );
-    }
-
-    /// The visible user line numbers used for fork cut points must come from the extractor:
-    /// they are exactly the raw lines of the user messages `parse_session_file` produces, plus
-    /// an end-of-file sentinel. The whole fork path rests on this (cut = the n+1th visible user
-    /// line), so each shape is pinned to its line: CLI chrome (caveat / in-window envelope /
-    /// stdout), tool-result turns and `isMeta` expansions take no line; real questions, a skill
-    /// envelope outside the window and image-only turns take one each. If the line numbers ever
-    /// drift from the parser, a fork silently copies too few turns.
-    #[test]
-    fn claude_user_row_lines_match_the_visible_rows() {
-        let caveat = "<local-command-caveat>Caveat: local command.</local-command-caveat>";
-        let model = "<command-name>/model</command-name>\n<command-message>model</command-message>\n<command-args></command-args>";
-        let skill = "<command-message>aimax:code-review</command-message>\n<command-name>/aimax:code-review</command-name>\n<command-args>审查1772</command-args>";
-        let image = serde_json::json!({
-            "type": "user",
-            "message": {
-                "role": "user",
-                "content": [
-                    {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": "aGk="}}
-                ]
-            }
-        });
-        let tool_result = serde_json::json!({
-            "type": "user",
-            "message": {"role": "user", "content": [{"type": "tool_result", "content": "输出"}]}
-        });
-        let lines = vec![
-            claude_user(caveat, true),  // 0 CLI chrome: opens the window
-            claude_user(model, false),  // 1 CLI chrome: envelope inside the window
-            claude_user(
-                "<local-command-stdout>Set model to Opus</local-command-stdout>",
-                false,
-            ), // 2 CLI chrome: stdout
-            claude_user("先看一眼仓库结构", false), // 3 visible (and closes the window above)
-            tool_result,                // 4 tool-result turn: no line
-            claude_user(skill, false),  // 5 visible: window closed, envelope shown as `command args`
-            claude_user("被展开的命令", true), // 6 isMeta expansion: no line
-            image,                      // 7 visible: image-only turn (no text)
-            claude_user("你能干啥", false), // 8 visible
-        ];
-        let input = lines
-            .iter()
-            .map(Value::to_string)
-            .collect::<Vec<_>>()
-            .join("\n");
-
-        let cursor = || std::io::Cursor::new(input.clone());
-        assert_eq!(
-            user_row_lines("claude", cursor(), &HashSet::new()),
-            [3, 5, 7, 8, usize::MAX],
-            "visible user line numbers (from 0) plus the end sentinel"
-        );
-        // Same source as the parser: without the sentinel, the count equals the parsed user messages.
-        let parsed = collect_session(
-            cursor(),
-            &extractor_for("claude", ImageMode::Collect),
-            &HashSet::new(),
-        );
-        let texts: Vec<String> = parsed
-            .messages
-            .iter()
-            .filter(|m| m.role == "user")
-            .map(|m| m.text.clone())
-            .collect();
-        assert_eq!(
-            texts,
-            [
-                "先看一眼仓库结构",
-                "/aimax:code-review 审查1772",
-                "",
-                "你能干啥"
-            ],
-            "the line table and the parse must be the same user turns"
         );
     }
 
@@ -2989,10 +2676,7 @@ mod tests {
     }
 
     fn blob_scratch(tag: &str) -> PathBuf {
-        let dir = std::env::temp_dir().join(format!(
-            "ccgui-blob-{tag}-{}",
-            std::process::id()
-        ));
+        let dir = std::env::temp_dir().join(format!("ccgui-blob-{tag}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         dir
@@ -3074,7 +2758,7 @@ mod tests {
     #[test]
     fn codebuddy_transcript_parses_messages_tools_and_images() {
         let file = codebuddy_fixture_file("parse");
-        let parsed = parse_session_file("codebuddy", &file, &HashSet::new()).unwrap();
+        let parsed = parse_session_file("codebuddy", &file).unwrap();
         let roles: Vec<&str> = parsed.messages.iter().map(|m| m.role.as_str()).collect();
         assert_eq!(roles, ["user", "assistant", "tool", "user"]);
 
@@ -3109,7 +2793,7 @@ mod tests {
     #[test]
     fn codebuddy_scan_summary_uses_first_user_text_and_ms_timestamps() {
         let file = codebuddy_fixture_file("scan");
-        let summary = scan_summary_file("codebuddy", &file, &HashSet::new()).unwrap();
+        let summary = scan_summary_file("codebuddy", &file).unwrap();
         assert_eq!(summary.title, "帮我看看这个文件");
         assert_eq!(summary.preview, "好的，先读一下");
         assert_eq!(summary.message_count, 4);
@@ -3221,7 +2905,7 @@ mod tests {
         });
         let context_rows = extract_grok_line(&context);
         assert_eq!(context_rows.len(), 1);
-        assert!(normalize_extracted_row(context_rows.into_iter().next().unwrap(), &HashSet::new()).is_none());
+        assert!(normalize_extracted_row(context_rows.into_iter().next().unwrap()).is_none());
 
         let query: Value = serde_json::json!({
             "type": "user",
@@ -3233,7 +2917,7 @@ mod tests {
         });
         let rows = extract_grok_line(&query);
         assert_eq!(rows.len(), 1);
-        let normalized = normalize_extracted_row(rows.into_iter().next().unwrap(), &HashSet::new()).unwrap();
+        let normalized = normalize_extracted_row(rows.into_iter().next().unwrap()).unwrap();
         assert_eq!(normalized.role, "user");
         assert_eq!(normalized.text, "Grok CLI 的历史记录怎么没出现？");
 
@@ -3242,7 +2926,7 @@ mod tests {
             "please look at <user_info> in grok logs, not the typed <user_query>".into(),
             None,
         );
-        let kept = normalize_extracted_row(mentioned, &HashSet::new()).unwrap();
+        let kept = normalize_extracted_row(mentioned).unwrap();
         assert_eq!(
             kept.text,
             "please look at <user_info> in grok logs, not the typed <user_query>"
@@ -3406,7 +3090,7 @@ mod tests {
             .join("\n");
         let extractor: LineExtractor<'_> =
             Box::new(|value: &Value| extract_qoder_line(value, ImageMode::Collect));
-        let parsed = collect_session(std::io::Cursor::new(input), &extractor, &HashSet::new());
+        let parsed = collect_session(std::io::Cursor::new(input), &extractor);
         assert_eq!(parsed.messages.len(), 2);
         assert_eq!(parsed.messages[0].result, Some(serde_json::json!("body a")));
         assert_eq!(parsed.messages[1].result, Some(serde_json::json!("body b")));
@@ -3476,7 +3160,7 @@ mod tests {
     #[test]
     fn opencode_parse_reads_storage_tree() {
         let (dir, meta) = opencode_fixture();
-        let parsed = parse_session_file("opencode", &meta, &HashSet::new()).unwrap();
+        let parsed = parse_session_file("opencode", &meta).unwrap();
         let roles: Vec<&str> = parsed.messages.iter().map(|m| m.role.as_str()).collect();
         assert_eq!(roles, ["user", "thinking", "tool", "assistant"]);
         assert_eq!(parsed.messages[0].text, "hello opencode");
@@ -3503,7 +3187,7 @@ mod tests {
     #[test]
     fn opencode_scan_summary_from_storage_tree() {
         let (dir, meta) = opencode_fixture();
-        let summary = scan_summary_file("opencode", &meta, &HashSet::new()).unwrap();
+        let summary = scan_summary_file("opencode", &meta).unwrap();
         assert_eq!(summary.title, "hello opencode");
         assert_eq!(summary.preview, "done");
         assert_eq!(summary.first_ts, Some(1_700_000_000_000));
@@ -3656,7 +3340,7 @@ mod tests {
     fn opencode_db_parse_reads_sqlite_rows() {
         let (dir, db) = opencode_db_fixture();
         let address = super::super::opencode_db_session_path(&db, "ses_db");
-        let parsed = parse_session_file("opencode", &address, &HashSet::new()).unwrap();
+        let parsed = parse_session_file("opencode", &address).unwrap();
         let roles: Vec<&str> = parsed.messages.iter().map(|m| m.role.as_str()).collect();
         assert_eq!(roles, ["user", "thinking", "tool", "assistant"]);
         assert_eq!(parsed.messages[0].text, "hello opencode");
@@ -3677,7 +3361,7 @@ mod tests {
             Some(1)
         );
 
-        let summary = scan_summary_file("opencode", &address, &HashSet::new()).unwrap();
+        let summary = scan_summary_file("opencode", &address).unwrap();
         assert_eq!(summary.title, "hello opencode");
         assert_eq!(summary.preview, "done");
         assert_eq!(summary.first_ts, Some(1_700_000_000_000));

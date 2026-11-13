@@ -53,7 +53,7 @@ describe("a window's native identity", () => {
     expect(parseProfileEntry({ id: 1, name: "A" })).toBeNull();
   });
 
-  it("follows the native identity and the profile's changes", async () => {
+  it("follows the native identity", async () => {
     native.invoke.mockImplementation(async (command: string) => {
       if (command === "profile_window_info")
         return {
@@ -67,14 +67,7 @@ describe("a window's native identity", () => {
     const window = await import("./profileWindow");
     window.startProfileWindow();
     await vi.waitFor(() => expect(window.currentWindowId()).toBe("w-3"));
-    native.listeners.get("misty://profile-window")?.({
-      payload: { id: "work", name: "Renamed", order: 1 },
-    });
-    expect(window.currentProfile()).toMatchObject({ name: "Renamed" });
-    native.listeners.get("misty://profile-window")?.({
-      payload: { id: "someone-else", name: "Other", order: 3 },
-    });
-    expect(window.currentProfile().id).toBe("work");
+    expect(window.currentProfile()).toMatchObject({ id: "work", name: "Work" });
   });
 
   it("names every window command as the native side does", async () => {

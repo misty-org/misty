@@ -21,7 +21,6 @@ const card = (patch: Partial<AppRequest> = {}): AppRequest => ({
 });
 function withCard(request: AppRequest, extra: object[] = []) {
   state = {
-    panel: "closed",
     working: false,
     error: null,
     submitAnswer,
@@ -56,7 +55,7 @@ it("continues the conversation once, after the app is connected", async () => {
   await continueAfterAppRequest(set, get, "chat", "reply", connected);
   expect(submitAnswer).toHaveBeenCalledTimes(1);
   expect(submitAnswer.mock.calls[0][0]).toBe("Continue the request above. Gmail is now connected.");
-  expect(submitAnswer.mock.calls[0][6]).toMatchObject({ continuation: true });
+  expect(submitAnswer.mock.calls[0][5]).toMatchObject({ continuation: true });
   expect(state.conversations[0].messages[0].appRequest?.state).toBe("connected");
 });
 

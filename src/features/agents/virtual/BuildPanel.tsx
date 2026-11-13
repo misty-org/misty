@@ -1,7 +1,7 @@
+import { AgentAvatar } from "../personal/AgentAvatar";
 import {
   Armchair,
   BookOpen,
-  Bot,
   Coffee,
   GlassWater,
   Lamp,
@@ -150,7 +150,7 @@ export function BuildPanel(props: {
                 ...props.agents.map(({ agent }) => ({
                   value: agent.id,
                   label: agent.name,
-                  icon: Bot,
+                  icon: <AgentAvatar agent={agent} compact />,
                 })),
               ]}
               onValueChange={(agent) =>

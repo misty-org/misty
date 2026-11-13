@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { BrandIcon, brandIconAsset } from "@/shared/ui";
+import { BrandIcon, LogoInitial, brandIconAsset } from "@/shared/ui";
 import { directAppsApi } from "./directApi";
 
 /** Logos fetched this session, by address; null when one couldn't be had. */
@@ -26,7 +26,8 @@ function logoOf(url: string): Promise<string | null> {
 
 /**
  * An app's official logo: Misty's own artwork of the brand when it has one, else the logo the
- * maker published, which native code fetches once and keeps; the app's initial until then.
+ * maker (or Composio, for its apps) published, which native code fetches once and keeps; the app's initial until then, and
+ * if the image turns out not to draw.
  */
 export function DirectAppLogo({
   app,
@@ -41,6 +42,7 @@ export function DirectAppLogo({
 }) {
   const brand = Boolean(brandIconAsset(app));
   const [src, setSrc] = useState<string | null>(() => (icon ? (logos.get(icon) ?? null) : null));
+  const [broken, setBroken] = useState<string | null>(null);
   useEffect(() => {
     if (brand || !icon) return;
     let live = true;
@@ -50,10 +52,11 @@ export function DirectAppLogo({
     };
   }, [brand, icon]);
   if (brand) return <BrandIcon brand={app} size={size} />;
-  if (src)
+  if (src && broken !== src)
     return (
       <img
         src={src}
+        onError={() => setBroken(src)}
         alt=""
         width={size}
         height={size}
@@ -61,9 +64,5 @@ export function DirectAppLogo({
         draggable={false}
       />
     );
-  return (
-    <span aria-hidden="true" className="text-xs font-semibold text-cream-muted">
-      {name.trim().charAt(0).toUpperCase()}
-    </span>
-  );
+  return <LogoInitial name={name || app} size={size} />;
 }

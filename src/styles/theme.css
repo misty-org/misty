@@ -1,7 +1,8 @@
 /* Semantic charcoal/cream palette. Utilities resolve through these variables
    so the Themes extension can preview and persist one coherent app palette. */
 :root {
-  --misty-theme-workspace: #0f0f0f;
+  /* The window around the pages: the pages' own color, so the whole window reads as one sheet. */
+  --misty-theme-workspace: #131313;
   /* Active tab and browser toolbar. Darker than the Polar reference so the
      chrome sits closer to the black tab strip. */
   --workspace-tab-surface-top: #1c1c1c;

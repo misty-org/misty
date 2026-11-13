@@ -114,7 +114,7 @@ export function NoteSuggestionMenu(props: {
       }}
     >
       <p className="mx-2 mb-1.5 mt-1 text-2xs font-semibold text-cream-muted">
-        {props.suggestion.type === "wiki" ? "Link to note" : "Insert block"}
+        {props.suggestion.type === "wiki" ? "Link to doc" : "Insert block"}
       </p>
       {props.suggestion.type === "slash"
         ? slashItems.map((item) => (
@@ -169,7 +169,7 @@ export function NoteSuggestionMenu(props: {
             />
           ))}
       {props.suggestion.type === "wiki" && notes.length === 0 ? (
-        <span className="p-2 text-xs text-cream-muted">No matching notes</span>
+        <span className="p-2 text-xs text-cream-muted">No matching docs</span>
       ) : null}
     </SuggestionList>
   );

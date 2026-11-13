@@ -261,8 +261,7 @@ fn native_installs_are_typed_into_the_terminal_without_bypass() {
 fn npm_shim_detection_ignores_relative_paths() {
     let base = std::path::PathBuf::from("target")
         .join(format!("misty-npm-shim-{}", uuid::Uuid::new_v4().simple()));
-    std::fs::create_dir_all(base.join("node_modules").join("@anthropic-ai/claude-code"))
-        .unwrap();
+    std::fs::create_dir_all(base.join("node_modules").join("@anthropic-ai/claude-code")).unwrap();
     let relative = base.join("claude");
     assert!(!beside_npm_package("claude", &relative.to_string_lossy()));
     let absolute = std::fs::canonicalize(&base).unwrap().join("claude");
@@ -283,7 +282,7 @@ fn update_kind_matches_distribution_channel() {
     assert_eq!(update_kind("dsh", "/usr/local/bin/dsh"), Some("npm"));
     // grok has no lifecycle action.
     assert_eq!(update_kind("grok", "/usr/local/bin/grok"), None);
-    assert_eq!(update_kind("agy", "/usr/local/bin/agy"), None);
+    assert_eq!(update_kind("agy", "/usr/local/bin/agy"), Some("native"));
     // claude / codex: a node_modules path means the npm distribution;
     // anything else uses the official standalone installer.
     assert_eq!(

@@ -296,7 +296,7 @@ describe("desktop dock store", () => {
     expect(store.openSurface(workspaceSurfaceFromRoute("/spaces/one/notes")!).id).toBe(first.id);
   });
 
-  it("opens Journal and Files as separate reusable tabs in one Space", () => {
+  it("opens Docs and Files as separate reusable tabs in one Space", () => {
     const journalRequest = workspaceSurfaceFromRoute("/spaces/one/notes");
     const plannerRequest = workspaceSurfaceFromRoute("/spaces/one/library");
     expect(journalRequest).not.toBeNull();
@@ -310,7 +310,7 @@ describe("desktop dock store", () => {
         expect.objectContaining({
           id: journal.id,
           groupKey: "space:one:journal",
-          title: "Journal",
+          title: "Docs",
         }),
         expect.objectContaining({
           id: planner.id,

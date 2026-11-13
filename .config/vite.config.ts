@@ -49,9 +49,6 @@ export default defineConfig(({ command, mode }) => {
       "import.meta.env.MISTY_SHELL_MACOS": JSON.stringify(
         ["darwin", "macos"].includes(process.env.TAURI_ENV_PLATFORM || process.platform),
       ),
-      "import.meta.env.MISTY_NATIVE_MACOS_CAPTURE": JSON.stringify(
-        ["darwin", "macos"].includes(process.env.TAURI_ENV_PLATFORM || process.platform),
-      ),
       ...publicAppEnv(env),
       // MISTY_PUBLIC_API_URL is the shared server/frontend deployment contract.
       // Vite's internal alias keeps non-VITE server secrets out of the bundle.
@@ -107,6 +104,10 @@ export default defineConfig(({ command, mode }) => {
       },
       assetsInlineLimit: 0,
       sourcemap: false,
+      // Vite's 500 kB warning is a guide for pages fetched over a network. Misty loads its
+      // bundle from disk inside the desktop app, where the main bundle is about 5.1 MB, so the
+      // limit sits just above today's largest and warns only if one grows past it.
+      chunkSizeWarningLimit: 6 * 1024,
     },
     server: {
       fs: {

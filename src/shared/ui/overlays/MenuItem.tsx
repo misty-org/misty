@@ -41,10 +41,14 @@ import {
 import { Tooltip } from "./Tooltip";
 
 /*
- * Every menu row, in dropdowns and right-click menus alike: a 16px icon, the label, an optional
- * shortcut, and a checkmark at the right edge when the row is a selection. The rows read which
- * kind of menu they are in from DropdownMenuContent or ContextMenuContent, so one tree of rows
- * can be written once and shown in both (RowActions does exactly that).
+ * Every menu row, in dropdowns and right-click menus alike: a 16px icon when it tells the row
+ * apart, the label, an optional shortcut on an action, and a checkmark at the right edge when the
+ * row is a selection. A list of like things (models, efforts, folders, agents, chats) is text
+ * alone: the same icon on every row says nothing. A choice (MenuRadioItem) never shows a
+ * shortcut, and a MenuRadioGroup drops its rows' icons unless every row has its own.
+ *
+ * The rows read which kind of menu they are in from DropdownMenuContent or ContextMenuContent, so
+ * one tree of rows can be written once and shown in both (RowActions does exactly that).
  */
 
 /**
@@ -76,14 +80,16 @@ type RowBodyProps = {
   icon?: MenuIcon | React.ReactNode;
   label: React.ReactNode;
   shortcut?: React.ReactNode;
+  state?: React.ReactNode;
 };
 
-function MenuRowBody({ icon, label, shortcut }: RowBodyProps) {
+function MenuRowBody({ icon, label, shortcut, state }: RowBodyProps) {
   return (
     <>
       <MenuIconSlot icon={icon} />
       <OverflowFadeText className={menuLabelTextClass}>{label}</OverflowFadeText>
       {shortcut ? <span className={menuShortcutClass}>{asKbd(shortcut)}</span> : null}
+      {state ? <span className="ml-auto flex shrink-0 items-center pl-2">{state}</span> : null}
     </>
   );
 }
@@ -104,8 +110,9 @@ type RadixItemProps = Omit<
 >;
 
 type MenuItemProps = RadixItemProps & {
-  /** The 16px icon every row starts with. */
-  icon: MenuIcon;
+  /** The 16px icon an action starts with, when it tells the row apart. Rows listing like things
+   * (agents, chats, folders) leave it out. */
+  icon?: MenuIcon;
   /** The row's text. It fades at the end when the menu is too narrow. */
   label: React.ReactNode;
   /** A key hint such as "⌘T" or a <ShortcutText /> element. */
@@ -159,7 +166,8 @@ type MenuCheckItemProps = Omit<
   React.ComponentPropsWithoutRef<typeof DropdownMenuCheckboxItem>,
   "children" | "checked" | "onCheckedChange" | "asChild"
 > & {
-  icon: MenuIcon;
+  /** Only when it tells the row apart from the others; a list of like things is text alone. */
+  icon?: MenuIcon;
   label: React.ReactNode;
   shortcut?: React.ReactNode;
   checked: boolean;
@@ -175,7 +183,7 @@ type MenuCheckItemProps = Omit<
  * A row that turns something on or off, with a checkmark at its right edge while on.
  *
  * ```tsx
- * <MenuCheckItem icon={Columns3} label="Owner" checked={shown.owner} onCheckedChange={toggleOwner} />
+ * <MenuCheckItem label="Owner" checked={shown.owner} onCheckedChange={toggleOwner} />
  * ```
  */
 function MenuCheckItem({
@@ -226,41 +234,85 @@ type MenuRadioGroupProps = Omit<
   ref?: React.Ref<HTMLDivElement>;
 };
 
+/** Whether a group's rows show their icons: inside a MenuRadioGroup, only when they differ. */
+const RadioIconsContext = React.createContext(true);
+
+/** The icons of a group's rows, through arrays and fragments. */
+function rowIcons(children: React.ReactNode): unknown[] {
+  const icons: unknown[] = [];
+  React.Children.forEach(children, (child) => {
+    if (!React.isValidElement(child)) return;
+    const props = child.props as { value?: unknown; icon?: unknown; children?: React.ReactNode };
+    if (child.type === React.Fragment) icons.push(...rowIcons(props.children));
+    else if (props.value !== undefined) icons.push(props.icon);
+  });
+  return icons;
+}
+
+/** What makes two row icons the same: the same component, or elements of one type and props. */
+function sameIcon(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (!React.isValidElement(a) || !React.isValidElement(b) || a.type !== b.type) return false;
+  const left = a.props as Record<string, unknown>;
+  const right = b.props as Record<string, unknown>;
+  const keys = new Set([...Object.keys(left), ...Object.keys(right)]);
+  return [...keys].every((key) => key === "children" || left[key] === right[key]);
+}
+
+/** True when every row has an icon and no two are the same, so the icons tell them apart. */
+function iconsTellApart(icons: unknown[]): boolean {
+  if (icons.length < 2 || icons.some((icon) => icon === undefined || icon === null)) return false;
+  return icons.every((icon, index) =>
+    icons.slice(index + 1).every((other) => !sameIcon(icon, other)),
+  );
+}
+
 /**
- * A set of MenuRadioItems where exactly one is picked, such as a sort order.
+ * A set of MenuRadioItems where exactly one is picked, such as a sort order. Its rows are text
+ * alone unless each has an icon of its own: a list of efforts or models, each with the same mark,
+ * reads better without them.
  *
  * ```tsx
- * <MenuRadioGroup value={sort} onValueChange={setSort}>
- *   <MenuRadioItem icon={Clock} value="recent" label="Recent" />
- *   <MenuRadioItem icon={ArrowDownAZ} value="name" label="Name" />
+ * <MenuRadioGroup value={effort} onValueChange={setEffort}>
+ *   <MenuRadioItem value="low" label="Low" />
+ *   <MenuRadioItem value="high" label="High" />
  * </MenuRadioGroup>
  * ```
  */
-function MenuRadioGroup(props: MenuRadioGroupProps) {
+function MenuRadioGroup({ children, ...props }: MenuRadioGroupProps) {
   const kind = useMenuKind();
   const Group = (
     kind === "context" ? ContextMenuRadioGroup : DropdownMenuRadioGroup
   ) as typeof DropdownMenuRadioGroup;
-  return <Group {...props} />;
+  return (
+    <RadioIconsContext.Provider value={iconsTellApart(rowIcons(children))}>
+      <Group {...props}>{children}</Group>
+    </RadioIconsContext.Provider>
+  );
 }
 
 type MenuRadioItemProps = Omit<
   React.ComponentPropsWithoutRef<typeof DropdownMenuRadioItem>,
   "children" | "asChild"
 > & {
-  icon: MenuIcon;
+  /** Shown only when every row in the group has an icon of its own (MenuRadioGroup). */
+  icon?: MenuIcon;
   label: React.ReactNode;
-  shortcut?: React.ReactNode;
+  /** The row's state at its right end, before the checkmark, such as a Spinner while it works. */
+  state?: React.ReactNode;
   /** Why a disabled row can't be used, shown in a tooltip while it is hovered. */
   reason?: string;
   ref?: React.Ref<HTMLDivElement>;
 };
 
-/** One choice in a MenuRadioGroup, with a checkmark at its right edge while picked. */
+/**
+ * One choice in a MenuRadioGroup, with a checkmark at its right edge while picked. A choice shows
+ * no shortcut: the menu is where it is picked, not where its key is learned.
+ */
 function MenuRadioItem({
   icon,
   label,
-  shortcut,
+  state,
   reason,
   disabled,
   className,
@@ -268,6 +320,7 @@ function MenuRadioItem({
   ...props
 }: MenuRadioItemProps) {
   const kind = useMenuKind();
+  const showIcon = React.useContext(RadioIconsContext);
   const Item = (
     kind === "context" ? ContextMenuRadioItem : DropdownMenuRadioItem
   ) as typeof DropdownMenuRadioItem;
@@ -280,15 +333,15 @@ function MenuRadioItem({
         className={cn(explained && menuItemExplainedClass, className)}
         {...props}
       >
-        <MenuRowBody icon={icon} label={label} shortcut={shortcut} />
+        <MenuRowBody icon={showIcon ? icon : undefined} label={label} state={state} />
       </Item>
     </Explained>
   );
 }
 
 type MenuSubmenuProps = {
-  /** The 16px icon every row starts with. */
-  icon: MenuIcon;
+  /** The 16px icon, when it tells the row apart. */
+  icon?: MenuIcon;
   label: React.ReactNode;
   children: React.ReactNode;
   width?: MenuWidth;

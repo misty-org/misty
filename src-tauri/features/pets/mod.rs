@@ -213,9 +213,7 @@ fn package_files(root: &Path) -> Result<(PetManifest, PathBuf, Vec<u8>, Vec<u8>)
 
 /// Checks a v2 atlas and counts each row's frames. Returns the file's bytes as read.
 fn validate_spritesheet(path: &Path) -> Result<(Vec<u8>, Vec<u8>), String> {
-    let size = fs::metadata(path)
-        .map_err(|error| error.to_string())?
-        .len();
+    let size = fs::metadata(path).map_err(|error| error.to_string())?.len();
     if size > MAX_SPRITESHEET_BYTES {
         return Err("This pet's spritesheet is too large.".to_string());
     }
@@ -410,7 +408,10 @@ fn import_from(folder: &Path) -> Result<PetSummary, String> {
     );
     let (manifest, _sprite, bytes, _) = package_files(folder)?;
     if package_dir(&manifest.id).is_some() {
-        return Err(format!("A pet named “{}” is already imported.", manifest.id));
+        return Err(format!(
+            "A pet named “{}” is already imported.",
+            manifest.id
+        ));
     }
     let destination = imported_root()?.join(&manifest.id);
     fs::create_dir_all(&destination).map_err(|error| error.to_string())?;

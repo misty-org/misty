@@ -76,7 +76,7 @@ const shellCommands: ShortcutCommandDefinition[] = [
 ];
 
 /** The Space home's tabs, on ⌘1 to ⌘4 while a Space is focused (window tabs elsewhere). */
-const spaceSections = ["Home", "Notes", "Drawings", "Files"] as const;
+const spaceSections = ["Home", "Docs", "Drawings", "Files"] as const;
 
 const tabAndToolCommands = [
   ...spaceSections.map((label, index) =>

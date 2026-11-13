@@ -16,16 +16,18 @@ export function IntegrationsPage() {
   const [view, setView] = useState<View>("plugins");
   return (
     <div className="@container mx-auto grid w-full max-w-5xl gap-6 px-4 pb-8 pt-(--ui-header)">
-      <ChoiceGroup
-        label="Integrations"
-        value={view}
-        onChange={setView}
-        options={[
-          { value: "plugins", label: "Plugins", icon: Blocks },
-          { value: "apps", label: "Apps", icon: Plug },
-        ]}
-        className="justify-self-start"
-      />
+      <span data-tour="integrations-tabs" className="contents">
+        <ChoiceGroup
+          label="Integrations"
+          value={view}
+          onChange={setView}
+          options={[
+            { value: "plugins", label: "Plugins", icon: Blocks },
+            { value: "apps", label: "Apps", icon: Plug },
+          ]}
+          className="justify-self-start"
+        />
+      </span>
       {view === "plugins" ? (
         <EngineMarketplace />
       ) : (

@@ -1,4 +1,4 @@
-//! Everything a profile keeps (tabs, downloads, site choices, extensions) as encrypted records in
+//! Everything a profile keeps (its open tabs and their page state) as encrypted records in
 //! one local database. Rows are sealed with a key kept for this install alone, and never leave
 //! this computer.
 //!
@@ -311,7 +311,6 @@ impl LocalStore {
 }
 
 mod notes;
-mod profiles;
 
 #[cfg(test)]
 mod tests;

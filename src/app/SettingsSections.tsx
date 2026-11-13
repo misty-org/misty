@@ -5,14 +5,14 @@ import {
   AgentDefaultsSection,
   AgentPermissionsSection,
   CompanionSection,
-  MistySection,
   ModelsSection,
   PersonaCatalogSection,
 } from "@/features/agents";
 import { AdvancedSection, AppearanceSection } from "@/features/app-windows";
-import { BrowserPermissionSettings, PrivacySection } from "@/features/browser";
+import { PrivacySection } from "@/features/browser";
 import { ChannelsSection } from "@/features/engine-config/channels";
 import { ClisSection } from "@/features/engine-config/clis";
+import { EnvironmentSection } from "@/features/engine-config/environment";
 import { FontsSection } from "@/features/engine-config/fonts";
 import { McpSection } from "@/features/engine-config/mcp";
 import { NetworkSection } from "@/features/engine-config/network";
@@ -46,7 +46,6 @@ const sections: Partial<Record<SettingsSection, ComponentType<SettingsContentPro
   shortcuts: ShortcutsSection,
   voice: VoiceSection,
   privacy: PrivacySection,
-  "browser-permissions": BrowserPermissionSettings,
   "agent-activity": AgentActivitySettings,
   advanced: AdvancedSection,
   network: NetworkSection,
@@ -54,12 +53,12 @@ const sections: Partial<Record<SettingsSection, ComponentType<SettingsContentPro
   models: ModelsSection,
   "engine-clis": ClisSection,
   "engine-channels": ChannelsSection,
+  "engine-env": () => <EnvironmentSection />,
   "engine-usage": UsageSection,
   "engine-mcp": McpSection,
   "engine-skills": SkillsSection,
   "engine-prompts": PromptsSection,
   "agents-defaults": AgentDefaultsSection,
-  misty: MistySection,
   "agents-companion": CompanionSection,
   "agents-permissions": AgentPermissionsSection,
   "agents-personas": PersonaCatalogSection,

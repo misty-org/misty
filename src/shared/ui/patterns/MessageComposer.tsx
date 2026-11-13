@@ -63,7 +63,7 @@ export type MessageComposerProps = Omit<ComponentProps<"div">, "children"> & {
  *   inputProps={{ value, onChange, "aria-label": "Message" }}
  *   items={[
  *     { id: "add", icon: Plus, label: "Add", priority: 3, render: () => <AddMenu />, menu: <AddRows /> },
- *     { id: "model", icon: Sparkles, label: model.name, priority: 2, shrink: true, render: …, menu: … },
+ *     { id: "model", icon: Cpu, label: model.name, priority: 2, shrink: true, render: …, menu: … },
  *   ]}
  *   end={<MessageComposerSend label="Send" disabled={!value.trim()} />}
  *   path={[{ icon: Layers, label: space.name }, { icon: GitBranch, label: branch, menu: <BranchRows /> }]}
@@ -172,7 +172,10 @@ export const MessageComposer = forwardRef<HTMLDivElement, MessageComposerProps>(
   },
 );
 
-/** The send button every composer shares; a running agent can put its Stop button there instead. */
+/**
+ * The send button every composer shares, at the small size so it sits quietly in the box's corner;
+ * a running agent can put its Stop button (the same size) there instead.
+ */
 export function MessageComposerSend({
   busy,
   disabled,
@@ -182,7 +185,7 @@ export function MessageComposerSend({
   busy?: boolean;
 }) {
   return (
-    <IconButton variant="primary" {...props} loading={busy} disabled={disabled || busy}>
+    <IconButton variant="primary" size="sm" {...props} loading={busy} disabled={disabled || busy}>
       <ArrowUp />
     </IconButton>
   );

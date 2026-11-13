@@ -27,6 +27,7 @@ impl ToolExecutionResponse {
     }
 
     /// Reads a tool's envelope, refusing anything but an object.
+    #[cfg(test)]
     pub(crate) fn from_json(value: &JsValue) -> Result<Self, RuntimeError> {
         if !value.is_object() {
             return Err(RuntimeError::error("invalid_tool_outcome"));

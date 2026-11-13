@@ -1,13 +1,13 @@
 import {
-  chooseFromSwitcher,
   composer,
   conversation,
   fixture,
   openAgentSettings,
+  openChat,
   renderAgentsPage,
   typeDraft,
 } from "./AgentsPage.testFixtures";
-import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import { expect, it } from "vitest";
 import { useMistyStore } from "@/features/agents/conversations/state/useMistyStore";
 
@@ -18,15 +18,6 @@ it("edits a global agent without requiring a work Space", async () => {
   fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Launch coordinator" } });
   expect(screen.queryByLabelText("Agent work Space")).toBeNull();
   expect((screen.getByLabelText("Name") as HTMLInputElement).value).toBe("Launch coordinator");
-});
-
-it("makes a new agent from a name and an engine", async () => {
-  renderAgentsPage();
-  chooseFromSwitcher("New agent");
-  const dialog = await screen.findByRole("dialog", { name: "New agent" });
-  expect(within(dialog).getByLabelText("Name")).toBeTruthy();
-  expect(within(dialog).getByRole("group", { name: "Engine" })).toBeTruthy();
-  expect(within(dialog).queryByText("Instructions")).toBeNull();
 });
 
 it("continues the open chat and starts new work", async () => {
@@ -49,7 +40,6 @@ it("continues the open chat and starts new work", async () => {
     "Continue this conversation",
     [],
     undefined,
-    "workspace",
     [],
     expect.objectContaining({ conversationId: "private" }),
     { executionMode: "user", interactionMode: "auto" },
@@ -65,7 +55,6 @@ it("continues the open chat and starts new work", async () => {
     "Start personal work",
     [],
     undefined,
-    "workspace",
     [],
     { conversationId: "", context: [] },
     { executionMode: "user", interactionMode: "auto" },
@@ -107,32 +96,14 @@ it("previews and saves a cloud avatar while preserving unrelated avatar metadata
   );
 });
 
-it("switches agents in place, guarding drafts and leaving the current agent untouched", async () => {
+it("names the chat, not its agent, with nothing to switch", () => {
   fixture.includeSecond = true;
   renderAgentsPage();
-  typeDraft("Keep my work");
-  fireEvent.click(screen.getByRole("button", { name: "Switch agent: Communications" }));
-  fireEvent.click(screen.getByRole("option", { name: /^Communications(?! settings)/ }));
-  expect(screen.queryByRole("alertdialog")).toBeNull();
-  expect(composer().value).toBe("Keep my work");
-  fireEvent.click(screen.getByRole("button", { name: "Switch agent: Communications" }));
-  fireEvent.click(screen.getByRole("option", { name: "Research" }));
-  expect(screen.getByRole("alertdialog")).toBeTruthy();
-  fireEvent.click(screen.getByRole("button", { name: "Keep editing" }));
-  expect(composer().value).toBe("Keep my work");
-  fireEvent.click(screen.getByRole("button", { name: "Switch agent: Communications" }));
-  fireEvent.click(screen.getByRole("option", { name: "Research" }));
-  fireEvent.click(screen.getByRole("button", { name: "Discard and switch" }));
-  expect(screen.getByRole("button", { name: "Switch agent: Research" })).toBeTruthy();
-  expect(screen.queryByRole("heading", { name: "Agents" })).toBeNull();
+  // The tab names the agent; the chat's bar shows only the chat's title.
+  expect(screen.getByRole("heading", { name: "New chat" })).toBeTruthy();
+  expect(screen.queryByText("Communications")).toBeNull();
+  openChat("research");
+  expect(screen.queryByText("Research")).toBeNull();
+  expect(screen.queryByRole("button", { name: /^Switch agent/ })).toBeNull();
   expect(useMistyStore.getState().selectedAgentId).toBe("research");
-});
-
-it("lets the person switch while an agent works: it keeps working in its own chat", () => {
-  fixture.includeSecond = true;
-  renderAgentsPage();
-  act(() => useMistyStore.setState({ working: true }));
-  fireEvent.click(screen.getByRole("button", { name: "Switch agent: Communications" }));
-  const research = screen.getByRole("option", { name: "Research" });
-  expect(research.getAttribute("aria-disabled")).not.toBe("true");
 });

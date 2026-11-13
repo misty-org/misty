@@ -36,10 +36,9 @@ use std::time::Duration;
 use serde_json::{json, Map, Value};
 
 use super::qoder_session::{
-    initialize_params, jsonrpc_result_response,
-    session_update_from_notification, spawn_piped_acp, teardown, AcpLine, AcpProcess,
-    JSONRPC_INVALID_PARAMS, JSONRPC_METHOD_NOT_FOUND, PROMPT_TIMEOUT, RPC_HANDSHAKE_TIMEOUT,
-    SESSION_NEW_TIMEOUT, SESSION_RESUME_TIMEOUT,
+    initialize_params, jsonrpc_result_response, session_update_from_notification, spawn_piped_acp,
+    teardown, AcpLine, AcpProcess, JSONRPC_INVALID_PARAMS, JSONRPC_METHOD_NOT_FOUND,
+    PROMPT_TIMEOUT, RPC_HANDSHAKE_TIMEOUT, SESSION_NEW_TIMEOUT, SESSION_RESUME_TIMEOUT,
 };
 use super::{BuiltCommand, Engine, EngineEvent, SendRequest, TurnCore, TurnState, VirtualRunGuard};
 
@@ -440,8 +439,7 @@ fn resolve_model_value(
     let options = session_result["configOptions"]
         .as_array()?
         .iter()
-        .find(|option| option["id"] == "model")?
-        ["options"]
+        .find(|option| option["id"] == "model")?["options"]
         .as_array()?;
     let candidates: Vec<(String, String)> = options
         .iter()
@@ -581,13 +579,16 @@ fn mode_id(permission: Option<&str>, session_result: &Value) -> Option<String> {
             .map(|_| id.to_string())
     });
     object_match.or_else(|| {
-        modes.iter().filter_map(|mode| mode.as_str()).find_map(|id| {
-            let lowered = id.to_lowercase();
-            needle
-                .iter()
-                .find(|word| lowered.contains(*word))
-                .map(|_| id.to_string())
-        })
+        modes
+            .iter()
+            .filter_map(|mode| mode.as_str())
+            .find_map(|id| {
+                let lowered = id.to_lowercase();
+                needle
+                    .iter()
+                    .find(|word| lowered.contains(*word))
+                    .map(|_| id.to_string())
+            })
     })
 }
 
@@ -762,7 +763,11 @@ pub(crate) fn models_from_config_options(session_result: &Value) -> Vec<ProbeMod
             name,
         });
     }
-    if let Some(index) = rows.iter().position(|row| row.is_default).filter(|i| *i > 0) {
+    if let Some(index) = rows
+        .iter()
+        .position(|row| row.is_default)
+        .filter(|i| *i > 0)
+    {
         let row = rows.remove(index);
         rows.insert(0, row);
     }

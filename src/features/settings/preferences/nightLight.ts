@@ -1,5 +1,3 @@
-import { invoke } from "@tauri-apps/api/core";
-
 /** The account's Night light setting: never, always, or between two local times. */
 export type NightLightMode = "off" | "on" | "scheduled";
 
@@ -70,12 +68,7 @@ export function nightLightTint(warmth: number): string {
     .join("")}`;
 }
 
-let pushed: string | null | undefined;
-
-/**
- * Tints Misty's window and every open browser page; null turns it off. Native
- * pages sit above the app's own view, so they get the same layer injected.
- */
+/** Tints Misty's window; null turns it off. */
 export function applyNightLight(tint: string | null): void {
   const root = document.documentElement;
   if (tint) {
@@ -85,9 +78,4 @@ export function applyNightLight(tint: string | null): void {
     root.style.removeProperty("--misty-night-light");
     delete root.dataset.nightLight;
   }
-  if (pushed === tint) return;
-  pushed = tint;
-  void invoke<void>("browser_set_night_light", { tint }).catch(() => {
-    pushed = undefined;
-  });
 }

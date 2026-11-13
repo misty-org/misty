@@ -17,7 +17,6 @@ import {
   Scissors,
 } from "lucide-react";
 import { browserOverlayReady, setBrowserWebviewsSuspended } from "@/features/app-windows";
-import { browserRuntimeIdForTabId } from "@/features/browser";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -48,48 +47,6 @@ const entries = {
   inspect: { label: "Inspect", icon: Code },
 };
 const suspensionReason = "browser-context-menu";
-
-/**
- * The native page beneath a renderer point, as fractions of its bounds. While
- * a renderer overlay is open the page sits under the renderer, which then
- * receives clicks over it. Only the transparent path to the page counts:
- * anything the renderer draws there itself (internal pages, annotations,
- * notifications, the menu) keeps its own click.
- */
-function browserPageAtPoint(
-  target: EventTarget | null,
-  clientX: number,
-  clientY: number,
-  root: ParentNode = document,
-): { id: string; x: number; y: number } | null {
-  if (!(target instanceof Element)) return null;
-  for (const host of root.querySelectorAll<HTMLElement>("[data-browser-page-host]")) {
-    if (!target.contains(host)) continue;
-    const rect = host.getBoundingClientRect();
-    if (
-      rect.width <= 0 ||
-      rect.height <= 0 ||
-      clientX < rect.left ||
-      clientX > rect.right ||
-      clientY < rect.top ||
-      clientY > rect.bottom
-    ) {
-      continue;
-    }
-    const tabId = host
-      .closest("[data-browser-workspace-tab]")
-      ?.getAttribute("data-browser-workspace-tab");
-    if (!tabId) return null;
-    const id = browserRuntimeIdForTabId(tabId);
-    if (!id) return null;
-    return {
-      id,
-      x: (clientX - rect.left) / rect.width,
-      y: (clientY - rect.top) / rect.height,
-    };
-  }
-  return null;
-}
 
 function isEditableTarget(target: EventTarget | null): boolean {
   return (
@@ -195,23 +152,15 @@ export function BrowserContextMenuBridge() {
         if (!disposed && current.current === payload) setMenu(payload);
       },
     );
-    // A right-click on a page under the renderer would otherwise get the
-    // renderer's own engine menu. Hand it to the page so this menu reopens there.
-    const forwardContextMenu = (event: MouseEvent) => {
-      const page = browserPageAtPoint(event.target, event.clientX, event.clientY);
-      if (!page) {
-        // While Misty's menu for a page is on its way or open, the renderer's own engine
-        // menu would open beside it for a few frames, so it never shows then. Fields keep theirs.
-        if (current.current && !isEditableTarget(event.target)) event.preventDefault();
-        return;
-      }
-      event.preventDefault();
-      void invoke("browser_webview_context_menu_at", { request: page }).catch(() => undefined);
+    // While Misty's menu for a page is on its way or open, the renderer's own engine menu would
+    // open beside it for a few frames, so it never shows then. Fields keep theirs.
+    const suppressEngineMenu = (event: MouseEvent) => {
+      if (current.current && !isEditableTarget(event.target)) event.preventDefault();
     };
-    window.addEventListener("contextmenu", forwardContextMenu, true);
+    window.addEventListener("contextmenu", suppressEngineMenu, true);
     return () => {
       disposed = true;
-      window.removeEventListener("contextmenu", forwardContextMenu, true);
+      window.removeEventListener("contextmenu", suppressEngineMenu, true);
       void unlisten.then((stop) => stop());
       const pending = current.current;
       current.current = null;

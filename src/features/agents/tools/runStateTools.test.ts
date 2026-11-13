@@ -21,7 +21,6 @@ import { setRunStateAccount } from "./run-state/documents";
 import { beforeSwap, rows } from "./run-state/fakeMistyDb.test-support";
 import { approvePlan } from "./run-state/plans";
 import { forgetKnownRunsForTests, noteRunOwner as rememberRun } from "./runContexts";
-import { setGoal } from "./run-state/goals";
 import { runStateTools } from "./runStateTools";
 
 const call = (
@@ -132,57 +131,6 @@ describe("plan tools", () => {
       plan_state: "completed",
       remaining: [],
     });
-  });
-});
-
-describe("goal.update", () => {
-  const withGoal = (successCriteria: string[]) =>
-    changeConversationState("me", "chat", (current) =>
-      setGoal(current, { id: "g", objective: "Ship", successCriteria, now: Date.now() }),
-    );
-
-  it("needs a pursued goal", async () => {
-    expect(await refusal(call("goal.update", { status: "unmet", summary: "x" }))).toContain(
-      "no goal being pursued",
-    );
-  });
-
-  it("achieved needs evidence for every criterion, in its own words", async () => {
-    await withGoal(["Tests  pass", "Docs updated"]);
-    expect(
-      await refusal(
-        call("goal.update", {
-          status: "achieved",
-          summary: "done",
-          evidence: [{ criterion: "tests pass", proof: "ran them" }],
-        }),
-      ),
-    ).toContain("every success criterion");
-    await expect(
-      call("goal.update", {
-        status: "achieved",
-        summary: "done",
-        evidence: [
-          { criterion: "tests pass", proof: "ran them" },
-          { criterion: "DOCS updated", proof: "read them" },
-        ],
-      }),
-    ).resolves.toEqual({ status: "recorded", goal_status: "achieved" });
-    expect(events()).toEqual(["goal.updated"]);
-    expect(published[0]!.event).not.toHaveProperty("goal.lastInvocationId");
-    expect((await state()).goal?.lastReport).toMatchObject({ invocation_id: "run" });
-  });
-
-  it("in_progress keeps the goal pursued, and a report stops being possible once it's over", async () => {
-    await withGoal([]);
-    await expect(call("goal.update", { status: "in_progress", summary: "half" })).resolves.toEqual({
-      status: "recorded",
-      goal_status: "pursuing",
-    });
-    await call("goal.update", { status: "unmet", summary: "blocked" });
-    expect(await refusal(call("goal.update", { status: "in_progress", summary: "x" }))).toContain(
-      "no goal being pursued",
-    );
   });
 });
 

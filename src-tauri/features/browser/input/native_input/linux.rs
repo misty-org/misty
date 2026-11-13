@@ -96,12 +96,34 @@ pub(in crate::browser) type Authorize = Arc<dyn Fn() -> Result<(), String> + Sen
 /// One synthesized event, in CSS pixels of the page's viewport.
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum Synth {
-    Motion { x: f64, y: f64, held: Option<u32> },
-    Press { x: f64, y: f64, button: u32, double: bool },
-    Release { x: f64, y: f64, button: u32 },
+    Motion {
+        x: f64,
+        y: f64,
+        held: Option<u32>,
+    },
+    Press {
+        x: f64,
+        y: f64,
+        button: u32,
+        double: bool,
+    },
+    Release {
+        x: f64,
+        y: f64,
+        button: u32,
+    },
     /// Smooth scroll by CSS pixels; positive y scrolls the content down.
-    Scroll { x: f64, y: f64, dx: f64, dy: f64 },
-    Key { keyval: u32, modifiers: u32, down: bool },
+    Scroll {
+        x: f64,
+        y: f64,
+        dx: f64,
+        dy: f64,
+    },
+    Key {
+        keyval: u32,
+        modifiers: u32,
+        down: bool,
+    },
 }
 
 /// WebKitGTK scrolls a smooth delta of 1.0 by one line step (40 CSS pixels).
@@ -118,7 +140,9 @@ pub(crate) fn deliver(view: &webkit2gtk::WebView, synth: Synth) -> Result<(), St
         .window()
         .ok_or("The granted browser must be visible before native input.")?;
     let display = window.display();
-    let seat = display.default_seat().ok_or("No input seat is available.")?;
+    let seat = display
+        .default_seat()
+        .ok_or("No input seat is available.")?;
     let zoom = view.zoom_level().max(0.01);
     let (origin_x, origin_y) = {
         let (_, x, y) = window.origin();
@@ -146,7 +170,12 @@ pub(crate) fn deliver(view: &webkit2gtk::WebView, synth: Synth) -> Result<(), St
     event.set_device(device.as_ref());
     let hardware_keycode = |keyval: u32| {
         gdk::Keymap::for_display(&display)
-            .and_then(|keymap| keymap.entries_for_keyval(keyval).first().map(|key| key.keycode()))
+            .and_then(|keymap| {
+                keymap
+                    .entries_for_keyval(keyval)
+                    .first()
+                    .map(|key| key.keycode())
+            })
             .unwrap_or(0) as u16
     };
     // SAFETY: `event` was made for exactly the variant written below; the window field takes
@@ -302,7 +331,8 @@ async fn send(webview: &Webview, authorize: &Authorize, events: Vec<Synth>) -> R
 pub(in crate::browser) async fn viewport(webview: &Webview) -> Result<(f64, f64), String> {
     let allow: Authorize = Arc::new(|| Ok(()));
     on_view(webview, &allow, |view| {
-        css_viewport(view).ok_or_else(|| "The granted browser must be visible before native input.".into())
+        css_viewport(view)
+            .ok_or_else(|| "The granted browser must be visible before native input.".into())
     })
     .await
 }
@@ -324,17 +354,32 @@ pub(in crate::browser) async fn act(
     match action["kind"].as_str().unwrap_or("") {
         "move" => {
             let (x, y) = point("x", "y");
-            send(webview, &authorize, vec![Synth::Motion { x, y, held: None }]).await?;
+            send(
+                webview,
+                &authorize,
+                vec![Synth::Motion { x, y, held: None }],
+            )
+            .await?;
         }
         "click" => {
             let (x, y) = point("x", "y");
             let button = if action["button"] == "right" { 3 } else { 1 };
             let mut events = vec![Synth::Motion { x, y, held: None }];
             for click in 1..=action["clickCount"].as_u64().unwrap_or(1) {
-                events.push(Synth::Press { x, y, button, double: false });
+                events.push(Synth::Press {
+                    x,
+                    y,
+                    button,
+                    double: false,
+                });
                 // GTK reports a second press in a row as a double press too.
                 if click == 2 {
-                    events.push(Synth::Press { x, y, button, double: true });
+                    events.push(Synth::Press {
+                        x,
+                        y,
+                        button,
+                        double: true,
+                    });
                 }
                 events.push(Synth::Release { x, y, button });
             }
@@ -347,8 +392,17 @@ pub(in crate::browser) async fn act(
                 webview,
                 &authorize,
                 vec![
-                    Synth::Motion { x: from_x, y: from_y, held: None },
-                    Synth::Press { x: from_x, y: from_y, button: 1, double: false },
+                    Synth::Motion {
+                        x: from_x,
+                        y: from_y,
+                        held: None,
+                    },
+                    Synth::Press {
+                        x: from_x,
+                        y: from_y,
+                        button: 1,
+                        double: false,
+                    },
                 ],
             )
             .await?;
@@ -358,13 +412,26 @@ pub(in crate::browser) async fn act(
                     from_x + (to_x - from_x) * fraction,
                     from_y + (to_y - from_y) * fraction,
                 );
-                send(webview, &authorize, vec![Synth::Motion { x, y, held: Some(1) }]).await?;
+                send(
+                    webview,
+                    &authorize,
+                    vec![Synth::Motion {
+                        x,
+                        y,
+                        held: Some(1),
+                    }],
+                )
+                .await?;
                 tokio::time::sleep(Duration::from_millis(12)).await;
             }
             send(
                 webview,
                 &authorize,
-                vec![Synth::Release { x: to_x, y: to_y, button: 1 }],
+                vec![Synth::Release {
+                    x: to_x,
+                    y: to_y,
+                    button: 1,
+                }],
             )
             .await?;
         }
@@ -400,8 +467,16 @@ pub(in crate::browser) async fn act(
                 webview,
                 &authorize,
                 vec![
-                    Synth::Key { keyval, modifiers, down: true },
-                    Synth::Key { keyval, modifiers, down: false },
+                    Synth::Key {
+                        keyval,
+                        modifiers,
+                        down: true,
+                    },
+                    Synth::Key {
+                        keyval,
+                        modifiers,
+                        down: false,
+                    },
                 ],
             )
             .await?;

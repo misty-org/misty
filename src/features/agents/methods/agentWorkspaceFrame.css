@@ -1,6 +1,5 @@
 /* The Agents workspace: its sidebar, canvas, composer and rows, in cascade order. */
 @import "./agentWorkspaceSidebar.css";
-@import "./agentWorkspaceSidebarFoot.css";
 @import "./agentWorkspaceCanvas.css";
 @import "./agentWorkspaceComposer.css";
 @import "./agentWorkspaceRows.css";

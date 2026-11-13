@@ -76,7 +76,6 @@ export function useSpaceSegment(
           {spaces.map((space) => (
             <MenuRadioItem
               key={space.id}
-              icon={space.id === personal?.id ? House : Layers}
               value={space.id}
               label={space.name}
               disabled={locked && space.id !== current}

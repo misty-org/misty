@@ -12,9 +12,9 @@
  * says that rather than pretending there are no servers. Misty's own server is listed by the
  * session but never offered for editing.
  */
-import { Activity, Bot, Folder, FolderMinus, FolderOpen, RefreshCw } from "lucide-react";
+import { Activity, FolderOpen, RefreshCw } from "lucide-react";
 import { useMemo, useState } from "react";
-import { EngineMark, hasEngineMark } from "../EngineMark";
+import { EngineMark } from "../EngineMark";
 import { folderName, useLinkedFolders } from "../host";
 import { DesktopSettingsNotice, DesktopSettingsSection as Section } from "@/features/settings";
 import {
@@ -36,14 +36,13 @@ import { mcpApi } from "./api";
 import { McpDetailDialog } from "./McpDetailDialog";
 import { McpProbeConfirmHost } from "./McpProbeConfirmHost";
 import { copy, engineLabel, runtimeStatusText, sourceLabel } from "./copy";
-import { EnableToggle, LaunchModeToggle } from "./LaunchControls";
+import { EnableToggle } from "./EnableToggle";
 import { latestCheckedAt, probeable, useAutoProbe, useMcpProbeStore } from "./probe-store";
 import { ProbeActionButton, ProbeStatusChip } from "./ProbeControls";
 import type {
   McpConfigEntry,
   McpEngineId,
   McpEngineInventory,
-  McpLaunchMode,
   McpRuntimeEntry,
   McpRuntimeSection,
   McpSourceInfo,
@@ -66,7 +65,6 @@ function ConfigRow({
   workspacePath,
   onOpen,
   onToggle,
-  onLaunchMode,
 }: {
   entry: McpConfigEntry;
   pending: boolean;
@@ -74,7 +72,6 @@ function ConfigRow({
   workspacePath: string | null;
   onOpen: () => void;
   onToggle: (enabled: boolean) => void;
-  onLaunchMode: (mode: McpLaunchMode) => void;
 }) {
   const meta = entry.command
     ? `${entry.command}${entry.argsCount > 0 ? ` +${entry.argsCount}` : ""}`
@@ -109,21 +106,19 @@ function ConfigRow({
         <ProbeStatusChip entry={entry} />
       </Pressable>
       {probeable(entry) ? <ProbeActionButton entry={entry} workspacePath={workspacePath} /> : null}
-      <LaunchModeToggle entry={entry} pending={pending} onChange={onLaunchMode} />
       <EnableToggle entry={entry} pending={pending} onChange={onToggle} />
     </li>
   );
 }
 
-/** One engine's configured servers; shared by the settings block and the `/mcp` panel so both show the same state. */
-export function McpConfigList({
+/** One engine's configured servers. */
+function McpConfigList({
   entries,
   pendingId,
   selectedId,
   workspacePath,
   onOpen,
   onToggle,
-  onLaunchMode,
 }: {
   entries: McpConfigEntry[];
   pendingId: string | null;
@@ -131,7 +126,6 @@ export function McpConfigList({
   workspacePath: string | null;
   onOpen: (entry: McpConfigEntry) => void;
   onToggle: (entry: McpConfigEntry, enabled: boolean) => void;
-  onLaunchMode: (entry: McpConfigEntry, mode: McpLaunchMode) => void;
 }) {
   return (
     <ul className="divide-y divide-charcoal-border">
@@ -144,7 +138,6 @@ export function McpConfigList({
           workspacePath={workspacePath}
           onOpen={() => onOpen(entry)}
           onToggle={(enabled) => onToggle(entry, enabled)}
-          onLaunchMode={(mode) => onLaunchMode(entry, mode)}
         />
       ))}
     </ul>
@@ -174,7 +167,7 @@ function EmptyLine({ children }: { children: string }) {
 }
 
 /** The runtime list, as a session reported it. */
-export function RuntimeBlock({
+function RuntimeBlock({
   section,
   filter,
   query,
@@ -222,7 +215,7 @@ export function RuntimeBlock({
 
 /** Where Misty looks for the engine's config. Missing files still show, so an empty list never
  *  reads as "this CLI has no MCP". */
-export function McpSourceHint({
+function McpSourceHint({
   sources,
   workspacePath = null,
 }: {
@@ -304,7 +297,7 @@ function EngineChoice({
           <SelectItem
             key={item.id}
             value={item.id}
-            icon={hasEngineMark(item.id) ? <EngineMark engine={item.id} size={14} /> : Bot}
+            icon={<EngineMark engine={item.id} size={14} />}
             label={
               <>
                 {engineLabel(item.id)}
@@ -343,9 +336,9 @@ function FolderChoice({
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
-        <SelectItem value={NO_FOLDER} icon={FolderMinus} label={copy.folderNone} />
+        <SelectItem value={NO_FOLDER} label={copy.folderNone} />
         {folders.map((folder) => (
-          <SelectItem key={folder} value={folder} icon={Folder} label={folderName(folder)} />
+          <SelectItem key={folder} value={folder} label={folderName(folder)} />
         ))}
       </SelectContent>
     </Select>
@@ -414,10 +407,6 @@ export function McpSection() {
   const handleToggle = (entry: McpConfigEntry, enabled: boolean) => {
     setToggleError(null);
     void store.setEnabled(entry, enabled).catch(reportError);
-  };
-  const handleLaunchMode = (entry: McpConfigEntry, mode: McpLaunchMode) => {
-    setToggleError(null);
-    void store.setLaunchMode(entry, mode).catch(reportError);
   };
   const handleRefresh = () => {
     if (refreshing) return;
@@ -520,7 +509,6 @@ export function McpSection() {
               workspacePath={workspace}
               onOpen={(entry) => setSelectedId(entry.id)}
               onToggle={handleToggle}
-              onLaunchMode={handleLaunchMode}
             />
           )}
         </Section>
@@ -534,7 +522,6 @@ export function McpSection() {
           pending={store.pendingId === selected.id}
           workspacePath={workspace}
           onToggle={(enabled) => handleToggle(selected, enabled)}
-          onLaunchMode={(mode) => handleLaunchMode(selected, mode)}
           onClose={() => setSelectedId(null)}
         />
       ) : null}

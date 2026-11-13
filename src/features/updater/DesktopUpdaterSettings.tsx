@@ -1,6 +1,6 @@
 import { reserveMistyUpdate } from "@/features/app-windows";
 import { getVersion } from "@tauri-apps/api/app";
-import { relaunch } from "@tauri-apps/plugin-process";
+import { relaunch } from "@/shared/platform/relaunch";
 import { check, type Update } from "@tauri-apps/plugin-updater";
 import { useCallback, useEffect, useRef, useState } from "react";
 

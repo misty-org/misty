@@ -4,7 +4,6 @@ import {
   computeDiffLines,
   countEditLines,
   createEditLineStatsBuilder,
-  deriveEditLineStats,
   isEditToolName,
   type EditToolCall,
 } from "./editLineStats";
@@ -87,37 +86,6 @@ describe("deriveEditLineStats", () => {
         ?.additions,
     ).toBe(2);
     expect(first.get("a.ts")?.additions).toBe(1);
-  });
-  it("counts gitignored paths git status never reports", () => {
-    const stats = deriveEditLineStats([
-      editRow(1, ".omp/docs/x.md", { old_string: "one\ntwo", new_string: "uno" }),
-    ]);
-    expect(stats.get(".omp/docs/x.md")).toEqual({ additions: 1, deletions: 2 });
-  });
-
-  it("accumulates repeated edits of one path instead of the last winning", () => {
-    const stats = deriveEditLineStats([
-      editRow(1, "src/a.ts", { content: "a\nb" }),
-      editRow(2, "src/a.ts", { old_string: "x\ny\nz", new_string: "" }),
-      editRow(3, "src/a.ts", { patch: "@@ -1 +1,2 @@\n+p\n+q" }),
-    ]);
-    expect(stats.get("src/a.ts")).toEqual({ additions: 4, deletions: 3 });
-  });
-
-  it("ignores non-file targets carrying a URI scheme", () => {
-    const stats = deriveEditLineStats([
-      editRow(1, "xd://ast_edit", { content: "a\nb\nc" }),
-      editRow(2, "src/a.ts", { content: "a" }),
-    ]);
-    expect([...stats.keys()]).toEqual(["src/a.ts"]);
-  });
-
-  it("skips rows that are not edit-class tools", () => {
-    const stats = deriveEditLineStats([
-      editRow(1, "src/a.ts", { content: "a\nb" }, "Read"),
-      { name: "Bash", args: { command: "write" } },
-    ]);
-    expect(stats.size).toBe(0);
   });
 });
 

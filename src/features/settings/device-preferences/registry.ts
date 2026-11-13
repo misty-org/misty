@@ -32,14 +32,6 @@ export const settingSearchEntries: SettingSearchEntry[] = [
   // Tab orders are edited in place.
   ...settingDefinitions.filter((definition) => !definition.id.startsWith("collections.tabs.")),
   {
-    id: "agents.misty.enabled",
-    label: "Enable Misty",
-    page: "misty",
-    owner: "device",
-    platforms: ["desktop"],
-    keywords: ["AI", "copilot", "hosted"],
-  },
-  {
     id: "agents.payments.ask",
     label: "Ask before paying",
     page: "agents-permissions",

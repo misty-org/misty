@@ -2,20 +2,19 @@ import { create } from "zustand";
 import { aiSurfaceApi } from "./api";
 import { aiPaneSession, aiSessionKey } from "./invocationSessions";
 import { artifactActions } from "./storeArtifacts";
-import { clearSpeechTimer, makeSpeech, patchSession } from "./storeRuntime";
+import { patchSession } from "./storeRuntime";
 import type {
   AiArtifact,
   AiCaptureAttachment,
-  AiCompanionAnchor,
   AiTranscriptMessage,
   AiInvocationState,
   AiSurfaceAdapter,
   AiSuggestedAction,
   MistyApprovalPrompt,
-  MistyPresencePhase,
-  MistySpeech,
   MistyUndoReceipt,
 } from "./invocationTypes";
+import { openMisty } from "../../conversations/ask/handoff";
+import { mistyContextRef } from "../../conversations/context/context";
 
 export interface AiPaneSession {
   accountId: string;
@@ -40,15 +39,12 @@ interface AiPaneRegistration {
   element: HTMLElement;
 }
 
+/** The pane whose change waits on approval, and the last change that can be undone. */
 interface MistyCompanionSession {
-  phase: MistyPresencePhase;
   accountId?: string;
   paneId?: string;
-  anchor?: AiCompanionAnchor;
-  speech?: MistySpeech;
   approval?: MistyApprovalPrompt;
   undo?: MistyUndoReceipt;
-  completedCount: number;
 }
 
 export interface AiSurfaceState {
@@ -57,13 +53,11 @@ export interface AiSurfaceState {
   companion: MistyCompanionSession;
   registerPane: (registration: AiPaneRegistration) => () => void;
   updatePaneAdapter: (accountId: string, paneId: string, adapter: AiSurfaceAdapter) => void;
-  follow: (accountId: string, paneId: string, anchor?: AiCompanionAnchor) => void;
-  summon: (accountId: string, paneId: string, anchor?: AiCompanionAnchor) => void;
+  summon: (accountId: string, paneId: string) => void;
   returnHome: () => void;
   dismiss: () => void;
   setPrompt: (accountId: string, paneId: string, prompt: string) => void;
   setCapture: (accountId: string, paneId: string, capture?: AiCaptureAttachment) => void;
-  settle: () => void;
   setContextBoundary: (accountId: string, paneId: string, boundary: string) => void;
   submit: (
     accountId: string,
@@ -88,7 +82,7 @@ const streamStops = new Map<string, () => void>();
 export const useAiSurfaceStore = create<AiSurfaceState>((set, get) => ({
   sessions: {},
   registrations: {},
-  companion: { phase: "home", completedCount: 0 },
+  companion: {},
 
   registerPane: (registration) => {
     const key = aiSessionKey(registration.accountId, registration.paneId);
@@ -115,23 +109,7 @@ export const useAiSurfaceStore = create<AiSurfaceState>((set, get) => ({
     }));
   },
 
-  follow: (accountId, paneId, anchor) => {
-    const key = aiSessionKey(accountId, paneId);
-    const registration = get().registrations[key] ?? Object.values(get().registrations)[0];
-    const resolvedAccountId = accountId || registration?.accountId || "";
-    const resolvedPaneId = paneId || registration?.paneId || "";
-    get().summon(resolvedAccountId, resolvedPaneId, anchor);
-    set((state) => ({
-      companion: {
-        ...state.companion,
-        phase: "following",
-        accountId: resolvedAccountId || state.companion.accountId,
-        paneId: resolvedPaneId || state.companion.paneId,
-      },
-    }));
-  },
-
-  summon: (accountId, paneId, _anchor) => {
+  summon: (accountId, paneId) => {
     const registration = get().registrations[aiSessionKey(accountId, paneId)];
     if (!registration) return;
     void get().submit(accountId, paneId, registration.adapter);
@@ -145,32 +123,16 @@ export const useAiSurfaceStore = create<AiSurfaceState>((set, get) => ({
         interactionOpen: inFlight || Boolean(current.approval),
       });
     }
-    clearSpeechTimer(current.accountId);
     set({
       companion: {
-        phase: "home",
         accountId: current.accountId,
         paneId: current.paneId,
-        speech: current.speech,
         approval: current.approval,
         undo: current.undo,
-        completedCount: current.completedCount,
       },
     });
   },
   dismiss: () => get().returnHome(),
-  settle: () => {
-    const current = get().companion;
-    if (current.phase === "home" || !current.accountId || !current.paneId) return;
-    set({
-      companion: {
-        ...current,
-        phase: "following",
-        speech: undefined,
-        approval: undefined,
-      },
-    });
-  },
   setPrompt: (accountId, paneId, prompt) =>
     patchSession(set, get, accountId, paneId, { prompt, error: undefined }),
   setCapture: (accountId, paneId, capture) =>
@@ -197,8 +159,6 @@ export const useAiSurfaceStore = create<AiSurfaceState>((set, get) => ({
 
   submit: async (accountId, paneId, adapter, action) => {
     const current = aiPaneSession(get().sessions, accountId, paneId);
-    const { openMisty } = await import("@/features/agents/conversations/ask/handoff");
-    const { mistyContextRef } = await import("@/features/agents/conversations/context/context");
     await openMisty({
       accountId,
       paneId,
@@ -215,13 +175,6 @@ export const useAiSurfaceStore = create<AiSurfaceState>((set, get) => ({
     await aiSurfaceApi.cancelInvocation(current.invocationId).catch(() => undefined);
     streamStops.get(aiSessionKey(accountId, paneId))?.();
     patchSession(set, get, accountId, paneId, { state: "canceled" });
-    set((state) => ({
-      companion: {
-        ...state.companion,
-        phase: "speaking",
-        speech: makeSpeech("reply", "Stopped."),
-      },
-    }));
   },
 
   ...artifactActions(set, get),
@@ -231,7 +184,6 @@ export const useAiSurfaceStore = create<AiSurfaceState>((set, get) => ({
       stop();
       streamStops.delete(key);
     }
-    clearSpeechTimer(accountId);
     set((state) => ({
       sessions: Object.fromEntries(
         Object.entries(state.sessions).filter(([, value]) => value.accountId !== accountId),
@@ -239,10 +191,7 @@ export const useAiSurfaceStore = create<AiSurfaceState>((set, get) => ({
       registrations: Object.fromEntries(
         Object.entries(state.registrations).filter(([, value]) => value.accountId !== accountId),
       ),
-      companion:
-        state.companion.accountId === accountId
-          ? { phase: "home", completedCount: 0 }
-          : state.companion,
+      companion: state.companion.accountId === accountId ? {} : state.companion,
     }));
   },
 }));
@@ -258,7 +207,7 @@ export function resetAiSurfaceAccountState(accountId?: string): void {
     useAiSurfaceStore.setState({
       sessions: {},
       registrations: {},
-      companion: { phase: "home", completedCount: 0 },
+      companion: {},
     });
   }
 }

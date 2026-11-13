@@ -1,6 +1,7 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 import { create } from "zustand";
 import { gitApi, gitErrorText, isNotARepo, type BranchInfo, type GitStatus } from "./gitApi";
+import { useFilesStore } from "../files/filesStore";
 
 const TTL_MS = 30_000;
 
@@ -54,9 +55,10 @@ const inflight = new Map<string, Promise<void>>();
 
 /** The file tree's Git colors and badges go stale after any change; it reads them again. */
 function refreshFileTree() {
-  // Imported when needed: the files store imports this one's diff view.
-  void import("../files/filesStore")
-    .then((files) => files.useFilesStore.getState().refreshTree())
+  // The files store imports this one's diff view; its binding is read only here, at run time.
+  void useFilesStore
+    .getState()
+    .refreshTree()
     .catch(() => undefined);
 }
 

@@ -47,7 +47,6 @@ pub(crate) async fn change_account_if<T>(
     if let Some(app) = app {
         // Menus and windows list the new account's profiles.
         crate::browser::app_windows::profiles_changed(app);
-        seed_first_profile();
     }
     result
 }

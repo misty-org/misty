@@ -108,20 +108,6 @@ fn a_row_this_version_cannot_read_is_kept_not_lost() {
 }
 
 #[test]
-fn removing_a_profile_leaves_the_others() {
-    let (_directory, mut store, _key) = store();
-    store
-        .write(P, C, vec![("a".into(), Some(record("a", "x")))])
-        .unwrap();
-    store
-        .write("profile-b", C, vec![("a".into(), Some(record("a", "y")))])
-        .unwrap();
-    store.remove_profile(P).unwrap();
-    assert!(store.list(P, C).unwrap().is_empty());
-    assert_eq!(store.list("profile-b", C).unwrap().len(), 1);
-}
-
-#[test]
 fn a_crash_halfway_through_a_page_leaves_everything_as_it_was() {
     let (_directory, mut store, _key) = store();
     let body = serde_json::to_vec(&record("a", "x")).unwrap();

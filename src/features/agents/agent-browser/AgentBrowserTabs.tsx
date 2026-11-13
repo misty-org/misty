@@ -1,6 +1,6 @@
 import { Globe, Plus, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { parseBrowserViewState } from "@/features/app-windows";
+import { browserFaviconUrl } from "@/features/app-windows";
 import { IconButton, OverflowFadeText, Pressable, Spinner, Tooltip } from "@/shared/ui";
 import { addPersonTab } from "../tabs/agentPersonTabs";
 import { closeAgentTab } from "../tabs/agentTabs";
@@ -25,8 +25,7 @@ const agentTabLabel = (tab: AgentBrowserTab | undefined) => {
 
 /** A tab's site icon, a spinner while it loads, as in the window's tab sidebar. */
 function AgentTabIcon({ tab, active }: { tab: AgentBrowserTab | undefined; active: boolean }) {
-  const icon =
-    tab?.faviconUrl ?? (tab?.url ? parseBrowserViewState({ url: tab.url }).faviconUrl : null);
+  const icon = tab?.faviconUrl ?? (tab?.url ? browserFaviconUrl(tab.url) : null);
   const [failed, setFailed] = useState(false);
   useEffect(() => setFailed(false), [icon]);
   if (tab?.loading)

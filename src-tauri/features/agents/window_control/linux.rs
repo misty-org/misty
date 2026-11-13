@@ -107,7 +107,12 @@ fn frame_of(window: &tauri::Window) -> Result<(i32, i32, i32, i32), String> {
             (x, y)
         })
         .unwrap_or_default();
-    Ok((x, y, toplevel.allocated_width(), toplevel.allocated_height()))
+    Ok((
+        x,
+        y,
+        toplevel.allocated_width(),
+        toplevel.allocated_height(),
+    ))
 }
 
 /// One capture of the display under control, or of the Misty window.
@@ -287,20 +292,26 @@ async fn action(app: &AppHandle, input: &Value) -> Result<Value, String> {
                 i64::from(frame.3),
             ]
         {
-            return Err("browser_snapshot_stale: the window moved or resized; inspect again".into());
+            return Err(
+                "browser_snapshot_stale: the window moved or resized; inspect again".into(),
+            );
         }
         let action = &input["action"];
         let views = views(&window);
         let target = |label: Option<String>| {
             let label = label.or_else(|| {
-                crate::browser::app_windows::primary_webview(app).map(|view| view.label().to_owned())
+                crate::browser::app_windows::primary_webview(app)
+                    .map(|view| view.label().to_owned())
             })?;
             views.iter().find(|view| view.label == label)
         };
         match action["kind"].as_str().unwrap_or("") {
             kind @ ("point" | "scroll") => {
                 let fraction = |key: &str| action[key].as_f64().unwrap_or(0.0).clamp(0.0, 1.0);
-                let (x, y) = (fraction("x") * f64::from(frame.2), fraction("y") * f64::from(frame.3));
+                let (x, y) = (
+                    fraction("x") * f64::from(frame.2),
+                    fraction("y") * f64::from(frame.3),
+                );
                 let view = views
                     .iter()
                     .find(|view| {
@@ -312,19 +323,39 @@ async fn action(app: &AppHandle, input: &Value) -> Result<Value, String> {
                     .ok_or("Only the Misty workspace can be controlled")?;
                 use webkit2gtk::WebViewExt;
                 let zoom = view.widget.zoom_level().max(0.01);
-                let (css_x, css_y) = ((x - f64::from(view.x)) / zoom, (y - f64::from(view.y)) / zoom);
+                let (css_x, css_y) = (
+                    (x - f64::from(view.x)) / zoom,
+                    (y - f64::from(view.y)) / zoom,
+                );
                 if let Ok(mut last) = TARGET.lock() {
                     *last = Some(view.label.clone());
                 }
                 let events = if kind == "point" {
                     vec![
-                        Synth::Motion { x: css_x, y: css_y, held: None },
-                        Synth::Press { x: css_x, y: css_y, button: 1, double: false },
-                        Synth::Release { x: css_x, y: css_y, button: 1 },
+                        Synth::Motion {
+                            x: css_x,
+                            y: css_y,
+                            held: None,
+                        },
+                        Synth::Press {
+                            x: css_x,
+                            y: css_y,
+                            button: 1,
+                            double: false,
+                        },
+                        Synth::Release {
+                            x: css_x,
+                            y: css_y,
+                            button: 1,
+                        },
                     ]
                 } else {
                     vec![
-                        Synth::Motion { x: css_x, y: css_y, held: None },
+                        Synth::Motion {
+                            x: css_x,
+                            y: css_y,
+                            held: None,
+                        },
                         Synth::Scroll {
                             x: css_x,
                             y: css_y,
@@ -345,10 +376,24 @@ async fn action(app: &AppHandle, input: &Value) -> Result<Value, String> {
             "key" => {
                 let last = TARGET.lock().ok().and_then(|last| last.clone());
                 let view = target(last).ok_or("Click into Misty before pressing keys")?;
-                let (keyval, modifiers) =
-                    key_of(action["key"].as_str().unwrap_or("")).ok_or("Unsupported workspace key")?;
-                deliver(&view.widget, Synth::Key { keyval, modifiers, down: true })?;
-                deliver(&view.widget, Synth::Key { keyval, modifiers, down: false })?;
+                let (keyval, modifiers) = key_of(action["key"].as_str().unwrap_or(""))
+                    .ok_or("Unsupported workspace key")?;
+                deliver(
+                    &view.widget,
+                    Synth::Key {
+                        keyval,
+                        modifiers,
+                        down: true,
+                    },
+                )?;
+                deliver(
+                    &view.widget,
+                    Synth::Key {
+                        keyval,
+                        modifiers,
+                        down: false,
+                    },
+                )?;
             }
             _ => return Err("Unsupported workspace action".into()),
         }

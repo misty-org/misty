@@ -6,12 +6,6 @@ type Held = { message: string; onDismiss?: () => void };
 const notices = vi.hoisted(() => ({ shown: [] as Held[] }));
 
 vi.mock("../sessions/authState", () => ({ useAuth: () => ({ user: { id: "account" } }) }));
-vi.mock("@/api/deployment/serverChoice", () => ({
-  currentApiBase: () => "https://pro",
-  mistyCloudServer: () => "https://pro",
-  mistyWebsite: () => "https://site",
-}));
-vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl: vi.fn() }));
 vi.mock("@/shared/ui", () => ({
   // Records what is held up on each render, as the notice stack would show it.
   useNotice: (show: boolean, options: Held) => {
@@ -21,8 +15,7 @@ vi.mock("@/shared/ui", () => ({
 
 import { AccountSuspendedNotice } from "./AccountSuspendedNotice";
 
-const noProShown = () =>
-  notices.shown.some((notice) => /doesn.t have Misty Pro/.test(notice.message));
+const limitShown = () => notices.shown.some((notice) => /reached a limit/.test(notice.message));
 
 beforeEach(() => {
   localStorage.clear();
@@ -31,15 +24,15 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
-it("says an account has no Misty Pro once, even after a restart", () => {
+it("says an account reached its limit once, even after a restart", () => {
   const first = render(<AccountSuspendedNotice />);
-  expect(noProShown()).toBe(true);
+  expect(limitShown()).toBe(true);
   act(() => notices.shown[notices.shown.length - 1]!.onDismiss!());
   first.unmount();
 
   notices.shown = [];
   render(<AccountSuspendedNotice />);
-  expect(noProShown()).toBe(false);
+  expect(limitShown()).toBe(false);
 });
 
 it("says so again if the account got devices and lost them", () => {
@@ -51,5 +44,5 @@ it("says so again if the account got devices and lost them", () => {
   notices.shown = [];
   useAccountNotSetUp.setState({ notSetUp: true, hasDevices: false });
   render(<AccountSuspendedNotice />);
-  expect(noProShown()).toBe(true);
+  expect(limitShown()).toBe(true);
 });

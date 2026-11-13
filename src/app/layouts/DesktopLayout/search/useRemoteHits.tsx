@@ -98,7 +98,7 @@ export function useRemoteHits({
               icon: icon(FileText),
               match,
               open: () =>
-                openRoute(`/agents?view=tutor&item=notebook:${encodeURIComponent(notebook.id)}`),
+                openRoute(`/agents?view=lab&item=notebook:${encodeURIComponent(notebook.id)}`),
             },
           ];
         });

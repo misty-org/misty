@@ -92,26 +92,9 @@ pub(in crate::browser) fn browser_target_observation(
     session: &BrowserSession,
     url: &url::Url,
 ) -> Value {
-    let provider = session
-        .profile_provider
-        .as_deref()
-        .or(session.provider_id.as_deref());
-    let callback_page = session
-        .oauth_callback
-        .as_ref()
-        .is_some_and(|(callback, _)| {
-            url::Url::parse(&callback.url).is_ok_and(|expected| {
-                expected.origin() == url.origin() && expected.path() == url.path()
-            })
-        });
-    let required =
-        callback_page || crate::browser::provider_accounts::authentication_required(provider, url);
-    let mut target = json!({"scopeId":session.scope_id,"origin":browser_page_origin(url),"authentication":if required {"required"} else {"unknown"},"accountIdentity":"unverified","trust":"host-observation","observedAt":Utc::now().to_rfc3339()});
+    let mut target = json!({"scopeId":session.scope_id,"origin":browser_page_origin(url),"accountIdentity":"unverified","trust":"host-observation","observedAt":Utc::now().to_rfc3339()});
     if let Some(profile) = session.context_profile_id() {
         target["profileId"] = json!(profile);
-    }
-    if let Some(provider) = provider {
-        target["providerId"] = json!(provider);
     }
     target
 }

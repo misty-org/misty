@@ -14,9 +14,9 @@ use tauri::{AppHandle, Manager};
 use xcap::Monitor;
 
 use super::driver::{
-    action_click, action_drag, action_key, action_move, action_scroll, action_type,
-    capture_frame, display_info_of, require_accessibility, require_screen_recording,
-    screen_recording_granted, DisplayInfo,
+    action_click, action_drag, action_key, action_move, action_scroll, action_type, capture_frame,
+    display_info_of, require_accessibility, require_screen_recording, screen_recording_granted,
+    DisplayInfo,
 };
 use crate::agents::run_control::tool_gate::{self, Admission};
 
@@ -62,13 +62,17 @@ fn tool(name: &str, description: &str, input: Value, read_only: bool) -> Value {
 
 /// Every computer tool, in MCP's shape, by the names an engine calls.
 pub(crate) fn offered() -> Vec<Value> {
-    let display_only = schema(json!({ "display_id": { "type": "integer", "description": DISPLAY } }), &[]);
+    let display_only = schema(
+        json!({ "display_id": { "type": "integer", "description": DISPLAY } }),
+        &[],
+    );
     let element = json!({
         "state": { "type": "string", "description": "state_id from computer_get_app_state (such as \"s3\"); a stale one is refused." },
         "ref": { "type": "integer", "description": "The element's ref from the tree: the number in brackets, such as [4]." },
     });
     let mut element_value = element.clone();
-    element_value["value"] = json!({ "type": "string", "description": "The value to write into the field." });
+    element_value["value"] =
+        json!({ "type": "string", "description": "The value to write into the field." });
     vec![
         tool("computer_screenshot", "Capture a screenshot of a display. Returns a JPEG; every coordinate the other tools take is in its pixels.", display_only.clone(), true),
         tool("computer_list_displays", "List the connected displays with their ids, sizes and scale factors.", schema(json!({}), &[]), true),
@@ -139,20 +143,43 @@ pub(crate) fn misty_name(wire: &str) -> Option<String> {
 #[derive(Debug, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 enum SequenceAction {
-    LeftClick { x: f64, y: f64 },
-    RightClick { x: f64, y: f64 },
-    DoubleClick { x: f64, y: f64 },
-    MouseMove { x: f64, y: f64 },
-    Drag { from_x: f64, from_y: f64, to_x: f64, to_y: f64 },
+    LeftClick {
+        x: f64,
+        y: f64,
+    },
+    RightClick {
+        x: f64,
+        y: f64,
+    },
+    DoubleClick {
+        x: f64,
+        y: f64,
+    },
+    MouseMove {
+        x: f64,
+        y: f64,
+    },
+    Drag {
+        from_x: f64,
+        from_y: f64,
+        to_x: f64,
+        to_y: f64,
+    },
     Scroll {
         #[serde(default)]
         delta_x: i32,
         #[serde(default)]
         delta_y: i32,
     },
-    Type { text: String },
-    Key { key: String },
-    Wait { ms: u64 },
+    Type {
+        text: String,
+    },
+    Key {
+        key: String,
+    },
+    Wait {
+        ms: u64,
+    },
 }
 
 fn run_sequence_step(action: &SequenceAction, display: Option<u32>) -> Result<String, String> {
@@ -211,7 +238,9 @@ fn action_result(message: String, display: Option<u32>) -> Value {
                     frame.width, frame.height
                 )));
             }
-            Err(error) => blocks.push(text_block(format!("(The screenshot after failed: {error})"))),
+            Err(error) => blocks.push(text_block(format!(
+                "(The screenshot after failed: {error})"
+            ))),
         }
     }
     json!({ "content": blocks })
@@ -336,10 +365,8 @@ fn run(name: &str, input: &Value) -> Result<Value, String> {
         }
         "computer.sequence" => {
             require_accessibility()?;
-            let actions: Vec<SequenceAction> =
-                serde_json::from_value(input["actions"].clone()).map_err(|error| {
-                    format!("The actions aren't valid: {error}")
-                })?;
+            let actions: Vec<SequenceAction> = serde_json::from_value(input["actions"].clone())
+                .map_err(|error| format!("The actions aren't valid: {error}"))?;
             if actions.is_empty() {
                 return Err("Give at least one action.".into());
             }

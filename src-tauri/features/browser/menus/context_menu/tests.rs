@@ -1,16 +1,13 @@
 use super::*;
 fn fixture() -> AskContext {
     let page: PageContext = serde_json::from_value(json!({
-            "url": "https://example.com/article", "documentRevision": "1:2", "title": "Pilot", "content": "Please reply", "selection": false, "editable": false, "link": "", "image": ""
+            "url": "https://example.com/article", "selection": false, "editable": false, "link": "", "image": ""
         })).unwrap();
     AskContext {
         id: "view".into(),
         scope_id: "scope".into(),
         space_id: Some("family".into()),
         profile_id: Some("profile".into()),
-        provider_id: None,
-        revision: "1:2".into(),
-        content_hash: "hash".into(),
         page,
     }
 }

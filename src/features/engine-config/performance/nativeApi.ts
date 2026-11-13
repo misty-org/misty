@@ -6,6 +6,7 @@ import { invoke } from "@/native/invoke";
 import { pickSaveFile } from "@/native/sandbox";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import type { NativePerformanceDiagnostics } from "./types";
+import { getVersion } from "@tauri-apps/api/app";
 
 /** The native side of the performance panel (`engine_config::metrics`). */
 export const performanceApi = {
@@ -32,6 +33,5 @@ export async function listen<T>(
 /** Misty's version, for the report. */
 export async function appVersion(): Promise<string | null> {
   if (!hasTauriInternals()) return null;
-  const { getVersion } = await import("@tauri-apps/api/app");
   return getVersion();
 }

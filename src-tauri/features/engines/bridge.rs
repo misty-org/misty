@@ -292,12 +292,22 @@ fn route(payload: &Value) {
         "usage" => {
             let (used, window) = context_usage(data);
             let mut event = json!({ "type": "usage.updated", "used": used, "window": window });
-            let number = |names: &[&str]| names.iter().find_map(|name| data.get(*name).and_then(Value::as_u64));
+            let number = |names: &[&str]| {
+                names
+                    .iter()
+                    .find_map(|name| data.get(*name).and_then(Value::as_u64))
+            };
             for (field, names) in [
                 ("input", &["input_tokens", "inputTokens", "input"][..]),
                 ("output", &["output_tokens", "outputTokens", "output"][..]),
-                ("cacheRead", &["cache_read_input_tokens", "cachedInputTokens", "cacheRead"][..]),
-                ("cacheWrite", &["cache_creation_input_tokens", "cacheWrite"][..]),
+                (
+                    "cacheRead",
+                    &["cache_read_input_tokens", "cachedInputTokens", "cacheRead"][..],
+                ),
+                (
+                    "cacheWrite",
+                    &["cache_creation_input_tokens", "cacheWrite"][..],
+                ),
             ] {
                 if let Some(value) = number(names) {
                     event[field] = json!(value);
@@ -376,7 +386,10 @@ fn route(payload: &Value) {
             if let Some(wire) = data["toolUseId"].as_str() {
                 denied["toolCallId"] = json!(wire);
             }
-            if let Some(path) = data["path"].as_str().or_else(|| data["input"]["file_path"].as_str()) {
+            if let Some(path) = data["path"]
+                .as_str()
+                .or_else(|| data["input"]["file_path"].as_str())
+            {
                 denied["path"] = json!(path);
             }
             send_to(run_id, denied);
@@ -613,7 +626,10 @@ fn start_tool(run_id: &str, wire: Option<String>, name: &str, args: Option<&Valu
     }
     if let Some(args) = args {
         event["args"] = clip_value(args);
-        if let Some(path) = ["file_path", "path", "notebook_path"].iter().find_map(|k| args[*k].as_str()) {
+        if let Some(path) = ["file_path", "path", "notebook_path"]
+            .iter()
+            .find_map(|k| args[*k].as_str())
+        {
             event["path"] = json!(path);
         }
     }

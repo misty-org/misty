@@ -38,8 +38,8 @@ use tokio::io::{AsyncBufReadExt, AsyncRead, BufReader};
 use tokio::process::Child;
 use tokio::time::{sleep, Instant};
 
-use crate::engines::{command_for_binary, resolve};
 use crate::engines::support::settings::AppSettings;
+use crate::engines::{command_for_binary, resolve};
 
 const DEFAULT_HOST: &str = "127.0.0.1";
 const DEFAULT_PORT: u16 = 3080;
@@ -290,7 +290,9 @@ fn store_credentials(origin: &str, credentials: HostCredentials) {
     map.insert(origin.to_string(), credentials);
     match serde_json::to_string_pretty(&map) {
         Ok(content) => {
-            if let Err(error) = crate::engines::support::settings::atomic_write(&credentials_path(), &content) {
+            if let Err(error) =
+                crate::engines::support::settings::atomic_write(&credentials_path(), &content)
+            {
                 eprintln!("[dsh] persisting host credentials failed: {error}");
             }
         }
@@ -622,7 +624,9 @@ pub(crate) async fn probe_describe(origin: &str) -> ProbeOutcome {
         return ProbeOutcome::Unauthorized;
     }
     if envelope.get("type").and_then(Value::as_str) != Some("server-response") {
-        return ProbeOutcome::Answered(format!("describe: the response has the wrong shape (HTTP {status})"));
+        return ProbeOutcome::Answered(format!(
+            "describe: the response has the wrong shape (HTTP {status})"
+        ));
     }
     let result = envelope.get("result").cloned().unwrap_or(Value::Null);
     if result.get("ok").and_then(Value::as_bool) == Some(true) {
@@ -782,7 +786,10 @@ impl HostLog {
 
     /// Open the sink for a run spawned now, or `None` when it cannot be named.
     fn for_new_run() -> Option<Arc<Self>> {
-        Self::for_new_run_at(&crate::engines::support::paths::app_home(), SystemTime::now())
+        Self::for_new_run_at(
+            &crate::engines::support::paths::app_home(),
+            SystemTime::now(),
+        )
     }
 
     /// `for_new_run` with an injectable home and clock (tests drive a temp one).
@@ -860,8 +867,7 @@ impl HostLog {
             *guard = None;
             return;
         }
-        self.written
-            .fetch_add(line.len() as u64, Ordering::Relaxed);
+        self.written.fetch_add(line.len() as u64, Ordering::Relaxed);
     }
 
     /// Move the current file aside as `<path>.1` (replacing the previous
@@ -885,7 +891,9 @@ impl HostLog {
 fn rotated_path(path: &Path) -> PathBuf {
     path.with_extension(format!(
         "{}{LOG_KEEP_SUFFIX}",
-        path.extension().and_then(|ext| ext.to_str()).unwrap_or("log")
+        path.extension()
+            .and_then(|ext| ext.to_str())
+            .unwrap_or("log")
     ))
 }
 
@@ -1226,7 +1234,9 @@ pub async fn dsh_host_start(
 }
 
 #[tauri::command]
-pub async fn dsh_host_stop(state: tauri::State<'_, crate::engines::support::EngineState>) -> Result<OkResult, String> {
+pub async fn dsh_host_stop(
+    state: tauri::State<'_, crate::engines::support::EngineState>,
+) -> Result<OkResult, String> {
     let settings = crate::engines::support::settings::read_settings().unwrap_or_default();
     let cfg = HostConfig::from(&settings);
     // Only our own child is ever stopped. Whatever else answers on the port
@@ -1385,7 +1395,9 @@ mod tests {
         let (server_hits, server_cookie) = (Arc::clone(&hits), Arc::clone(&saw_cookie));
         let server = tokio::spawn(async move {
             loop {
-                let Ok((mut socket, _)) = listener.accept().await else { return };
+                let Ok((mut socket, _)) = listener.accept().await else {
+                    return;
+                };
                 let mut buf = vec![0u8; 8192];
                 let n = socket.read(&mut buf).await.unwrap_or(0);
                 let request = String::from_utf8_lossy(&buf[..n]).to_ascii_lowercase();
@@ -1418,9 +1430,14 @@ mod tests {
         let error = ensure_host(&state, &settings).await.unwrap_err();
         assert!(error.contains("in use"), "{error}");
         assert!(hits.load(Ordering::SeqCst) > 0, "the port was probed");
-        assert!(!saw_cookie.load(Ordering::SeqCst), "cookie leaked to a foreign listener");
         assert!(
-            tokio::net::TcpStream::connect(("127.0.0.1", port)).await.is_ok(),
+            !saw_cookie.load(Ordering::SeqCst),
+            "cookie leaked to a foreign listener"
+        );
+        assert!(
+            tokio::net::TcpStream::connect(("127.0.0.1", port))
+                .await
+                .is_ok(),
             "the foreign listener must keep running"
         );
         assert!(lock(&state.spawned).is_none(), "nothing was spawned");
@@ -1446,10 +1463,8 @@ mod tests {
     /// of growing without bound.
     #[test]
     fn host_log_appends_lines_and_rotates_over_budget() {
-        let home = std::env::temp_dir().join(format!(
-            "ccgui-next-host-log-test-{}",
-            uuid::Uuid::new_v4()
-        ));
+        let home =
+            std::env::temp_dir().join(format!("ccgui-next-host-log-test-{}", uuid::Uuid::new_v4()));
         // One instant for both the name and the assertion: two `now()` calls
         // can straddle a second boundary and name different files.
         let now = SystemTime::now();
@@ -1483,10 +1498,8 @@ mod tests {
     /// under any schedule.
     #[test]
     fn host_log_rotates_once_when_two_drains_hit_the_budget() {
-        let home = std::env::temp_dir().join(format!(
-            "ccgui-next-host-log-race-{}",
-            uuid::Uuid::new_v4()
-        ));
+        let home =
+            std::env::temp_dir().join(format!("ccgui-next-host-log-race-{}", uuid::Uuid::new_v4()));
         let path = HostLog::path_for(&home, SystemTime::now()).unwrap();
         let log = HostLog::open(path.clone());
         // Two lines take the file over the 16-byte budget.
@@ -1586,7 +1599,10 @@ mod tests {
             "ccgui-next-host-log-first-{}",
             uuid::Uuid::new_v4()
         ));
-        assert!(!home.join(LOG_DIR).exists(), "precondition: the directory doesn't exist yet");
+        assert!(
+            !home.join(LOG_DIR).exists(),
+            "precondition: the directory doesn't exist yet"
+        );
         let now = SystemTime::now();
         let log = HostLog::for_new_run_at(&home, now).unwrap();
         log.line("first words\n");
@@ -1685,8 +1701,7 @@ mod tests {
 
     #[test]
     fn launch_token_is_extracted_from_web_url_line() {
-        let line =
-            "dsh web: http://127.0.0.1:3080/?token=test-launch-token";
+        let line = "dsh web: http://127.0.0.1:3080/?token=test-launch-token";
         assert_eq!(
             extract_launch_token(line).as_deref(),
             Some("test-launch-token")

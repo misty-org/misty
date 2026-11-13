@@ -20,7 +20,7 @@ mod tests {
 
     #[test]
     fn only_listed_jobs_count() {
-        for job in ["shell.run", "folder.read", "browser.run", "read_content"] {
+        for job in ["shell.run", "folder.read", "browser.run"] {
             assert!(is_agent_job(job), "{job}");
         }
         // Writing and deleting are never jobs: changes to a shared folder only happen in the shell,
@@ -33,6 +33,7 @@ mod tests {
             "code.delegate",
             "",
             "shell.run ",
+            "read_content",
         ] {
             assert!(!is_agent_job(job), "{job:?}");
         }

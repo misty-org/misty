@@ -1,8 +1,7 @@
 import { create } from "zustand";
 
 /** What the panel beside a chat can show. */
-export type ContextPanelTab =
-  "session" | "steps" | "files" | "changes" | "terminal" | "preview" | "browser";
+export type ContextPanelTab = "session" | "steps" | "files" | "changes" | "terminal" | "preview";
 
 /** Which tab of the context panel is open in this window, if any. Pressing the open one closes it. */
 export const useContextPanel = create<{

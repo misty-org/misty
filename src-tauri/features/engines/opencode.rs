@@ -9,7 +9,7 @@
 //! --format json` prints NO transcript, so parsing a run child was never an
 //! option — the server event stream is the only complete channel.
 
-use super::{BuiltCommand, Engine, EngineEvent, SendRequest};
+use super::Engine;
 
 pub struct OpenCodeEngine;
 
@@ -24,14 +24,6 @@ impl Engine for OpenCodeEngine {
 
     /// Never invoked on the virtual path (`send_host_stream` branches before
     /// the process spawn); a stub keeps the trait contract honest.
-    fn build_command(&self, _req: &SendRequest, _bin: &str) -> Result<BuiltCommand, String> {
-        Err("opencode runs as a server session; no child process to build".to_string())
-    }
-
-    /// Never invoked on the virtual path: frames arrive over the server SSE
-    /// and are projected to engine events in opencode_session.
-    fn parse_line(&self, _line: &str, _out: &mut Vec<EngineEvent>) {}
-
     fn supports_images(&self) -> bool {
         // prompt_async parts accept data-URL file parts; that IS the serve
         // image transport.
@@ -51,5 +43,4 @@ impl Engine for OpenCodeEngine {
         // session. "plan" selects the read-only plan agent in the prompt body.
         &["auto", "manual", "plan", "bypass"]
     }
-
 }

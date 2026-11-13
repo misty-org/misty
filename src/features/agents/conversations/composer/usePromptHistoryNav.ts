@@ -1,11 +1,6 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 import { useCallback, useEffect, useRef } from "react";
-import {
-  getPromptHistory,
-  INVISIBLE_CHARS_RE,
-  isPromptHistoryEnabled,
-  subscribePromptHistory,
-} from "./promptHistory";
+import { getPromptHistory, INVISIBLE_CHARS_RE, subscribePromptHistory } from "./promptHistory";
 
 interface HistoryKeyEvent {
   key: string;
@@ -40,7 +35,6 @@ export function usePromptHistoryNav({
     (event: HistoryKeyEvent): boolean => {
       const key = event.key;
       const navigating = indexRef.current !== -1;
-      if (!isPromptHistoryEnabled()) return false;
       if (navigating && key !== "ArrowUp" && key !== "ArrowDown") {
         resetNavigation();
         return false;

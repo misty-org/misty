@@ -14,7 +14,6 @@ const conversation = (
   checklists: [],
   plan: null,
   planHistory: [],
-  goal: null,
   questionSets: [],
   runningInvocationId: "",
   ...overrides,

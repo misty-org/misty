@@ -8,15 +8,15 @@ import {
   useLocalExecution,
   type Execution,
 } from "./localExecutionState";
+import { useMistyStore } from "../../conversations/state/useMistyStore";
+import { replaceActiveGlobalInvocationStream } from "../../conversations/state/mistyStoreUpdates";
+import { useCompanionState } from "../../tutor/cursor/companionState";
 
 export async function steerLocalExecution(prompt: string) {
-  const { useMistyStore } = await import("@/features/agents/conversations/state/useMistyStore");
   const before = useMistyStore.getState();
   const execution = useLocalExecution.getState().execution;
   const conversationId = execution?.conversationId ?? before.activeConversationId;
   await pauseLocalExecution();
-  const { replaceActiveGlobalInvocationStream } =
-    await import("@/features/agents/conversations/state/mistyStoreUpdates");
   replaceActiveGlobalInvocationStream();
   useMistyStore.setState({
     working: false,
@@ -24,23 +24,18 @@ export async function steerLocalExecution(prompt: string) {
     selectedSpaceId: useLocalExecution.getState().execution?.spaceId ?? before.selectedSpaceId,
   });
   if (useLocalExecution.getState().execution?.desktopControl) {
-    const companion = (
-      await import("../../tutor/cursor/companionState")
-    ).useCompanionState.getState();
+    const companion = useCompanionState.getState();
     if (!companion.submit || companion.accountId !== before.accountId)
       throw new Error(
         "Fresh desktop context is unavailable in this window. Open the main Misty window and ask there. The task remains paused.",
       );
     await companion.submit({ prompt, conversationId });
-  } else if (useLocalExecution.getState().execution?.autopilot) {
-    await useMistyStore.getState().submitAnswer(prompt, undefined, undefined, "workspace");
   } else {
     await useMistyStore.getState().submitAnswer(prompt);
   }
 }
 
 export async function routeLocalFollowup(prompt: string): Promise<string> {
-  const { useMistyStore } = await import("@/features/agents/conversations/state/useMistyStore");
   const execution = useLocalExecution.getState().execution;
   const conversationId = useMistyStore.getState().activeConversationId;
   if (!execution || !conversationId) throw new Error("Open the active task conversation first.");
@@ -97,7 +92,6 @@ export async function continueQueuedLocalWork(expectedTaskId: string) {
   if (drainingQueue) return;
   drainingQueue = true;
   try {
-    const { useMistyStore } = await import("@/features/agents/conversations/state/useMistyStore");
     const execution = useLocalExecution.getState().execution;
     if (
       execution?.taskId !== expectedTaskId ||

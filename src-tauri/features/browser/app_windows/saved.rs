@@ -209,7 +209,6 @@ mod tests {
         assert!(place.old_file.exists());
     }
 
-
     #[test]
     fn saving_again_replaces_the_row() {
         let home = home();

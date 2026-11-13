@@ -3,9 +3,7 @@ import { setRunStateAccount } from "../tools/run-state/documents";
 import { collaborationApi } from "./api";
 import { upsertChecklist } from "./checklists";
 import { upsertQuestionSet, withVersion } from "./storeLists";
-import { continueGoalAfterRun, type LocalRunEnd } from "./localApi";
 import type {
-  AgentGoal,
   AgentPlan,
   AgentPlanPayload,
   AgentQuestionAnswer,
@@ -23,7 +21,6 @@ const empty = (): ConversationCollaboration => ({
   checklists: [],
   plan: null,
   planHistory: [],
-  goal: null,
   questionSets: [],
   runningInvocationId: "",
 });
@@ -41,13 +38,6 @@ interface CollaborationStore {
   draftPermissionMode: PermissionMode | "";
   setDefaultMode(mode: ConversationMode): void;
   error: string;
-  /**
-   * A turn another surface (the Goal dialog) wants sent in a conversation, such
-   * as starting or resuming a goal. The open conversation sends it when idle.
-   */
-  queuedTurn?: { conversationId: string; prompt: string; nonce: number };
-  queueTurn(conversationId: string, prompt: string): void;
-  takeTurn(nonce: number): void;
   setAccount(accountId: string): void;
   load(conversationId: string): Promise<ConversationCollaboration | undefined>;
   modeFor(conversationId?: string): ConversationMode;
@@ -59,26 +49,8 @@ interface CollaborationStore {
   approvePlan(plan: AgentPlan): Promise<string>;
   revisePlan(plan: AgentPlan, payload: AgentPlanPayload): Promise<void>;
   rejectPlan(plan: AgentPlan): Promise<void>;
-  setGoal(
-    conversationId: string,
-    input: { objective: string; successCriteria: string[]; budgetTokens?: number },
-  ): Promise<string>;
-  controlGoal(
-    goal: AgentGoal,
-    status: "paused" | "pursuing" | "cleared",
-    budgetTokens?: number,
-  ): Promise<string | undefined>;
-  /**
-   * After a run ends, looks for the server's goal continuation and attaches to
-   * it. `reconnect` reloads conversations and subscribes to running work. With the chat's state on
-   * this computer, the goal's next turn starts here instead, from what `finished` says about the run.
-   */
-  afterRunSettled(
-    conversationId: string,
-    reconnect: () => void,
-    working: () => boolean,
-    finished?: LocalRunEnd,
-  ): void;
+  /** After a run ends, reloads the chat's state: what the run changed in it. */
+  afterRunSettled(conversationId: string): void;
 }
 
 const loading = new Map<string, Promise<ConversationCollaboration | undefined>>();
@@ -108,17 +80,9 @@ export const useCollaborationStore = create<CollaborationStore>((set, get) => {
     draftChosen: false,
     draftPermissionMode: "",
     error: "",
-    queuedTurn: undefined,
     setDefaultMode(mode) {
       if (mode === get().defaultMode) return;
       set({ defaultMode: mode, ...(get().draftChosen ? {} : { draftMode: mode }) });
-    },
-    queueTurn(conversationId, prompt) {
-      if (conversationId && prompt.trim())
-        set({ queuedTurn: { conversationId, prompt, nonce: Date.now() + Math.random() } });
-    },
-    takeTurn(nonce) {
-      if (get().queuedTurn?.nonce === nonce) set({ queuedTurn: undefined });
     },
     setAccount(accountId) {
       if (accountId === get().accountId) return;
@@ -133,7 +97,6 @@ export const useCollaborationStore = create<CollaborationStore>((set, get) => {
         draftChosen: false,
         draftPermissionMode: "",
         error: "",
-        queuedTurn: undefined,
       });
     },
     async load(conversationId) {
@@ -200,7 +163,6 @@ export const useCollaborationStore = create<CollaborationStore>((set, get) => {
             ? {}
             : { plan: event.plan, planHistory: withVersion(current.planHistory, event.plan) },
         );
-      else if (event.type === "goal.updated") patch(conversationId, () => ({ goal: event.goal }));
       else if (event.type === "checklist.updated")
         patch(conversationId, (current) => ({
           checklists: upsertChecklist(current.checklists, event.checklist),
@@ -235,28 +197,9 @@ export const useCollaborationStore = create<CollaborationStore>((set, get) => {
       const result = await collaborationApi.rejectPlan(plan);
       patch(plan.conversationId, () => ({ plan: result.plan }));
     },
-    async setGoal(conversationId, input) {
-      const result = await collaborationApi.setGoal(conversationId, input);
-      patch(conversationId, () => ({ goal: result.goal }));
-      return result.prompt;
-    },
-    async controlGoal(goal, status, budgetTokens) {
-      const result = await collaborationApi.controlGoal(goal, status, budgetTokens);
-      patch(goal.conversationId, () => ({ goal: status === "cleared" ? null : result.goal }));
-      return result.prompt;
-    },
-    afterRunSettled(conversationId, reconnect, working, finished) {
+    afterRunSettled(conversationId) {
       if (!conversationId) return;
-      const accountId = get().accountId;
-      void (
-        finished ? continueGoalAfterRun(accountId, conversationId, finished) : Promise.resolve()
-      )
-        .catch(() => undefined)
-        .then((prompt) => {
-          if (!sameAccount(accountId)) return;
-          void get().load(conversationId);
-          if (prompt) get().queueTurn(conversationId, prompt);
-        });
+      void get().load(conversationId);
     },
   };
 });

@@ -18,7 +18,7 @@ export const spaceIcons: Record<SpaceSearchHit["kind"], LucideIcon> = {
 };
 
 export const spaceGroups: Record<SpaceSearchHit["kind"], string> = {
-  note: "Notes",
+  note: "Docs",
   message: "Messages",
   task: "Tasks",
   event: "Events",

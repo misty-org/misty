@@ -110,6 +110,7 @@ impl ToolMonitor {
         self.0.order.start(&id, move || async move { inner.announce(&call).await }, concurrent)
     }
 
+    #[cfg(test)]
     pub(crate) async fn on_end(&self, event: ToolEnd) -> Result<(), RuntimeError> {
         self.on_end_then(event, async { Ok(()) }).await
     }

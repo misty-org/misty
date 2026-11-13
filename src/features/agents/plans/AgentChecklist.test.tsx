@@ -23,7 +23,6 @@ const state = (checklists: AgentChecklist[]): ConversationCollaboration => ({
   checklists,
   plan: null,
   planHistory: [],
-  goal: null,
   questionSets: [],
   runningInvocationId: "",
 });

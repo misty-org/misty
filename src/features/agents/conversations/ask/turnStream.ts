@@ -10,6 +10,7 @@ import { continueAfterScreenRequest } from "../context/screenRequests";
 import { submissionEpoch } from "./mistySubmissionEpoch";
 import type { MistyGet, MistySet } from "../state/mistyStoreUpdates";
 import type { subscribeToAiInvocation } from "../../runs/invocations/api";
+import { useAgentInterventions } from "../../interventions/store";
 
 /** The turn a stream belongs to; events for any other turn are ignored. */
 interface StreamedTurn {
@@ -43,10 +44,8 @@ export function turnStreamHandlers(
         // input and the control ring go back to them, and the request
         // shows as a Waiting for you card in this conversation.
         if (turn.executionTaskId) void awaitUserForExecution(turn.executionTaskId);
-        void import("@/features/agents/interventions/store").then(({ useAgentInterventions }) => {
-          useAgentInterventions.getState().setAccount(turn.accountId);
-          return useAgentInterventions.getState().refresh();
-        });
+        useAgentInterventions.getState().setAccount(turn.accountId);
+        void useAgentInterventions.getState().refresh();
       } else if (
         turn.executionTaskId &&
         ((event.type === "assistant.status" && event.phase === "intervention_resume_pending") ||
@@ -64,21 +63,7 @@ export function turnStreamHandlers(
             turn.executionTaskId,
           );
         void usePersonalAgentsStore.getState().load(turn.accountId);
-        // A pursued goal's next turn starts here.
-        useCollaborationStore.getState().afterRunSettled(
-          turn.conversationId,
-          () => void get().loadConversations(true),
-          () => get().working,
-          {
-            runId: turn.invocationId,
-            completed: event.type === "invocation.completed",
-            waitingOnPerson:
-              get()
-                .conversations.find((c) => c.id === turn.conversationId)
-                ?.messages.find((m) => m.id === turn.assistantMessageId)?.appRequest?.state ===
-              "pending",
-          },
-        );
+        useCollaborationStore.getState().afterRunSettled(turn.conversationId);
       }
       if (event.type === "artifact.proposed" || event.type === "approval.required") {
         patchConversationMessage(set, get, turn.conversationId, turn.assistantMessageId, {

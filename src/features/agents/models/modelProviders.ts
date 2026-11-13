@@ -97,12 +97,6 @@ export const modelProviders: ModelProvider[] = [
   },
 ];
 
-/**
- * Models that make video, which Tutor films its video overviews on. Google's Gemini Omni is the one
- * video API a person's own key reaches (OpenAI's Videos API and the Veo previews have shut down).
- */
-export const videoModels = ["google/gemini-omni-1.2-flash"];
-
 /** Voice providers have their own keys and appear in the Voice section only. */
 export const voiceProviders = [
   { id: "elevenlabs", label: "ElevenLabs", role: "speech" as const },

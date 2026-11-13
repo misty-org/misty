@@ -63,9 +63,7 @@ const samePath = (a: string, b: string) => a.replace(/[\\/]+$/, "") === b.replac
  */
 export function useWorktreeBusy(path: string, open: boolean): boolean {
   const terminals = useTerminalStore((s) =>
-    Object.entries(s.tabsByFolder).some(
-      ([folder, tabs]) => tabs.length > 0 && samePath(folder, path),
-    ),
+    Object.values(s.tabsByChat).some((tabs) => tabs.some((tab) => samePath(tab.folder, path))),
   );
   const running = useMistyStore((s) => (s.working ? (s.invocationConversationId ?? "") : null));
   const spaceFolder = useSpaceFolders((s) => folderOf(s, currentSpaceKey()));

@@ -150,11 +150,11 @@ async function requestScreen(
   target: string,
 ) {
   const settings = await agentSettings();
-  let location = (settings?.screen_location ?? "window") as ScreenRequest["location"];
-  if (location === "separate") location = "window";
-  if (target === "new_tab" || target === "window") location = "window";
-  // An agent never works in the person's own tab, whatever the setting says.
-  if (location === "current" && kind !== "look") location = "window";
+  // An agent never works in the person's own tab: a screen is a new tab, or the card asks first.
+  const location: ScreenRequest["location"] =
+    settings?.screen_location === "ask" && target !== "new_tab" && target !== "window"
+      ? "ask"
+      : "window";
   publishLocalRunEvent(entry.runId, {
     id: `local-${crypto.randomUUID()}`,
     type: "screen.request",

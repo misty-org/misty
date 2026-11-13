@@ -134,7 +134,7 @@ function useSpaceOverviewData(
             .filter((n) => n.lifecycle_state === "active")
             .map((n) => ({
               id: `note:${n.id}`,
-              title: n.title || "Untitled note",
+              title: n.title || "Untitled doc",
               area: "Journal",
               kind: "note",
               creatorUserId: n.creator_user_id,

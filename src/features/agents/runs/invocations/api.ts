@@ -21,8 +21,6 @@ import { startLocalRun } from "../local-run/startRun";
 
 export const aiSurfaceApi = {
   settings: async () => ({ settings: await readAgentSettings() }),
-  updateSettings: (enabled: boolean, retentionDays: number) =>
-    changeAgentSettings({ enabled, retention_days: retentionDays }),
   updateScreenLocation: (location: ScreenLocation) =>
     changeAgentSettings({ screen_location: location }),
   updateAgentSites: (change: { block_sensitive?: boolean; blocked_sites?: string[] }) =>

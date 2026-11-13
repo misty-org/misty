@@ -123,7 +123,6 @@ describe("Agents workspace conversations", () => {
       "Draft a launch note",
       [],
       undefined,
-      "workspace",
       [],
       {
         conversationId: "",
@@ -221,7 +220,7 @@ it("sends follow-ups to the scheduled conversation even when another chat is glo
   });
   fireEvent.click(screen.getByRole("button", { name: "Send message" }));
   await waitFor(() => expect(submit).toHaveBeenCalledOnce());
-  expect(submit.mock.calls[0][5]).toEqual({ conversationId: "scheduled-chat", context: [] });
+  expect(submit.mock.calls[0][4]).toEqual({ conversationId: "scheduled-chat", context: [] });
 });
 
 it("shares panel voice controls with the composer and leaves transcription for review", async () => {

@@ -41,7 +41,6 @@ function snapshotOf(entry: MistyActivityEntry, name: string, now: number): PetSt
   switch (entry.state) {
     case "running":
     case "queued":
-    case "awaiting_device":
       return { ...base, status: "running", activity: runningActivity(entry) };
     case "awaiting_approval":
     case "awaiting_intervention":

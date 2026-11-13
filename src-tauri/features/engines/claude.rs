@@ -255,7 +255,9 @@ impl Engine for ClaudeEngine {
             let mut nested = Vec::new();
             self.parse_value(&value, &mut nested);
             if !nested.is_empty() {
-                out.push(EngineEvent::Scope { parent: Some(parent) });
+                out.push(EngineEvent::Scope {
+                    parent: Some(parent),
+                });
                 out.append(&mut nested);
                 out.push(EngineEvent::Scope { parent: None });
             }
@@ -405,8 +407,7 @@ impl ClaudeEngine {
                 // The response's own account of what ran. `<synthetic>` marks
                 // messages the CLI fabricated locally (errors, interrupts):
                 // that is not a served model and must not read as one.
-                let served_model = reported_model
-                    .filter(|model| !model.starts_with('<'));
+                let served_model = reported_model.filter(|model| !model.starts_with('<'));
                 if served_model.is_some() || reported_effort.is_some() {
                     out.push(EngineEvent::Served {
                         model: served_model,
@@ -869,7 +870,11 @@ fn parse_content_block_start(
     }
     // Name-only start so the timeline can show the tool immediately; args
     // patch in when the JSON stream completes (or if input is already full).
-    out.push(tool_call_message_with_id(name, input, tool_call_id.as_deref()));
+    out.push(tool_call_message_with_id(
+        name,
+        input,
+        tool_call_id.as_deref(),
+    ));
 }
 
 fn parse_content_block_stop(
@@ -1010,7 +1015,8 @@ mod tests {
             &mut out,
         );
         assert!(
-            out.iter().any(|e| matches!(e, EngineEvent::Effort(level) if level == "max")),
+            out.iter()
+                .any(|e| matches!(e, EngineEvent::Effort(level) if level == "max")),
             "got {out:?}"
         );
         assert!(
@@ -1081,7 +1087,8 @@ mod tests {
             "model remains reported while effort stays unknown: {out:?}"
         );
         assert!(
-            !out.iter().any(|event| matches!(event, EngineEvent::Effort(_))),
+            !out.iter()
+                .any(|event| matches!(event, EngineEvent::Effort(_))),
             "missing stream effort must not be inferred: {out:?}"
         );
     }
@@ -1190,7 +1197,10 @@ mod tests {
         let mut out = Vec::new();
         ClaudeEngine::new().parse_line(&line, &mut out);
         match &out[..] {
-            [EngineEvent::ControlRequestError { request_id, subtype }] => {
+            [EngineEvent::ControlRequestError {
+                request_id,
+                subtype,
+            }] => {
                 assert_eq!(request_id, "req-unknown-1");
                 assert_eq!(subtype, "future_ask");
             }
@@ -1399,7 +1409,12 @@ mod tests {
         let result_todos = |out: &[EngineEvent]| {
             out.iter()
                 .find_map(|e| match e {
-                    EngineEvent::Message { patch: true, result: Some(_), todos, .. } => Some(todos.clone()),
+                    EngineEvent::Message {
+                        patch: true,
+                        result: Some(_),
+                        todos,
+                        ..
+                    } => Some(todos.clone()),
                     _ => None,
                 })
                 .expect("expected a tool result patch")
@@ -1432,7 +1447,10 @@ mod tests {
             ),
             &mut out,
         );
-        assert!(result_todos(&out).is_none(), "TaskGet must not patch the todo list");
+        assert!(
+            result_todos(&out).is_none(),
+            "TaskGet must not patch the todo list"
+        );
     }
 
     #[test]
@@ -1642,7 +1660,11 @@ mod tests {
         let mut out = Vec::new();
         ClaudeEngine::new().parse_line(&line, &mut out);
         match &out[..] {
-            [EngineEvent::Message { result: Some(result), patch: true, .. }] => {
+            [EngineEvent::Message {
+                result: Some(result),
+                patch: true,
+                ..
+            }] => {
                 assert_eq!(result["isError"], true);
             }
             other => panic!("expected a failed result patch, got {other:?}"),

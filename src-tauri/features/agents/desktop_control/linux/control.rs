@@ -91,7 +91,9 @@ pub fn prepare(app: &AppHandle, task: &str, ask: bool) {
                 && !super::wayland_session()
                 && super::x11::key_down(ESCAPE)
             {
-                stop_control(Some("You pressed Escape, so Misty stopped. You have control."));
+                stop_control(Some(
+                    "You pressed Escape, so Misty stopped. You have control.",
+                ));
                 return;
             }
         });
@@ -169,7 +171,9 @@ fn confirm(task: &str) -> Result<(), String> {
     };
     let (send, receive) = std::sync::mpsc::channel();
     app.dialog()
-        .message(format!("Misty is ready to use your apps with its own cursor for this task. {stop_hint}"))
+        .message(format!(
+            "Misty is ready to use your apps with its own cursor for this task. {stop_hint}"
+        ))
         .title("Allow desktop control?")
         .kind(MessageDialogKind::Info)
         .buttons(MessageDialogButtons::OkCancelCustom(
@@ -268,14 +272,27 @@ pub fn action(input: &Value) -> Result<Value, String> {
     let (x, y) = (fraction("x") * frame_width, fraction("y") * frame_height);
     ACTING.store(true, Ordering::SeqCst);
     let result = match action["kind"].as_str().unwrap_or("") {
-        "point" => driver::action_click(enigo::Button::Left, "Left", Some(x), Some(y), 1, Some(display)),
+        "point" => driver::action_click(
+            enigo::Button::Left,
+            "Left",
+            Some(x),
+            Some(y),
+            1,
+            Some(display),
+        ),
         "scroll" => {
             // Wheel steps of about 40 pixels, as Windows' desktop control counts them.
             let steps = |key: &str| {
                 let delta = action[key].as_i64().unwrap_or(0) as f64 / 40.0;
                 (delta.round() as i32).clamp(-20, 20)
             };
-            driver::action_scroll(Some(x), Some(y), steps("deltaX"), steps("deltaY"), Some(display))
+            driver::action_scroll(
+                Some(x),
+                Some(y),
+                steps("deltaX"),
+                steps("deltaY"),
+                Some(display),
+            )
         }
         "type" => driver::action_type(action["text"].as_str().unwrap_or("")),
         "key" => chord_of(action["key"].as_str().unwrap_or(""))

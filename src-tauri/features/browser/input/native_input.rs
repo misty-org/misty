@@ -245,12 +245,12 @@ pub(in crate::browser) async fn dispatch(
     }
 }
 
+#[cfg(target_os = "linux")]
+pub(crate) mod linux;
 #[cfg(test)]
 mod tests;
 #[cfg(windows)]
 pub(crate) mod windows;
-#[cfg(target_os = "linux")]
-pub(crate) mod linux;
 
 /// The agent still owns the task, the page has not navigated or changed since
 /// it was observed, and its origin is the one the agent saw.
@@ -289,4 +289,3 @@ fn authorize_native_input(
     }
     Ok(())
 }
-

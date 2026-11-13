@@ -177,7 +177,7 @@ async fn a_tool_nobody_runs_is_unavailable_and_goes_nowhere() {
     let gateway = LocalGateway { control };
     let input = JsValue::parse("{}").unwrap();
     let response = gateway
-        .call(GatewayCall { identity: &run.identity, call_id: "c", name: "x", input: &input, device_hook_token: "t" })
+        .call(GatewayCall { call_id: "c", name: "x", input: &input, device_hook_token: "t" })
         .await
         .unwrap();
     assert!(response.tool_error.is_some());

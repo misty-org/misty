@@ -1,5 +1,3 @@
-import "./browserToolbar.css";
-
 /** Page toolbar geometry. Buttons are the shared IconButton, whose icons size themselves. */
 export const browserToolbarStyles = {
   group: "flex shrink-0 items-center gap-0.5",

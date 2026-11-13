@@ -4,18 +4,21 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useEffect, useState, type FormEvent } from "react";
 import { Button, Input } from "@/shared/ui";
 import { DictationPill } from "@/features/voice";
+import { TrayPanel } from "../tray/TrayPanel";
 import "./desktopOverlay.css";
 
 /**
  * Misty's windows while it controls the desktop or its own window on Windows
  * (src-tauri/features/agents/desktop_control/windows/overlays.rs): the control island, and
- * the mist that rings what Misty controls and carries its own pointer. The
- * window's label says which this page is.
+ * the mist that rings what Misty controls and carries its own pointer; and the panel under the
+ * menu bar icon on macOS (src-tauri/features/app/tray_panel.rs). The window's label says which
+ * this page is.
  */
 export function DesktopOverlayRoot() {
   const label = getCurrentWebview().label;
   if (label === "misty-desktop-island") return <DesktopIsland />;
   if (label === "misty-dictation-pill") return <DictationPill />;
+  if (label === "misty-tray") return <TrayPanel />;
   return <DesktopMist />;
 }
 

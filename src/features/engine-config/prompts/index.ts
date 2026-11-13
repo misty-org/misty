@@ -14,7 +14,6 @@ export {
   matchPrompts,
   movePrompt,
   promptsFor,
-  prunePrompts,
   subscribePromptsChanged,
   updatePrompt,
   usePromptStore,

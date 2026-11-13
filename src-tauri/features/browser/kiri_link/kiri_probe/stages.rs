@@ -2,25 +2,15 @@
 use super::*;
 
 pub(super) async fn page_calls_reach_kiri_and_nothing_else(app: &AppHandle) -> Result<(), String> {
-    let (media, listener) = counter(app, "misty://browser-media");
     let result = eval(app, r#"
         const invoke = window.__TAURI_INTERNALS__.invoke;
         const outcome = async (promise) => promise.then(() => 'ok', (e) => String(e?.name ?? e));
         return JSON.stringify({
-            media: await outcome(invoke('plugin:kiri|call', { request: { v: 1, cap: 'media', method: 'state', args: { audible: true } } })),
             unknown: await outcome(invoke('plugin:kiri|call', { request: { v: 1, cap: 'bluetooth', method: 'request-device' } })),
-            app: await outcome(invoke('browser_site_permissions_list')),
+            app: await outcome(invoke('profile_window_info')),
             webauthnShim: String(navigator.credentials.create).includes('[native code]') ? 'native' : 'kiri',
         });
     "#).await?;
-    wait_for("media signal from the page", || {
-        media.load(Ordering::SeqCst) >= 1
-    })
-    .await?;
-    app.unlisten(listener);
-    if result["media"] != "ok" {
-        return Err(format!("media.state was refused: {result}"));
-    }
     if result["unknown"] != "NotSupportedError" {
         return Err(format!("unknown capability answered {result}"));
     }
@@ -144,7 +134,6 @@ pub(super) async fn passkey_path_reaches_authentication_services(
     use kiri::capabilities::webauthn::{macos, WebAuthn};
     struct ProbeHost(AppHandle);
     impl kiri::Host for ProbeHost {
-        fn signal(&self, _caller: &kiri::Caller, _signal: kiri::Signal) {}
         fn run_on_main(&self, work: Box<dyn FnOnce() + Send>) {
             let _ = self.0.run_on_main_thread(work);
         }

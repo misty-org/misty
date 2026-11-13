@@ -221,6 +221,14 @@ export function startGesture(
     point = { x: e.clientX, y: e.clientY };
     if (!active && Math.hypot(point.x - origin.x, point.y - origin.y) >= 6) {
       active = true;
+      // Captured only once the press is a drag: a capture taken on press sends the click to the
+      // handle instead of the control under the pointer, so a plain click on a tab or row whose
+      // handle wraps it would never reach it.
+      try {
+        source.setPointerCapture?.(pointerId);
+      } catch {
+        /* Window listeners still track the gesture. */
+      }
       window.getSelection()?.removeAllRanges();
       document.documentElement.dataset.pointerDragging = "true";
       if (drag.scope === "workspace-panes") {
@@ -281,11 +289,6 @@ export function startGesture(
   document.addEventListener("visibilitychange", visibility);
   source.addEventListener("lostpointercapture", cancel);
   source.addEventListener("dragstart", preventNative);
-  try {
-    source.setPointerCapture?.(pointerId);
-  } catch {
-    /* Window listeners still track the gesture. */
-  }
   cancelCurrent = cancel;
   return cancel;
 }

@@ -15,7 +15,6 @@ export function toServerInvocation(input: AiInvocationRequest) {
     collaboration_mode: input.collaborationMode,
     lesson: input.lesson,
     lesson_index: input.lessonIndex,
-    media_context: input.mediaContext,
     permission_mode: input.permissionMode,
     display_captures: input.displayCaptures?.map((c) => ({
       id: c.id,

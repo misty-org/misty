@@ -3,11 +3,13 @@ use super::discovery::{
     codebuddy_transcripts, codex_candidates, discover_agy, discover_claude, discover_codebuddy_in,
     discover_grok, discover_kimi, discover_minimax, discover_opencode, discover_qoder,
     dsh_candidates, identify_head, is_codex_subagent_file, is_dsh_subagent_file,
-    qoder_transcript_conflicts_with_workspace,
     opencode_db_updated_times, opencode_db_visible_sessions, opencode_tree_file_superseded,
     opencode_tree_root, path_is_under, pi_family_candidates,
+    qoder_transcript_conflicts_with_workspace,
 };
-use super::{same_or_child, scan_summary_file, split_opencode_db_path, stat_signature, ScanSummary};
+use super::{
+    same_or_child, scan_summary_file, split_opencode_db_path, stat_signature, ScanSummary,
+};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
@@ -64,7 +66,10 @@ fn scan_with_sink(
 }
 
 /// The scan itself, decoupled from the event sink for testing.
-pub fn scan_with(db: &crate::engines::support::db::Db, on_changed: impl Fn()) -> Result<ScanReport, String> {
+pub fn scan_with(
+    db: &crate::engines::support::db::Db,
+    on_changed: impl Fn(),
+) -> Result<ScanReport, String> {
     let guard = SCAN_LOCK.lock();
     scan_with_guard(db, on_changed, &guard)
 }
@@ -139,18 +144,10 @@ fn gather_candidates(workspaces: &[String]) -> Vec<Candidate> {
     candidates
 }
 
-/// Stat every candidate and fold (path, size, mtime) into one signature. The
-/// recorded accepted-frame table signature folds in too: recording a new frame
-/// identity changes derived history without touching any session file, and a
-/// matching global signature would otherwise skip the scan entirely.
-fn stat_all(
-    workspaces: &[String],
-    candidates: &[Candidate],
-    accepted_signature: &str,
-) -> (Vec<Option<(i64, i64)>>, String) {
+/// Stat every candidate and fold (path, size, mtime) into one signature.
+fn stat_all(workspaces: &[String], candidates: &[Candidate]) -> (Vec<Option<(i64, i64)>>, String) {
     let mut signature_hasher = Sha256::new();
     signature_hasher.update(format!("v{}|", crate::engines::support::db::CACHE_VERSION).as_bytes());
-    signature_hasher.update(accepted_signature.as_bytes());
     signature_hasher.update(b"codex_home=");
     signature_hasher.update(crate::engines::codex_home().to_string_lossy().as_bytes());
     signature_hasher.update(b"|");
@@ -178,7 +175,10 @@ struct Tier1 {
     retitle_pending: bool,
 }
 
-fn tier1_gate(db: &crate::engines::support::db::Db, signature: String) -> Result<Option<Tier1>, String> {
+fn tier1_gate(
+    db: &crate::engines::support::db::Db,
+    signature: String,
+) -> Result<Option<Tier1>, String> {
     let conn = db.0.lock();
     let previous: Option<String> = conn
         .query_row(
@@ -211,16 +211,10 @@ fn tier1_gate(db: &crate::engines::support::db::Db, signature: String) -> Result
 }
 
 /// One indexed session file as the db currently records it.
-/// `accepted_signature` identifies the recorded internal-frame set that
-/// produced its stored title/preview, so a newly recorded identity re-derives
-/// exactly the sessions it can affect.
 struct IndexedFile {
     size: i64,
     mtime_ms: i64,
-    engine: String,
-    session_id: String,
     workspace_path: String,
-    accepted_signature: String,
 }
 
 /// Prefetch (brief lock) the stored per-file index state and, while a summary
@@ -228,14 +222,16 @@ struct IndexedFile {
 fn prefetch_stat_keys(
     db: &crate::engines::support::db::Db,
     retitle_pending: bool,
-) -> Result<(std::collections::HashMap<String, IndexedFile>, HashSet<String>), String> {
+) -> Result<
+    (
+        std::collections::HashMap<String, IndexedFile>,
+        HashSet<String>,
+    ),
+    String,
+> {
     let conn = db.0.lock();
     let mut stmt = conn
-        .prepare(
-            "SELECT file_path, file_size, file_mtime_ms, engine, session_id,
-                    workspace_path, accepted_frames_signature
-             FROM cli_sessions",
-        )
+        .prepare("SELECT file_path, file_size, file_mtime_ms, workspace_path FROM cli_sessions")
         .map_err(|e| e.to_string())?;
     let rows = stmt
         .query_map([], |r| {
@@ -244,10 +240,7 @@ fn prefetch_stat_keys(
                 IndexedFile {
                     size: r.get(1)?,
                     mtime_ms: r.get(2)?,
-                    engine: r.get(3)?,
-                    session_id: r.get(4)?,
-                    workspace_path: r.get(5)?,
-                    accepted_signature: r.get(6)?,
+                    workspace_path: r.get(3)?,
                 },
             ))
         })
@@ -278,9 +271,6 @@ struct PreparedUpsert {
     path_str: String,
     size: i64,
     mtime_ms: i64,
-    /// Signature of the recorded frame identities this summary was derived
-    /// from; stored so the next scan can tell a stale summary from a fresh one.
-    accepted_signature: String,
     summary: ScanSummary,
 }
 
@@ -290,20 +280,13 @@ fn prepare_candidate(
     stat_keys: &std::collections::HashMap<String, IndexedFile>,
     stale_paths: &HashSet<String>,
     workspaces: &[String],
-    accepted: &crate::engines::support::db::AcceptedFrameIndex,
 ) -> Option<PreparedUpsert> {
     let (size, mtime_ms) = sig;
     let path_str = cand.path.to_string_lossy().to_string();
-    // Unchanged on disk, derived from the same recorded frame identities, and
-    // not pending re-title: reuse. The stored row names the session, so this
+    // Unchanged on disk and not pending re-title: reuse. The stored row names the session, so this
     // check costs no head peek.
     if let Some(indexed) = stat_keys.get(&path_str) {
-        let current = accepted
-            .get(indexed.engine.as_str())
-            .and_then(|sessions| sessions.get(indexed.session_id.as_str()))
-            .map_or("", |set| set.signature.as_str());
         if (indexed.size, indexed.mtime_ms) == sig
-            && indexed.accepted_signature == current
             && cand
                 .known_workspace
                 .as_ref()
@@ -330,12 +313,7 @@ fn prepare_candidate(
             (id, cwd)
         }
     };
-    let empty = crate::engines::support::db::AcceptedFrameSet::default();
-    let accepted_set = accepted
-        .get(cand.engine)
-        .and_then(|sessions| sessions.get(session_id.as_str()))
-        .unwrap_or(&empty);
-    let summary = scan_summary_file(cand.engine, &cand.path, &accepted_set.hashes).ok()?;
+    let summary = scan_summary_file(cand.engine, &cand.path).ok()?;
     Some(PreparedUpsert {
         engine: cand.engine,
         session_id,
@@ -343,7 +321,6 @@ fn prepare_candidate(
         path_str,
         size,
         mtime_ms,
-        accepted_signature: accepted_set.signature.clone(),
         summary,
     })
 }
@@ -471,9 +448,7 @@ fn prune_opencode_hidden_sessions(db: &crate::engines::support::db::Db) -> Resul
             .prepare("SELECT session_id, file_path FROM cli_sessions WHERE engine='opencode'")
             .map_err(|e| e.to_string())?;
         let rows = stmt
-            .query_map([], |r| {
-                Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?))
-            })
+            .query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))
             .map_err(|e| e.to_string())?;
         let mut grouped: std::collections::HashMap<PathBuf, Vec<String>> =
             std::collections::HashMap::new();
@@ -513,11 +488,7 @@ fn prune_opencode_hidden_sessions(db: &crate::engines::support::db::Db) -> Resul
         let Some(visible) = opencode_db_visible_sessions(&db_path, &session_ids) else {
             continue;
         };
-        dead.extend(
-            session_ids
-                .into_iter()
-                .filter(|id| !visible.contains(id)),
-        );
+        dead.extend(session_ids.into_iter().filter(|id| !visible.contains(id)));
     }
     if dead.is_empty() {
         return Ok(false);
@@ -733,8 +704,8 @@ fn upsert_rows(
         let created_at = row.summary.first_ts.or(Some(row.mtime_ms));
         let updated_at = row.summary.last_ts.or(Some(row.mtime_ms));
         tx.execute(
-            "INSERT INTO cli_sessions(engine, session_id, workspace_path, file_path, file_size, file_mtime_ms, title, preview, created_at, updated_at, message_count, accepted_frames_signature)
-             VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12)
+            "INSERT INTO cli_sessions(engine, session_id, workspace_path, file_path, file_size, file_mtime_ms, title, preview, created_at, updated_at, message_count)
+             VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11)
              ON CONFLICT(engine, session_id) DO UPDATE SET
                 workspace_path=excluded.workspace_path,
                 file_path=excluded.file_path,
@@ -744,8 +715,7 @@ fn upsert_rows(
                 preview=excluded.preview,
                 created_at=COALESCE(cli_sessions.created_at, excluded.created_at),
                 updated_at=excluded.updated_at,
-                message_count=excluded.message_count,
-                accepted_frames_signature=excluded.accepted_frames_signature",
+                message_count=excluded.message_count",
             rusqlite::params![
                 row.engine,
                 row.session_id,
@@ -758,7 +728,6 @@ fn upsert_rows(
                 created_at,
                 updated_at,
                 row.summary.message_count,
-                row.accepted_signature,
             ],
         )
         .map_err(|e| e.to_string())?;
@@ -790,8 +759,7 @@ fn scan_inner(
 ) -> Result<ScanReport, String> {
     let workspaces = db.workspace_paths()?;
     let candidates = gather_candidates(&workspaces);
-    let (accepted, accepted_signature) = db.accepted_internal_frame_index()?;
-    let (stats, signature) = stat_all(&workspaces, &candidates, &accepted_signature);
+    let (stats, signature) = stat_all(&workspaces, &candidates);
     let Some(tier1) = tier1_gate(db, signature)? else {
         // An unchanged signature only says no candidate moved. A row whose
         // file vanished before this build ever indexed it (older versions
@@ -840,7 +808,7 @@ fn scan_inner(
             }
             continue;
         };
-        match prepare_candidate(cand, *sig, &stat_keys, &stale_paths, &workspaces, &accepted) {
+        match prepare_candidate(cand, *sig, &stat_keys, &stale_paths, &workspaces) {
             Some(row) => rows.push(row),
             None => {
                 if stale {
@@ -884,7 +852,10 @@ fn scan_inner(
 
 /// Spawn a background scan off the Tauri runtime. Concurrent invocations
 /// collapse: a scan already in flight makes the new call a no-op.
-pub fn spawn_scan(db: Arc<crate::engines::support::db::Db>, sink: Arc<crate::engines::support::event_sink::EventSink>) {
+pub fn spawn_scan(
+    db: Arc<crate::engines::support::db::Db>,
+    sink: Arc<crate::engines::support::event_sink::EventSink>,
+) {
     use std::sync::atomic::{AtomicBool, Ordering};
     static SCAN_RUNNING: AtomicBool = AtomicBool::new(false);
     if SCAN_RUNNING
@@ -1033,7 +1004,8 @@ pub(super) mod tests {
         std::fs::write(&legacy_file, "").map_err(|e| e.to_string())?;
         std::fs::write(&other_file, "").map_err(|e| e.to_string())?;
 
-        let db = crate::engines::support::db::Db::open_at(&home.join("app.db")).map_err(|e| e.to_string())?;
+        let db = crate::engines::support::db::Db::open_at(&home.join("app.db"))
+            .map_err(|e| e.to_string())?;
         {
             let conn = db.0.lock();
             for (id, path) in [("keep", &legacy_file), ("drop", &other_file)] {
@@ -1090,7 +1062,8 @@ pub(super) mod tests {
         .map_err(|e| e.to_string())?;
 
         let _guard = HomeGuard::set(&home);
-        let db = crate::engines::support::db::Db::open_at(&home.join("app.db")).map_err(|e| e.to_string())?;
+        let db = crate::engines::support::db::Db::open_at(&home.join("app.db"))
+            .map_err(|e| e.to_string())?;
         {
             let conn = db.0.lock();
             conn.execute(
@@ -1125,14 +1098,14 @@ pub(super) mod tests {
             let conn = db.0.lock();
             conn.execute(
                 "UPDATE cli_sessions SET title=?1, preview=?2, custom_title='My title'",
-                rusqlite::params![
-                    "hello\n\n[CCGUI internal request-tail]\nsecret",
-                    "answer",
-                ],
+                rusqlite::params!["hello\n\n[CCGUI internal request-tail]\nsecret", "answer",],
             )
             .map_err(|e| e.to_string())?;
-            conn.execute("UPDATE cli_meta SET value='7' WHERE key='title_version'", [])
-                .map_err(|e| e.to_string())?;
+            conn.execute(
+                "UPDATE cli_meta SET value='7' WHERE key='title_version'",
+                [],
+            )
+            .map_err(|e| e.to_string())?;
         }
         let report = scan_with(&db, || {})?;
         assert_eq!(report.reparsed, 1);
@@ -1159,30 +1132,6 @@ pub(super) mod tests {
         }
         assert_eq!(scan_with(&db, || {})?.reparsed, 0);
 
-        // Recording the frame's identity is itself a summary input: the next
-        // scan re-derives this session even though the file never changed, and
-        // only then is the frame hidden.
-        assert!(db
-            .record_accepted_internal_frame_hash(
-                "omp",
-                "sid-1",
-                &crate::engines::history::internal_frame_hash(frame),
-                "",
-            )
-            .map_err(|e| e.to_string())?);
-        assert_eq!(scan_with(&db, || {})?.reparsed, 1);
-        {
-            let conn = db.0.lock();
-            let preview: String = conn
-                .query_row(
-                    "SELECT preview FROM cli_sessions WHERE session_id='sid-1'",
-                    [],
-                    |r| r.get(0),
-                )
-                .map_err(|e| e.to_string())?;
-            assert_eq!(preview, "answer");
-        }
-        assert_eq!(scan_with(&db, || {})?.reparsed, 0);
         drop(db);
         std::fs::remove_dir_all(&home).ok();
         Ok(())
@@ -1226,7 +1175,8 @@ pub(super) mod tests {
         std::env::set_var("CODEBUDDY_CONFIG_DIR", &config_dir);
         let _config_guard = ConfigGuard(previous_config);
 
-        let db = crate::engines::support::db::Db::open_at(&home.join("app.db")).map_err(|e| e.to_string())?;
+        let db = crate::engines::support::db::Db::open_at(&home.join("app.db"))
+            .map_err(|e| e.to_string())?;
         {
             let conn = db.0.lock();
             for (id, workspace) in [("wa", &workspace_a), ("wb", &workspace_b)] {
@@ -1250,7 +1200,10 @@ pub(super) mod tests {
         super::super::discovery::reset_codebuddy_head_read_count();
         assert_eq!(scan_with(&db, || {})?.reparsed, 1);
         assert_eq!(super::super::discovery::codebuddy_head_read_count(), 1);
-        assert_eq!(workspace_for("first")?, workspace_a.to_string_lossy().as_ref());
+        assert_eq!(
+            workspace_for("first")?,
+            workspace_a.to_string_lossy().as_ref()
+        );
 
         // The tier-1 no-op path still enumerates CodeBuddy before its gate, but
         // the unchanged transcript's content must not be opened again.
@@ -1264,7 +1217,10 @@ pub(super) mod tests {
         super::super::discovery::reset_codebuddy_head_read_count();
         assert_eq!(scan_with(&db, || {})?.reparsed, 1);
         assert_eq!(super::super::discovery::codebuddy_head_read_count(), 1);
-        assert_eq!(workspace_for("second")?, workspace_b.to_string_lossy().as_ref());
+        assert_eq!(
+            workspace_for("second")?,
+            workspace_b.to_string_lossy().as_ref()
+        );
 
         // Changing size and recorded cwd invalidates just this head and updates
         // the complete history row through the normal scan pipeline.
@@ -1272,7 +1228,10 @@ pub(super) mod tests {
         super::super::discovery::reset_codebuddy_head_read_count();
         assert_eq!(scan_with(&db, || {})?.reparsed, 1);
         assert_eq!(super::super::discovery::codebuddy_head_read_count(), 1);
-        assert_eq!(workspace_for("second")?, workspace_a.to_string_lossy().as_ref());
+        assert_eq!(
+            workspace_for("second")?,
+            workspace_a.to_string_lossy().as_ref()
+        );
         let title: String = db
             .0
             .lock()
@@ -1318,7 +1277,8 @@ pub(super) mod tests {
             .map_err(|e| e.to_string())?;
 
         let _guard = HomeGuard::set(&home);
-        let db = crate::engines::support::db::Db::open_at(&home.join("app.db")).map_err(|e| e.to_string())?;
+        let db = crate::engines::support::db::Db::open_at(&home.join("app.db"))
+            .map_err(|e| e.to_string())?;
         {
             let conn = db.0.lock();
             conn.execute(
@@ -1345,21 +1305,24 @@ pub(super) mod tests {
                 [],
             )
             .map_err(|e| e.to_string())?;
-            conn.execute("UPDATE cli_meta SET value='7' WHERE key='title_version'", [])
-                .map_err(|e| e.to_string())?;
+            conn.execute(
+                "UPDATE cli_meta SET value='7' WHERE key='title_version'",
+                [],
+            )
+            .map_err(|e| e.to_string())?;
         }
         std::fs::write(&retry_path, "not a session\n").map_err(|e| e.to_string())?;
         let workspace_paths = vec![workspace.to_string_lossy().to_string()];
         let (_, malformed_signature) =
-            stat_all(&workspace_paths, &gather_candidates(&workspace_paths), "");
+            stat_all(&workspace_paths, &gather_candidates(&workspace_paths));
         assert_ne!(malformed_signature, original_signature);
 
         let partial = scan_with(&db, || {})?;
         assert_eq!(partial.reparsed, 1);
         {
             let conn = db.0.lock();
-            let (version, signature, valid_title, retry_title): (String, String, String, String) = conn
-                .query_row(
+            let (version, signature, valid_title, retry_title): (String, String, String, String) =
+                conn.query_row(
                     "SELECT
                         (SELECT value FROM cli_meta WHERE key='title_version'),
                         (SELECT value FROM cli_meta WHERE key='stat_signature'),
@@ -1391,7 +1354,7 @@ pub(super) mod tests {
                 )
                 .map_err(|e| e.to_string())?;
             let (_, repaired_signature) =
-                stat_all(&workspace_paths, &gather_candidates(&workspace_paths), "");
+                stat_all(&workspace_paths, &gather_candidates(&workspace_paths));
             assert_eq!(version, TITLE_VERSION);
             assert_eq!(signature, repaired_signature);
             assert_eq!(retry_title, "repaired title");
@@ -1438,7 +1401,8 @@ pub(super) mod tests {
         .map_err(|e| e.to_string())?;
 
         let _guard = HomeGuard::set(&home);
-        let db = crate::engines::support::db::Db::open_at(&home.join("app.db")).map_err(|e| e.to_string())?;
+        let db = crate::engines::support::db::Db::open_at(&home.join("app.db"))
+            .map_err(|e| e.to_string())?;
         {
             let conn = db.0.lock();
             conn.execute(
@@ -1469,141 +1433,6 @@ pub(super) mod tests {
     }
 
     #[test]
-    fn delete_unscanned_failed_sessions_on_first_attempt() -> Result<(), String> {
-        let home = scratch_dir(&format!("delete-unscanned-{}", uuid::Uuid::new_v4()));
-        let _home_guard = HomeGuard::set(&home);
-        // HomeGuard owns HOME_LOCK; restore engine overrides even on a panic.
-        struct EngineHomes(Vec<(&'static str, Option<std::ffi::OsString>)>);
-        impl Drop for EngineHomes {
-            fn drop(&mut self) {
-                for (key, value) in &self.0 {
-                    match value {
-                        Some(value) => std::env::set_var(key, value),
-                        None => std::env::remove_var(key),
-                    }
-                }
-            }
-        }
-        let _engine_homes = EngineHomes(
-            ["CODEX_HOME", "CLAUDE_CONFIG_DIR"]
-                .into_iter()
-                .map(|key| (key, std::env::var_os(key)))
-                .collect(),
-        );
-        std::env::set_var("CODEX_HOME", home.join(".codex"));
-        std::env::set_var("CLAUDE_CONFIG_DIR", home.join(".claude"));
-        let workspace = home.join("ws");
-        std::fs::create_dir_all(&workspace).map_err(|e| e.to_string())?;
-        let db = crate::engines::support::db::Db::open_at(&home.join("app.db")).map_err(|e| e.to_string())?;
-        db.0.lock()
-            .execute(
-                "INSERT INTO cli_workspaces(id,path,name) VALUES('w1',?1,'ws')",
-                [workspace.to_string_lossy().as_ref()],
-            )
-            .map_err(|e| e.to_string())?;
-        let session_id = "failed-first-turn";
-        let claude_path = home
-            .join(".claude")
-            .join("projects")
-            .join(super::super::claude_encode_project_path(
-                &workspace.to_string_lossy(),
-            ))
-            .join(format!("{session_id}.jsonl"));
-        let codex_path = home
-            .join(".codex")
-            .join("sessions")
-            .join("2026")
-            .join("09")
-            .join("18")
-            .join(format!("rollout-2026-09-18T00-00-00-{session_id}.jsonl"));
-        let fixtures = [
-            (
-                "claude",
-                claude_path,
-                vec![serde_json::json!({
-                    "type": "user", "sessionId": session_id,
-                    "message": {"role": "user", "content": "hello"}
-                })],
-            ),
-            (
-                "codex",
-                codex_path,
-                vec![
-                    serde_json::json!({"type": "session_meta", "payload": {
-                        "id": session_id, "cwd": workspace.to_string_lossy()
-                    }}),
-                    serde_json::json!({"type": "response_item", "payload": {
-                        "type": "message", "role": "user",
-                        "content": [{"type": "input_text", "text": "hello"}]
-                    }}),
-                ],
-            ),
-        ];
-        for (engine, path, lines) in &fixtures {
-            // Each engine starts with a real file and no sessions-table row.
-            std::fs::create_dir_all(path.parent().unwrap()).map_err(|e| e.to_string())?;
-            let text = lines
-                .iter()
-                .map(serde_json::Value::to_string)
-                .collect::<Vec<_>>()
-                .join("\n")
-                + "\n";
-            std::fs::write(path, text).map_err(|e| e.to_string())?;
-            db.remember_session_model(engine, session_id, "model", 1)?;
-            db.remember_session_effort(engine, session_id, "high", 1)?;
-            db.record_accepted_internal_frame_hash(
-                engine, session_id, &"a".repeat(64), &workspace.to_string_lossy(),
-            )?;
-            let count: i64 = db.0.lock().query_row(
-                "SELECT COUNT(*) FROM cli_sessions WHERE engine=?1 AND session_id=?2",
-                rusqlite::params![engine, session_id], |r| r.get(0),
-            ).map_err(|e| e.to_string())?;
-            assert_eq!(count, 0);
-
-            super::super::reader::delete_session_blocking(&db, engine, session_id)?;
-            assert!(
-                !path.exists(),
-                "{engine}: first delete must remove the transcript"
-            );
-            scan_with(&db, || {})?;
-            for table in ["cli_accepted_internal_frames", "cli_sessions", "cli_session_models", "cli_session_efforts"] {
-                let count: i64 = db.0.lock().query_row(
-                    &format!("SELECT COUNT(*) FROM {table} WHERE engine=?1 AND session_id=?2"),
-                    rusqlite::params![engine, session_id], |r| r.get(0),
-                ).map_err(|e| e.to_string())?;
-                assert_eq!(count, 0, "{engine}: {table} must stay deleted after scanning");
-            }
-            // An already deleted session and one that never wrote a transcript
-            // both complete without asking the user to delete a second time.
-            super::super::reader::delete_session_blocking(&db, engine, session_id)?;
-            db.remember_session_model(engine, "never-persisted", "model", 1)?;
-            super::super::reader::delete_session_blocking(&db, engine, "never-persisted")?;
-            let count: i64 = db.0.lock().query_row(
-                "SELECT COUNT(*) FROM cli_session_models WHERE engine=?1 AND session_id='never-persisted'",
-                [engine], |r| r.get(0),
-            ).map_err(|e| e.to_string())?;
-            assert_eq!(count, 0);
-        }
-        db.0.lock()
-            .execute("DROP TABLE cli_meta", [])
-            .map_err(|e| e.to_string())?;
-        let error =
-            super::super::reader::delete_session_blocking(&db, "codex", "scan-failed").unwrap_err();
-        assert!(
-            error.contains("scan before deleting codex/scan-failed"),
-            "{error}"
-        );
-        assert!(error.contains("no such table"), "{error}");
-        drop(db);
-        std::fs::remove_dir_all(&home).map_err(|e| e.to_string())?;
-        Ok(())
-    }
-
-    /// Codex embeds its full base_instructions system prompt in the
-    /// session_meta line, pushing line 1 past the old 16 KiB head-peek cap;
-    /// the truncated line failed to parse and the rollout was never
-    /// attributed. A >16 KiB session_meta must still scan.
-    #[test]
     fn scan_identifies_codex_rollout_with_huge_session_meta() -> Result<(), String> {
         let home = scratch_dir("scan-codex-home");
         let workspace = home.join("ws");
@@ -1626,7 +1455,8 @@ pub(super) mod tests {
         .map_err(|e| e.to_string())?;
 
         let _guard = HomeGuard::set(&home);
-        let db = crate::engines::support::db::Db::open_at(&home.join("app.db")).map_err(|e| e.to_string())?;
+        let db = crate::engines::support::db::Db::open_at(&home.join("app.db"))
+            .map_err(|e| e.to_string())?;
         {
             let conn = db.0.lock();
             conn.execute(
@@ -1704,7 +1534,8 @@ pub(super) mod tests {
         .map_err(|e| e.to_string())?;
 
         let _guard = HomeGuard::set(&home);
-        let db = crate::engines::support::db::Db::open_at(&home.join("app.db")).map_err(|e| e.to_string())?;
+        let db = crate::engines::support::db::Db::open_at(&home.join("app.db"))
+            .map_err(|e| e.to_string())?;
         {
             let conn = db.0.lock();
             conn.execute(
@@ -1723,7 +1554,9 @@ pub(super) mod tests {
         let ids: Vec<String> = {
             let conn = db.0.lock();
             let mut stmt = conn
-                .prepare("SELECT session_id FROM cli_sessions WHERE engine='codex' ORDER BY session_id")
+                .prepare(
+                    "SELECT session_id FROM cli_sessions WHERE engine='codex' ORDER BY session_id",
+                )
                 .map_err(|e| e.to_string())?;
             let rows = stmt
                 .query_map([], |r| r.get::<_, String>(0))
@@ -1770,7 +1603,8 @@ pub(super) mod tests {
             ],
         );
         let _guard = HomeGuard::set(&home);
-        let db = crate::engines::support::db::Db::open_at(&home.join("app.db")).map_err(|e| e.to_string())?;
+        let db = crate::engines::support::db::Db::open_at(&home.join("app.db"))
+            .map_err(|e| e.to_string())?;
         {
             let conn = db.0.lock();
             conn.execute(
@@ -1789,7 +1623,9 @@ pub(super) mod tests {
         let ids: Vec<String> = {
             let conn = db.0.lock();
             let mut stmt = conn
-                .prepare("SELECT session_id FROM cli_sessions WHERE engine='dsh' ORDER BY session_id")
+                .prepare(
+                    "SELECT session_id FROM cli_sessions WHERE engine='dsh' ORDER BY session_id",
+                )
                 .map_err(|e| e.to_string())?;
             let rows = stmt
                 .query_map([], |r| r.get::<_, String>(0))
@@ -1835,11 +1671,15 @@ pub(super) mod tests {
             session("ses_empty", None, 1)?;
             conn.execute("INSERT INTO message VALUES('m_visible','ses_visible')", [])
                 .map_err(|e| e.to_string())?;
-            conn.execute("INSERT INTO message VALUES('m_subagent','ses_subagent')", [])
-                .map_err(|e| e.to_string())?;
+            conn.execute(
+                "INSERT INTO message VALUES('m_subagent','ses_subagent')",
+                [],
+            )
+            .map_err(|e| e.to_string())?;
         }
         let _guard = HomeGuard::set(&home);
-        let db = crate::engines::support::db::Db::open_at(&home.join("app.db")).map_err(|e| e.to_string())?;
+        let db = crate::engines::support::db::Db::open_at(&home.join("app.db"))
+            .map_err(|e| e.to_string())?;
         {
             let conn = db.0.lock();
             conn.execute(
@@ -1917,7 +1757,11 @@ pub(super) mod tests {
                  CREATE TABLE message(id TEXT PRIMARY KEY, session_id TEXT NOT NULL);",
             )
             .map_err(|e| e.to_string())?;
-            for (id, archived, updated) in [("ses_live", None, 2), ("ses_archived", Some(9), 5), ("ses_downgraded", None, 10)] {
+            for (id, archived, updated) in [
+                ("ses_live", None, 2),
+                ("ses_archived", Some(9), 5),
+                ("ses_downgraded", None, 10),
+            ] {
                 conn.execute(
                     "INSERT INTO session VALUES(?1,?2,NULL,?3,?4)",
                     rusqlite::params![id, ws, archived, updated],
@@ -1928,7 +1772,8 @@ pub(super) mod tests {
             }
         }
         let _guard = HomeGuard::set(&home);
-        let db = crate::engines::support::db::Db::open_at(&home.join("app.db")).map_err(|e| e.to_string())?;
+        let db = crate::engines::support::db::Db::open_at(&home.join("app.db"))
+            .map_err(|e| e.to_string())?;
         {
             let conn = db.0.lock();
             conn.execute(
@@ -1960,7 +1805,13 @@ pub(super) mod tests {
         assert_eq!(
             rows,
             vec![
-                ("ses_downgraded".to_string(), project.join("ses_downgraded.json").to_string_lossy().to_string()),
+                (
+                    "ses_downgraded".to_string(),
+                    project
+                        .join("ses_downgraded.json")
+                        .to_string_lossy()
+                        .to_string()
+                ),
                 ("ses_live".to_string(), live.to_string_lossy().to_string()),
             ]
         );
@@ -1984,7 +1835,8 @@ pub(super) mod tests {
         // file (missing files are now reclaimed by the file-existence GC).
         std::fs::write(&rollout, "{}\n").map_err(|e| e.to_string())?;
         let _guard = HomeGuard::set(&home);
-        let db = crate::engines::support::db::Db::open_at(&home.join("app.db")).map_err(|e| e.to_string())?;
+        let db = crate::engines::support::db::Db::open_at(&home.join("app.db"))
+            .map_err(|e| e.to_string())?;
         {
             let conn = db.0.lock();
             conn.execute(
@@ -2023,7 +1875,8 @@ pub(super) mod tests {
         let workspace = home.join("ws");
         std::fs::create_dir_all(&workspace).map_err(|e| e.to_string())?;
         let _guard = HomeGuard::set(&home);
-        let db = crate::engines::support::db::Db::open_at(&home.join("app.db")).map_err(|e| e.to_string())?;
+        let db = crate::engines::support::db::Db::open_at(&home.join("app.db"))
+            .map_err(|e| e.to_string())?;
         {
             let conn = db.0.lock();
             conn.execute(
@@ -2082,7 +1935,8 @@ pub(super) mod tests {
         std::env::set_var("CODEX_HOME", home.join(".codex"));
         let workspace = home.join("ws");
         std::fs::create_dir_all(&workspace).map_err(|e| e.to_string())?;
-        let db = crate::engines::support::db::Db::open_at(&home.join("app.db")).map_err(|e| e.to_string())?;
+        let db = crate::engines::support::db::Db::open_at(&home.join("app.db"))
+            .map_err(|e| e.to_string())?;
         db.0.lock()
             .execute(
                 "INSERT INTO cli_workspaces(id, path, name) VALUES('w1', ?1, 'ws')",
@@ -2131,23 +1985,37 @@ pub(super) mod tests {
         let _guard = HomeGuard::set(&home);
         let workspace = home.join("ws");
         std::fs::create_dir_all(&workspace).map_err(|e| e.to_string())?;
-        let db = crate::engines::support::db::Db::open_at(&home.join("app.db")).map_err(|e| e.to_string())?;
+        let db = crate::engines::support::db::Db::open_at(&home.join("app.db"))
+            .map_err(|e| e.to_string())?;
         let live_file = home.join("live.jsonl");
         std::fs::write(&live_file, "{}\n").map_err(|e| e.to_string())?;
         let ghost_file = home.join("ghost.jsonl"); // never created
-        let synthetic = super::super::opencode_db_session_path(
-            &home.join("opencode.db"),
-            "abc123",
-        );
+        let synthetic = super::super::opencode_db_session_path(&home.join("opencode.db"), "abc123");
         {
             let conn = db.0.lock();
             for (engine, id, path) in [
                 ("claude", "live", live_file.to_string_lossy().into_owned()),
                 ("claude", "ghost", ghost_file.to_string_lossy().into_owned()),
-                ("claude", "unc", "\\\\server\\share\\ghost.jsonl".to_string()),
-                ("claude", "extended", "\\\\?\\UNC\\server\\share\\x.jsonl".to_string()),
-                ("claude", "extended-local", format!("\\\\?\\{}", ghost_file.to_string_lossy())),
-                ("opencode", "synthetic", synthetic.to_string_lossy().into_owned()),
+                (
+                    "claude",
+                    "unc",
+                    "\\\\server\\share\\ghost.jsonl".to_string(),
+                ),
+                (
+                    "claude",
+                    "extended",
+                    "\\\\?\\UNC\\server\\share\\x.jsonl".to_string(),
+                ),
+                (
+                    "claude",
+                    "extended-local",
+                    format!("\\\\?\\{}", ghost_file.to_string_lossy()),
+                ),
+                (
+                    "opencode",
+                    "synthetic",
+                    synthetic.to_string_lossy().into_owned(),
+                ),
             ] {
                 conn.execute(
                     "INSERT INTO cli_sessions(engine, session_id, workspace_path, file_path, file_size, file_mtime_ms, title) VALUES(?1, ?2, ?3, ?4, 1, 1, 't')",
@@ -2194,13 +2062,22 @@ pub(super) mod tests {
     fn codex_gc_fixture(
         home: &Path,
         codex_home: &Path,
-    ) -> Result<(HomeGuard, CodexHomeEnv, PathBuf, crate::engines::support::db::Db), String> {
+    ) -> Result<
+        (
+            HomeGuard,
+            CodexHomeEnv,
+            PathBuf,
+            crate::engines::support::db::Db,
+        ),
+        String,
+    > {
         let guard = HomeGuard::set(home);
         let env = CodexHomeEnv(std::env::var_os("CODEX_HOME"));
         std::env::set_var("CODEX_HOME", codex_home);
         let workspace = home.join("ws");
         std::fs::create_dir_all(&workspace).map_err(|e| e.to_string())?;
-        let db = crate::engines::support::db::Db::open_at(&home.join("app.db")).map_err(|e| e.to_string())?;
+        let db = crate::engines::support::db::Db::open_at(&home.join("app.db"))
+            .map_err(|e| e.to_string())?;
         db.0.lock()
             .execute(
                 "INSERT INTO cli_workspaces(id, path, name) VALUES('w1', ?1, 'ws')",
@@ -2281,15 +2158,16 @@ pub(super) mod tests {
                 [],
             )
             .map_err(|e| e.to_string())?;
-        let user_fields = |db: &crate::engines::support::db::Db| -> Result<(i64, Option<String>), String> {
-            db.0.lock()
+        let user_fields =
+            |db: &crate::engines::support::db::Db| -> Result<(i64, Option<String>), String> {
+                db.0.lock()
                 .query_row(
                     "SELECT pinned, custom_title FROM cli_sessions WHERE engine='codex' AND session_id='pinned'",
                     [],
                     |r| Ok((r.get(0)?, r.get(1)?)),
                 )
                 .map_err(|e| e.to_string())
-        };
+            };
         let parked = home.join("disk-parked");
         std::fs::rename(&disk, &parked).map_err(|e| e.to_string())?;
         scan_with(&db, || {})?;
@@ -2396,7 +2274,10 @@ pub(super) mod tests {
             .unwrap();
     }
 
-    fn qoder_session_workspace(db: &crate::engines::support::db::Db, session_id: &str) -> Option<String> {
+    fn qoder_session_workspace(
+        db: &crate::engines::support::db::Db,
+        session_id: &str,
+    ) -> Option<String> {
         db.0.lock()
             .query_row(
                 "SELECT workspace_path FROM cli_sessions WHERE engine='qoder' AND session_id=?1",

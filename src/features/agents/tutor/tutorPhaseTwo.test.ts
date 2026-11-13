@@ -8,8 +8,7 @@ vi.mock("@/api/runtime/device-embeddings", () => ({
 
 import { parseOverview } from "./tutorPrompts";
 import { cosine, hashOf, passagesOf } from "./tutorSearch";
-import { guideMarkdown, notebookMarkdown } from "./tutorShare";
-import type { Guide, Notebook } from "./tutorTypes";
+import type { Notebook } from "./tutorTypes";
 
 describe("audio overviews", () => {
   it("reads a two-speaker script, B for the second voice and A for anything else", () => {
@@ -67,73 +66,6 @@ describe("search passages", () => {
   });
 });
 
-describe("sharing to a Space", () => {
-  const notebook: Notebook = {
-    id: "n",
-    title: "Biology",
-    sources: [
-      {
-        id: "a",
-        kind: "link",
-        title: "Wiki",
-        url: "https://example.org",
-        context: "full",
-        createdAt: "",
-      },
-      { id: "b", kind: "file", title: "paper.pdf", text: "…", context: "full", createdAt: "" },
-    ],
-    notes: [
-      {
-        id: "x",
-        title: "Key points",
-        body: "- cells",
-        origin: "agent",
-        createdAt: "",
-        updatedAt: "",
-      },
-    ],
-    transformations: [],
-    chats: [],
-    createdAt: "",
-    updatedAt: "",
-  };
-  const guide = (fields: Partial<Guide>): Guide => ({
-    id: "g",
-    kind: "guide",
-    title: "Cells",
-    body: "# Cells\n\nAll about cells.",
-    notebookId: "n",
-    createdAt: "",
-    updatedAt: "",
-    ...fields,
-  });
-
-  it("lists sources by name, then notes, then guides without their repeated title", () => {
-    const markdown = notebookMarkdown(notebook, [guide({})]);
-    expect(markdown).toContain("1. [Wiki](https://example.org)\n2. paper.pdf");
-    expect(markdown).toContain("### Key points\n\n- cells");
-    expect(markdown).toContain("### Cells\n\nAll about cells.");
-    expect(markdown).not.toMatch(/^# Cells$/m);
-  });
-
-  it("marks a quiz's right answers and writes an overview as its script", () => {
-    const quiz = guideMarkdown(
-      guide({ kind: "quiz", questions: [{ question: "2+2?", choices: ["3", "4"], answer: 1 }] }),
-    );
-    expect(quiz).toContain("   - 3\n   - **4**");
-    const overview = guideMarkdown(
-      guide({
-        kind: "overview",
-        script: [
-          { speaker: 0, text: "Hi." },
-          { speaker: 1, text: "Hello." },
-        ],
-      }),
-    );
-    expect(overview).toBe("**A:** Hi.\n\n**B:** Hello.");
-  });
-});
-
 describe("passages for a question", () => {
   it("cites each passage by its source's number", async () => {
     const { passagesContext } = await import("./tutorPrompts");
@@ -182,7 +114,7 @@ describe("runs Misty closed under", () => {
     const { interrupted } = await import("./tutorRuns");
     expect(interrupted("The Misty account changed. Open Misty again.")).toBe(true);
     expect(interrupted("Misty closed before this run finished.")).toBe(true);
-    expect(interrupted("The reply had nothing Tutor could use.")).toBe(false);
+    expect(interrupted("The reply had nothing Misty could use.")).toBe(false);
     expect(interrupted(undefined)).toBe(false);
   });
 });

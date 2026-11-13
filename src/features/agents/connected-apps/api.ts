@@ -10,6 +10,8 @@ export interface ConnectedApp {
   account?: string;
   status: "active" | "pending" | "needs_attention";
   created_at: string;
+  /** Composio's logo for the app, an https address native code fetches. */
+  logo?: string;
 }
 
 export interface CatalogApp {
@@ -17,6 +19,8 @@ export interface CatalogApp {
   name: string;
   description: string;
   connected: boolean;
+  /** Composio's logo for the app, an https address native code fetches. */
+  logo?: string;
 }
 
 /**

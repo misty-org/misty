@@ -143,21 +143,7 @@ export function createLoadConversations(
                   event.type,
                 )
               )
-                // Goal continuations chain: attach to the next one when it starts.
-                useCollaborationStore.getState().afterRunSettled(
-                  conversation.id,
-                  () => void get().loadConversations(true),
-                  () => get().working,
-                  {
-                    runId: invocationId,
-                    completed: event.type === "invocation.completed",
-                    waitingOnPerson:
-                      get()
-                        .conversations.find((c) => c.id === conversation.id)
-                        ?.messages.find((m) => m.id === message.id)?.appRequest?.state ===
-                      "pending",
-                  },
-                );
+                useCollaborationStore.getState().afterRunSettled(conversation.id);
               if (event.type === "artifact.proposed" || event.type === "approval.required") {
                 patchConversationMessage(set, get, conversation.id, message.id, {
                   artifact: event.artifact,

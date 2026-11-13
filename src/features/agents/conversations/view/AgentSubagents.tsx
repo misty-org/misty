@@ -5,14 +5,7 @@ import { Button } from "@/shared/ui";
 import { StatusRow, StatusTable, type StatusState } from "../../progress/StatusTable";
 import { WorkGroup } from "../../progress/WorkGroup";
 
-const running = new Set([
-  "queued",
-  "running",
-  "awaiting_approval",
-  "awaiting_device",
-  "awaiting_intervention",
-  "awaiting_timer",
-]);
+const running = new Set(["queued", "running", "awaiting_approval", "awaiting_intervention"]);
 
 /** Status as an icon, a word and, for waiting or failed, color; never color alone. */
 function status(state: string): { label: string; row: StatusState } {

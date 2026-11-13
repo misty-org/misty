@@ -211,6 +211,8 @@ async fn live_makers_take_a_keyless_sign_in() {
     println!("github -> {}", github.code());
     assert_eq!(github.code(), "needs_app");
     // Linear is in the shipped catalog, so the registry adds only what's newer, never a middleman.
-    let newer = super::catalog::search_registry(&http, "linear").await.unwrap();
+    let newer = super::catalog::search_registry(&http, "linear")
+        .await
+        .unwrap();
     assert!(newer.iter().all(|app| !app.url.contains("civai")));
 }

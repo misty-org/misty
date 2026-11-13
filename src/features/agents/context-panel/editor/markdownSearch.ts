@@ -1,5 +1,9 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
-import { findTextMatches, highlightSupported, type TextSearchOptions } from "./domTextSearch";
+import {
+  findTextMatches,
+  highlightSupported,
+  type TextSearchOptions,
+} from "../../conversations/view/navigation/domTextSearch";
 
 /**
  * Find in a file's Markdown preview: matches are colored with the CSS Custom Highlight API, so

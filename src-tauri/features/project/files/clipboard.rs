@@ -33,7 +33,9 @@ pub(super) async fn snapshot_on_main_thread(
 /// `GetClipboardSequenceNumber` opens the clipboard, so this answers while another program holds
 /// it open, which is when a snapshot fails: the tree's Paste can still tell that nothing newer
 /// was copied since its own Copy.
-pub(super) async fn change_count_on_main_thread(app: &tauri::AppHandle) -> Result<Option<u64>, String> {
+pub(super) async fn change_count_on_main_thread(
+    app: &tauri::AppHandle,
+) -> Result<Option<u64>, String> {
     let (sender, receiver) = tokio::sync::oneshot::channel();
     app.run_on_main_thread(move || {
         let _ = sender.send(platform::change_count());

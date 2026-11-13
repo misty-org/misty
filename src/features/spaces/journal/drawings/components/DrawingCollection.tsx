@@ -61,7 +61,7 @@ export function DrawingCollection(props: {
   return (
     <CollectionPage>
       <CollectionHeading
-        title="Journal"
+        title="Docs"
         end={
           <>
             <CollectionSearch

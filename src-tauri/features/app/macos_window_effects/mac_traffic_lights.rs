@@ -207,6 +207,18 @@ unsafe fn show_buttons(ns_window: id) {
 /// they never show in AppKit's spot and then jump. Returns whether they are waiting.
 #[cfg(target_os = "macos")]
 pub unsafe fn hold_traffic_lights(ns_window: id) -> bool {
+    hold_buttons(ns_window)
+}
+
+/// [`hold_traffic_lights`] for a window known only by the raw pointer a webview gives
+/// (`ns_window()`), so callers outside this module never name `cocoa`'s deprecated `id`.
+#[cfg(target_os = "macos")]
+pub unsafe fn hold_traffic_lights_of(ns_window: *mut c_void) -> bool {
+    hold_buttons(ns_window as id)
+}
+
+#[cfg(target_os = "macos")]
+unsafe fn hold_buttons(ns_window: id) -> bool {
     if placement(ns_window).is_some() {
         return false;
     }

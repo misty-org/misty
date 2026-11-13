@@ -1,4 +1,4 @@
-import { NotebookText, PenLine, Plus, Upload, type LucideIcon } from "lucide-react";
+import { FilePenLine, PenLine, Plus, Upload, type LucideIcon } from "lucide-react";
 import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { spacesApi } from "../api/api";
@@ -18,7 +18,7 @@ import { createSpaceItem, type SpaceCreateKind } from "./createSpaceItem";
 type Choice = { id: SpaceCreateKind; label: string; icon: LucideIcon; tone: ItemTone };
 
 const choices: Choice[] = [
-  { id: "note", label: "Note", icon: NotebookText, tone: itemTones.note },
+  { id: "note", label: "Doc", icon: FilePenLine, tone: itemTones.note },
   { id: "drawing", label: "Drawing", icon: PenLine, tone: itemTones.drawing },
   { id: "file", label: "Upload file", icon: Upload, tone: itemTones.document },
 ];
@@ -26,7 +26,7 @@ const choices: Choice[] = [
 const failed = (message: string) => notify({ message, tone: "error", id: "space-new" });
 
 /**
- * The page head's New menu: a note, a drawing or a file for this Space. Upload file opens the
+ * The page head's New menu: a doc, a drawing or a file for this Space. Upload file opens the
  * system picker and adds the files in place, without leaving the page.
  */
 export function MakeSomethingNew({
@@ -82,7 +82,7 @@ export function MakeSomethingNew({
         onChange={(event) => void upload(Array.from(event.target.files ?? []))}
       />
       <DropdownMenu>
-        <MenuTrigger label="New" variant="secondary" disabled={busy} icon={Plus} />
+        <MenuTrigger label="New" variant="primary" disabled={busy} icon={Plus} />
         <DropdownMenuContent align="end" className="min-w-44">
           {choices
             .filter((choice) => !only || only.includes(choice.id))

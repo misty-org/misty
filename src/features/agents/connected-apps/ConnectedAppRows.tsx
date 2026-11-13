@@ -1,19 +1,30 @@
-import { CircleAlert, Plug, Plus } from "lucide-react";
-import { BrandIcon, brandIconAsset, Button } from "@/shared/ui";
+import { CircleAlert, Plus } from "lucide-react";
+import { Button } from "@/shared/ui";
 import type { ConnectedApp } from "./api";
+import { DirectAppLogo } from "./DirectAppLogo";
 
-/** Official brand artwork when the shared registry has it; a monochrome plug otherwise. */
-export function AppLogo({ app, size = 24 }: { app: string; size?: number }) {
-  return brandIconAsset(app) ? (
-    <BrandIcon brand={app} size={size} />
-  ) : (
-    <Plug size={Math.round(size * 0.75)} className="text-cream-muted" aria-hidden="true" />
-  );
+/**
+ * An app's official logo: Misty's own artwork of the brand when it has one, else the logo Composio
+ * publishes for it (fetched by native code), else its initial.
+ */
+export function AppLogo({
+  app,
+  name,
+  logo,
+  size = 24,
+}: {
+  app: string;
+  name?: string;
+  logo?: string;
+  size?: number;
+}) {
+  return <DirectAppLogo app={app} name={name ?? app} icon={logo} size={size} />;
 }
 
 interface AppGroup {
   app: string;
   name: string;
+  logo?: string;
   accounts: ConnectedApp[];
 }
 
@@ -21,7 +32,12 @@ interface AppGroup {
 export function groupApps(apps: ConnectedApp[]): AppGroup[] {
   const groups = new Map<string, AppGroup>();
   for (const item of apps) {
-    const group = groups.get(item.app) ?? { app: item.app, name: item.name, accounts: [] };
+    const group = groups.get(item.app) ?? {
+      app: item.app,
+      name: item.name,
+      logo: item.logo,
+      accounts: [],
+    };
     group.accounts.push(item);
     groups.set(item.app, group);
   }

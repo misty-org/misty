@@ -29,7 +29,7 @@ export function ServerOption(props: {
   );
 }
 
-/** The wizard's first step: sign in on Misty Pro, a server you run, or this computer alone. */
+/** The wizard's first step: sign in on Misty Cloud, a server you run, or this computer alone. */
 export function ServerChoiceScreen(props: {
   busy?: boolean;
   onChoose: (target: ServerChoiceTarget) => void;
@@ -38,7 +38,7 @@ export function ServerChoiceScreen(props: {
     <div className="grid gap-2.5">
       <ServerOption
         icon={<Cloud />}
-        label="Misty Pro"
+        label="Misty Cloud"
         disabled={props.busy}
         onSelect={() => props.onChoose("cloud")}
       />

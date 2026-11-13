@@ -24,9 +24,9 @@ export async function prepareTurnContext(
     accountId: string;
     epoch: number;
     spaceId: string;
-    origin: SubmitArgs[5];
+    origin: SubmitArgs[4];
     handoff?: MistyHandoff;
-    companion: SubmitArgs[6];
+    companion: SubmitArgs[5];
     requestAgentId?: string;
     selection?: AiSelectionSnapshot;
     deviceContexts: AiInvocationDeviceContext[];

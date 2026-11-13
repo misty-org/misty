@@ -315,11 +315,14 @@ pub(crate) fn expire_parked_plans(core: &TurnCore, state: &mut TurnState, key: &
         .collect();
     if let Ok(expired) = plan_review::expire_reviews(db, &parked) {
         for (plan_id, revision, _previous) in expired {
-            core.dispatch_event(state, EngineEvent::PlanReviewSettled {
-                plan_id,
-                revision,
-                status: plan_review::PlanStatus::Expired.as_str().to_string(),
-            });
+            core.dispatch_event(
+                state,
+                EngineEvent::PlanReviewSettled {
+                    plan_id,
+                    revision,
+                    status: plan_review::PlanStatus::Expired.as_str().to_string(),
+                },
+            );
         }
     }
 }
@@ -416,8 +419,7 @@ impl TurnCore {
                 // explicit start marker keep running: claude streams tool
                 // arguments inside the same response and closes it at
                 // message_stop.
-                let response_end = role == "assistant"
-                    || (role == "tool" && result.is_none());
+                let response_end = role == "assistant" || (role == "tool" && result.is_none());
                 if response_end && !state.gen_explicit {
                     state.gen_end();
                 }
@@ -640,27 +642,33 @@ impl TurnCore {
                 // {revision, route, frames, ...} flat at the top level. The context is the
                 // adapter's object; native code injects `revision`, which adapters must not use.
                 if record.review_kind == plan_review::PlanReviewKind::NativeRequest {
-                if let Some(entry) = self.registry.get(&self.run_id) {
-                    if let Ok(mut plans) = entry.plans.lock() {
-                        let mut parked = context;
-                        if let Some(map) = parked.as_object_mut() {
-                            map.insert(
-                                "revision".to_string(),
-                                serde_json::Value::from(record.revision),
-                            );
-                        } else {
-                            parked = serde_json::json!({
-                                "revision": record.revision,
-                                "opaque": parked,
-                            });
+                    if let Some(entry) = self.registry.get(&self.run_id) {
+                        if let Ok(mut plans) = entry.plans.lock() {
+                            let mut parked = context;
+                            if let Some(map) = parked.as_object_mut() {
+                                map.insert(
+                                    "revision".to_string(),
+                                    serde_json::Value::from(record.revision),
+                                );
+                            } else {
+                                parked = serde_json::json!({
+                                    "revision": record.revision,
+                                    "opaque": parked,
+                                });
+                            }
+                            plans.insert(record.plan_id.clone(), parked);
                         }
-                        plans.insert(record.plan_id.clone(), parked);
                     }
-                }
                 }
                 let payload = serde_json::to_value(&record)
                     .unwrap_or_else(|_| serde_json::json!({ "planId": record.plan_id }));
-                state.push(&self.sink, &self.run_id, &self.engine_id, "plan_review", payload);
+                state.push(
+                    &self.sink,
+                    &self.run_id,
+                    &self.engine_id,
+                    "plan_review",
+                    payload,
+                );
             }
             EngineEvent::PlanReviewSettled {
                 plan_id,
@@ -860,8 +868,7 @@ impl TurnCore {
                     // still received; `turn_resumed` reopens the run for it.
                     state.awaiting_followup = true;
                     if let Some(id) = state.native_session_id.as_deref() {
-                        self.registry
-                            .set_awaiting_followup(id, &self.run_id, prefs);
+                        self.registry.set_awaiting_followup(id, &self.run_id, prefs);
                     }
                 } else {
                     state.saw_done = true;
@@ -1730,8 +1737,14 @@ mod terminal_event_tests {
             .filter_map(|event| event.get("genMs").and_then(Value::as_u64))
             .collect();
         assert_eq!(usages.len(), 2, "both usage reports carry genMs");
-        assert!(usages[0] >= 200, "explicit window ignored the tool row: {usages:?}");
-        assert!(usages[1] < 200, "implicit window closed at the tool row: {usages:?}");
+        assert!(
+            usages[0] >= 200,
+            "explicit window ignored the tool row: {usages:?}"
+        );
+        assert!(
+            usages[1] < 200,
+            "implicit window closed at the tool row: {usages:?}"
+        );
     }
 
     #[tokio::test]
@@ -1815,10 +1828,8 @@ mod terminal_event_tests {
             let stdout = child.stdout.take().unwrap();
             let child = Arc::new(TokioMutex::new(child));
             let collector = Arc::new(Collector::default());
-            let sink = event_sink::EventSink::with_name(
-                collector.clone(),
-                event_sink::ENGINE_EVENT_NAME,
-            );
+            let sink =
+                event_sink::EventSink::with_name(collector.clone(), event_sink::ENGINE_EVENT_NAME);
             let registry = Arc::new(ProcessRegistry::default());
             let killed = Arc::new(std::sync::atomic::AtomicBool::new(false));
             let run_id = "pa-relay-interrupt";

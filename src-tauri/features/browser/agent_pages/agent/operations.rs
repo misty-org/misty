@@ -49,7 +49,8 @@ pub(super) async fn visual_browser(
     #[cfg(target_os = "linux")]
     let capture = crate::browser::pages::linux::capture(view).await?;
     #[cfg(not(any(target_os = "macos", windows, target_os = "linux")))]
-    let capture: Value = return Err("Visual browser inspection isn't available on this system.".into());
+    let capture: Value =
+        return Err("Visual browser inspection isn't available on this system.".into());
     observed["image"] = capture;
     observed["viewport"] = json!({"width":size.width,"height":size.height});
     Ok(observed)
@@ -117,51 +118,4 @@ pub(super) async fn type_browser(
         session.element_targets.clear();
     }
     Ok(json!({"prepared": true}))
-}
-
-/// `browser.request`: a same-origin request from the provider view the task uses.
-pub(super) async fn request_browser(
-    app: &AppHandle,
-    state: &BrowserSessionState,
-    id: &str,
-    request: &BrowserAgentExecuteRequest,
-) -> Result<Value, String> {
-    let origin = request
-        .input
-        .get("origin")
-        .and_then(Value::as_str)
-        .ok_or("Provider origin required.")?;
-    let path = request
-        .input
-        .get("path")
-        .and_then(Value::as_str)
-        .filter(|path| path.starts_with('/') && !path.starts_with("//") && path.len() <= 2048)
-        .ok_or("A relative provider path is required.")?;
-    {
-        let sessions = state
-            .sessions
-            .lock()
-            .map_err(|_| "Browser state is unavailable.")?;
-        let provider = sessions
-            .get(id)
-            .and_then(|session| session.provider_id.as_deref())
-            .ok_or("Requests require an active provider view.")?;
-        if !crate::browser::provider_accounts::allows(provider, &external_url(origin)?) {
-            return Err("Provider origin mismatch.".into());
-        }
-    }
-    let script = format!(
-        "const origin = {}; const path = {}; {}",
-        serde_json::to_string(origin).unwrap(),
-        serde_json::to_string(path).unwrap(),
-        include_str!("../../kiri_link/scripts/provider_request.js")
-    );
-    let raw = evaluate_browser_async_javascript(
-        app.get_webview(&webview_label(id)?)
-            .ok_or("Browser tab is not running.")?,
-        script,
-    )
-    .await?;
-    resolve_agent_webview(app, state, request)?;
-    serde_json::from_str(&raw).map_err(|_| "Invalid provider response.".into())
 }

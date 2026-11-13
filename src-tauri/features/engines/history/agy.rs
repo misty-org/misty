@@ -8,7 +8,6 @@
 
 use super::{Message, ParsedSession, ScanSummary};
 use serde::Deserialize;
-use std::collections::HashSet;
 use std::path::Path;
 
 /// `steps.step_type` values observed on agy 1.2.x.
@@ -28,10 +27,7 @@ struct UserTurn {
     ts_ms: Option<i64>,
 }
 
-pub(super) fn parse_agy_session(
-    path: &Path,
-    accepted_internal_frames: &HashSet<String>,
-) -> ParsedSession {
+pub(super) fn parse_agy_session(path: &Path) -> ParsedSession {
     let id = conversation_id(path);
     let mut users = load_user_turns(id.as_deref());
     let mut user_iter = users.drain(..);
@@ -48,16 +44,14 @@ pub(super) fn parse_agy_session(
                     // at all, and without this fallback every user row
                     // vanishes from reloaded history (upstream #1388).
                     let turn = user_iter.next().or_else(|| {
-                        user_text_from_step(&payload)
-                            .map(|text| UserTurn { text, ts_ms: None })
+                        user_text_from_step(&payload).map(|text| UserTurn { text, ts_ms: None })
                     });
                     if let Some(turn) = turn {
                         seq += 1;
                         // agy's history.jsonl records the effective prompt verbatim,
                         // internal system/request tail included — strip it
                         // exactly like the other engines' user rows.
-                        let visible =
-                            super::extract::strip_internal_prompt_tail(&turn.text);
+                        let visible = super::extract::strip_internal_prompt_tail(&turn.text);
                         messages.push(plain_message(seq, "user", visible.to_string(), turn.ts_ms));
                     }
                 }
@@ -66,19 +60,7 @@ pub(super) fn parse_agy_session(
                     // reconstructing them yields protobuf/JSON fragments
                     // ("ommandLine", "WaitMsBeforeAsync"). History only keeps
                     // the visible assistant reply.
-                    let mut texts = proto_strings(&payload);
-                    if !accepted_internal_frames.is_empty() {
-                        for candidate in &mut texts {
-                            if candidate.depth == 1 && candidate.field == 1 {
-                                // Strip before the prose filter: the frame's JSON
-                                // would otherwise discard the surrounding reply.
-                                candidate.text = super::extract::strip_recorded_internal_frames(
-                                    std::mem::take(&mut candidate.text),
-                                    accepted_internal_frames,
-                                );
-                            }
-                        }
-                    }
+                    let texts = proto_strings(&payload);
                     if let Some(text) = pick_assistant(&texts) {
                         seq += 1;
                         messages.push(plain_message(seq, "assistant", text, None));
@@ -99,11 +81,8 @@ pub(super) fn parse_agy_session(
     ParsedSession { messages }
 }
 
-pub(super) fn scan_agy_summary(
-    path: &Path,
-    accepted_internal_frames: &HashSet<String>,
-) -> ScanSummary {
-    let parsed = parse_agy_session(path, accepted_internal_frames);
+pub(super) fn scan_agy_summary(path: &Path) -> ScanSummary {
+    let parsed = parse_agy_session(path);
     let mut first_ts = None;
     let mut last_ts = None;
     let mut title = String::new();
@@ -330,9 +309,7 @@ fn looks_like_tool_fragment(text: &str) -> bool {
     // dump; markdown tables are multi-line and usually contain CJK — those
     // must survive as assistant prose (upstream #1388: a reply whose only
     // table made the whole message vanish from reloaded history).
-    let pipe_dump = text.matches('|').count() >= 3
-        && !text.contains('\n')
-        && !has_cjk(text);
+    let pipe_dump = text.matches('|').count() >= 3 && !text.contains('\n') && !has_cjk(text);
     MARKERS.iter().any(|m| text.contains(m)) || pipe_dump
 }
 
@@ -631,8 +608,7 @@ mod tests {
         // agy's history.jsonl records the effective prompt verbatim, internal
         // system/request tail included; user rows must strip it like every
         // other engine's.
-        let scratch =
-            std::env::temp_dir().join(format!("ccgui-agy-test-{}", uuid::Uuid::new_v4()));
+        let scratch = std::env::temp_dir().join(format!("ccgui-agy-test-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(&scratch).unwrap();
         let previous = std::env::var_os("ANTIGRAVITY_HOME");
         std::env::set_var("ANTIGRAVITY_HOME", &scratch);
@@ -648,7 +624,7 @@ mod tests {
         // No readable steps db: the fallback loop still surfaces user turns.
         let session = scratch.join(format!("{id}.db"));
         std::fs::write(&session, b"").unwrap();
-        let parsed = parse_agy_session(&session, &HashSet::new());
+        let parsed = parse_agy_session(&session);
         match previous {
             Some(value) => std::env::set_var("ANTIGRAVITY_HOME", value),
             None => std::env::remove_var("ANTIGRAVITY_HOME"),
@@ -672,7 +648,7 @@ mod tests {
         if !path.is_file() {
             return;
         }
-        let parsed = parse_agy_session(&path, &HashSet::new());
+        let parsed = parse_agy_session(&path);
         assert!(
             parsed
                 .messages
@@ -743,56 +719,12 @@ mod tests {
     }
 
     #[test]
-    fn recorded_frames_preserve_agy_replies_and_summary() {
-        let path = std::env::temp_dir().join(format!("ccgui-agy-{}.db", uuid::Uuid::new_v4()));
-        let recorded = r#"<CCGUI_INTERNAL_accepted>{"plugin":"bridge","patch":{"goal":"done"}}</CCGUI_INTERNAL_accepted>"#;
-        let unrecorded = r#"<CCGUI_INTERNAL_example>{"v":1}</CCGUI_INTERNAL_example>"#;
-        let visible = format!("已完成桥接验证，未记录的示例仍保留。\n{unrecorded}");
-        let text = format!("{visible}\n{recorded}");
-        let inner = encode_string_field(1, &text);
-        let mut payload = Vec::new();
-        write_varint(&mut payload, (20 << 3) | 2);
-        write_varint(&mut payload, inner.len() as u64);
-        payload.extend(inner);
-        {
-            let conn = rusqlite::Connection::open(&path).unwrap();
-            conn.execute_batch(
-                "CREATE TABLE steps(idx INTEGER, step_type INTEGER, step_payload BLOB);",
-            )
-            .unwrap();
-            conn.execute(
-                "INSERT INTO steps VALUES(0, ?1, ?2)",
-                rusqlite::params![STEP_ASSISTANT, payload],
-            )
-            .unwrap();
-        }
-        let accepted = HashSet::from([
-            crate::engines::history::recordable_internal_frame_hash(recorded).unwrap(),
-        ]);
-
-        let parsed = crate::engines::history::parse_session_file("agy", &path, &accepted).unwrap();
-        let summary = crate::engines::history::scan_summary_file("agy", &path, &accepted).unwrap();
-        std::fs::remove_file(&path).unwrap();
-
-        let replies: Vec<_> = parsed
-            .messages
-            .iter()
-            .filter(|message| message.role == "assistant")
-            .map(|message| message.text.as_str())
-            .collect();
-        assert_eq!(replies, [visible.as_str()]);
-        assert_eq!(summary.preview, visible);
-        assert_eq!(summary.message_count, 1);
-    }
-
-    #[test]
     fn user_turns_fall_back_to_step_payload_without_history_jsonl() {
         let _guard = crate::engines::support::paths::HOME_ENV_LOCK.lock();
         // Newer agy builds do not write history.jsonl; the STEP_USER payload
         // (depth 1 / field 2) is then the only record of the prompt. Without
         // the fallback every user row disappears on reload (upstream #1388).
-        let scratch =
-            std::env::temp_dir().join(format!("ccgui-agy-test-{}", uuid::Uuid::new_v4()));
+        let scratch = std::env::temp_dir().join(format!("ccgui-agy-test-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(&scratch).unwrap();
         let previous = std::env::var_os("ANTIGRAVITY_HOME");
         std::env::set_var("ANTIGRAVITY_HOME", &scratch);
@@ -818,7 +750,7 @@ mod tests {
             )
             .unwrap();
         }
-        let parsed = parse_agy_session(&path, &HashSet::new());
+        let parsed = parse_agy_session(&path);
         match previous {
             Some(value) => std::env::set_var("ANTIGRAVITY_HOME", value),
             None => std::env::remove_var("ANTIGRAVITY_HOME"),
@@ -839,7 +771,10 @@ mod tests {
         // nested deeper belongs to the tool payload (here: the content of a
         // file being written) and must not be shown as an assistant message.
         let tool = [
-            encode_string_field(1, "# 设计文档\n\n本文件描述登录模块的重构方案，包括会话存储与令牌刷新。"),
+            encode_string_field(
+                1,
+                "# 设计文档\n\n本文件描述登录模块的重构方案，包括会话存储与令牌刷新。",
+            ),
             encode_string_field(2, "/repo/docs/design.md"),
         ]
         .concat();
@@ -909,7 +844,7 @@ mod tests {
                 .unwrap();
             }
         }
-        let parsed = parse_agy_session(&path, &HashSet::new());
+        let parsed = parse_agy_session(&path);
         std::fs::remove_file(&path).unwrap();
         let roles: Vec<(&str, &str)> = parsed
             .messages

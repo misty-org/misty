@@ -4,18 +4,12 @@
 /** The channel model behind Settings › Engines › Channels. */
 
 import type { ChannelView, EngineChannels } from "./api";
-import { ENGINE_IDS, type EngineId } from "./engines";
+import type { EngineId } from "./engines";
 
 export { ENGINE_IDS, type EngineId } from "./engines";
 
 export const PSEUDO_LOCAL = "__local_settings_json__";
 export const PSEUDO_DISABLED = "__disabled__";
-/** The choices that aren't channels: the CLI's own config, and the engine turned off. */
-export const PSEUDO_PROVIDER_IDS = [PSEUDO_LOCAL, PSEUDO_DISABLED] as const;
-export type PseudoProviderId = (typeof PSEUDO_PROVIDER_IDS)[number];
-
-export const isPseudoProvider = (id: string): id is PseudoProviderId =>
-  (PSEUDO_PROVIDER_IDS as readonly string[]).includes(id);
 
 const asString = (v: unknown): string => (typeof v === "string" ? v : "");
 
@@ -28,32 +22,6 @@ function channelEnv(raw: unknown): Record<string, unknown> {
   const nested =
     settings && typeof settings === "object" ? (settings as Record<string, unknown>) : {};
   return { ...flat, ...nested };
-}
-
-/** Claude Code's alias variables follow one shape: ANTHROPIC_DEFAULT_<FAMILY>_MODEL remaps that
- *  alias. Derived from the pattern rather than a table, so a new family needs no edit here. */
-const FAMILY_ENV_PATTERN = /^ANTHROPIC_DEFAULT_([A-Z]+)_MODEL$/;
-
-/** The alias id a family env key remaps ("ANTHROPIC_DEFAULT_OPUS_MODEL" →
- *  "opus"). */
-export function familyAliasOfEnvKey(key: string): string | null {
-  const match = FAMILY_ENV_PATTERN.exec(key);
-  return match ? match[1].toLowerCase() : null;
-}
-
-/** The alias remaps a channel defines (family to model id): what a pick of that alias runs while
- *  the channel is in use, so a model picker can name it. */
-export function providerFamilyModels(engine: string, raw: unknown): Record<string, string> {
-  if (engine !== "claude") return {};
-  const env = channelEnv(raw);
-  const result: Record<string, string> = {};
-  for (const [key, value] of Object.entries(env)) {
-    const family = familyAliasOfEnvKey(key);
-    if (!family) continue;
-    const id = asString(value).trim();
-    if (id) result[family] = id;
-  }
-  return result;
 }
 
 /** Per-engine model variable, mirroring native provider_files::env_mapping(). */
@@ -213,14 +181,4 @@ export const CLI_CONFIG_CHANGED_EVENT = "misty:engine-channels-changed";
 
 export function notifyCliConfigChanged() {
   window.dispatchEvent(new Event(CLI_CONFIG_CHANGED_EVENT));
-}
-
-/** Each engine's channel for new chats (`current`); unset or off reads as the CLI's own config. */
-export function engineCurrents(sections: readonly EngineChannels[]): Record<string, string> {
-  const out: Record<string, string> = {};
-  for (const id of ENGINE_IDS) {
-    const current = sections.find((section) => section.engine === id)?.current?.trim();
-    out[id] = current && current !== PSEUDO_DISABLED ? current : PSEUDO_LOCAL;
-  }
-  return out;
 }

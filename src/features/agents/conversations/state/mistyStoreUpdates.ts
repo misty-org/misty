@@ -20,10 +20,6 @@ export function replaceActiveGlobalInvocationStream(next?: () => void) {
   activeGlobalInvocationStream = next;
 }
 
-export function announceGlobalPanel(open: boolean) {
-  window.dispatchEvent(new CustomEvent("misty:global-panel", { detail: { open } }));
-}
-
 export function globalAiContext(context: GlobalAiContextRef[]): AiContextReference[] {
   return (
     context

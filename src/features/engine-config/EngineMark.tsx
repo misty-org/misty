@@ -1,10 +1,12 @@
 // The official marks of the engines Misty has adapters for, so an agent shows which engine it
 // runs on. The shapes in engineMarks.json come from lobe-icons (https://github.com/lobehub/lobe-icons,
 // MIT, Copyright (c) 2023 LobeHub), @lobehub/icons-static-svg 1.102.0, unchanged but for attribute
-// names React reads; Codex wears OpenAI's own mark from there. Oh My Pi's is its own icon, from
-// https://github.com/can1357/oh-my-pi (assets/icon.svg, MIT), its white drawn in the text colour so
-// it shows on a light theme too. The marks belong to their owners and only name their products.
+// names React reads, in each engine's colored version where lobe-icons has one (Codex, Qoder,
+// DeepSeek for DeepSeek Harness); Hermes wears Hermes Agent's. Oh My Pi's is its own gradient π, from
+// https://github.com/can1357/oh-my-pi (packages/collab-web/public/favicon.svg, MIT), without the
+// favicon's dark tile. The marks belong to their owners and only name their products.
 import { createElement, useId, type ReactNode } from "react";
+import { LogoInitial, MistyMark } from "@/shared/ui";
 import shapes from "./engineMarks.json";
 
 /** One SVG element: its tag, its attributes, and its children, if any. */
@@ -14,8 +16,8 @@ type Mark = [Record<string, string>, Shape[]];
 const marks = shapes as unknown as Record<string, Mark>;
 
 /**
- * Whether an engine has a mark. Misty's own engine does not: it keeps the cloud. An engine with no
- * mark shows its initial instead.
+ * Whether an engine has artwork of its own. Misty's own engine does not: avatars keep the cloud,
+ * and `EngineMark` draws Misty's mark. Any other engine with no artwork shows its initial.
  */
 export const hasEngineMark = (engine: string | undefined): engine is string =>
   Boolean(engine && marks[engine]);
@@ -39,11 +41,27 @@ function draw(shape: Shape, prefix: string, key: number): ReactNode {
   );
 }
 
-/** An engine's official mark at the size of the text around it, or of `size` pixels. */
-export function EngineMark({ engine, size }: { engine: string; size?: number }) {
+/**
+ * An engine's official mark at the size of the text around it, or of `size` pixels. Never blank:
+ * Misty's engine shows Misty's mark, and an engine with no artwork its initial (from `name`).
+ */
+export function EngineMark({
+  engine,
+  size,
+  name,
+}: {
+  engine: string;
+  size?: number;
+  name?: string;
+}) {
   const prefix = `mark${useId().replace(/[^A-Za-z0-9_-]/g, "")}-`;
   const mark = marks[engine];
-  if (!mark) return null;
+  if (!mark)
+    return engine === "misty" ? (
+      <MistyMark size={size ?? "1em"} />
+    ) : (
+      <LogoInitial name={name ?? engine} size={size ?? "1em"} />
+    );
   const [root, children] = mark;
   return (
     <svg

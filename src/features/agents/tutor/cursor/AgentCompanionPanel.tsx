@@ -70,9 +70,9 @@ export function AgentCompanionPanel() {
       )}
       <DesktopSettingsSection title="Behavior">
         {desktop && (
-          <DesktopSettingsRow label="Cursor tutor">
+          <DesktopSettingsRow label="Tutor">
             <Switch
-              aria-label="Cursor tutor"
+              aria-label="Tutor"
               checked={on === true}
               disabled={on === undefined}
               onCheckedChange={(next) =>

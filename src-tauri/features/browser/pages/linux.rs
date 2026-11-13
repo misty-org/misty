@@ -56,8 +56,8 @@ fn pixels(surface: gtk::cairo::Surface) -> Result<(u32, u32, Vec<u8>), String> {
     let width = ((f64::from(source_width) * scale).round() as i32).max(1);
     let height = ((f64::from(source_height) * scale).round() as i32).max(1);
     // Drawn into a surface Misty owns alone, so its bytes can be borrowed.
-    let mut copy = ImageSurface::create(Format::ARgb32, width, height)
-        .map_err(|error| error.to_string())?;
+    let mut copy =
+        ImageSurface::create(Format::ARgb32, width, height).map_err(|error| error.to_string())?;
     {
         let context = Context::new(&copy).map_err(|error| error.to_string())?;
         context.scale(scale, scale);
@@ -85,7 +85,12 @@ fn pixels(surface: gtk::cairo::Surface) -> Result<(u32, u32, Vec<u8>), String> {
                         as u8
                 }
             };
-            rgba.extend_from_slice(&[straight(word >> 16), straight(word >> 8), straight(word), alpha]);
+            rgba.extend_from_slice(&[
+                straight(word >> 16),
+                straight(word >> 8),
+                straight(word),
+                alpha,
+            ]);
         }
     }
     Ok((width as u32, height as u32, rgba))

@@ -1,4 +1,4 @@
-//! Plan, ask, checklist and goal instructions (`collaborationInstructions`, `ai_collaboration.go`).
+//! Plan, ask and checklist instructions (`collaborationInstructions`, `ai_collaboration.go`).
 use super::{
     go_text::{go_array, go_object, go_string, truncate_text},
     request::{PlanPayload, PlanState, PlanStep, RunRequest},
@@ -70,20 +70,6 @@ pub(super) fn collaboration_instructions(request: &RunRequest) -> String {
     out.push_str("\n\nBefore multi-step work, publish a live checklist with log_work_checklist: 3-8 concrete steps the user can follow. Keep exactly one step in_progress, mark each done as you finish it, and mark steps you hand to another agent as delegated. Each turn publishes its own checklist; skip it for a single quick answer.");
     if let Some(plan) = request.approved_plan() {
         out.push_str(&approved_plan_instructions(plan));
-    }
-    if let Some(goal) = request.pursued_goal() {
-        let used = goal.used_tokens as f64 / goal.budget_tokens as f64 * 100.0;
-        out.push_str(&format!(
-            "\n\nActive goal (keep working toward it across turns): {}\nBudget: {} of {} tokens used ({used:.0}%); continuation {} of {}.",
-            goal.objective, goal.used_tokens, goal.budget_tokens, goal.continuation_count, goal.max_continuations,
-        ));
-        if let Some(criteria) = goal.success_criteria.as_ref().filter(|criteria| !criteria.is_empty()) {
-            out.push_str(&format!("\nSuccess criteria (quote each exactly as evidence): {}", criteria.join("; ")));
-        }
-        out.push_str("\nBefore you stop, report with goal_update: in_progress with what is done and left; achieved only with inspected evidence for every criterion; unmet when a blocker needs the user. Do not accept proxy signals as completion: inspect the actual item, its content or result.");
-        if used >= 80.0 {
-            out.push_str("\nThe budget is nearly spent: finish the current step, then report progress, blockers and next steps instead of starting new work.");
-        }
     }
     out
 }

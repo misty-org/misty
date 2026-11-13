@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { GlobalAiConversation } from "../conversations/state/conversationTypes";
-import { BOARD_MS, boardOf, chatsOf, studioChatOf } from "./studioTalk";
+import { BOARD_MS, boardOf, chatsOf, speechOf, studioChatOf } from "./studioTalk";
 
 const chat = (id: string, agentId: string, updatedAt: string) =>
   ({ id, agentId, updatedAt, title: id, messages: [] }) as unknown as GlobalAiConversation;
@@ -61,5 +61,17 @@ describe("the meeting room's board", () => {
     expect(boardOf([], [], Date.now())).toBeNull();
     const old = { id: "h", task: "Old", chats: {}, startedAt: 0 };
     expect(boardOf([old], [], BOARD_MS + 1)).toBeNull();
+  });
+});
+
+describe("what an agent says in the studio", () => {
+  it("leaves out the cursor companion's tags", () => {
+    const talk = {
+      id: "talk",
+      agentId: "ada",
+      updatedAt: "",
+      messages: [{ role: "assistant", state: "completed", content: "I pick rock. [POINT:none]" }],
+    } as unknown as GlobalAiConversation;
+    expect(speechOf([talk], "talk", 0, 1)).toBe("I pick rock.");
   });
 });

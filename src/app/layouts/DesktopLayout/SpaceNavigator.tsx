@@ -1,7 +1,8 @@
 import {
   Armchair,
-  GraduationCap,
-  House,
+  Bot,
+  FlaskConical,
+  Galaxy,
   Plus,
   Search,
   Waypoints,
@@ -10,6 +11,7 @@ import {
 import { useEffect, useMemo } from "react";
 import { useAuth } from "@/features/account";
 import {
+  openAgentsHub,
   useChatStatuses,
   useAgentAccountId,
   useChatSectionsStore,
@@ -17,6 +19,7 @@ import {
   useMistyStore,
   tutorChatIds,
   useTutorStore,
+  watchSharedNotebooks,
   usePersonalAgentsStore,
 } from "@/features/agents";
 import { dockLeaves, useWorkspaceStore, type WorkspaceView } from "@/features/app-windows";
@@ -34,13 +37,15 @@ import {
   openWorkspaceRouteIn,
 } from "./spaceNavigation";
 
-/** The sidebar's places: search, the window's Space, the agents' studio and
- * tutor, and the integrations agents can use. */
+/** The sidebar's places: search, the Agents window (picking and setting up agents and their
+ * CLIs), the window's Space, the agents' studio, the person's Lab, and the integrations agents
+ * can use. */
 const placeNames: Record<SidebarPlaceId, { label: string; icon: LucideIcon }> = {
   search: { label: "Search", icon: Search },
-  space: { label: "Space", icon: House },
+  agents: { label: "Agents", icon: Bot },
+  space: { label: "Space", icon: Galaxy },
   studio: { label: "Studio", icon: Armchair },
-  tutor: { label: "Tutor", icon: GraduationCap },
+  lab: { label: "Lab", icon: FlaskConical },
   integrations: { label: "Integrations", icon: Waypoints },
 };
 
@@ -89,7 +94,7 @@ export function SpaceNavigator({ onOpen }: { onOpen(view: WorkspaceView): void }
   useEffect(() => {
     void usePersonalAgentsStore.getState().load(accountId);
     void useLessonStore.getState().load(accountId);
-    void useTutorStore.getState().load(accountId);
+    void useTutorStore.getState().load(accountId).then(watchSharedNotebooks);
     void useChatSectionsStore
       .getState()
       .load(accountId)
@@ -114,7 +119,9 @@ export function SpaceNavigator({ onOpen }: { onOpen(view: WorkspaceView): void }
   const openChat = path === "/agents" && !view ? params.get("conversation") : null;
   const base = space ? `/spaces/${encodeURIComponent(space.id)}` : "";
   const open = (target: string) => openWorkspaceRoute(target, onOpen);
-  type Page = Exclude<SidebarPlaceId, "search">;
+  // Search and Agents open windows over the page, not pages of their own.
+  type Page = Exclude<SidebarPlaceId, "search" | "agents">;
+  const isPage = (id: SidebarPlaceId): id is Page => id !== "search" && id !== "agents";
   const current = (id: Page) =>
     id === "space" ? Boolean(base) && (path === base || path.startsWith(`${base}/`)) : view === id;
   const target = (id: Page) => (id === "space" ? base : `/agents?view=${id}`);
@@ -126,8 +133,13 @@ export function SpaceNavigator({ onOpen }: { onOpen(view: WorkspaceView): void }
       id,
       {
         ...placeNames[id],
-        current: id !== "search" && current(id),
-        open: () => (id === "search" ? useSearchDialog.getState().setOpen(true) : open(target(id))),
+        current: isPage(id) && current(id),
+        open: () =>
+          isPage(id)
+            ? open(target(id))
+            : id === "search"
+              ? useSearchDialog.getState().setOpen(true)
+              : openAgentsHub(),
       },
     ]),
   ) as Record<SidebarPlaceId, SidebarPlace>;
@@ -141,6 +153,7 @@ export function SpaceNavigator({ onOpen }: { onOpen(view: WorkspaceView): void }
         shortcut={id === "search" ? "Meta+K" : undefined}
         current={here}
         onOpen={go}
+        data-tour={`sidebar-${id}`}
       />
     );
   };
@@ -149,9 +162,10 @@ export function SpaceNavigator({ onOpen }: { onOpen(view: WorkspaceView): void }
     <>
       <nav className="misty-space-nav" aria-label="Space" data-misty-window-drag-block="true">
         <Row
-          label="New chat"
+          label="New"
           icon={<Plus className="size-4" aria-hidden="true" />}
           onOpen={() => openNewChat(onOpen)}
+          data-tour="sidebar-new"
         />
         {!signedIn ? (
           row("search")

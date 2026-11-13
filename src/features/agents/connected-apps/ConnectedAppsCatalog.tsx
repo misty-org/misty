@@ -248,7 +248,7 @@ export function ConnectedAppsCatalog({ find = "" }: { find?: string } = {}) {
                       className="agent-integrations-tile agent-integrations-tile-button"
                       aria-label={`${group.name}, ${accountSummary(group)}. Show accounts`}
                     >
-                      <AppLogo app={group.app} />
+                      <AppLogo app={group.app} name={group.name} logo={group.logo} />
                       <div className="agent-integrations-row-text">
                         <strong>{group.name}</strong>
                         <span>{accountSummary(group)}</span>
@@ -267,7 +267,7 @@ export function ConnectedAppsCatalog({ find = "" }: { find?: string } = {}) {
               ))}
               {rest.map((app) => (
                 <div key={app.app} className="agent-integrations-tile" title={app.description}>
-                  <AppLogo app={app.app} />
+                  <AppLogo app={app.app} name={app.name} logo={app.logo} />
                   <div className="agent-integrations-row-text">
                     <strong>{app.name}</strong>
                     <span>{app.description}</span>

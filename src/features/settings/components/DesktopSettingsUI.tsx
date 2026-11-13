@@ -141,6 +141,8 @@ export function DesktopSettingsRow(props: {
   /** The control needs the full width (lists, text areas) and sits under the label. */
   stacked?: boolean;
   density?: "normal" | "compact";
+  /** A picture before the label, such as the feature a page sets up (Tutor's sprite). */
+  leading?: ReactNode;
 }) {
   const reset = useSettingReset(props.label);
   return (
@@ -159,37 +161,40 @@ export function DesktopSettingsRow(props: {
         props.indent && "[&>:first-child]:pl-5",
       )}
     >
-      <div className="grid min-w-0 gap-1">
-        <span
-          className={cn(
-            "text-md font-medium leading-6",
-            props.muted ? "text-cream-muted" : "text-cream-bright",
-          )}
-        >
-          {props.label}
-        </span>
-        {props.description || reset ? (
-          <p className="max-w-[720px] text-sm leading-[22px] text-cream-muted">
-            {props.description}
-            {reset ? (
-              <>
-                {props.description ? " " : null}
-                <Button
-                  type="button"
-                  variant="quiet"
-                  aria-label={`Reset ${props.label} to default`}
-                  className={cn(
-                    "inline h-auto border-0 p-0 align-baseline text-sm leading-[22px]",
-                    "font-normal text-cream underline underline-offset-2 hover:text-cream-bright",
-                  )}
-                  onClick={reset}
-                >
-                  Reset
-                </Button>
-              </>
-            ) : null}
-          </p>
-        ) : null}
+      <div className={cn("flex min-w-0 items-center", props.leading ? "gap-4" : null)}>
+        {props.leading}
+        <div className="grid min-w-0 gap-1">
+          <span
+            className={cn(
+              "text-md font-medium leading-6",
+              props.muted ? "text-cream-muted" : "text-cream-bright",
+            )}
+          >
+            {props.label}
+          </span>
+          {props.description || reset ? (
+            <p className="max-w-[720px] text-sm leading-[22px] text-cream-muted">
+              {props.description}
+              {reset ? (
+                <>
+                  {props.description ? " " : null}
+                  <Button
+                    type="button"
+                    variant="quiet"
+                    aria-label={`Reset ${props.label} to default`}
+                    className={cn(
+                      "inline h-auto border-0 p-0 align-baseline text-sm leading-[22px]",
+                      "font-normal text-cream underline underline-offset-2 hover:text-cream-bright",
+                    )}
+                    onClick={reset}
+                  >
+                    Reset
+                  </Button>
+                </>
+              ) : null}
+            </p>
+          ) : null}
+        </div>
       </div>
       <SettingsControlLabelContext.Provider value={props.label}>
         <div

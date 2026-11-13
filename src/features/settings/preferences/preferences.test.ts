@@ -1,13 +1,5 @@
 import { expect, it } from "vitest";
-import { selectAppearancePreferences, selectGeneralPreferences } from "./preferences";
-
-it("defaults new tabs to Agents and keeps the stored index", () => {
-  expect(selectGeneralPreferences({}).workspaceDefaultTabIndex).toBe(3);
-  expect(
-    selectGeneralPreferences({ general: { workspace_default_tab_index: 0 } })
-      .workspaceDefaultTabIndex,
-  ).toBe(0);
-});
+import { selectAppearancePreferences } from "./preferences";
 
 it("defaults to 100% and restores stored physical zoom scales", () => {
   expect(selectAppearancePreferences({}).appZoom).toBe(1);

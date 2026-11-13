@@ -102,7 +102,7 @@ function BacklinksInspector(props: {
             <Link2 className="mb-3 text-cream-muted" size={24} />
             <p className="m-0 text-sm font-medium text-cream">No backlinks yet</p>
             <p className="mb-0 mt-1 text-xs text-cream-muted">
-              Type [[ in another note to link here.
+              Type [[ in another doc to link here.
             </p>
           </div>
         )}

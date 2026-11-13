@@ -30,7 +30,11 @@ fn plain_server_name(name: &str) -> bool {
 /// `{"type": "http", "url", "headers"}`). Each name is looked up in the person's MCP configs on
 /// this computer. One the engine's own config already has is left to the engine, which starts it
 /// by itself; a name found nowhere is left out.
-pub(crate) fn agent_servers(engine: &str, workspace: &str, names: &[String]) -> serde_json::Map<String, Value> {
+pub(crate) fn agent_servers(
+    engine: &str,
+    workspace: &str,
+    names: &[String],
+) -> serde_json::Map<String, Value> {
     let mut servers = serde_json::Map::new();
     let workspace = Some(workspace);
     for name in names.iter().map(|name| name.trim()).take(16) {
@@ -73,7 +77,8 @@ pub(crate) fn agent_servers(engine: &str, workspace: &str, names: &[String]) -> 
                 let Some(command) = target.command.clone() else {
                     continue;
                 };
-                let mut server = json!({ "type": "stdio", "command": command, "args": target.args });
+                let mut server =
+                    json!({ "type": "stdio", "command": command, "args": target.args });
                 if !target.env.is_empty() {
                     server["env"] = Value::Object(pairs(&target.env));
                 }
@@ -86,7 +91,11 @@ pub(crate) fn agent_servers(engine: &str, workspace: &str, names: &[String]) -> 
                 let Some(url) = target.url.clone() else {
                     continue;
                 };
-                let kind = if target.transport.as_deref() == Some("sse") { "sse" } else { "http" };
+                let kind = if target.transport.as_deref() == Some("sse") {
+                    "sse"
+                } else {
+                    "http"
+                };
                 json!({ "type": kind, "url": url, "headers": Value::Object(pairs(&target.headers)) })
             }
             _ => continue,

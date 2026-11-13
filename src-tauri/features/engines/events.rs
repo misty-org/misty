@@ -2,9 +2,9 @@
 //! Engine event types and tool-call/todo payload parsing shared by every
 //! engine adapter (claude, kimi, codex, omp, ...).
 
+use super::plan_review::PlanReview;
 use serde::Serialize;
 use serde_json::Value;
-use super::plan_review::PlanReview;
 
 #[derive(Debug)]
 pub enum EngineEvent {
@@ -132,18 +132,13 @@ pub enum EngineEvent {
     /// for form input or a confirmation). This client has no elicitation
     /// form, so the runner declines in place — the MCP tool call settles
     /// with a declined result instead of parking the turn forever.
-    ElicitationDecline {
-        request_id: String,
-    },
+    ElicitationDecline { request_id: String },
     /// A control_request whose subtype this client does not implement.
     /// Every request must get exactly one response or the CLI parks on it
     /// forever (e.g. an MCP elicitation once hung the whole turn); the
     /// error reply mirrors the official SDK's fallback for unknown
     /// subtypes and lets the CLI surface the failure to its caller.
-    ControlRequestError {
-        request_id: String,
-        subtype: String,
-    },
+    ControlRequestError { request_id: String, subtype: String },
     /// Turn finished successfully.
     Done {
         session_id: Option<String>,
@@ -343,9 +338,7 @@ fn created_task(result: &Value) -> Option<(String, String)> {
         let (id, tail) = rest.split_once(" created successfully")?;
         let id = id.trim();
         // The CLI separates subject with ": " (and localizes the colon).
-        let content = tail
-            .trim_start_matches(&[':', '：'][..])
-            .trim();
+        let content = tail.trim_start_matches(&[':', '：'][..]).trim();
         if id.is_empty() || content.is_empty() {
             return None;
         }
@@ -437,9 +430,19 @@ fn phases_payload(phases: &[Value]) -> Option<TodosPayload> {
                 continue;
             };
             let status = todo_status(task.get("status").and_then(Value::as_str));
-            let phase = phase_name.or_else(|| task.get("phase").and_then(Value::as_str)).map(str::to_string);
-            let reason = task.get("blocker").or_else(|| task.get("reason")).and_then(Value::as_str).map(str::to_string);
-            let detail = task.get("detail").or_else(|| task.get("description")).and_then(Value::as_str).map(str::to_string);
+            let phase = phase_name
+                .or_else(|| task.get("phase").and_then(Value::as_str))
+                .map(str::to_string);
+            let reason = task
+                .get("blocker")
+                .or_else(|| task.get("reason"))
+                .and_then(Value::as_str)
+                .map(str::to_string);
+            let detail = task
+                .get("detail")
+                .or_else(|| task.get("description"))
+                .and_then(Value::as_str)
+                .map(str::to_string);
             items.push(TodoItem {
                 id: None,
                 content: content.to_string(),
@@ -575,9 +578,20 @@ pub(crate) fn parse_todo_args(args: &Value) -> Option<TodosPayload> {
                     id,
                     content: content.to_string(),
                     status: status.to_string(),
-                    phase: entry.get("phase").and_then(Value::as_str).map(str::to_string),
-                    reason: entry.get("reason").or_else(|| entry.get("blocker")).and_then(Value::as_str).map(str::to_string),
-                    detail: entry.get("detail").or_else(|| entry.get("description")).and_then(Value::as_str).map(str::to_string),
+                    phase: entry
+                        .get("phase")
+                        .and_then(Value::as_str)
+                        .map(str::to_string),
+                    reason: entry
+                        .get("reason")
+                        .or_else(|| entry.get("blocker"))
+                        .and_then(Value::as_str)
+                        .map(str::to_string),
+                    detail: entry
+                        .get("detail")
+                        .or_else(|| entry.get("description"))
+                        .and_then(Value::as_str)
+                        .map(str::to_string),
                 })
             })
             .collect();
@@ -596,7 +610,11 @@ pub(crate) fn parse_todo_args(args: &Value) -> Option<TodosPayload> {
     {
         if args.get("taskId").is_none() && args.get("op").is_none() {
             let status = todo_status(args.get("status").and_then(Value::as_str));
-            let detail = args.get("description").or_else(|| args.get("detail")).and_then(Value::as_str).map(str::to_string);
+            let detail = args
+                .get("description")
+                .or_else(|| args.get("detail"))
+                .and_then(Value::as_str)
+                .map(str::to_string);
             return Some(TodosPayload {
                 items: vec![TodoItem {
                     id: None,
@@ -633,7 +651,11 @@ pub(crate) fn parse_todo_args(args: &Value) -> Option<TodosPayload> {
                 .and_then(Value::as_str)
                 .map(|raw| todo_status(Some(raw)))
                 .unwrap_or("");
-            let detail = args.get("description").or_else(|| args.get("detail")).and_then(Value::as_str).map(str::to_string);
+            let detail = args
+                .get("description")
+                .or_else(|| args.get("detail"))
+                .and_then(Value::as_str)
+                .map(str::to_string);
             if content.is_empty() && status.is_empty() && detail.is_none() {
                 return None;
             }
@@ -687,9 +709,20 @@ pub(crate) fn parse_todo_args(args: &Value) -> Option<TodosPayload> {
                 "unblock" => "pending",
                 _ => "dropped",
             };
-            let phase = args.get("phase").and_then(Value::as_str).map(str::to_string);
-            let reason = args.get("reason").or_else(|| args.get("blocker")).and_then(Value::as_str).map(str::to_string);
-            let detail = args.get("detail").or_else(|| args.get("i")).and_then(Value::as_str).map(str::to_string);
+            let phase = args
+                .get("phase")
+                .and_then(Value::as_str)
+                .map(str::to_string);
+            let reason = args
+                .get("reason")
+                .or_else(|| args.get("blocker"))
+                .and_then(Value::as_str)
+                .map(str::to_string);
+            let detail = args
+                .get("detail")
+                .or_else(|| args.get("i"))
+                .and_then(Value::as_str)
+                .map(str::to_string);
             Some(TodosPayload {
                 items: vec![TodoItem {
                     id: None,
@@ -774,9 +807,12 @@ mod tool_args_tests {
     #[test]
     fn created_task_result_carries_the_id_task_update_addresses() {
         // Live wire shape: the structured object the CLI streams back.
-        let payload = parse_todo_result("TaskCreate", &json!({
-            "task": {"id": "1", "subject": "编写 bili_app.py 网页版"}
-        }))
+        let payload = parse_todo_result(
+            "TaskCreate",
+            &json!({
+                "task": {"id": "1", "subject": "编写 bili_app.py 网页版"}
+            }),
+        )
         .expect("create envelope is a todo fact");
         assert!(!payload.replace);
         assert_eq!(payload.items.len(), 1);
@@ -785,8 +821,11 @@ mod tool_args_tests {
         assert_eq!(payload.items[0].status, "pending");
 
         // Transcript shape: the same fact as the CLI's own result line.
-        let payload = parse_todo_result("TaskCreate", &json!("Task #12 created successfully: 樱花\"整季选集\"批量下载设计"))
-            .expect("result line is a todo fact");
+        let payload = parse_todo_result(
+            "TaskCreate",
+            &json!("Task #12 created successfully: 樱花\"整季选集\"批量下载设计"),
+        )
+        .expect("result line is a todo fact");
         assert_eq!(payload.items[0].id.as_deref(), Some("12"));
         assert_eq!(payload.items[0].content, "樱花\"整季选集\"批量下载设计");
     }
@@ -795,15 +834,26 @@ mod tool_args_tests {
     /// a phantom "pending" row per update would inflate the task count.
     #[test]
     fn non_create_results_are_not_todos() {
-        assert!(parse_todo_result("TaskUpdate", &json!({
-            "success": true,
-            "taskId": "13",
-            "statusChange": {"from": "pending", "to": "in_progress"}
-        }))
+        assert!(parse_todo_result(
+            "TaskUpdate",
+            &json!({
+                "success": true,
+                "taskId": "13",
+                "statusChange": {"from": "pending", "to": "in_progress"}
+            })
+        )
         .is_none());
         assert!(parse_todo_result("TaskUpdate", &json!("Updated task #13 status")).is_none());
-        assert!(parse_todo_result("TaskCreate", &json!({"stdout": "Task #1 created successfully: x"})).is_none());
-        assert!(parse_todo_result("TaskCreate", &json!("Task #1 created successfully: x\nextra line")).is_none());
+        assert!(parse_todo_result(
+            "TaskCreate",
+            &json!({"stdout": "Task #1 created successfully: x"})
+        )
+        .is_none());
+        assert!(parse_todo_result(
+            "TaskCreate",
+            &json!("Task #1 created successfully: x\nextra line")
+        )
+        .is_none());
     }
 
     /// TaskGet answers with the same `{task:{id,subject}}` envelope as
@@ -832,13 +882,18 @@ mod tool_args_tests {
         assert!(parse_todo_args(&json!({"taskId": "3", "addBlockedBy": ["1"]})).is_none());
         assert!(parse_todo_args(&json!({"taskId": "3", "owner": "researcher"})).is_none());
 
-        let rename = parse_todo_args(&json!({"taskId": "12", "subject": "新标题"})).expect("rename patch");
+        let rename =
+            parse_todo_args(&json!({"taskId": "12", "subject": "新标题"})).expect("rename patch");
         assert_eq!(rename.items[0].id.as_deref(), Some("12"));
         assert_eq!(rename.items[0].content, "新标题");
         let wire = serde_json::to_value(&rename).unwrap();
-        assert!(wire["items"][0].get("status").is_none(), "unchanged status stays off the wire: {wire}");
+        assert!(
+            wire["items"][0].get("status").is_none(),
+            "unchanged status stays off the wire: {wire}"
+        );
 
-        let done = parse_todo_args(&json!({"taskId": "12", "status": "completed"})).expect("status patch");
+        let done =
+            parse_todo_args(&json!({"taskId": "12", "status": "completed"})).expect("status patch");
         assert_eq!(done.items[0].status, "complete");
         let wire = serde_json::to_value(&done).unwrap();
         assert_eq!(wire["items"][0]["status"], "complete");

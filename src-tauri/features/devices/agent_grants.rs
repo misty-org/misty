@@ -3,10 +3,16 @@
 //! signed out and with the server blocked. Native code signs when a person's window asks, and checks
 //! before every action, so nothing a page or the model sends can widen a grant.
 use super::{
-    admission::now,
     identity::DeviceIdentity,
     records::{RunGrant, SignedRecord},
 };
+
+fn now() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|elapsed| elapsed.as_secs() as i64)
+        .unwrap_or_default()
+}
 
 /// What a grant files under. It's fixed, so a chat keeps its shell workspace across signing in and out.
 pub const AGENT_SCOPE: &str = "local";

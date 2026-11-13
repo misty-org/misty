@@ -1,4 +1,4 @@
-import { FolderOpen, FolderPlus, FolderX, PencilLine } from "lucide-react";
+import { FolderOpen, FolderPlus, PencilLine } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { confirmAction } from "@/shared/lib/confirmAction";
 import { hasTauriInternals } from "@/shared/platform/tauri";
@@ -94,11 +94,10 @@ export function useDeviceFolderSegment(conversationId: string | undefined): Path
           value={current?.id ?? none}
           onValueChange={(next) => chooseFolder(conversationId, next === none ? null : next)}
         >
-          <MenuRadioItem icon={FolderX} value={none} label="No folder" />
+          <MenuRadioItem value={none} label="No folder" />
           {folders.map((folder) => (
             <MenuRadioItem
               key={folder.id}
-              icon={FolderOpen}
               value={folder.id}
               label={folder.displayName}
               disabled={!folder.available}

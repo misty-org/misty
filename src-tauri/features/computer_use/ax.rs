@@ -399,7 +399,9 @@ mod imp {
             "Pass state_id back with refs; a ref from an older state is refused. \
              Prefer press/set_value over pixel clicks when the target has a ref.",
         );
-        *CURRENT.lock().unwrap_or_else(|poisoned| poisoned.into_inner()) = Some(AxState {
+        *CURRENT
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner()) = Some(AxState {
             id: id.clone(),
             nodes,
         });
@@ -413,7 +415,9 @@ mod imp {
         state_id: &str,
         ref_id: usize,
     ) -> Result<(AXUIElementRef, &'static [&'static str]), String> {
-        let guard = CURRENT.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let guard = CURRENT
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         let state = guard
             .as_ref()
             .ok_or_else(|| "no accessibility state yet: call get_app_state first".to_string())?;

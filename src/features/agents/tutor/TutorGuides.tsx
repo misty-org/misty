@@ -17,8 +17,6 @@ import { startJob } from "./tutorRuns";
 import { useTutorStore } from "./tutorStore";
 import type { Guide } from "./tutorTypes";
 import type { TutorActions } from "./TutorPage";
-import { ShareToSpace } from "./ShareToSpace";
-import { shareGuide } from "./tutorShare";
 import { deleteOverviewAudio, makeOverviewAudio, overviewAudioUrl } from "./tutorAudio";
 
 /** Starts flashcards or a quiz from a guide's own text. */
@@ -42,8 +40,6 @@ export function GuideView({
   actions: TutorActions;
   onClose(): void;
 }) {
-  const [error, setError] = useState("");
-  useNotice(Boolean(error), { message: error, tone: "error", onDismiss: () => setError("") });
   const remove = async () => {
     if (!(await confirmAction(`Delete “${guide.title}”? This can’t be undone.`))) return;
     useTutorStore.getState().removeGuide(guide.id);
@@ -90,11 +86,6 @@ export function GuideView({
               <MessageSquare />
             </IconButton>
           ) : null}
-          <ShareToSpace
-            shared={guide.sharedNote}
-            onShare={(spaceId) => shareGuide(guide.id, spaceId)}
-            onError={setError}
-          />
           <IconButton label="Delete guide" onClick={() => void remove()}>
             <Trash2 />
           </IconButton>
@@ -109,8 +100,6 @@ export function GuideView({
 
 /** Every question at once; Check marks them and keeps the score. */
 export function QuizView({ quiz, onClose }: { quiz: Guide; onClose(): void }) {
-  const [error, setError] = useState("");
-  useNotice(Boolean(error), { message: error, tone: "error", onDismiss: () => setError("") });
   const questions = quiz.questions ?? [];
   const [picked, setPicked] = useState<Record<number, number>>({});
   const [checked, setChecked] = useState(false);
@@ -139,11 +128,6 @@ export function QuizView({ quiz, onClose }: { quiz: Guide; onClose(): void }) {
               {score} of {questions.length} right
             </span>
           ) : null}
-          <ShareToSpace
-            shared={quiz.sharedNote}
-            onShare={(spaceId) => shareGuide(quiz.id, spaceId)}
-            onError={setError}
-          />
           <IconButton label="Delete quiz" onClick={() => void remove()}>
             <Trash2 />
           </IconButton>
@@ -207,8 +191,8 @@ export function QuizView({ quiz, onClose }: { quiz: Guide; onClose(): void }) {
 }
 
 /**
- * An audio overview: its sound, spoken on this computer's speech key, over the script it reads.
- * Without a speech model the script is still there, and the audio can be made once one is chosen.
+ * An audio overview: its sound, spoken on this computer's speech key or its own voices, over the
+ * script it reads. When no voice can read it, the script is still there, and the audio can be made again.
  */
 export function OverviewView({ overview, onClose }: { overview: Guide; onClose(): void }) {
   const [error, setError] = useState("");
@@ -260,11 +244,6 @@ export function OverviewView({ overview, onClose }: { overview: Guide; onClose()
           >
             {ready ? "Speak again" : "Make audio"}
           </Button>
-          <ShareToSpace
-            shared={overview.sharedNote}
-            onShare={(spaceId) => shareGuide(overview.id, spaceId)}
-            onError={setError}
-          />
           <IconButton label="Delete overview" onClick={() => void remove()}>
             <Trash2 />
           </IconButton>

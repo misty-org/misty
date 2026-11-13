@@ -1,44 +1,4 @@
-/** Pure helpers for device jobs: content references and error codes. */
-
-export function deviceContentReference(
-  input: unknown,
-  expectedScopeId: string,
-): Record<string, string> {
-  const ref = findDeviceContentReference(input);
-  if (
-    !ref ||
-    ref.scopeId !== expectedScopeId ||
-    !ref.relativePath ||
-    ref.relativePath.startsWith("/") ||
-    ref.relativePath.split(/[\\/]/).includes("..")
-  ) {
-    throw new Error("invalid_device_scope");
-  }
-  return { ...ref, scopeId: expectedScopeId, relativePath: ref.relativePath };
-}
-
-function findDeviceContentReference(value: unknown): Record<string, string> | null {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-  const record = value as Record<string, unknown>;
-  const candidate = (record.contentRef ?? record.content) as Record<string, unknown> | undefined;
-  const source = candidate && typeof candidate === "object" ? candidate : record;
-  const scopeId = stringValue(source.scopeId) || stringValue(source.permissionScope);
-  const relativePath = stringValue(source.relativePath) || stringValue(source.locator);
-  if (scopeId && relativePath) {
-    return {
-      ...Object.fromEntries(
-        Object.entries(source).map(([key, entry]) => [key, stringValue(entry)]),
-      ),
-      scopeId,
-      relativePath,
-    };
-  }
-  for (const child of Object.values(record)) {
-    const found = findDeviceContentReference(child);
-    if (found) return found;
-  }
-  return null;
-}
+/** Pure helpers for device jobs: error codes. */
 
 export function deviceWorkflowErrorCode(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);
@@ -134,10 +94,6 @@ export function browserUncertainErrorCode(error: unknown): string {
     if (known !== "device_execution_failed") category = known;
   }
   return category ? `device_execution_uncertain:${category}` : "device_execution_uncertain";
-}
-
-function stringValue(value: unknown): string {
-  return typeof value === "string" ? value.trim() : "";
 }
 
 /** Native stale-frame errors are emitted before any input is dispatched. */

@@ -11,7 +11,7 @@ use crate::tool_schema::{normalize_tool_input_schema, type_first};
 use crate::web_search::provider::SearchProviderId;
 use crate::model_calls::RawJson;
 
-use super::{build_prompt, catalog::THREAD_POST_DESCRIPTION, catalog_output_schemas, go_text::{go_quote, go_value}, kept_notes, run_catalog, CatalogInputs, RunRequest};
+use super::{build_prompt, catalog::{catalog_output_schemas, THREAD_POST_DESCRIPTION}, go_text::{go_quote, go_value}, kept_notes, run_catalog, CatalogInputs, RunRequest};
 
 fn fixtures() -> Vec<(String, Value)> {
     let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("local_prompt/fixtures");
@@ -163,34 +163,35 @@ fn a_signed_out_run_has_nothing_that_needs_the_server() {
 #[test]
 fn nobody_else_can_ask_this_agent_to_act() {
     let rows = catalog_output_schemas();
-    for removed in ["agent.request", "agent.request_status", "agent.directory", "agent.background"] {
+    for removed in ["agent.request", "agent.request_status", "agent.directory", "agent.background", "goal.update"] {
         assert!(!rows.contains_key(removed), "{removed} is gone");
     }
-    assert!(rows.contains_key("conversation.ask_user") && rows.contains_key("plan.propose") && rows.contains_key("goal.update") && rows.contains_key("shell.run") && rows.contains_key("integration.search"));
+    assert!(rows.contains_key("conversation.ask_user") && rows.contains_key("plan.propose") && rows.contains_key("shell.run") && rows.contains_key("integration.search"));
 }
 
-/// Which of the state's tools a fixture's run is offered, and whether the prompt speaks of them.
+/// Which of the state's tools a fixture's run is offered, and whether the prompt speaks of them. A
+/// goal saved by an older build is ignored.
 #[test]
-fn the_chats_plan_and_goal_decide_their_tools_and_instructions() {
+fn the_chats_plan_decides_its_tools_and_instructions() {
     let cases = [
-        ("approved_plan", true, false, "The user approved this plan"),
-        ("active_goal", false, true, "Active goal (keep working toward it across turns)"),
-        ("personal_agent_goal", true, true, "The budget is nearly spent"),
-        ("settled_plan_and_paused_goal", false, false, ""),
-        ("proposed_plan_while_acting", false, false, ""),
-        ("saved_plan_mode_rejected_plan", false, false, "The current proposed plan (version 6"),
-        ("plan_mode_over_approved_plan", false, false, ""),
+        ("approved_plan", true, "The user approved this plan"),
+        ("active_goal", false, ""),
+        ("personal_agent_goal", true, ""),
+        ("settled_plan_and_paused_goal", false, ""),
+        ("proposed_plan_while_acting", false, ""),
+        ("saved_plan_mode_rejected_plan", false, "The current proposed plan (version 6"),
+        ("plan_mode_over_approved_plan", false, ""),
     ];
     let all = fixtures();
-    for (name, plan_update, goal_update, words) in cases {
+    for (name, plan_update, words) in cases {
         let fixture = &all.iter().find(|(case, _)| case == name).unwrap().1;
         let request = RunRequest::from_json(&fixture["request"]);
         let tools = catalog_of(&request, &inputs_of(fixture));
-        let listed = |tool: &str| tools.iter().any(|item| item.name == tool);
-        assert_eq!((listed("plan.update"), listed("goal.update")), (plan_update, goal_update), "{name}");
+        assert_eq!(tools.iter().any(|item| item.name == "plan.update"), plan_update, "{name}");
         let names: Vec<String> = tools.iter().map(|tool| tool.name.clone()).collect();
         let system = build_prompt(&request, &names, "2026-11-06T17:04:05Z").system;
         assert!(system.contains(words), "{name}");
+        assert!(!system.contains("Active goal"), "{name}");
     }
 }
 

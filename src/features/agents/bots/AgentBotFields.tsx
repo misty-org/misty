@@ -1,14 +1,13 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 /**
- * The bot fields in an agent's editor: its soul, the tools, skills and MCP servers it may use,
+ * The bot fields in an agent's editor: its soul, the tools and MCP servers it may use,
  * and how an outside engine starts it. Under them, the prompt the run gets, built by the same
  * function the run uses, and the bot folder export.
  */
-import { Download } from "lucide-react";
 import { useState } from "react";
 import type { AgentProfile, AgentProfileInput } from "@/shared/schemas";
 import { Button, useNotice, Field, Input, Textarea } from "@/shared/ui";
-import { exportBotBundle, importBotBundle } from "./botBundle";
+import { exportBotBundle } from "./botBundle";
 import { assembleAgentPrompt, duplicateProseLines, proseOverLimit, PROSE_LIMIT } from "./botPrompt";
 
 const listText = (values?: string[]) => (values ?? []).join(", ");
@@ -29,7 +28,6 @@ export function AgentBotFields({
   onChange<K extends keyof AgentProfileInput>(key: K, value: AgentProfileInput[K]): void;
 }) {
   const [tools, setTools] = useState(listText(draft.tools));
-  const [skills, setSkills] = useState(listText(draft.skills));
   const [servers, setServers] = useState(listText(draft.mcp_servers));
   const [args, setArgs] = useState((draft.runtime_args ?? []).join("\n"));
   const duplicates = duplicateProseLines(draft);
@@ -51,14 +49,6 @@ export function AgentBotFields({
           value={tools}
           onChange={(event) => setTools(event.target.value)}
           onBlur={() => onChange("tools", listOf(tools))}
-        />
-      </Field>
-      <Field label="Skills">
-        <Input
-          placeholder="Every skill"
-          value={skills}
-          onChange={(event) => setSkills(event.target.value)}
-          onBlur={() => onChange("skills", listOf(skills))}
         />
       </Field>
       <Field label="MCP servers">
@@ -100,33 +90,6 @@ export function AgentBotFields({
           {preview.text || "Nothing yet"}
         </pre>
       </details>
-    </>
-  );
-}
-
-/** Import a bot folder as a new agent. */
-export function ImportBotButton({ onImported }: { onImported(agent: AgentProfile): void }) {
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  useNotice(Boolean(error), { message: error, tone: "error", onDismiss: () => setError("") });
-  return (
-    <>
-      <Button
-        variant="quiet"
-        type="button"
-        disabled={busy}
-        onClick={() => {
-          setBusy(true);
-          setError("");
-          importBotBundle()
-            .then((agent) => agent && onImported(agent))
-            .catch((reason) => setError(String(reason)))
-            .finally(() => setBusy(false));
-        }}
-      >
-        <Download size={15} />
-        <span>Import bot</span>
-      </Button>
     </>
   );
 }

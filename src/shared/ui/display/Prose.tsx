@@ -103,27 +103,6 @@ export const ProseCode = React.forwardRef<
 ));
 ProseCode.displayName = "ProseCode";
 
-/** Text that isn't parsed (yet): kept as written, line breaks and all, wrapping at the edge. */
-export function ProsePlain({ children }: { children?: React.ReactNode }) {
-  return (
-    <div data-slot="prose-plain" className="misty-prose-plain">
-      {children}
-    </div>
-  );
-}
-
-/**
- * One slice of a long document parsed on its own. It lays out as if it weren't there, so the
- * prose spacing runs across slices; `busy` while it still shows its plain text.
- */
-export function ProseChunk({ children, busy }: { children?: React.ReactNode; busy?: boolean }) {
-  return (
-    <div data-slot="prose-chunk" aria-busy={busy || undefined} className="contents">
-      {children}
-    </div>
-  );
-}
-
 /**
  * Spread on a link inside prose that opens a local file rather than a page: dotted underline,
  * the surrounding color. `<a {...proseFileLink} href={href}>…</a>`

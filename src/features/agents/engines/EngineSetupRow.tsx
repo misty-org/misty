@@ -16,12 +16,23 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
   MenuItem,
-  OverflowFadeText,
   Skeleton,
+  Text,
 } from "@/shared/ui";
 
 /** Where an engine stands for first run: one next step at a time. */
 export type EngineSetupState = "checking" | "failed" | "install" | "get" | "sign-in" | "ready";
+
+/**
+ * How each featured engine is paid for, in the words of someone who has never used one: the free
+ * ones say so, the others name the account they use. Nothing here asks anyone to buy anything.
+ */
+const ACCOUNT_HINTS: Partial<Record<EngineId, string>> = {
+  agy: "Free with a Google account",
+  opencode: "Free, no account",
+  codex: "With a ChatGPT account",
+  claude: "With a Claude plan",
+};
 
 /** DeepSeek Harness keeps its providers in its own web page, so installed is as ready as it gets. */
 const signsInElsewhere = (engine: EngineId) => engine === "dsh";
@@ -91,9 +102,16 @@ export function EngineSetupRow({
           <span className="text-sm font-semibold">{name.charAt(0)}</span>
         )}
       </span>
-      <OverflowFadeText full className="flex-1 text-sm font-medium text-cream-bright">
-        {name}
-      </OverflowFadeText>
+      <span className="flex min-w-0 flex-1 items-baseline gap-2">
+        <Text size="control" weight="medium" tone="bright" full className="min-w-0 shrink">
+          {name}
+        </Text>
+        {ACCOUNT_HINTS[engine] ? (
+          <Text size="meta" tone="muted" className="min-w-0 shrink-[2]">
+            {ACCOUNT_HINTS[engine]}
+          </Text>
+        ) : null}
+      </span>
       {state === "checking" ? (
         <Skeleton aria-label={`Checking ${name}`} className="h-8 w-22 rounded-md" />
       ) : state === "failed" ? (
@@ -152,8 +170,9 @@ export function EngineSetupRow({
           Ready
         </span>
       )}
-      <CliUpdateDialog engine={engine} flow={flow} />
+      <CliUpdateDialog engine={engine} flow={flow} plain />
       <SignInDialog
+        plain
         request={signingIn ? { engine, ...signingIn } : null}
         onClose={() => {
           setSigningIn(null);

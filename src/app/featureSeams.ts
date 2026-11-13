@@ -42,8 +42,6 @@ accountResets.listen((previousAccountId) => {
 });
 
 deviceDataErasers.listen(async () => {
-  await browserLibrary.clearHistory({ since: 0 });
-  await browserLibrary.removeDownloads({ since: 0 });
   await browserLibrary.clearWebsiteData({ kinds: ["cookies", "cache"], since: 0 });
 });
 

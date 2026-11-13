@@ -2,7 +2,6 @@ import { z } from "zod";
 
 export const MistyAiControlsSnapshotSchema = z.strictObject({
   available: z.boolean(),
-  following: z.boolean(),
   proposal: z
     .strictObject({
       id: z.string().min(1).max(256),

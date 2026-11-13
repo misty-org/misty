@@ -89,16 +89,8 @@ pub fn browser_webviews_hide_except(
 pub async fn browser_webviews_close_except(
     caller: Webview,
     app: AppHandle,
-    state: State<'_, BrowserSessionState>,
     request: BrowserWebviewsHideExceptRequest,
 ) -> Result<(), String> {
-    let pending: HashSet<String> = state
-        .pending_popups
-        .lock()
-        .map_err(|_| "Browser popup state is unavailable.")?
-        .iter()
-        .cloned()
-        .collect();
     let prefix = if request.agent_pages {
         "misty-browser-agent-"
     } else {
@@ -112,7 +104,6 @@ pub async fn browser_webviews_close_except(
                 .strip_prefix("misty-browser-")
                 .map(str::to_owned)
         })
-        .filter(|id| !pending.contains(id))
         .collect();
     let errors: Vec<String> = orphans
         .into_iter()
@@ -130,28 +121,4 @@ pub async fn browser_webviews_close_except(
     } else {
         Err(errors.join("; "))
     }
-}
-
-/// Parks every page in the caller's window except the ones the interface still shows outside a
-/// browser tab (`keep`: an agent's page beside its chat), which stay where they are.
-#[tauri::command]
-pub fn browser_webviews_park_all(
-    caller: Webview,
-    app: AppHandle,
-    request: Option<BrowserWebviewsHideExceptRequest>,
-) -> Result<(), String> {
-    let keep = request.map(|request| request.keep).unwrap_or_default();
-    // On Windows pages stay in place beneath the renderer (`stacked_pages`):
-    // overlays leave stacked pages where they are, and the renderer is opaque
-    // while no page is presented, so they never show over Home or Agents, and
-    // coming back only raises them, already drawn.
-    #[cfg(windows)]
-    let park = |webview: &Webview| stack_windows_webview(&app, webview);
-    // Inactive pages must be hidden, not merely stacked below the renderer.
-    // Closing an overlay restacks browser children above it, which otherwise
-    // exposes parked pages over Home or Agents. Hiding retains the native page
-    // and its session for the next explicit reconciliation.
-    #[cfg(not(windows))]
-    let park = hide_page;
-    each_page(window_pages(&caller, &app, "misty-browser-", &keep), park)
 }

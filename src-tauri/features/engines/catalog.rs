@@ -16,7 +16,6 @@ use std::path::{Path, PathBuf};
 
 use serde::Serialize;
 
-
 #[derive(Clone, Debug, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct CatalogItem {
@@ -612,14 +611,23 @@ pub fn catalog_for(engine: &str, home: &Path, project: Option<&Path>) -> Catalog
 
 /// What Claude Code's own commands do, for the names its report gives without a description.
 const KNOWN_DESCRIPTIONS: &[(&str, &str)] = &[
-    ("compact", "Summarize the conversation so far to free context"),
+    (
+        "compact",
+        "Summarize the conversation so far to free context",
+    ),
     ("context", "Show what is using the context window"),
     ("cost", "Show this session's token use"),
     ("usage", "Show this session's token use"),
     ("init", "Write a file that describes this project"),
     ("review", "Review the current changes"),
-    ("security-review", "Check the current changes for security problems"),
-    ("pr-comments", "Show the comments on this branch's pull request"),
+    (
+        "security-review",
+        "Check the current changes for security problems",
+    ),
+    (
+        "pr-comments",
+        "Show the comments on this branch's pull request",
+    ),
     ("release-notes", "Show what changed in this version"),
     ("todos", "Show the current todo list"),
 ];

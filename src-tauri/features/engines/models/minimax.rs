@@ -17,7 +17,6 @@ pub(super) async fn minimax_catalog(bin: &str) -> EngineCatalog {
             return EngineCatalog {
                 models: models.clone(),
                 authoritative: true,
-                remote: false,
             };
         }
     }
@@ -39,14 +38,12 @@ pub(super) async fn minimax_catalog(bin: &str) -> EngineCatalog {
             return EngineCatalog {
                 models,
                 authoritative: true,
-                remote: false,
             };
         }
     }
     EngineCatalog {
         models: fallback_catalog(),
         authoritative: false,
-        remote: false,
     }
 }
 

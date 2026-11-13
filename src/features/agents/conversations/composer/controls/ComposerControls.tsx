@@ -8,8 +8,6 @@ import {
   Shield,
   ShieldCheck,
   ShieldOff,
-  Sparkles,
-  Target,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -88,6 +86,7 @@ function picker(input: {
             iconOnly
             icon={icon}
             disabled={input.disabled}
+            data-tour={`composer-${input.id}`}
           />
         ) : (
           <MenuTrigger
@@ -97,6 +96,7 @@ function picker(input: {
             chevron={false}
             disabled={input.disabled}
             className="max-w-full"
+            data-tour={`composer-${input.id}`}
           />
         )}
         <DropdownMenuContent align="start" side="top" className="w-64" data-misty-layer-portal>
@@ -158,35 +158,6 @@ export function permissionItem(props: {
   });
 }
 
-/** The chat's goal: set one, or see how it is going. Pressing it makes the chat if needed. */
-export function goalItem(props: {
-  goal?: { objective: string; status: string };
-  disabled?: boolean;
-  onOpen(): void;
-}): ActionBarItem {
-  const goal = props.goal;
-  const active = goal?.status === "pursuing" || goal?.status === "paused";
-  const label = active && goal ? `Goal: ${goal.objective}` : "Set a goal";
-  return {
-    id: "goal",
-    icon: Target,
-    label,
-    priority: 2,
-    disabled: props.disabled,
-    onSelect: props.onOpen,
-    render: () => (
-      <IconButton
-        label={label}
-        disabled={props.disabled}
-        aria-pressed={active || undefined}
-        onClick={props.onOpen}
-      >
-        <Target />
-      </IconButton>
-    ),
-  };
-}
-
 /** How hard the engine thinks. None for an engine that has no levels to choose. */
 export function effortItem(props: {
   accountId: string;
@@ -210,7 +181,6 @@ export function effortItem(props: {
         }
       >
         <MenuRadioItem
-          icon={Gauge}
           value=""
           label={
             props.agentEffort
@@ -219,7 +189,7 @@ export function effortItem(props: {
           }
         />
         {efforts.map((effort) => (
-          <MenuRadioItem key={effort} icon={Gauge} value={effort} label={effortLabel(effort)} />
+          <MenuRadioItem key={effort} value={effort} label={effortLabel(effort)} />
         ))}
       </MenuRadioGroup>
       <CodexFastItem engine={props.engine} />
@@ -263,12 +233,11 @@ export function modeItem(props: {
             .setMode(props.conversationId, next as ConversationMode)
         }
       >
-        <MenuRadioItem icon={Hammer} value="act" label="Build" shortcut="⇧⇥" />
+        <MenuRadioItem icon={Hammer} value="act" label="Build" />
         <MenuRadioItem
           icon={ClipboardList}
           value="plan"
           label="Plan"
-          shortcut="⇧⇥"
           disabled={!canPlan}
           reason={canPlan ? undefined : "This engine can't plan without changing anything"}
         />
@@ -339,13 +308,12 @@ export function modelItem(props: {
         }
       >
         <MenuRadioItem
-          icon={Sparkles}
           value=""
           label={props.agentModel ? `Agent's default (${props.agentModel})` : "Engine's default"}
         />
         {list.length ? <MenuSeparator /> : null}
         {list.map((model) => (
-          <MenuRadioItem key={model.id} icon={Cpu} value={model.id} label={model.id} />
+          <MenuRadioItem key={model.id} value={model.id} label={model.id} />
         ))}
       </MenuRadioGroup>
     </>

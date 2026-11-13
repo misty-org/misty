@@ -138,8 +138,9 @@ type RadixSelectItemProps = Omit<
 };
 
 type SelectItemProps = RadixSelectItemProps & {
-  /** The 16px icon every row starts with; the trigger shows it too once picked. */
-  icon: MenuIcon;
+  /** The 16px icon, only when it tells the row apart (never one icon repeated down the list);
+   * the trigger shows it too once picked. */
+  icon?: MenuIcon;
   /** The row's text, which fades at its end when the list is narrow. */
   label: React.ReactNode;
 };

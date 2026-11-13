@@ -4,8 +4,12 @@ import { ENGINE_IDS, type EngineId } from "@/features/engine-config/channels";
 import { Button, cn } from "@/shared/ui";
 import { EngineSetupRow, type EngineSetupState } from "./EngineSetupRow";
 
-/** The engines most people already pay for, shown first; the rest wait behind More. */
-export const FEATURED_ENGINES: readonly EngineId[] = ["claude", "codex", "gemini", "opencode"];
+/**
+ * Shown first, the rest wait behind More: the two that cost nothing (Antigravity on any Google
+ * account, OpenCode's free models with no account), then the two most people already pay for.
+ * Gemini CLI stopped taking personal Google accounts in June 2026, so it waits under More.
+ */
+export const FEATURED_ENGINES: readonly EngineId[] = ["agy", "opencode", "codex", "claude"];
 // Read when shown: the engine list belongs to a feature that imports this one.
 const otherEngines = (first: readonly EngineId[]) =>
   ENGINE_IDS.filter((engine) => !first.includes(engine));

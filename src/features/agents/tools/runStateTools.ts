@@ -2,8 +2,7 @@ import type { AgentChecklist, AgentPlan, AgentPlanPayload } from "../plans/planT
 import { LocalToolRejected, type LocalToolHandler } from "./host";
 import { askUser } from "./run-state/askUser";
 import { checklistResult, saveChecklist, type ChecklistUpdate } from "./run-state/checklistRecords";
-import { changeConversationState, publicGoal } from "./run-state/conversationState";
-import { goalEvidenceComplete } from "./run-state/goals";
+import { changeConversationState } from "./run-state/conversationState";
 import { notebookKey, readNotebook, writeNotebook } from "./run-state/notebook";
 import {
   approvedPlanOf,
@@ -17,7 +16,6 @@ import {
   notebookReadSchema,
   notebookWriteSchema,
   proposePlanSchema,
-  updateGoalSchema,
   updatePlanSchema,
 } from "./run-state/schemas";
 import { chatOf, checkedInput, contextOf, correctable, showEvent } from "./run-state/toolSupport";
@@ -103,69 +101,6 @@ const updatePlanTool: LocalToolHandler = async (request) => {
       .filter((step) => !["done", "skipped"].includes(plan.progress[step.id]?.status ?? ""))
       .map((step) => step.id),
   };
-};
-
-const goalStatuses = { in_progress: "pursuing", achieved: "achieved", unmet: "unmet" } as const;
-
-function clipped(value: string, limit: number) {
-  const runes = [...value];
-  return runes.length <= limit
-    ? value
-    : `${runes
-        .slice(0, limit - 1)
-        .join("")
-        .trim()}…`;
-}
-
-const updateGoalTool: LocalToolHandler = async (request) => {
-  const input = checkedInput<{
-    status: keyof typeof goalStatuses;
-    summary: string;
-    evidence?: { criterion: string; proof: string }[];
-    next_steps?: string[];
-  }>(request, updateGoalSchema);
-  if (!input.summary.trim())
-    throw new LocalToolRejected(
-      "invalid_arguments",
-      "The arguments do not match this tool's input schema.",
-    );
-  const context = await contextOf(request.runId);
-  const conversationId = chatOf(context, "This conversation has no goal being pursued.");
-  const goal = await correctable(
-    () =>
-      changeConversationState(context.account, conversationId, (state) => {
-        const current = state.goal;
-        if (current?.status !== "pursuing")
-          throw new LocalToolRejected(
-            "invalid_request",
-            "This conversation has no goal being pursued.",
-          );
-        const status = goalStatuses[input.status];
-        if (status === "achieved" && !goalEvidenceComplete(current.successCriteria, input.evidence))
-          throw new LocalToolRejected(
-            "invalid_request",
-            "Achieved needs inspected evidence for every success criterion, quoting each one exactly. Inspect what is missing, or report in_progress.",
-          );
-        const at = new Date().toISOString();
-        const updated = {
-          ...current,
-          status,
-          lastReport: {
-            status: input.status,
-            summary: clipped(input.summary.trim(), 2000),
-            evidence: input.evidence ?? null,
-            next_steps: input.next_steps ?? null,
-            invocation_id: request.runId,
-            reported_at: at,
-          },
-          updatedAt: at,
-        };
-        return { next: { ...state, goal: updated }, result: updated };
-      }),
-    {},
-  );
-  showEvent(request.runId, context, { type: "goal.updated", goal: publicGoal(goal) });
-  return { status: "recorded", goal_status: goal.status };
 };
 
 const checklistTool: LocalToolHandler = async (request) => {
@@ -260,7 +195,6 @@ export const runStateTools: Record<string, LocalToolHandler> = {
   "conversation.ask_user": askUser,
   "plan.propose": proposePlanTool,
   "plan.update": updatePlanTool,
-  "goal.update": updateGoalTool,
   "log.work.checklist": checklistTool,
   "log.work.read": notebookReadTool,
   "log.work.write": notebookWriteTool,

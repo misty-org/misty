@@ -1,7 +1,10 @@
-//! Page tools for a running page: stop loading, mute, hold media and clear website data.
+//! Page tools for a running page: stop loading and clear website data.
 
 use crate::browser::*;
+// Clearing website data waits on WebView2 with these.
+#[cfg(windows)]
 use std::sync::Mutex;
+#[cfg(windows)]
 use std::time::Duration;
 
 fn running_webview(app: &AppHandle, id: &str) -> Result<Webview, String> {
@@ -33,10 +36,3 @@ pub fn browser_webview_stop(
 
 mod clear_data;
 pub use clear_data::*;
-mod media_hold;
-pub use media_hold::*;
-mod mute;
-pub use mute::*;
-
-// Media and reading tools live beside the everyday ones to keep both readable.
-pub(crate) mod media_tools;

@@ -94,11 +94,17 @@
   font-weight: 500;
   color: var(--color-cream-bright);
 }
+/* Side by side while both labels fit inside the pane's padding, one above the other when not:
+ * a button never shrinks its label, so a fixed two columns would push past the right edge. */
 .tutor-pane-actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+  display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   padding: 4px 12px 10px;
+}
+.tutor-pane-actions > * {
+  flex: 1 1 0;
+  min-width: max-content;
 }
 .tutor-pane-scroll {
   flex: 1;

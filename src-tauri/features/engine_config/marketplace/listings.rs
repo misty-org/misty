@@ -36,7 +36,9 @@ pub(super) async fn list_omp() -> Result<(Vec<MarketItem>, Vec<MarketSource>), S
 
 /// Qoder, CodeBuddy and MiniMax: Claude-style `plugin list --available --json`. CodeBuddy's docs
 /// show `--json` but not `--available`, so a refusal falls back to the installed list.
-pub(super) async fn list_loose(engine: &'static str) -> Result<(Vec<MarketItem>, Vec<MarketSource>), String> {
+pub(super) async fn list_loose(
+    engine: &'static str,
+) -> Result<(Vec<MarketItem>, Vec<MarketSource>), String> {
     let word = plugin_word(engine);
     let available = [word, "list", "--available", "--json"];
     let installed = [word, "list", "--json"];
@@ -99,7 +101,8 @@ async fn gallery() -> Result<std::sync::Arc<Value>, String> {
 fn extension_folder(engine: &str) -> (std::path::PathBuf, &'static [&'static str]) {
     match engine {
         "gemini" => (
-            crate::engine_config::support::engine_home(Some("GEMINI_CLI_HOME"), ".gemini").join("extensions"),
+            crate::engine_config::support::engine_home(Some("GEMINI_CLI_HOME"), ".gemini")
+                .join("extensions"),
             &["gemini-extension.json"],
         ),
         _ => (
@@ -150,7 +153,9 @@ fn installed_extensions(engine: &str) -> Vec<InstalledExtension> {
 }
 
 /// Gemini CLI and Qwen Code: the gallery, with what the engine has installed marked.
-pub(super) async fn list_gallery(engine: &'static str) -> Result<(Vec<MarketItem>, Vec<MarketSource>), String> {
+pub(super) async fn list_gallery(
+    engine: &'static str,
+) -> Result<(Vec<MarketItem>, Vec<MarketSource>), String> {
     let gallery = gallery().await?;
     let installed = tokio::task::spawn_blocking(move || installed_extensions(engine))
         .await

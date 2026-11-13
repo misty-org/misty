@@ -143,13 +143,6 @@ export function summarizeTargetResults(
   return { allOk: failed.length === 0, failed };
 }
 
-/** Which engine copies exist right now (`synced` only). */
-export function syncedTargets(skill: SkillRow): SkillTargetId[] {
-  return (skill.targets ?? []).filter(
-    (target) => (skill.targetStates?.[target] ?? "synced") === "synced",
-  );
-}
-
 export function hasOrphanCopy(skill: SkillRow): boolean {
   return Object.values(skill.targetStates ?? {}).some((state) => state === "orphan");
 }

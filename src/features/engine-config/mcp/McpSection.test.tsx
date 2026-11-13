@@ -9,7 +9,6 @@ import type { McpConfigEntry, McpEngineInventory, McpInventory, McpRuntimeSectio
 const api = vi.hoisted(() => ({
   inventory: vi.fn(),
   setEnabled: vi.fn(),
-  setLaunchMode: vi.fn(),
   probe: vi.fn(),
 }));
 
@@ -220,11 +219,9 @@ let root: Root;
 beforeEach(() => {
   api.inventory.mockReset();
   api.setEnabled.mockReset();
-  api.setLaunchMode.mockReset();
   api.probe.mockReset();
   api.inventory.mockResolvedValue(payload());
   api.setEnabled.mockResolvedValue(claudeProject());
-  api.setLaunchMode.mockResolvedValue(undefined);
   api.probe.mockResolvedValue(connectedProbe());
   useMcpProbeStore.setState({ results: {}, pending: {}, runningAll: false, error: null });
   container = document.createElement("div");
@@ -351,18 +348,14 @@ describe("McpSection", () => {
     });
   });
 
-  it("never checks on its own an on-demand entry or one whose config came with the folder", async () => {
+  it("never checks on its own an entry whose config came with the folder", async () => {
     const gamma: McpConfigEntry = { ...claudeUser(), id: "claude_user:gamma", name: "gamma" };
     api.inventory.mockResolvedValue(
       payload({
         engines: [
           engine("claude", {
             config: {
-              entries: [
-                { ...claudeUser(), launchMode: "onDemand" },
-                { ...claudeProject(), enabled: true },
-                gamma,
-              ],
+              entries: [{ ...claudeProject(), enabled: true }, gamma],
               errors: [],
             },
           }),
@@ -372,8 +365,6 @@ describe("McpSection", () => {
     await renderSection();
     await vi.waitFor(() => expect(api.probe).toHaveBeenCalled());
     expect(api.probe.mock.calls.map((call) => call[0].name)).toEqual(["gamma"]);
-    const launch = row("alpha")?.querySelector('button[aria-label="Start alpha on demand"]');
-    expect(launch?.getAttribute("aria-pressed")).toBe("true");
   });
 
   it("shows a failed check on the row, with the reason on hover", async () => {

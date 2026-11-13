@@ -31,10 +31,8 @@ const submitAnswer = vi.fn(async (..._args: unknown[]) => {});
 function withRequest(request: ScreenRequest) {
   state = {
     accountId: "owner",
-    panel: "closed",
     working: false,
     error: null,
-    closePanel: vi.fn(),
     submitAnswer,
     conversations: [
       {
@@ -74,44 +72,7 @@ it("follows the place the user named", async () => {
   });
   continueAfterScreenRequest(set, get, "chat", "reply");
   await vi.waitFor(() => expect(submitAnswer).toHaveBeenCalled());
-  expect(submitAnswer.mock.calls[0][6]).toMatchObject({ openScreen: { place: "new" } });
-});
-
-it("opens a retired separate-window request as a new tab, without a new user turn", async () => {
-  withRequest({
-    kind: "open",
-    reason: "Read the site",
-    location: "separate",
-    url: "https://example.com",
-    state: "pending",
-  });
-  continueAfterScreenRequest(set, get, "chat", "reply");
-  await vi.waitFor(() => expect(current()?.state).toBe("opened"));
-  expect(submitAnswer).toHaveBeenCalledWith(
-    expect.stringContaining("new browser tab"),
-    [],
-    undefined,
-    "workspace",
-    [],
-    { conversationId: "chat", context: [] },
-    expect.objectContaining({
-      executionMode: "agent",
-      continuation: true,
-      openScreen: expect.objectContaining({ place: "new" }),
-    }),
-  );
-  expect(submitAnswer.mock.calls[0][0]).toContain("Start at https://example.com.");
-});
-
-it("acts in the user's current tab when they named it", async () => {
-  withRequest({ kind: "open", reason: "Play this game", location: "current", state: "pending" });
-  continueAfterScreenRequest(set, get, "chat", "reply");
-  await vi.waitFor(() => expect(submitAnswer).toHaveBeenCalled());
-  expect(submitAnswer.mock.calls[0][0]).toContain("current Misty tab");
-  expect(submitAnswer.mock.calls[0][6]).toMatchObject({
-    executionMode: "agent",
-    openScreen: { place: "current" },
-  });
+  expect(submitAnswer.mock.calls[0][5]).toMatchObject({ openScreen: true });
 });
 
 it("opens a new tab in this window at the requested page", async () => {
@@ -123,11 +84,16 @@ it("opens a new tab in this window at the requested page", async () => {
     state: "pending",
   });
   continueAfterScreenRequest(set, get, "chat", "reply");
-  await vi.waitFor(() => expect(submitAnswer).toHaveBeenCalled());
-  expect(submitAnswer.mock.calls[0][6]).toMatchObject({
-    executionMode: "agent",
-    openScreen: { url: "https://example.com", place: "new" },
-  });
+  await vi.waitFor(() => expect(current()?.state).toBe("opened"));
+  expect(submitAnswer).toHaveBeenCalledWith(
+    expect.stringContaining("new browser tab"),
+    [],
+    undefined,
+    [],
+    { conversationId: "chat", context: [] },
+    expect.objectContaining({ executionMode: "agent", continuation: true, openScreen: true }),
+  );
+  expect(submitAnswer.mock.calls[0][0]).toContain("Start at https://example.com.");
 });
 
 it("starts desktop control with Misty's own cursor, whatever the screen location", async () => {
@@ -140,10 +106,10 @@ it("starts desktop control with Misty's own cursor, whatever the screen location
   continueAfterScreenRequest(set, get, "chat", "reply");
   await vi.waitFor(() => expect(current()?.state).toBe("opened"));
   expect(submitAnswer.mock.calls[0][0]).toContain("desktop apps with its own cursor");
-  expect(submitAnswer.mock.calls[0][6]).toMatchObject({
+  expect(submitAnswer.mock.calls[0][5]).toMatchObject({
     executionMode: "agent",
     continuation: true,
-    openScreen: undefined,
+    openScreen: false,
   });
   mocks.desktop = false;
   withRequest({
@@ -163,8 +129,8 @@ it("waits for the user's choice when the account asks each time", async () => {
   continueAfterScreenRequest(set, get, "chat", "reply");
   expect(submitAnswer).not.toHaveBeenCalled();
   expect(current()?.state).toBe("pending");
-  await openScreenAndContinue(set, get, "chat", "reply", "window");
-  expect(submitAnswer.mock.calls[0][6]).toMatchObject({ executionMode: "agent" });
+  await openScreenAndContinue(set, get, "chat", "reply");
+  expect(submitAnswer.mock.calls[0][5]).toMatchObject({ executionMode: "agent" });
   withRequest({ kind: "open", reason: "Read the site", location: "ask", state: "pending" });
   declineScreenRequest(set, get, "chat", "reply");
   expect(current()?.state).toBe("declined");
@@ -187,7 +153,7 @@ it("attaches a window capture when the companion is not running", async () => {
   continueAfterScreenRequest(set, get, "chat", "reply");
   await vi.waitFor(() => expect(current()?.state).toBe("opened"));
   expect(mocks.capture).toHaveBeenCalledOnce();
-  expect(submitAnswer.mock.calls[0][6]).toMatchObject({
+  expect(submitAnswer.mock.calls[0][5]).toMatchObject({
     executionMode: "user",
     capture: { id: "shot" },
   });
@@ -196,7 +162,7 @@ it("attaches a window capture when the companion is not running", async () => {
 it("reports a failure on the card instead of starting work while another task runs", async () => {
   withRequest({ kind: "open", reason: "Read the site", location: "window", state: "pending" });
   state = { ...state, working: true };
-  await openScreenAndContinue(set, get, "chat", "reply", "window");
+  await openScreenAndContinue(set, get, "chat", "reply");
   expect(current()).toMatchObject({
     state: "failed",
     error: expect.stringContaining("Another task"),

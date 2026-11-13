@@ -4,7 +4,6 @@
 //!
 //! The `/v1/device/*` table in `src/index.ts` is one method here per route, and
 //! [`DeviceCalls::device_call`] dispatches by the route's name. Dropping a call's future cancels it.
-mod day_summary;
 pub(crate) mod device_calls;
 mod device_routing;
 mod failure;
@@ -13,7 +12,6 @@ mod models;
 mod screen_calls;
 mod text_calls;
 mod transcribe_diarized;
-mod video;
 mod voice_notes;
 pub(crate) mod zod;
 
@@ -24,7 +22,6 @@ use serde_json::Value;
 pub use failure::{model_call_failure, CallError, DeviceCallFailure};
 pub use model_calls::{embed_call, speech_call, EmbedCall, EmbedImage, SpeechCall};
 pub use models::{DeviceModels, DeviceRole};
-pub use video::VideoCall;
 
 use super::js_json::JsValue;
 use crate::model_calls::{ModelError, ModelRoute};
@@ -34,18 +31,16 @@ use failure::answered;
 pub const MAX_DEVICE_BODY_BYTES: usize = 40 << 20;
 
 /// Every call [`DeviceCalls::device_call`] knows, by its route's name.
-pub const DEVICE_CALL_NAMES: [&str; 11] = [
+pub const DEVICE_CALL_NAMES: [&str; 9] = [
     "cleanup",
     "voice-transcription",
     "screen-model",
     "refine-point",
     "extract",
     "embed",
-    "day-summary",
     "voice-notes",
     "transcribe-diarized",
     "follow-up",
-    "restore-step",
 ];
 
 /// Two voices that sound apart: the person's chosen one (or the provider's default) and another of
@@ -107,11 +102,9 @@ impl DeviceCalls {
             "refine-point" => self.refine_point(body).await,
             "extract" => self.extract(body).await,
             "embed" => self.embed(body).await,
-            "day-summary" => self.day_summary(body).await,
             "voice-notes" => self.voice_notes(body).await,
             "transcribe-diarized" => self.transcribe_diarized(body).await,
             "follow-up" => self.follow_up(body).await,
-            "restore-step" => self.restore_step(body).await,
             _ => Err(DeviceCallFailure { status: 404, body: serde_json::json!({ "code": "not_found" }) }),
         }
     }
@@ -228,16 +221,6 @@ impl DeviceCalls {
         Ok(crate::voice::wav(&pcm))
     }
 
-    /// One day of the person's Memory, summarized on the device's fast model. The server sends the
-    /// day's items (memory_day_api.go).
-    pub async fn day_summary(&self, body: &str) -> Result<Value, DeviceCallFailure> {
-        let result = async {
-            let (model, route) = self.on_device(DeviceRole::Fast)?;
-            day_summary::day_summary_call(self, &model, &route, &read_body(body)?, 1200).await
-        };
-        answered("day-summary", result.await)
-    }
-
     /// A Note from a recording's transcript, on the device's agent model (voice_notes_api.go).
     pub async fn voice_notes(&self, body: &str) -> Result<Value, DeviceCallFailure> {
         let result = async {
@@ -264,13 +247,5 @@ impl DeviceCalls {
             Err(error) => Err(error),
         };
         answered("follow-up", result)
-    }
-
-    pub async fn restore_step(&self, body: &str) -> Result<Value, DeviceCallFailure> {
-        let result = match read_body(body) {
-            Ok(body) => device_routing::restore_step_call(self, &body).await,
-            Err(error) => Err(error),
-        };
-        answered("restore-step", result)
     }
 }

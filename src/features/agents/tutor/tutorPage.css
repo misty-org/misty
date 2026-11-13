@@ -8,27 +8,6 @@
   margin: 0 auto;
   padding: 28px 24px 40px;
 }
-.tutor-ask {
-  display: flex;
-  border: 1px solid var(--color-charcoal-border);
-  border-radius: var(--radius-xl);
-  background: var(--color-charcoal-card);
-}
-.tutor-ask:focus-within {
-  border-color: var(--color-charcoal-border-strong);
-}
-.tutor-ask textarea {
-  flex: 1;
-  min-height: 0;
-  padding: 6px 0;
-  font-size: 14px;
-  field-sizing: content;
-  max-height: 160px;
-}
-.tutor-ask-icon {
-  flex: none;
-  color: var(--color-cream-muted);
-}
 .tutor-section {
   display: flex;
   flex-direction: column;
@@ -111,12 +90,6 @@
 .tutor-page[data-wide="true"] {
   max-width: 1180px;
 }
-.tutor-tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-bottom: -8px;
-}
 .tutor-lead {
   display: flex;
   align-items: center;
@@ -164,53 +137,6 @@
 .tutor-muted {
   color: var(--color-cream-muted);
 }
-
-/* The ask box: the request, then what to make and Start, as one card. */
-.tutor-ask {
-  flex-direction: column;
-  align-items: stretch;
-  gap: 4px;
-  padding: 8px 8px 8px 14px;
-}
-.tutor-ask-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.tutor-ask-foot {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding-top: 4px;
-}
-
-/* Cards due: one quiet row that opens a review. */
-.tutor-due {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 14px;
-  border: 1px solid var(--color-charcoal-border);
-  border-radius: var(--radius-xl);
-  background: var(--color-charcoal-card);
-  text-align: left;
-}
-.tutor-due:hover {
-  border-color: var(--color-charcoal-border-strong);
-}
-.tutor-due-count {
-  min-width: 28px;
-  font-size: 20px;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  color: var(--color-cream-bright);
-}
-.tutor-due-go {
-  margin-left: auto;
-  font-size: 13px;
-  color: var(--color-cream-muted);
-}
 .tutor-row-lead {
   display: flex;
   min-width: 0;
@@ -226,32 +152,6 @@
   .tutor-search {
     width: 140px;
   }
-}
-.tutor-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 10px;
-  border: 1px solid var(--color-charcoal-border);
-  border-radius: var(--radius-xl);
-  background: var(--color-charcoal-card);
-}
-.tutor-panel-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  min-height: 32px;
-}
-.tutor-panel-head h2,
-.tutor-panel > header h2 {
-  margin: 0 0 0 4px;
-  font-size: 13px;
-  font-weight: 400;
-  color: var(--color-cream-muted);
-}
-.tutor-section > .tutor-panel-head h2 {
-  margin-left: 0;
 }
 .tutor-sources {
   display: flex;
@@ -271,61 +171,13 @@
 .tutor-source:hover {
   background: var(--color-control-hover);
 }
-.tutor-source[data-off="true"] .tutor-source-title,
 .tutor-source[data-off="true"] .tutor-source-icon {
   opacity: 0.5;
-}
-.tutor-source-row {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  gap: 6px;
-}
-.tutor-source-index {
-  flex: none;
-  min-width: 16px;
-  font-size: 11px;
-  font-variant-numeric: tabular-nums;
-  color: var(--color-cream-muted);
-  text-align: right;
 }
 .tutor-source-icon {
   display: inline-flex;
   flex: none;
   color: var(--color-cream-muted);
-}
-.tutor-source-title {
-  display: flex;
-  flex: 1;
-  min-width: 0;
-  padding: 2px 0;
-  text-align: left;
-  font-size: 13px;
-  color: var(--color-cream);
-}
-.tutor-source-meta {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding-left: 44px;
-}
-.tutor-source-context {
-  width: auto;
-  height: 26px;
-  font-size: 12px;
-}
-.tutor-source-body {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin: 4px 0 2px 44px;
-  font-size: 12px;
-  color: var(--color-cream);
-}
-.tutor-source-body a {
-  color: var(--color-cream-muted);
-  text-decoration: underline;
-  overflow-wrap: anywhere;
 }
 .tutor-source-text {
   max-height: 260px;
@@ -337,34 +189,11 @@
   line-height: 1.55;
   color: var(--color-cream-muted);
 }
-.tutor-make {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-.tutor-notes {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
 .tutor-note {
   padding: 10px 12px;
   border: 1px solid var(--color-charcoal-border);
   border-radius: var(--radius-xl);
   background: var(--color-charcoal-card);
-}
-.tutor-note .tutor-source-title {
-  font-weight: 500;
-  color: var(--color-cream-bright);
-}
-.tutor-note-body {
-  font-size: 13px;
-  color: var(--color-cream);
-}
-.tutor-note[data-open="false"] .tutor-note-body {
-  max-height: 96px;
-  overflow: hidden;
-  mask-image: linear-gradient(to bottom, #000 60%, transparent);
 }
 .tutor-card-form {
   display: flex;
@@ -497,11 +326,6 @@
 .tutor-quiz-choice[data-verdict="wrong"] {
   border-color: color-mix(in srgb, #f85149 55%, transparent);
   color: #ff7b72;
-}
-
-/* The cursor companion's controls, as on its settings page. */
-.tutor-cursor {
-  max-width: 720px;
 }
 
 /* Search across notebooks: the box leads the list's row, and results drop under it. */

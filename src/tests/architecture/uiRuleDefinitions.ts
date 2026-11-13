@@ -2,7 +2,8 @@ import {
   countLeadingRowIcons,
   countLegacySizes,
   countLegacyVariants,
-  countMenuRowsWithoutIcon,
+  countRawMenuRows,
+  countRepeatedMenuIcons,
   countNativeTitles,
   countRaggedWraps,
   countStatusWords,
@@ -222,12 +223,19 @@ export const uiRules = {
       "Button sizes are sm 24, md 32 and lg 36 (xs → sm, default and chip → md); IconButton " +
       "sizes are sm 24 and md 32 (2xs and xs → sm, lg → md)",
   },
-  "menu-item-without-icon": {
-    count: countMenuRowsWithoutIcon,
+  "raw-menu-row": {
+    count: countRawMenuRows,
     jsx: true,
     guidance:
-      "every menu row is a MenuItem, MenuCheckItem, MenuRadioItem or MenuSubmenu with a 16px " +
-      "icon (icon={Pencil}); never a raw DropdownMenu or ContextMenu item",
+      "every menu row is a MenuItem, MenuCheckItem, MenuRadioItem or MenuSubmenu; never a raw " +
+      "DropdownMenu or ContextMenu item",
+  },
+  "repeated-menu-icon": {
+    count: countRepeatedMenuIcons,
+    jsx: true,
+    guidance:
+      "a list of like things (models, efforts, folders, agents, chats) is text alone: drop the " +
+      "icon every row repeats, and give rows an icon only when it tells them apart",
   },
   "leading-icon-in-list-row": {
     count: countLeadingRowIcons,
@@ -235,6 +243,12 @@ export const uiRules = {
     guidance:
       "list rows start with their text: use ListRow with label, state and menu, and no " +
       "leading icon",
+  },
+  "sparkles-icon": {
+    pattern: /\b\w*Sparkles?\w*\b/g,
+    guidance:
+      "never the sparkles star (it reads as AI filler): pick an icon for what the thing is, " +
+      "such as Cpu for a model, Globe for web research or ScrollText for a skill",
   },
   duckduckgo: {
     pattern: /duckduckgo/gi,
@@ -268,6 +282,7 @@ export const sharedUiRuleIds = [
   "native-title",
   "ellipsis",
   "arbitrary-px",
+  "sparkles-icon",
 ] as const satisfies readonly (keyof typeof uiRules)[];
 
 /** Rules for every .css file outside src/styles and src/shared/ui. */

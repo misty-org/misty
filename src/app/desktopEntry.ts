@@ -1,12 +1,14 @@
 import { requireDesktopHost } from "./requireDesktopHost";
 
-// The desktop control island and mist on Windows (agents/desktop_control/windows/overlays.rs). Only
-// the island uses the app's controls and theme; the mist stays bare so nothing opaque ever covers
-// the screen.
+// The desktop control island and mist on Windows (agents/desktop_control/windows/overlays.rs), and
+// the menu bar panel on macOS (app/tray_panel.rs). The island and the panel use the app's controls
+// and theme; the mist stays bare so nothing opaque ever covers the screen.
 const island = async () => {
   const { getCurrentWebview } = await import("@tauri-apps/api/webview");
   const { label } = getCurrentWebview();
-  if (label === "misty-desktop-island") await import("@/styles/styles.css");
+  if (label === "misty-desktop-island" || label === "misty-tray") {
+    await import("@/styles/styles.css");
+  }
 };
 
 export const desktopStartup = requireDesktopHost()

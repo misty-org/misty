@@ -1,18 +1,18 @@
 import {
-  Bot,
+  Cpu,
   CircleHelp,
   Code,
+  FileText,
   Folder,
+  Footprints,
   Globe,
   MessageSquare,
-  NotebookPen,
   PenTool,
   Repeat,
   Repeat1,
   Settings,
   Shapes,
   Shuffle,
-  Sparkles,
   type LucideIcon,
 } from "lucide-react";
 import { cn, Input, OptionSelect, Pressable, Textarea } from "@/shared/ui";
@@ -29,15 +29,15 @@ const feedbackKinds: Array<{ id: FeedbackKind; label: string }> = [
 /** The areas a ticket can be about, each with the icon its menu row starts with. */
 const feedbackAreas: Array<[string, LucideIcon]> = [
   ["General", CircleHelp],
-  ["Onboarding", Sparkles],
+  ["Onboarding", Footprints],
   ["Spaces", Shapes],
   ["Chat", MessageSquare],
-  ["Notes", NotebookPen],
+  ["Docs", FileText],
   ["Drawings", PenTool],
   ["Files", Folder],
   ["Code", Code],
   ["Browser", Globe],
-  ["Agents", Bot],
+  ["Agents", Cpu],
   ["Settings", Settings],
 ];
 

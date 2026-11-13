@@ -48,7 +48,7 @@ export async function searchSpaceText(
         hits.push({
           kind: "note",
           id: result.id,
-          title: result.title || "Untitled note",
+          title: result.title || "Untitled doc",
           text: result.excerpt,
           href: `${base(spaceId)}/notes?note=${encodeURIComponent(result.id)}`,
         });

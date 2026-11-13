@@ -205,13 +205,16 @@ fn resolve_catalog_root(resource_dir: Option<&Path>) -> Result<PathBuf, String> 
     let found = catalog_root_candidates(resource_dir)
         .into_iter()
         .find(|candidate| candidate.join("manifest.json").is_file())
-        .ok_or_else(|| "The persona catalog isn't installed with this copy of Misty.".to_string())?;
+        .ok_or_else(|| {
+            "The persona catalog isn't installed with this copy of Misty.".to_string()
+        })?;
     file_access::allow_bundled_resources(&found);
     Ok(found)
 }
 
 fn read_json<T: for<'de> Deserialize<'de>>(path: &Path, label: &str) -> Result<T, String> {
-    let raw = fs::read_to_string(path).map_err(|error| format!("Couldn't read {label}: {error}"))?;
+    let raw =
+        fs::read_to_string(path).map_err(|error| format!("Couldn't read {label}: {error}"))?;
     serde_json::from_str(&raw).map_err(|error| format!("The {label} isn't valid: {error}"))
 }
 
@@ -328,7 +331,9 @@ fn resolve_prompt<'a>(
     }
     let actual_hash = format!("{:x}", Sha256::digest(prompt.as_bytes()));
     if !actual_hash.eq_ignore_ascii_case(&agent.prompt_hash) {
-        return Err(format!("The persona `{agent_id}` doesn't match the bundled pack."));
+        return Err(format!(
+            "The persona `{agent_id}` doesn't match the bundled pack."
+        ));
     }
     Ok((agent, prompt))
 }

@@ -62,12 +62,7 @@ async function mutate<T = SkillMutationResult>(mutation: SkillsMutation): Promis
   // "invalid args `payload` … missing required key payload".
   const { action, ...payload } = mutation;
   try {
-    const result = await invoke<T>("engine_skills_mutate", { action, payload });
-    // Callers outside this page that read the installed list must not keep
-    // listing a skill the person just uninstalled. (The composer's `/` and `$`
-    // menus re-read the engine's folders a minute after each read.)
-    invalidateInstalledSkillsCache();
-    return result;
+    return await invoke<T>("engine_skills_mutate", { action, payload });
   } catch (error) {
     throw normalizeError(error);
   }
@@ -77,36 +72,6 @@ async function mutate<T = SkillMutationResult>(mutation: SkillsMutation): Promis
  *  semantics (`params.force === "1"`). */
 function forceParam(force?: boolean): Record<string, unknown> {
   return force ? { force: "1" } : {};
-}
-
-/**
- * Process-wide cache of the installed-skill list, for callers that are not
- * components (a skills index built on every send, say) and must not re-scan
- * the skills folders each time.
- *
- * Only the first call's promise is shared (a failure clears it, so the next
- * call retries); `invalidateInstalledSkillsCache` runs after any mutation.
- */
-let installedCache: Promise<SkillsInstalledResult> | null = null;
-const INSTALLED_TTL_MS = 30_000;
-let installedAt = 0;
-
-export function invalidateInstalledSkillsCache(): void {
-  installedCache = null;
-  installedAt = 0;
-}
-
-export function cachedInstalledSkills(): Promise<SkillsInstalledResult> {
-  const fresh = installedCache && Date.now() - installedAt < INSTALLED_TTL_MS;
-  if (fresh && installedCache) return installedCache;
-  const promise = skillsHubApi.installed().catch((error: unknown) => {
-    // A failed scan must not be cached: the next send retries.
-    if (installedCache === promise) invalidateInstalledSkillsCache();
-    throw error;
-  });
-  installedCache = promise;
-  installedAt = Date.now();
-  return promise;
 }
 
 export const skillsHubApi = {

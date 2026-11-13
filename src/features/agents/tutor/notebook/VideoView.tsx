@@ -9,12 +9,10 @@ import {
   Play,
   RotateCcw,
   Trash2,
-  Video,
 } from "lucide-react";
 import { confirmAction } from "@/shared/lib/confirmAction";
 import { Button, IconButton, Pressable, useNotice, OverflowFadeText } from "@/shared/ui";
 import { deleteVideoAudio, makeVideoAudio, sceneAudioBytes } from "../tutorAudio";
-import { deleteVideoClips, makeVideoClips, sceneClipUrl } from "../tutorClips";
 import { useTutorStore } from "../tutorStore";
 import type { Guide } from "../tutorTypes";
 import { recordVideo, saveBytes, sceneSeconds, svgUrl } from "./videoExport";
@@ -24,43 +22,16 @@ function clock(seconds: number): string {
   return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, "0")}`;
 }
 
-/** A scene's filmed clip, as a playable address while it is shown. */
-function useClip(guideId: string, index: number, filmed: boolean): string | undefined {
-  const [url, setUrl] = useState<string>();
-  useEffect(() => {
-    setUrl(undefined);
-    if (!filmed) return;
-    let live = true;
-    let made: string | undefined;
-    sceneClipUrl(guideId, index)
-      .then((address) => {
-        made = address;
-        if (live) setUrl(address);
-        else URL.revokeObjectURL(address);
-      })
-      .catch(() => undefined);
-    return () => {
-      live = false;
-      if (made) URL.revokeObjectURL(made);
-    };
-  }, [guideId, index, filmed]);
-  return url;
-}
-
 /**
- * A video overview, after NotebookLM's: each scene filmed on this computer's video model (or the
- * engine's drawing without one), its narration spoken on this computer's speech key, with
- * captions. It plays here, fills the screen, and saves as a video file.
+ * A video overview, after NotebookLM's: each scene the engine's drawing, its narration spoken on
+ * this computer's speech key, with captions. It plays here, fills the screen, and saves as a video file.
  */
 export function VideoView({ video, onClose }: { video: Guide; onClose(): void }) {
   const scenes = video.scenes ?? [];
   const [at, setAt] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [error, setError] = useState("");
-  const shownError =
-    error ||
-    (video.audio?.state === "failed" ? (video.audio.error ?? "") : "") ||
-    (video.clips?.state === "failed" ? (video.clips.error ?? "") : "");
+  const shownError = error || (video.audio?.state === "failed" ? (video.audio.error ?? "") : "");
   useNotice(Boolean(shownError), {
     message: shownError,
     tone: "error",
@@ -71,10 +42,6 @@ export function VideoView({ video, onClose }: { video: Guide; onClose(): void })
   const stage = useRef<HTMLDivElement>(null);
   const voiced = video.audio?.state === "ready";
   const scene = scenes[at];
-  const clip = useClip(video.id, at, Boolean(scene?.clip));
-  const filming = video.clips?.state === "making";
-  const filmingScene = Math.min(scenes.length, scenes.filter((item) => item.clip).length + 1);
-  const unfilmed = scenes.some((item) => !item.clip);
 
   // Each scene plays its own narration; without one it holds for reading time.
   useEffect(() => {
@@ -111,7 +78,6 @@ export function VideoView({ video, onClose }: { video: Guide; onClose(): void })
   const remove = async () => {
     if (!(await confirmAction(`Delete “${video.title}”? This can’t be undone.`))) return;
     void deleteVideoAudio(video);
-    void deleteVideoClips(video);
     useTutorStore.getState().removeGuide(video.id);
     onClose();
   };
@@ -145,11 +111,6 @@ export function VideoView({ video, onClose }: { video: Guide; onClose(): void })
               Make narration
             </Button>
           ) : null}
-          {unfilmed && !filming && video.audio?.state !== "making" ? (
-            <Button variant="quiet" onClick={() => void makeVideoClips(video.id)} icon={Video}>
-              Film scenes
-            </Button>
-          ) : null}
           <IconButton
             label="Save as a video"
             disabled={Boolean(saving)}
@@ -164,18 +125,7 @@ export function VideoView({ video, onClose }: { video: Guide; onClose(): void })
       </div>
       {scene ? (
         <div ref={stage} className="tutor-video-stage">
-          {clip ? (
-            <video
-              key={clip}
-              className="tutor-video-art"
-              src={clip}
-              aria-label={scene.heading}
-              autoPlay
-              muted
-              loop
-              playsInline
-            />
-          ) : scene.svg ? (
+          {scene.svg ? (
             <img className="tutor-video-art" src={svgUrl(scene.svg)} alt={scene.heading} />
           ) : (
             <div className="tutor-video-fallback">
@@ -209,9 +159,7 @@ export function VideoView({ video, onClose }: { video: Guide; onClose(): void })
             ? `Saving ${clock(saving.done)} / ${clock(saving.total)}`
             : video.audio?.state === "making"
               ? "Speaking the narration"
-              : filming
-                ? `Filming scene ${filmingScene} of ${scenes.length}`
-                : `Scene ${at + 1} of ${scenes.length} · ${clock(total)}`}
+              : `Scene ${at + 1} of ${scenes.length} · ${clock(total)}`}
         </span>
         <Button
           variant="quiet"

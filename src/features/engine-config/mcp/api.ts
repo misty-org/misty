@@ -10,7 +10,6 @@ import type {
   McpConfigEntry,
   McpErrorCode,
   McpInventory,
-  McpLaunchMode,
   McpProbePlan,
   McpProbeResult,
 } from "./types";
@@ -54,15 +53,6 @@ export const mcpApi = {
   ): Promise<McpConfigEntry> =>
     call<McpConfigEntry>("engine_mcp_set_enabled", {
       request: { entryId: entry.id, enabled, version: entry.version, workspace },
-    }),
-  /** Writes only Misty's own device setting, never the CLI's config file. */
-  setLaunchMode: (
-    entry: McpConfigEntry,
-    mode: McpLaunchMode,
-    workspace: string | null,
-  ): Promise<McpConfigEntry> =>
-    call<McpConfigEntry>("engine_mcp_set_launch_mode", {
-      request: { entryId: entry.id, mode, workspace },
     }),
   /** Shows a config file this page lists in the file manager (its folder when it doesn't exist
    *  yet). Native code refuses any path the inventory doesn't read. */

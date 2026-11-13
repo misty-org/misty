@@ -11,7 +11,7 @@ links = "kiri"
 [features]
 default = ["tauri"]
 # The Tauri plugin and engine hooks. Without it the core (envelope, gate,
-# permission rules, capabilities) builds and tests on its own:
+# capabilities) builds and tests on its own:
 # `cargo test --no-default-features`.
 tauri = [
     "dep:tauri",
@@ -19,7 +19,6 @@ tauri = [
     "dep:block2",
     "dep:objc",
     "dep:objc2-foundation",
-    "dep:objc2-web-kit",
     "dep:webview2-com",
     "dep:windows",
     "dep:gtk",
@@ -43,12 +42,11 @@ url = "2"
 [target.'cfg(target_os = "macos")'.dependencies]
 block2 = { version = "0.6.2", optional = true }
 objc = { version = "0.2.7", optional = true }
-objc2-foundation = { version = "0.3.2", optional = true, default-features = false, features = ["std", "NSObject", "NSProcessInfo", "NSString", "NSURL", "NSUUID"] }
-objc2-web-kit = { version = "0.3.2", optional = true, default-features = false, features = ["std", "block2", "objc2-app-kit", "WKFrameInfo", "WKSecurityOrigin", "WKWebView", "WKWebViewConfiguration", "WKWebsiteDataStore"] }
+objc2-foundation = { version = "0.3.2", optional = true, default-features = false, features = ["std", "NSProcessInfo"] }
 
 [target.'cfg(windows)'.dependencies]
 webview2-com = { version = "0.38.2", optional = true }
-windows = { version = "0.61", optional = true, features = ["Win32_System_Com"] }
+windows = { version = "0.61", optional = true }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 gtk = { version = "0.18", optional = true }

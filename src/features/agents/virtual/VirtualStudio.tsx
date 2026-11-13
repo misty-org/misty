@@ -49,6 +49,8 @@ function StudioSkeleton() {
  */
 export function VirtualStudio(props: {
   onOpenChat(agentId: string, conversationId: string): void;
+  /** Opens an agent's settings: its engine, model and instructions. */
+  onAgentSettings(agentId: string): void;
 }) {
   const { agents: everyone, loading: agentsLoading } = useStudioAgents();
   // Misty's own built-in agent isn't one of the team: the studio is for the person's engines.
@@ -329,6 +331,7 @@ export function VirtualStudio(props: {
           focus={focus}
           onOpenChat={props.onOpenChat}
           onCustomize={pickedAgent ? () => setCustomizing(pickedAgent.agent.id) : undefined}
+          onSettings={pickedAgent ? () => props.onAgentSettings(pickedAgent.agent.id) : undefined}
           onClose={() => setSelected(null)}
         />
       ) : null}

@@ -11,11 +11,11 @@ export const accountLimitMessages: Record<string, string> = {
   device_limit_reached:
     "This account has as many signed-in sessions as its plan allows. Sign out of one you no longer use, then try again.",
   no_devices_allowed:
-    "This account can't add signed-in sessions yet. Get Misty Pro at mistysys.com/pricing, or ask whoever runs your Misty server.",
+    "This account reached a limit: it can't add signed-in sessions yet. Ask whoever runs your Misty server.",
   storage_limit_reached: storageFull,
   owner_storage_quota_exceeded: storageFull,
   account_suspended:
-    "This account is suspended, and its data is kept. Contact whoever runs your Misty server; for Misty Pro, write to support@mistysys.com.",
+    "This account is suspended, and its data is kept. Contact whoever runs your Misty server.",
   account_closing:
     "This account is closing and is read-only. You can still open and export everything until it is deleted. Subscribe again to keep it.",
 };

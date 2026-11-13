@@ -1,7 +1,7 @@
 import { ExternalLink } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { openExternalLink } from "@/shared/platform/openExternalLink";
-import { BrandIcon, brandIconAsset, Button, useNotice } from "@/shared/ui";
+import { BrandIcon, Button, useNotice } from "@/shared/ui";
 import { StatusRow, StatusTable, type StatusState } from "../progress/StatusTable";
 import { appsApi, type AppRequest, type AppRequestDecision } from "./api";
 import { ApprovalActions } from "./ApprovalActions";
@@ -89,7 +89,7 @@ export function AppRequestCard({
   const decide = (decision: AppRequestDecision) =>
     act(async () => answered((await appsApi.decide(current.id, decision)).request));
 
-  const logo = brandIconAsset(current.subject) ? (
+  const logo = current.subject ? (
     <BrandIcon brand={current.subject} size={16} className="mr-1.5 inline-block align-[-3px]" />
   ) : null;
   const row: StatusState = pending

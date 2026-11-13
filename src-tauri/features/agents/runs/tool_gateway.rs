@@ -16,8 +16,10 @@ pub(crate) trait ToolGateway: Send + Sync {
     fn call<'a>(&'a self, call: GatewayCall<'a>) -> BoxFuture<'a, Result<ToolExecutionResponse, RuntimeError>>;
 }
 
+/// A call the run's own tools don't take. On this computer the gateway refuses it
+/// (`LocalGateway`); the tests' gateways read what reached them.
+#[cfg_attr(not(test), allow(dead_code))]
 pub(crate) struct GatewayCall<'a> {
-    pub(crate) identity: &'a RuntimeIdentity,
     pub(crate) call_id: &'a str,
     pub(crate) name: &'a str,
     pub(crate) input: &'a JsValue,

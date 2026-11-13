@@ -13,5 +13,7 @@ pub async fn project_reveal_path(
     use tauri_plugin_opener::OpenerExt;
     person_window(&webview)?;
     let real = linked_path(&app, &account, &path).await?;
-    app.opener().reveal_item_in_dir(real).map_err(|error| error.to_string())
+    app.opener()
+        .reveal_item_in_dir(real)
+        .map_err(|error| error.to_string())
 }

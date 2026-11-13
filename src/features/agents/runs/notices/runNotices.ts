@@ -61,8 +61,7 @@ export function noticeKindOf(state: string, hint?: Hint): RunNoticeKind | null {
   if (state === "awaiting_approval" || state === "awaiting_intervention") return "needs-you";
   if (state === "failed") return "failed";
   if (state === "completed") return hint ? "needs-you" : "finished";
-  if (state === "running" || state === "queued" || state === "awaiting_device")
-    return hint === "asking" ? "needs-you" : null;
+  if (state === "running" || state === "queued") return hint === "asking" ? "needs-you" : null;
   return null;
 }
 

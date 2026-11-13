@@ -20,36 +20,3 @@ pub fn chosen_folder(path: &Path) -> io::Result<ChosenFolder> {
     let is_folder = real.is_dir();
     Ok(ChosenFolder { real, is_folder })
 }
-
-/// Whether Windows marks a folder on the way to a chosen folder as hidden or the system's.
-#[cfg(windows)]
-pub fn chosen_folder_attributes(path: &Path) -> Option<u32> {
-    use std::os::windows::fs::MetadataExt;
-    fs::metadata(path)
-        .ok()
-        .map(|metadata| metadata.file_attributes())
-}
-
-/// What the clipboard's file references are. They're paths the person copied in another app, and
-/// Misty never opens them; the pasting app does.
-pub struct ClipboardFile {
-    pub is_folder: bool,
-}
-
-/// `None` when a copied path no longer exists.
-pub fn clipboard_file(path: &Path) -> Option<ClipboardFile> {
-    fs::metadata(path).ok().map(|metadata| ClipboardFile {
-        is_folder: metadata.is_dir(),
-    })
-}
-
-/// A file from Misty's own download history: its size, and whether it's still there, for the list.
-pub fn recorded_download(path: &Path) -> Option<fs::Metadata> {
-    fs::metadata(path).ok()
-}
-
-/// Whether a program Misty might start is there. Starting it is `Command`'s business; nothing is
-/// read. Used to find the agent runtime and the Node that runs it.
-pub fn program_is_installed(path: &Path) -> bool {
-    path.is_file()
-}

@@ -12,7 +12,7 @@ export function mapServerNote(note: ServerSpaceNote, spaceName = ""): UnifiedNot
     id: `misty:${note.id}`,
     source: "misty",
     sourceId: note.id,
-    title: note.title.trim() || "Untitled note",
+    title: note.title.trim() || "Untitled doc",
     body: bodyMarkdown,
     bodyFormat: "markdown",
     bodyMarkdown,

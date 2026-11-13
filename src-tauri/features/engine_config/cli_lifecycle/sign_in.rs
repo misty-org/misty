@@ -35,109 +35,9 @@ const SCREEN_BUSY: Duration = Duration::from_secs(3);
 /// A CLI that has drawn nothing by then never gets the command typed into it.
 const SCREEN_DEADLINE: Duration = Duration::from_secs(20);
 
-/// What a sign-in starts: the program's arguments, and a command typed once its screen is up.
-#[derive(Debug, PartialEq)]
-struct Plan {
-    args: Vec<String>,
-    then_type: Option<String>,
-}
-
-fn plan(args: &[&str], then_type: Option<String>) -> Plan {
-    Plan {
-        args: args.iter().map(|arg| (*arg).to_string()).collect(),
-        then_type,
-    }
-}
-
-/// A provider id as Pi and Oh My Pi name them (`anthropic`, `openai-codex`): typed into the CLI,
-/// so nothing but those characters.
-fn provider_id(provider: Option<&str>) -> Result<Option<&str>, String> {
-    match provider.map(str::trim).filter(|id| !id.is_empty()) {
-        None => Ok(None),
-        Some(id)
-            if id.len() <= 64
-                && id
-                    .chars()
-                    .all(|ch| ch.is_ascii_lowercase() || ch.is_ascii_digit() || ch == '-') =>
-        {
-            Ok(Some(id))
-        }
-        Some(_) => Err("That isn't a provider.".into()),
-    }
-}
-
-/// Each engine's own sign-in (or sign-out), as its CLI offers it.
-fn sign_in_plan(engine: &str, provider: Option<&str>, sign_out: bool) -> Result<Plan, String> {
-    let provider = provider_id(provider)?;
-    Ok(match (engine, sign_out) {
-        ("claude", false) => plan(&["auth", "login"], None),
-        ("claude", true) => plan(&["auth", "logout"], None),
-        ("codex", false) => plan(&["login"], None),
-        ("codex", true) => plan(&["logout"], None),
-        ("opencode", false) => plan(&["auth", "login"], None),
-        ("opencode", true) => plan(&["auth", "logout"], None),
-        // Their own "Login with Google" (or a key) is the auth dialog of their screen.
-        ("gemini" | "qwen", _) => plan(&[], Some("/auth".into())),
-        // Slash commands can't go through argv (Pi would send them to the model as a prompt).
-        ("pi", false) => plan(
-            &[],
-            Some(match provider {
-                Some(id) => format!("/login {id}"),
-                None => "/login".into(),
-            }),
-        ),
-        // Pi's `/logout` asks which account itself; Misty never chooses for the person.
-        ("pi", true) => plan(&[], Some("/logout".into())),
-        ("omp", false) => match provider {
-            Some(id) => plan(&["auth-broker", "login", id], None),
-            None => plan(&[], Some("/login".into())),
-        },
-        ("omp", true) => match provider {
-            Some(id) => plan(&["auth-broker", "logout", id], None),
-            None => return Err("Choose the provider to sign out of.".into()),
-        },
-        // Kimi Code and Qoder CLI sign in and out only through slash commands in their own
-        // screen (no `login` subcommand; Qoder's `/signin` is an alias). Checked against their
-        // docs (moonshotai.github.io/kimi-code, docs.qoder.com/cli/auth); ccgui has no sign-in
-        // for either.
-        ("codebuddy" | "kimi" | "qoder" | "qoder-cn", false) => plan(&[], Some("/login".into())),
-        ("codebuddy" | "kimi" | "qoder" | "qoder-cn", true) => plan(&[], Some("/logout".into())),
-        // Grok Build: `grok login` opens xAI's sign-in page (`--device-auth` prints a code for a
-        // remote machine, which the person can run in the terminal themselves).
-        ("grok", false) => plan(&["login"], None),
-        ("grok", true) => plan(&["logout"], None),
-        // MiniMax Code: `mcode login` is a mainland China account, `--region global` a Global
-        // one; the person picks, Misty never guesses.
-        ("minimax", false) => match provider {
-            Some("global") => plan(&["login", "--region", "global"], None),
-            Some("cn") | None => plan(&["login"], None),
-            Some(_) => return Err("Choose Global or China.".into()),
-        },
-        ("minimax", true) => plan(&["logout"], None),
-        // Antigravity has no login subcommand: `agy` signs in from its first screen (a browser
-        // page, or a code over SSH) and signs out with `/logout` in its prompt.
-        ("agy", false) => plan(&[], None),
-        ("agy", true) => plan(&[], Some("/logout".into())),
-        ("dsh", _) => {
-            return Err("DeepSeek Harness keeps its providers in its own web page.".into())
-        }
-        (_, true) => return Err("Sign out from the CLI itself.".into()),
-        _ => return Err("Misty can't sign in to that engine.".into()),
-    })
-}
-
-/// The line the dialog shows for what runs.
-fn shown_command(program: &str, plan: &Plan) -> String {
-    let mut line = std::iter::once(program.to_string())
-        .chain(plan.args.iter().cloned())
-        .collect::<Vec<_>>()
-        .join(" ");
-    if let Some(typed) = &plan.then_type {
-        line.push_str(", then ");
-        line.push_str(typed);
-    }
-    line
-}
+#[path = "sign_in_plans.rs"]
+mod plans;
+use plans::{remembers_sign_in, shown_command, sign_in_plan};
 
 struct Session {
     master: Mutex<Box<dyn MasterPty + Send>>,
@@ -149,6 +49,9 @@ struct Session {
     first_output: Mutex<Option<Instant>>,
     last_output: Mutex<Option<Instant>>,
     ended: AtomicBool,
+    /// For an engine with no status command: the engine, and whether this is its sign-in (true)
+    /// or sign-out, recorded when the CLI exits cleanly.
+    remember: Option<(String, bool)>,
 }
 
 impl Session {
@@ -170,7 +73,9 @@ static OPEN: LazyLock<Mutex<HashMap<String, Arc<Session>>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 
 fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
-    mutex.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+    mutex
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
 fn open() -> MutexGuard<'static, HashMap<String, Arc<Session>>> {
@@ -218,7 +123,12 @@ fn take_text(held: &mut Vec<u8>) -> String {
     }
 }
 
-fn pump(app: tauri::AppHandle, id: String, session: Arc<Session>, mut reader: Box<dyn Read + Send>) {
+fn pump(
+    app: tauri::AppHandle,
+    id: String,
+    session: Arc<Session>,
+    mut reader: Box<dyn Read + Send>,
+) {
     std::thread::spawn(move || {
         let mut held = Vec::new();
         let mut chunk = [0_u8; 8192];
@@ -233,23 +143,41 @@ fn pump(app: tauri::AppHandle, id: String, session: Arc<Session>, mut reader: Bo
                     held.extend_from_slice(&chunk[..read]);
                     let data = take_text(&mut held);
                     if !data.is_empty() {
-                        let _ = app.emit_to(session.window.as_str(), OUTPUT, json!({ "id": id, "data": data }));
+                        let _ = app.emit_to(
+                            session.window.as_str(),
+                            OUTPUT,
+                            json!({ "id": id, "data": data }),
+                        );
                     }
                 }
             }
         }
         session.ended.store(true, Ordering::Relaxed);
-        let ok = lock(&session.child).wait().map(|status| status.success()).unwrap_or(false);
+        let ok = lock(&session.child)
+            .wait()
+            .map(|status| status.success())
+            .unwrap_or(false);
+        if ok {
+            if let Some((engine, signed_in)) = &session.remember {
+                let _ = crate::engines::support::settings::set_signed_in_here(engine, *signed_in);
+            }
+        }
         let current = {
             let mut held = open();
-            let current = held.get(&id).is_some_and(|current| Arc::ptr_eq(current, &session));
+            let current = held
+                .get(&id)
+                .is_some_and(|current| Arc::ptr_eq(current, &session));
             if current {
                 held.remove(&id);
             }
             current
         };
         if current {
-            let _ = app.emit_to(session.window.as_str(), CLOSED, json!({ "id": id, "ok": ok }));
+            let _ = app.emit_to(
+                session.window.as_str(),
+                CLOSED,
+                json!({ "id": id, "ok": ok }),
+            );
         }
     });
 }
@@ -264,7 +192,8 @@ fn type_when_ready(session: Arc<Session>, line: String) {
             if session.ended.load(Ordering::Relaxed) {
                 return;
             }
-            let (Some(first), Some(last)) = (*lock(&session.first_output), *lock(&session.last_output))
+            let (Some(first), Some(last)) =
+                (*lock(&session.first_output), *lock(&session.last_output))
             else {
                 continue;
             };
@@ -303,7 +232,19 @@ pub async fn engine_cli_sign_in(
     }
     let plan = sign_in_plan(&engine, provider.as_deref(), sign_out.unwrap_or(false))?;
     let program = super::engine_bin(&engine);
-    spawn_session(&app, &webview, &id, &engine, &program, &plan.args, plan.then_type.clone(), cols, rows)?;
+    let remember = remembers_sign_in(&engine).then(|| (engine.clone(), !sign_out.unwrap_or(false)));
+    spawn_session(
+        &app,
+        &webview,
+        &id,
+        &engine,
+        &program,
+        &plan.args,
+        plan.then_type.clone(),
+        remember,
+        cols,
+        rows,
+    )?;
     let name = std::path::Path::new(&program)
         .file_name()
         .map(|name| name.to_string_lossy().into_owned())
@@ -332,7 +273,18 @@ pub async fn engine_cli_install_in_terminal(
     }
     let (program, args, shown) = super::native_installer_argv(&engine)
         .ok_or_else(|| format!("{engine} doesn't install through its vendor's installer."))?;
-    spawn_session(&app, &webview, &id, "The installer", &program, &args, None, cols, rows)?;
+    spawn_session(
+        &app,
+        &webview,
+        &id,
+        "The installer",
+        &program,
+        &args,
+        None,
+        None,
+        cols,
+        rows,
+    )?;
     Ok(SignInStarted { command: shown })
 }
 
@@ -348,6 +300,7 @@ fn spawn_session(
     program: &str,
     args: &[String],
     then_type: Option<String>,
+    remember: Option<(String, bool)>,
     cols: u16,
     rows: u16,
 ) -> Result<(), String> {
@@ -368,7 +321,9 @@ fn spawn_session(
         let wrapper = std::path::Path::new(program)
             .extension()
             .and_then(|ending| ending.to_str())
-            .is_some_and(|ending| ending.eq_ignore_ascii_case("cmd") || ending.eq_ignore_ascii_case("bat"));
+            .is_some_and(|ending| {
+                ending.eq_ignore_ascii_case("cmd") || ending.eq_ignore_ascii_case("bat")
+            });
         if wrapper {
             let mut command = CommandBuilder::new("cmd");
             command.arg("/c");
@@ -392,8 +347,14 @@ fn spawn_session(
         .spawn_command(command)
         .map_err(|error| format!("{name} could not be started: {error}"))?;
     drop(pair.slave);
-    let reader = pair.master.try_clone_reader().map_err(|error| error.to_string())?;
-    let writer = pair.master.take_writer().map_err(|error| error.to_string())?;
+    let reader = pair
+        .master
+        .try_clone_reader()
+        .map_err(|error| error.to_string())?;
+    let writer = pair
+        .master
+        .take_writer()
+        .map_err(|error| error.to_string())?;
     let session = Arc::new(Session {
         master: Mutex::new(pair.master),
         writer: Mutex::new(writer),
@@ -403,6 +364,7 @@ fn spawn_session(
         first_output: Mutex::new(None),
         last_output: Mutex::new(None),
         ended: AtomicBool::new(false),
+        remember,
     });
     open().insert(id.to_string(), Arc::clone(&session));
     pump(app.clone(), id.to_string(), Arc::clone(&session), reader);
@@ -442,7 +404,9 @@ pub fn engine_cli_sign_in_resize(
         return Ok(());
     };
     let master = lock(&session.master);
-    master.resize(size(cols, rows)).map_err(|error| error.to_string())
+    master
+        .resize(size(cols, rows))
+        .map_err(|error| error.to_string())
 }
 
 /// Ends a sign-in's CLI, as its dialog closes. One that has ended changes nothing.
@@ -458,31 +422,5 @@ pub fn engine_cli_sign_in_close(webview: tauri::Webview, id: String) -> Result<(
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn slash_logins_are_typed_after_the_screen_is_up() {
-        let pi = sign_in_plan("pi", Some("anthropic"), false).unwrap();
-        assert!(pi.args.is_empty());
-        assert_eq!(pi.then_type.as_deref(), Some("/login anthropic"));
-        let omp = sign_in_plan("omp", Some("openai-codex"), false).unwrap();
-        assert_eq!(omp.args, ["auth-broker", "login", "openai-codex"]);
-        assert_eq!(omp.then_type, None);
-        assert_eq!(sign_in_plan("claude", None, false).unwrap().args, ["auth", "login"]);
-        assert_eq!(sign_in_plan("kimi", None, false).unwrap().then_type.as_deref(), Some("/login"));
-        assert_eq!(sign_in_plan("grok", None, true).unwrap().args, ["logout"]);
-        assert_eq!(
-            sign_in_plan("minimax", Some("global"), false).unwrap().args,
-            ["login", "--region", "global"]
-        );
-        assert!(sign_in_plan("minimax", Some("eu"), false).is_err());
-        assert_eq!(sign_in_plan("agy", None, true).unwrap().then_type.as_deref(), Some("/logout"));
-    }
-
-    #[test]
-    fn providers_are_plain_ids() {
-        assert!(sign_in_plan("pi", Some("x; rm -rf ~"), false).is_err());
-        assert!(sign_in_plan("pi", Some("Anthropic"), false).is_err());
-    }
-}
+#[path = "sign_in_tests.rs"]
+mod tests;

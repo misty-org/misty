@@ -1,4 +1,4 @@
-import { ArrowUp, MessageSquare, Shirt, Square, SquarePen, X } from "lucide-react";
+import { ArrowUp, MessageSquare, Settings, Shirt, Square, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import {
   Button,
@@ -15,6 +15,7 @@ import {
 } from "@/shared/ui";
 import type { GlobalAiConversation } from "../conversations/state/conversationTypes";
 import { useMistyStore } from "../conversations/state/useMistyStore";
+import { visibleConversationContent } from "../conversations/view/conversationTurns";
 import {
   actionQuestionHasDetails,
   actionQuestionText,
@@ -117,20 +118,19 @@ function ChatSwitcher(props: {
             props.onPicked();
           }}
         >
-          <MenuRadioItem icon={SquarePen} value="new" label="New chat" />
+          <MenuRadioItem value="new" label="New chat" />
           {own.length ? <MenuSeparator /> : null}
           {own.map((chat) => (
             <MenuRadioItem
               key={chat.id}
               value={chat.id}
-              icon={
+              label={chat.title || "Untitled chat"}
+              // A row's state sits at its right end: a spinner while the agent answers in it.
+              state={
                 isAnswering(props.conversations, chat.id) ? (
                   <Spinner size="sm" label="Answering" />
-                ) : (
-                  MessageSquare
-                )
+                ) : undefined
               }
-              label={chat.title || "Untitled chat"}
             />
           ))}
         </MenuRadioGroup>
@@ -155,6 +155,8 @@ export function AgentTalk(props: {
   onOpenChat(agentId: string, conversationId: string): void;
   /** Opens the panel to change its name, role, look and desk. */
   onCustomize?(): void;
+  /** Opens the agent's settings: its engine, model and instructions. */
+  onSettings?(): void;
   onClose(): void;
 }) {
   const { actor, item, name } = props;
@@ -231,6 +233,11 @@ export function AgentTalk(props: {
                   <Shirt aria-hidden="true" />
                 </IconButton>
               ) : null}
+              {props.onSettings ? (
+                <IconButton label={`${name} settings`} size="sm" onClick={props.onSettings}>
+                  <Settings aria-hidden="true" />
+                </IconButton>
+              ) : null}
               <IconButton label="Open chat" size="sm" onClick={open}>
                 <MessageSquare aria-hidden="true" />
               </IconButton>
@@ -256,26 +263,32 @@ export function AgentTalk(props: {
       ) : null}
       {shown.length ? (
         <div className="virtual-studio-talk-log" ref={scroll} aria-live="polite">
-          {shown.map((message) => (
-            <div
-              key={message.id}
-              className="virtual-studio-talk-message"
-              data-role={message.role}
-              data-state={message.state}
-            >
-              {message.role === "assistant" && !message.content ? (
-                <span className="virtual-studio-talk-typing" aria-label={`${name} is answering`}>
-                  <i />
-                  <i />
-                  <i />
-                </span>
-              ) : message.role === "assistant" ? (
-                <MistyMarkdown>{message.content}</MistyMarkdown>
-              ) : (
-                message.content
-              )}
-            </div>
-          ))}
+          {shown.map((message) => {
+            // As the chat page shows it: Tutor's tags and private context left out.
+            const text = visibleConversationContent(message.content, message.role);
+            const coming = message.state === "pending" || message.state === "streaming";
+            if (!text && !coming) return null;
+            return (
+              <div
+                key={message.id}
+                className="virtual-studio-talk-message"
+                data-role={message.role}
+                data-state={message.state}
+              >
+                {!text ? (
+                  <span className="virtual-studio-talk-typing" aria-label={`${name} is answering`}>
+                    <i />
+                    <i />
+                    <i />
+                  </span>
+                ) : message.role === "assistant" ? (
+                  <MistyMarkdown>{text}</MistyMarkdown>
+                ) : (
+                  text
+                )}
+              </div>
+            );
+          })}
         </div>
       ) : null}
       {error ? (

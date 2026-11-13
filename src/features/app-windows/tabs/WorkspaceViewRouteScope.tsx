@@ -26,6 +26,11 @@ interface WorkspaceViewRouteHistory {
 const routeHistories = new Map<string, WorkspaceViewRouteHistory>();
 const WorkspaceViewIdContext = createContext<string | null>(null);
 
+/** The id of the workspace view this component is mounted in, or null outside one. */
+export function useWorkspaceViewId(): string | null {
+  return useContext(WorkspaceViewIdContext);
+}
+
 export function useWorkspaceViewFocused(): boolean {
   const tabId = useContext(WorkspaceViewIdContext);
   return useWorkspaceStore((state) => {

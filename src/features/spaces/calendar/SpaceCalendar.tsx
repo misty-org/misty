@@ -120,7 +120,12 @@ export function SpaceCalendar({ spaceId }: { spaceId: string }) {
           onChange={setView}
         />
         <CalendarConnections onChange={connected.reload} />
-        <Button type="button" icon={Plus} onClick={() => newEvent(dayKey(new Date()))}>
+        <Button
+          type="button"
+          variant="primary"
+          icon={Plus}
+          onClick={() => newEvent(dayKey(new Date()))}
+        >
           New event
         </Button>
       </div>

@@ -11,6 +11,8 @@ import { useAiSurfaceStore } from "../../runs/invocations/store";
 import type { AiInvocationEvent } from "../../runs/invocations/invocationTypes";
 import { consumeInvocationEvent } from "../../runs/invocations/storeRuntime";
 import { isProfileWindowLabel } from "@/features/app-windows";
+import { assertMistyAvailable } from "../state/availability";
+import { useMistyStore } from "../state/useMistyStore";
 
 type Request = {
   id: string;
@@ -49,9 +51,7 @@ async function handleContextRequest(request: Omit<Request, "id">): Promise<unkno
       request.event,
     );
   if (request.decision) {
-    const { assertMistyAvailable } = await import("../state/availability");
     await assertMistyAvailable(request.accountId, request.spaceId);
-    const { useMistyStore } = await import("../state/useMistyStore");
     const artifact = [
       store.getState().companion.approval?.artifact,
       useMistyStore.getState().pendingArtifact,

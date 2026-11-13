@@ -134,7 +134,9 @@ pub(crate) async fn ensure_server(
     #[cfg(windows)]
     crate::engines::hide_console(&mut command);
     let mut child = command.spawn().map_err(|e| {
-        format!("Couldn't start opencode serve ({resolved}): {e}. Check that opencode is installed.")
+        format!(
+            "Couldn't start opencode serve ({resolved}): {e}. Check that opencode is installed."
+        )
     })?;
     #[cfg(windows)]
     let tree_guard = crate::engines::job::assign_kill_on_close(&child);
@@ -166,7 +168,9 @@ pub(crate) async fn ensure_server(
                 crate::engines::kill_process_group(pid);
             }
             let _ = child.start_kill();
-            return Err("opencode serve timed out starting (no healthy check within 20s)".to_string());
+            return Err(
+                "opencode serve timed out starting (no healthy check within 20s)".to_string(),
+            );
         }
         sleep(SPAWN_POLL_INTERVAL).await;
     }

@@ -59,7 +59,7 @@ describe("TabStrip", () => {
       <TabStrip label="Open files" tabs={tabs} active="a" onSelect={vi.fn()} />,
     );
     const row = () => screen.getByRole("tab", { name: "b.ts" }).parentElement!;
-    expect(row().getAttribute("draggable")).toBe("false");
+    expect(row().hasAttribute("data-reorder-handle")).toBe(false);
     rerender(
       <TabStrip
         label="Open files"
@@ -69,10 +69,13 @@ describe("TabStrip", () => {
         onReorder={onReorder}
       />,
     );
-    expect(row().getAttribute("draggable")).toBe("true");
-    const dataTransfer = { effectAllowed: "" };
-    fireEvent.dragStart(row(), { dataTransfer });
-    fireEvent.drop(screen.getByRole("tab", { name: "Files" }).parentElement!, { dataTransfer });
-    expect(onReorder).toHaveBeenCalledWith("b", 0);
+    expect(row().hasAttribute("data-reorder-handle")).toBe(true);
+    fireEvent.keyDown(screen.getByRole("tab", { name: "b.ts" }), {
+      key: "ArrowLeft",
+      altKey: true,
+      shiftKey: true,
+    });
+    expect(onReorder).toHaveBeenCalledWith("b", 1);
+    expect(onReorder).toHaveBeenCalledTimes(1);
   });
 });

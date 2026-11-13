@@ -41,7 +41,6 @@ describe("openMisty", () => {
       selectedAgentId: undefined,
       selectedSpaceId: "",
       handoff: undefined,
-      panel: "closed",
       query: "",
       context: [],
       conversations: [],

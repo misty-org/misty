@@ -1,4 +1,4 @@
-import { relaunch } from "@tauri-apps/plugin-process";
+import { relaunch } from "@/shared/platform/relaunch";
 import { probeServer } from "@/api/deployment/probe";
 import {
   currentApiBase,

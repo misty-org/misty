@@ -46,7 +46,7 @@ describe("notes store", () => {
     const { api, store } = setup();
     await store.getState().load("account", "space-product", "Product");
     const created = await store.getState().createNote({ title: "   ", body: "" });
-    expect(api.create).toHaveBeenCalledWith("space-product", "Untitled note");
+    expect(api.create).toHaveBeenCalledWith("space-product", "Untitled doc");
     expect(created?.spaceId).toBe("space-product");
     expect(store.getState().selectedNoteId).toBe(created?.id);
   });

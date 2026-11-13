@@ -13,6 +13,7 @@ import {
   updateConversation,
 } from "../conversations/state/mistyStoreUpdates";
 import { useMistyStore } from "../conversations/state/useMistyStore";
+import { visibleConversationContent } from "../conversations/view/conversationTurns";
 import { steerRunningTask } from "../conversations/view/conversationSend";
 import { chatDeviceGrants } from "../personal/deviceGrants";
 
@@ -250,7 +251,8 @@ export function speechOf(
   if (!chatId) return "";
   const reply = latestReply(conversations, chatId);
   if (!reply) return "";
-  const text = reply.content
+  // As the chat page shows it: Tutor's tags and private context left out.
+  const text = visibleConversationContent(reply.content, "assistant")
     .replace(/[#*_`>]+/g, "")
     .replace(/\s+/g, " ")
     .trim();

@@ -20,7 +20,11 @@ impl event_sink::Emit for Collector {
 fn ready_core(
     tag: &str,
     drop_table: bool,
-) -> (TurnCore, Arc<Collector>, Arc<crate::engines::support::db::Db>) {
+) -> (
+    TurnCore,
+    Arc<Collector>,
+    Arc<crate::engines::support::db::Db>,
+) {
     let dir = std::env::temp_dir().join(format!(
         "ccgui-plan-dispatch-{tag}-{}-{}",
         std::process::id(),

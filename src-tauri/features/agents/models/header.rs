@@ -19,13 +19,12 @@ pub const PROVIDERS: [&str; 11] = [
 ];
 
 /// Each role the header carries and the device setting (section `models`) naming its model.
-pub const ROLES: [(&str, &str); 6] = [
+pub const ROLES: [(&str, &str); 5] = [
     ("agent", "agent_model"),
     ("fast", "fast_model"),
     ("embedding", "embedding_model"),
     ("transcription", "transcription_model"),
     ("speech", "speech_model"),
-    ("video", "video_model"),
 ];
 
 /// The web search providers a key can be saved for. The runtime runs `web.search` on the one
@@ -54,7 +53,7 @@ pub fn is_provider(id: &str) -> bool {
 }
 
 /// The search provider and key for `web.search`, when the chosen provider has a key.
-fn search(settings: &Value, key: &dyn Fn(&str) -> Option<String>) -> Option<Value> {
+pub(crate) fn search(settings: &Value, key: &dyn Fn(&str) -> Option<String>) -> Option<Value> {
     let provider = text(settings, "search_provider")
         .filter(|provider| SEARCH_PROVIDERS.contains(provider))
         .unwrap_or(SEARCH_PROVIDERS[0]);
@@ -102,7 +101,7 @@ fn base_url(settings: &Value, provider: &str) -> Option<String> {
 
 /// This device's model choices and the keys they need. None when no role has a model with a usable
 /// provider and there's no Soniox key for the live relay. Engines do the thinking, so a device
-/// with only a speech or video model still gets its document.
+/// with only a speech model still gets its document.
 pub fn document(settings: &Value, key: &dyn Fn(&str) -> Option<String>) -> Option<Value> {
     let mut providers = Map::new();
     let mut models = Map::new();

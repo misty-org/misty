@@ -24,7 +24,8 @@ describe("account limits", () => {
     expect(accountLimitMessage("owner_storage_quota_exceeded")).toBe(
       accountLimitMessage("storage_limit_reached"),
     );
-    expect(accountLimitMessage("account_suspended")).toContain("support@mistysys.com");
+    expect(accountLimitMessage("account_suspended")).toContain("whoever runs your Misty server");
+    expect(accountLimitMessage("no_devices_allowed")).not.toMatch(/Misty Pro|pricing/);
     expect(accountLimitMessage("not_found")).toBeNull();
     expect(decodeApiError(JSON.stringify({ code: "device_limit_reached" })).message).toBe(
       accountLimitMessage("device_limit_reached"),

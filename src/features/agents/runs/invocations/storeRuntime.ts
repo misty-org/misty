@@ -1,12 +1,10 @@
 import type { StoreApi } from "zustand";
 import { aiPaneSession, aiMessage, aiSessionKey } from "./invocationSessions";
 import type { AiPaneSession, AiSurfaceState } from "./store";
-import type { AiArtifact, AiInvocationEvent, MistySpeech } from "./invocationTypes";
+import type { AiArtifact, AiInvocationEvent } from "./invocationTypes";
 
 type SetState = StoreApi<AiSurfaceState>["setState"];
 type GetState = StoreApi<AiSurfaceState>["getState"];
-
-const speechTimers = new Map<string, number>();
 
 export function patchSession(
   set: SetState,
@@ -36,31 +34,11 @@ export function consumeInvocationEvent(
     return;
   }
   if (event.type === "assistant.status") {
-    if (
-      event.phase === "awaiting_device" ||
-      event.phase === "device_resume_pending" ||
-      event.phase === "awaiting_intervention" ||
-      event.phase === "intervention_resume_pending" ||
-      event.phase === "awaiting_timer" ||
-      event.phase === "timer_resume_pending"
-    ) {
+    if (event.phase === "awaiting_intervention" || event.phase === "intervention_resume_pending") {
       patchSession(set, get, accountId, paneId, {
-        state:
-          event.phase === "awaiting_device"
-            ? "awaiting_device"
-            : event.phase === "awaiting_intervention"
-              ? "awaiting_intervention"
-              : event.phase === "awaiting_timer"
-                ? "awaiting_timer"
-                : "running",
+        state: event.phase === "awaiting_intervention" ? "awaiting_intervention" : "running",
       });
     }
-    set((state) => ({
-      companion: {
-        ...state.companion,
-        speech: makeSpeech("status", event.text || event.phase || "thinking", true),
-      },
-    }));
     return;
   }
   if (event.type === "invocation.failed") {
@@ -73,25 +51,6 @@ export function consumeInvocationEvent(
   }
   if (event.type === "invocation.completed") {
     patchSession(set, get, accountId, paneId, { state: event.state });
-    if (get().companion.approval) return;
-    const current = aiPaneSession(get().sessions, accountId, paneId);
-    const reply = [...current.messages].reverse().find((message) => message.role === "assistant");
-    const completedInBackground = get().companion.phase === "home";
-    set((state) => ({
-      companion: {
-        ...state.companion,
-        phase: completedInBackground ? "home" : "speaking",
-        speech: makeSpeech(
-          "reply",
-          reply?.content || "Done.",
-          false,
-          reply?.content,
-          current.conversationId,
-        ),
-        completedCount: state.companion.completedCount + 1,
-      },
-    }));
-    if (!completedInBackground) scheduleHome(get, accountId);
     return;
   }
   if (event.type === "run.started") {
@@ -130,23 +89,17 @@ export function consumeInvocationEvent(
   patchSession(set, get, accountId, paneId, { messages, state: "running" });
 
   if (event.type !== "artifact.proposed" && event.type !== "approval.required") return;
-  const awaitingInBackground = get().companion.phase === "home";
   set((state) => ({
     companion: {
       ...state.companion,
       accountId,
       paneId,
-      phase: awaitingInBackground ? "home" : "awaiting_approval",
-      speech: makeSpeech("clarification", event.artifact.summary, true),
       approval: {
         artifact: event.artifact,
         title: event.artifact.title,
         summary: event.artifact.summary,
         confirmLabel: event.artifact.approvalPolicy === "always_confirm" ? "Confirm" : "Apply",
       },
-      completedCount: awaitingInBackground
-        ? state.companion.completedCount + 1
-        : state.companion.completedCount,
     },
   }));
 }
@@ -159,18 +112,7 @@ export function failInvocation(
   message: string,
 ) {
   patchSession(set, get, accountId, paneId, { state: "failed", error: message });
-  set((state) => ({
-    companion: {
-      ...state.companion,
-      phase: state.companion.phase === "home" ? "home" : "speaking",
-      speech: makeSpeech("error", message, true),
-      approval: undefined,
-      completedCount:
-        state.companion.phase === "home"
-          ? state.companion.completedCount + 1
-          : state.companion.completedCount,
-    },
-  }));
+  set((state) => ({ companion: { ...state.companion, approval: undefined } }));
 }
 
 export function patchArtifact(
@@ -190,61 +132,4 @@ export function patchArtifact(
       ),
     })),
   });
-}
-
-export function makeSpeech(
-  kind: MistySpeech["kind"],
-  text: string,
-  persistent = false,
-  fullText?: string,
-  conversationId?: string,
-): MistySpeech {
-  return {
-    id: crypto.randomUUID(),
-    kind,
-    text: conciseSpeech(text),
-    fullText,
-    conversationId,
-    persistent,
-    createdAt: new Date().toISOString(),
-  };
-}
-
-function conciseSpeech(value: string) {
-  // The compact presence bubble is plain text; the durable task transcript
-  // renders the complete response as Markdown. Strip common Markdown syntax so
-  // emphasis/list markers never leak into this one-line preview.
-  const clean = value
-    .replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1")
-    .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
-    .replace(/(^|\s)[#>*_~-]+\s*/g, "$1")
-    .replace(/[`*_~]/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
-  return clean.length > 240 ? `${clean.slice(0, 239)}…` : clean;
-}
-
-export function scheduleHome(get: GetState, accountId?: string) {
-  if (!accountId) return;
-  clearSpeechTimer(accountId);
-  speechTimers.set(
-    accountId,
-    window.setTimeout(() => {
-      const current = get().companion;
-      if (
-        current.accountId === accountId &&
-        current.phase === "speaking" &&
-        !current.speech?.persistent
-      ) {
-        get().settle();
-      }
-    }, 10_000),
-  );
-}
-
-export function clearSpeechTimer(accountId?: string) {
-  if (!accountId) return;
-  const timer = speechTimers.get(accountId);
-  if (timer !== undefined) window.clearTimeout(timer);
-  speechTimers.delete(accountId);
 }

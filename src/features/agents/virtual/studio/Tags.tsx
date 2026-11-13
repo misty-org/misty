@@ -8,8 +8,6 @@ import {
   Monitor,
   Plug,
   Plus,
-  Check,
-  X,
   Search,
   SquareTerminal,
   StickyNote,
@@ -19,7 +17,7 @@ import {
 import { useMemo } from "react";
 import { Vector3 } from "three";
 import { Pressable, OverflowFadeText } from "@/shared/ui";
-import { EngineMark, hasEngineMark } from "@/features/engine-config/EngineMark";
+import { EngineMark } from "@/features/engine-config/EngineMark";
 import type { Actor } from "./behaviour";
 import { spreadLabels, type Label } from "./spread";
 
@@ -82,20 +80,24 @@ export function labelPriority(actor: Actor, selected: boolean): number {
 /** Free desks' markers matter least: they give way to every name. */
 export const FREE_DESK_PRIORITY = 4;
 
-/** The second line of a name tag: what the agent is on, that it needs you, or what it is for. */
+/**
+ * The second line of a name tag: what the agent is on, or that it needs you. A resting agent has
+ * none, so a room of idle agents is just their names. How its last run ended isn't a line: its
+ * name takes that state's color, as a chat row's mark does.
+ */
 export function tagLine(actor: Actor): string {
   if (actor.state === "needs-you") return "Needs you";
   if (actor.guest) return `${actor.owner}'s agent`;
   if (actor.state === "working") return actor.task || actor.doing || "Working";
-  if (actor.outcome === "done") return "Done · see what it did";
-  if (actor.outcome === "failed") return "Run failed";
-  return actor.role ?? "";
+  return "";
 }
+
+const outcomeWords = { done: "Done", failed: "Failed" } as const;
 
 /**
  * The name over a figure's head, as players' names float in a game: its engine's mark and name,
  * and under them what it is on, with a mark for the kind of work, or that it needs its person.
- * A resting agent shows its name alone; hovering it shows what it is for.
+ * A resting agent shows its name alone.
  */
 export function ActorTag(props: {
   actor: Actor;
@@ -105,14 +107,9 @@ export function ActorTag(props: {
 }) {
   const { actor, selected } = props;
   const line = tagLine(actor);
-  const Icon =
-    actor.state === "working"
-      ? (doingIcons[actor.doingCode] ?? Ellipsis)
-      : actor.outcome === "done"
-        ? Check
-        : actor.outcome === "failed"
-          ? X
-          : null;
+  const Icon = actor.state === "working" ? (doingIcons[actor.doingCode] ?? Ellipsis) : null;
+  const outcome = actor.state === "resting" && actor.outcome ? outcomeWords[actor.outcome] : "";
+  const spoken = [props.name, outcome, line].filter(Boolean).join(", ");
   return (
     <Pressable
       type="button"
@@ -120,11 +117,11 @@ export function ActorTag(props: {
       data-state={actor.state}
       data-outcome={actor.outcome || undefined}
       data-selected={selected || undefined}
-      aria-label={line ? `${props.name}, ${line}` : props.name}
+      aria-label={spoken}
       onClick={() => props.onPick(actor.id)}
     >
       <span className="virtual-studio-tag-name">
-        {hasEngineMark(actor.engine) ? <EngineMark engine={actor.engine} size={11} /> : null}
+        {actor.engine ? <EngineMark engine={actor.engine} size={11} /> : null}
         <OverflowFadeText>{props.name}</OverflowFadeText>
       </span>
       {line ? (

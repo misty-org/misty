@@ -213,7 +213,10 @@ pub(crate) fn place(window: &tauri::WebviewWindow, x: f64, y: f64, width: f64, h
         return;
     };
     let (x, y) = (x.round() as i32, y.round() as i32);
-    let (width, height) = ((width.round() as i32).max(1), (height.round() as i32).max(1));
+    let (width, height) = (
+        (width.round() as i32).max(1),
+        (height.round() as i32).max(1),
+    );
     if let Some(shell) = layered(&gtk_window) {
         let display = gtk::prelude::WidgetExt::display(&gtk_window);
         let Some(monitor) = monitor_at(&display, x, y) else {

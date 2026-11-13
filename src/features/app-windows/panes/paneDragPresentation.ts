@@ -1,6 +1,5 @@
 import { dockLeaves, dockPaneBounds, removeDockLeaf } from "./dockTree";
 import type { WorkspaceDockNode } from "../tabs/workspaceViews";
-import { useBrowserRuntimeStore } from "../page-runtime/browserRuntimeStore";
 
 /** A reversible visual lift; no store updates or app remounts during the gesture. */
 export function liftPanePresentation(root: WorkspaceDockNode, paneId: string): () => void {
@@ -25,7 +24,6 @@ export function liftPanePresentation(root: WorkspaceDockNode, paneId: string): (
     height: Math.max(...rects.map((r) => r.bottom)) - y,
   };
   const saved = new Map<HTMLElement, string | null>();
-  const overlays: HTMLElement[] = [];
   const save = (element: HTMLElement) => {
     if (!saved.has(element)) saved.set(element, element.getAttribute("style"));
   };
@@ -71,41 +69,12 @@ export function liftPanePresentation(root: WorkspaceDockNode, paneId: string): (
     });
     // Painted opaque so no page beneath it shows.
     element.style.setProperty("background-color", "var(--color-charcoal-bg)", "important");
-    // The native page can't move with the pane, so its last preview stands in for it and
-    // the panes visibly rearrange with their content.
-    const preview = useBrowserRuntimeStore.getState().previews[pane.activeViewId ?? ""];
-    if (!preview?.dataUrl) return;
-    const toolbar = element.querySelector<HTMLElement>("[data-browser-toolbar]");
-    const below = toolbar
-      ? toolbar.getBoundingClientRect().bottom - element.getBoundingClientRect().top
-      : 0;
-    const overlay = document.createElement("img");
-    overlay.src = preview.dataUrl;
-    overlay.alt = "";
-    overlay.setAttribute("aria-hidden", "true");
-    // The preview is stretched over the pane's new content area, so a pane that grows into the
-    // space a lifted pane left shows its whole page there, never a cut-off corner of it. The
-    // toolbar is real DOM and already follows the new width.
-    const contentTop = Math.max(0, below);
-    Object.assign(overlay.style, {
-      position: "absolute",
-      left: "0",
-      top: `${contentTop / zoom}px`,
-      width: `${rect.width / zoom}px`,
-      height: `${Math.max(0, rect.height - contentTop) / zoom}px`,
-      maxWidth: "none",
-      objectFit: "fill",
-      pointerEvents: "none",
-    });
-    element.append(overlay);
-    overlays.push(overlay);
   });
   // Pages follow their pane's new size on their own; this makes sure ones that only moved do too.
   window.requestAnimationFrame(() =>
     window.dispatchEvent(new Event("misty:workspace-geometry-changed")),
   );
   return () => {
-    overlays.forEach((overlay) => overlay.remove());
     saved.forEach((style, element) => {
       if (style === null) element.removeAttribute("style");
       else element.setAttribute("style", style);

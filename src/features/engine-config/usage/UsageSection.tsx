@@ -12,7 +12,7 @@ import {
   DesktopSettingsRow,
   DesktopSettingsSection,
 } from "@/features/settings";
-import { EngineMark, hasEngineMark } from "../EngineMark";
+import { EngineMark } from "../EngineMark";
 import {
   Button,
   ChoiceGroup,
@@ -156,7 +156,7 @@ function ProviderRow(props: {
             <div key={window.id} className="grid gap-1.5">
               <div className="flex items-baseline justify-between gap-3 text-sm">
                 <span className="flex items-center gap-2 text-cream">
-                  {hasEngineMark(limits.id) ? <EngineMark engine={limits.id} size={12} /> : null}
+                  <EngineMark engine={limits.id} size={12} />
                   {windowName(window)}
                   {window.status === "rejected" ? (
                     <span className="text-cream-bright">· Limit reached</span>
@@ -278,8 +278,8 @@ function UsageBlock(props: { onError: (error: string | null) => void }) {
                   <TableRow key={entry.key}>
                     <TableCell className="max-w-[240px] truncate" title={entry.key}>
                       <span className="flex items-center gap-2">
-                        {group === "engine" && hasEngineMark(entry.key) ? (
-                          <EngineMark engine={entry.key} size={12} />
+                        {group === "engine" ? (
+                          <EngineMark engine={entry.key} size={12} name={engineName(entry.key)} />
                         ) : null}
                         {group === "engine"
                           ? engineName(entry.key)

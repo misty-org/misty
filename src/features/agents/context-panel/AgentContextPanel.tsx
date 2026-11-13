@@ -1,5 +1,6 @@
 import { RotateCw } from "lucide-react";
 import { lazy, Suspense } from "react";
+import { useWorkspaceViewId } from "@/features/app-windows";
 import type { AgentProfile } from "@/shared/schemas";
 import { ErrorState, Skeleton } from "@/shared/ui";
 import type { ContextPanelTab } from "./contextPanelStore";
@@ -11,11 +12,11 @@ import { OpenInMenu } from "./open-app/OpenInMenu";
 import { SessionPanel } from "./SessionPanel";
 import { StepsPanel } from "../activity/StepsPanel";
 import { WorktreesButton } from "./worktree/WorktreesButton";
+import { terminalChatKey } from "./terminal/terminalStore";
 import "./contextPanel.css";
 
 const TerminalPanel = lazy(() => import("./terminal/TerminalPanel"));
 const PreviewPanel = lazy(() => import("../preview/PreviewPanel"));
-const BrowserPanel = lazy(() => import("./BrowserPanel"));
 
 /** What a panel shows while its code or its first read is on the way, never a blank box. */
 const panelSkeleton = (
@@ -29,8 +30,7 @@ const panelSkeleton = (
  * The panel beside a chat: the chat's session at a glance, or the Space's linked project folder
  * as files, as Git changes, or as a terminal; the folder is chosen in the session card. Agents on
  * outside engines work in the same folder, so this is where their work shows.
- * The preview tab shows the person's running app instead, and the browser tab a plain browser for
- * the person; neither needs a folder.
+ * The preview tab shows the person's running app instead and needs no folder.
  */
 export function AgentContextPanel(props: {
   tab: ContextPanelTab;
@@ -38,6 +38,7 @@ export function AgentContextPanel(props: {
   agent: AgentProfile;
 }) {
   const { folder, loaded, failed, retry } = useProjectFolder();
+  const chat = terminalChatKey(props.conversationId, useWorkspaceViewId());
   if (props.tab === "session") {
     return <SessionPanel conversationId={props.conversationId} agent={props.agent} />;
   }
@@ -45,18 +46,14 @@ export function AgentContextPanel(props: {
   // No title bar: the rail already says which panel this is. A panel's own controls are its first row.
   return (
     <>
-      {folder && props.tab !== "preview" && props.tab !== "browser" ? (
+      {folder && props.tab !== "preview" ? (
         <div className="context-tools">
           <WorktreesButton folder={folder} />
-          <LaunchScriptButton folder={folder} />
+          <LaunchScriptButton chat={chat} folder={folder} />
           <OpenInMenu folder={folder} />
         </div>
       ) : null}
-      {props.tab === "browser" ? (
-        <Suspense fallback={panelSkeleton}>
-          <BrowserPanel />
-        </Suspense>
-      ) : props.tab === "preview" ? (
+      {props.tab === "preview" ? (
         <Suspense fallback={panelSkeleton}>
           <PreviewPanel />
         </Suspense>
@@ -79,7 +76,7 @@ export function AgentContextPanel(props: {
         <ChangesPanel folder={folder} />
       ) : (
         <Suspense fallback={panelSkeleton}>
-          <TerminalPanel folder={folder} />
+          <TerminalPanel chat={chat} folder={folder} />
         </Suspense>
       )}
     </>

@@ -79,6 +79,15 @@ pub fn window_event(window: &Window, event: &WindowEvent) {
     }
 }
 
+/// Starts Misty again, after an update or a change of server. The main workspace asks.
+#[tauri::command]
+pub fn app_relaunch(webview: tauri::Webview, app: AppHandle) -> Result<(), String> {
+    if !crate::browser::app_windows::is_person_window(webview.label()) {
+        return Err("Only the main workspace can restart Misty".into());
+    }
+    app.restart()
+}
+
 /// Finishes the quit or close that was held: after the changes saved, or
 /// because the person chose to go ahead without them.
 #[tauri::command]

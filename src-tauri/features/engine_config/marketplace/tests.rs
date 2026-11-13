@@ -165,7 +165,10 @@ fn omp_text_lists_read_with_colour_codes_and_installed_marks() {
     );
     assert!(items[0].installed && items[0].enabled);
     assert!(!items[1].installed);
-    let gone = items.iter().find(|item| item.id == "gone@elsewhere").unwrap();
+    let gone = items
+        .iter()
+        .find(|item| item.id == "gone@elsewhere")
+        .unwrap();
     assert!(gone.installed && !gone.enabled);
 }
 
@@ -182,7 +185,11 @@ fn loose_listings_read_arrays_and_claude_style_objects() {
             ]
         }),
     );
-    assert_eq!(object.len(), 2, "an entry without a marketplace can't install");
+    assert_eq!(
+        object.len(),
+        2,
+        "an entry without a marketplace can't install"
+    );
     assert!(object[0].installed && object[0].enabled);
     assert_eq!(object[1].id, "docs@official");
     assert_eq!(object[1].installs, Some(12));
@@ -227,14 +234,19 @@ fn the_gallery_marks_installed_extensions_and_keeps_the_rest() {
     assert_eq!(items[0].id, "https://github.com/obra/superpowers");
     assert_eq!(items[0].stars, Some(299294));
     assert!(!items[0].installed);
-    assert_eq!(items[1].id, "b-tools", "an installed extension removes by name");
+    assert_eq!(
+        items[1].id, "b-tools",
+        "an installed extension removes by name"
+    );
     assert!(items[1].installed);
     assert_eq!(items[2].id, "local-thing");
     assert_eq!(items[2].link, None);
 
     assert!(valid_gallery_url("https://github.com/obra/superpowers"));
     assert!(!valid_gallery_url("https://github.com/obra"));
-    assert!(!valid_gallery_url("https://github.com/obra/superpowers/tree/main"));
+    assert!(!valid_gallery_url(
+        "https://github.com/obra/superpowers/tree/main"
+    ));
     assert!(!valid_gallery_url("https://example.com/obra/superpowers"));
     assert!(!valid_gallery_url("https://github.com/-x/y"));
 }

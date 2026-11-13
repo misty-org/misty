@@ -1,16 +1,4 @@
-import { useSettingsStore } from "@/features/settings";
-
-/** The section a Space opens on, from the person's opening-tool preference. */
+/** The section a Space opens on: its home. */
 export function defaultSpaceRoute(spaceId: string): string {
-  const preferences = useSettingsStore.getState().settings?.document.spaces as
-    Record<string, unknown> | undefined;
-  const tool = String(preferences?.opening_tool ?? "home");
-  // Older choices (Journal, Planner) open on Notes and the Space home.
-  const route =
-    tool === "journal"
-      ? "notes"
-      : ["home", "chat", "notes", "drawings", "library"].includes(tool)
-        ? tool
-        : "home";
-  return `/spaces/${encodeURIComponent(spaceId)}/${route}`;
+  return `/spaces/${encodeURIComponent(spaceId)}/home`;
 }

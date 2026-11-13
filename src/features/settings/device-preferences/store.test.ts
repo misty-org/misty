@@ -27,7 +27,7 @@ vi.mock("./persistence", () => ({
 import { useDevicePreferences as store } from "./store";
 import { resolveSetting } from "./settingResolution";
 
-const key = "files.startingFolder";
+const key = "voice.dictionary";
 async function setup(scope = "device", values: Record<string, unknown> = { [key]: "old" }) {
   mocks.disk.set(scope, { version: 3, values });
   await store.getState().configure(scope, {});

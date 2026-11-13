@@ -2,13 +2,15 @@ import {
   Armchair,
   CalendarDays,
   CalendarPlus,
+  FileText,
   GraduationCap,
   KanbanSquare,
-  LayoutGrid,
   Library,
   ListPlus,
   MessagesSquare,
   NotebookPen,
+  FlaskConical,
+  Galaxy,
   Plus,
   Settings,
   SquarePen,
@@ -50,12 +52,12 @@ import type { SearchHit, SearchKind } from "./searchTypes";
 
 /** The pages search goes to; the Space's need a Space. */
 const pages: { label: string; icon: LucideIcon; route(base: string): string; space?: boolean }[] = [
-  { label: "Space", icon: LayoutGrid, route: (base) => base, space: true },
+  { label: "Space", icon: Galaxy, route: (base) => base, space: true },
   { label: "Studio", icon: Armchair, route: () => "/agents?view=studio" },
-  { label: "Tutor", icon: GraduationCap, route: () => "/agents?view=tutor" },
+  { label: "Lab", icon: FlaskConical, route: () => "/agents?view=lab" },
   { label: "Integrations", icon: Waypoints, route: () => "/agents?view=integrations" },
   { label: "Chat", icon: MessagesSquare, route: (base) => `${base}/chat`, space: true },
-  { label: "Journal", icon: NotebookPen, route: (base) => `${base}/notes`, space: true },
+  { label: "Docs", icon: FileText, route: (base) => `${base}/notes`, space: true },
   { label: "Planner", icon: KanbanSquare, route: (base) => `${base}/planner`, space: true },
   { label: "Calendar", icon: CalendarDays, route: (base) => `${base}/calendar`, space: true },
   { label: "Library", icon: Library, route: (base) => `${base}/library`, space: true },
@@ -98,7 +100,7 @@ export interface SearchResults {
 
 /**
  * Everything ⌘K search can find, for what was typed: the person's chats (by their text too),
- * agents, the Space's notes, messages, tasks, events and files, Tutor's notebooks and lessons,
+ * agents, the Space's notes, messages, tasks, events and files, the notebooks and lessons,
  * apps to connect, settings, commands and pages. What lives on this computer is matched here;
  * Space content is searched by the server; engines' own histories by native code.
  */
@@ -273,8 +275,7 @@ export function useSearchHits(context: SearchContext): SearchResults {
         icon: notebook.emoji ? <span aria-hidden>{notebook.emoji}</span> : icon(NotebookPen),
         updatedAt: notebook.updatedAt,
         match,
-        open: () =>
-          openRoute(`/agents?view=tutor&item=notebook:${encodeURIComponent(notebook.id)}`),
+        open: () => openRoute(`/agents?view=lab&item=notebook:${encodeURIComponent(notebook.id)}`),
       });
     }
 
@@ -363,7 +364,7 @@ export function useSearchHits(context: SearchContext): SearchResults {
       return hits;
     }
     const makers = {
-      note: { icon: SquarePen, label: "note", make: createSpaceNote },
+      note: { icon: SquarePen, label: "doc", make: createSpaceNote },
       task: { icon: ListPlus, label: "task", make: createSpaceTask },
       event: { icon: CalendarPlus, label: "event", make: createSpaceEvent },
     } as const;

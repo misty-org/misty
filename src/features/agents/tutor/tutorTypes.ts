@@ -30,6 +30,9 @@ export interface NotebookSource {
   titled?: boolean;
   /** Why the agent chose it, for a source found on the web. */
   why?: string;
+  /** A news story the notebook's follow brought in, and when it was published. */
+  news?: boolean;
+  published?: string;
   createdAt: string;
 }
 
@@ -63,9 +66,20 @@ export interface NotebookChatStyle {
   length: "default" | "shorter" | "longer";
 }
 
+/** What a notebook follows: news on a subject. */
+export interface NotebookFollow {
+  /** What the news search asks for. */
+  query: string;
+  /** When news last came in, ISO. */
+  checkedAt?: string;
+}
+
 export interface Notebook {
   id: string;
   title: string;
+  /** The research topic it was started from (notebookTopics.ts). */
+  topic?: string;
+  follow?: NotebookFollow;
   sources: NotebookSource[];
   notes: NotebookNote[];
   /** The person's own transformations; the built-in ones are in code. */
@@ -75,10 +89,15 @@ export interface Notebook {
   /** The conversation open in the notebook now, with the questions as the person asked them
    * (the turns themselves carry the sources too). */
   thread?: { conversationId: string; questions: string[] };
-  /** The Space note it was last shared as. */
-  sharedNote?: { spaceId: string; noteId: string };
   /** One emoji for the notebook's cover, the agent's pick until the person chooses one. */
   emoji?: string;
+  /**
+   * Shared into a Space as a doc, at the person's request: the doc is rewritten as the notebook
+   * changes, until they stop sharing. Notebooks otherwise stay on this computer.
+   */
+  shared?: { spaceId: string; spaceName: string; docId: string; sharedAt: string };
+  /** Saved from a notebook someone shared into a Space: that doc. */
+  savedFrom?: { spaceId: string; docId: string };
   /** How its chat answers; unset answers in the default way. */
   chatStyle?: NotebookChatStyle;
   /** What the agent wrote about the sources: a summary, its topics and questions to start from.
@@ -152,10 +171,6 @@ export interface VideoScene {
   heading: string;
   points?: string[];
   narration: string;
-  /** What the video model films for the scene: a silent clip behind the narration. */
-  shot?: string;
-  /** The scene's clip is filmed and kept on this computer. */
-  clip?: boolean;
   /** How long its narration runs, once spoken. */
   seconds?: number;
 }
@@ -179,10 +194,6 @@ export interface Guide {
   /** An audio overview's script, and its audio, spoken on this computer's speech key. */
   script?: OverviewLine[];
   audio?: { state: "making" | "ready" | "failed"; seconds?: number; error?: string };
-  /** A video overview's clips, filmed on this computer's video model; "off" without one. */
-  clips?: { state: "making" | "ready" | "failed" | "off"; error?: string };
-  /** The Space note it was last shared as. */
-  sharedNote?: { spaceId: string; noteId: string };
   notebookId?: string;
   conversationId?: string;
   createdAt: string;

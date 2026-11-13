@@ -276,11 +276,6 @@ impl AgentRuntime {
         self.inner.local.saved_runs()
     }
 
-    /// The tools a run with this request would be offered.
-    pub fn local_tool_names(&self, body: &Value) -> Vec<String> {
-        self.inner.local.planner.catalog(body).into_iter().map(|tool| tool.name).collect()
-    }
-
     /// Whether a run started on this computer is still going.
     pub fn local_run_live(&self, run_id: &str) -> bool {
         self.inner.live(run_id)

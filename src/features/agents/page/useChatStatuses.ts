@@ -7,7 +7,7 @@ import { watchAllRunEvents } from "../runs/local-run/localRunEvents";
 export type ChatStatus = "working" | "needs-you" | "failed" | "done";
 
 export function chatStatusOf(state: string): ChatStatus {
-  if (state === "running" || state === "queued" || state === "awaiting_device") return "working";
+  if (state === "running" || state === "queued") return "working";
   if (state === "awaiting_approval" || state === "awaiting_intervention") return "needs-you";
   return state === "failed" ? "failed" : "done";
 }

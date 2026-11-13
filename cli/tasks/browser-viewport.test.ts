@@ -7,9 +7,8 @@ import { JSDOM } from "jsdom";
 // change website scrolling, even when the user zooms the native WebView.
 const part = (name) =>
   readFileSync(new URL(`../../src-tauri/features/browser/kiri_link/scripts/${name}`, import.meta.url), "utf8");
-// BROWSER_VIEWPORT_SCRIPT in browser/scripts/mod.rs, with its media and window-drag parts.
+// BROWSER_VIEWPORT_SCRIPT in browser/scripts/mod.rs, with its window-drag part.
 const viewport = `\n${part("viewport.js")}`
-  .replace("__MISTY_MEDIA_PLACEHOLDER__", () => part("media.js"))
   .replace("__MISTY_WINDOW_DRAG_PLACEHOLDER__", () => part("window_drag.js"));
 const context = readFileSync(
   new URL("../../src-tauri/features/browser/kiri_link/scripts/context_menu.js", import.meta.url),

@@ -81,7 +81,7 @@ export function createAgentsPageActions(state: AgentsPageState) {
     await load(user?.id ?? "");
   };
   // Pages are links, so the sidebar shows where the person is.
-  const openPage = (page: "studio" | "integrations" | "tutor") =>
+  const openPage = (page: "studio" | "integrations" | "lab") =>
     change(() => {
       setWorkspacePage(page);
       const next = new URLSearchParams(params);
@@ -104,35 +104,12 @@ export function createAgentsPageActions(state: AgentsPageState) {
 export type AgentsPageActions = ReturnType<typeof createAgentsPageActions>;
 
 /* Derived props shared by the page header, the workspace frame and the task content. */
-export function deriveAgentsPageView(state: AgentsPageState, actions: AgentsPageActions) {
-  const {
-    agents,
-    conversations,
-    profile,
-    activeConversationId,
-    guard,
-    settingsModalOpen,
-    identityRef,
-  } = state;
-  // Agents keep working in their own chats while the person switches between them
+export function deriveAgentsPageView(state: AgentsPageState) {
+  // Agents keep working in their own chats while the person moves between them;
   // only an unsaved change holds the page.
-  const disabled = guard.busy;
-  const showWorkspace = Boolean(profile);
-  const switcher = {
-    agents,
-    conversations,
-    selectedAgent: profile,
-    conversationId: activeConversationId,
-    disabled,
-    restoreTriggerFocus: !guard.pending && !settingsModalOpen,
-    triggerRef: identityRef,
-    onSelect: actions.select,
-    onSettings: (agentId: string) => {
-      if (agentId !== profile?.id) actions.select(agentId);
-      actions.openSettingsModal("settings");
-    },
-  };
-  return { disabled, showWorkspace, switcher };
+  const disabled = state.guard.busy;
+  const showWorkspace = Boolean(state.profile);
+  return { disabled, showWorkspace };
 }
 
 export type AgentsPageView = ReturnType<typeof deriveAgentsPageView>;

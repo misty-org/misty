@@ -19,11 +19,9 @@ use crate::browser::app_windows;
 mod account;
 mod commands;
 mod records;
-mod seed;
 mod tabs;
 pub(crate) use account::*;
 pub use records::*;
-pub(crate) use seed::seed_first_profile;
 pub use tabs::*;
 
 #[cfg(test)]
@@ -153,59 +151,6 @@ pub(crate) fn lock_database(path: &std::path::Path) -> Result<fs::File, String> 
     file.try_lock()
         .map_err(|_| "Another Misty process owns this computer's local storage")?;
     Ok(file)
-}
-
-/// A profile's records. `None` when this computer's key storage can't be read right now.
-pub fn profile_records(profile: &str) -> Option<ProfileRecords> {
-    Some(ProfileRecords {
-        profile: profile.to_owned(),
-        store: local_store().ok()?,
-    })
-}
-
-/// The records of the profile a window belongs to.
-pub fn window_records(label: &str) -> Option<ProfileRecords> {
-    profile_records(&app_windows::profile_for_window(label)?)
-}
-
-/// The records of the profile that opens its pages in `store_key`, as
-/// `site_settings::permissions::store_key` names a store: downloads and site permissions file
-/// things under that key. A store no profile of this account uses has none.
-pub fn store_records(store_key: &str) -> Option<ProfileRecords> {
-    let profile = app_windows::listed_profiles().into_iter().find(|profile| {
-        app_windows::store_for_profile(&profile.id)
-            .ok()
-            .and_then(|store| {
-                crate::browser::site_settings::permissions::store_key(store.as_deref()).ok()
-            })
-            .is_some_and(|key| key == store_key)
-    })?;
-    profile_records(&profile.id)
-}
-
-/// Erases everything a deleted profile kept.
-pub async fn remove_profile(profile: &str) {
-    let profile = profile.to_owned();
-    let _ = tokio::task::spawn_blocking(move || {
-        if let Ok(store) = local_store() {
-            if let Ok(mut store) = store.lock() {
-                let _ = store.remove_profile(&profile);
-            }
-        }
-    })
-    .await;
-}
-
-/// This install's stable id among the account's signed-in sessions.
-pub fn session_id() -> Option<String> {
-    let store = local_store().ok()?;
-    let store = store.lock().ok()?;
-    if let Ok(Some(id)) = store.meta("session.id") {
-        return Some(id);
-    }
-    let id = uuid::Uuid::new_v4().to_string();
-    store.set_meta("session.id", &id).ok()?;
-    Some(id)
 }
 
 /// A browser view's lease on its store: the account can't change, and the store can't be erased,

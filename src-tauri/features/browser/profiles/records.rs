@@ -75,8 +75,3 @@ impl ProfileRecords {
         Ok(())
     }
 }
-
-/// A stable record id for text that may not be one (an origin, a download id).
-pub fn hashed_id(prefix: &str, value: &str) -> String {
-    format!("{prefix}:{}", &hashed(value)[..32])
-}

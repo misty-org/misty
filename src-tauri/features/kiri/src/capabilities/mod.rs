@@ -7,7 +7,6 @@ use crate::{Caller, Host, KiriError};
 use serde_json::Value;
 use std::{future::Future, pin::Pin, sync::Arc};
 
-pub mod media;
 pub mod webauthn;
 
 pub type Reply = Pin<Box<dyn Future<Output = Result<Value, KiriError>> + Send>>;
@@ -30,11 +29,6 @@ pub trait Capability: Send + Sync + 'static {
         true
     }
 
-    /// Whether the host must have granted the caller's origin (`Host::allows`).
-    fn needs_permission(&self) -> bool {
-        false
-    }
-
     fn call(&self, call: Call) -> Reply;
 }
 
@@ -45,7 +39,7 @@ pub fn ready(result: Result<Value, KiriError>) -> Reply {
 
 pub(crate) fn builtin() -> Vec<Box<dyn Capability>> {
     #[allow(unused_mut)]
-    let mut capabilities: Vec<Box<dyn Capability>> = vec![Box::new(media::Media)];
+    let mut capabilities: Vec<Box<dyn Capability>> = Vec::new();
     // WebView2 reaches Windows Hello itself; WKWebView needs Kiri for any site.
     #[cfg(all(target_os = "macos", feature = "tauri"))]
     if webauthn::macos::available() {
@@ -59,9 +53,7 @@ pub(crate) fn builtin() -> Vec<Box<dyn Capability>> {
 /// Page-side shims for this platform, in the order they are installed.
 pub(crate) fn shims() -> Vec<&'static str> {
     #[allow(unused_mut)]
-    let mut shims = vec![media::SHIM];
-    #[cfg(windows)]
-    shims.push(media::CAPTURE_SHIM);
+    let mut shims = Vec::new();
     #[cfg(all(target_os = "macos", feature = "tauri"))]
     if webauthn::macos::available() {
         shims.push(webauthn::SHIM);

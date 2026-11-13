@@ -1,14 +1,9 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong), src-tauri/src/engine/codex.rs.
-use super::{
-    command_for_binary, images, push_session_id, BuiltCommand, Engine, EngineEvent, SendRequest,
-    Transport,
-};
+use super::{command_for_binary, BuiltCommand, Engine, SendRequest};
 use serde_json::Value;
 
-/// Codex child transport: `codex exec --json` (verified against codex CLI
-/// live). A local workspace sends through the app-server instead — only that
-/// protocol carries the model's question tool (`item/tool/requestUserInput`);
-/// `codex exec` answers every question itself.
+/// Codex runs over its app-server (`codex_app.rs`): only that protocol carries the model's
+/// question tool (`item/tool/requestUserInput`).
 pub struct CodexEngine;
 
 /// TOML basic-string literal for a `-c key=<value>` override. codex parses
@@ -51,9 +46,7 @@ fn apply_misty_mcp(cmd: &mut tokio::process::Command, req: &SendRequest) {
     let mut held: std::collections::HashMap<String, String> = cmd
         .as_std()
         .get_envs()
-        .filter_map(|(key, value)| {
-            Some((key.to_str()?.to_string(), value?.to_str()?.to_string()))
-        })
+        .filter_map(|(key, value)| Some((key.to_str()?.to_string(), value?.to_str()?.to_string())))
         .collect();
     for (name, server) in servers {
         if !bare_key(name) {
@@ -110,10 +103,16 @@ fn apply_misty_mcp(cmd: &mut tokio::process::Command, req: &SendRequest) {
             if !bare_key(header) {
                 continue;
             }
-            match value.strip_prefix("Bearer ").filter(|_| header.eq_ignore_ascii_case("authorization")) {
+            match value
+                .strip_prefix("Bearer ")
+                .filter(|_| header.eq_ignore_ascii_case("authorization"))
+            {
                 Some(token) => {
                     let variable = format!("MISTY_MCP_TOKEN_{tag}");
-                    args.push(format!("{prefix}.bearer_token_env_var={}", toml_string(&variable)));
+                    args.push(format!(
+                        "{prefix}.bearer_token_env_var={}",
+                        toml_string(&variable)
+                    ));
                     env.push((variable, token.to_string()));
                 }
                 None => {
@@ -141,9 +140,27 @@ fn apply_misty_mcp(cmd: &mut tokio::process::Command, req: &SendRequest) {
 /// The variables Codex hands every stdio server from its own environment.
 fn codex_own(key: &str) -> bool {
     const OWN: &[&str] = &[
-        "HOME", "LOGNAME", "PATH", "SHELL", "USER", "LANG", "LC_ALL", "TERM", "TMPDIR", "TZ",
-        "__CF_USER_TEXT_ENCODING", "APPDATA", "COMSPEC", "PATHEXT", "SYSTEMROOT", "SYSTEMDRIVE",
-        "TEMP", "TMP", "USERNAME", "USERPROFILE", "CODEX_HOME",
+        "HOME",
+        "LOGNAME",
+        "PATH",
+        "SHELL",
+        "USER",
+        "LANG",
+        "LC_ALL",
+        "TERM",
+        "TMPDIR",
+        "TZ",
+        "__CF_USER_TEXT_ENCODING",
+        "APPDATA",
+        "COMSPEC",
+        "PATHEXT",
+        "SYSTEMROOT",
+        "SYSTEMDRIVE",
+        "TEMP",
+        "TMP",
+        "USERNAME",
+        "USERPROFILE",
+        "CODEX_HOME",
     ];
     OWN.iter().any(|own| own.eq_ignore_ascii_case(key))
 }
@@ -345,16 +362,6 @@ impl Engine for CodexEngine {
         true
     }
 
-    /// A remote workspace keeps the CLI child path: the app-server driver
-    /// spawns the CLI locally and has no ssh path into the distro.
-    fn transport_for(&self, wsl: bool) -> Transport {
-        if wsl {
-            Transport::Child
-        } else {
-            Transport::Own
-        }
-    }
-
     /// The command the driver spawns. Model/effort/provider flags land on it
     /// from [`apply_channel`] like any child; only the app-server's own
     /// switches live here (the question tool on, skill MCP auto-install off).
@@ -400,7 +407,7 @@ impl Engine for CodexEngine {
     }
 
     fn supports_images(&self) -> bool {
-        true // -i/--image FILE
+        true
     }
     fn supports_mcp(&self) -> bool {
         true
@@ -414,8 +421,7 @@ impl Engine for CodexEngine {
 
     /// Human plan review follows the next_turn lifecycle (turn/start collaborationMode.plan →
     /// the complete plan item → on approval, one default execution turn), carried out by the
-    /// local app-server transport (codex_app.rs); the exec/WSL fallback has no such protocol and
-    /// refuses in build_command.
+    /// app-server transport (codex_app.rs).
     fn plan_approval(&self) -> super::plan_review::PlanApproval {
         super::plan_review::PlanApproval::Typed {
             review_kind: super::plan_review::PlanReviewKind::NextTurn,
@@ -423,286 +429,6 @@ impl Engine for CodexEngine {
             limitations: "every field involved is EXPERIMENTAL; the client arbitrates the approval point; after a restart the plan item must be fetched again and compared",
         }
     }
-
-    fn build_command(&self, req: &SendRequest, bin: &str) -> Result<BuiltCommand, String> {
-        if super::codex_read_only::requested(req) {
-            return Err("Codex read-only planning requires the local app-server; exec/WSL fallback is forbidden".into());
-        }
-        // Human plan approval exists only on the app-server transport
-        // (collaborationMode turns); the exec/WSL fallback has no such
-        // protocol, so an explicit plan request fails closed here instead of
-        // silently degrading to an auto run.
-        if req.permission.as_deref() == Some("plan") {
-            return Err("Codex plan approval runs on the local app-server transport; the exec/WSL fallback cannot honor it".into());
-        }
-        let mut cmd = command_for_binary(bin);
-        cmd.arg("exec");
-        let mut preassigned = None;
-        if let Some(session_id) = req.session_id.as_deref() {
-            // `codex exec resume [OPTIONS] [SESSION_ID] [PROMPT]`
-            cmd.arg("resume");
-            cmd.arg("--json");
-            cmd.arg(session_id);
-            preassigned = Some(session_id.to_string());
-        } else {
-            cmd.arg("--json");
-        }
-        cmd.arg("--skip-git-repo-check");
-        // exec auto-declines approval prompts, so "manual" is enforced by the
-        // sandbox instead: read-only means nothing can change without the
-        // user re-sending in a writable mode. codex exec has no plan mode.
-        // Sandbox goes through -c sandbox_mode (not --sandbox): `exec resume`
-        // dropped the --sandbox flag, while -c works on both subcommands.
-        match self.resolve_permission(req.permission.as_deref()) {
-            "bypass" => {
-                cmd.arg("--dangerously-bypass-approvals-and-sandbox");
-            }
-            "manual" => {
-                cmd.arg("-c");
-                cmd.arg("sandbox_mode=\"read-only\"");
-            }
-            _ => {
-                cmd.arg("-c");
-                cmd.arg("sandbox_mode=\"workspace-write\"");
-            }
-        }
-        if let Some(model) = req.model.as_deref() {
-            cmd.arg("-m");
-            cmd.arg(model);
-        }
-        // Reasoning effort maps onto codex's config key (TOML value, so the
-        // string needs quotes). Pass the level through as-is: current models
-        // accept low…ultra (catalog-ordered), including max.
-        if let Some(effort) = req.effort.as_deref() {
-            cmd.arg("-c");
-            cmd.arg(format!("model_reasoning_effort=\"{effort}\""));
-        }
-        // Fast mode is Codex's service_tier=priority (same id the desktop app
-        // uses). Explicit default opts out; None leaves the CLI's config alone.
-        if let Some(tier) = req.service_tier.as_deref() {
-            if !matches!(tier, "default" | "priority") {
-                return Err("Invalid Codex service tier".to_string());
-            }
-            cmd.arg("-c");
-            cmd.arg(format!("service_tier=\"{tier}\""));
-        }
-        for raw in &req.images {
-            if let Some(path) = images::absolutize_image_path(raw, &req.workspace) {
-                cmd.arg("-i");
-                cmd.arg(path);
-            }
-        }
-        // Prompt travels through stdin (`-`), never argv: on Windows the codex
-        // shim is a `.cmd` batch file and cmd.exe cuts a multiline argument at
-        // the first newline — every line after the first was dropped (or worse,
-        // executed as a command). stdin also dodges cmd's `%VAR%` expansion of
-        // quoted args. `codex exec [resume] -` reads the prompt from stdin.
-        cmd.arg("-");
-        Ok(BuiltCommand {
-            command: cmd,
-            stdin_payload: Some(req.prompt.clone()),
-            keep_stdin_open: false,
-            cleanup_files: Vec::new(),
-            preassigned_session_id: preassigned,
-        })
-    }
-
-    fn parse_line(&self, line: &str, out: &mut Vec<EngineEvent>) {
-        let Ok(value) = serde_json::from_str::<Value>(line) else {
-            return;
-        };
-        let event_type = value.get("type").and_then(Value::as_str).unwrap_or("");
-        match event_type {
-            "thread.started" => {
-                push_session_id(&value, "thread_id", out);
-            }
-            "item.completed" => {
-                let Some(item) = value.get("item") else {
-                    return;
-                };
-                match item.get("type").and_then(Value::as_str) {
-                    Some("agent_message") => {
-                        if let Some(text) = item.get("text").and_then(Value::as_str) {
-                            if !text.is_empty() {
-                                out.push(super::assistant_message(text.to_string()));
-                            }
-                        }
-                    }
-                    Some("reasoning") => {
-                        if let Some(text) = item.get("text").and_then(Value::as_str) {
-                            if !text.is_empty() {
-                                out.push(EngineEvent::Thinking(text.to_string()));
-                            }
-                        }
-                    }
-                    // codex exec has no delta events; tool calls surface as
-                    // command_execution items.
-                    Some("command_execution") => {
-                        let name = item
-                            .get("command")
-                            .and_then(Value::as_str)
-                            .unwrap_or("tool");
-                        // The command string itself is the payload; wrap it so
-                        // the timeline can expand a dedicated args panel.
-                        let command = name.to_string();
-                        out.push(super::tool_call_message(
-                            name.chars().take(120).collect::<String>(),
-                            Some(&Value::String(command)),
-                        ));
-                    }
-                    _ => {}
-                }
-            }
-            "turn.completed" => {
-                let usage = value
-                    .get("usage")
-                    .cloned()
-                    .map(|usage| attach_context_window(usage, &value));
-                out.push(EngineEvent::Done {
-                    session_id: None,
-                    usage,
-                });
-            }
-            "turn.failed" => {
-                out.push(EngineEvent::Error(error_message(&value)));
-            }
-            // Non-terminal: codex emits `error` for every retry it is about
-            // to make ("Reconnecting... 1/5 (...)") and once more with the
-            // final message just before `turn.failed`. Verified against a
-            // live run: both a retryable stream drop and a terminal 401
-            // produce retries, one bare error line, then turn.failed. Only
-            // turn.failed ends the turn — treating `error` as terminal
-            // settled the UI and killed the CLI on the first reconnect, so
-            // the turn died at 1/5 instead of continuing.
-            "error" => {
-                // codex announces every retry as `Reconnecting... N/M (...)`:
-                // that line is live progress for the run status strip, not an
-                // error. The bare error right before `turn.failed` (or any
-                // other line) stays a non-terminal notice — only turn.failed
-                // ends the turn.
-                match parse_reconnect_notice(&value) {
-                    Some((attempt, max, message)) => out.push(EngineEvent::Retry {
-                        attempt,
-                        max,
-                        message,
-                    }),
-                    None => out.push(EngineEvent::Warn(error_message(&value))),
-                }
-            }
-            _ => {}
-        }
-    }
-}
-
-fn attach_context_window(mut usage: Value, source: &Value) -> Value {
-    if usage.get("model_context_window").is_none() {
-        if let Some(window) = source.get("model_context_window").or_else(|| {
-            source
-                .get("info")
-                .and_then(|i| i.get("model_context_window"))
-        }) {
-            if let Some(obj) = usage.as_object_mut() {
-                obj.insert("model_context_window".to_string(), window.clone());
-            }
-        }
-    }
-    usage
-}
-
-/// codex's reconnect notice: `Reconnecting... 3/5 (stream disconnected …)`.
-/// Returns `(attempt, max, reason)` so the run status line can show
-/// "Retrying 3 of 5"; `None` for every other error line.
-fn parse_reconnect_notice(value: &Value) -> Option<(u64, u64, String)> {
-    let text = error_message(value);
-    let rest = text.strip_prefix("Reconnecting...")?.trim_start();
-    let (counts, reason) = match rest.split_once('(') {
-        Some((counts, reason)) => (counts.trim(), reason.trim_end_matches(')').trim()),
-        None => (rest.trim(), ""),
-    };
-    let (attempt, max) = counts.split_once('/')?;
-    Some((
-        attempt.trim().parse().ok()?,
-        max.trim().parse().ok()?,
-        reason.to_string(),
-    ))
-}
-
-/// Message text of a codex error payload: `error.message` when nested,
-/// `error` or `message` when flat, with a generic fallback.
-fn error_message(value: &Value) -> String {
-    value
-        .get("error")
-        .and_then(|e| e.get("message").or(Some(e)).and_then(Value::as_str))
-        .or_else(|| value.get("message").and_then(Value::as_str))
-        .unwrap_or("codex turn failed")
-        .to_string()
-}
-
-const UNSUPPORTED_EXEC_MESSAGE: &str = "This Codex CLI is too old for `codex exec --json`, which Misty uses to run it. Update it and try again: npm i -g @openai/codex@latest";
-
-/// Probe outcomes cached per (bin, resuming) pair: re-probing every send
-/// would add a full CLI startup (hundreds of ms through a Windows .cmd
-/// shim) to each message. Only successes are cached — a cached failure
-/// would keep blocking a user who already upgraded until an app restart.
-static PREFLIGHT_CACHE: std::sync::LazyLock<
-    std::sync::Mutex<std::collections::HashMap<String, ()>>,
-> = std::sync::LazyLock::new(Default::default);
-
-/// Fail fast when the resolved codex binary predates the exec transport
-/// (`codex exec --json`, plus `exec resume` for continuing sessions): such
-/// CLIs exit 1 before emitting any event, which surfaced as a bare
-/// "codex exited with status exit code: 1" banner. Probe flakes (spawn
-/// failure, timeout, non-zero help exit) never block the send — the real
-/// spawn surfaces its own error then.
-pub(crate) async fn check_exec_support(bin: &str, resuming: bool) -> Result<(), String> {
-    let key = format!("{bin}\u{0}{resuming}");
-    if let Ok(cache) = PREFLIGHT_CACHE.lock() {
-        if cache.contains_key(&key) {
-            return Ok(());
-        }
-    }
-    let result = match run_help_probe(bin).await {
-        Some(help) if !exec_help_supported(&help, resuming) => {
-            Err(UNSUPPORTED_EXEC_MESSAGE.to_string())
-        }
-        _ => Ok(()),
-    };
-    if result.is_ok() {
-        if let Ok(mut cache) = PREFLIGHT_CACHE.lock() {
-            cache.insert(key, ());
-        }
-    }
-    result
-}
-
-/// `exec --help` output (stdout+stderr), or None on spawn failure/timeout/
-/// non-zero exit. Verified live: current CLIs render `--json` under Options
-/// and `resume` under Commands.
-async fn run_help_probe(bin: &str) -> Option<String> {
-    let mut cmd = command_for_binary(bin);
-    cmd.args(["exec", "--help"]);
-    cmd.stdin(std::process::Stdio::null());
-    cmd.stdout(std::process::Stdio::piped());
-    cmd.stderr(std::process::Stdio::piped());
-    cmd.kill_on_drop(true);
-    #[cfg(windows)]
-    super::hide_console(&mut cmd);
-    let output = tokio::time::timeout(std::time::Duration::from_secs(8), cmd.output())
-        .await
-        .ok()?
-        .ok()?;
-    if !output.status.success() {
-        return None;
-    }
-    let mut text = String::from_utf8_lossy(&output.stdout).into_owned();
-    text.push_str(&String::from_utf8_lossy(&output.stderr));
-    Some(text)
-}
-
-/// `--json` is the hard requirement of the exec transport; continuing a
-/// session additionally needs the `resume` subcommand.
-fn exec_help_supported(help: &str, resuming: bool) -> bool {
-    help.contains("--json") && (!resuming || help.contains("resume"))
 }
 
 #[cfg(test)]

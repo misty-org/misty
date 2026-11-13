@@ -8,9 +8,9 @@ use super::teach::{Lesson, LessonSummary};
 
 pub(super) use super::request_parts::MAX_NOTES_CHARS;
 pub(crate) use super::request_parts::{
-    AgentIdentity, ContextReference, CurrentTab, DeviceContext, DisplayCapture, GoalState, HistoryNotes, HistoryTurn, MediaContext, PlanPayload, PlanState, PlanStep, ResolvedContext, Selection,
+    AgentIdentity, ContextReference, CurrentTab, DeviceContext, DisplayCapture, HistoryNotes, HistoryTurn, PlanPayload, PlanState, PlanStep, ResolvedContext, Selection,
 };
-use super::request_parts::{cleaned_media, cleaned_notes, cleaned_turn, has_usable_control, RawCapture, RawHistory};
+use super::request_parts::{cleaned_notes, cleaned_turn, has_usable_control, RawCapture, RawHistory};
 
 const MAX_HISTORY_TURNS: usize = 200;
 
@@ -18,8 +18,8 @@ const MAX_HISTORY_TURNS: usize = 200;
 ///
 /// The app's request carries most of it. The chat's own state came from the server's database and now
 /// lives on the computer: `collaboration` in the JSON is what `collaborationOf` gives the chat
-/// (`src/features/agents/localTools/runState/conversationState.ts`), and its `plan`, `goal` and `mode` are
-/// read here. `agent`, `resolved_context`, `prior_write_receipts` and `conversation_title` are keys of
+/// (`src/features/agents/localTools/runState/conversationState.ts`), and its `plan` and `mode` are
+/// read here; a `goal` an older build saved is ignored. `agent`, `resolved_context`, `prior_write_receipts` and `conversation_title` are keys of
 /// the same names.
 #[derive(Clone, Debug, Default)]
 pub(crate) struct RunRequest {
@@ -42,14 +42,12 @@ pub(crate) struct RunRequest {
     pub(crate) current_tab: Option<CurrentTab>,
     pub(crate) display_captures: Vec<DisplayCapture>,
     pub(crate) device_contexts: Vec<DeviceContext>,
-    pub(crate) media_context: Option<MediaContext>,
     pub(crate) lesson: Option<Lesson>,
     pub(crate) lesson_index: Vec<LessonSummary>,
     pub(crate) history_turns: Vec<HistoryTurn>,
     pub(crate) history_notes: Option<HistoryNotes>,
     pub(crate) agent: AgentIdentity,
     pub(crate) plan: Option<PlanState>,
-    pub(crate) goal: Option<GoalState>,
     pub(crate) resolved_context: Vec<ResolvedContext>,
     pub(crate) prior_write_receipts: String,
     /// `None` is a chat whose title is still its placeholder.
@@ -107,14 +105,12 @@ impl RunRequest {
             current_tab: parsed(body, "current_tab").and_then(cleaned_tab),
             display_captures: captures.iter().map(|capture| DisplayCapture { screen: capture.screen.clone(), has_controls: has_usable_control(capture) }).collect(),
             device_contexts: parsed(body, "device_contexts").unwrap_or_default(),
-            media_context: if companion { parsed(body, "media_context").and_then(cleaned_media) } else { None },
             lesson: if teach { parsed(body, "lesson").and_then(Lesson::cleaned) } else { None },
             lesson_index: if teach { LessonSummary::cleaned_list(parsed(body, "lesson_index").unwrap_or_default()) } else { Vec::new() },
             history_turns: raw_turns.into_iter().skip(skip).map(cleaned_turn).collect(),
             history_notes: parsed(body, "history_notes").and_then(cleaned_notes),
             agent: parsed(body, "agent").unwrap_or_default(),
             plan: parsed(saved, "plan"),
-            goal: parsed(saved, "goal"),
             resolved_context: parsed(body, "resolved_context").unwrap_or_default(),
             prior_write_receipts: body.get("prior_write_receipts").and_then(Value::as_str).unwrap_or("").to_owned(),
             conversation_title: parsed(body, "conversation_title"),
@@ -148,10 +144,6 @@ impl RunRequest {
 
     pub(super) fn approved_plan(&self) -> Option<&PlanState> {
         self.plan.as_ref().filter(|plan| !self.planning() && self.has_conversation() && plan.state == "approved")
-    }
-
-    pub(super) fn pursued_goal(&self) -> Option<&GoalState> {
-        self.goal.as_ref().filter(|goal| !self.planning() && self.has_conversation() && goal.status == "pursuing")
     }
 
     pub(super) fn desktop_control(&self) -> bool {

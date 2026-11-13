@@ -2,12 +2,7 @@ import { AppWindow } from "lucide-react";
 import type { ScreenRequest } from "../../runs/invocations/invocationTypes";
 import { Button } from "@/shared/ui";
 import { StatusRow, StatusTable, type StatusState } from "../../progress/StatusTable";
-import {
-  declineScreenRequest,
-  openScreenAndContinue,
-  screenChoice,
-  type ScreenChoice,
-} from "./screenRequests";
+import { declineScreenRequest, openScreenAndContinue } from "./screenRequests";
 import { useMistyStore } from "../state/useMistyStore";
 
 function status(request: ScreenRequest) {
@@ -34,7 +29,7 @@ function status(request: ScreenRequest) {
   }
 }
 
-/** Shows a screen the agent asked for; with "Ask each time", lets the user pick where. */
+/** Shows a screen the agent asked for; with "Ask each time", asks before opening it. */
 export function ScreenRequestCard({
   messageId,
   request,
@@ -53,14 +48,13 @@ export function ScreenRequestCard({
     request.state === "pending" && request.kind === "open" && request.location === "ask";
   // A request restored after a reload no longer continues on its own.
   const stalled = request.state === "pending" && !asking && !working;
-  const choose = (choice: ScreenChoice) => {
+  const choose = () => {
     if (conversationId)
       void openScreenAndContinue(
         useMistyStore.setState,
         useMistyStore.getState,
         conversationId,
         messageId,
-        choice,
       );
   };
   const row: StatusState = asking
@@ -78,12 +72,12 @@ export function ScreenRequestCard({
     stalled || asking ? (
       <>
         {stalled ? (
-          <Button variant="primary" onClick={() => choose(screenChoice(request.location))}>
+          <Button variant="primary" onClick={choose}>
             Continue
           </Button>
         ) : (
           <>
-            <Button variant="primary" disabled={working} onClick={() => choose("window")}>
+            <Button variant="primary" disabled={working} onClick={choose}>
               <AppWindow className="size-3.5" /> New tab
             </Button>
             <Button

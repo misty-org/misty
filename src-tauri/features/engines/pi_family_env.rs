@@ -9,8 +9,7 @@
 //! found values → probe the missing ones by name.
 //! Not found, failures and timeouts aren't cached; found values are cached for at most 5
 //! seconds, so a changed key needs no restart.
-//! Values go only into this child process and are never logged. WSL is skipped by the caller;
-//! this computer's environment doesn't cross ssh.
+//! Values go only into this child process and are never logged.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;

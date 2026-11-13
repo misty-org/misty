@@ -22,8 +22,7 @@ fn parses_response_notification_and_agent_request() {
         _ => panic!("expected notification"),
     }
     // method + id = the agent is asking US (permission, fs).
-    let request =
-        json!({"jsonrpc":"2.0","id":9,"method":"session/request_permission","params":{}});
+    let request = json!({"jsonrpc":"2.0","id":9,"method":"session/request_permission","params":{}});
     match parse_acp_line(&request) {
         AcpLine::AgentRequest { id, method, .. } => {
             assert_eq!(id, json!(9));
@@ -42,8 +41,7 @@ fn parses_response_notification_and_agent_request() {
         parse_acp_line(&json!({"jsonrpc":"2.0"})),
         AcpLine::Other
     ));
-    let error =
-        json!({"jsonrpc":"2.0","id":2,"error":{"code":-32601,"message":"no such method"}});
+    let error = json!({"jsonrpc":"2.0","id":2,"error":{"code":-32601,"message":"no such method"}});
     match parse_acp_line(&error) {
         AcpLine::Response {
             error: Some(error), ..
@@ -295,7 +293,10 @@ async fn stopping_a_hung_prompt_gives_up_after_the_settle_window() {
     let mut command = Command::new("sh");
     // The shell keeps stdout open (a hung CLI, not an exited one) while
     // cat records what the driver sends.
-    command.args(["-c", &format!("cat > '{}'; exec sleep 30", received.display())]);
+    command.args([
+        "-c",
+        &format!("cat > '{}'; exec sleep 30", received.display()),
+    ]);
     let mut spawned = spawn_piped_acp(&mut command, "sh", &directory).unwrap();
     let killed = AtomicBool::new(false);
     let mut on_update = |_: &Value| {};

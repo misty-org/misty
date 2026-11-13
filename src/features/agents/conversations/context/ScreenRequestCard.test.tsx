@@ -4,7 +4,6 @@ const mocks = vi.hoisted(() => ({ open: vi.fn(), decline: vi.fn() }));
 vi.mock("./screenRequests", () => ({
   openScreenAndContinue: mocks.open,
   declineScreenRequest: mocks.decline,
-  screenChoice: (location: string) => (location === "current" ? "current" : "window"),
 }));
 import { ScreenRequestCard } from "./ScreenRequestCard";
 import { useMistyStore } from "../state/useMistyStore";
@@ -39,7 +38,6 @@ it("asks where to work only when the account asks each time", () => {
     useMistyStore.getState,
     "chat",
     "reply",
-    "window",
   );
   fireEvent.click(screen.getByRole("button", { name: "Not now" }));
   expect(mocks.decline).toHaveBeenCalled();

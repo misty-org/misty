@@ -77,19 +77,6 @@ export function toFileLink(path: string) {
   return `${FILE_LINK_PROTOCOL}${encodeURIComponent(path)}`;
 }
 
-export function isFileLinkUrl(url: string) {
-  return url.startsWith(FILE_LINK_PROTOCOL);
-}
-
-export function decodeFileLink(url: string) {
-  const raw = url.slice(FILE_LINK_PROTOCOL.length);
-  try {
-    return decodeURIComponent(raw);
-  } catch {
-    return raw;
-  }
-}
-
 /**
  * Resolve a markdown-sourced path to an absolute one. Relative paths anchor
  * at the session's workspace; slash-prefixed Windows drive paths are normalized.

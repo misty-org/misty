@@ -2,7 +2,8 @@ import { LayoutPanelLeft } from "lucide-react";
 import { useLayoutEditor } from "@/features/app-windows";
 import { IconButton } from "@/shared/ui";
 
-/** Turns layout mode on or off: split and join the window's pages over the live page. */
+/** Opens the layout picker, which splits and joins the current tab's pages. It sits at the far end
+ * of the tab row. */
 export function LayoutButton() {
   const active = useLayoutEditor((state) => state.active);
   return (

@@ -46,28 +46,29 @@ function TabTitle(props: { tab: TerminalTab; index: number; onRename(title: stri
 }
 
 /**
- * The folder's terminals: a strip of tabs and one shell per tab, each running in the folder.
- * Shells outlive the panel: closing it, or switching tabs, leaves every shell running, and its
- * output is there when the tab shows again. A shell ends when its tab is closed. Double-click a
- * tab to rename it.
+ * The chat's terminals: a strip of tabs and one shell per tab. Each chat has its own, so two
+ * chats side by side never share a shell. A new tab runs in the chat's folder, and a tab keeps
+ * the folder it was opened in. Shells outlive the panel: closing it, or switching tabs or chats,
+ * leaves every shell running, and its output is there when the tab shows again. A shell ends
+ * when its tab is closed. Double-click a tab to rename it.
  */
-export default function TerminalPanel({ folder }: { folder: string }) {
-  const tabs = useTerminalStore((state) => state.tabsByFolder[folder] ?? noTabs);
-  const activeId = useTerminalStore((state) => state.activeByFolder[folder]);
+export default function TerminalPanel({ chat, folder }: { chat: string; folder: string }) {
+  const tabs = useTerminalStore((state) => state.tabsByChat[chat] ?? noTabs);
+  const activeId = useTerminalStore((state) => state.activeByChat[chat]);
   const newTab = useTerminalStore((state) => state.newTab);
   const selectTab = useTerminalStore((state) => state.selectTab);
   const closeTab = useTerminalStore((state) => state.closeTab);
   const renameTab = useTerminalStore((state) => state.renameTab);
 
-  // The panel always shows a shell: opening it on a folder with no tabs starts the first one.
+  // The panel always shows a shell: opening it on a chat with no tabs starts the first one.
   useEffect(() => {
-    if (!tabs.length) newTab(folder);
-  }, [tabs.length, folder, newTab]);
+    if (!tabs.length) newTab(chat, folder);
+  }, [tabs.length, chat, folder, newTab]);
 
   const active = tabs.find((tab) => tab.id === activeId) ?? tabs[tabs.length - 1];
   const closeActive = useCallback(() => {
-    if (active) closeTab(folder, active.id);
-  }, [active, closeTab, folder]);
+    if (active) closeTab(chat, active.id);
+  }, [active, closeTab, chat]);
 
   return (
     <div className="terminal-panel">
@@ -81,31 +82,31 @@ export default function TerminalPanel({ folder }: { folder: string }) {
                 aria-selected={selected}
                 tabIndex={selected ? 0 : -1}
                 className="terminal-tab-select"
-                onClick={() => selectTab(folder, tab.id)}
+                onClick={() => selectTab(chat, tab.id)}
               >
                 <TabTitle
                   tab={tab}
                   index={index}
-                  onRename={(title) => renameTab(folder, tab.id, title)}
+                  onRename={(title) => renameTab(chat, tab.id, title)}
                 />
               </Pressable>
               <IconButton
                 label="Close terminal"
                 size="sm"
                 className="terminal-tab-close"
-                onClick={() => closeTab(folder, tab.id)}
+                onClick={() => closeTab(chat, tab.id)}
               >
                 <X />
               </IconButton>
             </div>
           );
         })}
-        <IconButton label="New terminal" size="sm" onClick={() => newTab(folder)}>
+        <IconButton label="New terminal" size="sm" onClick={() => newTab(chat, folder)}>
           <Plus />
         </IconButton>
       </div>
       {active ? (
-        <TerminalView key={active.id} id={active.id} cwd={folder} onCloseTab={closeActive} />
+        <TerminalView key={active.id} id={active.id} cwd={active.folder} onCloseTab={closeActive} />
       ) : (
         <div className="terminal-view" />
       )}

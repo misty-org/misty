@@ -2,18 +2,17 @@ import { useState } from "react";
 import {
   AudioLines,
   CircleHelp,
+  Clapperboard,
   FileText,
   GraduationCap,
+  ImageIcon,
   Layers,
   Network,
   PanelRightClose,
   PanelRightOpen,
   Presentation,
   RotateCcw,
-  Sparkles,
   Table2,
-  Clapperboard,
-  ImageIcon,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -302,7 +301,7 @@ export function StudioPanel({
           })}
           {!made.length && !making.length ? (
             <div className="tutor-pane-empty">
-              <Sparkles size={22} aria-hidden="true" />
+              <Layers size={22} aria-hidden="true" />
               <p>What you create is saved here.</p>
             </div>
           ) : null}

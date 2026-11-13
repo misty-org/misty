@@ -19,8 +19,6 @@ type GlobalAiCitationKind =
   | "agent"
   | "action";
 
-export type UnifiedMistyPanel = "closed" | "answer" | "agent";
-
 export interface GlobalAiContextRef {
   id: string;
   kind: string;

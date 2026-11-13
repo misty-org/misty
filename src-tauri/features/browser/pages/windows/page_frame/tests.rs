@@ -2,7 +2,10 @@ use super::*;
 use windows_sys::Win32::{
     Foundation::POINT,
     Graphics::Gdi::PtInRegion,
-    UI::WindowsAndMessaging::{WindowFromPoint, WS_EX_TOPMOST, WS_POPUP, WS_VISIBLE},
+    UI::WindowsAndMessaging::{
+        DestroyWindow, SetLayeredWindowAttributes, WindowFromPoint, LWA_ALPHA, WS_EX_TOPMOST,
+        WS_POPUP, WS_VISIBLE,
+    },
 };
 
 #[test]
@@ -36,7 +39,7 @@ fn corners_cut_only_outside_their_arcs() {
 }
 
 #[test]
-fn the_dim_lets_clicks_through_to_the_page() {
+fn an_overlay_lets_clicks_through_to_the_page() {
     let class: Vec<u16> = "STATIC".encode_utf16().chain([0]).collect();
     // SAFETY: windows created, used and destroyed on this thread.
     unsafe {
@@ -77,7 +80,7 @@ fn the_dim_lets_clicks_through_to_the_page() {
         ShowWindow(overlay, SW_SHOWNA);
         let hit = WindowFromPoint(POINT { x: 140, y: 120 });
         DestroyWindow(top);
-        assert_ne!(hit, overlay, "the dim must not take the click");
+        assert_ne!(hit, overlay, "the overlay must not take the click");
         assert_eq!(hit, page);
     }
 }

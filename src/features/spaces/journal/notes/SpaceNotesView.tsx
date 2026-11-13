@@ -131,7 +131,7 @@ export function SpaceNotesView(
     [store.notes, store.query, props.spaceId],
   );
   const selectedNote = store.notes.find((note) => note.id === store.selectedNoteId);
-  useWorkspaceViewTitle(props.workspaceTabId, selectedNote?.title?.trim() || "Notes");
+  useWorkspaceViewTitle(props.workspaceTabId, selectedNote?.title?.trim() || "Docs");
   const rememberNoteView = useCallback(
     (nextView: "doc" | "list", note?: UnifiedNote) => {
       const next = new URLSearchParams(searchParams);
@@ -152,7 +152,7 @@ export function SpaceNotesView(
     const count = ids.length;
     if (
       !(await confirmAction(
-        `Permanently delete ${count} selected ${count === 1 ? "note" : "notes"}?`,
+        `Permanently delete ${count} selected ${count === 1 ? "doc" : "docs"}?`,
       ))
     )
       return;
@@ -170,7 +170,7 @@ export function SpaceNotesView(
         setSearchParams(next, { replace: true });
       }
     } catch {
-      setDeleteManyError("Some selected notes couldn't be deleted. Try again.");
+      setDeleteManyError("Some selected docs couldn't be deleted. Try again.");
     }
   };
   return (

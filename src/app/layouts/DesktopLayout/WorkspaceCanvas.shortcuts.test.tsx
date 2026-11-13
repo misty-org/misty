@@ -3,7 +3,6 @@ import { ShortcutRuntime } from "@/app/ShortcutRuntime";
 import "@/app/featureSeams";
 import {
   allLayoutViews,
-  configureWorkspaceDefaultView,
   dockLeaves,
   dockTreeViews,
   useWorkspaceStore,
@@ -53,11 +52,9 @@ describe("WorkspaceCanvas virtual window shortcuts", () => {
     });
     Object.defineProperty(navigator, "platform", { configurable: true, value: "MacIntel" });
     useWorkspaceStore.persist.clearStorage();
-    configureWorkspaceDefaultView(1);
     useWorkspaceStore.getState().reset();
   });
   afterEach(() => {
-    configureWorkspaceDefaultView(1);
     cleanup();
     if (originalAnimate) HTMLElement.prototype.animate = originalAnimate;
     else delete (HTMLElement.prototype as Partial<HTMLElement>).animate;
@@ -71,14 +68,13 @@ describe("WorkspaceCanvas virtual window shortcuts", () => {
         <LocationProbe />
       </MemoryRouter>,
     );
-    fireEvent.click(ui.getByRole("button", { name: "New chat" }));
+    fireEvent.click(ui.getByRole("button", { name: "New" }));
     expect(ui.getByTestId("location").textContent).toBe("/agents");
     fireEvent.click(ui.getByRole("button", { name: "Go back in shell" }));
     expect(ui.getByTestId("location").textContent).toBe("/before");
   });
 
   it("leaves the final tab closed until the new-tab command runs", async () => {
-    configureWorkspaceDefaultView(3);
     useWorkspaceStore.getState().reset();
     render(
       <MemoryRouter initialEntries={["/agents"]}>
@@ -98,7 +94,6 @@ describe("WorkspaceCanvas virtual window shortcuts", () => {
   });
 
   it("creates an independent new tab and lets the previous tab close", () => {
-    configureWorkspaceDefaultView(3);
     useWorkspaceStore.getState().reset();
     render(
       <MemoryRouter initialEntries={["/agents"]}>
@@ -149,5 +144,26 @@ describe("WorkspaceCanvas virtual window shortcuts", () => {
       );
       expect(view.getByTestId("location").textContent).toBe("/agents");
     });
+  });
+
+  it("lists open pages as tabs that select and reorder", () => {
+    useWorkspaceStore.getState().reset();
+    const first = allLayoutViews(useWorkspaceStore.getState().layout)[0];
+    const second = useWorkspaceStore.getState().newTab();
+    const view = render(
+      <MemoryRouter initialEntries={["/agents"]}>
+        <LocationProbe />
+        <WorkspaceCanvas />
+      </MemoryRouter>,
+    );
+    const strip = view.getByRole("tablist", { name: "Open pages" });
+    expect(strip.querySelectorAll('[role="tab"]')).toHaveLength(2);
+    expect(useWorkspaceStore.getState().layout.activeTabId).toBe(`layout:${second.id}`);
+    fireEvent.click(view.getAllByRole("tab")[0]);
+    expect(useWorkspaceStore.getState().layout.activeTabId).toBe(`layout:${first.id}`);
+    act(() => {
+      useWorkspaceStore.getState().reorderTabs([`layout:${second.id}`, `layout:${first.id}`]);
+    });
+    expect(view.getAllByRole("tab")[0].getAttribute("aria-selected")).toBe("false");
   });
 });

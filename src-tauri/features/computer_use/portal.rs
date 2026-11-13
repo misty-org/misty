@@ -112,9 +112,7 @@ fn remote() -> Result<MutexGuard<'static, Option<Remote>>, String> {
 }
 
 /// Runs one portal call; a session the person ended is started again once, with a new prompt.
-fn with<T>(
-    call: impl Fn(&Remote) -> Result<T, ashpd::Error>,
-) -> Result<T, String> {
+fn with<T>(call: impl Fn(&Remote) -> Result<T, ashpd::Error>) -> Result<T, String> {
     for attempt in 0..2 {
         let mut guard = remote()?;
         let Some(session) = guard.as_ref() else {
@@ -274,11 +272,12 @@ pub(crate) fn key(key: Key, pressed: bool) -> Result<(), String> {
         KeyState::Released
     };
     with(|remote| {
-        block(
-            remote
-                .proxy
-                .notify_keyboard_keysym(&remote.session, symbol, state, Default::default()),
-        )
+        block(remote.proxy.notify_keyboard_keysym(
+            &remote.session,
+            symbol,
+            state,
+            Default::default(),
+        ))
     })
 }
 

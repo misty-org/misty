@@ -17,6 +17,7 @@ pub fn invoke_handler() -> impl Fn(Invoke<Wry>) -> bool + Send + Sync + 'static 
             crate::browser::commands::browser_recovery_write,
             crate::browser::commands::browser_recovery_forget,
             crate::app::lifecycle::app_quit_confirmed,
+            crate::app::lifecycle::app_relaunch,
             crate::account::commands::auth_session_capture,
             crate::account::commands::auth_session_restore,
             crate::account::commands::auth_session_forget,
@@ -61,22 +62,10 @@ pub fn invoke_handler() -> impl Fn(Invoke<Wry>) -> bool + Send + Sync + 'static 
             crate::agents::commands::tutor_overview_make,
             crate::agents::commands::tutor_overview_audio,
             crate::agents::commands::tutor_overview_delete,
-            crate::agents::tutor_video::tutor_video_clip_make,
-            crate::agents::tutor_video::tutor_video_clip,
-            crate::agents::tutor_video::tutor_video_clip_delete,
+            crate::agents::notebook_news::notebook_news,
             crate::agents::tutor_links::tutor_read_link,
             crate::agents::tutor_links::tutor_read_dropped,
             crate::agents::tutor_links::tutor_save_export,
-            #[cfg(desktop)]
-            crate::devices::commands::devices_start,
-            #[cfg(desktop)]
-            crate::devices::commands::devices_stop,
-            #[cfg(desktop)]
-            crate::devices::commands::devices_view,
-            #[cfg(desktop)]
-            crate::devices::commands::folders::devices_publish_folders,
-            #[cfg(desktop)]
-            crate::devices::commands::jobs::device_sign_request,
             #[cfg(desktop)]
             crate::devices::commands::jobs::device_sign_run_grants,
             #[cfg(desktop)]
@@ -102,9 +91,17 @@ pub fn invoke_handler() -> impl Fn(Invoke<Wry>) -> bool + Send + Sync + 'static 
             crate::account::commands::sign_out_misty,
             #[cfg(desktop)]
             crate::browser::commands::browser_webview_create,
-            crate::browser::commands::diagnostic_log,
             #[cfg(any(target_os = "macos", windows, target_os = "linux"))]
             crate::agents::commands::cursor_companion_configure,
+            crate::app::tray::cursor_companion_tray,
+            #[cfg(target_os = "macos")]
+            crate::app::tray_panel::tray_agents,
+            #[cfg(target_os = "macos")]
+            crate::app::tray_panel::tray_panel_fit,
+            #[cfg(target_os = "macos")]
+            crate::app::tray_panel::tray_panel_press,
+            #[cfg(target_os = "macos")]
+            crate::app::tray_panel::tray_panel_state,
             #[cfg(any(target_os = "macos", windows, target_os = "linux"))]
             crate::voice::commands::voice_dictation_configure,
             #[cfg(any(target_os = "macos", windows, target_os = "linux"))]

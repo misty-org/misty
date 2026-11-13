@@ -13,6 +13,7 @@ mod companion;
 pub use companion::companion_engine_note;
 mod go_text;
 mod history;
+pub use history::without_cursor_tags;
 mod request;
 mod request_parts;
 mod system;
@@ -23,11 +24,11 @@ mod user_prompt;
 mod tests;
 
 #[allow(unused_imports)]
-pub(crate) use catalog::{catalog_output_schemas, run_catalog, CatalogInputs};
+pub(crate) use catalog::{run_catalog, CatalogInputs};
 #[allow(unused_imports)]
 pub(crate) use history::kept_notes;
 #[allow(unused_imports)]
-pub(crate) use request::{AgentIdentity, GoalState, PlanState, ResolvedContext, RunRequest};
+pub(crate) use request::{AgentIdentity, PlanState, ResolvedContext, RunRequest};
 
 use go_text::single_spaced;
 use history::summary_request;

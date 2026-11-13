@@ -1,5 +1,6 @@
 import type { CSSProperties } from "react";
 import { brandIconAsset } from "./brandIcons";
+import { LogoInitial, LogoPlate } from "./LogoFallbacks";
 
 interface BrandIconProps {
   brand: string;
@@ -15,7 +16,7 @@ interface BrandIconProps {
 }
 
 /** Single-color marks painted black or white to match the surrounding surface. */
-const adaptiveMarks = new Set([
+export const adaptiveMarks: ReadonlySet<string> = new Set([
   "anthropic",
   "composio",
   "filen",
@@ -36,7 +37,11 @@ const adaptiveMarks = new Set([
   "zai",
 ]);
 
-/** Shared original SVG artwork; never inherit an inactive row's foreground color. */
+/**
+ * A brand's official artwork in its own colors; never inherit an inactive row's foreground color.
+ * Single-color marks follow the theme, a logo that would disappear on one theme sits on a plate
+ * there (`logoPlates`), and a brand with no artwork shows its initial, never nothing.
+ */
 export function BrandIcon({
   brand,
   size = 24,
@@ -46,7 +51,20 @@ export function BrandIcon({
   ...aria
 }: BrandIconProps) {
   const asset = brandIconAsset(brand);
-  if (!asset) return null;
+  if (!asset)
+    return (
+      <span
+        {...aria}
+        role={name ? "img" : undefined}
+        aria-label={name}
+        aria-hidden={aria["aria-hidden"] ?? !name}
+        className={className}
+        data-brand-icon=""
+        style={{ display: "inline-flex", flexShrink: 0, verticalAlign: "middle", ...style }}
+      >
+        <LogoInitial name={name ?? brand} size={size} />
+      </span>
+    );
   // Embedded SVG media queries can follow the OS rather than the surrounding
   // WebView surface. Paint monochrome silhouettes using the local color scheme.
   if (adaptiveMarks.has(asset.id)) {
@@ -75,29 +93,31 @@ export function BrandIcon({
     );
   }
   return (
-    <img
-      {...aria}
-      src={asset.src}
-      alt={name ?? ""}
-      aria-hidden={aria["aria-hidden"] ?? !name}
-      width={size}
-      height={size}
-      draggable={false}
-      className={className}
-      style={{
-        display: "inline-block",
-        flexShrink: 0,
-        objectFit: "contain",
-        verticalAlign: "middle",
-        ...style,
-      }}
-      data-brand-icon={asset.id}
-      data-mail-provider-icon={
-        asset.id === "gmail" || asset.id === "outlook" ? asset.id : undefined
-      }
-      data-social-provider-icon={
-        ["instagram", "messenger", "x", "discord"].includes(asset.id) ? asset.id : undefined
-      }
-    />
+    <LogoPlate logo={`brand:${asset.id}`}>
+      <img
+        {...aria}
+        src={asset.src}
+        alt={name ?? ""}
+        aria-hidden={aria["aria-hidden"] ?? !name}
+        width={size}
+        height={size}
+        draggable={false}
+        className={className}
+        style={{
+          display: "inline-block",
+          flexShrink: 0,
+          objectFit: "contain",
+          verticalAlign: "middle",
+          ...style,
+        }}
+        data-brand-icon={asset.id}
+        data-mail-provider-icon={
+          asset.id === "gmail" || asset.id === "outlook" ? asset.id : undefined
+        }
+        data-social-provider-icon={
+          ["instagram", "messenger", "x", "discord"].includes(asset.id) ? asset.id : undefined
+        }
+      />
+    </LogoPlate>
   );
 }

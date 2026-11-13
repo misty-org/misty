@@ -1,6 +1,5 @@
 import type {
   AgentChecklist,
-  AgentGoal,
   AgentPlan,
   AgentPlanVersion,
   AgentQuestionSet,
@@ -19,12 +18,6 @@ export interface StoredQuestionSet extends AgentQuestionSet {
   waitUntil: string;
 }
 
-export interface StoredGoal extends AgentGoal {
-  lastInvocationId: string;
-  /** A continuation was started and hasn't finished: it must report, or the goal pauses. */
-  continuing: boolean;
-}
-
 /** Everything one chat holds about its runs, as one document so a change to it is one step. */
 export interface ConversationState {
   id: string;
@@ -33,8 +26,6 @@ export interface ConversationState {
   /** Newest version first. */
   plans: AgentPlan[];
   planVersion: number;
-  /** The latest goal that wasn't cleared. */
-  goal: StoredGoal | null;
   /** Newest first. */
   questionSets: StoredQuestionSet[];
   /** Every run's checklist, newest first. */
@@ -47,7 +38,6 @@ export const blankConversationState = (id: string): ConversationState => ({
   permissionMode: "",
   plans: [],
   planVersion: 0,
-  goal: null,
   questionSets: [],
   checklists: [],
 });
@@ -76,11 +66,6 @@ export const nowText = (now: number) => new Date(now).toISOString();
 
 export function publicQuestionSet(set: StoredQuestionSet): AgentQuestionSet {
   const { callId: _callId, continued: _continued, waitUntil: _waitUntil, ...shown } = set;
-  return shown;
-}
-
-export function publicGoal(goal: StoredGoal): AgentGoal {
-  const { lastInvocationId: _last, continuing: _continuing, ...shown } = goal;
   return shown;
 }
 
@@ -120,7 +105,6 @@ export function collaborationOf(state: ConversationState, now: number): Conversa
     checklists: shownChecklists(state.checklists),
     plan: state.plans[0] ?? null,
     planHistory: planHistory(state.plans),
-    goal: state.goal ? publicGoal(state.goal) : null,
     questionSets: state.questionSets
       .slice(0, 10)
       .map((set) =>

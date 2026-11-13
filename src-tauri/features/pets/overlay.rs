@@ -301,8 +301,7 @@ fn start_look_tracking(app: &AppHandle) {
             let center_y = pet_top + pet_height / 2.0;
             let dx = mouse_x - center_x;
             let dy = mouse_y - center_y;
-            let direction = (((dx.atan2(-dy) / std::f64::consts::TAU) * 16.0).round() as i32
-                + 16)
+            let direction = (((dx.atan2(-dy) / std::f64::consts::TAU) * 16.0).round() as i32 + 16)
                 .rem_euclid(16) as u8;
             let radius = PROXIMITY_PADDING + (pet_width.max(pet_height) / 2.0);
             let cursor_nearby = dx.hypot(dy) <= radius;
@@ -405,8 +404,7 @@ pub fn pet_set_scale(app: AppHandle, scale: f64) -> Result<f64, String> {
 /// What the person's agents are doing, from one of their windows.
 #[tauri::command]
 pub fn pet_set_state(app: AppHandle, next: PetStateUpdate) -> Result<(), String> {
-    if !STATUSES.contains(&next.status.as_str()) || !ACTIVITIES.contains(&next.activity.as_str())
-    {
+    if !STATUSES.contains(&next.status.as_str()) || !ACTIVITIES.contains(&next.activity.as_str()) {
         return Err("Unknown pet state.".to_string());
     }
     {

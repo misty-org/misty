@@ -11,7 +11,6 @@ import { useAuth } from "@/features/account";
 import { isAuthPath, routes } from "@/app/shell";
 import { useSetupStore } from "@/features/account";
 import { desktopRouteIdFromPath } from "../routing/navigation";
-import { DeviceSessionBridge } from "@/features/agents";
 import { UnsavedQuitGuard } from "@/features/app-windows";
 import { SpaceWindowBridge } from "@/features/spaces";
 import { accountScopeFor } from "@/features/app-windows";
@@ -106,7 +105,6 @@ export function AppFrameLayout() {
       <Suspense key={`account:${user?.id ?? "anonymous"}`} fallback={null}>
         <DesktopLayout getRouteId={desktopRouteIdFromPath} />
       </Suspense>
-      <DeviceSessionBridge />
       <SpacesRealtimeBridge />
       <SpaceWindowBridge />
       <AgentExecutionSurface />

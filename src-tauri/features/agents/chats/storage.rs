@@ -29,7 +29,7 @@ pub(in crate::agents) fn device_snapshot_sync(
             "id": device_id,
             "displayName": "This Misty",
             "status": "online",
-            "capabilities": ["workflow_node_leases", "read_content", "document_intelligence", "citations"],
+            "capabilities": ["workflow_node_leases", "document_intelligence", "citations"],
             "lastSeenAt": Utc::now().to_rfc3339(),
         },
         "scopes": scopes,

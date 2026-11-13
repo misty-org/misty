@@ -29,7 +29,7 @@ describe("upload limits", () => {
 
   it("names the surface in the error so the user knows which limit applies", () => {
     expect(uploadLimitError("attachment", 20 * MB)).toContain("Chat attachment");
-    expect(uploadLimitError("note_attachment", 20 * MB)).toContain("Note attachment");
+    expect(uploadLimitError("note_attachment", 20 * MB)).toContain("Doc attachment");
     expect(uploadLimitError("library", 200 * MB)).toContain("Library file");
   });
 

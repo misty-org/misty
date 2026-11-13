@@ -28,7 +28,9 @@ fn clip(text: &str) -> String {
 fn as_object(value: &Value) -> Option<Value> {
     match value {
         Value::Object(_) => Some(value.clone()),
-        Value::String(text) if text.trim_start().starts_with('{') => serde_json::from_str(text).ok(),
+        Value::String(text) if text.trim_start().starts_with('{') => {
+            serde_json::from_str(text).ok()
+        }
         _ => None,
     }
 }
@@ -43,7 +45,11 @@ fn tool_name(raw: &str) -> String {
         && name
             .chars()
             .all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '.' | '-' | ':'));
-    if plain { name.to_owned() } else { "shell".to_owned() }
+    if plain {
+        name.to_owned()
+    } else {
+        "shell".to_owned()
+    }
 }
 
 /// The file or address a call's arguments name.
@@ -68,7 +74,11 @@ fn page_of(result: &Value) -> (String, String) {
     {
         result = inner;
     }
-    let page = if result["page"].is_object() { &result["page"] } else { &result };
+    let page = if result["page"].is_object() {
+        &result["page"]
+    } else {
+        &result
+    };
     let text = |key: &str| page[key].as_str().map(clip).unwrap_or_default();
     let url = text("url");
     // Only a web address is a page; a result's `url` can name anything.
@@ -114,7 +124,10 @@ pub(super) fn record_start(
     }
     let oldest = now - KEPT_DAYS * 24 * 60 * 60 * 1000;
     connection.execute("DELETE FROM agent_run_steps WHERE at < ?1", params![oldest])?;
-    connection.execute("DELETE FROM agent_run_parents WHERE at < ?1", params![oldest])?;
+    connection.execute(
+        "DELETE FROM agent_run_parents WHERE at < ?1",
+        params![oldest],
+    )?;
     Ok(())
 }
 
@@ -138,7 +151,9 @@ pub(super) fn record_event(
             |row| row.get(0),
         )
         .optional()?;
-    let Some(account) = account else { return Ok(()) };
+    let Some(account) = account else {
+        return Ok(());
+    };
     let call = event["toolCallId"].as_str().unwrap_or("");
     // Calls are keyed by run as well, so two sub-agents' ids never meet.
     let call_id = format!("{run_id}:{call}");
@@ -177,16 +192,32 @@ pub(super) fn record_event(
             if next > MAX_STEPS {
                 return Ok(());
             }
-            let nested = nested_run || event["parentToolCallId"].as_str().is_some_and(|id| !id.is_empty());
+            let nested = nested_run
+                || event["parentToolCallId"]
+                    .as_str()
+                    .is_some_and(|id| !id.is_empty());
             connection.execute(
                 "INSERT INTO agent_run_steps
                      (run_id, seq, account, call_id, at, tool, target, state, nested)
                  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'running', ?8)",
-                params![root, next, account, call_id, now, tool_name(tool), target, nested],
+                params![
+                    root,
+                    next,
+                    account,
+                    call_id,
+                    now,
+                    tool_name(tool),
+                    target,
+                    nested
+                ],
             )?;
         }
         "tool.completed" | "tool.failed" => {
-            let state = if kind == "tool.failed" { "failed" } else { "completed" };
+            let state = if kind == "tool.failed" {
+                "failed"
+            } else {
+                "completed"
+            };
             let (url, title) = page_of(&event["result"]);
             let target = target_of(&event["args"]);
             let duration = event["durationMs"].as_i64().unwrap_or(0).max(0);
@@ -202,7 +233,11 @@ pub(super) fn record_event(
         }
         _ => {
             // The run ended: a call nobody saw finish ended with it.
-            let state = if kind == "invocation.completed" { "completed" } else { "failed" };
+            let state = if kind == "invocation.completed" {
+                "completed"
+            } else {
+                "failed"
+            };
             connection.execute(
                 "UPDATE agent_run_steps SET state = ?2, duration_ms = MAX(?3 - at, 0)
                  WHERE run_id = ?1 AND state = 'running' AND call_id LIKE ?4",
@@ -255,7 +290,11 @@ pub struct StepRow {
     pub picture: String,
 }
 
-pub(super) fn rows(connection: &Connection, account: &str, run_id: &str) -> rusqlite::Result<Vec<StepRow>> {
+pub(super) fn rows(
+    connection: &Connection,
+    account: &str,
+    run_id: &str,
+) -> rusqlite::Result<Vec<StepRow>> {
     let mut statement = connection.prepare(
         "SELECT seq, at, tool, target, title, state, duration_ms, nested, picture
          FROM agent_run_steps WHERE run_id = ?1 AND account = ?2 ORDER BY seq",
@@ -313,12 +352,16 @@ pub(super) fn latest(
 /// Forgets every step of an account's runs. The ledger's rows stay. Returns the pictures that
 /// went with them, by run, for the caller to delete.
 pub(super) fn clear(connection: &Connection, account: &str) -> rusqlite::Result<Vec<String>> {
-    let mut statement = connection
-        .prepare("SELECT DISTINCT run_id FROM agent_run_steps WHERE account = ?1 AND picture <> ''")?;
+    let mut statement = connection.prepare(
+        "SELECT DISTINCT run_id FROM agent_run_steps WHERE account = ?1 AND picture <> ''",
+    )?;
     let runs = statement
         .query_map(params![account], |row| row.get::<_, String>(0))?
         .collect::<Result<Vec<_>, _>>()?;
-    connection.execute("DELETE FROM agent_run_steps WHERE account = ?1", params![account])?;
+    connection.execute(
+        "DELETE FROM agent_run_steps WHERE account = ?1",
+        params![account],
+    )?;
     Ok(runs)
 }
 
@@ -337,7 +380,11 @@ fn person_account(webview: &Webview) -> Result<String, String> {
 
 /// A run's steps, oldest first. Steps of another account's run never come back.
 #[tauri::command]
-pub async fn agent_run_steps(app: AppHandle, webview: Webview, run_id: String) -> Result<Vec<StepRow>, String> {
+pub async fn agent_run_steps(
+    app: AppHandle,
+    webview: Webview,
+    run_id: String,
+) -> Result<Vec<StepRow>, String> {
     let account = person_account(&webview)?;
     let store = store(&app);
     tokio::task::spawn_blocking(move || {
@@ -368,7 +415,12 @@ pub async fn agent_run_latest_steps(
         let connection = store.connect().map_err(|error| error.to_string())?;
         let run_ids: Vec<String> = run_ids.into_iter().take(64).collect();
         latest(&connection, &account, &run_ids)
-            .map(|found| found.into_iter().map(|(run_id, step)| LatestStep { run_id, step }).collect())
+            .map(|found| {
+                found
+                    .into_iter()
+                    .map(|(run_id, step)| LatestStep { run_id, step })
+                    .collect()
+            })
             .map_err(|error| error.to_string())
     })
     .await

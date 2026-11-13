@@ -1,5 +1,5 @@
 import {
-  Bot,
+  Network,
   Compass,
   Eye,
   Hand,
@@ -33,7 +33,7 @@ const verbIcon: Record<StepVerb, LucideIcon> = {
   search: Search,
   ask: Hand,
   plan: ListChecks,
-  delegate: Bot,
+  delegate: Network,
   app: Plug,
   other: Wrench,
 };

@@ -26,7 +26,8 @@ pub(crate) fn run(dispatch: fn(Input)) {
             if !reported {
                 reported = true;
                 dispatch(Input::Error(
-                    "Voice shortcuts need an X11 display. Use the microphone button instead.".into(),
+                    "Voice shortcuts need an X11 display. Use the microphone button instead."
+                        .into(),
                 ));
             }
             std::thread::sleep(RETRY);

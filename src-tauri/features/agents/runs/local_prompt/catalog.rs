@@ -52,7 +52,8 @@ fn read_only(row: &JsValue) -> bool {
     row.get("annotations").and_then(|annotations| annotations.get("readOnlyHint")) == Some(&JsValue::Bool(true))
 }
 
-/// What each tool promises to return, by name, which the runtime checks results against.
+/// What each tool promises to return, by name (the tests check the catalog against it).
+#[cfg(test)]
 pub(crate) fn catalog_output_schemas() -> HashMap<String, JsValue> {
     rows().iter().filter_map(|row| Some((row_name(row).to_owned(), row.get("outputSchema")?.clone()))).collect()
 }
@@ -75,7 +76,7 @@ fn needs_account(row: &JsValue) -> bool {
     locality == Some("routed")
         || matches!(
             row_name(row),
-            "space.list" | "space.manage" | "search.all" | "device.list" | "item.delete" | "item.rename" | "agent.list" | "agent.configure" | "folder.send"
+            "space.list" | "space.manage" | "search.all" | "item.delete" | "item.rename" | "agent.list" | "agent.configure" | "folder.send"
         )
 }
 
@@ -104,9 +105,9 @@ fn browser_grants(contexts: &[DeviceContext]) -> BrowserGrants {
 }
 
 /// Plan mode only reads. Writes are neither listed nor executable, and these reads still act: user
-/// action requests in the browser, and progress or goal reports.
+/// action requests in the browser, and progress reports.
 fn plan_mode_allows(row: &JsValue) -> bool {
-    read_only(row) && !matches!(row_name(row), "browser.request_user_action" | "plan.update" | "goal.update" | "log.work.checklist")
+    read_only(row) && !matches!(row_name(row), "browser.request_user_action" | "plan.update" | "log.work.checklist")
 }
 
 fn offered(row: &JsValue, request: &RunRequest, inputs: &CatalogInputs, grants: &BrowserGrants) -> bool {
@@ -129,7 +130,6 @@ fn offered(row: &JsValue, request: &RunRequest, inputs: &CatalogInputs, grants: 
         "conversation.ask_user" => request.can_ask(),
         "plan.propose" => request.planning(),
         "plan.update" => request.approved_plan().is_some(),
-        "goal.update" => request.pursued_goal().is_some(),
         // Sub-agents never start sub-agents of their own.
         "agent.delegate" | "agent.wait" => request.delegated_from.is_empty(),
         _ => true,

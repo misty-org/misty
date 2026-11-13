@@ -1,7 +1,7 @@
 //! The rounded corners: the clipping region and the layered caps that smooth its edge pixels.
 use super::*;
 
-/// Lays a cap over each rounded corner, above the page and its dim, or hides
+/// Lays a cap over each rounded corner, above the page, or hides
 /// it when the corner is square or its chrome color is unknown.
 pub(super) fn apply_caps(host: HWND, frame: &mut Frame, width: i32, height: i32, radii: [i32; 4]) {
     let radii = radii.map(|radius| radius.clamp(0, width.min(height).max(0) / 2));
@@ -36,7 +36,7 @@ pub(super) fn apply_caps(host: HWND, frame: &mut Frame, width: i32, height: i32,
             0
         };
         let y = if corner >= 2 { height - radius } else { 0 };
-        // SAFETY: as above; the caps go above the page's windows and its dim.
+        // SAFETY: as above; the caps go above the page's windows.
         unsafe {
             SetWindowPos(cap, HWND_TOP, x, y, radius, radius, SWP_NOACTIVATE);
             ShowWindow(cap, SW_SHOWNA);

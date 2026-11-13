@@ -15,7 +15,7 @@ import {
   terminalTheme,
 } from "@/shared/lib/terminal/appearance";
 import { loadXterm } from "@/shared/lib/terminal/xtermLoader";
-import { Button, Dialog, DialogContent, DialogTitle, Skeleton } from "@/shared/ui";
+import { Button, Dialog, DialogContent, DialogTitle, Skeleton, Text } from "@/shared/ui";
 import { engineName } from "../channels/engines";
 import { listenSignIn, signInApi, type SignInRequest } from "./signInApi";
 
@@ -24,11 +24,14 @@ const errorText = (error: unknown) => (error instanceof Error ? error.message : 
 export function SignInDialog({
   request,
   onClose,
+  plain = false,
 }: {
   /** null keeps the dialog closed. */
   request: SignInRequest | null;
   /** After the CLI ended or the person closed the dialog. */
   onClose: () => void;
+  /** First run: a plain sentence on what to do before the terminal, and a plain ending. */
+  plain?: boolean;
 }) {
   if (!request) return null;
   return (
@@ -36,11 +39,40 @@ export function SignInDialog({
       key={`${request.engine}:${request.provider ?? ""}:${request.signOut ? "out" : "in"}`}
       request={request}
       onClose={onClose}
+      plain={plain && !request.signOut}
     />
   );
 }
 
-function SignInTerminal({ request, onClose }: { request: SignInRequest; onClose: () => void }) {
+/** What the person does during each first-run sign-in, in plain words. */
+function signInSteps(engine: string): string {
+  switch (engine) {
+    case "agy":
+      return (
+        "A Google page opens in your browser. Sign in with any Google account, then copy the " +
+        "code it shows, paste it below and press Return. It costs nothing."
+      );
+    case "codex":
+      return "A ChatGPT page opens in your browser. Sign in there with your ChatGPT account, then come back here.";
+    case "claude":
+      return (
+        "A Claude page opens in your browser. Sign in there with your Claude account. If it " +
+        "shows a code, paste it below and press Return."
+      );
+    default:
+      return "A sign-in page opens in your browser. Finish there. If it shows a code, paste it below and press Return.";
+  }
+}
+
+function SignInTerminal({
+  request,
+  onClose,
+  plain,
+}: {
+  request: SignInRequest;
+  onClose: () => void;
+  plain: boolean;
+}) {
   // Started once per dialog: the key above remounts it for another engine or provider.
   const requestRef = useRef(request);
   const [ended, setEnded] = useState<boolean | null>(null);
@@ -53,13 +85,24 @@ function SignInTerminal({ request, onClose }: { request: SignInRequest; onClose:
         className="flex max-h-[86vh] w-[720px] max-w-[94vw] flex-col gap-3 p-5"
       >
         <DialogTitle className="pr-10 text-base">{title}</DialogTitle>
+        {plain ? (
+          <Text size="body" wrap>
+            {signInSteps(request.engine)}
+          </Text>
+        ) : null}
         <CliTerminal
           start={(id, cols, rows) => signInApi.start(requestRef.current, id, cols, rows)}
           onEnded={setEnded}
         />
         {ended !== null ? (
           <p role="status" className="text-sm text-cream-muted">
-            {ended ? `${name} finished.` : `${name} ended.`}
+            {plain
+              ? ended
+                ? `You're signed in to ${name}.`
+                : "The sign-in didn't finish. Close this and press Sign in to try again."
+              : ended
+                ? `${name} finished.`
+                : `${name} ended.`}
           </p>
         ) : null}
         <div className="flex justify-end gap-2">

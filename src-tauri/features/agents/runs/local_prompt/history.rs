@@ -180,6 +180,12 @@ fn without_speech_tags(reply: &str) -> String {
     strip_tags(&lesson, &[("[POINT:", false)])
 }
 
+/// An earlier reply without the cursor companion's tags, for an engine's chat. Left in, they
+/// teach the engine to keep writing them on turns that aren't the companion's.
+pub fn without_cursor_tags(reply: &str) -> String {
+    strip_tags(&without_speech_tags(reply), &[("[GUIDE:", false)])
+}
+
 /// Voice turns and lesson steps are short and only need the last few exchanges
 /// (`companionConversationHistory`, `boundedAIConversationHistory`).
 pub(super) fn companion_history(turns: &[HistoryTurn]) -> String {

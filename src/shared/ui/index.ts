@@ -35,6 +35,7 @@ export * from "./overlays/ContextMenu";
 export * from "./overlays/Dialog";
 export * from "./overlays/DropdownMenu";
 export * from "./overlays/MenuItem";
+export * from "./overlays/MenuPanel";
 export * from "./overlays/MenuChevron";
 export * from "./overlays/MenuTrigger";
 export * from "./overlays/Popover";
@@ -44,6 +45,7 @@ export * from "./overlays/SearchablePicker";
 export * from "./overlays/Sheet";
 export * from "./overlays/SuggestionList";
 export * from "./overlays/Tooltip";
+export * from "./overlays/Tour";
 export * from "./overlays/ViewportLayer";
 export * from "./overlays/WorkspaceOverlay";
 
@@ -58,6 +60,7 @@ export * from "./layout/SectionHeading";
 export * from "./layout/PageStage";
 export * from "./layout/IconBarItem";
 export * from "./layout/ScrollArea";
+export * from "./layout/SplitHandle";
 export * from "./layout/Separator";
 
 // display
@@ -98,8 +101,9 @@ export {
 export * from "./navigation/TabStrip";
 
 // icons
-export * from "./icons/AssetIcon";
 export * from "./icons/BrandIcon";
+export * from "./icons/LogoFallbacks";
+export * from "./icons/MistyMark";
 export * from "./icons/appIcons";
 export * from "./icons/brandIcons";
 export * from "./icons/itemTones";
@@ -111,6 +115,7 @@ export * from "./patterns/RenameItemDialog";
 export * from "./patterns/MessageActions";
 export * from "./patterns/QuestionPanel";
 export * from "./patterns/FindBar";
+export * from "./patterns/StarterPrompts";
 
 export * from "./classNames";
 

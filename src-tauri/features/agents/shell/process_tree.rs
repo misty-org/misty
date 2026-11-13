@@ -75,7 +75,11 @@ fn start_time(pid: i32) -> Option<(u64, u64)> {
 #[allow(clippy::disallowed_methods)]
 fn children(pid: i32) -> Vec<i32> {
     let mut found = Vec::new();
-    for task in std::fs::read_dir(format!("/proc/{pid}/task")).into_iter().flatten().flatten() {
+    for task in std::fs::read_dir(format!("/proc/{pid}/task"))
+        .into_iter()
+        .flatten()
+        .flatten()
+    {
         let Ok(list) = std::fs::read_to_string(task.path().join("children")) else {
             continue;
         };

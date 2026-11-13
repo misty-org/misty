@@ -5,8 +5,10 @@ export {
   CollectionHeading,
   CollectionSearch,
   CollectionFilters,
+  CollectionSortMenu,
   CollectionViewToggle,
   type CollectionFilterTab,
+  type CollectionSortOption,
   type CollectionHeadingProps,
 } from "./collection/CollectionToolbar";
 export { CollectionCardTitle, CollectionCardMetadata } from "./collection/CollectionCards";

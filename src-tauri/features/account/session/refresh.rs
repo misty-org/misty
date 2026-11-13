@@ -15,6 +15,7 @@ pub(crate) struct RefreshAnswer {
 }
 
 impl RefreshAnswer {
+    #[cfg(test)]
     pub fn succeeded(&self) -> bool {
         (200..300).contains(&self.status)
     }
@@ -27,6 +28,8 @@ impl RefreshAnswer {
     }
 }
 
+/// Native code only rotates through `account::http`; the tests rotate a session directly.
+#[cfg(test)]
 fn refresh_endpoint(base: &url::Url) -> url::Url {
     let mut endpoint = base.clone();
     endpoint.set_path(&format!(
@@ -40,6 +43,7 @@ fn refresh_endpoint(base: &url::Url) -> url::Url {
 impl AccountClient {
     /// Rotates the session once. A caller that was waiting while another rotated it uses that
     /// rotation instead of starting its own.
+    #[cfg(test)]
     pub(crate) async fn refresh(self: &Arc<Self>, base: &url::Url) -> Result<(), String> {
         let used = self.access_header();
         let answer = self.refresh_after(base, used.as_deref()).await?;
@@ -51,6 +55,7 @@ impl AccountClient {
     }
 
     /// Rotates the session after the server refused `used`, the `access_header` a request sent.
+    #[cfg(test)]
     pub(crate) async fn refresh_after(
         self: &Arc<Self>,
         base: &url::Url,

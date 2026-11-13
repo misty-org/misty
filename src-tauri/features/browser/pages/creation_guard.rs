@@ -4,9 +4,8 @@
 //! messages, and Tauri holds a lock for that whole time. A page can ask for a
 //! popup during that pump, and building the popup's window there takes the same
 //! lock on the same thread: the UI thread waits on itself and the window stays
-//! black. While a creation is in flight a new popup is not built inside the
-//! pump; it opens as an ordinary tab instead (`on_new_window` falls back to that
-//! when `provider_popup` declines).
+//! black. While a creation is in flight a download popup is not built inside
+//! the pump; it opens in its opener's view instead (`open_popup_in_place`).
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 static IN_FLIGHT: AtomicUsize = AtomicUsize::new(0);

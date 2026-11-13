@@ -26,6 +26,7 @@ import { SpaceOptionsMenu } from "../components/space-row/SpaceOptionsMenu";
 import { SpaceSwitcher } from "../components/space-row/SpaceSwitcher";
 import { editedLabel, galleryFilters, type GalleryItem, isGalleryFilter } from "./galleryItems";
 import { GalleryPreview, kindIcon } from "./GalleryPreview";
+import { GetStartedCard } from "./GetStartedCard";
 import { readHomePreference, writeHomePreference } from "./homePreferences";
 import { HomeSectionHead } from "./HomeSection";
 import { MakeSomethingNew } from "./MakeSomethingNew";
@@ -75,7 +76,7 @@ const scopes = [
  * items live on their own pages and show here only as search results, in Misty's collection
  * layout. All or Yours picks whose things show; the filter menu narrows by type and sets the
  * order. New in the head makes a note or drawing, or adds files. As the Journal it holds the
- * Space's notes and drawings, without the home's overview.
+ * Space's docs and drawings, without the home's overview.
  */
 export function SpaceHome({ space, journal = false }: { space: Space; journal?: boolean }) {
   const { user } = useAuth();
@@ -219,7 +220,15 @@ export function SpaceHome({ space, journal = false }: { space: Space; journal?: 
   return (
     <CollectionPage className="bg-charcoal-bg">
       <CollectionHeading
-        title={journal ? "Journal" : <SpaceSwitcher space={space} />}
+        title={
+          journal ? (
+            "Docs"
+          ) : (
+            <span data-tour="space-switcher" className="contents">
+              <SpaceSwitcher space={space} />
+            </span>
+          )
+        }
         end={
           <div className="flex min-w-0 items-center gap-2">
             <CollectionSearch
@@ -228,18 +237,30 @@ export function SpaceHome({ space, journal = false }: { space: Space; journal?: 
               value={query}
               onChange={(event) => setQuery(event.target.value)}
             />
-            <MakeSomethingNew
-              spaceId={space.id}
-              onCreated={gallery.reload}
-              only={journal ? journalKinds : undefined}
-            />
-            {!journal && <SpaceOptionsMenu space={space} />}
+            <span data-tour="space-make" className="contents">
+              <MakeSomethingNew
+                spaceId={space.id}
+                onCreated={gallery.reload}
+                only={journal ? journalKinds : undefined}
+              />
+            </span>
+            {!journal && (
+              <span data-tour="space-options" className="contents">
+                <SpaceOptionsMenu space={space} />
+              </span>
+            )}
           </div>
         }
       />
       {!showItems && (
         <div className="space-home">
-          <SpacePlaces spaceId={space.id} />
+          <span data-tour="space-places" className="contents">
+            <SpacePlaces spaceId={space.id} />
+          </span>
+          <GetStartedCard
+            space={space}
+            wroteDoc={gallery.items.some((item) => item.kind === "note" && item.creatorId === me)}
+          />
           <SpaceOverview spaceId={space.id} />
           {space.is_shared && <SpaceTeamwork spaceId={space.id} />}
         </div>

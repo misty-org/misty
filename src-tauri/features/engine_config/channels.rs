@@ -389,8 +389,8 @@ pub(crate) fn resolve_provider(
     Ok(None)
 }
 
-/// The environment a start of `engine` gets for `provider_id` (or the current channel). Empty for
-/// the official config.
+/// The environment a start of `engine` gets for `provider_id` (or the current channel), for tests.
+#[cfg(test)]
 pub fn resolve_provider_env(
     engine: &str,
     provider_id: Option<&str>,

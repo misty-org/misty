@@ -8,12 +8,12 @@ use kiri::channel::{HostChannel, HostMessage};
 mod messages;
 use messages::*;
 mod page_background;
+pub(in crate::browser) use page_background::forget_page_background;
 use page_background::page_backgrounds;
 #[cfg(target_os = "macos")]
 pub(in crate::browser) use page_background::replay_page_background;
 #[cfg(any(target_os = "macos", windows))]
 use page_background::set_under_page_background;
-pub(in crate::browser) use page_background::forget_page_background;
 use std::sync::OnceLock;
 
 fn trusted(app: &AppHandle, id: &str, token: &str) -> bool {
@@ -75,33 +75,6 @@ impl HostChannel for Channel {
                 "misty://browser-background",
                 json!({ "id": id, "color": background.background }),
             );
-            return;
-        }
-        if let Some(back) = picture_in_picture_return(raw) {
-            if back.pip_return && message.main_frame && trusted(app, id, &back.token) {
-                if let Some(window) = app.get_window(&crate::browser::browser_owner_label(app, id))
-                {
-                    let _ = window.unminimize();
-                    let _ = window.show();
-                    let _ = window.set_focus();
-                }
-                // The same signal as a click on the page: its tab comes forward.
-                let _ = app.emit_to(
-                    crate::browser::browser_owner_label(app, id),
-                    "misty://browser-focus",
-                    BrowserFocusEvent { id: id.to_owned() },
-                );
-            }
-            return;
-        }
-        if let Some(update) = media_message(raw) {
-            if message.main_frame && trusted(app, id, &update.token) {
-                let _ = app.emit_to(
-                    crate::browser::browser_owner_label(app, id),
-                    "misty://browser-media-state",
-                    json!({ "id": id, "info": update.media }),
-                );
-            }
             return;
         }
         // Companion tracking shares the authenticated channel with focus.

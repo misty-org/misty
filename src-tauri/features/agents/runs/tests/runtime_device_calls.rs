@@ -114,22 +114,6 @@ async fn following_up_asks_for_a_model_when_the_device_has_none() {
     needs_a_model(calls(Device::default()).follow_up(r#"{"conversation":[],"new_message":"Stop"}"#).await.unwrap_err());
 }
 
-const RESTORE: &str = r#"{"url":"https://shop.test/checkout","goal":[{"label":"Size","kind":"text","value":{"value":"M"}}],"controls":[{"ref":"1","role":"field","label":"Size"}],"history":[]}"#;
-
-#[tokio::test]
-async fn returns_one_action_on_a_control_the_page_has() {
-    let server = provider(answers(r#"{"type":"type","ref":"1","value":"M"}"#)).await;
-    assert_eq!(calls(local(&server.base_url)).restore_step(RESTORE).await.unwrap(), json!({ "action": { "type": "type", "ref": "1", "value": "M" } }));
-}
-
-#[tokio::test]
-async fn ends_the_restore_on_a_control_the_page_does_not_have_or_a_reply_off_the_menu() {
-    for reply in [r#"{"type":"click","ref":"9"}"#, r#"{"type":"submit","ref":"1"}"#] {
-        let server = provider(answers(reply)).await;
-        assert_eq!(calls(local(&server.base_url)).restore_step(RESTORE).await.unwrap(), json!({ "action": { "type": "done" } }));
-    }
-}
-
 #[tokio::test]
 async fn the_dispatcher_knows_each_route_and_refuses_the_rest() {
     for name in DEVICE_CALL_NAMES {
@@ -155,11 +139,11 @@ async fn bodies_are_limited_and_must_be_json() {
 async fn validation_comes_before_the_model_except_where_the_route_read_the_model_first() {
     let bad = "{}";
     // Parsed first, so a bad body is a 400 even with no model.
-    for name in ["cleanup", "voice-transcription", "screen-model", "refine-point", "extract", "embed", "follow-up", "restore-step"] {
+    for name in ["cleanup", "voice-transcription", "screen-model", "refine-point", "extract", "embed", "follow-up"] {
         assert_eq!(calls(Device::default()).device_call(name, bad).await.unwrap_err().status, 400, "{name}");
     }
     // These chose their model first, so the missing model is what they say.
-    for name in ["day-summary", "voice-notes", "transcribe-diarized"] {
+    for name in ["voice-notes", "transcribe-diarized"] {
         assert_eq!(calls(Device::default()).device_call(name, bad).await.unwrap_err().status, 409, "{name}");
     }
 }
@@ -169,19 +153,15 @@ async fn validation_comes_before_the_model_except_where_the_route_read_the_model
 async fn structured_replies_send_their_schema_with_its_keys_in_order() {
     let server = provider(|_| Answer::json(400, json!({ "error": { "message": "stop here" } }))).await;
     let device = || Device::default().with_model("agent", "openai/gpt").with_model("fast", "openai/gpt").with_key(ProviderId::Openai, "k", &server.base_url);
-    let day = r#"{"date":"2026-10-14","items":[{"at":"09:12","kind":"page","title":"T"}]}"#;
     let notes = r#"{"mode":"notes","turns":[{"speaker":"A","start":0,"end":1,"text":"x"}]}"#;
     let extract = r#"{"instruction":"Get","schema":{"type":"object","required":["z","a"],"properties":{"z":{"type":"string"},"a":{"type":"number"}}},"url":"u","title":"t","markdown":"m"}"#;
-    assert_eq!(calls(device()).day_summary(day).await.unwrap_err().status, 502);
     assert_eq!(calls(device()).voice_notes(notes).await.unwrap_err().status, 502);
     assert_eq!(calls(device()).extract(extract).await.unwrap_err().status, 502);
     let sent = server.requests();
-    assert!(sent[0].text.contains(r##""schema":{"$schema":"http://json-schema.org/draft-07/schema#","type":"object","properties":{"markdown":{"type":"string"},"topics":{"maxItems":8,"type":"array","items":{"type":"string"}},"threads":{"maxItems":6,"type":"array","items":{"type":"object","properties":{"title":{"type":"string","maxLength":120},"items":{"maxItems":400,"type":"array","items":{"type":"integer","minimum":-9007199254740991,"maximum":9007199254740991}}},"required":["title","items"],"additionalProperties":false}},"next":{"maxItems":3,"type":"array","items":{"type":"string","maxLength":200}}},"required":["markdown","topics","threads","next"],"additionalProperties":false}"##), "{}", sent[0].text);
-    assert!(sent[1].text.contains(r##""properties":{"title":{"type":"string"},"markdown":{"type":"string"},"actionItems""##), "{}", sent[1].text);
-    assert!(sent[2].text.contains(r#""schema":{"type":"object","required":["z","a"],"properties":{"z":{"type":"string"},"a":{"type":"number"}}}"#), "{}", sent[2].text);
-    assert!(sent[0].text.contains(r#""name":"day_summary""#));
-    assert!(sent[1].text.contains(r#""name":"voice_notes""#));
-    assert!(sent[2].text.contains(r#""name":"extraction""#));
+    assert!(sent[0].text.contains(r##""properties":{"title":{"type":"string"},"markdown":{"type":"string"},"actionItems""##), "{}", sent[0].text);
+    assert!(sent[1].text.contains(r#""schema":{"type":"object","required":["z","a"],"properties":{"z":{"type":"string"},"a":{"type":"number"}}}"#), "{}", sent[1].text);
+    assert!(sent[0].text.contains(r#""name":"voice_notes""#));
+    assert!(sent[1].text.contains(r#""name":"extraction""#));
 }
 
 #[tokio::test]

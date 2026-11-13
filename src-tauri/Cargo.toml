@@ -34,12 +34,6 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 aes-gcm = "0.10"
 regex = "1"
-# Browser import: Chromium's AES-128-CBC cookie values, its PBKDF2-SHA1 key,
-# Firefox's LZ4 search settings and Safari's property-list bookmarks.
-aes = "0.8"
-cbc = { version = "0.1", features = ["alloc"] }
-lz4_flex = { version = "0.13", default-features = false, features = ["std", "safe-decode", "safe-encode"] }
-plist = { version = "1", default-features = false }
 # A small local HTTP server: routing, state/path extractors and raw responses.
 axum = { version = "0.8", default-features = false, features = ["http1", "tokio"] }
 arboard = "3.6.1"
@@ -65,10 +59,7 @@ sha2 = "0.10"
 tempfile = "3"
 tauri = { version = "2", features = ["protocol-asset", "macos-private-api", "tray-icon", "image-png", "unstable"] }
 tauri-plugin-dialog = "2"
-tauri-plugin-clipboard-manager = "2"
 tauri-plugin-opener = "2"
-tauri-plugin-os = "2"
-tauri-plugin-notification = "2.3.3"
 thiserror = "1"
 tokio = { version = "1", features = ["fs", "io-util", "macros", "net", "process", "rt-multi-thread", "sync", "time"] }
 reqwest = { version = "0.13.4", default-features = false, features = ["json", "query", "rustls-no-provider", "socks", "stream"] }
@@ -90,9 +81,6 @@ ed25519-dalek = "2"
 # Devices: the control channel socket.
 futures-util = { version = "0.3", features = ["sink"] }
 tokio-tungstenite = { version = "0.30", default-features = false, features = ["connect", "rustls-tls-native-roots"] }
-# Deflate through flate2's Rust backend only; zip's "deflate" also builds zopfli and zlib-rs.
-zip = { version = "4.6.1", default-features = false, features = ["deflate-flate2"] }
-flate2 = { version = "1", default-features = false, features = ["rust_backend"] }
 zstd = { version = "0.13", default-features = false }
 tauri-plugin-keystore = { path = "vendor/tauri-plugin-keystore" }
 tauri-plugin-deep-link = "2"
@@ -106,7 +94,6 @@ toml_edit = "0.25"
 serde_yaml = "0.9"
 sysinfo = "0.36.1"
 which = "7"
-dunce = "1"
 
 [target.'cfg(any(target_os = "macos", windows, target_os = "linux"))'.dependencies]
 # Confined helpers: Seatbelt on macOS, an AppContainer and Job object on Windows, Landlock,
@@ -119,26 +106,23 @@ xcap = "0.9"
 # Computer use: mouse and keyboard input for an outside engine's screen control (MIT; X11 on Linux).
 enigo = "0.6"
 tauri-plugin-single-instance = { version = "2.4.3", features = ["deep-link"] }
-tauri-plugin-process = "2.3.1"
 tauri-plugin-updater = "2.10.1"
 
 [target.'cfg(not(target_os = "macos"))'.dependencies]
+# Run notices on Windows and Linux; macOS uses mac-notification-sys.
+tauri-plugin-notification = "2.3.3"
 image = { version = "0.25.10", default-features = false, features = ["bmp", "gif", "jpeg", "tga", "webp"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 # System notices that open their chat when clicked (agents/run_control/run_notices.rs).
 mac-notification-sys = "0.6.15"
 block2 = "0.6.2"
-# The vendored copy (see [patch.crates-io]); used for download progress and cancel.
-wry = { version = "=0.55.1", default-features = false }
 cocoa = "0.26"
 core-graphics = "0.24"
 core-foundation = "0.10"
 objc = "0.2.7"
 objc2 = "0.6.4"
 dispatch2 = "0.3.1"
-# Reads another browser's cookie key from its own Keychain item on import.
-security-framework = "3.7"
 objc2-app-kit = { version = "0.3.2", default-features = false, features = ["std", "NSAppearance", "NSApplication", "NSBitmapImageRep", "NSImageRep", "NSEvent", "NSPasteboard", "NSResponder", "NSScrollView", "NSTrackingArea", "NSView", "NSWindow", "NSPopover", "NSScreen", "NSMenu", "NSMenuItem", "NSImage", "NSGraphics", "NSControl", "NSWindowController", "NSPanel", "NSTextField", "NSTextFieldCell", "NSButton", "NSButtonCell", "NSBezierPath", "NSColor", "NSAnimationContext", "NSWorkspace", "NSRunningApplication", "NSFont", "NSText", "NSCell", "NSTextInputClient", "NSAnimation", "block2", "objc2-core-graphics", "objc2-core-image", "objc2-core-foundation", "NSAccessibility", "NSPasteboardItem", "NSParagraphStyle", "NSFontDescriptor", "NSLayoutConstraint", "NSGraphicsContext"] }
 objc2-foundation = { version = "0.3.2", default-features = false, features = ["std", "NSArray", "NSData", "NSBundle", "NSDictionary", "NSError", "NSObject", "NSProcessInfo", "NSUserDefaults", "NSUUID", "NSString", "NSURL", "NSURLResponse", "NSHTTPCookie", "NSDate", "NSSet", "NSJSONSerialization", "NSNotification", "NSNull", "NSFileHandle", "NSFileManager", "NSPathUtilities", "NSRegularExpression", "NSLocale", "NSCharacterSet", "NSRange", "NSValue", "NSOrderedSet", "NSTask", "NSURLRequest", "NSThread", "NSRunLoop", "NSGeometry", "NSEnumerator", "NSTimer", "NSOperation", "block2", "NSObjCRuntime"] }
 objc2-web-kit = { version = "0.3.2", default-features = false, features = ["WKSecurityOrigin", "WKSnapshotConfiguration", "objc2-core-foundation", "WKContentWorld", "WKFrameInfo", "WKScriptMessage", "WKScriptMessageHandler", "objc2-app-kit", "WKWebView", "WKWebViewConfiguration", "WKUserContentController", "WKUserScript", "WKNavigationResponse", "WKNavigationDelegate", "WKHTTPCookieStore", "WKWebsiteDataStore", "block2", "WKNavigationAction", "WKNavigation", "WKWebsiteDataRecord", "WKDownload", "WKUIDelegate", "WKWindowFeatures", "WKError"] }
@@ -170,15 +154,12 @@ libloading = "0.8"
 [target.'cfg(windows)'.dependencies]
 # The engine layer reads the live User/Machine PATH from the registry (MIT).
 winreg = "0.55"
-rfd = { version = "0.16", default-features = false }
+# Plain paths, not \\?\ ones, for the Grok sessions junction.
+dunce = "1"
 # Confined helpers and agent commands (AppContainer and Job objects).
 webview2-com = "0.38.2"
-# Awaiting the Windows Hello prompt before a saved card fills.
-windows-future = "0.2"
-# The vendored copy (see [patch.crates-io]); used for download progress and cancel.
-wry = { version = "=0.55.1", default-features = false }
-windows = { version = "0.61", features = ["Foundation", "Graphics", "Graphics_Capture", "Graphics_DirectX", "Graphics_DirectX_Direct3D11", "Security_Credentials_UI", "Win32_Foundation", "Win32_Graphics_Direct3D", "Win32_Graphics_Direct3D11", "Win32_Graphics_Dxgi", "Win32_Graphics_Dxgi_Common", "Win32_Graphics_Gdi", "Win32_Media_MediaFoundation", "Win32_Security", "Win32_Security_Authorization", "Win32_Security_Cryptography", "Win32_Storage_FileSystem", "Win32_System_Com", "Win32_System_Com_StructuredStorage", "Win32_System_JobObjects", "Win32_System_Ole", "Win32_System_Registry", "Win32_System_Threading", "Win32_System_Variant", "Win32_System_WinRT", "Win32_System_WinRT_Direct3D11", "Win32_System_WinRT_Graphics_Capture", "Win32_UI_Accessibility", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging"] }
-windows-sys = { version = "0.59", features = ["Wdk_Storage_FileSystem", "Win32_Devices_DeviceAndDriverInstallation", "Win32_Foundation", "Win32_Graphics_Dwm", "Win32_Graphics_Gdi", "Win32_NetworkManagement_WNet", "Win32_Security", "Win32_Security_Authorization", "Win32_Security_Isolation", "Win32_Storage_FileSystem", "Win32_System_Com", "Win32_System_DataExchange", "Win32_System_Diagnostics_Debug", "Win32_System_Diagnostics_ToolHelp", "Win32_System_IO", "Win32_System_Ioctl", "Win32_System_JobObjects", "Win32_System_LibraryLoader", "Win32_System_Memory", "Win32_System_Power", "Win32_System_Registry", "Win32_System_SystemInformation", "Win32_System_SystemServices", "Win32_System_Threading", "Win32_System_WindowsProgramming", "Win32_UI_Accessibility", "Win32_UI_HiDpi", "Win32_UI_Input_KeyboardAndMouse", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging"] }
+windows = { version = "0.61", features = ["Foundation", "Graphics", "Graphics_Capture", "Graphics_DirectX", "Graphics_DirectX_Direct3D11", "Win32_Foundation", "Win32_Graphics_Direct3D", "Win32_Graphics_Direct3D11", "Win32_Graphics_Dxgi", "Win32_Graphics_Dxgi_Common", "Win32_Graphics_Gdi", "Win32_Media_MediaFoundation", "Win32_Security", "Win32_Security_Cryptography", "Win32_Storage_FileSystem", "Win32_System_Com", "Win32_System_Com_StructuredStorage", "Win32_System_JobObjects", "Win32_System_Ole", "Win32_System_Threading", "Win32_System_Variant", "Win32_System_WinRT", "Win32_System_WinRT_Direct3D11", "Win32_System_WinRT_Graphics_Capture", "Win32_UI_Accessibility", "Win32_UI_WindowsAndMessaging"] }
+windows-sys = { version = "0.59", features = ["Wdk_Storage_FileSystem", "Win32_Devices_DeviceAndDriverInstallation", "Win32_Foundation", "Win32_Graphics_Dwm", "Win32_Graphics_Gdi", "Win32_NetworkManagement_WNet", "Win32_Security", "Win32_Security_Isolation", "Win32_Storage_FileSystem", "Win32_System_Com", "Win32_System_DataExchange", "Win32_System_Diagnostics_Debug", "Win32_System_Diagnostics_ToolHelp", "Win32_System_IO", "Win32_System_Ioctl", "Win32_System_JobObjects", "Win32_System_LibraryLoader", "Win32_System_Memory", "Win32_System_Power", "Win32_System_Registry", "Win32_System_SystemInformation", "Win32_System_SystemServices", "Win32_System_Threading", "Win32_System_WindowsProgramming", "Win32_UI_Accessibility", "Win32_UI_HiDpi", "Win32_UI_Input_KeyboardAndMouse", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging"] }
 
 [features]
 custom-protocol = ["tauri/custom-protocol"]
@@ -216,6 +197,10 @@ tokio = { version = "1", features = ["test-util"] }
 file_access = { path = "features/file_access", features = ["test-fixtures"] }
 # Build fixtures/reference decoders without shipping these codecs in the macOS host.
 image = { version = "0.25.10", default-features = false, features = ["bmp", "gif", "jpeg", "tga", "webp"] }
+
+[target.'cfg(target_os = "macos")'.dev-dependencies]
+# The vendored copy (see [patch.crates-io]); the webview URL test compiles its URL reader.
+wry = { version = "=0.55.1", default-features = false }
 
 [patch.crates-io]
 # Preserve the clipboard API while using AppKit instead of a bundled TIFF decoder on macOS.

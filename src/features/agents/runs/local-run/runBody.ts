@@ -4,12 +4,8 @@ import { assembleAgentPrompt } from "../../bots/botPrompt";
 import { takeComputerUseAttachment } from "@/features/computer-use/computerUseAttachment";
 import { multirunFolderOf } from "../../multirun/multirunFolders";
 import { agentAccountId, isSignedIn } from "../../personal/agentAccount";
-import {
-  blankConversationState,
-  collaborationOf,
-  readConversationState,
-} from "@/features/agents/localRun";
-import { computerName } from "@/features/agents/localRun";
+import { blankConversationState, collaborationOf, readConversationState } from "../../localRun";
+import { computerName } from "../../localRun";
 import { personalAgentFor } from "../../personal/personalAgentsStore";
 import { invoke } from "@/native/invoke";
 import { localAttachmentsForRun } from "../../conversations/composer/localAttachments";
@@ -27,6 +23,7 @@ import { inferredArtifactKind } from "./artifactSpecs";
 import { resolveContext, type ResolvedSource } from "./resolvedContext";
 import { goNow } from "./runIdentity";
 import { teammateClaimsNote } from "../../virtual/teammates";
+import { useMistyStore } from "../../conversations/state/useMistyStore";
 
 /**
  * Everything a run reads to start: the request as the crate's `RunRequest` reads it
@@ -41,7 +38,6 @@ interface ChatFacts {
 }
 
 async function chatFacts(conversationId: string, runId: string): Promise<ChatFacts> {
-  const { useMistyStore } = await import("@/features/agents/conversations/state/useMistyStore");
   const chat = useMistyStore.getState().conversations.find((item) => item.id === conversationId);
   const title = chat?.title?.trim();
   // A new chat shows its opening words until a run names it (`openTurn`), which isn't a name yet.

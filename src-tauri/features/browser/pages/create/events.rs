@@ -1,42 +1,14 @@
 //! What a new page's webview does when it asks for a window and as it loads.
 use super::*;
 
-/// Answers a page's request for a new window.
+/// Answers a page's request for a new window: it opens in the page's own view.
 pub(super) fn new_window(
     popup_app: &AppHandle,
     popup_id: &str,
     url: Url,
     features: tauri::webview::NewWindowFeatures,
 ) -> NewWindowResponse<tauri::Wry> {
-    if let Some(response) = provider_popup(popup_app, popup_id, &url, features) {
-        return response;
-    }
-    // An agent's own hidden tab has no person to show a new tab to (a "New document"
-    // button, a target=_blank link): the page opens in place, where the agent's next
-    // look finds it, instead of in a tab the agent never sees.
-    if popup_id.starts_with("agent-") && matches!(url.scheme(), "https" | "http") {
-        if let Ok(label) = webview_label(popup_id) {
-            if let Some(view) = popup_app.get_webview(&label) {
-                let url = url.clone();
-                tauri::async_runtime::spawn(async move {
-                    let _ = view.navigate(url);
-                });
-            }
-        }
-        return NewWindowResponse::Deny;
-    }
-    if external_url(url.as_str()).is_ok() {
-        let _ = popup_app.emit_to(
-            browser_owner_label(popup_app, popup_id).as_str(),
-            "misty://browser-popup",
-            BrowserPopupEvent {
-                popup_instance_key: None,
-                source_id: popup_id.to_owned(),
-                url: url.to_string(),
-            },
-        );
-    }
-    NewWindowResponse::Deny
+    open_popup_in_place(popup_app, popup_id, &url, features)
 }
 
 /// Follows a page through a load: input locks, the agent ring, shortcuts and
@@ -123,7 +95,6 @@ pub(super) fn page_load(
         if let Some(state) = page_app.try_state::<BrowserSessionState>() {
             let _ = apply_shortcuts(&webview, &state);
         }
-        crate::browser::pages::night_light::apply(&webview);
         let _ = webview.eval("window.__MISTY_REPORT_BACKGROUND__?.()");
         request_browser_favicon(&webview, page_app, page_id);
         request_browser_compatibility(&webview, page_app, page_id);

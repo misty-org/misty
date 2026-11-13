@@ -38,7 +38,7 @@ export function workspaceSurfaceFromRoute(pathname: string): OpenWorkspaceSurfac
       tool === "social"
         ? "Chat"
         : tool === "journal"
-          ? "Journal"
+          ? "Docs"
           : tool === "planner"
             ? "Planner"
             : tool === "calendar"

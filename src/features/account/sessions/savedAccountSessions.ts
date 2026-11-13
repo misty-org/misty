@@ -1,10 +1,8 @@
 import { readDeploymentStorageItem } from "@/api/deployment/api";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import {
-  activeHostedAccountId,
-  hostedSessions,
+  activeVaultAccountId,
   isPresent,
-  isHostedSession,
   savedAccountSession,
   type SavedAccountSession,
   type SecureAccountSession,
@@ -47,9 +45,7 @@ export async function updateSavedAccountSession(
 ): Promise<void> {
   if (!hasTauriInternals()) return;
   const vault = await loadSecureVault();
-  const session = vault.sessions.find(
-    (item) => isHostedSession(item) && item.account.id === account.id,
-  );
+  const session = vault.sessions.find((item) => item.account.id === account.id);
   if (!session) return;
   session.account = {
     ...session.account,
@@ -58,8 +54,8 @@ export async function updateSavedAccountSession(
   await persistSecureVault(vault);
 }
 export function selectActiveSession(vault: SecureAccountVault): SecureAccountSession | null {
-  const preferredId = readActiveAccountId() || activeHostedAccountId(vault);
-  const sessions = hostedSessions(vault);
+  const preferredId = readActiveAccountId() || activeVaultAccountId(vault);
+  const sessions = vault.sessions;
   if (!preferredId && vault.activeAccountId === "") return null;
   return (
     sessions.find((item) => item.account.id === preferredId) ??

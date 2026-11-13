@@ -18,10 +18,14 @@ import { useClearTabsShortcut } from "./useClearTabsShortcut";
 import { WorkspaceTabPanels } from "./WorkspaceTabPanels";
 import { TopEdge } from "./TopEdge";
 import { LayoutPopup } from "./LayoutPopup";
+import { WorkspaceTabBar } from "./WorkspaceTabBar";
 import { WorkspaceSearch } from "./search/WorkspaceSearch";
+import { AgentsHub } from "./AgentsHub";
+import { agentChatRoute, openWorkspaceRoute } from "./spaceNavigation";
+import { TrayAgentsSync } from "@/features/agents";
 import type { WorkspaceTab } from "@/features/app-windows";
 import { useWorkspaceCanvasShortcuts } from "./useWorkspaceCanvasShortcuts";
-import { useLegacyTabTitles, useWorkspaceTabShortcuts } from "./useWorkspaceTabShortcuts";
+import { useWorkspaceTabShortcuts } from "./useWorkspaceTabShortcuts";
 import { disposeWorkspaceTab, workspaceTabsById } from "./workspaceViewLifecycle";
 
 export function WorkspaceCanvas(props: {
@@ -33,7 +37,6 @@ export function WorkspaceCanvas(props: {
   /** The vertical sidebar's closing row: the account and settings, inside its panel. */
   stripAccount?: ReactNode;
 }) {
-  useLegacyTabTitles();
   const location = useLocation();
   const navigate = useNavigate();
   const layout = useWorkspaceStore((state) => state.layout);
@@ -145,7 +148,7 @@ export function WorkspaceCanvas(props: {
       {/* Clipped, not hidden: a collapsed right sidebar waits past this edge, and scrolling its
           active tab into view must not scroll the page sideways. */}
       <div
-        className={`grid h-full min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)] overflow-clip bg-charcoal-workspace ${
+        className={`grid h-full min-h-0 min-w-0 grid-rows-[auto_auto_minmax(0,1fr)] overflow-clip bg-charcoal-workspace ${
           side === "right" ? "grid-cols-[minmax(0,1fr)_auto]" : "grid-cols-[auto_minmax(0,1fr)]"
         }`}
         data-workspace-panes={leaves.length}
@@ -161,12 +164,23 @@ export function WorkspaceCanvas(props: {
               />
             </SidebarDrawer>
             <TopEdge gridColumn={contentColumn} side={side} />
+            <WorkspaceTabBar
+              gridColumn={contentColumn}
+              onOpen={openTab}
+              onClosed={navigateToActiveLayoutTab}
+            />
           </>
         ) : null}
         <WorkspaceTabPanels gridColumn={contentColumn} layout={layout} renderTree={dockTree} />
         <PaneSwapMode />
         <LayoutPopup onApplied={navigateToActiveLayoutTab} />
         <WorkspaceSearch onOpen={openTab} />
+        <AgentsHub onOpen={openTab} />
+        <TrayAgentsSync
+          onOpenChat={(agentId, chatId) =>
+            openWorkspaceRoute(agentChatRoute(agentId, chatId), openTab)
+          }
+        />
       </div>
     </>
   );

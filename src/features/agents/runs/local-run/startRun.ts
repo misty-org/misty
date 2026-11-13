@@ -1,6 +1,5 @@
 import { agentAccountId } from "../../personal/agentAccount";
 import { rememberRun } from "@/features/agents/localRun";
-import { noteOnboardingStep } from "../invocations/localAiSettings";
 import { spaceWindow } from "@/features/app-windows";
 import { invoke } from "@/native/invoke";
 import { hasTauriInternals } from "@/shared/platform/tauri";
@@ -57,7 +56,6 @@ export async function startLocalRun(input: AiInvocationRequest): Promise<AiInvoc
       sources: sources.map((source) => source.citation),
     }).catch(() => undefined);
   await invoke("agent_run_start", { runId, body });
-  void noteOnboardingStep(input);
   return {
     invocationId: runId,
     conversationId,

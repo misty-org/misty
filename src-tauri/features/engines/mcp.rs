@@ -36,7 +36,14 @@ const CATALOG: &str = include_str!("../agents/runs/local_prompt/catalog.json");
 /// on disk, the shell and the web; these are what only Misty has. `integration.` is the person's
 /// connected apps (`agents/connected_apps`), signed in once in Misty for every engine.
 const SPACE_TOOLS: [&str; 9] = [
-    "space.", "note.", "file.", "thread.", "message.", "drawing.", "search.", "item.",
+    "space.",
+    "note.",
+    "file.",
+    "thread.",
+    "message.",
+    "drawing.",
+    "search.",
+    "item.",
     "integration.",
 ];
 

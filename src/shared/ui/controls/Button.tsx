@@ -73,9 +73,10 @@ const variantClass: Record<ButtonLook, string> = {
     "aria-pressed:bg-charcoal-hover aria-pressed:text-cream-bright",
     "data-[state=open]:bg-charcoal-hover data-[state=open]:text-cream-bright",
   ),
-  // Washing with the text color keeps it right on light themes too.
+  // Washing with the text color keeps it right on light themes too. Its fill reaches under its
+  // unseen border too, so a hovered or open quiet button is as big as the buttons beside it.
   quiet: cn(
-    "text-cream-muted hover:bg-control-hover hover:text-cream",
+    "bg-clip-border text-cream-muted hover:bg-control-hover hover:text-cream",
     "focus-visible:bg-control-hover focus-visible:text-cream",
     "aria-pressed:bg-control-active aria-pressed:text-cream",
     "aria-expanded:bg-control-active aria-expanded:text-cream",

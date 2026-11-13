@@ -171,10 +171,7 @@ pub async fn get(providers: Option<Vec<String>>, refresh: bool) -> Result<Limits
 }
 
 /// What is known without starting anything: the last limits each CLI reported.
-pub fn cached() -> LimitsResponse {
-    cached_from(&STORE)
-}
-
+#[cfg(test)]
 fn cached_from(store: &Store) -> LimitsResponse {
     LimitsResponse {
         providers: ProviderId::ALL

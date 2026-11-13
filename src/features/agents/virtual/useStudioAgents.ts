@@ -47,7 +47,7 @@ export function outcomeOf(state: string | undefined): Outcome {
 }
 
 export function studioStateOf(state: string | undefined): StudioState {
-  if (state === "running" || state === "queued" || state === "awaiting_device") return "working";
+  if (state === "running" || state === "queued") return "working";
   if (state === "awaiting_approval" || state === "awaiting_intervention") return "needs-you";
   return "resting";
 }

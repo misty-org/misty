@@ -46,7 +46,7 @@ export async function uploadJournalAsset(input: {
   externalFileId?: string;
 }): Promise<JournalAssetRecord> {
   if (input.file.size < 1 || input.file.size > MAX_JOURNAL_ASSET_BYTES) {
-    throw new Error("Journal files must be 15 MB or smaller.");
+    throw new Error("Docs files must be 15 MB or smaller.");
   }
   const bytes = await input.file.arrayBuffer();
   const sha256 = await sha256Hex(bytes);
@@ -74,7 +74,7 @@ export async function uploadJournalAsset(input: {
     ),
   );
   const asset = input.kind === "note" ? completed.note_asset : completed.drawing_asset;
-  if (!asset?.id) throw new Error("Misty did not return the uploaded Journal asset.");
+  if (!asset?.id) throw new Error("Misty did not return the uploaded file.");
   return asset;
 }
 
@@ -107,7 +107,7 @@ export function resolveJournalAssetUrl(downloadPath: string): Promise<string> {
 
 async function putDirectlyToR2(transfer: UploadReservation["transfer"], file: File): Promise<void> {
   if (!/^https:\/\//i.test(transfer.url)) {
-    throw new Error("Journal assets require a direct Cloudflare R2 upload.");
+    throw new Error("Docs files require a direct Cloudflare R2 upload.");
   }
   const response = await httpRequest(transfer.url, {
     method: transfer.method || "PUT",
@@ -116,9 +116,9 @@ async function putDirectlyToR2(transfer: UploadReservation["transfer"], file: Fi
     credentials: "omit",
   });
   if (!response.ok) {
-    const error = new Error(
-      `Cloudflare R2 rejected the Journal asset (${response.status}).`,
-    ) as Error & { status: number };
+    const error = new Error(`Cloudflare R2 rejected the file (${response.status}).`) as Error & {
+      status: number;
+    };
     error.status = response.status;
     throw error;
   }
@@ -149,19 +149,19 @@ async function downloadAndVerifyJournalAsset(downloadPath: string): Promise<stri
     !/^[a-f0-9]{64}$/.test(descriptor.sha256) ||
     descriptor.byte_size < 1
   ) {
-    throw new Error("Misty returned an invalid Journal asset descriptor.");
+    throw new Error("Misty returned an invalid file descriptor.");
   }
   const response = await httpRequest(descriptor.url, { credentials: "omit" });
   if (!response.ok) {
-    throw new Error(`Cloudflare R2 could not load the Journal asset (${response.status}).`);
+    throw new Error(`Cloudflare R2 could not load the file (${response.status}).`);
   }
   const blob = await response.blob();
   if (blob.size !== descriptor.byte_size) {
-    throw new Error("The Journal asset size did not match its verified metadata.");
+    throw new Error("The file's size did not match its verified metadata.");
   }
   const bytes = await blob.arrayBuffer();
   if ((await sha256Hex(bytes)) !== descriptor.sha256) {
-    throw new Error("The Journal asset checksum did not match its verified metadata.");
+    throw new Error("The file's checksum did not match its verified metadata.");
   }
   return dataURLFromBytes(bytes, descriptor.mime_type || blob.type);
 }
@@ -179,8 +179,4 @@ function dataURLFromBytes(bytes: ArrayBuffer, mimeType: string): string {
     binary += String.fromCharCode(...view.subarray(offset, offset + chunkSize));
   }
   return `data:${mimeType || "application/octet-stream"};base64,${btoa(binary)}`;
-}
-
-export function clearJournalAssetCache(): void {
-  resolvedAssetCache.clear();
 }

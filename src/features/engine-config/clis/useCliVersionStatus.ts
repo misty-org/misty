@@ -105,23 +105,6 @@ export function useCliVersionStatus(engine: string): CliVersionStatusView {
   };
 }
 
-/**
- * For first run and anywhere else that needs to know whether an engine is ready: installed, its
- * version, whether an update exists, and whether the person is signed in (as the CLI says).
- */
-export function useCliStatus(engine: string) {
-  const view = useCliVersionStatus(engine);
-  return {
-    loading: view.status === null && view.error === null,
-    installed: view.status?.installed ?? false,
-    version: view.status?.localVersion ?? null,
-    updateAvailable: view.status?.updateAvailable ?? false,
-    signedIn: view.signIn?.signedIn ?? null,
-    error: view.error,
-    refresh: view.refresh,
-  };
-}
-
 /** Clears the cache; tests only. */
 export function resetCliStatusForTests() {
   entries.clear();

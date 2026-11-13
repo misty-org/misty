@@ -1,5 +1,5 @@
 use super::*;
-use crate::engines::{engine_by_id, SendRequest, Transport};
+use crate::engines::{engine_by_id, SendRequest};
 
 /// Every flag an engine takes to stop asking for permission.
 const SKIP_FLAGS: &[&str] = &[
@@ -42,7 +42,7 @@ fn request(permission: &str) -> SendRequest {
 /// The command line the engine is started with for this permission level, local folder.
 fn argv(engine: &dyn Engine, permission: &str) -> Option<Vec<String>> {
     let req = request(permission);
-    let built = if engine.transport_for(false) == Transport::Own {
+    let built = if engine.drives_own_transport() {
         engine.host_command(&req, engine.id())
     } else {
         engine.build_command(&req, engine.id())

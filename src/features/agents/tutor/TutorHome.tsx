@@ -5,31 +5,31 @@ import {
   Clock,
   EllipsisVertical,
   Plus,
-  Settings2,
   Trash2,
   type LucideIcon,
 } from "lucide-react";
 import { confirmAction } from "@/shared/lib/confirmAction";
 import {
   Button,
+  CollectionSortMenu,
   CollectionViewToggle,
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
   IconButton,
   MenuItem,
-  MenuRadioGroup,
-  MenuRadioItem,
   OverflowFadeText,
   Pressable,
   Skeleton,
+  ToolbarDivider,
   useNotice,
 } from "@/shared/ui";
 import { shortAgo } from "../page/useChatStatuses";
-import { companionAvailable } from "./cursor/companionOn";
-import { CursorMenuItem } from "./notebook/NotebookBar";
 import "./notebook/tutorBar.css";
 import { SearchAll } from "./SearchAll";
+import { NotebookShareItems, SharedNotebooks } from "./SharedNotebooks";
+import { TopicStart } from "./TopicStart";
 import { TutorLessons } from "./TutorLessons";
 import type { TutorActions } from "./TutorPage";
 import { useTutorStore } from "./tutorStore";
@@ -58,7 +58,15 @@ const dateLabel = (iso: string) =>
   new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 
 /** A notebook's own menu, on its card or row. */
-function NotebookMenu({ notebook, className }: { notebook: Notebook; className?: string }) {
+function NotebookMenu({
+  notebook,
+  className,
+  onError,
+}: {
+  notebook: Notebook;
+  className?: string;
+  onError(message: string): void;
+}) {
   const remove = async () => {
     const message = `Delete “${notebook.title}”, its sources and notes? This can’t be undone.`;
     if (await confirmAction(message)) useTutorStore.getState().removeNotebook(notebook.id);
@@ -75,6 +83,8 @@ function NotebookMenu({ notebook, className }: { notebook: Notebook; className?:
         </IconButton>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" data-misty-layer-portal>
+        <NotebookShareItems notebook={notebook} onError={onError} />
+        <DropdownMenuSeparator />
         <MenuItem icon={Trash2} label="Delete notebook" danger onSelect={() => void remove()} />
       </DropdownMenuContent>
     </DropdownMenu>
@@ -82,8 +92,9 @@ function NotebookMenu({ notebook, className }: { notebook: Notebook; className?:
 }
 
 /**
- * Tutor's home, after NotebookLM's: a search across every notebook, the view, the order, Tutor's
- * settings and a new notebook, then the notebooks as cards or rows, then any lessons.
+ * the Lab's home, after NotebookLM's: a search across every notebook, the view, the order and
+ * a new notebook; then what to research and the topics to start from
+ * (TopicStart); then the notebooks as cards or rows, then any lessons.
  */
 export function TutorHome({ actions }: { actions: TutorActions }) {
   const notebooks = useTutorStore((state) => state.notebooks);
@@ -101,43 +112,24 @@ export function TutorHome({ actions }: { actions: TutorActions }) {
       <div className="tutor-library-tools">
         <SearchAll actions={actions} />
         <div className="tutor-library-tools-end">
+          <CollectionSortMenu value={sort} options={sorts} onChange={setSort} />
+          <ToolbarDivider />
           <CollectionViewToggle value={view} onChange={setView} />
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="quiet">
-                {sorts.find((option) => option.value === sort)?.label}
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" data-misty-layer-portal>
-              <MenuRadioGroup value={sort} onValueChange={(next) => setSort(next as Sort)}>
-                {sorts.map((option) => (
-                  <MenuRadioItem
-                    key={option.value}
-                    value={option.value}
-                    icon={option.icon}
-                    label={option.label}
-                  />
-                ))}
-              </MenuRadioGroup>
-            </DropdownMenuContent>
-          </DropdownMenu>
-          {companionAvailable() && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <IconButton label="Tutor settings">
-                  <Settings2 />
-                </IconButton>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" data-misty-layer-portal>
-                <CursorMenuItem onError={setError} />
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
-          <Button variant="primary" className="tutor-bar-create" onClick={create} icon={Plus}>
-            Create new
+          <Button
+            variant="primary"
+            className="tutor-bar-create"
+            onClick={create}
+            icon={Plus}
+            data-tour="lab-new"
+          >
+            Create notebook
           </Button>
         </div>
       </div>
+
+      <span data-tour="lab-start" className="contents">
+        <TopicStart actions={actions} onError={setError} />
+      </span>
 
       <h2>Notebooks</h2>
       {view === "grid" ? (
@@ -161,9 +153,14 @@ export function TutorHome({ actions }: { actions: TutorActions }) {
                     <span className="tutor-library-card-title">{notebook.title}</span>
                     <span className="tutor-card-detail">
                       {dateLabel(notebook.createdAt)} · {sourcesLabel(notebook.sources.length)}
+                      {notebook.shared ? ` · Shared with ${notebook.shared.spaceName}` : null}
                     </span>
                   </Pressable>
-                  <NotebookMenu notebook={notebook} className="tutor-library-menu" />
+                  <NotebookMenu
+                    notebook={notebook}
+                    className="tutor-library-menu"
+                    onError={setError}
+                  />
                 </div>
               ))}
         </div>
@@ -192,7 +189,11 @@ export function TutorHome({ actions }: { actions: TutorActions }) {
                   <span className="tutor-card-detail">{shortAgo(notebook.updatedAt)}</span>
                   <span />
                 </Pressable>
-                <NotebookMenu notebook={notebook} className="tutor-library-menu" />
+                <NotebookMenu
+                  notebook={notebook}
+                  className="tutor-library-menu"
+                  onError={setError}
+                />
               </div>
             ))
           ) : (
@@ -201,6 +202,7 @@ export function TutorHome({ actions }: { actions: TutorActions }) {
         </div>
       )}
 
+      <SharedNotebooks onOpen={(notebookId) => actions.open(`notebook:${notebookId}`)} />
       <TutorLessons onLesson={actions.onChat} />
     </div>
   );

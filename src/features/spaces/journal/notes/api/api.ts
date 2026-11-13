@@ -42,6 +42,18 @@ export const notesApi = {
       method: "POST",
       body: JSON.stringify({ title }),
     }),
+  /** A doc made with a body, as a Lab notebook shared into the Space is. */
+  createWithMarkdown: (spaceId: string, title: string, markdown: string) =>
+    spaceRequest<ServerSpaceNote>(`/spaces/${part(spaceId)}/notes`, {
+      method: "POST",
+      body: JSON.stringify({ title, markdown }),
+    }),
+  /** Replaces a doc's title and body, as a shared notebook keeps its doc up to date. */
+  replaceContent: (spaceId: string, noteId: string, title: string, markdown: string) =>
+    spaceRequest<ServerSpaceNote>(`/spaces/${part(spaceId)}/notes/${part(noteId)}/content`, {
+      method: "PUT",
+      body: JSON.stringify({ title, markdown }),
+    }),
   updateMetadata: (spaceId: string, noteId: string, sharedTags: string[]) =>
     spaceRequest<ServerSpaceNote>(`/spaces/${part(spaceId)}/notes/${part(noteId)}/metadata`, {
       method: "PATCH",

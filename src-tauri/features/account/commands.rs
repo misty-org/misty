@@ -21,13 +21,6 @@ pub(crate) use crate::account::api_cache::{
     __tauri_command_name_api_cache_put, api_cache_clear, api_cache_delete_prefix, api_cache_get,
     api_cache_put,
 };
-#[cfg(target_os = "macos")]
-pub(crate) use crate::account::google_sign_in_sheet::{
-    __cmd__google_sign_in_sheet_close, __cmd__google_sign_in_sheet_open,
-    __tauri_command_name_google_sign_in_sheet_close,
-    __tauri_command_name_google_sign_in_sheet_open, google_sign_in_sheet_close,
-    google_sign_in_sheet_open,
-};
 pub(crate) use crate::account::http::{
     __cmd__auth_http_cancel, __cmd__auth_http_read, __cmd__auth_http_start,
     __tauri_command_name_auth_http_cancel, __tauri_command_name_auth_http_read,

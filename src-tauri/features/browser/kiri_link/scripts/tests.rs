@@ -1,31 +1,11 @@
-use super::{
-    browser_captions_script, browser_status_script, browser_viewport_script,
-    BROWSER_VIEWPORT_SCRIPT,
-};
+use super::{browser_status_script, browser_viewport_script, BROWSER_VIEWPORT_SCRIPT};
 
-/// The viewport script with its media and window-drag parts, before the
-/// runtime placeholders are filled.
+/// The viewport script with its window-drag part, before the runtime placeholders are filled.
 fn viewport() -> String {
-    BROWSER_VIEWPORT_SCRIPT
-        .replace("__MISTY_MEDIA_PLACEHOLDER__", include_str!("media.js"))
-        .replace(
-            "__MISTY_WINDOW_DRAG_PLACEHOLDER__",
-            include_str!("window_drag.js"),
-        )
-}
-
-#[test]
-fn captions_run_in_every_frame_without_the_tab_token() {
-    let captions = browser_captions_script();
-    assert!(captions.starts_with("(() => {"));
-    assert!(captions.contains("const mistyCaptions"));
-    assert!(captions.contains("track.mode = 'hidden'"));
-    assert!(captions.contains("topWindow.postMessage"));
-    assert!(!captions.contains("shortcutToken"));
-    assert!(!captions.contains("PLACEHOLDER"));
-    // The top document reads frames' captions; YouTube is no longer read only there.
-    assert!(viewport().contains("window.__mistyFramedMedia"));
-    assert!(!viewport().contains("prefetchCaptions"));
+    BROWSER_VIEWPORT_SCRIPT.replace(
+        "__MISTY_WINDOW_DRAG_PLACEHOLDER__",
+        include_str!("window_drag.js"),
+    )
 }
 
 #[test]

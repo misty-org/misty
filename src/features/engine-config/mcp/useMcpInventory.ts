@@ -11,7 +11,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { mcpApi, McpHubError } from "./api";
-import type { McpConfigEntry, McpInventory, McpLaunchMode } from "./types";
+import type { McpConfigEntry, McpInventory } from "./types";
 
 export interface McpInventoryStore {
   inventory: McpInventory | null;
@@ -21,8 +21,6 @@ export interface McpInventoryStore {
   /** Toggle one entry; reloads config after the write so the UI reflects the
    *  file, not the optimistic click. */
   setEnabled: (entry: McpConfigEntry, enabled: boolean) => Promise<void>;
-  /** Changes how an entry starts; also read back after the write, sharing pendingId. */
-  setLaunchMode: (entry: McpConfigEntry, mode: McpLaunchMode) => Promise<void>;
   /** Entry id currently being written (only that row is disabled). */
   pendingId: string | null;
 }
@@ -90,11 +88,6 @@ export function useMcpInventory(workspacePath: string | null): McpInventoryStore
       write(entry, () => mcpApi.setEnabled(entry, enabled, workspacePath)),
     [write, workspacePath],
   );
-  const setLaunchMode = useCallback(
-    (entry: McpConfigEntry, mode: McpLaunchMode) =>
-      write(entry, () => mcpApi.setLaunchMode(entry, mode, workspacePath)),
-    [write, workspacePath],
-  );
 
-  return { inventory, loading, error, reload, setEnabled, setLaunchMode, pendingId };
+  return { inventory, loading, error, reload, setEnabled, pendingId };
 }

@@ -113,9 +113,10 @@ pub(crate) async fn current_selection(
             return Some((provider.to_string(), model.to_string()));
         }
     }
-    let catalog = crate::engines::support::dsh_host::host_call(origin, "session/modelCatalog", json!({}))
-        .await
-        .ok()?;
+    let catalog =
+        crate::engines::support::dsh_host::host_call(origin, "session/modelCatalog", json!({}))
+            .await
+            .ok()?;
     let default = catalog.get("default")?;
     let provider = default.get("provider")?.as_str()?.trim();
     let model = default.get("model")?.as_str()?.trim();
@@ -154,10 +155,13 @@ pub(crate) async fn ensure_image_admission(
             .map_err(|error| {
                 format!("Couldn't read the DSH settings to declare picture input for {provider}/{model}: {error}")
             })?;
-        let configurable =
-            crate::engines::support::dsh_host::host_call(origin, "llm/listConfigurableProviders", json!({}))
-                .await
-                .unwrap_or(Value::Null);
+        let configurable = crate::engines::support::dsh_host::host_call(
+            origin,
+            "llm/listConfigurableProviders",
+            json!({}),
+        )
+        .await
+        .unwrap_or(Value::Null);
         match plan_image_admission(&describe, &configurable, provider, model) {
             AdmissionPlan::Noop => return Ok(()),
             AdmissionPlan::Reject(reason) => return Err(reason),
@@ -266,7 +270,8 @@ fn plan_image_admission(
 
     let Some(expected_revision) = json_u64(namespace.get("revision")) else {
         return AdmissionPlan::Reject(
-            "settings/describe returned no llm-pi-ai revision, so it can't be written safely".to_string(),
+            "settings/describe returned no llm-pi-ai revision, so it can't be written safely"
+                .to_string(),
         );
     };
 

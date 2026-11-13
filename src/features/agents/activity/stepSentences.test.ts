@@ -1,13 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { RunStep } from "./activityApi";
-import {
-  describeLive,
-  describeSteps,
-  fileLabel,
-  offsetLabel,
-  toolKey,
-  tookLabel,
-} from "./stepSentences";
+import { describeLive, describeSteps, fileLabel, offsetLabel, toolKey } from "./stepSentences";
 
 let seq = 0;
 const step = (tool: string, more: Partial<RunStep> = {}): RunStep => ({
@@ -107,8 +100,5 @@ describe("step sentences", () => {
     expect(fileLabel("src/a.ts")).toBe("src/a.ts");
     expect(offsetLabel(62_000, 0)).toBe("1:02");
     expect(offsetLabel(3_725_000, 0)).toBe("1:02:05");
-    expect(tookLabel(400)).toBe("1s");
-    expect(tookLabel(150_000)).toBe("3 min");
-    expect(tookLabel(3_900_000)).toBe("1 h 5 min");
   });
 });

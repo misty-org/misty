@@ -28,7 +28,14 @@ import {
   Underline,
   Undo2,
   type LucideIcon,
+  Heading1,
+  Heading2,
+  Heading3,
+  Heading4,
 } from "lucide-react";
+
+/** Each heading level its own mark, so the menu's rows are told apart by more than a number. */
+const headingIcons = [Heading1, Heading2, Heading3, Heading4] as const;
 
 export function NoteToolbarStructureControls({ editor }: { editor: Editor }) {
   return (
@@ -46,20 +53,23 @@ export function NoteToolbarStructureControls({ editor }: { editor: Editor }) {
               label="Text"
               onSelect={() => editor.chain().focus().setParagraph().run()}
             />
-            {[1, 2, 3, 4].map((level) => (
-              <MenuItem
-                icon={<Heading />}
-                label={<>Heading {level}</>}
-                key={level}
-                onSelect={() =>
-                  editor
-                    .chain()
-                    .focus()
-                    .toggleHeading({ level: level as 1 | 2 | 3 | 4 })
-                    .run()
-                }
-              />
-            ))}
+            {headingIcons.map((LevelIcon, index) => {
+              const level = index + 1;
+              return (
+                <MenuItem
+                  icon={<LevelIcon />}
+                  label={<>Heading {level}</>}
+                  key={level}
+                  onSelect={() =>
+                    editor
+                      .chain()
+                      .focus()
+                      .toggleHeading({ level: level as 1 | 2 | 3 | 4 })
+                      .run()
+                  }
+                />
+              );
+            })}
           </DropdownMenuContent>
         </DropdownMenu>
         <DropdownMenu>

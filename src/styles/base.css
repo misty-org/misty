@@ -66,11 +66,6 @@
   html[data-browser-page-presented]
     [data-workspace-pane]:has([data-browser-page-host])
     > [data-pane-layer],
-  html[data-browser-page-presented] [data-misty-trusted-app]:has([data-browser-page-host]),
-  html[data-browser-page-presented] [data-misty-native-surface]:has([data-browser-page-host]),
-  html[data-browser-page-presented] [data-browser-page-container]:has([data-browser-page-host]),
-  html[data-browser-page-presented] [data-browser-workspace-tab],
-  html[data-browser-page-presented] [data-browser-page-stage],
   html[data-browser-page-presented] [data-browser-page-host] {
     background-color: transparent !important;
   }
@@ -92,22 +87,12 @@
   /* Browser chrome is application UI, not selectable page content. Prevent a
      stray drag or focus transfer elsewhere in Misty from painting selection
      or tap-highlight layers behind the native child view. */
-  [data-browser-workspace-tab],
-  [data-browser-page-stage],
   [data-browser-page-host] {
     -webkit-tap-highlight-color: transparent;
     -webkit-user-select: none;
     user-select: none;
   }
 
-  [data-browser-workspace-tab] input,
-  [data-browser-workspace-tab] textarea,
-  [data-browser-workspace-tab] [contenteditable="true"] {
-    -webkit-user-select: text;
-    user-select: text;
-  }
-
-  [data-browser-page-stage]::selection,
   [data-browser-page-host]::selection {
     background: transparent;
   }

@@ -21,8 +21,8 @@ export interface SearchablePickerOption {
   /** What `onPick` gets; the option whose value is the picker's `value` is checked. */
   value: string;
   label: string;
-  /** The 16px icon every row starts with, e.g. a cloud for a remote branch. */
-  icon: MenuIcon;
+  /** The 16px icon, only when it tells options apart, e.g. a cloud for a remote branch. */
+  icon?: MenuIcon;
   /** More words the search matches besides the label. */
   keywords?: ReadonlyArray<string>;
   disabled?: boolean;

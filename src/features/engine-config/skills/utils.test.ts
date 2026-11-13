@@ -7,13 +7,11 @@ import {
   daysSince,
   filterSkills,
   formatTokens,
-  hasOrphanCopy,
   nextTargets,
   relevantTargets,
   sortSkills,
   sourceKindOf,
   summarizeTargetResults,
-  syncedTargets,
   usageForSkill,
   visibleEngines,
 } from "./utils";
@@ -83,15 +81,6 @@ describe("skills utils", () => {
     ]);
     expect(partial.allOk).toBe(false);
     expect(partial.failed).toEqual([{ target: "codex", error: "permission denied" }]);
-  });
-
-  it("reports synced targets and orphan copies", () => {
-    const row = skill({
-      targets: ["claude", "codex"],
-      targetStates: { claude: "synced", codex: "orphan" },
-    });
-    expect(syncedTargets(row)).toEqual(["claude"]);
-    expect(hasOrphanCopy(row)).toBe(true);
   });
 
   it("formats token counts compactly", () => {

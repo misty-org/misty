@@ -187,11 +187,13 @@ impl CliModelConfig {
         let raw = self.env_model.as_deref().or(self.model_key.as_deref())?;
         let family = raw.strip_suffix("[1m]").unwrap_or(raw);
         let resolved = self.override_for(family).unwrap_or(raw);
-        Some(if family.len() != raw.len() && !resolved.ends_with("[1m]") {
-            format!("{resolved}[1m]")
-        } else {
-            resolved.to_string()
-        })
+        Some(
+            if family.len() != raw.len() && !resolved.ends_with("[1m]") {
+                format!("{resolved}[1m]")
+            } else {
+                resolved.to_string()
+            },
+        )
     }
 }
 
@@ -236,13 +238,11 @@ fn resolve_launch_model_from(config: &CliModelConfig, selector: &str) -> String 
 }
 
 /// Resolve only the comparison evidence; keep the CLI's selector unchanged.
-/// Remote binaries are not inferred from the host's registry.
 pub(crate) fn comparison_model(
     selector: &str,
     bin: Option<&std::path::Path>,
     channel_env: Option<&std::collections::HashMap<String, String>>,
     workspace: &std::path::Path,
-    remote: bool,
 ) -> Option<String> {
     let config = match channel_env {
         Some(env) => {
@@ -250,7 +250,6 @@ pub(crate) fn comparison_model(
             merge_settings_json(&mut config, &serde_json::json!({"env": env}).to_string());
             config
         }
-        None if remote => CliModelConfig::default(),
         None => {
             let mut config = CliModelConfig::default();
             let env: std::collections::HashMap<_, _> = FAMILY_ENV_KEYS
@@ -275,11 +274,7 @@ pub(crate) fn comparison_model(
             config
         }
     };
-    let registry = if remote {
-        None
-    } else {
-        bin.and_then(embedded_registry)
-    };
+    let registry = bin.and_then(embedded_registry);
     comparison_model_from(selector, &config, registry.as_ref())
 }
 
@@ -338,8 +333,7 @@ fn read_cli_config_from(dir: &std::path::Path) -> CliModelConfig {
     config
 }
 
-/// Per-field settings merge (settings.local.json wins), shared by the local
-/// read and the remote (WSL distro) variant.
+/// Per-field settings merge (settings.local.json wins).
 fn merge_settings_json(config: &mut CliModelConfig, content: &str) {
     let pick = |value: Option<&serde_json::Value>| {
         value
@@ -372,17 +366,6 @@ fn merge_settings_json(config: &mut CliModelConfig, content: &str) {
             config.overrides.insert(family.to_string(), m);
         }
     }
-}
-
-/// Remote (WSL distro) catalog from the distro's `$CLAUDE_CONFIG_DIR`
-/// settings contents (fetched via ssh by the caller). Aliases are CLI
-/// built-ins; only the per-field overrides come from config, so the distro
-/// settings reproduce its own /model menu.
-pub(super) fn claude_models_remote(user_json: &str, local_json: &str) -> Vec<EngineModel> {
-    let mut config = CliModelConfig::default();
-    merge_settings_json(&mut config, user_json);
-    merge_settings_json(&mut config, local_json);
-    claude_models_from(config, None)
 }
 
 /// Claude's picker catalog: the CLI's built-in aliases, default row first.
@@ -656,24 +639,6 @@ mod tests {
         assert_eq!(
             comparison_model_from("default", &config, None).as_deref(),
             Some("custom-opus")
-        );
-    }
-
-    #[test]
-    fn remote_comparison_uses_only_explicit_channel_mapping() {
-        let empty = std::collections::HashMap::new();
-        let workspace = std::path::Path::new("/unused");
-        assert_eq!(comparison_model("opus", None, None, workspace, true), None);
-        assert_eq!(
-            comparison_model("opus", None, Some(&empty), workspace, true),
-            None
-        );
-        let mapped = [("ANTHROPIC_DEFAULT_OPUS_MODEL".into(), "remote-opus".into())]
-            .into_iter()
-            .collect();
-        assert_eq!(
-            comparison_model("opus", None, Some(&mapped), workspace, true).as_deref(),
-            Some("remote-opus")
         );
     }
 

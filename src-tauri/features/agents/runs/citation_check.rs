@@ -108,6 +108,7 @@ pub(crate) fn unread_citations(answer: &str, messages: &[Message], tools: &Resea
 }
 
 /// What follows the fix in a refusal when the caller names nothing else.
+#[cfg(test)]
 pub(crate) const CALL_FINISH_AGAIN: &str = "call agent_finish again";
 
 /// The reason to refuse a report once, in words the model can act on.

@@ -342,26 +342,6 @@ pub(crate) fn get_review(
     .map_err(|e| e.to_string())
 }
 
-/// Every plan revision of a session (deduplicated by the planId/revision key).
-pub(crate) fn list_reviews(db: &Db, engine: &str, session_id: &str) -> Result<Vec<PlanReview>, String> {
-    let conn = db.0.lock();
-    let mut stmt = conn
-        .prepare(&format!(
-            "SELECT {REVIEW_COLUMNS} FROM cli_plan_reviews
-             WHERE engine=?1 AND session_id=?2
-             ORDER BY plan_id, revision"
-        ))
-        .map_err(|e| e.to_string())?;
-    let rows = stmt
-        .query_map(rusqlite::params![engine, session_id], map_review)
-        .map_err(|e| e.to_string())?;
-    let mut out = Vec::new();
-    for row in rows {
-        out.push(row.map_err(|e| e.to_string())?);
-    }
-    Ok(out)
-}
-
 /// Compare-and-set result: either this call claimed the submission, or the current state comes
 /// back for the caller to show the conflict (a repeated click gets the same result or a conflict).
 #[derive(Debug)]
@@ -390,7 +370,9 @@ pub(crate) fn submit_decision(
     let conn = db.0.lock();
     let current = conn
         .query_row(
-            &format!("SELECT {REVIEW_COLUMNS} FROM cli_plan_reviews WHERE plan_id=?1 AND revision=?2"),
+            &format!(
+                "SELECT {REVIEW_COLUMNS} FROM cli_plan_reviews WHERE plan_id=?1 AND revision=?2"
+            ),
             rusqlite::params![plan_id, expected_revision],
             map_review,
         )
@@ -537,9 +519,9 @@ pub(crate) fn expire_reviews(
     Ok(expired)
 }
 
-/// Cleaned up with the session or workspace that goes away (no ghost plans after a delete; a
-/// sessions row can be created after the plan record, so there is no foreign key and each delete
-/// path cleans up explicitly). The caller passes its connection inside its own transaction.
+/// Cleaned up with the session that goes away (no ghost plans after a delete; a sessions row
+/// can be created after the plan record, so there is no foreign key and each delete path cleans
+/// up explicitly). The caller passes its connection inside its own transaction.
 pub(crate) fn delete_reviews_for_session(
     conn: &rusqlite::Connection,
     engine: &str,
@@ -548,18 +530,6 @@ pub(crate) fn delete_reviews_for_session(
     conn.execute(
         "DELETE FROM cli_plan_reviews WHERE engine=?1 AND session_id=?2",
         rusqlite::params![engine, session_id],
-    )
-    .map_err(|e| e.to_string())?;
-    Ok(())
-}
-
-pub(crate) fn delete_reviews_for_workspace(
-    conn: &rusqlite::Connection,
-    workspace_path: &str,
-) -> Result<(), String> {
-    conn.execute(
-        "DELETE FROM cli_plan_reviews WHERE workspace_path=?1",
-        rusqlite::params![workspace_path],
     )
     .map_err(|e| e.to_string())?;
     Ok(())
@@ -730,22 +700,16 @@ mod tests {
     }
 
     #[test]
-    fn delete_follows_session_and_workspace_lifecycle() {
+    fn delete_follows_session_lifecycle() {
         let (db, dir) = temp_db("delete");
         record_review(&db, &review("p1", "s1")).unwrap();
         record_review(&db, &review("p2", "s2")).unwrap();
         {
             let conn = db.0.lock();
             delete_reviews_for_session(&conn, "dsh", "s1").unwrap();
-            delete_reviews_for_workspace(&conn, "/tmp/ws-empty").unwrap();
         }
         assert!(get_review(&db, "p1", 1).unwrap().is_none());
         assert!(get_review(&db, "p2", 1).unwrap().is_some());
-        {
-            let conn = db.0.lock();
-            delete_reviews_for_workspace(&conn, "/tmp/ws").unwrap();
-        }
-        assert!(get_review(&db, "p2", 1).unwrap().is_none());
         std::fs::remove_dir_all(&dir).ok();
     }
 
@@ -759,7 +723,6 @@ mod tests {
         let loaded = get_review(&reopened, "p1", 1).unwrap().unwrap();
         assert_eq!(loaded.content, "# Plan\nStep one");
         assert_eq!(loaded.status, PlanStatus::AwaitingReview);
-        assert_eq!(list_reviews(&reopened, "dsh", "s1").unwrap().len(), 1);
         std::fs::remove_dir_all(&dir).ok();
     }
 }

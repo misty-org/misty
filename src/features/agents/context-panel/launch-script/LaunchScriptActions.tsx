@@ -75,9 +75,9 @@ function ScriptFields(props: {
  * The folder's start commands in the panel's head, after ccgui's launch script button: the first
  * command gets a play button (click to run it, right-click to edit it), commands with names get
  * named buttons, and the editor changes the first command and adds more. A command runs in the
- * folder's launch tab of the terminal, the same tab every time. Saving an empty command removes it.
+ * chat's launch tab of the terminal, the same tab every time. Saving an empty command removes it.
  */
-export function LaunchScriptButton({ folder }: { folder: string }) {
+export function LaunchScriptButton({ chat, folder }: { chat: string; folder: string }) {
   const entries = useLaunchScripts((state) => state.byFolder[folder] ?? noEntries);
   const loaded = useLaunchScripts((state) => state.byFolder[folder] !== undefined);
   // `false` while closed; `null` edits a first command that doesn't exist yet.
@@ -139,7 +139,7 @@ export function LaunchScriptButton({ folder }: { folder: string }) {
 
   const run = (entry: LaunchScriptEntry, index: number) => {
     setError("");
-    void runLaunchScript(folder, entry).catch((reason: unknown) => {
+    void runLaunchScript(chat, folder, entry).catch((reason: unknown) => {
       // A run that fails is never silent: the editor opens with what went wrong.
       openEditor(index);
       setError(`The start command could not run: ${errorText(reason)}`);

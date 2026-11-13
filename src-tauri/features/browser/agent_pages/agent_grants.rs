@@ -165,7 +165,6 @@ pub(in crate::browser) fn is_browser_capability(value: &str) -> bool {
             | "browser.navigate"
             | "browser.click"
             | "browser.type"
-            | "browser.request"
             | "browser.interact"
             | "browser.upload"
             | "browser.downloads.list"

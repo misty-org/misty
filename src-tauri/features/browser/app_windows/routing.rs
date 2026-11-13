@@ -35,13 +35,6 @@ pub(crate) fn last_person_window() -> Option<String> {
     registry::last_focused_person()
 }
 
-/// Whether any window of the profile is open.
-pub fn profile_is_open(key: &str) -> bool {
-    current_windows()
-        .iter()
-        .any(|(_, shown)| shown.profile == key)
-}
-
 /// Every open app window.
 pub fn app_windows<R: Runtime>(app: &AppHandle<R>) -> Vec<Window<R>> {
     // `get_webview_window` cannot see a window that holds page views beside its own.

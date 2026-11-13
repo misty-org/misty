@@ -46,8 +46,6 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use rusqlite::OptionalExtension;
-
 use serde_json::{json, Map, Value};
 use tokio::io::{AsyncWriteExt, BufReader};
 use tokio::process::{Child, ChildStdin, ChildStdout, Command};
@@ -56,15 +54,16 @@ use tokio::time::{timeout, Instant};
 
 use super::codex_read_only;
 use super::images;
+use super::plan_review::{self, PlanDecision, PlanReview, PlanReviewKind};
 use super::qoder_session::{
     encode_ndjson, jsonrpc_id_key, jsonrpc_request, jsonrpc_result_response, teardown, KILL_POLL,
     PROMPT_TIMEOUT, RPC_HANDSHAKE_TIMEOUT,
 };
-use super::plan_review::{self, PlanDecision, PlanReview, PlanReviewKind};
 use super::{
     assistant_message, read_line_capped, spawn_stderr_capture, tool_call_message,
-    tool_call_message_with_id, tool_result_patch, tool_result_patch_with_id, BuiltCommand, ChildEntry, Engine, EngineEvent, LineRead, SendRequest,
-    TurnCore, TurnState, VirtualRunGuard, MAX_LINE_BYTES,
+    tool_call_message_with_id, tool_result_patch, tool_result_patch_with_id, BuiltCommand,
+    ChildEntry, Engine, EngineEvent, LineRead, SendRequest, TurnCore, TurnState, VirtualRunGuard,
+    MAX_LINE_BYTES,
 };
 
 #[path = "codex_app_questions.rs"]
@@ -538,7 +537,14 @@ fn handle_notification(
         "item/started" | "item/completed" => {
             if let Some(item) = params.get("item") {
                 let thread_id = params.get("threadId").and_then(Value::as_str);
-                handle_item(core, state, view, item, method == "item/completed", thread_id);
+                handle_item(
+                    core,
+                    state,
+                    view,
+                    item,
+                    method == "item/completed",
+                    thread_id,
+                );
             }
         }
         // Plan body streaming (EXPERIMENTAL): draft preview only. The schema
@@ -582,7 +588,11 @@ fn handle_notification(
         }
         "thread/started" => {
             if let Some(thread_id) = params.pointer("/thread/id").and_then(Value::as_str) {
-                if view.main_thread.as_deref().map_or(true, |main| main == thread_id) {
+                if view
+                    .main_thread
+                    .as_deref()
+                    .map_or(true, |main| main == thread_id)
+                {
                     core.dispatch_event(state, EngineEvent::SessionId(thread_id.to_string()));
                 }
             }
@@ -685,16 +695,12 @@ fn handle_item(
                         .as_deref()
                         .map(str::trim)
                         .filter(|id| !id.is_empty()),
-                    view.turn_id.as_deref().map(str::trim).filter(|id| !id.is_empty()),
+                    view.turn_id
+                        .as_deref()
+                        .map(str::trim)
+                        .filter(|id| !id.is_empty()),
                 ) {
-                    park_async_question(
-                        core,
-                        state,
-                        request_id,
-                        thread_id,
-                        turn_id,
-                        cards,
-                    );
+                    park_async_question(core, state, request_id, thread_id, turn_id, cards);
                 }
             }
         }
@@ -911,7 +917,10 @@ fn handle_item(
                     state,
                     tool_result_patch_with_id(
                         name,
-                        Some(&pick(item, &["status", "receiverThreadIds", "agentsStates"])),
+                        Some(&pick(
+                            item,
+                            &["status", "receiverThreadIds", "agentsStates"],
+                        )),
                         item_id,
                     ),
                 );
@@ -1116,8 +1125,7 @@ fn decision_collaboration(
     let model = thread_model
         .filter(|m| !m.trim().is_empty())
         .ok_or_else(|| {
-            "thread/resume reported no model; cannot restate collaborationMode settings"
-                .to_string()
+            "thread/resume reported no model; cannot restate collaborationMode settings".to_string()
         })?;
     Ok(collaboration_mode(mode, model, thread_effort))
 }
@@ -1155,11 +1163,13 @@ fn decision_spec(
         PlanDecision::Approve => {
             let permission = review.exec_permission.trim();
             if permission.is_empty() {
-                return Err(
-                    "the plan review lost its execution permission snapshot".to_string()
-                );
+                return Err("the plan review lost its execution permission snapshot".to_string());
             }
-            ("default", EXECUTE_PLAN_PROMPT.to_string(), permission.to_string())
+            (
+                "default",
+                EXECUTE_PLAN_PROMPT.to_string(),
+                permission.to_string(),
+            )
         }
         PlanDecision::RequestChanges => {
             let feedback = feedback
@@ -1217,21 +1227,6 @@ fn check_plan_item(page: &Value, native_plan_id: &str, expected_hash: &str) -> R
     Err(format!(
         "{PLAN_STALE_PREFIX} the reviewed plan item is no longer in the thread"
     ))
-}
-
-/// The channel the planning session ran on (recorded per session by the
-/// frontend's session memory): the decision turn must re-attach with the same
-/// credentials, or thread/resume would land on the default backend.
-fn session_provider_id(db: &crate::engines::support::db::Db, session_id: &str) -> Option<String> {
-    let conn = db.0.lock();
-    conn.query_row(
-        "SELECT provider_id FROM cli_session_providers WHERE engine='codex' AND session_id=?1",
-        rusqlite::params![session_id],
-        |row| row.get::<_, String>(0),
-    )
-    .optional()
-    .ok()
-    .flatten()
 }
 
 struct SpawnedCodex {
@@ -1428,8 +1423,16 @@ async fn drive(
     // so the registry gets the writer from the first frame on.
     core.registry
         .set_stdin(&core.run_id, Arc::clone(&spawned.server.stdin));
-    let result =
-        handshake_and_turn(&mut spawned.server, core, state, view, req, killed, decision).await;
+    let result = handshake_and_turn(
+        &mut spawned.server,
+        core,
+        state,
+        view,
+        req,
+        killed,
+        decision,
+    )
+    .await;
     teardown(&mut spawned.child).await;
     view.exit_unconfirmed = !matches!(spawned.child.try_wait(), Ok(Some(_)));
     match result {
@@ -1727,8 +1730,11 @@ async fn handshake_and_start(
         // Planning turn (EXPERIMENTAL): collaborationMode takes precedence
         // over the top-level model/effort fields, so only one of the two
         // shapes is sent. A missing model is schema-invalid — fail closed.
-        turn_params["collaborationMode"] =
-            plan_collaboration(req.model.as_deref(), thread_model.as_deref(), req.effort.as_deref())?;
+        turn_params["collaborationMode"] = plan_collaboration(
+            req.model.as_deref(),
+            thread_model.as_deref(),
+            req.effort.as_deref(),
+        )?;
     } else {
         if let Some(effort) = req.effort.as_deref() {
             turn_params["effort"] = json!(effort);
@@ -1763,7 +1769,11 @@ async fn handshake_and_start(
 /// The app-server call for a message that is one of Codex's own commands, if it is: `/compact`
 /// alone compacts the thread; `/review` reviews the uncommitted changes, or follows the
 /// instructions written after it. Anything else, or a message with images, is a turn.
-fn native_command(prompt: &str, images: &[String], thread_id: &str) -> Option<(&'static str, Value)> {
+fn native_command(
+    prompt: &str,
+    images: &[String],
+    thread_id: &str,
+) -> Option<(&'static str, Value)> {
     if !images.is_empty() {
         return None;
     }
@@ -1878,7 +1888,9 @@ async fn verify_plan_item(
             &mut |value| route(core, state, view, value),
         )
         .await?
-        .ok_or_else(|| "the codex app-server ended before thread/turns/list was answered".to_string())?;
+        .ok_or_else(|| {
+            "the codex app-server ended before thread/turns/list was answered".to_string()
+        })?;
     check_plan_item(&page, &check.native_plan_id, &check.content_hash)
 }
 
@@ -1909,15 +1921,12 @@ pub(crate) async fn run_plan_decision(
         content_hash: review.content_hash.clone(),
     };
 
-    // Rebuild the launch exactly like a send on this session would: same
-    // binary, same channel (the decision turn re-attaches to the thread, and
-    // the thread's backend only answers with the planning session's
-    // credentials), same service tier.
+    // Rebuild the launch like a send on this session would: same binary, the engine's current
+    // channel and the same service tier.
     crate::engines::support::config::ensure_engine_enabled("codex")?;
     let settings = crate::engines::support::settings::read_settings().unwrap_or_default();
     let bin = super::engine_bin(&settings, "codex");
-    let provider_id = session_provider_id(&state.db, &thread_id);
-    let provider = crate::engines::support::config::resolve_provider("codex", provider_id.as_deref())?;
+    let provider = crate::engines::support::config::resolve_provider("codex", None)?;
     let channel_env = provider
         .as_ref()
         .map(|provider| crate::engines::support::provider_files::channel_env("codex", provider))
@@ -1937,7 +1946,7 @@ pub(crate) async fn run_plan_decision(
         service_tier: settings.codex_service_tier.clone(),
         permission: Some(spec.permission),
         additional_dirs: state.db.granted_roots().unwrap_or_default(),
-        provider_id,
+        provider_id: None,
         mcp_servers: None,
         allowed_tools: None,
     };
@@ -1971,7 +1980,6 @@ pub(crate) async fn run_plan_decision(
     };
     {
         let mut map = state.processes.0.lock().map_err(|e| e.to_string())?;
-        state.processes.ensure_session_not_editing(Some(&thread_id))?;
         if super::registry::active_run_count(&map) >= super::MAX_CONCURRENT_RUNS {
             return Err(format!(
                 "too many concurrent runs ({}); wait for one to finish",
@@ -2180,8 +2188,8 @@ fn terminal_message(raw: String, stderr_buf: &Mutex<String>) -> String {
 mod tests {
     use super::*;
     use crate::engines::registry::ChildEntry;
-    use crate::engines::ProcessRegistry;
     use crate::engines::support::event_sink::{Emit, EventSink};
+    use crate::engines::ProcessRegistry;
     use std::collections::HashMap;
 
     /// Test emitter collecting flushed event JSON for assertions.
@@ -2283,9 +2291,6 @@ mod tests {
             mcp_servers: None,
             allowed_tools: None,
         };
-        assert!(crate::engines::codex::CodexEngine
-            .build_command(&request, &bin)
-            .is_err());
         let mut built = crate::engines::codex::CodexEngine
             .host_command(&request, &bin)
             .unwrap();
@@ -2792,7 +2797,8 @@ require('node:readline').createInterface({input: process.stdin}).on('line', line
         let events = flushed(&core, &emitter);
         assert!(
             events.iter().any(|(kind, data)| {
-                kind == "served" && data.get("model").and_then(Value::as_str) == Some("gpt-5.6-cyber")
+                kind == "served"
+                    && data.get("model").and_then(Value::as_str) == Some("gpt-5.6-cyber")
             }),
             "{events:?}"
         );
@@ -3248,8 +3254,14 @@ require('node:readline').createInterface({input: process.stdin}).on('line', line
         assert_eq!(
             events,
             vec![
-                ("plan_draft".to_string(), json!({"planId": "thread-1/plan", "text": "# Dra", "replace": false})),
-                ("plan_draft".to_string(), json!({"planId": "thread-1/plan", "text": "ft", "replace": false})),
+                (
+                    "plan_draft".to_string(),
+                    json!({"planId": "thread-1/plan", "text": "# Dra", "replace": false})
+                ),
+                (
+                    "plan_draft".to_string(),
+                    json!({"planId": "thread-1/plan", "text": "ft", "replace": false})
+                ),
             ]
         );
         // Not a plan turn: the same deltas are ignored and never reach plan review.
@@ -3573,7 +3585,10 @@ require('node:readline').createInterface({input: process.stdin}).on('line', line
         let mut command = Command::new("sh");
         // The shell keeps stdout open (a hung CLI, not an exited one) while
         // cat records what the driver sends.
-        command.args(["-c", &format!("cat > '{}'; exec sleep 30", received.display())]);
+        command.args([
+            "-c",
+            &format!("cat > '{}'; exec sleep 30", received.display()),
+        ]);
         let mut spawned = spawn_app_server(&mut command, &directory).unwrap();
         let killed = Arc::new(AtomicBool::new(false));
         let started = TurnStarted {

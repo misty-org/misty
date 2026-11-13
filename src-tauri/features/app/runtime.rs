@@ -7,7 +7,6 @@ use settings::SettingsService;
 
 pub struct MistyRuntime {
     pub agent_chats: crate::agents::chats::AgentChatsService,
-    pub navigation_names: crate::browser::app_windows::navigation_names::NavigationNamesService,
     pub environment: AppEnvironmentService,
     pub settings: SettingsService,
     pub shortcuts: ShortcutService,
@@ -27,10 +26,6 @@ impl MistyRuntime {
 
         Self {
             agent_chats: crate::agents::chats::AgentChatsService::new(environment.store()),
-            navigation_names:
-                crate::browser::app_windows::navigation_names::NavigationNamesService::new(
-                    environment.store(),
-                ),
             environment,
             settings,
             shortcuts,

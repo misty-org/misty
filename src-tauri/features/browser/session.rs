@@ -2,27 +2,9 @@
 
 use super::*;
 
-/// Where a tab's site permissions live: its profile's store, or its incognito
-/// session's.
-pub(crate) fn session_permission_scope(
-    app: &AppHandle,
-    id: &str,
-) -> Option<kiri::engine::StoreScope> {
-    let state = app.try_state::<BrowserSessionState>()?;
-    let sessions = state.sessions.lock().ok()?;
-    let session = sessions.get(id)?;
-    if session.private {
-        return Some(kiri::engine::StoreScope::Temporary(0));
-    }
-    crate::browser::site_settings::permissions::store_key(session.store_id.as_deref())
-        .ok()
-        .map(kiri::engine::StoreScope::Persistent)
-}
-
 pub struct BrowserSessionState {
     pub(super) context_menu:
         Mutex<HashMap<String, crate::browser::menus::context_menu::PendingMenu>>,
-    pub(super) pending_popups: Mutex<HashSet<String>>,
     pub(super) sessions: Mutex<HashMap<String, BrowserSession>>,
     pub(super) reserved_downloads: Mutex<HashSet<PathBuf>>,
     pub(crate) shortcut_bindings: Mutex<Vec<BrowserShortcutBinding>>,
@@ -33,7 +15,6 @@ impl Default for BrowserSessionState {
     fn default() -> Self {
         Self {
             context_menu: Mutex::default(),
-            pending_popups: Mutex::default(),
             sessions: Mutex::default(),
             reserved_downloads: Mutex::default(),
             shortcut_bindings: Mutex::new(
@@ -58,12 +39,6 @@ pub(super) struct BrowserSession {
     // The page's Misty profile. Only this, never the store above, is included in renderer and
     // agent observations.
     pub(super) profile: Option<String>,
-    pub(super) profile_provider: Option<String>,
-    pub(super) provider_id: Option<String>,
-    pub(super) oauth_callback: Option<(
-        crate::browser::provider_accounts::OAuthCallback,
-        std::time::Instant,
-    )>,
     pub(super) scope_id: String,
     pub(super) grants: HashMap<String, BrowserGrant>,
     pub(super) snapshot_generation: u64,

@@ -19,12 +19,13 @@ export function AgentDiscardDialog({
   onCancel(): void;
   onDiscard(): void;
   /** Returns focus to whichever control started the change. */
-  restoreFocus(): void;
+  restoreFocus?(): void;
 }) {
   return (
     <AlertDialog open={open} onOpenChange={(next) => !next && onCancel()}>
       <AlertDialogContent
         onCloseAutoFocus={(event) => {
+          if (!restoreFocus) return;
           event.preventDefault();
           restoreFocus();
         }}

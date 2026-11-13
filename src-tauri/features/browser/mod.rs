@@ -36,18 +36,10 @@ pub(crate) use input::click_focus::install as install_click_focus;
 pub(crate) use pages::corner_scrollbars::install as install_corner_scrollbars;
 
 #[cfg(any(target_os = "macos", windows, target_os = "linux"))]
-use menus::popups::provider_popup;
+use menus::popups::open_popup_in_place;
 
 #[cfg(windows)]
 use pages::stacked_pages::{is_stacked, place_beneath, stack_windows_webview, unstack, wake};
-
-/// Pages switch by stacking order only on Windows; elsewhere the engine shows
-/// and hides views in one frame on its own.
-#[cfg(not(windows))]
-#[tauri::command]
-pub fn browser_webviews_show_only() -> Vec<String> {
-    Vec::new()
-}
 
 pub(crate) use agent_pages::page_agent::{page_controls, scope_site, SiteBlocks};
 use input::interact::interact_browser;
@@ -61,6 +53,7 @@ pub(crate) use agent_pages::agent_support::*;
 pub use agent_pages::agent_tab_close::*;
 pub use history_downloads::downloads::*;
 pub use menus::menu_commands::*;
+pub(crate) use pages::account_views::*;
 pub use pages::create::*;
 use pages::create_probes::*;
 pub use pages::renderer_reload::close_pages_on_renderer_load;
@@ -69,7 +62,6 @@ pub use pages::view_close::*;
 pub use pages::view_ops::*;
 pub use pages::view_overlay::*;
 pub use pages::window_pages::*;
-pub(crate) use provider_accounts::account_views::*;
 pub(crate) use site_data::store_data::*;
 pub use types::*;
 mod session;
@@ -83,9 +75,8 @@ use crate::browser::input::shortcuts::{
     shortcut_token_matches, BrowserShortcutBinding,
 };
 use crate::browser::kiri_link::scripts::{
-    browser_captions_script, browser_status_script, browser_status_update_script,
-    browser_viewport_script, emit_browser_pointer,
-    BROWSER_COMPATIBILITY_SCRIPT, BROWSER_FAVICON_SCRIPT,
+    browser_status_script, browser_status_update_script, browser_viewport_script,
+    emit_browser_pointer, BROWSER_COMPATIBILITY_SCRIPT, BROWSER_FAVICON_SCRIPT,
 };
 #[cfg(target_os = "macos")]
 use crate::browser::pages::macos::configure_main_webview_pointer_guard;
@@ -207,10 +198,8 @@ pub mod page_text;
 pub mod pages;
 #[cfg(desktop)]
 pub mod profiles;
-pub mod provider_accounts;
 pub mod site_data;
 pub mod site_icons;
-pub mod site_settings;
 #[cfg(test)]
 // Tests build their fixtures directly, outside the file gate.
 #[allow(clippy::disallowed_methods, clippy::disallowed_types)]

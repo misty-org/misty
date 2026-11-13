@@ -1,29 +1,16 @@
-import { workspaceDefaultViewIndex } from "@/features/settings";
 import { type WorkspaceView } from "./workspaceViews";
 
-/** Settings store the view's index in the setting's legacy values, where 0 was the retired Home
- * page, 1 the browser and 2 the retired Files tool; all now open Agents. */
-const defaultViewSurfaces = [null, "agents", null, "agents"] as const;
-const defaultViewChoices = [{ label: "Agents", storedIndex: 3 }] as const;
-
-export { workspaceDefaultViewIndex };
-let defaultIndex = workspaceDefaultViewIndex;
-export function configureWorkspaceDefaultView(index: number): void {
-  defaultIndex =
-    Number.isInteger(index) && defaultViewSurfaces[index] ? index : workspaceDefaultViewIndex;
-}
-
-function createTab(index: number, placeholder: boolean): WorkspaceView {
+/** A new tab or split: it always opens Agents. */
+function createTab(placeholder: boolean): WorkspaceView {
   const now = Date.now();
   const id = `tab:${crypto.randomUUID()}`;
-  const surfaceId = defaultViewSurfaces[index] ?? "agents";
   return {
     id,
-    surfaceId,
-    groupKey: `tool:${surfaceId}`,
+    surfaceId: "agents",
+    groupKey: "tool:agents",
     instanceKey: id,
-    title: defaultViewChoices.find((choice) => choice.storedIndex === index)?.label ?? "Agents",
-    route: `/${surfaceId}`,
+    title: "Agents",
+    route: "/agents",
     sidebarVisible: true,
     state: {},
     createdAt: now,
@@ -32,6 +19,12 @@ function createTab(index: number, placeholder: boolean): WorkspaceView {
   };
 }
 export function createDefaultWorkspaceView(): WorkspaceView {
-  return createTab(defaultIndex, true);
+  return createTab(true);
 }
 export const createBlankWorkspaceView = createDefaultWorkspaceView;
+
+/**
+ * The retired "New tabs and splits" setting's hook. Every tab opens Agents now, so it changes
+ * nothing; it stays only until the last test that calls it drops the call.
+ */
+export function configureWorkspaceDefaultView(_index: number): void {}

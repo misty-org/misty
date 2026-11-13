@@ -307,7 +307,10 @@ pub fn page(search: &str, offset: usize, limit: usize) -> (Vec<CatalogApp>, usiz
         })
         .collect();
     let total = matching.len();
-    (matching.into_iter().skip(offset).take(limit).collect(), total)
+    (
+        matching.into_iter().skip(offset).take(limit).collect(),
+        total,
+    )
 }
 
 /// The makers' servers among one registry page.

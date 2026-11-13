@@ -56,9 +56,7 @@ pub enum Reach {
     HostnameFile,
     /// The Downloads folder, after its grant (`grant:downloads`).
     DownloadsFolder,
-    /// The folder the person chose for downloads in Settings, which counts as granted.
-    ChosenDownloadFolder,
-    /// A file Misty saved as a download earlier, looked up in its own download history.
+    /// A file Misty is saving as a download, so finishing it doesn't depend on its folder's grant.
     RecordedDownload,
     /// A folder the person shared with agents (`grant-shared-folder`). Read-only here: writes come
     /// only from the shell, whose OS profile holds it to `grant-shared-folder-write` per chat.
@@ -232,23 +230,7 @@ pub fn revoke_downloads_folder() {
     with_policy(|policy| policy.remove_all(Reach::DownloadsFolder));
 }
 
-/// Replaces the folder chosen for downloads; `None` when Settings goes back to Downloads.
-pub fn set_chosen_download_folder(folder: Option<&Path>) {
-    with_policy(|policy| {
-        policy.remove_all(Reach::ChosenDownloadFolder);
-        if let Some(folder) = folder {
-            policy.add(
-                Reach::ChosenDownloadFolder,
-                folder,
-                Shape::Folder,
-                Access::Write,
-            );
-        }
-    });
-}
-
-/// A file from Misty's own download history, so the list keeps working for a download saved
-/// through a dialog or to a folder that's no longer the chosen one.
+/// A download Misty is saving, so it can finish even if its folder's grant changes meanwhile.
 pub fn allow_recorded_download(path: &Path) {
     with_policy(|policy| policy.add(Reach::RecordedDownload, path, Shape::Exact, Access::Write));
 }

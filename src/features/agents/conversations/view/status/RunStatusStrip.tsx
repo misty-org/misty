@@ -1,7 +1,7 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 import "./runStatus.css";
 import { memo, useEffect, useMemo, useState, type ReactNode } from "react";
-import { Bot, ListChecks, Pencil } from "lucide-react";
+import { ListChecks, Network, Pencil } from "lucide-react";
 import { Pressable } from "@/shared/ui";
 import { checklistForInvocation } from "../../../plans/checklists";
 import { useCollaborationStore } from "../../../plans/store";
@@ -205,7 +205,7 @@ export const RunStatusStrip = memo(function RunStatusStrip({
               running={live && childrenDone.length < subagents.length}
               label="Sub-agents"
               count={`${childrenDone.length}/${subagents.length}`}
-              icon={<Bot aria-hidden="true" />}
+              icon={<Network aria-hidden="true" />}
               onClick={() => toggle("subagent")}
             />
           )}

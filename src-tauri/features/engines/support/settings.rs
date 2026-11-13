@@ -128,9 +128,11 @@ pub fn read_settings() -> Result<AppSettings, String> {
     };
     let text: Option<String> = {
         let conn = db.read();
-        conn.query_row("SELECT document FROM cli_settings WHERE id = 1", [], |row| {
-            row.get(0)
-        })
+        conn.query_row(
+            "SELECT document FROM cli_settings WHERE id = 1",
+            [],
+            |row| row.get(0),
+        )
         .ok()
     };
     match text {
@@ -148,7 +150,11 @@ pub fn write_settings(settings: &AppSettings) -> Result<(), String> {
             validate_bin_override(path)?;
         }
     }
-    if let Some(home) = settings.codex_home.as_deref().filter(|home| !home.trim().is_empty()) {
+    if let Some(home) = settings
+        .codex_home
+        .as_deref()
+        .filter(|home| !home.trim().is_empty())
+    {
         validate_home_override(home)?;
     }
     let db = crate::engines::support::db::global().ok_or("The engine store isn't open.")?;
@@ -206,14 +212,19 @@ fn write_target(path: &std::path::Path) -> Result<std::path::PathBuf, String> {
     if let Ok(resolved) = std::fs::canonicalize(path) {
         return Ok(resolved);
     }
-    let link = std::fs::read_link(path).map_err(|e| format!("read link {}: {e}", path.display()))?;
+    let link =
+        std::fs::read_link(path).map_err(|e| format!("read link {}: {e}", path.display()))?;
     Ok(match path.parent() {
         Some(parent) if link.is_relative() => parent.join(link),
         _ => link,
     })
 }
 
-fn write_staged(tmp: &std::path::Path, target: &std::path::Path, content: &str) -> Result<(), String> {
+fn write_staged(
+    tmp: &std::path::Path,
+    target: &std::path::Path,
+    content: &str,
+) -> Result<(), String> {
     use std::io::Write;
     let mut file = std::fs::OpenOptions::new()
         .write(true)
@@ -235,4 +246,34 @@ fn write_staged(tmp: &std::path::Path, target: &std::path::Path, content: &str) 
     let _ = target;
     file.write_all(content.as_bytes())
         .map_err(|e| format!("write {}: {e}", tmp.display()))
+}
+
+/// Engines with no way to ask whether the person is signed in (Antigravity), whose own sign-in
+/// Misty watched finish in its sign-in terminal on this device. Only that it finished is kept,
+/// never anything the CLI got; its sign-out in the same terminal forgets it.
+pub fn signed_in_here(engine: &str) -> bool {
+    let Some(db) = crate::engines::support::db::global() else {
+        return false;
+    };
+    let conn = db.read();
+    conn.query_row(
+        "SELECT 1 FROM cli_signed_in_here WHERE engine = ?1",
+        [engine],
+        |_| Ok(()),
+    )
+    .is_ok()
+}
+
+/// Records (or, with `signed_in` false, forgets) that the engine's sign-in finished here.
+pub fn set_signed_in_here(engine: &str, signed_in: bool) -> Result<(), String> {
+    let db = crate::engines::support::db::global().ok_or("The engine store isn't open.")?;
+    let conn = db.0.lock();
+    let statement = if signed_in {
+        "INSERT OR IGNORE INTO cli_signed_in_here (engine) VALUES (?1)"
+    } else {
+        "DELETE FROM cli_signed_in_here WHERE engine = ?1"
+    };
+    conn.execute(statement, [engine])
+        .map_err(|e| e.to_string())?;
+    Ok(())
 }

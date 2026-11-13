@@ -147,10 +147,8 @@ describe("shortcut dispatcher", () => {
     useSettingsStore.setState({
       shortcuts: {
         detectedPlatform: "macos",
-        profileName: "Default",
         commandDefinitions: [],
         effectiveBindings: [],
-        bindings: [],
         configPath: "",
         overrides: [],
       },

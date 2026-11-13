@@ -1,7 +1,7 @@
 import type { MessageSpan } from "../../api/dto/common";
 import type { SpaceMessage } from "../../api/dto/entities";
 import { Badge } from "@/shared/ui";
-import { Bot } from "lucide-react";
+import { AgentMark } from "@/features/agents";
 import { Fragment } from "react";
 import { Link } from "react-router-dom";
 import { formatChatMessageTime } from "./ChatDisplay";
@@ -15,7 +15,7 @@ export function MessageHeader({ message }: { message: SpaceMessage }) {
       <strong className="text-md font-semibold text-cream">{message.sender_name}</strong>
       {agentAuthored ? (
         <Badge variant="secondary" className="h-4 gap-1 rounded px-1 text-3xs">
-          <Bot />
+          <AgentMark agentId={message.sender_agent_id} />
           Agent
         </Badge>
       ) : null}

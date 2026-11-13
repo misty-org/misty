@@ -1,4 +1,4 @@
-import { FileText, Image as ImageIcon, MessagesSquare, NotebookText, PenLine } from "lucide-react";
+import { FilePenLine, FileText, Image as ImageIcon, MessagesSquare, PenLine } from "lucide-react";
 import type { ComponentType, ReactNode } from "react";
 import { LibraryItemThumbnail } from "../library";
 import { itemTones, type ItemTone } from "@/shared/ui";
@@ -7,7 +7,7 @@ import type { GalleryItem, GalleryKind } from "./galleryItems";
 type KindIcon = ComponentType<{ className?: string; "aria-hidden"?: boolean }>;
 export const kindIcon: Record<GalleryKind, { Icon: KindIcon; tone: ItemTone; label: string }> = {
   chat: { Icon: MessagesSquare, tone: itemTones.chat, label: "Chat" },
-  note: { Icon: NotebookText, tone: itemTones.note, label: "Note" },
+  note: { Icon: FilePenLine, tone: itemTones.note, label: "Doc" },
   drawing: { Icon: PenLine, tone: itemTones.drawing, label: "Drawing" },
   image: { Icon: ImageIcon, tone: itemTones.image, label: "Image" },
   file: { Icon: FileText, tone: itemTones.document, label: "File" },
@@ -26,7 +26,7 @@ export function GalleryPreview({
     return (
       <div className="h-full p-3">
         <p className="m-0 line-clamp-4 text-xs leading-relaxed text-cream-muted">
-          {item.excerpt || "Empty note"}
+          {item.excerpt || "Empty doc"}
         </p>
       </div>
     );

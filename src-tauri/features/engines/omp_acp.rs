@@ -38,9 +38,9 @@ use serde_json::{json, Map, Value};
 
 use crate::engines::plan_review::{self, PlanExecution, PlanReview, PlanReviewKind, PlanStatus};
 use crate::engines::qoder_session::{
-    initialize_params, jsonrpc_id_key, jsonrpc_result_response,
-    session_update_from_notification, spawn_piped_acp, teardown, AcpLine, AcpProcess,
-    QoderSessionUpdate, PROMPT_TIMEOUT, RPC_HANDSHAKE_TIMEOUT, SESSION_NEW_TIMEOUT,
+    initialize_params, jsonrpc_id_key, jsonrpc_result_response, session_update_from_notification,
+    spawn_piped_acp, teardown, AcpLine, AcpProcess, QoderSessionUpdate, PROMPT_TIMEOUT,
+    RPC_HANDSHAKE_TIMEOUT, SESSION_NEW_TIMEOUT,
 };
 use crate::engines::{
     cleanup_staged_files, BuiltCommand, EngineEvent, SendRequest, TurnCore, TurnState,
@@ -205,7 +205,8 @@ async fn handshake_and_prompt(
         .ok_or_else(|| "OMP session/new returned no sessionId".to_string())?;
     if !plan_mode_advertised(&session_result) {
         return Err(
-            "The OMP session offers no plan mode (plan.enabled is off), so plan review can't start".to_string(),
+            "The OMP session offers no plan mode (plan.enabled is off), so plan review can't start"
+                .to_string(),
         );
     }
     core.dispatch_event(state, EngineEvent::SessionId(session_id.clone()));
@@ -634,7 +635,10 @@ fn plan_candidate_names(local_root: &Path, slug: Option<&str>) -> Vec<String> {
                 .filter_map(|entry| {
                     let name = entry.file_name().to_string_lossy().into_owned();
                     let is_plan = name.to_ascii_lowercase().ends_with("plan.md");
-                    let is_file = entry.file_type().map(|kind| kind.is_file()).unwrap_or(false);
+                    let is_file = entry
+                        .file_type()
+                        .map(|kind| kind.is_file())
+                        .unwrap_or(false);
                     if is_plan && is_file {
                         let mtime = entry
                             .metadata()
@@ -669,11 +673,17 @@ fn read_plan_candidate(local_root: &Path, name: &str) -> Result<Option<String>, 
         || name.contains("..")
         || !name.to_ascii_lowercase().ends_with("plan.md")
     {
-        return Err(format!("The plan file name `{name}` isn't in the allowlist"));
+        return Err(format!(
+            "The plan file name `{name}` isn't in the allowlist"
+        ));
     }
     let candidate = local_root.join(name);
-    let root_canonical = std::fs::canonicalize(local_root)
-        .map_err(|error| format!("The plan directory {} can't be read: {error}", local_root.display()))?;
+    let root_canonical = std::fs::canonicalize(local_root).map_err(|error| {
+        format!(
+            "The plan directory {} can't be read: {error}",
+            local_root.display()
+        )
+    })?;
     let file_canonical = match std::fs::canonicalize(&candidate) {
         Ok(path) => path,
         // Missing (a dangling symlink included) = this candidate misses; try the next.
@@ -689,15 +699,19 @@ fn read_plan_candidate(local_root: &Path, name: &str) -> Result<Option<String>, 
         return Ok(None);
     }
     if meta.len() > MAX_PLAN_BYTES as u64 {
-        return Err(format!("The plan file `{name}` is over the 1 MiB limit, so it isn't read"));
+        return Err(format!(
+            "The plan file `{name}` is over the 1 MiB limit, so it isn't read"
+        ));
     }
     let bytes = std::fs::read(&file_canonical).map_err(|error| error.to_string())?;
     if bytes.len() > MAX_PLAN_BYTES {
-        return Err(format!("The plan file `{name}` is over the 1 MiB limit, so it isn't read"));
+        return Err(format!(
+            "The plan file `{name}` is over the 1 MiB limit, so it isn't read"
+        ));
     }
-    String::from_utf8(bytes)
-        .map(Some)
-        .map_err(|_| format!("The plan file `{name}` isn't valid UTF-8, so it isn't taken as the plan"))
+    String::from_utf8(bytes).map(Some).map_err(|_| {
+        format!("The plan file `{name}` isn't valid UTF-8, so it isn't taken as the plan")
+    })
 }
 
 /// Locates and verifies this proposal's plan file: the elicitation carries only a 12-line
@@ -708,7 +722,9 @@ fn load_verified_plan(local_roots: &[PathBuf], params: &Value) -> Result<(String
     let message = params
         .get("message")
         .and_then(Value::as_str)
-        .ok_or_else(|| "The OMP plan elicitation has no message, so the body can't be verified".to_string())?;
+        .ok_or_else(|| {
+            "The OMP plan elicitation has no message, so the body can't be verified".to_string()
+        })?;
     let (title, preview) = parse_approval_message(message)
         .ok_or_else(|| "The OMP plan elicitation's message isn't a plan review, and a summary is never approved".to_string())?;
     if local_roots.is_empty() {
@@ -875,7 +891,10 @@ fn handle_session_update(
             input,
         } => {
             view.tool_names.insert(tool_id, tool_name.clone());
-            core.dispatch_event(state, crate::engines::tool_call_message(tool_name, input.as_ref()));
+            core.dispatch_event(
+                state,
+                crate::engines::tool_call_message(tool_name, input.as_ref()),
+            );
         }
         QoderSessionUpdate::ToolCompleted {
             tool_id,
@@ -891,7 +910,10 @@ fn handle_session_update(
                 (None, Some(error)) => json!({ "text": error, "isError": true }),
                 (None, None) => Value::Null,
             };
-            core.dispatch_event(state, crate::engines::tool_result_patch(name, Some(&result)));
+            core.dispatch_event(
+                state,
+                crate::engines::tool_result_patch(name, Some(&result)),
+            );
         }
         QoderSessionUpdate::Ignore => {}
     }

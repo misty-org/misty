@@ -1,5 +1,5 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
-import { AppWindow, Check, Plus, Trash2 } from "lucide-react";
+import { Check, Plus, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import {
   DropdownMenu,
@@ -29,7 +29,17 @@ const errorText = (reason: unknown) => (reason instanceof Error ? reason.message
 
 /** An app's own icon, or its first letter where the system gave none. */
 function TargetIcon({ target, icon }: { target: OpenAppTarget; icon?: string }) {
-  if (icon) return <img src={icon} alt="" aria-hidden="true" className="open-app-icon" />;
+  const [broken, setBroken] = useState<string | null>(null);
+  if (icon && broken !== icon)
+    return (
+      <img
+        src={icon}
+        alt=""
+        aria-hidden="true"
+        className="open-app-icon"
+        onError={() => setBroken(icon)}
+      />
+    );
   return (
     <span aria-hidden="true" className="open-app-letter">
       {target.label.trim().charAt(0).toUpperCase() || "?"}
@@ -139,7 +149,6 @@ export function OpenInMenu({ folder }: { folder: string }) {
               {programs.map((program) => (
                 <MenuItem
                   key={program.id}
-                  icon={AppWindow}
                   label={program.name}
                   onSelect={() =>
                     void useOpenApps

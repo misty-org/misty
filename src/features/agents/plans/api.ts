@@ -1,6 +1,5 @@
 import { localCollaborationApi } from "./localApi";
 import type {
-  AgentGoal,
   AgentPlan,
   AgentPlanPayload,
   AgentQuestionAnswer,
@@ -28,14 +27,4 @@ export const collaborationApi = {
   revisePlan: (plan: AgentPlan, payload: AgentPlanPayload) =>
     localCollaborationApi.revisePlan(plan, payload),
   rejectPlan: (plan: AgentPlan) => localCollaborationApi.rejectPlan(plan),
-  setGoal: (
-    conversationId: string,
-    input: { objective: string; successCriteria: string[]; budgetTokens?: number },
-  ) => localCollaborationApi.setGoal(conversationId, input),
-  controlGoal: (
-    goal: AgentGoal,
-    status: "paused" | "pursuing" | "cleared",
-    budgetTokens?: number,
-  ): Promise<{ goal: AgentGoal; prompt?: string }> =>
-    localCollaborationApi.controlGoal(goal, status, budgetTokens),
 };

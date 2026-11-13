@@ -70,6 +70,27 @@ async fn connected_apps_never_carry_what_a_connection_holds() {
 }
 
 #[tokio::test]
+async fn the_catalog_carries_each_apps_logo_when_it_is_https() {
+    let fake = fake(vec![
+        ("POST /api/v3.1/tool_router/session ", 201, json!({ "session_id": "s_session" })),
+        (
+            "GET /api/v3.1/tool_router/session/s_session/toolkits",
+            200,
+            json!({ "items": [
+                { "slug": "gmail", "name": "Gmail", "meta": { "logo": "https://logos.composio.dev/api/gmail" } },
+                { "slug": "odd", "name": "Odd", "meta": { "logo": "http://example.com/odd.png" } },
+            ] }),
+        ),
+    ])
+    .await;
+    let (apps, _) = apps::catalog(&client_of(&fake), "", "").await.unwrap();
+    assert_eq!(apps[0].logo, "https://logos.composio.dev/api/gmail");
+    assert_eq!(apps[1].logo, "");
+    let text = serde_json::to_string(&apps[1]).unwrap();
+    assert!(!text.contains("logo"));
+}
+
+#[tokio::test]
 async fn a_connect_card_finishes_once_the_app_has_an_account() {
     let empty = fake(vec![
         (

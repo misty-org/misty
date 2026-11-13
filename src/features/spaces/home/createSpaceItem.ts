@@ -17,7 +17,7 @@ export async function createSpaceItem(
   const base = `/spaces/${encodeURIComponent(spaceId)}`;
   if (kind === "note") {
     await preloadSpaceSection("notes");
-    const note = await notesApi.create(spaceId, "Untitled note");
+    const note = await notesApi.create(spaceId, "Untitled doc");
     onCreated();
     navigate(`${base}/notes?note=${encodeURIComponent(note.id)}`);
   } else if (kind === "drawing") {

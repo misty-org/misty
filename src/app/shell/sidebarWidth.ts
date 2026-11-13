@@ -2,9 +2,9 @@ import { create } from "zustand";
 
 const storageKey = "misty:sidebar-width:v1";
 const sidebarWidthDefault = 320;
-/** About an eighth of a laptop screen: the window controls and the two toggles still fit, and
- * back and forward step aside below 230px. */
-export const sidebarWidthMin = 160;
+/** The narrowest the sidebar goes: the window controls, the sidebar toggle, and back and forward
+ * all still fit in its head. */
+export const sidebarWidthMin = 200;
 const sidebarWidthMax = 480;
 
 const clamp = (value: number) =>

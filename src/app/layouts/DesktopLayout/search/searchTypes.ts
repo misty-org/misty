@@ -8,7 +8,7 @@ export const searchKinds: { id: SearchKind; label: string }[] = [
   { id: "all", label: "All" },
   { id: "chats", label: "Chats" },
   { id: "space", label: "Space" },
-  { id: "learn", label: "Tutor" },
+  { id: "learn", label: "Lab" },
   { id: "apps", label: "Apps" },
   { id: "settings", label: "Settings" },
   { id: "commands", label: "Commands" },

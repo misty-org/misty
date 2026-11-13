@@ -1,6 +1,6 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 import { describe, expect, it } from "vitest";
-import { mergeUsage, parseUsage, reportedContextWindow } from "./usage";
+import { parseUsage, reportedContextWindow } from "./usage";
 import { usageBreakdown } from "./usageBreakdown";
 
 describe("parseUsage", () => {
@@ -126,35 +126,6 @@ describe("parseUsage", () => {
 });
 
 describe("mergeUsage", () => {
-  it("keeps a previously reported context window", () => {
-    const merged = mergeUsage(
-      { input_tokens: 10, output_tokens: 2, total_tokens: 12 },
-      { input_tokens: 8, output_tokens: 1, total_tokens: 9, model_context_window: 475_000 },
-    );
-    expect(merged).toMatchObject({
-      input_tokens: 10,
-      total_tokens: 12,
-      model_context_window: 475_000,
-    });
-  });
-
-  it("folds a window-only report into the previous tokens instead of replacing them", () => {
-    const merged = mergeUsage(
-      { contextWindow: 1_000_000, model_context_window: 1_000_000 },
-      {
-        input_tokens: 900_000,
-        output_tokens: 50,
-        total_tokens: 900_050,
-        model_context_window: 200_000,
-      },
-    );
-    expect(merged).toMatchObject({
-      input_tokens: 900_000,
-      total_tokens: 900_050,
-      model_context_window: 1_000_000,
-    });
-  });
-
   describe("usageBreakdown", () => {
     it("returns null when usage cannot be parsed", () => {
       expect(usageBreakdown(null, 200000)).toBeNull();

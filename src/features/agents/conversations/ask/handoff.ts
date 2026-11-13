@@ -39,15 +39,6 @@ function currentConversationRoute() {
   return `/agents${query ? `?${query}` : ""}`;
 }
 
-/**
- * The panel's "Open full chat": the current conversation in a new tab. The tab that asked keeps
- * its side panels.
- */
-export function openMistyConversationInNewTab() {
-  const surface = workspaceSurfaceFromRoute(currentConversationRoute());
-  if (surface) useWorkspaceStore.getState().addSurface(surface);
-}
-
 /** Misty's conversations live on the Agents page; open it on the current one. */
 function showMistyConversation() {
   const route = currentConversationRoute();

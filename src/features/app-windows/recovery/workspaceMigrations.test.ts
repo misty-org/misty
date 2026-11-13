@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createDockLeaf, dockTreeViews } from "../panes/dockTree";
-import { createBrowserViewState, type WorkspaceView } from "../tabs/workspaceViews";
+import type { WorkspaceView } from "../tabs/workspaceViews";
 import {
   collectUnrestoredViews,
   migrateRetiredWorkspaceView,
@@ -8,6 +8,9 @@ import {
 } from "./workspaceMigrations";
 import { allLayoutViews } from "../panes/layoutTabs";
 import { migrateWorkspaceStore } from "../tabs/workspaceStorePersistence";
+
+/** A person's web page as old windows saved it. */
+const legacyPage = (url: string) => ({ version: 1, url, faviconUrl: null });
 
 /** Saved views may still carry surfaces this build no longer renders. */
 type LegacyViewOverrides = Omit<Partial<WorkspaceView>, "surfaceId" | "groupKey"> & {
@@ -48,7 +51,7 @@ describe("browser workspace migration", () => {
             surfaceId: "browser",
             groupKey,
             route: "/browser",
-            state: { ...createBrowserViewState("https://example.com/report"), agentOwned: true },
+            state: { ...legacyPage("https://example.com/report"), agentOwned: true },
             title: "Report",
           }),
         ),
@@ -78,7 +81,7 @@ describe("browser workspace migration", () => {
       surfaceId: "browser",
       groupKey: "tool:browser",
       route: "/browser",
-      state: createBrowserViewState("https://example.com/"),
+      state: legacyPage("https://example.com/"),
     });
     const agents = legacyTab({
       id: "agents",
@@ -134,7 +137,7 @@ describe("browser workspace migration", () => {
       surfaceId: "browser",
       groupKey: "tool:browser",
       route: "/browser",
-      state: createBrowserViewState("https://example.com/"),
+      state: legacyPage("https://example.com/"),
     });
     const pane = createDockLeaf([web]);
     const layout = { root: pane, focusedPaneId: pane.id };

@@ -1,13 +1,14 @@
 import {
+  Cpu,
   EyeOff,
   Keyboard,
   MessagesSquare,
   Mic,
+  MousePointer2,
   Palette,
   Plug,
   Server,
   ShieldCheck,
-  Sparkles,
   SlidersHorizontal,
   SquareTerminal,
   UserCircle,
@@ -16,14 +17,9 @@ import {
 } from "lucide-react";
 import type { ComponentType } from "react";
 import type { SettingOwnership } from "./device-preferences/registry";
-import { canonicalSettingsSection } from "./settingsRouting";
 import type { SettingsContentProps, SettingsSection } from "./settingsTypes";
 
-export {
-  canonicalSettingsSection,
-  preferenceSection,
-  preferencesWithoutRows,
-} from "./settingsRouting";
+export { preferenceSection, preferencesWithoutRows } from "./settingsRouting";
 
 /**
  * Sidebar pages. Each opens one scrolling page; the registry blocks of a page render on it in
@@ -40,6 +36,7 @@ type SettingsArea =
   | "advanced"
   | "models"
   | "conversations"
+  | "tutor"
   | "access"
   | "engines"
   | "tools";
@@ -58,8 +55,9 @@ export const settingsAreas: Record<SettingsArea, SettingsAreaInfo> = {
   voice: { label: "Voice", icon: Mic },
   privacy: { label: "Privacy", icon: EyeOff },
   advanced: { label: "Advanced", icon: Wrench },
-  models: { label: "Models", icon: Sparkles },
+  models: { label: "Models", icon: Cpu },
   conversations: { label: "Behavior", icon: MessagesSquare },
+  tutor: { label: "Tutor", icon: MousePointer2 },
   access: { label: "Access", icon: ShieldCheck },
   engines: { label: "Engines", icon: SquareTerminal },
   tools: { label: "Tools", icon: Plug },
@@ -74,7 +72,7 @@ export const settingsGroups: readonly { label: string; areas: readonly SettingsA
   },
   {
     label: "Agents",
-    areas: ["models", "engines", "tools", "conversations", "access"],
+    areas: ["models", "engines", "tools", "conversations", "tutor", "access"],
   },
 ];
 
@@ -108,7 +106,6 @@ const settingsBlocks: readonly SettingsBlock[] = [
   block("shortcuts", "shortcuts", "Shortcuts"),
   block("voice", "voice", "Voice"),
   block("privacy", "privacy", "Privacy"),
-  block("privacy", "browser-permissions", "Websites", "resource"),
   block("privacy", "agent-activity", "Agent activity"),
   block("advanced", "advanced", "Advanced"),
   block("advanced", "network", "Network"),
@@ -116,14 +113,14 @@ const settingsBlocks: readonly SettingsBlock[] = [
   block("models", "models", "Models"),
   block("engines", "engine-clis", "CLIs"),
   block("engines", "engine-channels", "Channels"),
+  block("engines", "engine-env", "Environment variables"),
   block("engines", "engine-usage", "Usage"),
   block("tools", "engine-mcp", "MCP servers"),
   block("tools", "engine-skills", "Skills"),
   block("tools", "engine-prompts", "Prompts"),
   block("conversations", "agents-defaults", "Conversations"),
-  block("conversations", "misty", "Misty", "resource"),
-  block("conversations", "agents-companion", "Cursor"),
   block("conversations", "agents-personas", "Personas"),
+  block("tutor", "agents-companion", "Tutor"),
   block("access", "agents-permissions", "Access", "resource"),
   block("access", "agents-computer-use", "Computer use"),
 ];
@@ -146,8 +143,7 @@ export function registerSettingsSections(
 }
 
 export function settingsPage(section: SettingsSection): SettingsRegistryEntry | undefined {
-  const id = canonicalSettingsSection(section);
-  return settingsRegistry.find((entry) => entry.id === id);
+  return settingsRegistry.find((entry) => entry.id === section);
 }
 
 /** The sidebar name of the page a block sits on. */

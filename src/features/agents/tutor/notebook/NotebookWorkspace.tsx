@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
-import { confirmAction } from "@/shared/lib/confirmAction";
 import { useNotice } from "@/shared/ui";
+import { followIsStale, lookForNews } from "../notebookFollow";
 import type { TutorActions } from "../TutorPage";
 import { jobTitle, notebookContext } from "../tutorPrompts";
 import { startJob } from "../tutorRuns";
@@ -192,30 +192,25 @@ export function NotebookWorkspace({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [notebook.id]);
 
+  // A notebook that follows something takes in recent news as it opens.
+  useEffect(() => {
+    if (!followIsStale(notebook.follow)) return;
+    void lookForNews(notebook.id).then((failed) => failed && setError(failed));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [notebook.id]);
+
   const source =
     opened?.kind === "source" ? notebook.sources.find((item) => item.id === opened.id) : undefined;
   const note =
     opened?.kind === "note" ? notebook.notes.find((item) => item.id === opened.id) : undefined;
-  const remove = async () => {
-    const message = `Delete “${notebook.title}”, its sources and notes? This can’t be undone.`;
-    if (!(await confirmAction(message))) return;
-    useTutorStore.getState().removeNotebook(notebook.id);
-    actions.open("");
-  };
-  const create = () => {
-    const next = useTutorStore.getState().createNotebook("Untitled notebook");
-    actions.open(`notebook:${next.id}`);
-  };
 
   return (
     <div className="tutor-notebook-frame">
       <NotebookBar
         notebook={notebook}
         onBack={() => actions.open("")}
-        onCreate={create}
         onCustomize={() => setCustomizing(true)}
         onRebrief={() => void start().catch(() => undefined)}
-        onDelete={() => void remove()}
         onError={setError}
       />
       <div

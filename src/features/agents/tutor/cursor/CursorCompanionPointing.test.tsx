@@ -87,11 +87,11 @@ it("answers a spoken screen question from fresh captures, then points and reads 
   });
   expect(id).toBe("teach");
   expect(mocks.invoke).toHaveBeenCalledWith("cursor_companion_capture", { turn: 2 });
-  expect(mocks.submit.mock.calls[0][6]).toMatchObject({
+  expect(mocks.submit.mock.calls[0][5]).toMatchObject({
     displayCaptures: [screen],
     idempotencyKey: "voice-1:show",
   });
-  expect(mocks.submit.mock.calls[0][6]).not.toHaveProperty("intent");
+  expect(mocks.submit.mock.calls[0][5]).not.toHaveProperty("intent");
   act(() =>
     mocks.conversationOptions!.onDone({
       id: "voice-1",
@@ -179,7 +179,7 @@ it("holds a walkthrough step until its target is clicked, then asks for the next
       voice: true,
     }),
   );
-  expect(mocks.submit.mock.calls[0][6]).toMatchObject({
+  expect(mocks.submit.mock.calls[0][5]).toMatchObject({
     displayCaptures: [screen],
   });
   complete(
@@ -206,7 +206,7 @@ it("holds a walkthrough step until its target is clicked, then asks for the next
   });
   await waitFor(() => expect(mocks.submit).toHaveBeenCalledTimes(2));
   expect(mocks.submit.mock.calls[1][0]).toContain("I did step 1 of 3 (open Source Control)");
-  expect(mocks.submit.mock.calls[1][6]).toMatchObject({
+  expect(mocks.submit.mock.calls[1][5]).toMatchObject({
     continuation: true,
     displayCaptures: [screen],
   });

@@ -304,15 +304,16 @@
   color: var(--color-cream-bright);
 }
 
-/* The session card, after OpenChamber's: groups parted by space alone, a small title, and one row
-   pattern throughout (a muted glyph, a label that gives way, a value held at the end). Nothing
-   fills on hover; a row that opens something only brightens. */
+/* The session card, after OpenChamber's: compact groups parted by space alone, each titled with a
+   glyph and what it is about at its far end, and one row pattern throughout (a muted glyph, a label
+   that gives way, a value held at the end). Nothing fills on hover; a row that opens something only
+   brightens. */
 .session-panel {
   display: flex;
   min-height: 0;
   flex: 0 1 auto;
   flex-direction: column;
-  padding: 10px 10px 12px;
+  padding: 10px 12px 12px;
   overflow-y: auto;
   scrollbar-width: none;
 }
@@ -324,7 +325,7 @@
   flex-direction: column;
 }
 .session-section + .session-section {
-  margin-top: 20px;
+  margin-top: 16px;
 }
 .session-section-head {
   display: flex;
@@ -332,31 +333,51 @@
   min-height: 24px;
   align-items: center;
   gap: 6px;
-  padding: 0 4px;
+  color: var(--color-cream-bright);
+}
+.session-section-head > svg {
+  flex: none;
+  color: var(--color-cream-muted);
+}
+.session-section-toggle {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  color: inherit;
+}
+.session-section-chevron {
+  color: var(--color-cream-muted);
+  transform: rotate(-90deg);
+  transition: transform 120ms ease;
+}
+.session-section-chevron[data-open] {
+  transform: none;
 }
 .session-section-head h3 {
   flex: none;
   margin: 0;
-  font-size: 12px;
+  font-size: var(--text-control);
   font-weight: 600;
-  color: var(--color-cream-bright);
 }
 .session-section-subject {
   display: flex;
   min-width: 0;
-  font-size: 12px;
-  color: var(--color-cream-muted);
+  margin-left: auto;
+  align-items: center;
+  font-size: var(--text-control);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-cream);
 }
 .session-row {
   display: flex;
   width: 100%;
   min-width: 0;
-  height: 28px;
+  height: 24px;
   align-items: center;
   gap: 8px;
-  padding: 0 4px;
   border-radius: var(--radius-md);
-  font-size: 13px;
+  font-size: var(--text-control);
   color: var(--color-cream-muted);
   text-align: left;
 }
@@ -371,30 +392,64 @@
   flex: none;
 }
 .session-row-label {
+  display: flex;
   min-width: 0;
   flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 .session-row-value {
+  display: flex;
   flex: none;
-  max-width: 55%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  max-width: 60%;
+  align-items: center;
+  gap: 6px;
   font-variant-numeric: tabular-nums;
+  color: var(--color-cream);
+}
+/* The usage the Context row opens, set in under it. */
+.session-details {
+  display: flex;
+  flex-direction: column;
+  padding-left: 22px;
+}
+/* Lines added and removed, in the colors the changes panel gives them. */
+.session-lines {
+  display: flex;
+  gap: 6px;
+}
+.session-lines [data-tone="added"] {
+  color: var(--tone-added);
+}
+.session-lines [data-tone="removed"] {
+  color: var(--tone-failed);
+}
+/* Commits ahead of and behind the branch's upstream. */
+.session-sync {
+  display: flex;
+  gap: 6px;
+}
+.session-sync > span {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+/* An MCP server and its switch. */
+.session-switch-row {
+  cursor: pointer;
+  gap: 10px;
+}
+.session-switch-row .session-row-label {
+  color: var(--color-cream);
 }
 .session-empty {
   margin: 0;
-  padding: 4px;
-  font-size: 13px;
+  padding: 2px 0;
+  font-size: var(--text-control);
   color: var(--color-cream-muted);
 }
 /* How full the engine's context is: a thin bar under its row. Its color is what it means. */
 .session-meter {
   height: 4px;
-  margin: 0 4px 4px;
+  margin: 2px 0 4px;
   overflow: hidden;
   border-radius: 999px;
   background: color-mix(in srgb, var(--misty-theme-text) 9%, transparent);

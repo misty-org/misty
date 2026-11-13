@@ -21,28 +21,6 @@ pub fn from_wide(buffer: &[u16]) -> OsString {
     OsString::from_wide(&buffer[..end])
 }
 
-/// Turns off the "There is no disk in the drive" dialog for this thread while
-/// `body` runs, so probing empty card readers and optical drives stays silent.
-pub fn without_error_dialogs<T>(body: impl FnOnce() -> T) -> T {
-    use windows_sys::Win32::System::Diagnostics::Debug::{
-        SetThreadErrorMode, SEM_FAILCRITICALERRORS, SEM_NOOPENFILEERRORBOX,
-    };
-    let mut previous = 0;
-    // SAFETY: plain flag swap for the calling thread.
-    let changed = unsafe {
-        SetThreadErrorMode(
-            SEM_FAILCRITICALERRORS | SEM_NOOPENFILEERRORBOX,
-            &mut previous,
-        )
-    } != 0;
-    let result = body();
-    if changed {
-        // SAFETY: restores the mode saved above.
-        unsafe { SetThreadErrorMode(previous, std::ptr::null_mut()) };
-    }
-    result
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

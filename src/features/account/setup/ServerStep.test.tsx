@@ -32,7 +32,7 @@ it.each<[string, boolean, ServerChoice | null, boolean]>([
 it("fills in the development server, and Continue chooses it", async () => {
   useServerChoice.setState({ loaded: true, choice: null });
   render(<ServerStep />);
-  fireEvent.click(screen.getByRole("button", { name: "Self-hosted" }));
+  fireEvent.click(screen.getByRole("button", { name: "Use my own server" }));
   const address = screen.getByLabelText<HTMLInputElement>("Server address");
   expect(address.value).toBe("http://127.0.0.1:8081");
   fireEvent.click(screen.getByRole("button", { name: "Continue" }));

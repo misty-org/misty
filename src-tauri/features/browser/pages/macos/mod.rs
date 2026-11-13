@@ -12,12 +12,6 @@ mod website_data;
 mod webview;
 
 #[cfg(target_os = "macos")]
-pub use capture::host_webview_capture_region;
-#[cfg(target_os = "macos")]
-pub(crate) use capture::{
-    __cmd__host_webview_capture_region, __tauri_command_name_host_webview_capture_region,
-};
-#[cfg(target_os = "macos")]
 pub(crate) use capture::{capture_webview_region, capture_webview_region_sized};
 pub(crate) use javascript::*;
 #[cfg(target_os = "macos")]

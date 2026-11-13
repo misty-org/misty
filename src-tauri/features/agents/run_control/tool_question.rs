@@ -222,8 +222,7 @@ mod tests {
     #[test]
     fn a_long_command_is_shown_whole() {
         let command = "x".repeat(60_000);
-        let text =
-            question_text("shell.run", &json!({ "command": command }), &none()).unwrap();
+        let text = question_text("shell.run", &json!({ "command": command }), &none()).unwrap();
         assert!(text.contains(&command));
     }
 
@@ -237,10 +236,7 @@ mod tests {
     #[test]
     fn what_cannot_be_shown_is_refused() {
         let call = json!({ "command": "x".repeat(MAX_SHOWN + 1) });
-        assert_eq!(
-            question_text("shell.run", &call, &none()),
-            Err(TOO_LONG)
-        );
+        assert_eq!(question_text("shell.run", &call, &none()), Err(TOO_LONG));
     }
 
     #[test]
@@ -315,7 +311,8 @@ mod tests {
         let text = question_text(
             "browser.navigate",
             &json!({ "scopeId": "tab-1", "url": "https://example.com" }),
-            &none())
+            &none(),
+        )
         .unwrap();
         assert_eq!(text, "Browser navigate\nurl: https://example.com");
     }

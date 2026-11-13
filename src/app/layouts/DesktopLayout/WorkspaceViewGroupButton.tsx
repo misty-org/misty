@@ -1,9 +1,8 @@
 import { spaceWorkspaceToolFromRoute, type WorkspaceView } from "@/features/app-windows";
 import { workspaceAppIcon } from "@/features/app-windows";
 import { appIconStrokeWidth, BrandIcon, brandIconAsset, cn } from "@/shared/ui";
-import { type LucideIcon } from "lucide-react";
-import { providerFromRoute } from "@/features/browser";
-import { websiteIntegrations } from "@/features/browser";
+import { Armchair, FlaskConical, Waypoints, type LucideIcon } from "lucide-react";
+import { AgentAvatar, usePersonalAgentsStore } from "@/features/agents";
 import { DestinationIcon } from "./NavigatorDestinationIcon";
 function getViewAppId(tab: WorkspaceView | undefined): string {
   if (!tab) return "";
@@ -18,6 +17,31 @@ function getViewIcon(tab: WorkspaceView | undefined, fallback: LucideIcon): Luci
     workspaceAppIcon(getViewAppId(tab), tab?.surfaceId === "space" ? "space" : "app") ?? fallback
   );
 }
+/** The Agents pages that aren't a chat, with the icons their sidebar rows wear. */
+const agentsPlaceIcons: Record<string, LucideIcon> = {
+  lab: FlaskConical,
+  studio: Armchair,
+  integrations: Waypoints,
+};
+
+/**
+ * A chat's agent, as its sidebar row shows it: the engine's own logo, never a generic agent
+ * glyph. A new chat with no agent named yet shows the agent new chats start with.
+ */
+function ChatAgentIcon({ route }: { route: string }) {
+  const agentId = new URL(route, "https://misty.local").searchParams.get("agent");
+  const agent = usePersonalAgentsStore((state) =>
+    agentId
+      ? state.agents.find((item) => item.id === agentId)
+      : (state.agents.find(
+          (item) => item.id === state.selected.global && item.enabled && !item.system_managed,
+        ) ??
+        state.agents.find((item) => item.engine && item.enabled) ??
+        state.agents.find((item) => item.system_managed)),
+  );
+  return <AgentAvatar agent={agent} compact />;
+}
+
 export function ViewIcon({
   tab,
   icon: DefaultIcon,
@@ -29,33 +53,16 @@ export function ViewIcon({
   size?: number;
   isActive?: boolean;
 }) {
+  const place =
+    tab?.surfaceId === "agents"
+      ? new URL(tab.route, "https://misty.local").searchParams.get("view")
+      : null;
+  if (tab?.surfaceId === "agents" && !place) return <ChatAgentIcon route={tab.route} />;
   const appId = getViewAppId(tab);
   if (brandIconAsset(appId)) return <BrandIcon brand={appId} size={size} />;
-  const provider =
-    tab && (appId === "social" || appId === "chat") ? providerFromRoute(tab.route, "chat") : null;
-  if (provider)
-    return (
-      <span className="inline-flex shrink-0">
-        <BrandIcon brand={provider} size={size} />
-      </span>
-    );
-  const website = tab
-    ? new URL(tab.route, "https://misty.local").searchParams.get("provider")
-    : null;
-  if (
-    website &&
-    ["journal", "library"].includes(appId) &&
-    Object.prototype.hasOwnProperty.call(websiteIntegrations, website)
-  )
-    return (
-      <span className="inline-flex shrink-0">
-        <BrandIcon brand={website} size={size} />
-      </span>
-    );
   const section = tab ? new URL(tab.route, "https://misty.local").searchParams.get("view") : null;
   if (
     tab &&
-    (!website || website === "misty") &&
     section &&
     ["notes", "drawings", "explorer", "recent", "favorites", "collections", "deleted"].includes(
       section,
@@ -73,7 +80,7 @@ export function ViewIcon({
         />
       </span>
     );
-  const ResolvedIcon = getViewIcon(tab, DefaultIcon);
+  const ResolvedIcon = (place && agentsPlaceIcons[place]) || getViewIcon(tab, DefaultIcon);
   return (
     <ResolvedIcon
       size={size}

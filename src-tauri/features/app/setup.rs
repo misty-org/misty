@@ -46,18 +46,6 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         eprintln!("Could not prepare ~/.misty: {error}");
     }
     let runtime = MistyRuntime::new();
-    // What this device trusts (device list, its own policy) lives beside
-    // its other app data.
-    #[cfg(desktop)]
-    crate::devices::trust::set_storage_root(
-        runtime
-            .environment
-            .store()
-            .path()
-            .parent()
-            .map(std::path::Path::to_path_buf)
-            .unwrap_or_default(),
-    );
     #[cfg(desktop)]
     database::retired_coding_data::remove_once_in_background(&runtime.environment);
     #[cfg(desktop)]

@@ -72,9 +72,6 @@ export function updateAgent(
   );
 }
 
-/** Renames one of the person's agents. */
-export const renameAgent = (agent: AgentProfile, name: string) => updateAgent(agent, { name });
-
 /**
  * Hiring, the studio's shop: a card for each engine installed on this computer and for Misty's
  * own, then a name and what the agent is for. Several agents can run on one engine, each with its

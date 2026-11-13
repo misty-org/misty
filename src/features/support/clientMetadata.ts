@@ -16,7 +16,7 @@ interface CommonClientProperties {
   environment: "development" | "test" | "staging" | "production";
 }
 import { getVersion } from "@tauri-apps/api/app";
-import { arch, platform, version } from "@tauri-apps/plugin-os";
+import { arch, platform, version } from "@/shared/platform/os";
 let cached: Promise<CommonClientProperties> | undefined;
 export function clientMetadata(): Promise<CommonClientProperties> {
   cached ??= loadMetadata();

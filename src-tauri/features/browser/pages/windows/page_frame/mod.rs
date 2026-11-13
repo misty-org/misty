@@ -1,12 +1,11 @@
 //! The frame of a browser page on Windows: rounded corners where the page
-//! meets a rounded workspace corner, and the dim over a pane that lost focus.
+//! meets a rounded workspace corner.
 //!
 //! WebView2 draws a page in windows under a host window Misty owns. The
-//! corners clip that host window with a region; the dim is a black layered
-//! window laid over the page inside it, which the mouse passes through, so
-//! the page keeps working and nothing is injected into it. A subclass of the
-//! host window reapplies both whenever it is resized, whichever path resized
-//! it, and lets go of them when the window is destroyed.
+//! corners clip that host window with a region, so nothing is injected into
+//! the page. A subclass of the host window reapplies it whenever it is
+//! resized, whichever path resized it, and lets go of it when the window is
+//! destroyed.
 //!
 //! A region keeps or cuts whole pixels, so on its own a curve comes out as a
 //! staircase. The region therefore keeps every pixel the curve touches, and a
@@ -37,11 +36,10 @@ use windows_sys::Win32::{
         HiDpi::GetDpiForWindow,
         Shell::{DefSubclassProc, RemoveWindowSubclass, SetWindowSubclass},
         WindowsAndMessaging::{
-            CreateWindowExW, DefWindowProcW, DestroyWindow, GetAncestor, GetClientRect,
-            RegisterClassW, SetLayeredWindowAttributes, SetWindowPos, ShowWindow,
-            UpdateLayeredWindow, GA_ROOT, HWND_TOP, LWA_ALPHA, SWP_NOACTIVATE, SW_HIDE, SW_SHOWNA,
-            ULW_ALPHA, WM_MOVE, WM_NCDESTROY, WM_SIZE, WNDCLASSW, WS_CHILD, WS_EX_LAYERED,
-            WS_EX_NOACTIVATE, WS_EX_TRANSPARENT,
+            CreateWindowExW, DefWindowProcW, GetAncestor, GetClientRect, RegisterClassW,
+            SetWindowPos, ShowWindow, UpdateLayeredWindow, GA_ROOT, HWND_TOP, SWP_NOACTIVATE,
+            SW_HIDE, SW_SHOWNA, ULW_ALPHA, WM_MOVE, WM_NCDESTROY, WM_SIZE, WNDCLASSW, WS_CHILD,
+            WS_EX_LAYERED, WS_EX_NOACTIVATE, WS_EX_TRANSPARENT,
         },
     },
 };
@@ -56,9 +54,6 @@ const OVERLAY_CLASS: &str = "MistyPaneDim";
 struct Frame {
     /// Top-left, top-right, bottom-right, bottom-left, in logical pixels.
     radii: [f64; 4],
-    dim: f64,
-    /// The dim window, once a dim has been shown.
-    overlay: Option<isize>,
     /// The chrome color around the page's rounded corners, when it is known.
     corner_color: Option<[u8; 3]>,
     /// Each corner's cap window and the radius and color it last painted.
@@ -131,11 +126,6 @@ pub(in crate::browser) fn set_corners(
     })
 }
 
-/// Lays a dim of `strength` (0 to 1) over the page; zero removes it.
-pub(in crate::browser) fn set_dim(webview: &Webview, strength: f64) -> Result<(), String> {
-    change(webview, move |frame| frame.dim = strength.clamp(0.0, 1.0))
-}
-
 /// Records a change for the page's host window and applies its frame, on
 /// the window's own thread.
 fn change(webview: &Webview, edit: impl FnOnce(&mut Frame) + Send + 'static) -> Result<(), String> {
@@ -158,13 +148,13 @@ fn update(
             let changed = if let Ok(mut frames) = frames().lock() {
                 let fresh = !frames.contains_key(&(host as isize));
                 let frame = frames.entry(host as isize).or_default();
-                let before = (frame.radii, frame.dim, frame.corner_color);
+                let before = (frame.radii, frame.corner_color);
                 edit(frame);
                 if fresh {
                     // SAFETY: a live window owned by this thread.
                     unsafe { SetWindowSubclass(host, Some(on_message), SUBCLASS, 0) };
                 }
-                fresh || before != (frame.radii, frame.dim, frame.corner_color)
+                fresh || before != (frame.radii, frame.corner_color)
             } else {
                 false
             };
@@ -227,7 +217,7 @@ unsafe fn cut_notice_holes(host: HWND, mut region: HRGN, width: i32, height: i32
     region
 }
 
-/// Clips `host` to its rounded corners and notices and fits its dim over it.
+/// Clips `host` to its rounded corners and notices and lays the caps over them.
 fn apply(host: HWND) {
     let Ok(mut frames) = frames().lock() else {
         return;
@@ -252,36 +242,7 @@ fn apply(host: HWND) {
         let region = cut_notice_holes(host, rounded_region(width, height, radii), width, height);
         SetWindowRgn(host, region, 1);
     }
-    apply_dim(host, frame, width, height);
     apply_caps(host, frame, width, height, radii);
-}
-
-fn apply_dim(host: HWND, frame: &mut Frame, width: i32, height: i32) {
-    if frame.dim <= 0.0 {
-        if let Some(overlay) = frame.overlay {
-            // SAFETY: the dim window this module created.
-            unsafe { ShowWindow(overlay as HWND, SW_HIDE) };
-        }
-        return;
-    }
-    let overlay = match frame.overlay {
-        Some(overlay) => overlay as HWND,
-        None => match create_overlay(host) {
-            Some(overlay) => {
-                frame.overlay = Some(overlay as isize);
-                overlay
-            }
-            None => return,
-        },
-    };
-    let alpha = (frame.dim * 255.0).round() as u8;
-    // SAFETY: the dim window this module created. It goes on top of the
-    // page's own windows, which WebView2 may recreate.
-    unsafe {
-        SetLayeredWindowAttributes(overlay, 0, alpha, LWA_ALPHA);
-        SetWindowPos(overlay, HWND_TOP, 0, 0, width, height, SWP_NOACTIVATE);
-        ShowWindow(overlay, SW_SHOWNA);
-    }
 }
 
 /// A black layered child window that takes no clicks or focus.
@@ -336,13 +297,9 @@ unsafe extern "system" fn on_message(
         // A notice stays put in the app window, so its hole shifts when the page moves.
         WM_MOVE if has_notice_holes(window) => apply(window),
         WM_NCDESTROY => {
-            let overlay = frames()
-                .lock()
-                .ok()
-                .and_then(|mut frames| frames.remove(&(window as isize)))
-                .and_then(|frame| frame.overlay);
-            if let Some(overlay) = overlay {
-                DestroyWindow(overlay as HWND);
+            // The caps are child windows and go with it.
+            if let Ok(mut frames) = frames().lock() {
+                frames.remove(&(window as isize));
             }
             RemoveWindowSubclass(window, Some(on_message), SUBCLASS);
         }

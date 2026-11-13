@@ -13,13 +13,9 @@ macro_rules! with_more_commands {
             #[cfg(desktop)]
             crate::browser::commands::browser_context_menu_select,
             #[cfg(desktop)]
-            crate::browser::commands::browser_webview_context_menu_at,
-            #[cfg(desktop)]
             crate::browser::commands::browser_shortcuts_update,
             #[cfg(desktop)]
             crate::browser::commands::browser_webview_set_bounds,
-            #[cfg(target_os = "macos")]
-            crate::browser::commands::host_webview_capture_region,
             #[cfg(desktop)]
             crate::browser::commands::browser_webview_reconcile,
             crate::browser::commands::agent_action_confirm,
@@ -41,7 +37,6 @@ macro_rules! with_more_commands {
             crate::agents::commands::agent_run_latest_steps,
             crate::agents::commands::agent_run_steps_clear,
             crate::agents::commands::agent_run_step_picture,
-            crate::agents::commands::agent_run_tools,
             crate::agents::commands::agent_turn_files,
             crate::agents::commands::agent_turn_restore,
             crate::agents::commands::agent_tool_host_ready,
@@ -77,22 +72,12 @@ macro_rules! with_more_commands {
             #[cfg(desktop)]
             crate::browser::commands::browser_webview_reload,
             #[cfg(desktop)]
-            crate::browser::commands::browser_site_permissions_list,
-            #[cfg(desktop)]
-            crate::browser::commands::browser_site_permissions_reset,
-            #[cfg(desktop)]
-            crate::browser::commands::browser_set_night_light,
-            #[cfg(desktop)]
             crate::browser::commands::browser_webview_show,
             crate::browser::commands::browser_webview_held,
             #[cfg(desktop)]
             crate::browser::commands::browser_webviews_set_overlay_active,
             #[cfg(desktop)]
             crate::browser::commands::browser_webviews_set_notice_rects,
-            #[cfg(target_os = "macos")]
-            crate::account::commands::google_sign_in_sheet_open,
-            #[cfg(target_os = "macos")]
-            crate::account::commands::google_sign_in_sheet_close,
             #[cfg(desktop)]
             crate::browser::commands::browser_webviews_set_pointer_tracking,
             #[cfg(desktop)]
@@ -100,35 +85,19 @@ macro_rules! with_more_commands {
             #[cfg(desktop)]
             crate::browser::commands::browser_clear_website_data,
             #[cfg(desktop)]
-            crate::browser::commands::browser_webview_set_muted,
-            #[cfg(desktop)]
-            crate::browser::commands::browser_webview_set_media_hold,
-            #[cfg(desktop)]
             crate::browser::commands::browser_retired_profiles_erase,
             crate::browser::commands::profile_window_info,
-            crate::browser::commands::profiles_list,
-            crate::browser::commands::profile_create,
-            crate::browser::commands::profile_rename,
-            crate::browser::commands::profile_set_color,
-            crate::browser::commands::profile_delete,
-            crate::browser::commands::profile_open,
             crate::browser::commands::profile_window_new,
             crate::browser::commands::profile_window_close,
             crate::browser::commands::profile_window_take_orphans,
             crate::browser::commands::profile_window_set_space,
             crate::browser::commands::profile_window_is_host,
             crate::browser::commands::profile_window_link_target,
-            crate::browser::commands::profile_sites,
-            crate::browser::commands::profile_set_sites,
             crate::browser::commands::profile_tabs_sync,
             crate::browser::commands::profile_tabs_publish,
             #[cfg(desktop)]
             crate::voice::commands::global_hotkey_signed_out,
-            #[cfg(desktop)]
-            crate::browser::commands::browser_history_clear,
             crate::browser::commands::browser_tab_download_open,
-            #[cfg(desktop)]
-            crate::browser::commands::browser_downloads_remove,
             #[cfg(desktop)]
             crate::browser::commands::browser_webview_hide,
             #[cfg(desktop)]
@@ -137,12 +106,6 @@ macro_rules! with_more_commands {
             crate::browser::commands::browser_webviews_hide_except,
             #[cfg(desktop)]
             crate::browser::commands::browser_webviews_close_except,
-            #[cfg(desktop)]
-            crate::browser::commands::browser_webviews_park_all,
-            #[cfg(windows)]
-            crate::browser::commands::browser_webviews_show_only,
-            #[cfg(not(windows))]
-            crate::browser::commands::browser_webviews_show_only,
             #[cfg(desktop)]
             crate::browser::commands::browser_webview_close,
             crate::browser::commands::browser_webview_sleep,
@@ -172,8 +135,6 @@ macro_rules! with_more_commands {
             crate::agents::commands::agent_chats_swap,
             crate::agents::commands::agent_chats_put,
             crate::agents::commands::agent_chats_delete,
-            #[cfg(desktop)]
-            crate::browser::commands::navigation_names_snapshot,
             crate::app::settings_commands::settings_snapshot,
             crate::app::settings_commands::settings_session_state,
             crate::app::settings_commands::settings_session_commit,
@@ -188,20 +149,13 @@ macro_rules! with_more_commands {
             crate::engines::commands::engine_catalog,
             crate::engines::commands::engine_answer_question,
             crate::engines::commands::engine_plan_respond,
-            crate::engines::commands::engine_plan_reviews,
             crate::engines::commands::engine_settings_get,
             crate::engines::commands::engine_settings_set,
             crate::engines::commands::engine_chat_clear,
             crate::engines::commands::engine_chat_resume,
             crate::engines::history_commands::engine_history_list,
-            crate::engines::history_commands::engine_history_page,
             crate::engines::history_commands::engine_history_search,
             crate::engines::history_commands::engine_history_rename,
-            crate::engines::history_commands::engine_history_rescan,
-            crate::engines::commands::engine_chat_fork,
-            crate::engines::history_commands::engine_history_read_file,
-            crate::engines::history_commands::engine_history_write_file,
-            crate::engines::history_commands::engine_history_open_file,
             crate::engines::commands::space_folder_list,
             crate::engines::commands::space_folder_link,
             crate::engines::commands::space_folder_unlink,
@@ -216,6 +170,7 @@ macro_rules! with_more_commands {
             crate::project::files::project_list_dir,
             crate::project::files::search::project_find_files,
             crate::agents::screen_context::region::misty_capture_region,
+            crate::app::dropped_files::dropped_file_read,
             crate::project::files::project_read_file,
             crate::project::reveal::project_reveal_path,
             crate::project::files::project_write_file,
@@ -271,17 +226,14 @@ macro_rules! with_more_commands {
             crate::engine_config::mcp::engine_mcp_inventory,
             crate::engine_config::mcp::engine_mcp_set_enabled,
             crate::engine_config::mcp::engine_mcp_reveal,
-            crate::engine_config::mcp::engine_mcp_set_launch_mode,
             crate::engine_config::mcp::probe::engine_mcp_probe,
             crate::engine_config::mcp::probe::engine_mcp_probe_plan,
-            crate::engine_config::metrics::engine_metrics_app,
             crate::engine_config::metrics::engine_performance_enabled,
             crate::engine_config::metrics::engine_performance_export,
             crate::engine_config::metrics::engine_performance_report,
             crate::engine_config::metrics::engine_performance_set_enabled,
             crate::engine_config::prompts::engine_prompts_create,
             crate::engine_config::prompts::engine_prompts_delete,
-            crate::engine_config::prompts::engine_prompts_dirs,
             crate::engine_config::prompts::engine_prompts_list,
             crate::engine_config::prompts::engine_prompts_move,
             crate::engine_config::prompts::engine_prompts_reveal,
@@ -290,6 +242,9 @@ macro_rules! with_more_commands {
             crate::engine_config::provider_files::engine_channels_official_read,
             crate::engine_config::provider_files::engine_channels_official_write,
             crate::engine_config::provider_models::engine_channels_models,
+            crate::engine_config::engine_env::engine_env_list,
+            crate::engine_config::engine_env::engine_env_set,
+            crate::engine_config::engine_env::engine_env_remove,
             crate::engine_config::proxy::engine_proxy_get,
             crate::engine_config::proxy::engine_proxy_set,
             crate::engine_config::skills_hub::engine_skills_mutate,
@@ -297,10 +252,8 @@ macro_rules! with_more_commands {
             crate::engine_config::usage_stats::commands::engine_usage_limits,
             crate::engine_config::usage_stats::commands::engine_usage_prices,
             crate::engine_config::usage_stats::commands::engine_usage_query,
-            crate::engine_config::usage_stats::commands::engine_usage_refresh,
             crate::engine_config::usage_stats::commands::engine_usage_rescan,
             crate::engine_config::usage_stats::commands::engine_usage_sources,
-            crate::engine_config::usage_stats::commands::engine_usage_summary,
             crate::engine_config::usage_stats::commands::engine_usage_update_prices,
             crate::project::files::project_create_dir,
             crate::project::files::project_create_file,

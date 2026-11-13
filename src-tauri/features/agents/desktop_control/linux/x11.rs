@@ -33,10 +33,23 @@ fn with<T>(work: impl FnOnce(&Server) -> Option<T>) -> Option<T> {
 
 impl Server {
     fn atom(&self, name: &[u8]) -> Option<Atom> {
-        Some(self.connection.intern_atom(false, name).ok()?.reply().ok()?.atom)
+        Some(
+            self.connection
+                .intern_atom(false, name)
+                .ok()?
+                .reply()
+                .ok()?
+                .atom,
+        )
     }
 
-    fn property(&self, window: Window, name: &[u8], kind: impl Into<Atom>, length: u32) -> Option<Vec<u8>> {
+    fn property(
+        &self,
+        window: Window,
+        name: &[u8],
+        kind: impl Into<Atom>,
+        length: u32,
+    ) -> Option<Vec<u8>> {
         let property = self.atom(name)?;
         let reply = self
             .connection
@@ -69,7 +82,9 @@ impl Server {
     fn app(&self, window: Window) -> String {
         self.property(window, b"WM_CLASS", AtomEnum::STRING, 256)
             .map(|bytes| {
-                let mut parts = bytes.split(|&byte| byte == 0).filter(|part| !part.is_empty());
+                let mut parts = bytes
+                    .split(|&byte| byte == 0)
+                    .filter(|part| !part.is_empty());
                 let instance = parts.next().unwrap_or_default();
                 let class = parts.next().unwrap_or(instance);
                 String::from_utf8_lossy(class).into_owned()
@@ -92,7 +107,9 @@ impl Server {
             .map(|value| {
                 let side = |index: usize| {
                     f64::from(u32::from_ne_bytes(
-                        value[index * 4..index * 4 + 4].try_into().unwrap_or_default(),
+                        value[index * 4..index * 4 + 4]
+                            .try_into()
+                            .unwrap_or_default(),
                     ))
                 };
                 (side(0), side(1), side(2), side(3))

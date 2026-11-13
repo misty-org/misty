@@ -8,7 +8,7 @@ const native = vi.hoisted(() => ({
 }));
 vi.mock("@/native", () => ({ enableModernWindowStyle: vi.fn().mockResolvedValue(undefined) }));
 vi.mock("@/shared/platform/tauri", () => ({ hasTauriInternals: () => true }));
-vi.mock("@tauri-apps/plugin-os", () => ({ platform: () => "macos" }));
+vi.mock("@/shared/platform/os", () => ({ platform: () => "macos" }));
 vi.mock("@tauri-apps/api/window", () => ({ getCurrentWindow: () => native }));
 
 import { useDesktopWindowChrome } from "./DesktopLayout/useDesktopWindowChrome";

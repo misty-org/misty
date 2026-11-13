@@ -1,62 +1,52 @@
-import type { ComponentProps, ReactNode } from "react";
-import { Skeleton } from "@/shared/ui";
+import type { ReactNode } from "react";
+import type { AgentProfile } from "@/shared/schemas";
+import { Skeleton, Text } from "@/shared/ui";
 import { useTitlePending } from "../conversations/state/conversationTitles";
 import { AgentConversationActions } from "../conversations/view/AgentConversationActions";
 import { AgentAvatar } from "../personal/AgentAvatar";
-import { AgentSwitcher } from "../personal/AgentSwitcher";
-
-type SwitcherProps = ComponentProps<typeof AgentSwitcher>;
+import { AgentIdentity } from "../personal/AgentIdentity";
 
 /**
- * The conversation title bar. Inside the agent workspace the sidebar owns identity and
- * New task, so the bar carries only the conversation's title; the chat itself shows a run
- * working, and rename and delete live on its Recents row. Outside it (loading) the bar keeps the switcher and the conversation's actions.
+ * The open chat's name, as its title call made it: a skeleton while that call runs, "New chat"
+ * before the first message. The tab above names the agent; the chat itself shows only this.
+ */
+export function ChatTitle({ conversation }: { conversation?: { id: string; title?: string } }) {
+  const titlePending = useTitlePending(conversation);
+  if (titlePending)
+    return (
+      <span className="min-w-0 flex-1" aria-busy>
+        <Skeleton className="agent-title-skeleton" />
+        <span className="sr-only">Naming this conversation</span>
+      </span>
+    );
+  return (
+    <Text as="h1" size="control" weight="semibold" className="min-w-0 flex-1">
+      {conversation ? conversation.title || "Untitled conversation" : "New chat"}
+    </Text>
+  );
+}
+
+/**
+ * The conversation title bar outside the agent workspace (loading): it names the chat's agent and
+ * keeps the conversation's actions. Inside the workspace the studio bar shows `ChatTitle` instead.
+ * It never switches the agent.
  */
 export function AgentConversationHeading({
-  workspace = false,
   conversation,
-  switcher,
+  agent,
   disabled,
   actions,
   panelPicker,
 }: {
-  workspace?: boolean;
   conversation?: { id: string; title?: string };
-  switcher: SwitcherProps;
+  /** The chat's agent. */
+  agent?: AgentProfile;
   disabled: boolean;
   /** Extra controls after New chat, for a host that is not the Agents page. */
   actions?: ReactNode;
-  /** The Misty panel's conversation picker. Given, the switcher shows only the agent's avatar. */
+  /** The Misty panel's conversation picker. Given, the bar shows only the agent's avatar. */
   panelPicker?: ReactNode;
 }) {
-  const titlePending = useTitlePending(conversation);
-  if (workspace)
-    return (
-      <header
-        className="agent-conversation-heading"
-        data-workspace
-        data-window-toolbar
-        data-tauri-drag-region
-        data-misty-window-titlebar-region="true"
-      >
-        <h1
-          className="agent-heading-title"
-          title={titlePending ? undefined : conversation?.title}
-          aria-busy={titlePending || undefined}
-        >
-          {titlePending ? (
-            <>
-              <Skeleton className="agent-title-skeleton" />
-              <span className="sr-only">Naming this conversation</span>
-            </>
-          ) : conversation ? (
-            conversation.title || "Untitled conversation"
-          ) : (
-            ""
-          )}
-        </h1>
-      </header>
-    );
   return (
     <header
       className="agent-conversation-heading"
@@ -65,12 +55,11 @@ export function AgentConversationHeading({
       data-misty-window-titlebar-region="true"
     >
       {panelPicker ? (
-        // The panel follows the agent chosen in the navbar pill, so its avatar is not a switch.
         <span className="agent-heading-avatar">
-          <AgentAvatar agent={switcher.selectedAgent} />
+          <AgentAvatar agent={agent} />
         </span>
       ) : (
-        <AgentSwitcher {...switcher} />
+        <AgentIdentity agent={agent} className="agent-heading-identity" />
       )}
       {panelPicker}
       <div className="agent-heading-end">

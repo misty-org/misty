@@ -58,7 +58,7 @@ export function DrawingHeader({ reportError, drawing, onBack, onRename }: Drawin
       {onBack ? (
         <BackButton onClick={onBack} aria-label="Back to drawings" />
       ) : (
-        <span className="shrink-0 text-sm font-semibold text-cream-muted">Journal -</span>
+        <span className="shrink-0 text-sm font-semibold text-cream-muted">Docs -</span>
       )}
 
       <div

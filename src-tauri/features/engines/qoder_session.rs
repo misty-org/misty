@@ -720,7 +720,13 @@ impl AcpProcess {
                 None
             }
             AcpLine::AgentRequest { id, method, params } => {
-                crate::engines::gate::acp_agent_request(gate.as_ref(), &workspace, id, method, params)
+                crate::engines::gate::acp_agent_request(
+                    gate.as_ref(),
+                    &workspace,
+                    id,
+                    method,
+                    params,
+                )
             }
             _ => None,
         };

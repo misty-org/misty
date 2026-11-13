@@ -12,7 +12,6 @@ pub(in crate::browser) fn browser_viewport_script(
 ) -> String {
     let bindings_json = serde_json::to_string(bindings).unwrap_or_else(|_| "[]".to_owned());
     BROWSER_VIEWPORT_SCRIPT
-        .replace("__MISTY_MEDIA_PLACEHOLDER__", include_str!("media.js"))
         .replace(
             "__MISTY_WINDOW_DRAG_PLACEHOLDER__",
             include_str!("window_drag.js"),
@@ -73,23 +72,6 @@ pub(in crate::browser) fn browser_status_script(shortcut_token: &str) -> String 
             "__MISTY_STATUS_TOKEN_PLACEHOLDER__",
             &serde_json::to_string(shortcut_token).unwrap_or_else(|_| "\"\"".to_owned()),
         )
-}
-
-/// Reads what videos say in every frame and gathers it in the top document
-/// (captions.js). It carries no token: frames talk to the top over postMessage.
-pub(in crate::browser) fn browser_captions_script() -> String {
-    concat!(
-        "(() => {
-",
-        include_str!("caption_parsers.js"),
-        "
-",
-        include_str!("captions.js"),
-        "
-})();
-"
-    )
-    .to_owned()
 }
 
 pub(in crate::browser) fn browser_status_update_script(state: &serde_json::Value) -> String {

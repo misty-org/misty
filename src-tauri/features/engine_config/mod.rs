@@ -12,6 +12,7 @@ pub mod support;
 pub mod cc_switch;
 pub mod channels;
 pub mod cli_lifecycle;
+pub mod engine_env;
 pub mod fonts;
 pub mod marketplace;
 pub mod mcp;

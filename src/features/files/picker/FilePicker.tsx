@@ -1,9 +1,7 @@
 import { useAppStore } from "@/app/shell";
-import { selectGeneralPreferences, useSettingsStore } from "@/features/settings";
 import { Button } from "@/shared/ui";
 import { open } from "@tauri-apps/plugin-dialog";
 import { useEffect, useRef } from "react";
-import { resolvePreferredRoot } from "./filePickerPaths";
 
 export type MistyFilePickerMode = "file" | "folder";
 
@@ -40,11 +38,8 @@ export function MistyFilePicker({
   onSelect,
   onSelectMany,
 }: MistyFilePickerProps) {
-  const homeDir = useAppStore((s) => s.app?.environment.homeDir);
-  const preferences = useSettingsStore((s) => s.settings?.document);
-  const startingFolder = homeDir
-    ? resolvePreferredRoot(selectGeneralPreferences(preferences).preferredWorkspaceRoot, homeDir)
-    : undefined;
+  // The dialog opens in the person's home folder.
+  const startingFolder = useAppStore((s) => s.app?.environment.homeDir) || undefined;
 
   const choose = async () => {
     const chosen = await open({

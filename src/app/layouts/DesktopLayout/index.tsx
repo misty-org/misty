@@ -1,4 +1,4 @@
-import { CursorCompanionController } from "@/features/agents";
+import { CursorCompanionController, TutorTraySync } from "@/features/agents";
 import { CapturePanel, DictationController } from "@/features/voice";
 import { type AppTab } from "@/app/shell";
 import {
@@ -10,7 +10,6 @@ import {
   SignOutSheet,
   useAuth,
 } from "@/features/account";
-import { NavigationNamesBoundary } from "@/features/app-windows";
 import { blockIfUnsaved } from "@/features/settings";
 import { setBrowserWebviewsSuspended } from "@/features/app-windows";
 import { useWindowDockingLayout } from "@/features/app-windows";
@@ -33,6 +32,7 @@ import { useDesktopFrameStyle } from "./useDesktopFrameStyle";
 import { useDesktopRouteEffects } from "./useDesktopRouteEffects";
 import { useDesktopShellStatus } from "./useDesktopShellStatus";
 import { HelpDialog } from "./HelpDialog";
+import { TourHost } from "@/features/onboarding";
 import { useDesktopShortcuts } from "./useDesktopShortcuts";
 import { useDesktopTitlebarGeometry } from "./useDesktopTitlebarGeometry";
 import { useDesktopWindowChrome } from "./useDesktopWindowChrome";
@@ -147,108 +147,108 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
     />
   ) : null;
   return (
-    <NavigationNamesBoundary userId={user?.id ?? ""} enabled={!isAuthRoute}>
-      <main
-        ref={shellRef}
-        className={cn(
-          "misty-docking-frame",
-          "misty-app-reveal",
-          "transition-[grid-template-columns,grid-template-rows]",
-          styles.navigatorMotionClass,
-        )}
-        style={
-          isAuthRoute
-            ? { gridTemplateColumns: "minmax(0, 1fr)", gridTemplateRows: "38px minmax(0, 1fr)" }
-            : geometry.frame
+    <main
+      ref={shellRef}
+      className={cn(
+        "misty-docking-frame",
+        "misty-app-reveal",
+        "transition-[grid-template-columns,grid-template-rows]",
+        styles.navigatorMotionClass,
+      )}
+      style={
+        isAuthRoute
+          ? { gridTemplateColumns: "minmax(0, 1fr)", gridTemplateRows: "38px minmax(0, 1fr)" }
+          : geometry.frame
+      }
+      data-misty-desktop-frame
+      data-rail-flush={!isAuthRoute && geometry.railFlush ? "true" : undefined}
+      data-navigation-position={docking.navigation}
+      data-tab-position={docking.tabs}
+      onPointerDown={(event) => {
+        const target = event.target instanceof Element ? event.target : null;
+        if (target?.closest("[data-misty-window-titlebar-region='true']")) {
+          handleDesktopTitlebarPointerDown(event);
+          return;
         }
-        data-misty-desktop-frame
-        data-rail-flush={!isAuthRoute && geometry.railFlush ? "true" : undefined}
-        data-navigation-position={docking.navigation}
-        data-tab-position={docking.tabs}
-        onPointerDown={(event) => {
-          const target = event.target instanceof Element ? event.target : null;
-          if (target?.closest("[data-misty-window-titlebar-region='true']")) {
-            handleDesktopTitlebarPointerDown(event);
-            return;
-          }
-          // Pages drawn by the app itself move the window from their top edge too, as native
-          // browser pages do. Portalled menus and dialogs sit outside this element.
-          if (shellRef.current?.contains(target) && isTopEdgeDragPress(event))
-            handleTopEdgePointerDown(event);
-        }}
+        // Pages drawn by the app itself move the window from their top edge too, as native
+        // browser pages do. Portalled menus and dialogs sit outside this element.
+        if (shellRef.current?.contains(target) && isTopEdgeDragPress(event))
+          handleTopEdgePointerDown(event);
+      }}
+    >
+      <header
+        className={cn("misty-docking-titlebar", isAuthRoute && "border-b-0 bg-transparent")}
+        data-shared-chrome={!isAuthRoute}
+        onPointerDown={handleDesktopTitlebarPointerDown}
       >
-        <header
-          className={cn("misty-docking-titlebar", isAuthRoute && "border-b-0 bg-transparent")}
-          data-shared-chrome={!isAuthRoute}
-          onPointerDown={handleDesktopTitlebarPointerDown}
-        >
-          {shouldShowWindowsControls && (captionSlot || floatingCaption) ? (
-            <WindowsTitlebarControls
-              standard={isAuthRoute}
-              slot={captionSlot}
-              controlsRef={windowsTitlebarControlsRef}
-              scale={titlebarNavigationGeometry.scale}
-              isWindowMaximized={isWindowMaximized}
-              minimizeTitlebarWindow={minimizeTitlebarWindow}
-              closeTitlebarWindow={closeTitlebarWindow}
-              toggleTitlebarMaximize={toggleTitlebarMaximize}
-              showSnapLayoutsSoon={showSnapLayoutsSoon}
-              cancelSnapLayouts={cancelSnapLayouts}
-            />
-          ) : null}
-        </header>
-
-        <section
-          className={cn(
-            "route-shell relative z-10 min-h-0 min-w-0 overflow-hidden",
-            isAuthRoute ? "bg-window-chrome" : "bg-charcoal-bg",
-          )}
-          style={isAuthRoute ? { gridColumn: 1, gridRow: 2 } : geometry.content}
-          data-misty-route-shell
-        >
-          {!isAuthRoute ? <AppNoticePublisher /> : null}
-
-          <>
-            {isAuthRoute ? (
-              <Outlet />
-            ) : standaloneRouteTitle ? (
-              <StandaloneRouteSurface title={standaloneRouteTitle}>
-                <Outlet />
-              </StandaloneRouteSurface>
-            ) : (
-              <WorkspaceCanvas
-                windowsTitlebarControls={shouldShowWindowsControls}
-                tabPosition={docking.tabs}
-                hideTabStrip={focusMode}
-                stripAccount={stripAccount}
-              />
-            )}
-            {!isAuthRoute && user?.id ? (
-              <DeferUntilIdle>
-                <CursorCompanionController key={user.id} accountId={user.id} />
-                <DictationController key={`dictation-${user.id}`} />
-                <CapturePanel key={`capture-${user.id}`} />
-              </DeferUntilIdle>
-            ) : null}
-          </>
-        </section>
-
-        <FramePacingOverlay enabled={!isAuthRoute && framePacingOverlayEnabled} />
-        {/* Also the setup wizard, which the first-run welcome opens. */}
-        <SignInSheet />
-        {!isAuthRoute && user ? <SignOutSheet /> : null}
-        <AccountSuspendedNotice />
-        <AccountClosingNotice />
-        {!isAuthRoute && user ? <ServerAlertsNotice /> : null}
-        {!isAuthRoute ? <HelpDialog /> : null}
-        {!isAuthRoute ? (
-          <DesktopShellOverlays
-            settingsOpen={settingsOpen}
-            onCloseSettings={closeSettingsOverlay}
-            userId={user?.id}
+        {shouldShowWindowsControls && (captionSlot || floatingCaption) ? (
+          <WindowsTitlebarControls
+            standard={isAuthRoute}
+            slot={captionSlot}
+            controlsRef={windowsTitlebarControlsRef}
+            scale={titlebarNavigationGeometry.scale}
+            isWindowMaximized={isWindowMaximized}
+            minimizeTitlebarWindow={minimizeTitlebarWindow}
+            closeTitlebarWindow={closeTitlebarWindow}
+            toggleTitlebarMaximize={toggleTitlebarMaximize}
+            showSnapLayoutsSoon={showSnapLayoutsSoon}
+            cancelSnapLayouts={cancelSnapLayouts}
           />
         ) : null}
-      </main>
-    </NavigationNamesBoundary>
+      </header>
+
+      <section
+        className={cn(
+          "route-shell relative z-10 min-h-0 min-w-0 overflow-hidden",
+          isAuthRoute ? "bg-window-chrome" : "bg-charcoal-bg",
+        )}
+        style={isAuthRoute ? { gridColumn: 1, gridRow: 2 } : geometry.content}
+        data-misty-route-shell
+      >
+        {!isAuthRoute ? <AppNoticePublisher /> : null}
+
+        <>
+          {isAuthRoute ? (
+            <Outlet />
+          ) : standaloneRouteTitle ? (
+            <StandaloneRouteSurface title={standaloneRouteTitle}>
+              <Outlet />
+            </StandaloneRouteSurface>
+          ) : (
+            <WorkspaceCanvas
+              windowsTitlebarControls={shouldShowWindowsControls}
+              tabPosition={docking.tabs}
+              hideTabStrip={focusMode}
+              stripAccount={stripAccount}
+            />
+          )}
+          {!isAuthRoute && user?.id ? (
+            <DeferUntilIdle>
+              <CursorCompanionController key={user.id} accountId={user.id} />
+              <TutorTraySync />
+              <DictationController key={`dictation-${user.id}`} />
+              <CapturePanel key={`capture-${user.id}`} />
+            </DeferUntilIdle>
+          ) : null}
+        </>
+      </section>
+
+      <FramePacingOverlay enabled={!isAuthRoute && framePacingOverlayEnabled} />
+      {/* Also the setup wizard, which the first-run welcome opens. */}
+      <SignInSheet />
+      {!isAuthRoute && user ? <SignOutSheet /> : null}
+      <AccountSuspendedNotice />
+      <AccountClosingNotice />
+      {!isAuthRoute && user ? <ServerAlertsNotice /> : null}
+      {!isAuthRoute ? <HelpDialog /> : null}
+      {!isAuthRoute ? <TourHost /> : null}
+      {!isAuthRoute ? (
+        <DesktopShellOverlays
+          settingsOpen={settingsOpen}
+          onCloseSettings={closeSettingsOverlay}
+          userId={user?.id}
+        />
+      ) : null}
+    </main>
   );
 }

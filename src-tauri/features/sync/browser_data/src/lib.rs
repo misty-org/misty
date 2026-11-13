@@ -1,7 +1,6 @@
 //! What the browser keeps on this computer: profile records, workspace recovery and the keys that
 //! seal them. Secret types deliberately cannot be serialized or formatted; the web renderer only
 //! receives projected UI state.
-pub mod collections;
 pub mod crypto;
 pub mod document;
 pub mod local;
@@ -24,8 +23,6 @@ pub enum Error {
     Sequence,
     #[error("OS-protected key storage is unavailable")]
     SecureStorage,
-    #[error("Connection is unavailable")]
-    Network,
     #[error("Local recovery files are unavailable")]
     Recovery,
     #[error("Local storage is unavailable")]

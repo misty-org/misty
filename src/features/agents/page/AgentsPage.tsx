@@ -1,9 +1,10 @@
 import "./agentsWorkspace.css";
+import { useEffect, useState } from "react";
 import { AgentSettingsModal } from "../personal/AgentSettingsModal";
 import { AgentSetup } from "../personal/AgentSetup";
-import { AgentSwitcher } from "../personal/AgentSwitcher";
 import { AgentEditor } from "../personal/AgentEditor";
 import { AgentDiscardDialog } from "./AgentDiscardDialog";
+import { ChatTitle } from "./AgentConversationHeading";
 import { AgentWorkspaceFrame } from "../methods/AgentWorkspaceFrame";
 import { AgentsTaskContent } from "./AgentsTaskContent";
 import { createAgentsPageActions, deriveAgentsPageView } from "./agentsPageActions";
@@ -26,7 +27,7 @@ function AgentsWorkspacePage() {
   const state = useAgentsPageState();
   // Agents group by their home Space here; the quick panel just lists them.
   const actions = createAgentsPageActions(state);
-  const view = deriveAgentsPageView(state, actions);
+  const view = deriveAgentsPageView(state);
   const {
     user,
     spaceId,
@@ -45,21 +46,34 @@ function AgentsWorkspacePage() {
     activity,
     activeConversationId,
     workspaceRef,
-    identityRef,
+    agents,
+    load,
   } = state;
   const { change, setEditorStatus } = guard;
   const { select, closeSettings, saveProfile, removeProfile, openApps } = actions;
+  // The Studio opens any agent's settings without moving the page to that agent's chat.
+  const [editingId, setEditingId] = useState<string>();
+  useEffect(() => {
+    if (!settingsModalOpen) setEditingId(undefined);
+  }, [settingsModalOpen]);
+  const editing = agents.find((agent) => agent.id === editingId) ?? profile;
+  const elsewhere = Boolean(editing && editing.id !== profile?.id);
+  const settleElsewhere = async () => {
+    await load(user?.id ?? "");
+    guard.cancel();
+    setSettingsModalOpen(false);
+  };
   const profileSection = () =>
-    profile && (
+    editing && (
       <AgentEditor
-        key={`${user?.id}:${profile.id}:${spaceId}`}
-        profile={profile}
+        key={`${user?.id}:${editing.id}:${spaceId}`}
+        profile={editing}
         onStatusChange={setEditorStatus}
-        onSaved={saveProfile}
-        onRemoved={removeProfile}
+        onSaved={elsewhere ? settleElsewhere : saveProfile}
+        onRemoved={elsewhere ? settleElsewhere : removeProfile}
       />
     );
-  const { showWorkspace, switcher } = view;
+  const { showWorkspace } = view;
   const taskContent = <AgentsTaskContent state={state} actions={actions} view={view} />;
   return (
     <main ref={workspaceRef} className="agents-workspace" data-settings-open={settingsModalOpen}>
@@ -72,7 +86,7 @@ function AgentsWorkspacePage() {
           activity={activity.entries}
           conversationId={activeConversationId}
           disabled={view.disabled}
-          identity={<AgentSwitcher {...switcher} className="agent-studio-identity" />}
+          title={<ChatTitle conversation={state.conversation} />}
           onPageChange={(page) =>
             page === "task"
               ? change(() => {
@@ -86,6 +100,10 @@ function AgentsWorkspacePage() {
           onLearn={(prompt) => {
             void useCollaborationStore.getState().setMode(undefined, "teach");
             select(profile.id, true, undefined, prompt);
+          }}
+          onAgentSettings={(agentId) => {
+            setEditingId(agentId);
+            actions.openSettingsModal("settings");
           }}
           onNewTask={() => select(profile.id, true)}
           onConversation={(id) => select(profile.id, false, id)}
@@ -116,13 +134,6 @@ function AgentsWorkspacePage() {
         open={guard.pending}
         onCancel={guard.cancel}
         onDiscard={guard.discard}
-        restoreFocus={() => {
-          if (workspacePage !== "task")
-            workspaceRef.current
-              ?.querySelector<HTMLButtonElement>('.agent-studio-sidebar [aria-current="page"]')
-              ?.focus();
-          else identityRef.current?.focus();
-        }}
       />
     </main>
   );

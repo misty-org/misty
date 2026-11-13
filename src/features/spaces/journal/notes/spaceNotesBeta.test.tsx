@@ -117,7 +117,7 @@ describe("SpaceNotes beta simplification", () => {
     });
     await wait();
 
-    expect(document.body.textContent).toContain("New note");
+    expect(document.body.textContent).toContain("New doc");
     expect(document.body.querySelector("#new-note-title")).not.toBeNull();
   });
 
@@ -146,10 +146,10 @@ describe("SpaceNotes beta simplification", () => {
     await wait(180);
 
     await act(async () => {
-      buttonByText("New note").click();
+      buttonByText("New doc").click();
     });
 
-    expect(document.body.textContent).toContain("New note");
+    expect(document.body.textContent).toContain("New doc");
     expect(document.body.textContent).toContain("Title");
     expect(document.body.querySelector("#new-note-body")).toBeNull();
     expect(document.body.querySelector("#new-note-space")).toBeNull();
@@ -166,7 +166,7 @@ describe("SpaceNotes beta simplification", () => {
       const dialog = document.body.querySelector<HTMLElement>('[role="dialog"]');
       const createButton = Array.from(
         dialog?.querySelectorAll<HTMLButtonElement>("button") ?? [],
-      ).find((candidate) => candidate.textContent?.trim() === "Create note");
+      ).find((candidate) => candidate.textContent?.trim() === "Create doc");
       createButton?.click();
     });
     await wait(160);
@@ -180,7 +180,7 @@ describe("SpaceNotes beta simplification", () => {
       syncStatus: "synced",
     });
     expect(useNotesStore.getState().selectedNoteId).toBe(created?.id);
-    expect(document.body.querySelector<HTMLInputElement>('[aria-label="Note title"]')?.value).toBe(
+    expect(document.body.querySelector<HTMLInputElement>('[aria-label="Doc title"]')?.value).toBe(
       "Beta note",
     );
     expect(
@@ -226,7 +226,7 @@ describe("SpaceNotes beta simplification", () => {
     });
     await wait(180);
 
-    await act(async () => buttonByText("Notes").click());
+    await act(async () => buttonByText("Docs").click());
 
     const noteRow = Array.from(document.body.querySelectorAll("button"))
       .find((candidate) => candidate.getAttribute("aria-label") === "Delete me")
@@ -367,7 +367,7 @@ describe("SpaceNotes beta simplification", () => {
     await wait(180);
 
     // Initial view is the note list
-    expect(container.querySelector("h1")?.textContent).toBe("Journal");
+    expect(container.querySelector("h1")?.textContent).toBe("Docs");
     expect(container.querySelector("h1")?.closest(".rounded-2xl")).toBeNull();
     expect(container.textContent).toContain("Alpha Roadmap Note");
     expect(container.textContent).toContain("Beta Sprint Plan");
@@ -404,7 +404,7 @@ describe("SpaceNotes beta simplification", () => {
 
     // Now in document view with Back button
     const backButton = container.querySelector<HTMLButtonElement>(
-      'button[aria-label="Back to notes"]',
+      'button[aria-label="Back to docs"]',
     );
     expect(backButton).not.toBeNull();
     expect(backButton?.textContent).toContain("Back");
@@ -425,7 +425,7 @@ describe("SpaceNotes beta simplification", () => {
       root.render(notesSurface("/spaces/space-product/notes?note=note-2&view=list"));
     });
     await wait();
-    expect(container.querySelector('button[aria-label="Back to notes"]')).toBeNull();
+    expect(container.querySelector('button[aria-label="Back to docs"]')).toBeNull();
     expect(container.querySelector('input[aria-label="Search journal"]')).not.toBeNull();
   });
 });

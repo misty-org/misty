@@ -92,7 +92,7 @@ describe("SpaceDrawings route-backed page state", () => {
     });
 
     expect(container.textContent).not.toContain("Sign in to open drawings");
-    expect(container.textContent).toContain("Journal");
+    expect(container.textContent).toContain("Docs");
     expect(container.querySelector('button[aria-label="Back to drawings"]')).toBeNull();
 
     await act(async () => {
@@ -115,7 +115,7 @@ describe("SpaceDrawings route-backed page state", () => {
       await import("./SpaceDrawings");
     });
     expect(container.textContent).not.toContain("Sign in to open drawings");
-    expect(container.textContent).toContain("Journal");
+    expect(container.textContent).toContain("Docs");
     expect(container.querySelector('button[aria-label="Back to drawings"]')).toBeNull();
   });
 });

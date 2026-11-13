@@ -4,7 +4,7 @@
  * off for the `#` menu, read in full, or made into one of the person's own agents. Divisions
  * filter the list and switch a whole division at once.
  */
-import { Bot, Check, Eye, UserPlus } from "lucide-react";
+import { Check, Eye, UserPlus } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import {
   Button,
@@ -19,6 +19,7 @@ import {
   Switch,
   useNotice,
   OverflowFadeText,
+  Text,
 } from "@/shared/ui";
 import {
   disabledPersonas,
@@ -208,7 +209,9 @@ export function PersonaCatalogSection() {
                     {persona.icon}
                   </span>
                 ) : (
-                  <Bot className="size-4 text-cream-muted" aria-hidden />
+                  <Text size="control" weight="semibold" tone="muted" aria-hidden>
+                    {(persona.name.trim()[0] ?? "?").toUpperCase()}
+                  </Text>
                 )}
               </span>
               <div className="grid min-w-0 flex-1 gap-0.5">

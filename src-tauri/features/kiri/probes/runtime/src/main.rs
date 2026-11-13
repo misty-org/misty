@@ -1,5 +1,5 @@
 //! Runs Kiri's engine code for real inside a minimal Tauri app: page bridge
-//! and ACL, host channel, camera permission hook, editing commands, and (on
+//! and ACL, host channel, camera and location refusal, editing commands, and (on
 //! Windows) that WebView2 keeps its own WebAuthn. Prints `KIRI RUNTIME` lines.
 use std::{
     io::{Read, Write},
@@ -9,11 +9,6 @@ use std::{
 use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
 
 static EVENTS: Mutex<Vec<String>> = Mutex::new(Vec::new());
-#[cfg(target_os = "macos")]
-static APP: std::sync::OnceLock<tauri::AppHandle> = std::sync::OnceLock::new();
-/// How the probe answers the next location question.
-#[cfg(target_os = "macos")]
-static ALLOW_LOCATION: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(true);
 
 fn record(event: String) {
     println!("EVENT {event}");
@@ -36,58 +31,12 @@ fn wait(prefix: &str, seconds: u64) -> Option<String> {
 }
 
 struct Host;
-impl kiri::Host for Host {
-    fn signal(&self, caller: &kiri::Caller, signal: kiri::Signal) {
-        record(format!("signal {} {} {:?}", caller.webview, caller.origin, signal));
-    }
-}
+impl kiri::Host for Host {}
 
 struct Channel;
 impl kiri::channel::HostChannel for Channel {
     fn receive(&self, message: kiri::channel::HostMessage<'_>) {
         record(format!("host {} {}", message.webview, message.body));
-    }
-}
-
-struct Policy;
-impl kiri::engine::SitePolicy for Policy {
-    fn media_verdict(&self, request: &kiri::engine::MediaRequest) -> kiri::permissions::Verdict {
-        record(format!(
-            "media-request {} {:?} {:?}",
-            request.webview, request.top_origin, request.kind
-        ));
-        kiri::permissions::Verdict::Deny
-    }
-
-    fn location_verdict(
-        &self,
-        request: &kiri::engine::LocationRequest,
-    ) -> kiri::permissions::Verdict {
-        record(format!(
-            "location-request {} {:?}",
-            request.webview, request.top_origin
-        ));
-        if cfg!(target_os = "macos") {
-            kiri::permissions::Verdict::Prompt
-        } else {
-            kiri::permissions::Verdict::Deny
-        }
-    }
-
-    /// Holds the decision across a turn of the main loop, as a host waiting for a person does.
-    #[cfg(target_os = "macos")]
-    fn ask(
-        &self,
-        request: kiri::engine::PermissionAsk,
-        answer: kiri::engine::AskAnswer,
-    ) -> Result<(), kiri::engine::AskAnswer> {
-        record(format!("location-ask {:?} {:?}", request.top_origin, request.kinds));
-        std::thread::spawn(move || {
-            std::thread::sleep(Duration::from_millis(300));
-            let allow = ALLOW_LOCATION.load(std::sync::atomic::Ordering::SeqCst);
-            let _ = APP.get().unwrap().run_on_main_thread(move || answer.answer(allow));
-        });
-        Ok(())
     }
 }
 
@@ -128,7 +77,6 @@ const SCRIPT: &str = r#"(async () => {
   const send = (message) => { const post = window.__kiriHost(); if (post) post(message); };
   const invoke = window.__TAURI_INTERNALS__.invoke;
   const outcome = (promise) => promise.then(() => 'ok', (e) => String(e?.name ?? e));
-  send('result:media=' + await outcome(invoke('plugin:kiri|call', { request: { v: 1, cap: 'media', method: 'state', args: { audible: true } } })));
   send('result:unknown=' + await outcome(invoke('plugin:kiri|call', { request: { v: 1, cap: 'bluetooth', method: 'request-device' } })));
   send('result:app=' + await outcome(invoke('plugin:app|version')));
   const passkeys = window.PublicKeyCredential ? await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable().catch(() => 'error') : 'missing';
@@ -141,13 +89,9 @@ const SCRIPT: &str = r#"(async () => {
 
 fn main() {
     let url = serve();
-    let origin = url.trim_end_matches('/').to_owned();
     tauri::Builder::default()
         .plugin(kiri::init(|_| kiri::Kiri::new("probe-", Host)))
         .setup(move |app| {
-            #[cfg(target_os = "macos")]
-            let _ = APP.set(app.handle().clone());
-            kiri::engine::set_site_policy(Policy);
             kiri::channel::set_host_channel(Channel);
             // Test-only: expose the captured sender so the script can report back.
             let expose = format!("window.__kiriHost = ({});", kiri::channel::sender_script());
@@ -164,11 +108,10 @@ fn main() {
                     settings.set_enable_mock_capture_devices(true);
                 }
             })?;
-            kiri::engine::install_site_permissions(webview)?;
+            kiri::engine::deny_permission_requests(webview)?;
             kiri::channel::install_host_channel(webview)?;
             let handle = app.handle().clone();
-            let origin = origin.clone();
-            std::thread::spawn(move || drive(handle, origin));
+            std::thread::spawn(move || drive(handle));
             Ok(())
         })
         .run(tauri::generate_context!())
@@ -191,7 +134,7 @@ fn clipboard_text(_app: &tauri::AppHandle) -> Option<String> {
     arboard::Clipboard::new().ok()?.get_text().ok()
 }
 
-fn drive(app: tauri::AppHandle, origin: String) {
+fn drive(app: tauri::AppHandle) {
     std::thread::sleep(Duration::from_secs(4));
     let window = app.get_webview_window("probe-tab").expect("probe tab");
     let webview: &tauri::Webview = window.as_ref();
@@ -206,56 +149,28 @@ fn drive(app: tauri::AppHandle, origin: String) {
     let selected = wait("host probe-tab result:selected", 30);
     check("host channel delivers the page script's messages", selected.is_some(), format!("{selected:?}"));
     let result = |key: &str| seen(&format!("host probe-tab result:{key}=")).unwrap_or_default();
-    check("page → plugin:kiri|call allowed", result("media").ends_with("=ok"), result("media"));
-    let signal = seen("signal ").unwrap_or_default();
-    check(
-        "media signal reaches the host with the engine's origin",
-        signal.contains(&origin) && signal.contains("MediaAudible(true)"),
-        signal,
-    );
     check("unknown capability is NotSupportedError", result("unknown").ends_with("=NotSupportedError"), result("unknown"));
     check("other Tauri commands are refused to the page", !result("app").ends_with("=ok"), result("app"));
     // Kiri adds a passkey shim only on macOS; elsewhere the engine's own WebAuthn
     // stays (WebView2 has one, WebKitGTK has none).
     check("no Kiri passkey shim off macOS", !result("webauthn").contains("=kiri"), result("webauthn"));
-    let request = seen("media-request ").unwrap_or_default();
     let gum = result("gum");
-    if request.is_empty() && gum.ends_with("=NotFoundError") {
-        println!("KIRI RUNTIME SKIP: camera permission hook (this machine has no camera: {gum})");
+    if gum.ends_with("=NotFoundError") {
+        println!("KIRI RUNTIME SKIP: camera refusal (this machine has no camera: {gum})");
     } else {
-        check(
-            "camera request reaches Kiri's policy",
-            request.contains(&origin) && request.contains("Camera"),
-            request,
-        );
-        check("Kiri's block reaches the page", gum.ends_with("=NotAllowedError"), gum);
+        check("Kiri refuses the camera without asking", gum.ends_with("=NotAllowedError"), gum);
     }
     kiri::engine::edit(webview, kiri::engine::EditCommand::Copy).expect("edit");
     std::thread::sleep(Duration::from_millis(800));
     let copied = clipboard_text(&app);
     check("engine::edit Copy reaches the clipboard", copied.as_deref() == Some("Kiri copy check"), format!("{copied:?}"));
-    #[cfg(target_os = "macos")]
-    {
-        // WebKit remembers an answer until the page reloads, so each answer gets a fresh page.
-        const LOCATE: &str = r#"navigator.geolocation.getCurrentPosition(
-          () => window.__kiriHost()('result:location=position'),
-          (e) => window.__kiriHost()('result:location=code' + e.code),
-          { timeout: 6000 });"#;
-        webview.eval(LOCATE).expect("eval");
-        let granted = wait("host probe-tab result:location=", 12).unwrap_or_default();
-        let asks = EVENTS.lock().unwrap().iter().filter(|e| e.starts_with("location-ask")).count();
-        check("a location request is held for the host to ask", asks == 1, format!("{asks} asks"));
-        // The position itself needs macOS's own answer for this app, which nobody gives here, so
-        // anything but a refusal shows the grant got through.
-        check("a grant reaches the page", !granted.is_empty() && !granted.ends_with("=code1"), granted);
-        EVENTS.lock().unwrap().retain(|e| !e.contains("result:location"));
-        ALLOW_LOCATION.store(false, std::sync::atomic::Ordering::SeqCst);
-        webview.eval("location.reload()").expect("eval");
-        std::thread::sleep(Duration::from_secs(2));
-        webview.eval(LOCATE).expect("eval");
-        let refused = wait("host probe-tab result:location=", 12).unwrap_or_default();
-        check("a refusal reaches the page", refused.ends_with("=code1"), refused);
-    }
+    const LOCATE: &str = r#"navigator.geolocation.getCurrentPosition(
+      () => window.__kiriHost()('result:location=position'),
+      (e) => window.__kiriHost()('result:location=code' + e.code),
+      { timeout: 6000 });"#;
+    webview.eval(LOCATE).expect("eval");
+    let located = wait("host probe-tab result:location=", 12).unwrap_or_default();
+    check("a location request is refused", located.ends_with("=code1"), located);
     finish(&app, failures);
 }
 

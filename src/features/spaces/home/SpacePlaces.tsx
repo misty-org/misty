@@ -1,9 +1,9 @@
 import {
   CalendarDays,
+  FileText,
   MessagesSquare,
   KanbanSquare,
   Library,
-  NotebookPen,
   type LucideIcon,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -13,7 +13,7 @@ import { HomeSection } from "./HomeSection";
 
 const places: { section: string; label: string; icon: LucideIcon }[] = [
   { section: "chat", label: "Chat", icon: MessagesSquare },
-  { section: "notes", label: "Journal", icon: NotebookPen },
+  { section: "notes", label: "Docs", icon: FileText },
   { section: "planner", label: "Planner", icon: KanbanSquare },
   { section: "calendar", label: "Calendar", icon: CalendarDays },
   { section: "library", label: "Library", icon: Library },

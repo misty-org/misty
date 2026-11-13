@@ -1,4 +1,3 @@
-import { useNavigationNames } from "@/features/app-windows";
 import { registerShortcutHandler, useShortcutHandler } from "@/features/shortcuts";
 import {
   canCloseWorkspaceView,
@@ -7,32 +6,9 @@ import {
   useWorkspaceStore,
   type WorkspaceView,
 } from "@/features/app-windows";
-import { layoutTabs } from "@/features/app-windows";
 import { useCallback, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-
-/** Gives tabs saved before titles were stored the names they had in the old navigation. */
-export function useLegacyTabTitles() {
-  const legacyNames = useNavigationNames((state) => state.names);
-  const legacyNamesReady = useNavigationNames((state) => state.ready);
-  useEffect(() => {
-    if (!legacyNamesReady) return;
-    const { layout } = useWorkspaceStore.getState();
-    useWorkspaceStore.setState({
-      layout: {
-        ...layout,
-        tabs: layoutTabs(layout).map((tab) => {
-          if (!tab.legacyNameKeys) return tab;
-          const { legacyNameKeys, ...rest } = tab;
-          return {
-            ...rest,
-            title: rest.title ?? legacyNameKeys.map((key) => legacyNames[key]).find(Boolean),
-          };
-        }),
-      },
-    });
-  }, [legacyNames, legacyNamesReady]);
-}
+import { openNewTab } from "./spaceNavigation";
 
 /** Close, reopen, cycle and pick tabs from the keyboard, and focus a tab another surface asks for. */
 export function useWorkspaceTabShortcuts(navigateToActiveLayoutTab: () => void) {
@@ -88,10 +64,7 @@ export function useWorkspaceTabShortcuts(navigateToActiveLayoutTab: () => void) 
   );
   useShortcutHandler(
     "workspace.new_tab",
-    useCallback(() => {
-      const view = useWorkspaceStore.getState().newTab();
-      openSelectedTab(view);
-    }, [openSelectedTab]),
+    useCallback(() => openNewTab(openSelectedTab), [openSelectedTab]),
   );
   useEffect(() => {
     const unregister = Array.from({ length: 9 }, (_, index) =>

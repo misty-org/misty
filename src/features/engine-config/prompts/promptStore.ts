@@ -129,16 +129,6 @@ export async function promptsFor(root: string): Promise<CustomPromptEntry[]> {
   return usePromptStore.getState().byRoot[root]?.entries ?? [];
 }
 
-/** Drops one folder's cache when it's unlinked. */
-export function prunePrompts(root: string): void {
-  usePromptStore.setState((s) => {
-    if (!(root in s.byRoot)) return {};
-    const byRoot = { ...s.byRoot };
-    delete byRoot[root];
-    return { byRoot };
-  });
-}
-
 // Each helper tells other surfaces before refreshing, so their refreshes join this one.
 
 export async function createPrompt(

@@ -38,10 +38,9 @@ use serde_json::{json, Map, Value};
 use tokio::process::Command;
 
 use super::qoder_session::{
-    initialize_params, jsonrpc_id_key, jsonrpc_result_response,
-    session_update_from_notification, spawn_piped_acp, teardown, AcpLine, AcpProcess,
-    QoderSessionUpdate, PROMPT_TIMEOUT, RPC_HANDSHAKE_TIMEOUT, SESSION_NEW_TIMEOUT,
-    SESSION_RESUME_TIMEOUT,
+    initialize_params, jsonrpc_id_key, jsonrpc_result_response, session_update_from_notification,
+    spawn_piped_acp, teardown, AcpLine, AcpProcess, QoderSessionUpdate, PROMPT_TIMEOUT,
+    RPC_HANDSHAKE_TIMEOUT, SESSION_NEW_TIMEOUT, SESSION_RESUME_TIMEOUT,
 };
 use super::{BuiltCommand, EngineEvent, SendRequest, TurnCore, TurnState, VirtualRunGuard};
 
@@ -179,19 +178,20 @@ async fn handshake_and_prompt(
     req: &SendRequest,
     killed: &AtomicBool,
 ) -> Result<(), String> {
-    let agent = acp.routed(
-        "initialize",
-        if core.engine_id == "kimi" {
-            super::kimi_acp::initialization()
-        } else {
-            initialize_params()
-        },
-        RPC_HANDSHAKE_TIMEOUT,
-        killed,
-        None,
-        &mut |_| None,
-    )
-    .await?;
+    let agent = acp
+        .routed(
+            "initialize",
+            if core.engine_id == "kimi" {
+                super::kimi_acp::initialization()
+            } else {
+                initialize_params()
+            },
+            RPC_HANDSHAKE_TIMEOUT,
+            killed,
+            None,
+            &mut |_| None,
+        )
+        .await?;
     let servers = crate::engines::gate::acp_mcp_servers(req, &agent);
     let gate = crate::engines::gate::AcpGate::of(core, req);
     let session_id = if core.engine_id == "kimi" {

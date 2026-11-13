@@ -9,13 +9,9 @@ const native = vi.hoisted(() => ({
   focus: vi.fn(async () => {}),
   stop: vi.fn(),
 }));
-vi.mock("@/features/browser/webviews/browserRuntime", async (importOriginal) => ({
-  ...(await importOriginal<Record<string, unknown>>()),
-  browserOverlayReady: vi.fn(async () => {}),
-  setBrowserWebviewsSuspended: native.suspend,
-}));
 vi.mock("@/features/app-windows/page-runtime/browserOverlayRuntime", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
+  browserOverlayReady: vi.fn(async () => {}),
   setBrowserWebviewsSuspended: native.suspend,
 }));
 vi.mock("@tauri-apps/api/core", () => ({ invoke: native.invoke }));

@@ -24,17 +24,8 @@ pub(crate) struct Taint {
 /// Whether this call read the person's private data.
 pub(crate) fn reads_private(name: &str, input: &Value) -> bool {
     match name {
-        "folder.read"
-        | "shell.run"
-        | "note.read"
-        | "note.search"
-        | "file.read"
-        | "file.search"
-        | "drawing.read"
-        | "drawing.list"
-        | "message.search"
-        | "thread.read"
-        | "thread.list"
+        "folder.read" | "shell.run" | "note.read" | "note.search" | "file.read" | "file.search"
+        | "drawing.read" | "drawing.list" | "message.search" | "thread.read" | "thread.list"
         | "search.all" => true,
         "integration.execute" => {
             let slug = input.get("tool_slug").and_then(Value::as_str).unwrap_or("");
@@ -294,12 +285,7 @@ mod tests {
 
     #[test]
     fn what_counts_as_a_private_read() {
-        for name in [
-            "folder.read",
-            "note.read",
-            "search.all",
-            "shell.run",
-        ] {
+        for name in ["folder.read", "note.read", "search.all", "shell.run"] {
             assert!(reads_private(name, &json!({})), "{name}");
         }
         assert!(reads_private(

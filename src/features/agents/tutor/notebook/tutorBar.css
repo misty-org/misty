@@ -4,6 +4,9 @@
  */
 .tutor-notebook-frame {
   display: flex;
+  /* The page around it is a flex row: without this it shrinks to its content's width. */
+  flex: 1;
+  min-width: 0;
   height: 100%;
   min-height: 0;
   flex-direction: column;
@@ -199,4 +202,24 @@
   padding: 48px 0;
   text-align: center;
   color: var(--color-cream-muted);
+}
+
+/* What to research, and the topics to start from, at the top of the home. */
+.notebook-start {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.notebook-topics {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(144px, 1fr));
+  gap: 8px;
+}
+.notebook-topics [data-slot="choice-tile"] {
+  padding: 12px 8px;
+}
+.notebook-topic-questions {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 4px 16px;
 }

@@ -28,7 +28,6 @@ const definitions = [
 
 const snapshot: ShortcutsSnapshot = {
   detectedPlatform: "macos",
-  profileName: "macOS",
   commandDefinitions: definitions,
   effectiveBindings: [
     {
@@ -53,7 +52,6 @@ const snapshot: ShortcutsSnapshot = {
       alternateSource: "default",
     },
   ],
-  bindings: [],
   configPath: "/tmp/commands.msy",
   overrides: [],
 };

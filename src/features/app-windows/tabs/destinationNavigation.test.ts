@@ -1,9 +1,8 @@
-import { beforeEach, afterEach, expect, it } from "vitest";
+import { beforeEach, expect, it } from "vitest";
 import { useWorkspaceStore } from "./useWorkspaceStore";
 import { workspaceSurfaceFromRoute } from "./routeSurface";
 import { activeLayoutView, allLayoutViews, layoutTabs } from "../panes/layoutTabs";
 import { dockLeaves, findDockLeaf } from "../panes/dockTree";
-import { configureWorkspaceDefaultView } from "./workspaceDefaultView";
 import { partialWorkspaceStore, migrateWorkspaceStore } from "./workspaceStorePersistence";
 import { normalizeWorkspaceLayout } from "../profiles/windows";
 import { openPage } from "@/tests/workspacePage";
@@ -11,10 +10,8 @@ import { openPage } from "@/tests/workspacePage";
 const store = () => useWorkspaceStore.getState();
 const go = (route: string) => store().openDestination(workspaceSurfaceFromRoute(route)!);
 beforeEach(() => {
-  configureWorkspaceDefaultView(3);
   store().reset();
 });
-afterEach(() => configureWorkspaceDefaultView(1));
 
 it("returns to the most recently used page of a destination, keeping each one's route", () => {
   const one = openPage(store(), { url: "https://one.example" });
@@ -78,7 +75,6 @@ it("keeps destination reuse inside the current window", () => {
 });
 
 it("starts configured fresh tabs and stops replacing them after interaction", () => {
-  configureWorkspaceDefaultView(3);
   const fresh = store().newTab();
   expect(fresh).toMatchObject({ surfaceId: "agents", placeholder: true });
   store().commitPlaceholder(fresh.id);

@@ -2,27 +2,15 @@
 mod agy;
 mod codex_titles;
 pub(crate) mod discovery;
-pub(crate) mod edit;
 mod extract;
 pub mod reader;
 pub mod scanner;
 pub mod search;
 
-pub use extract::{
-    internal_frame_hash, parse_session_file, recordable_internal_frame_hash, scan_summary_file,
-    ParsedSession, ScanSummary,
-};
-
-// `user_row_lines` serves only fork cut points (`engine::fork`) and isn't public API, so it is
-// re-exported crate-wide on its own rather than in the `pub use` above.
-pub(crate) use extract::user_row_lines;
-
-// `open_line_reader` is crate-internal too: a fork copying a dsh transcript prefix must use the
-// same decoding path (multi-frame zstd), never a wrapper of its own.
-pub(crate) use extract::open_line_reader;
+pub use extract::{parse_session_file, scan_summary_file, ParsedSession, ScanSummary};
 
 use crate::engines::TodosPayload;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use serde_json::Value;
 use std::path::{Path, PathBuf};
 
@@ -62,7 +50,7 @@ pub struct Message {
     pub images: Vec<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionMeta {
     pub engine: String,
@@ -78,26 +66,6 @@ pub struct SessionMeta {
     pub message_count: i64,
     pub pinned: bool,
     pub custom_title: Option<String>,
-    /// Model id this app sent for the session last ("provider/model", as the
-    /// picker spells it). Kept in our own table because the engine's own
-    /// transcript records only the bare model name — a session reopened in
-    /// another window, on the phone, or after a restart would otherwise have
-    /// nothing to recover its provider and model from.
-    pub model: Option<String>,
-    /// Reasoning effort the session last ran. Kept beside the model for the
-    /// same reason: a reopened session has to keep its level, wherever it is
-    /// opened from.
-    pub effort: Option<String>,
-    /// In-app channel this session last ran. Spawn injects that channel's env
-    /// onto the child; native CLI files stay official. Absent until a send
-    /// remembers one — the engine default `current` then applies.
-    pub provider: Option<String>,
-    /// Plugin-fed remote sessions have no local transcript. Archive snapshots
-    /// preserve their route so Settings can restore or delete them too.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub remote: Option<bool>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub remote_path: Option<String>,
 }
 
 /// A native session file discovered on disk, matched to a workspace.

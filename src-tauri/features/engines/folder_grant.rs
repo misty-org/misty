@@ -20,14 +20,26 @@ use crate::project::person_window;
 /// and relative paths are refused rather than guessed.
 pub(crate) fn grant_dir_for(path: &str) -> Result<PathBuf, String> {
     let asked = Path::new(path.trim());
-    if !asked.is_absolute() || asked.components().any(|part| matches!(part, Component::ParentDir)) {
+    if !asked.is_absolute()
+        || asked
+            .components()
+            .any(|part| matches!(part, Component::ParentDir))
+    {
         return Err("That path can't be granted as a folder.".into());
     }
     let looks_like_file = asked
         .file_name()
         .and_then(|name| name.to_str())
-        .is_some_and(|name| name.rsplit_once('.').is_some_and(|(stem, ending)| !stem.is_empty() && !ending.is_empty() && ending.len() <= 12));
-    let folder = if looks_like_file { asked.parent().unwrap_or(asked) } else { asked };
+        .is_some_and(|name| {
+            name.rsplit_once('.').is_some_and(|(stem, ending)| {
+                !stem.is_empty() && !ending.is_empty() && ending.len() <= 12
+            })
+        });
+    let folder = if looks_like_file {
+        asked.parent().unwrap_or(asked)
+    } else {
+        asked
+    };
     Ok(folder.components().collect())
 }
 
@@ -65,7 +77,10 @@ pub async fn space_folder_grant(
         ))
         .title("Allow folder")
         .kind(MessageDialogKind::Warning)
-        .buttons(MessageDialogButtons::OkCancelCustom("Allow folder".to_owned(), "Cancel".to_owned()))
+        .buttons(MessageDialogButtons::OkCancelCustom(
+            "Allow folder".to_owned(),
+            "Cancel".to_owned(),
+        ))
         .show(move |answer| {
             let _ = send.send(answer);
         });
@@ -108,10 +123,22 @@ mod tests {
 
     #[test]
     fn a_file_grants_its_folder_and_a_folder_itself() {
-        assert_eq!(grant_dir_for("/Users/me/notes/plan.md").unwrap(), PathBuf::from("/Users/me/notes"));
-        assert_eq!(grant_dir_for("/Users/me/notes").unwrap(), PathBuf::from("/Users/me/notes"));
-        assert_eq!(grant_dir_for("/Users/me/notes/").unwrap(), PathBuf::from("/Users/me/notes"));
-        assert_eq!(grant_dir_for("/Users/me/.config").unwrap(), PathBuf::from("/Users/me/.config"));
+        assert_eq!(
+            grant_dir_for("/Users/me/notes/plan.md").unwrap(),
+            PathBuf::from("/Users/me/notes")
+        );
+        assert_eq!(
+            grant_dir_for("/Users/me/notes").unwrap(),
+            PathBuf::from("/Users/me/notes")
+        );
+        assert_eq!(
+            grant_dir_for("/Users/me/notes/").unwrap(),
+            PathBuf::from("/Users/me/notes")
+        );
+        assert_eq!(
+            grant_dir_for("/Users/me/.config").unwrap(),
+            PathBuf::from("/Users/me/.config")
+        );
     }
 
     #[test]

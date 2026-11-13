@@ -22,7 +22,7 @@ export function JournalDeleteDialog(props: {
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const label = props.kind === "drawing" ? "drawing" : "note";
+  const label = props.kind === "drawing" ? "drawing" : "doc";
   useNotice(Boolean(error), {
     message: error ?? "",
     tone: "error",

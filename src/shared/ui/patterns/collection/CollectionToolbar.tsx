@@ -7,15 +7,20 @@ import {
   type ComponentProps,
   type ReactNode,
 } from "react";
-import { Columns3, LayoutGrid, List, ListFilter } from "lucide-react";
+import { ArrowUpDown, Columns3, LayoutGrid, List, ListFilter } from "lucide-react";
 import { usePointerReorder, reorderIds } from "@/shared/hooks/usePointerReorder";
-import { ChoiceGroup } from "../../controls/ChoiceGroup";
 import { FilterChip } from "../../controls/FilterChip";
 import { IconButton } from "../../controls/IconButton";
 import { SearchField } from "../../controls/SearchField";
 import { ActionBar, type ActionBarItem, type IconSource } from "../../layout/ActionBar";
 import { PageHeader } from "../../layout/PageHeader";
-import { Separator } from "../../layout/Separator";
+import { ToolbarDivider } from "../../layout/Separator";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "../../overlays/DropdownMenu";
+import { MenuRadioGroup, MenuRadioItem } from "../../overlays/MenuItem";
 import { cn } from "../../classNames";
 import { CollectionColumnChooser, CollectionColumnsContext } from "./CollectionColumns";
 
@@ -177,7 +182,7 @@ export function CollectionFilters({
             {utilities}
           </div>
         )}
-        {hasUtilities && actions && <Separator orientation="vertical" className="mx-1 h-4" />}
+        {hasUtilities && actions && <ToolbarDivider />}
         {actions}
       </>
     ) : undefined;
@@ -192,8 +197,9 @@ export function CollectionFilters({
 }
 
 /**
- * Grid or list, as one ChoiceGroup of icons. The board is another page rather than a third way to
- * draw this one, so it is a separate button beside the choice.
+ * Grid or list, as two bare icon buttons, the open one pressed: no box around them. A bar puts a
+ * ToolbarDivider between them and its other controls. The board is another page rather than a
+ * third way to draw this one, so it is a separate button beside them.
  */
 export function CollectionViewToggle({
   value,
@@ -206,23 +212,71 @@ export function CollectionViewToggle({
   onBoardView?: () => void;
   disabled?: boolean;
 }) {
+  const views = [
+    { value: "grid", label: "Grid view", icon: LayoutGrid },
+    { value: "list", label: "List view", icon: List },
+  ] as const;
   return (
-    <div className="flex items-center gap-1">
-      <ChoiceGroup
-        label="View layout"
-        value={value}
-        disabled={disabled}
-        onChange={onChange}
-        options={[
-          { value: "grid", label: "Grid view", icon: LayoutGrid, iconOnly: true },
-          { value: "list", label: "List view", icon: List, iconOnly: true },
-        ]}
-      />
+    <div role="group" aria-label="View layout" className="flex items-center gap-1">
+      {views.map(({ value: view, label, icon: Icon }) => (
+        <IconButton
+          key={view}
+          label={label}
+          aria-pressed={value === view}
+          disabled={disabled}
+          onClick={() => onChange(view)}
+        >
+          <Icon />
+        </IconButton>
+      ))}
       {onBoardView && (
         <IconButton label="Board view" disabled={disabled} onClick={onBoardView}>
           <Columns3 />
         </IconButton>
       )}
     </div>
+  );
+}
+
+export type CollectionSortOption<T extends string> = {
+  value: T;
+  label: string;
+  icon: IconSource;
+};
+
+/**
+ * The order of a collection, as one sort icon whose menu checks the order in use. Its tooltip
+ * names that order, so the bar never spells it out.
+ */
+export function CollectionSortMenu<T extends string>({
+  value,
+  options,
+  onChange,
+}: {
+  value: T;
+  options: readonly CollectionSortOption<T>[];
+  onChange: (value: T) => void;
+}) {
+  const current = options.find((option) => option.value === value);
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <IconButton label={current ? `Sort: ${current.label}` : "Sort"}>
+          <ArrowUpDown />
+        </IconButton>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" data-misty-layer-portal>
+        <MenuRadioGroup value={value} onValueChange={(next) => onChange(next as T)}>
+          {options.map((option) => (
+            <MenuRadioItem
+              key={option.value}
+              value={option.value}
+              icon={option.icon}
+              label={option.label}
+            />
+          ))}
+        </MenuRadioGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

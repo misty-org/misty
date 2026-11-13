@@ -1,10 +1,9 @@
 import { DockDropPreview } from "./DockDropPreview";
-import { useWorkspacePagePreview } from "@/features/app-windows";
 import { panePlacement } from "@/features/app-windows";
 import { keepsLayoutWhileHidden } from "./keptTabs";
 import { selectPaneFocusPreferences } from "@/features/app-windows";
 import { useSettingsStore } from "@/features/settings";
-import { allLayoutViews } from "@/features/app-windows";
+import { allLayoutViews, dockWidgetRegistry } from "@/features/app-windows";
 import { usePointerDropTarget } from "@/shared/hooks/usePointerReorder";
 import {
   dockLeaves,
@@ -83,7 +82,6 @@ export function DockLeafView(props: WorkspaceDockTreeProps & { pane: WorkspacePa
     return { width: bounds?.width ?? 0, height: bounds?.height ?? 0 };
   };
   const activeTab = pane.views.find((tab) => tab.id === pane.activeViewId) ?? pane.views[0];
-  useWorkspacePagePreview(activeTab, sectionRef, props.workspaceActive !== false);
   const focused = props.workspaceActive !== false && pane.id === props.focusedPaneId;
   // Open tabs own live UI state and subscriptions. Hiding an inactive surface
   // must not unmount it, otherwise collaborative tools reconnect and reload on
@@ -233,7 +231,8 @@ export function DockLeafView(props: WorkspaceDockTreeProps & { pane: WorkspacePa
         <OverflowFadeText>{activeTab?.title || "New tab"}</OverflowFadeText>
       </header>
       <div
-        className="grid min-h-0 min-w-0 grid-cols-[minmax(0,1fr)] grid-rows-[minmax(0,1fr)] overflow-hidden"
+        // A pane narrower than its view's content scrolls it sideways instead of crushing it.
+        className="grid min-h-0 min-w-0 grid-cols-[minmax(0,1fr)] grid-rows-[minmax(0,1fr)] overflow-x-auto overflow-y-hidden"
         data-pane-layer
       >
         {activeTab ? (
@@ -247,6 +246,7 @@ export function DockLeafView(props: WorkspaceDockTreeProps & { pane: WorkspacePa
                   "relative col-start-1 row-start-1 h-full min-h-0 w-full",
                   isActive ? "z-[1] block" : kept ? "z-0 block" : "hidden",
                 )}
+                style={{ minWidth: dockWidgetRegistry.get(mountedTab.surfaceId).contentWidth }}
                 aria-hidden={!isActive}
                 data-tab-kept={kept ? "" : undefined}
               >

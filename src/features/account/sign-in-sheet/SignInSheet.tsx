@@ -172,7 +172,7 @@ export function SignInSheet() {
     choice?.mode !== "server"
       ? ""
       : choice.url === mistyCloudServer()
-        ? "Misty Pro"
+        ? "Misty Cloud"
         : serverHost(choice.url);
   const title = setupStep
     ? setupStepCopy[setupStep]

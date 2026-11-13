@@ -78,15 +78,18 @@ fn model_session_result() -> Value {
 fn model_resolution_matches_live_config_values() {
     // Thinking variant preferred for a normal effort request…
     assert_eq!(
-        resolve_model_value(&model_session_result(), "minimax/MiniMax-M3", Some("medium"))
-            .as_deref(),
+        resolve_model_value(
+            &model_session_result(),
+            "minimax/MiniMax-M3",
+            Some("medium")
+        )
+        .as_deref(),
         Some("m:minimax:MiniMax-M3:v:thinking")
     );
     // …plain variant when the effort is off, with a fall-back to the
     // first candidate when the wanted variant does not exist.
     assert_eq!(
-        resolve_model_value(&model_session_result(), "minimax/MiniMax-M3", Some("off"))
-            .as_deref(),
+        resolve_model_value(&model_session_result(), "minimax/MiniMax-M3", Some("off")).as_deref(),
         Some("m:minimax:MiniMax-M3:v:")
     );
     assert_eq!(
@@ -113,7 +116,10 @@ fn model_resolution_matches_live_config_values() {
         resolve_model_value(&model_session_result(), "minimax/Nope-M99", None),
         None
     );
-    assert_eq!(resolve_model_value(&json!({}), "minimax/MiniMax-M3", None), None);
+    assert_eq!(
+        resolve_model_value(&json!({}), "minimax/MiniMax-M3", None),
+        None
+    );
 }
 
 #[test]
@@ -124,10 +130,7 @@ fn parse_model_option_skips_non_conforming_values() {
     );
     assert_eq!(
         parse_model_option_value("m:minimax:MiniMax-M2.7:v:thinking"),
-        Some((
-            "minimax/MiniMax-M2.7".to_string(),
-            "thinking".to_string()
-        ))
+        Some(("minimax/MiniMax-M2.7".to_string(), "thinking".to_string()))
     );
     assert_eq!(parse_model_option_value("minimax/MiniMax-M3"), None);
     assert_eq!(parse_model_option_value("m:::v:"), None);
@@ -218,12 +221,14 @@ fn rpc_error_recovery_keeps_code_and_message() {
 
 #[test]
 fn usage_and_updates_project_onto_frontend_keys() {
-    let usage = prompt_usage(&json!({ "_meta": { "inputTokens": 10, "outputTokens": 5 } }))
-        .unwrap();
+    let usage =
+        prompt_usage(&json!({ "_meta": { "inputTokens": 10, "outputTokens": 5 } })).unwrap();
     assert_eq!(usage["totalTokens"], json!(15));
     assert_eq!(
-        usage_update(&json!({"update": {"sessionUpdate": "usage_update", "used": 100, "size": 200000}}))
-            .unwrap()["model_context_window"],
+        usage_update(
+            &json!({"update": {"sessionUpdate": "usage_update", "used": 100, "size": 200000}})
+        )
+        .unwrap()["model_context_window"],
         json!(200000)
     );
     assert!(usage_update(&json!({"update": {"sessionUpdate": "agent_message_chunk"}})).is_none());

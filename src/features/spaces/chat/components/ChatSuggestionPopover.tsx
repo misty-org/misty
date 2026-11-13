@@ -10,7 +10,8 @@ import {
   PopoverContent,
   SkeletonList,
 } from "@/shared/ui";
-import { Bot, LibraryBig, Paperclip, Users } from "lucide-react";
+import { LibraryBig, Paperclip, Users } from "lucide-react";
+import { AgentMark } from "@/features/agents";
 import type { ComponentPropsWithoutRef } from "react";
 
 interface ChatSuggestionPopoverProps {
@@ -73,11 +74,13 @@ export function ChatSuggestionPopover(props: ChatSuggestionPopoverProps) {
                 onMouseEnter={() => props.onHoverIndex(index)}
                 onSelect={() => props.onSelect(suggestion)}
                 icon={
-                  suggestion.kind === "member"
-                    ? Users
-                    : suggestion.kind === "agent"
-                      ? Bot
-                      : LibraryBig
+                  suggestion.kind === "member" ? (
+                    Users
+                  ) : suggestion.kind === "agent" ? (
+                    <AgentMark agentId={suggestion.id} />
+                  ) : (
+                    LibraryBig
+                  )
                 }
                 label={suggestion.label}
                 description={suggestion.detail}

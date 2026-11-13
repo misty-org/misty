@@ -12,7 +12,7 @@ import { hasTauriInternals } from "@/shared/platform/tauri";
 import type { RunRow, RunStep } from "./activityApi";
 import { RunStateBadge } from "./RunLabels";
 import { StepPicture } from "./RunSteps";
-import { describeLive, lastPage, toolKey, verbOf } from "./stepSentences";
+import { describeLive, lastPage, verbOf } from "./stepSentences";
 import { useRunSteps } from "./useRunSteps";
 import "./activity.css";
 
@@ -109,8 +109,8 @@ export function HappeningNow(props: {
     agents.find((agent) => agent.id === agentId) ??
     (agentId ? undefined : agents.find((agent) => agent.system_managed));
 
-  const open = (run: RunRow, panel: "browser" | "steps") => {
-    useContextPanel.getState().show(panel);
+  const open = (run: RunRow) => {
+    useContextPanel.getState().show("steps");
     props.onOpenChat({
       agentId: chatOf(run.conversationId)?.agentId,
       conversationId: run.conversationId,
@@ -136,7 +136,6 @@ export function HappeningNow(props: {
             !waiting &&
             latest?.state !== "running" &&
             now - (latest?.at ?? run.startedAt) > IDLE_AFTER_MS;
-          const onBrowser = latest ? toolKey(latest.tool).startsWith("browser.") : false;
           const chat = chatOf(run.conversationId);
           const agent = agentOf(chat?.agentId);
           const line = waiting
@@ -178,12 +177,12 @@ export function HappeningNow(props: {
                 </p>
                 <div className="activity-now-actions">
                   {waiting ? (
-                    <Button onClick={() => open(run, onBrowser ? "browser" : "steps")}>
+                    <Button onClick={() => open(run)}>
                       <Hand aria-hidden="true" />
                       Help now
                     </Button>
                   ) : (
-                    <Button onClick={() => open(run, onBrowser ? "browser" : "steps")}>
+                    <Button onClick={() => open(run)}>
                       <Eye aria-hidden="true" />
                       Watch
                     </Button>

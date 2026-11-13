@@ -1,4 +1,3 @@
-import { devicesApi } from "@/features/devices";
 import { preferredDefaultSpace, spacesSnapshot } from "@/features/app-windows";
 import { agentsDeviceSnapshot } from "../personal/useAgentsStore";
 import {
@@ -102,25 +101,19 @@ export async function runFolderSend(request: LocalToolRequest, entry: RunEntry) 
   });
 }
 
-/** The Misty browser this call means: the only one, or the computer it names. */
-async function resolveWorkspace(entry: RunEntry, wanted: unknown) {
-  const workspaces = entry.contexts.filter((item) => item.kind === "workspace");
-  if (!workspaces.length) throw notAllowed();
-  if (workspaces.length === 1) return workspaces[0];
-  const computer = await thisComputerName();
-  const name = (typeof wanted === "string" ? wanted : "").trim();
-  const found = workspaces.find(
-    (item) => item.deviceId === name || (computer && computer.toLowerCase() === name.toLowerCase()),
-  );
-  if (!found) throw invalidRequest(`name the computer: ${computer}`);
-  return found;
+/** The Misty browser this call means. */
+function resolveWorkspace(entry: RunEntry) {
+  // A run carries one workspace grant: the computer it was sent from (`desktopDeviceGrants`).
+  const workspace = entry.contexts.find((item) => item.kind === "workspace");
+  if (!workspace) throw notAllowed();
+  return workspace;
 }
 
 /** A command in the chat's workspace. The computer takes the workspace from the signed grant. */
 export async function runShellTool(request: LocalToolRequest, entry: RunEntry) {
   const command = request.input.command;
   if (typeof command !== "string" || !command.trim()) throw argumentsInvalid();
-  const workspace = await resolveWorkspace(entry, request.input.device);
+  const workspace = resolveWorkspace(entry);
   const folder = entry.contexts.find(
     (item) => item.kind === "local_folder" && item.deviceId === workspace.deviceId,
   );
@@ -130,32 +123,4 @@ export async function runShellTool(request: LocalToolRequest, entry: RunEntry) {
     ...(typeof seconds === "number" && seconds > 0 ? { timeoutSeconds: seconds } : {}),
     ...(folder ? { folderScopeId: folder.opaqueRef } : {}),
   });
-}
-
-interface AccountDeviceRow {
-  id: string;
-  name: string;
-  platform: string;
-  lastSeenAt: string;
-  admissionState?: string;
-}
-
-/** The account's signed-in devices, from the normal signed-in API. */
-export async function runDeviceList() {
-  const answer = await devicesApi.list<{ devices: AccountDeviceRow[] }>().catch(() => {
-    throw new LocalToolRejected(
-      "device_list_unavailable",
-      "Misty could not complete this tool call.",
-    );
-  });
-  return {
-    devices: (answer.devices ?? [])
-      .filter((device) => device.admissionState !== "revoked")
-      .map((device) => ({
-        id: device.id,
-        name: device.name,
-        platform: device.platform,
-        last_seen: device.lastSeenAt,
-      })),
-  };
 }

@@ -1,5 +1,5 @@
 import { runBrowserTool } from "./browserTools";
-import { runDeviceList, runFolderRead, runFolderSend, runShellTool } from "./computerTools";
+import { runFolderRead, runFolderSend, runShellTool } from "./computerTools";
 import { deviceToolSchemas, matchesSchema } from "./deviceToolSchemas";
 import {
   LocalToolRejected,
@@ -98,5 +98,4 @@ export const deviceTools: Record<string, LocalToolHandler> = {
   "screen.open": tool("screen.open", runScreenOpen),
   "screen.look": tool("screen.look", runScreenLook),
   "screen.close": tool("screen.close", runScreenClose),
-  "device.list": tool("device.list", runDeviceList),
 };

@@ -1,5 +1,4 @@
 import type { DisplayCapture } from "../../tutor/cursor/protocol";
-import type { MediaContext } from "../../tutor/cursor/mediaContext";
 import type { ThinkingMode } from "../../runs/jobs/thinkingMode";
 import type { AiInvocationDeviceContext, AiSelectionSnapshot } from "../../runs/invocations";
 import type { AiArtifact, AiCaptureAttachment } from "../../runs/invocations/invocationTypes";
@@ -9,9 +8,7 @@ import type {
   GlobalAiContextRef,
   GlobalAiConversation,
   MistyImageAttachment,
-  UnifiedMistyPanel,
 } from "./conversationTypes";
-type MistySubmissionPresentation = "panel" | "workspace";
 export interface MistyState {
   thinkingMode?: ThinkingMode;
   thinkingModeExplicit?: boolean;
@@ -30,7 +27,6 @@ export interface MistyState {
   invocationId?: string;
   invocationConversationId?: string;
   accountId: string;
-  panel: UnifiedMistyPanel;
   query: string;
   working: boolean;
   conversationsLoading: boolean;
@@ -39,8 +35,6 @@ export interface MistyState {
   conversations: GlobalAiConversation[];
   activeConversationId: string;
   setAccount: (accountId: string) => void;
-  openPanel: (context?: GlobalAiContextRef[]) => void;
-  closePanel: () => void;
   setQuery: (query: string) => void;
   setContext: (context: GlobalAiContextRef[]) => void;
   removeContext: (id: string) => void;
@@ -63,7 +57,6 @@ export interface MistyState {
     prompt: string,
     attachments?: MistyImageAttachment[],
     selection?: AiSelectionSnapshot,
-    presentation?: MistySubmissionPresentation,
     deviceContexts?: AiInvocationDeviceContext[],
     origin?: {
       conversationId: string;
@@ -82,13 +75,11 @@ export interface MistyState {
       continuation?: boolean;
       /** Sends the turn as a lesson step (Teach mode) or in Act, whatever the chat's saved mode. */
       collaborationMode?: "teach" | "act";
-      /** What the video in front was saying (companion/mediaContext.ts). */
-      mediaContext?: MediaContext;
       /** The Space the turn runs in; absent is the window's. */
       spaceId?: string;
       /** Opens a tab in this window for the task, at this page when given. */
-      openScreen?: { url?: string; hint?: string; tabId?: string; place?: "current" | "new" };
+      /** The turn continues on a browser screen it asked for, so it starts no desktop control. */
+      openScreen?: boolean;
     },
   ) => Promise<void>;
-  submitAgentTask: (prompt: string, presentation?: MistySubmissionPresentation) => Promise<void>;
 }

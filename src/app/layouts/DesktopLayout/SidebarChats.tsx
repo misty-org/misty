@@ -3,13 +3,11 @@ import {
   Archive,
   ArchiveRestore,
   ChevronRight,
-  Folder,
   FolderInput,
   FolderPlus,
   GitFork,
   Mail,
   MailOpen,
-  MessagesSquare,
   PanelBottom,
   PanelRight,
   Pencil,
@@ -290,14 +288,9 @@ export function SidebarChats(props: {
         {archived ? null : (
           <MenuSubmenu icon={FolderInput} label="Move to section">
             <MenuRadioGroup value={place ?? "mixed"} onValueChange={(next) => fileChats(ids, next)}>
-              <MenuRadioItem icon={MessagesSquare} value={unfiled} label="Chats" />
+              <MenuRadioItem value={unfiled} label="Chats" />
               {sections.map((section) => (
-                <MenuRadioItem
-                  key={section.id}
-                  icon={Folder}
-                  value={section.id}
-                  label={section.name}
-                />
+                <MenuRadioItem key={section.id} value={section.id} label={section.name} />
               ))}
             </MenuRadioGroup>
             <MenuSeparator />

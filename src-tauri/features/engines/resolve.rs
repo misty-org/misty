@@ -360,7 +360,10 @@ fn build_unix_extra_search_paths() -> Vec<PathBuf> {
     // The person's login shell PATH: an app opened from the Dock never ran that shell, and the
     // engines are often installed where only it reaches. Read once, never written back to the
     // process environment.
-    for folder in login_shell_path().map(|path| std::env::split_paths(&path).collect::<Vec<_>>()).unwrap_or_default() {
+    for folder in login_shell_path()
+        .map(|path| std::env::split_paths(&path).collect::<Vec<_>>())
+        .unwrap_or_default()
+    {
         if !paths.contains(&folder) {
             paths.push(folder);
         }
@@ -526,12 +529,6 @@ fn get_extra_search_paths() -> Vec<PathBuf> {
     }
 
     paths
-}
-
-pub fn clear_search_paths_cache() {
-    if let Ok(mut guard) = EXTRA_SEARCH_PATHS_CACHE.lock() {
-        *guard = None;
-    }
 }
 
 fn cached_extra_search_paths() -> Vec<PathBuf> {

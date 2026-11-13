@@ -311,13 +311,18 @@ fn logical_point(x: f64, y: f64, display_id: Option<u32>) -> Result<(i32, i32), 
 #[cfg(target_os = "linux")]
 fn linux_point(x: f64, y: f64, frame_w: u32, frame_h: u32, display: &DisplayInfo) -> (i32, i32) {
     let logical_x = f64::from(display.x) + x * f64::from(display.width) / f64::from(frame_w.max(1));
-    let logical_y = f64::from(display.y) + y * f64::from(display.height) / f64::from(frame_h.max(1));
-    let scale = if crate::agents::desktop_control::linux::wayland_session() || display.scale <= 0.0 {
+    let logical_y =
+        f64::from(display.y) + y * f64::from(display.height) / f64::from(frame_h.max(1));
+    let scale = if crate::agents::desktop_control::linux::wayland_session() || display.scale <= 0.0
+    {
         1.0
     } else {
         display.scale
     };
-    ((logical_x * scale).round() as i32, (logical_y * scale).round() as i32)
+    (
+        (logical_x * scale).round() as i32,
+        (logical_y * scale).round() as i32,
+    )
 }
 
 pub(crate) fn action_move(x: f64, y: f64, display_id: Option<u32>) -> Result<String, String> {

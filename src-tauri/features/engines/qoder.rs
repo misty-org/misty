@@ -11,7 +11,7 @@
 
 use std::path::Path;
 
-use super::{BuiltCommand, Engine, SendRequest};
+use super::Engine;
 
 /// Qoder ships two distributions with independent binaries and config dirs
 /// (reference qoder_provider_profile.rs): Global (`qodercli`, `~/.qoder`)
@@ -73,14 +73,6 @@ impl Engine for QoderEngine {
 
     /// Never invoked on the virtual path (`send_host_stream` branches before
     /// the process spawn); a stub keeps the trait contract honest.
-    fn build_command(&self, _req: &SendRequest, _bin: &str) -> Result<BuiltCommand, String> {
-        Err("qoder runs as an ACP host session; no child command to build".to_string())
-    }
-
-    /// Never invoked on the virtual path: ACP frames are JSON-RPC, parsed by
-    /// the turn driver, not line-mapped here.
-    fn parse_line(&self, _line: &str, _out: &mut Vec<super::EngineEvent>) {}
-
     fn supports_images(&self) -> bool {
         // session/prompt carries image content blocks (base64).
         true

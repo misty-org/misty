@@ -1,19 +1,14 @@
 import { invoke } from "@tauri-apps/api/core";
 import { isBrowserLayoutMoving } from "@/features/app-windows";
-import { useBrowserRuntimeStore } from "@/features/app-windows";
 import {
-  browserRuntimeId,
-  createdRuntimeIds,
   desiredVisibleRuntimeIds,
   enqueue,
   hideRequest,
   keepLiveRuntimeIds,
   lastBounds,
-  registerBrowserRuntime,
   runtimeQueues,
   setBrowserPagePresented,
   visibleRuntimeIds,
-  type BrowserRuntimeTab,
 } from "@/features/app-windows";
 import {
   cancelDeferredHide,
@@ -94,68 +89,14 @@ export function scheduleStrayPageSweep(): void {
   }, 400);
 }
 
-/** Remote URL changes held for pages on screen, applied once they are hidden. */
-const deferredNavigations = new Map<
-  string,
-  { tab: BrowserRuntimeTab; url: string; stillCurrent: () => boolean }
->();
-
-function releaseDeferredNavigation(id: string): void {
-  const deferred = deferredNavigations.get(id);
-  if (!deferred) return;
-  deferredNavigations.delete(id);
-  void navigateSyncedBrowserWebview(deferred.tab, deferred.url, deferred.stillCurrent).catch(
-    () => undefined,
-  );
-}
-
-/** A closed page's held navigation has nowhere left to go. */
-export function forgetDeferredNavigation(id: string): void {
-  deferredNavigations.delete(id);
-}
-
-/** Parking hides every page, so every held navigation applies now. */
-export function releaseAllDeferredNavigations(): void {
-  [...deferredNavigations.keys()].forEach(releaseDeferredNavigation);
-}
-
-/** Apply a committed sync URL to an existing page without showing or focusing
- * it. Unopened pages will use the projected URL when they are created. A page
- * on screen is never reloaded under its reader by another machine's
- * navigation: the change applies when the page is next hidden. */
-function navigateSyncedBrowserWebview(
-  tab: BrowserRuntimeTab,
-  url: string,
-  stillCurrent: () => boolean,
-): Promise<void> {
-  const id = browserRuntimeId(tab);
-  if (visibleRuntimeIds.has(id) || desiredVisibleRuntimeIds.has(id)) {
-    deferredNavigations.set(id, { tab, url, stillCurrent });
-    return Promise.resolve();
-  }
-  deferredNavigations.delete(id);
-  return enqueue(id, async () => {
-    // Creation/closing may still be queued, and a newer local or remote edit
-    // may have superseded this URL while we waited for the native view.
-    if (!createdRuntimeIds.has(id) || !stillCurrent()) return;
-    useBrowserRuntimeStore.getState().setLoading(tab.id, true);
-    await invoke("browser_webview_navigate", { request: { id, url } });
-  });
-}
-
 /**
- * A positive `graceMs` keeps the page on screen while another browser tab is
- * about to take its place, so a switch never shows an empty frame between
- * them. The old page leaves as soon as the new one is presented.
+ * Takes a page off screen. A positive `graceMs` keeps it there while another page is about to
+ * take its place, so a switch never shows an empty frame between them. The old page leaves as
+ * soon as the new one is presented.
  */
-export function hideBrowserWebview(tab: BrowserRuntimeTab, graceMs = 0): Promise<void> {
-  return hideBrowserRuntime(registerBrowserRuntime(tab), graceMs);
-}
-
 export function hideBrowserRuntime(id: string, graceMs = 0): Promise<void> {
   desiredVisibleRuntimeIds.delete(id);
   visibleRuntimeIds.delete(id);
-  releaseDeferredNavigation(id);
   // A hide can race the page's creation; the sweep catches any page left up.
   scheduleStrayPageSweep();
   if (graceMs > 0) {

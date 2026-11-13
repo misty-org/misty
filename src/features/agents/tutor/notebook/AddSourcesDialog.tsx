@@ -1,4 +1,5 @@
-import { useState, type DragEvent, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
+import { useFileDropZone } from "@/shared/hooks/useFileDropZone";
 import { ArrowRight, Clipboard, Globe, Link2, Mic, Upload } from "lucide-react";
 import {
   Button,
@@ -47,7 +48,6 @@ export function AddSourcesDialog({
   const [links, setLinks] = useState("");
   const [title, setTitle] = useState("");
   const [pasted, setPasted] = useState("");
-  const [dragging, setDragging] = useState(false);
   const [busy, setBusy] = useState(false);
   const used = notebook.sources.length;
   const close = () => {
@@ -98,25 +98,22 @@ export function AddSourcesDialog({
     for (const address of addresses) void addLink(notebook.id, address).then(report);
     close();
   };
-  const drop = (event: DragEvent) => {
-    event.preventDefault();
-    setDragging(false);
-    const files = [...event.dataTransfer.files];
-    if (files.length) run(() => addDroppedFiles(notebook.id, files).then(report));
-  };
+  // Files dropped from the computer's file manager, on every desktop system and in a browser.
+  const dropZone = useFileDropZone<HTMLDivElement>(
+    (files) => {
+      if (files.length) run(() => addDroppedFiles(notebook.id, files).then(report));
+    },
+    { onError },
+  );
 
   return (
     <Dialog open={open} onOpenChange={(next) => !next && close()}>
       <DialogContent
         aria-describedby={undefined}
         className="tutor-add-dialog"
-        data-dragging={dragging ? "true" : undefined}
-        onDragOver={(event) => {
-          event.preventDefault();
-          setDragging(true);
-        }}
-        onDragLeave={() => setDragging(false)}
-        onDrop={drop}
+        ref={dropZone.ref}
+        data-dragging={dropZone.dragging ? "true" : undefined}
+        {...dropZone.handlers}
       >
         <DialogTitle className="tutor-add-title">Add sources</DialogTitle>
         <form className="tutor-research tutor-research-large" onSubmit={research}>

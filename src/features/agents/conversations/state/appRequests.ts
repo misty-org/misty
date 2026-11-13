@@ -37,7 +37,6 @@ export async function continueAfterAppRequest(
       continuationPrompt(request),
       [],
       undefined,
-      get().panel === "closed" ? "workspace" : "panel",
       [],
       { conversationId, context: [] },
       // On the screen the run that showed the card held, when it had one.

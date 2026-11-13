@@ -22,7 +22,7 @@ use crate::serial_tool_lifecycle::SerialToolLifecycle;
 use crate::tool_calls::{execute_tool, CallEnvironment, SavedWait, ToolCallDeps};
 use crate::tool_execution::{rejected_without_effect, settle_device_call};
 use crate::tool_monitor::RejectedCalls;
-use crate::tool_transport::{HarnessCheckpoint, ToolCheckpoints, ToolTransport};
+use crate::tool_transport::{HarnessCheckpoint, ToolCheckpoints};
 use crate::web_fetch::fetch_step::{run_device_web_fetch, FetchContext};
 use crate::web_fetch::tool::WEB_FETCH_TOOL;
 use crate::web_search::search_step::{run_device_web_search, SearchContext};
@@ -60,16 +60,6 @@ pub(crate) struct RunShared {
 /// A lock's contents, whether or not a tool panicked holding it: the run is failing either way.
 pub(crate) fn locked<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
     mutex.lock().unwrap_or_else(PoisonError::into_inner)
-}
-
-/// A call that records nothing about its waits: a restart asks again.
-struct NoSavedWaits<'a>(&'a RunShared);
-
-impl CallEnvironment for NoSavedWaits<'_> {
-    fn waiting<'a>(&'a self, _: &'a str, _: Option<SavedWait>) -> BoxFuture<'a, Result<(), RuntimeError>> {
-        Box::pin(async { Ok(()) })
-    }
-
 }
 
 impl RunShared {
@@ -141,15 +131,6 @@ impl RunShared {
 impl ToolCheckpoints for RunShared {
     fn checkpoint(&self, event: HarnessCheckpoint) -> BoxFuture<'_, Result<(), RuntimeError>> {
         Box::pin(async move { checkpoint(self.deps.control.as_ref(), &self.identity, &event).await })
-    }
-}
-
-impl ToolTransport for RunShared {
-    fn run<'a>(&'a self, call_id: &'a str, name: &'a str, input: &'a JsValue) -> BoxFuture<'a, Result<Option<JsValue>, RuntimeError>> {
-        Box::pin(async move {
-            let output = self.execute_capability(&NoSavedWaits(self), call_id, name, input, None).await?;
-            Ok(Some(output))
-        })
     }
 }
 

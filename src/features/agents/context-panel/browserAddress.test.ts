@@ -1,13 +1,5 @@
-import { afterEach, expect, it } from "vitest";
-import { browserAddress, rememberAddress, rememberedAddress } from "./browserAddress";
-
-afterEach(() => {
-  try {
-    localStorage.clear();
-  } catch {
-    // No storage in this environment.
-  }
-});
+import { expect, it } from "vitest";
+import { browserAddress } from "./browserAddress";
 
 it("keeps web addresses, completes bare names and searches the rest with Google", () => {
   expect(browserAddress("https://example.com/a?b=1")).toBe("https://example.com/a?b=1");
@@ -24,10 +16,4 @@ it("keeps web addresses, completes bare names and searches the rest with Google"
   expect(browserAddress("javascript:alert(1)")).toBe(
     "https://www.google.com/search?q=javascript%3Aalert(1)",
   );
-});
-
-it("starts on a blank page until a page was shown", () => {
-  expect(rememberedAddress("space-1")).toBe("");
-  rememberAddress("space-1", "https://example.com/");
-  expect(rememberedAddress("space-1")).toBe("https://example.com/");
 });

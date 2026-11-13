@@ -1,12 +1,6 @@
 import { Blocks, Check, X } from "lucide-react";
-import {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type PointerEvent,
-  type SyntheticEvent,
-} from "react";
+import { useEffect, useMemo, useRef, useState, type SyntheticEvent } from "react";
+import { usePointerDrag, usePointerDropTarget } from "@/shared/hooks/usePointerReorder";
 import {
   allLayoutPanes,
   allLayoutViews,
@@ -33,43 +27,109 @@ import {
   DialogTitle,
   IconButton,
   OverflowFadeText,
+  Pressable,
 } from "@/shared/ui";
-import { DockDropPreview } from "./DockDropPreview";
 import { dropZoneAt } from "./dockSplitFit";
 import { ViewIcon } from "./WorkspaceViewGroupButton";
 
-/** Where the pointer is over the draft: a pane and the side of it, or the empty canvas. */
-interface Hover {
-  paneId: string | null;
-  zone: DockDropZone;
-}
+const dragScope = "layout-popup";
 
-interface Dragging {
-  label: string;
-  x: number;
-  y: number;
+/** The part of a pane a drop on `zone` fills: its middle, or the half on that side. */
+function zoneRect(rect: DOMRect, zone: DockDropZone): DOMRect {
+  const inset = 8;
+  const { left, top, width, height } = rect;
+  const halfWidth = width / 2 - inset;
+  const halfHeight = height / 2 - inset;
+  if (zone === "left") return new DOMRect(left + inset, top + inset, halfWidth, height - inset * 2);
+  if (zone === "right")
+    return new DOMRect(left + width / 2, top + inset, halfWidth, height - inset * 2);
+  if (zone === "up") return new DOMRect(left + inset, top + inset, width - inset * 2, halfHeight);
+  if (zone === "down")
+    return new DOMRect(left + inset, top + height / 2, width - inset * 2, halfHeight);
+  return new DOMRect(left + inset, top + inset, width - inset * 2, height - inset * 2);
 }
 
 /** Nothing pressed inside the popup reaches the window behind it through React's tree. */
 const contained = (event: SyntheticEvent) => event.stopPropagation();
 
-/** One pane of the draft, drawn as a card. Pressing and moving it picks it up to place it elsewhere. */
+/** A page in the list: a press adds it where the grid has room, and dragging it places it. */
+function LayoutListRow(props: { view: WorkspaceView; placed: boolean; onAdd(): void }) {
+  const { view } = props;
+  const drag = usePointerDrag({ id: view.id, label: paneViewLabel(view), scope: dragScope });
+  return (
+    <Pressable
+      data-reorder-handle=""
+      data-reorder-preview=""
+      onPointerDown={(event) => {
+        contained(event);
+        drag(event);
+      }}
+      onClick={props.onAdd}
+      className={cn(
+        "flex h-8 w-full cursor-grab touch-none select-none items-center gap-2 rounded-md px-2",
+        "text-sm hover:bg-control-hover active:cursor-grabbing",
+        props.placed ? "text-cream-bright" : "text-cream-muted",
+      )}
+    >
+      <ViewIcon tab={view.placeholder ? undefined : view} icon={Blocks} />
+      <OverflowFadeText className="flex-1 text-left">{paneViewLabel(view)}</OverflowFadeText>
+      {props.placed ? <Check size={14} aria-hidden="true" /> : null}
+    </Pressable>
+  );
+}
+
+/**
+ * One pane of the draft, drawn as a card. Dragging it moves it; a page dropped on its sides splits
+ * it, and one dropped on its middle takes its place.
+ */
 function DraftPane(props: {
   pane: WorkspacePane;
-  zone: DockDropZone | null;
-  onPick(event: PointerEvent, view: WorkspaceView): void;
+  canPlace(viewId: string, paneId: string, zone: DockDropZone): boolean;
+  onPlace(viewId: string, paneId: string, zone: DockDropZone): void;
   onRemove(viewId: string): void;
 }) {
   const { pane } = props;
   const view = pane.views[0];
+  const ref = useRef<HTMLDivElement>(null);
+  const drag = usePointerDrag({
+    id: view?.id ?? pane.id,
+    label: paneViewLabel(view),
+    scope: dragScope,
+  });
+  usePointerDropTarget(ref, {
+    scope: dragScope,
+    hit(x, y, moving) {
+      const rect = ref.current?.getBoundingClientRect();
+      // A pane dropped on itself stays where it is.
+      if (!rect || moving.id === view?.id) return null;
+      const zone = dropZoneAt(rect, x, y);
+      if (!props.canPlace(moving.id, pane.id, zone)) return null;
+      return {
+        id: zone,
+        after: false,
+        rect,
+        previewRect: zoneRect(rect, zone),
+        axis: "x",
+        box: true,
+      };
+    },
+    drop: (moving, hit) => props.onPlace(moving.id, pane.id, hit.id as DockDropZone),
+  });
   return (
     <div
+      ref={ref}
       data-layout-pane={pane.id}
-      onPointerDown={(event) => props.onPick(event, view)}
+      data-reorder-handle=""
+      data-reorder-preview=""
+      onPointerDown={(event) => {
+        contained(event);
+        if (view) drag(event);
+      }}
       className={cn(
-        "group relative flex min-h-0 min-w-0 flex-1 cursor-grab select-none flex-col items-center",
-        "justify-center gap-2 rounded-xl border border-dashed border-cream/40 bg-charcoal-card p-3",
-        "text-center shadow-lg shadow-black/30 hover:border-cream/70 active:cursor-grabbing",
+        "group relative flex min-h-0 min-w-0 flex-1 cursor-grab touch-none select-none flex-col",
+        "items-center justify-center gap-2 rounded-xl border border-dashed border-cream/40",
+        "bg-charcoal-card p-3 text-center shadow-lg shadow-black/30 hover:border-cream/70",
+        "active:cursor-grabbing",
       )}
     >
       <ViewIcon tab={view?.placeholder ? undefined : view} icon={Blocks} size={22} />
@@ -79,6 +139,7 @@ function DraftPane(props: {
       <IconButton
         label={`Remove ${paneViewLabel(view)} from the layout`}
         size="sm"
+        data-reorder-ignore=""
         onPointerDown={contained}
         onClick={() => props.onRemove(view.id)}
         className={cn(
@@ -88,27 +149,18 @@ function DraftPane(props: {
       >
         <X aria-hidden="true" />
       </IconButton>
-      {props.zone ? <DockDropPreview zone={props.zone} /> : null}
     </div>
   );
 }
 
 function DraftTree(props: {
   node: WorkspaceDockNode;
-  hover: Hover | null;
-  onPick(event: PointerEvent, view: WorkspaceView): void;
+  canPlace(viewId: string, paneId: string, zone: DockDropZone): boolean;
+  onPlace(viewId: string, paneId: string, zone: DockDropZone): void;
   onRemove(viewId: string): void;
 }) {
   const { node } = props;
-  if (node.type === "leaf")
-    return (
-      <DraftPane
-        pane={node}
-        zone={props.hover?.paneId === node.id ? props.hover.zone : null}
-        onPick={props.onPick}
-        onRemove={props.onRemove}
-      />
-    );
+  if (node.type === "leaf") return <DraftPane {...props} pane={node} />;
   const horizontal = node.direction === "horizontal";
   return (
     <div className={cn("flex min-h-0 min-w-0 flex-1 gap-3", horizontal ? "flex-row" : "flex-col")}>
@@ -122,10 +174,41 @@ function DraftTree(props: {
   );
 }
 
+/** The canvas with nothing on it: the first page dropped here becomes the only pane. */
+function EmptyCanvas(props: { onPlace(viewId: string): void }) {
+  const ref = useRef<HTMLDivElement>(null);
+  usePointerDropTarget(ref, {
+    scope: dragScope,
+    hit(_x, _y) {
+      const rect = ref.current?.getBoundingClientRect();
+      return rect
+        ? {
+            id: "center",
+            after: false,
+            rect,
+            previewRect: zoneRect(rect, "center"),
+            axis: "x",
+            box: true,
+          }
+        : null;
+    },
+    drop: (moving) => props.onPlace(moving.id),
+  });
+  return (
+    <div
+      ref={ref}
+      className="grid flex-1 place-items-center rounded-xl border-2 border-dashed border-cream/25 text-sm text-cream-muted"
+    >
+      Drag a tab here
+    </div>
+  );
+}
+
 /**
  * The layout popup: a small copy of the window. Tabs are on the left with search, and the page's
- * layout is on the right as panes. A tab is pressed and moved onto a pane's sides to split
- * it, or onto its middle to take its place. Nothing in the window changes until Apply, and nothing
+ * layout is on the right as panes. A tab is dragged onto a pane's sides to split it, or onto its
+ * middle to take its place; a press adds it where the grid has room. Drags use the app's shared
+ * pointer drag, which captures the pointer and never starts a native drag. Nothing in the window changes until Apply, and nothing
  * pressed here reaches the tabs behind it.
  */
 export function LayoutPopup(props: { onApplied: () => void }) {
@@ -135,11 +218,6 @@ export function LayoutPopup(props: { onApplied: () => void }) {
   const [original, setOriginal] = useState<WorkspaceDockNode | null>(null);
   const [draft, setDraft] = useState<WorkspaceDockNode | null>(null);
   const [notice, setNotice] = useState("");
-  const [dragging, setDragging] = useState<Dragging | null>(null);
-  const [hover, setHover] = useState<Hover | null>(null);
-  // Tabs made in the popup exist only in the draft until Apply, so Cancel leaves no trace of them.
-  const letGo = useRef<(() => void) | null>(null);
-  const frame = useRef<HTMLDivElement>(null);
 
   // The popup starts from the tab the window is showing when it opens.
   useEffect(() => {
@@ -156,18 +234,24 @@ export function LayoutPopup(props: { onApplied: () => void }) {
     return () => setBrowserWebviewsSuspended(false, "layout-popup");
   }, [active]);
 
-  // Closing in the middle of a drag drops it.
-  useEffect(() => () => letGo.current?.(), []);
-
   const views = useMemo(() => allLayoutViews(layout), [layout]);
   const placed = new Set(
     draft ? dockLeaves(draft).flatMap((pane) => pane.views.map((view) => view.id)) : [],
   );
 
+  const sourceOf = (viewId: string) =>
+    allLayoutPanes(layout).find((pane) => pane.views[0]?.id === viewId);
+
+  /** Whether a page dropped on a pane's side or middle fits the grid. */
+  const canPlace = (viewId: string, paneId: string, zone: DockDropZone) => {
+    const view = views.find((item) => item.id === viewId);
+    return Boolean(view && draft && draftPlace(draft, view, paneId, zone, sourceOf(viewId)));
+  };
+
   const place = (viewId: string, paneId: string | null, zone: DockDropZone) => {
     const view = views.find((item) => item.id === viewId);
     if (!view) return;
-    const source = allLayoutPanes(layout).find((pane) => pane.views[0]?.id === viewId);
+    const source = sourceOf(viewId);
     const next = draft && paneId ? draftPlace(draft, view, paneId, zone, source) : null;
     if (draft && paneId && !next) {
       if (zone !== "center") setNotice("The window fits at most a 2 by 2 grid");
@@ -185,7 +269,7 @@ export function LayoutPopup(props: { onApplied: () => void }) {
   /** A tab pressed in the list joins where the grid has room, as a way in without dragging. */
   const addFromList = (view: WorkspaceView) => {
     if (placed.has(view.id)) return;
-    const source = allLayoutPanes(layout).find((pane) => pane.views[0]?.id === view.id);
+    const source = sourceOf(view.id);
     const next = draft ? draftAdd(draft, view, source) : createDockLeaf([view]);
     if (!next) {
       setNotice("The window fits at most a 2 by 2 grid");
@@ -193,62 +277,6 @@ export function LayoutPopup(props: { onApplied: () => void }) {
     }
     setNotice("");
     setDraft(next);
-  };
-
-  /** What is under the pointer: a pane and the side of it, or the empty canvas. */
-  const hitTest = (viewId: string, x: number, y: number): Hover | null => {
-    const under = document.elementFromPoint(x, y);
-    const pane = under?.closest<HTMLElement>("[data-layout-pane]");
-    if (pane?.dataset.layoutPane) {
-      const paneId = pane.dataset.layoutPane;
-      const own = draft && dockLeaves(draft).find((leaf) => leaf.id === paneId);
-      // A pane dropped on itself stays where it is.
-      if (own?.views.some((view) => view.id === viewId)) return null;
-      return { paneId, zone: dropZoneAt(pane.getBoundingClientRect(), x, y) };
-    }
-    if (!draft && under?.closest("[data-layout-canvas]")) return { paneId: null, zone: "center" };
-    return null;
-  };
-
-  /** Pressing a tab or a pane: a short press adds or does nothing, and moving it drags it. */
-  const pick = (event: PointerEvent, view: WorkspaceView, onPress?: () => void) => {
-    if (event.button !== 0) return;
-    contained(event);
-    const startX = event.clientX;
-    const startY = event.clientY;
-    const label = paneViewLabel(view);
-    let moved = false;
-    const move = (at: globalThis.PointerEvent) => {
-      if (!moved && Math.hypot(at.clientX - startX, at.clientY - startY) < 5) return;
-      moved = true;
-      const origin = frame.current?.getBoundingClientRect();
-      setDragging({
-        label,
-        x: at.clientX - (origin?.left ?? 0),
-        y: at.clientY - (origin?.top ?? 0),
-      });
-      setHover(hitTest(view.id, at.clientX, at.clientY));
-    };
-    const end = (at: globalThis.PointerEvent | null) => {
-      window.removeEventListener("pointermove", move);
-      window.removeEventListener("pointerup", up);
-      window.removeEventListener("pointercancel", cancel);
-      window.removeEventListener("blur", cancel);
-      letGo.current = null;
-      setDragging(null);
-      setHover(null);
-      if (!at) return;
-      if (!moved) return onPress?.();
-      const target = hitTest(view.id, at.clientX, at.clientY);
-      if (target) place(view.id, target.paneId, target.zone);
-    };
-    const up = (at: globalThis.PointerEvent) => end(at);
-    const cancel = () => end(null);
-    letGo.current = cancel;
-    window.addEventListener("pointermove", move);
-    window.addEventListener("pointerup", up);
-    window.addEventListener("pointercancel", cancel);
-    window.addEventListener("blur", cancel);
   };
 
   const apply = () => {
@@ -279,23 +307,16 @@ export function LayoutPopup(props: { onApplied: () => void }) {
         <DialogDescription className="sr-only">
           Drag tabs onto the canvas to split the window. Nothing changes until you apply.
         </DialogDescription>
-        <div ref={frame} className="relative grid h-full min-h-0 grid-cols-[240px_minmax(0,1fr)]">
+        <div className="relative grid h-full min-h-0 grid-cols-[240px_minmax(0,1fr)]">
           <div className="flex min-h-0 flex-col gap-2 border-r border-charcoal-border p-3">
             <ul className="-mx-1 flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-1">
               {views.map((view) => (
                 <li key={view.id}>
-                  <div
-                    onPointerDown={(event) => pick(event, view, () => addFromList(view))}
-                    className={cn(
-                      "flex h-8 cursor-grab touch-none select-none items-center gap-2 rounded-md px-2",
-                      "text-sm hover:bg-control-hover active:cursor-grabbing",
-                      placed.has(view.id) ? "text-cream-bright" : "text-cream-muted",
-                    )}
-                  >
-                    <ViewIcon tab={view.placeholder ? undefined : view} icon={Blocks} />
-                    <OverflowFadeText className="flex-1">{paneViewLabel(view)}</OverflowFadeText>
-                    {placed.has(view.id) ? <Check size={14} aria-hidden="true" /> : null}
-                  </div>
+                  <LayoutListRow
+                    view={view}
+                    placed={placed.has(view.id)}
+                    onAdd={() => addFromList(view)}
+                  />
                 </li>
               ))}
             </ul>
@@ -304,19 +325,12 @@ export function LayoutPopup(props: { onApplied: () => void }) {
             {draft ? (
               <DraftTree
                 node={draft}
-                hover={hover}
-                onPick={(event, view) => pick(event, view)}
+                canPlace={canPlace}
+                onPlace={place}
                 onRemove={(viewId) => setDraft(draftRemove(draft, viewId))}
               />
             ) : (
-              <div
-                className={cn(
-                  "grid flex-1 place-items-center rounded-xl border-2 border-dashed text-sm",
-                  hover ? "border-cream/60 text-cream-bright" : "border-cream/25 text-cream-muted",
-                )}
-              >
-                Drag a tab here
-              </div>
+              <EmptyCanvas onPlace={(viewId) => place(viewId, null, "center")} />
             )}
             <div className="absolute bottom-4 right-4 flex items-center gap-2">
               <span role="status" className="mr-2 text-xs text-cream-muted">
@@ -324,28 +338,17 @@ export function LayoutPopup(props: { onApplied: () => void }) {
               </span>
               <Button
                 variant="secondary"
-                size="sm"
+                size="lg"
                 onClick={() => useLayoutEditor.getState().stop()}
               >
                 Cancel
               </Button>
-              <Button variant="primary" size="sm" disabled={!draft || !changed} onClick={apply}>
+              <Button variant="primary" size="lg" disabled={!draft || !changed} onClick={apply}>
                 Apply
               </Button>
             </div>
           </div>
         </div>
-        {dragging ? (
-          <div
-            className={cn(
-              "pointer-events-none absolute z-50 max-w-56 rounded-md border",
-              "border-charcoal-border bg-charcoal-card px-2 py-1 text-sm text-cream-bright shadow-lg",
-            )}
-            style={{ left: dragging.x + 12, top: dragging.y + 12 }}
-          >
-            <OverflowFadeText>{dragging.label}</OverflowFadeText>
-          </div>
-        ) : null}
       </DialogContent>
     </Dialog>
   );

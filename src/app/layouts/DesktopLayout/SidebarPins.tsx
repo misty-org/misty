@@ -58,6 +58,7 @@ export function SidebarMore({ places }: { places: Record<SidebarPlaceId, Sidebar
             <ContextMenuTrigger asChild>
               <DropdownMenuTrigger asChild>
                 <SidebarRow
+                  data-tour="sidebar-more"
                   label="More"
                   icon={<Ellipsis className="size-4" aria-hidden="true" />}
                   current={rest.some((id) => places[id].current)}

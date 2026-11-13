@@ -153,8 +153,10 @@ fn pending_count(db: &crate::engines::support::db::Db) -> Result<i64, String> {
 /// against, reported next to the search duration.
 fn message_count(db: &crate::engines::support::db::Db) -> Result<i64, String> {
     let conn = db.read();
-    conn.query_row("SELECT COUNT(*) FROM cli_session_messages", [], |r| r.get(0))
-        .map_err(|e| e.to_string())
+    conn.query_row("SELECT COUNT(*) FROM cli_session_messages", [], |r| {
+        r.get(0)
+    })
+    .map_err(|e| e.to_string())
 }
 
 /// Write the fts_state row shared by the success and failure paths.
@@ -222,15 +224,8 @@ fn stamp_failure(db: &crate::engines::support::db::Db, row: &PendingSession) -> 
 /// (e.g. deleted transcript) neither retries nor counts as pending until
 /// its stat moves.
 fn index_one(db: &crate::engines::support::db::Db, row: &PendingSession) -> Result<bool, String> {
-    // Index the same text the reader shows: parse with this session's accepted
-    // internal frames, so hidden frames stay out of the index (an empty set
-    // would re-reveal every frame the capture validator hid). The signature
-    // rides along so `write_index` can prove, while holding the write lock,
-    // that no identity was recorded after this read.
-    let (accepted_frames, accepted_signature) =
-        db.accepted_internal_frames(&row.engine, &row.session_id)?;
     let parsed = if row.message_count > 0 {
-        match parse_session_file(&row.engine, Path::new(&row.file_path), &accepted_frames) {
+        match parse_session_file(&row.engine, Path::new(&row.file_path)) {
             Ok(parsed) => parsed,
             Err(error) => {
                 eprintln!(
@@ -245,19 +240,15 @@ fn index_one(db: &crate::engines::support::db::Db, row: &PendingSession) -> Resu
         super::ParsedSession { messages: vec![] }
     };
 
-    write_index(db, row, &parsed, &accepted_signature)
+    write_index(db, row, &parsed)
 }
 
-/// Publish one parsed session. The identity-set re-check runs under the same
-/// db lock as the record path: a frame recorded while this file was parsed
-/// must not be published as visible text, and the stamp must not mark that
-/// stale content as current. A changed set returns `false` without writing,
-/// leaving the session pending; `spawn_index` re-drains after a raced request.
+/// Publish one parsed session. A file whose stat moved while it was parsed returns `false`
+/// without writing, leaving the session pending for the next pass.
 fn write_index(
     db: &crate::engines::support::db::Db,
     row: &PendingSession,
     parsed: &super::ParsedSession,
-    accepted_signature: &str,
 ) -> Result<bool, String> {
     // Deletion paths hold SCAN_LOCK, so under it the sessions row cannot
     // vanish mid-write; the stat re-check keeps a file rewritten mid-parse
@@ -266,11 +257,6 @@ fn write_index(
     let mut conn = db.0.lock();
     let tx = conn.transaction().map_err(|e| e.to_string())?;
     if !stat_unchanged(&tx, row)? {
-        return Ok(false);
-    }
-    let (_, current_signature) =
-        crate::engines::support::db::accepted_internal_frames_from(&tx, &row.engine, &row.session_id)?;
-    if current_signature != accepted_signature {
         return Ok(false);
     }
     // Replace-then-insert made every turn rebuild the whole session's FTS
@@ -806,7 +792,13 @@ mod tests {
             .unwrap();
     }
 
-    fn insert_message(db: &crate::engines::support::db::Db, session_id: &str, seq: i64, role: &str, text: &str) {
+    fn insert_message(
+        db: &crate::engines::support::db::Db,
+        session_id: &str,
+        seq: i64,
+        role: &str,
+        text: &str,
+    ) {
         db.0
             .lock()
             .execute(
@@ -904,7 +896,9 @@ mod tests {
         assert_eq!(page.total_messages, 0, "cascade emptied the corpus too");
         let count: i64 =
             db.0.lock()
-                .query_row("SELECT COUNT(*) FROM cli_session_messages", [], |r| r.get(0))
+                .query_row("SELECT COUNT(*) FROM cli_session_messages", [], |r| {
+                    r.get(0)
+                })
                 .unwrap();
         assert_eq!(count, 0);
     }
@@ -933,7 +927,11 @@ mod tests {
         path
     }
 
-    fn register_file_session(db: &crate::engines::support::db::Db, session_id: &str, path: &std::path::Path) {
+    fn register_file_session(
+        db: &crate::engines::support::db::Db,
+        session_id: &str,
+        path: &std::path::Path,
+    ) {
         let (size, mtime_ms) = super::super::stat_signature(path).unwrap();
         db.0
             .lock()
@@ -978,7 +976,9 @@ mod tests {
         // Old content stays (replace-then-insert keeps one copy).
         let count: i64 =
             db.0.lock()
-                .query_row("SELECT COUNT(*) FROM cli_session_messages", [], |r| r.get(0))
+                .query_row("SELECT COUNT(*) FROM cli_session_messages", [], |r| {
+                    r.get(0)
+                })
                 .unwrap();
         assert_eq!(count, 2);
     }
@@ -990,7 +990,10 @@ mod tests {
         let path = write_session_file(
             &scratch,
             "stable.jsonl",
-            &[claude_user_line("保持不变的内容"), claude_assistant_line("回复不变")],
+            &[
+                claude_user_line("保持不变的内容"),
+                claude_assistant_line("回复不变"),
+            ],
         );
         register_file_session(&db, "stable", &path);
         assert_eq!(index_pending(&db).unwrap(), 1);
@@ -1017,7 +1020,10 @@ mod tests {
             let rows = stmt.query_map([], |r| r.get(0)).unwrap();
             rows.collect::<Result<Vec<_>, _>>().unwrap()
         };
-        assert_eq!(ids_after, ids_before, "unchanged rows must not be rewritten");
+        assert_eq!(
+            ids_after, ids_before,
+            "unchanged rows must not be rewritten"
+        );
     }
 
     #[test]
@@ -1054,86 +1060,37 @@ mod tests {
         assert!(search(&db, "旧内容", None, None).unwrap().hits.is_empty());
         assert_eq!(search(&db, "新内容", None, None).unwrap().hits.len(), 1);
         assert_eq!(search(&db, "第一段保持", None, None).unwrap().hits.len(), 1);
-        assert_eq!(search(&db, "最后一段保持", None, None).unwrap().hits.len(), 1);
+        assert_eq!(
+            search(&db, "最后一段保持", None, None).unwrap().hits.len(),
+            1
+        );
 
         // Drop the middle message: its index row must not survive a pass.
         std::fs::write(
             &path,
-            [claude_user_line("第一段保持"), claude_user_line("最后一段保持")].join("\n") + "\n",
+            [
+                claude_user_line("第一段保持"),
+                claude_user_line("最后一段保持"),
+            ]
+            .join("\n")
+                + "\n",
         )
         .unwrap();
         register_file_session(&db, "edit", &path);
         assert_eq!(index_pending(&db).unwrap(), 1);
         assert!(search(&db, "新内容", None, None).unwrap().hits.is_empty());
         assert_eq!(search(&db, "第一段保持", None, None).unwrap().hits.len(), 1);
-        assert_eq!(search(&db, "最后一段保持", None, None).unwrap().hits.len(), 1);
+        assert_eq!(
+            search(&db, "最后一段保持", None, None).unwrap().hits.len(),
+            1
+        );
         let count: i64 = db
             .read()
-            .query_row("SELECT COUNT(*) FROM cli_session_messages", [], |r| r.get(0))
+            .query_row("SELECT COUNT(*) FROM cli_session_messages", [], |r| {
+                r.get(0)
+            })
             .unwrap();
         assert_eq!(count, 2, "only the two remaining user rows");
-    }
-
-    #[test]
-    fn a_frame_recorded_mid_parse_never_gets_indexed_as_visible() {
-        let scratch = Scratch::new();
-        let db = crate::engines::support::db::Db::open_at(&scratch.0.join("app.db")).unwrap();
-        let frame =
-            "<CCGUI_INTERNAL_race-1>{\"note\":\"racehidden\"}</CCGUI_INTERNAL_race-1>".to_string();
-        let path = write_session_file(
-            &scratch,
-            "race.jsonl",
-            &[
-                claude_user_line("可见的提问"),
-                claude_assistant_line(&format!("可见的回复 {frame}")),
-            ],
-        );
-        register_file_session(&db, "race", &path);
-
-        // index_one's first step: the identity set this parse is derived from.
-        let (accepted_frames, accepted_signature) =
-            db.accepted_internal_frames("claude", "race").unwrap();
-        assert!(accepted_frames.is_empty());
-        let parsed = parse_session_file("claude", &path, &accepted_frames).unwrap();
-        // The frame is visible in this parse — exactly the content that must
-        // not be published if an identity is recorded before the write.
-        assert!(parsed
-            .messages
-            .iter()
-            .any(|message| message.text.contains("racehidden")));
-        let (file_size, file_mtime_ms) = super::super::stat_signature(&path).unwrap();
-        let row = PendingSession {
-            engine: "claude".into(),
-            session_id: "race".into(),
-            file_path: path.to_string_lossy().into_owned(),
-            file_size,
-            file_mtime_ms,
-            message_count: 2,
-        };
-
-        // The capture validator records the frame while that parse is running:
-        // insert identity + drop the fts stamp (the record path's own sequence).
-        let hash = crate::engines::history::recordable_internal_frame_hash(&frame).unwrap();
-        assert!(db
-            .record_accepted_internal_frame_hash("claude", "race", &hash, "/ws")
-            .unwrap());
-
-        // The stale parse is refused: nothing is published, nothing is stamped.
-        assert!(!write_index(&db, &row, &parsed, &accepted_signature).unwrap());
-        assert!(search(&db, "racehidden", None, None)
-            .unwrap()
-            .hits
-            .is_empty());
-        assert_eq!(pending_count(&db).unwrap(), 1, "the session stays pending");
-
-        // The fresh pass reads the enlarged identity set and hides the frame.
-        assert_eq!(index_pending(&db).unwrap(), 1);
-        assert_eq!(pending_count(&db).unwrap(), 0);
-        assert!(search(&db, "racehidden", None, None)
-            .unwrap()
-            .hits
-            .is_empty());
-        assert_eq!(search(&db, "可见的回复", None, None).unwrap().hits.len(), 1);
     }
 
     #[test]

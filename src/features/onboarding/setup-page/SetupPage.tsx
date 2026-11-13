@@ -17,7 +17,7 @@ import "../welcome/welcome.css";
 type Step = "engines" | "apps";
 
 const steps: { id: Step; title: string }[] = [
-  { id: "engines", title: "Which AI do you use?" },
+  { id: "engines", title: "Pick an AI to start with" },
   { id: "apps", title: "Which apps should agents use?" },
 ];
 

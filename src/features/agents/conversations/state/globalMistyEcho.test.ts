@@ -9,7 +9,6 @@ describe("Global Misty prompt echo", () => {
     window.localStorage.clear();
     useMistyStore.getState().setAccount("");
     useMistyStore.setState({
-      panel: "closed",
       working: false,
       context: [],
       handoff: undefined,

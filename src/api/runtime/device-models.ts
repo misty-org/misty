@@ -8,7 +8,6 @@ type DeviceModelCall =
   | "refine-point"
   | "extract"
   | "embed"
-  | "day-summary"
   | "voice-notes"
   | "transcribe-diarized"
   | "follow-up";

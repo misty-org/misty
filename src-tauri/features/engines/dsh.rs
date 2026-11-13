@@ -8,7 +8,7 @@
 //! projected in [`super::dsh_session::run_host_turn`]. The host itself is
 //! probed/adopted/spawned by [`crate::engines::support::dsh_host`].
 
-use super::{BuiltCommand, Engine, SendRequest};
+use super::Engine;
 
 pub struct DshEngine;
 
@@ -23,14 +23,6 @@ impl Engine for DshEngine {
 
     /// Never invoked on the virtual path (`send_host_stream` branches before
     /// the process spawn); a stub keeps the trait contract honest.
-    fn build_command(&self, _req: &SendRequest, _bin: &str) -> Result<BuiltCommand, String> {
-        Err("dsh runs as a host session; no child process to build".to_string())
-    }
-
-    /// Never invoked on the virtual path: frames arrive over the mux WS and
-    /// are projected directly to engine events.
-    fn parse_line(&self, _line: &str, _out: &mut Vec<super::EngineEvent>) {}
-
     fn supports_images(&self) -> bool {
         // Images go out as `session/prompt` image content parts (base64) —
         // that IS the dsh image transport; `dsh_images` declares the

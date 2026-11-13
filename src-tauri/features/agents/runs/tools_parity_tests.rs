@@ -16,7 +16,7 @@ use super::{
     serial_tool_lifecycle::SerialToolLifecycle,
     tool_monitor::{ToolCall, ToolEnd, ToolMonitor},
     tool_outcomes::{classify_tool_outcome, incomplete_tool_result_text, unconfirmed_tool_result_reason, unfinished_model_result, OutcomeInput, ToolFailure, ToolOutcome, DEFAULT_TURN_LIMIT, EXECUTION_INSTRUCTIONS},
-    tool_transport::{object, string, HarnessCheckpoint, ToolCheckpoints, ToolTransport},
+    tool_transport::{object, string, HarnessCheckpoint, ToolCheckpoints},
     toolsets::agent_tools,
     transcript::stringify_output,
     web_fetch::tool::web_fetch_descriptor,

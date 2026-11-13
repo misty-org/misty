@@ -176,7 +176,6 @@ pub async fn engine_catalog(
 
 // ---- Engine turns: questions, plan reviews, settings, history, fork ----
 
-
 /// Answers a question card an engine raised (Claude's AskUserQuestion, Codex's
 /// `requestUserInput`, an ACP form). `answers` maps each question's text to the chosen label, or
 /// an array of labels for a multi-select question, or the person's own words; None dismisses it.
@@ -236,12 +235,19 @@ pub async fn engine_plan_respond(
     }
     let db = std::sync::Arc::clone(&state.db);
     let review = blocking(move || {
-        match super::plan_review::submit_decision(&db, &plan_id, revision, decision, feedback.as_deref())? {
+        match super::plan_review::submit_decision(
+            &db,
+            &plan_id,
+            revision,
+            decision,
+            feedback.as_deref(),
+        )? {
             super::plan_review::SubmitOutcome::Conflict(review) => return Ok(*review),
             super::plan_review::SubmitOutcome::Claimed { .. } => {}
         }
         super::plan_review::mark_applied(&db, &plan_id, revision, decision)?;
-        super::plan_review::get_review(&db, &plan_id, revision)?.ok_or_else(|| "That plan is gone.".to_string())
+        super::plan_review::get_review(&db, &plan_id, revision)?
+            .ok_or_else(|| "That plan is gone.".to_string())
     })
     .await?;
     Ok(PlanDecided {
@@ -249,18 +255,6 @@ pub async fn engine_plan_respond(
         review,
         native: false,
     })
-}
-
-/// The plans an engine session has shown for review, newest revision last.
-#[tauri::command]
-pub async fn engine_plan_reviews(
-    webview: tauri::Webview,
-    state: State<'_, EngineState>,
-    engine: String,
-    session_id: String,
-) -> Result<Vec<super::PlanReview>, String> {
-    person_window(&webview)?;
-    super::list_plan_reviews(state, engine, session_id).await
 }
 
 /// This device's engine settings (default models and efforts, Codex Fast, program overrides).
@@ -318,91 +312,4 @@ pub async fn engine_chat_resume(
         store::keep_session(&db, &account, &conversation, &engine, &folder, &session_id)
     })
     .await
-}
-
-/// Forks a chat's engine session after one of the person's messages into a new chat: the new
-/// chat's next turn resumes a session holding the history through that message's turn, in the
-/// engine's own format. `later_same` counts later messages with the same text, to pick the right
-/// one.
-#[tauri::command]
-pub async fn engine_chat_fork(
-    webview: tauri::Webview,
-    state: State<'_, EngineState>,
-    runtime: State<'_, MistyRuntime>,
-    account: String,
-    conversation: String,
-    new_conversation: String,
-    user_text: Option<String>,
-    later_same: Option<u32>,
-) -> Result<super::fork::ForkPlan, String> {
-    person_window(&webview)?;
-    let db = runtime.environment.store();
-    let (lookup, from) = (db.clone(), (account.clone(), conversation.clone()));
-    let (engine, session, _folder) = blocking(move || {
-        store::chat_session(&lookup, &from.0, &from.1)
-            .ok_or_else(|| "This chat has no engine session to fork yet.".to_string())
-    })
-    .await?;
-    let at = match user_text {
-        None => None,
-        Some(text) => {
-            let (sessions, engine, session) =
-                (std::sync::Arc::clone(&state.db), engine.clone(), session.clone());
-            let (stored, tail) = blocking(move || {
-                stored_user_text(&sessions, &engine, &session, &text, later_same.unwrap_or(0))
-            })
-            .await?;
-            Some(super::fork::ForkAnchor {
-                user_text_sha256: super::fork::text_sha256_hex(&stored),
-                seq_hint: None,
-                tail_occurrence: Some(tail),
-            })
-        }
-    };
-    let plan = super::fork::fork_session(state, engine.clone(), session, at).await?;
-    let (target, folder) = (plan.target_session_id.clone(), plan.workspace_path.clone());
-    blocking(move || store::keep_session(&db, &account, &new_conversation, &engine, &folder, &target))
-        .await?;
-    Ok(plan)
-}
-
-/// The person's message as the engine's own transcript holds it, and how many later messages hold
-/// exactly that text. A turn reaches the engine wrapped at times: a shared Space's note about
-/// teammates' files before it, a fresh session's earlier turns before it, the browser hint after
-/// it. The chat keeps only what the person wrote, so a transcript message is theirs when it is that
-/// text, or ends with it after a blank line, once a known hint is taken off its end. `later_same`
-/// counts the chat's later messages with the same text, newest last.
-fn stored_user_text(
-    db: &super::support::db::Db,
-    engine: &str,
-    session: &str,
-    text: &str,
-    later_same: u32,
-) -> Result<(String, u32), String> {
-    let wanted = text.trim();
-    let meta = super::history::reader::session_meta_by_id(db, engine, session)?
-        .ok_or("This chat's engine session isn't on this computer any more.")?;
-    let (accepted, _) = db.accepted_internal_frames(engine, session)?;
-    let parsed =
-        super::history::parse_session_file(engine, std::path::Path::new(&meta.file_path), &accepted)?;
-    let users: Vec<&str> = parsed
-        .messages
-        .iter()
-        .filter(|message| message.role == "user")
-        .map(|message| message.text.as_str())
-        .collect();
-    let theirs = |stored: &str| {
-        let body = super::run_prompt::without_browser_hint(stored.trim());
-        body == wanted || body.ends_with(&format!("\n\n{wanted}"))
-    };
-    let hits: Vec<usize> = (0..users.len()).filter(|&index| theirs(users[index])).collect();
-    let picked = hits
-        .len()
-        .checked_sub(1 + later_same as usize)
-        .map(|position| hits[position])
-        .or_else(|| hits.last().copied())
-        .ok_or("Couldn't find this message in the engine's own copy of the chat.")?;
-    let stored = users[picked].to_string();
-    let tail = users[picked + 1..].iter().filter(|other| **other == stored).count() as u32;
-    Ok((stored, tail))
 }

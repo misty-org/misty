@@ -3,13 +3,6 @@ import { deviceModelCall } from "@/api/runtime/device-models";
 /** The vector size asked of the embedding model. A model that answers in another size is fine. */
 const embeddingDimensions = 768;
 
-/** The model this computer's vectors were last made with, which memory re-embeds toward. */
-let lastModel = "";
-
-export function lastEmbeddingModel(): string {
-  return lastModel;
-}
-
 /** Vectors on this computer's embedding model, with that model's ID. */
 export async function embedOnDevice(values: string[], signal?: AbortSignal) {
   const answer = await deviceModelCall<{ model: string; embeddings: number[][] }>(
@@ -17,7 +10,6 @@ export async function embedOnDevice(values: string[], signal?: AbortSignal) {
     { values, dimensions: embeddingDimensions },
     signal,
   );
-  if (answer.model) lastModel = answer.model;
   return answer;
 }
 

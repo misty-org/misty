@@ -70,8 +70,8 @@ export function setRunStateAccount(account: string) {
 }
 
 /**
- * A run outlives the chat panel: one resumed after a reload or a restart, or started by a schedule, has
- * its tools called with no panel open, so nothing has named the account yet.
+ * A run outlives its chat: one resumed after a reload or a restart has its tools called with no
+ * chat open, so nothing has named the account yet.
  */
 export function runStateAccount(): string {
   return currentAccount || agentAccountId();

@@ -1,5 +1,5 @@
 import type { Dispatch, RefObject, SetStateAction } from "react";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { Globe, Mic, Square } from "lucide-react";
 import type { useAiVoiceRecorder } from "../../runs/markdown/useAiVoiceRecorder";
 import { MistyComposer } from "../composer/MistyComposer";
@@ -8,16 +8,13 @@ import { useMistyStore } from "../state/useMistyStore";
 import type { AgentProfile } from "@/shared/schemas";
 import { IconButton, MenuItem, type ActionBarItem, type PathLineSegment } from "@/shared/ui";
 import { useDeviceFolderSegment } from "../../plans/AgentFolderMenu";
-import { AgentGoalDialog } from "../../plans/AgentGoalDialog";
 import type { usePermissionMode } from "../../plans/permissionMode";
-import { useCollaborationStore } from "../../plans/store";
 import type { useCollaborationComposer } from "../../plans/useCollaborationComposer";
 import { currentSpaceKey, mistyEngine } from "../../engines/enginesApi";
 import {
   BrowserChip,
   captureRegionFile,
   effortItem,
-  goalItem,
   modeItem,
   modelItem,
   permissionItem,
@@ -58,7 +55,7 @@ const engineNames: Record<string, string> = {
 
 /**
  * The conversation's message box: the text, then one bar that never wraps (the + menu with attach
- * and screen capture, permissions, goal, effort, mode and model, giving way in that order), with
+ * and screen capture, permissions, effort, mode and model, giving way in that order), with
  * the context ring, voice and send (Stop while a reply runs and nothing is typed) at its end.
  * Where the chat works, Space › folder › branch, is a line under the box. `@` mentions a file in
  * the linked folder, `/` runs a command and `$` uses a skill.
@@ -76,7 +73,6 @@ export function AgentConversationComposer({
   permission,
   working,
   send,
-  ensureConversation,
   reportError,
 }: {
   agent?: AgentProfile;
@@ -91,8 +87,6 @@ export function AgentConversationComposer({
   permission: ReturnType<typeof usePermissionMode>;
   working: boolean;
   send: () => void;
-  /** The open conversation's id, made first when there is none yet. */
-  ensureConversation: () => Promise<string>;
   reportError: (message: string) => void;
 }) {
   const { planning } = collaboration;
@@ -136,28 +130,9 @@ export function AgentConversationComposer({
   const allowed = engineOptions(engine).modes;
   const choices = useChatChoices(conversationId);
   const models = useEngineModels(engine);
-  const goal = useCollaborationStore((s) =>
-    conversationId ? s.byConversation[conversationId]?.goal : undefined,
-  );
-  // The goal belongs to a chat; pressing Goal in a new one makes the chat first.
-  const [goalFor, setGoalFor] = useState<string>();
-  const openGoal = () => {
-    if (conversationId) return setGoalFor(conversationId);
-    // Making the chat empties the box; what was typed stays for the person to send.
-    const typed = draft;
-    void ensureConversation()
-      .then((id) => {
-        if (typed) setDraft(typed);
-        setGoalFor(id);
-      })
-      .catch((error: unknown) =>
-        reportError(error instanceof Error ? error.message : String(error)),
-      );
-  };
 
   const items = [
     permissionItem({ conversationId, permission, engine, disabled }),
-    goalItem({ goal: goal ?? undefined, disabled, onOpen: openGoal }),
     effortItem({
       accountId,
       conversationId,
@@ -194,6 +169,7 @@ export function AgentConversationComposer({
     working && !draft.trim() && !attachments.attachments.length ? (
       <IconButton
         variant="secondary"
+        size="sm"
         label="Stop response"
         onClick={() => {
           void useMistyStore
@@ -282,11 +258,6 @@ export function AgentConversationComposer({
           </>
         }
         sendControl={stop}
-      />
-      <AgentGoalDialog
-        conversationId={goalFor}
-        open={Boolean(goalFor)}
-        onOpenChange={(open) => !open && setGoalFor(undefined)}
       />
       {/* Working status belongs to the transcript, under the message that started it. */}
       {(voice.recording || voice.transcribing) && (

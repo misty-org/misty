@@ -7,8 +7,6 @@ export type { ChannelView, EngineChannels } from "./api";
 export { ENGINE_DOCS_URLS, ENGINE_IDS, ENGINE_NAMES, engineName, type EngineId } from "./engines";
 export {
   CLI_CONFIG_CHANGED_EVENT,
-  engineCurrents,
-  providerFamilyModels,
   providerModel,
   PSEUDO_DISABLED,
   PSEUDO_LOCAL,

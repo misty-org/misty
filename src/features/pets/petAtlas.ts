@@ -2,7 +2,6 @@
 export const PET_CELL_WIDTH = 192;
 export const PET_CELL_HEIGHT = 208;
 export const PET_COLUMNS = 8;
-export const PET_ROWS = 11;
 /** The pet window's logical width, which leaves room for the status bubble. */
 export const PET_BUBBLE_WIDTH = 420;
 /** The fixed logical space above the sprite for the two-line status bubble. */
@@ -10,15 +9,6 @@ export const PET_BUBBLE_HEIGHT = 64;
 
 export type PetStatus = "idle" | "running" | "waiting" | "failed" | "review";
 export type PetAnimation = PetStatus | "stand" | "rest" | "lay" | "jump";
-
-/** The standard Codex v2 rows. Rows 9 and 10 are the 16 directions, clockwise. */
-export const PET_STATUS_ROWS: Record<PetStatus, number> = {
-  idle: 0,
-  running: 7,
-  waiting: 6,
-  failed: 5,
-  review: 8,
-};
 
 /** Codex v2 action rows, for how the pet moves on its own. */
 export const PET_ANIMATION_ROWS: Record<Exclude<PetAnimation, "idle">, number> = {

@@ -1,7 +1,6 @@
 import {
   Fragment,
   useEffect,
-  useMemo,
   useRef,
   useState,
   type CSSProperties,
@@ -11,7 +10,8 @@ import {
 } from "react";
 import { setBrowserWebviewsSuspended } from "@/features/app-windows";
 import { cn } from "@/shared/ui";
-import { MistyPanel, type MistyPanelSide } from "./MistyPanel";
+import type { MistyPanelSide } from "./mistyPanelSide";
+import "./mistyPanel.css";
 import {
   MISTY_PANEL_MAX_WIDTH,
   MISTY_PANEL_MIN_WIDTH,
@@ -31,8 +31,6 @@ const panelGap = 6;
 const closeDistance = 70;
 
 const geometryChanged = () => window.dispatchEvent(new Event("misty:workspace-geometry-changed"));
-
-const viewLabel = (view: MistyPanelView) => (view === "chat" ? "chat panel" : "Misty panel");
 
 /**
  * Follows one pointer drag on a resize edge until release. Pages pause while it runs, as they do
@@ -71,10 +69,9 @@ function useEdgeDrag(reason: string) {
 }
 
 /**
- * The Misty panels' column beside a content area: the agent conversation, your Space's chat,
- * or both, each its own rounded card. The column widens from zero to slide the panels in from
- * the edge, pushing the content aside. Each card's inner edge resizes its width, and the gap
- * between two cards moves the line between them.
+ * The side panel's column beside a content area: your Space's chat, a rounded card of its own.
+ * The column widens from zero to slide the panel in from the edge, pushing the content aside.
+ * The card's inner edge resizes its width.
  */
 export function MistyPanelDock({
   views,
@@ -88,8 +85,7 @@ export function MistyPanelDock({
   chat?: ReactNode;
 }) {
   const open = views.length > 0;
-  const agentsWidth = useMistyPanelStore((s) => s.width);
-  const chatWidth = useMistyPanelStore((s) => s.chatWidth);
+  const column = useMistyPanelStore((s) => s.width);
   // While the dock slides shut it keeps showing what it last showed.
   const [shown, setShown] = useState(views);
   const key = views.join(",");
@@ -126,15 +122,8 @@ export function MistyPanelDock({
     const timer = window.setTimeout(geometryChanged, slideMs + 20);
     return () => window.clearTimeout(timer);
   }, [expanded, mounted, side, key]);
-  // The conversation does not re-render as the width changes: the panel reads the width
-  // from a custom property, so a drag only restyles its card. It also stays mounted when
-  // the chat panel opens or closes beside it.
-  const agents = useMemo(() => <MistyPanel side={side} />, [side]);
   if (!mounted) return null;
   const list = open ? views : shown;
-  const widthOf = (view: MistyPanelView) => (view === "chat" ? chatWidth : agentsWidth);
-  // Every card is as wide as the column, so stacked panels always line up edge to edge.
-  const column = Math.max(0, ...list.map(widthOf));
   return (
     <div
       className={cn(
@@ -180,8 +169,8 @@ export function MistyPanelDock({
                 }
                 data-misty-panel-card={view}
               >
-                {view === "chat" ? chat : agents}
-                {open ? <MistyPanelResizer side={side} view={view} width={column} /> : null}
+                {chat}
+                {open ? <MistyPanelResizer side={side} width={column} /> : null}
               </div>
             </Fragment>
           ))}
@@ -195,15 +184,7 @@ export function MistyPanelDock({
  * A card's inner edge. Drag to resize, arrow keys step it, and a double-click restores
  * the default width. Pulled well past its narrowest, the card closes.
  */
-function MistyPanelResizer({
-  side,
-  view,
-  width,
-}: {
-  side: MistyPanelSide;
-  view: MistyPanelView;
-  width: number;
-}) {
+function MistyPanelResizer({ side, width }: { side: MistyPanelSide; width: number }) {
   const { dragging, start } = useEdgeDrag("misty-panel-resize");
   const setWidth = (next: number) => useMistyPanelStore.getState().setWidth(next);
   // Toward the page widens the panel: leftward for a panel on the right.
@@ -216,7 +197,7 @@ function MistyPanelResizer({
       // Pulled well past the narrowest it goes, in the closing direction, it closes.
       if (dragged < MISTY_PANEL_MIN_WIDTH - closeDistance) {
         end();
-        useMistyPanelStore.getState().close(view);
+        useMistyPanelStore.getState().close();
         return;
       }
       setWidth(dragged);
@@ -236,7 +217,7 @@ function MistyPanelResizer({
     <div
       role="separator"
       aria-orientation="vertical"
-      aria-label={`Resize ${viewLabel(view)}`}
+      aria-label="Resize chat panel"
       aria-valuenow={width}
       aria-valuemin={MISTY_PANEL_MIN_WIDTH}
       aria-valuemax={MISTY_PANEL_MAX_WIDTH}

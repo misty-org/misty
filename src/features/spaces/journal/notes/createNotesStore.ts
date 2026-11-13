@@ -80,13 +80,13 @@ export function createNotesStore(services: {
     async createNote(input) {
       const { spaceId, spaceName } = get();
       if (!spaceId || !spaceName) {
-        set({ error: "Open a Space before creating a note." });
+        set({ error: "Open a Space before creating a doc." });
         return undefined;
       }
       const generation = notesLoadGeneration;
       try {
         const created = mapServerNote(
-          await api.create(spaceId, input.title.trim() || "Untitled note"),
+          await api.create(spaceId, input.title.trim() || "Untitled doc"),
           spaceName,
         );
         if (generation !== notesLoadGeneration) return undefined;
@@ -106,7 +106,7 @@ export function createNotesStore(services: {
     async deleteNote(noteId: string) {
       const note = get().notes.find((candidate) => candidate.id === noteId);
       if (!note) return;
-      if (!note.spaceId) throw new Error("Open the note's Space before deleting it.");
+      if (!note.spaceId) throw new Error("Open the doc's Space before deleting it.");
       const generation = notesLoadGeneration;
       try {
         await api.remove(note.spaceId, note.sourceId);
@@ -148,7 +148,7 @@ export function createNotesStore(services: {
 }
 
 function errorMessage(reason: unknown): string {
-  return reason instanceof Error ? reason.message : "Misty could not update this note.";
+  return reason instanceof Error ? reason.message : "Misty could not update this doc.";
 }
 
 interface NotesStoreState {

@@ -214,7 +214,10 @@ pub(crate) fn channel_env(
             .get("CODEBUDDY_BASE_URL")
             .and_then(|base| codebuddy_edition_for(base))
         {
-            out.insert("CODEBUDDY_INTERNET_ENVIRONMENT".to_string(), edition.to_string());
+            out.insert(
+                "CODEBUDDY_INTERNET_ENVIRONMENT".to_string(),
+                edition.to_string(),
+            );
         }
     }
     Ok(out)
@@ -227,13 +230,15 @@ pub(crate) fn channel_env(
 /// them to the wrong auth/endpoint family — the very 401 this derivation is
 /// meant to prevent.
 fn codebuddy_edition_for(base_url: &str) -> Option<&'static str> {
-    let rest = base_url.split_once("://").map_or(base_url, |(scheme, rest)| {
-        if scheme.is_empty() || scheme.contains(['/', '?', '#']) {
-            base_url
-        } else {
-            rest
-        }
-    });
+    let rest = base_url
+        .split_once("://")
+        .map_or(base_url, |(scheme, rest)| {
+            if scheme.is_empty() || scheme.contains(['/', '?', '#']) {
+                base_url
+            } else {
+                rest
+            }
+        });
     let authority = rest.split(['/', '?', '#']).next().unwrap_or(rest);
     let host_port = authority.rsplit('@').next().unwrap_or(authority);
     let host = host_port

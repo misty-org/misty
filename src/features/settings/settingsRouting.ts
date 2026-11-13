@@ -1,51 +1,12 @@
 import type { SettingsSection } from "./settingsTypes";
 
 /**
- * Where a Settings section id lands. Kept apart from the registry (which imports every page) so
+ * Where a preference's row lands. Kept apart from the registry (which imports every page) so
  * the preference store can resolve rows without importing the pages themselves.
  */
 
-/** Sections that no longer exist on their own resolve to the block that holds them now. */
-const retiredSections: Partial<Record<SettingsSection, SettingsSection>> = {
-  about: "account",
-  support: "account",
-  diagnostics: "advanced",
-  search: "general",
-  browser: "general",
-  "browser-links": "general",
-  "browser-extensions": "general",
-  "browser-appearance": "advanced",
-  "browser-tabs": "general",
-  "browser-downloads": "general",
-  layout: "appearance",
-  "browser-privacy": "privacy",
-  "browser-signins": "privacy",
-  passwords: "privacy",
-  autofill: "privacy",
-  profiles: "account",
-  devices: "account",
-  "browser-handoff": "account",
-  sync: "account",
-  "browser-import": "general",
-  "spaces-defaults": "general",
-  "spaces-manage": "general",
-  "files-locations": "general",
-  "files-indexing": "general",
-  social: "general",
-  journal: "general",
-  library: "general",
-  terminal: "general",
-  agents: "agents-defaults",
-};
-
-export function canonicalSettingsSection(section: SettingsSection): SettingsSection {
-  return retiredSections[section] ?? section;
-}
-
 /** Preferences whose row sits in a different block from the page their definition names. */
 const preferenceRowSection: Readonly<Record<string, SettingsSection>> = {
-  "app.updates.automatic": "updates",
-  "app.diagnostics.framePacing": "advanced",
   "app.appearance.dim_inactive_panes": "advanced",
   "app.appearance.pane_dim_strength": "advanced",
   "app.appearance.compact_mode_enabled": "advanced",
@@ -53,7 +14,7 @@ const preferenceRowSection: Readonly<Record<string, SettingsSection>> = {
 
 /** The block that shows a preference's row. */
 export function preferenceSection(id: string, page: string): SettingsSection {
-  return preferenceRowSection[id] ?? canonicalSettingsSection(page as SettingsSection);
+  return preferenceRowSection[id] ?? (page as SettingsSection);
 }
 
 /**
@@ -61,12 +22,9 @@ export function preferenceSection(id: string, page: string): SettingsSection {
  * hidden to keep Settings short. Search skips them so a result always lands on a visible row.
  */
 export const preferencesWithoutRows: ReadonlySet<string> = new Set([
-  "app.tabs.startPage",
   "app.layout.presets",
   "app.shortcuts.bindings",
   "collections.tabs.space",
   "collections.tabs.journal",
   "collections.tabs.library",
-  "files.startingFolder",
-  "spaces.openingTool",
 ]);

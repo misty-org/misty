@@ -105,7 +105,12 @@ impl Display {
 
     /// The pointer, and whether the primary button is down.
     pub(crate) fn pointer_and_button(&self) -> Option<(i32, i32, bool)> {
-        let reply = self.connection.query_pointer(self.root).ok()?.reply().ok()?;
+        let reply = self
+            .connection
+            .query_pointer(self.root)
+            .ok()?
+            .reply()
+            .ok()?;
         Some((
             i32::from(reply.root_x),
             i32::from(reply.root_y),
@@ -114,7 +119,14 @@ impl Display {
     }
 
     fn atom(&self, name: &[u8]) -> Option<u32> {
-        Some(self.connection.intern_atom(false, name).ok()?.reply().ok()?.atom)
+        Some(
+            self.connection
+                .intern_atom(false, name)
+                .ok()?
+                .reply()
+                .ok()?
+                .atom,
+        )
     }
 
     fn property32(&self, window: Window, name: &[u8], kind: impl Into<u32>) -> Option<u32> {

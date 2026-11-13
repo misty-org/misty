@@ -1,4 +1,4 @@
-import { File, FileText, Folder, Globe, Plus, Sparkles, Terminal, UserRound } from "lucide-react";
+import { File, FileText, Folder, Globe, Plus, ScrollText, Terminal, UserRound } from "lucide-react";
 import { useEffect, useRef, useState, type KeyboardEvent, type RefObject } from "react";
 import { SkeletonList, SuggestionItem, SuggestionList, Text } from "@/shared/ui";
 import { engineCatalog, mistyEngine, type EngineCatalog } from "../../../engines/enginesApi";
@@ -54,14 +54,6 @@ const mistyCommands: Suggestion[] = [
     name: "plan",
     description: "Switch to Plan and send what follows",
     insert: "/plan ",
-    icon: "command",
-    source: "Misty",
-  },
-  {
-    key: "misty:goal",
-    name: "goal",
-    description: "Set a goal and start working toward it",
-    insert: "/goal ",
     icon: "command",
     source: "Misty",
   },
@@ -204,7 +196,7 @@ const icons = {
   file: File,
   folder: Folder,
   command: Terminal,
-  skill: Sparkles,
+  skill: ScrollText,
   browser: Globe,
   prompt: FileText,
   new: Plus,

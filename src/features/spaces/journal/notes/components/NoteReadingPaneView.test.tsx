@@ -64,15 +64,15 @@ it("does not seed a title before sync or let a viewer edit it", () => {
     listeners.forEach((listener) => listener());
   });
   expect(session.title.toString()).toBe("Remote title");
-  expect(document.activeElement).toBe(screen.getByLabelText("Note title"));
+  expect(document.activeElement).toBe(screen.getByLabelText("Doc title"));
   expect(onRenameHandled).toHaveBeenCalledTimes(1);
-  expect((screen.getByLabelText("Note title") as HTMLInputElement).value).toBe("Remote title");
+  expect((screen.getByLabelText("Doc title") as HTMLInputElement).value).toBe("Remote title");
   session.role = "viewer";
   view.rerender(
     <NoteReadingPaneView runtime={runtime} note={note} loading={false} onNewNote={vi.fn()} />,
   );
-  expect((screen.getByLabelText("Note title") as HTMLInputElement).readOnly).toBe(true);
-  fireEvent.change(screen.getByLabelText("Note title"), { target: { value: "forbidden" } });
+  expect((screen.getByLabelText("Doc title") as HTMLInputElement).readOnly).toBe(true);
+  fireEvent.change(screen.getByLabelText("Doc title"), { target: { value: "forbidden" } });
   expect(session.title.toString()).toBe("Remote title");
   view.unmount();
   awareness.destroy();

@@ -20,8 +20,8 @@ use std::time::Duration;
 use super::cli_lifecycle::{command_for_binary, engine_bin, run_capture, ProcOutput};
 use listings::{list_gallery, list_loose, list_omp};
 use parse::*;
-use parse_more::*;
 pub use parse::{Connector, MarketItem, MarketSource, ShownCommand};
+use parse_more::*;
 
 /// Engines whose CLI lists and installs plugins from marketplaces.
 const ENGINES: &[&str] = &[

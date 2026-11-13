@@ -1,3 +1,4 @@
+import { ChatStart } from "./ChatStart";
 import { needsModelKey } from "../models/ModelKeyNeeded";
 import { openModelSettings } from "../models/modelKeys";
 import { ErrorNotice } from "../conversations/ErrorNotice";
@@ -31,7 +32,7 @@ export function AgentsTaskContent({ state, actions, view }: AgentsTaskContentPro
     draftSeed,
     guard,
   } = state;
-  const { showWorkspace, switcher, disabled } = view;
+  const { showWorkspace, disabled } = view;
   const { create } = actions;
   return (
     <>
@@ -46,12 +47,14 @@ export function AgentsTaskContent({ state, actions, view }: AgentsTaskContentPro
                   : { label: "Retry", onSelect: () => void load(user?.id ?? "") }
               }
             />
-            <AgentConversationHeading
-              workspace={showWorkspace}
-              conversation={conversation}
-              switcher={switcher}
-              disabled={disabled}
-            />
+            {/* In the workspace the studio bar above carries the chat's title. */}
+            {showWorkspace ? null : (
+              <AgentConversationHeading
+                conversation={conversation}
+                agent={profile}
+                disabled={disabled}
+              />
+            )}
             {/* The agent browser shrunk to a picture; clicking it opens the split again. */}
             <AgentBrowserPip
               conversationId={activeConversationId ?? undefined}
@@ -62,6 +65,7 @@ export function AgentsTaskContent({ state, actions, view }: AgentsTaskContentPro
             <AgentWorkspaceConversation
               key={`${user?.id}:${profile?.id}:${conversationSpaceId}:${chatRevision}`}
               agent={profile}
+              conversationId={activeConversationId}
               spaceId={conversationSpaceId}
               accountId={user?.id ?? ""}
               initialDraft={
@@ -70,13 +74,7 @@ export function AgentsTaskContent({ state, actions, view }: AgentsTaskContentPro
               voiceControlRef={voiceRef}
               onVoiceStateChange={setVoiceState}
               onDraftStateChange={guard.setConversationStatus}
-              emptyContent={
-                profile ? (
-                  <div className="agent-studio-welcome">
-                    <h1>What can I do for you?</h1>
-                  </div>
-                ) : undefined
-              }
+              emptyContent={profile ? <ChatStart agent={profile} /> : undefined}
               onCreate={create}
               onNewChat={() => profile && actions.select(profile.id, true)}
             />

@@ -22,7 +22,9 @@ use crate::browser::agent_pages::action_confirm::{ask_tool, Answer, ToolAsk};
 
 use super::bridge::{self, RunNote};
 use super::gate::Decision;
-use super::run_prompt::{save_images, with_browser_hint, with_history, with_teammates};
+use super::run_prompt::{
+    save_files, save_images, with_attached_files, with_browser_hint, with_history, with_teammates,
+};
 use super::{store, support};
 
 /// A live run: the request it started with, and what to tidy when it ends.
@@ -210,7 +212,9 @@ pub(crate) fn install(app: &AppHandle) -> Result<support::EngineState, String> {
 fn note(run_id: &str, note: RunNote) {
     match note {
         RunNote::Session(session) => {
-            let Some(run) = live().get(run_id).map(|run| {
+            // The cursor companion's turn keeps no session for the chat (`start`).
+            let companion = |run: &LiveRun| run.body["mode"].as_str() == Some("companion");
+            let Some(run) = live().get(run_id).filter(|run| !companion(run)).map(|run| {
                 (
                     run.account.clone(),
                     run.conversation.clone(),
@@ -268,8 +272,8 @@ static APP: std::sync::OnceLock<AppHandle> = std::sync::OnceLock::new();
 /// Where an engine works when the chat names no folder: `~/.misty/workspace`, made on first use.
 /// Not `~/.misty` itself, which holds Misty's database and credential store.
 fn default_workspace() -> Result<PathBuf, String> {
-    let home = file_access::paths::misty_home_dir()
-        .ok_or("Misty couldn't find your home folder.")?;
+    let home =
+        file_access::paths::misty_home_dir().ok_or("Misty couldn't find your home folder.")?;
     let folder = home.join("workspace");
     std::fs::create_dir_all(&folder)
         .map_err(|error| format!("Misty couldn't make {}: {error}", folder.display()))?;
@@ -289,11 +293,18 @@ pub(crate) async fn start(app: &AppHandle, run_id: String, body: Value) -> Resul
     // A chat with no linked folder works in Misty's own workspace folder. Only native code picks
     // it, so a page still can't point an engine at a folder the person didn't link.
     let default = named.is_empty();
-    let folder = if default { default_workspace()? } else { PathBuf::from(&named) };
+    let folder = if default {
+        default_workspace()?
+    } else {
+        PathBuf::from(&named)
+    };
     let folder_text = folder.to_string_lossy().into_owned();
     let db = app.state::<MistyRuntime>().environment.store();
     let conversation = body["conversation_id"].as_str().unwrap_or("").to_string();
     let fresh = body["engine"]["fresh"].as_bool() == Some(true);
+    // The cursor companion's turn runs apart from the chat's engine session, so its pointing
+    // rules never stay in what the chat's later turns resume.
+    let companion_turn = body["mode"].as_str() == Some("companion");
     // The folder must be one the person linked themselves: a page can't point an engine elsewhere.
     let (linked, session) = {
         let (db, account, folder, conversation, folder_text, engine) = (
@@ -310,7 +321,9 @@ pub(crate) async fn start(app: &AppHandle, run_id: String, body: Value) -> Resul
             let linked = default
                 || store::is_linked(&db, &account, &folder).unwrap_or(false)
                 || super::multirun::is_worktree(&db, &account, &folder);
-            let session = if fresh {
+            let session = if companion_turn {
+                None
+            } else if fresh {
                 let _ = store::forget_session(&db, &account, &conversation);
                 None
             } else {
@@ -354,6 +367,8 @@ pub(crate) async fn start(app: &AppHandle, run_id: String, body: Value) -> Resul
         Some(note) => format!("{prompt}\n\n{note}"),
         None => prompt,
     };
+    // PDFs and documents are saved as files the engine opens with its own tools.
+    let prompt = with_attached_files(prompt, &save_files(&body["attachments"], &run_id));
     // `/compact` on Oh My Pi is its native compaction call; other engines take the command as
     // text, which their CLI runs itself.
     let native_compact = prompt.trim() == "/compact";

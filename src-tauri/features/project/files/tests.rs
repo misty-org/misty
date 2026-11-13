@@ -70,7 +70,13 @@ fn list_dir_flags_git_ignored_entries_only_when_asked() {
 #[test]
 fn list_dir_leaves_out_the_systems_own_files() {
     let scratch = Scratch::new();
-    let made = [".DS_Store", "Thumbs.db", "Desktop.ini", "main.rs", ".env.local"];
+    let made = [
+        ".DS_Store",
+        "Thumbs.db",
+        "Desktop.ini",
+        "main.rs",
+        ".env.local",
+    ];
     for name in made {
         std::fs::write(scratch.0.join(name), "").unwrap();
     }

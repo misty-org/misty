@@ -103,7 +103,7 @@ describe("SpaceDrawings list layout", () => {
       );
     });
 
-    expect(container.querySelector("h1")?.textContent).toBe("Journal");
+    expect(container.querySelector("h1")?.textContent).toBe("Docs");
     expect(container.querySelector("h1")?.closest(".rounded-2xl")).toBeNull();
     expect(container.textContent).toContain("Pinned sketch");
     expect(container.textContent).toContain("Recent sketch");

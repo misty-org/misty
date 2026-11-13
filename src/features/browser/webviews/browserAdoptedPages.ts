@@ -66,8 +66,3 @@ export function hideAdoptedBrowserPage(runtimeId: string, graceMs = 0): Promise<
     lastBounds.delete(runtimeId);
   });
 }
-
-/** Adopted pages wanted on screen now, which parking and switching leave in place. */
-export function shownAdoptedPages(): string[] {
-  return [...adoptedPages.keys()].filter((id) => desiredVisibleRuntimeIds.has(id));
-}

@@ -47,8 +47,8 @@ export function LeaveDeleteSpaceDialogs({
           </AlertDialogHeader>
           <WhatGoes />
           <p className="m-0 text-sm text-cream-muted">
-            Your public notes, drawings and files stay with the Space. Another member must invite
-            you to come back.
+            Your public docs, drawings and files stay with the Space. Another member must invite you
+            to come back.
           </p>
           {error ? <DangerError message={error} /> : null}
           <AlertDialogFooter>
@@ -120,7 +120,7 @@ function WhatGoes() {
   return (
     <ul className="m-0 list-disc space-y-1 pl-5 text-sm text-cream">
       <li>Agent conversations in this Space</li>
-      <li>Private notes, drawings and files</li>
+      <li>Private docs, drawings and files</li>
       <li>The app accounts picked for this Space</li>
     </ul>
   );

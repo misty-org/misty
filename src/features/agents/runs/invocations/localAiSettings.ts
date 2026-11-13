@@ -1,22 +1,17 @@
 import { invoke } from "@/native/invoke";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import type { AiUserSettings } from "./aiSettingsTypes";
-import type { AiInvocationRequest } from "./invocationTypes";
 
 /**
  * What agents may do on this computer: saved in misty.db, belonging to the
- * device, never sent anywhere. The one thing that isn't a setting here is which Get started steps have
- * been done, kept beside them because it's this computer's too.
+ * device, never sent anywhere.
  */
 
 const scope = "device:agent-settings";
 
-export type OnboardingStep = "page_ask";
-
 interface Stored {
   version: 1;
   settings: Partial<AiUserSettings>;
-  steps: OnboardingStep[];
 }
 
 interface Snapshot {
@@ -25,15 +20,12 @@ interface Snapshot {
 }
 
 const defaults: AiUserSettings = {
-  enabled: true,
   app_actions_ask: false,
   payments_ask: true,
   screen_location: "window",
   agent_block_sensitive: true,
   agent_blocked_sites: [],
   keep_awake_for_agents: true,
-  retention_days: 30,
-  purge_state: "none",
 };
 
 const snapshot = () => invoke<Snapshot>("settings_session_state", { scope });
@@ -48,7 +40,6 @@ async function change(update: (current: Stored) => Stored): Promise<Stored> {
     const next = update({
       version: 1,
       settings: state?.settings ?? {},
-      steps: state?.steps ?? [],
     });
     try {
       await invoke("settings_session_commit", { scope, revision, document: next });
@@ -73,16 +64,4 @@ export async function changeAgentSettings(
     settings: { ...current.settings, ...patch, updated_at: new Date().toISOString() },
   }));
   return { settings: settingsOf(stored) };
-}
-
-/** Get started ticks off what's actually been done here. Never gets in a run's way. */
-export async function noteOnboardingStep(run: AiInvocationRequest): Promise<void> {
-  const step: OnboardingStep | null =
-    run.currentTab || run.context.some((reference) => reference.kind === "browser-tab")
-      ? "page_ask"
-      : null;
-  if (!step) return;
-  await change((current) =>
-    current.steps.includes(step) ? current : { ...current, steps: [...current.steps, step] },
-  ).catch(() => undefined);
 }

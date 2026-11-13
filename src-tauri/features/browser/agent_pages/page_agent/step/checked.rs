@@ -159,9 +159,8 @@ pub(super) async fn run_step_checked(
         "hover" => {
             let input =
                 json!({"kind": "move", "x": prepared["point"]["x"], "y": prepared["point"]["y"]});
-            let moved =
-                cfg!(any(target_os = "macos", target_os = "linux"))
-                    && native(input, prepared.clone()).await?.is_some();
+            let moved = cfg!(any(target_os = "macos", target_os = "linux"))
+                && native(input, prepared.clone()).await?.is_some();
             let mut result =
                 call_at(view, frame, "perform", step_args(document, step), false).await?;
             if moved {

@@ -1,4 +1,4 @@
-//! Download events, destinations and history for browser pages.
+//! Download events and destinations for browser pages, and each tab's own list of them.
 
 use crate::browser::*;
 use file_access::{self, fs};
@@ -64,14 +64,6 @@ pub(in crate::browser) fn handle_download_event(
             file_access::allow_recorded_download(&path);
             *destination = path.clone();
             let record = requested_download(&state, tab_id, &url, &path);
-            if record.initiator == "human" && !tab_is_private(&state, tab_id) {
-                crate::browser::history_downloads::library::download_started(
-                    app,
-                    &record.download_id,
-                    &record.url,
-                    &path,
-                );
-            }
             let _ = app.emit_to(
                 browser_owner_label(app, tab_id),
                 "misty://browser-download",
@@ -86,24 +78,6 @@ pub(in crate::browser) fn handle_download_event(
             if record.success {
                 let _ = app.asset_protocol_scope().allow_file(&record.path);
             }
-            if record.initiator == "human" {
-                crate::browser::history_downloads::library::download_finished(
-                    app,
-                    &record.download_id,
-                    record.success,
-                    record.error.as_deref(),
-                );
-                // Private tabs have no profile store; their downloads stay here.
-                if let (true, Some(kiri::engine::StoreScope::Persistent(store_key))) =
-                    (record.success, session_permission_scope(app, tab_id))
-                {
-                    crate::browser::history_downloads::library::download_into_profile(
-                        app,
-                        store_key,
-                        &record.download_id,
-                    );
-                }
-            }
             let _ = app.emit_to(
                 browser_owner_label(app, tab_id),
                 "misty://browser-download",
@@ -117,15 +91,6 @@ pub(in crate::browser) fn handle_download_event(
 
 const DOWNLOADS_NOT_ALLOWED: &str =
     "Misty needs your OK to save to the Downloads folder. Start the download again to allow it.";
-
-pub(in crate::browser) fn tab_is_private(state: &BrowserSessionState, tab_id: &str) -> bool {
-    state
-        .sessions
-        .lock()
-        .ok()
-        .and_then(|sessions| sessions.get(tab_id).map(|session| session.private))
-        .unwrap_or(false)
-}
 
 pub(in crate::browser) fn emit_download_failure(
     app: &AppHandle,
@@ -148,12 +113,6 @@ pub(in crate::browser) fn emit_download_failure(
         file: None,
         error: Some(error.to_owned()),
     };
-    crate::browser::history_downloads::library::download_failed(
-        app,
-        &record.download_id,
-        &record.url,
-        error,
-    );
     if let Ok(mut sessions) = state.sessions.lock() {
         let downloads = &mut sessions.entry(tab_id.to_owned()).or_default().downloads;
         downloads.push(record.clone());

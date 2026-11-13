@@ -43,13 +43,27 @@ export function agentChatRoute(agentId: string, conversationId?: string, fresh =
   return `/agents?${params}`;
 }
 
-/** Starts a new chat with the agent last used here, or one on the person's engines. */
-export function openNewChat(onOpen: (view: WorkspaceView) => void) {
+/** A new chat with the agent last used here, or one on the person's engines. */
+function newChatRoute() {
   const { agents, selected } = usePersonalAgentsStore.getState();
   const agent =
     agents.find((item) => item.id === selected.global && item.enabled && !item.system_managed) ??
     agents.find((item) => item.engine && item.enabled) ??
     agents.find((item) => item.system_managed) ??
     agents[0];
-  openWorkspaceRoute(agent ? agentChatRoute(agent.id, undefined, true) : "/agents", onOpen);
+  return agent ? agentChatRoute(agent.id, undefined, true) : "/agents";
+}
+
+/** Starts a new chat in the focused pane. */
+export function openNewChat(onOpen: (view: WorkspaceView) => void) {
+  openWorkspaceRoute(newChatRoute(), onOpen);
+}
+
+/** Opens a new tab on a new chat, not on whichever chat Agents last showed. */
+export function openNewTab(onOpen: (view: WorkspaceView) => void) {
+  const workspace = useWorkspaceStore.getState();
+  const view = workspace.newTab();
+  const route = newChatRoute();
+  workspace.updateViewRoute(view.id, route, true);
+  onOpen({ ...view, route });
 }

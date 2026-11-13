@@ -23,8 +23,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 mod config;
-pub mod launch;
-pub mod lazy;
 pub mod probe;
 pub mod runtime;
 mod sources;
@@ -145,11 +143,6 @@ pub struct McpConfigEntry {
     pub(crate) readonly_reason_code: Option<String>,
     /// The file's content hash when read; a write reads it again and refuses on a mismatch.
     pub(crate) version: String,
-    /// How it starts (launch.rs): `eager` with the session, `onDemand` on its first call.
-    pub(crate) launch_mode: String,
-    /// Why it can't start on demand (engine | transport | workspace_file | workspace_env |
-    /// project_trust | name | shadowed); None when it can.
-    pub(crate) launch_mode_unsupported: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -231,16 +224,6 @@ pub struct McpSetEnabledRequest {
     pub(crate) workspace: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct McpSetLaunchModeRequest {
-    pub(crate) entry_id: String,
-    /// `eager` | `onDemand`
-    pub(crate) mode: String,
-    #[serde(default)]
-    pub(crate) workspace: Option<String>,
-}
-
 fn person_window(webview: &tauri::Webview) -> Result<(), McpError> {
     if crate::browser::app_windows::is_person_window(webview.label()) {
         Ok(())
@@ -280,7 +263,6 @@ fn inventory(workspace: Option<&str>) -> McpInventory {
     // The other engines' declared sources (Kimi, Grok, OMP, OpenCode, Antigravity, Qoder, dsh)
     // join the same list, then each engine's tab takes its own.
     sources::append_entries(&mut config, workspace);
-    launch::annotate(&mut config, workspace);
     let collected_at = now_ms();
 
     let by_engine = |engine: &str, available: bool, runtime: McpRuntimeSection| {
@@ -368,39 +350,6 @@ pub async fn engine_mcp_set_enabled(
     .await
 }
 
-/// Changes how one entry starts. Only Misty's own setting is written, never the CLI's config.
-#[tauri::command]
-pub async fn engine_mcp_set_launch_mode(
-    webview: tauri::Webview,
-    request: McpSetLaunchModeRequest,
-) -> Result<McpConfigEntry, McpError> {
-    person_window(&webview)?;
-    blocking(move || {
-        let workspace = validate_workspace(request.workspace.as_deref())?;
-        let mut section = read_config_entries(workspace.as_deref());
-        sources::append_entries(&mut section, workspace.as_deref());
-        let entry = section
-            .entries
-            .iter()
-            .find(|entry| entry.id == request.entry_id)
-            .cloned()
-            .ok_or_else(|| McpError::not_found("MCP entry not found"))?;
-        launch::write_mode(
-            &entry,
-            &section.entries,
-            &request.mode,
-            workspace.as_deref(),
-        )?;
-        launch::annotate(&mut section, workspace.as_deref());
-        section
-            .entries
-            .into_iter()
-            .find(|entry| entry.id == request.entry_id)
-            .ok_or_else(|| McpError::not_found("MCP entry not found"))
-    })
-    .await
-}
-
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct McpRevealRequest {
@@ -425,12 +374,15 @@ pub async fn engine_mcp_reveal(
         let wanted = request.path.trim();
         let mut entries = read_config_entries(workspace);
         sources::append_entries(&mut entries, workspace);
-        let listed = crate::engines::support::config::ENGINES.iter().any(|engine| {
-            config::engine_source_infos(engine, workspace)
-                .into_iter()
-                .chain(sources::engine_source_infos(engine, workspace))
-                .any(|info| info.path == wanted)
-        }) || entries.entries.iter().any(|entry| entry.path == wanted);
+        let listed = crate::engines::support::config::ENGINES
+            .iter()
+            .any(|engine| {
+                config::engine_source_infos(engine, workspace)
+                    .into_iter()
+                    .chain(sources::engine_source_infos(engine, workspace))
+                    .any(|info| info.path == wanted)
+            })
+            || entries.entries.iter().any(|entry| entry.path == wanted);
         if wanted.is_empty() || !listed {
             return Err(McpError::invalid("That file isn't one this page lists."));
         }
@@ -438,9 +390,14 @@ pub async fn engine_mcp_reveal(
         if file_access::fs::is_file(&path) {
             return Ok((path, true));
         }
-        match path.parent().filter(|parent| file_access::fs::is_dir(parent)) {
+        match path
+            .parent()
+            .filter(|parent| file_access::fs::is_dir(parent))
+        {
             Some(parent) => Ok((parent.to_path_buf(), false)),
-            None => Err(McpError::not_found("Neither the file nor its folder exists yet.")),
+            None => Err(McpError::not_found(
+                "Neither the file nor its folder exists yet.",
+            )),
         }
     })
     .await?;

@@ -2,7 +2,7 @@
 // See NOTICE.
 
 /**
- * MCP check results, in memory only and shared by the settings block and the `/mcp` panel.
+ * MCP check results, in memory only, for the settings block.
  *
  * Apart from `useMcpInventory`'s runtime section: that is what a CLI session reported itself,
  * while this is a check **Misty ran**. The rules:
@@ -162,17 +162,12 @@ export const useMcpProbeStore = create<McpProbeStore>((set, get) => {
 });
 
 /**
- * Entries checked on their own when the page opens: on, checkable, starting with the session,
- * and in the person's own file. Folder config (`workspaceFile`) may come with a repository and a
- * check really runs its commands, so it never runs on its own; on-demand entries don't either
- * (starting them when the page opens is just what on demand avoids). Both can still be checked
- * by hand.
+ * Entries checked on their own when the page opens: on, checkable and in the person's own file.
+ * Folder config (`workspaceFile`) may come with a repository and a check really runs its commands,
+ * so it never runs on its own; it can still be checked by hand.
  */
 export function autoProbeEligible(entries: McpConfigEntry[]): McpConfigEntry[] {
-  return entries.filter(
-    (entry) =>
-      entry.enabled && probeable(entry) && entry.launchMode !== "onDemand" && !entry.workspaceFile,
-  );
+  return entries.filter((entry) => entry.enabled && probeable(entry) && !entry.workspaceFile);
 }
 
 /**

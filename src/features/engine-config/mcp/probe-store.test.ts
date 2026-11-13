@@ -174,9 +174,8 @@ describe("probe store", () => {
       command: "powershell",
     });
     expect(autoProbeEligible([user, repo])).toEqual([user]);
-    // Disabled and on-demand entries stay out as before.
+    // Disabled entries stay out as before.
     expect(autoProbeEligible([entry({ enabled: false })])).toEqual([]);
-    expect(autoProbeEligible([entry({ launchMode: "onDemand" })])).toEqual([]);
   });
 
   it("asks before probing a workspace server and does nothing when declined", async () => {

@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { AgentDeviceSnapshot, PreparedAgentDocument } from "./agentScope";
+import { useConversationFolder } from "../shared-folders/useConversationFolder";
 
 export async function agentsDeviceSnapshot(): Promise<AgentDeviceSnapshot> {
   return invoke<AgentDeviceSnapshot>("agents_device_snapshot");
@@ -30,28 +31,13 @@ export function adoptFolderChanges(from: string, chat: string): Promise<void> {
 }
 
 export async function shareFolder(): Promise<{ id: string; displayName: string } | null> {
-  const result = await invoke<{ id: string; displayName: string } | null>("agents_share_folder");
-  await republishDeviceFolders();
-  return result;
+  return invoke<{ id: string; displayName: string } | null>("agents_share_folder");
 }
 
 /** Stops sharing a folder. The folder and its files stay. */
 export async function forgetFolder(scopeId: string): Promise<void> {
   await invoke("agents_forget_folder", { scopeId });
-  await republishDeviceFolders();
-  const { useConversationFolder } = await import("../shared-folders/useConversationFolder");
   useConversationFolder.getState().forget(scopeId);
-}
-
-/** This device's signed policy lists its shared folders (names only, never
- * paths) so the person's other devices can offer them to agents. */
-export async function republishDeviceFolders(): Promise<void> {
-  const { deviceAccount } = await import("./useAgentDeviceStore");
-  const { devicesNative } = await import("@/features/devices/api/native-devices");
-  // Signed out or offline there's nobody to tell, and the folder is shared here all the same.
-  await deviceAccount()
-    .then((account) => devicesNative.publishFolders(account))
-    .catch(() => {});
 }
 
 export async function agentsPrepareScopedDocument(

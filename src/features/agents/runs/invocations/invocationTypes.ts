@@ -1,6 +1,5 @@
 import type { DisplayCapture } from "../../tutor/cursor/protocol";
 import type { LessonPayload, LessonSummaryPayload } from "../../tutor/lessons/lessonTypes";
-import type { MediaContext } from "../../tutor/cursor/mediaContext";
 
 import type { AiInvocationState } from "./invocationEventTypes";
 
@@ -13,9 +12,8 @@ export interface ScreenRequest {
   kind: "open" | "look" | "desktop";
   url?: string;
   reason: string;
-  /** current: the user's tab; window: a new tab in their window. "separate" (the retired agent
-   * window) opens a new tab too. */
-  location: "current" | "separate" | "window" | "ask";
+  /** window: a new tab in the person's window; ask: wait for the card. */
+  location: "window" | "ask";
   /** The user named where to work; otherwise a matching open tab is reused first. */
   chosen?: boolean;
   /** Client progress: waiting for a choice, opening, or done. */
@@ -133,17 +131,6 @@ export interface AiSuggestedAction {
   trigger?: AiTrigger;
   requestedArtifactKind?: AiArtifactKind;
 }
-export type MistyPresencePhase =
-  "home" | "following" | "composing" | "working" | "speaking" | "awaiting_approval" | "returning";
-export interface MistySpeech {
-  id: string;
-  kind: "status" | "reply" | "error" | "clarification";
-  text: string;
-  fullText?: string;
-  conversationId?: string;
-  createdAt: string;
-  persistent?: boolean;
-}
 export interface MistyApprovalPrompt {
   artifact: AiArtifact;
   title: string;
@@ -233,8 +220,6 @@ export interface AiInvocationRequest {
   /** A Teach turn's lesson and the paused lessons it may resume, kept on this device. */
   lesson?: LessonPayload;
   lessonIndex?: LessonSummaryPayload[];
-  /** What the video in front was saying, for a question at the cursor. */
-  mediaContext?: MediaContext;
   /** Ask or Auto for this turn. Omitted uses the chat's choice or its agent's default. */
   permissionMode?: "ask" | "auto" | "bypass";
   /** Screen and input control for an outside engine, which the person turned on for this send. */

@@ -7,9 +7,7 @@ export type AiInvocationState =
   | "queued"
   | "running"
   | "awaiting_approval"
-  | "awaiting_device"
   | "awaiting_intervention"
-  | "awaiting_timer"
   | "completed"
   | "failed"
   | "canceled";

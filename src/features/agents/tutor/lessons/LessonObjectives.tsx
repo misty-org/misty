@@ -30,7 +30,6 @@ async function startNextLesson(courseId: string, index: number, title: string, g
       `Start the next lesson of the course: ${title}.${goal ? ` ${goal}` : ""}`,
       [],
       undefined,
-      "workspace",
       [],
       { conversationId, context: [] },
       { executionMode: "user", collaborationMode: "teach" },

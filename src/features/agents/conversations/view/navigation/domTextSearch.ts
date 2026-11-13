@@ -1,7 +1,7 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 /**
- * DOM text-search primitives for searching inside a chat. By default matches are case-insensitive, literal and
- * non-overlapping, in document order — the same contract as the browser's own
+ * DOM text-search primitives for searching inside a chat and in the editor's Markdown preview.
+ * By default matches are case-insensitive, literal and non-overlapping, in document order — the same contract as the browser's own
  * find counter. Case, whole-word and regexp matching are options.
  *
  * Callers turn the node/offset pairs into Ranges: highlights go through the

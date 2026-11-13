@@ -10,6 +10,7 @@ import {
   RefreshCw,
   RotateCcw,
   ShieldCheck,
+  Signpost,
 } from "lucide-react";
 import { routes } from "@/app/shell";
 import { useState } from "react";
@@ -130,10 +131,20 @@ export function SupportRecoverySection({ onClose }: { onClose?: () => void } = {
   return (
     <>
       <SupportSectionBlock
-        title="Setup"
-        description="Install and sign in to your AI again, or connect more apps."
+        title="Getting started"
+        description="Take the tour again, or install and sign in to your AI again."
       >
         <div className="grid gap-px bg-charcoal-border">
+          <RecoveryAction
+            icon={Signpost}
+            title="Show me around"
+            detail="A short tour of the page you're on, or of Misty as a whole from a chat."
+            action="Start tour"
+            onClick={() => {
+              onClose?.();
+              window.dispatchEvent(new CustomEvent("misty:start-tour", { detail: "here" }));
+            }}
+          />
           <RecoveryAction
             icon={Compass}
             title="Run setup again"

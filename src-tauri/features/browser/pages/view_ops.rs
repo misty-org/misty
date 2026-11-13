@@ -72,19 +72,6 @@ pub async fn browser_webview_navigate(
     request: BrowserNavigateRequest,
 ) -> Result<(), String> {
     let url = external_url(&request.url)?;
-    let state = app.state::<BrowserSessionState>();
-    {
-        let mut sessions = state
-            .sessions
-            .lock()
-            .map_err(|_| "Browser session is unavailable.")?;
-        let session = sessions
-            .get_mut(&request.id)
-            .ok_or("Browser session is unavailable.")?;
-        session.oauth_callback = request
-            .oauth_callback
-            .map(|callback| (callback, std::time::Instant::now()));
-    }
     with_webview(&app, &request.id, |webview| {
         webview.navigate(url).map_err(|e| e.to_string())
     })

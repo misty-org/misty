@@ -294,6 +294,72 @@ the drawing shows. Filming has never been run against Google.
 
 Left: a notebook shared with a Space as a live notebook rather than a note.
 
+## Decisions of 2026-11-12: the Lab, the person's own place
+
+Misty serves people, businesses and developers, and lets someone move between them: a question
+becomes a notebook, a notebook is shared into a Space, a Space's agents show in the Studio. One
+sign-in to an engine carries across all of it.
+
+- **Names.** Tutor's section is the **Lab** (a flask in the sidebar), the place to learn, research
+  and do personal work with agents; what it holds are notebooks. A Space shows a galaxy. "Tutor"
+  stays the name of the cursor companion inside it. A Space's Journal is **Docs** and its notes
+  are docs, because they are shared and edited together. Done first as what people see and the
+  route and pin IDs; the code folders, `tutor_*` commands, stored keys and the
+  server's `/notes` follow later, in both repositories at once.
+- **Topics.** The Lab's home offers common research topics (Finance, Marketing, Business,
+  Technology and AI, Science, Health, Law and policy, Study). A topic is a setup, not a feature:
+  questions to start from, what the agent looks for first, and what the notebook offers to make.
+  Starting from one makes an ordinary notebook. Verticals never get sections of their own.
+- **Following.** Any notebook can follow the news on its subject (its ⋯ menu). Each time it opens,
+  or on "Look for news now", recent stories come in through the person's search key (Serper or
+  Decodo, kind `news`, `notebook_news`) and land as dated sources the agent cites. No background
+  schedule.
+- **Finance is only a topic.** Prices, charts and a market data key were built and taken out the
+  same day: there is no dependable keyless source of stock prices (Google and Yahoo license theirs
+  and offer no public API; Twelve Data and Alpha Vantage need a key each person gets), and a key is
+  too much to ask of people here to learn. Not to be picked up again unless the person asks.
+- **Never.** Trading, buy or sell advice, live tickers or watchlists.
+- **Tutor is a switch, not a place.** It works anywhere on the desktop while Misty runs, so it
+  isn't in the Lab or any page. It's turned on and off from the menu bar (Tutor, checked while
+  on; "Set up Tutor…" until it has a model with a key; Tutor settings), which the main window keeps
+  in step (`cursor_companion_tray`, `tutorTray.ts`). Its setup is Settings › Tutor: Misty's sprite,
+  what Tutor is doing and its switch, then the Tutor model and its key (the one required step),
+  the optional voice keys (Soniox to hear, ElevenLabs to talk back) and how it behaves.
+
+## Decisions of 2026-11-12 (afternoon): someone who knows nothing about AI
+
+The test for the beta: a friend who has never used AI or code makes Misty their daily driver, and
+people learn from each other in it. Decided with the person:
+
+- **Never ask anyone to buy anything.** Setup is "Pick an AI to start with" and leads with the two
+  free ones: Antigravity (Google's CLI, free on any Google account; Gemini CLI stopped taking
+  personal accounts on 2026-06-18 and waits under More) and OpenCode (its free models, no account).
+  Codex and Claude Code follow, each saying which account it uses.
+- **No terminal to type into.** Antigravity and OpenCode install through their makers' own
+  installers (no Node.js); first-run installs start at once and fold the commands and the
+  installer's terminal under Show details. Sign-in says in a sentence what to do in the browser.
+  Antigravity has no status command, so a sign-in Misty watched finish counts
+  (`cli_signed_in_here`, never synced); on Linux its token file's presence does.
+- **No dead end.** With no engine and no model key, an empty chat offers setup instead of a
+  failing first message; otherwise it shows starter ideas that fill the composer, unsent.
+- **Misty Cloud by default.** Signing in is one Continue with Misty Cloud button; the person's own
+  server is a quiet second choice. The UI says Misty Cloud, not Misty Pro, for the server.
+- **Tours.** A shared `Tour` (`src/shared/ui/overlays/Tour.tsx`) and `TourHost`
+  (`onboarding/tours`): the welcome tour the first time the chat opens after setup, then each
+  page's own (Space, Lab, Studio, Integrations) the first time it opens. Show me around (account
+  menu, Help) replays the page's tour. Seen tours are kept per device. Space home has a Get started
+  list that ticks itself off from what really happened. The Lab is pinned in the sidebar by default.
+- **No chat sharing.** Chats stay on the device.
+- **Notebooks shared live.** A Lab notebook's menu shares it with the window's Space, after a
+  confirm that says who will see it: it becomes a doc titled "Notebook: …" (overview, sources with
+  their summaries, notes; never a source's full text) that is rewritten as the notebook changes,
+  until Stop sharing. Others see it under "Shared in <Space>" on the Lab's home and can save it into
+  their own Lab, where its links become sources their own AI reads again.
+
+Not yet seen in the running app: any of the above (the native app didn't build while another
+session was mid-change in the same checkout), a real Antigravity or OpenCode install and sign-in,
+and a notebook shared between two accounts.
+
 ## Memory
 
 Removed 2026-11-11, too much to maintain for the beta: engines keep their own memory. Gone are the
@@ -331,7 +397,6 @@ running app yet, and nothing is committed.
 | 3 Panels | Files with an editor, changes with step-by-step diffs and commit, terminal, in a panel beside the chat (`agents/context-panel`, `src-tauri/features/project`) | Preview with element picking; branches and history in the changes panel |
 | 4 Space for engines | Local MCP server (`engines/mcp.rs`) offering the Space's tools and `ask_misty`, through the same journal and gate as Misty's own agent; handed to all three engines | Unverified end to end; a "save to Space" tool for a file in the folder |
 | 5 Space home | Agents and what each is doing at the top of home; Happening now cards; each run's steps, page pictures and playback in its chat (`agents/activity`, `run_control/run_steps.rs`); activity log on a shared Space. The Space Activity page was removed (2026-11-11): chats already show it | Waiting-for-you items, recent chats, linked folders and cost on home; the activity views not yet watched in the running app |
-| 6 Human browsing | Nothing deleted | Every deletion, each to be confirmed |
 | 7 Virtual view | Studio in 2D and 3D on the Agents page, with teammates' agents | Not a Space page of its own |
 
 ## What already exists
@@ -512,18 +577,7 @@ OpenChamber's dashboard is the model: status, approvals and cost across the Spac
 
 Only after phases 1 to 5 are in use.
 
-- Keep: kiri, hidden agent tabs, `AgentBrowser`, take over, sign-in state, and whatever the
-  `browser.*` tools need.
-- Candidates to delete: omnibox, favorites, history, downloads UI, bars auto-hide, now playing,
-  peek, pinned tabs, default-browser registration, extensions, password and card autofill,
-  browser-data sync (`sync/browser_data`).
-- This is the one phase that removes a lot of code, so each item is confirmed before it goes.
-  Check first whether agents drive the person's visible tabs (`browser.workspace.*`,
-  `runs/jobs/workspaceAutopilot.ts`); that wasn't settled when this was written.
-
-## Phase 7: virtual view
-
-After the ccgui port. A new view of a Space, next to home and chat, drawn from the same state:
+- Kee home and chat, drawn from the same state:
 agents, their status from run events, and who is waiting on the person.
 
 - **2D first**: a flat room, one figure per agent, clicking one opens its chat.

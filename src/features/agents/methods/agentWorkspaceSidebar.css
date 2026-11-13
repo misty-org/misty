@@ -7,75 +7,17 @@
   height: 100%;
   container: agent-studio / inline-size;
 }
-.agent-studio-sidebar {
-  position: relative;
-  /* The chosen width (dragged at the trailing edge), never more than 40% of the studio. */
-  width: min(var(--agent-studio-sidebar-width, 240px), 40cqw);
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  padding: 8px;
-  border-right: 1px solid var(--color-charcoal-border);
-  background: var(--color-charcoal-sidebar);
-}
-.agent-studio-sidebar > header {
-  display: flex;
+/* The chat's agent hugs its name; only the name gives way in a narrow bar, the avatar stays whole. */
+.agent-studio-identity {
+  display: inline-flex;
+  flex: 0 1 auto;
   align-items: center;
   gap: 8px;
-  min-height: 36px;
-  margin-bottom: 4px;
-}
-/* Where the sidebar meets the native window buttons, the identity drops below them
-   (like a Space's title row) rather than squeezing beside them in a narrow sidebar. */
-.agent-studio-sidebar > header[data-window-chrome="true"] {
-  padding-left: 0 !important;
-  padding-right: 0 !important;
-  padding-top: calc(var(--shell-titlebar, 38px) - 8px);
-}
-/* Row, label and icon sizes come from the shared --misty-sidebar-* metrics (App.css). */
-/* The switcher hugs its name instead of spanning the sidebar. */
-.agent-studio-identity {
-  flex: 0 0 auto;
-  /* Only the name gives way in a narrow sidebar; the avatar and chevron stay whole. */
   min-width: 0;
   max-width: 100%;
-  height: auto;
   min-height: 36px;
-  justify-content: flex-start;
   padding: 4px 8px 4px 4px;
-  font-size: 15px;
-  font-weight: 600;
 }
-.agent-studio-sidebar .agent-avatar {
-  width: 30px;
-  height: 30px;
-  flex-shrink: 0;
-}
-.agent-studio-sidebar nav {
-  display: grid;
-  gap: 4px;
-}
-.agent-studio-sidebar nav > button {
-  width: 100%;
-  height: var(--misty-sidebar-row-height);
-  min-height: var(--misty-sidebar-row-height);
-  gap: 10px;
-  padding: 0 var(--misty-sidebar-row-padding);
-  font-size: var(--misty-sidebar-label-size);
-  font-weight: 400;
-}
-.agent-studio-sidebar button[aria-current="page"] {
-  background: var(--color-charcoal-active);
-  color: var(--color-cream-bright);
-}
-.agent-studio-sidebar button > svg {
-  flex-shrink: 0;
-  width: var(--misty-sidebar-icon-size);
-  height: var(--misty-sidebar-icon-size);
-}
-.agent-studio-sidebar button > span {
-  min-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+.agent-studio-identity .agent-avatar {
+  flex: none;
 }

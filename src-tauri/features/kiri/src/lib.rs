@@ -1,8 +1,7 @@
 //! Kiri (霧, "mist") is Misty's native web platform layer.
 //!
 //! OS webviews (WKWebView, WebView2, WebKitGTK) supply an engine, but not the
-//! browser layer Chromium and Gecko build above theirs: permissions, WebAuthn,
-//! device APIs. Kiri supplies that layer from Rust. Each
+//! browser layer Chromium and Gecko build above theirs, such as WebAuthn. Kiri supplies that layer from Rust. Each
 //! capability presents a web API to the page through a thin shim and does the
 //! real work natively, behind one envelope check and one gate.
 
@@ -16,7 +15,6 @@ pub mod capabilities;
 pub mod channel;
 #[cfg(feature = "tauri")]
 pub mod engine;
-pub mod permissions;
 #[cfg(feature = "tauri")]
 mod plugin;
 
@@ -24,7 +22,7 @@ pub use capabilities::{Call, Capability, Reply};
 pub use envelope::Request;
 pub use error::KiriError;
 pub use gate::Caller;
-pub use host::{Host, Signal};
+pub use host::Host;
 #[cfg(feature = "tauri")]
 pub use plugin::init;
 
@@ -79,12 +77,6 @@ impl Kiri {
             return Err(KiriError::security(format!(
                 "{} requires a secure context.",
                 request.cap
-            )));
-        }
-        if capability.needs_permission() && !self.host.allows(&caller, capability.name()) {
-            return Err(KiriError::not_allowed(format!(
-                "{} was not allowed for {}.",
-                request.cap, caller.origin
             )));
         }
         capability

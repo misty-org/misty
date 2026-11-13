@@ -758,6 +758,16 @@ const MIGRATIONS: &[&str] = &[
      DROP TABLE IF EXISTS memory_embed_leases;
      DELETE FROM agent_chats
          WHERE kind IN ('workflow_method', 'workflow_schedule', 'workflow_replay', 'workflow_vector');",
+    // 36: what nothing reads any more: extensions' install journal, removals and approvals, memory's
+    // vectors, websites' camera, microphone and location choices (websites never get them now),
+    // and the downloads list and browsing history a person's own tabs kept.
+    "DROP TABLE IF EXISTS extension_journal;
+     DROP TABLE IF EXISTS extension_removals;
+     DROP TABLE IF EXISTS extension_approvals;
+     DROP TABLE IF EXISTS memory_vectors;
+     DROP TABLE IF EXISTS site_permissions;
+     DROP TABLE IF EXISTS downloads;
+     DROP TABLE IF EXISTS visits;",
 ];
 
 #[derive(Debug, Clone)]

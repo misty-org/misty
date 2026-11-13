@@ -150,7 +150,7 @@ pub(crate) const COMPUTER_ACTS: &[&str] = &[
 /// Whether a tool is allowed by the run's list. The tools a run needs to talk to the person and
 /// to report are never left out.
 fn allowed_by_list(facts: &RunFacts, name: &str) -> bool {
-    const ALWAYS: &[&str] = &["conversation.ask_user", "goal.update", "log.work.write"];
+    const ALWAYS: &[&str] = &["conversation.ask_user", "log.work.write"];
     facts.allowed_tools.is_empty()
         || ALWAYS.contains(&name)
         || facts.allowed_tools.iter().any(|allowed| {
@@ -256,8 +256,9 @@ pub(crate) fn decide(facts: &RunFacts, taint: &Taint, name: &str, input: &Value)
     if computer && !facts.computer_use {
         return Decision::Refuse {
             code: "computer_use_off",
-            message: "Screen control is off for this message. The person turns it on when they send."
-                .to_owned(),
+            message:
+                "Screen control is off for this message. The person turns it on when they send."
+                    .to_owned(),
         };
     }
     if facts.planning && COMPUTER_ACTS.contains(&name) {

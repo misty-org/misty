@@ -115,14 +115,6 @@ vi.mock("@/features/browser/webviews/BrowserRuntimeBridge", async (importOrigina
   ...(await importOriginal<Record<string, unknown>>()),
   BrowserRuntimeBridge: () => null,
 }));
-vi.mock("@/features/browser/webviews/browserRuntime", async (importOriginal) => ({
-  ...(await importOriginal<Record<string, unknown>>()),
-  setBrowserWebviewsSuspended: vi.fn(),
-  setBrowserPointerTrackingEnabled: vi.fn(),
-  isBrowserRuntimeCreated: vi.fn(() => false),
-  onBrowserRuntimeClose: vi.fn(() => () => {}),
-  windowChromeChangedEvent: "misty:window-chrome-changed",
-}));
 vi.mock("@/features/app-windows/page-runtime/browserOverlayRuntime", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   setBrowserWebviewsSuspended: vi.fn(),
@@ -149,7 +141,6 @@ vi.mock("@/features/agents", async (importOriginal) => {
 import { SavedAccountSessionUnavailableError } from "@/features/account/sessions/sessionErrors";
 import SignIn from "@/features/account/pages/SignInPage";
 import { notifyAccountScopeReset } from "@/features/account/sessions/accountEvents";
-import { useNavigationNames } from "@/features/app-windows/navigation-names/store";
 import { useSettingsStore } from "@/features/settings";
 import { useMistyPanelStore } from "@/features/agents";
 import { NoticeViewport } from "@/shared/ui";
@@ -169,8 +160,7 @@ describe("DesktopLayout on Auth Routes", () => {
     mocks.user = null;
     vi.clearAllMocks();
     vi.spyOn(useSettingsStore.getState(), "updateSetting").mockImplementation(() => {});
-    useNavigationNames.setState({ account: "", ready: false, names: {}, error: null });
-    useMistyPanelStore.setState({ open: false });
+    useMistyPanelStore.setState({ chatOpen: false });
   });
 
   afterEach(async () => {

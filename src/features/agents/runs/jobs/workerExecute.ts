@@ -1,9 +1,7 @@
 import { devicesNative } from "@/features/devices";
 import { executeBrowserJob } from "./browserJobRun";
 import { deviceAgentOperations, runDeviceAgentOperation } from "../../personal/deviceAgentTools";
-import { agentsPrepareScopedDocument } from "../../personal/useAgentsStore";
 import { DeviceOperationNotAttempted, type ClaimedWorkflowNodeJob } from "./workerBrowserJobs";
-import { deviceContentReference } from "./workerDeviceJobs";
 
 /** Runs one claimed job on this computer, after checking the grant the asking device signed. */
 export async function executeWorkflowNodeOnDevice(
@@ -41,46 +39,7 @@ export async function executeWorkflowNodeOnDevice(
   if (deviceAgentOperations.has(job.operation)) {
     return runDeviceAgentOperation(job, signal);
   }
-  if (job.operation !== "read_content") {
-    throw new Error(`unsupported_device_operation:${job.operation}`);
-  }
-  return readDeviceContent(job, signal);
-}
-
-/** Reads one file in a folder the run was granted, as sections the agent can cite. */
-async function readDeviceContent(job: ClaimedWorkflowNodeJob["job"], signal: AbortSignal) {
-  const ref = deviceContentReference(job.input, job.scopeId);
-  const document = await agentsPrepareScopedDocument(
-    { scopeId: ref.scopeId, relativePath: ref.relativePath },
-    signal,
-  );
-  const content = {
-    sourceKind: ref.sourceKind || "local_file",
-    providerId: ref.providerId || "device",
-    resourceId: ref.resourceId || `${ref.scopeId}:${ref.relativePath}`,
-    version: ref.version || "",
-    fingerprint: ref.fingerprint || "",
-    mimeType: document.mimeType,
-    displayName: document.displayName,
-    locator: ref.relativePath,
-    permissionScope: ref.scopeId,
-  };
-  return {
-    content,
-    sections: document.sections.map((section) => ({
-      kind: section.kind,
-      locator: section.locator,
-      text: section.text,
-    })),
-    citations: document.sections.map((section) => ({
-      content,
-      kind: section.kind,
-      locator: section.locator,
-      excerpt: section.text.slice(0, 240),
-    })),
-    truncated: document.truncated,
-    sourceChanged: false,
-  };
+  throw new Error(`unsupported_device_operation:${job.operation}`);
 }
 
 /** Settles with the operation, or rejects as soon as the signal aborts. */

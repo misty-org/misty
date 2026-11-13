@@ -1,29 +1,17 @@
-//! Closing a popup: when its page asks to, and when no tab adopted it in time.
+//! Closing a download popup: when its page asks to, and when the agent's wait for its file is over.
 use super::*;
 
-/// A popup no tab adopted is dropped after a while, with its session and token.
-/// Export popups may wait longer, for the download the source expects.
-pub(super) fn expire_unadopted(app: &AppHandle, id: String, label: String, agent_download: bool) {
+/// A download popup closes, with its session and token, once the agent's bounded wait for its file
+/// is over. Export popups may spend time generating a file before it downloads.
+pub(super) fn close_after_download_wait(app: &AppHandle, id: String) {
     let cleanup_app = app.clone();
     tauri::async_runtime::spawn(async move {
-        // Export popups may spend time generating a file before it downloads.
-        // Keep the view alive through the source's bounded download wait.
-        tokio::time::sleep(Duration::from_secs(if agent_download { 100 } else { 30 })).await;
-        let state = cleanup_app.state::<BrowserSessionState>();
-        let pending = state
-            .pending_popups
-            .lock()
-            .map(|mut pending| pending.remove(&id))
-            .unwrap_or(false);
-        if pending {
-            if let Ok(mut sessions) = state.sessions.lock() {
-                sessions.remove(&id);
-            }
-            forget_shortcut_token(&state, &id);
-            if let Some(window) = cleanup_app.get_webview_window(&label) {
-                let _ = window.destroy();
-            }
-        }
+        tokio::time::sleep(Duration::from_secs(100)).await;
+        let _ = close_browser_webview(
+            cleanup_app.clone(),
+            cleanup_app.state::<BrowserSessionState>(),
+            BrowserWebviewIdRequest { id },
+        );
     });
 }
 

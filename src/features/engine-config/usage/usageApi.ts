@@ -74,13 +74,6 @@ export interface UsagePriceInfo {
   models: number;
 }
 
-export interface UsageScanProgress {
-  done: number;
-  total: number;
-  engine: string;
-  finished: boolean;
-}
-
 export interface LimitWindow {
   id: string;
   kind: "session" | "weekly" | "other";
@@ -115,30 +108,6 @@ export interface ProviderLimits {
 
 export interface LimitsResult {
   providers: ProviderLimits[];
-}
-
-export interface UsageTotals {
-  requests: number;
-  input: number;
-  output: number;
-  cacheRead: number;
-  cacheWrite: number;
-  /** Every token counted: input, output and both cache kinds. */
-  tokens: number;
-  cost: number;
-  /** Some usage had no known price, so `cost` is a lower bound. */
-  unpriced: boolean;
-}
-
-export interface UsageSummary {
-  todayDate: string;
-  today: UsageTotals;
-  /** Today and the six days before it. */
-  week: UsageTotals;
-  engines: { engine: string; totals: UsageTotals }[];
-  limits: ProviderLimits[];
-  scannedAt: number | null;
-  scanning: boolean;
 }
 
 const DATE_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
@@ -186,8 +155,6 @@ export const queryUsage = (query: UsageQuery) =>
 
 export const usageSources = () => invoke<UsageSource[]>("engine_usage_sources");
 
-export const refreshUsage = () => invoke<UsageScanSummary>("engine_usage_refresh");
-
 export const rescanUsage = () => invoke<UsageScanSummary>("engine_usage_rescan");
 
 export const usagePrices = () => invoke<UsagePriceInfo>("engine_usage_prices");
@@ -201,20 +168,9 @@ export const usageLimits = (options?: { providers?: LimitProviderId[]; refresh?:
     refresh: options?.refresh ?? false,
   });
 
-/**
- * A short summary for the composer and the Space home: today's and this week's tokens and cost,
- * by engine, and the plan limits last seen. It never starts a CLI.
- */
-export const usageSummary = () =>
-  invoke<UsageSummary>("engine_usage_summary", { tzOffsetMinutes: tzOffsetForDay(new Date()) });
-
 /** Calls `onChange` when a scan added usage, until the returned function is called. */
 export function onUsageChanged(onChange: () => void): () => void {
   return subscribe("engine-usage://changed", onChange);
-}
-
-export function onUsageScanProgress(onProgress: (progress: UsageScanProgress) => void): () => void {
-  return subscribe<UsageScanProgress>("engine-usage://scan-progress", onProgress);
 }
 
 /** Native event → callback; the returned function also covers the time before `listen` resolves. */

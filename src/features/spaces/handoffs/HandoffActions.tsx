@@ -1,4 +1,3 @@
-import { Bot } from "lucide-react";
 import { useEffect } from "react";
 import { agentAccountId, draftRequestForAgent, usePersonalAgentsStore } from "@/features/agents";
 import {
@@ -46,12 +45,7 @@ export function HandoffActions(props: {
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start">
             {mine.map((agent) => (
-              <MenuItem
-                key={agent.id}
-                icon={Bot}
-                label={agent.name}
-                onSelect={() => give(agent.id)}
-              />
+              <MenuItem key={agent.id} label={agent.name} onSelect={() => give(agent.id)} />
             ))}
           </DropdownMenuContent>
         </DropdownMenu>

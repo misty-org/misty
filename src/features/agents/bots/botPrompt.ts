@@ -1,7 +1,7 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 /**
  * An agent's part of a run's instructions, built from its bot fields: who it is, its soul, its
- * working rules and the skills it may use. One pure function serves both the run and the editor's
+ * working rules. One pure function serves both the run and the editor's
  * preview, so what the person reads is what the engine gets. Block order is fixed and empty blocks
  * are left out whole.
  */
@@ -9,17 +9,14 @@ import type { AgentProfile } from "@/shared/schemas";
 
 /** SOUL and AGENTS share this budget; the editor warns above it. */
 export const PROSE_LIMIT = 10_000;
-/** The skills index's budget (names and descriptions, not the skills themselves). */
-export const SKILL_INDEX_LIMIT = 3_000;
 
-export type PromptBlockId = "identity" | "soul" | "instructions" | "skills" | "collaborators";
+export type PromptBlockId = "identity" | "soul" | "instructions";
 
 export interface PromptBlock {
   id: PromptBlockId;
   title: string;
   text: string;
   chars: number;
-  limit?: number;
   omitted: boolean;
   /** The first line with text, for the preview's one-line summary. */
   preview: string;
@@ -29,16 +26,6 @@ export interface AssembledPrompt {
   blocks: PromptBlock[];
   text: string;
   totalChars: number;
-}
-
-export interface SkillIndexEntry {
-  name: string;
-  description: string;
-}
-
-export interface CollaboratorEntry {
-  name: string;
-  description: string;
 }
 
 type PromptAgent = Pick<AgentProfile, "name" | "role" | "description" | "instructions"> &
@@ -60,58 +47,18 @@ export function identityText(agent: Pick<AgentProfile, "name" | "role" | "descri
   return lines.join("\n");
 }
 
-/** The skills index: names and descriptions only, cut by list order with a pointer to the rest. */
-export function skillsIndexText(skills: SkillIndexEntry[]) {
-  const lines: string[] = [];
-  let used = 0;
-  let truncated = 0;
-  for (const [index, skill] of skills.entries()) {
-    const line = `- ${skill.name}: ${skill.description}`;
-    const cost = countChars(line) + 1;
-    if (used + cost > SKILL_INDEX_LIMIT) {
-      truncated = skills.length - index;
-      break;
-    }
-    lines.push(line);
-    used += cost;
-  }
-  if (truncated > 0) lines.push(`- ${truncated} more skills are available by name`);
-  return { text: lines.join("\n"), truncated };
-}
-
-function collaboratorsText(collaborators: CollaboratorEntry[]) {
-  return collaborators
-    .filter((entry) => entry.name.trim())
-    .map((entry) =>
-      entry.description.trim() ? `- ${entry.name}: ${entry.description.trim()}` : `- ${entry.name}`,
-    )
-    .join("\n");
-}
-
-export function assembleAgentPrompt(input: {
-  agent: PromptAgent;
-  skills?: SkillIndexEntry[];
-  collaborators?: CollaboratorEntry[];
-}): AssembledPrompt {
+export function assembleAgentPrompt(input: { agent: PromptAgent }): AssembledPrompt {
   const { agent } = input;
-  const skills = skillsIndexText((input.skills ?? []).filter((skill) => skill.name.trim()));
-  const drafts: { id: PromptBlockId; title: string; body: string; limit?: number }[] = [
+  const drafts: { id: PromptBlockId; title: string; body: string }[] = [
     { id: "identity", title: "Who you are", body: agent.soul?.trim() ? identityText(agent) : "" },
     { id: "soul", title: "Your soul", body: (agent.soul ?? "").trim() },
     { id: "instructions", title: "How you work", body: (agent.instructions ?? "").trim() },
-    { id: "skills", title: "Skills you can use", body: skills.text, limit: SKILL_INDEX_LIMIT },
-    {
-      id: "collaborators",
-      title: "Agents you can hand work to",
-      body: collaboratorsText(input.collaborators ?? []),
-    },
   ];
   const blocks = drafts.map((draft) => ({
     id: draft.id,
     title: draft.title,
     text: draft.body,
     chars: countChars(draft.body),
-    limit: draft.limit,
     omitted: draft.body.length === 0,
     preview: firstLine(draft.body),
   }));

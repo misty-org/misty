@@ -149,8 +149,6 @@ const verbs: Record<string, [running: string, done: string]> = {
   type: ["Typing in", "Typed in"],
   send: ["Sending", "Sent"],
   invite: ["Inviting to", "Invited to"],
-  schedule: ["Scheduling", "Scheduled"],
-  unschedule: ["Unscheduling", "Unscheduled"],
   plan: ["Planning", "Planned"],
   fetch: ["Fetching", "Fetched"],
 };
@@ -162,12 +160,10 @@ const verbs: Record<string, [running: string, done: string]> = {
 const uiSubjects: Record<string, string> = {
   "log.work": "notebook",
   file: "Library",
-  "file.album": "albums",
   integration: "apps",
   folder: "shared folder",
   "space.member": "members",
   "browser.tab": "tabs",
-  bookmark: "bookmarks",
   note: "notes",
   drawing: "drawings",
   message: "messages",

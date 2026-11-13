@@ -41,7 +41,7 @@ type MenuTriggerProps = Omit<
  *
  * ```tsx
  * <DropdownMenu>
- *   <MenuTrigger label="Model" value={model.name} icon={Sparkles} />
+ *   <MenuTrigger label="Model" value={model.name} icon={Cpu} />
  *   <DropdownMenuContent>…</DropdownMenuContent>
  * </DropdownMenu>
  * ```

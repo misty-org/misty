@@ -229,7 +229,10 @@ pub(crate) fn engine_args(body: &serde_json::Value) -> Result<Vec<String>, Strin
     }
     for arg in &args {
         if arg.chars().count() > MAX_ENGINE_ARG_LEN || arg.chars().any(char::is_control) {
-            return Err("One of this agent's engine arguments is too long or has control characters.".into());
+            return Err(
+                "One of this agent's engine arguments is too long or has control characters."
+                    .into(),
+            );
         }
         if let Some(reason) = reserved(arg) {
             return Err(format!(
@@ -260,7 +263,9 @@ fn reserved(arg: &str) -> Option<String> {
         }
         // `-yolo`-style long options with one dash, and bundled short flags (`-ya`).
         if RESERVED_OPTIONS.contains(&letters.to_ascii_lowercase().as_str())
-            || RESERVED_WORDS.iter().any(|word| letters.to_ascii_lowercase().contains(word))
+            || RESERVED_WORDS
+                .iter()
+                .any(|word| letters.to_ascii_lowercase().contains(word))
             || (letters.len() <= 4 && letters.chars().any(|c| RESERVED_SHORT.contains(&c)))
         {
             return Some(format!("-{letters}"));

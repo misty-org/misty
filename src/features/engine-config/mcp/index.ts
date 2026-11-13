@@ -1,5 +1,5 @@
-// Settings › Tools › MCP servers, and the `/mcp` panel the composer opens.
+// Settings › Tools › MCP servers.
 export { McpSection } from "./McpSection";
-export { McpCommandPanel, MCP_SETTINGS_SECTION } from "./McpCommandPanel";
 export { McpProbeConfirmHost } from "./McpProbeConfirmHost";
-export { useMcpPanel } from "./panel";
+// The session card lists the open engine's servers with their switches.
+export { useMcpInventory } from "./useMcpInventory";

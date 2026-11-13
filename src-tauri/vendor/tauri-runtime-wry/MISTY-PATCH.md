@@ -27,3 +27,10 @@ window stays responsive and the website opens as a tab.
 
 Remove this patch when upstream stops dispatching its messages inside a
 webview's creation, or releases the `WebContext` lock before WebView2 pumps.
+
+## Also: no `unsafe` around safe AppKit calls
+
+`src/window/macos.rs` called `setAlphaValue`, `beginSheet_completionHandler`, `attachedSheet`
+and `endSheet` inside `unsafe` blocks. The `objc2-app-kit` version Misty builds against marks
+them safe, so the blocks only produced "unnecessary `unsafe`" warnings. They are removed; the
+calls are unchanged.

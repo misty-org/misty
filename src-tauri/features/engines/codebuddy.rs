@@ -112,15 +112,12 @@ pub(super) fn apply_channel(
     // `--settings` merge (that is exactly how models/codebuddy.rs reads the
     // configured default). Mirror the selected model, or the channel's own
     // CODEBUDDY_MODEL when no request model was selected, into the overlay.
-    let model = model
-        .map(str::trim)
-        .filter(|m| !m.is_empty())
-        .or_else(|| {
-            env.get("CODEBUDDY_MODEL")
-                .map(String::as_str)
-                .map(str::trim)
-                .filter(|m| !m.is_empty())
-        });
+    let model = model.map(str::trim).filter(|m| !m.is_empty()).or_else(|| {
+        env.get("CODEBUDDY_MODEL")
+            .map(String::as_str)
+            .map(str::trim)
+            .filter(|m| !m.is_empty())
+    });
     if let Some(model) = model {
         settings["model"] = serde_json::Value::String(model.to_string());
     }
@@ -472,10 +469,8 @@ mod tests {
     impl ScratchHome {
         fn new(tag: &str) -> Self {
             let lock = crate::engines::support::paths::HOME_ENV_LOCK.lock();
-            let dir = std::env::temp_dir().join(format!(
-                "ccgui-codebuddy-{tag}-{}",
-                uuid::Uuid::new_v4()
-            ));
+            let dir = std::env::temp_dir()
+                .join(format!("ccgui-codebuddy-{tag}-{}", uuid::Uuid::new_v4()));
             std::fs::create_dir_all(&dir).unwrap();
             let previous_home = std::env::var_os("HOME");
             let previous_profile = std::env::var_os("USERPROFILE");
@@ -759,10 +754,7 @@ mod tests {
         let listed: Vec<&str> = whitelist.split(',').collect();
         assert_eq!(listed, ["Read", "Glob"]);
         for tool in ["Bash", "Edit", "Write", "PowerShell"] {
-            assert!(
-                !listed.contains(&tool),
-                "whitelist must not contain {tool}"
-            );
+            assert!(!listed.contains(&tool), "whitelist must not contain {tool}");
         }
 
         let denied = &args[args
@@ -785,19 +777,12 @@ mod tests {
             "Workflow",
             "TeamCreate",
         ] {
-            assert!(
-                denied.iter().any(|a| a == tool),
-                "missing deny for {tool}"
-            );
+            assert!(denied.iter().any(|a| a == tool), "missing deny for {tool}");
         }
 
         // An explicitly allowed tool must not also be denied.
         let args = args_of(vec!["Bash".to_string()]);
-        let denied = &args[args
-            .iter()
-            .position(|a| a == "--disallowedTools")
-            .unwrap()
-            + 1..];
+        let denied = &args[args.iter().position(|a| a == "--disallowedTools").unwrap() + 1..];
         assert!(!denied.iter().any(|a| a == "Bash"));
     }
 
@@ -821,10 +806,8 @@ mod tests {
                 "internal".to_string(),
             ),
         ]);
-        let dir = std::env::temp_dir().join(format!(
-            "ccgui-codebuddy-stage-{}",
-            uuid::Uuid::new_v4()
-        ));
+        let dir =
+            std::env::temp_dir().join(format!("ccgui-codebuddy-stage-{}", uuid::Uuid::new_v4()));
         apply_channel(&mut built, &env, None, &dir).unwrap();
         let args: Vec<_> = built
             .command
@@ -878,10 +861,8 @@ mod tests {
             cleanup_files: Vec::new(),
             preassigned_session_id: None,
         };
-        let dir = std::env::temp_dir().join(format!(
-            "ccgui-codebuddy-model-{}",
-            uuid::Uuid::new_v4()
-        ));
+        let dir =
+            std::env::temp_dir().join(format!("ccgui-codebuddy-model-{}", uuid::Uuid::new_v4()));
         apply_channel(
             &mut built,
             &std::collections::HashMap::new(),

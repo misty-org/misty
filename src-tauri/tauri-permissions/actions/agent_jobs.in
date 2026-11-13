@@ -23,6 +23,5 @@
     "folder.list",
     "folder.read",
     "folder.send",
-    "read_content",
     "shell.run",
 ]

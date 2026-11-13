@@ -3,7 +3,7 @@
 //! Each permission ask comes back through `session/request_permission` and Misty's gate answers
 //! it; only Bypass starts the CLI with `--yolo`.
 
-use super::{command_for_binary, BuiltCommand, Engine, EngineEvent, SendRequest, Transport};
+use super::{command_for_binary, BuiltCommand, Engine, SendRequest};
 
 /// Gemini CLI, or Qwen Code (a fork of it with the same flags).
 pub struct GeminiEngine {
@@ -25,11 +25,6 @@ impl Engine for GeminiEngine {
 
     fn drives_own_transport(&self) -> bool {
         true
-    }
-
-    /// The ACP driver spawns the CLI on this computer; a WSL folder has no path to it.
-    fn transport_for(&self, _wsl: bool) -> Transport {
-        Transport::Own
     }
 
     fn host_command(&self, req: &SendRequest, bin: &str) -> Result<BuiltCommand, String> {
@@ -55,16 +50,6 @@ impl Engine for GeminiEngine {
             preassigned_session_id: None,
         })
     }
-
-    fn build_command(&self, _req: &SendRequest, _bin: &str) -> Result<BuiltCommand, String> {
-        Err(format!(
-            "{} runs only over the Agent Client Protocol.",
-            super::engine_name(self.id)
-        ))
-    }
-
-    /// ACP sessions report through the driver, never through stdout lines.
-    fn parse_line(&self, _line: &str, _out: &mut Vec<EngineEvent>) {}
 
     fn supports_images(&self) -> bool {
         true

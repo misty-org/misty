@@ -58,21 +58,3 @@ export function useRegistry<T extends { id: string }>(registry: Registry<T>): re
 }
 
 export const commandRegistry = new Registry<CommandDef>();
-
-/** The commands whose title or keywords contain the query, case-insensitively. */
-export function matchCommands(commands: readonly CommandDef[], query: string) {
-  const resolved = commands
-    .filter((def) => !def.available || def.available())
-    .map((def) => ({
-      def,
-      title: def.title(),
-      keywords: def.keywords?.() ?? [],
-    }));
-  const needle = query.trim().toLowerCase();
-  if (!needle) return resolved;
-  return resolved.filter(
-    ({ title, keywords }) =>
-      title.toLowerCase().includes(needle) ||
-      keywords.some((keyword) => keyword.toLowerCase().includes(needle)),
-  );
-}

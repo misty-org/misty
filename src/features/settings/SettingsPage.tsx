@@ -19,7 +19,6 @@ import {
 } from "./device-preferences/store";
 import { settingsErrorMessage } from "./settingsErrors";
 import {
-  canonicalSettingsSection,
   settingsAreaEntry,
   settingsAreas,
   settingsGroups,
@@ -73,7 +72,7 @@ export const SettingsWorkspace = memo(function SettingsWorkspace(props: Settings
   const [query, setQuery] = useState("");
   const content = useFocusSettingRow(store.focusTarget);
   const { settings, load } = store;
-  const section = canonicalSettingsSection(store.activeSection);
+  const section = store.activeSection;
   const entry = settingsRegistry.find((item) => item.id === section) ?? settingsRegistry[0];
   const pageEntries = settingsRegistry.filter((item) => item.area === entry.area);
   const results = useMemo(() => searchSettings(query), [query]);

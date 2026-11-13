@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
 import { constants } from "node:os";
+import { whenStranded } from "./stranded.ts";
 import { toolCommand } from "./tooling.ts";
 
 // Tauri and the preview stop this runner, not the tool under it. Passing their signal on keeps a dev server
@@ -22,6 +23,10 @@ try {
   });
   const forward = (signal: NodeJS.Signals) => child.kill(signal);
   for (const signal of forwardedSignals) process.on(signal, forward);
+  whenStranded(() => {
+    child.kill("SIGTERM");
+    setTimeout(() => child.kill("SIGKILL"), 5_000).unref();
+  });
   child.on("error", fail);
   child.on("exit", (code, signal) => {
     for (const forwarded of forwardedSignals) process.off(forwarded, forward);

@@ -21,7 +21,9 @@ use super::{
     text::{js_prefix, js_trim},
     transcript::{failed, input_value, said, tool_parts, ToolPart},
 };
-use crate::model_calls::{Message, RawJson};
+use crate::model_calls::Message;
+#[cfg(test)]
+use crate::model_calls::RawJson;
 
 const WINDOW: usize = 12;
 const REPEATS: usize = 3;
@@ -66,6 +68,7 @@ fn all_calls(messages: &[Message]) -> Vec<Call> {
 }
 
 /// The address a call opens, the same however it was written, or "".
+#[cfg(test)]
 pub(crate) fn address(input: &RawJson) -> String {
     address_of(&input_value(input))
 }

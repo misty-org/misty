@@ -1,5 +1,5 @@
 use super::*;
-use crate::{Caller, Signal};
+use crate::Caller;
 use serde_json::json;
 use std::{
     pin::pin,
@@ -9,9 +9,7 @@ use std::{
 
 struct NoHost;
 
-impl Host for NoHost {
-    fn signal(&self, _caller: &Caller, _signal: Signal) {}
-}
+impl Host for NoHost {}
 
 #[derive(Default)]
 struct Fake {

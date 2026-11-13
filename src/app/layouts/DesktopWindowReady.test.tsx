@@ -15,7 +15,6 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/features/settings", () => ({
   settingsBoolean: () => true,
   useSettingsStore: (select: (state: { settings: null }) => unknown) => select({ settings: null }),
-  workspaceDefaultViewIndex: 3,
   appThemeChangedEvent: "misty://app-theme-changed",
   appThemeSnapshot: () => ({
     tokens: {
@@ -47,7 +46,7 @@ vi.mock("@tauri-apps/api/webview", () => ({
     setZoom: mocks.zoom,
   }),
 }));
-vi.mock("@tauri-apps/plugin-os", () => ({
+vi.mock("@/shared/platform/os", () => ({
   platform: mocks.platform,
 }));
 // No onboarding or route content has mounted yet.

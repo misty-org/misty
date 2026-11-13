@@ -92,15 +92,7 @@ export interface McpConfigEntry {
   readonlyReasonCode?: string | null;
   /** Content hash at read time; a mismatch on write means an external edit. */
   version: string;
-  /** How it starts: with the session (the default) or on its first call
-   *  (through the `--mcp-lazy` proxy). Misty's own device setting; the CLI's
-   *  config isn't written. */
-  launchMode?: McpLaunchMode;
-  /** Why it can't start on demand, as a code; null when it can. */
-  launchModeUnsupported?: string | null;
 }
-
-export type McpLaunchMode = "eager" | "onDemand";
 
 export interface McpSourceError {
   source: string;

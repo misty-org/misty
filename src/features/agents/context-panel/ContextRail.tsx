@@ -2,7 +2,6 @@ import {
   FolderTree,
   GitCompareArrows,
   GaugeCircle,
-  Globe,
   ListOrdered,
   MonitorPlay,
   SquareTerminal,
@@ -23,10 +22,7 @@ const groups: [ContextPanelTab, string, LucideIcon][][] = [
     ["files", "Files", FolderTree],
     ["terminal", "Terminal", SquareTerminal],
   ],
-  [
-    ["preview", "Preview", MonitorPlay],
-    ["browser", "Browser", Globe],
-  ],
+  [["preview", "Preview", MonitorPlay]],
 ];
 
 /**

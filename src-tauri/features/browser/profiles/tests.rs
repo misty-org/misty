@@ -37,12 +37,3 @@ fn a_database_whose_key_is_gone_is_set_aside_not_deleted() {
     assert_eq!(kept.len(), 2);
     assert!(kept.iter().all(|name| name.starts_with("records.lost-")));
 }
-
-#[test]
-fn hashed_ids_are_stable_and_never_show_the_value() {
-    let id = hashed_id("site", "https://a.example");
-    assert_eq!(id, hashed_id("site", "https://a.example"));
-    assert_ne!(id, hashed_id("download", "https://a.example"));
-    assert!(id.starts_with("site:") && !id.contains("a.example"));
-    assert_eq!(id.len(), "site:".len() + 32);
-}

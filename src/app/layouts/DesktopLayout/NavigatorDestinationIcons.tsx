@@ -26,5 +26,4 @@ export const DrawingsDestinationIcon = destinationIcon(Pencil, "drawings");
 export const AllItemsDestinationIcon = destinationIcon(Images, "all-items");
 export const FavoritesDestinationIcon = destinationIcon(Heart, "favorites");
 export const CollectionsDestinationIcon = destinationIcon(Folders, "collections");
-export const AlbumsDestinationIcon = destinationIcon(Images, "albums");
 export const DeletedDestinationIcon = destinationIcon(Trash2, "deleted");

@@ -6,9 +6,7 @@ import {
   GraphemeSegmenter,
   StreamReveal,
   REVEAL_MAX_LAG_MS,
-  visibleLineWindow,
-  visiblePrefix,
-  visibleWindow,
+  createVisibleTextReader,
   type RevealClock,
 } from "./streamReveal";
 function clock() {
@@ -123,23 +121,6 @@ test("completed text runs are not notified on subsequent reveal frames", () => {
   assert.ok(last > first);
   off();
 });
-test("no intermediate prefix splits CJK, emoji, flags or combining characters", () => {
-  for (const text of ["hiworld", "A🙂B", "👩‍💻done", "🇨🇳🇸🇬", "e\u0301clair"]) {
-    const boundaries = new Set([
-      0,
-      ...[...new GraphemeSegmenter!(undefined, { granularity: "grapheme" }).segment(text)].map(
-        (s) => s.index + s.segment.length,
-      ),
-    ]);
-    for (let n = 0; n <= text.length; n++) {
-      const part = visiblePrefix(text, n);
-      assert.ok(boundaries.has(part.length));
-      assert.ok(text.startsWith(part));
-      assert.ok(part.length <= n);
-    }
-    assert.equal(visiblePrefix(text, text.length), text);
-  }
-});
 
 test("continuous arrivals cannot postpone the stalled-frame watchdog forever", () => {
   const c = clock(),
@@ -156,6 +137,8 @@ test("continuous arrivals cannot postpone the stalled-frame watchdog forever", (
 
 test("thinking window follows revealed text and preserves grapheme boundaries", () => {
   const text = "x".repeat(2100) + "👩‍💻" + "y".repeat(2100);
+  const visibleWindow = (value: string, count: number, limit: number) =>
+    createVisibleTextReader(value).window(count, limit);
   assert.equal(visibleWindow(text, 100, 2000), "x".repeat(100));
   assert.equal(visibleWindow(text, 3000, 2000).length, 2000);
   const count = 2100 + 2 + 2000;
@@ -274,23 +257,6 @@ test("markdown reshaping the rendered text does not dump the unrevealed backlog"
   assert.ok(after < head.length, `reshape must not reveal the backlog: ${after}`);
   c.advance(1000);
   assert.equal(reveal.read(0, head.length), head.length);
-});
-test("thinking window drops whole rows from the revealed cursor, not from the received tail", () => {
-  const text = "1234567890\n".repeat(300);
-  const end = 2000,
-    limit = 1000;
-  const windowed = visibleLineWindow(text, end, limit);
-  assert.equal(windowed.truncated, true);
-  // Cut lands on the row boundary after the limit, so the window is a pure
-  // suffix of what has been revealed and never exceeds the limit.
-  assert.equal(windowed.text, text.slice(1001, end));
-  assert.ok(windowed.text.length <= limit);
-  // A burst still being drained cannot push content out before it was shown.
-  const early = visibleLineWindow(text, 600, limit);
-  assert.deepEqual(early, { text: text.slice(0, 600), truncated: false });
-  const past = visibleLineWindow(text, text.length, limit);
-  assert.ok(past.text.length <= limit);
-  assert.ok(past.text.startsWith("1234567890\n"));
 });
 test("a cancelled drain resumes on the next identical snapshot instead of freezing", () => {
   // Fast Refresh re-running effects (or StrictMode's double effect) cleans up

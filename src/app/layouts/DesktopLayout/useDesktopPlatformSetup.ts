@@ -10,7 +10,7 @@ import { dockingMetrics } from "./dockingGeometry";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { platform as osPlatform } from "@tauri-apps/plugin-os";
+import { platform as osPlatform } from "@/shared/platform/os";
 import { useEffect, useState } from "react";
 
 export function useDesktopPlatform() {

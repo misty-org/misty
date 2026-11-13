@@ -9,8 +9,6 @@ pub enum DeviceRole {
     Embedding,
     Transcription,
     Speech,
-    /// Films Tutor's video scenes.
-    Video,
 }
 
 /// `deviceModelId` and `deviceRoute`.

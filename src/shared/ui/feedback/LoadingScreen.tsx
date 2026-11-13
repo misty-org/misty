@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { cn } from "../classNames";
 import { FlyingMisty } from "./FlyingMisty";
 import { Skeleton, SkeletonList } from "./Skeleton";
@@ -8,6 +8,28 @@ const LONGEST_WAIT_MS = 3_500;
 
 const stillPreferred = () =>
   typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+
+/** How many full-screen splashes are on screen, counting one still fading out. */
+let splashes = 0;
+const splashListeners = new Set<() => void>();
+const splashChanged = (by: number) => {
+  splashes += by;
+  for (const listener of splashListeners) listener();
+};
+
+/**
+ * Whether the startup splash is on screen, from the moment it shows until it has faded away.
+ * Anything that would pop up over the window (a tour, a prompt) waits for this to be false.
+ */
+export function useSplashShowing(): boolean {
+  return useSyncExternalStore(
+    (listener) => {
+      splashListeners.add(listener);
+      return () => splashListeners.delete(listener);
+    },
+    () => splashes > 0,
+  );
+}
 
 /** Loading surface for initial loads and route transitions. Full screen it is the startup
  * splash: Misty flying along her track over the window color, with no loading text (AGENTS.md);
@@ -28,6 +50,11 @@ export function LoadingScreen({
   onLeft?: () => void;
 }) {
   const [fading, setFading] = useState(false);
+  useEffect(() => {
+    if (!fullScreen) return;
+    splashChanged(1);
+    return () => splashChanged(-1);
+  }, [fullScreen]);
   useEffect(() => {
     if (!leaving) {
       setFading(false);

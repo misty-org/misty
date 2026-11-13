@@ -54,13 +54,13 @@ export function JournalCollection(props: {
   };
   const [view, setView] = useState<"list" | "grid">("list");
   const refinement = useCollectionRefinement(props.notes, {
-    label: "Filter notes",
-    title: (note) => note.title || "Untitled note",
+    label: "Filter docs",
+    title: (note) => note.title || "Untitled doc",
     date: (note) => note.updatedAt,
     facet: {
       label: "Access",
       options: [
-        { value: "all", label: "All notes" },
+        { value: "all", label: "All docs" },
         { value: "editable", label: "Can edit" },
         { value: "viewer", label: "View only" },
       ],
@@ -72,7 +72,7 @@ export function JournalCollection(props: {
     tone: "error",
   });
   useNotice(filter !== "all" && props.error, {
-    message: "Notes couldn’t load.",
+    message: "Docs couldn’t load.",
     tone: "error",
     action: { label: "Retry", onSelect: props.onRetry },
   });
@@ -86,18 +86,18 @@ export function JournalCollection(props: {
   return (
     <CollectionPage>
       <CollectionHeading
-        title="Journal"
+        title="Docs"
         end={
           <>
             <CollectionSearch
-              aria-label="Search notes"
+              aria-label="Search docs"
               placeholder="Search journal"
               value={props.query}
               onChange={(event) => props.onQueryChange(event.target.value)}
             />
             {!props.readOnly && (
               <Button variant="primary" icon={Plus} onClick={props.onCreate}>
-                New note
+                New doc
               </Button>
             )}
           </>
@@ -112,7 +112,7 @@ export function JournalCollection(props: {
         actions={<CollectionViewToggle value={view} onChange={setView} disabled={!notes.length} />}
       />
       {props.loading ? (
-        <CollectionSkeleton label="Loading notes" view={view} />
+        <CollectionSkeleton label="Loading docs" view={view} />
       ) : (
         <CollectionItems
           columnSetId="notes"
@@ -123,10 +123,10 @@ export function JournalCollection(props: {
           listIcons
           items={notes.map((note) => ({
             id: note.id,
-            title: note.title || "Untitled note",
+            title: note.title || "Untitled doc",
             icon: <FileText size={18} />,
             tone: itemTones.note,
-            category: "Note",
+            category: "Doc",
             creator: creatorName(note.creatorUserId),
             metadata: {
               Access: props.readOnly || note.role === "viewer" ? "View only" : "Can edit",
@@ -146,14 +146,14 @@ export function JournalCollection(props: {
               selection.menuTargets(note.id).length > 1 ? (
                 <MenuItem
                   icon={<Trash2 />}
-                  label={`Delete ${selection.selectedIds.length} notes`}
+                  label={`Delete ${selection.selectedIds.length} docs`}
                   danger
                   onSelect={() => props.onDeleteMany?.(selection.selectedIds)}
                 />
               ) : (
                 <NoteActions note={note} props={props} />
               ),
-            menuLabel: `More actions for ${note.title || "Untitled note"}`,
+            menuLabel: `More actions for ${note.title || "Untitled doc"}`,
             onMenuOpen: () => selection.pickForMenu(note.id),
           }))}
           selectedIds={selection.selectedIds}
@@ -179,7 +179,7 @@ function NoteActions({
         disabled={props.readOnly || note.role === "viewer"}
         reason={
           props.readOnly || note.role === "viewer"
-            ? "You have view-only access to this note."
+            ? "You have view-only access to this doc."
             : undefined
         }
         onSelect={() => props.onRename(note)}
@@ -193,7 +193,7 @@ function NoteActions({
           props.readOnly
             ? "This Space is read-only."
             : !note.canDelete
-              ? "Only the creator or Space owner can delete this note."
+              ? "Only the creator or Space owner can delete this doc."
               : undefined
         }
         onSelect={() => props.onDelete(note)}

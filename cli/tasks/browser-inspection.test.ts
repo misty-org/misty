@@ -88,21 +88,6 @@ test('draft preparation retains text without submitting and rejects replaced/pas
   } finally { dom.window.close(); }
 });
 
-test('provider GET requests reject origin escapes and bound output without returning response headers', async () => {
-  const body = readFileSync(new URL('../../src-tauri/features/browser/kiri_link/scripts/provider_request.js', import.meta.url), 'utf8');
-  const run = new (Object.getPrototypeOf(async function(){}).constructor)('origin', 'path', 'location', 'fetch', body);
-  const location = { origin: 'https://www.instagram.com', href: 'https://www.instagram.com/direct/inbox/' };
-  let options;
-  const request = async (_url, input) => { options = input; return new Response('x'.repeat(300000), { status: 200, headers: { 'x-sensitive': 'do-not-return' } }); };
-  const result = JSON.parse(await run(location.origin, '/api/fixture', location, request));
-  assert.equal(result.truncated, true);
-  assert.equal(result.body.length, 262144);
-  assert.equal(JSON.stringify(result).includes('do-not-return'), false);
-  assert.equal(options.method, 'GET'); assert.equal(options.credentials, 'same-origin'); assert.equal(options.redirect, 'error');
-  for (const path of ['//evil.test/data', '/\\evil.test/data', 'https://evil.test/data']) await assert.rejects(run(location.origin, path, location, request));
-  await assert.rejects(run('https://other.instagram.com', '/api', location, request));
-});
-
 test('bounded interactions require the exact unconsumed document and retain selection', () => {
   const dom = new JSDOM('<select aria-label="Folder"><option value="inbox">Inbox</option><option value="archive">Archive</option></select>', { url: 'https://example.com', runScripts: 'outside-only' });
   try {

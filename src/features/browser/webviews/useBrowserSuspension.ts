@@ -1,11 +1,12 @@
 import { useEffect } from "react";
-import { browserBlockingOverlayOpen, browserNoticeRects } from "@/features/app-windows";
 import {
+  browserBlockingOverlayOpen,
+  browserNoticeRects,
   reconcileBrowserOverlayState,
   setBrowserNoticeRects,
   setBrowserPointerGestureActive,
   setBrowserWebviewsSuspended,
-} from "./browserRuntime";
+} from "@/features/app-windows";
 
 /** Suspends native pages during pointer reorders and drags that cross native views. */
 export function useBrowserPointerSuspension(): void {

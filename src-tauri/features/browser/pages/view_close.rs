@@ -90,11 +90,9 @@ pub fn close_browser_webview(
     }
     crate::browser::menus::popups::forget_close_handler(&request.id);
     crate::browser::kiri_link::host_messages::forget(&request.id);
-    if let Ok(mut pending) = state.pending_popups.lock() {
-        pending.remove(&request.id);
-    }
-    if let Some(staging) = app.get_window(&webview_label(&request.id)?) {
-        let _ = staging.destroy();
+    // A download popup has a hidden window of its own.
+    if let Some(popup_window) = app.get_window(&webview_label(&request.id)?) {
+        let _ = popup_window.destroy();
     }
     forget_shortcut_token(&state, &request.id);
     let Some(webview) = app.get_webview(&webview_label(&request.id)?) else {

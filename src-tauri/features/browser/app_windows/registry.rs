@@ -23,9 +23,6 @@ pub struct ProfileEntry {
     pub color: Option<String>,
     #[serde(default)]
     pub order: f64,
-    /// The sites this profile claims for links from other apps (see `links`).
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub sites: Vec<String>,
 }
 
 /// A window left open at quit.
@@ -141,51 +138,19 @@ pub(super) fn save(state: &Registry) {
     });
 }
 
-/// The palette names a profile color may use, or a custom `#rrggbb`.
-const COLORS: [&str; 8] = [
-    "blue", "red", "yellow", "green", "pink", "purple", "cyan", "orange",
-];
-
-pub fn valid_color(color: &str) -> bool {
-    COLORS.contains(&color)
-        || (color.len() == 7
-            && color.starts_with('#')
-            && color[1..]
-                .bytes()
-                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte)))
-}
-
-/// The first palette color no profile uses yet, else the least used one.
-pub(super) fn next_color(profiles: &BTreeMap<String, ProfileEntry>) -> String {
-    let mut counts: BTreeMap<&str, usize> = COLORS.iter().map(|name| (*name, 0)).collect();
-    for entry in profiles.values() {
-        if let Some(count) = entry.color.as_deref().and_then(|c| counts.get_mut(c)) {
-            *count += 1;
-        }
-    }
-    COLORS
-        .iter()
-        .min_by_key(|name| (counts[*name], COLORS.iter().position(|c| c == *name)))
-        .copied()
-        .unwrap_or("blue")
-        .into()
-}
-
 impl Registry {
     /// The current account's profiles. Every account has at least the first one.
     pub(super) fn current(&mut self) -> &mut BTreeMap<String, ProfileEntry> {
         let scope = self.scope.clone();
         let profiles = self.profiles.entry(scope).or_default();
         if !profiles.contains_key(PERSONAL) {
-            let color = next_color(profiles);
             profiles.insert(
                 PERSONAL.into(),
                 ProfileEntry {
                     id: PERSONAL.into(),
                     name: "Personal".into(),
-                    color: Some(color),
+                    color: Some("blue".into()),
                     order: 0.0,
-                    sites: Vec::new(),
                 },
             );
         }
@@ -215,20 +180,6 @@ pub fn entry(key: &str) -> Option<ProfileEntry> {
     let entry = state.current().get(key).cloned();
     save(&state);
     entry
-}
-
-/// The current account's profiles, in the order the person put them.
-pub fn listed_profiles() -> Vec<ProfileEntry> {
-    let Ok(mut state) = lock_registry() else {
-        return Vec::new();
-    };
-    let mut profiles: Vec<_> = state.current().values().cloned().collect();
-    profiles.sort_by(|a, b| {
-        a.order
-            .total_cmp(&b.order)
-            .then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase()))
-    });
-    profiles
 }
 
 /// The store a profile's pages open in, for the current account. `Err` when the registry is

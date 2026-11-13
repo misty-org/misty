@@ -25,8 +25,10 @@
     "status-word",
     "legacy-button-variant",
     "legacy-button-size",
-    "menu-item-without-icon",
+    "raw-menu-row",
+    "repeated-menu-icon",
     "leading-icon-in-list-row",
+    "sparkles-icon",
     "duckduckgo",
     "arbitrary-px",
     "raw-color-class",
@@ -85,7 +87,7 @@
       "raw-color-class": 1
     },
     "src/app/layouts/DesktopLayout/LayoutPopup.tsx": {
-      "raw-color-class": 17
+      "raw-color-class": 12
     },
     "src/app/layouts/DesktopLayout/NavRail.tsx": {
       "raw-color-class": 3
@@ -120,9 +122,6 @@
       "raw-color-class": 2
     },
     "src/app/layouts/DesktopLayout/WorkspaceCanvas.tsx": {
-      "raw-color-class": 1
-    },
-    "src/app/layouts/DesktopLayout/WorkspaceDockTree.tsx": {
       "raw-color-class": 1
     },
     "src/app/layouts/DesktopLayout/WorkspaceSidebar.tsx": {
@@ -223,24 +222,13 @@
     "src/features/agents/connected-apps/ApprovalActions.tsx": {
       "raw-color-class": 1
     },
-    "src/features/agents/connected-apps/ConnectedAppRows.tsx": {
-      "raw-color-class": 1
-    },
     "src/features/agents/connected-apps/ConnectedAppsCatalog.tsx": {
       "native-title": 1,
       "raw-color-class": 1
     },
-    "src/features/agents/connected-apps/DirectAppLogo.tsx": {
-      "raw-color-class": 1
-    },
     "src/features/agents/connected-apps/DirectApps.tsx": {
       "native-title": 1,
-      "raw-color-class": 7
-    },
-    "src/features/agents/connected-apps/integrationsApps.css": {
-      "css-ellipsis": 2,
-      "css-font-size": 3,
-      "feature-stylesheet": 1
+      "raw-color-class": 6
     },
     "src/features/agents/context-panel/contextPanel.css": {
       "css-ellipsis": 4,
@@ -358,10 +346,6 @@
       "css-font-size": 2,
       "feature-stylesheet": 1
     },
-    "src/features/agents/conversations/view/meta/runMeta.css": {
-      "css-font-size": 1,
-      "feature-stylesheet": 1
-    },
     "src/features/agents/conversations/view/navigation/FindPanel.tsx": {
       "native-title": 1
     },
@@ -393,14 +377,10 @@
     },
     "src/features/agents/engines/EngineSetupRow.tsx": {
       "arbitrary-px": 1,
-      "raw-color-class": 7
+      "raw-color-class": 5
     },
     "src/features/agents/engines/EnginesStep.tsx": {
       "raw-color-class": 4
-    },
-    "src/features/agents/engines/NewAgentDialog.tsx": {
-      "arbitrary-px": 1,
-      "raw-color-class": 1
     },
     "src/features/agents/island/AgentControlIsland.tsx": {
       "raw-color-class": 2
@@ -421,11 +401,10 @@
     },
     "src/features/agents/methods/agentWorkspaceCanvas.css": {
       "css-font-size": 2,
-      "css-z": 1,
       "feature-stylesheet": 1
     },
     "src/features/agents/methods/agentWorkspaceCatalog.css": {
-      "css-font-size": 8,
+      "css-font-size": 1,
       "feature-stylesheet": 1
     },
     "src/features/agents/methods/agentWorkspaceComposer.css": {
@@ -446,15 +425,7 @@
       "feature-stylesheet": 1
     },
     "src/features/agents/methods/agentWorkspaceSidebar.css": {
-      "css-ellipsis": 1,
-      "css-font-size": 2,
       "feature-stylesheet": 1
-    },
-    "src/features/agents/methods/agentWorkspaceSidebarFoot.css": {
-      "feature-stylesheet": 1
-    },
-    "src/features/agents/methods/RecentStatusBadge.tsx": {
-      "native-title": 1
     },
     "src/features/agents/models/ModelChoiceRows.tsx": {
       "arbitrary-px": 2
@@ -475,9 +446,6 @@
     },
     "src/features/agents/multirun/MultirunStartForm.tsx": {
       "raw-color-class": 1
-    },
-    "src/features/agents/page/AgentConversationHeading.tsx": {
-      "native-title": 1
     },
     "src/features/agents/page/agentsConversation.css": {
       "css-ellipsis": 1,
@@ -500,7 +468,6 @@
       "feature-stylesheet": 1
     },
     "src/features/agents/panel/mistyPanel.css": {
-      "css-font-size": 1,
       "css-hex": 1,
       "css-z": 1,
       "feature-stylesheet": 1
@@ -527,7 +494,7 @@
     },
     "src/features/agents/personas/PersonaCatalogSection.tsx": {
       "ragged-wrap": 1,
-      "raw-color-class": 9
+      "raw-color-class": 8
     },
     "src/features/agents/personas/PersonaSuggestions.tsx": {
       "raw-color-class": 1
@@ -536,12 +503,6 @@
       "arbitrary-px": 1,
       "loading-text": 1,
       "mono-outside-code": 1
-    },
-    "src/features/agents/plans/AgentGoalSection.tsx": {
-      "raw-color-class": 1
-    },
-    "src/features/agents/plans/AgentPlanChecklist.tsx": {
-      "native-title": 1
     },
     "src/features/agents/plans/AgentPlanEditor.tsx": {
       "loading-text": 1
@@ -553,7 +514,7 @@
       "feature-stylesheet": 1
     },
     "src/features/agents/plans/collaborationPlans.css": {
-      "css-font-size": 18,
+      "css-font-size": 10,
       "feature-stylesheet": 1
     },
     "src/features/agents/plans/collaborationQuestions.css": {
@@ -601,10 +562,6 @@
       "css-font-size": 2,
       "feature-stylesheet": 1
     },
-    "src/features/agents/tutor/cursor/CompanionAppearanceSettings.tsx": {
-      "arbitrary-px": 1,
-      "raw-color-class": 1
-    },
     "src/features/agents/tutor/cursor/cursorCompanion.css": {
       "css-ellipsis": 1,
       "css-hex": 4,
@@ -632,8 +589,8 @@
       "raw-color-class": 1
     },
     "src/features/agents/tutor/tutorPage.css": {
-      "css-font-size": 28,
-      "css-hex": 5,
+      "css-font-size": 19,
+      "css-hex": 4,
       "css-z": 1,
       "feature-stylesheet": 1
     },
@@ -656,28 +613,22 @@
     },
     "src/features/agents/virtual/virtualStudio.css": {
       "css-font-size": 25,
-      "css-hex": 26,
+      "css-hex": 23,
       "css-z": 8,
       "feature-stylesheet": 1
     },
     "src/features/agents/virtual/VirtualStudio.tsx": {
       "raw-color-class": 1
     },
-    "src/features/browser/SavedWebsiteIcon.tsx": {
-      "arbitrary-px": 1
-    },
     "src/features/browser/settings/ClearWebsiteDataDialog.tsx": {
       "loading-text": 1,
       "raw-color-class": 4
-    },
-    "src/features/browser/webviews/browserToolbar.css": {
-      "feature-stylesheet": 1
     },
     "src/features/computer-use/ComputerUseSection.tsx": {
       "raw-color-class": 2
     },
     "src/features/engine-config/brands/BrandMark.tsx": {
-      "raw-color-class": 3
+      "raw-color-class": 2
     },
     "src/features/engine-config/channels/ChannelRow.tsx": {
       "arbitrary-px": 1,
@@ -685,7 +636,7 @@
       "raw-color-class": 12
     },
     "src/features/engine-config/channels/ChannelsSection.tsx": {
-      "raw-color-class": 7
+      "raw-color-class": 6
     },
     "src/features/engine-config/channels/OfficialEditDialog.tsx": {
       "arbitrary-px": 1,
@@ -698,12 +649,12 @@
     },
     "src/features/engine-config/channels/ProviderFormSections.tsx": {
       "mono-outside-code": 3,
-      "raw-color-class": 22
+      "raw-color-class": 21
     },
     "src/features/engine-config/clis/ClisSection.tsx": {
       "arbitrary-px": 1,
       "native-title": 2,
-      "raw-color-class": 7
+      "raw-color-class": 6
     },
     "src/features/engine-config/clis/CliUpdateDialog.tsx": {
       "arbitrary-px": 2,
@@ -744,16 +695,8 @@
       "arbitrary-px": 1,
       "raw-color-class": 6
     },
-    "src/features/engine-config/mcp/LaunchControls.tsx": {
-      "native-title": 1,
-      "raw-color-class": 4
-    },
-    "src/features/engine-config/mcp/McpCommandPanel.tsx": {
-      "arbitrary-px": 1,
-      "ellipsis": 1,
-      "mono-outside-code": 1,
-      "native-title": 1,
-      "raw-color-class": 10
+    "src/features/engine-config/mcp/EnableToggle.tsx": {
+      "raw-color-class": 2
     },
     "src/features/engine-config/mcp/McpDetailDialog.tsx": {
       "arbitrary-px": 1,
@@ -863,7 +806,7 @@
     },
     "src/features/onboarding/setup-page/AppsStep.tsx": {
       "arbitrary-px": 2,
-      "raw-color-class": 9
+      "raw-color-class": 7
     },
     "src/features/onboarding/setup-page/SetupPage.tsx": {
       "arbitrary-px": 1,
@@ -913,10 +856,8 @@
       "raw-color-class": 4
     },
     "src/features/settings/SettingsTextControls.tsx": {
-      "arbitrary-px": 3,
-      "loading-text": 1,
-      "mono-outside-code": 1,
-      "raw-color-class": 2
+      "arbitrary-px": 2,
+      "mono-outside-code": 1
     },
     "src/features/shortcuts/settings/ShortcutsSection.tsx": {
       "arbitrary-px": 1,
@@ -1251,7 +1192,7 @@
     },
     "src/features/support/SupportRecoveryParts.tsx": {
       "arbitrary-px": 2,
-      "raw-color-class": 11
+      "raw-color-class": 10
     },
     "src/features/support/SupportRecoverySection.tsx": {
       "loading-text": 2,

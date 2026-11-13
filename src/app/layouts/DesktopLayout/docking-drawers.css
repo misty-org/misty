@@ -16,7 +16,7 @@
      pull away from the native page during a live resize, since AppKit holds the page's left edge
      until the window settles, and the gap would show the host behind it. Only a sidebar too wide
      to leave the page 240px gives way. It goes as narrow as the person drags it (sidebarWidth.ts). */
-  --sidebar-w: max(160px, min(var(--shell-side-tabs, 280px), calc(100vw - 240px)));
+  --sidebar-w: max(200px, min(var(--shell-side-tabs, 280px), calc(100vw - 240px)));
   position: relative;
   flex: none;
   width: var(--sidebar-w);
@@ -175,7 +175,6 @@
   min-height: 0;
   flex-direction: column;
   padding: 0 8px 8px;
-  border-right: 1px solid var(--color-charcoal-border);
   background: var(--misty-theme-sidebar);
 }
 /* The account row closes the sidebar's one panel, under a faint line. */
@@ -192,15 +191,9 @@
   padding: 4px 2px 0 0;
   border-top: 1px solid color-mix(in srgb, var(--misty-theme-text) 10%, transparent);
 }
-.misty-sidebar-drawer[data-side="right"] .misty-sidebar-card {
-  border-right: 0;
-  border-left: 1px solid var(--color-charcoal-border);
-}
 
-/* A narrow sidebar keeps the window buttons and its two toggles; back and forward step aside (the
-   keyboard and mouse buttons still go back), and the shortcut hints drop. */
+/* A narrow sidebar drops the shortcut hints; back and forward always stay. */
 @container misty-sidebar (max-width: 230px) {
-  .misty-sidebar-card .misty-sidebar-head .misty-sidebar-nav,
   .misty-sidebar-card .misty-space-nav-key {
     display: none;
   }

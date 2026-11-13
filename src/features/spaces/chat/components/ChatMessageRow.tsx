@@ -1,7 +1,7 @@
 import type { SpaceChatMessagesProps } from "./ChatMessages";
 import type { SpaceMessage } from "../../api/dto/entities";
 import { Avatar, AvatarFallback, AvatarImage, Button, useNotice } from "@/shared/ui";
-import { Bot } from "lucide-react";
+import { AgentMark } from "@/features/agents";
 import { Fragment, memo, type FormEvent } from "react";
 import { ChatDateDivider, formatChatMessageTime } from "./ChatDisplay";
 import { MessageAttachments } from "./MessageAttachments";
@@ -147,7 +147,7 @@ function ChatMessageRowView({
               {avatarUrl ? <AvatarImage src={avatarUrl} alt="" /> : null}
               <AvatarFallback className="bg-charcoal-card text-cream text-xs font-semibold">
                 {agentAuthored ? (
-                  <Bot className="size-4" strokeWidth={2} />
+                  <AgentMark agentId={message.sender_agent_id} />
                 ) : (
                   initials(message.sender_name)
                 )}

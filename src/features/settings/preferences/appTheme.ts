@@ -140,7 +140,8 @@ function applySnapshot(snapshot: AppThemeSnapshot): void {
   root.classList.toggle("dark", !light);
   root.style.colorScheme = snapshot.mode;
   const cssTokens: Record<string, string> = {
-    "--misty-theme-workspace": mix(tokens.background, "#000000", light ? 0.02 : 0.18),
+    // The window and every page on it are one sheet: no darker chrome around the pages.
+    "--misty-theme-workspace": tokens.background,
     "--misty-theme-bg": tokens.background,
     "--misty-theme-sidebar": tokens.surface,
     "--misty-theme-card": tokens.surfaceRaised,

@@ -1,8 +1,8 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong), src-tauri/src/engine/omp_acp.rs.
 use super::*;
 use crate::engines::registry::ChildEntry;
-use crate::engines::ProcessRegistry;
 use crate::engines::support::event_sink::{Emit, EventSink};
+use crate::engines::ProcessRegistry;
 use std::sync::Mutex as StdMutex;
 
 /// Keeps the raw event JSON: parking is only observable through what the
@@ -77,10 +77,7 @@ fn elicitation_params(message: &str) -> Value {
 }
 
 fn temp_dir(tag: &str) -> PathBuf {
-    let dir = std::env::temp_dir().join(format!(
-        "ccgui-omp-acp-test-{}-{tag}",
-        std::process::id()
-    ));
+    let dir = std::env::temp_dir().join(format!("ccgui-omp-acp-test-{}-{tag}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     dir
@@ -156,9 +153,10 @@ fn approval_frames_match_the_cli_labels_exactly() {
 
 #[test]
 fn parses_the_approval_message_and_binds_the_preview() {
-    let (title, preview) =
-        parse_approval_message("Approve plan \"auth-refactor\" and start implementation?\n\n# 认证重构\n步骤一\n")
-            .expect("approval message");
+    let (title, preview) = parse_approval_message(
+        "Approve plan \"auth-refactor\" and start implementation?\n\n# 认证重构\n步骤一\n",
+    )
+    .expect("approval message");
     assert_eq!(title, "auth-refactor");
     assert_eq!(preview, "# 认证重构\n步骤一\n");
     // Anything not shaped as a review is None (ask messages, truncated messages).
@@ -172,7 +170,10 @@ fn parses_the_approval_message_and_binds_the_preview() {
     assert!(!preview_matches(short, "a\nb\nc\n…"));
     let long: String = (1..=20).map(|n| format!("l{n}\n")).collect();
     let long = long.trim_end_matches('\n');
-    let head12 = (1..=12).map(|n| format!("l{n}")).collect::<Vec<_>>().join("\n");
+    let head12 = (1..=12)
+        .map(|n| format!("l{n}"))
+        .collect::<Vec<_>>()
+        .join("\n");
     assert!(preview_matches(long, &format!("{head12}\n…")));
     assert!(!preview_matches(long, &head12));
     // The body changed after the proposal → refused.
@@ -181,12 +182,18 @@ fn parses_the_approval_message_and_binds_the_preview() {
 
 #[test]
 fn slug_and_heading_follow_the_cli_rules() {
-    assert_eq!(slug_from_title("auth-refactor"), Some("auth-refactor".into()));
+    assert_eq!(
+        slug_from_title("auth-refactor"),
+        Some("auth-refactor".into())
+    );
     // A trailing -plan is stripped (case-insensitive); an empty slug falls back to the sanitized title.
     assert_eq!(slug_from_title("auth-plan"), Some("auth".into()));
     assert_eq!(slug_from_title("auth-PLAN"), Some("auth".into()));
     assert_eq!(slug_from_title("plan"), Some("plan".into()));
-    assert_eq!(slug_from_title("My feature plan.md"), Some("My-feature".into()));
+    assert_eq!(
+        slug_from_title("My feature plan.md"),
+        Some("My-feature".into())
+    );
     assert_eq!(slug_from_title("!!!"), None);
     // The first level-one heading; ## and # without a space don't count.
     assert_eq!(first_heading("# 认证重构\n正文"), Some("认证重构".into()));
@@ -201,21 +208,33 @@ fn session_dir_name_encoding_matches_the_cli() {
     let tmp = Path::new("/private/var/folders/xx");
     // Relative to home (home itself included) → the `-` prefix.
     assert_eq!(
-        encode_session_dir_name(Path::new("/Users/alice/proj"), Some(home), tmp, Path::new("/Users/alice/proj")),
+        encode_session_dir_name(
+            Path::new("/Users/alice/proj"),
+            Some(home),
+            tmp,
+            Path::new("/Users/alice/proj")
+        ),
         "-proj"
     );
-    assert_eq!(
-        encode_session_dir_name(home, Some(home), tmp, home),
-        "-"
-    );
+    assert_eq!(encode_session_dir_name(home, Some(home), tmp, home), "-");
     // Relative to tmp → `-tmp-…`.
     assert_eq!(
-        encode_session_dir_name(Path::new("/private/var/folders/xx/ws"), Some(home), tmp, Path::new("/private/var/folders/xx/ws")),
+        encode_session_dir_name(
+            Path::new("/private/var/folders/xx/ws"),
+            Some(home),
+            tmp,
+            Path::new("/private/var/folders/xx/ws")
+        ),
         "-tmp-ws"
     );
     // Any other absolute path → legacy `--…--`, with separators and colons turned into `-`.
     assert_eq!(
-        encode_session_dir_name(Path::new("/Volumes/data/proj"), Some(home), tmp, Path::new("/Volumes/data/proj")),
+        encode_session_dir_name(
+            Path::new("/Volumes/data/proj"),
+            Some(home),
+            tmp,
+            Path::new("/Volumes/data/proj")
+        ),
         "--Volumes-data-proj--"
     );
 }
@@ -271,9 +290,8 @@ fn verified_plan_loads_only_when_the_preview_matches() {
     assert!(loaded.contains("第一步"));
 
     // A preview that doesn't match → refused (changed after the proposal).
-    let stale = elicitation_params(
-        "Approve plan \"auth\" and start implementation?\n\n# 别的计划\n",
-    );
+    let stale =
+        elicitation_params("Approve plan \"auth\" and start implementation?\n\n# 别的计划\n");
     let error = load_verified_plan(&[local.clone()], &stale).unwrap_err();
     assert!(error.contains("doesn't match"), "{error}");
     // No artifacts root → refused.

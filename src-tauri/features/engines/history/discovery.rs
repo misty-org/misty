@@ -283,26 +283,6 @@ pub(super) fn discover_codebuddy(workspace: &Path) -> Vec<SessionFile> {
     discover_codebuddy_in(&codebuddy_transcripts(), workspace)
 }
 
-/// Session id recorded in a transcript's head. `Ok(None)` means the file was
-/// read successfully but carried no identity; `Err` means that is still unknown.
-pub(super) fn codebuddy_session_id(path: &Path) -> std::io::Result<Option<String>> {
-    Ok(codebuddy_head(path)?.map(|identity| identity.session_id))
-}
-
-/// Every on-disk transcript carrying `session_id`. A successfully read copy
-/// with a damaged/identity-free head falls back to its file stem. An I/O error
-/// skips that copy: its stem is not evidence of the session it belongs to.
-pub(super) fn codebuddy_session_paths(session_id: &str) -> Vec<PathBuf> {
-    codebuddy_transcript_paths()
-        .into_iter()
-        .filter(|path| match codebuddy_session_id(path) {
-            Ok(Some(id)) => id == session_id,
-            Ok(None) => path.file_stem().and_then(|stem| stem.to_str()) == Some(session_id),
-            Err(_) => false,
-        })
-        .collect()
-}
-
 fn codebuddy_metadata_signature(metadata: &std::fs::Metadata) -> Option<(i64, i64)> {
     let mtime_ms = metadata
         .modified()
@@ -313,21 +293,15 @@ fn codebuddy_metadata_signature(metadata: &std::fs::Metadata) -> Option<(i64, i6
     Some((metadata.len() as i64, mtime_ms))
 }
 
-fn codebuddy_head(path: &Path) -> std::io::Result<Option<CodebuddyIdentity>> {
-    let signature = std::fs::metadata(path)
-        .ok()
-        .and_then(|metadata| codebuddy_metadata_signature(&metadata));
-    codebuddy_head_with_signature(path, signature)
-}
-
 fn codebuddy_head_with_signature(
     path: &Path,
     signature: Option<(i64, i64)>,
 ) -> std::io::Result<Option<CodebuddyIdentity>> {
     if let Some(signature) = signature {
-        let cached = CODEBUDDY_HEAD_CACHE.lock().get(path).and_then(|cached| {
-            (cached.signature == signature).then(|| cached.identity.clone())
-        });
+        let cached = CODEBUDDY_HEAD_CACHE
+            .lock()
+            .get(path)
+            .and_then(|cached| (cached.signature == signature).then(|| cached.identity.clone()));
         if let Some(identity) = cached {
             return Ok(identity);
         }
@@ -586,7 +560,8 @@ fn read_qoder_transcript_cwd(path: &Path, bucket: &str) -> Option<String> {
         .find_map(|line| {
             let cwd = line.get("cwd")?.as_str()?;
             (!cwd.is_empty()
-                && (qoder_cli_project_slug(cwd) == bucket || qoder_encode_project_slug(cwd) == bucket))
+                && (qoder_cli_project_slug(cwd) == bucket
+                    || qoder_encode_project_slug(cwd) == bucket))
                 .then(|| cwd.to_owned())
         })
 }
@@ -843,10 +818,16 @@ fn sqlite_has(conn: &rusqlite::Connection, probe: &str) -> bool {
 /// database degrades to "show everything" instead of "show nothing".
 fn opencode_visible_filter(conn: &rusqlite::Connection) -> String {
     let mut filter = String::new();
-    if sqlite_has(conn, "SELECT 1 FROM pragma_table_info('session') WHERE name='parent_id'") {
+    if sqlite_has(
+        conn,
+        "SELECT 1 FROM pragma_table_info('session') WHERE name='parent_id'",
+    ) {
         filter.push_str(" AND parent_id IS NULL");
     }
-    if sqlite_has(conn, "SELECT 1 FROM sqlite_master WHERE type='table' AND name='message'") {
+    if sqlite_has(
+        conn,
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='message'",
+    ) {
         filter.push_str(" AND EXISTS (SELECT 1 FROM message m WHERE m.session_id = session.id)");
     }
     filter
@@ -862,15 +843,16 @@ pub(super) fn opencode_db_visible_sessions(
     if db.file_name().and_then(|n| n.to_str()) != Some("opencode.db") {
         return None;
     }
-    let conn = rusqlite::Connection::open_with_flags(
-        db,
-        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
-    )
-    .ok()?;
+    let conn =
+        rusqlite::Connection::open_with_flags(db, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)
+            .ok()?;
     let mut filter = opencode_visible_filter(&conn);
     // Discovery lists only unarchived rows; an archived one indexed earlier
     // must leave the sidebar too.
-    if sqlite_has(&conn, "SELECT 1 FROM pragma_table_info('session') WHERE name='time_archived'") {
+    if sqlite_has(
+        &conn,
+        "SELECT 1 FROM pragma_table_info('session') WHERE name='time_archived'",
+    ) {
         filter.insert_str(0, " AND time_archived IS NULL");
     }
     let mut visible = std::collections::HashSet::new();
@@ -917,17 +899,19 @@ pub(super) fn opencode_db_updated_times(root: &Path) -> std::collections::HashMa
     if !db.is_file() {
         return Default::default();
     }
-    let Ok(conn) = rusqlite::Connection::open_with_flags(
-        &db,
-        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
-    ) else {
+    let Ok(conn) =
+        rusqlite::Connection::open_with_flags(&db, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)
+    else {
         return Default::default();
     };
     let Ok(mut stmt) = conn.prepare("SELECT id, time_updated FROM session") else {
         return Default::default();
     };
     let Ok(rows) = stmt.query_map([], |r| {
-        Ok((r.get::<_, String>(0)?, r.get::<_, Option<i64>>(1)?.unwrap_or(0)))
+        Ok((
+            r.get::<_, String>(0)?,
+            r.get::<_, Option<i64>>(1)?.unwrap_or(0),
+        ))
     }) else {
         return Default::default();
     };
@@ -1017,7 +1001,11 @@ fn discover_opencode_tree(
                 .get("id")
                 .and_then(|v| v.as_str())
                 .map(str::to_string)
-                .or_else(|| path.file_stem().and_then(|s| s.to_str()).map(str::to_string))
+                .or_else(|| {
+                    path.file_stem()
+                        .and_then(|s| s.to_str())
+                        .map(str::to_string)
+                })
                 .unwrap_or_default();
             if session_id.is_empty()
                 || opencode_tree_superseded(in_database, &session_id, &meta)
@@ -1052,10 +1040,9 @@ fn discover_opencode_db(
     }
     // Read-only: a live `opencode serve` holds the database (WAL), and a scan
     // must never mutate it.
-    let Ok(conn) = rusqlite::Connection::open_with_flags(
-        &db,
-        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
-    ) else {
+    let Ok(conn) =
+        rusqlite::Connection::open_with_flags(&db, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)
+    else {
         return;
     };
     // Since 1.18 a spawned subagent is its own `session` row: `parent_id` is
@@ -1153,9 +1140,11 @@ pub(crate) fn dir_session_anchor_roots(engine: &str) -> Vec<PathBuf> {
         // minimax: session dirs live under <data>/v2/sessions/<date>/…-session_<id>/, and the db
         // row's history_relative_dir holds the relative path; the anchor matches discovery.
         "minimax" => {
-            vec![crate::engines::engine_home(Some("MINIMAX_DATA_DIR"), ".minimax")
-                .join("v2")
-                .join("sessions")]
+            vec![
+                crate::engines::engine_home(Some("MINIMAX_DATA_DIR"), ".minimax")
+                    .join("v2")
+                    .join("sessions"),
+            ]
         }
         _ => Vec::new(),
     }
@@ -1269,12 +1258,14 @@ pub(super) fn discover_agy(workspace: &Path) -> Vec<SessionFile> {
 pub(super) fn discover_minimax(workspace: &Path) -> Vec<SessionFile> {
     let data_dir = crate::engines::engine_home(Some("MINIMAX_DATA_DIR"), ".minimax");
     let sessions_root = data_dir.join("v2").join("sessions");
-    let db_path = data_dir.join("v2").join("sqlite").join("runtime-state.sqlite");
+    let db_path = data_dir
+        .join("v2")
+        .join("sqlite")
+        .join("runtime-state.sqlite");
     let mut out = Vec::new();
-    let Ok(conn) = rusqlite::Connection::open_with_flags(
-        &db_path,
-        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
-    ) else {
+    let Ok(conn) =
+        rusqlite::Connection::open_with_flags(&db_path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)
+    else {
         return out;
     };
     let Ok(mut stmt) = conn.prepare(
@@ -1301,8 +1292,7 @@ pub(super) fn discover_minimax(workspace: &Path) -> Vec<SessionFile> {
             continue;
         }
         let matches = |session_workspace: &str| {
-            !session_workspace.is_empty()
-                && same_or_child(Path::new(session_workspace), workspace)
+            !session_workspace.is_empty() && same_or_child(Path::new(session_workspace), workspace)
         };
         if !matches(workspace_dir.trim()) && !matches(project_dir.trim()) {
             continue;
@@ -1840,14 +1830,20 @@ mod tests {
         let _guard = CodebuddyConfigDirGuard::set(&config_dir);
         inject_codebuddy_head_io_error(&path);
         assert!(discover_codebuddy(&workspace).is_empty());
-        assert_eq!(crate::engines::history::stat_signature(&path), original_stat);
+        assert_eq!(
+            crate::engines::history::stat_signature(&path),
+            original_stat
+        );
 
         // No size/mtime change: only a transient error not entering the cache
         // allows the second discovery to see this session.
         let found = discover_codebuddy(&workspace);
         assert_eq!(found.len(), 1);
         assert_eq!(found[0].session_id, "recovered");
-        assert_eq!(crate::engines::history::stat_signature(&path), original_stat);
+        assert_eq!(
+            crate::engines::history::stat_signature(&path),
+            original_stat
+        );
 
         std::fs::remove_dir_all(&home).ok();
     }
@@ -1958,9 +1954,6 @@ mod tests {
         let found = discover_codebuddy(&workspace);
         assert_eq!(found.len(), 1);
         assert_eq!(found[0].file_path, paths[1]);
-        // Deletion must see every copy, not only the retained one.
-        let copies = codebuddy_session_paths("dup");
-        assert_eq!(copies.len(), 2);
 
         std::fs::remove_dir_all(&home).ok();
     }
@@ -1971,7 +1964,9 @@ mod tests {
         workspace: &Path,
         session_id: &str,
     ) {
-        let wire = session_dir.join("agents").join(crate::known_names::KIMI_PRIMARY_AGENT);
+        let wire = session_dir
+            .join("agents")
+            .join(crate::known_names::KIMI_PRIMARY_AGENT);
         std::fs::create_dir_all(index_dir).unwrap();
         std::fs::create_dir_all(&wire).unwrap();
         std::fs::write(wire.join("wire.jsonl"), "{}\n").unwrap();
@@ -2112,9 +2107,8 @@ mod tests {
             base,
             Path::new(r"E:\公司\深圳睿服科技\04Project\RFKJ\261015RuiFuOperationsBusiPlat"),
         );
-        assert!(dirs.iter().any(|dir| dir.path == base.join(
-            "E------------04Project-RFKJ-261015RuiFuOperationsBusiPlat"
-        )));
+        assert!(dirs.iter().any(|dir| dir.path
+            == base.join("E------------04Project-RFKJ-261015RuiFuOperationsBusiPlat")));
     }
 
     #[test]
@@ -2261,14 +2255,17 @@ mod tests {
         )
         .unwrap();
         let ws = workspace.to_string_lossy().to_string();
-        let insert =
-            |id: &str, directory: &str, parent: Option<&str>, archived: Option<i64>, updated: i64| {
-                conn.execute(
-                    "INSERT INTO session VALUES(?1,?2,?3,?4,?5)",
-                    rusqlite::params![id, directory, parent, archived, updated],
-                )
-                .unwrap();
-            };
+        let insert = |id: &str,
+                      directory: &str,
+                      parent: Option<&str>,
+                      archived: Option<i64>,
+                      updated: i64| {
+            conn.execute(
+                "INSERT INTO session VALUES(?1,?2,?3,?4,?5)",
+                rusqlite::params![id, directory, parent, archived, updated],
+            )
+            .unwrap();
+        };
         let message = |id: &str, session_id: &str| {
             conn.execute(
                 "INSERT INTO message VALUES(?1,?2)",
@@ -2309,7 +2306,12 @@ mod tests {
         let data_root = home.join(".local/share/opencode");
         let project = data_root.join("storage/session/b8119e41");
         std::fs::create_dir_all(&project).unwrap();
-        for (id, updated) in [("ses_migrated", 2), ("ses_archived", 1), ("ses_tree_only", 1), ("ses_downgraded", 50)] {
+        for (id, updated) in [
+            ("ses_migrated", 2),
+            ("ses_archived", 1),
+            ("ses_tree_only", 1),
+            ("ses_downgraded", 50),
+        ] {
             std::fs::write(
                 project.join(format!("{id}.json")),
                 serde_json::json!({"id": id, "projectID": "b8119e41", "directory": ws, "time": {"updated": updated}}).to_string(),
@@ -2335,7 +2337,10 @@ mod tests {
         let mut ids: Vec<&str> = found.iter().map(|f| f.session_id.as_str()).collect();
         ids.sort();
         assert_eq!(ids, ["ses_downgraded", "ses_migrated", "ses_tree_only"]);
-        let migrated = found.iter().find(|f| f.session_id == "ses_migrated").unwrap();
+        let migrated = found
+            .iter()
+            .find(|f| f.session_id == "ses_migrated")
+            .unwrap();
         assert_eq!(
             super::super::split_opencode_db_path(&migrated.file_path),
             Some((db.clone(), "ses_migrated".to_string()))
@@ -2455,7 +2460,11 @@ mod tests {
         let bucket = qoder_cli_project_slug(&frontend.to_string_lossy());
         let transcript = home.join("session.jsonl");
         let read = || {
-            qoder_transcript_cwd(&transcript, &bucket, &std::fs::metadata(&transcript).unwrap())
+            qoder_transcript_cwd(
+                &transcript,
+                &bucket,
+                &std::fs::metadata(&transcript).unwrap(),
+            )
         };
         std::fs::write(&transcript, "{}\n").unwrap();
         assert_eq!(read(), None);

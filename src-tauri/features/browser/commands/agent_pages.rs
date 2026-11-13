@@ -13,11 +13,7 @@ pub(crate) use crate::browser::agent_pages::agent_control::{
 };
 #[cfg(desktop)]
 pub(crate) use crate::browser::agent_pages::page_tools::{
-    __cmd__browser_clear_website_data, __cmd__browser_webview_set_media_hold,
-    __cmd__browser_webview_set_muted, __cmd__browser_webview_stop,
-    __tauri_command_name_browser_clear_website_data,
-    __tauri_command_name_browser_webview_set_media_hold,
-    __tauri_command_name_browser_webview_set_muted, __tauri_command_name_browser_webview_stop,
-    browser_clear_website_data, browser_webview_set_media_hold, browser_webview_set_muted,
-    browser_webview_stop,
+    __cmd__browser_clear_website_data, __cmd__browser_webview_stop,
+    __tauri_command_name_browser_clear_website_data, __tauri_command_name_browser_webview_stop,
+    browser_clear_website_data, browser_webview_stop,
 };

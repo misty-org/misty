@@ -63,7 +63,9 @@ pub fn omp_available(output: &str, marketplace: &str) -> Vec<MarketItem> {
             }
             continue;
         }
-        let Some(entry) = line.strip_prefix("  ") else { continue };
+        let Some(entry) = line.strip_prefix("  ") else {
+            continue;
+        };
         let entry = entry.trim();
         let name = match entry.rsplit_once('@') {
             Some((name, _version)) if !name.is_empty() => name,
@@ -94,7 +96,9 @@ pub fn omp_available(output: &str, marketplace: &str) -> Vec<MarketItem> {
 /// Marks the available items installed and adds the installed ones no marketplace lists any more.
 pub fn omp_mark_installed(items: &mut Vec<MarketItem>, listing: &Value) {
     for entry in listing["marketplace"].as_array().into_iter().flatten() {
-        let Some(id) = text(entry, "id") else { continue };
+        let Some(id) = text(entry, "id") else {
+            continue;
+        };
         let enabled = entry["entries"][0]["enabled"].as_bool().unwrap_or(true);
         if let Some(item) = items.iter_mut().find(|item| item.id == id) {
             item.installed = true;
@@ -149,11 +153,15 @@ pub fn loose_items(engine: &str, listing: &Value) -> Vec<MarketItem> {
         let marketplace = text(entry, "marketplaceName")
             .or_else(|| text(entry, "marketplace"))
             .unwrap_or_default();
-        let id = text(entry, "pluginId").or_else(|| text(entry, "id")).or_else(|| {
-            let name = text(entry, "name")?;
-            (!marketplace.is_empty()).then(|| format!("{name}@{marketplace}"))
-        });
-        let Some(id) = id.filter(|id| valid_id(id)) else { continue };
+        let id = text(entry, "pluginId")
+            .or_else(|| text(entry, "id"))
+            .or_else(|| {
+                let name = text(entry, "name")?;
+                (!marketplace.is_empty()).then(|| format!("{name}@{marketplace}"))
+            });
+        let Some(id) = id.filter(|id| valid_id(id)) else {
+            continue;
+        };
         let installed = entry["installed"].as_bool().unwrap_or(listed_installed);
         if let Some(existing) = items.iter_mut().find(|item| item.id == id) {
             existing.installed |= installed;
@@ -165,7 +173,11 @@ pub fn loose_items(engine: &str, listing: &Value) -> Vec<MarketItem> {
                 .unwrap_or_else(|| readable(&text(entry, "name").unwrap_or(name))),
             description: text(entry, "description").unwrap_or_default(),
             engine: engine.to_string(),
-            marketplace: if marketplace.is_empty() { from_id } else { marketplace },
+            marketplace: if marketplace.is_empty() {
+                from_id
+            } else {
+                marketplace
+            },
             category: text(entry, "category"),
             installed,
             enabled: entry["enabled"].as_bool().unwrap_or(installed),
@@ -247,7 +259,11 @@ pub fn gallery_items(
                 matched[at] = true;
             }
             Some(MarketItem {
-                id: if found.is_some() { installed[found?].name.clone() } else { url.clone() },
+                id: if found.is_some() {
+                    installed[found?].name.clone()
+                } else {
+                    url.clone()
+                },
                 name: readable(&name),
                 description: text(entry, "extensionDescription")
                     .or_else(|| text(entry, "repoDescription"))
@@ -278,7 +294,10 @@ pub fn gallery_items(
             installed: true,
             enabled: true,
             installs: None,
-            link: extension.source.clone().filter(|url| url.starts_with("https://")),
+            link: extension
+                .source
+                .clone()
+                .filter(|url| url.starts_with("https://")),
             sign_in: None,
             stars: None,
         });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { decodeFileLink, isLinkableFilePath, resolveFilePath, toFileLink } from "./fileLinks";
+import { isLinkableFilePath, resolveFilePath } from "./fileLinks";
 
 describe("file links", () => {
   it("knows file paths from commands and prose", () => {
@@ -7,11 +7,6 @@ describe("file links", () => {
       expect(isLinkableFilePath(path)).toBe(true);
     for (const text of ["/commit", "hello", "//host/share", "a/b", "and/or"])
       expect(isLinkableFilePath(text)).toBe(false);
-  });
-
-  it("round-trips a path through its link", () => {
-    const path = "src/notes/my file.md";
-    expect(decodeFileLink(toFileLink(path))).toBe(path);
   });
 
   it("anchors relative paths at the folder and strips line numbers", () => {

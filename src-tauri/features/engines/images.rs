@@ -50,44 +50,6 @@ pub fn save_pasted_image(data_base64: String, extension: String) -> Result<Strin
     store_image_bytes(&bytes, &ext)
 }
 
-/// Images the user picked via the system open dialog arrive as arbitrary
-/// absolute paths; that explicit choice IS the authorization, so the source
-/// needs no workspace confinement — but only a copy inside the sandbox is
-/// handed back, keeping every downstream consumer confined.
-#[tauri::command]
-pub fn import_attachments(paths: Vec<String>) -> Result<Vec<String>, String> {
-    let mut out = Vec::new();
-    for raw in paths {
-        let path = PathBuf::from(raw.trim());
-        let ext = path
-            .extension()
-            .and_then(|e| e.to_str())
-            .unwrap_or("")
-            .to_ascii_lowercase();
-        if !PASTED_IMAGE_EXTENSIONS.contains(&ext.as_str()) {
-            eprintln!(
-                "[images] import skipped (bad extension): {}",
-                path.display()
-            );
-            continue;
-        }
-        let result = std::fs::metadata(&path)
-            .map_err(|e| format!("stat {}: {e}", path.display()))
-            .and_then(|meta| {
-                if meta.len() > MAX_PASTED_IMAGE_BYTES as u64 {
-                    return Err(format!("{} exceeds 8MB", path.display()));
-                }
-                std::fs::read(&path).map_err(|e| format!("read {}: {e}", path.display()))
-            })
-            .and_then(|bytes| store_image_bytes(&bytes, &ext));
-        match result {
-            Ok(stored) => out.push(stored),
-            Err(error) => eprintln!("[images] import skipped: {error}"),
-        }
-    }
-    Ok(out)
-}
-
 /// Queued messages hold pasted-image paths, but the queue lives in memory
 /// only, so nothing references these files after a restart: sweep the dir at
 /// startup to keep app home from growing without bound.
@@ -247,9 +209,11 @@ pub fn claude_stdin_message(
 }
 
 /// Kimi image injection: absolute path tags the CLI reads via ReadMediaFile.
-/// Marker lets history parsing strip the instruction block.
+/// Marker lets history parsing strip the instruction block from older transcripts.
 pub const KIMI_IMAGE_MARKER: &str = "\n\n<!-- ccgui:kimi-image-attachments -->\n";
 
+/// The prompt an older Kimi transcript holds for attached images (the history tests rebuild it).
+#[cfg(test)]
 pub fn kimi_prompt_with_images(prompt: &str, images: &[String], workspace: &Path) -> String {
     let paths: Vec<PathBuf> = images
         .iter()
@@ -292,38 +256,4 @@ pub fn minimax_prompt_with_images(prompt: &str, images: &[String], workspace: &P
         out.push_str(&format!("<image path=\"{}\"></image>\n", path.display()));
     }
     out
-}
-
-/// Grok ACP content blocks for `--prompt-file`; None when no images.
-pub fn grok_prompt_json(
-    prompt: &str,
-    images: &[String],
-    workspace: &Path,
-) -> Result<Option<String>, String> {
-    if images.iter().all(|i| i.trim().is_empty()) {
-        return Ok(None);
-    }
-    let mut blocks: Vec<Value> = Vec::new();
-    if !prompt.trim().is_empty() {
-        blocks.push(json!({ "type": "text", "text": prompt }));
-    }
-    for raw in images {
-        if raw.trim().is_empty() {
-            continue;
-        }
-        let (mime, data) = load_image(raw, workspace)?;
-        blocks.push(json!({ "type": "image", "mimeType": mime, "data": data }));
-    }
-    if blocks
-        .iter()
-        .all(|b| b.get("type").and_then(Value::as_str) != Some("text"))
-    {
-        blocks.insert(
-            0,
-            json!({ "type": "text", "text": "Please analyze the attached image(s)." }),
-        );
-    }
-    serde_json::to_string(&blocks)
-        .map(Some)
-        .map_err(|e| e.to_string())
 }

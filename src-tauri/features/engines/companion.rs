@@ -18,13 +18,23 @@ pub(super) struct CompanionTurn {
 
 pub(super) fn companion_turn(body: &Value, takes_images: bool) -> CompanionTurn {
     if body["mode"].as_str() != Some("companion") {
-        return CompanionTurn { images: Vec::new(), note: None };
+        return CompanionTurn {
+            images: Vec::new(),
+            note: None,
+        };
     }
     let mut images = Vec::new();
     let mut named = Vec::new();
     if takes_images {
-        for capture in body["display_captures"].as_array().into_iter().flatten().take(MOST_SCREENS) {
-            let Some(path) = save_capture(capture) else { continue };
+        for capture in body["display_captures"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .take(MOST_SCREENS)
+        {
+            let Some(path) = save_capture(capture) else {
+                continue;
+            };
             let screen = capture["screen"].as_str().unwrap_or("screen1").to_string();
             let size = |key: &str| capture[key].as_u64().unwrap_or(0) as u32;
             named.push((screen, size("width"), size("height")));
@@ -74,7 +84,10 @@ mod tests {
         });
         let turn = companion_turn(&body, false);
         assert!(turn.images.is_empty());
-        assert!(turn.note.unwrap().contains("No screenshots came with this turn"));
+        assert!(turn
+            .note
+            .unwrap()
+            .contains("No screenshots came with this turn"));
     }
 
     #[test]

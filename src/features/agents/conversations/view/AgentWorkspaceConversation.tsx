@@ -161,11 +161,7 @@ export function AgentWorkspaceConversation({
   const collaboration = useCollaborationComposer({
     accountId,
     conversationId: conversation?.id,
-    working: state.working,
-    send: (prompt, id) => void send(prompt, "", id),
-    ensureConversation,
     clearDraft: () => setDraft(""),
-    reportError,
   });
   const { questions, proposedPlan } = collaboration;
   /** `resume`: an answer to a run that handed off, continued on that run's screen. */
@@ -176,7 +172,7 @@ export function AgentWorkspaceConversation({
     resume = false,
   ) => {
     const written = typed;
-    // /browser attaches Misty's browser to this message; /plan and /goal run as commands.
+    // /browser attaches Misty's browser to this message; /plan runs as a command.
     if (!quote) {
       const rest = takeComputerCommand(
         takeBrowserCommand(typed, conversation?.id),
@@ -366,7 +362,6 @@ export function AgentWorkspaceConversation({
           permission={permission}
           working={state.working}
           send={() => void send()}
-          ensureConversation={ensureConversation}
           reportError={reportError}
         />
       </div>

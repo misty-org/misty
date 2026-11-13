@@ -4,15 +4,8 @@ use super::*;
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BrowserWebviewCreateRequest {
-    /// Temporary offscreen Home capture: no media, popups, downloads, or tab events.
-    #[serde(default)]
-    pub preview_only: bool,
     #[serde(default)]
     pub origin_space_id: Option<String>,
-    #[serde(default)]
-    pub provider_id: Option<String>,
-    #[serde(default)]
-    pub profile_provider_id: Option<String>,
     #[serde(default)]
     pub store_id: Option<String>,
     #[serde(default)]
@@ -35,9 +28,6 @@ pub struct BrowserWebviewCreateRequest {
     /// The agent run this tab works for, for an agent's own tab.
     #[serde(default)]
     pub agent_run_id: Option<String>,
-    /// From another computer, with nobody here looking at it: it plays nothing until released.
-    #[serde(default)]
-    pub hold_media: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -87,8 +77,6 @@ pub struct BrowserWebviewHideRequest {
 pub struct BrowserNavigateRequest {
     pub id: String,
     pub url: String,
-    #[serde(default)]
-    pub oauth_callback: Option<crate::browser::provider_accounts::OAuthCallback>,
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -179,15 +167,6 @@ pub(super) struct BrowserCompatibilityProbe {
 pub(super) struct BrowserCompatibilityEvent {
     pub(super) id: String,
     pub(super) kind: String,
-    pub(super) url: String,
-}
-
-#[derive(Debug, Serialize, Clone)]
-#[serde(rename_all = "camelCase")]
-pub(super) struct BrowserPopupEvent {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub(super) popup_instance_key: Option<String>,
-    pub(super) source_id: String,
     pub(super) url: String,
 }
 

@@ -16,6 +16,7 @@ import {
   type Execution,
 } from "./localExecutionState";
 import { createWorkspaceView } from "./localExecutionView";
+import { trackTaskArtifacts } from "../../artifacts/taskArtifacts";
 
 interface LocalExecutionOptions {
   desktopControl?: boolean;
@@ -104,7 +105,7 @@ export async function startLocalExecution(
     }
     assertCurrent();
     startHeartbeat(execution, assertCurrent);
-    await (await import("../../artifacts/taskArtifacts")).trackTaskArtifacts(accountId);
+    await trackTaskArtifacts(accountId);
     assertCurrent();
     if (previous) await rebindPreviousViews(execution, previous, assertCurrent);
     // Agents use the window's native default profile. Logical

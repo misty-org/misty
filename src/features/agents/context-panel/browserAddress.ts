@@ -25,23 +25,3 @@ export function browserAddress(input: string): string | null {
   }
   return `https://www.google.com/search?q=${encodeURIComponent(typed)}`;
 }
-
-const storageKey = (space: string) => `misty.browser-panel.url:${space || "personal"}`;
-
-/** The page this Space's browser panel last showed on this device, or "" for a blank page. */
-export function rememberedAddress(space: string): string {
-  try {
-    const saved = localStorage.getItem(storageKey(space));
-    return saved && /^https?:\/\//i.test(saved) ? saved : "";
-  } catch {
-    return "";
-  }
-}
-
-export function rememberAddress(space: string, url: string): void {
-  try {
-    localStorage.setItem(storageKey(space), url);
-  } catch {
-    // Without storage the panel starts on a blank page next time.
-  }
-}

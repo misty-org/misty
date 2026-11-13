@@ -165,7 +165,6 @@ export function RichRowsSection() {
               {["writer", "reviewer"].map((id) => (
                 <CommandItem
                   key={id}
-                  icon={Bot}
                   label={id === "writer" ? "Writer" : "Reviewer"}
                   checked={agent === id}
                   onSelect={() => setAgent(id)}

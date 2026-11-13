@@ -27,7 +27,7 @@ import { closeDrawingCollaborationSession } from ".";
 
 export const journalSections = [
   { value: "all", label: "All" },
-  { value: "notes", label: "Notes" },
+  { value: "notes", label: "Docs" },
   { value: "drawings", label: "Drawings" },
 ];
 
@@ -119,7 +119,7 @@ export function JournalAllCollection(props: {
   return (
     <CollectionPage>
       <CollectionHeading
-        title="Journal"
+        title="Docs"
         end={
           <>
             <CollectionSearch
@@ -131,7 +131,7 @@ export function JournalAllCollection(props: {
             {!props.readOnly && <CaptureMenu />}
             {!props.readOnly && (
               <Button variant="primary" icon={Plus} onClick={props.onCreate}>
-                New note
+                New doc
               </Button>
             )}
           </>

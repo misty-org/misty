@@ -1,3 +1,4 @@
+import { platform } from "@/shared/platform/os";
 import { getAppliedAppRenderScale } from "@/shared/hooks/useAppZoom";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import type { DisplayCapture, ScreenControl } from "./protocol";
@@ -66,10 +67,7 @@ export async function withMistyControls(captures: DisplayCapture[]): Promise<Dis
 /** Only while a Misty window is in front: another app could cover a background one. */
 async function focusedWebviewFrame(): Promise<WebviewFrame | undefined> {
   if (document.visibilityState !== "visible") return undefined;
-  const [{ getCurrentWindow }, { platform }] = await Promise.all([
-    import("@tauri-apps/api/window"),
-    import("@tauri-apps/plugin-os"),
-  ]);
+  const { getCurrentWindow } = await import("@tauri-apps/api/window");
   const win = getCurrentWindow();
   const [focused, minimized, origin, factor] = await Promise.all([
     win.isFocused(),

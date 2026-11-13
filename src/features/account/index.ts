@@ -2,7 +2,6 @@ export * from "./AuthContext";
 export { AccountClosingNotice } from "./notices/AccountClosingNotice";
 export { AccountSuspendedNotice } from "./notices/AccountSuspendedNotice";
 export { ServerAlertsNotice } from "./notices/ServerAlertsNotice";
-export { bootstrapDemoSession } from "./sessions/demoSessionBootstrap";
 export * from "./hooks/useAccountAvatarUrl";
 // SavedAccountSession comes through ./store/useAuthTokenStore below.
 export { default as RegisterPage } from "./pages/RegisterPage";

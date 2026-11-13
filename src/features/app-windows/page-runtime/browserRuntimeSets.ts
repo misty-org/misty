@@ -1,8 +1,7 @@
-import type { WorkspaceView } from "../tabs/workspaceViews";
 import { useBrowserRuntimeStore } from "./browserRuntimeStore";
-import type { BrowserBounds, BrowserTheme } from "./pageRuntimeTypes";
+import type { BrowserBounds } from "./pageRuntimeTypes";
 
-/** Page state the runtime modules, its overlay guard and previews share (browserRuntime.ts). */
+/** Page state the runtime modules and its overlay guard share (browserRuntime.ts). */
 export const visibleRuntimeIds = new Set<string>();
 export const desiredVisibleRuntimeIds = new Set<string>();
 export const lastBounds = new Map<string, string>();
@@ -10,42 +9,12 @@ export const browserWebviewSuspensions = new Set<string>();
 
 export const browserRuntimeResumeEvent = "misty:browser-runtime-resume";
 
-export type BrowserRuntimeTab = Pick<WorkspaceView, "id" | "instanceKey">;
-
-export type BrowserSyncInput = {
-  originSpaceId?: string;
-  /** Opaque host-issued context used by agent browser grants. */
-  scopeId?: string;
-  providerId?: string;
-  profileProviderId?: string;
-  tab: WorkspaceView;
-  url: string;
-  bounds: BrowserBounds;
-  theme: BrowserTheme;
-  nativeLiveResize?: boolean;
-};
-
-export interface BrowserSyncState {
-  latest: BrowserSyncInput | null;
-  running: boolean;
-  waiters: Array<{ resolve: () => void; reject: (error: unknown) => void }>;
-}
-
-export const createdRuntimeIds = new Set<string>();
-export const runtimeTabIds = new Map<string, string>();
 export const runtimeQueues = new Map<string, Promise<void>>();
-export const browserSyncStates = new Map<string, BrowserSyncState>();
-/** Runtimes whose tab was closed, with a check for whether it is still gone. */
-export const closedRuntimes = new Map<string, () => boolean>();
-/** Bumped by every sync and park, so a park that a newer sync overtook gives up. */
-export const parkGeneration = { current: 0 };
 
 /**
  * Pages another owner creates and closes, shown through this runtime all the same: an agent's
- * pages beside its chat (agentTabs.ts). They take the tab pages' placement, presented state,
- * first-paint hold, parking and switching, under their own runtime id, with the key their
- * presented state is kept under. This runtime never creates them, and they are not tabs: their
- * page events never reach the person's tabs or history.
+ * pages beside its chat (agentTabs.ts). Each has its runtime id and the key its presented state
+ * is kept under. This runtime never creates them, and they are not tabs.
  */
 export const adoptedPages = new Map<string, string>();
 /** Pages floating a video in picture in picture: parked out of sight when their tab leaves, not
@@ -59,32 +28,10 @@ export function setBrowserRuntimeKeepLive(runtimeId: string, keepLive: boolean):
 
 export const hideRequest = (id: string) => ({ id, keepLive: keepLiveRuntimeIds.has(id) });
 
-export function browserRuntimeId(tab: BrowserRuntimeTab): string {
-  return `tab-${tab.instanceKey.replace(/[^a-zA-Z0-9_-]/g, "-").slice(0, 80)}`;
-}
-
-export function browserScopeId(tab: BrowserRuntimeTab): string {
-  return `scope-${browserRuntimeId(tab)}`;
-}
-
-export function browserTabIdForRuntime(runtimeId: string): string | null {
-  return runtimeTabIds.get(runtimeId) ?? null;
-}
-
-export function registerBrowserRuntime(tab: BrowserRuntimeTab): string {
-  const runtimeId = browserRuntimeId(tab);
-  runtimeTabIds.set(runtimeId, tab.id);
-  return runtimeId;
-}
-
-export function browserRuntimeCreated(tab: BrowserRuntimeTab): boolean {
-  return createdRuntimeIds.has(browserRuntimeId(tab));
-}
-
-/** Whether the tab's page is on screen in its host; until it is, the host paints a fill. */
+/** Whether the page is on screen in its host; until it is, the host paints a fill. */
 export function setBrowserPagePresented(runtimeId: string, presented: boolean): void {
-  const tabId = runtimeTabIds.get(runtimeId) ?? adoptedPages.get(runtimeId);
-  if (tabId) useBrowserRuntimeStore.getState().setPresented(tabId, presented);
+  const key = adoptedPages.get(runtimeId);
+  if (key) useBrowserRuntimeStore.getState().setPresented(key, presented);
 }
 
 export function serializeBounds(bounds: BrowserBounds, nativeLiveResize = false): string {

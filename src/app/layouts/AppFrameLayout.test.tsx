@@ -57,11 +57,6 @@ vi.mock("@/features/updater/UpdateNotices", async (importOriginal) => ({
   UpdateNotices: () => <div data-testid="update-notices" />,
 }));
 
-vi.mock("@/features/devices", async (importOriginal) => ({
-  ...(await importOriginal<Record<string, unknown>>()),
-  DeviceSessionBridge: () => null,
-}));
-
 import { AppFrameLayout } from "./AppFrameLayout";
 
 beforeAll(async () => {

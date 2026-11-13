@@ -41,7 +41,13 @@ fn store_of(app: &AppHandle) -> Option<database::store::Store> {
 /// A run id as a folder name: anything but letters, digits, `-` and `_` becomes `_`.
 fn safe(name: &str) -> String {
     name.chars()
-        .map(|c| if c.is_ascii_alphanumeric() || c == '-' || c == '_' { c } else { '_' })
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || c == '-' || c == '_' {
+                c
+            } else {
+                '_'
+            }
+        })
         .take(120)
         .collect()
 }
@@ -59,7 +65,10 @@ fn due(run_id: &str) -> bool {
         .lock()
         .unwrap_or_else(PoisonError::into_inner);
     let now = Instant::now();
-    if last.get(run_id).is_some_and(|at| now.duration_since(*at) < EVERY) {
+    if last
+        .get(run_id)
+        .is_some_and(|at| now.duration_since(*at) < EVERY)
+    {
         return false;
     }
     last.retain(|_, at| now.duration_since(*at) < Duration::from_secs(600));
@@ -79,15 +88,20 @@ pub(super) fn after_step(app: &AppHandle, run_id: &str, event: &Value) {
     let (app, run_id) = (app.clone(), run_id.to_owned());
     let call = event["toolCallId"].as_str().unwrap_or("").to_owned();
     tauri::async_runtime::spawn(async move {
-        let Some(bytes) =
-            crate::browser::agent_pages::run_picture::picture_of_run(&app, std::slice::from_ref(&run_id)).await
+        let Some(bytes) = crate::browser::agent_pages::run_picture::picture_of_run(
+            &app,
+            std::slice::from_ref(&run_id),
+        )
+        .await
         else {
             return;
         };
         if bytes.len() > MAX_BYTES {
             return;
         }
-        let (Some(store), Some(base)) = (store_of(&app), folder(&app)) else { return };
+        let (Some(store), Some(base)) = (store_of(&app), folder(&app)) else {
+            return;
+        };
         let _ = tauri::async_runtime::spawn_blocking(move || -> Option<()> {
             let connection = store.connect().ok()?;
             // Filed under the run its steps are filed under.
@@ -117,13 +131,25 @@ pub(super) fn forget_run(app: &AppHandle, run_id: &str) {
 
 /// Deletes the picture folders of runs that no longer have steps.
 pub(super) fn prune(app: &AppHandle) {
-    let (Some(base), Some(store)) = (folder(app), store_of(app)) else { return };
-    let Ok(entries) = file_access::fs::read_dir(&base) else { return };
-    let Ok(connection) = store.connect() else { return };
-    let Ok(mut runs) = connection.prepare("SELECT DISTINCT run_id FROM agent_run_steps") else { return };
+    let (Some(base), Some(store)) = (folder(app), store_of(app)) else {
+        return;
+    };
+    let Ok(entries) = file_access::fs::read_dir(&base) else {
+        return;
+    };
+    let Ok(connection) = store.connect() else {
+        return;
+    };
+    let Ok(mut runs) = connection.prepare("SELECT DISTINCT run_id FROM agent_run_steps") else {
+        return;
+    };
     let Ok(known) = runs
         .query_map([], |row| row.get::<_, String>(0))
-        .map(|rows| rows.filter_map(Result::ok).map(|run| safe(&run)).collect::<Vec<_>>())
+        .map(|rows| {
+            rows.filter_map(Result::ok)
+                .map(|run| safe(&run))
+                .collect::<Vec<_>>()
+        })
     else {
         return;
     };
@@ -149,7 +175,10 @@ pub async fn agent_run_step_picture(
     let account = account_of_window(webview.label()).unwrap_or_default();
     let named = picture.len() <= 64
         && picture.ends_with(".jpg")
-        && picture.trim_end_matches(".jpg").chars().all(|c| c.is_ascii_alphanumeric());
+        && picture
+            .trim_end_matches(".jpg")
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric());
     if !named {
         return Err("That isn't a step's picture.".into());
     }

@@ -1,10 +1,9 @@
 import { useServerChoice } from "@/api/deployment/serverChoice";
-import { BackButton } from "@/shared/ui";
+import { BackButton, Button } from "@/shared/ui";
 import { Cloud, Server } from "lucide-react";
 import { useState } from "react";
 import AuthMessage from "../components/AuthMessage";
 import { OwnServerScreen } from "./OwnServerScreen";
-import { ServerOption } from "./ServerChoiceScreen";
 import { useServerSwitch } from "./useServerSwitch";
 
 const ignoreConnected = () => undefined;
@@ -15,8 +14,10 @@ export function useNeedsServer(): boolean {
   return useServerChoice((state) => state.loaded && state.choice?.mode !== "server");
 }
 
-/** Asks for the server on the sign-in pages: Misty Pro or a self-hosted one. Choosing brings the
- * page's own form back. A sign-in link names its own server and opens in the sign-in sheet. */
+/** Asks for the server on the sign-in pages. Misty Cloud is the one way on, in a single button,
+ * since most people never need to know accounts live on a server; their own server is a quiet
+ * second choice. Choosing brings the page's own form back. A sign-in link names its own server
+ * and opens in the sign-in sheet. */
 export function ServerStep() {
   const { switchToMistyCloud } = useServerSwitch();
   const [selfHosted, setSelfHosted] = useState(false);
@@ -46,19 +47,25 @@ export function ServerStep() {
 
   return (
     <div className="flex flex-col gap-2.5">
-      <ServerOption
-        icon={<Cloud />}
-        label="Misty Pro"
-        busy={busy}
+      <Button
+        variant="primary"
+        size="lg"
+        icon={Cloud}
+        loading={busy}
         disabled={busy}
-        onSelect={() => void chooseMistyPro()}
-      />
-      <ServerOption
-        icon={<Server />}
-        label="Self-hosted"
+        onClick={() => void chooseMistyPro()}
+      >
+        Continue with Misty Cloud
+      </Button>
+      <Button
+        variant="quiet"
+        icon={Server}
         disabled={busy}
-        onSelect={() => setSelfHosted(true)}
-      />
+        className="self-center"
+        onClick={() => setSelfHosted(true)}
+      >
+        Use my own server
+      </Button>
       {error ? <AuthMessage tone="error" message={error} /> : null}
     </div>
   );

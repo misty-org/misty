@@ -56,14 +56,12 @@ pub async fn browser_webview_create(
     let label = webview_label(&request.id)?;
     let (position, size) = logical_bounds(request.x, request.y, request.width, request.height);
     let window = caller.window();
-    if !request.preview_only {
-        // A `None` theme reset can repaint WebView2's native scrollbar. Match
-        // the update path and apply a theme only when one is explicit.
-        if let Some(theme) = browser_theme(&request.theme)? {
-            window
-                .set_theme(Some(theme))
-                .map_err(|error| error.to_string())?;
-        }
+    // A `None` theme reset can repaint WebView2's native scrollbar. Match
+    // the update path and apply a theme only when one is explicit.
+    if let Some(theme) = browser_theme(&request.theme)? {
+        window
+            .set_theme(Some(theme))
+            .map_err(|error| error.to_string())?;
     }
     // A live webview's cookie store cannot be changed by updating its metadata.
     // Account switches must close/reopen through the owning host view.
@@ -84,7 +82,7 @@ pub async fn browser_webview_create(
     record_request(&state, &request, &profile)?;
     let shortcut_token = shortcut_token_for(&state, &request.id)?;
     if let Some(webview) = app.get_webview(&label) {
-        return adopt_existing(&app, &state, &window, webview, &request, position, size);
+        return adopt_existing(&app, &state, webview, &request, position, size);
     }
 
     let page_app = app.clone();
@@ -95,7 +93,6 @@ pub async fn browser_webview_create(
     let popup_id = request.id.clone();
     let download_app = app.clone();
     let download_id = request.id.clone();
-    let preview_only = request.preview_only;
     let initial_url = external_url(&request.url)?;
     let builder = with_store_data(
         WebviewBuilder::new(label, WebviewUrl::External(initial_url))
@@ -134,28 +131,11 @@ pub async fn browser_webview_create(
     let initial_bindings = crate::browser::input::shortcuts::current_shortcut_bindings(&state);
     let builder = builder
         .focused(false)
-        .initialization_script(if preview_only {
-            "HTMLMediaElement.prototype.play = function(){ return Promise.resolve(); }; document.addEventListener('play', event => { if (event.target instanceof HTMLMediaElement) { event.target.muted = true; event.target.pause(); } }, true); if (window.AudioContext) window.AudioContext.prototype.resume = function(){ return Promise.resolve(); };"
-        } else { "" })
         .accept_first_mouse(true)
-        // Captions for questions about a video, read in every frame; private tabs keep none.
-        .initialization_script_for_all_frames(if request.private || preview_only {
-            String::new()
-        } else {
-            browser_captions_script()
-        })
-        .initialization_script_for_all_frames(if cfg!(windows) && !preview_only {
+        .initialization_script_for_all_frames(if cfg!(windows) {
             include_str!("../../kiri_link/scripts/background_tab.js")
-        } else { "" })
-        .initialization_script_for_all_frames(if preview_only {
+        } else {
             ""
-        } else {
-            crate::browser::agent_pages::page_tools::MEDIA_HOLD_SCRIPT
-        })
-        .initialization_script_for_all_frames(if request.hold_media && !preview_only {
-            crate::browser::agent_pages::page_tools::media_hold_state(true)
-        } else {
-            String::new()
         })
         .initialization_script(browser_viewport_script(
             &shortcut_token,
@@ -164,7 +144,6 @@ pub async fn browser_webview_create(
         ))
         .initialization_script(browser_status_script(&shortcut_token))
         .initialization_script(kiri::page_script())
-        .initialization_script(crate::browser::agent_pages::page_tools::media_tools::session::MEDIA_SESSION_PAGE_SCRIPT)
         .on_navigation(move |url| {
             // Misty's page scripts report over Kiri's host channel, never by
             // navigating, so every non-web scheme is refused here. This
@@ -172,16 +151,11 @@ pub async fn browser_webview_create(
             // Never turn these requests into URL-only Browser handoffs.
             external_url(url.as_str()).is_ok()
         })
-        .on_new_window(move |url, features| {
-            if preview_only { return NewWindowResponse::Deny; }
-            new_window(&popup_app, &popup_id, url, features)
-        })
+        .on_new_window(move |url, features| new_window(&popup_app, &popup_id, url, features))
         .on_page_load(move |webview, payload| {
-            if preview_only { return; }
             page_load(&page_app, &page_id, webview, payload);
         })
         .on_document_title_changed(move |webview, title| {
-            if preview_only { return; }
             let _ = title_app.emit_to(
                 browser_owner_label(&title_app, &title_id).as_str(),
                 "misty://browser-title",
@@ -194,15 +168,12 @@ pub async fn browser_webview_create(
             request_browser_compatibility(&webview, &title_app, &title_id);
         })
         .on_download(move |_webview, event| {
-            if preview_only { return false; }
             handle_download_event(&download_app, &download_id, event)
         });
     // On Windows a page waits offscreen from the moment it exists: the steps
     // below take long enough for its blank surface to show over the app.
     #[cfg(windows)]
-    let initial_position = if preview_only {
-        position
-    } else {
+    let initial_position = {
         hold_until_first_paint(&app, &request.id);
         PARKED_POSITION
     };
@@ -222,13 +193,9 @@ pub async fn browser_webview_create(
         }
     };
     crate::browser::kiri_link::host_messages::install(&webview)?;
-    if !preview_only {
-        crate::browser::agent_pages::frames::install(&webview)?;
-    }
+    crate::browser::agent_pages::frames::install(&webview)?;
     #[cfg(target_os = "macos")]
-    if !preview_only {
-        crate::browser::pages::url_observer::install(&app, &webview, &request.id)?;
-    }
+    crate::browser::pages::url_observer::install(&app, &webview, &request.id)?;
     #[cfg(windows)]
     crate::browser::pages::process_ended::watch_page_process(&webview);
     #[cfg(windows)]

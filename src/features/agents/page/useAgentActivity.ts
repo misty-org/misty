@@ -37,24 +37,3 @@ export function useAgentActivity(accountId: string, agentId?: string) {
     ? state
     : { key, entries: [], loading: Boolean(accountId), failed: false };
 }
-
-export const activityStateLabels: Record<string, string> = {
-  queued: "Queued",
-  running: "Working",
-  completed: "Done",
-  failed: "Failed",
-  canceled: "Canceled",
-  completed_with_errors: "Done with errors",
-  awaiting_approval: "Needs approval",
-  awaiting_device: "Waiting for signed-in session",
-  awaiting_intervention: "Needs attention",
-};
-
-export const formatActivityTime = (value: string) => {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  const today = new Date().toDateString() === date.toDateString();
-  return today
-    ? `Today, ${date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}`
-    : date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
-};

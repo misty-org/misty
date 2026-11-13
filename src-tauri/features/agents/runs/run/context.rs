@@ -7,8 +7,6 @@ use crate::model_input::TaskInput;
 use crate::web_search::provider::SearchProviderId;
 
 pub(crate) struct SpaceTaskContext {
-    /// The whole body with the device's choices, for the run's file.
-    pub(crate) raw: JsValue,
     pub(crate) model_id: String,
     pub(crate) reasoning_effort: String,
     pub(crate) system: String,
@@ -63,7 +61,6 @@ impl SpaceTaskContext {
             device_search,
             title_prompt: text("title_prompt"),
             summary_request: summary,
-            raw,
         }
     }
 

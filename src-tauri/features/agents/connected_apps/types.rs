@@ -86,6 +86,8 @@ pub struct Toolkit {
 #[serde(default)]
 pub struct ToolkitMeta {
     pub description: String,
+    /// The app's logo as Composio publishes it, for the catalog to show.
+    pub logo: String,
 }
 
 /// A connected app account. Only the display name is read from Composio's `state`.

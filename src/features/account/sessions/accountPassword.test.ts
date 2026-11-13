@@ -5,7 +5,7 @@ vi.mock("@/features/account/api/api", () => ({
   accountApi: { changePassword: mocks.changePassword },
   isAccountUnauthorizedError: (error: unknown) => (error as { status?: number })?.status === 401,
 }));
-import { accountChangePassword, accountSetFirstPassword } from "./accountPassword";
+import { accountSetFirstPassword } from "./accountPassword";
 import { passwordResetToken, rememberPasswordReset } from "./passwordReset";
 import { passwordProblem } from "./passwordRules";
 
@@ -25,31 +25,6 @@ describe("the password rules", () => {
     expect(passwordProblem(`${"a-".repeat(37)}`)).toMatch(/72 bytes/);
     expect(passwordProblem("lower-only")).toBeNull();
     expect(passwordProblem("correct horse battery")).toBeNull();
-  });
-});
-
-describe("changing the account password", () => {
-  it("sends both passwords as typed", async () => {
-    mocks.changePassword.mockResolvedValue({ status: "ok" });
-    await accountChangePassword("old-password", next);
-    expect(mocks.changePassword).toHaveBeenCalledTimes(1);
-    expect(mocks.changePassword).toHaveBeenCalledWith("old-password", next);
-  });
-
-  it("refuses to make the current password the new one", async () => {
-    await expect(accountChangePassword(next, next)).rejects.toThrow("not used before");
-    expect(mocks.changePassword).not.toHaveBeenCalled();
-  });
-
-  it("checks the rules before anything reaches the server", async () => {
-    await expect(accountChangePassword("old-password", "short")).rejects.toThrow("8 characters");
-    expect(mocks.changePassword).not.toHaveBeenCalled();
-  });
-
-  it("reports a wrong current password once, without trying again", async () => {
-    mocks.changePassword.mockRejectedValue(unauthorized);
-    await expect(accountChangePassword("wrong-password", next)).rejects.toBe(unauthorized);
-    expect(mocks.changePassword).toHaveBeenCalledTimes(1);
   });
 });
 

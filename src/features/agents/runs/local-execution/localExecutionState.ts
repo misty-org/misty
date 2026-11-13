@@ -3,6 +3,9 @@ import { invoke } from "@tauri-apps/api/core";
 import type { AiInvocationDeviceContext } from "../invocations";
 import type { GlobalAiContextRef } from "../../conversations/state/conversationTypes";
 import { releaseLease } from "../jobs/executionLease";
+import { useMistyStore } from "../../conversations/state/useMistyStore";
+import { replaceActiveGlobalInvocationStream } from "../../conversations/state/mistyStoreUpdates";
+import { aiSurfaceApi } from "../invocations/api";
 
 export interface Execution {
   taskId: string;
@@ -44,9 +47,6 @@ export async function pauseLocalExecution(expectedTaskId?: string) {
   const epoch = nextExecutionGeneration();
   replaceExecutionHeartbeat();
   useLocalExecution.setState({ execution: { ...execution, state: "paused" } });
-  const { useMistyStore } = await import("@/features/agents/conversations/state/useMistyStore");
-  const { replaceActiveGlobalInvocationStream } =
-    await import("@/features/agents/conversations/state/mistyStoreUpdates");
   const stillCurrent =
     generation === epoch && useLocalExecution.getState().execution?.taskId === execution.taskId;
   const invocationId = stillCurrent ? useMistyStore.getState().invocationId : undefined;
@@ -56,7 +56,6 @@ export async function pauseLocalExecution(expectedTaskId?: string) {
   }
   await releaseLease(execution);
   if (invocationId) {
-    const { aiSurfaceApi } = await import("@/features/agents/runs/invocations/api");
     await aiSurfaceApi.cancelInvocation(invocationId).catch(() => {});
   }
 }

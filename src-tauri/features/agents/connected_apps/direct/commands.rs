@@ -16,6 +16,8 @@ const MAX_CHECKS: usize = 40;
 /// Apps per catalog page.
 const PAGE: usize = 60;
 const ICON_LIMIT: usize = 512 << 10;
+/// How long a logo that couldn't be fetched is left alone before it is asked for again.
+const MISS_RETRY: std::time::Duration = std::time::Duration::from_secs(24 * 60 * 60);
 
 fn person(webview: &tauri::Webview) -> Result<String, Failure> {
     if crate::browser::app_windows::is_person_window(webview.label()) {
@@ -83,7 +85,20 @@ pub async fn direct_apps_icon(app: tauri::AppHandle, url: String) -> Result<Stri
     let name = format!("{:x}", sha2::Sha256::digest(url.as_bytes()));
     let file = folder.join(&name);
     if let Ok(saved) = tokio::fs::read_to_string(&file).await {
-        return if saved.is_empty() { Err(unusable()) } else { Ok(saved) };
+        if !saved.is_empty() {
+            return Ok(saved);
+        }
+        // A miss is asked again after a day, so one bad fetch doesn't leave an app without its
+        // logo for good.
+        let fresh = tokio::fs::metadata(&file)
+            .await
+            .and_then(|meta| meta.modified())
+            .ok()
+            .and_then(|at| at.elapsed().ok())
+            .is_some_and(|age| age < MISS_RETRY);
+        if fresh {
+            return Err(unusable());
+        }
     }
     let fetched = async {
         let response = http().ok()?.get(&url).send().await.ok()?;
@@ -106,7 +121,8 @@ pub async fn direct_apps_icon(app: tauri::AppHandle, url: String) -> Result<Stri
         })
     }
     .await;
-    // A logo that couldn't be had is remembered as empty, so it isn't asked for on every view.
+    // A logo that couldn't be had is remembered as empty for a day, so it isn't asked for on
+    // every view.
     let _ = tokio::fs::create_dir_all(&folder).await;
     let _ = tokio::fs::write(&file, fetched.as_deref().unwrap_or_default()).await;
     fetched.ok_or_else(unusable)

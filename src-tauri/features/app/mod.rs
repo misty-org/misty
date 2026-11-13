@@ -4,9 +4,11 @@
 pub mod app_menu;
 pub mod autostart;
 pub mod commands;
+pub mod dropped_files;
 pub(crate) mod error;
 pub mod handlers;
 pub mod permission_commands;
+pub mod platform_info;
 pub mod plugins;
 pub mod runtime;
 pub mod settings_commands;
@@ -30,6 +32,10 @@ pub mod macos_window_effects;
 pub(crate) mod plugin_routes;
 #[cfg(desktop)]
 pub mod tray;
+#[cfg(target_os = "macos")]
+mod tray_mark;
+#[cfg(target_os = "macos")]
+pub mod tray_panel;
 pub mod trusted_windows;
 #[cfg(windows)]
 pub mod windows;

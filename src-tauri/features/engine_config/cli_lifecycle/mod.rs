@@ -229,6 +229,15 @@ fn update_kind(engine: &str, bin: &str) -> Option<&'static str> {
     if engine == "claude" || engine == "codex" {
         return Some(native_or_npm_kind(engine, bin));
     }
+    // Antigravity ships only through Google's installer.
+    if engine == "agy" {
+        return Some("native");
+    }
+    // OpenCode's own installer needs no Node.js, so a first install takes it; an npm copy keeps
+    // updating through npm. It publishes no Windows script, so Windows stays on npm.
+    if engine == "opencode" && !cfg!(windows) {
+        return Some(native_or_npm_kind(engine, bin));
+    }
     npm_package(engine).map(|_| "npm")
 }
 
@@ -497,16 +506,23 @@ fn shell_kind(shell_path: &str) -> ShellKind {
 /// handle fresh installs and in-place updates; Codex's updates
 /// `~/.local/bin/codex` (or `$CODEX_INSTALL_DIR`) instead of an npm copy.
 fn installer_urls(engine: &str) -> (&'static str, &'static str) {
-    if engine == "codex" {
-        (
+    match engine {
+        "codex" => (
             "https://chatgpt.com/codex/install.sh",
             "https://chatgpt.com/codex/install.ps1",
-        )
-    } else {
-        (
+        ),
+        // Google's Antigravity CLI installs `agy` into `~/.local/bin`.
+        "agy" => (
+            "https://antigravity.google/cli/install.sh",
+            "https://antigravity.google/cli/install.ps1",
+        ),
+        // OpenCode's installs into `~/.opencode/bin`; `update_kind` keeps Windows on npm, so
+        // its Windows half is never used.
+        "opencode" => ("https://opencode.ai/v2/install", ""),
+        _ => (
             "https://claude.ai/install.sh",
             "https://claude.ai/install.ps1",
-        )
+        ),
     }
 }
 
@@ -590,7 +606,11 @@ pub(crate) fn native_installer_argv(engine: &str) -> Option<(String, Vec<String>
         // The full path, never a bare `powershell` a folder could shadow.
         let program = windows_powershell_path();
         let script = format!("irm {ps1} | iex");
-        let args = vec!["-NoProfile".to_string(), "-Command".to_string(), script.clone()];
+        let args = vec![
+            "-NoProfile".to_string(),
+            "-Command".to_string(),
+            script.clone(),
+        ];
         Some((program, args, script))
     } else {
         // pipefail, so a failed download doesn't read as success (a pipe reports its last
@@ -702,7 +722,10 @@ pub(crate) struct ProcOutput {
     pub(crate) timed_out: bool,
 }
 
-pub(crate) async fn run_capture(command: &mut Command, limit: Duration) -> Result<ProcOutput, String> {
+pub(crate) async fn run_capture(
+    command: &mut Command,
+    limit: Duration,
+) -> Result<ProcOutput, String> {
     command
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
@@ -956,7 +979,10 @@ fn settings_sign_in(engine: &str) -> Option<(Option<bool>, Option<String>)> {
     ))
 }
 
-fn sign_in_from_selection(selected: Option<&str>, creds_exist: bool) -> (Option<bool>, Option<String>) {
+fn sign_in_from_selection(
+    selected: Option<&str>,
+    creds_exist: bool,
+) -> (Option<bool>, Option<String>) {
     match selected {
         None | Some("") => (Some(false), None),
         Some(kind @ ("oauth-personal" | "qwen-oauth" | "login-with-google")) => {
@@ -966,11 +992,26 @@ fn sign_in_from_selection(selected: Option<&str>, creds_exist: bool) -> (Option<
     }
 }
 
+/// Antigravity has no status command. On Linux its sign-in leaves a token file (only whether it
+/// exists is looked at); elsewhere the token is in the system keychain, which Misty never reads,
+/// so a sign-in Misty watched finish on this device is what counts.
+fn agy_sign_in() -> (Option<bool>, Option<String>) {
+    let token = crate::engines::agy::agy_home().join("antigravity-oauth-token");
+    let signed_in = (cfg!(target_os = "linux") && is_file_outside_gate(&token))
+        || crate::engines::support::settings::signed_in_here("agy");
+    (Some(signed_in), None)
+}
+
 #[tauri::command]
 pub async fn engine_cli_signed_in(engine: String) -> Result<CliSignInStatus, String> {
     let engine = checked_engine(&engine)?;
     let bin = engine_bin(&engine);
-    if let Some((signed_in, detail)) = settings_sign_in(&engine) {
+    let known = if engine == "agy" {
+        Some(agy_sign_in())
+    } else {
+        settings_sign_in(&engine)
+    };
+    if let Some((signed_in, detail)) = known {
         let installed = probe_local_version(&bin).await.installed;
         return Ok(CliSignInStatus {
             engine,

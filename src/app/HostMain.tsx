@@ -11,10 +11,11 @@ import {
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import ReactDOM from "react-dom/client";
 import { AppErrorBoundary } from "./AppErrorBoundary";
+import { openUrl } from "@tauri-apps/plugin-opener";
 // A link a person clicks opens in their own browser: Misty shows web pages only to agents.
 configureMistyBrowserLinkOpener(async (url) => {
   if (!hasTauriInternals()) throw new Error("Links open only from the desktop app.");
-  await (await import("@tauri-apps/plugin-opener")).openUrl(url);
+  await openUrl(url);
 });
 installExternalLinkRouting();
 initializeHostAgentsRuntime();
@@ -53,8 +54,6 @@ async function bootstrap() {
   void import("./layouts/DesktopLayout").catch(() => undefined);
   // Every request goes to the server this device chose, so the choice is read first.
   await (await import("@/api/deployment/serverChoice")).loadServerChoice();
-  const { bootstrapDemoSession } = await import("@/features/account");
-  await bootstrapDemoSession();
   const [{ App }] = await appModules;
   root.render(
     <AppErrorBoundary>

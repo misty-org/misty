@@ -1,10 +1,10 @@
-/* Misty panel: the app's dark surface beside the content, as a panel of its own */
+/* The side panel: the app's dark surface beside the content, as a panel of its own */
 aside[data-misty-panel] {
   --misty-panel-bg: var(--color-charcoal-bg, #131313);
   background: var(--misty-panel-bg);
 }
-/* Each panel is its own rounded card, as the page is, set off from it and from the other panel
-   by a margin of window chrome. */
+/* The panel is its own rounded card, as the page is, set off from it by a margin of window
+   chrome. */
 aside[data-misty-panel] {
   border: 1px solid var(--color-charcoal-border);
   border-radius: 12px;
@@ -21,42 +21,7 @@ aside[data-misty-panel] {
   border-bottom-left-radius: 12px;
 }
 
-aside[data-misty-panel] .agent-studio,
-aside[data-misty-panel] .agent-studio-canvas,
-aside[data-misty-panel] .agent-studio-task,
-aside[data-misty-panel] .agents-main,
-aside[data-misty-panel] .agents-body {
-  background: transparent;
-}
-
-/* The sticky header and composer paint the panel's own color so the
-   conversation scrolls beneath them instead of showing through. */
-aside[data-misty-panel] .agents-body {
-  --agents-canvas: var(--misty-panel-bg);
-}
-
-/* The chat column keeps a 360px floor in the Agents page; here the panel's own minimum
-   width governs, so the column never outgrows the panel and clips its right edge. */
-aside[data-misty-panel] .agents-chat {
-  min-width: 0;
-}
-
-/* A narrow column: the welcome line sits close above the composer, sized for the panel. */
-aside[data-misty-panel] .agent-conversation[data-empty="true"] {
-  padding-top: clamp(64px, 24vh, 200px);
-}
-aside[data-misty-panel] .agent-studio-welcome {
-  margin-bottom: clamp(56px, 12vh, 112px);
-}
-aside[data-misty-panel] .agent-studio-welcome h1 {
-  font-size: 26px;
-}
-aside[data-misty-panel] .agent-conversation[data-empty="true"] .agent-compose-area {
-  width: auto;
-  max-width: calc(100% - 32px);
-}
-
-/* Each card's inner outline is its resize handle: drag it, or focus it and use the arrow keys.
+/* The card's inner outline is its resize handle: drag it, or focus it and use the arrow keys.
    Like the tab drawer's, it draws nothing of its own, only the resize cursor. The dock places
    it on the card's edge, half over the margin beside the page. */
 .misty-panel-resizer {

@@ -92,17 +92,10 @@ export function migrateTabs(layout: WorkspaceLayout): WorkspaceLayout {
     id: `layout:${view?.id ?? root.id}`,
     root,
     focusedPaneId: layout.focusedPaneId,
-    legacyNameKeys: view ? [`tab:${view.id}`, `group:${view.groupInstanceId}`] : [],
   };
   return {
     ...active,
-    tabs: [
-      active,
-      ...hidden.map((view) => ({
-        ...singleViewTab(view),
-        legacyNameKeys: [`tab:${view.id}`, `group:${view.groupInstanceId}`],
-      })),
-    ],
+    tabs: [active, ...hidden.map(singleViewTab)],
     activeTabId: active.id,
   };
 }

@@ -19,14 +19,12 @@ mod query;
 mod scan;
 mod sources;
 mod store;
-mod summary;
 pub(crate) mod time;
 mod types;
 
 #[cfg(test)]
 mod tests;
 
-pub use summary::{usage_summary, EngineTotals, UsageSummary, UsageTotals};
 pub use types::{PriceInfo, QueryRequest, QueryResponse, ScanSummary, SourceStatus, UsageStatRow};
 
 use scan::{ScanMode, ScanProgress};
@@ -100,12 +98,6 @@ pub async fn sources() -> Result<Vec<SourceStatus>, String> {
     })
     .await
     .map_err(|e| format!("usage sources task: {e}"))
-}
-
-/// Incremental scan now (waits for a running scan to finish first).
-pub async fn refresh() -> Result<ScanSummary, String> {
-    let permit = ScanPermit::acquire().await;
-    run_scan(permit, ScanMode::Incremental).await
 }
 
 /// Forget the index and rebuild it from the logs. Readers keep the old

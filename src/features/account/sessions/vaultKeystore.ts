@@ -1,8 +1,7 @@
 import { deploymentStorageKey, readDeploymentStorageItem } from "@/api/deployment/api";
 import { remove, retrieve, store } from "@impierce/tauri-plugin-keystore";
 import {
-  activeHostedAccountId,
-  hostedSessions,
+  activeVaultAccountId,
   parseSecureVault,
   type SavedAccountSession,
   type SecureAccountVault,
@@ -36,16 +35,12 @@ async function readSecureVault(): Promise<SecureAccountVault> {
   } catch {
     // A missing credential file is a normal signed-out state.
   }
-  const parsed = parseSecureVault(raw);
-  cachedVault = parsed.vault;
-  if (parsed.migrated && parsed.vault.sessions.length > 0) {
-    await persistSecureVault(parsed.vault);
-  } else if (parsed.vault.sessions.length > 0) {
-    // Record what the keystore already holds so an unchanged re-persist on the
-    // common cold-start path is skipped.
-    lastPersistedPayload = JSON.stringify(parsed.vault);
-  }
-  return parsed.vault;
+  const vault = parseSecureVault(raw);
+  cachedVault = vault;
+  // Record what the keystore already holds so an unchanged re-persist on the common cold-start
+  // path is skipped.
+  if (vault.sessions.length > 0) lastPersistedPayload = JSON.stringify(vault);
+  return vault;
 }
 export async function persistSecureVault(vault: SecureAccountVault): Promise<void> {
   cachedVault = vault;
@@ -67,8 +62,8 @@ export async function persistSecureVault(vault: SecureAccountVault): Promise<voi
     lastPersistedPayload = payload;
   }
   writeAccountIndex(
-    hostedSessions(vault).map((item) => item.account),
-    activeHostedAccountId(vault),
+    vault.sessions.map((item) => item.account),
+    activeVaultAccountId(vault),
   );
   writeTokenStoredMarker(true);
 }

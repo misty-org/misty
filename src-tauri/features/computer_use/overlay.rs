@@ -40,7 +40,9 @@ static INNER: LazyLock<Mutex<Inner>> = LazyLock::new(|| {
 static APP: OnceLock<AppHandle> = OnceLock::new();
 
 fn inner() -> std::sync::MutexGuard<'static, Inner> {
-    INNER.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+    INNER
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
 pub(crate) fn init(app: &AppHandle) {

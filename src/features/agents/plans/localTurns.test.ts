@@ -27,7 +27,6 @@ import {
 import { rows, settings } from "@/features/agents/tools/run-state/fakeMistyDb.test-support";
 import { openQuestionSet } from "@/features/agents/tools/run-state/questions";
 import { forgetKnownRunsForTests } from "@/features/agents/tools/runContexts";
-import { setGoal } from "@/features/agents/tools/run-state/goals";
 import { collaborationApi } from "./api";
 import { admitLocalTurn, supersedeRunQuestions } from "./localTurns";
 import { turnModes } from "./permissionMode";
@@ -103,26 +102,6 @@ it("a chat with nothing saved keeps the draft mode for its first turn", async ()
   await store.load("new");
   expect(useCollaborationStore.getState().byConversation.new).toBeUndefined();
   expect(turnModes("new", true).collaborationMode).toBe("plan");
-});
-
-it("after a run the store queues the goal's next turn itself", async () => {
-  await changeConversationState("me", "chat", (state) =>
-    setGoal(state, { id: "g", objective: "Ship", successCriteria: [], now: Date.now() }),
-  );
-  useCollaborationStore.getState().afterRunSettled(
-    "chat",
-    () => undefined,
-    () => false,
-    { runId: "r1", completed: true, waitingOnPerson: false },
-  );
-  await vi.waitFor(() =>
-    expect(useCollaborationStore.getState().queuedTurn?.prompt).toBe(
-      "Continue working toward the goal (continuation 1 of 20).",
-    ),
-  );
-  await vi.waitFor(() =>
-    expect(useCollaborationStore.getState().byConversation.chat?.goal?.continuationCount).toBe(1),
-  );
 });
 
 it("answering through the store passes the continuation on", async () => {

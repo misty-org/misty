@@ -2,7 +2,6 @@ import "@/app/SettingsSections";
 import { describe, expect, it } from "vitest";
 import { settingDefinitions } from "./device-preferences/registry";
 import {
-  canonicalSettingsSection,
   preferenceSection,
   preferencesWithoutRows,
   settingsAreaEntry,
@@ -51,24 +50,14 @@ describe("settings registry", () => {
 });
 
 describe("settings routing", () => {
-  it("resolves every section id, retired or not, to a block that exists", () => {
-    for (const section of settingsSections)
-      expect(blockIds.has(canonicalSettingsSection(section)), section).toBe(true);
-  });
-
-  it("sends retired pages to where their settings live now", () => {
-    expect(settingsPage("diagnostics")?.area).toBe("advanced");
-    expect(settingsPage("browser")?.area).toBe("general");
-    expect(settingsPage("search")?.id).toBe("general");
-    expect(settingsPage("browser-handoff")?.id).toBe("account");
-    expect(settingsPage("sync")?.id).toBe("account");
-    expect(settingsPage("about")?.id).toBe("account");
+  it("resolves every section id to a block that exists", () => {
+    for (const section of settingsSections) expect(blockIds.has(section), section).toBe(true);
   });
 
   it("lands every “manage it in Settings” link on the page that holds it", () => {
     const links: Record<string, [SettingsSection, string]> = {
       "update notice": ["updates", "general"],
-      "clipboard devices": ["devices", "account"],
+      "MCP servers": ["engine-mcp", "tools"],
     };
     for (const [link, [section, area]] of Object.entries(links))
       expect(settingsPage(section)?.area, link).toBe(area);
@@ -80,8 +69,7 @@ describe("settings routing", () => {
       const section = preferenceSection(definition.id, definition.page);
       expect(blockIds.has(section), `${definition.id} → ${section}`).toBe(true);
     }
-    expect(preferenceSection("app.diagnostics.framePacing", "about")).toBe("advanced");
-    expect(preferenceSection("browser.linkPreviews", "browser-appearance")).toBe("advanced");
+    expect(preferenceSection("app.appearance.compact_mode_enabled", "appearance")).toBe("advanced");
   });
 });
 

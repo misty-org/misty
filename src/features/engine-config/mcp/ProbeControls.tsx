@@ -5,8 +5,7 @@
  * What a connection check shows: a status badge, the check button and the details.
  *
  * The badge sits on the entry's row (to see everything at a glance); the details give the error,
- * the server's own name, its tools and how long it took. The settings block and the `/mcp` panel
- * share one set of results (`useMcpProbeStore`).
+ * the server's own name, its tools and how long it took. Results are kept in `useMcpProbeStore`.
  */
 import { Activity, AlertTriangle, Check, X } from "lucide-react";
 import { useMemo } from "react";

@@ -7,16 +7,11 @@ export { usePresentedPageHost } from "./webviews/presentedPageHost";
 export { BrowserRuntimeBridge } from "./webviews/BrowserRuntimeBridge";
 export { SiteIcon } from "./webviews/SiteIcon";
 export {
-  browserRuntimeIdForTabId,
   closeOrphanAgentPages,
   closeOrphanBrowserPages,
   hideAdoptedBrowserPage,
   requestBrowserWebviewLayoutByRuntimeId,
   scheduleStrayPageSweep,
   showAdoptedBrowserPage,
-  windowChromeChangedEvent,
 } from "./webviews/browserRuntime";
-export { providerFromRoute } from "./webviews/providers";
-export { websiteIntegrations } from "./webviews/websiteIntegrations";
-export { BrowserPermissionSettings } from "./settings/BrowserPermissionSettings";
 export { PrivacySection } from "./settings/PrivacySection";

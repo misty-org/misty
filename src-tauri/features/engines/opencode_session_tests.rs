@@ -4,7 +4,10 @@ use super::*;
 #[test]
 fn a_command_is_its_name_and_what_follows() {
     assert_eq!(command_in(" /init "), Some(("init", "")));
-    assert_eq!(command_in("/review the parser\nonly"), Some(("review", "the parser\nonly")));
+    assert_eq!(
+        command_in("/review the parser\nonly"),
+        Some(("review", "the parser\nonly"))
+    );
     assert_eq!(command_in("/usr/bin is a path"), None);
     assert_eq!(command_in("hello /init"), None);
     assert_eq!(command_in("/"), None);
@@ -71,8 +74,8 @@ fn reply_answers_orders_labels_and_free_text_per_question() {
 #[tokio::test]
 async fn serves_a_full_question_turn_against_a_mock_server() {
     use crate::engines::registry::ChildEntry;
-    use crate::engines::ProcessRegistry;
     use crate::engines::support::event_sink::{Emit, EventSink};
+    use crate::engines::ProcessRegistry;
     use std::sync::Mutex as StdMutex;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use tokio::net::TcpListener;
@@ -255,8 +258,8 @@ async fn serves_a_full_question_turn_against_a_mock_server() {
     let context = parked.get("opencode").cloned().expect("answer context");
     let origin = context["origin"].as_str().unwrap().to_string();
     let directory = context["directory"].as_str().unwrap().to_string();
-    let answers = reply_answers(&context["request"], &json!({ "部署到哪?": "prod" }))
-        .expect("reply answers");
+    let answers =
+        reply_answers(&context["request"], &json!({ "部署到哪?": "prod" })).expect("reply answers");
     opencode_server::post(
         &origin,
         "/question/que_mock/reply",
@@ -361,8 +364,7 @@ fn attaches_the_window_only_when_usage_omits_it() {
     windows.insert("qf/deepseek-v4.1-flash".to_string(), 1_048_576u64);
     let info = json!({ "providerID": "qf", "modelID": "deepseek-v4.1-flash" });
 
-    let usage =
-        attach_context_window(json!({ "input": 12018, "output": 50 }), &info, &windows);
+    let usage = attach_context_window(json!({ "input": 12018, "output": 50 }), &info, &windows);
     assert_eq!(usage["model_context_window"], 1_048_576);
 
     // An engine-reported window wins; an unknown model stays untouched.

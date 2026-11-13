@@ -8,8 +8,6 @@ const api = vi.hoisted(() => ({
   approvePlan: vi.fn(),
   revisePlan: vi.fn(),
   rejectPlan: vi.fn(),
-  setGoal: vi.fn(),
-  controlGoal: vi.fn(),
 }));
 vi.mock("./api", () => ({ collaborationApi: api }));
 
@@ -58,7 +56,6 @@ const loaded = (overrides: Partial<ConversationCollaboration> = {}): Conversatio
   checklists: [],
   plan: null,
   planHistory: [],
-  goal: null,
   questionSets: [],
   runningInvocationId: "",
   ...overrides,
@@ -116,18 +113,6 @@ it("applies question and plan events, ignoring a stale plan version", () => {
     [3, "proposed"],
     [2, "superseded"],
   ]);
-});
-
-it("hands a queued turn to the conversation exactly once", () => {
-  const store = useCollaborationStore.getState();
-  store.queueTurn("c1", "Start working toward the goal");
-  const queued = useCollaborationStore.getState().queuedTurn!;
-  store.takeTurn(queued.nonce + 1);
-  expect(useCollaborationStore.getState().queuedTurn).toBeDefined();
-  store.takeTurn(queued.nonce);
-  expect(useCollaborationStore.getState().queuedTurn).toBeUndefined();
-  store.queueTurn("", "ignored");
-  expect(useCollaborationStore.getState().queuedTurn).toBeUndefined();
 });
 
 it("drops another account's state and answers", async () => {

@@ -4,24 +4,13 @@ import {
   changeConversationState,
   collaborationOf,
   conversationStateExists,
-  publicGoal,
   publicQuestionSet,
   readConversationState,
 } from "../tools/run-state/conversationState";
 import { RunStateError, runStateAccount } from "../tools/run-state/documents";
-import {
-  claimDailyContinuation,
-  controlGoal,
-  goalAfterRun,
-  pauseGoal,
-  setGoal,
-  type FinishedRun,
-} from "../tools/run-state/goals";
 import { approvePlan, rejectPlan, revisePlan } from "../tools/run-state/plans";
 import { answerQuestionSet, questionContinuationPrompt } from "../tools/run-state/questions";
-import { runContext } from "../tools/runContexts";
 import type {
-  AgentGoal,
   AgentPlan,
   AgentPlanPayload,
   AgentQuestionAnswer,
@@ -107,59 +96,4 @@ export const localCollaborationApi = {
     );
     return { plan: rejected };
   },
-  async setGoal(
-    conversationId: string,
-    input: { objective: string; successCriteria: string[]; budgetTokens?: number },
-  ) {
-    const goal = await changeConversationState(account(), conversationId, (state) =>
-      setGoal(state, { id: `goal_${crypto.randomUUID()}`, ...input, now: Date.now() }),
-    );
-    return {
-      goal: publicGoal(goal),
-      prompt: `Start working toward the goal: ${goal.objective}`,
-    };
-  },
-  async controlGoal(
-    goal: AgentGoal,
-    status: "paused" | "pursuing" | "cleared",
-    budgetTokens?: number,
-  ) {
-    const updated = await changeConversationState(account(), goal.conversationId, (state) =>
-      controlGoal(state, goal.id, status, budgetTokens ?? 0, Date.now()),
-    );
-    return {
-      goal: publicGoal(updated),
-      ...(updated.status === "pursuing"
-        ? { prompt: `Resume working toward the goal: ${updated.objective}` }
-        : {}),
-    };
-  },
 };
-
-/** What a chat knows about a run that just ended. */
-export type LocalRunEnd = Omit<FinishedRun, "voice">;
-
-/**
- * Counts a finished run against its chat's goal. Returns the next turn when the goal goes on; any
- * window may ask, and only the first gets it. The server did this when a run completed.
- */
-export async function continueGoalAfterRun(
-  owner: string,
-  conversationId: string,
-  run: LocalRunEnd,
-): Promise<string | undefined> {
-  const context = await runContext(run.runId, 1);
-  const prompt = await changeConversationState(owner, conversationId, (state) =>
-    goalAfterRun(state, { ...run, voice: Boolean(context?.voice) }, Date.now()),
-  );
-  if (!prompt) return undefined;
-  if (await claimDailyContinuation(owner, Date.now())) return prompt;
-  await changeConversationState(owner, conversationId, (state) =>
-    pauseGoal(
-      state,
-      "Misty couldn't start the next step toward the goal. Resume to try again.",
-      Date.now(),
-    ),
-  );
-  return undefined;
-}

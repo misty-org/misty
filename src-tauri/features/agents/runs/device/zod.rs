@@ -89,19 +89,6 @@ pub(crate) fn number_value(number: f64) -> Value {
     serde_json::Number::from_f64(number).map_or(Value::Null, Value::Number)
 }
 
-/// A value read as JavaScript reads it, for a reply. Its order doesn't survive, and doesn't need to:
-/// the app has always handed replies to the renderer through a `serde_json::Value`.
-pub(super) fn to_value(value: &JsValue) -> Value {
-    match value {
-        JsValue::Null => Value::Null,
-        JsValue::Bool(value) => Value::Bool(*value),
-        JsValue::Number(value) => number_value(*value),
-        JsValue::String(text) => Value::String(text.clone()),
-        JsValue::Array(items) => Value::Array(items.iter().map(to_value).collect()),
-        JsValue::Object(fields) => Value::Object(fields.iter().map(|(key, field)| (key.clone(), to_value(field))).collect()),
-    }
-}
-
 /// Keeps only the schema's fields, in the schema's order, as a parsed zod object does.
 pub(super) fn picked(fields: Vec<(&str, Option<JsValue>)>) -> JsValue {
     JsValue::Object(fields.into_iter().filter_map(|(key, value)| Some((key.to_owned(), value?))).collect())

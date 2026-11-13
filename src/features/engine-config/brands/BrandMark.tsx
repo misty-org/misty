@@ -6,6 +6,7 @@
 // The marks belong to their owners and only name their products.
 import { Globe } from "lucide-react";
 import { createElement, useId, type ReactNode } from "react";
+import { LogoPlate } from "@/shared/ui";
 import shapes from "./brandMarks.json";
 
 type Shape = [string, Record<string, string>, Shape[]?];
@@ -44,6 +45,15 @@ function Mark({ mark, size }: { mark: Mark; size: number }) {
   );
 }
 
+/** A mark on its plate where it would disappear on the theme (`logoPlates`). */
+function PlatedMark({ id, mark, size }: { id: string; mark: Mark; size: number }) {
+  return (
+    <LogoPlate logo={`provider:${id}`}>
+      <Mark mark={mark} size={size} />
+    </LogoPlate>
+  );
+}
+
 /**
  * A provider's mark in the 32px slot rows use, bare; a globe when it has no public mark, never a
  * letter dressed up as a brand.
@@ -52,8 +62,8 @@ export function BrandTile({ mark, size = 20 }: { mark: string | null | undefined
   const found = mark ? marks[mark] : undefined;
   return (
     <span className="flex size-8 shrink-0 items-center justify-center text-cream">
-      {found ? (
-        <Mark mark={found} size={size} />
+      {found && mark ? (
+        <PlatedMark id={mark} mark={found} size={size} />
       ) : (
         <Globe className="size-4 text-cream-muted" aria-hidden />
       )}
@@ -61,8 +71,12 @@ export function BrandTile({ mark, size = 20 }: { mark: string | null | undefined
   );
 }
 
-/** Just the mark, at `size` pixels, or nothing when there is none. */
+/** Just the mark, at `size` pixels, or a globe when the provider has no public mark. */
 export function BrandMark({ mark, size = 16 }: { mark: string | null | undefined; size?: number }) {
   const found = mark ? marks[mark] : undefined;
-  return found ? <Mark mark={found} size={size} /> : null;
+  return found && mark ? (
+    <PlatedMark id={mark} mark={found} size={size} />
+  ) : (
+    <Globe width={size} height={size} aria-hidden />
+  );
 }

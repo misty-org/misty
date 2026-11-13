@@ -1,5 +1,6 @@
 import { X } from "lucide-react";
-import { useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { useId, useRef, type KeyboardEvent, type ReactNode } from "react";
+import { reorderIds, usePointerReorder } from "../../hooks/usePointerReorder";
 import { cn } from "../classNames";
 import { IconButton } from "../controls/IconButton";
 import { Pressable } from "../controls/Pressable";
@@ -29,19 +30,16 @@ export interface TabStripProps {
   onClose?(id: string): void;
   /** Moves a dragged tab to `index`; without it tabs don't drag. */
   onReorder?(id: string, index: number): void;
-  /** Controls after the tabs that never scroll away, such as a New tab button. */
+  /** A control right after the last tab that scrolls with them, such as a New tab button. */
+  after?: ReactNode;
+  /** Controls at the row's far end that never scroll away. */
   end?: ReactNode;
 }
 
+// Tabs are a sidebar row's height and padding, with 6px above and below them in the row.
 const tabClass = cn(
-  "group/tab relative flex h-8 min-w-24 max-w-48 flex-none items-center rounded-md",
-  "hover:bg-control-hover data-[selected]:bg-control-active data-[dragging]:opacity-50",
-);
-
-// The closer shows on hover, while the tab holds focus, and always on the open tab.
-const closerClass = cn(
-  "mr-1 opacity-0 group-hover/tab:opacity-100 group-focus-within/tab:opacity-100",
-  "group-data-[selected]/tab:opacity-100",
+  "group/tab relative flex h-8 min-w-32 max-w-60 flex-none items-center rounded-md",
+  "hover:bg-control-hover data-[selected]:bg-control-active",
 );
 
 /** The tab a key moves to from `index`, or -1 for a key the strip leaves alone. */
@@ -56,8 +54,9 @@ function nextTabIndex(key: string, index: number, count: number): number {
 /**
  * A row of tabs over a pane: 32px tabs with an icon and a label that fades when long, a closer
  * that shows on hover and on the open tab, arrows and Home/End to move between them, a middle
- * click or the closer to close, dragging to reorder, and the tab's menu on a right-click. The row
- * scrolls sideways when the tabs don't fit, never wrapping. `end` holds controls after the tabs.
+ * click or the closer to close, dragging (or Alt+Shift and an arrow) to reorder, and the tab's menu on a right-click. The row
+ * scrolls sideways when the tabs don't fit, never wrapping. `after` holds a control right after
+ * the last tab and `end` controls at the far end.
  *
  * ```tsx
  * <TabStrip label="Terminals" tabs={tabs} active={activeId} onSelect={select} onClose={close}
@@ -65,8 +64,23 @@ function nextTabIndex(key: string, index: number, count: number): number {
  * ```
  */
 export function TabStrip(props: TabStripProps) {
-  const list = useRef<HTMLDivElement>(null);
-  const [dragging, setDragging] = useState<string | null>(null);
+  const list = useRef<HTMLDivElement | null>(null);
+  const ids = props.tabs.map((tab) => tab.id);
+  const moveTo = (id: string, order: string[]) => props.onReorder?.(id, order.indexOf(id));
+  const reorder = usePointerReorder({
+    scope: useId(),
+    axis: "x",
+    animate: true,
+    getDrag: (id) => {
+      const tab = props.tabs.find((candidate) => candidate.id === id);
+      return props.onReorder && tab ? { id, label: tab.label } : null;
+    },
+    onDrop: (drag, target, after) => moveTo(drag.id, reorderIds(ids, [drag.id], target, after)),
+    onKeyboardMove: (id, direction) => {
+      const target = ids[ids.indexOf(id) + direction];
+      if (target) moveTo(id, reorderIds(ids, [id], target, direction === 1));
+    },
+  });
 
   const focusTab = (id: string) =>
     requestAnimationFrame(() =>
@@ -82,12 +96,19 @@ export function TabStrip(props: TabStripProps) {
   };
 
   return (
-    <div className="flex h-10 flex-none items-center gap-1 border-b px-2">
+    <div className="flex h-11 flex-none items-center gap-1 border-b px-1">
       <div
-        ref={list}
+        {...reorder}
+        ref={(element) => {
+          list.current = element;
+          reorder.ref(element);
+        }}
         role="tablist"
         aria-label={props.label}
-        className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto [scrollbar-width:none]"
+        className={cn(
+          "flex min-w-0 flex-1 items-center overflow-x-auto [scrollbar-width:none]",
+          "gap-1",
+        )}
       >
         {props.tabs.map((tab, index) => {
           const selected = tab.id === props.active;
@@ -95,22 +116,10 @@ export function TabStrip(props: TabStripProps) {
           const body = (
             <div
               data-selected={selected || undefined}
-              data-dragging={dragging === tab.id || undefined}
+              data-reorder-item={tab.id}
+              data-reorder-handle={props.onReorder ? "" : undefined}
+              data-reorder-preview=""
               className={tabClass}
-              draggable={Boolean(props.onReorder)}
-              onDragStart={(event) => {
-                setDragging(tab.id);
-                event.dataTransfer.effectAllowed = "move";
-              }}
-              onDragEnd={() => setDragging(null)}
-              onDragOver={(event) => {
-                if (dragging && dragging !== tab.id) event.preventDefault();
-              }}
-              onDrop={(event) => {
-                event.preventDefault();
-                if (dragging) props.onReorder?.(dragging, index);
-                setDragging(null);
-              }}
               onAuxClick={(event) => {
                 if (event.button === 1 && closable) props.onClose?.(tab.id);
               }}
@@ -140,7 +149,9 @@ export function TabStrip(props: TabStripProps) {
                 <IconButton
                   label={tab.closeLabel!}
                   size="sm"
-                  className={closerClass}
+                  // Always shown, on every tab, not only the open or hovered one.
+                  className="mr-1"
+                  data-reorder-ignore=""
                   onClick={() => props.onClose?.(tab.id)}
                 >
                   <X />
@@ -161,6 +172,7 @@ export function TabStrip(props: TabStripProps) {
             </div>
           );
         })}
+        {props.after ? <div className="flex flex-none items-center">{props.after}</div> : null}
       </div>
       {props.end ? <div className="flex flex-none items-center gap-1">{props.end}</div> : null}
     </div>

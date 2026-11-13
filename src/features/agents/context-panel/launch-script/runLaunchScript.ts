@@ -10,20 +10,24 @@ import { terminalApi } from "../terminal/terminalApi";
 import { useTerminalStore } from "../terminal/terminalStore";
 import type { LaunchScriptEntry } from "./launchScripts";
 
-/** The one terminal tab a folder's start commands run in, every time. */
+/** The one terminal tab a chat's start commands for a folder run in, every time. */
 export const LAUNCH_TAB_KEY = "launch";
 
 /**
- * Runs a start command in the folder's launch tab. Every run starts that tab's shell again
+ * Runs a start command in the chat's launch tab for the folder. Every run starts that tab's shell again
  * (close, then open), so a shell that ended, or a server still running from the last run, never
  * swallows the command. The terminal panel opens to show it.
  */
-export async function runLaunchScript(folder: string, entry: LaunchScriptEntry): Promise<void> {
+export async function runLaunchScript(
+  chat: string,
+  folder: string,
+  entry: LaunchScriptEntry,
+): Promise<void> {
   // Output is kept even before any terminal view has mounted.
   ensureTerminalOutputListener();
   const id = useTerminalStore
     .getState()
-    .ensureTab(folder, LAUNCH_TAB_KEY, entry.label || "Start command");
+    .ensureTab(chat, folder, LAUNCH_TAB_KEY, entry.label || "Start command");
   useContextPanel.getState().show("terminal");
   if (hasTerminalSession(id)) {
     markTerminalClosed(id);

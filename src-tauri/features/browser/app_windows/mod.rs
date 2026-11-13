@@ -17,22 +17,15 @@ use std::sync::Mutex;
 use tauri::{AppHandle, Emitter, EventTarget, Manager, Runtime, Window};
 
 mod commands;
-mod diagnostics;
 mod lifecycle;
-mod links;
-#[cfg(target_os = "macos")]
-pub(crate) mod macos;
 mod registry;
 mod routing;
 mod saved;
 pub(crate) mod window_geometry;
 pub use commands::*;
-pub use diagnostics::*;
 pub use lifecycle::*;
-pub(crate) use links::*;
 pub use registry::*;
 pub use routing::*;
-pub mod navigation_names;
 #[cfg(test)]
 mod tests;
 #[cfg(windows)]
@@ -42,8 +35,6 @@ pub mod workspace_recovery;
 /// The first profile's id, the same on every computer and for every account.
 pub const PERSONAL: &str = "personal";
 const WINDOW_PREFIX: &str = "window-";
-/// Emitted to a window's app when its profile's name or color changes.
-pub const PROFILE_CHANGED_EVENT: &str = "misty://profile-window";
 /// Emitted to every window when the list of profiles changes.
 pub const PROFILES_CHANGED_EVENT: &str = "misty://profiles-changed";
 /// Tells a profile's windows that a closed window left tabs for them to take.

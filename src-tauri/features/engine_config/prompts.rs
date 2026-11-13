@@ -460,12 +460,6 @@ pub async fn engine_prompts_list(path: String) -> Result<Vec<CustomPromptEntry>,
     blocking(move || prompts_list_blocking(&path)).await
 }
 
-/// Both scopes' folders, made if missing, to open in the file manager.
-#[tauri::command]
-pub async fn engine_prompts_dirs(path: String) -> Result<PromptsDirs, String> {
-    blocking(move || prompts_dirs_blocking(&path)).await
-}
-
 /// Opens one scope's prompts folder (`workspace` or `global`) in the file manager, made if missing.
 /// The folder is worked out here, so a window can't open anything else.
 #[tauri::command]

@@ -223,18 +223,41 @@ pub async fn tutor_overview_make(
         .take(120)
         .map(|line| (line.speaker.min(1), line.text.chars().take(3000).collect()))
         .collect();
-    let running = super::ensure(&app).await?;
-    let audio = super::contained(async move { running.calls.speak_dialogue(&lines).await })
-        .await?
-        .map_err(|error| {
-            let failure = agent_runs::device::model_call_failure(&error);
-            failure
-                .body
-                .get("message")
-                .and_then(Value::as_str)
-                .unwrap_or("The speech model couldn't read it. Check Settings → Models.")
-                .to_owned()
-        })?;
+    let spoken = match super::ensure(&app).await {
+        Ok(running) => {
+            let lines = lines.clone();
+            super::contained(async move { running.calls.speak_dialogue(&lines).await })
+                .await
+                .and_then(|result| {
+                    result.map_err(|error| {
+                        let failure = agent_runs::device::model_call_failure(&error);
+                        failure
+                            .body
+                            .get("message")
+                            .and_then(Value::as_str)
+                            .unwrap_or(
+                                "The speech model couldn't read it. Check Settings → Models.",
+                            )
+                            .to_owned()
+                    })
+                })
+        }
+        Err(error) => Err(error),
+    };
+    // With no speech key (or a model that failed), the computer's own voices read it, so an
+    // overview never needs anything bought.
+    let audio = match spoken {
+        Ok(audio) => audio,
+        Err(error) => super::system_speech::speak_dialogue(&lines)
+            .await
+            .map_err(|fallback| {
+                if speech_key_missing(&error) {
+                    fallback
+                } else {
+                    error
+                }
+            })?,
+    };
     if let Some(folder) = path.parent() {
         tokio::fs::create_dir_all(folder)
             .await
@@ -245,6 +268,13 @@ pub async fn tutor_overview_make(
         .await
         .map_err(|error| error.to_string())?;
     Ok(seconds)
+}
+
+/// Whether a speech call failed only because no speech model or key is set up, so the system
+/// voices' own reason is the one worth showing.
+fn speech_key_missing(error: &str) -> bool {
+    let error = error.to_ascii_lowercase();
+    error.contains("settings") || error.contains("key") || error.contains("speech model")
 }
 
 /// An overview's audio, as raw WAV bytes.

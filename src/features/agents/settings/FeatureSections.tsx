@@ -1,7 +1,7 @@
 import type { AgentScope } from "../personal/agentScope";
 import { agentsDeviceSnapshot, forgetFolder, shareFolder } from "../personal/useAgentsStore";
 import { shareFolderWarning } from "../plans/AgentFolderMenu";
-import { CompanionAppearanceSettings } from "../tutor/cursor/CompanionAppearanceSettings";
+import { TutorSettings } from "../tutor/cursor/TutorSettings";
 import { confirmAction } from "@/shared/lib/confirmAction";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { Button, useNotice, SkeletonList } from "@/shared/ui";
@@ -68,7 +68,7 @@ function CollaborationModeRow() {
   );
 }
 export function CompanionSection() {
-  return hasTauriInternals() ? <CompanionAppearanceSettings /> : null;
+  return <TutorSettings />;
 }
 /** What agents may do: remembered approvals (server-owned), shared folders on a desktop, and
  * sites they only read. Then what Misty itself may reach on this computer. */

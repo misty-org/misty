@@ -23,8 +23,6 @@ export const AgentProfileInputSchema = z.strictObject({
   tools: z.array(z.string().max(120)).max(200).optional(),
   /** The MCP servers this agent is given, by name. */
   mcp_servers: z.array(z.string().max(120)).max(50).optional(),
-  /** The skills this agent uses, by name; `*` is every skill. */
-  skills: z.array(z.string().max(120)).max(200).optional(),
   /** The folder an outside engine starts in, and extra arguments it is started with. */
   runtime_cwd: z.string().max(1000).optional(),
   runtime_args: z.array(z.string().max(400)).max(40).optional(),

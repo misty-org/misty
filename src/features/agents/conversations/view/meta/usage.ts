@@ -105,24 +105,3 @@ export function parseUsage(usage: unknown): ParsedUsage | null {
     contextWindow: reportedContextWindow(raw),
   };
 }
-
-/** Keep a previously reported context window when a later snapshot omits it. */
-export function mergeUsage(next: unknown, prev: unknown): unknown {
-  if (!next) return prev ?? null;
-  const nextObj = asRecord(next);
-  const prevObj = asRecord(prev);
-  if (!nextObj || !prevObj) return next;
-  const nextWindow = reportedContextWindow(nextObj);
-  if (nextWindow) {
-    // A window-only report (no token counters — e.g. a turn whose done payload
-    // carries just the host-announced window) refines the denominator, not the
-    // numerator: fold it into prev instead of dropping prev's tokens.
-    if (!parseUsage(nextObj) && parseUsage(prevObj)) {
-      return { ...prevObj, model_context_window: nextWindow };
-    }
-    return next;
-  }
-  const window = reportedContextWindow(prevObj);
-  if (!window) return next;
-  return { ...nextObj, model_context_window: window };
-}

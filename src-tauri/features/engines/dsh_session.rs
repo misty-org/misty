@@ -166,7 +166,10 @@ pub(crate) async fn run_host_turn(
             // or the frontend falls back to an assumed 200k at the end of the turn.
             view.last_usage
                 .clone()
-                .or_else(|| view.context_window.map(|window| json!({ "contextWindow": window })))
+                .or_else(|| {
+                    view.context_window
+                        .map(|window| json!({ "contextWindow": window }))
+                })
                 .map(|usage| attach_context_window(usage, view.context_window))
         };
         let session_id = state.native_session_id.clone();
@@ -284,7 +287,10 @@ async fn turn_inner(
     if view.events_client_id.is_none() {
         core.dispatch_event(
             state,
-            EngineEvent::Warn("The question channel isn't ready; questions in this turn will be skipped".to_string()),
+            EngineEvent::Warn(
+                "The question channel isn't ready; questions in this turn will be skipped"
+                    .to_string(),
+            ),
         );
     }
     if plan_mode {
@@ -389,7 +395,9 @@ async fn turn_inner(
 async fn ensure_plan_command(origin: &str, session_id: &str) -> Result<(), String> {
     let listed = host_call(origin, "commands/list", json!({ "agentId": session_id }))
         .await
-        .map_err(|error| format!("Couldn't confirm the host's plan command (commands/list failed): {error}"))?;
+        .map_err(|error| {
+            format!("Couldn't confirm the host's plan command (commands/list failed): {error}")
+        })?;
     if !plan_command_listed(&listed) {
         return Err(
             "This dsh host doesn't include the plan-mode plugin (no plan command in commands/list), so plan review can't start; it won't run in auto instead"
@@ -478,9 +486,10 @@ async fn await_plan_mode_active(ws: &mut Ws) -> Result<(), String> {
                 {
                     continue;
                 }
-                if value.pointer("/value/event/type").and_then(Value::as_str)
-                    == Some("plan/mode")
-                    && value.pointer("/value/event/data/active").and_then(Value::as_bool)
+                if value.pointer("/value/event/type").and_then(Value::as_str) == Some("plan/mode")
+                    && value
+                        .pointer("/value/event/data/active")
+                        .and_then(Value::as_bool)
                         == Some(true)
                 {
                     return Ok(());
@@ -712,7 +721,10 @@ async fn handle_events_frame(
             match (answered, notice) {
                 (Err(_), _) => core.dispatch_event(
                     state,
-                    EngineEvent::Warn("Answering an approval or question failed; this turn may be stuck".to_string()),
+                    EngineEvent::Warn(
+                        "Answering an approval or question failed; this turn may be stuck"
+                            .to_string(),
+                    ),
                 ),
                 (Ok(_), Some(notice)) => {
                     core.dispatch_event(state, EngineEvent::Warn(notice));
@@ -870,8 +882,7 @@ async fn park_plan_review(
         .get("id")
         .and_then(Value::as_str)
         .filter(|id| !id.is_empty());
-    let (Some(content), Some(approve), Some(question_id)) = (content, approve, question_id)
-    else {
+    let (Some(content), Some(approve), Some(question_id)) = (content, approve, question_id) else {
         // Fail closed: without the body, the approve label or the question id no review true to
         // the native meaning can be built. Reject the waterfall so the host unblocks, and warn;
         // never fall back to an ordinary question card (that would lose the review's meaning).
@@ -1190,8 +1201,8 @@ fn client_time_zone() -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::engines::ProcessRegistry;
     use crate::engines::support::event_sink::{Emit, EventSink};
+    use crate::engines::ProcessRegistry;
     use std::path::PathBuf;
     use std::sync::Mutex as StdMutex;
 
@@ -1838,9 +1849,13 @@ mod tests {
                 .any(|(kind, _)| kind == "plan_review" || kind == "question"),
             "{kinds:?}"
         );
-        let empty = registry
-            .get("test-run")
-            .map(|entry| entry.plans.lock().map(|plans| plans.is_empty()).unwrap_or(true));
+        let empty = registry.get("test-run").map(|entry| {
+            entry
+                .plans
+                .lock()
+                .map(|plans| plans.is_empty())
+                .unwrap_or(true)
+        });
         assert_eq!(empty, Some(true));
     }
 

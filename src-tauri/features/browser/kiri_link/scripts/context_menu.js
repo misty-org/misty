@@ -29,15 +29,12 @@ const handleContextMenu = (event) => {
   const sensitive = editable?.matches('input[type="password"]');
   const fieldSelection = editable && typeof editable.selectionStart === 'number'
     ? editable.value.slice(editable.selectionStart, editable.selectionEnd) : '';
-  const selection = sensitive ? '' : (fieldSelection || String(window.getSelection() || '')).slice(0, 16000);
+  const selection = sensitive ? '' : fieldSelection || String(window.getSelection() || '');
   const link = target.closest('a[href]');
   const image = target.closest('img[src]');
-  const content = sensitive ? '' : selection || (target.innerText || '').slice(0, 16000);
   const safeURL = value => { try { const u = new URL(value, location.href); return /^https?:$/.test(u.protocol) && !u.username && !u.password ? u.href.slice(0, 2048) : ''; } catch { return ''; } };
   const payload = {
-    url: location.href.slice(0, 2048), title: document.title.slice(0, 200),
-    documentRevision: `${performance.timeOrigin}:${Math.round(performance.now())}`,
-    content, selection: Boolean(selection), editable: Boolean(editable),
+    url: location.href.slice(0, 2048), selection: Boolean(selection), editable: Boolean(editable),
     link: link ? safeURL(link.href) : '', image: image ? safeURL(image.currentSrc || image.src) : '',
   };
   // The page's own data may pass through its hooks; the token never does.

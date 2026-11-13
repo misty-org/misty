@@ -100,15 +100,11 @@ export async function refreshProfileWindow(): Promise<void> {
 
 let started = false;
 
-/** Loads this window's identity and follows its profile's changes. */
+/** Loads this window's identity and reloads it when the profiles change. */
 export function startProfileWindow() {
   if (started || !hasTauriInternals()) return;
   started = true;
   void refreshProfileWindow();
-  void listen<unknown>("misty://profile-window", ({ payload }) => {
-    const profile = parseProfileEntry(payload);
-    if (profile && profile.id === currentProfile().id) useProfileWindowStore.setState({ profile });
-  }).catch(() => undefined);
   void listen("misty://profiles-changed", () => void refreshProfileWindow()).catch(() => undefined);
 }
 

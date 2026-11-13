@@ -1,9 +1,10 @@
 import { aiSurfaceApi } from "./api";
-import { failInvocation, makeSpeech, patchArtifact, scheduleHome } from "./storeRuntime";
+import { failInvocation, patchArtifact } from "./storeRuntime";
 import type { MistyUndoReceipt } from "./invocationTypes";
 
 import type { StoreApi } from "zustand";
 import type { AiSurfaceState } from "./store";
+import { assertMistyAvailable } from "../../conversations/state/availability";
 
 // Undo for applied artifacts, by receipt id; it lives only as long as this window.
 const undoCallbacks = new Map<string, () => void | Promise<void>>();
@@ -16,8 +17,6 @@ export function artifactActions(
   return {
     decideArtifact: async (accountId, paneId, adapter, artifact, decision) => {
       if (decision === "accept") {
-        const { assertMistyAvailable } =
-          await import("@/features/agents/conversations/state/availability");
         await assertMistyAvailable(
           accountId,
           artifact.target?.spaceId ||
@@ -26,18 +25,7 @@ export function artifactActions(
         );
       }
       if (decision === "refine") {
-        set((state) => ({
-          companion: {
-            ...state.companion,
-            phase: "composing",
-            approval: undefined,
-            speech: makeSpeech(
-              "clarification",
-              `What should I change about ${artifact.title}?`,
-              true,
-            ),
-          },
-        }));
+        set((state) => ({ companion: { ...state.companion, approval: undefined } }));
         return;
       }
       patchArtifact(set, get, accountId, paneId, artifact.id, {
@@ -45,15 +33,7 @@ export function artifactActions(
       });
       if (decision === "reject") {
         await aiSurfaceApi.decideArtifact(artifact.id, "reject", artifact.idempotencyKey);
-        set((state) => ({
-          companion: {
-            ...state.companion,
-            phase: "speaking",
-            approval: undefined,
-            speech: makeSpeech("reply", "Canceled."),
-          },
-        }));
-        scheduleHome(get, accountId);
+        set((state) => ({ companion: { ...state.companion, approval: undefined } }));
         return;
       }
       try {
@@ -84,20 +64,7 @@ export function artifactActions(
           };
           undoCallbacks.set(undo.id, () => adapter.undoArtifact!(artifact));
         }
-        set((state) => ({
-          companion: {
-            ...state.companion,
-            phase: state.companion.phase === "home" ? "home" : "speaking",
-            approval: undefined,
-            undo,
-            speech: makeSpeech("reply", artifact.summary || "Done."),
-            completedCount:
-              state.companion.phase === "home"
-                ? state.companion.completedCount + 1
-                : state.companion.completedCount,
-          },
-        }));
-        scheduleHome(get, accountId);
+        set((state) => ({ companion: { ...state.companion, approval: undefined, undo } }));
       } catch (error) {
         const message =
           error instanceof Error ? error.message : "That change could not be applied.";
@@ -116,15 +83,7 @@ export function artifactActions(
       if (!receipt || Date.parse(receipt.expiresAt) < Date.now()) return;
       await undoCallbacks.get(receipt.id)?.();
       undoCallbacks.delete(receipt.id);
-      set((state) => ({
-        companion: {
-          ...state.companion,
-          undo: undefined,
-          speech: makeSpeech("reply", "Undone."),
-          phase: "speaking",
-        },
-      }));
-      scheduleHome(get, get().companion.accountId);
+      set((state) => ({ companion: { ...state.companion, undo: undefined } }));
     },
   };
 }

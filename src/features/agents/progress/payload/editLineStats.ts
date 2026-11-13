@@ -235,15 +235,6 @@ export function editPath(call: EditToolCall): string | undefined {
   return call.path || parseEditArgs(call.args)?.filePath;
 }
 
-/**
- * Line stats per file for a chat, counted from its edit calls' own arguments rather than Git:
- * ignored files, folders outside a repository and files already committed are still real
- * edits. Repeated edits of one path add up: the chat's whole churn, not the last call's.
- */
-export function deriveEditLineStats(calls: EditToolCall[]): Map<string, EditLineStat> {
-  return createEditLineStatsBuilder()(calls);
-}
-
 export function createEditLineStatsBuilder() {
   const cache = new WeakMap<EditToolCall, EditLineStat | null>();
   let previous: EditToolCall[] = [];

@@ -223,24 +223,6 @@ export const GraphemeSegmenter = (Intl as unknown as { Segmenter?: GraphemeSegme
 const segmenter = GraphemeSegmenter
   ? new GraphemeSegmenter(undefined, { granularity: "grapheme" })
   : null;
-/** Never show half an emoji, combining sequence, or surrogate pair. */
-export function visiblePrefix(text: string, count: number) {
-  return createVisibleTextReader(text).prefix(count);
-}
-
-/** Window follows the revealed cursor, not the received tail, so a large
- * thinking chunk cannot hide all content while the cursor catches up. */
-export function visibleWindow(text: string, count: number, limit: number) {
-  return createVisibleTextReader(text).window(count, limit);
-}
-
-/** Same contract as `visibleWindow`, but the window starts on a LINE boundary.
- * Pre-wrapped thinking text re-wraps when its first character changes, so a
- * character cut makes the whole paragraph shift; dropping whole rows keeps
- * the block's line count stable while the cursor drains a burst. */
-export function visibleLineWindow(text: string, count: number, limit: number) {
-  return createVisibleTextReader(text).lineWindow(count, limit);
-}
 
 /** One segmentation handle per text snapshot, shared by all reveal frames.
  * In particular, long thinking text must not recreate both full-text and

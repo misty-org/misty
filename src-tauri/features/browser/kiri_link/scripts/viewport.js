@@ -109,8 +109,6 @@
     sendFocus();
   }, true);
 
-__MISTY_MEDIA_PLACEHOLDER__
-
 __MISTY_WINDOW_DRAG_PLACEHOLDER__
 
   const sendPointer = (pointer) => {

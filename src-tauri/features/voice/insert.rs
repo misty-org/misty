@@ -8,10 +8,10 @@
 use crate::voice::hold_to_talk::Modifiers;
 use std::time::{Duration, Instant};
 
-#[cfg(target_os = "macos")]
-use crate::voice::insert::macos as platform;
 #[cfg(target_os = "linux")]
 use crate::voice::insert::linux as platform;
+#[cfg(target_os = "macos")]
+use crate::voice::insert::macos as platform;
 #[cfg(windows)]
 use crate::voice::insert::windows as platform;
 

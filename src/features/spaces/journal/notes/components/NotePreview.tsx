@@ -13,7 +13,7 @@ export function NotePreview(props: NotePreviewProps) {
           reportSystemError({
             error,
             scope: `notes:${props.note.spaceId ?? "unknown"}:${props.note.sourceId}:copy`,
-            title: "Note could not be copied",
+            title: "Doc could not be copied",
           }),
       }}
     />

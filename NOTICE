@@ -69,17 +69,19 @@ desktop-cc-gui (https://github.com/zhukunpenglinyutong/desktop-cc-gui)
   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 lobe-icons (https://github.com/lobehub/lobe-icons)
-  The engines' marks in src/features/agents/engines/engineMarks.json and the providers' marks in
+  The engines' marks in src/features/engine-config/engineMarks.json and the providers' marks in
   src/features/engine-config/brands/brandMarks.json are generated from
-  @lobehub/icons-static-svg. The marks belong to their owners and only name their products.
+  @lobehub/icons-static-svg 1.102.0, in each brand's colored version where there is one. The
+  marks belong to their owners and only name their products.
 
   MIT License
 
   Copyright (c) 2023 LobeHub
 
 Oh My Pi (https://github.com/can1357/oh-my-pi)
-  Oh My Pi's mark in src/features/agents/engines/engineMarks.json is its assets/icon.svg, with
-  its white drawn in the text colour. The mark belongs to its owners and only names their product.
+  Oh My Pi's mark in src/features/engine-config/engineMarks.json is the gradient π of its
+  packages/collab-web/public/favicon.svg, without the favicon's dark tile. The mark belongs to its
+  owners and only names their product.
 
   MIT License
 

@@ -1,7 +1,7 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 // See NOTICE.
 
-//! The commands behind Settings › Engines › Usage and the usage summary. Adapted from
+//! The commands behind Settings › Engines › Usage. Adapted from
 //! desktop-cc-gui's plugin_usage.rs, without its plugin grant: Misty's own windows call these.
 //!
 //! Background scanning starts on the first call, not at app startup, so Misty never walks the
@@ -10,7 +10,7 @@
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
-use super::{PriceInfo, QueryRequest, QueryResponse, ScanSummary, SourceStatus, UsageSummary};
+use super::{PriceInfo, QueryRequest, QueryResponse, ScanSummary, SourceStatus};
 use crate::engine_config::usage_limits::{self, LimitsResponse};
 
 /// `update_prices` downloads a public file; repeated calls inside the window
@@ -50,13 +50,6 @@ pub async fn engine_usage_sources() -> Result<Vec<SourceStatus>, String> {
     super::sources().await
 }
 
-/// Reads what the logs gained since the last scan.
-#[tauri::command]
-pub async fn engine_usage_refresh() -> Result<ScanSummary, String> {
-    super::start_background();
-    super::refresh().await
-}
-
 /// Reads every log again from the start.
 #[tauri::command]
 pub async fn engine_usage_rescan() -> Result<ScanSummary, String> {
@@ -92,13 +85,6 @@ pub async fn engine_usage_limits(
     refresh: Option<bool>,
 ) -> Result<LimitsResponse, String> {
     usage_limits::get(providers, refresh.unwrap_or(false)).await
-}
-
-/// Today's and this week's usage and the plan limits last seen, for the composer and Space home.
-#[tauri::command]
-pub async fn engine_usage_summary(tz_offset_minutes: i32) -> Result<UsageSummary, String> {
-    super::start_background();
-    super::usage_summary(tz_offset_minutes).await
 }
 
 #[cfg(test)]

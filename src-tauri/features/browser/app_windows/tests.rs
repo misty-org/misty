@@ -18,7 +18,6 @@ fn labels_name_a_window_and_its_profile_is_kept_natively() {
     assert_eq!(profile_for_window(&label), None);
     set_current(&label, window(PERSONAL));
     assert_eq!(profile_for_window(&label).as_deref(), Some(PERSONAL));
-    assert!(profile_is_open(PERSONAL));
     forget_current(&label);
     assert_eq!(profile_for_window(&label), None);
 
@@ -109,24 +108,4 @@ fn every_account_always_has_its_first_profile() {
     };
     assert!(state.current().contains_key(PERSONAL));
     assert!(state.current()[PERSONAL].color.is_some());
-}
-
-#[test]
-fn colors_are_the_palette_or_a_custom_hex() {
-    assert!(valid_color("blue"));
-    assert!(valid_color("#a1b2c3"));
-    assert!(!valid_color("#A1B2C3"));
-    assert!(!valid_color("teal"));
-    let mut profiles = BTreeMap::new();
-    assert_eq!(next_color(&profiles), "blue");
-    profiles.insert(
-        PERSONAL.into(),
-        ProfileEntry {
-            id: PERSONAL.into(),
-            name: "Personal".into(),
-            color: Some("blue".into()),
-            ..Default::default()
-        },
-    );
-    assert_eq!(next_color(&profiles), "red");
 }

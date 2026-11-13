@@ -35,19 +35,10 @@ export interface ShortcutBindingSet {
   alternateSource: "default" | "user";
 }
 
-/** @deprecated Use effectiveBindings. Kept while focused tools move to the dispatcher. */
-interface ShortcutBinding {
-  commandId: string;
-  shortcut: string;
-  source: "default" | "user";
-}
-
 export interface ShortcutsSnapshot {
   detectedPlatform: ShortcutPlatform;
-  profileName: string;
   commandDefinitions: ShortcutCommandDefinition[];
   effectiveBindings: ShortcutBindingSet[];
-  bindings: ShortcutBinding[];
   configPath: string;
   overrides: NativeShortcutOverride[];
 }

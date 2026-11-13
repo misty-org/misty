@@ -101,7 +101,7 @@ export function SpacePlanner({ spaceId }: { spaceId: string }) {
               value={query}
               onChange={(event) => setQuery(event.target.value)}
             />
-            <Button type="button" icon={Plus} onClick={newTask}>
+            <Button type="button" variant="primary" icon={Plus} onClick={newTask}>
               New task
             </Button>
           </>

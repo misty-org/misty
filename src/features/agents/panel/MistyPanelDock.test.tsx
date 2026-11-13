@@ -8,15 +8,7 @@ import {
   useMistyPanelStore,
 } from "./mistyPanelStore";
 
-vi.mock("./MistyPanel", () => ({
-  MistyPanel: () => <aside data-testid="panel" />,
-}));
-
 const suspend = vi.hoisted(() => vi.fn());
-vi.mock("@/features/browser/webviews/browserRuntime", () => ({
-  setBrowserWebviewsSuspended: suspend,
-  onBrowserRuntimeClose: () => () => undefined,
-}));
 vi.mock("@/features/app-windows/page-runtime/browserOverlayRuntime", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   setBrowserWebviewsSuspended: suspend,
@@ -24,13 +16,7 @@ vi.mock("@/features/app-windows/page-runtime/browserOverlayRuntime", async (impo
 
 afterEach(() => {
   cleanup();
-  useMistyPanelStore.setState({
-    open: false,
-    chatOpen: false,
-    paneId: null,
-    width: MISTY_PANEL_WIDTH,
-    chatWidth: MISTY_PANEL_WIDTH,
-  });
+  useMistyPanelStore.setState({ chatOpen: false, width: MISTY_PANEL_WIDTH });
   localStorage.clear();
   suspend.mockClear();
 });
@@ -40,7 +26,9 @@ const pointer = (target: EventTarget, type: string, at: { clientX?: number; clie
     target.dispatchEvent(new MouseEvent(type, { bubbles: true, button: 0, ...at }));
   });
 
-describe("Misty panel width", () => {
+const chat = <aside data-testid="chat" />;
+
+describe("Chat panel width", () => {
   it("keeps the width within bounds", () => {
     useMistyPanelStore.getState().setWidth(10);
     expect(useMistyPanelStore.getState().width).toBe(MISTY_PANEL_MIN_WIDTH);
@@ -49,10 +37,10 @@ describe("Misty panel width", () => {
   });
 
   it("follows the pointer: dragging toward the page widens the panel", async () => {
-    render(<MistyPanelDock views={["agents"]} side="right" />);
+    render(<MistyPanelDock views={["chat"]} side="right" chat={chat} />);
     // Let the opening slide finish; only opening and closing animate.
     await act(() => new Promise((resolve) => setTimeout(resolve, 300)));
-    const edge = screen.getByRole("separator", { name: "Resize Misty panel" });
+    const edge = screen.getByRole("separator", { name: "Resize chat panel" });
     pointer(edge, "pointerdown", { clientX: 600 });
     expect(edge.dataset.dragging).toBe("true");
     // Pages pause while the edge moves, so a native page cannot swallow the drag.
@@ -75,8 +63,8 @@ describe("Misty panel width", () => {
   });
 
   it("resizes from the panel's inner edge", () => {
-    render(<MistyPanelDock views={["agents"]} side="right" />);
-    const edge = screen.getByRole("separator", { name: "Resize Misty panel" });
+    render(<MistyPanelDock views={["chat"]} side="right" chat={chat} />);
+    const edge = screen.getByRole("separator", { name: "Resize chat panel" });
     // On the right, the edge faces left: moving it left widens the panel.
     act(() => {
       fireEvent.keyDown(edge, { key: "ArrowLeft" });
@@ -92,70 +80,28 @@ describe("Misty panel width", () => {
       fireEvent.doubleClick(edge);
     });
     expect(useMistyPanelStore.getState().width).toBe(MISTY_PANEL_WIDTH);
-    const card = screen.getByTestId("panel").closest<HTMLElement>("[data-misty-panel-card]")!;
+    const card = screen.getByTestId("chat").closest<HTMLElement>("[data-misty-panel-card]")!;
     expect(card.style.getPropertyValue("--misty-panel-width")).toBe(`${MISTY_PANEL_WIDTH}px`);
   });
 
-  it("remembers one width for both panels on this device", () => {
+  it("remembers its width on this device", () => {
     useMistyPanelStore.getState().setWidth(480);
     expect(localStorage.getItem("misty:misty-panel-width")).toBe("480");
-    expect(useMistyPanelStore.getState().chatWidth).toBe(480);
+    expect(useMistyPanelStore.getState().width).toBe(480);
     // The default leaves nothing behind.
     useMistyPanelStore.getState().setWidth(MISTY_PANEL_WIDTH);
     expect(localStorage.getItem("misty:misty-panel-width")).toBeNull();
   });
 });
 
-describe("two Misty panels", () => {
-  const renderBoth = () =>
-    render(
-      <MistyPanelDock
-        views={["agents", "chat"]}
-        side="right"
-        chat={<aside data-testid="chat" />}
-      />,
-    );
-  const card = (view: string) =>
-    document.querySelector<HTMLElement>(`[data-misty-panel-card='${view}']`)!;
-
-  it("are separate cards with a margin of chrome between them, the same height", () => {
-    renderBoth();
-    expect(screen.getByTestId("panel").closest("[data-misty-panel-card='agents']")).not.toBeNull();
-    expect(screen.getByTestId("chat").closest("[data-misty-panel-card='chat']")).not.toBeNull();
-    const gap = card("agents").nextElementSibling as HTMLElement;
-    expect(gap.style.height).toBe("6px");
-    expect(gap.nextElementSibling).toBe(card("chat"));
-    expect(card("agents").style.flexGrow).toBe("1");
-    expect(card("chat").style.flexGrow).toBe("1");
-  });
-
-  it("are always the same width, so they line up", () => {
-    renderBoth();
-    const chatEdge = screen.getByRole("separator", { name: "Resize chat panel" });
-    act(() => {
-      fireEvent.keyDown(chatEdge, { key: "ArrowLeft", shiftKey: true });
-    });
-    const wide = `${MISTY_PANEL_WIDTH + 64}px`;
-    expect(useMistyPanelStore.getState().chatWidth).toBe(MISTY_PANEL_WIDTH + 64);
-    expect(useMistyPanelStore.getState().width).toBe(MISTY_PANEL_WIDTH + 64);
-    expect(card("chat").style.getPropertyValue("--misty-panel-width")).toBe(wide);
-    expect(card("agents").style.getPropertyValue("--misty-panel-width")).toBe(wide);
-    const stack = document.querySelector<HTMLElement>("[data-misty-panel-stack]")!;
-    expect(stack.style.width).toBe(wide);
-    // Each edge sits on its own card's inner outline.
-    expect(chatEdge.style.right).toBe(`${MISTY_PANEL_WIDTH + 64 - 6}px`);
-    const agentsEdge = screen.getByRole("separator", { name: "Resize Misty panel" });
-    expect(agentsEdge.style.right).toBe(`${MISTY_PANEL_WIDTH + 64 - 6}px`);
-  });
-
-  it("pulling one card's edge shut closes only that card", () => {
-    useMistyPanelStore.setState({ open: true, chatOpen: true });
-    renderBoth();
-    const chatEdge = screen.getByRole("separator", { name: "Resize chat panel" });
-    pointer(chatEdge, "pointerdown", { clientX: 600 });
+describe("Chat panel", () => {
+  it("closes when its edge is pulled well past its narrowest", () => {
+    useMistyPanelStore.setState({ chatOpen: true });
+    render(<MistyPanelDock views={["chat"]} side="right" chat={chat} />);
+    const edge = screen.getByRole("separator", { name: "Resize chat panel" });
+    pointer(edge, "pointerdown", { clientX: 600 });
     pointer(window, "pointermove", { clientX: 600 + MISTY_PANEL_WIDTH });
     expect(useMistyPanelStore.getState().chatOpen).toBe(false);
-    expect(useMistyPanelStore.getState().open).toBe(true);
     expect(suspend).toHaveBeenLastCalledWith(false, "misty-panel-resize");
   });
 });

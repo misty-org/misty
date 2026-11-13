@@ -53,8 +53,6 @@ export const useMistyStore = create<MistyState>((set, get) => ({
       handoff: undefined,
     }),
   ...createMistyConversationActions(set, get),
-  submitAgentTask: async (prompt, presentation = "panel") =>
-    get().submitAnswer(prompt, [], undefined, presentation),
   cancelResponse: async () => {
     advanceSubmissionEpoch();
     const accountId = get().accountId;

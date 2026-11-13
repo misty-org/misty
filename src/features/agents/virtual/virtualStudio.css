@@ -219,10 +219,10 @@
   margin-bottom: 4px;
   padding: 0 4px;
   color: #fff;
+  /* A tight outline: a wide glow is cut into a box by the fade that shortens long names. */
   text-shadow:
-    0 1px 0 rgb(0 0 0 / 85%),
-    0 0 3px rgb(0 0 0 / 80%),
-    0 0 8px rgb(0 0 0 / 45%);
+    0 1px 1px rgb(0 0 0 / 85%),
+    0 0 2px rgb(0 0 0 / 75%);
   pointer-events: auto;
   user-select: none;
 }
@@ -253,28 +253,18 @@
   color: #7dff8c;
 }
 .virtual-studio-tag[data-state="needs-you"] .virtual-studio-tag-line {
-  color: #ffd23f;
-}
-.virtual-studio-tag[data-outcome="done"] .virtual-studio-tag-line {
-  color: #7dff8c;
-}
-.virtual-studio-tag[data-outcome="failed"] .virtual-studio-tag-line {
-  color: #ff8a8a;
-}
-/* A resting agent's role shows on hover, so a room of idle agents is just their names; how its
-   last run ended always shows, until the person looks. */
-.virtual-studio-tag[data-state="resting"]:not(
-    [data-outcome],
-    :hover,
-    :focus-visible,
-    [data-selected]
-  )
-  .virtual-studio-tag-line {
-  display: none;
+  color: var(--color-state-waiting);
 }
 .virtual-studio-tag:hover .virtual-studio-tag-name,
 .virtual-studio-tag[data-selected] .virtual-studio-tag-name {
   color: #b8ffbf;
+}
+/* How its last run ended colors its name, in a chat row's state colors, until the person looks. */
+.virtual-studio-tag[data-state="resting"][data-outcome="done"] .virtual-studio-tag-name {
+  color: var(--color-state-done);
+}
+.virtual-studio-tag[data-state="resting"][data-outcome="failed"] .virtual-studio-tag-name {
+  color: var(--color-state-failed);
 }
 
 /* A free desk, marked like a plot to take: a quiet round sign that names itself on hover. */

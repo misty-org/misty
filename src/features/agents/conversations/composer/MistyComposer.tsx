@@ -14,8 +14,9 @@ import {
   type PathLineSegment,
 } from "@/shared/ui";
 import { ImagePlus, Plus, ScanLine, X } from "lucide-react";
-import type { DragEvent, KeyboardEvent, ReactNode, RefObject } from "react";
-import { useRef, useState } from "react";
+import type { KeyboardEvent, ReactNode, RefObject } from "react";
+import { useRef } from "react";
+import { useFileDropZone } from "@/shared/hooks/useFileDropZone";
 import { validateMistyImage } from "./mistyImageValues";
 import type { MistyImageAttachment } from "../state/conversationTypes";
 
@@ -61,7 +62,6 @@ export function MistyComposer(props: {
   const fileRef = useRef<HTMLInputElement | null>(null);
   const localTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const textareaRef = props.textareaRef ?? localTextareaRef;
-  const [dragging, setDragging] = useState(false);
   const accept = (files: File[]) => {
     if (props.disabled) return;
     try {
@@ -81,11 +81,11 @@ export function MistyComposer(props: {
       );
     }
   };
-  const onDrop = (event: DragEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    setDragging(false);
-    accept(Array.from(event.dataTransfer.files));
-  };
+  // Files dropped from the computer's file manager, on every desktop system and in a browser.
+  const dropZone = useFileDropZone<HTMLDivElement>(accept, {
+    disabled: props.disabled,
+    onError: props.onError,
+  });
   const ready = props.attachments.every((item) => item.state === "ready");
   const canSend = Boolean(
     props.value.trim() || props.attachments.some((item) => item.state === "ready"),
@@ -109,7 +109,13 @@ export function MistyComposer(props: {
     menu: addRows,
     render: () => (
       <DropdownMenu>
-        <MenuTrigger label="Add" iconOnly icon={Plus} disabled={props.disabled} />
+        <MenuTrigger
+          label="Add"
+          iconOnly
+          icon={Plus}
+          disabled={props.disabled}
+          data-tour="composer-add"
+        />
         <DropdownMenuContent align="start" side="top" data-misty-layer-portal>
           {addRows}
         </DropdownMenuContent>
@@ -128,23 +134,17 @@ export function MistyComposer(props: {
         }}
       />
       <MessageComposer
-        className={cn(dragging && "border-cream-muted bg-charcoal-hover", props.className)}
-        onDragEnter={(event) => {
-          event.preventDefault();
-          if (!props.disabled) setDragging(true);
-        }}
-        onDragOver={(event) => event.preventDefault()}
-        onDragLeave={(event) => {
-          if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragging(false);
-        }}
-        onDrop={onDrop}
+        ref={dropZone.ref}
+        className={cn(dropZone.dragging && "border-cream-muted bg-charcoal-hover", props.className)}
+        {...dropZone.handlers}
         onPaste={(event) => {
           const files = Array.from(event.clipboardData.files);
           if (files.length) accept(files);
         }}
         data-misty-universal-composer
+        data-tour="composer"
         data-composer-layout="toolbar"
-        data-dragging={dragging}
+        data-dragging={dropZone.dragging}
         inputRef={textareaRef}
         inputProps={{
           "data-global-misty-launcher-input": true,

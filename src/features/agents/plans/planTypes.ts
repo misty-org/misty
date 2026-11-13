@@ -95,31 +95,6 @@ export interface AgentPlan {
   updatedAt: string;
 }
 
-type GoalStatus = "pursuing" | "paused" | "achieved" | "unmet" | "budget_limited" | "cleared";
-
-interface GoalReport {
-  status: string;
-  summary: string;
-  evidence?: Array<{ criterion: string; proof: string }> | null;
-  next_steps?: string[] | null;
-  reported_at?: string;
-}
-
-export interface AgentGoal {
-  id: string;
-  conversationId: string;
-  objective: string;
-  successCriteria: string[];
-  status: GoalStatus;
-  budgetTokens: number;
-  usedTokens: number;
-  continuationCount: number;
-  maxContinuations: number;
-  lastReport?: GoalReport | null;
-  createdAt: string;
-  updatedAt: string;
-}
-
 /** One version of a conversation's plan, for its history. */
 export interface AgentPlanVersion {
   id: string;
@@ -141,9 +116,8 @@ export interface ConversationCollaboration {
   plan: AgentPlan | null;
   /** Every version of the plan, newest first. */
   planHistory: AgentPlanVersion[];
-  goal: AgentGoal | null;
   questionSets: AgentQuestionSet[];
-  /** A run the server started on its own, such as a goal continuation. */
+  /** A run the server started on its own. */
   runningInvocationId: string;
 }
 
@@ -151,7 +125,6 @@ export interface ConversationCollaboration {
 export type CollaborationEvent =
   | { type: "question.requested" | "question.answered"; questionSet: AgentQuestionSet }
   | { type: "plan.proposed" | "plan.updated"; plan: AgentPlan }
-  | { type: "goal.updated"; goal: AgentGoal }
   | { type: "checklist.updated"; checklist: AgentChecklist };
 
 export const collaborationEventTypes = new Set([
@@ -159,6 +132,5 @@ export const collaborationEventTypes = new Set([
   "question.answered",
   "plan.proposed",
   "plan.updated",
-  "goal.updated",
   "checklist.updated",
 ]);

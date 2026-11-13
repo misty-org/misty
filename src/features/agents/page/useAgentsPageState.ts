@@ -10,6 +10,7 @@ import { usePersonalAgentsStore } from "../personal/personalAgentsStore";
 import { useAgentActivity } from "./useAgentActivity";
 import { useAgentChangeGuard } from "./useAgentChangeGuard";
 import type { AgentWorkspacePage } from "../methods/AgentWorkspaceFrame";
+import { useViewConversation, useViewTitle } from "./useViewConversation";
 
 /*
  * Page state for the Agents page: selection, settings modal, workspace page and the
@@ -24,8 +25,7 @@ export function useAgentsPageState() {
   const [selected, setSelected] = useState<string>();
   const [params, setParams] = useSearchParams();
   const workspaceRef = useRef<HTMLElement>(null);
-  const identityRef = useRef<HTMLButtonElement>(null);
-  // Links: ?view=studio, integrations or tutor open that page; anything else the task.
+  // Links: ?view=studio, integrations or lab open that page; anything else the task.
   const linkedView = params.get("view") ?? "";
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
   const [settingsModalTab, setSettingsModalTab] = useState<AgentSettingsTab>("settings");
@@ -39,7 +39,6 @@ export function useAgentsPageState() {
   const guard = useAgentChangeGuard();
   const workingAgentId = useMistyStore((s) => s.selectedAgentId);
   const conversations = useMistyStore((s) => s.conversations);
-  const activeConversationId = useMistyStore((s) => s.activeConversationId);
   // The chat surface doesn't change with the conversation's Space.
   const conversationSpaceId = "";
   useEffect(() => {
@@ -59,10 +58,26 @@ export function useAgentsPageState() {
   const linkedConversationId = params.get("conversation");
   // A link that asks for a new chat; its value only tells one ask from the next.
   const linkedNew = params.get("new");
+  // Declared before the link below: a view that gains focus hands the store its chat first.
+  const viewConversation = useViewConversation({
+    agentId: selected ?? linkedAgentId ?? undefined,
+    linkedConversationId,
+    linkedNew,
+    params,
+    setParams,
+  });
+  const activeConversationId = viewConversation.conversationId;
+  const { isFocused, applyUnfocusedLink } = viewConversation;
   useEffect(() => {
     if (!linkedAgentId) return;
     setSelected(linkedAgentId);
     setWorkspacePage("task");
+    // Another view has the store: the link only changes what this one shows.
+    if (!isFocused()) {
+      if (linkedNew || linkedConversationId)
+        applyUnfocusedLink(linkedNew ? "" : (linkedConversationId ?? ""));
+      return;
+    }
     // Back from another page to the chat already open: keep it mounted, draft and all.
     const open = useMistyStore.getState();
     if (
@@ -94,7 +109,7 @@ export function useAgentsPageState() {
       void useMistyStore.getState().selectConversation(linkedConversationId);
     // The account settles after a reload (signed out scope, then the person's), and switching it
     // clears the open chat, so the link is applied again for the account that is now in place.
-  }, [accountId, linkedAgentId, linkedConversationId, linkedNew]);
+  }, [accountId, linkedAgentId, linkedConversationId, linkedNew, isFocused, applyUnfocusedLink]);
   // The sidebar opens Studio and Tutor by link; a link naming a page wins over the chat.
   // Leaving a page's link for one without a view goes back to the chat.
   const viewed = useRef(linkedView);
@@ -130,6 +145,12 @@ export function useAgentsPageState() {
     (c) => c.agentId === profile?.id || (!c.agentId && profile?.system_managed),
   );
   const conversation = agentConversations.find((c) => c.id === activeConversationId);
+  useViewTitle(
+    viewConversation.viewId,
+    workspacePage === "task"
+      ? conversation?.title.trim() || "New chat"
+      : workspacePageTitles[workspacePage],
+  );
   // Feeds the Recents status dots.
   const activity = useAgentActivity(accountId, profile?.id);
   return {
@@ -145,7 +166,6 @@ export function useAgentsPageState() {
     params,
     setParams,
     workspaceRef,
-    identityRef,
     settingsModalOpen,
     setSettingsModalOpen,
     settingsModalTab,
@@ -175,9 +195,16 @@ export function useAgentsPageState() {
 
 export type AgentsPageState = ReturnType<typeof useAgentsPageState>;
 
-/** The page a link's ?view= opens; the earlier office opens the studio. */
+const workspacePageTitles: Record<Exclude<AgentWorkspacePage, "task">, string> = {
+  studio: "Studio",
+  integrations: "Integrations",
+  lab: "Lab",
+};
+
+/** The page a link's ?view= opens; the earlier office opens the studio, and tutor or notebooks the Lab. */
 function pageFromView(view: string): AgentWorkspacePage | undefined {
   if (view === "office") return "studio";
-  if (view === "studio" || view === "integrations" || view === "tutor") return view;
+  if (view === "tutor" || view === "notebooks") return "lab";
+  if (view === "studio" || view === "integrations" || view === "lab") return view;
   return undefined;
 }

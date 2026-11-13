@@ -25,7 +25,7 @@ const customPropertyDefinitionOwners = new Set([
   "src/features/settings/preferences/appTheme.ts",
   // The companion's runtime size feeds four rules in cursorCompanion.css.
   "src/features/agents/tutor/cursor/CursorOverlayMarkup.tsx",
-  // Dragged widths: the Misty panel and the agent sidebar restyle only their column.
+  // Dragged widths: the chat panel and the agent sidebar restyle only their column.
   "src/features/agents/panel/MistyPanelDock.tsx",
   "src/features/agents/methods/AgentWorkspaceFrame.tsx",
 ]);
@@ -219,15 +219,20 @@ describe("UI rules", () => {
     });
   });
 
-  it("asks every menu row for an icon", () => {
-    expect(count(feature, `<MenuItem label="Rename" onSelect={() => rename()} />`)).toEqual({
-      "menu-item-without-icon": 1,
-    });
+  it("keeps menu rows shared, with icons only where they tell rows apart", () => {
+    expect(count(feature, `<MenuItem label="Rename" onSelect={() => rename()} />`)).toEqual({});
     expect(count(feature, `<MenuItem icon={Pencil} label="Rename" />`)).toEqual({});
-    expect(count(feature, `<MenuItem {...item} />`)).toEqual({});
     expect(count(feature, `<DropdownMenuItem onSelect={go}>Go</DropdownMenuItem>`)).toEqual({
-      "menu-item-without-icon": 1,
+      "raw-menu-row": 1,
     });
+    const repeated = `{models.map((model) => (
+      <MenuRadioItem key={model.id} icon={Cpu} value={model.id} label={model.id} />
+    ))}`;
+    expect(count(feature, repeated)).toEqual({ "repeated-menu-icon": 1 });
+    const own = `{sorts.map((sort) => (
+      <MenuRadioItem key={sort.value} icon={sort.icon} value={sort.value} label={sort.label} />
+    ))}`;
+    expect(count(feature, own)).toEqual({});
   });
 
   it("finds bars that wrap, not chip clouds", () => {

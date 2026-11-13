@@ -186,7 +186,6 @@ export const deviceToolSchemas: Record<string, Schema> = {
   ),
   "screen.look": object({ reason: text(3, 300) }, ["reason"]),
   "screen.close": object({ scopeId }, ["scopeId"]),
-  "device.list": object({}),
 };
 
 function isType(value: unknown, type: NonNullable<Schema["type"]>): boolean {

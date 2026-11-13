@@ -15,9 +15,9 @@ export interface UploadNoteAssetInput {
 }
 
 export async function uploadNoteAsset(input: UploadNoteAssetInput): Promise<string> {
-  if (!input.spaceId) throw new Error("Open a Space before adding files to a note.");
+  if (!input.spaceId) throw new Error("Open a Space before adding files to a doc.");
   if (input.file.size > MAX_NOTE_ASSET_BYTES) {
-    throw new Error("Note files must be 15 MB or smaller for this beta.");
+    throw new Error("Doc files must be 15 MB or smaller for this beta.");
   }
 
   const asset = await uploadJournalAsset({

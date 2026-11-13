@@ -6,8 +6,6 @@ import {
   type StoredDockingLayout,
 } from "@/app/shell/dockingLayout";
 import { configureStartupPreference } from "@/app/shell";
-import { configureWorkspaceDefaultView } from "@/features/app-windows";
-import { workspaceDefaultViewIndex } from "@/features/settings";
 import { configureLinkPreviews } from "@/features/files";
 import {
   onSettingsApplied,
@@ -41,9 +39,6 @@ function applyFeatureSettings(
     /* Invalid legacy data uses the last applied presets. */
   }
   configureLinkPreviews(settingsBoolean(document, "general", "browser_link_previews", true));
-  configureWorkspaceDefaultView(
-    settingsNumber(document, "general", "workspace_default_tab_index", workspaceDefaultViewIndex),
-  );
   // Mirrored to localStorage: the index route redirects before this document
   // has loaded, so it cannot read the preference from here directly.
   configureStartupPreference({

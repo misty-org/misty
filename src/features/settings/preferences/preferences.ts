@@ -1,5 +1,4 @@
 import { appZoomBaseline, appZoomFromStoredScale } from "@/shared/hooks/useAppZoom";
-import { workspaceDefaultViewIndex } from "../settingsConstants";
 import { booleanSetting, numberSetting, stringSetting } from "../SettingsControls";
 import type { AppThemeMode } from "./appTheme";
 import type { NightLightMode } from "./nightLight";
@@ -22,22 +21,6 @@ export function selectAppearancePreferences(
     nightLightWarmth: settingsNumber(source, "appearance", "night_light_warmth", 0.5),
   };
 }
-export function selectGeneralPreferences(
-  document: Record<string, unknown> | null | undefined,
-): GeneralPreferences {
-  const source = document ?? {};
-  return {
-    preferredWorkspaceRoot: settingsString(source, "general", "preferred_workspace_root", ""),
-    reopenLastSession: settingsBoolean(source, "general", "reopen_last_session", true),
-    startupViewIndex: settingsNumber(source, "general", "startup_view_index", 0),
-    workspaceDefaultTabIndex: settingsNumber(
-      source,
-      "general",
-      "workspace_default_tab_index",
-      workspaceDefaultViewIndex,
-    ),
-  };
-}
 function themeMode(value: string): AppThemeMode {
   return value === "system" || value === "light" ? value : "dark";
 }
@@ -52,10 +35,4 @@ interface AppearancePreferences {
   nightLightStart: string;
   nightLightEnd: string;
   nightLightWarmth: number;
-}
-interface GeneralPreferences {
-  preferredWorkspaceRoot: string;
-  reopenLastSession: boolean;
-  startupViewIndex: number;
-  workspaceDefaultTabIndex: number;
 }

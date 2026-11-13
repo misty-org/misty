@@ -14,42 +14,30 @@
 pub mod agy;
 mod bridge;
 pub mod catalog;
-pub mod reported;
 pub mod channels;
 pub mod claude;
 mod claude_channel;
+pub mod reported;
 
-/// The model a Claude Code channel actually runs (opus/sonnet/haiku aliases map to the
-/// channel's slot models, `default` to the channel default).
-#[allow(dead_code)]
-pub(crate) fn resolve_claude_channel_model(
-    selected: Option<&str>,
-    provider: &serde_json::Value,
-    env: &std::collections::HashMap<String, String>,
-) -> Option<String> {
-    claude_channel::resolve_model(selected, Some(provider), env)
-}
-pub mod codex;
 pub mod codebuddy;
+pub mod codex;
 mod codex_app;
 mod codex_provider_env;
 mod codex_read_only;
 mod codex_usage;
 pub mod commands;
-pub mod history_commands;
+mod companion;
 pub mod dsh;
 mod dsh_images;
 mod dsh_session;
 mod events;
 pub mod folder_grant;
-pub mod fork;
-mod fork_dsh;
 pub(crate) mod gate;
 pub mod gemini;
-mod companion;
 pub mod grok;
 mod grok_acp;
 pub mod history;
+pub mod history_commands;
 pub mod images;
 #[cfg(windows)]
 pub(crate) mod job;
@@ -78,14 +66,13 @@ mod shell_env;
 pub mod store;
 pub mod support;
 pub mod turn;
-pub mod wsl_transport;
 
 pub(crate) use resolve::command_for_binary;
 
 // Event types and tool-call/todo payload helpers (events.rs).
 pub(crate) use events::{
-    assistant_message, parse_todo_args, parse_todo_result, parse_tool_args_value, push_session_id, safe_prompt_arg,
-    tool_call_message, tool_call_message_with_id, tool_call_patch_with_id,
+    assistant_message, parse_todo_args, parse_todo_result, parse_tool_args_value, push_session_id,
+    safe_prompt_arg, tool_call_message, tool_call_message_with_id, tool_call_patch_with_id,
     tool_path_arg, tool_result_patch, tool_result_patch_with_id,
 };
 pub use events::{EngineEvent, TodoItem, TodosPayload};
@@ -211,20 +198,16 @@ pub struct BuiltCommand {
     /// Session id assigned before spawn (grok `-s <uuid>`).
     pub preassigned_session_id: Option<String>,
 }
-/// Which transport one send uses. On `Own` the app spawns no engine child:
-/// the host driver task owns the process (or the connection) and settles the
-/// turn itself.
-#[derive(Clone, Copy, PartialEq, Eq)]
-pub enum Transport {
-    /// The app spawns the CLI and reads its stdout.
-    Child,
-    /// The engine drives its own transport (host session, ACP, app-server).
-    Own,
-}
-
 pub trait Engine: Send + Sync {
     fn id(&self) -> &'static str;
-    fn build_command(&self, req: &SendRequest, bin: &str) -> Result<BuiltCommand, String>;
+    /// The child command for one turn, for engines Misty reads over stdout. An engine that
+    /// drives its own transport has none.
+    fn build_command(&self, _req: &SendRequest, _bin: &str) -> Result<BuiltCommand, String> {
+        Err(format!(
+            "{} runs over its own transport; it has no child command",
+            self.id()
+        ))
+    }
     /// The command a host-transport driver spawns, for engines whose `Own`
     /// transport is a process of their own (codex app-server, grok ACP). The
     /// driver spawns it verbatim, so channel flags/env land here exactly as
@@ -241,8 +224,9 @@ pub trait Engine: Send + Sync {
             preassigned_session_id: None,
         })
     }
-    /// Parse one NDJSON stdout line into zero or more events.
-    fn parse_line(&self, line: &str, out: &mut Vec<EngineEvent>);
+    /// Parse one NDJSON stdout line into zero or more events. An engine that drives its own
+    /// transport reports through its driver, never through stdout lines.
+    fn parse_line(&self, _line: &str, _out: &mut Vec<EngineEvent>) {}
     /// Attach this run's served-model sidecar before the reader starts.
     /// Engines whose injected extension records the provider's own `model`
     /// read it back; the default is a no-op.
@@ -260,19 +244,6 @@ pub trait Engine: Send + Sync {
     /// abort handle, and the transport task settles the turn itself.
     fn drives_own_transport(&self) -> bool {
         false
-    }
-    /// Transport for one send. Default: an engine that drives its own
-    /// transport keeps it for every workspace, so a WSL one has to be
-    /// rejected — the driver spawns locally and its session has no remote
-    /// path. codex and grok override this: their native harness protocol
-    /// carries the question channel for a local workspace, while a remote one
-    /// keeps today's one-shot CLI child, which the ssh wrapper owns.
-    fn transport_for(&self, _wsl: bool) -> Transport {
-        if self.drives_own_transport() {
-            Transport::Own
-        } else {
-            Transport::Child
-        }
     }
     /// Whether this engine accepts image attachments.
     fn supports_images(&self) -> bool;
@@ -365,7 +336,9 @@ pub(crate) fn codex_home() -> PathBuf {
 }
 #[cfg(not(test))]
 fn settings_codex_home() -> Option<PathBuf> {
-    let custom = crate::engines::support::settings::read_settings().ok()?.codex_home?;
+    let custom = crate::engines::support::settings::read_settings()
+        .ok()?
+        .codex_home?;
     let trimmed = custom.trim();
     if trimmed.is_empty() {
         return None;
@@ -417,7 +390,9 @@ pub struct EngineInfo {
     /// plan entry point; unavailable + reason = Plan runs read-only and asks are refused.
     pub plan: PlanApproval,
 }
-fn codex_bin_from_home(settings: &crate::engines::support::settings::AppSettings) -> Option<String> {
+fn codex_bin_from_home(
+    settings: &crate::engines::support::settings::AppSettings,
+) -> Option<String> {
     let home = settings.codex_home.as_deref()?.trim();
     if home.is_empty() {
         return None;
@@ -450,7 +425,10 @@ pub fn installed(engine_id: &str) -> bool {
     (path.is_absolute() && path.is_file()) || resolve::find_program(&bin).is_some()
 }
 
-pub(crate) fn engine_bin(settings: &crate::engines::support::settings::AppSettings, engine_id: &str) -> String {
+pub(crate) fn engine_bin(
+    settings: &crate::engines::support::settings::AppSettings,
+    engine_id: &str,
+) -> String {
     // An explicit bin override always wins: it predates the codex-home row
     // (hidden for codex in the UI), and a stale codexBin in an upgraded
     // settings.json must not be silently overridden by $home/bin/codex.
@@ -571,10 +549,10 @@ pub struct EngineModel {
 /// The models an engine offers on this computer, from its own catalog (its CLI, config or
 /// registry). Empty when it can't say; the person can still type one.
 pub async fn models(engine: &str) -> Vec<EngineModel> {
-    let Some(state) = support::state() else {
+    if support::state().is_none() {
         return Vec::new();
-    };
-    let catalog = match models::list_engine_models(state, engine.to_string(), None).await {
+    }
+    let catalog = match models::list_engine_models(engine.to_string()).await {
         Ok(catalog) => catalog,
         Err(_) => return Vec::new(),
     };
@@ -621,6 +599,7 @@ pub fn start(app: &tauri::App) {
     tauri::async_runtime::spawn_blocking(move || {
         sweep_staging_dirs();
         images::sweep_pasted_images();
+        run_prompt::sweep_attached_files();
         // Every folder linked to a Space on this computer is a workspace whose engine sessions
         // are listed and searched.
         for folder in store::all_folders(&store).unwrap_or_default() {
@@ -630,7 +609,8 @@ pub fn start(app: &tauri::App) {
         tauri::async_runtime::spawn(async move {
             let settings = support::settings::read_settings().unwrap_or_default();
             if support::dsh_host::autostart_allowed(&settings) {
-                if let Err(error) = support::dsh_host::ensure_host(&state.dsh_host, &settings).await {
+                if let Err(error) = support::dsh_host::ensure_host(&state.dsh_host, &settings).await
+                {
                     eprintln!("[dsh] autostart failed: {error}");
                 }
             }
@@ -642,7 +622,7 @@ pub fn start(app: &tauri::App) {
 pub fn folder_linked(folder: &str) {
     if let Some(state) = support::state() {
         if std::path::Path::new(folder).is_dir() {
-            let _ = history::reader::add_workspace_inner(&state.db, &state.sink, folder, None, None, None);
+            let _ = history::reader::add_workspace_inner(&state.db, &state.sink, folder);
         }
     }
 }
@@ -706,7 +686,6 @@ fn prepare_launch(
     mcp_servers: Option<Value>,
     allowed_tools: Option<Vec<String>>,
     extra_args: Vec<String>,
-    wsl: bool,
 ) -> Result<Launch, String> {
     let engine_impl = engine_by_id(engine).ok_or_else(|| format!("unknown engine: {engine}"))?;
     // Channel settings apply to this child below; native CLI files remain the official
@@ -735,12 +714,20 @@ fn prepare_launch(
         None => None,
     };
     let provider_id = provider_id.filter(|s| !s.trim().is_empty());
-    let provider = crate::engines::support::config::resolve_provider(engine, provider_id.as_deref())?;
+    let provider =
+        crate::engines::support::config::resolve_provider(engine, provider_id.as_deref())?;
     let mut channel_env = match provider.as_ref() {
         Some(p) => crate::engines::support::provider_files::channel_env(engine, p)?,
         None => HashMap::new(),
     };
     channel_env.extend(crate::engines::channels::env_for(engine));
+    // The person's own variables for this engine come first: a channel chosen for this chat is
+    // more specific, so its variables win.
+    let channel_env = {
+        let mut env = crate::engine_config::engine_env::env_for(engine)?;
+        env.extend(channel_env);
+        env
+    };
     let settings = crate::engines::support::settings::read_settings().unwrap_or_default();
     let model = model
         .filter(|m| !m.trim().is_empty())
@@ -779,9 +766,8 @@ fn prepare_launch(
             .take(32)
             .collect(),
         provider_id,
-        // Only an engine that can mount it gets the Space's server; a remote (WSL) CLI can't
-        // reach this computer's loopback address.
-        mcp_servers: mcp_servers.filter(|_| engine_impl.supports_mcp() && !wsl),
+        // Only an engine that can mount it gets the Space's server.
+        mcp_servers: mcp_servers.filter(|_| engine_impl.supports_mcp()),
         allowed_tools,
     };
     let bin = engine_bin(&settings, engine);
@@ -789,13 +775,11 @@ fn prepare_launch(
     // hand back the real app-server / ACP command the driver spawns verbatim
     // (channel flags and env land on it below, as for any child), while the
     // session-only engines keep the placeholder their driver never touches.
-    let mut built = if engine_impl.transport_for(wsl) == Transport::Own {
+    let mut built = if engine_impl.drives_own_transport() {
         let mut own = engine_impl.host_command(&req, &bin)?;
         // The driver spawns this command with the workspace as its cwd.
         own.command.current_dir(&req.workspace);
         own
-    } else if engine == "kimi" && provider.is_some() {
-        kimi::build_channel_command(&req, &bin)?
     } else {
         engine_impl.build_command(&req, &bin)?
     };
@@ -840,7 +824,6 @@ fn prepare_launch(
             &bin,
             provider.as_ref().map(|_| &channel_env),
             &req.workspace,
-            wsl,
         )
     });
     Ok(Launch {
@@ -953,16 +936,15 @@ async fn send_message_inner_with_sink(
     // turn on this very session. A new process would stop that task, so the
     // prompt goes into the live one instead; the bridge shows its events under
     // this send's run id (`bridge::redirect`). Chat sends only.
-    let followup = (engine == "claude" && Arc::ptr_eq(&sink, &state.sink)).then(|| {
-        registry::FollowupPrefs {
+    let followup =
+        (engine == "claude" && Arc::ptr_eq(&sink, &state.sink)).then(|| registry::FollowupPrefs {
             model: model.clone(),
             effort: effort.clone(),
             permission: permission.clone(),
             provider_id: provider_id.clone(),
             allowed_tools: allowed_tools.clone(),
             launch: extras.key.clone(),
-        }
-    });
+        });
     if let Some(prefs) = followup.as_ref() {
         let workspace = PathBuf::from(&workspace_path);
         let images = image_paths.clone().unwrap_or_default();
@@ -1003,7 +985,6 @@ async fn send_message_inner_with_sink(
     let reader_abort = Arc::new(std::sync::OnceLock::new());
     {
         let mut map = state.processes.0.lock().map_err(|e| e.to_string())?;
-        state.processes.ensure_session_not_editing(session_id.as_deref())?;
         if map.contains_key(&run_id) {
             return Err("run id already active".into());
         }
@@ -1023,7 +1004,8 @@ async fn send_message_inner_with_sink(
             plans: Arc::new(Mutex::new(HashMap::new())),
         };
         if let Some(session_id) = session_id.as_ref() {
-            map.entry(session_id.clone()).or_insert_with(|| entry.clone());
+            map.entry(session_id.clone())
+                .or_insert_with(|| entry.clone());
         }
         map.insert(run_id.clone(), entry);
     }
@@ -1134,8 +1116,6 @@ async fn send_reserved(
     extra_args: Vec<String>,
     followup: Option<registry::FollowupPrefs>,
 ) -> Result<SendResult, String> {
-    // WSL remote workspace: the engine process runs inside the distro over ssh (see wsl_transport).
-    let wsl_tp = wsl_transport::transport_for_workspace(&state.db, &workspace_path);
     let mut launch = prepare_launch(
         &engine,
         &workspace_path,
@@ -1150,24 +1130,30 @@ async fn send_reserved(
         // Every user-granted directory rides along as a launch argument, so
         // a grant approved mid-conversation takes effect on the next send
         // (each send is a fresh process).
-        state.db.granted_roots().unwrap_or_default(),
+        {
+            let mut dirs = state.db.granted_roots().unwrap_or_default();
+            // The documents attached to this turn, so the engine may read them (run_prompt.rs).
+            let attached = run_prompt::attached_files_dir(&run_id);
+            if file_access::fs::is_dir(&attached) {
+                dirs.push(attached.to_string_lossy().into_owned());
+            }
+            dirs
+        },
         provider_id,
         mcp_servers,
         allowed_tools,
         extra_args,
-        wsl_tp.is_some(),
     )?;
-    if wsl_tp.is_none() && matches!(engine.as_str(), "pi" | "omp") {
+    if matches!(engine.as_str(), "pi" | "omp") {
         // Ask the login shell only for the variables the engine's current config names: Pi uses $VAR,
-        // OMP bare names. Injected into this child only; WSL carries no local env, so it is skipped.
+        // OMP bare names. Injected into this child only.
         pi_family_env::apply(&mut launch.built.command, &engine).await;
     }
     // pi/omp: the injected extension observes the provider response's own
     // `model` field and appends it to a per-run sidecar. The reader consults
-    // that file when `message_end` has no `upstreamModel`. Remote workspaces
-    // run the CLI inside WSL, which cannot write this host-side path; runs
-    // without the extension have nothing to write it.
-    if wsl_tp.is_none() && pi_family::loads_served_model_bridge(&engine, &launch.req) {
+    // that file when `message_end` has no `upstreamModel`; runs without the
+    // extension have nothing to write it.
+    if pi_family::loads_served_model_bridge(&engine, &launch.req) {
         if let Some(path) = pi_family::prepare_served_models_file(&run_id) {
             launch.engine_impl.set_served_models_file(&path);
             launch
@@ -1177,67 +1163,21 @@ async fn send_reserved(
         }
     }
     // Host-stream engines drive their own transport: no child process — the
-    // registry entry only routes interrupts to the transport task. Their
-    // drivers spawn locally, so a remote workspace either keeps the CLI
-    // transport (codex/grok) or has no path at all, and is refused explicitly.
+    // registry entry only routes interrupts to the transport task.
     // An explicit OMP plan session always runs on the ACP transport (elicitation.form handshake plus
     // the whole plan file, see omp_acp.rs); every other omp/pi request keeps the child-process path.
-    if launch.engine_impl.transport_for(wsl_tp.is_some()) == Transport::Own
+    if launch.engine_impl.drives_own_transport()
         || (engine == "omp" && pi_family::acp_plan_requested(&launch.req))
     {
-        // A local driver has no remote path: a remote workspace is refused explicitly (as before),
-        // rather than silently starting a local session that can't reach it. codex/grok fall back to child above.
-        if wsl_tp.is_some() {
-            return Err(format!("Engine {engine} doesn't support remote (WSL) workspaces"));
-        }
-        // The child path resolves codex's provider credentials further down;
-        // the app-server driver owns its own process, so it needs them here.
+        // The app-server driver owns its own process, so codex's provider credentials are
+        // resolved here.
         if engine == "codex" && !codex_read_only::requested(&launch.req) {
             codex_provider_env::apply(&mut launch.built.command).await;
         }
         return send_host_stream(state, launch, engine, run_id, killed, reader_abort).await;
     }
-    let (mut command, extra_cleanup, skip_local_cwd) = match &wsl_tp {
-        Some(tp) => {
-            // Engines that depend on local staging files (grok and others with cleanup_files): the remote
-            // CLI can't read local files, so refuse rather than fail obscurely, and remove the staging files
-            // already written so nothing is stranded.
-            if !launch.built.cleanup_files.is_empty() {
-                for path in &launch.built.cleanup_files {
-                    let _ = std::fs::remove_file(path);
-                }
-                return Err(format!(
-                    "Engine {engine} doesn't support remote (WSL) workspaces: it depends on local temporary files"
-                ));
-            }
-            match wsl_transport::wrap(launch.built.command, tp).await {
-                Ok(wrapped) => (
-                    wrapped.command,
-                    wrapped.cleanup_files,
-                    wrapped.skip_local_cwd,
-                ),
-                Err(error) => {
-                    // A failed wrap (an ssh upload failure and the like) must not strand staging files either.
-                    for path in &launch.built.cleanup_files {
-                        let _ = std::fs::remove_file(path);
-                    }
-                    return Err(error);
-                }
-            }
-        }
-        None => (launch.built.command, Vec::new(), false),
-    };
-    let mut cleanup_files = launch.built.cleanup_files;
-    cleanup_files.extend(extra_cleanup);
-    // Local env doesn't cross ssh: in the WSL branch the command is the local ssh process, so apply
-    // would be pointless (and cost a login-shell probe); remote codex uses the distro's own config.
-    if engine == "codex" && wsl_tp.is_none() {
-        // v1.0.0 switched codex to `codex exec --json`: a CLI that predates
-        // the exec transport exits 1 before any event, surfacing as a bare
-        // "exit code: 1" banner. Fail fast with an actionable message.
-        codex::check_exec_support(&launch.bin, launch.req.session_id.is_some()).await?;
-        codex_provider_env::apply(&mut command).await;
-    }
+    let mut command = launch.built.command;
+    let cleanup_files = launch.built.cleanup_files;
     command
         .stdin(
             if launch.built.stdin_payload.is_some() || launch.built.keep_stdin_open {
@@ -1248,12 +1188,7 @@ async fn send_reserved(
         )
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped());
-    // A remote workspace path doesn't exist locally, so cwd falls back to a local directory (wsl.exe/ssh don't care).
-    if skip_local_cwd {
-        command.current_dir(wsl_transport::fallback_cwd());
-    } else {
-        command.current_dir(&launch.req.workspace);
-    }
+    command.current_dir(&launch.req.workspace);
     // Own process group so interrupt can kill the whole tree (grandchildren
     // inherit the stdout pipe and would otherwise block EOF forever).
     #[cfg(unix)]
@@ -1265,7 +1200,6 @@ async fn send_reserved(
     // is a stale launchd snapshot and an absolute shim path alone cannot
     // find the interpreter. Same dirs find_cli_binary searched; appended
     // after the process PATH, so normal resolution order is unchanged.
-    // Harmless for the WSL/ssh-wrapped command (local env doesn't cross).
     command.env("PATH", resolve::cli_search_path());
 
     let mut child = match command.spawn() {
@@ -1485,29 +1419,6 @@ async fn send_host_stream(
         session_id: resume_session_id,
     })
 }
-/// Async + spawn_blocking: the kill waits for the Windows tree walk to
-/// finish (see `kill_process_group`), and a synchronous command would hold
-/// that wait on the UI thread — the app would visibly hitch on every Stop.
-#[tauri::command]
-pub async fn interrupt_session(
-    state: tauri::State<'_, crate::engines::support::EngineState>,
-    session_id: String,
-) -> Result<bool, String> {
-    let registry = Arc::clone(&state.processes);
-    tauri::async_runtime::spawn_blocking(move || registry.kill(&session_id))
-        .await
-        .map_err(|e| e.to_string())
-}
-/// Which of `run_ids` the host still runs. The frontend's orphan sweep asks
-/// before settling a run that went silent: a long command or a question
-/// waiting on the user emits nothing, and silence alone is not a dead run.
-#[tauri::command]
-pub async fn live_runs(
-    state: tauri::State<'_, crate::engines::support::EngineState>,
-    run_ids: Vec<String>,
-) -> Result<Vec<String>, String> {
-    Ok(state.processes.live_run_ids(&run_ids))
-}
 /// Answer a pending question card. Multiple transports share this command:
 /// - claude / codebuddy (control protocol): the answers merge into the parked tool input
 ///   and ride stdin as a `control_response`.
@@ -1524,7 +1435,7 @@ pub async fn live_runs(
 /// `answers` maps each question's text to the chosen option label — an array
 /// of labels for multiSelect questions. `None` means the user
 /// skipped/dismissed. Accepts either the run id or the conversation session
-/// id, like `interrupt_session`.
+/// id.
 #[tauri::command]
 pub async fn answer_question(
     state: tauri::State<'_, crate::engines::support::EngineState>,
@@ -1596,7 +1507,9 @@ pub async fn answer_question(
                 "Codex did not acknowledge the question answer; it is still available to retry"
                     .to_string()
             })?
-            .map_err(|_| "Codex app-server stopped before acknowledging the answer".to_string())??;
+            .map_err(|_| {
+                "Codex app-server stopped before acknowledging the answer".to_string()
+            })??;
         if reply.get("turnId").and_then(Value::as_str).is_none() {
             return Err("Codex returned an invalid turn/steer response".to_string());
         }
@@ -1851,7 +1764,10 @@ pub async fn respond_plan_review(
     }
 
     // native_request: take the parked context and check it belongs to the same revision and unchanged body.
-    let session_key = review.run_id.clone().unwrap_or_else(|| review.session_id.clone());
+    let session_key = review
+        .run_id
+        .clone()
+        .unwrap_or_else(|| review.session_id.clone());
     let entry = state
         .processes
         .get(&session_key)
@@ -1878,8 +1794,9 @@ pub async fn respond_plan_review(
             // The body changed while awaiting review: the claimed revision must not run with the old body;
             // expire it first and ask for a fresh review.
             let _ = plan_review::expire_reviews(&state.db, &[(plan_id.clone(), expected_revision)]);
-            return Err("plan content changed while awaiting review; the revision was expired"
-                .to_string());
+            return Err(
+                "plan content changed while awaiting review; the revision was expired".to_string(),
+            );
         }
     }
 
@@ -1902,14 +1819,21 @@ pub async fn respond_plan_review(
     let frame = substitute_plan_feedback(frame, feedback.as_deref());
 
     let written = match parked.get("route").and_then(Value::as_str) {
-        Some("stdin") => state.processes.write_line(&session_key, frame_to_line(&frame)).await,
+        Some("stdin") => {
+            state
+                .processes
+                .write_line(&session_key, frame_to_line(&frame))
+                .await
+        }
         Some("http") => {
             let origin = parked.get("origin").and_then(Value::as_str).unwrap_or("");
             let path = parked.get("path").and_then(Value::as_str).unwrap_or("");
             if origin.is_empty() || path.is_empty() {
                 Err("the parked native context is missing its http origin/path".to_string())
             } else {
-                crate::engines::support::dsh_host::host_call(origin, path, frame).await.map(|_| ())
+                crate::engines::support::dsh_host::host_call(origin, path, frame)
+                    .await
+                    .map(|_| ())
             }
         }
         _ => Err("the parked native context does not declare a reply route".to_string()),
@@ -1935,17 +1859,6 @@ pub async fn respond_plan_review(
     let review = plan_review::get_review(&state.db, &plan_id, expected_revision)?
         .ok_or_else(|| "plan review vanished mid-decision".to_string())?;
     Ok(PlanRespondOutcome::Applied { review })
-}
-
-/// Plan review history (loaded by the history page after a restart): deduplicated by the
-/// planId/revision key and removed with the session. The frontend's localStorage isn't the authority.
-#[tauri::command]
-pub async fn list_plan_reviews(
-    state: tauri::State<'_, crate::engines::support::EngineState>,
-    engine: String,
-    session_id: String,
-) -> Result<Vec<PlanReview>, String> {
-    plan_review::list_reviews(&state.db, &engine, &session_id)
 }
 
 /// Feedback injected into the native reply frame: when parking, an adapter writes this placeholder
@@ -2255,12 +2168,14 @@ mod permission_tests {
 
     #[test]
     fn omp_tier_settings_are_backward_compatible_and_roundtrip() {
-        let mut settings: crate::engines::support::settings::AppSettings = serde_json::from_str("{}").unwrap();
+        let mut settings: crate::engines::support::settings::AppSettings =
+            serde_json::from_str("{}").unwrap();
         assert_eq!(settings.omp_openai_service_tier, None);
         for tier in [Some("priority"), Some("default"), None] {
             settings.omp_openai_service_tier = tier.map(str::to_string);
             let encoded = serde_json::to_string(&settings).unwrap();
-            let decoded: crate::engines::support::settings::AppSettings = serde_json::from_str(&encoded).unwrap();
+            let decoded: crate::engines::support::settings::AppSettings =
+                serde_json::from_str(&encoded).unwrap();
             assert_eq!(decoded.omp_openai_service_tier.as_deref(), tier);
         }
     }
@@ -2306,91 +2221,6 @@ mod permission_tests {
         let bypass = argv(&e, &req(Some("bypass")));
         assert!(bypass.contains(&"--dangerously-skip-permissions".to_string()));
         assert!(!bypass.contains(&"--permission-mode".to_string()));
-    }
-
-    #[test]
-    fn codex_maps_modes_to_sandbox_flags() {
-        let e = codex::CodexEngine;
-        let auto = argv(&e, &req(Some("auto")));
-        assert!(auto.contains(&"sandbox_mode=\"workspace-write\"".to_string()));
-        assert!(!auto.contains(&"--dangerously-bypass-approvals-and-sandbox".to_string()));
-
-        let manual = argv(&e, &req(Some("manual")));
-        assert!(manual.contains(&"sandbox_mode=\"read-only\"".to_string()));
-
-        let bypass = argv(&e, &req(Some("bypass")));
-        assert!(bypass.contains(&"--dangerously-bypass-approvals-and-sandbox".to_string()));
-    }
-
-    #[test]
-    fn codex_resume_avoids_unsupported_sandbox_flag() {
-        // `codex exec resume` rejects --sandbox (clap exit 2); the sandbox must
-        // travel via -c sandbox_mode on both fresh and resumed sessions.
-        let e = codex::CodexEngine;
-        let mut resume = req(Some("manual"));
-        resume.session_id = Some("00000000-0000-0000-0000-000000000000".to_string());
-        let args = argv(&e, &resume);
-        assert!(args.contains(&"resume".to_string()));
-        assert!(!args.contains(&"--sandbox".to_string()));
-        assert!(args.contains(&"sandbox_mode=\"read-only\"".to_string()));
-
-        let fresh = argv(&e, &req(Some("auto")));
-        assert!(!fresh.contains(&"--sandbox".to_string()));
-        assert!(fresh.contains(&"sandbox_mode=\"workspace-write\"".to_string()));
-    }
-
-    #[test]
-    fn codex_prompt_goes_through_stdin_not_argv() {
-        // Windows resolves npm codex to a `.cmd` shim spawned via `cmd /c`;
-        // cmd.exe cuts a multiline argument at the first newline, so only line
-        // 1 ever reached the model. The prompt must ride stdin (`-`) verbatim.
-        let e = codex::CodexEngine;
-        let mut request = req(Some("auto"));
-        request.prompt = "first line\nmodel = \"gpt-5\"\n%PATH%".to_string();
-        let built = e.build_command(&request, "fake-bin").unwrap();
-        let args: Vec<String> = built
-            .command
-            .as_std()
-            .get_args()
-            .map(|a| a.to_string_lossy().to_string())
-            .collect();
-        assert!(args.contains(&"-".to_string()));
-        assert!(!args.iter().any(|a| a.contains("first line")));
-        assert_eq!(
-            built.stdin_payload.as_deref(),
-            Some(request.prompt.as_str())
-        );
-
-        let mut resume = req(Some("auto"));
-        resume.session_id = Some("00000000-0000-0000-0000-000000000000".to_string());
-        let built = e.build_command(&resume, "fake-bin").unwrap();
-        let args: Vec<String> = built
-            .command
-            .as_std()
-            .get_args()
-            .map(|a| a.to_string_lossy().to_string())
-            .collect();
-        assert!(args.contains(&"-".to_string()));
-        assert_eq!(built.stdin_payload.as_deref(), Some("hi"));
-    }
-
-    #[test]
-    fn kimi_prompt_mode_never_combines_interactive_permission_flags() {
-        let e = kimi::KimiEngine;
-        let auto = argv(&e, &req(Some("auto")));
-        assert!(!auto.contains(&"--yolo".to_string()));
-        assert!(!auto.contains(&"--plan".to_string()));
-
-        assert!(e.build_command(&req(Some("plan")), "kimi").is_err());
-
-        let bypass = argv(&e, &req(Some("bypass")));
-        assert!(!bypass.contains(&"--yolo".to_string()));
-        assert!(!bypass.contains(&"--auto".to_string()));
-
-        // Manual is unsupported: falls back to auto (no flags).
-        let manual = argv(&e, &req(Some("manual")));
-        assert!(!manual.contains(&"--yolo".to_string()));
-        assert!(!manual.contains(&"--plan".to_string()));
     }
 
     #[test]
@@ -2451,7 +2281,10 @@ mod permission_tests {
             let Err(message) = refusal else {
                 panic!("{id} plan request must be refused before spawn");
             };
-            assert!(message.contains("cannot run a human-approved plan"), "{message}");
+            assert!(
+                message.contains("cannot run a human-approved plan"),
+                "{message}"
+            );
             assert!(ensure_plan_approval(&id, engine.as_ref(), Some("auto")).is_ok());
         }
 
@@ -2469,7 +2302,10 @@ mod permission_tests {
         let mut auto_req = req(Some("auto"));
         auto_req.model = Some("openai-codex/gpt-5.4".into());
         let auto = argv(&pi_family::omp(), &auto_req);
-        let pin = auto.iter().position(|a| a == "--model").expect("model flag");
+        let pin = auto
+            .iter()
+            .position(|a| a == "--model")
+            .expect("model flag");
         assert_eq!(auto[pin + 1], "openai-codex/gpt-5.4");
         assert!(!auto.contains(&"--auto-approve".to_string()));
         let bypass = argv(&pi_family::omp(), &req(Some("bypass")));
@@ -2499,12 +2335,7 @@ mod permission_tests {
         let pairs: Vec<&[String]> = args.windows(2).filter(|w| w[0] == "--add-dir").collect();
         assert_eq!(pairs.len(), 1, "{args:?}");
         assert_eq!(pairs[0][1], "/data/shared");
-
-        // Other engines have no equivalent flag: the field stays inert.
-        let codex_args = argv(&codex::CodexEngine, &r);
-        assert!(!codex_args.iter().any(|a| a == "--add-dir"));
     }
-
 }
 #[cfg(test)]
 mod retry_lifecycle_tests {
@@ -2556,16 +2387,25 @@ mod retry_lifecycle_tests {
 
         core.dispatch_event(&mut state, EngineEvent::BackgroundTasks { pending: 1 });
         core.dispatch_event(&mut state, done());
-        assert!(!state.saw_done, "the run must stay open for the follow-up turn");
+        assert!(
+            !state.saw_done,
+            "the run must stay open for the follow-up turn"
+        );
         assert_eq!(
-            registry.take_awaiting_followup("s-1").map(|a| a.run_id).as_deref(),
+            registry
+                .take_awaiting_followup("s-1")
+                .map(|a| a.run_id)
+                .as_deref(),
             Some("bg-run")
         );
         registry.set_awaiting_followup("s-1", "bg-run", test_followup_prefs());
 
         core.dispatch_event(&mut state, EngineEvent::BackgroundTasks { pending: 0 });
         core.dispatch_event(&mut state, EngineEvent::Delta("later".to_string()));
-        assert!(registry.take_awaiting_followup("s-1").is_none(), "resumed run is no longer idle");
+        assert!(
+            registry.take_awaiting_followup("s-1").is_none(),
+            "resumed run is no longer idle"
+        );
 
         core.dispatch_event(&mut state, done());
         assert!(state.saw_done);
@@ -2576,7 +2416,12 @@ mod retry_lifecycle_tests {
             .unwrap()
             .iter()
             // The background-task count is reported on its own; these follow the turn.
-            .filter(|event| !matches!(event["kind"].as_str(), Some("background_tasks" | "process_closed")))
+            .filter(|event| {
+                !matches!(
+                    event["kind"].as_str(),
+                    Some("background_tasks" | "process_closed")
+                )
+            })
             .map(|event| event["kind"].as_str().unwrap().to_string())
             .collect();
         assert_eq!(kinds, ["done", "turn_resumed", "delta", "done"]);
@@ -2614,7 +2459,12 @@ mod retry_lifecycle_tests {
         let kinds: Vec<_> = events
             .iter()
             // The background-task count is reported on its own; these follow the turn.
-            .filter(|event| !matches!(event["kind"].as_str(), Some("background_tasks" | "process_closed")))
+            .filter(|event| {
+                !matches!(
+                    event["kind"].as_str(),
+                    Some("background_tasks" | "process_closed")
+                )
+            })
             .map(|event| event["kind"].as_str().unwrap())
             .collect();
         assert_eq!(kinds, ["error"], "a settled run must not send live events");
@@ -2777,7 +2627,12 @@ mod retry_lifecycle_tests {
         let kinds: Vec<_> = events
             .iter()
             // The background-task count is reported on its own; these follow the turn.
-            .filter(|event| !matches!(event["kind"].as_str(), Some("background_tasks" | "process_closed")))
+            .filter(|event| {
+                !matches!(
+                    event["kind"].as_str(),
+                    Some("background_tasks" | "process_closed")
+                )
+            })
             .map(|event| event["kind"].as_str().unwrap())
             .collect();
         assert_eq!(
@@ -2787,7 +2642,12 @@ mod retry_lifecycle_tests {
         );
         let turn: Vec<_> = events
             .iter()
-            .filter(|event| !matches!(event["kind"].as_str(), Some("background_tasks" | "process_closed")))
+            .filter(|event| {
+                !matches!(
+                    event["kind"].as_str(),
+                    Some("background_tasks" | "process_closed")
+                )
+            })
             .collect();
         assert_eq!(turn[3]["data"], "background task finished");
     }
@@ -2806,7 +2666,12 @@ mod retry_lifecycle_tests {
         let kinds: Vec<_> = events
             .iter()
             // The background-task count is reported on its own; these follow the turn.
-            .filter(|event| !matches!(event["kind"].as_str(), Some("background_tasks" | "process_closed")))
+            .filter(|event| {
+                !matches!(
+                    event["kind"].as_str(),
+                    Some("background_tasks" | "process_closed")
+                )
+            })
             .map(|event| event["kind"].as_str().unwrap())
             .collect();
         assert_eq!(
@@ -2852,7 +2717,12 @@ mod retry_lifecycle_tests {
         let kinds: Vec<_> = events
             .iter()
             // The background-task count is reported on its own; these follow the turn.
-            .filter(|event| !matches!(event["kind"].as_str(), Some("background_tasks" | "process_closed")))
+            .filter(|event| {
+                !matches!(
+                    event["kind"].as_str(),
+                    Some("background_tasks" | "process_closed")
+                )
+            })
             .map(|event| event["kind"].as_str().unwrap())
             .collect();
         let text: String = events
@@ -2884,7 +2754,12 @@ mod retry_lifecycle_tests {
         let kinds: Vec<_> = events
             .iter()
             // The background-task count is reported on its own; these follow the turn.
-            .filter(|event| !matches!(event["kind"].as_str(), Some("background_tasks" | "process_closed")))
+            .filter(|event| {
+                !matches!(
+                    event["kind"].as_str(),
+                    Some("background_tasks" | "process_closed")
+                )
+            })
             .map(|event| event["kind"].as_str().unwrap())
             .collect();
         let replies: Vec<String> = events
@@ -2934,7 +2809,12 @@ mod retry_lifecycle_tests {
         let kinds: Vec<_> = events
             .iter()
             // The background-task count is reported on its own; these follow the turn.
-            .filter(|event| !matches!(event["kind"].as_str(), Some("background_tasks" | "process_closed")))
+            .filter(|event| {
+                !matches!(
+                    event["kind"].as_str(),
+                    Some("background_tasks" | "process_closed")
+                )
+            })
             .map(|event| event["kind"].as_str().unwrap())
             .collect();
         assert_eq!(kinds, ["delta", "done"], "{events:?}");
@@ -2953,7 +2833,12 @@ mod retry_lifecycle_tests {
         let kinds: Vec<_> = events
             .iter()
             // The background-task count is reported on its own; these follow the turn.
-            .filter(|event| !matches!(event["kind"].as_str(), Some("background_tasks" | "process_closed")))
+            .filter(|event| {
+                !matches!(
+                    event["kind"].as_str(),
+                    Some("background_tasks" | "process_closed")
+                )
+            })
             .map(|event| event["kind"].as_str().unwrap())
             .collect();
         assert_eq!(kinds, ["delta", "done"], "{events:?}");
@@ -2972,7 +2857,12 @@ mod retry_lifecycle_tests {
         let kinds: Vec<_> = events
             .iter()
             // The background-task count is reported on its own; these follow the turn.
-            .filter(|event| !matches!(event["kind"].as_str(), Some("background_tasks" | "process_closed")))
+            .filter(|event| {
+                !matches!(
+                    event["kind"].as_str(),
+                    Some("background_tasks" | "process_closed")
+                )
+            })
             .map(|event| event["kind"].as_str().unwrap())
             .collect();
         assert_eq!(kinds, ["retry", "delta", "done"]);
@@ -3083,7 +2973,12 @@ mod retry_lifecycle_tests {
         let kinds: Vec<_> = events
             .iter()
             // The background-task count is reported on its own; these follow the turn.
-            .filter(|event| !matches!(event["kind"].as_str(), Some("background_tasks" | "process_closed")))
+            .filter(|event| {
+                !matches!(
+                    event["kind"].as_str(),
+                    Some("background_tasks" | "process_closed")
+                )
+            })
             .map(|event| event["kind"].as_str().unwrap())
             .collect();
         assert_eq!(

@@ -1,4 +1,4 @@
-import { platform as osPlatform } from "@tauri-apps/plugin-os";
+import { platform as osPlatform } from "@/shared/platform/os";
 import { hasTauriInternals } from "./tauri";
 
 type DesktopOs = "macos" | "windows" | "linux";

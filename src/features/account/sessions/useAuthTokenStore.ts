@@ -3,15 +3,7 @@ import { clearApiCache } from "@/api/cache/api-cache";
 import { configureApiSession } from "@/api/client/session";
 import { resolveApiBase } from "@/api/deployment/api";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { store } from "@impierce/tauri-plugin-keystore";
-import {
-  activeHostedAccountId,
-  hostedScope,
-  hostedSessions,
-  isHostedSession,
-  vaultAccountId,
-  type SavedAccountSession,
-} from "./accountVault";
+import { activeVaultAccountId, vaultAccountId, type SavedAccountSession } from "./accountVault";
 import { errorDetail, recordRemoveError, recordTokenDebugEvent } from "./authTokenDebug";
 import {
   loadSecureVault,
@@ -51,23 +43,17 @@ export async function saveAccountAuthToken(
   if (cachedToken !== undefined && cachedToken !== (token || null)) accountSessionGeneration += 1;
   cachedToken = token || null;
   if (!token || !hasTauriInternals()) return;
-  if (!account?.id) {
-    await persistRawToken(token);
-    return;
-  }
+  if (!account?.id) return;
   try {
     const vault = await loadSecureVault();
     const saved: SavedAccountSession = {
       ...account,
       lastUsedAt: new Date().toISOString(),
     };
-    const sessions = vault.sessions.filter(
-      (item) => !isHostedSession(item) || item.account.id !== saved.id,
-    );
+    const sessions = vault.sessions.filter((item) => item.account.id !== saved.id);
     sessions.push({
       account: saved,
       token,
-      deploymentScope: hostedScope,
     });
     await persistSecureVault({
       version: 1,
@@ -86,11 +72,7 @@ export async function saveAccountAuthToken(
   }
 }
 export async function readAccountAuthToken(): Promise<string | null> {
-  if (!hasTauriInternals()) {
-    return import.meta.env.DEV && import.meta.env.VITE_MISTY_DEMO_MODE === "1"
-      ? (cachedToken ?? null)
-      : null;
-  }
+  if (!hasTauriInternals()) return null;
   // The handle can be loaded before the native cookie restore finishes. Every
   // caller must wait for that restore before issuing authenticated requests.
   if (tokenReadPromise) return tokenReadPromise;
@@ -134,17 +116,13 @@ export async function activateAccountSession(accountId: string): Promise<SavedAc
     throw new Error("Saved account switching is only available in the Misty desktop app.");
   }
   const vault = await loadSecureVault();
-  const session = vault.sessions.find(
-    (item) => isHostedSession(item) && item.account.id === accountId,
-  );
+  const session = vault.sessions.find((item) => item.account.id === accountId);
   if (!session) {
-    const activeAccountId = hostedSessions(vault).some(
-      (item) => item.account.id === readActiveAccountId(),
-    )
+    const activeAccountId = vault.sessions.some((item) => item.account.id === readActiveAccountId())
       ? readActiveAccountId()
-      : activeHostedAccountId(vault);
+      : activeVaultAccountId(vault);
     writeAccountIndex(
-      hostedSessions(vault).map((item) => item.account),
+      vault.sessions.map((item) => item.account),
       activeAccountId,
     );
     throw new SavedAccountSessionUnavailableError(
@@ -175,11 +153,9 @@ export async function clearAccountAuthToken(): Promise<SavedAccountSession | nul
     const activeId = readActiveAccountId();
     if (activeId) await clearApiCache(activeId);
     if (activeId) await forgetAccountCookies(await resolveApiBase(), activeId);
-    vault.sessions = vault.sessions.filter(
-      (item) => !isHostedSession(item) || item.account.id !== activeId,
-    );
+    vault.sessions = vault.sessions.filter((item) => item.account.id !== activeId);
     const next =
-      hostedSessions(vault).sort((left, right) =>
+      [...vault.sessions].sort((left, right) =>
         right.account.lastUsedAt.localeCompare(left.account.lastUsedAt),
       )[0] ?? null;
     vault.activeAccountId = next ? vaultAccountId(next.account.id) : "";
@@ -231,9 +207,7 @@ export async function removeSavedAccountSession(accountId: string): Promise<bool
     }
     await clearApiCache(accountId);
     await forgetAccountCookies(await resolveApiBase(), accountId);
-    const sessions = vault.sessions.filter(
-      (item) => !isHostedSession(item) || item.account.id !== accountId,
-    );
+    const sessions = vault.sessions.filter((item) => item.account.id !== accountId);
     if (sessions.length === vault.sessions.length) return true;
     vault.sessions = sessions;
     await persistSecureVault(vault);
@@ -242,20 +216,6 @@ export async function removeSavedAccountSession(accountId: string): Promise<bool
     recordRemoveError(error);
     return false;
   }
-}
-async function persistRawToken(token: string): Promise<void> {
-  try {
-    await store(token);
-    writeTokenStoredMarker(true);
-  } catch (error) {
-    recordTokenDebugEvent({
-      level: "error",
-      scope: "account-auth-token",
-      message: "Could not store Misty auth token in this computer's keystore.",
-      detail: errorDetail(error),
-    });
-  }
-  await syncManagedAiToken(token);
 }
 
 // The saved "token" is now a non-secret account handle. Actual JWT cookies

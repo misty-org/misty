@@ -1,10 +1,7 @@
 use crate::browser::*;
-use sha2::{Digest, Sha256};
 // Swipes and protected-video reports share the menu's token.
 mod page_signals;
-mod right_click;
 mod selection;
-pub(in crate::browser) use right_click::right_click;
 #[cfg(test)]
 use selection::menu_action_allowed;
 pub(in crate::browser) use selection::select;
@@ -13,9 +10,6 @@ pub(in crate::browser) use selection::select;
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct PageContext {
     url: String,
-    document_revision: String,
-    title: String,
-    content: String,
     selection: bool,
     editable: bool,
     link: String,
@@ -29,9 +23,6 @@ struct AskContext {
     scope_id: String,
     space_id: Option<String>,
     profile_id: Option<String>,
-    provider_id: Option<String>,
-    revision: String,
-    content_hash: String,
     page: PageContext,
 }
 
@@ -61,11 +52,7 @@ pub(in crate::browser) fn forward(app: &AppHandle, id: &str, url: &Url) -> bool 
     let Ok(page) = serde_json::from_str::<PageContext>(raw) else {
         return true;
     };
-    if page.content.chars().count() > 16000
-        || page.title.chars().count() > 200
-        || page.url.len() > 8192
-        || page.document_revision.len() > 80
-    {
+    if page.url.len() > 8192 {
         return true;
     }
     let Ok(label) = webview_label(id) else {
@@ -97,9 +84,6 @@ pub(in crate::browser) fn forward(app: &AppHandle, id: &str, url: &Url) -> bool 
             scope_id: session.scope_id.clone(),
             space_id: session.origin_space_id.clone(),
             profile_id: session.context_profile_id().map(str::to_owned),
-            provider_id: session.profile_provider.clone(),
-            revision: page.document_revision.clone(),
-            content_hash: format!("{:x}", Sha256::digest(page.content.as_bytes())),
             page,
         }
     };

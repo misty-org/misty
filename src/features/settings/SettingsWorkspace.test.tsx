@@ -36,9 +36,7 @@ const mocks = vi.hoisted(() => {
       enabled: false,
     },
     openWithAssociations: [] as unknown[],
-    shortcuts: {
-      bindings: [] as unknown[],
-    },
+    shortcuts: {},
     working: false,
     error: null,
     message: null,

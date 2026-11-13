@@ -11,17 +11,19 @@ import { VirtualStudio } from "../virtual/VirtualStudio";
 import { ContextRail } from "../context-panel/ContextRail";
 import { useContextPanel } from "../context-panel/contextPanelStore";
 import { isUnread, markConversationRead } from "./conversationReads";
-import { isRunInProgress } from "./RecentStatusBadge";
 import { IntegrationsPage } from "../connected-apps/IntegrationsPage";
 import { TutorPage } from "../tutor/TutorPage";
 import "./agentWorkspaceCatalog.css";
 import "./agentWorkspaceFrame.css";
 
+/** Queued or working: read state doesn't apply yet. */
+const isRunInProgress = (state?: string) => state === "running" || state === "queued";
+
 const AgentContextPanel = lazy(async () => ({
   default: (await import("../context-panel/AgentContextPanel")).AgentContextPanel,
 }));
 
-export type AgentWorkspacePage = "task" | "integrations" | "studio" | "tutor";
+export type AgentWorkspacePage = "task" | "integrations" | "studio" | "lab";
 type RecentConversation = {
   id: string;
   title?: string;
@@ -31,11 +33,11 @@ type RecentConversation = {
 };
 
 /**
- * The Agents page: a chat with its agent, or one of the pages the sidebar opens (studio, tutor,
- * and integrations from the studio). Only the chat has a bar, holding the agent and the context
- * panel for the folder's files, changes and a terminal. The other pages have no title bar, since
- * the sidebar and the tab already name them: integrations puts the agent switcher on its first
- * row, and the studio floats its few buttons over the room. The
+ * The Agents page: a chat with its agent, or one of the pages the sidebar opens (studio, notebooks,
+ * and integrations from the studio). Only the chat has a bar, naming the chat's agent and holding
+ * the context panel for the folder's files, changes and a terminal. The other pages have no title
+ * bar, since the sidebar and the tab already name them, and the studio, where agents are hired and
+ * set up, floats its few buttons over the room. The
  * chats are listed in the window's sidebar, so this page has no list of its own. Presentation
  * only: conversation and account actions remain owned by AgentsPage.
  */
@@ -46,12 +48,13 @@ export function AgentWorkspaceFrame({
   activity,
   conversationId,
   disabled,
-  identity,
+  title,
   children,
   onPageChange,
   onNewTask,
   onConversation,
   onLearn,
+  onAgentSettings,
 }: {
   agent: AgentProfile;
   page: AgentWorkspacePage;
@@ -60,14 +63,16 @@ export function AgentWorkspaceFrame({
   activity: MistyActivityEntry[];
   conversationId: string;
   disabled: boolean;
-  /** The agent switcher. It also holds New agent and this agent's settings. */
-  identity: ReactNode;
+  /** The open chat's title. The tab names its agent, so the chat doesn't. */
+  title: ReactNode;
   children: ReactNode;
   onPageChange(page: AgentWorkspacePage): void;
   onNewTask(): void;
   onConversation(id: string): void;
   /** Starts a Teach chat that opens with this request. */
   onLearn(prompt: string): void;
+  /** Opens an agent's settings, from its desk in the studio. */
+  onAgentSettings(agentId: string): void;
 }) {
   // The open conversation is read once its run settles while the window is in view.
   const activeId = page === "task" ? conversationId : undefined;
@@ -96,7 +101,7 @@ export function AgentWorkspaceFrame({
     <div className="agent-studio" data-page={page}>
       {page === "task" ? (
         <header className="agent-studio-bar" data-window-toolbar>
-          {identity}
+          {title}
           <div className="agent-studio-panels">
             <IconButton label="New task" disabled={disabled} onClick={onNewTask}>
               <SquarePen size={16} />
@@ -112,7 +117,7 @@ export function AgentWorkspaceFrame({
           <div className="agent-studio-task" hidden={page !== "task"}>
             {children}
           </div>
-          {page === "tutor" ? (
+          {page === "lab" ? (
             <TutorPage
               agentId={agent.id}
               onLesson={(agentId, id) => {
@@ -125,6 +130,7 @@ export function AgentWorkspaceFrame({
           ) : null}
           {page === "studio" ? (
             <VirtualStudio
+              onAgentSettings={onAgentSettings}
               onOpenChat={(agentId, chat) => {
                 onPageChange("task");
                 if (agentId === agent.id && chat) onConversation(chat);

@@ -8,7 +8,6 @@ export * from "./tabs/accountScope";
 export * from "./profiles/profileWindow";
 export * from "./tabs/spaceWindow";
 export * from "./tabs/routeSurface";
-export { isUnseenPreload, mayPreload } from "./tabs/tabPreload";
 export { useWindowDockingLayout } from "./panes/useWindowDockingLayout";
 export * from "./tabs/useWorkspaceStore";
 export { useFocusedPaneHistory } from "./panes/useFocusedPaneHistory";
@@ -19,8 +18,6 @@ export * from "./tabs/workspaceViewOperations";
 export * from "./tabs/WorkspaceViewRouteScope";
 
 // Public surface used by other features (generated from their imports).
-export { NavigationNamesBoundary } from "./navigation-names/NavigationNamesBoundary";
-export { useNavigationNames } from "./navigation-names/store";
 export { StablePaneLayout } from "./panes/StablePaneLayout";
 export { dockLeaves, dockTreeViews } from "./panes/dockTree";
 export {
@@ -69,18 +66,18 @@ export { workspaceAppIcon } from "./tabs/WorkspaceAppIcon";
 export {
   releaseWorkspaceViewRouteHistory,
   useWorkspaceViewFocused,
+  useWorkspaceViewId,
 } from "./tabs/WorkspaceViewRouteScope";
 export { accountScopeFor, localAccountScope } from "./tabs/accountScope";
 export {
   blankBrowserUrl,
-  parseBrowserViewState,
+  browserFaviconUrl,
   type DockSplitDirection,
   type WorkspaceDockNode,
   type WorkspaceLayout,
   type WorkspaceTab,
   type WorkspaceView,
 } from "./tabs/workspaceViews";
-export { type PageDocument } from "./tabs/pageSnapshot";
 export { isRetiredWebRoute, workspaceSurfaceFromRoute } from "./tabs/routeSurface";
 export {
   onSpaceWindowSwitch,
@@ -89,12 +86,8 @@ export {
   useSpaceWindowStore,
   type SpaceWindowIdentity,
 } from "./tabs/spaceWindow";
-export { useWorkspacePagePreview } from "./tabs/useWorkspacePagePreview";
 export { useWorkspaceStore } from "./tabs/useWorkspaceStore";
-export {
-  configureWorkspaceDefaultView,
-  workspaceDefaultViewIndex,
-} from "./tabs/workspaceDefaultView";
+export { configureWorkspaceDefaultView } from "./tabs/workspaceDefaultView";
 
 // Public surface used by other features (generated from their imports).
 export { AdvancedSection } from "./settings/AdvancedSection";
@@ -114,40 +107,21 @@ export {
   setBrowserPointerTrackingEnabled,
   setBrowserWebviewsSuspended,
 } from "./page-runtime/browserOverlayRuntime";
-export { savePagePreview } from "./page-runtime/browserPagePreview";
 export {
   adoptedPages,
-  browserRuntimeCreated,
-  browserRuntimeId,
   browserRuntimeResumeEvent,
-  browserScopeId,
-  browserSyncStates,
-  browserTabIdForRuntime,
-  closedRuntimes,
-  createdRuntimeIds,
   desiredVisibleRuntimeIds,
   enqueue,
   hideRequest,
   keepLiveRuntimeIds,
   lastBounds,
-  parkGeneration,
-  registerBrowserRuntime,
   runtimeQueues,
-  runtimeTabIds,
   serializeBounds,
   setBrowserPagePresented,
   setBrowserRuntimeKeepLive,
   visibleRuntimeIds,
-  type BrowserRuntimeTab,
-  type BrowserSyncInput,
-  type BrowserSyncState,
 } from "./page-runtime/browserRuntimeSets";
 export { useBrowserRuntimeStore } from "./page-runtime/browserRuntimeStore";
-export {
-  type BrowserHistory,
-  type BrowserInspection,
-  type BrowserMistyPage,
-} from "./page-runtime/browserRuntimeTypes";
 export {
   cancelDeferredHide,
   completeHandoff,
@@ -156,7 +130,6 @@ export {
   markBrowserPerf,
   onBrowserSettled,
 } from "./page-runtime/browserSwitchHandoff";
-export { isMediaHeld } from "./page-runtime/mediaHold";
 export { type BrowserBounds, type BrowserTheme } from "./page-runtime/pageRuntimeTypes";
 
 // Public surface used by other features (generated from their imports).

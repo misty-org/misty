@@ -573,8 +573,21 @@ fn target_list_covers_every_cli_and_reports_availability() {
     assert_eq!(
         ids,
         vec![
-            "claude", "codex", "kimi", "grok", "pi", "omp", "dsh", "agy", "gemini", "opencode",
-            "qoder", "qoder-cn", "qwen", "codebuddy", "hermes",
+            "claude",
+            "codex",
+            "kimi",
+            "grok",
+            "pi",
+            "omp",
+            "dsh",
+            "agy",
+            "gemini",
+            "opencode",
+            "qoder",
+            "qoder-cn",
+            "qwen",
+            "codebuddy",
+            "hermes",
         ]
     );
     // The hidden agents target stays out of the UI list.
@@ -1056,7 +1069,13 @@ async fn remote_skill_content_live_reads_the_repo_file() {
     );
 
     // A skill that really isn't in the repo must report not_found, not pick some other SKILL.md.
-    let missing = remote_skill_content("github", "awesome-copilot", crate::known_names::DEFAULT_BRANCH, "gh-cli").await;
+    let missing = remote_skill_content(
+        "github",
+        "awesome-copilot",
+        crate::known_names::DEFAULT_BRANCH,
+        "gh-cli",
+    )
+    .await;
     match missing.expect_err("must be not_found") {
         SkillError::Coded(code, _) => assert_eq!(code, "not_found"),
         other => panic!("unexpected error: {other:?}"),

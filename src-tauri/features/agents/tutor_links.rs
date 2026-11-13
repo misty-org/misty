@@ -58,7 +58,10 @@ async fn page(address: &url::Url) -> Result<ReadLink, String> {
     .await
     .map_err(|_| "Misty couldn't reach that page.".to_owned())?;
     if response.status >= 400 {
-        return Err(format!("The page answered with an error ({}).", response.status));
+        return Err(format!(
+            "The page answered with an error ({}).",
+            response.status
+        ));
     }
     if response.content_type.starts_with("application/pdf") {
         return pdf(&response.body, address).await;
@@ -86,7 +89,9 @@ async fn page(address: &url::Url) -> Result<ReadLink, String> {
 async fn pdf(bytes: &[u8], address: &url::Url) -> Result<ReadLink, String> {
     let folder = tempfile::tempdir().map_err(|error| error.to_string())?;
     let path = folder.path().join("source.pdf");
-    tokio::fs::write(&path, bytes).await.map_err(|error| error.to_string())?;
+    tokio::fs::write(&path, bytes)
+        .await
+        .map_err(|error| error.to_string())?;
     let document = documents::prepare_document(path, crate::app::embedded_workers::builtin_worker)
         .await
         .map_err(|_| "Misty couldn't read that PDF.".to_owned())?;
@@ -107,7 +112,12 @@ async fn pdf(bytes: &[u8], address: &url::Url) -> Result<ReadLink, String> {
         .and_then(|mut segments| segments.next_back().map(str::to_owned))
         .filter(|name| !name.is_empty())
         .unwrap_or_else(|| address.host_str().unwrap_or("PDF").to_owned());
-    Ok(ReadLink { title, text, kind: "pdf", truncated: document.truncated })
+    Ok(ReadLink {
+        title,
+        text,
+        kind: "pdf",
+        truncated: document.truncated,
+    })
 }
 
 /// A file dropped on a notebook: its bytes come as the request body and its name in a header, so
@@ -141,10 +151,13 @@ pub async fn tutor_read_dropped(
         .unwrap_or_else(|| "txt".to_owned());
     let folder = tempfile::tempdir().map_err(|error| error.to_string())?;
     let path = folder.path().join(format!("source.{extension}"));
-    tokio::fs::write(&path, bytes).await.map_err(|error| error.to_string())?;
-    let mut document = documents::prepare_document(path, crate::app::embedded_workers::builtin_worker)
+    tokio::fs::write(&path, bytes)
         .await
-        .map_err(|_| format!("Misty couldn't read {name}."))?;
+        .map_err(|error| error.to_string())?;
+    let mut document =
+        documents::prepare_document(path, crate::app::embedded_workers::builtin_worker)
+            .await
+            .map_err(|_| format!("Misty couldn't read {name}."))?;
     document.display_name = name;
     Ok(document)
 }
@@ -210,18 +223,29 @@ fn percent_decode(value: &str) -> String {
         out.push(bytes[index]);
         index += 1;
     }
-    String::from_utf8_lossy(&out).chars().filter(|c| !c.is_control()).take(200).collect()
+    String::from_utf8_lossy(&out)
+        .chars()
+        .filter(|c| !c.is_control())
+        .take(200)
+        .collect()
 }
 
 /// The video id of a YouTube watch, short, embed or youtu.be link.
 pub(crate) fn youtube_id(url: &url::Url) -> Option<String> {
-    let host = url.host_str()?.trim_start_matches("www.").trim_start_matches("m.");
+    let host = url
+        .host_str()?
+        .trim_start_matches("www.")
+        .trim_start_matches("m.");
     let id = match host {
         "youtu.be" => url.path_segments()?.next()?.to_owned(),
         "youtube.com" | "music.youtube.com" => {
             let mut segments = url.path_segments()?;
             match segments.next()? {
-                "watch" => url.query_pairs().find(|(key, _)| key == "v")?.1.into_owned(),
+                "watch" => url
+                    .query_pairs()
+                    .find(|(key, _)| key == "v")?
+                    .1
+                    .into_owned(),
                 "shorts" | "embed" | "live" => segments.next()?.to_owned(),
                 _ => return None,
             }
@@ -230,7 +254,9 @@ pub(crate) fn youtube_id(url: &url::Url) -> Option<String> {
     };
     let valid = !id.is_empty()
         && id.len() <= 20
-        && id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_');
+        && id
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_');
     valid.then_some(id)
 }
 
@@ -245,14 +271,24 @@ async fn video(id: &str) -> Result<ReadLink, String> {
     let Some(track) = caption_track(&html) else {
         return Err("This video has no captions Misty can read.".into());
     };
-    let captions = fetch_raw(&track, "text/xml,application/xml", PAGE_BYTES, readable_type)
-        .await
-        .map_err(|_| "Misty couldn't fetch the video's captions.".to_owned())?;
+    let captions = fetch_raw(
+        &track,
+        "text/xml,application/xml",
+        PAGE_BYTES,
+        readable_type,
+    )
+    .await
+    .map_err(|_| "Misty couldn't fetch the video's captions.".to_owned())?;
     let lines = caption_lines(&String::from_utf8_lossy(&captions.body));
     if lines.is_empty() {
         return Err("YouTube didn't hand over this video's captions.".into());
     }
-    Ok(ReadLink { title, text: lines.join("\n"), kind: "video", truncated: captions.truncated })
+    Ok(ReadLink {
+        title,
+        text: lines.join("\n"),
+        kind: "video",
+        truncated: captions.truncated,
+    })
 }
 
 fn page_title(html: &str) -> Option<String> {
@@ -298,7 +334,11 @@ pub(crate) fn caption_track(html: &str) -> Option<String> {
     }
     let tracks: Vec<serde_json::Value> = serde_json::from_str(&rest[..end?]).ok()?;
     let language = |track: &serde_json::Value| {
-        track.get("languageCode").and_then(|value| value.as_str()).unwrap_or("").to_owned()
+        track
+            .get("languageCode")
+            .and_then(|value| value.as_str())
+            .unwrap_or("")
+            .to_owned()
     };
     let automatic = |track: &serde_json::Value| {
         track.get("kind").and_then(|value| value.as_str()) == Some("asr")
@@ -306,7 +346,11 @@ pub(crate) fn caption_track(html: &str) -> Option<String> {
     let pick = tracks
         .iter()
         .find(|track| language(track).starts_with("en") && !automatic(track))
-        .or_else(|| tracks.iter().find(|track| language(track).starts_with("en")))
+        .or_else(|| {
+            tracks
+                .iter()
+                .find(|track| language(track).starts_with("en"))
+        })
         .or_else(|| tracks.iter().find(|track| !automatic(track)))
         .or_else(|| tracks.first())?;
     let base = pick.get("baseUrl")?.as_str()?;
@@ -321,9 +365,13 @@ pub(crate) fn caption_lines(xml: &str) -> Vec<String> {
     let mut rest = xml;
     while let Some(open) = rest.find("<text") {
         let after = &rest[open..];
-        let Some(close_tag) = after.find('>') else { break };
+        let Some(close_tag) = after.find('>') else {
+            break;
+        };
         let attributes = &after[..close_tag];
-        let Some(end) = after.find("</text>") else { break };
+        let Some(end) = after.find("</text>") else {
+            break;
+        };
         let body = &after[close_tag + 1..end];
         let start = attributes
             .split("start=\"")
@@ -361,7 +409,9 @@ fn decode_entities(text: &str) -> String {
             "quot" => Some('"'),
             "apos" => Some('\''),
             "nbsp" => Some(' '),
-            _ if name.starts_with("#x") => u32::from_str_radix(&name[2..], 16).ok().and_then(char::from_u32),
+            _ if name.starts_with("#x") => u32::from_str_radix(&name[2..], 16)
+                .ok()
+                .and_then(char::from_u32),
             _ if name.starts_with('#') => name[1..].parse().ok().and_then(char::from_u32),
             _ => None,
         };
@@ -386,7 +436,10 @@ mod tests {
 
     #[test]
     fn decodes_a_dropped_file_name() {
-        assert_eq!(percent_decode("Notes%20on%20cells.pdf"), "Notes on cells.pdf");
+        assert_eq!(
+            percent_decode("Notes%20on%20cells.pdf"),
+            "Notes on cells.pdf"
+        );
         assert_eq!(percent_decode("caf%C3%A9.txt"), "café.txt");
         assert_eq!(percent_decode("100%"), "100%");
     }
@@ -394,9 +447,18 @@ mod tests {
     #[test]
     fn finds_a_video_id_in_every_kind_of_youtube_link() {
         let id = |address: &str| youtube_id(&url::Url::parse(address).unwrap());
-        assert_eq!(id("https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=10"), Some("dQw4w9WgXcQ".into()));
-        assert_eq!(id("https://youtu.be/dQw4w9WgXcQ"), Some("dQw4w9WgXcQ".into()));
-        assert_eq!(id("https://m.youtube.com/shorts/abc_DEF-123"), Some("abc_DEF-123".into()));
+        assert_eq!(
+            id("https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=10"),
+            Some("dQw4w9WgXcQ".into())
+        );
+        assert_eq!(
+            id("https://youtu.be/dQw4w9WgXcQ"),
+            Some("dQw4w9WgXcQ".into())
+        );
+        assert_eq!(
+            id("https://m.youtube.com/shorts/abc_DEF-123"),
+            Some("abc_DEF-123".into())
+        );
         assert_eq!(id("https://www.youtube.com/@channel"), None);
         assert_eq!(id("https://example.com/watch?v=x"), None);
     }
@@ -408,13 +470,17 @@ mod tests {
             caption_track(html).as_deref(),
             Some("https://www.youtube.com/api/timedtext?v=1&lang=en")
         );
-        let elsewhere = r#"{"captionTracks":[{"baseUrl":"https://evil.example/x","languageCode":"en"}]}"#;
+        let elsewhere =
+            r#"{"captionTracks":[{"baseUrl":"https://evil.example/x","languageCode":"en"}]}"#;
         assert_eq!(caption_track(elsewhere), None);
     }
 
     #[test]
     fn reads_timed_captions_with_their_times_and_entities() {
         let xml = r#"<?xml version="1.0"?><transcript><text start="0.5" dur="2">Hello &amp;amp; welcome</text><text start="75.2" dur="1">it&amp;#39;s &lt;fine&gt;</text><text start="80" dur="1"> </text></transcript>"#;
-        assert_eq!(caption_lines(xml), vec!["[0:00] Hello & welcome", "[1:15] it's <fine>"]);
+        assert_eq!(
+            caption_lines(xml),
+            vec!["[0:00] Hello & welcome", "[1:15] it's <fine>"]
+        );
     }
 }

@@ -155,18 +155,6 @@ export function material(topic: string, context: string): string {
   return context ? `${context}\n\nFocus: ${topic}` : `Topic: ${topic}`;
 }
 
-export function guidePrompt(topic: string, context = ""): string {
-  return [
-    material(topic, context),
-    "Write a definitive study guide on this for someone learning it now. Start from what they must " +
-      "already know, build up step by step, explain why as well as what, give a worked example for " +
-      "each idea that needs one, call out common mistakes, and end with a short recap. Use headings, " +
-      "short paragraphs, lists and code blocks where they help." +
-      (context ? ` ${cite}` : ""),
-    "Reply with the guide only, in Markdown, starting with a level-one heading that is its title. Don't create or edit any files.",
-  ].join("\n\n");
-}
-
 export function deckPrompt(topic: string, context = "", count = 20): string {
   return [
     material(topic, context),

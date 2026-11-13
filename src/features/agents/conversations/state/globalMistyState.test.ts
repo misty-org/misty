@@ -11,7 +11,6 @@ describe("Global Misty state", () => {
     window.localStorage.clear();
     useMistyStore.getState().setAccount("");
     useMistyStore.setState({
-      panel: "closed",
       working: false,
       context: [],
       handoff: undefined,
@@ -143,7 +142,6 @@ describe("Global Misty state", () => {
       "Explain agents",
       [],
       undefined,
-      "workspace",
       [],
       {
         conversationId: "companion",
@@ -181,17 +179,6 @@ describe("Global Misty state", () => {
     await pending;
     expect(create).not.toHaveBeenCalled();
     expect(useMistyStore.getState().working).toBe(false);
-  });
-  it("collapses without canceling background work", () => {
-    useMistyStore.setState({
-      panel: "answer",
-      working: true,
-    });
-    useMistyStore.getState().closePanel();
-    expect(useMistyStore.getState()).toMatchObject({
-      panel: "closed",
-      working: true,
-    });
   });
   it("keeps Deep thinking when creating the first conversation", async () => {
     const create = vi
@@ -318,32 +305,6 @@ describe("Global Misty state", () => {
       selectedAgentId: "default-misty",
     });
   });
-  it("keeps Agent workspace answers out of the global Search panel", async () => {
-    const createInvocation = vi
-      .spyOn(aiSurfaceApi, "createInvocation")
-      .mockRejectedValueOnce(new Error("stop after presentation state"));
-    useMistyStore.setState({
-      accountId: "account-a",
-      panel: "closed",
-      activeConversationId: "conversation-a",
-      conversations: [
-        {
-          id: "conversation-a",
-          agentId: "default-misty",
-          title: "Misty",
-          spaceId: "work",
-          createdAt: "2026-08-25T00:00:00.000Z",
-          updatedAt: "2026-08-25T00:00:00.000Z",
-          messages: [],
-          remote: true,
-        },
-      ],
-    });
-    await useMistyStore.getState().submitAnswer("hello", undefined, undefined, "workspace");
-    expect(useMistyStore.getState().panel).toBe("closed");
-    expect(useMistyStore.getState().conversations[0]?.messages[0]?.content).toBe("hello");
-    createInvocation.mockRestore();
-  });
   it("uses the originating conversation after workspace preparation changes the active view", async () => {
     const createInvocation = vi
       .spyOn(aiSurfaceApi, "createInvocation")
@@ -373,7 +334,7 @@ describe("Global Misty state", () => {
       ],
       context: [],
     });
-    await useMistyStore.getState().submitAnswer("Create a task", [], undefined, "workspace", [], {
+    await useMistyStore.getState().submitAnswer("Create a task", [], undefined, [], {
       conversationId: "origin",
       context: [],
     });
@@ -401,7 +362,6 @@ describe("Global Misty state", () => {
       .mockRejectedValueOnce(new Error("stop after binding"));
     useMistyStore.setState({
       accountId: "account-a",
-      panel: "answer",
       activeConversationId: "conversation-a",
       conversations: [
         {
@@ -433,32 +393,6 @@ describe("Global Misty state", () => {
     );
     expect(useMistyStore.getState().conversations[0]?.spaceId).toBe("work");
     createInvocation.mockRestore();
-  });
-  it("keeps Agent workspace tasks out of the global Search panel", async () => {
-    const createRun = vi
-      .spyOn(aiSurfaceApi, "createInvocation")
-      .mockRejectedValueOnce(new Error("stop after presentation state"));
-    useMistyStore.setState({
-      accountId: "account-a",
-      panel: "closed",
-      activeConversationId: "conversation-a",
-      conversations: [
-        {
-          id: "conversation-a",
-          agentId: "default-misty",
-          title: "Misty",
-          spaceId: "work",
-          createdAt: "2026-08-25T00:00:00.000Z",
-          updatedAt: "2026-08-25T00:00:00.000Z",
-          messages: [],
-          remote: true,
-        },
-      ],
-    });
-    await useMistyStore.getState().submitAgentTask("draw a diagram", "workspace");
-    expect(useMistyStore.getState().panel).toBe("closed");
-    expect(useMistyStore.getState().conversations[0]?.messages[0]?.content).toBe("draw a diagram");
-    createRun.mockRestore();
   });
   it("deduplicates context by its semantic destination", () => {
     useMistyStore.getState().setContext([

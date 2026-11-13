@@ -9,8 +9,9 @@ changing a feature. There are no feature docs to keep current, and none should b
 
 # Rules that apply everywhere
 
-- The interface is quiet and mostly neutral, and it has to look finished: flat panes split by hairlines on the
-  window's surface, never floating cards, with generous spacing, modelled on OpenChamber. Color is used where it carries meaning: Git changes, file and folder icons, an agent's
+- The interface is quiet and mostly neutral, and it has to look finished: flat panes on the
+  window's surface that read as one sheet, with no divider lines between them and no floating cards except the
+  panels named below, with generous spacing, modelled on OpenChamber. Color is used where it carries meaning: Git changes, file and folder icons, an agent's
   state, an engine's own mark. The studio uses full color. Selections and focus rings stay neutral.
 - Dropdowns and context menus mark the selection with a checkmark, never a dot.
 - Never show "Loading…" text; first loads use skeletons shaped like the content.
@@ -75,6 +76,12 @@ looking as it did.
 - Controls in one row share one height. Spacing comes from the 4px scale, with no one-off pixel widths.
 - Buttons have four roles and three sizes: primary (at most one per surface), secondary, quiet, and danger (only where
   something is deleted), at 24, 32 and 36px, with 36 only in dialogs and empty states.
+- A page's create action (New, Create notebook, New task) is its primary button, filled: white in the dark theme,
+  black in the light one. It lives where the things it makes are listed, not inside one of them. The sidebar's New is
+  the exception: a plain row like the ones under it, with no fill.
+- A bar's controls stand bare, never some boxed and some not. Grid and list are two bare icons, the open one pressed
+  (`CollectionViewToggle`); the order is one sort icon (`CollectionSortMenu`) and filtering one filter icon
+  (`CollectionFilterMenu`), never a spelled-out "Most recent". Groups of controls are split by a `ToolbarDivider`.
 - The composer is one bar that never wraps. Where the chat works (Space, folder, branch) is a path line under the box,
   and screen capture lives in the + menu.
 - Every message has the same action bar under it, aligned to its edge, shown on hover and always on the latest message.
@@ -84,9 +91,20 @@ looking as it did.
 - Type follows the scale in `src/styles/theme.css`: 14px in controls, 15px body, 16px page text. One font everywhere,
   the system font; monospace only inside code itself (code blocks, the editor, diffs, the terminal), never for URLs,
   paths, IDs, model names or shortcuts.
-- Every menu item (dropdowns and right-click) starts with a 16px icon, and the selection is a checkmark.
+- A menu row (dropdowns and right-click) has a 16px icon only when the icon tells it apart. A list of like things
+  (models, efforts, folders, agents, chats, columns) is text alone, never one icon repeated down the list; a choice
+  of a few different things (Build and Plan, sort orders) keeps its own icons. A choice shows no shortcut. The
+  selection is a checkmark. `MenuRadioGroup` drops icons that don't differ, and the `repeated-menu-icon` UI rule
+  fails on a list that repeats one.
 - Icons, logos and engine marks stand bare, never inside a box: no fill, border or rounded tile behind them. Only an
   avatar (a person's picture or initial) has a shape of its own.
+- Every third-party logo is the brand's official artwork in its own colors, never a generic glyph or a blank: a
+  single-color mark follows the theme (black on light, white on dark), and one with no artwork shows its initial.
+  A colored logo that would disappear on one theme uses the brand's own variant for it; only when none exists does it
+  sit on a small plate on that theme (`logoPlates` in `src/shared/ui/icons/LogoFallbacks.tsx`).
+  `src/tests/architecture/logoArtwork.contract.test.tsx` checks every logo on both themes.
+- Never the sparkles star, in any form: it reads as AI filler. An icon shows what the thing is (a model, a web search,
+  a skill). The `sparkles-icon` UI rule fails on it.
 - Labels never get cut off. When tiles or buttons are too narrow for their labels, the grid drops a column first.
 - The agent browser opens on a blank page and searches with Google, never DuckDuckGo.
 - A row's state sits at its right end: a spinner while an agent works, an amber dot when it waits on the person, a
@@ -99,8 +117,11 @@ looking as it did.
 - Notices stack at the bottom right, carry at most one action and leave on their own. Errors in a form show next to
   the field.
 - Tooltips are Misty's own (`Tooltip`), quick, with the shortcut when shortcut hints are on, never the system title.
-- The Studio and Tutor are in full color. The Studio's panels float over the office as translucent panels; it and
-  settings are the only places with floating panels.
+- The Studio and Tutor are in full color. The Studio's panels float over the office as translucent panels. A
+  chat's context panel (session, steps, changes, files, terminal, preview) floats beside the chat as a rounded card
+  with a faint edge, after OpenChamber's; the session card is narrow and only as tall as it needs. Those, and
+  settings, are the only places with floating panels. The chat page itself is one flat sheet: no line parts its title
+  bar, the chat, the panel and the rail.
 
 # Decided, not built
 

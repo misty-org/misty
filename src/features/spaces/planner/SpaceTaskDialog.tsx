@@ -1,3 +1,4 @@
+import { AgentMark } from "@/features/agents";
 import {
   Button,
   Dialog,
@@ -13,7 +14,6 @@ import {
 import {
   ArrowDown,
   ArrowUp,
-  Bot,
   CircleCheck,
   CircleDashed,
   CircleDot,
@@ -138,7 +138,11 @@ export function SpaceTaskDialog(props: {
                   { value: "", label: "No one", icon: CircleSlash },
                   ...props.assignees.map((assignee) => ({
                     ...assignee,
-                    icon: assignee.value.startsWith("agent:") ? Bot : User,
+                    icon: assignee.value.startsWith("agent:") ? (
+                      <AgentMark agentId={assignee.value.slice("agent:".length)} />
+                    ) : (
+                      User
+                    ),
                   })),
                 ]}
                 onValueChange={setAssignee}

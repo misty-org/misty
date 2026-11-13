@@ -311,13 +311,13 @@ pub mod desktop_control;
 pub mod keep_awake;
 pub mod live_pages_memory;
 pub mod models;
+pub mod notebook_news;
 pub mod run_control;
 pub mod screen_context;
 pub mod shell;
-pub mod tutor_links;
-pub mod tutor_video;
 #[cfg(test)]
 // Tests build their fixtures directly, outside the file gate.
 #[allow(clippy::disallowed_methods, clippy::disallowed_types)]
 mod tests;
+pub mod tutor_links;
 pub mod window_control;

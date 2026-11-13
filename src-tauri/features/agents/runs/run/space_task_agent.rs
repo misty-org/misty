@@ -32,6 +32,8 @@ use super::{
     store::StoredRun,
 };
 
+/// How a run ended. The runtime only needs that it did; the loop tests read the rest.
+#[cfg_attr(not(test), allow(dead_code))]
 pub(crate) struct RunResult {
     pub(crate) text: String,
     pub(crate) steps: usize,

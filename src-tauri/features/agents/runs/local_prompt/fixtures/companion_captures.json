@@ -155,12 +155,6 @@
         "readOnly": true
       },
       {
-        "description": "List this account's signed-in devices with their platform and when each was last online.",
-        "locality": "server",
-        "name": "device.list",
-        "readOnly": true
-      },
-      {
         "description": "List this user's personal agents in the browser workspace.",
         "locality": "server",
         "name": "agent.list",

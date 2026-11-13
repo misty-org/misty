@@ -1,9 +1,9 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong), src-tauri/src/engine/grok_acp.rs.
 use super::*;
-use crate::engines::registry::ChildEntry;
-use crate::engines::ProcessRegistry;
 use crate::engines::plan_review;
+use crate::engines::registry::ChildEntry;
 use crate::engines::support::event_sink::{Emit, EventSink};
+use crate::engines::ProcessRegistry;
 use std::sync::Mutex as StdMutex;
 
 /// Keeps the raw event JSON: parking is only observable through what the
@@ -191,23 +191,18 @@ async fn kimi_form_parks_all_questions_with_reply_context() {
             "type": "string", "title": "选择", "oneOf": [{"const": "A"}, {"const": "B"}]
         }}
     }});
-    assert!(
-        super::super::kimi_acp::park_question(&core, &mut state, &json!(8), &params).is_none()
-    );
+    assert!(super::super::kimi_acp::park_question(&core, &mut state, &json!(8), &params).is_none());
     let entry = registry.get("test-run").unwrap();
     let parked = entry.questions.lock().unwrap()["8"].clone();
     assert_eq!(parked["questions"][0]["allowOther"], false);
-    let frame = super::super::kimi_acp::answer_frame(
-        &parked["kimiAcp"],
-        Some(&json!({"选哪种？": "B"})),
-    )
-    .unwrap();
+    let frame =
+        super::super::kimi_acp::answer_frame(&parked["kimiAcp"], Some(&json!({"选哪种？": "B"})))
+            .unwrap();
     assert_eq!(frame["result"]["content"], json!({"q0": "B"}));
     core.sink.flush();
     assert!(emitter.0.lock().unwrap().join(" ").contains("kimiAcp"));
     let decline =
-        super::super::kimi_acp::park_question(&core, &mut state, &json!(9), &json!({}))
-            .unwrap();
+        super::super::kimi_acp::park_question(&core, &mut state, &json!(9), &json!({})).unwrap();
     assert_eq!(decline["result"]["action"], "decline");
     assert_eq!(entry.questions.lock().unwrap().len(), 1);
 }
@@ -259,8 +254,15 @@ async fn settle_parked_expires_plan_reviews_under_every_run_key() {
         .plans
         .lock()
         .unwrap()
-        .insert("plan-1".to_string(), json!({ "revision": revision, "route": "stdin" }));
-    settle_parked(&core, &mut state, [Some("test-run".to_string()), None, None]);
+        .insert(
+            "plan-1".to_string(),
+            json!({ "revision": revision, "route": "stdin" }),
+        );
+    settle_parked(
+        &core,
+        &mut state,
+        [Some("test-run".to_string()), None, None],
+    );
     assert!(
         registry
             .get("test-run")
@@ -271,10 +273,9 @@ async fn settle_parked_expires_plan_reviews_under_every_run_key() {
             .is_empty(),
         "the parked context leaves the registry with the run"
     );
-    let settled =
-        plan_review::get_review(core.db.as_ref().unwrap(), "plan-1", revision)
-            .unwrap()
-            .unwrap();
+    let settled = plan_review::get_review(core.db.as_ref().unwrap(), "plan-1", revision)
+        .unwrap()
+        .unwrap();
     assert_eq!(settled.status, plan_review::PlanStatus::Expired);
     core.sink.flush();
     let emitted = emitter.0.lock().unwrap().join(" ");
@@ -291,7 +292,11 @@ async fn settle_parked_keeps_the_question_contract_and_no_ops_when_empty() {
     core.engine_id = "kimi".into();
     let mut state = TurnState::new(None);
     assert!(park_question(&core, &mut state, &json!(7), &ask_params()).is_none());
-    settle_parked(&core, &mut state, [Some("test-run".to_string()), None, None]);
+    settle_parked(
+        &core,
+        &mut state,
+        [Some("test-run".to_string()), None, None],
+    );
     assert!(
         registry
             .get("test-run")
@@ -303,9 +308,18 @@ async fn settle_parked_keeps_the_question_contract_and_no_ops_when_empty() {
         "the ask is drained by the settle, not left parked"
     );
     core.sink.flush();
-    assert!(emitter.0.lock().unwrap().join(" ").contains("question_settled"));
+    assert!(emitter
+        .0
+        .lock()
+        .unwrap()
+        .join(" ")
+        .contains("question_settled"));
     // Nothing parked, no db: settling again must not emit or fail.
-    settle_parked(&core, &mut state, [Some("test-run".to_string()), None, None]);
+    settle_parked(
+        &core,
+        &mut state,
+        [Some("test-run".to_string()), None, None],
+    );
 }
 
 #[test]

@@ -49,7 +49,13 @@ fn running_processes() -> u64 {
         .into_iter()
         .flatten()
         .flatten()
-        .filter(|entry| entry.file_name().to_string_lossy().bytes().all(|b| b.is_ascii_digit()))
+        .filter(|entry| {
+            entry
+                .file_name()
+                .to_string_lossy()
+                .bytes()
+                .all(|b| b.is_ascii_digit())
+        })
         .filter(|entry| entry.metadata().is_ok_and(|metadata| metadata.uid() == uid))
         .count() as u64
 }
@@ -76,7 +82,11 @@ fn scan(root: &Path, writable: bool) -> Scanned {
     let mut queue = vec![root.to_path_buf()];
     let mut seen = 0;
     while let Some(folder) = queue.pop() {
-        for entry in file_access::fs::read_dir(&folder).into_iter().flatten().flatten() {
+        for entry in file_access::fs::read_dir(&folder)
+            .into_iter()
+            .flatten()
+            .flatten()
+        {
             seen += 1;
             if seen > MAX_SCANNED_ENTRIES {
                 return found;
@@ -113,7 +123,11 @@ fn scan(root: &Path, writable: bool) -> Scanned {
 /// inside such a folder are refused; anywhere else they work as usual. A secret's name shows in a
 /// listing; what's in it never does. The folder's own rule comes first.
 fn folder_rules(root: &Path, writable: bool) -> Vec<(PathBuf, Access)> {
-    let full = if writable { Access::AddEdit } else { Access::Read };
+    let full = if writable {
+        Access::AddEdit
+    } else {
+        Access::Read
+    };
     let scanned = scan(root, writable);
     if scanned.closed.is_empty() && scanned.read_only.is_empty() {
         return vec![(root.to_path_buf(), full)];
@@ -133,7 +147,11 @@ fn folder_rules(root: &Path, writable: bool) -> Vec<(PathBuf, Access)> {
     let mut queue = vec![root.to_path_buf()];
     while let Some(folder) = queue.pop() {
         rules.push((folder.clone(), Access::List));
-        for entry in file_access::fs::read_dir(&folder).into_iter().flatten().flatten() {
+        for entry in file_access::fs::read_dir(&folder)
+            .into_iter()
+            .flatten()
+            .flatten()
+        {
             let path = entry.path();
             let Ok(kind) = entry.file_type() else {
                 continue;
@@ -153,11 +171,7 @@ fn folder_rules(root: &Path, writable: bool) -> Vec<(PathBuf, Access)> {
     rules
 }
 
-fn policy(
-    tools: &tools::Tools,
-    workspace: &Path,
-    folder: Option<(&Path, bool)>,
-) -> Policy {
+fn policy(tools: &tools::Tools, workspace: &Path, folder: Option<(&Path, bool)>) -> Policy {
     let mut required = vec![
         (tools.folder.clone(), Access::Read),
         (workspace.to_path_buf(), Access::Private),
@@ -210,7 +224,9 @@ pub(super) async fn run(
             Confinement::new(&policy(
                 &tools,
                 &workspace,
-                folder.as_ref().map(|(root, writable)| (root.as_path(), *writable)),
+                folder
+                    .as_ref()
+                    .map(|(root, writable)| (root.as_path(), *writable)),
             ))
         })
         .await

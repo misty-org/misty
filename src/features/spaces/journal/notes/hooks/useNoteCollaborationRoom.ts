@@ -31,7 +31,7 @@ export function useNoteCollaborationRoom(spaceId: string, noteId: string) {
       })
       .catch((cause) => {
         if (!active) return;
-        setError(cause instanceof Error ? cause.message : "Could not connect to this note.");
+        setError(cause instanceof Error ? cause.message : "Could not connect to this doc.");
       });
 
     return () => {

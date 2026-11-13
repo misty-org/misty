@@ -48,26 +48,26 @@ export const noteSelectionActions: AiSuggestedAction[] = [
 const notePageActions: AiSuggestedAction[] = [
   {
     id: "notes.summarize",
-    label: "Summarize note",
-    prompt: "Summarize this note, including its key points and any unresolved questions.",
+    label: "Summarize doc",
+    prompt: "Summarize this doc, including its key points and any unresolved questions.",
     trigger: "object",
   },
   {
     id: "notes.decisions",
     label: "Find decisions",
-    prompt: "Identify decisions, commitments, and open questions in this note.",
+    prompt: "Identify decisions, commitments, and open questions in this doc.",
     trigger: "object",
   },
   {
     id: "notes.next-steps",
     label: "Find next steps",
-    prompt: "Identify concrete next steps in this note. Do not create anything yet.",
+    prompt: "Identify concrete next steps in this doc. Do not create anything yet.",
     trigger: "object",
   },
   {
     id: "notes.extract-tasks",
     label: "Extract tasks",
-    prompt: "Extract concrete action items from this note as reviewable tasks.",
+    prompt: "Extract concrete action items from this doc as reviewable tasks.",
     trigger: "object",
     requestedArtifactKind: "task_set",
   },
@@ -83,7 +83,7 @@ export function createNoteAiAdapter(
   if (!context) return null;
   return {
     surfaceId: "notes",
-    label: context.title || "this note",
+    label: context.title || "this doc",
     getContext: () => [context],
     getSelection: () => selection?.snapshot ?? null,
     getSuggestedActions: () => (selection ? noteSelectionActions : notePageActions),
@@ -157,13 +157,13 @@ async function applyNoteArtifact(
 ) {
   if (props.readOnlyReason) throw new Error(props.readOnlyReason);
   if (!canApplyNoteArtifact(editor, props, artifact)) {
-    throw new Error("The note selection changed. Ask your agent to regenerate this draft.");
+    throw new Error("The doc selection changed. Ask your agent to regenerate this draft.");
   }
   const operations = artifact.operations as Record<string, unknown>;
   const replacement = operations.replacement;
   const selection = artifactSelection(artifact);
   if (typeof replacement !== "string" || !selection) {
-    throw new Error("This note draft is not compatible with the current editor.");
+    throw new Error("This doc draft is not compatible with the current editor.");
   }
   const from = Number(selection.anchors?.from);
   const to = Number(selection.anchors?.to);

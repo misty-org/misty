@@ -126,8 +126,8 @@ type RadixCommandItemProps = Omit<
 };
 
 type CommandItemProps = RadixCommandItemProps & {
-  /** The 16px icon every row starts with. */
-  icon: MenuIcon;
+  /** The 16px icon, only when it tells the row apart from the others. */
+  icon?: MenuIcon;
   /** The row's text. It is also what the search matches unless `value` is given. */
   label: React.ReactNode;
   /** A muted line under the label, such as what an action does; the row grows to two lines. */
@@ -147,7 +147,7 @@ type CommandItemProps = RadixCommandItemProps & {
  * One row of a Command list.
  *
  * ```tsx
- * <CommandItem icon={Bot} label={agent.name} checked={agent.id === current} onSelect={() => pick(agent.id)} />
+ * <CommandItem label={agent.name} checked={agent.id === current} onSelect={() => pick(agent.id)} />
  * ```
  */
 function CommandItem({

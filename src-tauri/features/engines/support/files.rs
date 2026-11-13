@@ -37,4 +37,3 @@ pub(crate) fn canonicalize_lenient(path: &Path) -> Result<PathBuf, String> {
         .ok_or_else(unresolved)?;
     Ok(canonicalize_lenient(parent)?.join(name))
 }
-

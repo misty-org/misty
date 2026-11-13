@@ -1,66 +1,8 @@
-//! Signed device policies (shared folders per device) and run grants.
-use serde::{Deserialize, Serialize};
+//! Signed run grants.
 use serde_json::Value;
 
 use super::{valid_device_id, SignedRecord};
-use crate::devices::identity::{verify_device_signature, POLICY_DOMAIN, RUN_GRANT_DOMAIN};
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub struct SharedFolder {
-    pub scope_id: String,
-    pub name: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub struct DevicePolicy {
-    pub version: u64,
-    /// "off", "view" or "edit".
-    pub files: String,
-    pub clipboard: bool,
-    pub agent_surfaces: Vec<String>,
-    pub shared_folders: Vec<SharedFolder>,
-}
-
-impl DevicePolicy {
-    pub fn first(shared_folders: Vec<SharedFolder>) -> Self {
-        Self {
-            version: 0,
-            files: "view".to_owned(),
-            clipboard: false,
-            agent_surfaces: vec!["browser".to_owned(), "folders".to_owned()],
-            shared_folders,
-        }
-    }
-
-    pub fn payload(
-        &self,
-        account_id: &str,
-        device_id: &str,
-        issued_at: i64,
-    ) -> Result<Vec<u8>, serde_json::Error> {
-        let mut surfaces = self.agent_surfaces.clone();
-        surfaces.sort();
-        surfaces.dedup();
-        let folders: Vec<(String, String)> = self
-            .shared_folders
-            .iter()
-            .map(|folder| (folder.scope_id.clone(), folder.name.clone()))
-            .collect();
-        serde_json::to_vec(&(
-            POLICY_DOMAIN,
-            account_id,
-            device_id,
-            self.version,
-            &self.files,
-            self.clipboard,
-            surfaces,
-            folders,
-            issued_at,
-        ))
-    }
-}
+use crate::devices::identity::{verify_device_signature, RUN_GRANT_DOMAIN};
 
 #[derive(Debug, Clone)]
 pub struct RunGrant {

@@ -76,13 +76,17 @@ export function slidesPrompt(topic: string, context = ""): string {
   ].join("\n\n");
 }
 
-export function researchPrompt(topic: string, have: string[] = []): string {
+/** `focus` is a research topic's own guidance on what to look for (notebookTopics.ts). */
+export function researchPrompt(topic: string, have: string[] = [], focus = ""): string {
   return [
-    `Find the best sources on the web for learning about: ${topic}`,
+    focus
+      ? `Find the best sources on the web for researching: ${topic}`
+      : `Find the best sources on the web for learning about: ${topic}`,
     "Search the web and pick six to ten pages, papers or videos that together cover it well: " +
       "an overview, the fundamentals, worked examples, and one or two deeper ones. Prefer " +
       "primary sources, official documentation, reputable courses and well-known explainers. " +
       "Only include addresses you actually found and opened.",
+    focus,
     have.length ? `The notebook already has these; don't repeat them:\n${have.join("\n")}` : "",
     jsonReply(
       '{"sources": [{"title": string, "url": string, "why": string}]}',
@@ -229,15 +233,12 @@ export function videoPrompt(topic: string, context = ""): string {
     "Make a video overview: six to ten scenes that teach this in two to four minutes, from the " +
       "big picture to the details and a recap. Each scene has a short heading, up to four short " +
       "points, the narration spoken over it (two to four natural sentences), and an illustration " +
-      `that shows the idea: a diagram, a process, a comparison or a labelled drawing. Use ${palette}. ` +
-      "Each scene also has a shot: one paragraph a video model films as a silent clip of five to " +
-      "ten seconds behind the narration, saying the subject, what moves, the setting, the camera " +
-      "and the light. A shot shows things happening and has no words, letters or captions on screen.",
+      `that shows the idea: a diagram, a process, a comparison or a labelled drawing. Use ${palette}.`,
     `${svgRules} Each illustration uses viewBox="0 0 1280 720" and leaves the bottom 120 pixels ` +
       "clear for captions.",
     jsonReply(
       '{"title": string, "scenes": [{"heading": string, "points": [string], ' +
-        '"narration": string, "shot": string, "svg": string}]}',
+        '"narration": string, "svg": string}]}',
       "svg is the scene's SVG as a string.",
     ),
   ].join("\n\n");
@@ -270,14 +271,13 @@ export function parseInfographic(reply: string): string | null {
 
 export function parseVideo(reply: string): {
   title: string;
-  scenes: { heading: string; points: string[]; narration: string; shot?: string; svg?: string }[];
+  scenes: { heading: string; points: string[]; narration: string; svg?: string }[];
 } | null {
   const value = jsonOf(reply) as { title?: unknown; scenes?: unknown } | undefined;
   if (!value || !Array.isArray(value.scenes)) return null;
   const scenes = value.scenes
     .map((scene: Record<string, unknown>) => {
       const svg = typeof scene?.svg === "string" ? cleanSvg(scene.svg) : null;
-      const shot = text(scene?.shot, 1200);
       return {
         heading: text(scene?.heading, 160),
         points: Array.isArray(scene?.points)
@@ -287,7 +287,6 @@ export function parseVideo(reply: string): {
               .slice(0, 5)
           : [],
         narration: text(scene?.narration, 1200),
-        ...(shot ? { shot } : {}),
         ...(svg ? { svg } : {}),
       };
     })

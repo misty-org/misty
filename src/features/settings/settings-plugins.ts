@@ -54,21 +54,8 @@ export function hydrateShortcutsSnapshot(snapshot: NativeShortcutsSnapshot): Sho
   });
   const hydrated: ShortcutsSnapshot = {
     detectedPlatform,
-    profileName:
-      detectedPlatform === "macos" ? "macOS" : detectedPlatform === "windows" ? "Windows" : "Linux",
     commandDefinitions: [...shortcutCommandRegistry],
     effectiveBindings,
-    bindings: effectiveBindings.flatMap((binding) =>
-      binding.primary
-        ? [
-            {
-              commandId: binding.commandId,
-              shortcut: binding.primary,
-              source: binding.primarySource,
-            },
-          ]
-        : [],
-    ),
     configPath: snapshot.path,
     overrides: snapshot.overrides,
   };

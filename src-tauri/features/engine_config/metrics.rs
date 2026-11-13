@@ -31,13 +31,6 @@ struct DiagnosticsPreference {
     enabled: bool,
 }
 
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct AppMetrics {
-    pub memory_bytes: u64,
-    pub cpu_percent: f32,
-}
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "kebab-case")]
 enum Role {
@@ -395,28 +388,6 @@ impl MetricsState {
             let _ = sender.send(());
             let _ = worker.join();
         }
-    }
-
-    fn cached_app_metrics(&self) -> Result<AppMetrics, String> {
-        let cache = self.cache.lock().map_err(|_| "metrics cache unavailable")?;
-        if !cache.enabled {
-            return Err("metrics diagnostics disabled".into());
-        }
-        if matches!(cache.status(), "stale" | "stopped") {
-            return Err("metrics sampler is stale or stopped".into());
-        }
-        let (_, sample) = cache.samples.back().ok_or("metrics sample not ready")?;
-        if sample.status == "unavailable" {
-            return Err(sample.error.unwrap_or("metrics unavailable").into());
-        }
-        Ok(AppMetrics {
-            memory_bytes: sample
-                .main_memory_bytes
-                .ok_or("metrics memory unavailable")?,
-            cpu_percent: sample
-                .main_cpu_percent
-                .ok_or("metrics CPU baseline not ready")?,
-        })
     }
 
     fn report(&self) -> Result<PerformanceDiagnostics, String> {
@@ -849,12 +820,6 @@ async fn blocking<T: Send + 'static>(
         .map_err(|e| e.to_string())?
 }
 
-/// Misty's own memory and CPU from the latest sample.
-#[tauri::command]
-pub async fn engine_metrics_app() -> Result<AppMetrics, String> {
-    state()?.cached_app_metrics()
-}
-
 /// The whole report: every sample in the last five minutes and what they can't tell.
 #[tauri::command]
 pub async fn engine_performance_report() -> Result<PerformanceDiagnostics, String> {
@@ -997,7 +962,6 @@ mod tests {
         assert!(!state.set_enabled(false, |_| {}).unwrap());
         let stopped_calls = calls.load(Ordering::SeqCst);
         for _ in 0..10 {
-            assert!(state.cached_app_metrics().is_err());
             let report = state.report().unwrap();
             assert!(!report.enabled);
             assert_eq!(report.status, "disabled");
@@ -1039,7 +1003,6 @@ mod tests {
             assert_eq!(state.report().unwrap().status, "disabled");
             assert!(!state.enabled().unwrap());
             assert!(state.lifecycle.lock().unwrap().worker.is_none());
-            assert!(state.cached_app_metrics().is_err());
             assert!(state.set_enabled(true, |_| {}).unwrap());
         }
         let state = MetricsState::load_from(path.clone()).unwrap();
@@ -1108,7 +1071,6 @@ mod tests {
             state.report().unwrap().samples[0].error,
             Some("samplerStartFailed")
         );
-        assert!(state.cached_app_metrics().is_err());
         let stored: DiagnosticsPreference =
             serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
         assert!(stored.enabled);
@@ -1465,7 +1427,6 @@ mod tests {
     #[test]
     fn startup_cache_single_sampler_and_prompt_cleanup() {
         let state = MetricsState::empty();
-        assert!(state.cached_app_metrics().is_err());
         let calls = Arc::new(AtomicUsize::new(0));
         let count = calls.clone();
         assert!(state
@@ -1483,7 +1444,6 @@ mod tests {
             std::thread::sleep(Duration::from_millis(5));
         }
         for _ in 0..20 {
-            let _ = state.cached_app_metrics();
             let _ = state.report().unwrap();
         }
         assert_eq!(calls.load(Ordering::SeqCst), 1);
@@ -1502,16 +1462,12 @@ mod tests {
         let mut sample = Sample::unavailable("processRefreshFailed");
         sample.main_memory_bytes = Some(123);
         state.cache.lock().unwrap().push(Instant::now(), sample);
-        assert!(state.cached_app_metrics().is_err());
         let mut sample = Sample::unavailable("test");
         sample.status = "available";
         sample.error = None;
         sample.main_memory_bytes = Some(123);
         sample.main_cpu_percent = Some(0.0);
         state.cache.lock().unwrap().push(Instant::now(), sample);
-        let metrics = state.cached_app_metrics().unwrap();
-        assert_eq!(metrics.memory_bytes, 123);
-        assert_eq!(metrics.cpu_percent, 0.0);
         let json = serde_json::to_value(state.report().unwrap()).unwrap();
         assert_eq!(json["persistence"], "currentSessionOnly");
         assert_eq!(json["sampleCapacity"], 60);
@@ -1576,7 +1532,6 @@ mod tests {
             Sample::unavailable("test"),
         );
         assert_eq!(state.report().unwrap().status, "stale");
-        assert!(state.cached_app_metrics().is_err());
     }
 
     #[test]
@@ -1630,7 +1585,6 @@ mod tests {
                 assert_eq!(report.status, "unavailable");
                 assert_eq!(sample.error, Some("samplerPanicked"));
                 assert!(sample.main_cpu_percent.is_none());
-                assert!(state.cached_app_metrics().is_err());
                 break;
             }
             assert!(Instant::now() < deadline);
@@ -1660,9 +1614,6 @@ mod tests {
                 assert_eq!(decoded["arch"], std::env::consts::ARCH);
                 assert!(decoded["samples"][0]["systemCpuPercent"].is_null());
                 assert!(decoded["samples"][1]["systemCpuPercent"].is_number());
-                let metrics = state.cached_app_metrics().unwrap();
-                assert_eq!(Some(metrics.cpu_percent), latest.main_cpu_percent);
-                assert_eq!(Some(metrics.memory_bytes), latest.main_memory_bytes);
                 assert!(report.samples[1].timestamp_ms >= report.samples[0].timestamp_ms + 5000);
                 eprintln!(
                     "native metrics smoke: samples={}, collection_ms={:?}, selected_processes={}",
@@ -1700,7 +1651,6 @@ mod tests {
                         .all(|process| process.attribution == Attribution::UnattributedCandidate));
                 }
                 state.stop();
-                assert!(state.cached_app_metrics().is_err());
                 break;
             }
             assert!(

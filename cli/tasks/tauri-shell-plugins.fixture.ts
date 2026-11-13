@@ -4,6 +4,8 @@ import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
 
 const { windows, ...scripts } = JSON.parse(readFileSync(0, 'utf8'));
+// The notification plugin is only built for Windows and Linux.
+const notifies = 'notification' in scripts;
 
 async function page({ label, subframe = false, metadata = true, notification = true }) {
   const calls = [];
@@ -66,15 +68,19 @@ for (const options of [{ label: 'space-personal', subframe: true }, { metadata: 
 }
 
 const shell = await page({ label: 'space-personal' });
-assert.notEqual(shell.window.Notification, shell.NativeNotification);
-assert.equal(shell.window.Notification.permission, windows ? 'denied' : 'granted');
 assert.equal(shell.event.defaultPrevented, true);
 assert.deepEqual(shell.calls.map(call => call.command), [
-  ...(!windows ? ['plugin:notification|is_permission_granted'] : []),
+  ...(notifies && !windows ? ['plugin:notification|is_permission_granted'] : []),
   'plugin:opener|open_url',
 ]);
 assert.equal(String(shell.calls.at(-1).args.url), 'https://accounts.google.com/signin');
-new shell.window.Notification('Shell notification', { body: 'Still available' });
-await new Promise(resolve => setImmediate(resolve));
-assert.equal(shell.calls.at(-1).command, 'plugin:notification|notify');
+if (notifies) {
+  assert.notEqual(shell.window.Notification, shell.NativeNotification);
+  assert.equal(shell.window.Notification.permission, windows ? 'denied' : 'granted');
+  new shell.window.Notification('Shell notification', { body: 'Still available' });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(shell.calls.at(-1).command, 'plugin:notification|notify');
+} else {
+  assert.equal(shell.window.Notification, shell.NativeNotification);
+}
 console.log('PASS: embedded tabs, popups, absent Notification, subframes, and shell plugin behavior');

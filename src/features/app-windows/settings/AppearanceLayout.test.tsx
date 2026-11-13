@@ -3,7 +3,6 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { defaultDockingLayout, useDockingLayoutStore } from "@/app/shell/dockingLayout";
 import { useWorkspaceStore } from "@/features/app-windows";
 import { useWindowDockingLayout } from "@/features/app-windows/panes/useWindowDockingLayout";
-import { canonicalSettingsSection } from "../../settings/settingsRouting";
 import type { SettingsContentProps } from "../../settings/settingsTypes";
 import { AppearanceSection } from "./AppearanceSection";
 
@@ -38,8 +37,4 @@ it("moves this window's tab sidebar between the left and the right from Appearan
   expect(result.current).toEqual({ tabs: "right", navigation: "left" });
   chooseTabs("Left");
   expect(result.current).toEqual({ tabs: "left", navigation: "right" });
-});
-
-it("has no Layout page of its own; old links open Appearance", () => {
-  expect(canonicalSettingsSection("layout")).toBe("appearance");
 });

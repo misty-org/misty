@@ -8,7 +8,7 @@ import {
   DropdownMenuTrigger,
   MenuItem,
 } from "@/shared/ui";
-import { Bot } from "lucide-react";
+import { UserPlus } from "lucide-react";
 import { useEffect } from "react";
 
 /** Your agents that aren't in this Space yet; picking one brings it in. */
@@ -36,18 +36,13 @@ export function BringAgentMenu({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button type="button" variant="secondary" icon={Bot}>
+        <Button type="button" variant="secondary" icon={UserPlus}>
           Bring an agent
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         {available.map((agent) => (
-          <MenuItem
-            key={agent.id}
-            icon={Bot}
-            label={agent.name}
-            onSelect={() => onBring(agent.id)}
-          />
+          <MenuItem key={agent.id} label={agent.name} onSelect={() => onBring(agent.id)} />
         ))}
       </DropdownMenuContent>
     </DropdownMenu>

@@ -1644,7 +1644,6 @@ dependencies = [
  "javascriptcore-rs",
  "objc",
  "objc2-foundation",
- "objc2-web-kit",
  "psl",
  "serde",
  "serde_json",

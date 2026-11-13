@@ -226,7 +226,10 @@ fn received(label: &str, message: Message, reply: Reply) {
                 let _ = waiter.send(if answer.ok {
                     Ok(answer.value)
                 } else {
-                    Err(format!("The frame could not run page-state code: {}", answer.error))
+                    Err(format!(
+                        "The frame could not run page-state code: {}",
+                        answer.error
+                    ))
                 });
             }
         }

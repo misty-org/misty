@@ -1,0 +1,17 @@
+{
+  "identifier": "tray-panel",
+  "description": "The panel under the menu bar icon: reads what it shows, sizes itself, and passes on what the person chooses",
+  "platforms": [
+    "macOS"
+  ],
+  "webviews": [
+    "misty-tray"
+  ],
+  "permissions": [
+    "core:event:default",
+    "allow-tray-panel-state",
+    "allow-tray-panel-press",
+    "allow-tray-panel-fit"
+  ],
+  "$schema": "../../gen/schemas/desktop-schema.json"
+}

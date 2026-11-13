@@ -91,7 +91,7 @@ it("keeps Notes available as a separate section and applies search to All", () =
   );
   expect(screen.queryByRole("button", { name: "Weekly notes" })).toBeNull();
   expect(screen.getByRole("button", { name: "Weekend sketch" })).toBeTruthy();
-  fireEvent.click(screen.getByRole("button", { name: "Notes" }));
+  fireEvent.click(screen.getByRole("button", { name: "Docs" }));
   expect(screen.getByTestId("route").textContent).toBe("/spaces/test/notes?section=notes");
   expect(ui.queryByRole("button", { name: "Weekend sketch" })).toBeNull();
 });

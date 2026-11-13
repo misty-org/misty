@@ -63,7 +63,7 @@ export function useEngineFolderSegment(space: string, folder: string): PathLineS
               onValueChange={(path) => useSpaceFolders.getState().choose(space, path)}
             >
               {active.map((path) => (
-                <MenuRadioItem key={path} icon={Folder} value={path} label={nameOf(path)} />
+                <MenuRadioItem key={path} value={path} label={nameOf(path)} />
               ))}
             </MenuRadioGroup>
             <MenuSeparator />

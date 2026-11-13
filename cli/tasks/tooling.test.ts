@@ -150,3 +150,24 @@ test("stopping the runner stops the dev server under it", async () => {
     runner.kill("SIGKILL");
   }
 });
+
+test("force-killing what started the runner stops the dev server under it", async () => {
+  const port = 5290 + Math.floor(Math.random() * 100);
+  const runTool = resolve(toolingRoot, "cli/tasks/run-tool.ts");
+  // The trailing `:` keeps sh from exec-ing into node, so sh stays the runner's parent.
+  const shell = spawn(
+    "sh",
+    ["-c", `"${process.execPath}" "${runTool}" vite --port ${port} --strictPort; :`],
+    { stdio: "ignore" },
+  );
+  try {
+    assert.ok(await until(() => portAnswers(port), 30_000), "Vite never started listening");
+    shell.kill("SIGKILL");
+    assert.ok(
+      await until(async () => !(await portAnswers(port)), 15_000),
+      "Vite outlived the shell that started it",
+    );
+  } finally {
+    shell.kill("SIGKILL");
+  }
+});

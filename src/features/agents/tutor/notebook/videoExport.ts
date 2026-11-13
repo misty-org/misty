@@ -1,11 +1,10 @@
 import { invoke } from "@tauri-apps/api/core";
 import { pickSaveFile } from "@/native/sandbox";
 import { sceneAudioBytes } from "../tutorAudio";
-import { sceneClipUrl } from "../tutorClips";
 import type { Guide, VideoScene } from "../tutorTypes";
 
 /**
- * A video overview as a file: each scene's clip (or its illustration) drawn on a canvas with its
+ * A video overview as a file: each scene's illustration drawn on a canvas with its
  * caption, the narration mixed under it, recorded as it plays. Everything happens on this computer.
  */
 
@@ -31,27 +30,6 @@ function loadImage(source: string): Promise<HTMLImageElement | null> {
     image.onerror = () => resolve(null);
     image.src = source;
   });
-}
-
-/** A scene's clip, ready to draw frames from; muted, since the narration is the sound. */
-function loadClip(guideId: string, index: number): Promise<HTMLVideoElement | null> {
-  return sceneClipUrl(guideId, index)
-    .then(
-      (url) =>
-        new Promise<HTMLVideoElement | null>((resolve) => {
-          const clip = document.createElement("video");
-          clip.muted = true;
-          clip.loop = true;
-          clip.playsInline = true;
-          clip.oncanplay = () => resolve(clip);
-          clip.onerror = () => {
-            URL.revokeObjectURL(url);
-            resolve(null);
-          };
-          clip.src = url;
-        }),
-    )
-    .catch(() => null);
 }
 
 /** Lines of `text` that fit in `max` pixels at the context's font. */
@@ -131,10 +109,7 @@ export async function recordVideo(
   const images = await Promise.all(
     scenes.map((scene) => (scene.svg ? loadImage(svgUrl(scene.svg)) : null)),
   );
-  const clips = await Promise.all(
-    scenes.map((scene, index) => (scene.clip ? loadClip(video.id, index) : null)),
-  );
-  const pictures = scenes.map((_, index) => clips[index] ?? images[index]);
+  const pictures = images;
   const audio = new AudioContext();
   const output = audio.createMediaStreamDestination();
   const voiced = video.audio?.state === "ready";
@@ -164,7 +139,6 @@ export async function recordVideo(
   recorder.ondataavailable = (event) => event.data.size && chunks.push(event.data);
   const stopped = new Promise<void>((resolve) => (recorder.onstop = () => resolve()));
 
-  void clips[0]?.play();
   drawScene(context, scenes[0], pictures[0], 1);
   recorder.start(1000);
   const begin = audio.currentTime + 0.15;
@@ -175,22 +149,11 @@ export async function recordVideo(
     source.connect(output);
     source.start(begin + starts[index] + 0.3);
   });
-  let showing = 0;
   await new Promise<void>((resolve) => {
     const frame = () => {
       const at = audio.currentTime - begin;
       if (at >= total) return resolve();
       const index = Math.max(0, starts.filter((start) => start <= at).length - 1);
-      // Each clip plays from its start while its scene is on.
-      if (index !== showing) {
-        clips[showing]?.pause();
-        const next = clips[index];
-        if (next) {
-          next.currentTime = 0;
-          void next.play();
-        }
-        showing = index;
-      }
       drawScene(context, scenes[index], pictures[index], 1);
       const into = at - starts[index];
       // The next scene fades in over the last moments of this one.
@@ -205,11 +168,6 @@ export async function recordVideo(
   recorder.stop();
   await stopped;
   await audio.close();
-  for (const clip of clips) {
-    if (!clip) continue;
-    clip.pause();
-    URL.revokeObjectURL(clip.src);
-  }
   return {
     blob: new Blob(chunks, { type }),
     extension: type.startsWith("video/mp4") ? "mp4" : "webm",
@@ -224,7 +182,7 @@ export async function saveBytes(
   kind: string,
 ): Promise<boolean> {
   const path = await pickSaveFile({
-    defaultName: `${name.replace(/[\\/:*?"<>|]+/g, " ").trim() || "Tutor"}.${extension}`,
+    defaultName: `${name.replace(/[\\/:*?"<>|]+/g, " ").trim() || "Notebook"}.${extension}`,
     filters: [{ name: kind, extensions: [extension] }],
   });
   if (!path) return false;

@@ -69,7 +69,7 @@ export function NoteTitleInput(props: {
       className="h-8 max-w-md text-sm font-semibold text-cream-bright"
       value={title}
       maxLength={500}
-      aria-label="Note title"
+      aria-label="Doc title"
       readOnly={!session || session.role === "viewer"}
       onChange={(event) => {
         setTitle(event.target.value);
@@ -77,7 +77,7 @@ export function NoteTitleInput(props: {
       }}
       onBlur={() => {
         if (!title.trim() && session && session.role !== "viewer")
-          replaceYText(session.title, "Untitled note");
+          replaceYText(session.title, "Untitled doc");
       }}
     />
   );

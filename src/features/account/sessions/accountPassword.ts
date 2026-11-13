@@ -2,16 +2,6 @@ import { accountApi, isAccountUnauthorizedError } from "../api/api";
 import { forgetPasswordReset, passwordResetToken } from "./passwordReset";
 import { passwordProblem } from "./passwordRules";
 
-const REUSED = "Choose a password you have not used before.";
-
-/** Changes the password of a signed-in account. */
-export async function accountChangePassword(current: string, next: string): Promise<void> {
-  if (current === next) throw new Error(REUSED);
-  const problem = passwordProblem(next);
-  if (problem) throw new Error(problem);
-  await accountApi.changePassword(current, next);
-}
-
 /**
  * The password of an account a setup key signed in: its first, or a new one in place of a
  * forgotten one. The sign-in's reset token stands in for the current password

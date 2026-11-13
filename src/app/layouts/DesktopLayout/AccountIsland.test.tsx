@@ -1,11 +1,11 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 
-const agents = vi.hoisted(() => ({ showAgentsPanel: vi.fn(), openSignInSheet: vi.fn() }));
+const agents = vi.hoisted(() => ({ openSignInSheet: vi.fn() }));
 
 vi.mock("@/features/agents", () => ({
-  showAgentsPanel: agents.showAgentsPanel,
-  useMistyPanelStore: (select: (state: { open: boolean }) => boolean) => select({ open: false }),
+  useMistyPanelStore: (select: (state: { chatOpen: boolean }) => boolean) =>
+    select({ chatOpen: false }),
 }));
 vi.mock("@/features/account", () => ({ openSignInSheet: agents.openSignInSheet }));
 vi.mock("@/features/settings", () => ({ preloadSettingsWorkspace: () => Promise.resolve() }));

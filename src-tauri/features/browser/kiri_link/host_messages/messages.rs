@@ -32,63 +32,6 @@ pub(super) fn pointer_message(raw: &str) -> Option<PointerMessage> {
     Some(message)
 }
 
-/// What a page is playing, pushed whenever it changes. The fields are fixed and capped, so the
-/// page can say nothing else through this message.
-#[derive(serde::Deserialize, serde::Serialize)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
-pub(super) struct MediaState {
-    pub(super) title: String,
-    pub(super) artist: String,
-    pub(super) artwork: String,
-    pub(super) duration: Option<f64>,
-    pub(super) position: Option<f64>,
-    pub(super) paused: bool,
-    pub(super) has_media: bool,
-    pub(super) can_previous: bool,
-    pub(super) can_next: bool,
-    pub(super) picture_in_picture: bool,
-}
-
-#[derive(serde::Deserialize)]
-#[serde(deny_unknown_fields)]
-pub(super) struct MediaMessage {
-    pub(super) token: String,
-    pub(super) media: MediaState,
-}
-
-pub(super) fn media_message(raw: &str) -> Option<MediaMessage> {
-    if raw.len() > 4096 {
-        return None;
-    }
-    let message: MediaMessage = serde_json::from_str(raw).ok()?;
-    let m = &message.media;
-    let fine =
-        |value: Option<f64>| value.is_none_or(|n| n.is_finite() && (0.0..=1.0e9).contains(&n));
-    (m.title.chars().count() <= 200
-        && m.artist.chars().count() <= 200
-        && m.artwork.len() <= 600
-        && fine(m.duration)
-        && fine(m.position))
-    .then_some(message)
-}
-
-/// A video came back from picture in picture still playing: the floating window's back-to-tab
-/// button. Misty's window comes forward even if the person is in another app.
-#[derive(serde::Deserialize)]
-#[serde(deny_unknown_fields)]
-pub(super) struct PictureInPictureReturn {
-    pub(super) token: String,
-    #[serde(rename = "pipReturn")]
-    pub(super) pip_return: bool,
-}
-
-pub(super) fn picture_in_picture_return(raw: &str) -> Option<PictureInPictureReturn> {
-    if raw.len() > 1024 {
-        return None;
-    }
-    serde_json::from_str(raw).ok()
-}
-
 /// A host navigation (shortcut or context menu) posted instead of loaded, so
 /// the page cannot observe the URL that carries the token. The forwarders it
 /// is handed to check that token exactly as they do for a navigation.

@@ -4,7 +4,7 @@
 
 use super::reader::READER_SETTLE_GRACE;
 use serde_json::Value;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use tokio::io::AsyncWriteExt;
 use tokio::process::Child;
@@ -80,20 +80,8 @@ pub struct ProcessRegistry(
     /// native session id -> settled-but-parked run waiting for a background
     /// task's self-started follow-up turn.
     Mutex<HashMap<String, AwaitingFollowup>>,
-    /// Sessions being saved; leases never hold the live-process map across I/O.
-    Mutex<HashSet<String>>,
 );
 
-pub(crate) struct SessionEditGuard<'a> {
-    registry: &'a ProcessRegistry,
-    session_id: &'a str,
-}
-
-impl Drop for SessionEditGuard<'_> {
-    fn drop(&mut self) {
-        self.registry.3.lock().unwrap_or_else(|e| e.into_inner()).remove(self.session_id);
-    }
-}
 /// Count in-flight runs, not map entries: one run is keyed twice (run id +
 /// session alias), so `map.len()` would halve the real concurrency limit.
 /// Reservations (pid 0, pre-spawn) count too — a spawn storm must not slip
@@ -108,29 +96,6 @@ pub(crate) fn active_run_count(map: &HashMap<String, ChildEntry>) -> usize {
 /// Two concurrent runs of one session must never evict each other's entries:
 /// an evicted child leaks (no key routes an interrupt to it).
 impl ProcessRegistry {
-    /// Atomically exclude existing/launching turns and new sends to this session.
-    pub(crate) fn begin_session_edit<'a>(&'a self, session_id: &'a str) -> Result<SessionEditGuard<'a>, String> {
-        let map = self.0.lock().map_err(|_| "native session process registry is unavailable".to_string())?;
-        if map.contains_key(session_id) {
-            return Err("native session cannot be edited while a turn is running or launching".into());
-        }
-        let mut edits = self.3.lock().map_err(|_| "native session edit registry is unavailable".to_string())?;
-        if !edits.insert(session_id.to_string()) {
-            return Err("native session save is already in progress".into());
-        }
-        Ok(SessionEditGuard { registry: self, session_id })
-    }
-
-    /// Call under the launch map lock, before inserting the run reservation.
-    pub(crate) fn ensure_session_not_editing(&self, session_id: Option<&str>) -> Result<(), String> {
-        let Some(session_id) = session_id else { return Ok(()); };
-        let edits = self.3.lock().map_err(|_| "native session edit registry is unavailable".to_string())?;
-        if edits.contains(session_id) {
-            return Err("native session is being saved; wait for the save to finish".into());
-        }
-        Ok(())
-    }
-
     /// Registers the JSON-RPC reply an answer command waits for, keyed by run so app-server connections stay apart.
     pub(crate) fn register_pending_rpc_reply(
         &self,
@@ -157,11 +122,10 @@ impl ProcessRegistry {
         request_id: &str,
         result: Result<Value, String>,
     ) -> bool {
-        let sender = self
-            .1
-            .lock()
-            .ok()
-            .and_then(|mut pending| pending.remove(&(run_id.to_string(), request_id.to_string())));
+        let sender =
+            self.1.lock().ok().and_then(|mut pending| {
+                pending.remove(&(run_id.to_string(), request_id.to_string()))
+            });
         match sender {
             Some(sender) => sender.send(result).is_ok(),
             None => false,
@@ -192,7 +156,7 @@ impl ProcessRegistry {
         };
         for sender in pending {
             let _ = sender.send(Err(
-                "Codex turn ended before the answer was acknowledged".to_string(),
+                "Codex turn ended before the answer was acknowledged".to_string()
             ));
         }
     }
@@ -210,37 +174,6 @@ impl ProcessRegistry {
             Ok(map) => active_run_count(&map),
             Err(poisoned) => active_run_count(&poisoned.into_inner()),
         }
-    }
-
-    /// The subset of `run_ids` still mid-turn. Matched on the entry's run
-    /// id, not the map key: after a rekey a run may be keyed only by its
-    /// session id, while the frontend still routes it by run id. A run parked
-    /// for a background follow-up keeps its process but already sent done,
-    /// so it is not live; its follow-up arrives as `turn_resumed`.
-    pub fn live_run_ids(&self, run_ids: &[String]) -> Vec<String> {
-        // One lock at a time: the parked set is read and released before the
-        // process map, so no lock order is introduced between the two.
-        let parked: HashSet<String> = self
-            .2
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .values()
-            .map(|waiting| waiting.run_id.clone())
-            .collect();
-        let map = self
-            .0
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
-        let live: HashSet<&str> = map
-            .values()
-            .map(|entry| entry.run_id.as_str())
-            .filter(|run_id| !parked.contains(*run_id))
-            .collect();
-        run_ids
-            .iter()
-            .filter(|run_id| live.contains(run_id.as_str()))
-            .cloned()
-            .collect()
     }
 
     /// Write one NDJSON control line to a live run's interactive stdin.
@@ -322,10 +255,7 @@ impl ProcessRegistry {
         plans
             .drain()
             .map(|(plan_id, context)| {
-                let revision = context
-                    .get("revision")
-                    .and_then(Value::as_i64)
-                    .unwrap_or(0);
+                let revision = context.get("revision").and_then(Value::as_i64).unwrap_or(0);
                 (plan_id, revision, context)
             })
             .collect()
@@ -363,12 +293,18 @@ impl ProcessRegistry {
     /// its settings no longer match or it is unwritable — kills it and falls
     /// back to a fresh `--resume` launch, which must not race the idle one.
     pub(crate) fn take_awaiting_followup(&self, session_id: &str) -> Option<AwaitingFollowup> {
-        self.2.lock().ok().and_then(|mut map| map.remove(session_id))
+        self.2
+            .lock()
+            .ok()
+            .and_then(|mut map| map.remove(session_id))
     }
 
     pub(crate) fn insert(&self, key: String, entry: ChildEntry) {
         if let Ok(mut map) = self.0.lock() {
-            for reserved in map.values_mut().filter(|reserved| reserved.pid == 0 && reserved.run_id == entry.run_id) {
+            for reserved in map
+                .values_mut()
+                .filter(|reserved| reserved.pid == 0 && reserved.run_id == entry.run_id)
+            {
                 *reserved = entry.clone();
             }
             map.insert(key, entry);
@@ -422,7 +358,9 @@ impl ProcessRegistry {
                 .map(|entry| entry.child.is_none() && entry.pid == 0)
                 .unwrap_or(false);
             if reserved {
-                map.retain(|_, entry| entry.run_id != key || entry.pid != 0 || entry.child.is_some());
+                map.retain(|_, entry| {
+                    entry.run_id != key || entry.pid != 0 || entry.child.is_some()
+                });
             }
         }
     }

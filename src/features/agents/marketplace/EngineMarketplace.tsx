@@ -1,4 +1,4 @@
-import { Blocks, FolderGit2, RefreshCw, Sparkles } from "lucide-react";
+import { Blocks, FolderGit2, RefreshCw, ScrollText } from "lucide-react";
 import { useEffect, useState } from "react";
 import { EngineMark } from "@/features/engine-config/EngineMark";
 import {
@@ -24,7 +24,7 @@ import { EngineSkills } from "./EngineSkills";
 
 const kindLabels: Record<MarketKind, { label: string; icon: typeof Blocks }> = {
   plugins: { label: "Plugins", icon: Blocks },
-  skills: { label: "Skills", icon: Sparkles },
+  skills: { label: "Skills", icon: ScrollText },
 };
 
 /**
@@ -82,7 +82,7 @@ export function EngineMarketplace() {
           options={engines.map((entry) => ({
             value: entry.id,
             label: entry.name,
-            icon: <EngineMark engine={entry.id} size={16} />,
+            icon: <EngineMark engine={entry.id} size={16} name={entry.name} />,
           }))}
         />
         {kinds.length > 1 ? (

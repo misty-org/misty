@@ -8,11 +8,11 @@ export interface SearchQuery {
   kind?: SearchKind;
   /** `@agent …`: the agent named, and what to ask it. */
   ask?: { agentId: string; prompt: string };
-  /** `note: …`, `task: …` or `event: …` (with or without "new"): what to make. */
+  /** `doc: …` (or `note: …`), `task: …` or `event: …` (with or without "new"): what to make. */
   create?: { what: "note" | "task" | "event"; title: string };
 }
 
-const createPattern = /^(?:new\s+)?(note|task|event)\s*:\s*(\S.*)$/i;
+const createPattern = /^(?:new\s+)?(doc|note|task|event)\s*:\s*(\S.*)$/i;
 
 /** Reads the prefixes out of what was typed. `agents` decides who `@` can name. */
 export function readQuery(raw: string, agents: { id: string; name: string }[]): SearchQuery {
@@ -43,7 +43,8 @@ export function readQuery(raw: string, agents: { id: string; name: string }[]): 
     return {
       text: create[2].trim(),
       create: {
-        what: create[1].toLowerCase() as "note" | "task" | "event",
+        what: (create[1].toLowerCase() === "doc" ? "note" : create[1].toLowerCase()) as
+          "note" | "task" | "event",
         title: create[2].trim(),
       },
     };

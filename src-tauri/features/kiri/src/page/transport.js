@@ -1,6 +1,6 @@
 // Kiri's page side. Runs in each top-level document before the site's own
 // scripts. Shims build spec-shaped objects and marshal calls; every decision
-// (who is calling, permission, platform support) is made in Rust.
+// (who is calling, platform support) is made in Rust.
 (() => {
   if (window.top !== window) return;
   const internals = window.__TAURI_INTERNALS__;

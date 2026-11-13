@@ -19,6 +19,7 @@ pub(crate) struct ControlPlaneError {
 }
 
 impl ControlPlaneError {
+    #[cfg(test)]
     pub(crate) fn new(status: u16, message: impl Into<String>, code: Option<&str>) -> Self {
         let code = code.unwrap_or("control_plane_error").to_owned();
         let transient = code != "usage_limit_reached" && (status == 408 || status == 429 || status >= 500);
@@ -62,6 +63,7 @@ impl RuntimeError {
         }
     }
 
+    #[cfg(test)]
     pub(crate) fn with_cause(self, next: RuntimeError) -> Self {
         match self {
             Self::Other { name, message, status, .. } => Self::Other { name, message, status, cause: Some(Box::new(next)) },

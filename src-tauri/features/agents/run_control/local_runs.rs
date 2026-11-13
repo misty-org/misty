@@ -289,17 +289,6 @@ pub async fn agent_run_cancel(
         .map_err(|error| error.code().to_owned())
 }
 
-/// The tools a run with this request would be offered, for what the app checks before it starts one.
-#[tauri::command]
-pub async fn agent_run_tools(
-    app: AppHandle,
-    webview: Webview,
-    body: Value,
-) -> Result<Vec<String>, String> {
-    person_window(&webview)?;
-    Ok(super::ensure(&app).await?.runtime.local_tool_names(&body))
-}
-
 /// What these earlier runs wrote, newest first, so the next turn can check before repeating one.
 #[tauri::command]
 pub async fn agent_run_receipts(

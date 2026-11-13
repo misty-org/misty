@@ -1,5 +1,5 @@
 import { createContext, useContext, useMemo, useState, type ComponentProps } from "react";
-import { Columns3, RotateCcw, TableProperties } from "lucide-react";
+import { RotateCcw, TableProperties } from "lucide-react";
 import { IconButton } from "../../controls/IconButton";
 import {
   DropdownMenu,
@@ -52,7 +52,6 @@ export function CollectionColumnChooser() {
         {schema.columns.map((column) => (
           <MenuCheckItem
             key={column.key}
-            icon={Columns3}
             label={column.label}
             checked={!excluded.includes(column.key)}
             // The name says which row is which, so it can't be hidden.

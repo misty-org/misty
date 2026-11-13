@@ -28,6 +28,7 @@ describe("search prefixes", () => {
       title: "ship search",
     });
     expect(readQuery("note: ideas", agents).create).toEqual({ what: "note", title: "ideas" });
+    expect(readQuery("new doc: plan", agents).create).toEqual({ what: "note", title: "plan" });
     expect(readQuery("notes about x", agents).create).toBeUndefined();
   });
 });

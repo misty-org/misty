@@ -31,9 +31,7 @@ pub fn register(builder: Builder<Wry>) -> Builder<Wry> {
         .on_web_content_process_terminate(crate::browser::pages::process_ended::page_process_ended);
 
     #[cfg(desktop)]
-    let builder = builder
-        .plugin(tauri_plugin_process::init())
-        .plugin(tauri_plugin_updater::Builder::new().build());
+    let builder = builder.plugin(tauri_plugin_updater::Builder::new().build());
 
     let builder = builder
         // Keeps privileged windows on the bundled app; see navigation_guard.rs.
@@ -42,15 +40,17 @@ pub fn register(builder: Builder<Wry>) -> Builder<Wry> {
         .register_asynchronous_uri_scheme_protocol("asset", |context, request, responder| {
             crate::app::trusted_windows::asset_protocol::handle(context, request, responder)
         })
-        .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_keystore::init())
-        .plugin(shell_plugins::ShellScriptPlugin(
-            tauri_plugin_notification::init(),
-        ))
         .plugin(shell_plugins::ShellScriptPlugin(tauri_plugin_opener::init()))
-        .plugin(tauri_plugin_os::init());
+        .plugin(crate::app::platform_info::plugin());
+
+    // Run notices on Windows and Linux; macOS sends them through mac-notification-sys.
+    #[cfg(not(target_os = "macos"))]
+    let builder = builder.plugin(shell_plugins::ShellScriptPlugin(
+        tauri_plugin_notification::init(),
+    ));
 
     #[cfg(desktop)]
     let builder = builder.on_menu_event(|app, event| {
@@ -64,6 +64,7 @@ pub fn register(builder: Builder<Wry>) -> Builder<Wry> {
 
     builder.on_window_event(|window, event| {
         crate::app::lifecycle::window_event(window, event);
+        crate::app::dropped_files::window_event(window, event);
         #[cfg(desktop)]
         crate::browser::app_windows::window_event(window, event);
         #[cfg(all(desktop, not(target_os = "macos")))]

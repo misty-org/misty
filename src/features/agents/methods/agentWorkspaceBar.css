@@ -1,5 +1,5 @@
 /* The Agents page is a bar over a body: the chat (or another view) and, when open, the context
-   panel at its right. */
+   panel at its right. Bar, chat, panel and rail are one flat sheet: no line parts them. */
 .agent-studio {
   flex-direction: column;
 }
@@ -10,7 +10,6 @@
   gap: 8px;
   min-height: 48px;
   padding: 4px 12px;
-  border-bottom: 1px solid var(--color-charcoal-border);
   background: var(--color-charcoal-bg);
 }
 .agent-studio-bar .agent-avatar {
@@ -34,6 +33,8 @@
   min-width: 0;
   min-height: 0;
 }
+/* The open panel floats on the sheet as a card, after OpenChamber's: inset from the chat's top and
+   bottom, rounded, with a faint edge. The session card is narrow and only as tall as it needs. */
 .agent-studio-context {
   display: flex;
   width: min(46%, 560px);
@@ -41,8 +42,17 @@
   flex: none;
   flex-direction: column;
   min-height: 0;
-  border-left: 1px solid var(--color-charcoal-border);
+  margin: 8px 0;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--misty-theme-text) 9%, transparent);
+  border-radius: var(--radius-xl);
   background: var(--color-charcoal-bg);
+}
+.agent-studio-context[data-panel="session"] {
+  width: 272px;
+  min-width: 0;
+  align-self: flex-start;
+  max-height: calc(100% - 16px);
 }
 /* A narrow page gives the whole body to the panel's neighbour by stacking it below the bar. */
 @container agent-studio (max-width: 760px) {
@@ -50,7 +60,7 @@
     width: 100%;
     min-width: 0;
     position: absolute;
-    inset: 48px 0 0 0;
+    inset: 48px 8px 8px 8px;
     z-index: 15;
   }
 }

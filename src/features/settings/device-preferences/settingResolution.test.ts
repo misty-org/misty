@@ -22,7 +22,6 @@ describe("device settings", () => {
       portableValues({
         general: {
           startup_view_index: 2,
-          preferred_workspace_root: "/private",
           launch_on_login: true,
         },
         ai: { api_key: "secret" },
@@ -30,19 +29,15 @@ describe("device settings", () => {
       }),
     ).toEqual({
       "app.startup.view": "agents",
-      "files.startingFolder": "/private",
       "app.startup.login": true,
     });
   });
   it("projects shared settings and preserves unknown namespaces", () => {
     const next = projectPreferences(
-      { general: { preferred_workspace_root: "/old" }, plugin: { future: true } },
+      { general: { startup_view_index: 0 }, plugin: { future: true } },
       { "app.startup.view": "agents", "app.zoom": 2 },
     );
-    expect(next.general).toMatchObject({
-      startup_view_index: 2,
-      preferred_workspace_root: "",
-    });
+    expect(next.general).toMatchObject({ startup_view_index: 2 });
     expect(next.plugin).toEqual({ future: true });
     expect(next.appearance).toMatchObject({ app_zoom: 2 });
   });

@@ -40,7 +40,7 @@ export function NewNoteDialogView(props: NewNoteDialogProps) {
     <Dialog open={props.open} onOpenChange={props.onOpenChange}>
       <DialogContent className={cn("max-w-[380px]")}>
         <DialogHeader>
-          <DialogTitle className="text-sm">New note</DialogTitle>
+          <DialogTitle className="text-sm">New doc</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-1.5">
@@ -51,7 +51,7 @@ export function NewNoteDialogView(props: NewNoteDialogProps) {
             id="new-note-title"
             value={title}
             autoFocus
-            placeholder="Untitled note"
+            placeholder="Untitled doc"
             className={cn("h-8 text-ui")}
             onChange={(event) => setTitle(event.target.value)}
             onKeyDown={(event) => {
@@ -65,7 +65,7 @@ export function NewNoteDialogView(props: NewNoteDialogProps) {
             Cancel
           </Button>
           <Button type="button" disabled={submitting} onClick={() => void submit()}>
-            {submitting ? "Creating…" : "Create note"}
+            {submitting ? "Creating…" : "Create doc"}
           </Button>
         </DialogFooter>
       </DialogContent>

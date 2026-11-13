@@ -46,8 +46,8 @@ fn build_window<R: Runtime>(
     #[cfg(target_os = "macos")]
     if let Some(view) = app.get_webview(label) {
         let _ = view.with_webview(|view| unsafe {
-            crate::app::macos_window_effects::mac_traffic_lights::hold_traffic_lights(
-                view.ns_window() as cocoa::base::id,
+            crate::app::macos_window_effects::mac_traffic_lights::hold_traffic_lights_of(
+                view.ns_window(),
             );
         });
     }
@@ -107,7 +107,6 @@ fn open_window<R: Runtime>(app: &AppHandle<R>, window: OpenWindow) -> Result<(),
     if let Ok(state) = lock_registry() {
         save(&state);
     }
-    refresh_menus(app);
     Ok(())
 }
 
@@ -133,28 +132,6 @@ pub fn open_profile_window<R: Runtime>(app: &AppHandle<R>, key: &str) -> Result<
             geometry: None,
         },
     )
-}
-
-/// Brings forward a window of the profile, the one used last first, or opens one. This is
-/// what switching profile does: tabs never swap under a window.
-pub fn open_profile<R: Runtime>(app: &AppHandle<R>, key: &str) -> Result<(), String> {
-    if !valid_key(key) {
-        return Err("Unknown profile.".into());
-    }
-    let showing = windows_for_profile(app, key)
-        .into_iter()
-        .filter(|window| is_person_window(window.label()))
-        .collect::<Vec<_>>();
-    let last = last_focused_any();
-    if let Some(window) = showing
-        .iter()
-        .find(|window| Some(window.label()) == last.as_deref())
-        .or_else(|| showing.first())
-    {
-        focus(window);
-        return Ok(());
-    }
-    open_profile_window(app, key)
 }
 
 /// Opens the windows the last launch left open, or the first profile's.
@@ -236,7 +213,6 @@ pub fn window_event(window: &Window, event: &tauri::WindowEvent) {
                 save(&state);
             }
             emit_to_profile(window.app_handle(), &parsed.profile, ORPHANS_EVENT, ());
-            refresh_menus(window.app_handle());
         }
         _ => {}
     }

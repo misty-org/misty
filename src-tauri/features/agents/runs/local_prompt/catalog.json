@@ -966,27 +966,6 @@
   "annotations": {
    "readOnlyHint": true
   },
-  "description": "List this account's signed-in devices with their platform and when each was last online.",
-  "inputSchema": {
-   "additionalProperties": false,
-   "properties": {},
-   "required": [],
-   "type": "object"
-  },
-  "name": "device.list",
-  "outputSchema": {
-   "type": "object"
-  }
- },
- {
-  "_meta": {
-   "misty/layer": "private",
-   "misty/locality": "server",
-   "misty/risk": "read"
-  },
-  "annotations": {
-   "readOnlyHint": true
-  },
   "description": "List this user's personal agents in the browser workspace.",
   "inputSchema": {
    "additionalProperties": false,
@@ -2782,76 +2761,6 @@
    "type": "object"
   },
   "name": "plan.update",
-  "outputSchema": {
-   "type": "object"
-  }
- },
- {
-  "_meta": {
-   "misty/layer": "public",
-   "misty/locality": "server",
-   "misty/risk": "read"
-  },
-  "annotations": {
-   "readOnlyHint": true
-  },
-  "description": "Report on the active goal. in_progress records progress with work left. achieved requires evidence you inspected for every success criterion, quoting each criterion exactly; a tool call that returned ok is not proof. unmet means a blocker needs the user; say exactly what is needed.",
-  "inputSchema": {
-   "additionalProperties": false,
-   "properties": {
-    "evidence": {
-     "items": {
-      "additionalProperties": false,
-      "properties": {
-       "criterion": {
-        "maxLength": 400,
-        "minLength": 1,
-        "type": "string"
-       },
-       "proof": {
-        "maxLength": 1000,
-        "minLength": 1,
-        "type": "string"
-       }
-      },
-      "required": [
-       "criterion",
-       "proof"
-      ],
-      "type": "object"
-     },
-     "maxItems": 10,
-     "type": "array"
-    },
-    "next_steps": {
-     "items": {
-      "maxLength": 400,
-      "type": "string"
-     },
-     "maxItems": 10,
-     "type": "array"
-    },
-    "status": {
-     "enum": [
-      "in_progress",
-      "achieved",
-      "unmet"
-     ],
-     "type": "string"
-    },
-    "summary": {
-     "maxLength": 2000,
-     "minLength": 1,
-     "type": "string"
-    }
-   },
-   "required": [
-    "status",
-    "summary"
-   ],
-   "type": "object"
-  },
-  "name": "goal.update",
   "outputSchema": {
    "type": "object"
   }

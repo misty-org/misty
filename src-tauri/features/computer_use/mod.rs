@@ -97,11 +97,15 @@ thread_local! {
 }
 
 fn active() -> std::sync::MutexGuard<'static, HashSet<String>> {
-    ACTIVE.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+    ACTIVE
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
 fn stopped_runs() -> std::sync::MutexGuard<'static, HashSet<String>> {
-    STOPPED.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+    STOPPED
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
 /// Whether the run the driver is acting for was stopped.

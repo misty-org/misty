@@ -24,6 +24,9 @@ pub struct ConnectedApp {
     pub account: String,
     pub status: &'static str,
     pub created_at: String,
+    /// Composio's logo for the app; native code fetches it, so the page never loads it itself.
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub logo: String,
 }
 
 #[derive(Debug, PartialEq, Serialize)]
@@ -32,6 +35,18 @@ pub struct CatalogApp {
     pub name: String,
     pub description: String,
     pub connected: bool,
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub logo: String,
+}
+
+/// A logo address worth fetching: `https` and of a sane length, else none.
+fn logo_url(value: &str) -> String {
+    let value = value.trim();
+    if value.starts_with("https://") && value.len() <= 2048 {
+        value.to_owned()
+    } else {
+        String::new()
+    }
 }
 
 /// `None` hides an abandoned sign-in.
@@ -63,10 +78,13 @@ pub async fn connected_apps(client: &Client) -> Result<Vec<ConnectedApp>, Error>
         .iter()
         .filter_map(|account| {
             let status = status_of(account, now)?;
-            let name = toolkits
+            let toolkit = toolkits
                 .iter()
-                .find(|toolkit| toolkit.slug == account.toolkit.slug)
-                .map_or(account.toolkit.slug.clone(), |toolkit| toolkit.name.clone());
+                .find(|toolkit| toolkit.slug == account.toolkit.slug);
+            let name = toolkit.map_or(account.toolkit.slug.clone(), |toolkit| toolkit.name.clone());
+            let logo = toolkit
+                .map(|toolkit| logo_url(&toolkit.meta.logo))
+                .unwrap_or_default();
             Some(ConnectedApp {
                 id: account.id.clone(),
                 app: account.toolkit.slug.clone(),
@@ -75,6 +93,7 @@ pub async fn connected_apps(client: &Client) -> Result<Vec<ConnectedApp>, Error>
                 account: identities.get(&account.id).cloned().unwrap_or_default(),
                 status,
                 created_at: account.created_at.clone(),
+                logo,
             })
         })
         .collect();
@@ -105,6 +124,7 @@ pub async fn catalog(
         .map(|item| CatalogApp {
             connected: item.connected_account.is_some(),
             description: truncate(&item.meta.description, 240),
+            logo: logo_url(&item.meta.logo),
             app: item.slug,
             name: item.name,
         })

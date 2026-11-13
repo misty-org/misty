@@ -22,22 +22,6 @@ use crate::browser::*;
 mod background;
 pub use background::*;
 
-/// The window's client size when each page was stacked. A page is raised in
-/// place only while the window still has that size; otherwise its layout may
-/// have moved and the ordinary reconcile places it first.
-fn stacked_window_sizes() -> &'static Mutex<HashMap<String, (u32, u32)>> {
-    static SIZES: OnceLock<Mutex<HashMap<String, (u32, u32)>>> = OnceLock::new();
-    SIZES.get_or_init(Default::default)
-}
-
-fn window_size(webview: &Webview) -> Option<(u32, u32)> {
-    webview
-        .window()
-        .inner_size()
-        .ok()
-        .map(|size| (size.width, size.height))
-}
-
 /// Per stacked page: which hide this is, and whether the page was backgrounded.
 fn background_states() -> &'static Mutex<HashMap<String, (u64, bool)>> {
     static STATES: OnceLock<Mutex<HashMap<String, (u64, bool)>>> = OnceLock::new();
@@ -82,9 +66,6 @@ pub(in crate::browser) fn unstack(id: &str) -> bool {
         for ids in windows.values_mut() {
             ids.retain(|other| other != id);
         }
-    }
-    if let Ok(mut sizes) = stacked_window_sizes().lock() {
-        sizes.remove(id);
     }
     background_states()
         .lock()
@@ -212,9 +193,6 @@ pub(in crate::browser) fn stack_windows_webview(
         let extra = ids.len().saturating_sub(STACKED_PER_WINDOW);
         ids.drain(..extra).collect::<Vec<_>>()
     };
-    if let (Some(size), Ok(mut sizes)) = (window_size(webview), stacked_window_sizes().lock()) {
-        sizes.insert(id.clone(), size);
-    }
     schedule_background(app, &id);
     for id in overflow {
         if let Some(oldest) = app.get_webview(&format!("misty-browser-{id}")) {
@@ -222,58 +200,4 @@ pub(in crate::browser) fn stack_windows_webview(
         }
     }
     Ok(())
-}
-
-#[derive(Debug, serde::Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct BrowserShowOnlyRequest {
-    /// The pages the window's active tabs show now.
-    pub ids: Vec<String>,
-}
-
-/// Switches the caller's window to `ids` the moment its tabs change, before
-/// any layout runs: stacked pages among them come up in place, already drawn,
-/// and every other page on screen drops beneath the renderer. Returns the
-/// pages it raised; the rest are left to the ordinary reconcile, which also
-/// still checks every page's bounds afterward.
-#[tauri::command]
-pub fn browser_webviews_show_only(
-    caller: Webview,
-    app: AppHandle,
-    request: BrowserShowOnlyRequest,
-) -> Result<Vec<String>, String> {
-    let window = caller.window().label().to_owned();
-    let size = window_size(&caller);
-    let mut raised = Vec::new();
-    // The pages coming up are raised before any page goes under, so the window is never left
-    // with nothing in front for the renderer's transparent area to show through.
-    let mut leaving = Vec::new();
-    for (label, webview) in app.webviews() {
-        let Some(id) = label.strip_prefix("misty-browser-") else {
-            continue;
-        };
-        if webview.window().label() != window {
-            continue;
-        }
-        if request.ids.iter().any(|wanted| wanted == id) {
-            let same_window = stacked_window_sizes()
-                .lock()
-                .is_ok_and(|sizes| size.is_some() && sizes.get(id).copied() == size);
-            if is_stacked(&webview) && same_window && !is_held_view(&webview) {
-                present_macos_webview(&webview)?;
-                raised.push(id.to_owned());
-            }
-            continue;
-        }
-        leaving.push(webview);
-    }
-    for webview in leaving {
-        let parked = webview
-            .position()
-            .is_ok_and(|position| position.x <= -10_000 && position.y <= -10_000);
-        if !parked && !is_stacked(&webview) && !is_held_view(&webview) {
-            stack_windows_webview(&app, &webview)?;
-        }
-    }
-    Ok(raised)
 }

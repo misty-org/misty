@@ -5,7 +5,7 @@ use tauri::{
 };
 use url::Url;
 
-/// Notification replaces `window.Notification` and Opener intercepts link clicks.
+/// Notification (Windows and Linux) replaces `window.Notification` and Opener intercepts link clicks.
 /// Tauri injects plugin scripts into every webview, even when its ACL denies the
 /// plugin commands there. Run these integrations only in the shell's main frame.
 /// Native setup, commands and lifecycle hooks remain owned by the original plugin.
@@ -75,15 +75,23 @@ mod tests {
 
     #[test]
     fn plugin_scripts_preserve_website_apis_and_shell_integrations() {
-        let notification = ShellScriptPlugin(tauri_plugin_notification::init::<tauri::Wry>());
         let opener = ShellScriptPlugin(tauri_plugin_opener::init::<tauri::Wry>());
-        assert_eq!(notification.name(), "notification");
         assert_eq!(opener.name(), "opener");
-        let scripts = serde_json::json!({
+        let mut scripts = serde_json::json!({
             "windows": cfg!(windows),
-            "notification": notification.initialization_script_2().unwrap().script,
             "opener": opener.initialization_script_2().unwrap().script,
         });
+        // Notification is a plugin only where macOS's own notices aren't used.
+        #[cfg(not(target_os = "macos"))]
+        {
+            let notification = ShellScriptPlugin(tauri_plugin_notification::init::<tauri::Wry>());
+            assert_eq!(notification.name(), "notification");
+            scripts["notification"] = notification
+                .initialization_script_2()
+                .unwrap()
+                .script
+                .into();
+        }
         // Execute the actual dependency scripts, so upgrades exercise the same
         // DOM and IPC behavior that will be injected by the native application.
         let mut child = Command::new("node")

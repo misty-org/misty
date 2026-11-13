@@ -1,5 +1,5 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { List, Pencil, Plus, Trash2 } from "lucide-react";
 import { afterEach, expect, it, vi } from "vitest";
 import { MenuItem } from "../overlays/MenuItem";
 import { RenameItemDialog } from "./RenameItemDialog";
@@ -8,6 +8,7 @@ import {
   CollectionItems,
   CollectionFilters,
   CollectionPage,
+  CollectionSortMenu,
   CollectionViewToggle,
 } from "./CollectionWorkspace";
 
@@ -407,24 +408,43 @@ it("keeps the section tabs and utilities on one bar that never wraps", () => {
   );
   const bar = screen.getByRole("toolbar", { name: "Collection controls" });
   expect(within(bar).getByRole("button", { name: "Drawings" })).toBeTruthy();
-  expect(within(bar).getByRole("radiogroup", { name: "View layout" })).toBeTruthy();
+  expect(within(bar).getByRole("group", { name: "View layout" })).toBeTruthy();
   expect(document.querySelector(".flex-wrap")).toBeNull();
   expect(document.querySelector("[title]")).toBeNull();
 });
 
-it("chooses grid or list as one ChoiceGroup and keeps the board a separate button", () => {
+it("chooses grid or list as bare pressed icons and keeps the board a separate button", () => {
   const onChange = vi.fn();
   const onBoardView = vi.fn();
   render(<CollectionViewToggle value="list" onChange={onChange} onBoardView={onBoardView} />);
-  const group = screen.getByRole("radiogroup", { name: "View layout" });
-  expect(within(group).getByRole("radio", { name: "List view" }).getAttribute("aria-checked")).toBe(
-    "true",
-  );
-  expect(within(group).queryByRole("radio", { name: "Board view" })).toBeNull();
-  fireEvent.click(within(group).getByRole("radio", { name: "Grid view" }));
+  const group = screen.getByRole("group", { name: "View layout" });
+  expect(
+    within(group).getByRole("button", { name: "List view" }).getAttribute("aria-pressed"),
+  ).toBe("true");
+  expect(
+    within(group).getByRole("button", { name: "Grid view" }).getAttribute("aria-pressed"),
+  ).toBe("false");
+  // No box around the pair: the buttons are quiet, with no border or fill of their own.
+  expect(within(group).getByRole("button", { name: "List view" }).dataset.variant).toBe("quiet");
+  fireEvent.click(within(group).getByRole("button", { name: "Grid view" }));
   expect(onChange).toHaveBeenCalledWith("grid");
   fireEvent.click(screen.getByRole("button", { name: "Board view" }));
   expect(onBoardView).toHaveBeenCalledTimes(1);
+});
+
+it("sorts from one icon whose tooltip names the order in use", () => {
+  render(
+    <CollectionSortMenu
+      value="title"
+      options={[
+        { value: "recent", label: "Most recent", icon: List },
+        { value: "title", label: "Title", icon: List },
+      ]}
+      onChange={() => {}}
+    />,
+  );
+  const trigger = screen.getByRole("button", { name: "Sort: Title" });
+  expect(trigger.textContent).toBe("");
 });
 
 it("shows a failed rename under the name field and keeps the dialog open", async () => {

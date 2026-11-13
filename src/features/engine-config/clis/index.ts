@@ -8,4 +8,4 @@ export { signInApi, type SignInRequest } from "./signInApi";
 export { cliApi } from "./api";
 export type { CliSignInStatus, CliUpdatePlan, CliVersionStatus } from "./api";
 export { useCliUpdateFlow } from "./useCliUpdateFlow";
-export { refreshCliStatus, useCliStatus, useCliVersionStatus } from "./useCliVersionStatus";
+export { refreshCliStatus, useCliVersionStatus } from "./useCliVersionStatus";

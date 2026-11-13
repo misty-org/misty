@@ -14,6 +14,7 @@ import {
 import {
   ArrowUp,
   Copy,
+  Cpu,
   Folder,
   GitBranch,
   Layers,
@@ -23,7 +24,6 @@ import {
   RotateCcw,
   Share2,
   Shield,
-  Sparkles,
   ThumbsUp,
   Trash2,
 } from "lucide-react";
@@ -43,7 +43,7 @@ function useComposerItems(): ActionBarItem[] {
     { id: "attach", icon: Paperclip, label: "Attach", priority: 3, onSelect: () => {} },
     {
       id: "model",
-      icon: Sparkles,
+      icon: Cpu,
       label: modelName,
       priority: 4,
       shrink: true,
@@ -51,7 +51,7 @@ function useComposerItems(): ActionBarItem[] {
       menu: (
         <MenuRadioGroup value={model} onValueChange={setModel}>
           {models.map((item) => (
-            <MenuRadioItem key={item.id} icon={Sparkles} value={item.id} label={item.name} />
+            <MenuRadioItem key={item.id} value={item.id} label={item.name} />
           ))}
         </MenuRadioGroup>
       ),

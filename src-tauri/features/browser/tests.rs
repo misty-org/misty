@@ -172,7 +172,6 @@ fn download_completion_never_guesses_between_simultaneous_identical_urls() {
 fn browser_capabilities_are_closed_over_known_operations() {
     assert!(is_browser_capability("browser.inspect"));
     assert!(is_browser_capability("browser.type"));
-    assert!(is_browser_capability("browser.request"));
     assert!(is_browser_capability("browser.interact"));
     assert!(is_browser_capability("browser.downloads.list"));
     assert!(!is_browser_capability("browser.eval"));
