@@ -116,6 +116,6 @@ pub(in crate::browser::agent_pages::page_agent) async fn run_skill(
         output["attempted"] = json!(false);
         output["tool_error"] = json!({"code": "browser_skill_failed", "message": message});
     }
-    after_snapshot(view, request, &mut output).await?;
+    after_snapshot(view, request, &document, &mut output).await?;
     Ok(output)
 }

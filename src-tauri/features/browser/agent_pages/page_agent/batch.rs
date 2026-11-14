@@ -19,26 +19,45 @@ fn request_document(request: &BrowserAgentExecuteRequest) -> Option<String> {
         .map(str::to_owned)
 }
 
+/// The compact state's size after a batch that stayed on its page (page_effects.js).
+const COMPACT_STATE_CHARS: u64 = 4_000;
+
+/// The page after a batch: the compact state, with controls new since the last read marked, when
+/// every step stayed on the batch's document; a full snapshot after a navigation.
 async fn after_snapshot(
     view: &Webview,
     request: &BrowserAgentExecuteRequest,
+    document: &str,
     output: &mut Value,
 ) -> Result<(), String> {
     if request.input["includeSnapshot"] == false {
         return Ok(());
     }
+    let navigated = output["page"]["documentId"] != json!(document)
+        || output["steps"]
+            .as_array()
+            .is_some_and(|steps| steps.iter().any(|step| step["effect"] == "navigated"));
     let candidate = uuid::Uuid::new_v4().to_string();
-    let snapshot = call(
-        view,
-        "snapshot",
-        json!({"candidateId": candidate, "maxChars": AFTER_STEPS_SNAPSHOT_CHARS, "maxRefs": 800}),
-        true,
-    )
-    .await?;
-    let mut snapshot = snapshot;
+    let mut snapshot = if navigated {
+        call(
+            view,
+            "snapshot",
+            json!({"candidateId": candidate, "maxChars": AFTER_STEPS_SNAPSHOT_CHARS, "maxRefs": 800}),
+            true,
+        )
+        .await?
+    } else {
+        call(
+            view,
+            "compact",
+            json!({"candidateId": candidate, "maxChars": COMPACT_STATE_CHARS, "maxRefs": 800}),
+            false,
+        )
+        .await?
+    };
     if snapshot["ok"] == true {
         super::with_frame_trees(view, &mut snapshot).await;
-        output["snapshot"] = json!({"documentId": snapshot["documentId"], "tree": snapshot["tree"], "truncated": snapshot["truncated"], "skills": snapshot["skills"]});
+        output["snapshot"] = json!({"documentId": snapshot["documentId"], "tree": snapshot["tree"], "truncated": snapshot["truncated"], "skills": snapshot["skills"], "compact": snapshot["compact"] == true});
     }
     Ok(())
 }
@@ -68,7 +87,7 @@ pub(super) async fn run_steps(
         allow_consequential,
     )
     .await?;
-    after_snapshot(view, request, &mut output).await?;
+    after_snapshot(view, request, &document, &mut output).await?;
     Ok(output)
 }
 
@@ -97,6 +116,16 @@ async fn run_batch(
             task,
         )?;
         resolve_agent_webview(app, state, request)?;
+        // Arms the step's verdict (page_effects.js); read after the step settles.
+        let token = call(
+            view,
+            "effectStart",
+            json!({"ref": step.reference}),
+            false,
+        )
+        .await
+        .ok()
+        .and_then(|armed| armed["token"].as_str().map(str::to_owned));
         let outcome = match run_step(
             app,
             state,
@@ -162,6 +191,22 @@ async fn run_batch(
                 false,
             )
             .await;
+        }
+        // What the step did: navigated, page changed, or no change (a click the page ignored).
+        if let Some(token) = &token {
+            if let (Ok(effect), Some(record)) = (
+                call(view, "effectEnd", json!({"token": token}), false).await,
+                results.last_mut(),
+            ) {
+                if let Some(verdict) = effect["effect"].as_str() {
+                    record["effect"] = json!(verdict);
+                }
+                for field in ["valueNow", "checkedNow", "focus"] {
+                    if !effect[field].is_null() {
+                        record[field] = effect[field].clone();
+                    }
+                }
+            }
         }
         let now = call(view, "observe", json!({}), false).await?;
         if index + 1 < steps.len() {
