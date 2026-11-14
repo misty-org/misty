@@ -54,6 +54,8 @@ pub(super) struct View {
     /// The model the step that is running uses, as `provider/model`.
     model: Option<String>,
     pub(super) last_usage: Option<Value>,
+    /// What the turn's steps cost so far, in dollars, once one reports a cost.
+    cost: Option<f64>,
     /// `provider/model` → context window, from `GET /api/model`.
     context_windows: HashMap<String, u64>,
     started: bool,
@@ -268,8 +270,14 @@ fn event_session(value: &Value) -> Option<&str> {
 }
 
 #[cfg(test)]
-#[path = "opencode_v2_tests.rs"]
-mod tests;
+#[path = "opencode_v2_fake_provider.rs"]
+mod fake_provider;
+#[cfg(test)]
+#[path = "opencode_v2_keyed_tests.rs"]
+mod keyed_tests;
 #[cfg(test)]
 #[path = "opencode_v2_live_tests.rs"]
 mod live_tests;
+#[cfg(test)]
+#[path = "opencode_v2_tests.rs"]
+mod tests;

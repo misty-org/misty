@@ -51,11 +51,23 @@ pub(super) async fn handle_event(
                     .and_then(|model| view.context_windows.get(model))
                     .copied();
                 let usage = usage_of(tokens.unwrap_or(&Value::Null), window);
-                let usage = if compacted {
+                let mut usage = if compacted {
                     after_compaction(usage)
                 } else {
                     usage
                 };
+                // Each step reports what it alone cost (from the model's price list), and the
+                // message keeps the last report, so the report carries the turn's total so far.
+                if let Some(cost) = event
+                    .get("cost")
+                    .and_then(Value::as_f64)
+                    .filter(|cost| cost.is_finite() && *cost >= 0.0)
+                {
+                    view.cost = Some(view.cost.unwrap_or(0.0) + cost);
+                }
+                if let Some(cost) = view.cost {
+                    usage["cost_usd"] = json!(cost);
+                }
                 view.last_usage = Some(usage.clone());
                 core.dispatch_event(state, EngineEvent::Usage(usage));
             }

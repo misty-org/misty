@@ -5,7 +5,7 @@ use super::*;
 
 /// What one live turn collected: the run's engine events as `(kind, data)`.
 #[derive(Default)]
-struct Collected(std::sync::Mutex<Vec<String>>);
+pub(super) struct Collected(std::sync::Mutex<Vec<String>>);
 
 impl crate::engines::support::event_sink::Emit for Collected {
     fn emit_json(&self, _name: &str, raw_json: &str) {
@@ -14,7 +14,7 @@ impl crate::engines::support::event_sink::Emit for Collected {
 }
 
 impl Collected {
-    fn kinds(&self) -> Vec<(String, Value)> {
+    pub(super) fn kinds(&self) -> Vec<(String, Value)> {
         let mut out = Vec::new();
         for raw in self.0.lock().unwrap().iter() {
             let flushed: Value = serde_json::from_str(raw).unwrap_or(Value::Null);
@@ -29,15 +29,15 @@ impl Collected {
 
 /// One live turn on Misty's real path (`run_server_turn_with_probe_port`), started on its own
 /// task; the caller waits on the handle.
-struct LiveTurn {
-    emitter: Arc<Collected>,
+pub(super) struct LiveTurn {
+    pub(super) emitter: Arc<Collected>,
     registry: Arc<crate::engines::ProcessRegistry>,
-    killed: Arc<AtomicBool>,
+    pub(super) killed: Arc<AtomicBool>,
     run_id: String,
-    handle: tokio::task::JoinHandle<()>,
+    pub(super) handle: tokio::task::JoinHandle<()>,
 }
 
-fn start_live_turn(
+pub(super) fn start_live_turn(
     server: &Arc<opencode_server::OpencodeServerState>,
     bin: &str,
     folder: &std::path::Path,
@@ -109,7 +109,7 @@ fn start_live_turn(
 }
 
 impl LiveTurn {
-    async fn finish(self) -> Vec<(String, Value)> {
+    pub(super) async fn finish(self) -> Vec<(String, Value)> {
         tokio::time::timeout(Duration::from_secs(180), self.handle)
             .await
             .expect("the turn never settled")
@@ -146,7 +146,7 @@ impl LiveTurn {
     }
 }
 
-fn of_kind<'a>(kinds: &'a [(String, Value)], kind: &str) -> Vec<&'a Value> {
+pub(super) fn of_kind<'a>(kinds: &'a [(String, Value)], kind: &str) -> Vec<&'a Value> {
     kinds
         .iter()
         .filter(|(k, _)| k == kind)
@@ -154,7 +154,7 @@ fn of_kind<'a>(kinds: &'a [(String, Value)], kind: &str) -> Vec<&'a Value> {
         .collect()
 }
 
-fn text_of(kinds: &[(String, Value)]) -> String {
+pub(super) fn text_of(kinds: &[(String, Value)]) -> String {
     of_kind(kinds, "delta")
         .into_iter()
         .filter_map(Value::as_str)
@@ -163,7 +163,7 @@ fn text_of(kinds: &[(String, Value)]) -> String {
 
 /// Every frame the server streams, printed as it comes, so a live run shows the raw wire
 /// beside what Misty made of it.
-fn tap_raw_events(origin: &str) {
+pub(super) fn tap_raw_events(origin: &str) {
     let origin = origin.to_owned();
     tokio::spawn(async move {
         let client = reqwest::Client::new();

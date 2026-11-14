@@ -430,3 +430,12 @@ fn a_compaction_summary_clears_the_context_count() {
         (Some(6249), Some(200_000))
     );
 }
+
+#[test]
+fn a_message_cost_rides_on_its_usage() {
+    let tokens = json!({ "input": 600, "output": 50, "cache": { "read": 400, "write": 0 } });
+    let priced = with_message_cost(v2::usage_of(&tokens, None), &json!({ "cost": 0.00534 }));
+    assert_eq!(priced["cost_usd"], 0.00534);
+    let free = with_message_cost(v2::usage_of(&tokens, None), &json!({ "cost": 0 }));
+    assert!(free.get("cost_usd").is_none());
+}

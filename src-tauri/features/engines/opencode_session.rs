@@ -315,6 +315,15 @@ fn parse_context_windows(config: &Value) -> HashMap<String, u64> {
     windows
 }
 
+/// 1.x prices a whole assistant message, every step of the turn, as its `cost`: it goes on the
+/// message's usage report as `cost_usd`, which the chat shows. A message with no price adds none.
+pub(super) fn with_message_cost(mut usage: Value, info: &Value) -> Value {
+    if let Some(cost) = info.get("cost").and_then(Value::as_f64).filter(|cost| *cost > 0.0) {
+        usage["cost_usd"] = serde_json::json!(cost);
+    }
+    usage
+}
+
 /// Whether an assistant message is the summary a compaction wrote: 1.x marks it `summary: true`
 /// and runs it on its `compaction` agent (`mode` in older releases).
 pub(crate) fn is_compaction_summary(info: &Value) -> bool {
@@ -798,6 +807,7 @@ async fn handle_server_event(
                     usage
                 };
                 let usage = attach_context_window(usage, &info, &view.context_windows);
+                let usage = with_message_cost(usage, &info);
                 view.last_usage = Some(usage.clone());
                 core.dispatch_event(state, EngineEvent::Usage(usage));
             }
