@@ -1,0 +1,29 @@
+misty-browser-harness
+Copyright (C) 2026 Matthew Chen
+
+misty-browser-harness began as part of Misty (https://github.com/misty-org/misty) and is licensed
+like it, under the GNU Affero General Public License, version 3 or (at your option) any later
+version (see LICENSE), with this additional term under section 7(b):
+
+  Author attribution. Every copy of misty-browser-harness or of a work based on it that you
+  convey, and every copy you let users interact with remotely over a computer network, must
+  preserve the attribution "Misty, created by Matthew Chen (https://github.com/misty-org/misty)"
+  in this file, and display it wherever the program displays its Appropriate Legal Notices, if it
+  does. You may add your own attribution next to it but not remove or obscure this one.
+
+This term is a requirement to preserve reasonable author attributions, as section 7(b) allows.
+It adds no other restriction, and it does not limit any right the license grants.
+
+Third-party code
+
+wry and tao (https://github.com/tauri-apps/wry, https://github.com/tauri-apps/tao)
+  Dependencies of crates/host, under Apache-2.0 or MIT. The host's window and event loop follow
+  wry's `simple` example.
+
+BU Bench (https://github.com/browser-use/benchmark)
+  benchmarks/bu-bench/misty_eval.py runs against a separate checkout of BU Bench and imports its
+  code there (task loading, selection, the findings judge, scoring and summaries); none of that
+  code is copied here. Its evidence layout and the task prompt follow BU Bench's BrowserCode
+  runner. The BU Bench repository states no license of its own; its README asks that decrypted
+  tasks and rubrics are never published or used for training, and this repository keeps run data
+  out of version control.
