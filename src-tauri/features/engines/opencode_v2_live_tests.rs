@@ -202,13 +202,30 @@ pub(super) fn tap_raw_events(origin: &str) {
 /// a question form and a stop mid-turn. Spends a handful of tiny prompts:
 /// `OPENCODE_BIN=/path/to/opencode cargo test --lib live_v2_turns -- --ignored --nocapture`
 /// (`OPENCODE_FREE_MODEL` picks another free model; the default is the server's own default).
+/// `OPENCODE_PAID_MODEL` runs it on a priced model from a provider the person signed in to, and
+/// then also checks that the turn's cost reaches Misty.
 #[tokio::test]
 #[ignore]
 async fn live_v2_turns() {
     let _ = rustls::crypto::ring::default_provider().install_default();
     let bin = std::env::var("OPENCODE_BIN").expect("OPENCODE_BIN");
-    let model =
-        std::env::var("OPENCODE_FREE_MODEL").unwrap_or_else(|_| "opencode/big-pickle".into());
+    let paid = std::env::var("OPENCODE_PAID_MODEL").ok();
+    if paid.is_some() {
+        // The test binary's HOME is a scratch folder; a provider the person signed in to keeps its
+        // sign-in under their real one, which their account record names.
+        // SAFETY: getpwuid returns the calling user's static record, read before anything else.
+        let home = unsafe {
+            let record = libc::getpwuid(libc::getuid());
+            assert!(!record.is_null(), "the user's account record");
+            std::ffi::CStr::from_ptr((*record).pw_dir)
+                .to_string_lossy()
+                .into_owned()
+        };
+        std::env::set_var("HOME", home);
+    }
+    let model = paid.clone().unwrap_or_else(|| {
+        std::env::var("OPENCODE_FREE_MODEL").unwrap_or_else(|_| "opencode/big-pickle".into())
+    });
     let folder =
         std::env::temp_dir().join(format!("misty-opencode-v2-live-{}", std::process::id()));
     std::fs::create_dir_all(&folder).unwrap();
@@ -233,13 +250,26 @@ async fn live_v2_turns() {
                 .find(|m| m["providerID"] == provider && m["id"] == id)
                 .cloned()
         })
-        .expect("the model isn't served");
-    assert!(
-        listed["cost"]
-            .as_array()
-            .is_some_and(|costs| costs.iter().all(|c| c["input"] == 0 && c["output"] == 0)),
-        "not a free model: {listed}"
-    );
+        .unwrap_or_else(|| {
+            let served: Vec<String> = data(&models)
+                .as_array()
+                .into_iter()
+                .flatten()
+                .map(|m| {
+                    format!(
+                        "{}/{}",
+                        m["providerID"].as_str().unwrap_or("?"),
+                        m["id"].as_str().unwrap_or("?")
+                    )
+                })
+                .collect();
+            panic!("{model} isn't served; the server lists {served:?}")
+        });
+    let free = listed["cost"]
+        .as_array()
+        .is_some_and(|costs| costs.iter().all(|c| c["input"] == 0 && c["output"] == 0));
+    // Only a model the person asked for by name may cost anything.
+    assert!(free || paid.is_some(), "not a free model: {listed}");
     tap_raw_events(&origin);
     // Misty's gate answers permission asks; here it allows each and remembers what it saw.
     let asked: Arc<std::sync::Mutex<Vec<(String, Value)>>> = Arc::default();
@@ -272,6 +302,12 @@ async fn live_v2_turns() {
     let last = usage.last().expect("no usage");
     assert!(last["model_context_window"].as_u64().is_some(), "{last}");
     assert!(last["input_tokens"].as_u64().unwrap_or(0) > 0, "{last}");
+    if paid.is_some() {
+        assert!(
+            last["cost_usd"].as_f64().unwrap_or(0.0) > 0.0,
+            "no cost: {last}"
+        );
+    }
     let done = of_kind(&kinds, "done");
     assert_eq!(done.len(), 1, "{kinds:?}");
     assert!(of_kind(&kinds, "error").is_empty(), "{kinds:?}");
