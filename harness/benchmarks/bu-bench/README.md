@@ -81,7 +81,9 @@ Results go to `benchmark/run_data/BU_Bench_V2_misty_<time>/`, in the layout `run
   line up, screenshots go to the judge in order without step numbers, which the judge supports.
 - **The prompt** is the benchmark's BrowserCode prompt with Misty's browser in place of
   BrowserCode's, plus: don't ask questions, and don't use the engine's own web fetch or search.
-  That last part is only an instruction; check `events.jsonl` if a score looks too good.
+  That last part is only an instruction, so the runner checks: a task whose run called a web
+  fetch or search tool, or a shell command that reaches a URL, gets `contaminated` in its
+  `result.json` with the steps, and the run lists those tasks. Report them apart from the score.
 - **Cost** is what the engine reports (Claude Code reports it; others may report nothing).
 - **Fresh browser per task:** BrowserCode starts a clean browser per task. Misty's runs share the
   profile's cookies, so sign-ins and site state carry between tasks.

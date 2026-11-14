@@ -75,6 +75,26 @@ return activityApi.picture(request.runId, request.picture);
 """
 
 
+# The engine's own ways onto the web, which bypass Misty's browser: its fetch and search tools, and
+# shell commands that open URLs. A run that used one is reported as contaminated, apart from the
+# score, since the prompt only asks the engine not to (README, "How it differs").
+WEB_TOOLS = re.compile(r"(^|[_.])(web_?fetch|web_?search|fetch_url|http_get|browse_url)$", re.I)
+SHELL_TOOLS = re.compile(r"(^|[_.])(bash|shell|exec|run_command|terminal)$", re.I)
+SHELL_WEB = re.compile(r"\b(curl|wget|httpie|lynx|w3m)\b|https?://|urllib|requests\.(get|post)|fetch\(", re.I)
+
+
+def bypass_of(name: str, arguments) -> str | None:
+    """Why a tool call reached the web without Misty's browser, or None."""
+    bare = (name or "").rsplit("__", 1)[-1]
+    if is_browser_tool(name):
+        return None
+    if WEB_TOOLS.search(bare):
+        return bare
+    if SHELL_TOOLS.search(bare) and SHELL_WEB.search(json.dumps(arguments, default=str)):
+        return f"{bare} reaching the web"
+    return None
+
+
 def is_browser_tool(name: str) -> bool:
     """The same test `run_control/step_pictures.rs` uses to picture a step."""
     bare = (name or "").rsplit("__", 1)[-1]
@@ -135,6 +155,8 @@ class Trajectory:
         self.browser_steps: list[int] = []
         self.cost = 0.0
         self.notes: list[str] = []
+        # Tool calls that reached the web without Misty's browser.
+        self.bypasses: list[str] = []
 
     def flush(self) -> None:
         if self.thinking.strip():
@@ -180,6 +202,9 @@ class Trajectory:
             )
             if is_browser_tool(name) and not event.get("parentToolCallId"):
                 self.browser_steps.append(len(self.steps))
+            bypass = bypass_of(name, arguments)
+            if bypass:
+                self.bypasses.append(f"step {len(self.steps)}: {bypass}")
         elif kind == "usage.updated":
             # Claude Code reports the turn's total so far; the highest figure is the run's cost.
             self.cost = max(self.cost, float(event.get("costUsd") or 0))
@@ -338,6 +363,8 @@ async def execute(bridge: Bridge, task: dict, task_dir: Path, *, agent: dict, ar
         "duration": time.monotonic() - start,
         "cost": trajectory.cost,
     }
+    if trajectory.bypasses:
+        metrics["contaminated"] = trajectory.bypasses
     if errors:
         trace["agent_steps"].append("Executor notes: " + "\n".join(errors))
     if trace["evidence_errors"]:
@@ -485,6 +512,10 @@ async def main(args) -> None:
                 )
             )
             summary = summarize_results(results)
+            # Tasks where the engine reached the web without Misty's browser; report them apart.
+            summary["contaminated_tasks"] = [r["task_id"] for r in results if r.get("contaminated")]
+            if summary["contaminated_tasks"]:
+                print(f"Contaminated (used the engine's own web access): {', '.join(summary['contaminated_tasks'])}")
             write_json(run_dir / "results.json", {"config": config, **summary, "task_results": results})
             if summary["mean_score"] is not None:
                 print(f"Mean weighted score: {summary['mean_score']:.2%} (raw: {summary['mean_raw_score']:.2%})")
