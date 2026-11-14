@@ -36,6 +36,15 @@ export function SessionGoalButton({ conversationId }: { conversationId: string }
           tooltipSide="left"
           aria-pressed={Boolean(goal)}
           disabled={!conversationId}
+          // While open, pressing this button must not move focus. WebKit doesn't focus a clicked
+          // button, so focus falls to the workspace pane around the rail (tabIndex 0); the popover
+          // reads that as focus leaving it and closes, and since the rail's reorder handler stops
+          // the pointerdown Radix would otherwise use to recognise its own trigger, the click then
+          // toggles it open again, or not, depending on whether React re-rendered in between.
+          // Keeping focus in the popover leaves the click as the only thing that closes it.
+          onMouseDown={(event) => {
+            if (open) event.preventDefault();
+          }}
         >
           <Target />
         </IconButton>

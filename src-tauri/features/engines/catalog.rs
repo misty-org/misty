@@ -28,6 +28,9 @@ pub struct CatalogItem {
     /// The command's `argument-hint`, shown after its name.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub argument_hint: Option<String>,
+    /// Who runs it: the engine, as the chat's next message, or Misty, out of turn
+    /// (`slash/mod.rs`).
+    pub runs: super::slash::Runs,
 }
 
 #[derive(Debug, Default, Serialize)]
@@ -210,6 +213,28 @@ fn derive_command_name(path: &Path, root: &Path) -> Option<String> {
     Some(parts.join(":"))
 }
 
+/// A TOML command's `description`, on one line, else nothing. The file is read as TOML (a
+/// multi-line or escaped string included); a head cut short of the whole file falls back to its
+/// `description = "…"` line.
+fn toml_description(text: &str) -> String {
+    if let Ok(table) = text.parse::<toml::Table>() {
+        return table
+            .get("description")
+            .and_then(toml::Value::as_str)
+            .map(|description| clip(&description.split_whitespace().collect::<Vec<_>>().join(" ")))
+            .unwrap_or_default();
+    }
+    text.lines()
+        .find_map(|line| {
+            let rest = line.trim().strip_prefix("description")?.trim_start();
+            let value = rest.strip_prefix('=')?.trim();
+            let quote = value.chars().next().filter(|c| *c == '"' || *c == '\'')?;
+            let inner = value[1..].split(quote).next()?;
+            Some(clip(inner))
+        })
+        .unwrap_or_default()
+}
+
 /// One command or skill as found on disk, before the engine's syntax is applied.
 #[derive(Clone, Debug)]
 struct Found {
@@ -234,14 +259,28 @@ fn discover_commands_in(dir: &Path, root: &Path, source: &'static str) -> Vec<Fo
             out.extend(discover_commands_in(&path, root, source));
             continue;
         }
-        let is_md = path
+        let extension = path
             .extension()
             .and_then(|s| s.to_str())
-            .is_some_and(|ext| ext.eq_ignore_ascii_case("md"));
-        if !is_md {
-            continue;
-        }
-        let content = read_head(&path);
+            .map(str::to_ascii_lowercase);
+        let content = match extension.as_deref() {
+            Some("md") => read_head(&path),
+            // Gemini CLI, Qwen Code and Qoder write commands as TOML: `description` and `prompt`.
+            Some("toml") => {
+                let text = read_head(&path);
+                let found = derive_command_name(&path, root).filter(|name| !name.is_empty());
+                if let Some(name) = found {
+                    out.push(Found {
+                        name,
+                        description: toml_description(&text),
+                        argument_hint: None,
+                        source,
+                    });
+                }
+                continue;
+            }
+            _ => continue,
+        };
         let (name, _, argument_hint) = parse_command_frontmatter(&content);
         let Some(resolved) = name.or_else(|| derive_command_name(&path, root)) else {
             continue;
@@ -436,6 +475,7 @@ fn items(found: Vec<Found>, prefix: &str) -> Vec<CatalogItem> {
             description: found.description,
             source: found.source,
             argument_hint: found.argument_hint,
+            runs: super::slash::Runs::Turn,
         })
         .collect()
 }
@@ -449,6 +489,7 @@ fn builtin(names: &[(&str, &str)], prefix: &str) -> Vec<CatalogItem> {
             source: "builtin",
             insert: format!("{prefix}{name} "),
             argument_hint: None,
+            runs: super::slash::Runs::Turn,
         })
         .collect()
 }
@@ -491,7 +532,7 @@ pub fn catalog_for(engine: &str, home: &Path, project: Option<&Path>) -> Catalog
                     ("context", "Show what is using the context window"),
                     ("cost", "Show this session's token use"),
                     ("init", "Write a CLAUDE.md that describes this project"),
-                    ("review", "Review the current changes"),
+                    ("code-review", "Review the current changes"),
                     (
                         "security-review",
                         "Check the current changes for security problems",
@@ -512,18 +553,8 @@ pub fn catalog_for(engine: &str, home: &Path, project: Option<&Path>) -> Catalog
         }
         "codex" => {
             let codex_home = env_home("CODEX_HOME", &[".codex"]);
-            // Codex runs no slash commands outside its terminal app. These two Misty runs
-            // through the app-server's own compaction and review calls.
-            catalog.commands = builtin(
-                &[
-                    (
-                        "compact",
-                        "Summarize the conversation so far to free context",
-                    ),
-                    ("review", "Review the current changes"),
-                ],
-                "/",
-            );
+            // Codex's own commands (`/compact`, `/review`, `/init` and the rest of its terminal
+            // app's) are listed from `slash/codex/`.
             let mut prompts = Folders::new();
             prompts.add(codex_home.join("prompts"), "user");
             catalog
@@ -582,12 +613,69 @@ pub fn catalog_for(engine: &str, home: &Path, project: Option<&Path>) -> Catalog
                 ],
                 "/",
             );
+            // Its custom `.toml` commands as Gemini CLI's loader has them (and as Misty expands
+            // them before a prompt goes): its names, its default description, and a project's
+            // only in a trusted folder that isn't the home folder.
+            let user_dir = env_home("GEMINI_CLI_HOME", &[]).join(".gemini");
+            let custom = super::gemini::custom_commands_from(Some(&user_dir), project)
+                .into_iter()
+                .map(|command| Found {
+                    name: command.name,
+                    description: clip(&command.description),
+                    argument_hint: None,
+                    source: if command.scope == "Project" {
+                        "project"
+                    } else {
+                        "user"
+                    },
+                })
+                .collect();
+            catalog.commands.extend(items(custom, "/"));
+        }
+        "pi" => {
+            // pi's own loader: prompts and skills under its agent folder and a project's `.pi`.
+            let agent = env_home("PI_CODING_AGENT_DIR", &[".pi", "agent"]);
             let mut commands = Folders::new();
+            let mut skills = Folders::new();
             if let Some(project) = project {
-                commands.add(join(project, &[".gemini", "commands"]), "project");
+                commands.add(join(project, &[".pi", "prompts"]), "project");
+                skills.add(join(project, &[".pi", "skills"]), "project");
+                commands.add_under(project, SHARED_WORKSPACE_COMMAND_SUBPATHS, "project");
+                skills.add_under(project, SHARED_WORKSPACE_SKILL_SUBPATHS, "project");
             }
-            commands.add(join(home, &[".gemini", "commands"]), "user");
+            commands.add(agent.join("prompts"), "user");
+            skills.add(agent.join("skills"), "user");
+            skills.add(join(home, &[".agents", "skills"]), "user");
             catalog.commands.extend(items(commands_from(commands), "/"));
+            catalog.skills.extend(items(skills_from(skills), "/"));
+        }
+        "qwen" | "qoder" | "qoder-cn" | "codebuddy" => {
+            // Each reads its own folders (`.qwen`, `.qoder`, `.qoder-cn`, `.codebuddy`) the way
+            // Claude Code reads `.claude`, plus the shared skills folder.
+            let own = match engine {
+                "qwen" => ".qwen",
+                "qoder" => ".qoder",
+                "qoder-cn" => ".qoder-cn",
+                _ => ".codebuddy",
+            };
+            // Qwen Code keeps its user folder at `QWEN_HOME` when that is set.
+            let user_dir = if engine == "qwen" {
+                env_home("QWEN_HOME", &[own])
+            } else {
+                home.join(own)
+            };
+            let mut commands = Folders::new();
+            let mut skills = Folders::new();
+            if let Some(project) = project {
+                commands.add(join(project, &[own, "commands"]), "project");
+                skills.add(join(project, &[own, "skills"]), "project");
+                skills.add(join(project, &[".agents", "skills"]), "project");
+            }
+            commands.add(user_dir.join("commands"), "user");
+            skills.add(user_dir.join("skills"), "user");
+            skills.add(join(home, &[".agents", "skills"]), "user");
+            catalog.commands.extend(items(commands_from(commands), "/"));
+            catalog.skills.extend(items(skills_from(skills), "/"));
         }
         // The other engines read the shared layouts: `.agents` (the Open Agent standard), `.agent`
         // (pi, omp) and a project's own `commands` and `skills`.
@@ -604,9 +692,39 @@ pub fn catalog_for(engine: &str, home: &Path, project: Option<&Path>) -> Catalog
         }
     }
     with_report(&mut catalog, engine);
+    with_ports(&mut catalog, engine);
     catalog.commands = unique(catalog.commands);
     catalog.skills = unique(catalog.skills);
     catalog
+}
+
+/// Adds the engine's commands Misty runs for it (`slash/mod.rs`), which its headless report
+/// leaves out, so the menu offers all its terminal app does. One Misty runs out of turn replaces
+/// the engine's own row of that name, which can't run headless; one run in the turn only fills a
+/// gap.
+fn with_ports(catalog: &mut Catalog, engine: &str) {
+    for command in super::slash::commands(engine) {
+        let out_of_turn = command.runs == super::slash::Runs::Misty;
+        if out_of_turn {
+            catalog
+                .commands
+                .retain(|item| item.source != "builtin" || item.name != command.name);
+        } else if catalog
+            .commands
+            .iter()
+            .any(|item| item.name.eq_ignore_ascii_case(command.name))
+        {
+            continue;
+        }
+        catalog.commands.push(CatalogItem {
+            name: command.name.into(),
+            description: command.description.into(),
+            source: "builtin",
+            insert: format!("/{} ", command.name),
+            argument_hint: command.argument_hint.map(Into::into),
+            runs: command.runs,
+        });
+    }
 }
 
 /// What Claude Code's own commands do, for the names its report gives without a description.
@@ -619,17 +737,13 @@ const KNOWN_DESCRIPTIONS: &[(&str, &str)] = &[
     ("cost", "Show this session's token use"),
     ("usage", "Show this session's token use"),
     ("init", "Write a file that describes this project"),
-    ("review", "Review the current changes"),
     (
         "security-review",
         "Check the current changes for security problems",
     ),
-    (
-        "pr-comments",
-        "Show the comments on this branch's pull request",
-    ),
     ("release-notes", "Show what changed in this version"),
-    ("todos", "Show the current todo list"),
+    ("rename", "Rename the current conversation"),
+    ("recap", "Generate a one-line session recap now"),
 ];
 
 /// Puts what the engine reported about itself (`reported.rs`) in place of the built-in guess:
@@ -651,6 +765,7 @@ fn with_report(catalog: &mut Catalog, engine: &str) {
         name: named.name,
         source: "builtin",
         argument_hint: named.argument_hint,
+        runs: super::slash::Runs::Turn,
     };
     if let Some(commands) = report.commands {
         catalog.commands.retain(|item| item.source != "builtin");

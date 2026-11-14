@@ -1,5 +1,5 @@
 import * as React from "react";
-import { OutOfRow } from "../controls/rowContext";
+import { OutOfRow } from "../controls/RowContext";
 import { cn } from "../classNames";
 import { Button } from "../controls/Button";
 import { Text } from "../display/Text";

@@ -217,7 +217,7 @@ describe("spaceRequest account isolation", () => {
 
     await expect(
       spacesApi.uploadLibraryPath("space-a", "/tmp/too-large.mov", "library"),
-    ).rejects.toThrow("up to 128 MB");
+    ).rejects.toThrow("limited to 100 MB");
     expect(readBody).not.toHaveBeenCalled();
   });
 

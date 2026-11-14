@@ -7,3 +7,6 @@ pub const DEFAULT_BRANCH: &str = "main";
 pub const OLD_DEFAULT_BRANCH: &str = "master";
 /// The folder Kimi keeps its primary agent's transcript in: `agents/main/wire.jsonl`.
 pub const KIMI_PRIMARY_AGENT: &str = "main";
+/// The section Claude Code's account catalog puts its main models in, and the name an engine's
+/// model carries for its menu's main section (the rest are "more", for its "More models").
+pub const MAIN_MODEL_SECTION: &str = "main";

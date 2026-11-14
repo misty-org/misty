@@ -1775,7 +1775,8 @@ fn opencode_ts(value: &Value, keys: &[&str]) -> Option<String> {
         .map(|ms| ms.to_string())
 }
 
-/// `step-finish` tokens → the claude-shaped usage object the context bar reads.
+/// `step-finish` tokens → the claude-shaped usage object the context bar reads. OpenCode's input
+/// leaves out the cache, so the total adds it back, or a cached turn reads as a few hundred tokens.
 fn opencode_usage(part: &Value) -> Option<Value> {
     let tokens = part.get("tokens")?;
     let input = tokens.get("input").and_then(Value::as_i64).unwrap_or(0);
@@ -1796,7 +1797,7 @@ fn opencode_usage(part: &Value) -> Option<Value> {
         "output_tokens": output,
         "cache_read_input_tokens": cache_read,
         "cache_creation_input_tokens": cache_write,
-        "total_tokens": input + output + reasoning,
+        "total_tokens": input + output + reasoning + cache_read + cache_write,
     }))
 }
 
@@ -1874,6 +1875,9 @@ fn opencode_db_messages(
     else {
         return Vec::new();
     };
+    if let Some(messages) = super::opencode_v2::messages(&conn, session_id, part_byte_cap) {
+        return messages;
+    }
     let Ok(mut stmt) = conn.prepare(
         "SELECT id, data FROM message WHERE session_id=?1 ORDER BY time_created, id LIMIT ?2",
     ) else {
@@ -2026,6 +2030,19 @@ fn opencode_message_rows(message: &Value, parts: &[Value], images: ImageMode) ->
             ..LineRow::new(role, text, created)
         });
     }
+    // A compaction summary's tokens are the summarizing call's, so what it read is the context
+    // from before. The live path reports it as `used: 0`, the size unknown until the next reply;
+    // the total that would read as the context's size goes.
+    let pending_usage = match pending_usage {
+        Some(mut usage) if crate::engines::opencode_session::is_compaction_summary(message) => {
+            if let Some(fields) = usage.as_object_mut() {
+                fields.remove("total_tokens");
+                fields.insert("used".to_string(), Value::from(0));
+            }
+            Some(usage)
+        }
+        other => other,
+    };
     if let Some(usage) = pending_usage {
         // Attach to this message's own last content row (the flushed text
         // when present); fall back to the shared __usage__ fold.
@@ -3309,7 +3326,59 @@ mod tests {
             usage.get("cache_read_input_tokens").and_then(Value::as_i64),
             Some(1)
         );
+        assert_eq!(usage.get("total_tokens").and_then(Value::as_i64), Some(18));
         std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn an_opencode_compaction_summary_leaves_the_context_size_unknown() {
+        // A 1.x compaction summary (`summary: true` on its `compaction` agent): its step read the
+        // whole old context, so its tokens aren't the compacted size.
+        let parts = [
+            serde_json::json!({"type": "text", "text": "## Goal\nShip it."}),
+            serde_json::json!({"type": "step-finish", "tokens": {
+                "input": 580, "output": 165, "reasoning": 0, "cache": {"read": 5504, "write": 0}}}),
+        ];
+        let summary = serde_json::json!({"id": "msg_3", "role": "assistant", "summary": true,
+            "mode": "compaction", "agent": "compaction", "time": {"created": 1_700_000_003_000i64}});
+        let rows = opencode_message_rows(&summary, &parts, ImageMode::Collect);
+        let usage = rows
+            .last()
+            .and_then(|row| row.usage.as_ref())
+            .expect("usage");
+        assert_eq!(usage["used"], 0);
+        assert_eq!(usage["cache_read_input_tokens"], 5504);
+        assert!(usage.get("total_tokens").is_none());
+        assert_eq!(
+            crate::engines::bridge::context_usage(usage),
+            (Some(0), None)
+        );
+        // An ordinary reply keeps its total as the context size.
+        let reply = serde_json::json!({"id": "msg_4", "role": "assistant", "agent": "build"});
+        let rows = opencode_message_rows(&reply, &parts, ImageMode::Collect);
+        assert_eq!(
+            rows.last().unwrap().usage.as_ref().unwrap()["total_tokens"],
+            6249
+        );
+    }
+
+    #[test]
+    fn opencode_usage_total_counts_the_cache() {
+        // A cached turn: OpenCode's input leaves the cache out, so most of the prompt is there.
+        let part = serde_json::json!({"type": "step-finish", "tokens": {
+            "input": 82, "output": 75, "reasoning": 3, "cache": {"read": 5376, "write": 10}}});
+        assert_eq!(
+            opencode_usage(&part),
+            Some(serde_json::json!({
+                "input_tokens": 82, "output_tokens": 75,
+                "cache_read_input_tokens": 5376, "cache_creation_input_tokens": 10,
+                "total_tokens": 5546,
+            }))
+        );
+        // Older parts without a cache still total what they have.
+        let part = serde_json::json!({"tokens": {"input": 10, "output": 5}});
+        assert_eq!(opencode_usage(&part).unwrap()["total_tokens"], 15);
+        assert_eq!(opencode_usage(&serde_json::json!({"type": "step-finish"})), None);
     }
 
     #[test]

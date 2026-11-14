@@ -90,8 +90,12 @@ fn adopt_legacy(root: &Path, home: &Path, report: &mut ProfileReport) -> io::Res
             continue;
         }
         fs::rename(&from, &to)?;
-        relink(&to, &from, &to)?;
         report.adopted.push(entry);
+    }
+    // Once everything has moved, a link that led into any moved entry leads to its new place,
+    // including links between entries (`data/runs` into `turn-snapshots`).
+    for entry in &report.adopted {
+        relink(home, &root.join(entry), &home.join(entry))?;
     }
     Ok(())
 }

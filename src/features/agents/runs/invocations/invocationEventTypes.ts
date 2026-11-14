@@ -255,7 +255,11 @@ export type EngineTurnEvent =
   | { type: "engine.compaction"; active: boolean; reason?: string | null }
   | { type: "engine.retry"; attempt: number; max: number; message: string }
   | { type: "engine.model"; model?: string | null; effort?: string | null; requested?: boolean }
-  | { type: "engine.background"; pending: number };
+  | { type: "engine.background"; pending: number }
+  /** The engine changed its own session in the turn (a slash command, say): the chat follows. */
+  | { type: "engine.title"; title: string }
+  | { type: "engine.mode"; mode: string; engine: string }
+  | { type: "engine.choice"; model?: string | null; effort?: string | null };
 
 export interface AiTranscriptMessage {
   id: string;

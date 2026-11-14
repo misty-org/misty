@@ -91,25 +91,31 @@ fn add_rows(conn: &rusqlite::Connection, sql: &str, to_ms: impl Fn(f64) -> i64, 
     }
 }
 
-/// OpenCode 1.18 and later: one `session` row per chat, with its `directory`. Subagents' and
-/// archived chats are left out where the schema has those columns.
+/// OpenCode 1.18 and later: one `session` row per chat, with its `directory`; 2.x keeps its
+/// chats in `session_v2`, same columns, in the same database. Subagents' and archived chats are
+/// left out where the schema has those columns.
 pub(super) fn find_opencode_db(db: &Path, found: &mut Found) {
     let Some(conn) = open_read_only(db) else {
         return;
     };
-    let mut filter = String::new();
-    if has_column(&conn, "session", "parent_id") {
-        filter.push_str(" AND parent_id IS NULL");
+    for table in ["session", "session_v2"] {
+        if !has_column(&conn, table, "directory") {
+            continue;
+        }
+        let mut filter = String::new();
+        if has_column(&conn, table, "parent_id") {
+            filter.push_str(" AND parent_id IS NULL");
+        }
+        if has_column(&conn, table, "time_archived") {
+            filter.push_str(" AND time_archived IS NULL");
+        }
+        let sql = format!(
+            "SELECT directory, MAX(time_updated) FROM {table}
+             WHERE directory IS NOT NULL AND directory <> ''{filter}
+             GROUP BY directory ORDER BY 2 DESC LIMIT ?1"
+        );
+        add_rows(&conn, &sql, |at| at as i64, found);
     }
-    if has_column(&conn, "session", "time_archived") {
-        filter.push_str(" AND time_archived IS NULL");
-    }
-    let sql = format!(
-        "SELECT directory, MAX(time_updated) FROM session
-         WHERE directory IS NOT NULL AND directory <> ''{filter}
-         GROUP BY directory ORDER BY 2 DESC LIMIT ?1"
-    );
-    add_rows(&conn, &sql, |at| at as i64, found);
 }
 
 /// OpenCode 1.1 and earlier: `storage/session/<project>/<session>.json`, each with its

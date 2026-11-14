@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("@/native/invoke", () => ({ invoke: vi.fn() }));
+vi.mock("@/shared/platform/nativeInvoke", () => ({ invoke: vi.fn() }));
 
 import { providerOf, tutorModel } from "./tutorSetup";
 import { tutorStatus } from "./TutorSettings";

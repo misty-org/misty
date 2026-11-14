@@ -43,6 +43,7 @@ import { gitApi, type GitStatus } from "./git/gitApi";
 import { chatUsage, formatCost, type ChatUsage } from "./chatUsage";
 import { formatTokens } from "../conversations/view/meta/format";
 import { Row, Section } from "./SessionRows";
+import { ContextSources, McpServers, StartCommandRows, TurnStats } from "./SessionSections";
 import { useEngineTurnStore, type EngineTurn } from "../conversations/view/engine/engineTurnStore";
 import { effortLabel } from "../conversations/composer/controls/engineOptions";
 import type { EngineTodo } from "../runs/invocations/invocationEventTypes";
@@ -213,7 +214,12 @@ function LineCounts({ git }: { git: GitStatus }) {
  * turn's task list; then where the chat works (its Space, its folder with the branch and
  * changes), and its goal when it has one. Only as tall as what it holds.
  */
-export function SessionPanel(props: { conversationId: string; agent: AgentProfile }) {
+export function SessionPanel(props: {
+  conversationId: string;
+  agent: AgentProfile;
+  /** The card's own control, at the end of its first header row. */
+  corner?: ReactNode;
+}) {
   const engineId = props.agent.engine || mistyEngine;
   const outside = engineId !== mistyEngine;
   const engine = useEngine(engineId);
@@ -249,6 +255,7 @@ export function SessionPanel(props: { conversationId: string; agent: AgentProfil
       <Section
         title="Session"
         icon={MessageSquare}
+        end={props.corner}
         subject={
           <span className="flex min-w-0 items-center gap-1.5">
             {props.agent.engine ? <EngineMark engine={props.agent.engine} size={13} /> : null}
@@ -375,13 +382,22 @@ export function SessionPanel(props: { conversationId: string; agent: AgentProfil
             ) : null}
           </>
         ) : null}
+        {folder ? (
+          <StartCommandRows conversationId={props.conversationId} folder={folder} />
+        ) : null}
       </Section>
+
+      <ContextSources engine={engineId} folder={folder} branch={git?.branch} />
+
+      <McpServers engine={engineId} folder={folder} />
 
       {goal ? (
         <Section title="Goal" icon={Target} subject={`${goal.turns}/${MOST_TURNS}`}>
           <Row label={goal.text} />
         </Section>
       ) : null}
+
+      <TurnStats conversationId={props.conversationId} />
     </div>
   );
 }

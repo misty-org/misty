@@ -28,7 +28,7 @@ vi.mock("../engines/enginesApi", () => ({
   mistyEngine: "misty",
 }));
 vi.mock("./agentAccount", () => ({ agentAccountId: () => "acct" }));
-vi.mock("@/native/invoke", () => ({
+vi.mock("@/shared/platform/nativeInvoke", () => ({
   invoke: async () => ({ revision: 0, state: { engines: [] } }),
 }));
 

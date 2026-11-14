@@ -105,7 +105,7 @@ export function TabStrip(props: TabStripProps) {
   return (
     <div
       className={cn(
-        "flex h-(--ui-header) flex-none items-center gap-1 border-b pl-2",
+        "flex h-(--ui-header) flex-none items-center gap-1 border-b pl-3",
         props.windowEdge ? "pr-3" : "pr-4",
       )}
     >

@@ -207,12 +207,20 @@ export function FloatingPip({
         onClick={(event) => {
           if (event.detail === 0) onOpen();
         }}
-        className="block aspect-[16/10] w-full cursor-[inherit] overflow-hidden outline-none focus-visible:opacity-90 [&>*]:block [&>*]:size-full [&>img]:object-cover [&>img]:object-top"
+        className={cn(
+          "block aspect-[16/10] w-full cursor-[inherit] overflow-hidden outline-none focus-visible:opacity-90",
+          "[&>*]:block [&>*]:size-full [&>img]:object-cover [&>img]:object-top",
+        )}
       >
         {picture}
       </button>
       {caption ? (
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 flex min-w-0 items-center gap-2 bg-linear-to-t from-black/70 to-transparent px-3 pt-6 pb-2 text-caption text-white">
+        <div
+          className={cn(
+            "pointer-events-none absolute inset-x-0 bottom-0 flex min-w-0 items-center gap-2",
+            "bg-linear-to-t from-black/70 to-transparent px-3 pt-6 pb-2 text-caption text-white",
+          )}
+        >
           <OverflowFadeText className="min-w-0">{caption}</OverflowFadeText>
           {status ? <span className="shrink-0 text-micro text-white/70">{status}</span> : null}
         </div>
@@ -233,7 +241,11 @@ export function FloatingPip({
       {active ? (
         <span
           aria-hidden="true"
-          className="pointer-events-none absolute inset-0 rounded-xl animate-[misty-ring-pulse_1.6s_ease-in-out_infinite] motion-reduce:animate-none motion-reduce:shadow-[inset_0_0_0_1.5px_rgb(255_255_255/0.9)]"
+          className={cn(
+            "pointer-events-none absolute inset-0 rounded-xl",
+            "animate-[misty-ring-pulse_1.6s_ease-in-out_infinite] motion-reduce:animate-none",
+            "motion-reduce:shadow-[inset_0_0_0_1.5px_rgb(255_255_255/0.9)]",
+          )}
         />
       ) : null}
     </div>

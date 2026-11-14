@@ -1,5 +1,5 @@
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { OutOfRow } from "../controls/rowContext";
+import { OutOfRow } from "../controls/RowContext";
 import { X } from "lucide-react";
 import * as React from "react";
 

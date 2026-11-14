@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const native = vi.hoisted(() => ({ invoke: vi.fn() }));
-vi.mock("@/native/invoke", () => native);
+vi.mock("@/shared/platform/nativeInvoke", () => native);
 vi.mock("../../personal/agentAccount", () => ({ agentAccountId: () => "me" }));
 
 import { useFolderSettings } from "../folders/folderSettings";

@@ -64,9 +64,18 @@ pub(super) fn merge_configured_models(
 /// the rows, and each model's own thinking levels (`thinking`, empty for one that doesn't reason).
 pub(super) async fn run_models_json(
     bin: &str,
-) -> Result<(Vec<EngineModel>, std::collections::HashMap<String, super::ModelDetails>), String> {
+) -> Result<
+    (
+        Vec<EngineModel>,
+        std::collections::HashMap<String, super::ModelDetails>,
+    ),
+    String,
+> {
     let stdout = run_probe(bin, &["models", "--json"], "models --json").await?;
-    Ok((parse_models_json(&stdout)?, parse_models_json_details(&stdout)))
+    Ok((
+        parse_models_json(&stdout)?,
+        parse_models_json_details(&stdout),
+    ))
 }
 
 /// The thinking levels each model in `models --json` takes, keyed by the same id the rows use.
@@ -93,16 +102,22 @@ pub fn parse_models_json_details(
                 None => continue,
             },
         };
-        let levels = row.get("thinking").and_then(serde_json::Value::as_array).map(|levels| {
-            levels
-                .iter()
-                .filter_map(serde_json::Value::as_str)
-                .filter(|level| !level.trim().is_empty())
-                .map(super::EffortLevel::bare)
-                .collect::<Vec<_>>()
-        });
+        let levels = row
+            .get("thinking")
+            .and_then(serde_json::Value::as_array)
+            .map(|levels| {
+                levels
+                    .iter()
+                    .filter_map(serde_json::Value::as_str)
+                    .filter(|level| !level.trim().is_empty())
+                    .map(super::EffortLevel::bare)
+                    .collect::<Vec<_>>()
+            });
         // A model the engine marks as not reasoning takes no levels.
-        let efforts = match (levels, row.get("reasoning").and_then(serde_json::Value::as_bool)) {
+        let efforts = match (
+            levels,
+            row.get("reasoning").and_then(serde_json::Value::as_bool),
+        ) {
             (Some(levels), _) => Some(levels),
             (None, Some(false)) => Some(Vec::new()),
             (None, _) => None,

@@ -27,9 +27,9 @@ macOS and Windows.
   up your past chats with them
 - **Spaces:** shared places with a group chat, docs and drawings you edit together, tasks and
   files
-- **The Lab:** notebooks made from your sources, with summaries, mind maps, flashcards, quizzes
+- **Lab:** notebooks made from your sources, with summaries, mind maps, flashcards, quizzes
   and audio overviews
-- **The Studio:** a 3D room where you see your agents, and your teammates', at work
+- **Studio:** a 3D room where you see your agents, and your teammates', at work
 - **A browser for agents:** agents work on web pages, and you can watch or take over
 - **Apps and plugins:** let your agents use the apps you sign in to and learn new skills
 

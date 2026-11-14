@@ -48,6 +48,7 @@ const mocks = vi.hoisted(() => {
   };
   const useUserStore = Object.assign(vi.fn(), {
     getState: () => userStore,
+    subscribe: () => () => {},
   });
   const spacesLoad = vi.fn().mockResolvedValue(undefined);
   const useSpacesStore = Object.assign(vi.fn(), {

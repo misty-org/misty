@@ -9,7 +9,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl: vi.fn(() => Promise.resolve()) }));
 vi.mock("../../account/components/WelcomeNav", () => ({ WelcomeNav: () => null }));
-vi.mock("@/native/invoke", () => ({
+vi.mock("@/shared/platform/nativeInvoke", () => ({
   invoke: vi.fn(async (command: string, args?: { engine?: string }) => {
     const engine = args?.engine ?? "";
     switch (command) {

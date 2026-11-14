@@ -31,10 +31,11 @@ import { AgentQuestionCard } from "../../plans/AgentQuestionCard";
 import { WaitingForYouCard } from "../../interventions/WaitingForYouCard";
 import { useCollaborationComposer } from "../../plans/useCollaborationComposer";
 import { takeBrowserCommand } from "../composer/controls/composerChoices";
-import { mistyEngine } from "../../engines/enginesApi";
-import { agentAccountId } from "../../personal/agentAccount";
-import { invoke } from "@/native/invoke";
-import { openSettings } from "@/features/settings";
+import { currentSpaceKey, mistyEngine } from "../../engines/enginesApi";
+import { useEngineFolder } from "../composer/controls/FolderSegment";
+import { useAgentFolder } from "../../shared-folders/agentFolder";
+import { runComposerCommand } from "../composer/commands/engineCommands";
+import { CommandReportDialog } from "../composer/commands/CommandReportDialog";
 import { EngineQueueChips } from "./engine/EngineQueueChips";
 import { EngineHistoryDialog } from "./engine/EngineHistoryDialog";
 import { useEngineQueue } from "./engine/engineQueue";
@@ -119,6 +120,11 @@ export function AgentWorkspaceConversation({
     state.working &&
     (!state.invocationConversationId || state.invocationConversationId === conversation?.id);
   const permission = usePermissionMode(conversation?.id, agent?.default_run_mode);
+  // The folder the chat works in, as the composer reads it, for the commands that need it.
+  const outsideEngine = agent?.engine && agent.engine !== mistyEngine ? agent.engine : "";
+  const spaceFolder = useEngineFolder(currentSpaceKey(), Boolean(outsideEngine));
+  const ownFolder = useAgentFolder(agent);
+  const folder = !outsideEngine || ownFolder === undefined ? "" : (ownFolder ?? spaceFolder);
   const reportError = (error: string) =>
     useMistyStore.setState({
       error: error || null,
@@ -198,39 +204,42 @@ export function AgentWorkspaceConversation({
       }
       typed = rest;
     }
-    const onEngine = Boolean(agent?.engine && agent.engine !== mistyEngine);
-    // `/new` starts a new chat with this agent; `/mcp` opens the MCP servers in Settings.
-    if (!quote && typed.trim() === "/new" && onNewChat) {
-      setDraft("");
-      onNewChat();
-      return;
-    }
-    if (!quote && typed.trim() === "/mcp") {
-      setDraft("");
-      openSettings("engine-mcp");
-      return;
-    }
-    // `/resume` on an outside engine picks a session from its own history for this chat.
-    if (onEngine && !quote && typed.trim() === "/resume") {
-      setDraft("");
-      setHistoryOpen(true);
-      return;
-    }
-    // `/clear` on an outside engine starts its next turn in a new session; the chat stays.
-    if (onEngine && !quote && typed.trim() === "/clear" && conversation?.id) {
-      await invoke("engine_chat_clear", {
-        account: agentAccountId(),
-        conversation: conversation.id,
-      }).catch((error: unknown) =>
-        reportError(error instanceof Error ? error.message : String(error)),
-      );
-      setDraft("");
-      return;
-    }
-    if (!quote && !state.working && typed.trim().startsWith("/")) {
-      const rewritten = await collaboration.command(typed);
-      if (rewritten === undefined) return;
-      typed = rewritten;
+    const onEngine = Boolean(outsideEngine);
+    // A `/` command Misty runs: its own, or one of the engine's that only its terminal app runs
+    // (`engineCommands.ts`). What it leaves to send goes on as the message.
+    if (!quote && typed.trim().startsWith("/")) {
+      let ran;
+      try {
+        ran = await runComposerCommand(typed, {
+          accountId,
+          engine: outsideEngine || mistyEngine,
+          conversationId: conversation?.id,
+          folder,
+          messages: conversation?.messages ?? [],
+          working: state.working,
+          newChat: onNewChat,
+          openHistory: () => setHistoryOpen(true),
+          stop: async () => {
+            await useMistyStore.getState().cancelResponse?.();
+          },
+          plan: (text) => collaboration.command(text),
+        });
+      } catch (error) {
+        reportError(error instanceof Error ? error.message : String(error));
+        return;
+      }
+      if (ran === null) {
+        setDraft("");
+        return;
+      }
+      if (ran) {
+        typed = ran.send;
+        if (ran.conversationId && ran.conversationId !== conversation?.id) {
+          setDraft("");
+          void send(ran.send, "", ran.conversationId);
+          return;
+        }
+      }
     }
     const prompt = quote && typed.trim() ? replyPrompt(quote, typed) : typed;
     const targetId = targetConversationId ?? conversation?.id ?? "";
@@ -347,6 +356,7 @@ export function AgentWorkspaceConversation({
           />
         )}
         <RunStatusStrip conversationId={conversation?.id} messages={conversation?.messages} />
+        <CommandReportDialog />
         {agent?.engine && agent.engine !== mistyEngine ? (
           <EngineHistoryDialog
             open={historyOpen}

@@ -89,6 +89,12 @@ pub(super) fn result_failed(result: &Value) -> Option<String> {
 
 /// How full the context is, out of the engine layer's usage report: the tokens it holds and the
 /// model's window, either of which may be missing.
+///
+/// The size is the first of: Codex's and OpenCode's `total_tokens`, an explicit `used` (ACP's
+/// usage_update, pi's reply, a compaction's `0`), the camelCase `totalTokens` that ACP prompt
+/// results carry (Grok's `_meta`, MiniMax's and omp's `usage`, pi-ai), then the sum of the
+/// token buckets. Only an explicit `used` can say 0: a failed attempt reports zero tokens, and
+/// that must not read as a compaction's unknown size.
 pub(crate) fn context_usage(usage: &Value) -> (Option<u64>, Option<u64>) {
     let number = |name: &str| usage.get(name).and_then(Value::as_u64);
     let window = number("model_context_window")
@@ -96,21 +102,64 @@ pub(crate) fn context_usage(usage: &Value) -> (Option<u64>, Option<u64>) {
         .or_else(|| number("context_window"))
         .or_else(|| number("contextWindow"))
         .or_else(|| number("size"));
+    let counted = |tokens: &u64| *tokens > 0;
     let used = number("total_tokens")
+        .filter(counted)
         .or_else(|| number("used"))
+        .or_else(|| number("totalTokens").filter(counted))
         .or_else(|| {
+            // Each bucket under the first name it's sent by, so one spelt two ways counts once.
             let parts: Vec<u64> = [
-                "input_tokens",
-                "cache_read_input_tokens",
-                "cache_creation_input_tokens",
-                "output_tokens",
+                &["input_tokens", "inputTokens"][..],
+                &["cache_read_input_tokens", "cacheRead", "cachedReadTokens"][..],
+                &[
+                    "cache_creation_input_tokens",
+                    "cacheWrite",
+                    "cachedWriteTokens",
+                ][..],
+                &["output_tokens", "outputTokens"][..],
             ]
             .iter()
-            .filter_map(|name| number(name))
+            .filter_map(|names| names.iter().find_map(|name| number(name)))
             .collect();
-            (!parts.is_empty()).then(|| parts.iter().sum())
+            Some(parts.iter().sum()).filter(counted)
         });
     (used, window)
+}
+
+/// The usage report's token buckets, under each name an engine sends them by.
+pub(super) const USAGE_BUCKETS: [(&str, &[&str]); 4] = [
+    ("input", &["input_tokens", "inputTokens", "input"]),
+    ("output", &["output_tokens", "outputTokens", "output"]),
+    (
+        "cacheRead",
+        &[
+            "cache_read_input_tokens",
+            "cachedInputTokens",
+            "cacheRead",
+            "cachedReadTokens",
+        ],
+    ),
+    (
+        "cacheWrite",
+        &[
+            "cache_creation_input_tokens",
+            "cacheWrite",
+            "cachedWriteTokens",
+        ],
+    ),
+];
+
+/// Whether a report's size is only an ACP turn's `totalTokens`, which sums every model call in
+/// the turn rather than measuring the context.
+pub(super) fn only_turn_total(usage: &Value) -> bool {
+    let counted = |name: &str| {
+        usage
+            .get(name)
+            .and_then(Value::as_u64)
+            .is_some_and(|n| n > 0)
+    };
+    !counted("total_tokens") && usage.get("used").is_none() && counted("totalTokens")
 }
 
 /// The question cards an engine's ask carries, in one shape: `{question, header, options:

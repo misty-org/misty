@@ -11,6 +11,7 @@
 
 mod local;
 mod multirun;
+mod pull_request;
 mod remote;
 mod repo;
 #[cfg(test)]
@@ -22,6 +23,7 @@ use std::path::{Path, PathBuf};
 pub use local::*;
 pub use multirun::FileChange;
 pub(crate) use multirun::{changes_since, run};
+pub use pull_request::*;
 pub use remote::*;
 
 use super::{linked_path, person_window};

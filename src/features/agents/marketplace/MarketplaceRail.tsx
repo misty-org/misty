@@ -4,7 +4,7 @@ import { EngineMark } from "@/features/engine-config/EngineMark";
 import { openExternalLink } from "@/shared/platform/openExternalLink";
 import { Button, notify, Pressable, SectionHeading, Surface, Text } from "@/shared/ui";
 import { failureText, marketApi, unaddedSuggestions, type MarketEngine } from "./api";
-import { MakerLogo, pluginMaker } from "./pluginMaker";
+import { MakerLogo, pluginMaker } from "./PluginMaker";
 import { useEngineMarket } from "./useEngineMarket";
 
 const rowClass = "flex h-8 w-full min-w-0 items-center gap-2.5 rounded-lg px-2 text-left";

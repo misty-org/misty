@@ -821,6 +821,33 @@ impl TurnCore {
                     selection_payload(model, effort),
                 );
             }
+            EngineEvent::SessionTitle(title) => {
+                state.push(
+                    &self.sink,
+                    &self.run_id,
+                    &self.engine_id,
+                    "session_title",
+                    Value::String(title),
+                );
+            }
+            EngineEvent::SessionMode(mode) => {
+                state.push(
+                    &self.sink,
+                    &self.run_id,
+                    &self.engine_id,
+                    "session_mode",
+                    Value::String(mode),
+                );
+            }
+            EngineEvent::SessionChoice { model, effort } => {
+                state.push(
+                    &self.sink,
+                    &self.run_id,
+                    &self.engine_id,
+                    "session_choice",
+                    selection_payload(model, effort),
+                );
+            }
             EngineEvent::McpServers { servers, tools } => {
                 // Not a chat event: the MCP settings page reads this snapshot
                 // (workspace-scoped, timestamped) instead of the stream.

@@ -137,4 +137,4 @@ export {
   RunTimeStatus,
   TutorStatus,
   UnreadStatus,
-} from "./bottomBarStatus";
+} from "./BottomBarStatus";

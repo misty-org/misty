@@ -1,5 +1,5 @@
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 import type { TutorActions } from "../TutorPage";
 import { useTutorStore } from "../tutorStore";
 import type { Deck, Guide, Notebook, TutorJob } from "../tutorTypes";
@@ -72,9 +72,9 @@ const job = (change: Partial<TutorJob> & Pick<TutorJob, "id" | "kind" | "state">
 
 let actions: TutorActions;
 let props: {
-  onCollapse: ReturnType<typeof vi.fn>;
-  onView: ReturnType<typeof vi.fn>;
-  onError: ReturnType<typeof vi.fn>;
+  onCollapse: Mock<(collapsed: boolean) => void>;
+  onView: Mock<(viewing?: { id: string; review?: boolean }) => void>;
+  onError: Mock<(message: string) => void>;
 };
 
 function panel(options: { collapsed?: boolean; viewing?: { id: string; review?: boolean } } = {}) {

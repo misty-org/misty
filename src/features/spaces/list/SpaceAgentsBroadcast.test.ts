@@ -3,7 +3,11 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("@/features/agents", () => ({}));
 vi.mock("../components/space-row/useWindowSpace", () => ({}));
 vi.mock("../overview/useSpaceItemCreator", () => ({}));
-vi.mock("./createSpacesRealtimeActions", () => ({}));
+vi.mock("./createSpacesRealtimeActions", () => ({
+  createSpacesRealtimeActions: () => ({}),
+  resetSpacesRealtimeRuntime: () => {},
+  sendAgentStatuses: () => {},
+}));
 
 const { spaceAgentStatuses } = await import("./SpaceAgentsBroadcast");
 

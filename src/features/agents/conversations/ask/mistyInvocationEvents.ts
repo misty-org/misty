@@ -7,6 +7,9 @@ import type { AiCitation, AiInvocationEvent } from "../../runs/invocations";
 import { settleProgress, withAnswer, withToolEvent } from "../../progress/progressTimeline";
 import type { GlobalAiCitation } from "../state/conversationTypes";
 import { withDeniedFolder } from "../view/grants/folderGrants";
+import { useComposerChoices, type ComposerChoices } from "../composer/controls/composerChoices";
+import { chooseEngineMode, effectivePermissionMode } from "../../plans/permissionMode";
+import { engineModesFor } from "../../engines/engineModes";
 
 import {
   patchConversationMessage,
@@ -135,6 +138,14 @@ export function applyGlobalInvocationEvent(
     }));
     return;
   }
+  if (
+    event.type === "engine.title" ||
+    event.type === "engine.mode" ||
+    event.type === "engine.choice"
+  ) {
+    void followEngineSession(get, conversationId, event);
+    return;
+  }
   if (event.type === "conversation.notes") {
     updateConversation(set, get, conversationId, (conversation) => ({
       ...conversation,
@@ -253,6 +264,46 @@ export function applyGlobalInvocationEvent(
     // The transcript shows how the run ended; no popup over the composer.
     set({ working: false, error: null });
   }
+}
+
+type EngineSessionEvent = Extract<
+  AiInvocationEvent,
+  { type: "engine.title" | "engine.mode" | "engine.choice" }
+>;
+
+/**
+ * The engine changed its own session in the turn, through a slash command typed there or a
+ * switch of its own: the chat takes its title, mode or model, so the next turn asks for what the
+ * engine now runs. Only what differs from the chat's own is changed, and only a mode the engine
+ * offers in Misty.
+ */
+async function followEngineSession(
+  get: MistyGet,
+  conversationId: string,
+  event: EngineSessionEvent,
+) {
+  if (event.type === "engine.title") {
+    const title = event.title.trim();
+    const conversation = get().conversations.find((item) => item.id === conversationId);
+    if (title && conversation && conversation.title !== title)
+      await get().renameConversation(conversationId, title);
+    return;
+  }
+  if (event.type === "engine.mode") {
+    const mode = (await engineModesFor(event.engine)).find((option) => option.id === event.mode);
+    const saved = useCollaborationStore.getState().byConversation[conversationId];
+    if (mode && effectivePermissionMode(saved, "") !== mode.id)
+      await chooseEngineMode(conversationId, mode);
+    return;
+  }
+  const account = get().accountId;
+  const choices = useComposerChoices.getState();
+  await choices.load(account, conversationId).catch(() => undefined);
+  const known = useComposerChoices.getState().byConversation[conversationId];
+  const patch: Partial<ComposerChoices> = {};
+  if (event.model && event.model !== known?.model) patch.model = event.model;
+  if (event.effort && event.effort !== known?.effort) patch.effort = event.effort;
+  if (patch.model || patch.effort) choices.choose(account, conversationId, patch);
 }
 
 function dedupeGlobalCitations(citations: AiCitation[]) {

@@ -855,8 +855,8 @@ fn build_review(
 }
 
 /// One `session/update` notification projected to engine events. OMP's update vocabulary is
-/// the same as qoder's and grok's, so the shared mapping is reused; usage_update gives only the
-/// context window, and the token totals come from the prompt answer.
+/// the same as qoder's and grok's, so the shared mapping is reused; usage_update gives the
+/// context's size and window, and the turn's token totals come from the prompt answer.
 fn handle_session_update(
     core: &TurnCore,
     state: &mut TurnState,
@@ -875,6 +875,10 @@ fn handle_session_update(
             .filter(|size| *size > 0)
         {
             view.context_window = Some(size);
+        }
+        // How full the context is: the prompt answer's total adds up every call in the turn.
+        if let Some(usage) = crate::engines::kimi_acp::usage(params) {
+            core.dispatch_event(state, EngineEvent::Usage(usage));
         }
         return;
     }

@@ -158,6 +158,25 @@ pub async fn engine_catalog(
         return Err("That engine has no adapter.".into());
     }
     let db = state.environment.store();
+    // OpenCode reports its commands from its server; asking it now fills the menu before the
+    // chat's first turn. The next menu read shows them.
+    if engine == "opencode" && !folder.is_empty() {
+        let (db, account, folder) = (db.clone(), account.clone(), folder.clone());
+        tokio::spawn(async move {
+            let path = std::path::PathBuf::from(&folder);
+            let linked = tokio::task::spawn_blocking(move || {
+                path.is_absolute() && store::is_linked(&db, &account, &path).unwrap_or(false)
+            })
+            .await
+            .unwrap_or(false);
+            if !linked {
+                return;
+            }
+            if let Ok(origin) = super::opencode_server::ensure_running().await {
+                super::opencode_session::report_commands(origin, folder).await;
+            }
+        });
+    }
     blocking(move || {
         let home = dirs::home_dir().ok_or("Misty can't find your home folder.")?;
         let folder = std::path::PathBuf::from(folder);
@@ -273,6 +292,61 @@ pub async fn engine_settings_set(
 ) -> Result<(), String> {
     person_window(&webview)?;
     blocking(move || super::support::settings::write_settings(&settings)).await
+}
+
+/// Runs one of an engine's commands Misty runs for it out of turn (`slash/mod.rs`): `/status`,
+/// `/rename`, `/fork` and the like, which the engine only runs in its own terminal app. `folder`
+/// is the chat's linked folder; one that isn't linked is ignored.
+#[tauri::command]
+pub async fn engine_command_run(
+    webview: tauri::Webview,
+    state: State<'_, MistyRuntime>,
+    account: String,
+    conversation: String,
+    engine: String,
+    folder: String,
+    name: String,
+    args: String,
+) -> Result<super::slash::Output, String> {
+    person_window(&webview)?;
+    if !super::is_engine(&engine) {
+        return Err("That engine has no adapter.".into());
+    }
+    let db = state.environment.store();
+    let (folder, session) = {
+        let db = db.clone();
+        let (account, conversation, engine) =
+            (account.clone(), conversation.clone(), engine.clone());
+        blocking(move || {
+            let folder = std::path::PathBuf::from(folder);
+            let linked = !folder.as_os_str().is_empty()
+                && folder.is_absolute()
+                && store::is_linked(&db, &account, &folder).unwrap_or(false);
+            let session = linked
+                .then(|| {
+                    store::session(
+                        &db,
+                        &account,
+                        &conversation,
+                        &engine,
+                        &folder.to_string_lossy(),
+                    )
+                })
+                .flatten();
+            Ok((linked.then_some(folder), session))
+        })
+        .await?
+    };
+    let context = super::slash::Context {
+        engine,
+        account,
+        conversation,
+        folder,
+        session,
+        args: args.trim().to_string(),
+        db,
+    };
+    super::slash::run(context, name.trim().trim_start_matches('/')).await
 }
 
 /// Forgets a chat's engine session (`/clear`): the chat stays, its next turn starts fresh.

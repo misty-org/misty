@@ -50,7 +50,7 @@ export function FilesBreadcrumbs(props: { folder: string; picker: ReactNode }) {
   const lineage = (here && treeLineage(root, here)) || [root];
   const below = lineage.slice(1);
   const dirs = isFile ? below.slice(0, -1) : below;
-  const file = isFile ? below.at(-1) : undefined;
+  const file = isFile ? below[below.length - 1] : undefined;
   const folded = dirs.slice(0, Math.max(0, dirs.length - MOST_SHOWN));
   const shown = dirs.slice(folded.length);
 
@@ -81,8 +81,8 @@ export function FilesBreadcrumbs(props: { folder: string; picker: ReactNode }) {
           <Button
             variant="quiet"
             size="sm"
-            className="min-w-0 flex-[0_1_auto]"
-            aria-current={!file && dir === shown.at(-1) ? "location" : undefined}
+            shrink
+            aria-current={!file && dir === shown[shown.length - 1] ? "location" : undefined}
             onClick={() => goTo(dir)}
           >
             <OverflowFadeText full>{fileName(dir)}</OverflowFadeText>

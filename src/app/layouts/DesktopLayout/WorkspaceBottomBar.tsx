@@ -1,7 +1,8 @@
 import { useEffect } from "react";
 import { useShallow } from "zustand/react/shallow";
+import type { WorkspaceView } from "@/features/app-windows";
 import { BottomBar, CustomizableBar, type BarItem, type BarLayout } from "@/shared/ui";
-import { BottomBarOpenContext, bottomBarItems } from "./bottomBarItems";
+import { BottomBarOpenContext, bottomBarItems } from "./BottomBarItems";
 import {
   bottomBarDefaults,
   bottomBarItemIds,

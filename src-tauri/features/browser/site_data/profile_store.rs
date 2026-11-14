@@ -239,7 +239,10 @@ mod tests {
         let link = store_home(&home, Some(&store)).unwrap();
         let own = std::fs::read_link(&link).unwrap();
         assert_ne!(own, shared);
-        assert_eq!(std::fs::read_to_string(own.join("cookies")).unwrap(), "signed in");
+        assert_eq!(
+            std::fs::read_to_string(own.join("cookies")).unwrap(),
+            "signed in"
+        );
         // The shared store stays as it was, for the release build.
         assert!(shared.join("cookies").is_file());
     }

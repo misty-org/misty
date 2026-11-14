@@ -12,8 +12,13 @@ import {
 import { useEffect } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { CustomizableBar, IconButton, type BarItem } from "@/shared/ui";
-import { isBrowserOpen, useAgentBrowser } from "../agent-browser/agentBrowserStore";
+import {
+  closeAgentBrowser,
+  isBrowserOpen,
+  useAgentBrowser,
+} from "../agent-browser/agentBrowserStore";
 import { SessionGoalButton } from "../goals/SessionGoalButton";
+import { useSidePanelShown } from "./ChatSidePanels";
 import { toggleChatBrowser } from "../tabs/agentPersonTabs";
 import { chatKey } from "../conversations/state/draftChat";
 import { useContextPanel, type ContextPanelTab } from "./contextPanelStore";
@@ -54,7 +59,16 @@ export function ContextRail(props: {
   );
   useEffect(() => void useRailLayout.getState().load(), []);
   // The panel shows one view; the browser holds it only while no other view is open.
-  const pressed = (id: ContextPanelTab) => (id === "session" ? session : open === id);
+  const sidePanel = useSidePanelShown(chat);
+  // The session card sits behind any side panel, so it reads as pressed only while it shows, and
+  // pressing it then puts the side panel away to bring the card forward.
+  const pressed = (id: ContextPanelTab) => (id === "session" ? session && !sidePanel : open === id);
+  const press = (id: ContextPanelTab) => {
+    if (id !== "session" || !sidePanel) return toggle(id);
+    if (open) useContextPanel.getState().close();
+    else closeAgentBrowser(chat);
+    useContextPanel.getState().show("session");
+  };
   const items: Record<RailItemId, BarItem> = {
     "new-task": {
       label: "New task",
@@ -82,7 +96,7 @@ export function ContextRail(props: {
               label={label}
               tooltipSide="left"
               aria-pressed={pressed(id)}
-              onClick={() => toggle(id)}
+              onClick={() => press(id)}
             >
               <Icon />
             </IconButton>
@@ -110,7 +124,7 @@ export function ContextRail(props: {
   return (
     <nav
       // Its 32px buttons are the tab row's layout button's size, 12px from the page's edge like
-      // it, the first centred on the 48px header band the tab row centres its buttons in.
+      // it, the first centred on the header band (`--ui-header`) the tab row centres its buttons in.
       className="flex flex-none flex-col pt-[calc((var(--ui-header)-32px)/2)] pr-3 pb-2 pl-1"
       aria-label="Panels"
       data-misty-window-drag-block="true"

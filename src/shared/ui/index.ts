@@ -31,6 +31,8 @@ export * from "./controls/Textarea";
 export * from "./controls/Pressable";
 // Only the group: rows set their controls' size themselves, never a feature.
 export { RowTools, type RowToolsReveal } from "./controls/RowTools";
+// The frame every control shares at each size, read by the control-frame contract test.
+export { controlFrame, type ControlFrameSize } from "./controls/controlFrame";
 
 // overlays
 export * from "./overlays/FloatingPip";

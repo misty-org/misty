@@ -1,11 +1,2 @@
-import { hasTauriInternals } from "@/shared/platform/tauri";
-import { invoke as tauriInvoke } from "@tauri-apps/api/core";
-
-export function invoke<T>(command: string, args?: Record<string, unknown>): Promise<T> {
-  if (!hasTauriInternals()) {
-    return Promise.reject(
-      new Error(`Native command "${command}" is only available in the Misty app runtime.`),
-    );
-  }
-  return tauriInvoke<T>(command, args);
-}
+// The native command call lives in shared/platform, so shared code (device settings) can make it.
+export { invoke } from "@/shared/platform/nativeInvoke";

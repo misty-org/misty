@@ -9,6 +9,7 @@ import {
   CatalogTile,
   CatalogTileRow,
   CodeBlock,
+  CollectionFilters,
   Dialog,
   DialogBody,
   DialogContent,
@@ -17,7 +18,6 @@ import {
   DialogHeader,
   DialogTitle,
   EmptyState,
-  FilterChip,
   ListRowSkeleton,
   MenuItem,
   notify,
@@ -43,13 +43,15 @@ import {
 } from "./api";
 import { SourcesDialog } from "./MarketplaceSources";
 import { PluginDetailsDialog } from "./PluginDetailsDialog";
-import { MakerLogo, pluginMaker, sourceLabel } from "./pluginMaker";
+import { MakerLogo, pluginMaker, sourceLabel } from "./PluginMaker";
 import { useEngineMarket } from "./useEngineMarket";
 
 /** Cards drawn at first; Show more adds this many again. */
 const PAGE = 60;
 /** Category chips past this many fold into All. */
 const CATEGORY_CHIPS = 8;
+/** The All chip's value among the category chips. */
+const allCategories = "all";
 
 /**
  * The plugins an engine's own marketplaces offer, as a catalog: what's installed in a row up top,
@@ -256,21 +258,18 @@ export function EnginePlugins({
                 count={cards.length}
               />
               {categories.length > 1 ? (
-                <div className="flex flex-wrap gap-1.5" role="group" aria-label="Category">
-                  <FilterChip
-                    label="All"
-                    pressed={category === null}
-                    onPressedChange={() => setCategory(null)}
-                  />
-                  {categories.map(([value, count]) => (
-                    <FilterChip
-                      key={value}
-                      label={`${categoryLabel(value)} ${count}`}
-                      pressed={category === value}
-                      onPressedChange={(on) => setCategory(on ? value : null)}
-                    />
-                  ))}
-                </div>
+                // One bar of chips: past its width they fold into ⋯, the chosen one last.
+                <CollectionFilters
+                  options={[
+                    { value: allCategories, label: "All" },
+                    ...categories.map(([value, count]) => ({
+                      value,
+                      label: `${categoryLabel(value)} ${count}`,
+                    })),
+                  ]}
+                  value={category ?? allCategories}
+                  onChange={(value) => setCategory(value === allCategories ? null : value)}
+                />
               ) : null}
             </div>
 

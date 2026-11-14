@@ -11,7 +11,7 @@ import {
   menuWidthClass,
   type MenuWidth,
 } from "./popupStyles";
-import { OutOfRow } from "../controls/rowContext";
+import { OutOfRow } from "../controls/RowContext";
 import type { MenuItemVariant } from "./DropdownMenu";
 
 import * as ContextMenuPrimitive from "@radix-ui/react-context-menu";

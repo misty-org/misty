@@ -252,3 +252,11 @@ OpenChamber (https://github.com/openchamber/openchamber)
   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
   SOFTWARE.
+
+Codex (https://github.com/openai/codex)
+  The prompt Codex's `/init` command sends (codex-rs/tui/prompt_for_init_command.md, release
+  rust-v0.147.0) is reproduced in src-tauri/features/engines/codex_app.rs, so `/init` in Misty
+  asks Codex for exactly what its own terminal app does.
+
+  Licensed under the Apache License, Version 2.0 (https://www.apache.org/licenses/LICENSE-2.0).
+  Copyright 2025 OpenAI.

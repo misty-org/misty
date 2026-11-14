@@ -34,6 +34,14 @@ use tokio_tungstenite::tungstenite::Message;
 use super::{dsh_images, EngineEvent, SendRequest, TurnCore, TurnState, VirtualRunGuard};
 use crate::engines::support::dsh_host::host_call;
 
+#[path = "dsh_commands.rs"]
+mod commands;
+use commands::{
+    command_line, command_name, command_outcome, execute_command, plan_execute_outcome,
+    report_commands, send_prompt, COMMAND_TURN_GRACE,
+};
+pub(crate) use commands::{host_call_slow, slow_client};
+
 /// Extract and normalize the context-window field. DSH's `TokenUsage` carries no window; it
 /// comes only in `request/context` events (`RequestContext.contextWindow`), so the caller passes
 /// that event's cached value as `fallback`. A usage report with its own window wins; otherwise
@@ -101,6 +109,8 @@ type Ws =
 struct TurnView {
     attempt_streamed_text: bool,
     last_usage: Option<Value>,
+    /// A `turn/start` came through: the agent is working, so the turn waits for its end.
+    turn_started: bool,
     turn_ended: bool,
     /// The context window `request/context` announced (valid for this turn). It backs up usage
     /// reports without one and rides on the done payload, or the frontend falls back to an
@@ -229,12 +239,23 @@ async fn turn_inner(
         .map(str::to_string)
         .ok_or("session/create returned no sessionId")?;
     core.dispatch_event(state, EngineEvent::SessionId(session_id.clone()));
+    // The host's slash commands for this session (its plugins register them): reported for the
+    // composer's `/` menu, and a message that names one runs through commands/execute instead of
+    // reaching the model as text, as it does in the host's own composer.
+    let listed = host_call(&origin, "commands/list", json!({ "agentId": session_id })).await;
+    if let Ok(listed) = &listed {
+        report_commands(listed);
+    }
+    let command = listed
+        .as_ref()
+        .ok()
+        .and_then(|listed| command_line(&req.prompt, listed));
     // Plan review mode: commands/list first checks whether the host includes the plan-mode
     // plugin, and its absence is an error. HTTP 200 doesn't mean the command exists, and this
     // never falls back to running in auto.
     let plan_mode = req.permission.as_deref() == Some("plan");
     if plan_mode {
-        ensure_plan_command(&origin, &session_id).await?;
+        ensure_plan_command(&listed)?;
     }
 
     // Model: the picker's ids are `provider/model` selector ids (models.rs).
@@ -299,35 +320,29 @@ async fn turn_inner(
         enter_plan_mode(&origin, &session_id, &mut ws, opened.plan_active).await?;
     }
 
-    let mut prompt_request = json!({
-        "requestId": format!("codemoss-{}", uuid::Uuid::new_v4()),
-        "sessionId": session_id,
-        "mode": "queue",
-        "content": dsh_images::build_prompt_content(&req.prompt, &prompt_images),
-        "clientTimeZone": client_time_zone(),
-    });
-    if let Some(effort) = req
-        .effort
-        .as_deref()
-        .map(str::trim)
-        .filter(|e| !e.is_empty())
-    {
-        prompt_request["effort"] = json!(effort);
-        prompt_request["reasoningEffort"] = json!(effort);
-    }
-    let prompt = crate::engines::support::dsh_host::host_call_rpc(
-        &origin,
-        "session/prompt",
-        json!({ "request": prompt_request }),
-    )
-    .await;
-    if let Err(error) = prompt {
-        let _ = ws.close(None).await;
-        return Err(format!(
-            "The task couldn't be sent: {}",
-            dsh_images::format_prompt_refusal(&error)
-        ));
-    }
+    // A command settles before its answer comes back and opens no turn of its own; when it
+    // starts the agent working, the follow stream carries that turn like a prompt's.
+    let grace = match command {
+        Some(line) => {
+            let attachments = dsh_images::build_prompt_content("", &prompt_images).split_off(1);
+            let Some(result) =
+                execute_command(&origin, &session_id, &line, attachments, killed).await?
+            else {
+                let _ = ws.close(None).await;
+                return Ok(());
+            };
+            let text = command_outcome(command_name(&line), &result)?;
+            if !text.trim().is_empty() {
+                core.dispatch_event(state, EngineEvent::Delta(format!("{text}\n\n")));
+            }
+            Some(tokio::time::Instant::now() + COMMAND_TURN_GRACE)
+        }
+        None => {
+            send_prompt(&origin, &session_id, req, &prompt_images, &mut ws).await?;
+            None
+        }
+    };
+    let grace_deadline = grace.unwrap_or_else(tokio::time::Instant::now);
 
     let (mut write, mut read) = ws.split();
     let mut kill_poll = tokio::time::interval(KILL_POLL);
@@ -369,6 +384,8 @@ async fn turn_inner(
                     return Err("The dsh session stream closed".to_string());
                 }
             },
+            // A command that started no turn is done once the grace passes.
+            _ = tokio::time::sleep_until(grace_deadline), if grace.is_some() && !view.turn_started => break,
             _ = kill_poll.tick() => {
                 if killed.load(Ordering::SeqCst) {
                     // Best-effort server-side cancel; if this races the
@@ -392,13 +409,11 @@ async fn turn_inner(
 
 /// The preflight check: commands/list confirms the plan command exists. A missing plugin (no
 /// plan in the list) or a failed check is an error, never a fallback to auto.
-async fn ensure_plan_command(origin: &str, session_id: &str) -> Result<(), String> {
-    let listed = host_call(origin, "commands/list", json!({ "agentId": session_id }))
-        .await
-        .map_err(|error| {
-            format!("Couldn't confirm the host's plan command (commands/list failed): {error}")
-        })?;
-    if !plan_command_listed(&listed) {
+fn ensure_plan_command(listed: &Result<Value, String>) -> Result<(), String> {
+    let listed = listed.as_ref().map_err(|error| {
+        format!("Couldn't confirm the host's plan command (commands/list failed): {error}")
+    })?;
+    if !plan_command_listed(listed) {
         return Err(
             "This dsh host doesn't include the plan-mode plugin (no plan command in commands/list), so plan review can't start; it won't run in auto instead"
                 .to_string(),
@@ -417,26 +432,6 @@ fn plan_command_listed(listed: &Value) -> bool {
                 .any(|command| command.get("name").and_then(Value::as_str) == Some("plan"))
         })
         .unwrap_or(false)
-}
-
-/// Classifies a commands/execute answer (a pure function, for tests): an unknown command returns
-/// undefined (null or no commandId on the wire), so HTTP 200 isn't success; a handler error
-/// (result.kind=="error") is refused too.
-fn plan_execute_outcome(result: &Value) -> Result<(), String> {
-    if result.get("commandId").and_then(Value::as_str).is_none() {
-        return Err(
-            "The host didn't confirm the /plan command (it answered undefined): the plan-mode plugin may be missing, so plan review can't start"
-                .to_string(),
-        );
-    }
-    if result.pointer("/result/kind").and_then(Value::as_str) == Some("error") {
-        let text = result
-            .pointer("/result/text")
-            .and_then(Value::as_str)
-            .unwrap_or("");
-        return Err(format!("The /plan command failed: {text}"));
-    }
-    Ok(())
 }
 
 /// How the plan permission starts: commands/execute {agentId, line:"/plan",
@@ -594,6 +589,7 @@ fn handle_session_event(
             }
             view.attempt_streamed_text = false;
         }
+        "turn/start" => view.turn_started = true,
         "turn/end" => {
             view.turn_ended = true;
             let kind = data
@@ -1813,6 +1809,9 @@ mod tests {
     /// rejected with a warning, with no plan_review event, nothing parked and no question card.
     #[tokio::test]
     async fn malformed_plan_review_is_rejected_fail_closed() {
+        // The refusal goes out over HTTP, and the client needs a TLS provider even for plain
+        // HTTP; the app installs it at start.
+        let _ = rustls::crypto::ring::default_provider().install_default();
         let (core, registry, emitter) = test_core();
         let mut state = TurnState::new(Some("session-1".to_string()));
         let mut view = TurnView {

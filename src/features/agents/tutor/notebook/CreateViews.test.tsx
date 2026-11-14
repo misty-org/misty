@@ -6,6 +6,7 @@ import { useTutorStore } from "../tutorStore";
 import type { Deck, Guide } from "../tutorTypes";
 import { MindMapView, SlidesView } from "./StudioViews";
 import { InfographicView, VideoView } from "./VideoView";
+import type * as VideoExport from "./videoExport";
 
 /** The viewers Create opens what it made in: each one's controls, on what an engine wrote. */
 
@@ -32,7 +33,7 @@ vi.mock("../tutorAudio", () => ({
   sceneAudioBytes: fakes.sceneAudioBytes,
 }));
 vi.mock("./videoExport", async (actual) => ({
-  ...(await actual<typeof import("./videoExport")>()),
+  ...(await actual<typeof VideoExport>()),
   recordVideo: fakes.recordVideo,
   saveBytes: fakes.saveBytes,
 }));

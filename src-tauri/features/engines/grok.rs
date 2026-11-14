@@ -412,6 +412,13 @@ mod channel_tests {
     }
 }
 
+/// Grok's mode for one prompt, as its `session/prompt` `_meta.mode` (`acp_agent.rs`), which
+/// outranks the session's mode: `ask` for its Ask mode, None for its agent. A build that ignores
+/// it still runs Ask read-only: Ask is a planning kind, so Misty's gate refuses every change.
+pub(super) fn prompt_mode(permission: Option<&str>) -> Option<&'static str> {
+    (GrokEngine.resolve_permission(permission) == "ask").then_some("ask")
+}
+
 impl Engine for GrokEngine {
     fn id(&self) -> &'static str {
         "grok"
@@ -466,11 +473,19 @@ impl Engine for GrokEngine {
     fn supports_effort(&self) -> bool {
         true
     }
-    /// Grok's one mode here: each ask comes back through ACP. Its plan review isn't wired
-    /// (`plan_approval`), and it has no sandbox that keeps it inside its folder.
+    /// Grok's session modes (`xai-grok-tools` `SessionMode`): `default`, its agent, where each
+    /// ask comes back through ACP, and `ask`, which answers questions without using tools
+    /// (`prompt_mode`). Its `plan` isn't offered: its plan review isn't wired (`plan_approval`).
+    /// Its auto and always-approve are permission settings, not modes, and always-approve has no
+    /// sandbox that keeps it inside its folder.
     fn modes(&self) -> &'static [super::modes::EngineMode] {
         use super::modes::{mode, ModeKind::*};
-        const MODES: &[super::modes::EngineMode] = &[mode("default", "Default", Asks, "manual")];
+        const MODES: &[super::modes::EngineMode] = &[
+            mode("default", "Default", Asks, "manual"),
+            // Ask only answers, with no tools; it isn't a plan mode, since Grok's plan review
+            // isn't wired, so the gate reads it as one that asks.
+            mode("ask", "Ask", Asks, "ask"),
+        ];
         MODES
     }
     fn supports_mcp(&self) -> bool {

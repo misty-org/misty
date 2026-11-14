@@ -13,7 +13,7 @@ const suspend = vi.hoisted(() => vi.fn());
 const db = await vi.hoisted(async () =>
   (await import("@/tests/fakeDeviceSettings")).fakeDeviceSettings(),
 );
-vi.mock("@/native/invoke", () => ({ invoke: db.invoke }));
+vi.mock("@/shared/platform/nativeInvoke", () => ({ invoke: db.invoke }));
 vi.mock("@/features/app-windows/page-runtime/browserOverlayRuntime", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   setBrowserWebviewsSuspended: suspend,

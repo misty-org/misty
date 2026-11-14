@@ -10,7 +10,7 @@ vi.mock("@tauri-apps/api/window", () => ({ getCurrentWindow: () => ({ label: "ma
 vi.mock("@/api/deployment/api", () => ({ resolveApiBase: async () => "https://api.example" }));
 vi.mock("@/features/account/core", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  useUserStore: { getState: () => ({ me: { id: "account-1" } }) },
+  useUserStore: { getState: () => ({ me: { id: "account-1" } }), subscribe: () => () => {} },
 }));
 vi.mock("@/features/app-windows/addresses/browserHome", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),

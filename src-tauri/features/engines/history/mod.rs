@@ -5,6 +5,7 @@ pub(crate) mod discovery;
 mod extract;
 mod gemini_family;
 mod hermes;
+mod opencode_v2;
 mod past_folders;
 mod past_folders_stores;
 pub mod reader;
@@ -84,7 +85,25 @@ pub fn stat_signature(path: &Path) -> Option<(i64, i64)> {
     // OpenCode ≥1.18 keeps every session in one SQLite file; the virtual
     // address below carries the session id, so stat the shared database.
     let target = split_opencode_db_path(path).map(|(db, _)| db);
+    let shared_db = target.is_some();
     let path = target.as_deref().unwrap_or(path);
+    let (size, mtime_ms) = file_stat(path)?;
+    if !shared_db {
+        return Some((size, mtime_ms));
+    }
+    // OpenCode writes through SQLite's write-ahead log, so new turns land in `<db>-wal` and the
+    // database file itself only changes at a checkpoint. The log counts too, or new activity
+    // would wait for the next checkpoint to show.
+    let mut wal = path.as_os_str().to_owned();
+    wal.push("-wal");
+    Some(match file_stat(Path::new(&wal)) {
+        Some((wal_size, wal_mtime)) => (size + wal_size, mtime_ms.max(wal_mtime)),
+        None => (size, mtime_ms),
+    })
+}
+
+/// A file's size and modified time in milliseconds.
+fn file_stat(path: &Path) -> Option<(i64, i64)> {
     let meta = std::fs::metadata(path).ok()?;
     let mtime_ms = meta
         .modified()

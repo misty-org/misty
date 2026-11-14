@@ -32,7 +32,6 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { createContext, useContext, type ComponentType } from "react";
-import { currentApiBase, isMistyCloud, useServerChoice } from "@/api/deployment/serverChoice";
 import { useFocusModeStore, useSidebarCollapsedStore } from "@/app/shell";
 import {
   dockLeaves,
@@ -58,12 +57,13 @@ import {
 } from "@/features/agents";
 import { TourInfoButton, tourForRoute } from "@/features/onboarding";
 import { openSettings, useAppThemeStore, useSettingsStore } from "@/features/settings";
-import { SpaceBarMenu, SpacePresence, useSpacesConnection } from "@/features/spaces";
+import { SpaceBarMenu, SpacePresence } from "@/features/spaces";
 import { CaptureBarStatus } from "@/features/voice";
 import { appZoomDefault, setAppZoom, useAppZoomValue } from "@/shared/hooks/useAppZoom";
 import { Button, IconButton, StateMark, Tooltip } from "@/shared/ui";
 import { useHelpDialog } from "./HelpDialog";
 import { useSearchDialog } from "./search/searchStore";
+import { ConnectionProblem, ServerStatus } from "./ServerStatusItems";
 import { agentChatRoute, openNewChat, openNewTab, openWorkspaceRoute } from "./spaceNavigation";
 import type { BottomBarItemId } from "./bottomBarStore";
 
@@ -346,60 +346,6 @@ function AgentActivity() {
         </Button>
       ) : null}
     </>
-  );
-}
-
-function useServerName(): string {
-  const choice = useServerChoice((state) => state.choice);
-  const base = choice ? (choice.mode === "server" ? choice.url : "") : currentApiBase();
-  if (!base) return "";
-  if (isMistyCloud(choice)) return "Misty Cloud";
-  try {
-    return new URL(base).host;
-  } catch {
-    return base;
-  }
-}
-
-/** The server this device uses, with its live connection's state. Opens Settings › Server. */
-function ServerStatus() {
-  const name = useServerName();
-  const connection = useSpacesConnection((state) => state.state);
-  if (!name) return null;
-  const mark =
-    connection === "connected"
-      ? "online"
-      : connection === "reconnecting"
-        ? "waiting"
-        : connection === "connecting"
-          ? "working"
-          : null;
-  return (
-    <Button
-      variant="quiet"
-      icon={mark ? <StateMark kind={mark} label={markLabel[mark]} /> : Server}
-      onClick={() => openSettings("server")}
-    >
-      {connection === "reconnecting" ? `Reconnecting to ${name}` : name}
-    </Button>
-  );
-}
-
-const markLabel = { online: "Connected", waiting: "Reconnecting", working: "Connecting" } as const;
-
-/** Only while the live line to the server is down. Opens Settings › Server. */
-function ConnectionProblem() {
-  const name = useServerName();
-  const connection = useSpacesConnection((state) => state.state);
-  if (!name || connection !== "reconnecting") return null;
-  return (
-    <Button
-      variant="quiet"
-      icon={<StateMark kind="waiting" label="Reconnecting" />}
-      onClick={() => openSettings("server")}
-    >
-      {`Can't reach ${name}`}
-    </Button>
   );
 }
 

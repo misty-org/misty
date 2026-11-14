@@ -1,6 +1,6 @@
 "use client";
 import { useOverlaySide } from "./OverlaySide";
-import { OutOfRow } from "../controls/rowContext";
+import { OutOfRow } from "../controls/RowContext";
 
 import * as PopoverPrimitive from "@radix-ui/react-popover";
 import { Search, X } from "lucide-react";

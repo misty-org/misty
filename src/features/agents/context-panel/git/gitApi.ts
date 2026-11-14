@@ -32,6 +32,26 @@ export interface GitImageDiff {
   new: string | null;
 }
 
+/** An issue the branch's pull request closes. Title and state are absent when `gh` couldn't say. */
+export interface LinkedIssue {
+  number: number;
+  title?: string;
+  state?: "OPEN" | "CLOSED";
+  url?: string;
+}
+
+/** The pull request for the branch checked out in a folder, as the GitHub CLI reports it. */
+export interface BranchPullRequest {
+  number: number;
+  title: string;
+  state: "OPEN" | "CLOSED" | "MERGED";
+  url: string;
+  draft: boolean;
+  /** How its checks stand together; absent when it has none. */
+  checks?: "passing" | "failing" | "pending";
+  issues: LinkedIssue[];
+}
+
 const account = () => agentAccountId();
 
 /** The changes panel's native calls (`project/git.rs`). Every folder is checked against the account's linked folders. */
@@ -59,6 +79,9 @@ export const gitApi = {
   createBranch: (folder: string, name: string) =>
     invoke<void>("project_git_create_branch", { account: account(), folder, name }),
   init: (folder: string) => invoke<void>("project_git_init", { account: account(), folder }),
+  /** The checked-out branch's pull request; null without one, or without a working `gh`. */
+  pullRequest: (folder: string) =>
+    invoke<BranchPullRequest | null>("project_branch_pull_request", { account: account(), folder }),
 };
 
 const rawText = (reason: unknown) => (reason instanceof Error ? reason.message : String(reason));

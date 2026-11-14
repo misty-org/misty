@@ -1,56 +1,18 @@
 import {
-  Activity,
-  Bot,
-  Brain,
-  Bug,
-  ChartColumn,
-  CircleArrowUp,
-  CircleHelp,
-  ClipboardList,
-  Code,
-  Coins,
-  Cpu,
-  DoorOpen,
-  Download,
-  Eraser,
   File,
-  FileCode,
-  FilePlus,
   FileText,
-  FoldVertical,
   Folder,
-  FolderPlus,
-  Gauge,
-  GitBranch,
-  GitPullRequest,
   Globe,
-  History,
-  Keyboard,
-  KeyRound,
-  ListTodo,
-  LogIn,
-  LogOut,
-  MessageSquareText,
-  Monitor,
-  Newspaper,
-  Palette,
-  PanelBottom,
   Plus,
   ScrollText,
-  Server,
-  Settings,
-  ShieldAlert,
-  SquarePen,
-  SquareSlash,
-  Stethoscope,
-  Undo2,
   UserRound,
-  Webhook,
   type LucideIcon,
 } from "lucide-react";
 import { useEffect, useRef, useState, type KeyboardEvent, type RefObject } from "react";
 import { SkeletonList, SuggestionItem, SuggestionList, Text } from "@/shared/ui";
-import { engineCatalog, mistyEngine, type EngineCatalog } from "../../../engines/enginesApi";
+import { mistyEngine } from "../../../engines/enginesApi";
+import { commandIcon } from "../commands/commandIcons";
+import { catalogFor, mistyCommandsFor } from "../commands/engineCommands";
 import { matchMentionEntries, mentionIndex, prefetchMentionIndex } from "./mentionFiles";
 import {
   matchPrompts,
@@ -68,6 +30,10 @@ interface Suggestion {
   /** What replaces the typed trigger. */
   insert: string;
   icon: "file" | "folder" | "command" | "skill" | "browser" | "prompt" | "new" | "persona";
+  /** What a command takes after its name, such as `[model]` or `show | refresh`. */
+  hint?: string;
+  /** Where a command comes from, which picks its icon (`commandIcon`). */
+  origin?: "builtin" | "user" | "project";
   /** A catalog persona's id, which can also be made into an agent from the menu. */
   persona?: string;
   /** A command run in the composer instead of inserted. */
@@ -97,54 +63,6 @@ const computerCommand: Suggestion = {
   source: "Misty",
 };
 
-const mistyCommands: Suggestion[] = [
-  {
-    key: "misty:plan",
-    name: "plan",
-    description: "Switch to Plan and send what follows",
-    insert: "/plan ",
-    icon: "command",
-    source: "Misty",
-  },
-];
-
-/** Commands Misty runs for an outside engine's chat, since the engine only runs them in its own
- * terminal app. */
-const engineChatCommands: Suggestion[] = [
-  {
-    key: "misty:new",
-    name: "new",
-    description: "Start a new chat with this agent",
-    insert: "/new",
-    icon: "command",
-    source: "Misty",
-  },
-  {
-    key: "misty:clear",
-    name: "clear",
-    description: "Start the engine's next turn in a new session",
-    insert: "/clear",
-    icon: "command",
-    source: "Misty",
-  },
-  {
-    key: "misty:resume",
-    name: "resume",
-    description: "Continue one of the engine's earlier sessions here",
-    insert: "/resume",
-    icon: "command",
-    source: "Misty",
-  },
-  {
-    key: "misty:mcp",
-    name: "mcp",
-    description: "Manage MCP servers",
-    insert: "/mcp",
-    icon: "command",
-    source: "Misty",
-  },
-];
-
 const sourceLabel = { builtin: "", user: "Yours", project: "Project" } as const;
 
 /** The `!` menu's last row, which opens Settings on the prompt library. */
@@ -156,20 +74,6 @@ const newPrompt: Suggestion = {
   icon: "new",
   action: "new-prompt",
 };
-
-const catalogs = new Map<string, Promise<EngineCatalog>>();
-
-function catalogFor(engine: string, folder: string) {
-  const key = `${engine}\n${folder}`;
-  let pending = catalogs.get(key);
-  if (!pending) {
-    pending = engineCatalog(engine, folder).catch(() => ({ commands: [], skills: [] }));
-    catalogs.set(key, pending);
-    // Commands and skills change rarely; a minute later the next menu reads them again.
-    setTimeout(() => catalogs.delete(key), 60_000);
-  }
-  return pending;
-}
 
 async function suggestionsFor(
   trigger: Trigger,
@@ -205,26 +109,35 @@ async function suggestionsFor(
   }
   const catalog = outside ? await catalogFor(engine, folder) : { commands: [], skills: [] };
   if (trigger.kind === "command") {
-    // A command the engine itself offers wins over Misty's of the same name.
     const engineNames = new Set(catalog.commands.map((item) => item.name.toLowerCase()));
-    const ownCommands = (outside ? engineChatCommands : []).filter(
-      (item) => !engineNames.has(item.name),
-    );
-    const engineCommands: Suggestion[] = catalog.commands.map((item) => ({
-      key: `command:${item.source}:${item.name}`,
+    // Misty's own commands, less those the engine has itself, unless Misty's always wins
+    // (`engineCommands.ts`).
+    const own = mistyCommandsFor(engine, engineNames);
+    const ownNames = new Set(own.map((item) => item.name));
+    const ownCommands: Suggestion[] = own.map((item) => ({
+      key: `misty:${item.name}`,
       name: item.name,
       description: item.description,
-      insert: item.insert,
+      insert: `/${item.name}${item.hint ? " " : ""}`,
+      hint: item.hint,
       icon: "command",
-      source: sourceLabel[item.source],
+      origin: "builtin",
+      source: "Misty",
     }));
+    const engineCommands: Suggestion[] = catalog.commands
+      .filter((item) => !ownNames.has(item.name.toLowerCase()))
+      .map((item) => ({
+        key: `command:${item.source}:${item.name}`,
+        name: item.name,
+        description: item.description,
+        insert: item.insert,
+        hint: item.argumentHint,
+        icon: "command",
+        origin: item.source,
+        source: sourceLabel[item.source],
+      }));
     return filterItems(
-      [
-        ...(outside ? [browserCommand, computerCommand] : []),
-        ...mistyCommands,
-        ...ownCommands,
-        ...engineCommands,
-      ],
+      [...(outside ? [browserCommand, computerCommand] : []), ...ownCommands, ...engineCommands],
       trigger.query,
     );
   }
@@ -259,7 +172,6 @@ function rememberList(key: string, list: Suggestion[]) {
 const icons = {
   file: File,
   folder: Folder,
-  command: SquareSlash,
   skill: ScrollText,
   browser: Globe,
   prompt: FileText,
@@ -267,57 +179,9 @@ const icons = {
   persona: UserRound,
 };
 
-/** Each command wears its own subject's icon, by the name the engine (or Misty) gives it. */
-const commandIcons: Record<string, LucideIcon> = {
-  computer: Monitor,
-  plan: ClipboardList,
-  new: SquarePen,
-  clear: Eraser,
-  resume: History,
-  mcp: Server,
-  compact: FoldVertical,
-  context: Gauge,
-  cost: Coins,
-  usage: ChartColumn,
-  init: FilePlus,
-  review: GitPullRequest,
-  "security-review": ShieldAlert,
-  "pr-comments": MessageSquareText,
-  "release-notes": Newspaper,
-  todos: ListTodo,
-  agents: Bot,
-  model: Cpu,
-  memory: Brain,
-  config: Settings,
-  settings: Settings,
-  help: CircleHelp,
-  status: Activity,
-  login: LogIn,
-  logout: LogOut,
-  doctor: Stethoscope,
-  export: Download,
-  permissions: KeyRound,
-  hooks: Webhook,
-  "add-dir": FolderPlus,
-  bug: Bug,
-  feedback: Bug,
-  vim: Keyboard,
-  ide: Code,
-  rewind: Undo2,
-  "output-style": Palette,
-  statusline: PanelBottom,
-  upgrade: CircleArrowUp,
-  exit: DoorOpen,
-  "install-github-app": GitBranch,
-};
-
 function iconOf(item: Suggestion): LucideIcon {
-  if (item.icon !== "command") return icons[item.icon];
-  const known = commandIcons[item.name.toLowerCase()];
-  if (known) return known;
-  // A command written as a file in the person's or project's folders.
-  if (item.source === "Yours" || item.source === "Project") return FileCode;
-  return icons.command;
+  if (item.icon === "command") return commandIcon(item.name, item.origin);
+  return icons[item.icon];
 }
 
 const prefixes = { file: "", command: "/", skill: "$", prompt: "!", persona: "#" };
@@ -458,6 +322,11 @@ export function useComposerSuggestions(input: {
             label={
               <>
                 {item.action === "new-prompt" ? item.name : `${prefixes[trigger.kind]}${item.name}`}
+                {item.hint ? (
+                  <Text as="span" tone="muted" className="ml-1 inline">
+                    {item.hint}
+                  </Text>
+                ) : null}
                 {item.description ? (
                   <Text as="span" tone="muted" className="ml-2 inline">
                     {item.description}

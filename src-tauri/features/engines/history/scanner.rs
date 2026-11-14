@@ -3,9 +3,8 @@ use super::discovery::{
     codebuddy_transcripts, codex_candidates, discover_agy, discover_claude, discover_codebuddy_in,
     discover_grok, discover_kimi, discover_minimax, discover_opencode, discover_qoder,
     dsh_candidates, identify_head, is_codex_subagent_file, is_dsh_subagent_file,
-    opencode_db_updated_times, opencode_db_visible_sessions, opencode_tree_file_superseded,
-    opencode_tree_root, path_is_under, pi_family_candidates,
-    qoder_transcript_conflicts_with_workspace,
+    opencode_db_updated_times, opencode_tree_file_superseded, opencode_tree_root, path_is_under,
+    pi_family_candidates, qoder_transcript_conflicts_with_workspace,
 };
 use super::gemini_family::discover_gemini_family;
 use super::{
@@ -491,7 +490,7 @@ fn prune_opencode_hidden_sessions(db: &crate::engines::support::db::Db) -> Resul
     let mut dead: Vec<String> = Vec::new();
     for (db_path, session_ids) in grouped {
         // Unreadable db (missing/locked): leave every indexed row alone.
-        let Some(visible) = opencode_db_visible_sessions(&db_path, &session_ids) else {
+        let Some(visible) = super::opencode_v2::visible_sessions(&db_path, &session_ids) else {
             continue;
         };
         dead.extend(session_ids.into_iter().filter(|id| !visible.contains(id)));

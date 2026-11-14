@@ -12,6 +12,16 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/native", () => ({
   appSnapshot: mocks.appSnapshot,
 }));
+// This device's server choice, as misty.db answers it.
+vi.mock("@/shared/platform/nativeInvoke", () => ({
+  invoke: async (command: string) => {
+    if (command === "settings_session_state") {
+      const choice = { mode: "server", url: "https://api.test" };
+      return { revision: 1, state: { version: 1, choice } };
+    }
+    throw new Error(`unexpected ${command}`);
+  },
+}));
 vi.mock("./useAuthTokenStore", () => ({
   clearAccountAuthToken: vi.fn().mockResolvedValue(null),
   readAccountAuthToken: vi.fn().mockResolvedValue("account-a-token"),

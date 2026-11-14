@@ -66,10 +66,15 @@ use super::{
     MAX_LINE_BYTES,
 };
 
+#[path = "codex_app_denials.rs"]
+pub(super) mod denials;
+#[path = "codex_app_native.rs"]
+mod native;
 #[path = "codex_app_questions.rs"]
 mod questions;
 #[path = "codex_app_sandbox.rs"]
 mod sandbox;
+use native::{native_command, started_turn_id, NativeCommand};
 use sandbox::{sandbox_for, writable_roots};
 
 pub(super) use questions::{answer_frame, async_answer_request, next_async_question_rpc_id};
@@ -123,7 +128,8 @@ struct TurnView {
     /// it would print the answer twice. Same for reasoning.
     streamed_message: Option<String>,
     streamed_reasoning: Option<String>,
-    /// Turn id from the `turn/start` reply — the handle `turn/interrupt` needs.
+    /// Turn id from the `turn/start` reply, or from `turn/started` for a turn
+    /// whose reply has none (`/compact`) — the handle `turn/interrupt` needs.
     turn_id: Option<String>,
     /// Last `thread/tokenUsage/updated` payload, folded into this turn's Done:
     /// the terminal notification itself carries no usage.
@@ -273,21 +279,31 @@ impl AppServer {
     /// alone a notification, id alone a reply) because codex speaks plain
     /// JSON-RPC, unlike the ACP framing the sibling drivers parse. A `None`
     /// deadline reads on until the expectation, the CLI's EOF, or a kill.
+    ///
+    /// `interrupt` is the thread a kill interrupts and its turn id. A turn
+    /// started by `thread/compact/start` has no id in its reply, so with
+    /// `None` for the id the pump takes it from the thread's `turn/started`.
     async fn pump(
         &mut self,
         label: &str,
         expect: Expect<'_>,
         deadline: impl Into<Option<Instant>>,
         killed: &AtomicBool,
-        interrupt: Option<(&str, &str)>,
+        interrupt: Option<(&str, Option<&str>)>,
         // `Send` is required: the driver runs inside a spawned task, and a
         // bare trait object would make the whole turn future non-Send.
         on_message: &mut (dyn FnMut(&Value) -> Handled + Send),
     ) -> Result<Option<Value>, String> {
         let mut interrupted = false;
+        // Killed before the turn's id was known: the pump reads on for the
+        // settle window, waiting for `turn/started`.
+        let mut awaiting_id = false;
+        let mut learned: Option<String> = None;
         let mut deadline: Option<Instant> = deadline.into();
         loop {
             if killed.load(Ordering::SeqCst) {
+                let interrupt = interrupt
+                    .map(|(thread_id, turn_id)| (thread_id, turn_id.or(learned.as_deref())));
                 match interrupt {
                     // Ask the CLI to stop the turn itself: its `interrupted`
                     // completion is what lets it persist the rollout before the
@@ -297,7 +313,7 @@ impl AppServer {
                     // ignored and the turn runs on to completion — and its own
                     // reply is dropped by the pump, which is waiting on the
                     // completion, not on the acknowledgement.
-                    Some((thread_id, turn_id)) if !interrupted => {
+                    Some((thread_id, Some(turn_id))) if !interrupted => {
                         interrupted = true;
                         let settle_by = Instant::now() + INTERRUPT_SETTLE_TIMEOUT;
                         deadline = Some(deadline.map_or(settle_by, |until| until.min(settle_by)));
@@ -308,7 +324,17 @@ impl AppServer {
                         .await?;
                     }
                     // Already asked: read on until the window closes.
-                    Some(_) => {}
+                    Some((_, Some(_))) => {}
+                    // The turn hasn't said its id yet: give it the settle
+                    // window to, then interrupt it.
+                    Some((_, None)) => {
+                        if !awaiting_id {
+                            awaiting_id = true;
+                            let settle_by = Instant::now() + INTERRUPT_SETTLE_TIMEOUT;
+                            deadline =
+                                Some(deadline.map_or(settle_by, |until| until.min(settle_by)));
+                        }
+                    }
                     // Nothing to interrupt, so there is no turn left to settle.
                     // The answer command still needs the registry entry, so
                     // this returns rather than tearing the child down here.
@@ -319,7 +345,7 @@ impl AppServer {
             // is honored within KILL_POLL rather than at the next line.
             let remaining = deadline.map(|until| until.saturating_duration_since(Instant::now()));
             if remaining == Some(Duration::ZERO) {
-                return Err(if interrupted {
+                return Err(if interrupted || awaiting_id {
                     CANCELLED.to_string()
                 } else {
                     format!("{label} timed out")
@@ -357,6 +383,11 @@ impl AppServer {
                 // no peer is blocked on it.
                 continue;
             };
+            if let Some((thread_id, None)) = interrupt {
+                if learned.is_none() {
+                    learned = started_turn_id(&value, thread_id).map(str::to_string);
+                }
+            }
             let id = value.get("id").filter(|id| !id.is_null());
             if value.get("method").is_none() {
                 // This pump may be waiting on another request or the turn's end, so unmatched
@@ -510,6 +541,13 @@ fn handle_notification(
             return handle_child_notification(core, state, view, method, params, &thread);
         }
     }
+    if method == "turn/started" && view.turn_id.is_none() {
+        view.turn_id = params
+            .pointer("/turn/id")
+            .and_then(Value::as_str)
+            .filter(|id| !id.is_empty())
+            .map(str::to_string);
+    }
     if matches!(method, "item/started" | "item/completed") {
         view.set_scope(core, state, None);
     }
@@ -644,6 +682,16 @@ fn handle_notification(
                 );
             }
             return Handled::Ended;
+        }
+        // Codex's auto-review turned an action down. Its terminal app lets the person approve
+        // one retry with `/approve`; keep the denial for Misty's `/approve` and say it's there.
+        "item/autoApprovalReview/completed" => {
+            let thread = params.get("threadId").and_then(Value::as_str);
+            if let (Some(thread), Some(event)) = (thread, denials::core_event(params)) {
+                let notice = denials::notice(&event);
+                denials::keep(thread, event);
+                core.dispatch_event(state, EngineEvent::Warn(notice));
+            }
         }
         // Non-terminal by contract (`willRetry`): the CLI is retrying an
         // upstream call, so the turn keeps running and the UI shows a notice.
@@ -1464,8 +1512,8 @@ async fn handshake_and_turn(
 /// A turn whose `turn/start` the server has acknowledged.
 struct TurnStarted {
     thread_id: String,
-    /// None when the ack carried no id (defensive; interrupt then has no
-    /// handle and a kill falls back to ending the pump).
+    /// None when the ack carried no id and no `turn/started` came before it
+    /// (`/compact`): the turn pump then takes it from `turn/started`.
     turn_id: Option<String>,
 }
 
@@ -1485,7 +1533,9 @@ struct TurnStarted {
 ///   sign-in for gateway-OAuth providers: a missing or rejected gateway token
 ///   fails with "Gateway sign-in required" until the user signs in with Codex.
 /// - Codex hooks receive `client: "codex-backend"`.
-fn initialize_params(experimental: bool) -> Value {
+///
+/// Out-of-turn calls (`codex_rpc.rs`) shake hands the same way, so Codex sees one client.
+pub(super) fn initialize_params(experimental: bool) -> Value {
     json!({
         "clientInfo": { "name": "codex-backend", "version": "" },
         "capabilities": { "experimentalApi": experimental },
@@ -1679,35 +1729,48 @@ async fn handshake_and_start(
     if let Some(check) = decision {
         verify_plan_item(server, core, state, view, &thread_id, check, killed).await?;
     }
-    // `/compact` and `/review` are Codex terminal commands; the app-server runs them through
-    // its own calls, each as an ordinary turn that streams like any other.
+    // `/compact`, `/review` and `/init` are Codex terminal commands. The app-server runs the
+    // first two through its own calls, each as an ordinary turn that streams like any other;
+    // `/init` is a turn whose text is Codex's own prompt for it.
+    let mut prompt_text = None;
     if decision.is_none()
         && req.permission.as_deref() != Some("plan")
         && !codex_read_only::requested(req)
     {
-        if let Some((method, params)) = native_command(&req.prompt, &req.images, &thread_id) {
-            let key = server.request(method, params).await?;
-            let Some(result) = server
-                .pump(
-                    method,
-                    Expect::Reply(&key),
-                    ack_timeout.map(|limit| Instant::now() + limit),
-                    killed,
-                    None,
-                    &mut |value| route(core, state, view, value),
-                )
-                .await?
-            else {
-                return Ok(None);
-            };
-            let turn_id = result
-                .pointer("/turn/id")
-                .and_then(Value::as_str)
-                .map(str::to_string);
-            return Ok(Some(TurnStarted { thread_id, turn_id }));
+        match native_command(&req.prompt, &req.images, &thread_id) {
+            Some(NativeCommand::Prompt(text)) => prompt_text = Some(text),
+            Some(NativeCommand::Call(method, params)) => {
+                let key = server.request(method, params).await?;
+                let Some(result) = server
+                    .pump(
+                        method,
+                        Expect::Reply(&key),
+                        ack_timeout.map(|limit| Instant::now() + limit),
+                        killed,
+                        None,
+                        &mut |value| route(core, state, view, value),
+                    )
+                    .await?
+                else {
+                    return Ok(None);
+                };
+                // `review/start` answers with its turn; `thread/compact/start` answers with
+                // nothing, so its id is the one `turn/started` gave, if that came first.
+                let turn_id = result
+                    .pointer("/turn/id")
+                    .and_then(Value::as_str)
+                    .map(str::to_string)
+                    .or_else(|| view.turn_id.clone());
+                return Ok(Some(TurnStarted { thread_id, turn_id }));
+            }
+            None => {}
         }
     }
-    let mut turn_params = json!({ "threadId": thread_id, "input": turn_input(req) });
+    let input = match prompt_text {
+        Some(text) => vec![json!({ "type": "text", "text": text })],
+        None => turn_input(req),
+    };
+    let mut turn_params = json!({ "threadId": thread_id, "input": input });
     if codex_read_only::requested(req) {
         turn_params["approvalPolicy"] = json!("never");
         turn_params["sandboxPolicy"] = json!({"type":"readOnly","networkAccess":false});
@@ -1762,37 +1825,6 @@ async fn handshake_and_start(
     Ok(Some(TurnStarted { thread_id, turn_id }))
 }
 
-/// The app-server call for a message that is one of Codex's own commands, if it is: `/compact`
-/// alone compacts the thread; `/review` reviews the uncommitted changes, or follows the
-/// instructions written after it. Anything else, or a message with images, is a turn.
-fn native_command(
-    prompt: &str,
-    images: &[String],
-    thread_id: &str,
-) -> Option<(&'static str, Value)> {
-    if !images.is_empty() {
-        return None;
-    }
-    let text = prompt.trim();
-    if text == "/compact" {
-        return Some(("thread/compact/start", json!({ "threadId": thread_id })));
-    }
-    let rest = text.strip_prefix("/review")?;
-    if !rest.is_empty() && !rest.starts_with(char::is_whitespace) {
-        return None;
-    }
-    let instructions = rest.trim();
-    let target = if instructions.is_empty() {
-        json!({ "type": "uncommittedChanges" })
-    } else {
-        json!({ "type": "custom", "instructions": instructions })
-    };
-    Some((
-        "review/start",
-        json!({ "threadId": thread_id, "target": target, "delivery": "inline" }),
-    ))
-}
-
 /// A resume reply is one NDJSON frame. Asking Codex to hydrate every prior
 /// turn can make that otherwise valid frame exceed the host's safety bound.
 /// `excludeTurns` only omits history from the reply; Codex still resumes its
@@ -1820,20 +1852,16 @@ async fn pump_turn_to_end(
 ) -> Result<(), String> {
     // The turn id is needed to interrupt a cancelled turn, so it must be known
     // before the turn pump starts.
-    view.turn_id = started.turn_id.clone();
-    let interrupt = started
-        .turn_id
-        .clone()
-        .map(|turn_id| (started.thread_id.clone(), turn_id));
+    if started.turn_id.is_some() {
+        view.turn_id = started.turn_id.clone();
+    }
     server
         .pump(
             "turn",
             Expect::Turn,
             PROMPT_TIMEOUT.map(|limit| Instant::now() + limit),
             killed,
-            interrupt
-                .as_ref()
-                .map(|(thread_id, turn_id)| (thread_id.as_str(), turn_id.as_str())),
+            Some((started.thread_id.as_str(), started.turn_id.as_deref())),
             &mut |value| route(core, state, view, value),
         )
         .await?;
@@ -2189,7 +2217,7 @@ mod tests {
     use std::collections::HashMap;
 
     /// Test emitter collecting flushed event JSON for assertions.
-    struct CollectingEmitter(Mutex<Vec<String>>);
+    pub(super) struct CollectingEmitter(Mutex<Vec<String>>);
 
     impl Emit for CollectingEmitter {
         fn emit_json(&self, _name: &str, raw_json: &str) {
@@ -2199,7 +2227,7 @@ mod tests {
 
     /// A TurnCore with a registry entry under its run id (so question parking
     /// has somewhere to land) plus the collected flushes for assertions.
-    fn test_core() -> (TurnCore, Arc<ProcessRegistry>, Arc<CollectingEmitter>) {
+    pub(super) fn test_core() -> (TurnCore, Arc<ProcessRegistry>, Arc<CollectingEmitter>) {
         let emitter = Arc::new(CollectingEmitter(Mutex::new(Vec::new())));
         let registry = Arc::new(ProcessRegistry::default());
         registry.insert(
@@ -2384,20 +2412,23 @@ mod tests {
             killed,
             virtual_pid,
         ));
-        timeout(Duration::from_secs(3), async {
-            while !pid_file.exists() {
+        // The shell makes the file before it writes its pid, and a busy test run can be slow to
+        // start it, so wait for a pid that reads whole, with room to spare.
+        let child_pid: i32 = timeout(Duration::from_secs(15), async {
+            loop {
+                let pid = std::fs::read_to_string(&pid_file)
+                    .ok()
+                    .and_then(|text| text.trim().parse().ok());
+                if let Some(pid) = pid {
+                    break pid;
+                }
                 tokio::time::sleep(Duration::from_millis(10)).await;
             }
         })
         .await
         .unwrap();
-        let child_pid: i32 = std::fs::read_to_string(&pid_file)
-            .unwrap()
-            .trim()
-            .parse()
-            .unwrap();
         assert!(registry.kill(&run_id));
-        timeout(Duration::from_secs(3), task)
+        timeout(Duration::from_secs(15), task)
             .await
             .unwrap()
             .unwrap();
@@ -3030,27 +3061,6 @@ require('node:readline').createInterface({input: process.stdin}).on('line', line
         assert_eq!(events[0].1["text"], json!("Hello"));
     }
 
-    #[test]
-    fn codex_commands_go_to_the_app_servers_own_calls() {
-        assert_eq!(
-            native_command(" /compact ", &[], "t1"),
-            Some(("thread/compact/start", json!({ "threadId": "t1" })))
-        );
-        assert_eq!(
-            native_command("/review", &[], "t1").map(|(_, params)| params["target"].clone()),
-            Some(json!({ "type": "uncommittedChanges" }))
-        );
-        assert_eq!(
-            native_command("/review only the parser", &[], "t1")
-                .map(|(_, params)| params["target"].clone()),
-            Some(json!({ "type": "custom", "instructions": "only the parser" }))
-        );
-        assert_eq!(native_command("/reviewer", &[], "t1"), None);
-        assert_eq!(native_command("/compact this", &[], "t1"), None);
-        assert_eq!(native_command("/compact", &["a.png".into()], "t1"), None);
-        assert_eq!(native_command("please /compact", &[], "t1"), None);
-    }
-
     #[tokio::test]
     async fn a_token_usage_notification_is_held_for_the_turn_end() {
         let (core, _registry, emitter) = test_core();
@@ -3613,7 +3623,7 @@ require('node:readline').createInterface({input: process.stdin}).on('line', line
     /// Paused time races past the child process, so wait on the wall clock
     /// for `cat` to record what the driver sent before tearing it down.
     #[cfg(unix)]
-    fn recorded(path: &Path, needle: &str) -> String {
+    pub(super) fn recorded(path: &Path, needle: &str) -> String {
         for _ in 0..300 {
             let sent = std::fs::read_to_string(path).unwrap_or_default();
             if sent.contains(needle) {

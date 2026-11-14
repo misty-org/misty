@@ -5,12 +5,14 @@ import {
   Globe,
   ListOrdered,
   MonitorPlay,
+  PanelRightClose,
+  Pin,
   SquareTerminal,
   type LucideIcon,
 } from "lucide-react";
 import { lazy, Suspense, useEffect, useRef } from "react";
 import type { AgentProfile } from "@/shared/schemas";
-import { cn, SideCard, SidePanel } from "@/shared/ui";
+import { cn, IconButton, RowTools, SideCard, SidePanel } from "@/shared/ui";
 import { AgentBrowser } from "../agent-browser/AgentBrowser";
 import {
   closeAgentBrowser,
@@ -55,33 +57,34 @@ function useOnePanel(conversationId: string, tab: ContextPanelSurface | null, br
   }, [conversationId, tab, browser]);
 }
 
-// How the panel and the card give way on a narrow Agents page (its `agent-studio` container).
-// Important, since the shared panel's own geometry is in its stylesheet.
-/** Too narrow for three columns: the card steps aside while a panel is open, never floating
- * over the browser, preview or terminal behind it, and comes back when the panel closes. */
-const besidePanelCardClass = "@max-[1200px]/agent-studio:hidden!";
-/** On a narrow page the open panel covers the chat instead of squeezing it… */
+/**
+ * Whether a side panel (a context view, or the agent browser holding the slot) shows beside this
+ * chat. The session card goes behind any of them while one does, and comes back as it closes.
+ */
+export function useSidePanelShown(conversationId: string) {
+  const tab = useContextPanel((state) => state.tab);
+  const browserOpen = useAgentBrowser((state) =>
+    isBrowserOpen(state.chats[chatKey(conversationId)]),
+  );
+  return tab !== null || browserOpen;
+}
+
+// How the panel gives way on a narrow Agents page (its `agent-studio` container). Important,
+// since the shared panel's own geometry is in its stylesheet.
+/** On a narrow page the open panel covers the chat instead of squeezing it. */
 const narrowPanelClass = cn(
   "@max-[761px]/agent-studio:absolute!",
   "@max-[761px]/agent-studio:inset-[--spacing(2)_--spacing(1)_--spacing(2)_--spacing(2)]!",
   "@max-[761px]/agent-studio:w-auto! @max-[761px]/agent-studio:max-w-none!",
   "@max-[761px]/agent-studio:m-0!",
 );
-/** …and the card, with no panel open, floats at the edge over the chat. */
-const narrowCardClass = cn(
-  "@max-[761px]/agent-studio:absolute! @max-[761px]/agent-studio:top-2!",
-  "@max-[761px]/agent-studio:right-1! @max-[761px]/agent-studio:m-0!",
-);
-
 /**
  * The right side of a chat, after the chat column and before the rail: the floating side panel
- * (the agent browser, the preview, steps, or the project folder's changes, files and terminal),
- * then the session card, a narrow glance at the chat's usage and where it works that stays open
- * beside any of them when the page has room for both, and steps aside for them when it hasn't.
+ * (the agent browser, the preview, steps, or the project folder's changes, files and terminal).
+ * The session card floats over the chat itself (`ChatSessionCard`), so it takes no width here.
  */
 export function ChatSidePanels(props: { conversationId: string; agent: AgentProfile }) {
   const tab = useContextPanel((state) => state.tab);
-  const session = useContextPanel((state) => state.session);
   const width = useContextPanel((state) => state.width);
   const expanded = useContextPanel((state) => state.expanded);
   // A chat that hasn't started keeps its browser under the draft key until it does.
@@ -122,20 +125,44 @@ export function ChatSidePanels(props: { conversationId: string; agent: AgentProf
           )}
         </SidePanel>
       ) : null}
-      {session ? (
-        <SideCard
-          label="Session"
-          className={cn(
-            "agent-studio-session context-panel",
-            surface && besidePanelCardClass,
-            narrowCardClass,
-          )}
-        >
-          <Suspense fallback={<SessionSkeleton />}>
-            <SessionPanel conversationId={props.conversationId} agent={props.agent} />
-          </Suspense>
-        </SideCard>
-      ) : null}
     </>
+  );
+}
+
+/**
+ * The session card, a narrow glance at the chat's usage and where it works, floating over the
+ * chat's top right corner: it takes none of the chat's width, and goes behind any side panel
+ * while one is open (`useSidePanelShown`). Its parent is the chat's positioned column. Its corner button tucks
+ * it off the chat's edge, where resting the pointer brings it back; pressed there, it stays.
+ */
+export function ChatSessionCard(props: { conversationId: string; agent: AgentProfile }) {
+  const session = useContextPanel((state) => state.session);
+  const tucked = useContextPanel((state) => state.sessionTucked);
+  const setTucked = useContextPanel((state) => state.setSessionTucked);
+  // Never beside a side panel: it stays open underneath and shows again once the panel closes.
+  const covered = useSidePanelShown(props.conversationId);
+  if (!session || covered) return null;
+  const corner = (
+    <RowTools>
+      <IconButton
+        label={tucked ? "Keep open" : "Hide to the edge"}
+        tooltipSide="bottom"
+        onClick={() => setTucked(!tucked)}
+      >
+        {tucked ? <Pin /> : <PanelRightClose />}
+      </IconButton>
+    </RowTools>
+  );
+  return (
+    <SideCard
+      label="Session"
+      floating
+      tucked={tucked}
+      className="agent-studio-session context-panel"
+    >
+      <Suspense fallback={<SessionSkeleton />}>
+        <SessionPanel conversationId={props.conversationId} agent={props.agent} corner={corner} />
+      </Suspense>
+    </SideCard>
   );
 }

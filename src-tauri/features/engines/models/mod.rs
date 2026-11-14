@@ -37,6 +37,7 @@
 //! caches the last success. Remaining engines are filled by the frontend
 //! from the configured provider channels instead.
 
+mod acp;
 mod agy;
 mod claude;
 mod codebuddy;
@@ -47,6 +48,8 @@ mod minimax;
 mod opencode;
 mod pi;
 mod qoder;
+
+pub(crate) use acp::{acp_modes, acp_thought_levels};
 
 /// Claude launch-time model resolution: picker alias → the custom id its
 /// ANTHROPIC_DEFAULT_<FAMILY>_MODEL override maps to (pass-through when
@@ -93,67 +96,6 @@ pub struct FastMode {
     pub tier: String,
 }
 
-/// An ACP engine's own reasoning levels, from its `session/new` result: the config option of
-/// category `thought_level` (or id `reasoning_effort`), its options as levels with the engine's
-/// names and lines, and its current value. None when the engine offers no such option.
-pub(crate) fn acp_thought_levels(
-    session: &serde_json::Value,
-) -> Option<(Vec<EffortLevel>, Option<String>)> {
-    let text = |value: Option<&serde_json::Value>| {
-        value
-            .and_then(serde_json::Value::as_str)
-            .map(str::trim)
-            .filter(|text| !text.is_empty())
-            .map(str::to_string)
-    };
-    let option = session
-        .get("configOptions")
-        .and_then(serde_json::Value::as_array)?
-        .iter()
-        .find(|option| {
-            text(option.get("category")).as_deref() == Some("thought_level")
-                || text(option.get("id")).as_deref() == Some("reasoning_effort")
-        })?;
-    let levels: Vec<EffortLevel> = option
-        .get("options")
-        .and_then(serde_json::Value::as_array)?
-        .iter()
-        .filter_map(|choice| {
-            let id = text(choice.get("value")).or_else(|| text(choice.get("id")))?;
-            Some(EffortLevel {
-                name: text(choice.get("name")).filter(|name| *name != id),
-                description: text(choice.get("description")),
-                id,
-                ..EffortLevel::default()
-            })
-        })
-        .collect();
-    (!levels.is_empty()).then(|| (levels, text(option.get("currentValue"))))
-}
-
-/// An ACP engine's own modes, with its names for them, from its `session/new` result
-/// (`modes.availableModes`).
-pub(crate) fn acp_modes(session: &serde_json::Value) -> Vec<super::modes::ListedMode> {
-    session
-        .pointer("/modes/availableModes")
-        .and_then(serde_json::Value::as_array)
-        .into_iter()
-        .flatten()
-        .filter_map(|mode| {
-            let id = mode.get("id")?.as_str()?.trim().to_string();
-            (!id.is_empty()).then(|| super::modes::ListedMode {
-                name: mode
-                    .get("name")
-                    .and_then(serde_json::Value::as_str)
-                    .map(str::trim)
-                    .filter(|name| !name.is_empty())
-                    .map(str::to_string),
-                id,
-            })
-        })
-        .collect()
-}
-
 /// Whether Claude Code's own catalog gives this model a fast mode: the model named, or the CLI's
 /// current one when the run names none.
 pub(crate) fn claude_fast_offered(model: Option<&str>) -> bool {
@@ -162,7 +104,9 @@ pub(crate) fn claude_fast_offered(model: Option<&str>) -> bool {
     };
     match model.filter(|model| !model.trim().is_empty()) {
         Some(id) => details.get(id).is_some_and(|facts| facts.fast.is_some()),
-        None => details.values().any(|facts| facts.current && facts.fast.is_some()),
+        None => details
+            .values()
+            .any(|facts| facts.current && facts.fast.is_some()),
     }
 }
 
@@ -180,7 +124,7 @@ pub struct ModelDetails {
     /// The level the engine itself would use for it: its remembered one, else its default.
     pub default_effort: Option<String>,
     pub context_window: Option<u64>,
-    /// Where the engine's own menu puts it: "main", or "more" for its "More models".
+    /// Where the engine's own menu puts it: `main`, or "more" for its "More models".
     pub section: Option<String>,
     /// The engine's fast mode for this model, when it has one.
     pub fast: Option<FastMode>,
@@ -674,115 +618,5 @@ pub(super) fn with_default_first(
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn top_level_model_stops_at_first_table() {
-        let toml = "\
-model_provider = \"OpenAI\"
-model = \"gpt-5.6-sol\"   # active
-review_model = 'gpt-5.6-mini'
-
-[model_providers.OpenAI]
-model = \"must-not-leak\"
-";
-        assert_eq!(
-            parse_top_level_toml_string(toml, "model"),
-            Some("gpt-5.6-sol".to_string())
-        );
-        assert_eq!(
-            parse_top_level_toml_string("[features]\nmodel = \"x\"", "model"),
-            None
-        );
-        assert_eq!(parse_top_level_toml_string("model = ''", "model"), None);
-    }
-
-    #[test]
-    fn default_entry_leads_the_catalog() {
-        let listed = vec![
-            EngineModel {
-                id: "a".to_string(),
-                name: None,
-                description: None,
-                provider: "p".to_string(),
-                context_window: None,
-            },
-            EngineModel {
-                id: "b".to_string(),
-                name: None,
-                description: None,
-                provider: "p".to_string(),
-                context_window: None,
-            },
-        ];
-        let default = || EngineModel {
-            id: "b".to_string(),
-            name: None,
-            description: None,
-            provider: "p".to_string(),
-            context_window: None,
-        };
-        let ids: Vec<String> = with_default_first(listed.clone(), Some(default()))
-            .into_iter()
-            .map(|m| m.id)
-            .collect();
-        assert_eq!(ids, vec!["b", "a"]);
-        // Absent from the catalog: prepended, not dropped.
-        let absent = EngineModel {
-            id: "z".to_string(),
-            name: None,
-            description: None,
-            provider: "p".to_string(),
-            context_window: None,
-        };
-        let ids: Vec<String> = with_default_first(listed.clone(), Some(absent))
-            .into_iter()
-            .map(|m| m.id)
-            .collect();
-        assert_eq!(ids, vec!["z", "a", "b"]);
-        // No default known: order untouched.
-        let ids: Vec<String> = with_default_first(listed, None)
-            .into_iter()
-            .map(|m| m.id)
-            .collect();
-        assert_eq!(ids, vec!["a", "b"]);
-    }
-}
-
-#[cfg(test)]
-mod acp_tests {
-    use super::*;
-
-    #[test]
-    fn reads_an_acp_engine_own_levels_and_modes() {
-        // Oh My Pi's live `session/new` shape.
-        let session = serde_json::json!({
-            "configOptions": [
-                {"id": "model", "category": "model", "options": []},
-                {"id": "thinking", "category": "thought_level", "currentValue": "high", "options": [
-                    {"value": "off", "name": "Off"},
-                    {"value": "auto", "name": "Auto", "description": "Auto-detect per prompt"},
-                    {"value": "high", "name": "high"}
-                ]}
-            ],
-            "modes": {"currentModeId": "default", "availableModes": [
-                {"id": "default", "name": "Default"},
-                {"id": "plan", "name": "Plan", "description": "Read-only planning mode"}
-            ]}
-        });
-        let (levels, current) = acp_thought_levels(&session).unwrap();
-        assert_eq!(
-            levels.iter().map(|level| level.id.as_str()).collect::<Vec<_>>(),
-            ["off", "auto", "high"]
-        );
-        assert_eq!(levels[1].description.as_deref(), Some("Auto-detect per prompt"));
-        // A name that only repeats the id says nothing more.
-        assert_eq!(levels[2].name, None);
-        assert_eq!(current.as_deref(), Some("high"));
-        let modes = acp_modes(&session);
-        assert_eq!(modes[1].id, "plan");
-        assert_eq!(modes[1].name.as_deref(), Some("Plan"));
-        assert!(acp_thought_levels(&serde_json::json!({})).is_none());
-    }
-}
+#[path = "tests.rs"]
+mod tests;

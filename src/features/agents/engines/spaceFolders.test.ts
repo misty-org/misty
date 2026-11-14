@@ -4,7 +4,7 @@ const stored = vi.hoisted(() => ({
   linked: ["/a", "/b", "/c"] as string[],
   prefs: { revision: 0, state: null as unknown },
 }));
-vi.mock("@/native/invoke", () => ({
+vi.mock("@/shared/platform/nativeInvoke", () => ({
   invoke: vi.fn(async (command: string, args: Record<string, unknown>) => {
     if (command === "space_folder_list") return stored.linked;
     if (command === "settings_session_state") return stored.prefs;

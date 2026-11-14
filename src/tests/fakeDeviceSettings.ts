@@ -9,12 +9,13 @@ interface Stored {
  * `misty.db`'s `settings_state` in memory, by scope, answering `settings_session_state` and
  * `settings_session_commit` with the same revision check, for tests of device settings.
  *
- * Make it in `vi.hoisted` so module resets keep it, and hand its `invoke` to `@/native/invoke`:
+ * Make it in `vi.hoisted` so module resets keep it, and hand its `invoke` to
+ * `@/shared/platform/nativeInvoke`:
  *
  *   const db = await vi.hoisted(async () =>
  *     (await import("@/tests/fakeDeviceSettings")).fakeDeviceSettings(),
  *   );
- *   vi.mock("@/native/invoke", () => ({ invoke: db.invoke }));
+ *   vi.mock("@/shared/platform/nativeInvoke", () => ({ invoke: db.invoke }));
  */
 export function fakeDeviceSettings() {
   const scopes = new Map<string, Stored>();

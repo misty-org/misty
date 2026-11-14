@@ -9,7 +9,7 @@ const db = await vi.hoisted(async () =>
   (await import("@/tests/fakeDeviceSettings")).fakeDeviceSettings(),
 );
 
-vi.mock("@/native/invoke", () => ({ invoke: db.invoke }));
+vi.mock("@/shared/platform/nativeInvoke", () => ({ invoke: db.invoke }));
 vi.mock("../sessions/authState", () => ({ useAuth: () => ({ user: { id: "account" } }) }));
 vi.mock("@/shared/ui", () => ({
   // Records what is held up on each render, as the notice stack would show it.

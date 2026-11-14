@@ -1,5 +1,5 @@
 import { create, type StoreApi, type UseBoundStore } from "zustand";
-import { invoke } from "@/native/invoke";
+import { invoke } from "@/shared/platform/nativeInvoke";
 
 /**
  * A choice a person makes about this device's interface (a width, a view, an order), kept in

@@ -62,7 +62,7 @@ it("never offers to delete, leave or transfer the person's own Space", () => {
   open(<SpaceSettingsItems space={own} onDialog={vi.fn()} />);
   expect(screen.queryByRole("menuitem", { name: /Delete/ })).toBeNull();
   expect(screen.queryByRole("menuitem", { name: /Leave/ })).toBeNull();
-  expect(screen.getByRole("menuitem", { name: "Rename" })).toBeTruthy();
+  expect(screen.getByRole("menuitem", { name: "Edit name and picture" })).toBeTruthy();
 });
 
 it("offers Delete for another Space its owner made", () => {

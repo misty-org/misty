@@ -10,6 +10,8 @@ export function Section(props: {
   title: string;
   icon?: LucideIcon;
   subject?: ReactNode;
+  /** A control after the subject, at the header's far end. */
+  end?: ReactNode;
   open?: boolean;
   onToggle?(): void;
   children?: ReactNode;
@@ -60,6 +62,7 @@ export function Section(props: {
             {props.subject}
           </Text>
         ) : null}
+        {props.end ? <span className="-my-0.5 -mr-1 flex flex-none">{props.end}</span> : null}
       </header>
       {props.onToggle && !props.open ? null : props.children}
     </section>

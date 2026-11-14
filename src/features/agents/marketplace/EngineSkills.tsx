@@ -21,7 +21,7 @@ import {
   useConfirmDelete,
 } from "@/shared/ui";
 import { failureText } from "./api";
-import { MakerLogo, pluginMaker, sourceLabel } from "./pluginMaker";
+import { MakerLogo, pluginMaker, sourceLabel } from "./PluginMaker";
 
 const installsFormat = new Intl.NumberFormat(undefined, { notation: "compact" });
 

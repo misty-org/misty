@@ -428,8 +428,8 @@ pub(crate) fn map_session_update(update: &Value) -> QoderSessionUpdate {
                 error,
             }
         }
-        // plan / available_commands_update / config_option_update /
-        // user_message_chunk: UI noise here.
+        // plan / available_commands_update / user_message_chunk: UI noise here. The session's
+        // own state (mode, config, title) is read by `session_state_update`.
         _ => QoderSessionUpdate::Ignore,
     }
 }
@@ -437,6 +437,153 @@ pub(crate) fn map_session_update(update: &Value) -> QoderSessionUpdate {
 pub(crate) fn session_update_from_notification(params: &Value) -> QoderSessionUpdate {
     let update = params.get("update").unwrap_or(params);
     map_session_update(update)
+}
+
+// ==================== the session's own state ====================
+
+/// What an ACP session says about itself rather than the turn: its title, mode, model and
+/// reasoning effort. A side it didn't mention is None.
+#[derive(Debug, Default, Clone, PartialEq)]
+pub(crate) struct AcpSessionState {
+    pub title: Option<String>,
+    pub mode: Option<String>,
+    pub model: Option<String>,
+    pub effort: Option<String>,
+}
+
+fn non_empty(value: Option<&Value>) -> Option<String> {
+    value
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string)
+}
+
+/// The session state one `session/update` carries: `session_info_update` (its title),
+/// `current_mode_update` (`currentModeId`) and `config_option_update` (`configOptions`). None
+/// for every other update.
+pub(crate) fn session_state_update(params: &Value) -> Option<AcpSessionState> {
+    let update = params.get("update").unwrap_or(params);
+    match update.get("sessionUpdate").and_then(Value::as_str)? {
+        "session_info_update" => Some(AcpSessionState {
+            title: non_empty(update.get("title")),
+            ..Default::default()
+        }),
+        "current_mode_update" => Some(AcpSessionState {
+            mode: non_empty(update.get("currentModeId").or_else(|| update.get("modeId"))),
+            ..Default::default()
+        }),
+        "config_option_update" => Some(config_options_state(update.get("configOptions")?)),
+        _ => None,
+    }
+}
+
+/// The mode, model and effort a list of ACP config options holds, by their category (`mode`,
+/// `model`, `thought_level`) or, for an engine that leaves it out, their id. The handshake's
+/// `session/new` result carries the same list.
+pub(crate) fn config_options_state(options: &Value) -> AcpSessionState {
+    let mut state = AcpSessionState::default();
+    for option in options.as_array().into_iter().flatten() {
+        let Some(value) = non_empty(option.get("currentValue")) else {
+            continue;
+        };
+        let id = option.get("id").and_then(Value::as_str).unwrap_or("");
+        let category = option.get("category").and_then(Value::as_str).unwrap_or("");
+        let slot = match (category, id) {
+            ("mode", _) | (_, "mode") => &mut state.mode,
+            ("model", _) | (_, "model") => &mut state.model,
+            ("thought_level", _) | (_, "reasoning_effort" | "effort" | "thought_level") => {
+                &mut state.effort
+            }
+            _ => continue,
+        };
+        slot.get_or_insert(value);
+    }
+    state
+}
+
+impl AcpSessionState {
+    /// The events for what `next` says that differs from what this knew, which it then knows.
+    /// A side `next` doesn't mention stays as it was.
+    pub(crate) fn follow(&mut self, next: AcpSessionState) -> Vec<EngineEvent> {
+        fn take(known: &mut Option<String>, reported: Option<String>) -> Option<String> {
+            let reported = reported?;
+            if known.as_deref() == Some(reported.as_str()) {
+                return None;
+            }
+            *known = Some(reported.clone());
+            Some(reported)
+        }
+        let mut events = Vec::new();
+        if let Some(title) = take(&mut self.title, next.title) {
+            events.push(EngineEvent::SessionTitle(title));
+        }
+        if let Some(mode) = take(&mut self.mode, next.mode) {
+            events.push(EngineEvent::SessionMode(mode));
+        }
+        let model = take(&mut self.model, next.model);
+        let effort = take(&mut self.effort, next.effort);
+        if model.is_some() || effort.is_some() {
+            events.push(EngineEvent::SessionChoice { model, effort });
+        }
+        events
+    }
+}
+
+/// Reports what a `session/update` says about the session itself as engine events, for the ACP
+/// drivers that keep no record of it (`grok_acp.rs`); the chat skips what it already has.
+pub(crate) fn report_session_state(core: &TurnCore, state: &mut TurnState, params: &Value) {
+    if let Some(update) = session_state_update(params) {
+        for event in AcpSessionState::default().follow(update) {
+            core.dispatch_event(state, event);
+        }
+    }
+}
+
+/// Misty's id for a mode Qoder's ACP reports. ACP names its internal ids (`acceptEdits`,
+/// `dontAsk`, `yolo`); Misty's are its `--permission-mode` values (`modes()` in `qoder.rs`).
+fn misty_mode_id(mode: &str) -> String {
+    match mode {
+        "acceptEdits" => "accept_edits",
+        "dontAsk" => "dont_ask",
+        "yolo" | "bypassPermissions" => "bypass_permissions",
+        other => other,
+    }
+    .to_string()
+}
+
+/// What the session holds once the handshake set it up: its own report, then the model, effort
+/// and mode the handshake just set. Qoder repeats its whole config after every slash command, so
+/// only what differs from this is a change the person made in the turn.
+fn handshake_state(session_result: &Value, req: &SendRequest, bypass_set: bool) -> AcpSessionState {
+    let mut known = session_result
+        .get("configOptions")
+        .map(config_options_state)
+        .unwrap_or_default();
+    if let Some(mode) = non_empty(session_result.pointer("/modes/currentModeId")) {
+        known.mode = Some(mode);
+    }
+    if let Some(model) = non_empty(session_result.pointer("/models/currentModelId")) {
+        known.model = Some(model);
+    }
+    let asked = |value: &Option<String>| {
+        value
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(str::to_string)
+    };
+    if let Some(model) = asked(&req.model) {
+        known.model = Some(model);
+    }
+    if let Some(effort) = asked(&req.effort) {
+        known.effort = Some(effort);
+    }
+    if bypass_set {
+        known.mode = Some("yolo".to_string());
+    }
+    known.mode = known.mode.as_deref().map(misty_mode_id);
+    known
 }
 
 // ==================== agent-initiated requests ====================
@@ -618,10 +765,19 @@ fn session_setting_error(setting: &str, value: &str, error: String) -> String {
     format!("Qoder {setting} `{value}` setup failed: {error}")
 }
 
+/// The CLI's own words from an `rpc:<code>:<method>: <message>` error (`AcpProcess::routed`),
+/// without the code and the method it answered.
 fn parse_rpc_error_message(message: &str) -> String {
     if let Some(rest) = message.strip_prefix("rpc:") {
         if let Some((_, text)) = rest.split_once(':') {
-            return text.to_string();
+            return match text.split_once(": ") {
+                Some((method, text))
+                    if !method.is_empty() && !method.contains(char::is_whitespace) =>
+                {
+                    text.to_string()
+                }
+                _ => text.to_string(),
+            };
         }
     }
     message.to_string()
@@ -884,6 +1040,49 @@ impl AcpProcess {
         }
     }
 
+    /// Reads one line the agent sends with no request of this client's open, waiting up to
+    /// `wait`, and routes it as [`AcpProcess::routed`] does. Antigravity's sub-agents work on
+    /// after the prompt that started them has answered (`grok_acp::follow_on`). Returns whether a
+    /// line came; a closed stdout is an error.
+    pub(crate) async fn listen(
+        &mut self,
+        wait: Duration,
+        router: &mut LineRouter<'_>,
+    ) -> Result<bool, String> {
+        let bytes = match timeout(
+            wait,
+            super::read_line_capped(&mut self.reader, &mut self.line_buf),
+        )
+        .await
+        {
+            Err(_) => return Ok(false),
+            Ok(Ok(super::LineRead::Line(bytes))) => bytes,
+            Ok(Ok(super::LineRead::Eof)) => return Err("ACP stdout closed".to_string()),
+            Ok(Ok(super::LineRead::TooLong)) => {
+                return Err("the ACP agent sent a line too long to read".to_string())
+            }
+            Ok(Err(error)) => return Err(format!("ACP stdout error: {error}")),
+        };
+        let text = String::from_utf8_lossy(&bytes);
+        let Ok(value) = serde_json::from_str::<Value>(text.trim()) else {
+            return Ok(true);
+        };
+        let parsed = parse_acp_line(&value);
+        if let (Some(engine), AcpLine::Notification { method, params }) =
+            (&self.reports_as, &parsed)
+        {
+            if method == "session/update" {
+                super::reported::acp_update(engine, params);
+            }
+        }
+        if !matches!(parsed, AcpLine::Response { .. }) {
+            if let Some(response) = router(&parsed) {
+                self.write_line(&response).await?;
+            }
+        }
+        Ok(true)
+    }
+
     async fn notify(&mut self, method: &str, params: Value) -> Result<(), String> {
         self.write_line(&jsonrpc_notification(method, params)).await
     }
@@ -1010,6 +1209,9 @@ struct TurnView {
     /// toolCallId → tool name from tool_call starts, so the matching
     /// tool_call_update patch can find the row it belongs to.
     tool_names: HashMap<String, String>,
+    /// The session's title, mode, model and effort as last known, so only a change the turn
+    /// made (a slash command, say) reaches the chat.
+    session: AcpSessionState,
 }
 
 /// Drive one send as a qoder ACP turn. Mirrors run_host_turn's settle
@@ -1108,11 +1310,20 @@ async fn handshake_and_prompt(
         .await?;
     let servers = crate::engines::gate::acp_mcp_servers(req, &agent);
     let cwd = req.workspace.to_string_lossy().to_string();
+    // The folders the person added (`/add-dir`): qodercli takes them as ACP's
+    // `additionalDirectories` on session/new and session/resume (absolute paths only, which
+    // `prepare_launch` already keeps to).
+    let extra = additional_directories(&req.additional_dirs);
     let session_result = match req.session_id.as_deref() {
         Some(session_id) => {
             acp.request(
                 "session/resume",
-                json!({ "cwd": cwd, "mcpServers": servers.clone(), "sessionId": session_id }),
+                json!({
+                    "cwd": cwd,
+                    "mcpServers": servers.clone(),
+                    "sessionId": session_id,
+                    "additionalDirectories": extra,
+                }),
                 SESSION_RESUME_TIMEOUT,
                 killed,
                 None,
@@ -1123,7 +1334,7 @@ async fn handshake_and_prompt(
         None => {
             acp.request(
                 "session/new",
-                json!({ "cwd": cwd, "mcpServers": servers }),
+                json!({ "cwd": cwd, "mcpServers": servers, "additionalDirectories": extra }),
                 SESSION_NEW_TIMEOUT,
                 killed,
                 None,
@@ -1174,7 +1385,8 @@ async fn handshake_and_prompt(
     // In Bypass, switch only when the startup flag did not take (folder trust or a settings
     // policy downgraded to default, or a CLI that ignores it); the CLI's own error then surfaces
     // instead of a silent non-bypass turn.
-    if launch_level(req) == "bypass" && !bypass_mode_active(&session_result) {
+    let bypass_set = launch_level(req) == "bypass" && !bypass_mode_active(&session_result);
+    if bypass_set {
         acp.request(
             "session/set_mode",
             json!({ "sessionId": session_id, "modeId": "bypassPermissions" }),
@@ -1185,6 +1397,7 @@ async fn handshake_and_prompt(
         )
         .await?;
     }
+    view.session = handshake_state(&session_result, req, bypass_set);
 
     let prompt_blocks = assemble_prompt_blocks(&req.prompt, &req.images, &req.workspace)?;
     let result = acp
@@ -1207,6 +1420,14 @@ async fn handshake_and_prompt(
     Ok(())
 }
 
+/// The added folders that still exist; a missing one would only fail the handshake.
+fn additional_directories(dirs: &[String]) -> Vec<&str> {
+    dirs.iter()
+        .map(String::as_str)
+        .filter(|dir| Path::new(dir).is_dir())
+        .collect()
+}
+
 /// One session/update notification projected to engine events.
 fn handle_session_update(
     core: &TurnCore,
@@ -1214,6 +1435,25 @@ fn handle_session_update(
     view: &mut TurnView,
     params: &Value,
 ) {
+    // ACP's `usage_update` (how full the context is): the same `usage` event the other ACP
+    // drivers send, which the composer's context meter reads. qodercli 1.1.89 declares it in
+    // its ACP schema without sending it yet; the prompt result's totals still follow.
+    if let Some(usage) = super::kimi_acp::usage(params) {
+        view.last_usage = Some(usage.clone());
+        core.dispatch_event(state, EngineEvent::Usage(usage));
+    }
+    // Qoder sends its mode and config after slash commands and its own switches; the chat
+    // follows what changed (`current_mode_update`, `config_option_update`, `session_info_update`).
+    if let Some(update) = session_state_update(params) {
+        let update = AcpSessionState {
+            mode: update.mode.as_deref().map(misty_mode_id),
+            ..update
+        };
+        for event in view.session.follow(update) {
+            core.dispatch_event(state, event);
+        }
+        return;
+    }
     match session_update_from_notification(params) {
         QoderSessionUpdate::AgentMessageChunk { text } => {
             if is_error_prefixed_text(&text) {
@@ -1375,6 +1615,66 @@ pub(crate) async fn probe_models(bin: &str) -> Result<(Vec<QoderModelEntry>, Val
     .map_err(|_| "Qoder's model catalog probe timed out".to_string())??;
     Ok((parse_models_from_session_new(&result), result))
 }
+
+// ==================== session fork ====================
+
+/// Copies `session_id` into a new Qoder session without a model call: qodercli's ACP
+/// `session/fork` (the call behind its `--fork-session` and `/branch`) in a throwaway child in
+/// the session's folder. Returns the new session's id.
+pub(crate) async fn fork_session(
+    bin: &str,
+    workspace: &Path,
+    session_id: &str,
+    env: &HashMap<String, String>,
+) -> Result<String, String> {
+    if super::qoder::is_qoder_ide_launcher_bin(bin) {
+        return Err(
+            "qoderBin must point to qodercli, not the Qoder IDE launcher (`qoder`)".to_string(),
+        );
+    }
+    let mut command = super::command_for_binary(bin);
+    command.arg("--acp");
+    command.envs(env);
+    let killed = AtomicBool::new(false);
+    let cwd = workspace.to_string_lossy().to_string();
+    let result = timeout(FORK_TOTAL, async {
+        let mut spawned = spawn_piped_acp(&mut command, bin, workspace)?;
+        let result = async {
+            spawned
+                .acp
+                .request(
+                    "initialize",
+                    initialize_params(),
+                    RPC_HANDSHAKE_TIMEOUT,
+                    &killed,
+                    None,
+                    &mut |_| {},
+                )
+                .await?;
+            spawned
+                .acp
+                .request(
+                    "session/fork",
+                    json!({ "cwd": cwd, "mcpServers": [], "sessionId": session_id }),
+                    SESSION_NEW_TIMEOUT,
+                    &killed,
+                    None,
+                    &mut |_| {},
+                )
+                .await
+        }
+        .await;
+        teardown(&mut spawned.child).await;
+        result
+    })
+    .await
+    .map_err(|_| "Qoder took too long to fork the session".to_string())?
+    .map_err(|error| parse_rpc_error_message(&error).trim().to_string())?;
+    extract_session_id(&result).ok_or_else(|| "Qoder's fork returned no sessionId".to_string())
+}
+
+/// The whole fork: start, handshake, and the copy (which opens the new session in its folder).
+const FORK_TOTAL: Duration = Duration::from_secs(120);
 
 #[cfg(test)]
 #[path = "qoder_session_tests.rs"]

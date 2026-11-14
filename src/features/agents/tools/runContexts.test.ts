@@ -14,7 +14,7 @@ import {
 } from "./runContexts";
 
 const store = vi.hoisted(() => ({ revision: 0, state: null as unknown, conflicts: 0 }));
-vi.mock("@/native/invoke", () => ({
+vi.mock("@/shared/platform/nativeInvoke", () => ({
   invoke: async (command: string, args: { revision: number; document: unknown }) => {
     if (command === "settings_session_state")
       return { revision: store.revision, state: store.state };

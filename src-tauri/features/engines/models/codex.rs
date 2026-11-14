@@ -35,9 +35,18 @@ fn parse_codex_config_model(content: &str) -> Option<EngineModel> {
 /// default level (`default_reasoning_level`).
 pub(super) async fn run_codex_debug_models(
     bin: &str,
-) -> Result<(Vec<EngineModel>, std::collections::HashMap<String, super::ModelDetails>), String> {
+) -> Result<
+    (
+        Vec<EngineModel>,
+        std::collections::HashMap<String, super::ModelDetails>,
+    ),
+    String,
+> {
     let stdout = run_probe(bin, &["debug", "models"], "debug models").await?;
-    Ok((parse_codex_models_json(&stdout)?, parse_codex_model_details(&stdout)))
+    Ok((
+        parse_codex_models_json(&stdout)?,
+        parse_codex_model_details(&stdout),
+    ))
 }
 
 pub fn parse_codex_model_details(
@@ -82,7 +91,9 @@ pub fn parse_codex_model_details(
                     detail: text(row.get("description")),
                     efforts,
                     default_effort: text(row.get("default_reasoning_level")),
-                    context_window: row.get("context_window").and_then(serde_json::Value::as_u64),
+                    context_window: row
+                        .get("context_window")
+                        .and_then(serde_json::Value::as_u64),
                     // Its faster service tier, by Codex's own id and name, when it lists one.
                     fast: row
                         .get("service_tiers")
@@ -190,7 +201,13 @@ mod tests {
         assert_eq!(luna.detail.as_deref(), Some("Older fast model."));
         assert_eq!(luna.default_effort.as_deref(), Some("medium"));
         let levels = luna.efforts.as_ref().unwrap();
-        assert_eq!(levels.iter().map(|level| level.id.as_str()).collect::<Vec<_>>(), ["low", "max"]);
+        assert_eq!(
+            levels
+                .iter()
+                .map(|level| level.id.as_str())
+                .collect::<Vec<_>>(),
+            ["low", "max"]
+        );
         assert_eq!(levels[1].description.as_deref(), Some("Deepest"));
         // No tier listed: no fast mode of Misty's making.
         assert!(luna.fast.is_none());
@@ -198,6 +215,9 @@ mod tests {
             r#"{"models":[{"slug":"m","visibility":"list","service_tiers":[{"id":"priority","name":"Priority"}]}]}"#,
         );
         let fast = tiered["m"].fast.as_ref().unwrap();
-        assert_eq!((fast.label.as_str(), fast.tier.as_str()), ("Priority", "priority"));
+        assert_eq!(
+            (fast.label.as_str(), fast.tier.as_str()),
+            ("Priority", "priority")
+        );
     }
 }

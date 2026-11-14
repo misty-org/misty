@@ -27,3 +27,13 @@ export function formatTokens(n: number): string {
   const rounded = Math.round(value * 10) / 10;
   return `${Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1)}${suffix}`;
 }
+
+/** How long a run took, the way a reply's facts say it: "8s", "2m 5s", "1h 3m". */
+export function tookText(ms: number): string {
+  const seconds = Math.max(1, Math.round(ms / 1000));
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return seconds % 60 ? `${minutes}m ${seconds % 60}s` : `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  return minutes % 60 ? `${hours}h ${minutes % 60}m` : `${hours}h`;
+}

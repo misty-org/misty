@@ -130,6 +130,10 @@ fn error_prefixed_chunks_are_detected() {
 #[test]
 fn rpc_error_message_strips_the_code_prefix() {
     assert_eq!(parse_rpc_error_message("rpc:-32601:no method"), "no method");
+    assert_eq!(
+        parse_rpc_error_message("rpc:-32000:session/fork: Authentication required: Sign in."),
+        "Authentication required: Sign in."
+    );
     assert_eq!(parse_rpc_error_message("plain failure"), "plain failure");
 }
 
@@ -345,4 +349,49 @@ fn recorded(path: &Path, needle: &str) -> String {
         std::thread::sleep(Duration::from_millis(10));
     }
     std::fs::read_to_string(path).unwrap_or_default()
+}
+
+#[test]
+fn session_state_follows_only_what_changed() {
+    // qodercli 1.1.89 repeats its whole config after every slash command.
+    let config = |model: &str, effort: &str| {
+        json!({"update": {"sessionUpdate": "config_option_update", "configOptions": [
+            {"type": "select", "id": "mode", "category": "mode", "currentValue": "default", "options": []},
+            {"type": "select", "id": "model", "category": "model", "currentValue": model, "options": []},
+            {"type": "select", "id": "reasoning_effort", "category": "thought_level", "currentValue": effort, "options": []}
+        ]}})
+    };
+    let mut known = AcpSessionState {
+        mode: Some("default".into()),
+        model: Some("auto".into()),
+        effort: Some("medium".into()),
+        ..Default::default()
+    };
+    let same = session_state_update(&config("auto", "medium")).unwrap();
+    assert!(known.follow(same).is_empty());
+    let switched = session_state_update(&config("ultimate", "medium")).unwrap();
+    match &known.follow(switched)[..] {
+        [EngineEvent::SessionChoice {
+            model: Some(model),
+            effort: None,
+        }] => {
+            assert_eq!(model, "ultimate")
+        }
+        other => panic!("expected a model change, got {other:?}"),
+    }
+    let mode =
+        json!({"update": {"sessionUpdate": "current_mode_update", "currentModeId": "acceptEdits"}});
+    let reported = session_state_update(&mode).unwrap();
+    assert_eq!(
+        misty_mode_id(reported.mode.as_deref().unwrap()),
+        "accept_edits"
+    );
+    let title =
+        json!({"update": {"sessionUpdate": "session_info_update", "title": " Fix the build "}});
+    match &AcpSessionState::default().follow(session_state_update(&title).unwrap())[..] {
+        [EngineEvent::SessionTitle(title)] => assert_eq!(title, "Fix the build"),
+        other => panic!("expected a title, got {other:?}"),
+    }
+    let chunk = json!({"update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "hi"}}});
+    assert!(session_state_update(&chunk).is_none());
 }

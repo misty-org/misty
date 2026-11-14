@@ -5,11 +5,16 @@ import type { AgentProfile } from "@/shared/schemas";
 import { useSessionGoalRunner } from "../goals/sessionGoals";
 import { VirtualStudio } from "../virtual/VirtualStudio";
 import { ContextRail } from "../context-panel/ContextRail";
-import { ChatSidePanels } from "../context-panel/ChatSidePanels";
+import {
+  ChatSessionCard,
+  ChatSidePanels,
+  useSidePanelShown,
+} from "../context-panel/ChatSidePanels";
 import { isUnread, markConversationRead } from "./conversationReads";
 import { IntegrationsPage } from "../connected-apps/IntegrationsPage";
 import { TutorPage } from "../tutor/TutorPage";
 import { cn, Surface } from "@/shared/ui";
+import { useContextPanel } from "../context-panel/contextPanelStore";
 import { StudioPage, StudioPageScroll } from "./StudioPage";
 
 /**
@@ -29,6 +34,9 @@ const emptyChatClass = cn(
   "[&_.agent-conversation[data-empty=true]_.agent-compose-area]:max-w-[calc(100%-var(--spacing)*12)]",
   "[&_.agent-conversation[data-empty=true]_.agent-compose-area]:shrink-0",
   "[&_.agent-conversation[data-empty=true]_.agent-compose-area]:p-0",
+  // With the session card kept open over the chat's top right, the greeting and composer center
+  // in the room left of it, where there is room for both.
+  "@min-[1000px]/agent-studio:[&[data-session-card]_.agent-conversation[data-empty=true]]:pr-[calc(--spacing(72)+var(--misty-scrollbar-size)+--spacing(3))]",
 );
 
 /** Queued or working: read state doesn't apply yet. */
@@ -102,6 +110,11 @@ export function AgentWorkspaceFrame({
     document.addEventListener("visibilitychange", read);
     return () => document.removeEventListener("visibilitychange", read);
   }, [activeId, readable]);
+  // The session card kept open over the chat, so a new chat's greeting and composer stay clear of it.
+  // Not while a side panel is open: the card is behind it then, so the chat keeps its full width.
+  const sidePanel = useSidePanelShown(conversationId);
+  const sessionCard =
+    useContextPanel((state) => state.session && !state.sessionTucked) && !sidePanel;
   const [, setParams] = useSearchParams();
   useSessionGoalRunner(activeId ?? "");
   // Integrations mounts the first time it is opened, then stays mounted while hidden. Mounted
@@ -119,6 +132,7 @@ export function AgentWorkspaceFrame({
         emptyChatClass,
       )}
       data-page={page}
+      data-session-card={(page === "task" && sessionCard) || undefined}
     >
       <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
         {/* The chat, then the side panel and the session card, each 8px off the chat. */}
@@ -130,6 +144,10 @@ export function AgentWorkspaceFrame({
             <div className="flex h-full min-w-0" hidden={page !== "task"}>
               {children}
             </div>
+            {/* The session card floats over the chat's top right, taking none of its width. */}
+            {page === "task" ? (
+              <ChatSessionCard conversationId={conversationId} agent={agent} />
+            ) : null}
             {page === "lab" ? (
               <TutorPage
                 agentId={agent.id}
@@ -162,7 +180,7 @@ export function AgentWorkspaceFrame({
               </div>
             ) : null}
           </Surface>
-          {/* The chat's side panel and session card, between the chat and the rail. */}
+          {/* The chat's side panel, between the chat and the rail. */}
           {page === "task" ? (
             <ChatSidePanels conversationId={conversationId} agent={agent} />
           ) : null}

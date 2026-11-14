@@ -374,10 +374,18 @@ mod tests {
 
     type Writing = ProtocolObject<dyn NSPasteboardWriting>;
 
-    /// A private pasteboard keeps the test off the person's clipboard.
-    fn test_pasteboard(file_paths: &[&str], web_url: Option<&str>) -> Retained<NSPasteboard> {
-        let pasteboard = NSPasteboard::pasteboardWithUniqueName();
+    /// A private pasteboard keeps the test off the person's clipboard. It is named with a fresh
+    /// UUID: `pasteboardWithUniqueName` can hand tests running at once the same pasteboard (one
+    /// test then reads another's files), which made these tests fail now and then.
+    fn private_pasteboard() -> Retained<NSPasteboard> {
+        let name = format!("com.misty.tests.clipboard.{}", uuid::Uuid::new_v4());
+        let pasteboard = NSPasteboard::pasteboardWithName(&NSString::from_str(&name));
         pasteboard.clearContents();
+        pasteboard
+    }
+
+    fn test_pasteboard(file_paths: &[&str], web_url: Option<&str>) -> Retained<NSPasteboard> {
+        let pasteboard = private_pasteboard();
         let mut objects: Vec<Retained<Writing>> = file_paths
             .iter()
             .map(|path| {
@@ -388,13 +396,13 @@ mod tests {
             let url = NSURL::URLWithString(&NSString::from_str(url)).expect("valid url");
             objects.push(ProtocolObject::from_retained(url));
         }
-        pasteboard.writeObjects(&NSArray::from_retained_slice(&objects));
+        assert!(pasteboard.writeObjects(&NSArray::from_retained_slice(&objects)));
         pasteboard
     }
 
     #[test]
     fn writes_file_urls_that_read_back() {
-        let pasteboard = NSPasteboard::pasteboardWithUniqueName();
+        let pasteboard = private_pasteboard();
         let paths = vec![
             "/tmp/notes with space.md".to_string(),
             "/tmp/pic.png".to_string(),
@@ -414,12 +422,11 @@ mod tests {
 
     #[test]
     fn a_text_clipboard_has_no_files() {
-        let pasteboard = NSPasteboard::pasteboardWithUniqueName();
-        pasteboard.clearContents();
+        let pasteboard = private_pasteboard();
         let text = NSString::from_str("just text");
-        pasteboard.writeObjects(&NSArray::from_retained_slice(&[
+        assert!(pasteboard.writeObjects(&NSArray::from_retained_slice(&[
             ProtocolObject::from_retained(text),
-        ]));
+        ])));
         assert!(read_file_urls(&pasteboard).is_empty());
     }
 }

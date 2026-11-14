@@ -20,11 +20,9 @@
 
 use std::future::Future;
 use std::pin::Pin;
-use std::process::Stdio;
 use std::time::Duration;
 
 use serde_json::{json, Value};
-use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 
 use super::{
     clamp_percent, timestamp_ms, title_case, Credits, LimitWindow, KIND_OTHER, KIND_SESSION,
@@ -80,100 +78,24 @@ fn command_for(program: &std::path::Path) -> tokio::process::Command {
 }
 
 async fn read_through_app_server() -> Result<Value, CodexFailure> {
+    use crate::engines::codex_rpc::{RpcError, Session};
     let program =
         crate::engine_config::support::find_program("codex").ok_or(CodexFailure::NotInstalled)?;
     let mut command = command_for(&program);
     command
         .arg("app-server")
-        .envs(crate::engine_config::support::child_env())
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null())
-        .kill_on_drop(true);
-    #[cfg(unix)]
-    command.process_group(0);
-    #[cfg(windows)]
-    crate::engine_config::support::hide_console_tokio(&mut command);
-    let mut child = command
-        .spawn()
-        .map_err(|error| CodexFailure::Error(format!("Codex could not be started: {error}")))?;
-    let pid = child.id();
-    let (Some(stdin), Some(stdout)) = (child.stdin.take(), child.stdout.take()) else {
-        return Err(CodexFailure::Error("Codex has no input or output.".into()));
+        .envs(crate::engine_config::support::child_env());
+    let failure = |error: RpcError| match error {
+        RpcError::NotInstalled => CodexFailure::NotInstalled,
+        RpcError::Refused { message, .. } => classify_error(&json!({ "message": message })),
+        RpcError::Failed(reason) => CodexFailure::Error(reason),
     };
-    let outcome = tokio::time::timeout(READ_TIMEOUT, converse(stdin, stdout)).await;
-    if let Some(pid) = pid {
-        crate::engine_config::support::kill_process_group(pid);
-    }
-    let _ = tokio::time::timeout(Duration::from_secs(5), child.wait()).await;
-    match outcome {
-        Ok(result) => result,
-        Err(_) => Err(CodexFailure::Error("Codex didn't answer in time.".into())),
-    }
-}
-
-async fn converse(
-    mut stdin: tokio::process::ChildStdin,
-    stdout: tokio::process::ChildStdout,
-) -> Result<Value, CodexFailure> {
-    let mut lines = BufReader::new(stdout).lines();
-    write(
-        &mut stdin,
-        line(json!({
-            "id": 1,
-            "method": "initialize",
-            "params": {
-                "clientInfo": { "name": "misty", "title": "Misty", "version": env!("CARGO_PKG_VERSION") },
-                "capabilities": null
-            }
-        })),
-    )
-    .await?;
-    answer(&mut lines, 1).await?;
-    write(&mut stdin, line(json!({ "method": "initialized" }))).await?;
-    write(
-        &mut stdin,
-        line(json!({ "id": 2, "method": "account/rateLimits/read" })),
-    )
-    .await?;
-    answer(&mut lines, 2).await
-}
-
-fn line(message: Value) -> Vec<u8> {
-    let mut text = message.to_string();
-    text.push('\n');
-    text.into_bytes()
-}
-
-async fn write(stdin: &mut tokio::process::ChildStdin, bytes: Vec<u8>) -> Result<(), CodexFailure> {
-    let stopped = |_| CodexFailure::Error("Codex stopped before answering.".into());
-    stdin.write_all(&bytes).await.map_err(stopped)?;
-    stdin.flush().await.map_err(stopped)
-}
-
-/// The result of request `id`, skipping notifications on the way.
-async fn answer(
-    lines: &mut tokio::io::Lines<BufReader<tokio::process::ChildStdout>>,
-    id: u64,
-) -> Result<Value, CodexFailure> {
-    loop {
-        let line = lines
-            .next_line()
-            .await
-            .map_err(|_| CodexFailure::Error("Codex stopped before answering.".into()))?
-            .ok_or_else(|| CodexFailure::Error("Codex stopped before answering.".into()))?;
-        let Ok(message) = serde_json::from_str::<Value>(&line) else {
-            continue;
-        };
-        if message.get("method").is_some() || message.get("id").and_then(Value::as_u64) != Some(id)
-        {
-            continue;
-        }
-        if let Some(error) = message.get("error") {
-            return Err(classify_error(error));
-        }
-        return Ok(message.get("result").cloned().unwrap_or(Value::Null));
-    }
+    let mut session = Session::start(command, false, READ_TIMEOUT)
+        .await
+        .map_err(failure)?;
+    let read = session.call("account/rateLimits/read", Value::Null).await;
+    session.stop().await;
+    read.map_err(failure)
 }
 
 /// A JSON-RPC error as a failure. Only a short, secret-free reason is kept.

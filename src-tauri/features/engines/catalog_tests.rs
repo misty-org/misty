@@ -100,6 +100,7 @@ fn project_shadows_user_on_name_collision() {
         source,
         insert: format!("/{name} "),
         argument_hint: None,
+        runs: crate::engines::slash::Runs::Turn,
     };
     let merged = unique(vec![item("Plan", "user"), item("plan", "project")]);
     assert_eq!(merged.len(), 1);

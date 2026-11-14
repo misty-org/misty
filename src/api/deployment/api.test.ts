@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const saved = vi.hoisted(() => ({ state: null as unknown, revision: 0 }));
-vi.mock("@/native/invoke", () => ({
+vi.mock("@/shared/platform/nativeInvoke", () => ({
   invoke: vi.fn(async (command: string, args: { revision?: number; document?: unknown }) => {
     if (command === "settings_session_state")
       return { revision: saved.revision, state: saved.state };

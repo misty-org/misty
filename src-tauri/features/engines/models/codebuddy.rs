@@ -91,7 +91,12 @@ pub fn parse_registry(content: &str) -> Vec<RegistryEntry> {
             let efforts = reasoning
                 .and_then(|reasoning| reasoning.get("supportedEfforts"))
                 .and_then(serde_json::Value::as_array)
-                .map(|levels| levels.iter().filter_map(|level| text(Some(level))).collect());
+                .map(|levels| {
+                    levels
+                        .iter()
+                        .filter_map(|level| text(Some(level)))
+                        .collect()
+                });
             Some(RegistryEntry {
                 name: text(row.get("name")),
                 description: text(row.get("descriptionEn")),
@@ -101,7 +106,8 @@ pub fn parse_registry(content: &str) -> Vec<RegistryEntry> {
                     .and_then(serde_json::Value::as_u64),
                 // A model the registry says doesn't reason takes no levels.
                 efforts: efforts.or_else(|| {
-                    (row.get("supportsReasoning").and_then(serde_json::Value::as_bool)
+                    (row.get("supportsReasoning")
+                        .and_then(serde_json::Value::as_bool)
                         == Some(false))
                     .then(Vec::new)
                 }),
@@ -124,7 +130,10 @@ fn registry_details(
                 entry.id.clone(),
                 super::ModelDetails {
                     efforts: entry.efforts.as_ref().map(|levels| {
-                        levels.iter().map(|level| super::EffortLevel::bare(level)).collect()
+                        levels
+                            .iter()
+                            .map(|level| super::EffortLevel::bare(level))
+                            .collect()
                     }),
                     default_effort: entry.default_effort.clone(),
                     context_window: entry.context_window,
@@ -280,7 +289,10 @@ mod tests {
             "Currently supported: (custom:kimi-k3, hy4-preview, deepseek-v4-pro|deepseek-v4-pro)",
             &registry,
         );
-        assert_eq!(ids(&models), ["hy4-preview", "deepseek-v4-pro", "custom:kimi-k3"]);
+        assert_eq!(
+            ids(&models),
+            ["hy4-preview", "deepseek-v4-pro", "custom:kimi-k3"]
+        );
         assert_eq!(models[0].name.as_deref(), Some("Hunyuan 4 Preview"));
         assert_eq!(models[0].description.as_deref(), Some("Tencent's newest"));
         assert_eq!(models[0].context_window, Some(256_000));
@@ -298,7 +310,10 @@ mod tests {
         assert_eq!(hy.default_effort.as_deref(), Some("high"));
         // The older shape gives a default and no list.
         assert_eq!(details["balanced-model"].efforts, None);
-        assert_eq!(details["balanced-model"].default_effort.as_deref(), Some("medium"));
+        assert_eq!(
+            details["balanced-model"].default_effort.as_deref(),
+            Some("medium")
+        );
         // A model that doesn't reason takes no levels.
         assert_eq!(details["plain"].efforts.as_ref().map(Vec::len), Some(0));
     }

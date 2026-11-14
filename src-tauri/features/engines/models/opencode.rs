@@ -27,7 +27,9 @@ pub fn parse_models_output(stdout: &str) -> Vec<EngineModel> {
         if line.contains("(default)") && default_index.is_none() {
             default_index = Some(models.len());
         }
-        let provider = full_id.split_once('/').map_or("opencode", |(provider, _)| provider);
+        let provider = full_id
+            .split_once('/')
+            .map_or("opencode", |(provider, _)| provider);
         models.push(EngineModel {
             id: full_id.to_string(),
             name: None,

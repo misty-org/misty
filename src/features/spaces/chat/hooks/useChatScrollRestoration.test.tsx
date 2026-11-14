@@ -15,7 +15,7 @@ function Probe({
 }: {
   conversationId: string;
   scrollHeight?: number;
-  revision?: readonly unknown[];
+  revision?: readonly { id?: string }[];
 }) {
   const scroll = useChatScrollRestoration({
     viewerId: "user-1",

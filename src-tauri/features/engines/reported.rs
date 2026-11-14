@@ -122,26 +122,132 @@ pub fn acp_update(engine: &str, params: &Value) {
         .get("availableCommands")
         .and_then(Value::as_array)
         .map(|items| {
-            items
-                .iter()
-                .filter_map(|item| {
-                    Some(Named {
-                        name: clean_name(item.get("name").and_then(Value::as_str)?)?,
-                        description: clean_text(
-                            item.get("description").and_then(Value::as_str),
-                            200,
-                        ),
-                        argument_hint: item
-                            .pointer("/input/hint")
-                            .and_then(Value::as_str)
-                            .map(|hint| clean_text(Some(hint), 80))
-                            .filter(|hint| !hint.is_empty()),
-                    })
-                })
-                .collect()
+            let mut commands: Vec<Named> = Vec::new();
+            for item in items {
+                let Some(raw) = item.get("name").and_then(Value::as_str) else {
+                    continue;
+                };
+                let description = clean_text(item.get("description").and_then(Value::as_str), 200);
+                let mut hint = item
+                    .pointer("/input/hint")
+                    .and_then(Value::as_str)
+                    .map(|hint| clean_text(Some(hint), 80))
+                    .filter(|hint| !hint.is_empty());
+                // Qwen names a command's subcommands in `_meta.subcommands`.
+                if hint.is_none() {
+                    hint = subcommand_hint(item.pointer("/_meta/subcommands"));
+                }
+                // Gemini reports a subcommand as its own two-word entry ("memory show"): it
+                // becomes one of its command's choices instead.
+                let mut words = raw.trim().trim_start_matches(['/', '$']).split_whitespace();
+                let (Some(first), second) = (words.next(), words.next()) else {
+                    continue;
+                };
+                let Some(name) = clean_name(first) else {
+                    continue;
+                };
+                if super::slash::acp::withheld(engine).contains(&name.as_str()) {
+                    continue;
+                }
+                match second.and_then(clean_name) {
+                    Some(sub) => add_subcommand(&mut commands, name, sub),
+                    None => match commands.iter_mut().find(|command| command.name == name) {
+                        Some(known) => {
+                            known.description = description;
+                            if hint.is_some() {
+                                known.argument_hint = hint;
+                            }
+                        }
+                        None => commands.push(Named {
+                            name,
+                            description,
+                            argument_hint: hint,
+                        }),
+                    },
+                }
+            }
+            commands
         });
-    let skills = names_in(update.pointer("/_meta/availableSkills"));
+    // Qwen names its skills alone in `availableSkills`; their descriptions are in
+    // `availableSkillDetails`, and on the command each one also is.
+    let details = names_in(update.pointer("/_meta/availableSkillDetails")).unwrap_or_default();
+    let skills = names_in(update.pointer("/_meta/availableSkills")).map(|skills| {
+        skills
+            .into_iter()
+            .map(|mut skill| {
+                if skill.description.is_empty() {
+                    let named = details
+                        .iter()
+                        .chain(commands.iter().flatten())
+                        .find(|named| named.name == skill.name && !named.description.is_empty());
+                    if let Some(named) = named {
+                        skill.description = named.description.clone();
+                    }
+                }
+                skill
+            })
+            .collect()
+    });
     store(engine, commands, skills);
+}
+
+/// The longest hint a command's subcommands make. Only whole choices go in, so a list that
+/// runs over loses its last choices rather than ending in half a word.
+const MOST_CHOICES: usize = 160;
+
+/// `choices` joined as a hint, with as many whole choices as fit.
+fn choices_hint<'a>(choices: impl IntoIterator<Item = &'a str>) -> Option<String> {
+    let mut hint = String::new();
+    for choice in choices {
+        let more = if hint.is_empty() { 0 } else { 3 } + choice.chars().count();
+        if hint.chars().count() + more > MOST_CHOICES {
+            break;
+        }
+        if !hint.is_empty() {
+            hint.push_str(" | ");
+        }
+        hint.push_str(choice);
+    }
+    (!hint.is_empty()).then_some(hint)
+}
+
+/// The choices a command's `_meta.subcommands` lists (names, or objects with a name), as a hint.
+fn subcommand_hint(list: Option<&Value>) -> Option<String> {
+    let names: Vec<String> = list?
+        .as_array()?
+        .iter()
+        .filter_map(|item| {
+            let name = item
+                .as_str()
+                .or_else(|| item.get("name").and_then(Value::as_str))?;
+            clean_name(name)
+        })
+        .collect();
+    choices_hint(names.iter().map(String::as_str))
+}
+
+/// Adds `sub` to the choices of the command `name`, adding the command when it isn't listed yet.
+fn add_subcommand(commands: &mut Vec<Named>, name: String, sub: String) {
+    let command = match commands.iter().position(|command| command.name == name) {
+        Some(at) => &mut commands[at],
+        None => {
+            commands.push(Named {
+                name,
+                description: String::new(),
+                argument_hint: None,
+            });
+            commands.last_mut().expect("just pushed")
+        }
+    };
+    let hint = command.argument_hint.take().unwrap_or_default();
+    let mut choices: Vec<&str> = hint
+        .split(" | ")
+        .filter(|choice| !choice.is_empty())
+        .collect();
+    if !choices.contains(&sub.as_str()) {
+        choices.push(&sub);
+    }
+    command.argument_hint = choices_hint(choices).or(Some(hint).filter(|hint| !hint.is_empty()));
 }
 
 #[cfg(test)]
@@ -152,59 +258,5 @@ pub(crate) fn forget(engine: &str) {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use serde_json::json;
-
-    #[test]
-    fn claude_init_keeps_commands_apart_from_skills() {
-        claude_init(
-            "test-claude",
-            &json!({
-                "slash_commands": ["compact", "context", "review", "pdf", "bad name", ""],
-                "skills": ["pdf"],
-            }),
-        );
-        let report = report_of("test-claude");
-        let commands: Vec<_> = report
-            .commands
-            .unwrap()
-            .into_iter()
-            .map(|c| c.name)
-            .collect();
-        assert_eq!(commands, ["compact", "context", "review"]);
-        assert_eq!(report.skills.unwrap()[0].name, "pdf");
-        forget("test-claude");
-    }
-
-    #[test]
-    fn acp_commands_carry_their_description_and_hint() {
-        acp_update(
-            "test-acp",
-            &json!({"update": {
-                "sessionUpdate": "available_commands_update",
-                "availableCommands": [
-                    {"name": "init", "description": "Analyze the project\nand write a file"},
-                    {"name": "/memory", "description": "Manage memory", "input": {"hint": "show | add"}},
-                ],
-                "_meta": {"availableSkills": ["review-pr"]},
-            }}),
-        );
-        let report = report_of("test-acp");
-        let commands = report.commands.unwrap();
-        assert_eq!(
-            commands[0].description,
-            "Analyze the project and write a file"
-        );
-        assert_eq!(commands[1].name, "memory");
-        assert_eq!(commands[1].argument_hint.as_deref(), Some("show | add"));
-        assert_eq!(report.skills.unwrap()[0].name, "review-pr");
-        // Other updates change nothing.
-        acp_update(
-            "test-acp",
-            &json!({"update": {"sessionUpdate": "agent_message_chunk"}}),
-        );
-        assert_eq!(report_of("test-acp").commands.unwrap().len(), 2);
-        forget("test-acp");
-    }
-}
+#[path = "reported_tests.rs"]
+mod tests;

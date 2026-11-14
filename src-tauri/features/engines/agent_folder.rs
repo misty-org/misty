@@ -169,8 +169,12 @@ pub(crate) async fn ask_before_first_run(
     }
     let db = app.state::<MistyRuntime>().environment.store();
     let known = {
-        let (db, account, agent, named) =
-            (db.clone(), account.to_string(), agent.to_string(), named.to_string());
+        let (db, account, agent, named) = (
+            db.clone(),
+            account.to_string(),
+            agent.to_string(),
+            named.to_string(),
+        );
         blocking(move || known_for_run(&db, &account, &agent, &named)).await?
     };
     if known.is_some() {
@@ -182,7 +186,9 @@ pub(crate) async fn ask_before_first_run(
         agent_name.trim()
     };
     let Some(path) = pick_folder(app, &format!("Choose where {name} works")).await? else {
-        return Err(format!("{name} needs a folder to work in. Send again to choose one."));
+        return Err(format!(
+            "{name} needs a folder to work in. Send again to choose one."
+        ));
     };
     adopt(app, &db, account, agent, path).await?;
     Ok(())

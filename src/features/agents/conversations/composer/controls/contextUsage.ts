@@ -75,6 +75,8 @@ export function useChatContextUsage(runIds: string[]): ContextUsage | undefined 
   return useContextUsageStore((state) => {
     for (let index = runIds.length - 1; index >= 0; index--) {
       const usage = state.byRun[runIds[index]];
+      // None used is a compaction the engine didn't size: older runs' counts are stale too.
+      if (usage?.used === 0) return undefined;
       if (usage?.used) return usage;
     }
     return undefined;

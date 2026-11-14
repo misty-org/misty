@@ -15,7 +15,7 @@ const mocks = vi.hoisted(() => ({
   apiRequest: vi.fn(),
 }));
 
-vi.mock("@/native/invoke", () => ({
+vi.mock("@/shared/platform/nativeInvoke", () => ({
   invoke: async (command: string, args: { revision: number; document: unknown; host: string }) => {
     if (command === "settings_session_state") {
       return { revision: mocks.settings.revision, state: mocks.settings.state };

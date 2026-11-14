@@ -6,7 +6,7 @@ const { transcribeVoice } = vi.hoisted(() => ({ transcribeVoice: vi.fn() }));
 const db = await vi.hoisted(async () =>
   (await import("@/tests/fakeDeviceSettings")).fakeDeviceSettings(),
 );
-vi.mock("@/native/invoke", () => ({ invoke: db.invoke }));
+vi.mock("@/shared/platform/nativeInvoke", () => ({ invoke: db.invoke }));
 
 vi.mock("@/features/agents/AgentsRuntime", () => ({
   runtimeAgentsApi: { transcribeVoice },

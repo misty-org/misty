@@ -210,7 +210,7 @@ export function ContextStatus({ conversationId }: FocusedChat) {
   const choices = useChatChoices(conversationId);
   const engine = agent?.engine || mistyEngine;
   const max = resolveContextMax({ usage, engine, model: usage?.model || choices.model });
-  const { pct } = usageBreakdown(usage, max);
+  const pct = usageBreakdown(usage, max)?.pct;
   if (pct === undefined) return null;
   return (
     <Tooltip content="Context used">

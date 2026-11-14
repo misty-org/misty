@@ -16,6 +16,9 @@
 //!   of the session) — either way the old headless run never prompted,
 //!   same net outcome; config denies never reach us.
 //! - Interrupt sends `POST /session/:id/abort`.
+//!
+//! OpenCode 2.x replaced this API with its `/api/…` one; a server that speaks it runs the turn in
+//! [`v2`] instead.
 
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -48,7 +51,12 @@ struct TurnView {
     context_windows: HashMap<String, u64>,
     turn_ended: bool,
     saw_content: bool,
+    /// The same, for a 2.x server's turn.
+    v2: v2::View,
 }
+
+#[path = "opencode_v2.rs"]
+mod v2;
 
 /// Drive one send as a server turn. Mirrors `run_host_turn`'s settle
 /// contract: dispatch events until a terminal done/error, settle parked
@@ -115,7 +123,9 @@ async fn run_server_turn_with_probe_port(
         let usage = if killed.load(Ordering::SeqCst) {
             None
         } else {
-            view.last_usage.clone()
+            view.last_usage
+                .clone()
+                .or_else(|| view.v2.last_usage.clone())
         };
         core.dispatch_event(&mut state, EngineEvent::Done { session_id, usage });
     }
@@ -140,7 +150,14 @@ async fn turn_inner(
     probe_port: u16,
 ) -> Result<(), String> {
     let origin = opencode_server::ensure_server(server, bin, probe_port).await?;
+    if opencode_server::is_v2(&origin) {
+        return v2::turn(core, state, &mut view.v2, req, &origin, killed).await;
+    }
     let directory = req.workspace.to_string_lossy().to_string();
+    // The `/` menu lists the commands OpenCode reports for this folder. Reading them as each turn
+    // starts puts `/review` and the person's own commands there from the first turn on, not only
+    // after a command has been sent once.
+    tokio::spawn(report_commands(origin.clone(), directory.clone()));
 
     // The context gauge needs the model's window; opencode's usage payload
     // never carries one, so read the server's merged config once per turn and
@@ -258,11 +275,15 @@ async fn load_context_windows(origin: &str, directory: &str) -> HashMap<String, 
     else {
         return HashMap::new();
     };
-    let Ok(response) = client
-        .get(format!("{origin}/config"))
-        .query(&[("directory", directory)])
-        .send()
-        .await
+    let Ok(response) = opencode_server::request(
+        &client,
+        reqwest::Method::GET,
+        origin,
+        "/config",
+        Some(directory),
+    )
+    .send()
+    .await
     else {
         return HashMap::new();
     };
@@ -294,6 +315,15 @@ fn parse_context_windows(config: &Value) -> HashMap<String, u64> {
     windows
 }
 
+/// Whether an assistant message is the summary a compaction wrote: 1.x marks it `summary: true`
+/// and runs it on its `compaction` agent (`mode` in older releases).
+pub(crate) fn is_compaction_summary(info: &Value) -> bool {
+    info.get("summary").and_then(Value::as_bool) == Some(true)
+        || ["agent", "mode"]
+            .iter()
+            .any(|key| info.get(*key).and_then(Value::as_str) == Some("compaction"))
+}
+
 /// Attach the model's window to a usage payload when opencode didn't report
 /// one, keyed as `model_context_window` — the field the rest of the app reads.
 /// The provider/model come off the assistant message, so resumed sessions and
@@ -322,16 +352,21 @@ async fn create_session(origin: &str, directory: &str, prompt: &str) -> Result<S
     } else {
         json!({ "title": title })
     };
-    let created = reqwest::Client::new()
-        .post(format!("{origin}/session"))
-        .query(&[("directory", directory)])
-        .json(&body)
-        .send()
-        .await
-        .map_err(|e| format!("OpenCode could not create a session: {e}"))?
-        .json::<Value>()
-        .await
-        .map_err(|e| format!("OpenCode's session reply could not be read: {e}"))?;
+    let client = reqwest::Client::new();
+    let created = opencode_server::request(
+        &client,
+        reqwest::Method::POST,
+        origin,
+        "/session",
+        Some(directory),
+    )
+    .json(&body)
+    .send()
+    .await
+    .map_err(|e| format!("OpenCode could not create a session: {e}"))?
+    .json::<Value>()
+    .await
+    .map_err(|e| format!("OpenCode's session reply could not be read: {e}"))?;
     created
         .get("id")
         .and_then(Value::as_str)
@@ -348,21 +383,48 @@ fn command_in(prompt: &str) -> Option<(&str, &str)> {
     (!name.is_empty() && !name.contains('/')).then_some((name, arguments))
 }
 
-/// OpenCode's commands for this folder (`GET /command`), kept for the `/` menu.
+/// Reads OpenCode's commands for this folder and keeps them for the `/` menu, on its own task.
+pub(crate) async fn report_commands(origin: String, directory: String) {
+    commands(&origin, &directory).await;
+}
+
+/// OpenCode's commands for this folder (`GET /command`, 2.x's `GET /api/command`), kept for the
+/// `/` menu.
 async fn commands(origin: &str, directory: &str) -> Vec<String> {
-    let Ok(response) = reqwest::Client::new()
-        .get(format!("{origin}/command"))
-        .query(&[("directory", directory)])
-        .timeout(Duration::from_secs(10))
-        .send()
-        .await
-    else {
+    let path = if opencode_server::is_v2(origin) {
+        "/api/command"
+    } else {
+        "/command"
+    };
+    let get = || {
+        opencode_server::call(
+            reqwest::Method::GET,
+            origin,
+            path,
+            Some(directory),
+            None,
+            Duration::from_secs(10),
+        )
+    };
+    let Ok(mut list) = get().await else {
         return Vec::new();
     };
-    let Ok(list) = response.json::<Value>().await else {
-        return Vec::new();
-    };
-    let named = list.as_array().map(|items| {
+    // 2.x can answer an empty list while it is still loading a folder it hasn't opened before;
+    // it always has its built-in commands once loaded, so an empty answer is asked again.
+    for _ in 0..4 {
+        let empty = opencode_server::data(&list)
+            .as_array()
+            .is_some_and(Vec::is_empty);
+        if !(empty && opencode_server::is_v2(origin)) {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(500)).await;
+        match get().await {
+            Ok(again) => list = again,
+            Err(_) => break,
+        }
+    }
+    let named = opencode_server::data(&list).as_array().map(|items| {
         items
             .iter()
             .filter_map(|item| {
@@ -388,19 +450,19 @@ async fn commands(origin: &str, directory: &str) -> Vec<String> {
 }
 
 /// Runs a message that is one of OpenCode's own commands through its command call, or
-/// `/compact` through its summarize call; false when the message is an ordinary prompt. The
-/// call answers only once the command is done, so it runs on its own while the event stream
-/// carries the turn.
+/// `/compact` (`/summarize` in its terminal app too) through its summarize call; false when the
+/// message is an ordinary prompt. The call answers only once the command is done, so it runs on
+/// its own while the event stream carries the turn.
 async fn run_command(origin: &str, directory: &str, session_id: &str, req: &SendRequest) -> bool {
-    if !req.images.is_empty() || req.permission.as_deref() == Some("plan") {
+    if !req.images.is_empty() {
         return false;
     }
     let Some((name, arguments)) = command_in(&req.prompt) else {
         return false;
     };
-    let model = req.model.as_deref().and_then(|model| model.split_once('/'));
-    let (path, body) = if name == "compact" && arguments.is_empty() {
-        let Some((provider, model)) = model else {
+    let (path, body) = if matches!(name, "compact" | "summarize") && arguments.is_empty() {
+        let Some((provider, model)) = compact_model(origin, directory, session_id, req).await
+        else {
             return false;
         };
         (
@@ -416,21 +478,115 @@ async fn run_command(origin: &str, directory: &str, session_id: &str, req: &Send
         if let Some(model) = req.model.as_deref() {
             body["model"] = json!(model);
         }
+        // In Plan the command runs on the plan agent, as a message sent there does and as
+        // OpenCode's terminal app passes the agent it is on.
+        if req.permission.as_deref() == Some("plan") {
+            body["agent"] = json!("plan");
+        }
+        if let Some(effort) = req
+            .effort
+            .as_deref()
+            .map(str::trim)
+            .filter(|e| !e.is_empty())
+        {
+            body["variant"] = json!(effort);
+        }
         ("command", body)
     } else {
         return false;
     };
-    let url = format!("{origin}/session/{session_id}/{path}");
+    let url = format!("/session/{session_id}/{path}");
     let directory = directory.to_owned();
+    let origin = origin.to_owned();
     tokio::spawn(async move {
-        let _ = reqwest::Client::new()
-            .post(url)
-            .query(&[("directory", directory.as_str())])
-            .json(&body)
-            .send()
-            .await;
+        let client = reqwest::Client::new();
+        let _ = opencode_server::request(
+            &client,
+            reqwest::Method::POST,
+            &origin,
+            &url,
+            Some(&directory),
+        )
+        .json(&body)
+        .send()
+        .await;
     });
     true
+}
+
+/// The model `/compact` summarizes with. OpenCode's terminal app uses the one it is on: here
+/// that is the chat's choice, else the one the session's last message ran on, else the
+/// server's configured model. None when there is none of them.
+async fn compact_model(
+    origin: &str,
+    directory: &str,
+    session_id: &str,
+    req: &SendRequest,
+) -> Option<(String, String)> {
+    if let Some((provider, model)) = req.model.as_deref().and_then(|m| m.split_once('/')) {
+        return Some((provider.to_owned(), model.to_owned()));
+    }
+    let messages = messages(origin, directory, session_id)
+        .await
+        .unwrap_or_default();
+    if let Some(model) = last_user_message(&messages).and_then(message_model) {
+        return Some(model);
+    }
+    let config = opencode_server::call(
+        reqwest::Method::GET,
+        origin,
+        "/config",
+        Some(directory),
+        None,
+        Duration::from_secs(10),
+    )
+    .await
+    .ok()?;
+    let (provider, model) = config.get("model")?.as_str()?.split_once('/')?;
+    Some((provider.to_owned(), model.to_owned()))
+}
+
+/// The session's messages (`GET /session/:id/message`), oldest first, each `{info, parts}`.
+pub(crate) async fn messages(
+    origin: &str,
+    directory: &str,
+    session_id: &str,
+) -> Result<Vec<Value>, String> {
+    if opencode_server::is_v2(origin) {
+        return v2::messages(origin, session_id).await;
+    }
+    let list = opencode_server::call(
+        reqwest::Method::GET,
+        origin,
+        &format!("/session/{session_id}/message"),
+        Some(directory),
+        None,
+        Duration::from_secs(15),
+    )
+    .await?;
+    Ok(list.as_array().cloned().unwrap_or_default())
+}
+
+/// Whether a `{info, parts}` message is one the person sent.
+pub(crate) fn is_user_message(message: &Value) -> bool {
+    message.pointer("/info/role").and_then(Value::as_str) == Some("user")
+}
+
+/// The last message the person sent, of `messages` (oldest first).
+pub(crate) fn last_user_message(messages: &[Value]) -> Option<&Value> {
+    messages
+        .iter()
+        .rev()
+        .find(|message| is_user_message(message))
+}
+
+/// The `(provider, model)` a user message ran on.
+fn message_model(message: &Value) -> Option<(String, String)> {
+    let model = message.pointer("/info/model")?;
+    Some((
+        model.get("providerID")?.as_str()?.to_owned(),
+        model.get("modelID")?.as_str()?.to_owned(),
+    ))
 }
 
 async fn prompt(
@@ -469,13 +625,18 @@ async fn prompt(
     {
         body["variant"] = json!(effort);
     }
-    let response = reqwest::Client::new()
-        .post(format!("{origin}/session/{session_id}/prompt_async"))
-        .query(&[("directory", directory)])
-        .json(&body)
-        .send()
-        .await
-        .map_err(|e| format!("OpenCode did not take the prompt: {e}"))?;
+    let client = reqwest::Client::new();
+    let response = opencode_server::request(
+        &client,
+        reqwest::Method::POST,
+        origin,
+        &format!("/session/{session_id}/prompt_async"),
+        Some(directory),
+    )
+    .json(&body)
+    .send()
+    .await
+    .map_err(|e| format!("OpenCode did not take the prompt: {e}"))?;
     if !response.status().is_success() {
         let status = response.status();
         let detail = response.text().await.unwrap_or_default();
@@ -496,14 +657,19 @@ fn spawn_event_stream(
 ) -> (mpsc::Receiver<Value>, tokio::sync::oneshot::Receiver<bool>) {
     let (tx, rx) = mpsc::channel::<Value>(64);
     let (ready_tx, ready_rx) = tokio::sync::oneshot::channel::<bool>();
-    let url = format!("{origin}/event");
+    let origin = origin.to_string();
     let directory = directory.to_string();
     tokio::spawn(async move {
-        let response = reqwest::Client::new()
-            .get(&url)
-            .query(&[("directory", directory.as_str())])
-            .send()
-            .await;
+        let client = reqwest::Client::new();
+        let response = opencode_server::request(
+            &client,
+            reqwest::Method::GET,
+            &origin,
+            "/event",
+            Some(&directory),
+        )
+        .send()
+        .await;
         let Ok(response) = response else {
             let _ = ready_tx.send(false);
             return;
@@ -622,8 +788,16 @@ async fn handle_server_event(
                 return;
             }
             // Finished assistant messages carry the authoritative token usage.
-            if let Some(tokens) = info.get("tokens").filter(|t| !t.is_null()) {
-                let usage = attach_context_window(tokens.clone(), &info, &view.context_windows);
+            if let Some(tokens) = info.get("tokens").filter(|t| t.is_object()) {
+                let usage = v2::usage_of(tokens, None);
+                // The summary `/compact` writes is a message too (`summary: true`), and its
+                // tokens size the context from before.
+                let usage = if is_compaction_summary(&info) {
+                    v2::after_compaction(usage)
+                } else {
+                    usage
+                };
+                let usage = attach_context_window(usage, &info, &view.context_windows);
                 view.last_usage = Some(usage.clone());
                 core.dispatch_event(state, EngineEvent::Usage(usage));
             }
@@ -632,6 +806,11 @@ async fn handle_server_event(
             if let Some(message) = extract_error_message(&info) {
                 core.dispatch_event(state, EngineEvent::Warn(message));
             }
+        }
+        // A compaction's end names no size either, so the bar's count clears here too, even when
+        // the summary message didn't say what it was.
+        "session.compacted" => {
+            core.dispatch_event(state, EngineEvent::Usage(v2::after_compaction(json!({}))));
         }
         "session.status" => {
             let status = properties.pointer("/status/type").and_then(Value::as_str);
@@ -861,6 +1040,55 @@ pub(crate) fn reply_answers(request: &Value, answers: &Value) -> Option<Vec<Vec<
         out.push(selected);
     }
     Some(out)
+}
+
+/// Answers a question parked by either driver, from its answer context (`{origin, directory,
+/// requestId, …}`): 1.x replies at `/question/:id/reply` (dismissed: `/reject`), 2.x replies to
+/// the form it parked. `None` answers mean the card was dismissed.
+pub(crate) async fn answer_question(
+    context: &Value,
+    answers: Option<&Value>,
+) -> Result<(), String> {
+    if context.get("form").is_some() {
+        return v2::answer_form(context, answers).await;
+    }
+    let origin = context
+        .get("origin")
+        .and_then(Value::as_str)
+        .ok_or_else(|| "question answer context is missing the server origin".to_string())?;
+    let directory = context
+        .get("directory")
+        .and_then(Value::as_str)
+        .unwrap_or("");
+    let request_id = context
+        .get("requestId")
+        .and_then(Value::as_str)
+        .ok_or_else(|| "question answer context is missing the request id".to_string())?;
+    let request = context.get("request").cloned().unwrap_or(Value::Null);
+    // Dismissed = reject (the tool raises QuestionRejectedError, the model hears the person
+    // declined to answer and goes on); otherwise reply, with answers in the questions' order.
+    match answers {
+        None => {
+            opencode_server::post(
+                origin,
+                &format!("/question/{request_id}/reject"),
+                directory,
+                None,
+            )
+            .await
+        }
+        Some(answers) => {
+            let answers = reply_answers(&request, answers)
+                .ok_or_else(|| "question answer context is malformed".to_string())?;
+            opencode_server::post(
+                origin,
+                &format!("/question/{request_id}/reply"),
+                directory,
+                Some(json!({ "answers": answers })),
+            )
+            .await
+        }
+    }
 }
 
 /// Extract a readable message from an opencode error object

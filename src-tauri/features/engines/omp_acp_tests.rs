@@ -361,3 +361,28 @@ async fn resume_is_refused_before_any_spawn() {
     assert!(emitted.contains("\"error\""), "{emitted}");
     assert!(emitted.contains("new session"), "{emitted}");
 }
+
+#[tokio::test]
+async fn usage_update_sizes_the_context_and_the_turn_total_keeps_its_window() {
+    let (core, _registry, emitter) = test_core();
+    let mut state = TurnState::new(None);
+    let mut view = TurnView::default();
+    // omp 18's usage_update (`getContextUsage()` and the session's cost).
+    let update = json!({"sessionId": "s1", "update": {"sessionUpdate": "usage_update",
+        "size": 128000, "used": 14777, "cost": {"amount": 0.01, "currency": "USD"}}});
+    handle_session_update(&core, &mut state, &mut view, &update);
+    assert_eq!(view.context_window, Some(128000));
+    core.sink.flush();
+    let emitted = emitter.0.lock().unwrap().join(" ");
+    assert!(emitted.contains("\"used\":14777"), "{emitted}");
+    // Its prompt answer: the turn's usage-statistics delta, which adds up every call.
+    let answer = json!({"stopReason": "end_turn", "usage": {"inputTokens": 300,
+        "outputTokens": 200, "totalTokens": 40300, "cachedReadTokens": 39800}});
+    let usage = prompt_usage(&answer, view.context_window).unwrap();
+    assert_eq!(usage["model_context_window"], 128000);
+    // Read alone it sizes the bar; after the usage_update the bridge keeps the update's size.
+    assert_eq!(
+        crate::engines::bridge::context_usage(&usage),
+        (Some(40300), Some(128000))
+    );
+}

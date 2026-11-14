@@ -108,7 +108,6 @@ export const SettingsWorkspace = memo(function SettingsWorkspace(props: Settings
     shortcuts: store.shortcuts,
     app,
   };
-  const dirty = useDevicePreferences((state) => state.dirty);
   const error = store.error || preferences.error;
 
   return (

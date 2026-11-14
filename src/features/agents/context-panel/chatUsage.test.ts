@@ -24,3 +24,13 @@ it("has no cost when no reply reported one", () => {
   expect(formatCost(0.004)).toBe("<$0.01");
   expect(formatCost(1.236)).toBe("$1.24");
 });
+
+it("clears the context count after a compaction that reported none", () => {
+  const usage = chatUsage([
+    { input: 580, cacheRead: 5504, output: 165, used: 6249, window: 200_000 },
+    { input: 580, cacheRead: 5504, output: 165, used: 0, window: 200_000 },
+  ]);
+  expect(usage.used).toBeUndefined();
+  expect(usage.totalIn).toBe(12_168);
+  expect(chatUsage([{ used: 6249 }, { used: 0 }, { input: 9, output: 1, used: 10 }]).used).toBe(10);
+});

@@ -16,9 +16,11 @@ import {
   captureRegionFile,
   engineModeItem,
   modelEffortItem,
+  vimItem,
   useEngineModels,
 } from "../composer/controls/ComposerControls";
 import { useComposerSuggestions } from "../composer/controls/ComposerSuggestions";
+import { handleVimKey, useComposerVim } from "../composer/controls/composerVim";
 import { useEngineFolder } from "../composer/controls/FolderSegment";
 import { useAgentFolder, useAgentFolders } from "../../shared-folders/agentFolder";
 import {
@@ -143,6 +145,8 @@ export function AgentConversationComposer({
     }
   };
   const choices = useChatChoices(conversationId);
+  const vimOn = useComposerVim((s) => s.on);
+  const vimMode = useComposerVim((s) => s.state.mode);
   const models = useEngineModels(engine);
 
   const items = [
@@ -158,6 +162,7 @@ export function AgentConversationComposer({
       agentEffort: agent?.reasoning_effort,
       disabled,
     }),
+    vimItem({ on: vimOn, mode: vimMode }),
   ].filter((item): item is ActionBarItem => Boolean(item));
 
   // One button: Send while there is something to send, Stop while a reply runs and nothing is typed.
@@ -214,6 +219,8 @@ export function AgentConversationComposer({
             e.preventDefault();
             return;
           }
+          // Vim keys, when on, take what they need before history and sending.
+          if (handleVimKey(e, textareaRef, setDraft)) return;
           // Up in an empty box brings back what was sent before.
           if (history.handleKeyDown(e)) return;
           if (e.key === "Tab" && e.shiftKey && !e.altKey && !e.metaKey && !e.ctrlKey) {
@@ -227,6 +234,8 @@ export function AgentConversationComposer({
           }
           if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
             e.preventDefault();
+            // The next message starts in insert mode, as a new Vim buffer would.
+            useComposerVim.getState().reset();
             if (!attachments.attachments.some((a) => a.state !== "ready")) send();
           }
         }}

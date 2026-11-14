@@ -75,14 +75,15 @@ impl Engine for KimiEngine {
     fn supports_effort(&self) -> bool {
         true
     }
-    /// Kimi's ACP session modes (`session/set_mode`): `default`, where each ask comes back
-    /// through ACP, and `plan`. Its YOLO isn't offered: Kimi has no sandbox that keeps it inside
-    /// its folder.
+    /// Kimi Code's ACP session modes (`session/set_mode`, `acp-server/src/modes.ts`): `default`,
+    /// where each ask comes back through ACP, `plan`, and `auto`, which approves safe operations
+    /// itself. Its YOLO isn't offered: Kimi has no sandbox that keeps it inside its folder.
     fn modes(&self) -> &'static [super::modes::EngineMode] {
         use super::modes::{mode, ModeKind::*};
         const MODES: &[super::modes::EngineMode] = &[
             mode("default", "Default", Asks, "manual"),
             mode("plan", "Plan", Plans, "plan"),
+            mode("auto", "Auto", Edits, "auto"),
         ];
         MODES
     }

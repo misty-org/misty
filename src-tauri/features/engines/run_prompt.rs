@@ -216,6 +216,11 @@ mod tests {
 
     #[test]
     fn documents_are_saved_for_the_engine_and_named_in_the_prompt() {
+        // The folder comes from `HOME`, which tests that use a scratch home move and then delete
+        // (the history scanner's, CodeBuddy's, DSH's). Saved while one of them held a scratch
+        // `HOME`, the files sat outside the folder asked for afterwards, or were deleted before
+        // they were read back, so this failed now and then. Those tests hold this lock.
+        let _home = crate::engines::support::paths::HOME_ENV_LOCK.lock();
         let run = format!("test-{}", uuid::Uuid::new_v4());
         let attachments = json!([
             { "name": "report.pdf", "mime_type": "application/pdf", "data_url": "data:application/pdf;base64,JVBERi0=" },

@@ -875,11 +875,10 @@ pub(super) fn opencode_db_visible_sessions(
     Some(visible)
 }
 
-/// OpenCode sessions, from either storage generation. Legacy (≤1.1.x) keeps
-/// one JSON tree per data root (`<root>/storage/session/<projectId>/<id>.json`,
-/// shape `{id, projectID, directory, title, time:{created,updated}}`); ≥1.18
-/// keeps one SQLite database per root (`<root>/opencode.db`). Both attribute a
-/// session to a workspace by its recorded `directory`.
+/// OpenCode sessions, from each storage generation. Legacy (≤1.1.x) keeps one JSON tree per
+/// data root (`<root>/storage/session/<projectId>/<id>.json`, shape `{id, projectID, directory,
+/// title, time:{created,updated}}`); ≥1.18 keeps one SQLite database per root (`opencode.db`,
+/// its 2.x tables read by `opencode_v2.rs`). Each matches a workspace by its `directory`.
 pub(super) fn discover_opencode(workspace: &Path) -> Vec<SessionFile> {
     let mut out = Vec::new();
     let mut seen_sessions = std::collections::HashSet::new();
@@ -887,6 +886,7 @@ pub(super) fn discover_opencode(workspace: &Path) -> Vec<SessionFile> {
         let in_database = opencode_db_updated_times(&root);
         discover_opencode_tree(&root, workspace, &in_database, &mut seen_sessions, &mut out);
         discover_opencode_db(&root, workspace, &mut seen_sessions, &mut out);
+        super::opencode_v2::discover(&root, workspace, &mut seen_sessions, &mut out);
     }
     out
 }

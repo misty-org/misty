@@ -2,6 +2,8 @@
 import { Maximize2, Minimize2, X, type LucideIcon } from "lucide-react";
 import {
   useContext,
+  useEffect,
+  useRef,
   useState,
   type CSSProperties,
   type KeyboardEvent,
@@ -203,10 +205,17 @@ export function SidePanelLead({ children }: { children: ReactNode }) {
   );
 }
 
+/** How long the pointer may stray from a peeking card before it tucks away again. */
+const TUCK_DELAY = 300;
+
 /**
- * A narrow glance card docked beside a page's column: as wide as a phone's sidebar, only as tall
- * as what it holds, and scrolling past the window. On a narrow page it floats over the column at
- * the edge instead of taking width from it.
+ * A narrow glance card: as wide as a phone's sidebar, only as tall as what it holds, and scrolling
+ * past the window. Docked beside a page's column, or `floating` over the column's top right
+ * corner (clear of its scrollbar) without taking any of its width; a floating card's parent is
+ * the positioned column it floats in.
+ *
+ * A floating card can be `tucked`: slid off the column's right edge, it peeks back while the
+ * pointer rests on that edge beside where it sits, and slides away again once the pointer leaves.
  */
 export function SideCard(props: {
   label: string;
@@ -214,15 +223,56 @@ export function SideCard(props: {
   corner?: ReactNode;
   children: ReactNode;
   className?: string;
+  floating?: boolean;
+  /** Floating only: off the column's edge, back while the pointer rests on it. */
+  tucked?: boolean;
 }) {
+  const tucked = Boolean(props.floating && props.tucked);
+  const [peek, setPeek] = useState(false);
+  const [wasTucked, setWasTucked] = useState(tucked);
+  // Tucking or keeping it starts from the card at rest.
+  if (wasTucked !== tucked) {
+    setWasTucked(tucked);
+    setPeek(false);
+  }
+  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  useEffect(() => () => clearTimeout(timer.current), []);
+  const away = tucked && !peek;
   return (
     <aside
       aria-label={props.label}
       data-slot="side-card"
+      data-floating={props.floating || undefined}
+      data-tucked={tucked || undefined}
+      data-away={away || undefined}
       className={cn("misty-side-card", props.className)}
+      onPointerEnter={
+        tucked
+          ? () => {
+              clearTimeout(timer.current);
+              setPeek(true);
+            }
+          : undefined
+      }
+      onPointerLeave={
+        tucked
+          ? () => {
+              clearTimeout(timer.current);
+              timer.current = setTimeout(() => setPeek(false), TUCK_DELAY);
+            }
+          : undefined
+      }
     >
-      {props.corner ? <div className="misty-side-card-corner">{props.corner}</div> : null}
-      <div className="misty-side-card-body">{props.children}</div>
+      {/* The edge it comes back from, and the gap between it and that edge while it peeks. */}
+      {tucked ? <div aria-hidden="true" className="misty-side-card-edge" /> : null}
+      {props.corner ? (
+        <div className="misty-side-card-corner" inert={away || undefined}>
+          {props.corner}
+        </div>
+      ) : null}
+      <div className="misty-side-card-body" inert={away || undefined}>
+        {props.children}
+      </div>
     </aside>
   );
 }

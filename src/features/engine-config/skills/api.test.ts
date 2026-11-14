@@ -11,7 +11,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const invoke = vi.hoisted(() => vi.fn());
 
-vi.mock("@/native/invoke", () => ({ invoke }));
+vi.mock("@/shared/platform/nativeInvoke", () => ({ invoke }));
 
 import { SkillsHubError, skillsHubApi } from "./api";
 import type { DiscoveredSkill } from "./types";

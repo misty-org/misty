@@ -6,7 +6,7 @@ import { agentForPastChat, usePastChatAsk } from "./pastChats";
 
 const folders: { agent: string; path: string }[] = [];
 
-vi.mock("@/native/invoke", () => ({
+vi.mock("@/shared/platform/nativeInvoke", () => ({
   invoke: async (command: string) => {
     if (command === "agent_folder_list") return folders;
     throw new Error(`unexpected ${command}`);

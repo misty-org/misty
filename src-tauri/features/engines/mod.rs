@@ -26,6 +26,7 @@ pub mod codex;
 mod codex_app;
 mod codex_provider_env;
 mod codex_read_only;
+pub(crate) mod codex_rpc;
 mod codex_usage;
 pub mod commands;
 mod companion;
@@ -67,6 +68,7 @@ pub mod resolve;
 mod run_prompt;
 pub mod runs;
 mod shell_env;
+pub mod slash;
 pub mod store;
 pub mod support;
 pub mod turn;
@@ -76,8 +78,8 @@ pub(crate) use resolve::command_for_binary;
 // Event types and tool-call/todo payload helpers (events.rs).
 pub(crate) use events::{
     assistant_message, parse_todo_args, parse_todo_result, parse_tool_args_value, push_session_id,
-    safe_prompt_arg, tool_call_message, tool_call_message_with_id, tool_call_patch_with_id,
-    tool_path_arg, tool_result_patch, tool_result_patch_with_id,
+    tool_call_message, tool_call_message_with_id, tool_call_patch_with_id, tool_path_arg,
+    tool_result_patch, tool_result_patch_with_id,
 };
 pub use events::{EngineEvent, TodosPayload};
 pub use plan_review::{PlanApproval, PlanReview, PlanReviewKind};
@@ -571,7 +573,7 @@ pub struct EngineModel {
     /// The level the engine itself would use for it (its remembered one, else its default).
     pub default_effort: Option<String>,
     pub context_window: Option<u64>,
-    /// Where the engine's own menu puts it: "main", or "more" for its "More models".
+    /// Where the engine's own menu puts it: `main`, or "more" for its "More models".
     pub section: Option<String>,
     /// The engine's fast mode for it, by the engine's own name.
     pub fast: Option<models::FastMode>,
@@ -1457,13 +1459,9 @@ async fn send_host_stream(
         "qoder" | "qoder-cn" => tokio::spawn(qoder_session::run_acp_turn(
             core, launch.req, launch.bin, killed, pid,
         )),
-        "grok" | "kimi" | "gemini" | "qwen" | "hermes" => tokio::spawn(grok_acp::run_acp_turn(
-            core,
-            launch.req,
-            launch.built,
-            killed,
-            pid,
-        )),
+        "grok" | "kimi" | "gemini" | "qwen" | "hermes" | "agy" => tokio::spawn(
+            grok_acp::run_acp_turn(core, launch.req, launch.built, killed, pid),
+        ),
         "minimax" => tokio::spawn(minimax_acp::run_acp_turn(
             core,
             launch.req,
@@ -1625,48 +1623,12 @@ pub async fn answer_question(
     // opencode attached sessions park an answer context: the reply is an HTTP
     // POST to the managed server, not a stdin line.
     if let Some(opencode) = input.get("opencode") {
-        let origin = opencode
-            .get("origin")
-            .and_then(Value::as_str)
-            .ok_or_else(|| "question answer context is missing the server origin".to_string())?;
-        let directory = opencode
-            .get("directory")
-            .and_then(Value::as_str)
-            .unwrap_or("");
-        let request_id = opencode
-            .get("requestId")
-            .and_then(Value::as_str)
-            .ok_or_else(|| "question answer context is missing the request id".to_string())?;
-        let request = opencode.get("request").cloned().unwrap_or(Value::Null);
-        // Dismissed = reject (the tool raises QuestionRejectedError, the model hears the person declined
-        // to answer and goes on); otherwise reply, with answers in the same order as the questions.
-        let result = match answers.as_ref() {
-            None => {
-                opencode_server::post(
-                    origin,
-                    &format!("/question/{request_id}/reject"),
-                    directory,
-                    None,
-                )
-                .await
-            }
-            Some(answers) => {
-                let answers = opencode_session::reply_answers(&request, answers)
-                    .ok_or_else(|| "question answer context is malformed".to_string())?;
-                opencode_server::post(
-                    origin,
-                    &format!("/question/{request_id}/reply"),
-                    directory,
-                    Some(serde_json::json!({ "answers": answers })),
-                )
-                .await
-            }
-        };
+        // 1.x replies to the question, 2.x to the form the question tool opened.
         // A failed post must surface: the frontend keeps the card pending on
         // Err instead of falsely marking the question answered.
-        result?;
+        opencode_session::answer_question(opencode, answers.as_ref()).await?;
         if let Ok(mut questions) = entry.questions.lock() {
-            questions.remove(request_id);
+            questions.remove(&request_id);
         }
         return Ok(());
     }
@@ -2102,8 +2064,19 @@ mod permission_tests {
         assert!(!args.contains(&"--tools".to_string()));
     }
 
+    /// `build_command` with `HOME` held still. pi and omp write their ask bridge extension under
+    /// `~/.misty/engines` while building, and tests that point `HOME` at a scratch folder (the
+    /// history scanner's, CodeBuddy's, DSH's) delete that folder when they end: built mid-swap,
+    /// the write landed in a folder being removed and failed now and then ("write pi ask
+    /// bridge …/ccgui-scan-home-…: No such file or directory"). Those tests hold this lock while
+    /// `HOME` is moved.
+    fn build(engine: &dyn Engine, req: &SendRequest) -> Result<BuiltCommand, String> {
+        let _home = crate::engines::support::paths::HOME_ENV_LOCK.lock();
+        engine.build_command(req, "fake-bin")
+    }
+
     fn argv(engine: &dyn Engine, req: &SendRequest) -> Vec<String> {
-        let built = engine.build_command(req, "fake-bin").unwrap();
+        let built = build(engine, req).unwrap();
         built
             .command
             .as_std()
@@ -2118,7 +2091,7 @@ mod permission_tests {
         // field of an NDJSON command on stdin, so multiline text is no longer cut by the Windows cmd.exe shim.
         let mut request = req(None);
         request.prompt = "first line\nsecond line\n%PATH%".to_string();
-        let built = pi_family::pi().build_command(&request, "fake-bin").unwrap();
+        let built = build(&pi_family::pi(), &request).unwrap();
         let args: Vec<String> = built
             .command
             .as_std()
@@ -2138,6 +2111,9 @@ mod permission_tests {
         // pi only has v1: no negotiate_protocol preamble.
         let state: Value = serde_json::from_str(lines.next().unwrap()).unwrap();
         assert_eq!(state["type"], "get_state");
+        // Then pi's own command list for the `/` menu (pi doesn't announce it).
+        let commands: Value = serde_json::from_str(lines.next().unwrap()).unwrap();
+        assert_eq!(commands["type"], "get_commands");
         let prompt: Value = serde_json::from_str(lines.next().unwrap()).unwrap();
         assert_eq!(prompt["type"], "prompt");
         assert_eq!(prompt["message"], request.prompt);
@@ -2161,8 +2137,7 @@ mod permission_tests {
         // Images ride the prompt command's base64 field (covered by load_image); plain text is enough here.
         let mut request = req(None);
         request.prompt = "first line\nsecond line".to_string();
-        let built = pi_family::omp()
-            .build_command(&request, "fake-bin")
+        let built = build(&pi_family::omp(), &request)
             .unwrap();
         let args: Vec<String> = built
             .command
@@ -2235,8 +2210,7 @@ mod permission_tests {
             .iter()
             .any(|a| a == "--service-tier"));
         request.service_tier = Some("invalid".into());
-        assert!(pi_family::omp()
-            .build_command(&request, "fake-bin")
+        assert!(build(&pi_family::omp(), &request)
             .is_err());
     }
 
@@ -2268,7 +2242,7 @@ mod permission_tests {
         // Engines not wired yet keep the fallback (the ensure_plan_approval gate refuses an explicit plan
         // first; the fallback is only a defensive layer).
         assert_eq!(pi_family::pi().resolve_permission(Some("plan")), "auto");
-        // Grok lists only its Default mode, which asks.
+        // Grok's Default asks; its Ask mode only answers, so a legacy choice keeps to Default.
         let grok = grok::GrokEngine;
         assert_eq!(grok.resolve_permission(Some("auto")), "manual");
         assert_eq!(grok.resolve_permission(Some("plan")), "manual");

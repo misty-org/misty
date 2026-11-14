@@ -85,7 +85,14 @@ fn reads_each_cli_help_list_of_modes() {
 "#;
     assert_eq!(
         parse_help_choices(claude, "--permission-mode").unwrap(),
-        ["acceptEdits", "auto", "bypassPermissions", "manual", "dontAsk", "plan"]
+        [
+            "acceptEdits",
+            "auto",
+            "bypassPermissions",
+            "manual",
+            "dontAsk",
+            "plan"
+        ]
     );
     // CodeBuddy: one sentence, with longer flags that start the same name after it.
     let codebuddy = "  --permission-mode <mode>   Default permission mode. Choices: acceptEdits, \
@@ -93,7 +100,14 @@ fn reads_each_cli_help_list_of_modes() {
         --permission-mode-before-plan <mode>   Mode to restore\n";
     assert_eq!(
         parse_help_choices(codebuddy, "--permission-mode").unwrap(),
-        ["acceptEdits", "bypassPermissions", "default", "plan", "dontAsk", "auto"]
+        [
+            "acceptEdits",
+            "bypassPermissions",
+            "default",
+            "plan",
+            "dontAsk",
+            "auto"
+        ]
     );
     // Qoder: unquoted, wrapped.
     let qoder = "  --permission-mode <mode>   Set the permission mode (choices:\n         \
@@ -101,7 +115,16 @@ fn reads_each_cli_help_list_of_modes() {
         --dangerously-skip-permissions   Bypass\n";
     assert_eq!(
         parse_help_choices(qoder, "--permission-mode").unwrap(),
-        ["default", "accept_edits", "bypass_permissions", "dont_ask", "auto"]
+        [
+            "default",
+            "accept_edits",
+            "bypass_permissions",
+            "dont_ask",
+            "auto"
+        ]
     );
-    assert_eq!(parse_help_choices("  --model <m>  A model", "--permission-mode"), None);
+    assert_eq!(
+        parse_help_choices("  --model <m>  A model", "--permission-mode"),
+        None
+    );
 }

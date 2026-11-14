@@ -4,7 +4,7 @@ const mocks = vi.hoisted(() => ({
   invoke: vi.fn(),
   request: vi.fn(async () => ""),
 }));
-vi.mock("@/native/invoke", () => ({ invoke: mocks.invoke }));
+vi.mock("@/shared/platform/nativeInvoke", () => ({ invoke: mocks.invoke }));
 vi.mock("./appsRun", () => ({ appRunRequest: mocks.request }));
 
 import type { AppRequest } from "../connected-apps/api";

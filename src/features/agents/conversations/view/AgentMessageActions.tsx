@@ -18,6 +18,7 @@ import { useSpaceWindowStore } from "@/features/app-windows";
 import { spacesGateway } from "../../spaces-gateway/spacesGateway";
 import { HandOffDialog } from "./HandOffDialog";
 import { formatCost } from "../../context-panel/chatUsage";
+import { tookText } from "./meta/format";
 import { modelName } from "../../engines/modelNames";
 
 const timeFormat = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" });
@@ -215,15 +216,6 @@ function MessageTime({ message }: { message: GlobalAiMessage }) {
 }
 
 /** How long a run took, as a reply's facts say it: "8s", "2m 5s", "1h 4m". */
-function tookText(ms: number): string {
-  const seconds = Math.max(1, Math.round(ms / 1000));
-  if (seconds < 60) return `${seconds}s`;
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return seconds % 60 ? `${minutes}m ${seconds % 60}s` : `${minutes}m`;
-  const hours = Math.floor(minutes / 60);
-  return minutes % 60 ? `${hours}h ${minutes % 60}m` : `${hours}h`;
-}
-
 /**
  * A reply's facts, in view under it: the model the engine says answered, how long the run took
  * and what it cost when the engine said. The time it was sent is the tooltip on how long it took,

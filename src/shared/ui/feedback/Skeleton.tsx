@@ -99,7 +99,7 @@ const leadingShapes = {
   icon: "size-4 rounded-sm",
   avatar: "size-6 rounded-full",
   "avatar-lg": "size-10 rounded-full",
-  tile: "size-8 rounded-lg",
+  tile: cn(controlFrame.md, "w-8"),
 } as const;
 
 /**

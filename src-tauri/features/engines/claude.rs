@@ -35,6 +35,12 @@ pub struct ClaudeEngine {
     /// empty zero-turn `result` before it answers the new message. That result
     /// ends nothing the user asked for.
     stopped_task_result_pending: Mutex<bool>,
+    /// The turn has streamed text of its own. A local command (`/context`, `/config`, …) streams
+    /// none: its output arrives only as a `<synthetic>` snapshot and the zero-turn `result`.
+    streamed_text: Mutex<bool>,
+    /// The text of this turn's `<synthetic>` snapshots, shown at its `result` when the turn
+    /// streamed none and ran no model turn (a local command's output).
+    local_text: Mutex<String>,
     /// The engine id its `system/init` report is kept under (`reported.rs`): Claude Code, or
     /// CodeBuddy, which shares this format.
     reports_as: &'static str,
@@ -59,6 +65,8 @@ impl ClaudeEngine {
             tool_paths: Mutex::new(HashMap::new()),
             compact_post_tokens: Mutex::new(None),
             stopped_task_result_pending: Mutex::new(false),
+            streamed_text: Mutex::new(false),
+            local_text: Mutex::new(String::new()),
             reports_as: engine,
         }
     }
@@ -66,7 +74,27 @@ impl ClaudeEngine {
 
 #[path = "claude_sandbox.rs"]
 mod sandbox;
+
+/// A short-lived process that answers control requests, for the commands Misty runs out of turn.
+#[path = "claude_control.rs"]
+pub(crate) mod control;
+
+/// The background tasks Claude Code reports per session, for `/tasks`.
+#[path = "claude_tasks.rs"]
+mod tasks;
+pub(crate) use tasks::{background_tasks, forget_background_tasks, BackgroundTask};
+use tasks::{record_background_tasks, record_task_update};
+
+/// A local command's output, shown as the turn's reply.
+#[path = "claude_local.rs"]
+mod local;
+use local::local_command_reply;
+
+/// A turn's reported context window and post-compaction usage.
+#[path = "claude_usage.rs"]
+mod usage;
 use sandbox::{extra_dirs, folder_sandbox_runs, folder_sandbox_settings};
+use usage::{attach_reported_context_window, compact_usage};
 
 /// Claude Code's own permission modes, in its mode switcher's order. `auto` (its classifier)
 /// and `dontAsk` aren't offered: neither is held to the folder.
@@ -391,7 +419,10 @@ impl ClaudeEngine {
                         .get("tasks")
                         .and_then(Value::as_array)
                         .map_or(0, Vec::len);
+                    record_background_tasks(&value);
                     out.push(EngineEvent::BackgroundTasks { pending });
+                } else if subtype == Some("task_updated") {
+                    record_task_update(&value);
                 } else if subtype == Some("compact_boundary") {
                     if let Some(post_tokens) = value
                         .get("compactMetadata")
@@ -409,13 +440,17 @@ impl ClaudeEngine {
                     }
                 }
             }
-            "stream_event" => parse_stream_event(
-                &self.pending_tool_json,
-                &self.tool_names,
-                &self.tool_paths,
-                &value,
-                out,
-            ),
+            "stream_event" => {
+                let before = out.len();
+                parse_stream_event(
+                    &self.pending_tool_json,
+                    &self.tool_names,
+                    &self.tool_paths,
+                    &value,
+                    out,
+                );
+                self.note_streamed_text(&out[before..]);
+            }
             "assistant" => {
                 // Full message snapshot; used as session-id and actual model source.
                 push_session_id(&value, "session_id", out);
@@ -447,6 +482,12 @@ impl ClaudeEngine {
                 // The response's own account of what ran. `<synthetic>` marks
                 // messages the CLI fabricated locally (errors, interrupts):
                 // that is not a served model and must not read as one.
+                let synthetic = reported_model
+                    .as_deref()
+                    .is_some_and(|model| model.starts_with('<'));
+                if synthetic {
+                    self.keep_local_text(&value);
+                }
                 let served_model = reported_model.filter(|model| !model.starts_with('<'));
                 if served_model.is_some() || reported_effort.is_some() {
                     out.push(EngineEvent::Served {
@@ -548,6 +589,8 @@ impl ClaudeEngine {
                 {
                     return;
                 }
+                // What this turn showed so far, cleared for the next turn on a live process.
+                let (streamed, local_text) = self.take_local_output();
                 // Structured fallback: the final result lists every denial
                 // of the turn. The frontend dedupes against the tool_result
                 // signal above (same path), so double-reporting is harmless.
@@ -619,6 +662,10 @@ impl ClaudeEngine {
                         .to_string();
                     out.push(EngineEvent::Error(message));
                 } else {
+                    // A local command's output, shown as the reply.
+                    if let Some(text) = local_command_reply(streamed, local_text, &value) {
+                        out.push(EngineEvent::Delta(text));
+                    }
                     out.push(EngineEvent::Done { session_id, usage });
                 }
             }
@@ -692,75 +739,6 @@ impl ClaudeEngine {
             _ => {}
         }
     }
-}
-
-/// Fold the CLI's reported context window into a turn's usage.
-///
-/// Claude's `result` line carries the window per model under `modelUsage`
-/// (`{ "<model>": { contextWindow, maxOutputTokens, … } }`); it never sends
-/// `model_context_window`, which is the key the rest of the app reads. Without
-/// this, every Claude turn fell through to the UI's assumed 200k — wrong for
-/// the 1M `[1m]` variants, and unverifiable for the rest.
-///
-/// A turn can name several models (a subagent on a cheap model, background
-/// work). The one that actually ran the turn is the one with the most tokens,
-/// so its window wins; entries without a usable window are ignored.
-fn attach_reported_context_window(mut usage: Value, source: &Value) -> Value {
-    if usage.get("model_context_window").is_some() {
-        return usage;
-    }
-    let Some(models) = source.get("modelUsage").and_then(Value::as_object) else {
-        return usage;
-    };
-    let busiest = models
-        .values()
-        .filter_map(|model| {
-            let window = model.get("contextWindow").and_then(Value::as_i64)?;
-            if window <= 0 {
-                return None;
-            }
-            let tokens: i64 = [
-                "inputTokens",
-                "outputTokens",
-                "cacheReadInputTokens",
-                "cacheCreationInputTokens",
-            ]
-            .iter()
-            .filter_map(|key| model.get(*key).and_then(Value::as_i64))
-            .sum();
-            Some((tokens, window))
-        })
-        .max_by_key(|(tokens, _)| *tokens);
-    let Some((_, window)) = busiest else {
-        return usage;
-    };
-    if let Some(object) = usage.as_object_mut() {
-        object.insert("model_context_window".to_string(), Value::from(window));
-    }
-    usage
-}
-
-/// Usage snapshot for a compacted turn. Occupancy is the post-compaction
-/// remainder (`post_tokens`), not the turn's billing input, but the turn's
-/// output still enters the context afterwards and the reported context
-/// window is carried over so the breakdown keeps its segments and scale
-/// (total = post_tokens + output_tokens).
-fn compact_usage(post_tokens: i64, raw: Option<&Value>) -> Value {
-    let output = raw
-        .and_then(|u| u.get("output_tokens"))
-        .and_then(Value::as_i64)
-        .unwrap_or(0);
-    let mut usage = serde_json::json!({
-        "input_tokens": post_tokens,
-        "output_tokens": output,
-        "total_tokens": post_tokens + output,
-    });
-    if let (Some(raw), Some(obj)) = (raw, usage.as_object_mut()) {
-        if let Some(window) = raw.get("model_context_window") {
-            obj.insert("model_context_window".to_string(), window.clone());
-        }
-    }
-    usage
 }
 
 /// Human-readable line for a `system/api_retry` event.
@@ -1817,229 +1795,6 @@ mod tests {
             Some("/etc/hosts".to_string())
         );
         assert_eq!(extract_absolute_path("no path here"), None);
-    }
-
-    fn compact_result_line() -> String {
-        serde_json::json!({
-            "type": "result",
-            "subtype": "success",
-            "is_error": false,
-            "session_id": "s-1",
-            "usage": {
-                "input_tokens": 30190,
-                "output_tokens": 1200,
-                "total_tokens": 31390,
-                "model_context_window": 200000
-            }
-        })
-        .to_string()
-    }
-
-    #[test]
-    fn compact_boundary_emits_usage_and_overrides_turn_result_once() {
-        let engine = ClaudeEngine::new();
-        let boundary = serde_json::json!({
-            "type": "system",
-            "subtype": "compact_boundary",
-            "compactMetadata": { "preTokens": 30190, "postTokens": 8038, "durationMs": 4207 }
-        })
-        .to_string();
-        let mut out = Vec::new();
-        engine.parse_line(&boundary, &mut out);
-        assert_eq!(out.len(), 1);
-        match &out[0] {
-            EngineEvent::Usage(usage) => {
-                assert_eq!(usage["input_tokens"], 8038);
-                assert_eq!(usage["total_tokens"], 8038);
-            }
-            _ => panic!("expected usage event"),
-        }
-
-        // The following result's billing usage is replaced by the
-        // post-compaction occupancy, keeping output and the context window.
-        let mut out = Vec::new();
-        engine.parse_line(&compact_result_line(), &mut out);
-        match &out[0] {
-            EngineEvent::Done { usage, .. } => {
-                let usage = usage.as_ref().expect("usage");
-                assert_eq!(usage["input_tokens"], 8038);
-                assert_eq!(usage["output_tokens"], 1200);
-                assert_eq!(usage["total_tokens"], 8038 + 1200);
-                assert_eq!(usage["model_context_window"], 200000);
-            }
-            _ => panic!("expected done event"),
-        }
-
-        // Single-shot: the next turn without a boundary keeps billing usage.
-        let mut out = Vec::new();
-        engine.parse_line(&compact_result_line(), &mut out);
-        match &out[0] {
-            EngineEvent::Done { usage, .. } => {
-                assert_eq!(usage.as_ref().expect("usage")["input_tokens"], 30190);
-            }
-            _ => panic!("expected done event"),
-        }
-    }
-
-    #[test]
-    fn result_without_compact_boundary_keeps_billing_usage() {
-        let mut out = Vec::new();
-        ClaudeEngine::new().parse_line(&compact_result_line(), &mut out);
-        match &out[0] {
-            EngineEvent::Done { usage, .. } => {
-                let usage = usage.as_ref().expect("usage");
-                assert_eq!(usage["input_tokens"], 30190);
-                assert_eq!(usage["total_tokens"], 31390);
-            }
-            _ => panic!("expected done event"),
-        }
-    }
-
-    #[test]
-    fn compact_boundary_without_metadata_stays_silent() {
-        let line = serde_json::json!({
-            "type": "system",
-            "subtype": "compact_boundary"
-        })
-        .to_string();
-        let mut out = Vec::new();
-        ClaudeEngine::new().parse_line(&line, &mut out);
-        assert!(out.is_empty());
-    }
-
-    /// The UI's context gauge divided by a hardcoded 200k because nothing
-    /// read the window the CLI reports per model. The result line carries it
-    /// under `modelUsage`; the model that did the work is the busiest one, so
-    /// a cheap subagent's window must not win a mixed turn.
-    #[test]
-    fn result_reports_the_window_of_the_model_that_did_the_work() {
-        let line = serde_json::json!({
-            "type": "result",
-            "subtype": "success",
-            "is_error": false,
-            "session_id": "s-1",
-            "usage": { "input_tokens": 900000, "output_tokens": 2000, "total_tokens": 902000 },
-            "modelUsage": {
-                "claude-haiku-4-5": {
-                    "inputTokens": 300, "outputTokens": 40, "contextWindow": 200000
-                },
-                "claude-opus-5[1m]": {
-                    "inputTokens": 880000, "outputTokens": 1250, "contextWindow": 1000000
-                }
-            }
-        })
-        .to_string();
-        let mut out = Vec::new();
-        ClaudeEngine::new().parse_line(&line, &mut out);
-        match &out[0] {
-            EngineEvent::Done { usage, .. } => {
-                let usage = usage.as_ref().expect("usage");
-                assert_eq!(usage["model_context_window"], 1_000_000);
-                // The billing figures stay the CLI's own.
-                assert_eq!(usage["input_tokens"], 900000);
-            }
-            _ => panic!("expected done event"),
-        }
-    }
-
-    /// Nothing usable reported ⇒ no key at all, so the UI keeps its own
-    /// explicit fallback instead of this layer inventing a number.
-    #[test]
-    fn result_without_a_reported_window_adds_nothing() {
-        for models in [
-            None,
-            Some(serde_json::json!({})),
-            Some(serde_json::json!({
-                "m": { "inputTokens": 10, "contextWindow": 0 }
-            })),
-        ] {
-            let mut value = serde_json::json!({
-                "type": "result",
-                "subtype": "success",
-                "is_error": false,
-                "session_id": "s-1",
-                "usage": { "input_tokens": 10, "output_tokens": 1, "total_tokens": 11 }
-            });
-            if let Some(models) = models {
-                value["modelUsage"] = models;
-            }
-            let mut out = Vec::new();
-            ClaudeEngine::new().parse_line(&value.to_string(), &mut out);
-            match &out[0] {
-                EngineEvent::Done { usage, .. } => {
-                    assert!(usage
-                        .as_ref()
-                        .expect("usage")
-                        .get("model_context_window")
-                        .is_none());
-                }
-                _ => panic!("expected done event"),
-            }
-        }
-    }
-
-    /// An explicitly reported window is the more specific statement and must
-    /// survive the per-model map.
-    #[test]
-    fn explicit_context_window_beats_the_model_map() {
-        let line = serde_json::json!({
-            "type": "result",
-            "subtype": "success",
-            "is_error": false,
-            "session_id": "s-1",
-            "usage": {
-                "input_tokens": 10, "output_tokens": 1, "total_tokens": 11,
-                "model_context_window": 500000
-            },
-            "modelUsage": { "m": { "inputTokens": 10, "contextWindow": 200000 } }
-        })
-        .to_string();
-        let mut out = Vec::new();
-        ClaudeEngine::new().parse_line(&line, &mut out);
-        match &out[0] {
-            EngineEvent::Done { usage, .. } => {
-                assert_eq!(
-                    usage.as_ref().expect("usage")["model_context_window"],
-                    500000
-                );
-            }
-            _ => panic!("expected done event"),
-        }
-    }
-
-    /// A compacted turn's usage is rebuilt from the boundary, so the window
-    /// has to be re-attached there too — that path dropped it before.
-    #[test]
-    fn compacted_turn_keeps_the_reported_window() {
-        let engine = ClaudeEngine::new();
-        let boundary = serde_json::json!({
-            "type": "system",
-            "subtype": "compact_boundary",
-            "compactMetadata": { "preTokens": 900000, "postTokens": 40000, "durationMs": 1000 }
-        })
-        .to_string();
-        let mut out = Vec::new();
-        engine.parse_line(&boundary, &mut out);
-
-        let result = serde_json::json!({
-            "type": "result",
-            "subtype": "success",
-            "is_error": false,
-            "session_id": "s-1",
-            "usage": { "input_tokens": 900000, "output_tokens": 50, "total_tokens": 900050 },
-            "modelUsage": { "claude-opus-5[1m]": { "inputTokens": 900000, "contextWindow": 1000000 } }
-        })
-        .to_string();
-        let mut out = Vec::new();
-        engine.parse_line(&result, &mut out);
-        match &out[0] {
-            EngineEvent::Done { usage, .. } => {
-                let usage = usage.as_ref().expect("usage");
-                assert_eq!(usage["input_tokens"], 40000);
-                assert_eq!(usage["model_context_window"], 1_000_000);
-            }
-            _ => panic!("expected done event"),
-        }
     }
 
     #[test]

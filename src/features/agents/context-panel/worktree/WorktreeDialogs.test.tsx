@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { WorktreeInfo, WorktreeListing } from "./worktreeApi";
 
 const native = vi.hoisted(() => ({ invoke: vi.fn() }));
-vi.mock("@/native/invoke", () => native);
+vi.mock("@/shared/platform/nativeInvoke", () => native);
 vi.mock("../../personal/agentAccount", () => ({ agentAccountId: () => "me" }));
 vi.mock("@tauri-apps/api/webview", () => ({
   getCurrentWebview: () => ({ listen: vi.fn(() => Promise.resolve(() => {})) }),

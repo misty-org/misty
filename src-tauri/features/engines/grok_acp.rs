@@ -1,6 +1,7 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong), src-tauri/src/engine/grok_acp.rs.
-//! Shared native ACP turn lifecycle for grok and Kimi.
-//! Kimi's handshake and elicitation forms are implemented in `kimi_acp`.
+//! Shared native ACP turn lifecycle for grok and Kimi, Gemini CLI, Qwen Code, Hermes and
+//! Antigravity. Kimi's handshake and elicitation forms are implemented in `kimi_acp`,
+//! Antigravity's in `agy_acp`.
 //!
 //! grok drives its own channel: the app prepares the command (channel flags,
 //! GROK_HOME staging, model/effort) and this driver owns the child for the
@@ -33,13 +34,14 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
+use std::time::Instant;
 
 use serde_json::{json, Map, Value};
 use tokio::process::Command;
 
 use super::qoder_session::{
     initialize_params, jsonrpc_id_key, jsonrpc_result_response, session_update_from_notification,
-    spawn_piped_acp, teardown, AcpLine, AcpProcess, QoderSessionUpdate, PROMPT_TIMEOUT,
+    spawn_piped_acp, teardown, AcpLine, AcpProcess, QoderSessionUpdate, KILL_POLL, PROMPT_TIMEOUT,
     RPC_HANDSHAKE_TIMEOUT, SESSION_NEW_TIMEOUT, SESSION_RESUME_TIMEOUT,
 };
 use super::{BuiltCommand, EngineEvent, SendRequest, TurnCore, TurnState, VirtualRunGuard};
@@ -60,6 +62,29 @@ const DISMISS_OUTCOME: &str = "cancelled";
 struct TurnView {
     last_usage: Option<Value>,
     tool_names: HashMap<String, String>,
+    /// Antigravity's sub-agents, read from their own transcripts (`agy_subagents.rs`). While it
+    /// is set, tool rows carry the agent's call ids, so a sub-agent's rows nest under its call.
+    subagents: Option<super::agy::Subagents>,
+}
+
+/// Shows what Antigravity's sub-agents did since the last look (`now` skips the wait between
+/// looks).
+fn follow_subagents(
+    core: &TurnCore,
+    state: &mut TurnState,
+    view: &mut TurnView,
+    now: bool,
+) -> bool {
+    let events = view
+        .subagents
+        .as_mut()
+        .map(|subagents| subagents.poll(now))
+        .unwrap_or_default();
+    let moved = !events.is_empty();
+    for event in events {
+        core.dispatch_event(state, event);
+    }
+    moved
 }
 
 /// Drive one send as a grok ACP turn. Mirrors the shared settle contract
@@ -181,10 +206,10 @@ async fn handshake_and_prompt(
     let agent = acp
         .routed(
             "initialize",
-            if core.engine_id == "kimi" {
-                super::kimi_acp::initialization()
-            } else {
-                initialize_params()
+            match core.engine_id.as_str() {
+                "kimi" => super::kimi_acp::initialization(),
+                "agy" => super::agy::initialization(),
+                _ => initialize_params(),
             },
             RPC_HANDSHAKE_TIMEOUT,
             killed,
@@ -192,58 +217,59 @@ async fn handshake_and_prompt(
             &mut |_| None,
         )
         .await?;
+    // Antigravity takes HTTP servers without listing them in its capabilities.
+    let agent = match core.engine_id.as_str() {
+        "agy" => super::agy::mcp_capable(&agent),
+        _ => agent,
+    };
     let servers = crate::engines::gate::acp_mcp_servers(req, &agent);
     let gate = crate::engines::gate::AcpGate::of(core, req);
-    let session_id = if core.engine_id == "kimi" {
-        let (session_id, effort) =
-            super::kimi_acp::attach_session(acp, req, servers.clone(), killed).await?;
-        if let Some(effort) = effort {
-            core.dispatch_event(state, EngineEvent::Effort(effort));
-        }
-        session_id
-    } else {
-        attach_session(acp, req, servers, killed).await?
+    // Kimi and Antigravity set their model, effort and mode in their own handshakes.
+    let (session_id, effort) = match core.engine_id.as_str() {
+        "kimi" => super::kimi_acp::attach_session(acp, req, servers, killed).await?,
+        "agy" => super::agy::attach_session(acp, req, servers, killed).await?,
+        _ => (attach_session(acp, req, servers, killed).await?, None),
     };
+    if let Some(effort) = effort {
+        core.dispatch_event(state, EngineEvent::Effort(effort));
+    }
     // Hermes takes the chosen model over ACP (`set_session_model`); the others take it as a flag.
     if let Some(model) = req.model.as_deref().filter(|_| core.engine_id == "hermes") {
         super::hermes::set_model(acp, &session_id, model, killed).await?;
     }
+    // Hermes takes its mode over ACP too; Kimi's is set in its own handshake.
+    if core.engine_id == "hermes" {
+        super::hermes::set_mode(acp, &session_id, req.permission.as_deref(), killed).await?;
+    }
     core.dispatch_event(state, EngineEvent::SessionId(session_id.clone()));
+    if core.engine_id == "agy" {
+        view.subagents = Some(super::agy::Subagents::of(&session_id));
+    }
 
-    let blocks = prompt_blocks(&req.prompt, &req.images, &req.workspace)?;
+    // Gemini runs no custom TOML command over ACP: Misty expands it into its prompt first.
+    let expanded = (core.engine_id == "gemini")
+        .then(|| super::gemini::expand_custom_command(&req.prompt, &req.workspace))
+        .flatten();
+    let blocks = prompt_blocks(
+        expanded.as_deref().unwrap_or(&req.prompt),
+        &req.images,
+        &req.workspace,
+    )?;
     let workspace = req.workspace.clone();
     // One router for the whole prompt: updates, agent requests and the ask all
     // mutate the same turn state, so they cannot live in separate callbacks.
     let result = {
-        let mut router = |line: &AcpLine| match line {
-            AcpLine::Notification { method, params } if method == "session/update" => {
-                // ACP's `usage_update`: how full the context is, from any engine that sends it.
-                if let Some(usage) = super::kimi_acp::usage(params) {
-                    view.last_usage = Some(usage.clone());
-                    core.dispatch_event(state, EngineEvent::Usage(usage));
-                }
-                handle_session_update(core, state, view, params);
-                None
-            }
-            AcpLine::AgentRequest { id, method, params }
-                if core.engine_id == "kimi" && method == "elicitation/create" =>
-            {
-                super::kimi_acp::park_question(core, state, id, params)
-            }
-            // The ask is the user's line to answer: return None so the frame is
-            // written by `answer_question` (via the registry-held stdin), not
-            // by the read loop.
-            AcpLine::AgentRequest { id, method, params } if method == ASK_METHOD => {
-                park_question(core, state, id, params)
-            }
-            AcpLine::AgentRequest { id, method, params } => {
-                crate::engines::gate::acp_agent_request(Some(&gate), &workspace, id, method, params)
-            }
-            _ => None,
-        };
+        let mut router = |line: &AcpLine| route(core, state, view, &gate, &workspace, line);
+        let mut prompt = json!({ "sessionId": session_id, "prompt": blocks });
+        // Grok's mode for one prompt rides its `_meta.mode`, which outranks the session's own.
+        if let Some(mode) =
+            super::grok::prompt_mode(req.permission.as_deref()).filter(|_| core.engine_id == "grok")
+        {
+            prompt["_meta"] = json!({ "mode": mode });
+        }
         acp.routed(
             "session/prompt",
-            json!({ "sessionId": session_id, "prompt": blocks }),
+            prompt,
             PROMPT_TIMEOUT,
             killed,
             Some(&session_id),
@@ -251,11 +277,99 @@ async fn handshake_and_prompt(
         )
         .await?
     };
+    follow_on(acp, core, state, view, &gate, &workspace, killed).await;
     if let Some(usage) = prompt_usage(&result) {
         view.last_usage = Some(usage.clone());
         core.dispatch_event(state, EngineEvent::Usage(usage));
     }
     Ok(())
+}
+
+/// One line the agent sent during the turn, with no request of this client's waiting on it.
+fn route(
+    core: &TurnCore,
+    state: &mut TurnState,
+    view: &mut TurnView,
+    gate: &crate::engines::gate::AcpGate,
+    workspace: &Path,
+    line: &AcpLine,
+) -> Option<Value> {
+    follow_subagents(core, state, view, false);
+    match line {
+        AcpLine::Notification { method, params } if method == "session/update" => {
+            // An `invoke_subagent` call is noted as the row its sub-agent's rows nest under.
+            let followed = view
+                .subagents
+                .as_mut()
+                .and_then(|subagents| subagents.update(params));
+            let params = followed.as_ref().unwrap_or(params);
+            // ACP's `usage_update`: how full the context is, from any engine that sends it.
+            if let Some(usage) = super::kimi_acp::usage(params) {
+                view.last_usage = Some(usage.clone());
+                core.dispatch_event(state, EngineEvent::Usage(usage));
+            }
+            if core.engine_id == "agy" {
+                super::agy::report_session_state(core, state, params);
+            } else {
+                super::qoder_session::report_session_state(core, state, params);
+            }
+            handle_session_update(core, state, view, params);
+            None
+        }
+        AcpLine::AgentRequest { id, method, params }
+            if core.engine_id == "kimi" && method == "elicitation/create" =>
+        {
+            super::kimi_acp::park_question(core, state, id, params)
+        }
+        AcpLine::AgentRequest { id, method, params }
+            if core.engine_id == "agy" && method == "elicitation/create" =>
+        {
+            super::agy::park_question(core, state, id, params)
+        }
+        // The ask is the user's line to answer: return None so the frame is
+        // written by `answer_question` (via the registry-held stdin), not
+        // by the read loop.
+        AcpLine::AgentRequest { id, method, params } if method == ASK_METHOD => {
+            park_question(core, state, id, params)
+        }
+        AcpLine::AgentRequest { id, method, params } => {
+            crate::engines::gate::acp_agent_request(Some(gate), workspace, id, method, params)
+        }
+        _ => None,
+    }
+}
+
+/// Antigravity's sub-agents work on after the prompt that started them has answered: the turn
+/// stays open while they do, showing their steps and whatever the main agent says once one
+/// reports back, and ends once all of it has gone quiet (`agy_subagents.rs`).
+async fn follow_on(
+    acp: &mut AcpProcess,
+    core: &TurnCore,
+    state: &mut TurnState,
+    view: &mut TurnView,
+    gate: &crate::engines::gate::AcpGate,
+    workspace: &Path,
+    killed: &AtomicBool,
+) {
+    let mut heard = Instant::now();
+    loop {
+        if follow_subagents(core, state, view, false) {
+            heard = Instant::now();
+        }
+        let Some(subagents) = view.subagents.as_ref().filter(|s| s.started_any()) else {
+            return;
+        };
+        if killed.load(Ordering::SeqCst) || heard.elapsed() >= subagents.quiet_after() {
+            return;
+        }
+        let mut router = |line: &AcpLine| route(core, state, view, gate, workspace, line);
+        match acp.listen(KILL_POLL, &mut router).await {
+            Ok(true) => heard = Instant::now(),
+            Ok(false) => {}
+            // The prompt itself answered: an agent gone after it ends the turn as it was.
+            Err(_) => return,
+        }
+    }
 }
 
 /// Re-attach the conversation's session, or open a fresh one. grok cannot be
@@ -363,8 +477,10 @@ fn handle_session_update(
             tool_name,
             input,
         } => {
-            view.tool_names.insert(tool_id, tool_name.clone());
-            core.dispatch_event(state, super::tool_call_message(tool_name, input.as_ref()));
+            let id = view.subagents.is_some().then_some(tool_id.as_str());
+            let event = super::tool_call_message_with_id(tool_name.clone(), input.as_ref(), id);
+            view.tool_names.insert(tool_id, tool_name);
+            core.dispatch_event(state, event);
         }
         QoderSessionUpdate::ToolCompleted {
             tool_id,
@@ -380,7 +496,11 @@ fn handle_session_update(
                 (None, Some(error)) => json!({ "text": error, "isError": true }),
                 (None, None) => Value::Null,
             };
-            core.dispatch_event(state, super::tool_result_patch(name, Some(&result)));
+            let id = view.subagents.is_some().then_some(tool_id.as_str());
+            core.dispatch_event(
+                state,
+                super::tool_result_patch_with_id(name, Some(&result), id),
+            );
         }
         QoderSessionUpdate::Ignore => {}
     }
@@ -433,6 +553,10 @@ pub(super) fn answer_frame(parked: &Value, answers: Option<&Value>) -> Result<Va
         .get("rpcId")
         .filter(|id| !id.is_null())
         .ok_or_else(|| "grok question answer context is missing the request id".to_string())?;
+    // Antigravity's question is an ACP form, answered with the form's own values.
+    if let Some(fields) = parked.get("agyForm") {
+        return super::agy::answer_frame(id, fields, answers);
+    }
     Ok(jsonrpc_result_response(id, answer_outcome(answers)?))
 }
 

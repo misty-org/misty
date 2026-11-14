@@ -183,6 +183,7 @@ const RESERVED_OPTIONS: &[&str] = &[
     "mode",
     "cd",
     "experimental-acp",
+    "acp",
 ];
 /// Single-letter options among those (`-y`, codex's `-a`, `-s`, `-c`, `-p`, claude's `-r`…).
 const RESERVED_SHORT: &[char] = &['y', 'a', 's', 'c', 'p', 'r', 'e', 'C'];

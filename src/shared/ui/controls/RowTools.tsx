@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { cn } from "../classNames";
 import { Surface } from "../display/Surface";
-import { RowControls } from "./rowContext";
+import { RowControls } from "./RowContext";
 
 /**
  * When a row's tools show:

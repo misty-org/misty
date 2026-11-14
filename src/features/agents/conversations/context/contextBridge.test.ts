@@ -7,7 +7,10 @@ const fixture = vi.hoisted(() => ({
 }));
 vi.mock("@/shared/platform/tauri", () => ({ hasTauriInternals: () => false }));
 vi.mock("@/features/account/core", () => ({
-  useUserStore: { getState: () => ({ me: { id: fixture.accountId } }) },
+  useUserStore: {
+    getState: () => ({ me: { id: fixture.accountId } }),
+    subscribe: () => () => {},
+  },
 }));
 vi.mock("../state/availability", () => ({ assertMistyAvailable: vi.fn(async () => {}) }));
 vi.mock("./context", () => ({

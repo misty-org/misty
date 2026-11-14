@@ -211,14 +211,21 @@ pub(crate) fn parse_help_choices(help: &str, flag: &str) -> Option<Vec<String>> 
     }
     let at = block.to_ascii_lowercase().find("choices:")? + "choices:".len();
     let rest = &block[at..];
-    let end = [rest.find(')'), rest.find(". "), rest.strip_suffix('.').map(str::len)]
-        .into_iter()
-        .flatten()
-        .min()
-        .unwrap_or(rest.len());
+    let end = [
+        rest.find(')'),
+        rest.find(". "),
+        rest.strip_suffix('.').map(str::len),
+    ]
+    .into_iter()
+    .flatten()
+    .min()
+    .unwrap_or(rest.len());
     let ids: Vec<String> = rest[..end]
         .split(',')
-        .map(|part| part.trim().trim_matches(|c: char| c == '"' || c == '\'' || c == '.'))
+        .map(|part| {
+            part.trim()
+                .trim_matches(|c: char| c == '"' || c == '\'' || c == '.')
+        })
         .filter(|id| {
             !id.is_empty()
                 && id

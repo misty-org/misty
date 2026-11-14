@@ -164,27 +164,39 @@ async fn decide(app: &AppHandle, run_id: &str, tool: &str, input: &Value) -> Dec
     }
 }
 
-/// What a permission ask is about, in one line.
+/// What a permission ask is about, in one line. Engines spell the same field differently
+/// (`file_path`, `filePath`, Antigravity's `Path` and `CommandLine`), so keys are matched without
+/// case or underscores.
 fn summarize(input: &Value) -> String {
-    let field = [
+    let fields = input.as_object();
+    let named = |name: &str| {
+        fields?.iter().find_map(|(key, value)| {
+            let key = key.replace('_', "").to_ascii_lowercase();
+            (key == name).then_some(value)
+        })
+    };
+    let names = [
         "command",
-        "file_path",
-        "filePath",
+        "commandline",
+        "filepath",
         "path",
+        "targetfile",
+        "absolutepath",
         "url",
         "pattern",
         "query",
-    ]
-    .iter()
-    .find_map(|name| input[name].as_str())
-    .map(str::to_string)
-    .or_else(|| {
-        input["command"]
-            .as_array()
-            .and_then(|parts| parts.last()?.as_str())
-            .map(str::to_string)
-    })
-    .unwrap_or_default();
+    ];
+    let field = names
+        .iter()
+        .find_map(|name| named(name)?.as_str())
+        .map(str::to_string)
+        .or_else(|| {
+            named("command")?
+                .as_array()
+                .and_then(|parts| parts.last()?.as_str())
+                .map(str::to_string)
+        })
+        .unwrap_or_default();
     let mut text: String = field.chars().take(600).collect();
     if field.chars().count() > 600 {
         text.push('…');
@@ -473,3 +485,7 @@ pub(crate) async fn start(app: &AppHandle, run_id: String, body: Value) -> Resul
     }
     Ok(())
 }
+
+#[cfg(test)]
+#[path = "runs_tests.rs"]
+mod tests;

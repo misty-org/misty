@@ -19,7 +19,7 @@ const db = await vi.hoisted(async () => {
   fake.write("chat-drafts", { three: "unsent before restart" });
   return fake;
 });
-vi.mock("@/native/invoke", () => ({ invoke: db.invoke }));
+vi.mock("@/shared/platform/nativeInvoke", () => ({ invoke: db.invoke }));
 
 const workspace = () => useWorkspaceStore.getState();
 

@@ -171,17 +171,17 @@ fn an_old_request_maps_to_the_engines_closest_mode() {
             "auto"
         })
     );
-    // Kimi has no mode that works without asking: Auto falls to the one that asks.
+    // Kimi Code has its own Auto mode, which works without asking for safe operations.
     let kimi = engine_by_id("kimi").unwrap();
     assert_eq!(
         launch_for(kimi.as_ref(), &json!({ "permission_mode": "auto" })),
-        Ok("manual")
+        Ok("auto")
     );
-    // Antigravity can't ask: an old Ask takes its own default.
+    // Antigravity asks over ACP: an old Ask takes its Default.
     let agy = engine_by_id("agy").unwrap();
     assert_eq!(
         launch_for(agy.as_ref(), &json!({ "permission_mode": "ask" })),
-        Ok("auto")
+        Ok("manual")
     );
 }
 

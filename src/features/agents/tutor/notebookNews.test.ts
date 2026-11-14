@@ -1,7 +1,7 @@
 import { beforeEach, expect, it, vi } from "vitest";
 
 const native = vi.hoisted(() => ({ invoke: vi.fn() }));
-vi.mock("@/native/invoke", () => ({ invoke: native.invoke }));
+vi.mock("@/shared/platform/nativeInvoke", () => ({ invoke: native.invoke }));
 
 import { latestNews } from "./notebookNews";
 

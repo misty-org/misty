@@ -1,7 +1,8 @@
-import { ArrowDownAZ, Blocks, Flame, RefreshCw, ScrollText } from "lucide-react";
+import { ArrowDownAZ, Blocks, Flame, PackageCheck, RefreshCw, ScrollText } from "lucide-react";
 import { useState } from "react";
 import { createDeviceSetting } from "@/shared/lib/deviceSetting";
 import {
+  ActionBar,
   ChoiceGroup,
   EmptyState,
   FilterChip,
@@ -131,7 +132,7 @@ export function EngineMarketplace() {
       </nav>
 
       <div className="grid min-w-0 grow-999 basis-140 gap-6">
-        <div className="flex flex-wrap items-center gap-2" data-tour="integrations-bar">
+        <div className="flex min-w-0 items-center gap-2" data-tour="integrations-bar">
           {kinds.length > 1 ? (
             <ChoiceGroup
               label="Kind"
@@ -155,22 +156,42 @@ export function EngineMarketplace() {
             placeholder={`Find a ${name} ${noun}`}
             aria-label={`Find a ${name} ${noun}`}
           />
-          <FilterChip
-            label="Installed"
-            pressed={installedOnly}
-            onPressedChange={setInstalledOnly}
+          {/* Past the search's narrowest, the Installed filter folds into ⋯; the order and
+              Refresh stay. */}
+          <ActionBar
+            label="Catalog controls"
+            width="content"
+            items={[
+              {
+                id: "installed",
+                icon: PackageCheck,
+                label: "Installed",
+                priority: 1,
+                pressed: installedOnly,
+                onSelect: () => setInstalledOnly(!installedOnly),
+                render: () => (
+                  <FilterChip
+                    label="Installed"
+                    pressed={installedOnly}
+                    onPressedChange={setInstalledOnly}
+                  />
+                ),
+              },
+            ]}
+            end={
+              plugins ? (
+                <>
+                  <CollectionSortMenu value={sort} options={sortOptions} onChange={setSort} />
+                  <IconButton
+                    label={`Refresh ${noun}s`}
+                    onClick={() => setRefreshes((count) => count + 1)}
+                  >
+                    <RefreshCw />
+                  </IconButton>
+                </>
+              ) : undefined
+            }
           />
-          {plugins ? (
-            <CollectionSortMenu value={sort} options={sortOptions} onChange={setSort} />
-          ) : null}
-          {plugins ? (
-            <IconButton
-              label={`Refresh ${noun}s`}
-              onClick={() => setRefreshes((count) => count + 1)}
-            >
-              <RefreshCw />
-            </IconButton>
-          ) : null}
         </div>
         {plugins ? (
           <EnginePlugins

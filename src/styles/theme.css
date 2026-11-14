@@ -22,7 +22,7 @@
   --misty-theme-text-muted: #8c8c8c;
   --misty-theme-danger: #c94747;
   /* The top band every surface shares: the sidebar's head, a page's bar, a panel's title row. */
-  --ui-header: 48px;
+  --ui-header: 40px;
 }
 
 /* Type. One face for the whole interface, the system font. Monospace (`font-mono`) is for code

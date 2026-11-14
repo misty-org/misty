@@ -29,7 +29,7 @@ import {
   type MarketItem,
   type PluginContents,
 } from "./api";
-import { MakerLogo, pluginMaker, sourceLabel } from "./pluginMaker";
+import { MakerLogo, pluginMaker, sourceLabel } from "./PluginMaker";
 
 const kinds: { key: keyof Omit<PluginContents, "known" | "version">; title: string }[] = [
   { key: "skills", title: "Skills" },

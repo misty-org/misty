@@ -178,6 +178,33 @@ fn rpc_error_recovery_keeps_code_and_message() {
 }
 
 #[test]
+fn the_prompt_answers_acp_usage_sizes_the_context() {
+    // MiniMax Code's prompt answer: ACP's `usage` (its input leaves the cache out) beside its
+    // own turn record in `_meta`.
+    let answer = json!({"stopReason": "end_turn",
+        "usage": {"totalTokens": 18200, "inputTokens": 1200, "outputTokens": 200,
+            "cachedReadTokens": 16800},
+        "_meta": {"minimax-code/turn": {"runId": "acp_t1", "turnId": "t1", "durationMs": 900,
+            "usageIncomplete": false}}});
+    let usage = prompt_usage(&answer).unwrap();
+    assert_eq!(usage["cachedReadTokens"], 16800);
+    assert_eq!(
+        crate::engines::bridge::context_usage(&usage),
+        (Some(18200), None)
+    );
+    // Its usage_update once the turn finishes: the context's size, sent on as `used`.
+    let update = usage_update(&json!({"sessionId": "s1", "update": {
+        "sessionUpdate": "usage_update", "used": 18200, "size": 204800,
+        "cost": {"amount": 0.002, "currency": "USD"}}}))
+    .unwrap();
+    assert_eq!(update["used"], 18200);
+    assert_eq!(
+        crate::engines::bridge::context_usage(&update),
+        (Some(18200), Some(204800))
+    );
+}
+
+#[test]
 fn usage_and_updates_project_onto_frontend_keys() {
     let usage =
         prompt_usage(&json!({ "_meta": { "inputTokens": 10, "outputTokens": 5 } })).unwrap();
@@ -191,4 +218,40 @@ fn usage_and_updates_project_onto_frontend_keys() {
     );
     assert!(usage_update(&json!({"update": {"sessionUpdate": "agent_message_chunk"}})).is_none());
     assert!(prompt_usage(&json!({})).is_none());
+}
+
+/// mcode 0.7.7's `session/load` answer for a session last run in plan mode (the mode outlives the
+/// process; `permissionMode` is per process and comes back `auto`).
+fn loaded_in_plan() -> Value {
+    json!({
+        "modes": {"currentModeId": "plan", "availableModes": [
+            {"id": "default", "name": "Default", "description": "Work normally with the configured tools and permission policy."},
+            {"id": "plan", "name": "Plan", "description": "Research and prepare an implementation plan before making changes."}
+        ]},
+        "configOptions": [{"type": "select", "id": "permissionMode", "name": "Permission mode",
+            "category": "_permission", "currentValue": "auto", "options": [
+                {"value": "default", "name": "Ask"}, {"value": "auto", "name": "Auto"},
+                {"value": "bypassPermissions", "name": "Full access"}],
+            "_meta": {"minimax-code/scope": "process"}}]
+    })
+}
+
+#[test]
+fn a_session_left_in_plan_mode_goes_back_to_default() {
+    assert_eq!(
+        leave_plan_mode(&loaded_in_plan()).as_deref(),
+        Some("default")
+    );
+    let mut fresh = loaded_in_plan();
+    fresh["modes"]["currentModeId"] = json!("default");
+    assert_eq!(leave_plan_mode(&fresh), None);
+    assert_eq!(leave_plan_mode(&json!({})), None);
+    // The plan request still finds mcode's plan mode, and the other modes are its permission
+    // option's values.
+    assert_eq!(
+        mode_id(Some("plan"), &loaded_in_plan()).as_deref(),
+        Some("plan")
+    );
+    assert_eq!(permission_config_value("manual"), "default");
+    assert_eq!(permission_config_value("auto"), "auto");
 }

@@ -50,6 +50,8 @@ struct RunView {
     /// When the turn began and the model the engine said answered, for the run's details.
     began: Option<Instant>,
     model: Option<String>,
+    /// The engine reported its context's own size (`used`) this run.
+    sized: bool,
     ended: bool,
     /// Background tasks the engine still has running (Claude Code's `run_in_background`).
     pending: u64,
@@ -290,25 +292,23 @@ fn route(payload: &Value) {
             }
         }
         "usage" => {
-            let (used, window) = context_usage(data);
+            let (mut used, window) = context_usage(data);
+            if let Some(view) = runs().get_mut(run_id) {
+                // A turn's total adds up every call in it, so once the engine said how full
+                // its context is, a later turn total doesn't replace that.
+                if data["used"].as_u64().is_some_and(|tokens| tokens > 0) {
+                    view.sized = true;
+                } else if view.sized && values::only_turn_total(data) {
+                    used = None;
+                }
+            }
             let mut event = json!({ "type": "usage.updated", "used": used, "window": window });
             let number = |names: &[&str]| {
                 names
                     .iter()
                     .find_map(|name| data.get(*name).and_then(Value::as_u64))
             };
-            for (field, names) in [
-                ("input", &["input_tokens", "inputTokens", "input"][..]),
-                ("output", &["output_tokens", "outputTokens", "output"][..]),
-                (
-                    "cacheRead",
-                    &["cache_read_input_tokens", "cachedInputTokens", "cacheRead"][..],
-                ),
-                (
-                    "cacheWrite",
-                    &["cache_creation_input_tokens", "cacheWrite"][..],
-                ),
-            ] {
+            for (field, names) in values::USAGE_BUCKETS {
                 if let Some(value) = number(names) {
                     event[field] = json!(value);
                 }
@@ -450,6 +450,20 @@ fn route(payload: &Value) {
         "launch" => send_to(
             run_id,
             json!({ "type": "engine.model", "model": data["model"], "effort": data["effort"], "requested": true }),
+        ),
+        // The engine changed its own session in the turn (a slash command, say): the chat
+        // follows, naming the engine so the mode is looked up in its own list.
+        "session_title" => send_to(
+            run_id,
+            json!({ "type": "engine.title", "title": clip(data.as_str().unwrap_or(""), 200) }),
+        ),
+        "session_mode" => send_to(
+            run_id,
+            json!({ "type": "engine.mode", "mode": data, "engine": payload["engine"] }),
+        ),
+        "session_choice" => send_to(
+            run_id,
+            json!({ "type": "engine.choice", "model": data["model"], "effort": data["effort"] }),
         ),
         "background_tasks" => {
             if let Some(view) = runs().get_mut(run_id) {
@@ -616,8 +630,11 @@ fn start_tool(run_id: &str, wire: Option<String>, name: &str, args: Option<&Valu
             id: id.clone(),
             started: Instant::now(),
         });
-        // The chat turns what was said so far into a note above the tool's row.
-        view.answer.clear();
+        // The chat turns what was said so far into a note above the tool's row. A sub-agent's
+        // row leaves the main agent's words alone: the chat nests it under its Task instead.
+        if view.parent.is_none() {
+            view.answer.clear();
+        }
         (id, view.parent.clone())
     };
     let mut event = json!({ "type": "tool.started", "toolCallId": id, "toolName": name });

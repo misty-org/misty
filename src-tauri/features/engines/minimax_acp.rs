@@ -339,6 +339,11 @@ async fn apply_session_config(
             );
         }
     } else {
+        // mcode keeps a session's plan mode in the session itself (a later load reports
+        // `currentModeId: "plan"`, mcode 0.7.7), so a turn that isn't a plan leaves it first.
+        if let Some(mode) = leave_plan_mode(session_result) {
+            set_mode(acp, session_id, &mode, killed).await?;
+        }
         let value = permission_config_value(requested);
         match set_config_option(acp, session_id, "permissionMode", value, killed).await {
             Ok(()) => {}
@@ -591,6 +596,26 @@ fn mode_id(permission: Option<&str>, session_result: &Value) -> Option<String> {
     })
 }
 
+/// The mode to switch a session to when it is in plan mode and the turn isn't a plan: the
+/// first advertised mode that isn't a plan (mcode's `default`). None when it isn't in plan.
+fn leave_plan_mode(session_result: &Value) -> Option<String> {
+    let modes = &session_result["modes"];
+    let current = modes["currentModeId"].as_str()?;
+    if !current.to_lowercase().contains("plan") {
+        return None;
+    }
+    modes["availableModes"]
+        .as_array()?
+        .iter()
+        .filter_map(|mode| {
+            mode.get("id")
+                .and_then(Value::as_str)
+                .or_else(|| mode.as_str())
+        })
+        .find(|id| !id.to_lowercase().contains("plan"))
+        .map(str::to_string)
+}
+
 /// ACP prompt content blocks. mcode advertises `promptCapabilities.image:
 /// false` (live 0.5.1), so pictures ride as absolute paths inside the text
 /// block for the agent's own file tools to read — no image blocks.
@@ -643,23 +668,21 @@ fn handle_session_update(
     }
 }
 
-/// Kimi-style mid-turn usage notifications (`usage_update` with the
-/// window's used/size); absent on builds that only report end-of-turn
-/// totals.
+/// ACP's `usage_update` (the context's used/size). MiniMax Code sends it once a turn finishes,
+/// and only when it knows the model's window.
 fn usage_update(params: &Value) -> Option<Value> {
-    let update = &params["update"];
-    if update["sessionUpdate"] != "usage_update" {
-        return None;
-    }
-    Some(
-        json!({"input_tokens": update["used"].as_u64()?, "model_context_window": update["size"].as_u64()?}),
-    )
+    super::kimi_acp::usage(params)
 }
 
-/// The prompt result's `_meta` token totals, projected onto the names the
-/// frontend's usage parser reads (same convention as grok).
+/// The prompt result's token totals, projected onto the names the frontend's usage parser reads
+/// (same convention as grok). MiniMax Code 0.x answers with ACP's own `usage` (`totalTokens`,
+/// `inputTokens`, `outputTokens`, `cachedReadTokens`, ...; its input leaves the cache out) and
+/// keeps `_meta` for its turn record; older builds put the totals in `_meta`.
 fn prompt_usage(result: &Value) -> Option<Value> {
-    let meta = result.get("_meta").filter(|meta| meta.is_object())?;
+    let meta = result
+        .get("usage")
+        .filter(|usage| usage.is_object())
+        .or_else(|| result.get("_meta").filter(|meta| meta.is_object()))?;
     let input = meta.get("inputTokens").and_then(Value::as_u64);
     let output = meta.get("outputTokens").and_then(Value::as_u64);
     let total = match meta.get("totalTokens").and_then(Value::as_u64) {
@@ -673,6 +696,11 @@ fn prompt_usage(result: &Value) -> Option<Value> {
     }
     if let Some(output) = output {
         usage.insert("outputTokens".to_string(), json!(output));
+    }
+    for name in ["cachedReadTokens", "cachedWriteTokens", "thoughtTokens"] {
+        if let Some(tokens) = meta.get(name).and_then(Value::as_u64) {
+            usage.insert(name.to_string(), json!(tokens));
+        }
     }
     Some(Value::Object(usage))
 }

@@ -5,7 +5,7 @@ const mocks = vi.hoisted(() => ({
   apiRequest: vi.fn(),
   cachedRequest: vi.fn(),
 }));
-vi.mock("@/native/invoke", () => ({ invoke: mocks.invoke }));
+vi.mock("@/shared/platform/nativeInvoke", () => ({ invoke: mocks.invoke }));
 vi.mock("@/api/client", () => ({ apiRequest: mocks.apiRequest }));
 vi.mock("@/api/cache/cached-request", () => ({ cachedRequest: mocks.cachedRequest }));
 

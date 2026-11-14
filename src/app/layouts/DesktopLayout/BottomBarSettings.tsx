@@ -4,7 +4,7 @@ import { useShallow } from "zustand/react/shallow";
 import { DesktopSettingsRow as Row, DesktopSettingsSection as Section } from "@/features/settings";
 import { usePointerReorder } from "@/shared/hooks/usePointerReorder";
 import { Button, cn, IconButton, Pressable, Surface, Text, Tooltip } from "@/shared/ui";
-import { bottomBarItems } from "./bottomBarItems";
+import { bottomBarItems } from "./BottomBarItems";
 import {
   bottomBarDefaults,
   bottomBarItemIds,

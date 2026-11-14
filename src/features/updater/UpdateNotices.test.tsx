@@ -10,6 +10,10 @@ vi.mock("@/features/settings", () => ({
 }));
 vi.mock("@/shared/platform/tauri", () => ({ hasTauriInternals: () => mocks.native }));
 vi.mock("@tauri-apps/plugin-updater", () => ({ check: mocks.check }));
+// The menu bar's "Check for updates" reaches the window as an event.
+vi.mock("@tauri-apps/api/window", () => ({
+  getCurrentWindow: () => ({ listen: async () => () => {} }),
+}));
 beforeEach(() => {
   mocks.enabled = true;
   mocks.native = true;

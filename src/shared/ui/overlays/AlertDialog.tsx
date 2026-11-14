@@ -1,7 +1,7 @@
 "use client";
 
 import * as AlertDialogPrimitive from "@radix-ui/react-alert-dialog";
-import { OutOfRow } from "../controls/rowContext";
+import { OutOfRow } from "../controls/RowContext";
 import * as React from "react";
 
 import { Button, type ButtonProps } from "../controls/Button";

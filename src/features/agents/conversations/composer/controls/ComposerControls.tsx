@@ -2,6 +2,7 @@ import {
   ClipboardList,
   Cpu,
   Globe,
+  Keyboard,
   Shield,
   ShieldCheck,
   ShieldOff,
@@ -13,6 +14,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   IconButton,
+  MenuItem,
   MenuLabel,
   MenuRadioGroup,
   MenuRadioItem,
@@ -40,6 +42,8 @@ import {
 import { modelName } from "../../../engines/modelNames";
 import { useComposerChoices, useModelEfforts, type ComposerChoices } from "./composerChoices";
 import { effectiveEffort, effortLabel, effortNote, modelEfforts } from "./engineOptions";
+import { useComposerVim } from "./composerVim";
+import type { VimMode } from "./vimKeys";
 
 /** Captures part of the screen with the system's own picker and attaches it. */
 export async function captureRegionFile(): Promise<File | null> {
@@ -160,6 +164,24 @@ export function engineModeItem(props: {
   });
 }
 
+/** Vim keys' mode while they're on (`/vim`), and the way to turn them off. */
+export function vimItem(props: { on: boolean; mode: VimMode }): ActionBarItem | null {
+  if (!props.on) return null;
+  return picker({
+    id: "vim",
+    icon: Keyboard,
+    name: "Vim",
+    value: props.mode === "normal" ? "Normal" : "Insert",
+    priority: 2,
+    rows: (
+      <>
+        <MenuLabel>Vim keys</MenuLabel>
+        <MenuItem label="Turn off" onSelect={() => useComposerVim.getState().toggle(false)} />
+      </>
+    ),
+  });
+}
+
 /** The models an engine offers, read once per engine. */
 export function useEngineModels(engine: string | undefined) {
   const [models, setModels] = useState<{ engine: string; list: EngineModel[] }>();
@@ -237,7 +259,7 @@ export function modelEffortItem(props: {
       : list.map((model) => ({
           value: model.id,
           label: model.label,
-          detail: model.detail,
+          detail: model.detail ?? undefined,
           efforts: modelEfforts(engine, model),
           keywords: [model.id],
           section: model.section === "more" ? ("more" as const) : ("main" as const),

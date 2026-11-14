@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { WorktreeCreateArgs, WorktreeCreateProgress } from "./worktreeApi";
 
 const native = vi.hoisted(() => ({ invoke: vi.fn() }));
-vi.mock("@/native/invoke", () => native);
+vi.mock("@/shared/platform/nativeInvoke", () => native);
 
 vi.mock("../../personal/agentAccount", () => ({ agentAccountId: () => "me" }));
 

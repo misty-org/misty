@@ -1,6 +1,6 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 import { ChevronRight } from "lucide-react";
-import { RowControls } from "../controls/rowContext";
+import { RowControls } from "../controls/RowContext";
 import type { CSSProperties, ReactNode } from "react";
 import { cn } from "../classNames";
 import { Pressable } from "../controls/Pressable";

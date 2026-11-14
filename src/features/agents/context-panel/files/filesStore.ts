@@ -1,6 +1,5 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 import { create } from "zustand";
-import { createDeviceSetting, type DeviceSetting } from "@/shared/lib/deviceSetting";
 import { errorText } from "../projectApi";
 import {
   filesApi,
@@ -14,13 +13,11 @@ import { isUnder, joinPath, treeLineage } from "./paths";
 import { nextChainDir } from "./treeChain";
 import { useTreePreferences } from "./treePreferences";
 import { keepShownTree, shownTrees } from "./shownTrees";
-import { readStored } from "./filesStorage";
+import { readExpanded, readTabs, saveExpanded, saveTabs } from "./savedTreeState";
 
 export { fileName, joinPath, parentPath } from "./paths";
+export { tabsKey, treeKey } from "./savedTreeState";
 
-/** Where a folder's open folders and tabs lived before `misty.db`; moved over on first use. */
-export const treeKey = (root: string) => `misty.fileTree:${root}`;
-export const tabsKey = (root: string) => `misty.editorTabs:${root}`;
 let treeGeneration = 0;
 
 /** `expanded` without `dir` and every folder under it. */
@@ -42,109 +39,6 @@ function treeEntry(
   // Sliced, not fileName(): on macOS and Linux a name may hold "\".
   const name = path.slice(joinPath(parent, "").length);
   return state.children[parent]?.find((entry) => entry.name === name);
-}
-
-/** Expanded paths whose every folder from the root down is expanded too. */
-function reachableExpanded(root: string, expanded: Record<string, true>): Record<string, true> {
-  const reachable: Record<string, true> = {};
-  for (const path of Object.keys(expanded)) {
-    if (treeLineage(root, path)?.every((dir) => expanded[dir])) reachable[path] = true;
-  }
-  return reachable;
-}
-
-interface SavedTabs {
-  open: string[];
-  active: string | null;
-}
-
-/** Each folder's entry, with when it was last used so the oldest can be let go. */
-type PerFolder<T> = Record<string, T & { at: number }>;
-
-/** Folders remembered at most per kind; the ones used longest ago are let go first. */
-const keptFolders = 200;
-
-function perFolder<T>(read: (entry: unknown) => T | null) {
-  return (stored: unknown): PerFolder<T> => {
-    const kept: PerFolder<T> = {};
-    if (!stored || typeof stored !== "object") return kept;
-    for (const [root, entry] of Object.entries(stored as Record<string, unknown>)) {
-      const at = (entry as { at?: unknown } | null)?.at;
-      const value = read(entry);
-      if (value && typeof at === "number") kept[root] = { ...value, at };
-    }
-    return kept;
-  };
-}
-
-const readTree = (value: unknown): { expanded: string[] } | null => {
-  const paths = (value as { expanded?: unknown } | null)?.expanded;
-  if (!Array.isArray(paths) || !paths.every((path) => typeof path === "string")) return null;
-  return { expanded: paths };
-};
-
-const readTabsEntry = (value: unknown): SavedTabs | null => {
-  const tabs = value as Partial<SavedTabs> | null;
-  if (!Array.isArray(tabs?.open)) return null;
-  return {
-    open: tabs.open.filter((path): path is string => typeof path === "string"),
-    active: typeof tabs.active === "string" ? tabs.active : null,
-  };
-};
-
-/** Which folders were open in each linked folder's tree, kept for this device in `misty.db`. */
-const savedTrees = createDeviceSetting<PerFolder<{ expanded: string[] }>>({
-  scope: "file-tree-expanded",
-  defaults: {},
-  normalize: perFolder(readTree),
-});
-
-/** Which files were open as tabs in each linked folder, kept for this device in `misty.db`. */
-const savedTabs = createDeviceSetting<PerFolder<SavedTabs>>({
-  scope: "editor-tabs",
-  defaults: {},
-  normalize: perFolder(readTabsEntry),
-});
-
-/** Puts one folder's entry in the map, keeping only the most recently used folders. */
-function keepFor<T>(root: string, value: T) {
-  return (current: PerFolder<T>): PerFolder<T> => {
-    const next = { ...current, [root]: { ...value, at: Date.now() } };
-    const recent = Object.entries(next).sort(([, a], [, b]) => b.at - a.at);
-    return Object.fromEntries(recent.slice(0, keptFolders));
-  };
-}
-
-/** A folder's entry, or the one it had in webview storage before `misty.db`. The legacy key is
- * dropped here; the store's subscriber saves what the folder opens with right after. */
-function savedFor<T>(
-  setting: { getState(): DeviceSetting<PerFolder<T>> },
-  legacyKey: string,
-  root: string,
-  read: (value: unknown) => T | null,
-): T | null {
-  const kept = setting.getState().value[root];
-  if (kept) return kept;
-  const legacy = readStored(legacyKey, read);
-  try {
-    localStorage.removeItem(legacyKey);
-  } catch {
-    // Storage is off, so there was nothing to move.
-  }
-  return legacy;
-}
-
-function readExpanded(root: string): Record<string, true> {
-  const saved = root ? savedFor(savedTrees, treeKey(root), root, readTree) : null;
-  if (!saved) return root ? { [root]: true } : {};
-  return reachableExpanded(root, Object.fromEntries(saved.expanded.map((path) => [path, true])));
-}
-
-function readTabs(root: string): SavedTabs {
-  const saved = savedFor(savedTabs, tabsKey(root), root, readTabsEntry);
-  if (!saved) return { open: [], active: null };
-  const open = saved.open.filter((path) => isUnder(path, root));
-  return { open, active: saved.active && open.includes(saved.active) ? saved.active : null };
 }
 
 /** Newest listing request per folder. Listings run off the main thread, so two of one folder (a
@@ -716,16 +610,8 @@ export const useFilesStore = create<FilesStore>((set, get) => ({
 // Each folder remembers which folders were open and which files were open as tabs.
 useFilesStore.subscribe((state, previous) => {
   if (!state.root) return;
-  if (state.expanded !== previous.expanded) {
-    savedTrees.getState().set(
-      keepFor(state.root, {
-        expanded: Object.keys(reachableExpanded(state.root, state.expanded)),
-      }),
-    );
-  }
+  if (state.expanded !== previous.expanded) saveExpanded(state.root, state.expanded);
   if (state.openFiles !== previous.openFiles || state.activeFilePath !== previous.activeFilePath) {
-    savedTabs
-      .getState()
-      .set(keepFor(state.root, { open: state.openFiles, active: state.activeFilePath }));
+    saveTabs(state.root, state.openFiles, state.activeFilePath);
   }
 });

@@ -171,6 +171,37 @@
     0 2px 4px rgb(0 0 0 / 0.22),
     0 1px 2px rgb(0 0 0 / 0.22);
 }
+/* Floating: over the top right of its column, taking none of its width. */
+.misty-side-card[data-floating] {
+  position: absolute;
+  top: 8px;
+  right: calc(var(--misty-scrollbar-size) + 4px);
+  z-index: var(--stack-raised);
+  margin: 0;
+}
+/* Tucked: slid past the column's right edge (shadow and all), back while it peeks. */
+.misty-side-card[data-tucked] {
+  transition: translate 180ms ease-out;
+}
+.misty-side-card[data-away] {
+  translate: calc(100% + var(--misty-scrollbar-size) + 12px) 0;
+  pointer-events: none;
+  transition-timing-function: ease-in;
+}
+/* While it peeks, the gap from its right side to the column's edge, so the pointer resting on the
+   edge keeps it out. Tucked away, a strip along the column's edge where it sits. */
+.misty-side-card-edge {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: calc(-1 * (var(--misty-scrollbar-size) + 4px));
+  width: calc(var(--misty-scrollbar-size) + 4px);
+}
+.misty-side-card[data-away] .misty-side-card-edge {
+  right: calc(100% + 8px);
+  width: 12px;
+  pointer-events: auto;
+}
 .misty-side-card-corner {
   position: absolute;
   top: 6px;
@@ -189,6 +220,9 @@
 
 @media (prefers-reduced-motion: reduce) {
   .misty-side-panel-resize::after {
+    transition: none;
+  }
+  .misty-side-card[data-tucked] {
     transition: none;
   }
 }

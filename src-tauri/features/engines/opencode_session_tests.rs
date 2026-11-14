@@ -409,3 +409,24 @@ fn every_mode_answers_permission_asks_once() {
     assert_eq!(permission_reply(Some("manual")), "once");
     assert_eq!(permission_reply(None), "once");
 }
+
+#[test]
+fn a_compaction_summary_clears_the_context_count() {
+    let summary = json!({ "role": "assistant", "summary": true, "mode": "compaction" });
+    assert!(is_compaction_summary(&summary));
+    assert!(is_compaction_summary(&json!({ "agent": "compaction" })));
+    assert!(!is_compaction_summary(&json!({ "agent": "build", "summary": false })));
+    // 1.x tokens come out in the same flat fields as 2.x's, with the cache counted.
+    let tokens = json!({ "input": 580, "output": 165, "reasoning": 0,
+                         "cache": { "read": 5504, "write": 0 } });
+    let usage = v2::after_compaction(v2::usage_of(&tokens, None));
+    assert_eq!(usage["cache_read_input_tokens"], 5504);
+    assert_eq!(
+        crate::engines::bridge::context_usage(&usage),
+        (Some(0), None)
+    );
+    assert_eq!(
+        crate::engines::bridge::context_usage(&v2::usage_of(&tokens, Some(200_000))),
+        (Some(6249), Some(200_000))
+    );
+}

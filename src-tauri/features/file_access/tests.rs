@@ -236,6 +236,7 @@ fn grants_for(reach: Reach) -> &'static [&'static str] {
         | Reach::BenchmarkKeys
         | Reach::EngineConfig
         | Reach::BundledResources
+        | Reach::WebsiteData
         | Reach::TestFixtures => &[],
     }
 }

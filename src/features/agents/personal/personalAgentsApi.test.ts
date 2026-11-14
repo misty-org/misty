@@ -27,7 +27,7 @@ vi.mock("../engines/enginesApi", () => ({ listEngines: engines.list, mistyEngine
 vi.mock("./agentAccount", () => ({ agentAccountId: () => "acct" }));
 // The device's settings rows: a commit lands only on the revision it read, as natively.
 const note = { revision: 0, state: null as { engines: string[] } | null };
-vi.mock("@/native/invoke", () => ({
+vi.mock("@/shared/platform/nativeInvoke", () => ({
   invoke: async (
     command: string,
     input: { revision?: number; document?: { engines: string[] } },

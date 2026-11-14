@@ -126,6 +126,10 @@ export interface EngineCatalogItem {
   description: string;
   source: "builtin" | "user" | "project";
   insert: string;
+  argumentHint?: string;
+  /** Who runs it: the engine, sent as the next message, or Misty, out of turn
+   * (`engineCommands.ts`). */
+  runs?: "turn" | "misty";
 }
 
 export interface EngineCatalog {

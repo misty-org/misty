@@ -50,6 +50,11 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
   caption?: React.ReactNode;
   /** Working on the click: a spinner replaces the icon, the label stays, and clicks wait. */
   loading?: boolean;
+  /**
+   * Gives way first when its bar runs short: it narrows below its label, which fades out at the
+   * cut (an `OverflowFadeText` label), as a breadcrumb's folder does.
+   */
+  shrink?: boolean;
   /** Styles its one child instead, such as a router Link. */
   asChild?: boolean;
   /** Defaults to "button": a form's submit button says `type="submit"`. */
@@ -172,6 +177,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       iconEnd,
       caption,
       loading = false,
+      shrink = false,
       asChild = false,
       children,
       onClick,
@@ -201,7 +207,11 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
           resolvedVariant,
           resolvedSize,
           resolvedJustify,
-          cn(caption != null && "h-12 min-w-24 flex-col gap-0", className),
+          cn(
+            caption != null && "h-12 min-w-24 flex-col gap-0",
+            shrink && "min-w-0 shrink",
+            className,
+          ),
         )}
         ref={ref}
         // A plain button unless it says otherwise, so one inside a form never submits it by
