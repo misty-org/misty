@@ -45,6 +45,8 @@ misty-credential-store = { path = "vendor/misty-credential-store" }
 browser_data = { path = "features/sync/browser_data" }
 agent-runs = { path = "features/agents/runs" }
 page_text = { path = "features/browser/page_text" }
+# The in-page agent runtime, from the sibling misty-browser-harness checkout.
+misty_page_runtime = { path = "../../misty-browser-harness/crates/page-runtime" }
 kiri = { path = "features/kiri" }
 file_access = { path = "features/file_access" }
 database = { path = "features/database" }

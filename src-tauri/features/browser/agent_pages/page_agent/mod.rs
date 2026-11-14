@@ -39,19 +39,8 @@ pub(in crate::browser) use site_blocks::blocked as site_blocked;
 pub(crate) use site_blocks::SiteBlocks;
 use steps::Step;
 
-const RUNTIME: &str = concat!(
-    include_str!("page_core.js"),
-    "\n",
-    include_str!("page_tree.js"),
-    "\n",
-    include_str!("page_actions.js"),
-    "\n",
-    include_str!("page_consequence.js"),
-    "\n",
-    include_str!("page_read.js"),
-    "\n",
-    include_str!("page_skills.js")
-);
+/// The script itself lives in the misty-browser-harness repository (`crates/page-runtime/js`).
+const RUNTIME: &str = misty_page_runtime::RUNTIME;
 #[cfg(any(target_os = "macos", windows, target_os = "linux"))]
 const WORLD: &str = "misty-agent-page";
 const SNAPSHOT_CHARS: u64 = 24_000;

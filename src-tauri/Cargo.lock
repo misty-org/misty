@@ -3430,6 +3430,7 @@ dependencies = [
  "libloading 0.8.9",
  "mac-notification-sys",
  "misty-credential-store",
+ "misty_page_runtime",
  "objc",
  "objc2",
  "objc2-app-kit",
@@ -3490,6 +3491,13 @@ dependencies = [
  "xcap",
  "zeroize",
  "zstd",
+]
+
+[[package]]
+name = "misty_page_runtime"
+version = "0.1.0"
+dependencies = [
+ "serde_json",
 ]
 
 [[package]]
