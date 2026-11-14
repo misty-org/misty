@@ -118,7 +118,7 @@ async fn stop_task(context: &Context, id: &str) -> Result<Output, String> {
         ));
     };
     // Claude Code answers on the turn's stdout, where the reader passes control responses by;
-    // the task's own `task_notification` and the next task list show it stopped.
+    // the task's `task_updated` and the next task list show it stopped.
     static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
     let request_id = format!(
         "misty-stop-{}",
@@ -138,5 +138,38 @@ async fn stop_task(context: &Context, id: &str) -> Result<Output, String> {
     } else {
         &task.description
     };
-    Ok(Output::done(format!("Stopping {name}")))
+    if !stopped(session, &turn, &task.id).await {
+        return Ok(Output::done(format!("Stopping {name}")));
+    }
+    // The turn's process stayed only for its background tasks. A stopped task opens no
+    // follow-up turn (2.1.322 reports it and goes quiet), so with none left the process would
+    // idle until the app quits: closing its stdin ends it the way a finished turn does. A
+    // send that already took the parked process keeps it.
+    if live_tasks(session, &turn).is_empty() {
+        if let Some(parked) = state.processes.take_awaiting_followup(session) {
+            state.processes.close_stdin(&parked.run_id);
+        }
+    }
+    Ok(Output::done(format!("Stopped {name}")))
+}
+
+/// How long Claude Code may take to report a stopped task; it answers within a moment.
+const STOP_REPORT: std::time::Duration = std::time::Duration::from_secs(10);
+
+/// Waits until Claude Code reports task `id` no longer running: its `task_updated` status
+/// changes, or the next `background_tasks_changed` leaves it out.
+async fn stopped(session: &str, turn: &crate::engines::ChildEntry, id: &str) -> bool {
+    let deadline = tokio::time::Instant::now() + STOP_REPORT;
+    loop {
+        let running = live_tasks(session, turn)
+            .iter()
+            .any(|task| task.id == id && task.status == "running");
+        if !running {
+            return true;
+        }
+        if tokio::time::Instant::now() >= deadline {
+            return false;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    }
 }

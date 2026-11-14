@@ -5,6 +5,9 @@ use serde_json::json;
 use super::super::{run, Context, Output};
 use crate::engines::codex_rpc::{self, Session};
 
+/// `/approve` on a real auto-review denial (two Codex turns).
+mod approve;
+
 struct Scratch {
     _dir: tempfile::TempDir,
     folder: PathBuf,

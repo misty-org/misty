@@ -2,6 +2,9 @@ use std::path::{Path, PathBuf};
 
 use super::super::{run, Context, Output};
 
+/// `/tasks` on a real turn's background shell (one haiku turn).
+mod tasks;
+
 struct Scratch {
     _dir: tempfile::TempDir,
     folder: PathBuf,
