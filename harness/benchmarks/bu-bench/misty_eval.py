@@ -73,6 +73,19 @@ PICTURE_SCRIPT = """
 const { activityApi } = await module("features/agents/activity/activityApi.ts");
 return activityApi.picture(request.runId, request.picture);
 """
+# The window's profile, whose website data store the runs' pages browse in.
+PROFILE_SCRIPT = """
+const { invoke } = await module("native/invoke.ts");
+const info = await invoke("profile_window_info");
+return { window: info.label, profile: info.profile.name };
+"""
+# Clears that profile's cookies, site storage and cache (Settings, Clear website data), so a task
+# starts in a clean browser as BrowserCode's do.
+CLEAR_SCRIPT = """
+const { invoke } = await module("native/invoke.ts");
+await invoke("browser_clear_website_data", { request: { kinds: ["cookies", "cache"], since: 0 } });
+return true;
+"""
 
 
 # The engine's own ways onto the web, which bypass Misty's browser: its fetch and search tools, and
@@ -391,6 +404,8 @@ async def run_task(bridge, task, semaphore, *, run_dir, agent, args, judge_llm):
         }
         phase = "execution"
         try:
+            if args.store == "fresh":
+                await bridge.run_script(CLEAR_SCRIPT)
             executed = await execute(bridge, task, task_dir, agent=agent, args=args)
             result.update(executed["metrics"])
             if not executed["metrics"]["steps"]:
@@ -469,6 +484,13 @@ async def main(args) -> None:
             raise SystemExit(
                 f"{agent['name']} has no folder yet. Send it one message in the app so it gets one, then run again."
             )
+        window = await bridge.run_script(PROFILE_SCRIPT)
+        if args.store == "fresh" and window["profile"] != args.profile:
+            raise SystemExit(
+                f"--store fresh clears the website data of {window['window']}'s profile, "
+                f"{window['profile']!r}, before every task. Pass --profile {window['profile']!r} "
+                "if that profile is only for benchmarks, or --window for another window."
+            )
         judge = create_judge(DEFAULT_BENCHMARK, args.judge_model, args.judge_reasoning)
         args.run_stamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S_%f")
         run_dir = (args.output_dir or bench / "run_data").expanduser().resolve() / f"BU_Bench_V2_misty_{args.run_stamp}"
@@ -485,6 +507,11 @@ async def main(args) -> None:
                     "reasoning_effort": args.effort or "agent default",
                     "permission_mode": args.permission_mode,
                     "execution_mode": args.execution_mode,
+                    "browser_store": {
+                        "fresh": "cleared before every task",
+                        "signed-in": "the profile's own sign-ins and site data, kept between tasks",
+                    }[args.store],
+                    "profile": window["profile"],
                     "misty_commit": commit_of(MISTY),
                     "harness_commit": commit_of(HARNESS),
                 },
@@ -498,7 +525,8 @@ async def main(args) -> None:
             write_json(run_dir / "config.json", config)
             print(
                 f"BU Bench V2: {len(tasks)} tasks; Misty / {agent['name']} ({agent['engine']}) / "
-                f"{config['executor_config']['model']}; findings judge {judge.model} / {judge.reasoning_effort}",
+                f"{config['executor_config']['model']}; {args.store} browser store "
+                f"({window['profile']}); findings judge {judge.model} / {judge.reasoning_effort}",
                 flush=True,
             )
             if args.check:
@@ -545,6 +573,13 @@ def parse_args(argv=None):
     parser.add_argument("--permission-mode", default="bypass", help="The engine's mode for each run (default: bypass)")
     parser.add_argument("--execution-mode", default="user", choices=["user", "agent"])
     parser.add_argument("--window", help="App window label to start runs from; the first window when omitted")
+    parser.add_argument(
+        "--store", required=True, choices=["fresh", "signed-in"],
+        help="fresh: clear the profile's cookies, storage and cache before every task, as the benchmark's "
+        "own runs start (scores comparable with other harnesses); signed-in: browse with the profile's "
+        "sign-ins, kept between tasks (reported apart)",
+    )
+    parser.add_argument("--profile", help="With --store fresh: the name of the profile it clears, to confirm it")
     parser.add_argument("--tasks", type=int, help="Run only the first N selected tasks")
     parser.add_argument("--task-ids", nargs="+", help="Exact task ids")
     parser.add_argument("--shard-index", type=int)
@@ -558,6 +593,10 @@ def parse_args(argv=None):
     args = parser.parse_args(argv)
     if (args.shard_index is None) != (args.shard_count is None):
         parser.error("--shard-index and --shard-count go together")
+    if args.store == "fresh" and not args.profile:
+        parser.error("--store fresh needs --profile <name>, the benchmark profile whose data it clears")
+    if args.store == "fresh" and args.parallel > 1:
+        parser.error("--store fresh runs one task at a time: tasks running together share the store")
     if args.parallel < 1:
         parser.error("--parallel must be at least 1")
     return args

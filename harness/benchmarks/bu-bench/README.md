@@ -35,8 +35,8 @@ browsing, so the score measures the engine's model with Misty's harness. Always 
    MISTY_BROWSER_EVAL_BRIDGE_PORT=47123 npm run tauri dev
    ```
 
-3. In the app, use an account kept for benchmarking: runs browse with that profile's sign-ins,
-   and the chats they leave contain the decrypted tasks. Send the agent you'll benchmark (for
+3. In the app, use an account kept for benchmarking, with a profile kept for benchmarking: runs
+   browse in the window's profile, and the chats they leave contain the decrypted tasks. Send the agent you'll benchmark (for
    example the Claude Code agent) one message, so it has a folder. Deliverables are saved in
    `<agent folder>/bu-bench/<run>/` during a task, then copied out and deleted.
 
@@ -46,12 +46,22 @@ From `misty-browser-harness/`, in the same shell (so the token is set). The Mist
 found beside it; pass `--misty <path>` otherwise.
 
 ```bash
-uv run --project ../benchmark python benchmarks/bu-bench/misty_eval.py --bench ../benchmark --check
+uv run --project ../benchmark python benchmarks/bu-bench/misty_eval.py --bench ../benchmark --store fresh --profile Benchmark --check
 ```
 
 ```bash
-uv run --project ../benchmark python benchmarks/bu-bench/misty_eval.py --bench ../benchmark --tasks 5
+uv run --project ../benchmark python benchmarks/bu-bench/misty_eval.py --bench ../benchmark --store fresh --profile Benchmark --tasks 5
 ```
+
+`--store` has no default, because one choice erases data:
+
+- **`fresh`** clears the profile's cookies, site storage and cache before every task (Misty's
+  Settings → Clear website data), so each task starts in a clean browser, as BrowserCode's do.
+  These are the scores to compare with other harnesses. It erases that profile's sign-ins, so it
+  asks for `--profile` with the profile's name and stops if the window belongs to another one.
+  It runs one task at a time.
+- **`signed-in`** browses with the profile's own sign-ins, kept between tasks: what Misty does
+  for a person. Report these scores apart; they aren't comparable with a clean-browser run.
 
 Adjust `../benchmark` if you cloned it somewhere else. Options:
 
@@ -61,6 +71,9 @@ Adjust `../benchmark` if you cloned it somewhere else. Options:
 | `--agent` | | A specific agent id instead |
 | `--model`, `--effort` | the agent's | The engine's model and reasoning effort |
 | `--permission-mode` | `bypass` | The engine's mode; nobody is there to approve steps |
+| `--store` | required | `fresh` or `signed-in`, above |
+| `--profile` | | With `fresh`: the name of the profile it clears |
+| `--window` | the first window | The app window runs start from; its profile is the one used |
 | `--tasks`, `--task-ids` | all 200 | Same as `run_eval.py` |
 | `--shard-index`, `--shard-count` | | Same as `run_eval.py` |
 | `--task-timeout` | 3600 | Seconds per task |
@@ -85,7 +98,9 @@ Results go to `benchmark/run_data/BU_Bench_V2_misty_<time>/`, in the layout `run
   fetch or search tool, or a shell command that reaches a URL, gets `contaminated` in its
   `result.json` with the steps, and the run lists those tasks. Report them apart from the score.
 - **Cost** is what the engine reports (Claude Code reports it; others may report nothing).
-- **Fresh browser per task:** BrowserCode starts a clean browser per task. Misty's runs share the
-  profile's cookies, so sign-ins and site state carry between tasks.
+- **Fresh browser per task:** BrowserCode starts a clean browser per task. `--store fresh` clears
+  the profile's stored data instead; pages still open from an earlier task keep what they hold
+  in memory until they close. `--store signed-in` keeps everything between tasks.
 
-Only compare scores on the same task set and revision, with the judge settings in `config.json`.
+Only compare scores on the same task set, revision and `browser_store`, with the judge settings
+in `config.json`.
