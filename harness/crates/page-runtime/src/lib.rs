@@ -21,8 +21,15 @@ pub const RUNTIME: &str = concat!(
     "\n",
     include_str!("../js/page_read.js"),
     "\n",
-    include_str!("../js/page_skills.js")
+    include_str!("../js/page_skills.js"),
+    "\n",
+    include_str!("../js/page_effects.js")
 );
+
+/// The page-world network counter (`js/page_network.js`), which a host may install at document
+/// start in the page's own world so settles wait for the page's fetch and XHR calls. Unlike the
+/// runtime it is visible to the page, so a host turns it on deliberately.
+pub const NETWORK: &str = include_str!("../js/page_network.js");
 
 /// The global the runtime defines in its world.
 pub const GLOBAL: &str = "__mistyAgentPageV1";

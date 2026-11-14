@@ -306,9 +306,13 @@
         /\b404\b|page not found|not found|can.?t (find|locate) (that|this|the) page|page (doesn.?t|does not|no longer) exist|no longer available/i.test(said))
         missing = `- note: This is an error page ("${P.clip(said, 80)}"): the address is wrong or gone. Find the page through the site's own search or links, or a web search, instead of guessing another address.\n`;
     } catch { missing = ""; }
+    // What this read showed, so a compact read later marks only the controls that are new
+    // (page_effects.js); a scoped read adds to the last one.
+    P.markSeen?.(out.text, !!args.scopeRef);
+    const signIn = root === document && P.signInNote ? P.signInNote() : "";
     return {
       ok: true, documentId: S.documentId, url: location.href, title: document.title || "",
-      tree: missing + cover + (out.text || "- text: (the page shows no readable content)"),
+      tree: missing + cover + signIn + (out.text || "- text: (the page shows no readable content)"),
       truncated: out.truncated || built.scanLimited || built.refLimited,
       refCount: built.interactive.length, dialogs: P.dialogs(), focused: P.focused(),
       // Pattern and app skills that apply to this page (page_skills.js).

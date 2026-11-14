@@ -1,5 +1,5 @@
-// Misty agent page runtime, part 4 of 4: what changed after an action, waiting
-// for the page, and the single entry point Rust calls.
+// Misty agent page runtime, part 4: what changed after an action, waiting for the
+// page, and the single entry point Rust calls.
 ((P) => {
   const S = P.state;
 
@@ -31,17 +31,37 @@
     };
   };
 
-  /** Resolves once the DOM has been quiet for quietMs, or after maxMs. */
+  /**
+   * Resolves once the page has been quiet for quietMs, or after maxMs. Quiet counts from the
+   * page's last real change (page_effects.js), so a page that settled during the step answers at
+   * once; style churn and Misty's own overlays don't count as changes. While the page is still
+   * loading, or the page-world network counter (page_network.js) says requests are in flight, it
+   * keeps waiting, up to loadingMaxMs.
+   */
   P.settle = (args) => new Promise((resolve) => {
     const quiet = Math.max(50, Math.min(1000, args.quietMs ?? 200));
     const max = Math.max(quiet, Math.min(5000, args.maxMs ?? 1500));
-    let timer = 0;
+    const loadingMax = Math.max(max, Math.min(10000, args.loadingMaxMs ?? 3000));
+    const busy = () => document.readyState === "loading" || !!document.documentElement?.hasAttribute("data-misty-busy");
+    const watched = P.watchPage ? P.watchPage() : null;
+    const styled = new WeakMap();
     const started = Date.now();
-    const done = () => { observer.disconnect(); clearTimeout(timer); clearTimeout(cap); resolve({ ok: true, waitedMs: Date.now() - started }); };
-    const observer = new MutationObserver(() => { clearTimeout(timer); timer = setTimeout(done, quiet); });
-    observer.observe(document, { subtree: true, childList: true, attributes: true, characterData: true });
-    timer = setTimeout(done, quiet);
-    const cap = setTimeout(done, max);
+    let timer = 0;
+    let cap = 0;
+    const done = () => { observer.disconnect(); clearTimeout(timer); clearTimeout(cap); resolve({ ok: true, waitedMs: Date.now() - started, busy: busy() }); };
+    const quietOver = () => {
+      if (busy() && Date.now() - started < loadingMax) { timer = setTimeout(quietOver, 50); return; }
+      done();
+    };
+    const arm = (wait) => { clearTimeout(timer); timer = setTimeout(quietOver, Math.max(0, wait)); };
+    const observer = new MutationObserver((records) => { if (!P.realMutations || P.realMutations(records, styled)) arm(quiet); });
+    observer.observe(document, { subtree: true, childList: true, attributes: true, attributeOldValue: true, characterData: true });
+    // Inside a step (effectStart armed), quiet runs from the step's start or the page's last change
+    // since, whichever is later; otherwise from now, as a plain wait.
+    const now = performance.now();
+    const anchor = S.effect?.at !== undefined && watched ? Math.max(S.effect.at, watched.last) : now;
+    arm(quiet - (now - anchor));
+    cap = setTimeout(() => (busy() ? (cap = setTimeout(done, loadingMax - max)) : done()), max);
   });
 
   // Cookie and consent banners cover what an agent came to read and show. Its own tabs answer
@@ -192,6 +212,8 @@
     waitCheck: (args) => P.waitCheck(args), settle: (args) => P.settle(args), mark: (args) => P.mark(args),
     skill: (args) => P.skill(args), locate: (args) => P.locate(args), declineConsent: () => P.declineConsent(), dismissPopup: () => P.dismissPopup(),
     consequenceAt: (args) => P.consequenceAt(args), consequenceOfKey: (args) => P.consequenceOfKey(args), describeRef: (args) => P.describeRef(args),
+    // page_effects.js
+    effectStart: (args) => P.effectStart(args), effectEnd: (args) => P.effectEnd(args), compact: (args) => P.compact(args), signIn: () => P.signIn(),
     locatorFor: (args) => {
       const resolved = P.resolve(args.documentId, args.ref);
       return resolved.ok && resolved.el ? { ok: true, locator: P.locatorOf(resolved.el) } : resolved;
