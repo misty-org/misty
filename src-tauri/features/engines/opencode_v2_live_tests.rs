@@ -203,7 +203,19 @@ pub(super) fn tap_raw_events(origin: &str) {
 /// `OPENCODE_BIN=/path/to/opencode cargo test --lib live_v2_turns -- --ignored --nocapture`
 /// (`OPENCODE_FREE_MODEL` picks another free model; the default is the server's own default).
 /// `OPENCODE_PAID_MODEL` runs it on a priced model from a provider the person signed in to, and
-/// then also checks that the turn's cost reaches Misty.
+/// then also checks that the turn's cost reaches Misty. `OPENCODE_LIVE_PAUSE` waits that many
+/// seconds between steps, for a key whose provider allows only a few requests a minute.
+/// Waits between the live test's steps when `OPENCODE_LIVE_PAUSE` asks for it.
+async fn pace() {
+    let seconds = std::env::var("OPENCODE_LIVE_PAUSE")
+        .ok()
+        .and_then(|value| value.parse::<u64>().ok())
+        .unwrap_or(0);
+    if seconds > 0 {
+        tokio::time::sleep(Duration::from_secs(seconds)).await;
+    }
+}
+
 #[tokio::test]
 #[ignore]
 async fn live_v2_turns() {
@@ -250,21 +262,7 @@ async fn live_v2_turns() {
                 .find(|m| m["providerID"] == provider && m["id"] == id)
                 .cloned()
         })
-        .unwrap_or_else(|| {
-            let served: Vec<String> = data(&models)
-                .as_array()
-                .into_iter()
-                .flatten()
-                .map(|m| {
-                    format!(
-                        "{}/{}",
-                        m["providerID"].as_str().unwrap_or("?"),
-                        m["id"].as_str().unwrap_or("?")
-                    )
-                })
-                .collect();
-            panic!("{model} isn't served; the server lists {served:?}")
-        });
+        .unwrap_or_else(|| panic!("{model} isn't served: {}", data(&models)));
     let free = listed["cost"]
         .as_array()
         .is_some_and(|costs| costs.iter().all(|c| c["input"] == 0 && c["output"] == 0));
@@ -312,6 +310,7 @@ async fn live_v2_turns() {
     assert_eq!(done.len(), 1, "{kinds:?}");
     assert!(of_kind(&kinds, "error").is_empty(), "{kinds:?}");
 
+    pace().await;
     eprintln!("== 2. a tool");
     let turn = start_live_turn(
         &server,
@@ -343,6 +342,7 @@ async fn live_v2_turns() {
     assert_eq!(of_kind(&kinds, "done").len(), 1);
     assert!(of_kind(&kinds, "error").is_empty(), "{kinds:?}");
 
+    pace().await;
     eprintln!("== 3. /compact");
     let turn = start_live_turn(
         &server,
@@ -372,6 +372,7 @@ async fn live_v2_turns() {
     );
     assert!(last["output_tokens"].as_u64().unwrap_or(0) > 0, "{last}");
 
+    pace().await;
     eprintln!("== 4. a permission ask (reading .env)");
     let turn = start_live_turn(
         &server,
@@ -395,6 +396,7 @@ async fn live_v2_turns() {
     assert_eq!(of_kind(&kinds, "done").len(), 1, "{kinds:?}");
     assert!(of_kind(&kinds, "error").is_empty(), "{kinds:?}");
 
+    pace().await;
     eprintln!("== 5. a question form");
     let turn = start_live_turn(
         &server,
@@ -434,13 +436,14 @@ async fn live_v2_turns() {
     );
     assert_eq!(of_kind(&kinds, "done").len(), 1, "{kinds:?}");
 
+    pace().await;
     eprintln!("== 6. stop mid-turn");
     let turn = start_live_turn(
         &server,
         &bin,
         &folder,
         Some(session.clone()),
-        "Write the numbers from 1 to 400, one per line, and nothing else.",
+        "Without using any tools, write the numbers from 1 to 2000, one per line, and nothing else.",
         &model,
         6,
     );
@@ -478,7 +481,7 @@ async fn live_v2_turns() {
         "the server kept the stopped turn going"
     );
     assert!(
-        !text_of(&kinds).contains("\n400"),
+        !text_of(&kinds).contains("\n2000"),
         "the turn ran to the end before the stop: {kinds:?}"
     );
     server.kill_spawned();
