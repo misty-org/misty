@@ -11,18 +11,19 @@ browsing, so the score measures the engine's model with Misty's harness. Always 
 
 ## Setup
 
-1. BU Bench is the submodule [`upstream/`](upstream), pinned to v2.1.1: this repository points
-   at its commit and copies none of its code. From `misty-browser-harness/`, fetch and install it:
+1. BU Bench is the submodule [`browser-use-benchmark/`](browser-use-benchmark), pinned to
+   v2.1.1: this repository points at its commit and copies none of its code. From
+   `misty-browser-harness/`, fetch and install it:
 
    ```bash
-   git submodule update --init benchmarks/bu-bench/upstream
+   git submodule update --init benchmarks/bu-bench/browser-use-benchmark
    ```
 
    ```bash
-   cd benchmarks/bu-bench/upstream && uv sync --frozen --python 3.12 && cp .env.example .env
+   cd benchmarks/bu-bench/browser-use-benchmark && uv sync --frozen --python 3.12 && cp .env.example .env
    ```
 
-   Set `OPENAI_API_KEY` in `benchmarks/bu-bench/upstream/.env` (BU Bench's git ignores it). The
+   Set `OPENAI_API_KEY` in `benchmarks/bu-bench/browser-use-benchmark/.env` (BU Bench's git ignores it). The
    judge (`gpt-5.6-luna`, xhigh) needs it. `BROWSER_USE_API_KEY` isn't needed: no Browser Use
    service is used.
 
@@ -48,11 +49,11 @@ From `misty-browser-harness/`, in the same shell (so the token is set). The Mist
 found beside it; pass `--misty <path>` otherwise.
 
 ```bash
-uv run --project benchmarks/bu-bench/upstream python benchmarks/bu-bench/misty_eval.py --store fresh --profile Benchmark --check
+uv run --project benchmarks/bu-bench/browser-use-benchmark python benchmarks/bu-bench/misty_eval.py --store fresh --profile Benchmark --check
 ```
 
 ```bash
-uv run --project benchmarks/bu-bench/upstream python benchmarks/bu-bench/misty_eval.py --store fresh --profile Benchmark --tasks 5
+uv run --project benchmarks/bu-bench/browser-use-benchmark python benchmarks/bu-bench/misty_eval.py --store fresh --profile Benchmark --tasks 5
 ```
 
 `--store` has no default, because one choice erases data:
@@ -69,7 +70,7 @@ Options:
 
 | Option | Default | |
 | --- | --- | --- |
-| `--bench` | `upstream/` | Another BU Bench checkout, for another revision |
+| `--bench` | `browser-use-benchmark/` | Another BU Bench checkout, for another revision |
 | `--engine` | `claude` | Runs as that engine's agent (`personal_engine_<engine>`) |
 | `--agent` | | A specific agent id instead |
 | `--model`, `--effort` | the agent's | The engine's model and reasoning effort |

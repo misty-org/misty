@@ -565,7 +565,7 @@ async def main(args) -> None:
 
 def parse_args(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    parser.add_argument("--bench", type=Path, default=HERE.parent / "upstream", help="BU Bench checkout (default: the upstream submodule, v2.1.1)")
+    parser.add_argument("--bench", type=Path, default=HERE.parent / "browser-use-benchmark", help="BU Bench checkout (default: the browser-use-benchmark submodule, v2.1.1)")
     parser.add_argument("--misty", type=Path, help="The Misty checkout the debug app runs from (default: ../misty)")
     who = parser.add_mutually_exclusive_group()
     who.add_argument("--engine", default="claude", help="Engine id whose default agent runs the tasks (claude, codex, gemini, ...)")
