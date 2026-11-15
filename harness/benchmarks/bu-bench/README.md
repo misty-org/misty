@@ -23,25 +23,30 @@ browsing, so the score measures the engine's model with Misty's harness. Always 
    cd benchmarks/bu-bench/browser-use-benchmark && uv sync --frozen --python 3.12 && cp .env.example .env
    ```
 
-   Set `OPENAI_API_KEY` in `benchmarks/bu-bench/browser-use-benchmark/.env` (BU Bench's git ignores it). The
-   judge (`gpt-5.6-luna`, xhigh) needs it. `BROWSER_USE_API_KEY` isn't needed: no Browser Use
-   service is used.
+   Set `OPENAI_API_KEY` in `benchmarks/bu-bench/browser-use-benchmark/.env` (BU Bench's git
+   ignores it). The judge (`gpt-5.6-luna`, xhigh) needs it. `BROWSER_USE_API_KEY` isn't needed:
+   no Browser Use service is used.
 
-2. Start Misty's debug app (from `misty/`) with the eval bridge on. The token is any random string of at least 24
-   characters; the bridge isn't compiled into release builds.
+2. Start Misty's debug app (from `misty/`) with the eval bridge on, in a dev folder of its own.
+   `MISTY_PROFILE=bench` opens `~/.misty/dev/bench` for that launch only: its own database,
+   chats, agent folders and WebKit store, apart from the folder `~/.misty/misty.conf` names, so
+   `--store fresh` only ever clears the benchmark's browser. It leaves `misty.conf` as it is, and
+   engine installs (`~/.misty/shared/engines`) are shared as for every build. The token is any
+   random string of at least 24 characters; the bridge isn't compiled into release builds.
 
    ```bash
    export MISTY_BROWSER_EVAL_BRIDGE_TOKEN=$(openssl rand -hex 24)
    ```
 
    ```bash
-   MISTY_BROWSER_EVAL_BRIDGE_PORT=47123 npm run tauri dev
+   MISTY_PROFILE=bench MISTY_BROWSER_EVAL_BRIDGE_PORT=47123 npm run tauri dev
    ```
 
-3. In the app, use an account kept for benchmarking, with a profile kept for benchmarking: runs
-   browse in the window's profile, and the chats they leave contain the decrypted tasks. Send the agent you'll benchmark (for
-   example the Claude Code agent) one message, so it has a folder. Deliverables are saved in
-   `<agent folder>/bu-bench/<run>/` during a task, then copied out and deleted.
+3. In that app, sign in to your Misty account (agents and chats are kept per account; signed
+   out, the runner can't find them), then send the agent you'll benchmark (for example the
+   Claude Code agent) one message, so it has a folder. Deliverables are saved in `<agent folder>/bu-bench/<run>/` during a task,
+   then copied out and deleted. Its one browser profile is `Personal`, so runs pass
+   `--profile Personal`.
 
 ## Running
 
@@ -49,11 +54,11 @@ From `misty-browser-harness/`, in the same shell (so the token is set). The Mist
 found beside it; pass `--misty <path>` otherwise.
 
 ```bash
-uv run --project benchmarks/bu-bench/browser-use-benchmark python benchmarks/bu-bench/misty_eval.py --store fresh --profile Benchmark --check
+uv run --project benchmarks/bu-bench/browser-use-benchmark python benchmarks/bu-bench/misty_eval.py --store fresh --profile Personal --check
 ```
 
 ```bash
-uv run --project benchmarks/bu-bench/browser-use-benchmark python benchmarks/bu-bench/misty_eval.py --store fresh --profile Benchmark --tasks 5
+uv run --project benchmarks/bu-bench/browser-use-benchmark python benchmarks/bu-bench/misty_eval.py --store fresh --profile Personal --tasks 5
 ```
 
 `--store` has no default, because one choice erases data:
@@ -61,7 +66,8 @@ uv run --project benchmarks/bu-bench/browser-use-benchmark python benchmarks/bu-
 - **`fresh`** clears the profile's cookies, site storage and cache before every task (Misty's
   Settings → Clear website data), so each task starts in a clean browser, as BrowserCode's do.
   These are the scores to compare with other harnesses. It erases that profile's sign-ins, so it
-  asks for `--profile` with the profile's name and stops if the window belongs to another one.
+  asks for `--profile` with the profile's name and stops if the window belongs to another one;
+  run it only in the benchmark app above, where that profile holds nothing of yours.
   It runs one task at a time.
 - **`signed-in`** browses with the profile's own sign-ins, kept between tasks: what Misty does
   for a person. Report these scores apart; they aren't comparable with a clean-browser run.
@@ -71,7 +77,7 @@ Options:
 | Option | Default | |
 | --- | --- | --- |
 | `--bench` | `browser-use-benchmark/` | Another BU Bench checkout, for another revision |
-| `--engine` | `claude` | Runs as that engine's agent (`personal_engine_<engine>`) |
+| `--engine` | `claude` | Runs as that engine's agent (`personal_engine_<engine>`, or the one agent on that engine) |
 | `--agent` | | A specific agent id instead |
 | `--model`, `--effort` | the agent's | The engine's model and reasoning effort |
 | `--permission-mode` | `bypass` | The engine's mode; nobody is there to approve steps |

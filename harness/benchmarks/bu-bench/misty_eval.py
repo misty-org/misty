@@ -56,8 +56,15 @@ const { personalAgentsApi } = await module("features/agents/personal/personalAge
 const { agentAccountId } = await module("features/agents/personal/agentAccount.ts");
 const { invoke } = await module("native/invoke.ts");
 const { agents } = await personalAgentsApi.list();
-const agent = agents.find((candidate) => candidate.id === request.agentId);
-if (!agent) return { agent: null, agents: agents.map((candidate) => candidate.id) };
+// A named agent, else the engine's agent: its built-in id, or the one agent on that engine.
+const onEngine = agents.filter((candidate) => candidate.engine === request.engine);
+const agent = request.agentId
+  ? agents.find((candidate) => candidate.id === request.agentId)
+  : agents.find((candidate) => candidate.id === `personal_engine_${request.engine}`) ??
+    (onEngine.length === 1 ? onEngine[0] : undefined);
+if (!agent) {
+  return { agent: null, agents: agents.map((candidate) => `${candidate.id} (${candidate.name}, ${candidate.engine || "no engine"})`) };
+}
 const folder = await invoke("agent_folder", { account: agentAccountId(), agent: agent.id });
 return { agent: { id: agent.id, name: agent.name, engine: agent.engine ?? "", folder: folder ?? null } };
 """
@@ -472,15 +479,15 @@ async def main(args) -> None:
     tasks = select_tasks(tasks, args.task_ids, args.tasks)
     if not tasks:
         raise SystemExit("The selected task set is empty")
-    agent_id = args.agent or f"personal_engine_{args.engine}"
 
     async with httpx.AsyncClient() as client:
         bridge = Bridge(client, token, args.window)
-        found = await bridge.run_script(AGENT_SCRIPT, {"agentId": agent_id})
+        found = await bridge.run_script(AGENT_SCRIPT, {"agentId": args.agent, "engine": args.engine})
         agent = found.get("agent")
         if not agent:
             raise SystemExit(
-                f"No agent {agent_id} in the app. Its agents: {', '.join(found.get('agents') or [])}"
+                f"No {'agent ' + args.agent if args.agent else 'single ' + args.engine + ' agent'} in the app; "
+                f"pass --agent with one of: {', '.join(found.get('agents') or [])}"
             )
         if not agent.get("folder"):
             raise SystemExit(
