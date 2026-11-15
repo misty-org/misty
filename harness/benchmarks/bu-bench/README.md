@@ -11,18 +11,20 @@ browsing, so the score measures the engine's model with Misty's harness. Always 
 
 ## Setup
 
-1. Check out the benchmark beside this repository and Misty and install it, as its README says:
+1. BU Bench is the submodule [`upstream/`](upstream), pinned to v2.1.1: this repository points
+   at its commit and copies none of its code. From `misty-browser-harness/`, fetch and install it:
 
    ```bash
-   git clone --branch v2.1.1 --single-branch https://github.com/browser-use/benchmark.git
+   git submodule update --init benchmarks/bu-bench/upstream
    ```
 
    ```bash
-   cd benchmark && uv sync --frozen --python 3.12 && cp .env.example .env
+   cd benchmarks/bu-bench/upstream && uv sync --frozen --python 3.12 && cp .env.example .env
    ```
 
-   Set `OPENAI_API_KEY` in `benchmark/.env`. The judge (`gpt-5.6-luna`, xhigh) needs it.
-   `BROWSER_USE_API_KEY` isn't needed: no Browser Use service is used.
+   Set `OPENAI_API_KEY` in `benchmarks/bu-bench/upstream/.env` (BU Bench's git ignores it). The
+   judge (`gpt-5.6-luna`, xhigh) needs it. `BROWSER_USE_API_KEY` isn't needed: no Browser Use
+   service is used.
 
 2. Start Misty's debug app (from `misty/`) with the eval bridge on. The token is any random string of at least 24
    characters; the bridge isn't compiled into release builds.
@@ -46,11 +48,11 @@ From `misty-browser-harness/`, in the same shell (so the token is set). The Mist
 found beside it; pass `--misty <path>` otherwise.
 
 ```bash
-uv run --project ../benchmark python benchmarks/bu-bench/misty_eval.py --bench ../benchmark --store fresh --profile Benchmark --check
+uv run --project benchmarks/bu-bench/upstream python benchmarks/bu-bench/misty_eval.py --store fresh --profile Benchmark --check
 ```
 
 ```bash
-uv run --project ../benchmark python benchmarks/bu-bench/misty_eval.py --bench ../benchmark --store fresh --profile Benchmark --tasks 5
+uv run --project benchmarks/bu-bench/upstream python benchmarks/bu-bench/misty_eval.py --store fresh --profile Benchmark --tasks 5
 ```
 
 `--store` has no default, because one choice erases data:
@@ -63,10 +65,11 @@ uv run --project ../benchmark python benchmarks/bu-bench/misty_eval.py --bench .
 - **`signed-in`** browses with the profile's own sign-ins, kept between tasks: what Misty does
   for a person. Report these scores apart; they aren't comparable with a clean-browser run.
 
-Adjust `../benchmark` if you cloned it somewhere else. Options:
+Options:
 
 | Option | Default | |
 | --- | --- | --- |
+| `--bench` | `upstream/` | Another BU Bench checkout, for another revision |
 | `--engine` | `claude` | Runs as that engine's agent (`personal_engine_<engine>`) |
 | `--agent` | | A specific agent id instead |
 | `--model`, `--effort` | the agent's | The engine's model and reasoning effort |
@@ -80,7 +83,7 @@ Adjust `../benchmark` if you cloned it somewhere else. Options:
 | `--parallel` | 1 | Runs at once in the app |
 | `--judge-model`, `--judge-reasoning` | the benchmark's | Change only to match another run |
 
-Results go to `benchmark/run_data/BU_Bench_V2_misty_<time>/`, in the layout `run_eval.py` uses:
+Results go to `benchmarks/bu-bench/run_data/BU_Bench_V2_misty_<time>/` (git ignores it), in the layout `run_eval.py` uses:
 `config.json`, `results.json`, and per task `events.jsonl`, `trace.json`, `screenshots/`,
 `screenshot_manifest.json`, `workspace/outputs/`, `judge_input.json`, `judge_response.json` and
 `result.json`. They contain decrypted tasks and rubrics: don't publish or commit them.

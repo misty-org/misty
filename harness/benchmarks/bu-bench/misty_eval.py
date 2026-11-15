@@ -452,7 +452,9 @@ async def main(args) -> None:
         raise SystemExit(f"{MISTY} is not a Misty checkout; pass --misty")
     bench = args.bench.expanduser().resolve()
     if not (bench / "BU_Bench_V2.enc").is_file():
-        raise SystemExit(f"{bench} is not a BU Bench checkout (no BU_Bench_V2.enc)")
+        raise SystemExit(
+            f"{bench} is not a BU Bench checkout (no BU_Bench_V2.enc). Run `git submodule update --init`, or pass --bench"
+        )
     sys.path.insert(0, str(bench))
     from dotenv import load_dotenv
 
@@ -493,7 +495,7 @@ async def main(args) -> None:
             )
         judge = create_judge(DEFAULT_BENCHMARK, args.judge_model, args.judge_reasoning)
         args.run_stamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S_%f")
-        run_dir = (args.output_dir or bench / "run_data").expanduser().resolve() / f"BU_Bench_V2_misty_{args.run_stamp}"
+        run_dir = (args.output_dir or HERE.parent / "run_data").expanduser().resolve() / f"BU_Bench_V2_misty_{args.run_stamp}"
         run_dir.mkdir(parents=True)
         try:
             config = {
@@ -563,7 +565,7 @@ async def main(args) -> None:
 
 def parse_args(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    parser.add_argument("--bench", type=Path, required=True, help="BU Bench checkout (v2.1.1 or main)")
+    parser.add_argument("--bench", type=Path, default=HERE.parent / "upstream", help="BU Bench checkout (default: the upstream submodule, v2.1.1)")
     parser.add_argument("--misty", type=Path, help="The Misty checkout the debug app runs from (default: ../misty)")
     who = parser.add_mutually_exclusive_group()
     who.add_argument("--engine", default="claude", help="Engine id whose default agent runs the tasks (claude, codex, gemini, ...)")
@@ -588,7 +590,7 @@ def parse_args(argv=None):
     parser.add_argument("--parallel", type=int, default=1, help="Runs at once in the app (default: 1)")
     parser.add_argument("--judge-model", default=None, help="Findings judge model (default: the benchmark's)")
     parser.add_argument("--judge-reasoning", default="xhigh")
-    parser.add_argument("--output-dir", type=Path, help="Where results go (default: <bench>/run_data)")
+    parser.add_argument("--output-dir", type=Path, help="Where results go (default: run_data/ beside this file, which git ignores)")
     parser.add_argument("--check", action="store_true", help="Check the app, agent and judge setup without running tasks")
     args = parser.parse_args(argv)
     if (args.shard_index is None) != (args.shard_count is None):

@@ -1,0 +1,3 @@
+[submodule "benchmarks/bu-bench/upstream"]
+	path = benchmarks/bu-bench/upstream
+	url = https://github.com/browser-use/benchmark.git

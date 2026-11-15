@@ -49,9 +49,10 @@ browser-use (https://github.com/browser-use/browser-use)
     SOFTWARE.
 
 BU Bench (https://github.com/browser-use/benchmark)
-  benchmarks/bu-bench/misty_eval.py runs against a separate checkout of BU Bench and imports its
-  code there (task loading, selection, the findings judge, scoring and summaries); none of that
-  code is copied here. Its evidence layout and the task prompt follow BU Bench's BrowserCode
+  benchmarks/bu-bench/upstream is a git submodule: this repository records which BU Bench commit
+  to use (v2.1.1) and includes none of its files. benchmarks/bu-bench/misty_eval.py imports BU
+  Bench's code from that checkout (task loading, selection, the findings judge, scoring and
+  summaries); none of that code is copied here. Its evidence layout and the task prompt follow BU Bench's BrowserCode
   runner. The BU Bench repository states no license of its own; its README asks that decrypted
   tasks and rubrics are never published or used for training, and this repository keeps run data
   out of version control.
