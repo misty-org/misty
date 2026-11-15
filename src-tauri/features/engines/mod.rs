@@ -2065,7 +2065,7 @@ mod permission_tests {
     }
 
     /// `build_command` with `HOME` held still. pi and omp write their ask bridge extension under
-    /// `~/.misty/engines` while building, and tests that point `HOME` at a scratch folder (the
+    /// `~/.misty/shared/engines` while building, and tests that point `HOME` at a scratch folder (the
     /// history scanner's, CodeBuddy's, DSH's) delete that folder when they end: built mid-swap,
     /// the write landed in a folder being removed and failed now and then ("write pi ask
     /// bridge …/ccgui-scan-home-…: No such file or directory"). Those tests hold this lock while

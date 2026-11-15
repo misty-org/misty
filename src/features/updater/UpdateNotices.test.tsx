@@ -10,6 +10,11 @@ vi.mock("@/features/settings", () => ({
 }));
 vi.mock("@/shared/platform/tauri", () => ({ hasTauriInternals: () => mocks.native }));
 vi.mock("@tauri-apps/plugin-updater", () => ({ check: mocks.check }));
+vi.mock("@/features/app-windows", () => ({ reserveMistyUpdate: () => () => {} }));
+vi.mock("@/features/agents", () => ({
+  MistyMarkdown: ({ children }: { children: string }) => <div>{children}</div>,
+}));
+vi.mock("@/shared/platform/relaunch", () => ({ relaunch: vi.fn() }));
 // The menu bar's "Check for updates" reaches the window as an event.
 vi.mock("@tauri-apps/api/window", () => ({
   getCurrentWindow: () => ({ listen: async () => () => {} }),
@@ -33,31 +38,18 @@ it("does not read the retired app catalog or respond to app update notices", asy
   expect(mocks.apps).not.toHaveBeenCalled();
   expect(screen.queryByRole("complementary")).toBeNull();
 });
-it("still checks for Misty releases and opens update settings", async () => {
+it("asks to install a new Misty release, showing its notes", async () => {
+  localStorage.clear();
   const close = vi.fn().mockResolvedValue(undefined);
-  mocks.check.mockResolvedValue({ version: "2.0.0", close });
-  const openSettings = vi.fn();
-  window.addEventListener("misty:open-settings", openSettings);
-  try {
-    render(
-      <>
-        <NoticeViewport />
-        <UpdateNotices accountScope="account" />
-      </>,
-    );
-    const notice = await screen.findByRole("status");
-    expect(notice.textContent).toContain("Misty 2.0.0 is available");
-    // Registered as a notice, so it shows over a page in that corner.
-    expect(notice.getAttribute("data-misty-notification")).toBe("true");
-    expect(close).toHaveBeenCalledTimes(1);
-    fireEvent.click(screen.getByRole("button", { name: "View release" }));
-    expect(openSettings).toHaveBeenCalledWith(
-      expect.objectContaining({ detail: { section: "updates" } }),
-    );
-    await waitFor(() => expect(screen.queryByRole("status")).toBeNull());
-  } finally {
-    window.removeEventListener("misty:open-settings", openSettings);
-  }
+  mocks.check.mockResolvedValue({ version: "2.0.0", body: "Faster startup.", close });
+  render(<UpdateNotices accountScope="account" />);
+  const dialog = await screen.findByRole("dialog");
+  expect(dialog.textContent).toContain("Misty 2.0.0 is available");
+  expect(dialog.textContent).toContain("Faster startup.");
+  expect(screen.getByRole("button", { name: "Install and restart" })).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Later" }));
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  expect(close).toHaveBeenCalledTimes(1);
 });
 it("preserves unsaved-work notices independently of update checks", async () => {
   mocks.enabled = false;

@@ -282,11 +282,11 @@ fn note(run_id: &str, note: RunNote) {
 
 static APP: std::sync::OnceLock<AppHandle> = std::sync::OnceLock::new();
 
-/// Where an engine works when the chat names no folder: `~/.misty/workspace`, made on first use and
-/// shared by every build, since the engines know their sessions by its path. Not a profile's own
-/// folder, which holds Misty's database and credential store.
+/// Where an engine works when the chat names no folder: `~/.misty/shared/projects`, made on first
+/// use and shared by every build, since the engines know their sessions by its path. Not a data
+/// folder of its own, which holds Misty's database and credential store.
 fn default_workspace() -> Result<PathBuf, String> {
-    let folder = file_access::paths::misty_shared_dir("workspace")
+    let folder = file_access::paths::misty_shared_dir("projects")
         .ok_or("Misty couldn't find your home folder.")?;
     std::fs::create_dir_all(&folder)
         .map_err(|error| format!("Misty couldn't make {}: {error}", folder.display()))?;
@@ -301,6 +301,13 @@ pub(crate) async fn start(app: &AppHandle, run_id: String, body: Value) -> Resul
         .ok_or("That engine has no adapter.")?
         .to_string();
     let state = support::state().ok_or_else(super::not_ready)?;
+    // An engine Misty installed in shared/engines is brought up to this build's minimum first; a
+    // failed update leaves the run on the version that is there.
+    if let Err(error) =
+        crate::engine_config::cli_lifecycle::upkeep::ensure_minimum(&engine).await
+    {
+        eprintln!("[engines] updating {engine} before the run failed: {error}");
+    }
     let facts = RunFacts::of_request(&run_id, &body);
     let named = body["engine"]["folder"].as_str().unwrap_or("").to_string();
     let agent_name = body["agent"]["name"].as_str().unwrap_or("").to_string();

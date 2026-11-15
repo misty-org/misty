@@ -403,7 +403,7 @@ pub(super) fn read_skill_content(directory: &str) -> SkillResult<Value> {
 /// Repoints engines' skill links that lead into another of Misty's folders at this one's copy of
 /// the skill. A new release version's folder starts as a copy of the last one, and the layout from
 /// before profiles moved into the first profile, so a link made then still leads to the old place.
-/// Dev and named builds only take over links from the layout before profiles: links into a release
+/// Dev builds only take over links from the layout before profiles: links into a release
 /// version's folder belong to whichever release ran last.
 pub(super) fn repoint_links_from_other_folders() {
     use file_access::paths::{self, Profile};
@@ -440,7 +440,7 @@ pub(super) fn repoint_links_from_other_folders() {
 
 /// The skill `points_at` names when it lies in another of Misty's folders' skills hub: the layout
 /// from before profiles (`~/.misty/engine-config/...`), or, for a release build, another release
-/// version's (`~/.misty/<channel>/<version>/engine-config/...`).
+/// version's (`~/.misty/rel/<version>/engine-config/...`).
 fn skill_in_other_folder(
     points_at: &Path,
     root: &Path,
@@ -461,8 +461,7 @@ fn skill_in_other_folder(
     } else if release
         && parts.len() == 6
         && parts[2..5] == hub
-        && parts[0] != file_access::paths::DEV_FOLDER
-        && parts[0] != file_access::paths::CUSTOM_FOLDER
+        && parts[0] == file_access::paths::RELEASE_FOLDER
     {
         &parts[5..]
     } else {

@@ -1,6 +1,6 @@
 // How an engine is installed, updated and removed. An engine already on the computer is used as
 // it is and updated the way it was installed; a missing one always goes into Misty's folder,
-// `~/.misty/engines/<engine>`. Every route runs inside the app, with no terminal to type into;
+// `~/.misty/shared/engines/<engine>`. Every route runs inside the app, with no terminal to type into;
 // its output streams to the dialog's Show details.
 //
 // - npm engines: `npm install --prefix <folder>` (never `-g`), with Misty's own Node.js when the
@@ -27,11 +27,11 @@ use crate::engines::support::paths::{engine_install_dir, InstallRoot};
 /// One way of installing or updating an engine.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum Route {
-    /// `npm install --prefix ~/.misty/engines/<engine>`.
+    /// `npm install --prefix ~/.misty/shared/engines/<engine>`.
     MistyNpm,
-    /// The maker's build, downloaded by Misty into `~/.misty/engines/<engine>/bin`.
+    /// The maker's build, downloaded by Misty into `~/.misty/shared/engines/<engine>/bin`.
     MistyDownload,
-    /// The maker's script, pointed at `~/.misty/engines/<engine>/bin`.
+    /// The maker's script, pointed at `~/.misty/shared/engines/<engine>/bin`.
     MistyScript,
     /// A copy npm put on the computer globally before; it updates the same way.
     NpmGlobal,
@@ -255,7 +255,7 @@ pub(super) fn script_argv(
 }
 
 /// The home Hermes Agent's script gets on macOS and Linux, beside its checkout in Misty's folder:
-/// `~/.misty/engines/hermes/home`. Its shell profile lines and `~/.local/bin` wrappers land there.
+/// `~/.misty/shared/engines/hermes/home`. Its shell profile lines and `~/.local/bin` wrappers land there.
 pub(super) fn installer_home(
     engine: &str,
     into: &Path,
@@ -449,7 +449,7 @@ async fn run_program(
     })
 }
 
-/// Removes an engine Misty installed: its whole folder in `~/.misty/engines`. A copy that was
+/// Removes an engine Misty installed: its whole folder in `~/.misty/shared/engines`. A copy that was
 /// on the computer before is never touched.
 pub(super) fn remove(engine: &str, bin: &str) -> Result<(), String> {
     remove_in(&InstallRoot::here(), &hermes_launchers::dirs(), engine, bin)

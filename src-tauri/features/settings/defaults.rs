@@ -82,11 +82,11 @@ pub(super) fn normalize_settings_document(document: &mut Value) -> bool {
 
 fn ensure_section_defaults(
     root: &mut Map<String, Value>,
-    section: &str,
+    section_name: &str,
     defaults: &[(&str, Value)],
 ) -> bool {
     let mut changed = false;
-    let value = root.entry(section.to_owned()).or_insert_with(|| {
+    let value = root.entry(section_name.to_owned()).or_insert_with(|| {
         changed = true;
         Value::Object(Map::new())
     });
@@ -97,9 +97,34 @@ fn ensure_section_defaults(
     let section = value.as_object_mut().expect("settings section object");
     for (key, default_value) in defaults {
         if !section.contains_key(*key) {
-            section.insert((*key).to_owned(), default_value.clone());
+            section.insert((*key).to_owned(), seeded(section_name, key, default_value));
             changed = true;
         }
     }
     changed
+}
+
+/// The value a missing key starts with: `misty.conf`'s `[defaults]` entry for it, read as the
+/// built-in default's type, else the built-in default. It seeds; it never changes a set value.
+fn seeded(section: &str, key: &str, built_in: &Value) -> Value {
+    file_access::conf::current()
+        .default_for(section, key)
+        .and_then(|text| as_type_of(built_in, text))
+        .unwrap_or_else(|| built_in.clone())
+}
+
+/// `text` as a value of `like`'s type, when it reads as one.
+fn as_type_of(like: &Value, text: &str) -> Option<Value> {
+    match like {
+        Value::Bool(_) => match text {
+            "true" | "on" => Some(Value::Bool(true)),
+            "false" | "off" => Some(Value::Bool(false)),
+            _ => None,
+        },
+        Value::Number(_) => serde_json::from_str::<serde_json::Number>(text)
+            .ok()
+            .map(Value::Number),
+        Value::String(_) => Some(Value::String(text.to_owned())),
+        _ => None,
+    }
 }

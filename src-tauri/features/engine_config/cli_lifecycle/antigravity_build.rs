@@ -7,7 +7,7 @@
 // - The manifest: `<release server>/manifests/<platform>.json`, naming the version, the build's
 //   URL and its SHA-512.
 // - The build: a `.tar.gz` holding the program as `antigravity` (macOS, Linux), or the program
-//   itself (Windows), kept as `~/.misty/engines/agy/bin/agy`.
+//   itself (Windows), kept as `~/.misty/shared/engines/agy/bin/agy`.
 
 use super::super::downloads::{self, Checksum};
 use super::super::ProgressReporter;

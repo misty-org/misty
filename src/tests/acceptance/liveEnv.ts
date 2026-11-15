@@ -3,10 +3,27 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 
 /**
+ * The data folder `~/.misty/misty.conf` names (`misty.root`), whose `.env` holds the keys:
+ * `~/.misty/dev/default` when there is no misty.conf yet.
+ */
+function dataFolder(): string {
+  const misty = join(homedir(), ".misty");
+  const conf = join(misty, "misty.conf");
+  const root = existsSync(conf)
+    ? /^\s*misty\.root\s*=\s*["']?([^"'#\s]+)/m.exec(readFileSync(conf, "utf8"))?.[1]
+    : undefined;
+  const folder = root?.replace(/^~\//, `${homedir()}/`) ?? join(misty, "dev", "default");
+  // Only a folder in ~/.misty/dev or ~/.misty/rel, as Misty itself allows.
+  return folder.startsWith(`${join(misty, "dev")}/`) || folder.startsWith(`${join(misty, "rel")}/`)
+    ? folder
+    : join(misty, "dev", "default");
+}
+
+/**
  * Live acceptance runs read the benchmark keys, without printing them. Process
  * variables take precedence.
  */
-const envFiles = [join(homedir(), ".misty/.env/client/agents.env")];
+const envFiles = [join(dataFolder(), ".env/client/agents.env")];
 
 function fileValues(): Record<string, string> {
   const values: Record<string, string> = {};

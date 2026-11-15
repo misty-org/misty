@@ -5,6 +5,7 @@ import { SpacesRealtimeBridge } from "@/features/spaces/SpacesRealtimeBridge";
 import { LoadingScreen } from "@/shared/ui";
 import { AgentExecutionSurface } from "@/features/agents";
 import { UpdateNotices } from "@/features/updater/UpdateNotices";
+import { EngineUpdatesPrompt } from "@/features/engine-config/clis";
 import { lazy, Suspense, useEffect, useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/features/account";
@@ -122,6 +123,7 @@ export function AppFrameLayout() {
       <SpaceWindowBridge />
       <AgentExecutionSurface />
       <UpdateNotices accountScope={accountScope} />
+      <EngineUpdatesPrompt accountScope={accountScope} />
       <UnsavedQuitGuard />
       {leavingScreen}
     </>

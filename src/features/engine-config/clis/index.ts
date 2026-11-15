@@ -3,6 +3,7 @@
 
 export { ClisSection } from "./ClisSection";
 export { CliUpdateDialog } from "./CliUpdateDialog";
+export { EngineUpdatesPrompt } from "./EngineUpdatesPrompt";
 export { SignInButton } from "./SignInButton";
 export { SignInDialog } from "./SignInDialog";
 export { useCliUpdateFlow } from "./useCliUpdateFlow";

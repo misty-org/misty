@@ -1,6 +1,6 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 // src-tauri/src/paths.rs: where the engine layer keeps its own files. In Misty that is a folder
-// inside Misty's data root (`~/.misty/engines`), set once at startup; structured data lives in
+// inside Misty's data root (`~/.misty/shared/engines`), set once at startup; structured data lives in
 // misty.db instead of ccgui's own database file.
 
 use std::path::PathBuf;
@@ -8,10 +8,16 @@ use std::sync::OnceLock;
 
 static ENGINES_HOME: OnceLock<PathBuf> = OnceLock::new();
 
-/// Points the engine layer at `~/.misty/engines`, which every build shares (the programs there
-/// only run from where they were installed). Called once while the app starts.
+/// Points the engine layer at `~/.misty/shared/engines`, which every build shares (the programs
+/// there only run from where they were installed). Called once while the app starts.
 pub fn init(misty_root: &std::path::Path) {
-    let _ = ENGINES_HOME.set(misty_root.join("engines"));
+    let _ = ENGINES_HOME.set(engines_in(misty_root));
+}
+
+fn engines_in(misty_root: &std::path::Path) -> PathBuf {
+    misty_root
+        .join(file_access::paths::SHARED_FOLDER)
+        .join("engines")
 }
 
 /// Home dir without panicking: a headless/odd environment falls back to the
@@ -43,16 +49,16 @@ pub(crate) static HOME_ENV_LOCK: parking_lot::Mutex<()> = parking_lot::Mutex::ne
 pub fn app_home() -> PathBuf {
     #[cfg(test)]
     {
-        return home_dir().join(".misty").join("engines");
+        return engines_in(&home_dir().join(".misty"));
     }
     #[allow(unreachable_code)]
     ENGINES_HOME
         .get()
         .cloned()
-        .unwrap_or_else(|| home_dir().join(".misty").join("engines"))
+        .unwrap_or_else(|| engines_in(&home_dir().join(".misty")))
 }
 
-/// Where Misty keeps what it installs, rooted at the engine layer's folder (`~/.misty/engines`).
+/// Where Misty keeps what it installs, rooted at the engine layer's folder (`~/.misty/shared/engines`).
 /// Tests root it in a scratch folder of their own instead of moving the process-wide `HOME`.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct InstallRoot {
@@ -70,7 +76,7 @@ impl InstallRoot {
         Self { engines }
     }
 
-    /// Where Misty installs an engine: `~/.misty/engines/<engine>`, beside the engine layer's own
+    /// Where Misty installs an engine: `~/.misty/shared/engines/<engine>`, beside the engine layer's own
     /// staging folders, none of which is named after an engine. Only the program lives here; the
     /// engine's sign-in and settings stay in its own folder (`~/.claude`, `~/.codex` and the like).
     pub fn engine_dir(&self, engine: &str) -> PathBuf {

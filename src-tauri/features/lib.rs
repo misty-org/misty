@@ -21,6 +21,8 @@ mod voice;
 
 pub fn run() {
     let context = tauri::generate_context!();
+    // misty.conf's [client] environment defaults, before anything reads the environment.
+    file_access::conf::apply_client_defaults();
     // Which folder in ~/.misty is this build's (see file_access::paths), settled before any path is
     // read. A new version's folder starts from the last version's here, before the database opens:
     // opened first, it would start empty.
@@ -32,6 +34,13 @@ pub fn run() {
                     "Misty {}: started from {}",
                     profile.label(),
                     source.display()
+                );
+            }
+            if !report.reorganized.is_empty() {
+                eprintln!(
+                    "Misty {}: moved {}",
+                    profile.label(),
+                    report.reorganized.join(", ")
                 );
             }
             if !report.adopted.is_empty() {

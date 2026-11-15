@@ -9,7 +9,7 @@
 //   release lists for it (the scripts check the same file against `codex-package_SHA256SUMS`,
 //   whose own SHA-256 comes from that same release listing).
 //
-// The package unpacks whole into `~/.misty/engines/codex` (`bin/codex`, with its `codex-path` and
+// The package unpacks whole into `~/.misty/shared/engines/codex` (`bin/codex`, with its `codex-path` and
 // `codex-resources` beside it, where Codex looks for them).
 
 use std::path::Path;

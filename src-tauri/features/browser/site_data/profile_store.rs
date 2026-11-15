@@ -81,7 +81,7 @@ fn webkit_store_folder(
 /// is reachable from Misty's folder. The store may not exist yet (WebKit creates it on first
 /// use); the link is then dangling until it does. Never removes anything it does not own.
 ///
-/// A dev or named build's store that doesn't exist yet starts as a copy of the one every build
+/// A dev build's store that doesn't exist yet starts as a copy of the one every build
 /// shared before stores were separated, so that build stays signed in to its sites.
 #[cfg(target_os = "macos")]
 pub(crate) fn link_store_data(
@@ -213,10 +213,8 @@ mod tests {
         assert_eq!(for_profile(shared, &stable), shared);
         let dev = for_profile(shared, &Profile::Dev("default".into()));
         let work = for_profile(shared, &Profile::Dev("work".into()));
-        let named = for_profile(shared, &Profile::Custom("default".into()));
         assert_ne!(dev, shared);
         assert_ne!(dev, work);
-        assert_ne!(dev, named);
     }
 
     #[cfg(target_os = "macos")]

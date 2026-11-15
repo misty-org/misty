@@ -270,6 +270,7 @@ pub fn revoke_linked_folder(folder: &Path) {
 #[cfg(test)]
 mod tests;
 pub mod paths;
+pub mod conf;
 
 /// Tests never reach the person's real data, whatever they exercise.
 #[cfg(test)]

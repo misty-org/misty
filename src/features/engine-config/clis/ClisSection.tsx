@@ -8,7 +8,7 @@
  * One row per engine: its mark and name, then its sign-in pill with a sign-in button while it is
  * signed out (the CLI's own login, in a terminal), a status pill (checking, not installed, or the
  * version with a check or an arrow), the install or update button naming the target, and the
- * docs and refresh buttons, and, for an engine Misty installed in `~/.misty/engines`, Remove in
+ * docs and refresh buttons, and, for an engine Misty installed in `~/.misty/shared/engines`, Remove in
  * the row's ⋯ menu. Versions are checked when the page opens and on refresh, never on a timer.
  */
 import { openUrl } from "@tauri-apps/plugin-opener";

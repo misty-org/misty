@@ -70,9 +70,11 @@ fn plain(text: &str) -> Result<String, String> {
     Ok(text.to_string())
 }
 
-/// `~/.misty/multirun`, shared by every build: each repository knows its worktrees by path.
+/// `~/.misty/shared/multirun`, shared by every build: each repository knows its worktrees by path.
 fn root(misty_root: &Path) -> PathBuf {
-    misty_root.join("multirun")
+    misty_root
+        .join(file_access::paths::SHARED_FOLDER)
+        .join("multirun")
 }
 
 fn now() -> i64 {

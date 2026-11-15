@@ -6,7 +6,7 @@
 //! - A Windows GUI process inherits a registry PATH snapshot that often predates the Node/npm
 //!   install (or misses nvm/fnm/scoop shims), so `which` alone can't find npm-global CLIs: the
 //!   registry's live User/Machine PATH, well-known install dirs and `npm config get prefix` are
-//!   probed too. Misty's own installs (`~/.misty/engines`, its Node.js) are searched last.
+//!   probed too. Misty's own installs (`~/.misty/shared/engines`, its Node.js) are searched last.
 //! - npm global bins ship an extensionless POSIX shim, a `.cmd` and a `.ps1` wrapper.
 //!   CreateProcess can't run the shim or batch files (os error 193), so the `.cmd` variant is
 //!   preferred and batch files run through `cmd /c` (`.ps1` through `powershell -File`).

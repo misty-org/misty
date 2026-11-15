@@ -12,6 +12,7 @@ path = "lib.rs"
 
 [dependencies]
 database = { path = "../database" }
+file_access = { path = "../file_access" }
 rusqlite = { version = "0.32", features = ["bundled"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

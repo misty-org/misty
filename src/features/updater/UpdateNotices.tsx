@@ -1,20 +1,41 @@
 import { useNotice } from "@/shared/ui";
 import { useEffect, useState } from "react";
-import { check } from "@tauri-apps/plugin-updater";
+import { check, type Update } from "@tauri-apps/plugin-updater";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { invoke } from "@/native/invoke";
 import { settingsBoolean, useSettingsStore } from "@/features/settings";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { ReleaseNotesDialog } from "./ReleaseNotesDialog";
+import { UpdatePromptDialog } from "./UpdatePromptDialog";
 import { requestUpdateCheck } from "./updateCheckRequest";
 
 /** Checks only. Downloads and installation always follow an explicit user action. */
 const minCheckIntervalMs = 6 * 60 * 60_000;
+/** After Later (or another window's prompt), the same version isn't offered again for this long. */
+const putOffMs = 6 * 60 * 60_000;
+const promptedKey = "misty.updater.prompted:v1";
+
+/** Whether this window may offer `version` now. Every window checks, so the first to find it
+ *  claims it for all of them; Later keeps the claim, so the version stays quiet for a while. */
+function claimPrompt(version: string): boolean {
+  try {
+    const last = JSON.parse(localStorage.getItem(promptedKey) ?? "null") as {
+      version?: string;
+      at?: number;
+    } | null;
+    if (last?.version === version && Date.now() - (last.at ?? 0) < putOffMs) return false;
+    localStorage.setItem(promptedKey, JSON.stringify({ version, at: Date.now() }));
+    return true;
+  } catch {
+    return true;
+  }
+}
 
 /** `accountScope` is the signed-in account, or `local` while nobody is signed in: updates
  * don't wait for an account. */
 export function UpdateNotices({ accountScope }: { accountScope: string }) {
   const [hostVersion, setHostVersion] = useState("");
+  const [prompt, setPrompt] = useState<Update | null>(null);
   const [notice, setNotice] = useState("");
   const [dismissed, setDismissed] = useState("");
   const enabled = useSettingsStore((s) =>
@@ -55,11 +76,10 @@ export function UpdateNotices({ accountScope }: { accountScope: string }) {
       try {
         const update = await check({ timeout: 30_000 });
         found = Boolean(update?.version);
-        try {
-          if (!closed) setHostVersion(update?.version ?? "");
-        } finally {
-          await update?.close();
-        }
+        if (!closed) setHostVersion(update?.version ?? "");
+        // A new version opens the prompt with its notes, kept open until it is answered.
+        if (update && !closed && claimPrompt(update.version)) setPrompt(update);
+        else await update?.close();
       } catch {
         /* Manual checking in Settings exposes connection errors. */
       } finally {
@@ -85,27 +105,22 @@ export function UpdateNotices({ accountScope }: { accountScope: string }) {
       window.removeEventListener("focus", run);
     };
   }, [accountScope, enabled]);
-  const showNotice = Boolean(hostVersion || notice) && key !== dismissed;
+  const showNotice = Boolean(notice) && key !== dismissed;
   const dismiss = () => {
     setDismissed(key);
     setNotice("");
   };
-  // A workspace notice says itself; otherwise the notice offers the new version's release.
-  useNotice(showNotice, {
-    message: notice || `Misty ${hostVersion} is available`,
-    action: notice
-      ? undefined
-      : {
-          label: "View release",
-          onSelect: () => {
-            setDismissed(key);
-            window.dispatchEvent(
-              new CustomEvent("misty:open-settings", { detail: { section: "updates" } }),
-            );
-          },
-        },
-    onDismiss: dismiss,
-  });
+  // A workspace notice says itself; a new version asks in its own dialog.
+  useNotice(showNotice, { message: notice, onDismiss: dismiss });
+  const later = () => {
+    void prompt?.close();
+    setPrompt(null);
+  };
   // Always in the same place, so a notice coming or going never shows the notes again.
-  return <ReleaseNotesDialog />;
+  return (
+    <>
+      <ReleaseNotesDialog />
+      {prompt ? <UpdatePromptDialog update={prompt} onLater={later} /> : null}
+    </>
+  );
 }

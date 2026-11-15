@@ -14,7 +14,7 @@ export interface CliVersionStatus {
   /** How install and update run, always inside the app: "npm", or "native" for the maker's own
    *  build or installer; null when Misty can't install it. */
   updateKind: "npm" | "native" | null;
-  /** The copy found is the one Misty installed in `~/.misty/engines`, so it can be removed. */
+  /** The copy found is the one Misty installed in `~/.misty/shared/engines`, so it can be removed. */
   installedByMisty?: boolean;
 }
 

@@ -215,7 +215,7 @@ describe("useCliVersionStatus session store", () => {
       engine: "gemini",
       action: "install",
       kind: "npm",
-      steps: ["Download Node.js", "npm install --prefix ~/.misty/engines/gemini"],
+      steps: ["Download Node.js", "npm install --prefix ~/.misty/shared/engines/gemini"],
       needsHelper: true,
       canRun: true,
       blockers: [],

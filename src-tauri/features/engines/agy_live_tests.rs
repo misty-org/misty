@@ -72,8 +72,8 @@ fn start(
     n: u32,
 ) -> LiveTurn {
     let home = real_home();
-    let bin =
-        std::env::var("AGY_BIN").unwrap_or_else(|_| format!("{home}/.misty/engines/agy/bin/agy"));
+    let bin = std::env::var("AGY_BIN")
+        .unwrap_or_else(|_| format!("{home}/.misty/shared/engines/agy/bin/agy"));
     let emitter = Arc::new(Collected::default());
     let registry = Arc::new(ProcessRegistry::default());
     let run_id = format!("agy-live-{n}");

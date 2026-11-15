@@ -52,6 +52,10 @@ vi.mock("@/features/spaces/SpacesRealtimeBridge", async (importOriginal) => ({
   SpacesRealtimeBridge: () => null,
 }));
 
+vi.mock("@/features/engine-config/clis", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  EngineUpdatesPrompt: () => null,
+}));
 vi.mock("@/features/updater/UpdateNotices", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   UpdateNotices: () => <div data-testid="update-notices" />,

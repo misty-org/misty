@@ -242,10 +242,10 @@ fn remove_takes_the_windows_launchers_of_mistys_checkout_and_no_others() {
 
 #[test]
 fn hermes_script_gets_a_home_inside_mistys_folder_on_macos_and_linux() {
-    let into = std::path::Path::new("/home/me/.misty/engines/hermes/hermes-agent");
+    let into = std::path::Path::new("/home/me/.misty/shared/engines/hermes/hermes-agent");
     assert_eq!(
         routes::installer_home("hermes", into, false),
-        Some(PathBuf::from("/home/me/.misty/engines/hermes/home"))
+        Some(PathBuf::from("/home/me/.misty/shared/engines/hermes/home"))
     );
     assert_eq!(routes::installer_home("hermes", into, true), None);
     assert_eq!(routes::installer_home("codex", into, false), None);

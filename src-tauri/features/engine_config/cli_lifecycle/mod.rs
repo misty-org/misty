@@ -9,7 +9,7 @@
 //
 // Every install runs inside the app with its output streamed to the dialog, never typed into a
 // terminal (`routes.rs`). An engine already on the computer is used as it is; a missing one goes
-// into `~/.misty/engines/<engine>`, and npm engines get Misty's own Node.js when the computer has
+// into `~/.misty/shared/engines/<engine>`, and npm engines get Misty's own Node.js when the computer has
 // none (`node_runtime.rs`). Remove deletes only what Misty installed.
 //
 // Probes run only when asked (Settings opened, refresh pressed), never on a timer: each one
@@ -38,6 +38,7 @@ mod node_runtime;
 mod plan;
 mod routes;
 pub mod sign_in;
+pub(crate) mod upkeep;
 mod user_path;
 
 pub use plan::CliUpdatePlan;
@@ -90,7 +91,7 @@ pub struct CliVersionStatus {
     /// How the install/update button acts: "npm" | "native"; null when the
     /// engine has no lifecycle action (grok).
     pub update_kind: Option<&'static str>,
-    /// The program found is the one Misty installed in `~/.misty/engines`, so Remove applies.
+    /// The program found is the one Misty installed in `~/.misty/shared/engines`, so Remove applies.
     pub installed_by_misty: bool,
 }
 
@@ -365,7 +366,7 @@ pub async fn engine_cli_update(engine: String, run_id: String) -> Result<UpdateR
     })
 }
 
-/// Removes an engine Misty installed (its folder in `~/.misty/engines`). A copy that was on the
+/// Removes an engine Misty installed (its folder in `~/.misty/shared/engines`). A copy that was on the
 /// computer before Misty is never removed here.
 #[tauri::command]
 pub async fn engine_cli_remove(engine: String) -> Result<(), String> {

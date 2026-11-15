@@ -5493,6 +5493,7 @@ name = "settings"
 version = "0.1.0"
 dependencies = [
  "database",
+ "file_access",
  "rusqlite",
  "serde",
  "serde_json",

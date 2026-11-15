@@ -535,7 +535,7 @@ mod tests {
     #[test]
     fn image_payload_failure_cleans_staged_mcp_config() {
         let home = ScratchHome::new("image-cleanup");
-        let staging = home.dir.join(".misty/engines/codebuddy-staging");
+        let staging = home.dir.join(".misty/shared/engines/codebuddy-staging");
         let mut req = sample_req();
         req.mcp_servers = Some(serde_json::json!({
             "misty": { "type": "http", "url": "http://127.0.0.1:1/mcp", "headers": { "Authorization": "Bearer t" } },

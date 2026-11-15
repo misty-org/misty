@@ -11,7 +11,7 @@
 //! Credential chain: the spawned host prints a one-time launch token
 //! (`dsh web: http://…/?token=…`) on its output; we capture it, exchange it
 //! via `GET /?token=…` (303 + set-cookie, no redirects), and persist the
-//! cookie per-origin in `~/.misty/engines/dsh-host-credentials.json`. The cookie
+//! cookie per-origin in `~/.misty/shared/engines/dsh-host-credentials.json`. The cookie
 //! rides only on requests to the origin of the child this run spawned
 //! ([`TRUSTED_ORIGIN`]); anything else answering on the port never sees it.
 //!
@@ -56,7 +56,7 @@ const SPAWN_READY_TIMEOUT: Duration = Duration::from_secs(20);
 /// Bytes of spawned-host stdout+stderr kept for error reporting.
 const RING_CAP: usize = 8192;
 /// Per-process stdout+stderr log files of spawned hosts, under the app home:
-/// `~/.misty/engines/dsh-host-logs/dsh-host-<epoch>.log`. The in-memory ring above
+/// `~/.misty/shared/engines/dsh-host-logs/dsh-host-<epoch>.log`. The in-memory ring above
 /// dies with the process, and a host that is killed mid-turn (app exit tears
 /// down its kill-on-close job, `dsh_host_stop`, or an outside kill) leaves no
 /// other trace of why a turn was cut — which is exactly the case this file
@@ -1358,7 +1358,7 @@ mod tests {
         fn new() -> Self {
             let lock = crate::engines::support::paths::HOME_ENV_LOCK.lock();
             let dir = std::env::temp_dir().join(format!("ccgui-dsh-home-{}", uuid::Uuid::new_v4()));
-            std::fs::create_dir_all(dir.join(".misty").join("engines")).unwrap();
+            std::fs::create_dir_all(dir.join(".misty").join("shared").join("engines")).unwrap();
             let previous = std::env::var_os("HOME");
             std::env::set_var("HOME", &dir);
             Self {

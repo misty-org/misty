@@ -351,7 +351,7 @@ fn makers_builds_are_picked_for_this_system() {
 
 #[test]
 fn hermes_installs_its_checkout_into_mistys_folder_without_questions() {
-    let into = Path::new("/home/me/.misty/engines/hermes/hermes-agent");
+    let into = Path::new("/home/me/.misty/shared/engines/hermes/hermes-agent");
     let (_, args, env) = routes::script_argv("hermes", Some(into), false);
     assert_eq!(
         args[1],
@@ -363,13 +363,13 @@ fn hermes_installs_its_checkout_into_mistys_folder_without_questions() {
     };
     assert_eq!(
         get(&env, "MISTY_ENGINE_DIR").as_deref(),
-        Some("/home/me/.misty/engines/hermes/hermes-agent")
+        Some("/home/me/.misty/shared/engines/hermes/hermes-agent")
     );
     // Its shell profile lines and wrappers land in a home inside Misty's folder; its data stays
     // in the person's own Hermes folder.
     assert_eq!(
         get(&env, "HOME").as_deref(),
-        Some("/home/me/.misty/engines/hermes/home")
+        Some("/home/me/.misty/shared/engines/hermes/home")
     );
     // The person's own Hermes folder (other tests move the home it is read from).
     let data = get(&env, "HERMES_HOME").unwrap();

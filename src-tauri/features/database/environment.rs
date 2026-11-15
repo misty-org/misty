@@ -50,7 +50,7 @@ impl AppEnvironmentService {
         self.inner.misty_dir.clone()
     }
 
-    /// `~/.misty` itself: every profile, and the entries they share (`paths::SHARED_ENTRIES`).
+    /// `~/.misty` itself: `misty.conf`, every data folder, and what they share in `shared/`.
     pub fn misty_root(&self) -> PathBuf {
         self.inner.home_dir.join(".misty")
     }

@@ -1,7 +1,8 @@
-//! `~/.misty/.env/client/agents.env`: keys and models for benchmark runs, so they don't have to be
-//! entered in Settings on each copy of the app. A debug build reads it only when started with
-//! `MISTY_AGENTS_ENV=1`, and a release never does. It's never copied into the credential store or a
-//! person's settings. Everyone else's models come from Settings › Models.
+//! `.env/client/agents.env` in this build's data folder (`~/.misty/dev/<kind>`): keys and models
+//! for benchmark runs, so they don't have to be entered in Settings on each copy of the app. A
+//! debug build reads it only when started with `MISTY_AGENTS_ENV=1`, and a release never does. It's
+//! never copied into the credential store or a person's settings. Everyone else's models come from
+//! Settings › Models.
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
@@ -59,8 +60,9 @@ fn parse(contents: &str) -> HashMap<String, String> {
         .collect()
 }
 
+/// In this build's own data folder, since each one has its own `.env`.
 fn file_path() -> Option<PathBuf> {
-    Some(dirs::home_dir()?.join(".misty/.env/client/agents.env"))
+    Some(file_access::paths::misty_home_dir()?.join(".env/client/agents.env"))
 }
 
 /// A file others can read is refused, since it holds keys.
