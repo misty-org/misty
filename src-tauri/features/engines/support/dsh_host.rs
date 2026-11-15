@@ -11,7 +11,8 @@
 //! Credential chain: the spawned host prints a one-time launch token
 //! (`dsh web: http://…/?token=…`) on its output; we capture it, exchange it
 //! via `GET /?token=…` (303 + set-cookie, no redirects), and persist the
-//! cookie per-origin in `~/.misty/shared/engines/dsh-host-credentials.json`. The cookie
+//! cookie per-origin in DSH's own engine folder, `~/.misty/shared/engines/dsh/host-credentials.json`,
+//! which goes when DSH is removed. The cookie
 //! rides only on requests to the origin of the child this run spawned
 //! ([`TRUSTED_ORIGIN`]); anything else answering on the port never sees it.
 //!
@@ -56,13 +57,13 @@ const SPAWN_READY_TIMEOUT: Duration = Duration::from_secs(20);
 /// Bytes of spawned-host stdout+stderr kept for error reporting.
 const RING_CAP: usize = 8192;
 /// Per-process stdout+stderr log files of spawned hosts, under the app home:
-/// `~/.misty/shared/engines/dsh-host-logs/dsh-host-<epoch>.log`. The in-memory ring above
+/// `~/.misty/shared/engines/dsh/host-logs/dsh-host-<epoch>.log`. The in-memory ring above
 /// dies with the process, and a host that is killed mid-turn (app exit tears
 /// down its kill-on-close job, `dsh_host_stop`, or an outside kill) leaves no
 /// other trace of why a turn was cut — which is exactly the case this file
 /// exists for. The newest `LOG_KEEP_RUNS` files survive; older runs are dropped
 /// on the next spawn.
-const LOG_DIR: &str = "dsh-host-logs";
+const LOG_DIR: &str = "host-logs";
 /// Rotate one log file at this size so a wedged or chatty host cannot grow it
 /// without bound. The rotated copy keeps the last window before rotation.
 const LOG_MAX_BYTES: u64 = 4 * 1024 * 1024;
@@ -273,7 +274,26 @@ struct HostCredentials {
 /// Keyed by origin because the cookie's BrowserAuth signature is bound to
 /// the host:port authority — an origin change invalidates it by construction.
 fn credentials_path() -> PathBuf {
-    crate::engines::support::paths::app_home().join("dsh-host-credentials.json")
+    dsh_home().join("host-credentials.json")
+}
+
+/// DSH's own folder among the engines (`shared/engines/dsh`), where its host's cookie and logs
+/// live beside the program, so Remove takes them too. Made when asked for, and anything still kept
+/// where it was before, directly in `shared/engines`, moves in.
+fn dsh_home() -> PathBuf {
+    let engines = crate::engines::support::paths::app_home();
+    let home = engines.join("dsh");
+    let _ = file_access::fs::create_dir_all(&home);
+    for (before, now) in [
+        ("dsh-host-credentials.json", "host-credentials.json"),
+        ("dsh-host-logs", LOG_DIR),
+    ] {
+        let (from, to) = (engines.join(before), home.join(now));
+        if from.exists() && !to.exists() {
+            let _ = file_access::fs::rename(&from, &to);
+        }
+    }
+    home
 }
 
 fn load_credentials(origin: &str) -> Option<HostCredentials> {
@@ -786,10 +806,7 @@ impl HostLog {
 
     /// Open the sink for a run spawned now, or `None` when it cannot be named.
     fn for_new_run() -> Option<Arc<Self>> {
-        Self::for_new_run_at(
-            &crate::engines::support::paths::app_home(),
-            SystemTime::now(),
-        )
+        Self::for_new_run_at(&dsh_home(), SystemTime::now())
     }
 
     /// `for_new_run` with an injectable home and clock (tests drive a temp one).
@@ -1451,10 +1468,7 @@ mod tests {
         let home = Path::new("C:\\home\\.ccgui-next");
         let path = HostLog::path_for(home, UNIX_EPOCH + Duration::from_secs(1_791_979_847))
             .expect("a post-epoch clock names a log");
-        assert_eq!(
-            path,
-            home.join("dsh-host-logs").join("dsh-host-1791979847.log")
-        );
+        assert_eq!(path, home.join("host-logs").join("dsh-host-1791979847.log"));
         assert!(HostLog::path_for(home, UNIX_EPOCH - Duration::from_secs(1)).is_none());
     }
 
@@ -1544,7 +1558,7 @@ mod tests {
     }
 
     /// One log per spawn that only rotates and is never reclaimed would let a crash-restart loop
-    /// grow dsh-host-logs forever. The newest LOG_KEEP_RUNS by the epoch in the file name (not
+    /// grow host-logs forever. The newest LOG_KEEP_RUNS by the epoch in the file name (not
     /// mtime) are kept, a dropped run's `.1` goes with it, and the current run and files without
     /// a parsable epoch are left alone.
     #[test]
