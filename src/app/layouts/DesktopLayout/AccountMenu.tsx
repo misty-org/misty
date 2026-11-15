@@ -6,6 +6,8 @@ import {
   useUserStore,
 } from "@/features/account";
 import { reportSystemError } from "@/shared/platform/systemErrors";
+import { openSystemExternalLink } from "@/shared/platform/openExternalLink";
+import { isMistyCloud, mistyWebsite, useServerChoice } from "@/api/deployment/serverChoice";
 import { routes } from "@/app/shell";
 import { useNativeSessionStore } from "@/features/account";
 import {
@@ -22,6 +24,7 @@ import { ShortcutText } from "@/features/shortcuts/runtime";
 import {
   Check,
   Compass,
+  CreditCard,
   LifeBuoy,
   LogOut,
   Plus,
@@ -60,6 +63,8 @@ function AccountMenuItems(props: {
 }) {
   const navigate = useNavigate();
   const currentPath = useLocation().pathname;
+  // Misty Cloud's plans are bought and changed on the website, in its account settings.
+  const cloud = useServerChoice((state) => isMistyCloud(state.choice));
   const currentUser = useNativeSessionStore((state) => state.status?.current_user ?? null);
   const { user, accounts, transitioning, switchAccount } = useAuth();
   const me = useUserStore(
@@ -132,6 +137,23 @@ function AccountMenuItems(props: {
         label="Account settings"
         onSelect={props.onOpenAccountSettings}
       />
+      {cloud ? (
+        <MenuItem
+          icon={<CreditCard />}
+          label="Plan and billing"
+          onSelect={() =>
+            void openSystemExternalLink(`${mistyWebsite()}/settings/subscription`).catch(
+              (error: unknown) => {
+                reportSystemError({
+                  scope: "account:plan",
+                  title: "Plan and billing could not be opened",
+                  error,
+                });
+              },
+            )
+          }
+        />
+      ) : null}
       <MenuSubmenu icon={<Repeat2 />} label="Switch accounts" width="lg" disabled={transitioning}>
         <DropdownMenuLabel>Switch accounts</DropdownMenuLabel>
         {accounts.map((saved) => (

@@ -5,7 +5,7 @@ import { create } from "zustand";
  * with what to do next. The codes are the server's.
  */
 const storageFull =
-  "Your storage is full. Free some space in your Library, or ask whoever runs your Misty server for more. Nothing already stored is lost.";
+  "Your storage is full. Free some space in your Library, or get more: on Misty Cloud, choose a larger plan in Plan and billing; on your own server, ask whoever runs it. Nothing already stored is lost.";
 
 export const accountLimitMessages: Record<string, string> = {
   device_limit_reached:
@@ -14,6 +14,16 @@ export const accountLimitMessages: Record<string, string> = {
     "This account reached a limit: it can't add signed-in sessions yet. Ask whoever runs your Misty server.",
   storage_limit_reached: storageFull,
   owner_storage_quota_exceeded: storageFull,
+  space_people_limit_reached:
+    "This Space is full for its level. Boost it on Misty Cloud to raise its level, or remove someone first.",
+  space_agent_limit_reached:
+    "This Space has as many agents as its level allows. Boost it to raise its level, or take an agent out first.",
+  space_upload_limit_reached:
+    "This file is larger than this Space's level allows. Boost the Space, or get Misty+ for larger files.",
+  space_storage_quota_exceeded:
+    "This Space's storage is full. Boost it for more, or free some space in it. Nothing already stored is lost.",
+  spaces_limit_reached:
+    "You're in as many Spaces as your plan allows, your own and joined ones together. Leave one, or on Misty Cloud choose a larger plan in Plan and billing.",
   account_suspended:
     "This account is suspended, and its data is kept. Contact whoever runs your Misty server.",
   account_closing:

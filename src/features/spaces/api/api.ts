@@ -113,13 +113,16 @@ export function spaceErrorMessage(code: string | undefined, fallback: string): s
     forbidden: "You no longer have access to this Space.",
     not_found: "That Space item no longer exists.",
     space_limit_reached: "This account has reached its Space limit.",
+    spaces_limit_reached: accountLimitMessages.spaces_limit_reached!,
+    space_people_limit_reached: accountLimitMessages.space_people_limit_reached!,
+    space_agent_limit_reached: accountLimitMessages.space_agent_limit_reached!,
+    space_upload_limit_reached: accountLimitMessages.space_upload_limit_reached!,
     space_ownership_limit_reached:
       "You have reached this server’s owned Space limit. Delete an owned Space permanently before creating another.",
     default_space_protected:
       "Your default Space can’t be deleted or transferred. It keeps your account usable.",
     owner_storage_quota_exceeded: accountLimitMessages.owner_storage_quota_exceeded!,
-    space_storage_quota_exceeded:
-      "Your cloud storage is full. Free some storage to add more. Existing files remain available.",
+    space_storage_quota_exceeded: accountLimitMessages.space_storage_quota_exceeded!,
     storage_limit_reached: accountLimitMessages.storage_limit_reached!,
     account_suspended: accountLimitMessages.account_suspended!,
     account_closing: accountLimitMessages.account_closing!,

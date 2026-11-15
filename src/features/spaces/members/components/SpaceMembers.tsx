@@ -12,6 +12,7 @@ import { InviteMemberDialog } from "./InviteMemberDialog";
 import { MemberActionDialog } from "./MemberActionDialog";
 import { MemberList } from "./MemberList";
 import { PendingInvitationsCard } from "./PendingInvitationsCard";
+import { SpaceBoosts } from "./SpaceBoosts";
 import { useMemberDialogs } from "./useMemberDialogs";
 import { useSpaceMembers } from "./useSpaceMembers";
 
@@ -62,6 +63,8 @@ export function SpaceMembers({
             ) : null}
           </div>
         </div>
+
+        <SpaceBoosts spaceId={spaceId} />
 
         {error || spaceAgents.error ? (
           <SystemErrorNotice
