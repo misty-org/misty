@@ -28,7 +28,7 @@ browsing, so the score measures the engine's model with Misty's harness. Always 
    no Browser Use service is used.
 
 2. Start Misty's debug app (from `misty/`) with the eval bridge on, in a dev folder of its own.
-   `MISTY_PROFILE=bench` opens `~/.misty/dev/bench` for that launch only: its own database,
+   `MISTY_PROFILE=benchmark` opens `~/.misty/dev/benchmark` for that launch only: its own database,
    chats, agent folders and WebKit store, apart from the folder `~/.misty/misty.conf` names, so
    `--store fresh` only ever clears the benchmark's browser. It leaves `misty.conf` as it is, and
    engine installs (`~/.misty/shared/engines`) are shared as for every build. The token is any
@@ -39,7 +39,7 @@ browsing, so the score measures the engine's model with Misty's harness. Always 
    ```
 
    ```bash
-   MISTY_PROFILE=bench MISTY_BROWSER_EVAL_BRIDGE_PORT=47123 npm run tauri dev
+   MISTY_PROFILE=benchmark MISTY_BROWSER_EVAL_BRIDGE_PORT=47123 npm run tauri dev
    ```
 
 3. In that app, sign in to your Misty account (agents and chats are kept per account; signed
