@@ -1,12 +1,22 @@
+import { useSpeechSupport } from "@/features/voice";
 import type { Dispatch, ReactNode, RefObject, SetStateAction } from "react";
 import { useEffect } from "react";
-import { Globe, Mic, Square } from "lucide-react";
+import { Download, Globe, History, LogIn, Mic, RefreshCw, Square } from "lucide-react";
 import type { useAiVoiceRecorder } from "../../runs/markdown/useAiVoiceRecorder";
 import { MistyComposer } from "../composer/MistyComposer";
 import type { useGlobalMistyAttachments } from "../composer/useGlobalMistyAttachments";
 import { useMistyStore } from "../state/useMistyStore";
 import type { AgentProfile } from "@/shared/schemas";
-import { IconButton, MenuItem, type ActionBarItem } from "@/shared/ui";
+import {
+  ComposerStatusRow,
+  IconButton,
+  MenuItem,
+  MessageComposerAction,
+  type ActionBarItem,
+} from "@/shared/ui";
+import { ENGINE_NAMES, type EngineId } from "@/features/engine-config/channels";
+import { blocksAgent, useEngineReadiness } from "../../engines/engineReadiness";
+import { EngineNextStep } from "../../engines/EngineNextStep";
 import { chooseEngineMode, type usePermissionMode } from "../../plans/permissionMode";
 import { resolveEngineMode, useEngineModes } from "../../engines/engineModes";
 import type { useCollaborationComposer } from "../../plans/useCollaborationComposer";
@@ -73,6 +83,8 @@ export function AgentConversationComposer({
   reportError,
   empty = false,
   status,
+  onOpenHistory,
+  onSync,
 }: {
   agent?: AgentProfile;
   accountId: string;
@@ -91,6 +103,10 @@ export function AgentConversationComposer({
   empty?: boolean;
   /** Rows about the chat's state at the top of the box, such as queued messages. */
   status?: ReactNode;
+  /** Opens the engine's own past chats, to continue one here (as `/resume` does). */
+  onOpenHistory?: () => void;
+  /** Pulls in what happened in this chat's engine session outside Misty. */
+  onSync?: () => void;
 }) {
   const engine = agent?.engine && agent.engine !== mistyEngine ? agent.engine : "";
   // The engine's own modes; the chat's saved choice read as one of them.
@@ -132,7 +148,12 @@ export function AgentConversationComposer({
     getText: () => textareaRef.current?.value ?? draft,
     setText: setDraft,
   });
-  const disabled = !agent?.enabled || !accountId;
+  // An agent whose engine isn't installed or signed in yet stays disabled: the box takes no
+  // message, and a row at its top says what is missing with the button that sets it up.
+  const readiness = useEngineReadiness(engine);
+  const held = Boolean(engine) && blocksAgent(readiness.state);
+  const engineName = ENGINE_NAMES[engine as EngineId] ?? engine;
+  const disabled = !agent?.enabled || !accountId || held;
   const browserAttached = useBrowserAttached(conversationId);
   const attachBrowser = (attached: boolean) =>
     useBrowserAttachment.getState().set(conversationId, attached);
@@ -168,8 +189,7 @@ export function AgentConversationComposer({
   // One button: Send while there is something to send, Stop while a reply runs and nothing is typed.
   const stop =
     working && !draft.trim() && !attachments.attachments.length ? (
-      <IconButton
-        variant="secondary"
+      <MessageComposerAction
         label="Stop response"
         onClick={() => {
           void useMistyStore
@@ -179,16 +199,40 @@ export function AgentConversationComposer({
         }}
       >
         <Square fill="currentColor" />
-      </IconButton>
+      </MessageComposerAction>
     ) : undefined;
   const listening = voice.recording;
+  // Voice input is recognized by this computer; where it can't, the microphone isn't shown.
+  const speech = useSpeechSupport();
   const voiceBusy = voice.requesting || voice.transcribing;
   return (
     <>
       <MistyComposer
         className="agent-toolbar-composer"
         roomy={empty}
-        status={status}
+        status={
+          held ? (
+            <>
+              <ComposerStatusRow
+                icon={readiness.state === "sign-in" ? LogIn : Download}
+                actions={
+                  <EngineNextStep
+                    engine={engine as EngineId}
+                    view={readiness.view}
+                    state={readiness.state}
+                  />
+                }
+              >
+                {readiness.state === "sign-in"
+                  ? `${engineName} isn't signed in`
+                  : `${engineName} isn't installed`}
+              </ComposerStatusRow>
+              {status}
+            </>
+          ) : (
+            status
+          )
+        }
         value={draft}
         onChange={setDraft}
         textareaRef={textareaRef}
@@ -205,13 +249,31 @@ export function AgentConversationComposer({
         }
         addMenuItems={
           engine ? (
-            <MenuItem
-              icon={Globe}
-              label="Misty's browser"
-              disabled={browserAttached}
-              reason={browserAttached ? "Already attached to this message" : undefined}
-              onSelect={() => attachBrowser(true)}
-            />
+            <>
+              <MenuItem
+                icon={Globe}
+                label="Misty's browser"
+                disabled={browserAttached}
+                reason={browserAttached ? "Already attached to this message" : undefined}
+                onSelect={() => attachBrowser(true)}
+              />
+              {onSync && conversationId ? (
+                <MenuItem
+                  icon={RefreshCw}
+                  label={`Sync from ${engineNames[engine] ?? "the engine"}`}
+                  disabled={working}
+                  onSelect={onSync}
+                />
+              ) : null}
+              {onOpenHistory ? (
+                <MenuItem
+                  icon={History}
+                  label="Continue an earlier chat"
+                  disabled={working}
+                  onSelect={onOpenHistory}
+                />
+              ) : null}
+            </>
           ) : null
         }
         onKeyDown={(e) => {
@@ -246,17 +308,19 @@ export function AgentConversationComposer({
         end={
           <>
             <ContextMeter usage={usage} engine={engine || mistyEngine} />
-            <IconButton
-              label={
-                listening ? "Stop recording" : voiceBusy ? "Transcribing" : "Start voice input"
-              }
-              aria-pressed={listening || undefined}
-              loading={voiceBusy}
-              disabled={disabled || working}
-              onClick={() => (listening ? voice.stop() : void voice.start())}
-            >
-              {listening ? <Square /> : <Mic />}
-            </IconButton>
+            {speech?.recognition ? (
+              <IconButton
+                label={
+                  listening ? "Stop recording" : voiceBusy ? "Transcribing" : "Start voice input"
+                }
+                aria-pressed={listening || undefined}
+                loading={voiceBusy}
+                disabled={disabled || working}
+                onClick={() => (listening ? voice.stop() : void voice.start())}
+              >
+                {listening ? <Square /> : <Mic />}
+              </IconButton>
+            ) : null}
           </>
         }
         sendControl={stop}

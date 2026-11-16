@@ -9,10 +9,13 @@ import {
   useState,
   type ComponentRef,
 } from "react";
-import { Vector3 } from "three";
+import { Package } from "lucide-react";
+import { PerspectiveCamera, Vector3 } from "three";
 import { planGoals, type Actor, type Goal } from "./behaviour";
 import { BuildLayer } from "./BuildLayer";
 import { Character } from "./Character";
+import { ME, type Crowd } from "./crowd";
+import type { StudioEmote } from "../studioOrders";
 import { GRID, applyRoomSize, type RoomSize } from "./grid";
 import { deskOwners, itemCenter, moveItem, type StudioLayout } from "./layout";
 import { teamShirts } from "./look";
@@ -34,7 +37,8 @@ import {
 } from "./Tags";
 import { usePageHidden, useReducedMotion } from "./useMotionPreference";
 import { Walk } from "./Walk";
-import { ScenePlate } from "@/shared/ui";
+import { holdingPointer, pointerHold, releasePointer } from "./pointerLock";
+import { ScenePlate, ScenePrompt, SceneReward, SceneSign } from "@/shared/ui";
 
 const TARGET: [number, number, number] = [0, 0.4, 0.6];
 const VIEW = { x: 0.6, y: 0.62, z: 0.7 };
@@ -81,6 +85,80 @@ function Framing({ size }: { size: RoomSize }) {
   return null;
 }
 
+/**
+ * Keeps the overview's depth sharp: the camera's nearest drawn distance follows how far it is from
+ * what it looks at. Close up a small one keeps nearby pieces whole; from across the room a larger
+ * one gives the flat layers on the floor (rugs, marks, the grid) depths of their own, where they
+ * would otherwise trade places from frame to frame and flicker.
+ */
+function OverviewDepth() {
+  const controls = useThree((state) => state.controls) as OrbitControlsImpl | null;
+  useFrame(({ camera }) => {
+    if (!(camera instanceof PerspectiveCamera) || !controls) return;
+    const away = camera.position.distanceTo(controls.target);
+    const near = Math.min(4, Math.max(0.5, away * 0.05));
+    if (Math.abs(camera.near - near) / near < 0.05) return;
+    camera.near = near;
+    camera.updateProjectionMatrix();
+  });
+  return null;
+}
+
+/** What of OrbitControls' insides turning by raw mouse movement reaches. */
+interface OrbitInsides {
+  enabled: boolean;
+  state: number;
+  rotateSpeed: number;
+  panSpeed: number;
+  _rotateLeft(angle: number): void;
+  _rotateUp(angle: number): void;
+  _pan(x: number, y: number): void;
+  update(): boolean;
+}
+const ORBIT = { rotate: 0, pan: 2 };
+
+/**
+ * Turning or panning the overview keeps going however far the mouse travels: the pointer is held
+ * while a button is down, and its raw movement turns the camera as OrbitControls would have from
+ * the pointer's place, which stops changing once it is held. Off in build mode, where a drag
+ * moves furniture under the pointer.
+ */
+function EndlessOrbit(props: { enabled: boolean }) {
+  const canvas = useThree((state) => state.gl.domElement);
+  const controls = useThree((state) => state.controls) as unknown as OrbitInsides | null;
+  useEffect(() => {
+    if (!props.enabled) return;
+    const hold = pointerHold(canvas);
+    const press = (event: PointerEvent) => hold.press(event);
+    const move = (event: PointerEvent) => {
+      hold.move(event);
+      if (!controls?.enabled || !holdingPointer(canvas)) return;
+      if (typeof controls._rotateLeft !== "function") return;
+      const height = canvas.clientHeight || 1;
+      if (controls.state === ORBIT.rotate) {
+        controls._rotateLeft(((2 * Math.PI * event.movementX) / height) * controls.rotateSpeed);
+        controls._rotateUp(((2 * Math.PI * event.movementY) / height) * controls.rotateSpeed);
+      } else if (controls.state === ORBIT.pan) {
+        controls._pan(event.movementX * controls.panSpeed, event.movementY * controls.panSpeed);
+      } else return;
+      controls.update();
+    };
+    const release = () => hold.release();
+    canvas.addEventListener("pointerdown", press);
+    document.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", release);
+    window.addEventListener("blur", release);
+    return () => {
+      canvas.removeEventListener("pointerdown", press);
+      document.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", release);
+      window.removeEventListener("blur", release);
+      releasePointer(canvas);
+    };
+  }, [canvas, controls, props.enabled]);
+  return null;
+}
+
 /** Brings the camera over to a figure when it is picked, unless the person is steering already. */
 function Follow(props: { id: string | null; anchors: Map<string, Vector3>; still: boolean }) {
   const controls = useThree((state) => state.controls) as OrbitControlsImpl | null;
@@ -115,6 +193,8 @@ export interface StudioSceneProps {
   layout: StudioLayout;
   selected: string | null;
   onSelect(id: string | null): void;
+  /** Whoever the person is talking to, who stops and listens. */
+  listening?: string | null;
   building: boolean;
   pickedItem: string | null;
   onPickItem(id: string | null): void;
@@ -131,10 +211,28 @@ export interface StudioSceneProps {
   onHireAt?(deskId: string): void;
   /** How each agent was dressed up, and what is on its desk. */
   looks: Record<string, AgentLook>;
-  /** Footsteps as the person walks. */
-  footsteps?: boolean;
   /** A task several agents share, put up on the meeting room's board. */
   board?: { task: string; rows: BoardRow[] } | null;
+  /** What the person's own figure acts out, picked from the emote wheel. */
+  myEmote?: { kind: StudioEmote; at: number } | null;
+  /** Milestones reached, one trophy each on a trophy shelf. */
+  trophies?: number;
+  /** Walking up to or clicking the arcade cabinet opens its games. */
+  onArcade?(): void;
+  /** Name tags over the figures, and what they say; off, none shows. */
+  namesShown?: boolean;
+  /** The key to press for what the person walked up to, floating by it. */
+  prompt?: { anchor: string; words: string } | null;
+  /** Figures that just earned something, by id, and when: a "+1" rises off each. */
+  pops?: Record<string, number>;
+  /** Agents with a finished task's result waiting on their desk, to be collected. */
+  results?: ReadonlySet<string>;
+  /** Picks up an agent's waiting result: walked up to as `result:<agent id>`, or its sign. */
+  onCollect?(agentId: string): void;
+  /** Told whether walking looks out of the person's own eyes. */
+  onFirstPerson?(first: boolean): void;
+  /** Whether walking may hold the pointer to look: not while a panel needs the cursor. */
+  freeLook?: boolean;
 }
 
 /**
@@ -160,6 +258,8 @@ export default function StudioScene(props: StudioSceneProps) {
   const controls = useRef<OrbitControlsImpl>(null);
   const [anchors] = useState(() => new Map<string, Vector3>());
   const [tags] = useState(() => new Map<string, HTMLElement>());
+  /** Where everyone stands, so nobody walks into anybody else. */
+  const [crowd] = useState<Crowd>(() => new Map());
 
   useEffect(() => {
     if (still || hidden) return;
@@ -181,10 +281,12 @@ export default function StudioScene(props: StudioSceneProps) {
   // Each plan starts from the last one, so figures keep their places (`planGoals`).
   const lastGoals = useRef(new Map<string, Goal>());
   const goals = useMemo(() => {
-    const next = planGoals(actors, places, desks, tick, lastGoals.current);
+    // Read on each plan: sent to the person, a figure finds them wherever they walked to.
+    const person = crowd.get(ME);
+    const next = planGoals(actors, places, desks, tick, lastGoals.current, person);
     lastGoals.current = next;
     return next;
-  }, [actors, places, desks, tick]);
+  }, [actors, places, desks, tick, crowd]);
   const shirts = useMemo(() => teamShirts(actors.map((actor) => actor.id)), [actors]);
   const deskNames = useMemo(() => {
     const names = new Map<string, string>();
@@ -198,15 +300,62 @@ export default function StudioScene(props: StudioSceneProps) {
     () => layout.items.filter((item) => item.kind === "desk"),
     [layout.items],
   );
+  const arcades = useMemo(
+    () => layout.items.filter((item) => item.kind === "arcade"),
+    [layout.items],
+  );
+  const { onArcade } = props;
+  const openArcade = useCallback(() => onArcade?.(), [onArcade]);
+  /** Each waiting result's agent, with the desk it waits on. */
+  const parcels = useMemo(() => {
+    const at = new Map<string, string>();
+    for (const agentId of props.results ?? []) {
+      const desk = desks.get(agentId);
+      if (desk) at.set(agentId, desk);
+    }
+    return at;
+  }, [props.results, desks]);
+  const parcelDesks = useMemo(() => new Set(parcels.values()), [parcels]);
   /** Desks nobody has: each can be hired for, from the room itself. */
   const freeDesks = useMemo(
     () => desksShown.filter((desk) => !deskNames.has(desk.id)),
     [desksShown, deskNames],
   );
+  // Your own agents, members (to talk to them) and free desks can be walked up to.
   const walkable = useMemo(
-    () => [...own.map((actor) => actor.id), ...freeDesks.map((desk) => `desk:${desk.id}`)],
-    [own, freeDesks],
+    () => [
+      ...actors.filter((actor) => !actor.guest || actor.kind === "member").map((actor) => actor.id),
+      ...freeDesks.map((desk) => `desk:${desk.id}`),
+      ...arcades.map((arcade) => `arcade:${arcade.id}`),
+      ...[...parcels.keys()].map((agentId) => `result:${agentId}`),
+    ],
+    [actors, freeDesks, arcades, parcels],
   );
+  useEffect(() => {
+    // A waiting result is walked up to at its desk, where its sign floats.
+    const placed: string[] = [];
+    for (const [agentId, deskId] of parcels) {
+      const desk = layout.items.find((item) => item.id === deskId);
+      if (!desk) continue;
+      const at = itemCenter(desk);
+      anchors.set(`result:${agentId}`, new Vector3(at.x, 1.5, at.z));
+      placed.push(`result:${agentId}`);
+    }
+    return () => {
+      for (const key of placed) anchors.delete(key);
+    };
+  }, [anchors, parcels, layout.items]);
+  useEffect(() => {
+    // The cabinet is walked up to like a person, to play it.
+    for (const arcade of arcades) {
+      const at = itemCenter(arcade);
+      // Level with the top of the cabinet, where its prompt floats.
+      anchors.set(`arcade:${arcade.id}`, new Vector3(at.x, 1.9, at.z));
+    }
+    return () => {
+      for (const arcade of arcades) anchors.delete(`arcade:${arcade.id}`);
+    };
+  }, [anchors, arcades]);
   useEffect(() => {
     // A desk's name floats over its screen; it only shows in build mode.
     for (const desk of desksShown) {
@@ -280,7 +429,8 @@ export default function StudioScene(props: StudioSceneProps) {
   return (
     <div className="absolute inset-0">
       <Canvas
-        shadows="percentage"
+        // Soft filtering: a wide PCF radius hatched the shadows into stripes seen up close.
+        shadows="soft"
         dpr={[1, 2]}
         // Always on: the browser already stops animation frames for a page out of sight. With
         // "never" while document.hidden, not even the first frame was drawn, so a web view that
@@ -297,10 +447,9 @@ export default function StudioScene(props: StudioSceneProps) {
           intensity={2.1}
           color="#fff0d8"
           castShadow
-          shadow-mapSize={[2048, 2048]}
+          shadow-mapSize={[4096, 4096]}
           shadow-bias={-0.0004}
           shadow-normalBias={0.04}
-          shadow-radius={5}
         >
           <orthographicCamera
             key={`${size.w}x${size.d}`}
@@ -315,9 +464,12 @@ export default function StudioScene(props: StudioSceneProps) {
             item={item}
             screen={screens.get(item.id) ?? null}
             decor={deskDecor.get(item.id)}
+            parcel={!building && parcelDesks.has(item.id)}
             still={still}
             glow={lamps.includes(item)}
+            trophies={item.kind === "trophies" ? props.trophies : undefined}
             onGrab={building ? grab : undefined}
+            onUse={item.kind === "arcade" && onArcade ? openArcade : undefined}
           />
         ))}
         {actors.map((actor) => {
@@ -333,6 +485,8 @@ export default function StudioScene(props: StudioSceneProps) {
               selected={!building && props.selected === actor.id}
               still={still}
               quiet={building}
+              listening={!building && props.listening === actor.id}
+              crowd={crowd}
               anchors={anchors}
               figure={props.looks[actor.id]?.figure}
               onPick={props.onSelect}
@@ -361,9 +515,12 @@ export default function StudioScene(props: StudioSceneProps) {
             grid={grid}
             still={still}
             anchors={anchors}
+            crowd={crowd}
             people={walkable}
-            footsteps={props.footsteps}
+            emote={props.myEmote}
             onNear={props.onNear}
+            onFirstPerson={props.onFirstPerson}
+            freeLook={props.freeLook}
           />
         ) : (
           <>
@@ -389,10 +546,12 @@ export default function StudioScene(props: StudioSceneProps) {
               }}
             />
             <Framing size={size} />
+            <OverviewDepth />
+            <EndlessOrbit enabled={!building} />
             <Follow id={building ? null : props.selected} anchors={anchors} still={still} />
           </>
         )}
-        <TagProjector anchors={anchors} tags={tags} />
+        <TagProjector anchors={anchors} tags={tags} shown={props.namesShown !== false} />
       </Canvas>
       {building ? (
         <div className={tagLayerClass}>
@@ -432,6 +591,58 @@ export default function StudioScene(props: StudioSceneProps) {
                 </div>
               ))
             : null}
+          {[...parcels.keys()].map((agentId) => (
+            <div
+              key={`result:${agentId}`}
+              className={tagAnchorClass}
+              data-up="true"
+              data-anchor={`result:${agentId}`}
+              data-priority={2.5}
+              ref={(node) => {
+                if (node) tags.set(`result:${agentId}`, node);
+                else tags.delete(`result:${agentId}`);
+              }}
+            >
+              <SceneSign
+                type="button"
+                icon={<Package aria-hidden="true" />}
+                aria-label={`Collect ${props.names.get(agentId) ?? "agent"}'s result`}
+                onClick={() => props.onCollect?.(agentId)}
+              >
+                Result
+              </SceneSign>
+            </div>
+          ))}
+          {props.prompt ? (
+            // Over everything of its figure's: it is what the person is about to do.
+            <div
+              className={tagAnchorClass}
+              data-up="true"
+              data-anchor={props.prompt.anchor}
+              data-priority={3.9}
+              ref={(node) => {
+                if (node) tags.set("prompt", node);
+                else tags.delete("prompt");
+              }}
+            >
+              <ScenePrompt keyName="E">{props.prompt.words}</ScenePrompt>
+            </div>
+          ) : null}
+          {Object.entries(props.pops ?? {}).map(([id, at]) => (
+            <div
+              key={`${id}:${at}`}
+              className={tagAnchorClass}
+              data-up="true"
+              data-anchor={`head:${id}`}
+              data-priority={3.8}
+              ref={(node) => {
+                if (node) tags.set(`pop:${id}`, node);
+                else tags.delete(`pop:${id}`);
+              }}
+            >
+              <SceneReward>+1</SceneReward>
+            </div>
+          ))}
           {actors.map((actor) => {
             const picked = props.selected === actor.id;
             const speech = props.speech.get(actor.id) ?? "";

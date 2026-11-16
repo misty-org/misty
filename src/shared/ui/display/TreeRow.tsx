@@ -7,6 +7,7 @@ import { Pressable } from "../controls/Pressable";
 import { OverflowFadeText } from "../layout/OverflowFadeText";
 import { RowActions, type RowActionsProps } from "../overlays/RowActions";
 import { Text } from "./Text";
+import { remCss } from "@/shared/lib/uiScale";
 
 /**
  * The name's color, where it carries meaning: what Git says of the file (new, changed, gone), or
@@ -82,7 +83,7 @@ export function TreeRow(props: TreeRowProps) {
         "group/row flex h-8 min-w-0 items-center gap-2 rounded-md pr-1",
         "hover:bg-control-hover data-[selected]:bg-control-active",
       )}
-      style={{ ...props.style, paddingLeft: baseIndent + (props.depth ?? 0) * levelIndent }}
+      style={{ ...props.style, paddingLeft: remCss(baseIndent + (props.depth ?? 0) * levelIndent) }}
     >
       {props.leading}
       <Pressable

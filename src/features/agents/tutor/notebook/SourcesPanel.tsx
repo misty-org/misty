@@ -4,6 +4,7 @@ import {
   FileText,
   Globe,
   Link2,
+  MessageSquareQuote,
   Mic,
   PanelLeftClose,
   PanelLeftOpen,
@@ -25,11 +26,15 @@ import {
   Text,
 } from "@/shared/ui";
 import { jobTitle } from "../tutorPrompts";
-import { dismissJob, retryJob, startJob } from "../tutorRuns";
+import { dismissJob, retryJob, startJob, unusableReply } from "../tutorRuns";
 import { researchPrompt } from "../tutorStudio";
 import { useTutorStore } from "../tutorStore";
 import type { Notebook, NotebookSource, TutorJob } from "../tutorTypes";
 import { paneClass, paneHeadClass, paneScrollClass, railClass } from "./panes";
+import type { NotebookAgent } from "../notebookAgents";
+import type { Person } from "../notebookPresence";
+import { useArrived } from "./useArrived";
+import { PaneFaces, RowFaces } from "./LivePeople";
 
 export type Opened = { kind: "source" | "note"; id: string };
 
@@ -97,6 +102,8 @@ export function SourcesPanel({
   onOpen,
   onNewNote,
   onError,
+  people = [],
+  agents = [],
 }: {
   notebook: Notebook;
   agentId: string;
@@ -107,7 +114,13 @@ export function SourcesPanel({
   onOpen(item: Opened): void;
   onNewNote(): void;
   onError(message: string): void;
+  /** The others in the notebook, for the faces on what they have open. */
+  people?: Person[];
+  /** The agents at work in it: on the pane while finding sources, on a row while on it. */
+  agents?: NotebookAgent[];
 }) {
+  const spaceId = notebook.space?.spaceId;
+  const fresh = useArrived(notebook);
   const store = useTutorStore.getState();
   const jobs = useTutorStore((state) => state.jobs);
   const [query, setQuery] = useState("");
@@ -169,11 +182,13 @@ export function SourcesPanel({
       className={`${paneClass} tutor-sources-pane border-0 border-r`}
       aria-label="Sources"
       data-tour="notebook-sources"
+      data-live-pane="sources"
     >
       <header className={paneHeadClass}>
         <Text as="h2" size="control" weight="medium" tone="bright" className="ml-1 flex-1">
           Sources
         </Text>
+        <PaneFaces spaceId={spaceId} people={people} agents={agents} pane="sources" />
         <IconButton label="Hide sources" onClick={() => onCollapse(true)}>
           <PanelLeftClose />
         </IconButton>
@@ -247,7 +262,11 @@ export function SourcesPanel({
           >
             <SourceLabel icon={<Globe aria-hidden="true" />}>
               <Text tone="danger" full>
-                {`Couldn’t find sources for “${searchTopic(job)}”`}
+                {/* Why it failed, when that says what to do (a missing key, an engine that
+                    couldn't start); otherwise that nothing was found. */}
+                {job.error && job.error !== unusableReply
+                  ? job.error
+                  : `Couldn’t find sources for “${searchTopic(job)}”`}
               </Text>
             </SourceLabel>
             <Button
@@ -282,10 +301,11 @@ export function SourcesPanel({
               tone="none"
               radius="lg"
               wash="control"
-              hovered={open}
+              hovered={open || fresh.has(source.id)}
               className={rowClass}
               data-open={open ? "true" : undefined}
               data-off={source.context === "off" ? "true" : undefined}
+              data-live-anchor={source.id}
             >
               <Pressable
                 className="flex min-w-0 flex-1"
@@ -299,6 +319,7 @@ export function SourcesPanel({
                   {source.title}
                 </SourceLabel>
               </Pressable>
+              <RowFaces spaceId={spaceId} people={people} agents={agents} itemId={source.id} />
               <Checkbox
                 aria-label={`Use ${source.title}`}
                 checked={source.context !== "off"}
@@ -325,12 +346,16 @@ export function SourcesPanel({
               tone="none"
               radius="lg"
               wash="control"
-              hovered={open}
-              className="flex min-w-0 flex-1 text-left"
+              hovered={open || fresh.has(note.id)}
+              className="flex min-w-0 flex-1 items-center text-left"
               data-open={open ? "true" : undefined}
+              data-live-anchor={note.id}
               onClick={() => onOpen({ kind: "note", id: note.id })}
             >
-              <SourceLabel icon={<StickyNote />}>{note.title || "Untitled note"}</SourceLabel>
+              <SourceLabel icon={note.fromQuestion ? <MessageSquareQuote /> : <StickyNote />}>
+                {note.title || "Untitled note"}
+              </SourceLabel>
+              <RowFaces spaceId={spaceId} people={people} itemId={note.id} />
             </Surface>
           );
         })}

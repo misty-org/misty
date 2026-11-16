@@ -17,10 +17,11 @@ const inputVariants = {
     "aria-invalid:border-danger",
   ],
   // The browser address bar: a filled field, so it keeps its shape beside a bright page
-  // where a hairline alone fades out.
+  // where a hairline alone fades out. The address sits centered at rest, as a browser's does,
+  // and moves to the start while it's being typed.
   address: [
     controlFrame.md,
-    "w-full min-w-0 border border-transparent bg-cream/7 px-2",
+    "w-full min-w-0 border border-transparent bg-cream/7 px-2 text-center focus:text-left",
     "text-control text-cream-bright outline-none transition-colors",
     "placeholder:text-cream-muted hover:bg-cream/10 focus:bg-cream/12",
     "disabled:pointer-events-none disabled:opacity-50",

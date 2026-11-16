@@ -1,5 +1,5 @@
 import type { CSSProperties, RefObject } from "react";
-import { cn, screenMarkClass, ViewportLayer } from "@/shared/ui";
+import { cn, companionTints, screenMarkClass, ViewportLayer, type CompanionTint } from "@/shared/ui";
 import { normalizeCompanionSize } from "./companionSize";
 import type { Presentation } from "./protocol";
 
@@ -8,6 +8,10 @@ type CursorOverlayMarkupProps = {
   marker: RefObject<HTMLDivElement | null>;
   focus: RefObject<HTMLDivElement | null>;
   sketch?: RefObject<HTMLDivElement | null>;
+  /** The paint the pointer leaves while the person asks. */
+  trail?: RefObject<HTMLDivElement | null>;
+  /** The caption at the bottom of the screen. */
+  caption?: RefObject<HTMLDivElement | null>;
   group: RefObject<HTMLDivElement | null>;
   bubble: RefObject<HTMLDivElement | null>;
   meter: RefObject<HTMLDivElement | null>;
@@ -30,14 +34,30 @@ export function CursorOverlayMarkup({
   marker,
   focus,
   sketch,
+  trail,
+  caption,
   group,
   bubble,
   meter,
 }: CursorOverlayMarkupProps) {
   return (
-    <ViewportLayer layer="agent-surface" passthrough className="select-none" aria-hidden="true">
+    <ViewportLayer
+      layer="agent-surface"
+      passthrough
+      className="select-none"
+      aria-hidden="true"
+      style={
+        presentation.tint && presentation.tint in companionTints && presentation.tint !== "white"
+          ? ({
+              "--companion-ink": companionTints[presentation.tint as CompanionTint],
+            } as CSSProperties)
+          : undefined
+      }
+    >
       <div ref={focus} className="pointer-events-none absolute inset-0" />
       <div ref={sketch} className="pointer-events-none absolute inset-0" />
+      <div ref={trail} className="pointer-events-none absolute inset-0" />
+      <div ref={caption} className={screenMarkClass.caption} data-hidden="" />
       <div
         ref={marker}
         className={cn(
@@ -71,7 +91,7 @@ export function CursorOverlayMarkup({
               key={i}
               className={cn(
                 "block h-1 w-0.5 rounded-full transition-[height] duration-80 ease-linear",
-                screenMarkClass.fill,
+                screenMarkClass.meter,
               )}
             />
           ))}

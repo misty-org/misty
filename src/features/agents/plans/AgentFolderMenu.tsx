@@ -89,7 +89,7 @@ export function ChatFolderMenu({ conversationId }: { conversationId: string | un
   return (
     <DropdownMenu>
       <MenuTrigger label="Chat folder" value={current?.displayName ?? "No folder"} plain />
-      <DropdownMenuContent align="end" className="w-72 max-w-[calc(100vw-16px)]">
+      <DropdownMenuContent align="end" className="w-72 max-w-[calc(100vw-1rem)]">
         <MenuRadioGroup
           value={current?.id ?? none}
           onValueChange={(next) => chooseFolder(conversationId, next === none ? null : next)}

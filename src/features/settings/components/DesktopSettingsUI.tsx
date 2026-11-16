@@ -16,10 +16,12 @@ import {
   WorkspaceSidebar,
 } from "@/shared/ui";
 import { X } from "lucide-react";
-import { Children, createContext, isValidElement, type ReactNode } from "react";
+import { Children, createContext, isValidElement, useContext, type ReactNode } from "react";
 import { useSettingReset } from "../device-preferences/SettingScope";
 import { type DesktopSettingsNavGroup, SettingsNavigation } from "./SettingsNavigation";
 export const SettingsControlLabelContext = createContext<string | undefined>(undefined);
+/** The page's title, as the frame's top bar shows it; a section named the same doesn't repeat it. */
+const SettingsPageTitleContext = createContext("");
 export function DesktopSettingsFrame<Id extends string>(props: DesktopSettingsFrameProps<Id>) {
   const overlay = props.presentation === "overlay";
   // With no pages to list there is no sidebar: an empty column only reads as a missing nav.
@@ -38,9 +40,9 @@ export function DesktopSettingsFrame<Id extends string>(props: DesktopSettingsFr
         overlay ? "h-full" : "h-screen",
         navigation
           ? [
-              "grid-cols-[248px_1px_minmax(0,1fr)]",
-              "max-[900px]:grid-cols-[208px_1px_minmax(0,1fr)]",
-              "max-[680px]:grid-cols-[168px_1px_minmax(0,1fr)]",
+              "grid-cols-[15.5rem_1px_minmax(0,1fr)]",
+              "max-[990px]:grid-cols-[13rem_1px_minmax(0,1fr)]",
+              "max-[748px]:grid-cols-[10.5rem_1px_minmax(0,1fr)]",
             ]
           : "grid-cols-[minmax(0,1fr)]",
       )}
@@ -49,11 +51,19 @@ export function DesktopSettingsFrame<Id extends string>(props: DesktopSettingsFr
       <WorkspaceSidebar
         hidden={!navigation}
         data-tour={props.navigationTour}
-        className="w-auto gap-0 overflow-hidden border-r-0 p-0 py-3"
+        className={cn(
+          "w-auto gap-0 overflow-hidden border-r-0 p-0",
+          // With a header band, 4px above it, as the divided top bar across from it has, so the
+          // search centers on the same line as the page's title and close button.
+          props.navigationHeader ? "pt-1 pb-3" : "py-3",
+        )}
       >
         <Text bare as="div" tone="muted" className="flex min-h-0 flex-1 flex-col">
+          {/* The search sits on the header band, level with the content's top bar and its title. */}
           {props.navigationHeader ? (
-            <div className="mb-3 shrink-0 px-3 max-[680px]:px-2">{props.navigationHeader}</div>
+            <div className="mb-2 flex h-(--ui-header) shrink-0 items-center px-3 *:w-full max-[748px]:px-2">
+              {props.navigationHeader}
+            </div>
           ) : null}
           {props.navigationOverride ?? (
             <SettingsNavigation
@@ -64,7 +74,7 @@ export function DesktopSettingsFrame<Id extends string>(props: DesktopSettingsFr
             />
           )}
           {props.navigationFooter ? (
-            <div className="shrink-0 px-3 max-[680px]:px-2">{props.navigationFooter}</div>
+            <div className="shrink-0 px-3 max-[748px]:px-2">{props.navigationFooter}</div>
           ) : null}
         </Text>
       </WorkspaceSidebar>
@@ -72,10 +82,26 @@ export function DesktopSettingsFrame<Id extends string>(props: DesktopSettingsFr
       {navigation ? <Separator orientation="vertical" /> : null}
 
       <Surface as="main" tone="page" className="relative flex min-h-0 min-w-0 flex-col">
-        {/* No title: the navigation names the page. An overlay's close button has a bar of its
-            own along the top, on the page's color, and the page scrolls beneath it. */}
+        {/* An overlay's close button has a bar of its own along the top, on the page's color, and
+            the page scrolls beneath it. The bar names the page at its start, lined up with the
+            content's own edge (its px-6 / px-4) under the bar's px-3. */}
         {overlay ? (
-          <TopBar>
+          <TopBar
+            divider
+            start={
+              props.title ? (
+                <Text
+                  as="h1"
+                  size="title"
+                  weight="semibold"
+                  tone="bright"
+                  className="min-w-0 pl-3 max-[792px]:pl-1"
+                >
+                  {props.title}
+                </Text>
+              ) : undefined
+            }
+          >
             <IconButton label={`Close ${props.ariaLabel.toLowerCase()}`} onClick={props.onClose}>
               <X />
             </IconButton>
@@ -88,13 +114,17 @@ export function DesktopSettingsFrame<Id extends string>(props: DesktopSettingsFr
         >
           <div
             className={cn(
-              "w-full max-w-240 px-6 pb-12 text-md leading-6 max-[720px]:px-4",
-              // Under an overlay's top bar the page starts closer; the bar already gives it room.
-              overlay ? "pt-2" : "pt-6",
+              "w-full max-w-240 px-6 pb-12 text-md leading-6 max-[792px]:px-4",
+              // Under an overlay's top bar the page starts a step below its hairline.
+              overlay ? "pt-4" : "pt-6",
             )}
           >
             {props.contentHeader}
-            {props.children}
+            <SettingsPageTitleContext.Provider
+              value={typeof props.title === "string" && overlay ? props.title : ""}
+            >
+              {props.children}
+            </SettingsPageTitleContext.Provider>
           </div>
         </div>
         {props.saveBar}
@@ -126,27 +156,38 @@ export function DesktopSettingsSection(props: {
   children: ReactNode;
   density?: "normal" | "compact";
 }) {
+  // The top bar already names the page; a section with the same name starts without a header.
+  const repeatsPage = useContext(SettingsPageTitleContext) === props.title;
   return (
     <section
       aria-label={props.title}
       className={cn("@container/settings min-w-0 last:mb-0", "mb-8")}
     >
-      <div className={cn("min-w-0", props.density === "compact" ? "mb-1.5" : "mb-3")}>
-        <Text
-          bare
-          as="h2"
-          tone="bright"
-          weight="semibold"
-          className={props.density === "compact" ? "text-base leading-6" : "text-md leading-6"}
-        >
-          {props.title}
-        </Text>
-        {props.description ? (
-          <Text bare as="p" tone="muted" className="mt-1 max-w-170 text-md leading-6">
-            {props.description}
-          </Text>
-        ) : null}
-      </div>
+      {repeatsPage && !props.description ? null : (
+        <div className={cn("min-w-0", props.density === "compact" ? "mb-1.5" : "mb-3")}>
+          {repeatsPage ? null : (
+            <Text
+              bare
+              as="h2"
+              tone="bright"
+              weight="semibold"
+              className={props.density === "compact" ? "text-base leading-6" : "text-md leading-6"}
+            >
+              {props.title}
+            </Text>
+          )}
+          {props.description ? (
+            <Text
+              bare
+              as="p"
+              tone="muted"
+              className={cn("max-w-170 text-md leading-6", !repeatsPage && "mt-1")}
+            >
+              {props.description}
+            </Text>
+          ) : null}
+        </div>
+      )}
       {props.density === "compact" ? (
         <div className="min-w-0">{props.children}</div>
       ) : (
@@ -166,7 +207,10 @@ export function DesktopSettingsRow(props: {
   label: string;
   description?: ReactNode;
   children: ReactNode;
-  /** Unavailable right now; dims the text only. */
+  /**
+   * Unavailable right now: its picture, name and line fade to the shared disabled look (half
+   * strength, pictures in grey), while its controls stay at full strength to set it up.
+   */
   muted?: boolean;
   /** Depends on the row above it and is drawn as its indented sub-row. */
   indent?: boolean;
@@ -189,17 +233,23 @@ export function DesktopSettingsRow(props: {
         "transition-colors duration-700 data-[flash=true]:duration-0",
         props.stacked
           ? "grid-cols-1"
-          : "grid-cols-[minmax(0,1fr)_auto] @max-[560px]/settings:grid-cols-1",
+          : "grid-cols-[minmax(0,1fr)_auto] @max-[35rem]/settings:grid-cols-1",
         // The panel owns the row's own padding, so the indent goes on its contents.
         props.indent && "[&>:first-child]:pl-5",
       )}
     >
-      <div className={cn("flex min-w-0 items-center", props.leading ? "gap-4" : null)}>
+      <div
+        className={cn(
+          "flex min-w-0 items-center",
+          props.leading ? "gap-4" : null,
+          props.muted && "opacity-50 grayscale",
+        )}
+      >
         {props.leading}
         <div className="grid min-w-0 gap-1">
           <Text
             bare
-            tone={props.muted ? "muted" : "bright"}
+            tone="bright"
             weight="medium"
             className="text-md leading-6"
           >
@@ -227,7 +277,7 @@ export function DesktopSettingsRow(props: {
           data-setting-control
           className={cn(
             "flex min-w-0 items-center gap-2",
-            props.stacked ? "justify-start" : "justify-end @max-[560px]/settings:justify-start",
+            props.stacked ? "justify-start" : "justify-end @max-[35rem]/settings:justify-start",
           )}
         >
           {props.children}

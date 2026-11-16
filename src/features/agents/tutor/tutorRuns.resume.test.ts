@@ -1,105 +1,75 @@
 import { describe, expect, it, vi } from "vitest";
 import type { TutorJob } from "./tutorTypes";
-import {
-  elsewhere,
-  fakes,
-  flush,
-  follow,
-  jobOf,
-  setChats,
-  type Chat,
-} from "./tutorRuns.testFixtures";
+import { fakes, finish, flush, follow, jobOf, tutor } from "./tutorRuns.testFixtures";
 
-// What Tutor does with its runs when Misty opens again after closing under them.
-describe("runs Misty closed under", () => {
+// What the Lab does with its jobs when Misty opens again after closing under them.
+describe("jobs Misty closed under", () => {
   const saved = (change: Partial<TutorJob>): TutorJob => ({
     id: "job-old",
     kind: "deck",
     title: "Flashcards: Volcanoes",
-    agentId: "agent-1",
-    conversationId: elsewhere.id,
+    agentId: "personal_engine_claude",
     prompt: "Make it",
     notebookId: "n1",
-    state: "failed",
+    state: "running",
     createdAt: "2026-11-01T00:00:00Z",
     updatedAt: "2026-11-01T00:00:00Z",
     ...change,
   });
 
-  it("starts an interrupted run again once", async () => {
-    fakes.stored.tutor_job = [saved({ error: "Misty closed before this run finished." })];
+  it("follows a run native code still has to its end", async () => {
+    fakes.readRunState.mockResolvedValue("running");
+    fakes.stored.tutor_job = [saved({ runId: "run-live" })];
     await follow();
-    await vi.waitFor(() => expect(jobOf("job-old").state).toBe("running"));
-    expect(jobOf("job-old").restarts).toBe(1);
+
+    await vi.waitFor(() => expect(fakes.followEngineRun).toHaveBeenCalledWith("run-live"));
+    expect(fakes.runOnEngine).not.toHaveBeenCalled();
+    await finish("run-live", '{"cards": [{"front": "a", "back": "b"}]}');
+    expect(jobOf("job-old").state).toBe("done");
+    expect(tutor().decks[jobOf("job-old").resultId!].cards).toHaveLength(1);
   });
 
-  it("leaves an interrupted run alone once it has been started again", async () => {
+  it("starts a run native code no longer has again, once", async () => {
+    fakes.readRunState.mockResolvedValue("missing");
+    fakes.stored.tutor_job = [saved({ runId: "run-gone" })];
+    await follow();
+
+    await vi.waitFor(() => expect(fakes.runOnEngine).toHaveBeenCalledTimes(1));
+    expect(jobOf("job-old")).toMatchObject({ state: "running", restarts: 1 });
+  });
+
+  it("fails a run that was already started again once", async () => {
+    fakes.stored.tutor_job = [saved({ runId: "run-gone", restarts: 1 })];
+    await follow();
+
+    await vi.waitFor(() =>
+      expect(jobOf("job-old")).toMatchObject({
+        state: "failed",
+        error: "This run stopped before it finished.",
+      }),
+    );
+    expect(fakes.runOnEngine).not.toHaveBeenCalled();
+  });
+
+  it("starts a job from before the default engine that was still waiting for its turn", async () => {
+    // Its own id: an earlier test's run for "job-old" is still going in this module.
     fakes.stored.tutor_job = [
-      saved({ error: "Misty closed before this run finished.", restarts: 1 }),
+      saved({ id: "job-queued", state: "queued", conversationId: "chat-old" }),
     ];
     await follow();
-    expect(jobOf("job-old").state).toBe("failed");
-    expect(fakes.submitAnswer).not.toHaveBeenCalled();
+
+    await vi.waitFor(() => expect(fakes.runOnEngine).toHaveBeenCalledTimes(1));
+    expect(jobOf("job-queued")).toMatchObject({ state: "running", restarts: 0 });
   });
 
-  it("leaves a run that failed at its own work for the person to retry", async () => {
-    fakes.stored.tutor_job = [saved({ error: "The reply had nothing Misty could use." })];
+  it("leaves a job that failed at its own work for the person to retry", async () => {
+    fakes.stored.tutor_job = [
+      saved({ state: "failed", error: "The reply had nothing Misty could use." }),
+    ];
     await follow();
-    expect(jobOf("job-old").state).toBe("failed");
-    expect(fakes.submitAnswer).not.toHaveBeenCalled();
-  });
-
-  it("fails a run whose reply waits on a turn that no longer runs, then starts it again", async () => {
-    const orphan: Chat = {
-      id: "chat-orphan",
-      title: "Flashcards: Volcanoes",
-      messages: [
-        {
-          id: "a",
-          role: "assistant",
-          mode: "ask",
-          content: "",
-          createdAt: "",
-          state: "streaming",
-          invocationId: "inv-gone",
-        },
-      ],
-    };
-    setChats({ conversations: [elsewhere, orphan] });
-    fakes.stored.tutor_job = [saved({ state: "running", conversationId: orphan.id })];
-    await follow();
-
-    await vi.waitFor(() => expect(fakes.readRunState).toHaveBeenCalledWith("inv-gone"));
-    await vi.waitFor(() => expect(jobOf("job-old").state).toBe("running"));
-    expect(jobOf("job-old").restarts).toBe(1);
-    expect(fakes.submitAnswer).toHaveBeenCalledTimes(1);
-  });
-
-  it("keeps waiting on a run native code still has", async () => {
-    fakes.readRunState.mockResolvedValue("running");
-    const live: Chat = {
-      id: "chat-live",
-      title: "Flashcards: Volcanoes",
-      messages: [
-        {
-          id: "a",
-          role: "assistant",
-          mode: "ask",
-          content: "",
-          createdAt: "",
-          state: "streaming",
-          invocationId: "inv-live",
-        },
-      ],
-    };
-    setChats({ conversations: [elsewhere, live] });
-    fakes.stored.tutor_job = [saved({ state: "running", conversationId: live.id })];
-    await follow();
-
-    await vi.waitFor(() => expect(fakes.readRunState).toHaveBeenCalledWith("inv-live"));
     await flush();
-    expect(jobOf("job-old").state).toBe("running");
-    expect(fakes.submitAnswer).not.toHaveBeenCalled();
+    expect(jobOf("job-old").state).toBe("failed");
+    expect(fakes.runOnEngine).not.toHaveBeenCalled();
   });
 
   it("makes audio again that was being spoken when Misty closed", async () => {

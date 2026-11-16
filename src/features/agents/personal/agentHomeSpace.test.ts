@@ -72,20 +72,41 @@ it("gives a new agent the Space the window shows", async () => {
   expect(made.space_id).toBe("team");
 });
 
+/** An agent saved before agents had a home Space. */
+const unplaced = () =>
+  rows.set(
+    "agent:personal_old",
+    JSON.stringify({
+      id: "personal_old",
+      owner_user_id: "acct",
+      name: "Codex",
+      instructions: "",
+      engine: "codex",
+      enabled: true,
+      system_managed: false,
+      version: 1,
+      created_at: "2026-01-01T00:00:00.000Z",
+      updated_at: "2026-01-01T00:00:00.000Z",
+    }),
+  );
+
 it("gives agents with no home Space the person's own, saved once the Spaces load", async () => {
+  unplaced();
   const before = await listPersonalAgents("acct");
-  expect(before.find((agent) => agent.system_managed)?.space_id).toBe("");
+  expect(before.find((agent) => agent.id === "personal_old")?.space_id ?? "").toBe("");
 
   useSpaceWindowStore.setState({ personalSpaceId: "own", personalSpaceOwner: "acct" });
   const after = await listPersonalAgents("acct");
-  expect(after.find((agent) => agent.system_managed)?.space_id).toBe("own");
-  expect(JSON.parse(rows.get("agent:personal_misty")!)).toMatchObject({ space_id: "own" });
+  expect(after.find((agent) => agent.id === "personal_old")?.space_id).toBe("own");
+  expect(JSON.parse(rows.get("agent:personal_old")!)).toMatchObject({ space_id: "own" });
 });
 
 it("never takes another account's own Space", async () => {
+  unplaced();
   useSpaceWindowStore.setState({ personalSpaceId: "theirs", personalSpaceOwner: "someone" });
   const agents = await listPersonalAgents("acct");
-  expect(agents.every((agent) => agent.space_id === "")).toBe(true);
+  expect(agents.every((agent) => (agent.space_id ?? "") === "")).toBe(true);
+  expect(agents).toHaveLength(1);
 });
 
 it("moves an agent's home only from its settings, keeping its version", async () => {

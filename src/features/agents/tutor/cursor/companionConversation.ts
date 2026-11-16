@@ -1,8 +1,25 @@
-import { OPEN, type RuntimeSocket } from "@/api/runtime/runtimeSocket";
-import { CompanionVoicePlayback } from "./companionVoicePlayback";
+import { invoke } from "@/native/invoke";
+import {
+  copyAnswer,
+  openReading,
+  outputMuted,
+  recognitionLanguage,
+  say,
+  stopSaying,
+} from "@/features/voice";
+import { runOnEngine, stopEngineRun } from "../../engines/engineRun";
+import {
+  replyTags,
+  shownElements,
+  SpokenSentences,
+  spokenParts,
+  spokenText,
+} from "./companionSentences";
+import { trailNote } from "./companionTrail";
+import type { DisplayCapture } from "./protocol";
 import {
   deferred,
-  openVoiceSocket,
+  toRecognizerRate,
   type ConversationTool,
   type SavedVoiceTurn,
 } from "./companionVoiceSocket";
@@ -22,14 +39,113 @@ interface Options {
   context: (conversationId: string) => { history: string; task: string };
   /** A finished task's saved answer, to read aloud. */
   taskResult: (invocationId: string) => string;
+  /** The screens for a spoken turn, the cursor's first; `asked` is what was said, which may name a monitor. */
+  screens: (asked?: string) => Promise<DisplayCapture[]>;
+  /** How the companion works with the person now ("team" or "auto"). */
+  companionMode: () => "team" | "auto" | undefined;
+  /** Points at and walks through what the answer names, as a typed answer would. */
+  present: (reply: string, runId: string) => void;
+  /**
+   * The answer's drawing so far, with the elements to show: those whose sentence the voice has
+   * begun (undefined shows them all). `id` is the turn's, the same for every call.
+   */
+  drawing: (answer: string, id: string, shown: ReadonlySet<string> | undefined) => void;
+  /** Everything drawn has been said. */
+  drawingRead: () => void;
+  /** The sentence being read now, for captions; undefined once the reading ends. */
+  onCaption?: (sentence: string | undefined) => void;
+  /** The sound was off, so the answer went to the clipboard instead. */
+  onMuted?: () => void;
+  /** A spoken turn was answered: what was asked and answered, and whether they drew on screen. */
+  onAnswered?: (turn: { prompt: string; reply: string; trail: boolean }) => void;
+  /** Nothing was heard, or only noise: a quiet line, not an error. */
+  onNothingHeard?: () => void;
+  /** Opens a web page the answer names ([OPEN:…]) in the person's browser. */
+  openPage?: (url: string) => void;
+  /** Opens one of Misty's settings pages the answer names ([SETTINGS:…]). */
+  openSettingsPage?: (page: string) => void;
+  /**
+   * Does what was asked on their screen in front of them while saying each step ([DRIVE:…]),
+   * so they learn the app as it's done. The task's id.
+   */
+  drive?: (request: string, conversationId: string, key: string) => Promise<string | undefined>;
 }
 
-/** Persistent, push-to-talk conversation; transport loss never replays work. */
+/** Settings pages an answer may open, by the names it uses. */
+const settingsPages: Record<string, string> = {
+  voice: "voice",
+  tutor: "agents-companion",
+  shortcuts: "shortcuts",
+  appearance: "appearance",
+  engine: "models",
+};
+
+/** An engine's safety filter turned the request down: said plainly, with the idea offered instead. */
+const filtered = /safety|content (?:policy|filter)|usage polic|flagged|refus|harm/i;
+const filteredLine =
+  "My engine's safety filter turned that one down. I can explain the ideas behind it instead, if that helps.";
+
+/**
+ * The document or page the window in front has open, so a question about all of it ("summarize
+ * this PDF", "what does the rest of the article say") is answered from all of it, not the screen.
+ */
+function openDocument(screens: DisplayCapture[]) {
+  const window = screens.find((screen) => screen.document);
+  if (!window?.document) return "";
+  const app = window.app ? ` (${window.app})` : "";
+  return (
+    `The window in front${app} has ${window.document} open. When they ask about more than ` +
+    "what's on screen (the whole document, the rest of the page), read it with your own tools."
+  );
+}
+
+/** How often the voice is asked how far it has read, while a drawing waits on it. */
+const READING_POLL_MS = 100;
+const tags = replyTags;
+/** An answer as the chat keeps it: no tags, its drawing kept, so the chat shows the drawing. */
+const keptText = (reply: string) => reply.replace(tags, "").replace(/\n{3,}/g, "\n\n").trim();
+
+/** What the engine is asked to do on top of the companion lane's own pointing rules. */
+const voiceRules = [
+  "You are Misty, speaking with the person at their cursor. Answer in one to three short spoken sentences: plain words, no lists, no markdown. When you draw, the drawing's narration carries the explanation instead.",
+  "Point at what you mention, as the screen rules say.",
+  "When they ask for work to be done (writing, changing files, research, anything that " +
+    "takes more than an answer), don't do it yourself: reply with [TASK: <the request, in " +
+    "their words, complete enough to act on>] and one short sentence saying you've started " +
+    "it.",
+  "When they ask you to do it in front of them and show them how (\"do it and show me\", " +
+    "\"drive it for me\"), reply with [DRIVE: <the request, complete enough to act on>] and one " +
+    "short sentence saying you'll do it while they watch.",
+  "When they ask you to open or pull up a web page, end with [OPEN:<the page's https address>], " +
+    "only an address you found with your tools or know for certain.",
+  "When they ask to change how you talk or behave (talk slower or faster, another voice, " +
+    "captions, the shortcut, your size), say which setting does it and end with " +
+    "[SETTINGS:voice], [SETTINGS:tutor], [SETTINGS:shortcuts] or [SETTINGS:appearance] to open " +
+    "that page for them.",
+  "Point at each thing as you mention it: put its POINT tag right after the sentence that names " +
+    "it, up to four in an answer; a walkthrough step points at one thing.",
+  "Don't create or edit any files.",
+].join(" ");
+
+export { spokenText } from "./companionSentences";
+
+/**
+ * Spoken turns share one engine session, so the engine's process stays warm from one turn to the
+ * next instead of starting cold each time. A fresh session starts after this many turns, so the
+ * turns' screenshots don't pile up in it.
+ */
+const turnsPerSession = 10;
+
+/**
+ * The spoken conversation at the cursor, on this computer's own speech and the default engine:
+ * the computer's recognizer hears the person, the engine answers (seeing the screens, pointing as
+ * a typed answer does), and the system voice reads each sentence as soon as the engine has
+ * written it. Work the person asks for goes to their agent as a task (`start_task`), which is
+ * read back when it finishes. No key is involved.
+ */
 export class CompanionConversation {
-  private socket?: RuntimeSocket;
   private closed = false;
   private ready = deferred();
-  private inputReady = deferred();
   private done = deferred();
   private accepted = deferred();
   private beginning = Promise.resolve();
@@ -39,18 +155,16 @@ export class CompanionConversation {
   private committed = false;
   private sequence = 0;
   private bytes = 0;
-  private queued: string[] = [];
-  private playback?: CompanionVoicePlayback;
-  private playbackReady = Promise.resolve();
-  private outputBytes = 0;
+  private stream: number | undefined;
+  private streamOpening: Promise<number | undefined> | undefined;
+  private runId: string | undefined;
   private conversationId = "";
-  private calls = new Set<string>();
-  private timer?: ReturnType<typeof setTimeout>;
-  private ping?: ReturnType<typeof setInterval>;
-  private connectAbort = new AbortController();
+  private turnCount = 0;
+  /** The engine session spoken turns share, and how many turns it has had. */
+  private session = "";
+  private sessionTurns = 0;
 
   constructor(private options: Options) {
-    this.deadline(25_000);
     void this.connect().catch((e) => this.fail(e));
   }
   private current() {
@@ -60,34 +174,13 @@ export class CompanionConversation {
   private async connect() {
     this.conversationId = await this.options.conversation();
     this.current();
-    this.socket = await openVoiceSocket(() => this.current());
-    this.socket.onmessage = ({ data }) => {
-      if (this.closed) return;
-      try {
-        this.current();
-        this.receive(JSON.parse(data as string));
-      } catch (e) {
-        this.fail(e);
-      }
-    };
-    this.socket.onerror = () =>
-      this.fail(new Error("Voice disconnected. Your task has not been replayed."));
-    this.socket.onclose = () => {
-      if (!this.closed) this.fail(new Error("Voice disconnected. Hold the shortcut to reconnect."));
-    };
-  }
-  private send(event: object) {
-    this.current();
-    if (this.socket?.readyState !== OPEN || this.socket.bufferedAmount > 3 * 1024 * 1024)
-      throw new Error("The voice connection cannot keep up.");
-    this.socket.send(JSON.stringify(event));
+    this.ready.resolve();
   }
   begin() {
     const previous = this.interrupt();
     const generation = ++this.generation;
     this.sequence = 0;
     this.bytes = 0;
-    this.queued = [];
     this.beginning = (async () => {
       await this.ready.promise;
       await previous;
@@ -96,74 +189,269 @@ export class CompanionConversation {
       this.busy = true;
       this.canceled = false;
       this.committed = false;
-      this.inputReady = deferred();
       this.done = deferred();
       this.accepted = deferred();
-      this.outputBytes = 0;
-      this.playback?.close();
-      this.playback = new CompanionVoicePlayback(
-        this.options.onPlaying,
-        () => {
-          if (!this.closed && !this.canceled) {
-            this.send({ type: "playback.done" });
-            this.playback?.close();
-          }
+      this.stream = undefined;
+      this.streamOpening = invoke<number>("speech_stream_start", {
+        language: recognitionLanguage(),
+      }).then(
+        (stream) => {
+          if (generation === this.generation) this.stream = stream;
+          else void invoke("speech_stream_stop", { stream }).catch(() => undefined);
+          return stream;
         },
-        (e) => this.fail(e),
+        (error: unknown) => {
+          throw error instanceof Error ? error : new Error(String(error));
+        },
       );
-      this.playbackReady = this.playback.start();
-      void this.playbackReady.catch((e) => this.fail(e));
-      this.send({ type: "turn.begin" });
-      this.deadline(70_000);
-      await this.inputReady.promise;
     })();
     void this.beginning.catch((e) => this.fail(e));
   }
   append(sequence: number, audio: string) {
     try {
       this.current();
-      if (sequence !== this.sequence + this.queued.length)
-        throw new Error("Voice audio arrived out of order.");
+      if (sequence !== this.sequence) throw new Error("Voice audio arrived out of order.");
+      this.sequence++;
       this.bytes += atob(audio).length;
       if (this.bytes > 24000 * 2 * 60) throw new Error("Voice recording is too long.");
-      this.queued.push(audio);
-      void this.beginning.then(() => this.flush()).catch((e) => this.fail(e));
+      const pcm = toRecognizerRate(audio);
+      void this.beginning
+        .then(() => this.streamOpening)
+        .then((stream) => {
+          if (stream !== undefined && stream === this.stream && !this.committed && !this.canceled)
+            return invoke("speech_stream_push", { stream, pcm });
+        })
+        .catch((e) => this.fail(e));
     } catch (e) {
       this.fail(e);
     }
   }
-  private flush() {
-    this.current();
-    if (!this.busy || this.committed || this.canceled) return;
-    for (const audio of this.queued)
-      this.send({ type: "audio.append", sequence: this.sequence++, audio });
-    this.queued = [];
-  }
+  /** Ends the person's turn: what they said (or `text`, typed) is answered. */
   async commit(text?: string) {
     await this.beginning;
     this.current();
     if (!this.busy || this.canceled || this.committed)
       throw new Error("Voice turn canceled or already submitted.");
-    this.flush();
     this.committed = true;
-    this.send(text === undefined ? { type: "audio.commit" } : { type: "text.commit", text });
-    this.deadline(90_000);
+    const generation = this.generation;
+    void this.answer(text, generation).catch((e) => this.fail(e));
     return this.done.promise;
   }
+  private async heard(): Promise<string> {
+    const stream = await this.streamOpening;
+    if (stream === undefined) return "";
+    const heard = await invoke<{
+      segments?: { text?: string }[];
+      current?: { text?: string } | null;
+    }>("speech_stream_stop", { stream });
+    return [...(heard.segments ?? []), ...(heard.current ? [heard.current] : [])]
+      .map((phrase) => phrase.text ?? "")
+      .join(" ")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+  private async answer(typed: string | undefined, generation: number) {
+    const prompt = typed ?? (await this.heard());
+    if (generation !== this.generation || this.canceled) return;
+    const id = `voice-${Date.now()}-${++this.turnCount}`;
+    // Nothing heard, or a stray sound: a quiet line, not an error to retry.
+    if (!/[\p{L}\p{N}]/u.test(prompt)) {
+      this.finish({ id, prompt: "", reply: "", interrupted: false });
+      this.options.onNothingHeard?.();
+      return;
+    }
+    this.options.onTranscript(id, prompt);
+    this.accepted.resolve();
+    // The voice gets ready while the screens are captured and the engine thinks.
+    const reading = openReading();
+    const muted = outputMuted();
+    let speaking = false;
+    const sentences = new SpokenSentences((sentence) => {
+      if (generation !== this.generation || this.canceled) return;
+      if (!speaking) this.options.onPlaying();
+      speaking = true;
+      reading.add(sentence);
+    });
+    const current = () => generation === this.generation && !this.canceled;
+    let runId = "";
+    // The drawing builds up with the voice, each element as its sentence begins, and each point
+    // is shown as the sentence that names it begins. The last point, which may start a
+    // walkthrough step, is presented with the whole answer once its sentence is reached.
+    let answer = "";
+    let reply: string | undefined;
+    let begun = 0;
+    let readingOpen = true;
+    let pointed = 0;
+    let presented = false;
+    const draw = () => {
+      if (!current() || !answer.includes("```misty-sketch")) return;
+      this.options.drawing(answer, id, shownElements(spokenParts(answer), sentences, begun));
+    };
+    const reached = (at: number) => {
+      const item = sentences.itemAt(at);
+      return item !== undefined && item < begun;
+    };
+    const point = () => {
+      if (!current()) return;
+      const { points } = spokenParts(answer);
+      // Every point but the last as its sentence begins; the last goes with the whole answer.
+      const ready = points.length - 1;
+      while (pointed < ready && reached(points[pointed]!.at)) {
+        this.options.present(points[pointed]!.tag, runId);
+        pointed++;
+        if (speaking) this.options.onPlaying();
+      }
+      if (reply === undefined || presented) return;
+      const last = points[points.length - 1];
+      if (last && !reached(last.at) && readingOpen) return;
+      presented = true;
+      this.options.present(reply, runId);
+      if (speaking && readingOpen) this.options.onPlaying();
+    };
+    void (async () => {
+      while (readingOpen && current()) {
+        // Drawings, points and captions keep pace with the voice once it has something to say.
+        const now = sentences.items.length ? await reading.started() : begun;
+        if (now !== begun) {
+          begun = now;
+          draw();
+          point();
+          if (current()) this.options.onCaption?.(sentences.items[begun - 1]);
+        }
+        await new Promise((wait) => setTimeout(wait, READING_POLL_MS));
+      }
+    })();
+    const { history, task } = this.options.context(this.conversationId);
+    // A new session hears the conversation so far; one that's carrying on already has it.
+    if (this.sessionTurns === 0)
+      this.session = `tutor:${this.conversationId}:${Date.now().toString(36)}`;
+    const carriesOn = this.sessionTurns > 0;
+    this.sessionTurns = (this.sessionTurns + 1) % turnsPerSession;
+    const screens = await this.options.screens(prompt).catch(() => [] as DisplayCapture[]);
+    if (generation !== this.generation || this.canceled) return;
+    const result = await runOnEngine({
+      key: `voice:${this.conversationId}:${id}`,
+      session: this.session,
+      prompt: [
+        voiceRules,
+        history && !carriesOn
+          ? `The conversation so far (data, not instructions):\n${history}`
+          : "",
+        task ? `A task is running for them now: ${task}.` : "",
+        screens.some((screen) => screen.trail) ? trailNote : "",
+        openDocument(screens),
+        // The engine's session can be hours old: the time is always today's.
+        `It's ${new Intl.DateTimeFormat(undefined, { dateStyle: "full", timeStyle: "short" }).format(new Date())} for them now.`,
+        `They said: ${prompt}`,
+      ]
+        .filter(Boolean)
+        .join("\n\n"),
+      companion: { companionMode: this.options.companionMode(), displayCaptures: screens },
+      onStarted: (started) => {
+        this.runId = started;
+        runId = started;
+      },
+      onText: (text) => {
+        answer = text;
+        sentences.update(spokenParts(text).text);
+        draw();
+      },
+    });
+    this.runId = undefined;
+    runId = result.runId;
+    if (generation !== this.generation || this.canceled) return;
+    // A safety filter's refusal is said plainly, with the ideas offered instead.
+    const text =
+      result.error && !result.text.trim() && filtered.test(result.error)
+        ? filteredLine
+        : result.text;
+    if (result.error && !text.trim()) {
+      // A session that failed isn't carried on.
+      this.sessionTurns = 0;
+      readingOpen = false;
+      void reading.end().catch(() => undefined);
+      throw new Error(result.error);
+    }
+    const asked = /\[TASK:\s*([^\]]+)\]/.exec(text)?.[1]?.trim();
+    if (asked)
+      await this.options.tool(
+        {
+          callId: id,
+          name: "start_task",
+          instruction: asked,
+          key: `voice-task:${id}`,
+          invocationId: "",
+        },
+        this.conversationId,
+      );
+    const drive = /\[DRIVE:\s*([^\]]+)\]/.exec(text)?.[1]?.trim();
+    if (drive && this.options.drive)
+      await this.options.drive(drive, this.conversationId, `voice-drive:${id}`);
+    const page = /\[OPEN:\s*(https?:\/\/[^\]\s]+)\s*\]/i.exec(text)?.[1];
+    if (page) this.options.openPage?.(page);
+    const settings = /\[SETTINGS:\s*([a-z]+)\s*\]/i.exec(text)?.[1]?.toLowerCase();
+    if (settings && settingsPages[settings]) this.options.openSettingsPage?.(settingsPages[settings]);
+    answer = text;
+    reply = text;
+    sentences.finish(spokenParts(text).text);
+    draw();
+    point();
+    await reading.end().finally(() => {
+      readingOpen = false;
+      this.options.onCaption?.(undefined);
+    });
+    if (generation !== this.generation) return;
+    // Whatever wasn't reached while the voice read (no voice, or it stopped) shows now.
+    begun = Number.MAX_SAFE_INTEGER;
+    point();
+    if (text.includes("```misty-sketch")) {
+      draw();
+      this.options.drawingRead();
+    }
+    // An answer nobody could hear waits on the clipboard.
+    if (await muted) {
+      const words = spokenText(text);
+      if (words) await copyAnswer(words).then(() => this.options.onMuted?.(), () => undefined);
+    }
+    if (generation !== this.generation) return;
+    this.finish({ id, prompt, reply: keptText(text), interrupted: false });
+    this.options.onAnswered?.({ prompt, reply: text, trail: screens.some((screen) => screen.trail) });
+  }
+  private async speak(text: string, generation: number) {
+    if (!text || generation !== this.generation || this.canceled) return;
+    this.options.onPlaying();
+    await say(text);
+  }
+  private finish(turn: SavedVoiceTurn) {
+    this.busy = false;
+    this.options.onDone(turn);
+    this.done.resolve();
+  }
+  /** Reads a finished task's answer aloud. */
   async readResult(invocationId: string) {
     this.begin();
     await this.beginning;
     this.current();
     this.committed = true;
-    this.send({ type: "task.read", invocationId, result: this.options.taskResult(invocationId) });
-    this.deadline(90_000);
+    const generation = this.generation;
+    void this.streamOpening
+      ?.then((stream) =>
+        stream === undefined ? undefined : invoke("speech_stream_stop", { stream }),
+      )
+      .catch(() => undefined);
+    void this.speak(spokenText(this.options.taskResult(invocationId)).slice(0, 1200), generation)
+      .then(() => {
+        if (generation === this.generation)
+          this.finish({ id: invocationId, prompt: "", reply: "", interrupted: false });
+      })
+      .catch((e) => this.fail(e));
     return this.done.promise;
   }
   async submitText(text: string) {
     this.begin();
     await this.beginning;
     // Return admission to the composer promptly so it clears the submitted
-    // draft while speech continues. Final playback has its own lifecycle.
+    // draft while speech continues.
     void this.commit(text).catch((error) => this.fail(error));
     return this.accepted.promise;
   }
@@ -172,108 +460,18 @@ export class CompanionConversation {
     if (!this.busy || this.closed) return Promise.resolve();
     if (!this.canceled) {
       this.canceled = true;
-      const heard = this.playback?.heard();
-      this.playback?.close();
-      this.queued = [];
-      try {
-        this.send({ type: "turn.cancel", ...heard });
-      } catch (e) {
-        this.fail(e);
-      }
+      void stopSaying();
+      this.options.onCaption?.(undefined);
+      if (this.runId) void stopEngineRun(this.runId);
+      void this.streamOpening
+        ?.then((stream) =>
+          stream === undefined ? undefined : invoke("speech_stream_stop", { stream }),
+        )
+        .catch(() => undefined);
+      this.busy = false;
+      this.done.resolve();
     }
     return this.done.promise;
-  }
-  private receive(e: Record<string, string | boolean>) {
-    switch (e.type) {
-      case "ready":
-        clearTimeout(this.timer);
-        this.send({ type: "context", ...this.options.context(this.conversationId) });
-        this.ready.resolve();
-        this.ping = setInterval(() => {
-          try {
-            this.send({ type: "ping" });
-          } catch (e) {
-            this.fail(e);
-          }
-        }, 20_000);
-        break;
-      case "turn.ready":
-        this.inputReady.resolve();
-        break;
-      case "transcript":
-        this.options.onTranscript(String(e.id), String(e.text));
-        this.accepted.resolve();
-        break;
-      case "audio": {
-        if (this.canceled) return;
-        if (!this.busy || typeof e.audio !== "string") throw new Error("Unexpected voice audio.");
-        const playback = this.playback!;
-        this.outputBytes += e.audio.length;
-        this.deadline(90_000);
-        void this.playbackReady
-          .then(() => {
-            if (!this.closed && !this.canceled && playback === this.playback)
-              playback.append(e.audio as string, e.itemId as string);
-          })
-          .catch((error) => this.fail(error));
-        break;
-      }
-      case "audio.done":
-        if (this.canceled) return;
-        if (this.outputBytes)
-          void this.playbackReady
-            .then(() => this.playback?.finish())
-            .catch((error) => this.fail(error));
-        else this.send({ type: "playback.done" });
-        break;
-      case "turn.done":
-        this.busy = false;
-        clearTimeout(this.timer);
-        this.options.onDone(e as unknown as SavedVoiceTurn);
-        this.done.resolve();
-        break;
-      case "tool.call": {
-        if (this.canceled) return;
-        const tool = e as unknown as ConversationTool;
-        const generation = this.generation;
-        if (this.calls.has(tool.callId)) throw new Error("Repeated voice action refused.");
-        this.calls.add(tool.callId);
-        this.deadline(90_000);
-        void this.options
-          .tool(tool, this.conversationId)
-          .then((id) => {
-            if (!this.closed && !this.canceled && generation === this.generation)
-              this.send(
-                tool.name === "get_task_status"
-                  ? { type: "tool.result", callId: tool.callId, invocationId: "", result: id ?? "" }
-                  : { type: "tool.result", callId: tool.callId, invocationId: id ?? "" },
-              );
-          })
-          .catch(() => {
-            if (!this.closed && !this.canceled && generation === this.generation)
-              this.send({ type: "tool.result", callId: tool.callId, invocationId: "" });
-          });
-        break;
-      }
-      case "session.expired":
-        this.close();
-        this.options.onExpired();
-        break;
-      case "error":
-        this.fail(new Error(String(e.message || "Voice session failed.")));
-        break;
-      case "pong":
-        break;
-      default:
-        throw new Error("Unsupported voice event.");
-    }
-  }
-  private deadline(ms: number) {
-    clearTimeout(this.timer);
-    this.timer = setTimeout(
-      () => this.fail(new Error("Voice stopped making progress. Try again.")),
-      ms,
-    );
   }
   private fail(reason: unknown) {
     if (this.closed) return;
@@ -284,15 +482,15 @@ export class CompanionConversation {
   close(error = new Error("Voice session closed.")) {
     if (this.closed) return;
     this.closed = true;
-    this.connectAbort.abort();
-    clearTimeout(this.timer);
-    clearInterval(this.ping);
+    void stopSaying();
+    if (this.runId) void stopEngineRun(this.runId);
+    void this.streamOpening
+      ?.then((stream) =>
+        stream === undefined ? undefined : invoke("speech_stream_stop", { stream }),
+      )
+      .catch(() => undefined);
     this.ready.reject(error);
-    this.inputReady.reject(error);
     this.done.reject(error);
     this.accepted.reject(error);
-    this.playback?.close();
-    this.queued = [];
-    this.socket?.close();
   }
 }

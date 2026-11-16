@@ -184,8 +184,8 @@ export function FloatingPip({
       className={cn(
         "group/pip absolute top-0 left-0 z-[var(--stack-raised)] w-72 max-w-[calc(100%-1.5rem)]",
         "cursor-grab touch-none select-none overflow-hidden rounded-xl bg-charcoal-card",
-        "shadow-[0_8px_28px_rgb(0_0_0/0.45),0_0_0_0.5px_rgb(255_255_255/0.08)]",
-        "data-[dragging]:cursor-grabbing data-[dragging]:shadow-[0_14px_40px_rgb(0_0_0/0.55),0_0_0_0.5px_rgb(255_255_255/0.12)]",
+        "shadow-[0_0.5rem_1.75rem_rgb(0_0_0/0.45),0_0_0_0.5px_rgb(255_255_255/0.08)]",
+        "data-[dragging]:cursor-grabbing data-[dragging]:shadow-[0_0.875rem_2.5rem_rgb(0_0_0/0.55),0_0_0_0.5px_rgb(255_255_255/0.12)]",
         gliding && "transition-transform duration-200 ease-out motion-reduce:transition-none",
         !at && "invisible",
       )}

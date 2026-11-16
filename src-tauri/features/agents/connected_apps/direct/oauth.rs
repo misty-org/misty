@@ -231,7 +231,7 @@ fn failure(response: &Value, fallback: &str) -> String {
     response["error_description"]
         .as_str()
         .or_else(|| response["error"].as_str())
-        .map(|text| super::super::client::truncate(text, 300))
+        .map(|text| super::super::text::truncate(text, 300))
         .unwrap_or_else(|| fallback.to_owned())
 }
 

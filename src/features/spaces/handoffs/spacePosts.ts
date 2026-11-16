@@ -25,7 +25,7 @@ export function claimBody(text: string): string {
   return `${claimMark} ${text.replace(/\s+/g, " ").trim().slice(0, claimMaxLength)}`;
 }
 
-function plainText(content: SpaceMessage["content"]): string {
+export function plainText(content: SpaceMessage["content"]): string {
   return content
     .map((span) =>
       span.type === "text" ? span.text : span.type === "mention" ? `@${span.label}` : span.label,
@@ -54,6 +54,8 @@ export function readSpacePost(message: PostMessage): SpacePost | undefined {
 
 export interface IncomingHandoff {
   id: string;
+  /** The sender's agent it names, when they asked for one of this person's agents. */
+  agentId?: string;
   /** Empty for the Space's main chat. */
   conversationId: string;
   fromUserId: string;
@@ -85,14 +87,25 @@ export function incomingHandoffs(
 ): IncomingHandoff[] {
   return messages
     .filter((message) => handoffIsFor(message, me, direct))
-    .map((message) => ({
-      id: message.id,
-      conversationId: message.conversation_id ?? "",
-      fromUserId: message.sender_user_id,
-      fromName: message.sender_name,
-      text: readSpacePost(message)!.text,
-      createdAt: message.created_at,
-    }));
+    .map((message) => {
+      const agent = message.content.find(
+        (span): span is Extract<typeof span, { agent_id: string }> =>
+          span.type === "mention" && "agent_id" in span,
+      );
+      // The agent's name rides along as a mention; the words to hand on are the rest.
+      const words = agent
+        ? readSpacePost({ ...message, content: message.content.filter((span) => span !== agent) })
+        : undefined;
+      return {
+        id: message.id,
+        ...(agent ? { agentId: agent.agent_id } : {}),
+        conversationId: message.conversation_id ?? "",
+        fromUserId: message.sender_user_id,
+        fromName: message.sender_name,
+        text: (words ?? readSpacePost(message)!).text,
+        createdAt: message.created_at,
+      };
+    });
 }
 
 /** The handoffs still waiting: not given to an agent or dismissed on this device. Newest first. */

@@ -8,7 +8,6 @@ import { AgentWorkspaceFrame } from "../methods/AgentWorkspaceFrame";
 import { AgentsTaskContent } from "./AgentsTaskContent";
 import { createAgentsPageActions, deriveAgentsPageView } from "./agentsPageActions";
 import { useAgentsPageState } from "./useAgentsPageState";
-import { useCollaborationStore } from "../plans/store";
 
 /* Agents opens straight into a conversation with the selected agent, which stays mounted across catalogs. */
 export default function NativeAgentsPage() {
@@ -98,10 +97,6 @@ function AgentsWorkspacePage() {
                 }, false)
               : actions.openPage(page)
           }
-          onLearn={(prompt) => {
-            void useCollaborationStore.getState().setMode(undefined, "teach");
-            select(profile.id, true, undefined, prompt);
-          }}
           onAgentSettings={(agentId) => {
             setEditingId(agentId);
             actions.openSettingsModal("settings");

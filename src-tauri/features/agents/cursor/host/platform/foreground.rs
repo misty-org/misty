@@ -16,6 +16,17 @@ pub struct ForegroundWindow {
     pub monitor: Option<(f64, f64, f64, f64)>,
 }
 
+/// The document or web page in the window in front, where the system says (macOS Accessibility).
+#[cfg(target_os = "macos")]
+pub fn front_document() -> Option<String> {
+    crate::agents::cursor::macos::companion_capture::front_document()
+}
+
+#[cfg(not(target_os = "macos"))]
+pub fn front_document() -> Option<String> {
+    None
+}
+
 /// A window is usable when it has an area and is not one of Misty's own
 /// companion, overlay or panel windows (`ignored`).
 pub fn usable_foreground(window: ForegroundWindow, ignored: &[isize]) -> Option<ForegroundWindow> {

@@ -14,6 +14,8 @@ fn awaiting_followup_is_taken_once_per_session_and_cleared_by_run() {
         provider_id: None,
         allowed_tools: None,
         launch: Vec::new(),
+        dirs: Vec::new(),
+        warm: false,
     };
     registry.set_awaiting_followup("s-1", "run-1", prefs());
     registry.set_awaiting_followup("s-2", "run-2", prefs());

@@ -1,4 +1,4 @@
-// Settings › Tools › MCP servers.
+// Agents › MCP servers.
 export { McpSection } from "./McpSection";
 export { McpProbeConfirmHost } from "./McpProbeConfirmHost";
 // The session card lists the open engine's servers with their switches.

@@ -1,0 +1,394 @@
+//! System or per-process audio through a Core Audio process tap.
+
+use super::{convert_and_send, global, output_format, Delivery, StartFailure, SYSTEM};
+use block2::RcBlock;
+use dispatch2::{DispatchQueue, DispatchRetained};
+use objc2::rc::Retained;
+use objc2::runtime::AnyObject;
+use objc2::AnyThread;
+use objc2_avf_audio::{AVAudioConverter, AVAudioFormat, AVAudioPCMBuffer};
+use objc2_core_audio::{
+    kAudioAggregateDeviceIsPrivateKey, kAudioAggregateDeviceNameKey,
+    kAudioAggregateDeviceTapAutoStartKey, kAudioAggregateDeviceTapListKey,
+    kAudioAggregateDeviceUIDKey, kAudioHardwareIllegalOperationError,
+    kAudioHardwarePropertyDefaultOutputDevice, kAudioHardwarePropertyTranslatePIDToProcessObject,
+    kAudioSubTapDriftCompensationKey, kAudioSubTapUIDKey, kAudioTapPropertyFormat,
+    AudioDeviceCreateIOProcIDWithBlock, AudioDeviceDestroyIOProcID, AudioDeviceIOProcID,
+    AudioDeviceStart, AudioDeviceStop, AudioHardwareCreateAggregateDevice,
+    AudioHardwareDestroyAggregateDevice, AudioObjectAddPropertyListenerBlock,
+    AudioObjectGetPropertyData, AudioObjectID, AudioObjectPropertyAddress,
+    AudioObjectRemovePropertyListenerBlock, CATapDescription, CATapMuteBehavior,
+};
+use objc2_core_audio_types::{AudioBufferList, AudioStreamBasicDescription, AudioTimeStamp};
+use objc2_core_foundation::CFDictionary;
+use objc2_foundation::{ns_string, NSArray, NSDictionary, NSNumber, NSString, NSUUID};
+use std::ffi::{c_void, CStr};
+use std::mem::{size_of, transmute};
+use std::ptr::{self, NonNull};
+use std::sync::{Arc, OnceLock};
+
+type CreateProcessTap =
+    unsafe extern "C-unwind" fn(*const CATapDescription, *mut AudioObjectID) -> i32;
+type DestroyProcessTap = unsafe extern "C-unwind" fn(AudioObjectID) -> i32;
+type ListenerBlock = RcBlock<dyn Fn(u32, NonNull<AudioObjectPropertyAddress>)>;
+
+/// The two process-tap calls, which only exist from macOS 14.2. Rust can't
+/// weak-link a symbol, and the app still launches on 14.0, where a direct
+/// reference would stop it loading, so they are looked up at run time.
+#[derive(Clone, Copy)]
+struct TapApi {
+    create: CreateProcessTap,
+    destroy: DestroyProcessTap,
+}
+
+fn tap_api() -> Option<TapApi> {
+    if !objc2::available!(macos = 14.2) {
+        return None;
+    }
+    static API: OnceLock<Option<TapApi>> = OnceLock::new();
+    *API.get_or_init(|| {
+        let find = |name: &CStr| {
+            // SAFETY: a lookup in the images already loaded; CoreAudio is
+            // linked, so its exports are among them.
+            unsafe { libc::dlsym(libc::RTLD_DEFAULT, name.as_ptr()) }
+        };
+        let create = find(c"AudioHardwareCreateProcessTap");
+        let destroy = find(c"AudioHardwareDestroyProcessTap");
+        if create.is_null() || destroy.is_null() {
+            return None;
+        }
+        // SAFETY: both symbols are the C functions declared in AudioHardware.h
+        // with exactly these signatures.
+        Some(unsafe {
+            TapApi {
+                create: transmute::<*mut c_void, CreateProcessTap>(create),
+                destroy: transmute::<*mut c_void, DestroyProcessTap>(destroy),
+            }
+        })
+    })
+}
+
+pub(super) fn supported() -> bool {
+    tap_api().is_some()
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Failure {
+    /// A Core Audio call returned this status.
+    CoreAudio(i32),
+    /// The tap's format could not be read as PCM or converted.
+    Device,
+}
+
+fn check(code: i32) -> Result<(), Failure> {
+    if code == 0 {
+        Ok(())
+    } else {
+        Err(Failure::CoreAudio(code))
+    }
+}
+
+fn numbers(objects: &[AudioObjectID]) -> Retained<NSArray<NSNumber>> {
+    let numbers: Vec<Retained<NSNumber>> = objects
+        .iter()
+        .map(|object| NSNumber::new_u32(*object))
+        .collect();
+    NSArray::from_retained_slice(&numbers)
+}
+
+fn dictionary(entries: &[(&CStr, &AnyObject)]) -> Retained<NSDictionary<NSString, AnyObject>> {
+    let keys: Vec<Retained<NSString>> = entries
+        .iter()
+        .map(|(key, _)| NSString::from_str(&key.to_string_lossy()))
+        .collect();
+    let keys: Vec<&NSString> = keys.iter().map(|key| &**key).collect();
+    let values: Vec<&AnyObject> = entries.iter().map(|(_, value)| *value).collect();
+    NSDictionary::from_slices(&keys, &values)
+}
+
+/// System or per-process audio through a Core Audio process tap on a private
+/// aggregate device (macOS 14.2+).
+/// The tap copies audio; what the user hears is unchanged.
+pub(super) struct SystemAudioCapture {
+    api: TapApi,
+    tap: AudioObjectID,
+    device: AudioObjectID,
+    io: AudioDeviceIOProcID,
+    listener: Option<ListenerBlock>,
+    delivery: Arc<Delivery>,
+    queue: DispatchRetained<DispatchQueue>,
+}
+
+impl SystemAudioCapture {
+    fn new(api: TapApi, delivery: Arc<Delivery>) -> Self {
+        Self {
+            api,
+            tap: 0,
+            device: 0,
+            io: None,
+            listener: None,
+            delivery,
+            queue: DispatchQueue::new("misty.audio.system-audio", None),
+        }
+    }
+
+    fn start(&mut self, processes: &[AudioObjectID], exclude_self: bool) -> Result<(), Failure> {
+        let result = self.open(processes, exclude_self);
+        if result.is_err() {
+            self.stop();
+        }
+        result
+    }
+
+    fn open(&mut self, processes: &[AudioObjectID], exclude_self: bool) -> Result<(), Failure> {
+        // SAFETY: plain initialisers and setters on a fresh description.
+        let description = unsafe {
+            let description = if processes.is_empty() {
+                let own = if exclude_self {
+                    process_object(libc::getpid())
+                } else {
+                    None
+                };
+                CATapDescription::initMonoGlobalTapButExcludeProcesses(
+                    CATapDescription::alloc(),
+                    &numbers(own.as_slice()),
+                )
+            } else {
+                CATapDescription::initMonoMixdownOfProcesses(
+                    CATapDescription::alloc(),
+                    &numbers(processes),
+                )
+            };
+            description.setName(ns_string!("Misty capture"));
+            description.setPrivate(true);
+            description.setMuteBehavior(CATapMuteBehavior::Unmuted);
+            description
+        };
+        // SAFETY: the description is alive and `tap` is this capture's own field.
+        check(unsafe { (self.api.create)(Retained::as_ptr(&description), &mut self.tap) })?;
+
+        let mut asbd = AudioStreamBasicDescription {
+            mSampleRate: 0.0,
+            mFormatID: 0,
+            mFormatFlags: 0,
+            mBytesPerPacket: 0,
+            mFramesPerPacket: 0,
+            mBytesPerFrame: 0,
+            mChannelsPerFrame: 0,
+            mBitsPerChannel: 0,
+            mReserved: 0,
+        };
+        let mut size = size_of::<AudioStreamBasicDescription>() as u32;
+        let address = global(kAudioTapPropertyFormat);
+        // SAFETY: every pointer is to a live local of the size passed.
+        check(unsafe {
+            AudioObjectGetPropertyData(
+                self.tap,
+                NonNull::from(&address),
+                0,
+                ptr::null(),
+                NonNull::from(&mut size),
+                NonNull::from(&mut asbd).cast(),
+            )
+        })?;
+        // SAFETY: plain initialisers; nil comes back as None.
+        let format = unsafe {
+            AVAudioFormat::initWithStreamDescription(AVAudioFormat::alloc(), NonNull::from(&asbd))
+        }
+        .ok_or(Failure::Device)?;
+        let output = output_format().ok_or(Failure::Device)?;
+        let converter = unsafe {
+            AVAudioConverter::initFromFormat_toFormat(AVAudioConverter::alloc(), &format, &output)
+        }
+        .ok_or(Failure::Device)?;
+
+        let yes = NSNumber::new_bool(true);
+        let device_name = NSString::from_str("Misty private capture");
+        let device_uid = NSUUID::new().UUIDString();
+        // SAFETY: a plain property read.
+        let tap_uid = unsafe { description.UUID() }.UUIDString();
+        let sub_tap = {
+            let tap_uid: &AnyObject = &tap_uid;
+            let yes: &AnyObject = &yes;
+            dictionary(&[
+                (kAudioSubTapUIDKey, tap_uid),
+                (kAudioSubTapDriftCompensationKey, yes),
+            ])
+        };
+        let tap_list = NSArray::from_retained_slice(&[sub_tap]);
+        let aggregate = {
+            let device_name: &AnyObject = &device_name;
+            let device_uid: &AnyObject = &device_uid;
+            let yes: &AnyObject = &yes;
+            let tap_list: &AnyObject = &tap_list;
+            dictionary(&[
+                (kAudioAggregateDeviceNameKey, device_name),
+                (kAudioAggregateDeviceUIDKey, device_uid),
+                (kAudioAggregateDeviceIsPrivateKey, yes),
+                (kAudioAggregateDeviceTapAutoStartKey, yes),
+                (kAudioAggregateDeviceTapListKey, tap_list),
+            ])
+        };
+        // SAFETY: NSDictionary is toll-free bridged to CFDictionary, and
+        // `aggregate` outlives the call.
+        let bridged: &CFDictionary =
+            unsafe { &*Retained::as_ptr(&aggregate).cast::<CFDictionary>() };
+        check(unsafe {
+            AudioHardwareCreateAggregateDevice(bridged, NonNull::from(&mut self.device))
+        })?;
+
+        let delivery = Arc::clone(&self.delivery);
+        let bytes_per_frame = asbd.mBytesPerFrame;
+        // SAFETY: a plain property read.
+        let rate = unsafe { format.sampleRate() };
+        let io_block: RcBlock<
+            dyn Fn(
+                NonNull<AudioTimeStamp>,
+                NonNull<AudioBufferList>,
+                NonNull<AudioTimeStamp>,
+                NonNull<AudioBufferList>,
+                NonNull<AudioTimeStamp>,
+            ),
+        > = RcBlock::new(
+            move |_now: NonNull<AudioTimeStamp>,
+                  input: NonNull<AudioBufferList>,
+                  _input_time: NonNull<AudioTimeStamp>,
+                  _output: NonNull<AudioBufferList>,
+                  _output_time: NonNull<AudioTimeStamp>| {
+                // SAFETY: Core Audio passes a valid input list for the duration of the call.
+                let list = unsafe { input.as_ref() };
+                if list.mNumberBuffers == 0 {
+                    return;
+                }
+                let first = &list.mBuffers[0];
+                if first.mData.is_null() || bytes_per_frame == 0 {
+                    return;
+                }
+                let frames = first.mDataByteSize / bytes_per_frame;
+                if frames == 0 {
+                    return;
+                }
+                // SAFETY: the buffer wraps the input list without copying or
+                // freeing it, and lives only for this call.
+                let Some(buffer) = (unsafe {
+                    AVAudioPCMBuffer::initWithPCMFormat_bufferListNoCopy_deallocator(
+                        AVAudioPCMBuffer::alloc(),
+                        &format,
+                        input,
+                        None,
+                    )
+                }) else {
+                    return;
+                };
+                unsafe { buffer.setFrameLength(frames) };
+                convert_and_send(&converter, &buffer, frames, rate, &output, &delivery);
+            },
+        );
+        // SAFETY: `io` is this capture's own field, the queue is serial and
+        // lives as long as the capture, and Core Audio copies the block.
+        check(unsafe {
+            AudioDeviceCreateIOProcIDWithBlock(
+                NonNull::from(&mut self.io),
+                self.device,
+                Some(&*self.queue),
+                RcBlock::as_ptr(&io_block),
+            )
+        })?;
+
+        // A new default output device invalidates the tap; report it.
+        let delivery = Arc::clone(&self.delivery);
+        let listener: ListenerBlock = RcBlock::new(
+            move |_count: u32, _addresses: NonNull<AudioObjectPropertyAddress>| delivery.fail(),
+        );
+        let block = RcBlock::as_ptr(&listener);
+        self.listener = Some(listener);
+        let output_address = global(kAudioHardwarePropertyDefaultOutputDevice);
+        // SAFETY: the block is kept in `listener` until `stop` removes it.
+        check(unsafe {
+            AudioObjectAddPropertyListenerBlock(
+                SYSTEM,
+                NonNull::from(&output_address),
+                Some(&*self.queue),
+                block,
+            )
+        })?;
+        // SAFETY: the device and IO proc were created above.
+        check(unsafe { AudioDeviceStart(self.device, self.io) })
+    }
+
+    pub(super) fn stop(&mut self) {
+        self.delivery.close();
+        // SAFETY: each call undoes one that succeeded in `open`, with the same
+        // arguments, in reverse order.
+        unsafe {
+            if let Some(listener) = self.listener.take() {
+                let output_address = global(kAudioHardwarePropertyDefaultOutputDevice);
+                AudioObjectRemovePropertyListenerBlock(
+                    SYSTEM,
+                    NonNull::from(&output_address),
+                    Some(&*self.queue),
+                    RcBlock::as_ptr(&listener),
+                );
+            }
+            if self.io.is_some() {
+                AudioDeviceStop(self.device, self.io);
+                AudioDeviceDestroyIOProcID(self.device, self.io);
+            }
+            self.io = None;
+            if self.device != 0 {
+                AudioHardwareDestroyAggregateDevice(self.device);
+                self.device = 0;
+            }
+            if self.tap != 0 {
+                (self.api.destroy)(self.tap);
+                self.tap = 0;
+            }
+        }
+    }
+}
+
+/// The Core Audio process object for a PID, or None when that process has
+/// never opened audio.
+fn process_object(pid: libc::pid_t) -> Option<AudioObjectID> {
+    let mut object: AudioObjectID = 0;
+    let mut size = size_of::<AudioObjectID>() as u32;
+    let address = global(kAudioHardwarePropertyTranslatePIDToProcessObject);
+    // SAFETY: every pointer is to a live local of the size passed.
+    let status = unsafe {
+        AudioObjectGetPropertyData(
+            SYSTEM,
+            NonNull::from(&address),
+            size_of::<libc::pid_t>() as u32,
+            (&pid as *const libc::pid_t).cast(),
+            NonNull::from(&mut size),
+            NonNull::from(&mut object).cast(),
+        )
+    };
+    (status == 0 && object != 0).then_some(object)
+}
+
+pub(super) fn start(
+    pids: &[i32],
+    exclude_self: bool,
+    delivery: Arc<Delivery>,
+) -> Result<SystemAudioCapture, StartFailure> {
+    let Some(api) = tap_api() else {
+        return Err(StartFailure::Unsupported);
+    };
+    let mut processes = Vec::new();
+    if !pids.is_empty() {
+        processes = pids.iter().filter_map(|pid| process_object(*pid)).collect();
+        if processes.is_empty() {
+            return Err(StartFailure::NoSuchProcess);
+        }
+    }
+    let mut capture = SystemAudioCapture::new(api, delivery);
+    match capture.start(&processes, exclude_self) {
+        Ok(()) => Ok(capture),
+        // A refused tap means the user has not allowed audio capture.
+        Err(Failure::CoreAudio(code)) if code == kAudioHardwareIllegalOperationError => {
+            Err(StartFailure::Denied)
+        }
+        Err(_) => Err(StartFailure::Device),
+    }
+}

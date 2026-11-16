@@ -8,6 +8,8 @@ import DesktopAgentsPage from "./AgentsPage";
 
 // Agents opens straight into an agent's workspace, so the store needs one.
 vi.mock("../personal/personalAgentsStore", () => ({
+  defaultAgentOf: (agents: { system_managed?: boolean; engine?: string }[]) =>
+    agents.find((agent) => agent.engine) ?? agents.find((agent) => agent.system_managed),
   usePersonalAgentsStore: () => ({
     agents: [
       {

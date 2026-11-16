@@ -77,7 +77,7 @@ export function SpaceChatMessages(props: SpaceChatMessagesProps) {
     <div
       ref={props.scrollRef}
       onScroll={props.onScroll}
-      className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-[clamp(16px,2.5vw,32px)] pb-3 pt-4"
+      className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-[clamp(1rem,2.5vw,2rem)] pb-3 pt-4"
     >
       <div>
         {props.error ? (

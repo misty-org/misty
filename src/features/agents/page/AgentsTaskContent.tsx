@@ -1,6 +1,5 @@
 import { ChatStart, ChatStartIdeas } from "./ChatStart";
-import { needsModelKey } from "../models/ModelKeyNeeded";
-import { openModelSettings } from "../models/modelKeys";
+import { needsDefaultEngine, openEngineSettings } from "../engines/engineNeeded";
 import { ErrorNotice } from "../conversations/ErrorNotice";
 import { AgentWorkspaceConversation } from "../conversations/view/AgentWorkspaceConversation";
 import { AgentConversationHeading, ChatTitle } from "./AgentConversationHeading";
@@ -9,7 +8,7 @@ import type { AgentsPageState } from "./useAgentsPageState";
 import { AgentBrowserPip } from "../agent-browser/AgentBrowserPip";
 import { setBrowserExpanded } from "../agent-browser/agentBrowserStore";
 import { chatKey } from "../conversations/state/draftChat";
-import { cn, windowToolbarClass } from "@/shared/ui";
+import { cn, Surface, windowToolbarClass } from "@/shared/ui";
 
 /**
  * The chat's header (the heading, or the studio bar in the workspace) floats over the top of the
@@ -79,8 +78,8 @@ export function AgentsTaskContent({ state, actions, view }: AgentsTaskContentPro
             <ErrorNotice
               message={error}
               action={
-                needsModelKey(error)
-                  ? { label: "Open Models settings", onSelect: openModelSettings }
+                needsDefaultEngine(error)
+                  ? { label: "Open engine settings", onSelect: openEngineSettings }
                   : { label: "Retry", onSelect: () => void load(user.id) }
               }
             />
@@ -95,7 +94,10 @@ export function AgentsTaskContent({ state, actions, view }: AgentsTaskContentPro
               />
             ) : state.workspacePage === "task" ? (
               // The page's one top band, as tall as the sidebar's head, with plain buttons on it.
-              <header
+              // On the page's own fill, so the conversation scrolls under it unseen.
+              <Surface
+                as="header"
+                tone="page"
                 className={cn(
                   "agent-studio-bar",
                   floatingHeaderClass,
@@ -105,7 +107,7 @@ export function AgentsTaskContent({ state, actions, view }: AgentsTaskContentPro
                 data-window-toolbar
               >
                 <ChatTitle conversation={conversation} />
-              </header>
+              </Surface>
             ) : null}
             {/* The agent browser as a picture-in-picture floating over the chat; opening it puts
                 the browser back in its panel beside the chat. */}

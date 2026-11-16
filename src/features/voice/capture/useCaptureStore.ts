@@ -1,8 +1,8 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { create } from "zustand";
-import { voiceDeviceId } from "../api";
-import { LiveTranscriber, type LiveChannel } from "../liveTranscriber";
+import { LocalTranscriber } from "../localTranscriber";
+import type { Channel as LiveChannel } from "../transcript/segment";
 import { captureApi, type VoiceNoteMode, type VoiceSourceKind, type VoiceTurn } from "./captureApi";
 import { savedTurns } from "./transcriptTurns";
 
@@ -49,7 +49,7 @@ interface CaptureStore {
 }
 
 interface Running {
-  live: LiveTranscriber;
+  live: LocalTranscriber;
   sessions: Set<number>;
   native: boolean;
   startedAt: number;
@@ -58,13 +58,6 @@ interface Running {
 }
 
 let running: Running | undefined;
-
-function decodePcm(base64: string) {
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  return bytes;
-}
 
 const message = (error: unknown, fallback: string) =>
   error instanceof Error && error.message ? error.message : fallback;
@@ -99,7 +92,8 @@ export const useCaptureStore = create<CaptureStore>((set, get) => ({
     });
     const channels: LiveChannel[] =
       source.kind === "mic" ? ["mic"] : source.mic ? ["mic", "system"] : ["system"];
-    const live = new LiveTranscriber({
+    // Heard by this computer's own speech recognition: Misty holds no transcription key.
+    const live = new LocalTranscriber({
       onChange: (transcript) => set({ turns: savedTurns(transcript.turns()) }),
       onNotice: (notice) => set({ notice }),
     });
@@ -116,8 +110,7 @@ export const useCaptureStore = create<CaptureStore>((set, get) => ({
       listen<{ session: number; channel: LiveChannel; pcm: string }>(
         "misty://capture-audio",
         ({ payload }) => {
-          if (current.sessions.has(payload.session))
-            live.push(payload.channel, decodePcm(payload.pcm));
+          if (current.sessions.has(payload.session)) live.pushBase64(payload.channel, payload.pcm);
         },
       ),
       listen<{ session: number; error?: string; notice?: string }>(
@@ -129,7 +122,6 @@ export const useCaptureStore = create<CaptureStore>((set, get) => ({
       ),
     );
     try {
-      await voiceDeviceId();
       const hearsOther = source.kind === "system" || source.kind === "app";
       if (source.mic || source.kind === "mic" || hearsOther) {
         current.native = true;
@@ -142,7 +134,7 @@ export const useCaptureStore = create<CaptureStore>((set, get) => ({
         });
         current.sessions.add(session);
       }
-      await live.connect({ channels, language }, { language, context: { text: source.title } });
+      await live.connect({ channels });
       if (running === current) set({ phase: "live" });
     } catch (error) {
       await release(current);

@@ -1,19 +1,13 @@
-import { openUrl } from "@tauri-apps/plugin-opener";
-import { Check, Download, ExternalLink, RefreshCw } from "lucide-react";
-import { useEffect, useState, type KeyboardEvent } from "react";
+import { Check } from "lucide-react";
+import { useEffect, type KeyboardEvent } from "react";
 import { EngineMark, hasEngineMark } from "@/features/engine-config/EngineMark";
-import { ENGINE_DOCS_URLS, ENGINE_NAMES, type EngineId } from "@/features/engine-config/channels";
-import {
-  CliUpdateDialog,
-  SignInButton,
-  SignInDialog,
-  useCliUpdateFlow,
-  useCliVersionStatus,
-} from "@/features/engine-config/clis";
-import { Button, cn, Skeleton, Surface, Text } from "@/shared/ui";
+import { ENGINE_NAMES, type EngineId } from "@/features/engine-config/channels";
+import { cn, Skeleton, Surface, Text } from "@/shared/ui";
+import { useEngineReadiness } from "./engineReadiness";
+import { EngineNextStep } from "./EngineNextStep";
 
-/** Where an engine stands for first run: one next step at a time. */
-export type EngineSetupState = "checking" | "failed" | "install" | "get" | "sign-in" | "ready";
+export { engineSetupState, type EngineSetupState } from "./engineReadiness";
+import type { EngineSetupState } from "./engineReadiness";
 
 /**
  * How each featured engine is paid for, in the words of someone who has never used one: the free
@@ -27,27 +21,8 @@ const ACCOUNT_HINTS: Partial<Record<EngineId, string>> = {
 };
 
 /**
- * Engines that run with no sign-in of Misty's: OpenCode is free with no account, and DeepSeek
- * Harness keeps its providers in its own web page, so installed is as ready as they get.
- */
-const needsNoSignIn = (engine: EngineId) => engine === "opencode" || engine === "dsh";
-
-export function engineSetupState(
-  engine: EngineId,
-  view: Pick<ReturnType<typeof useCliVersionStatus>, "status" | "signIn" | "error">,
-): EngineSetupState {
-  const { status, signIn, error } = view;
-  if (status === null) return error ? "failed" : "checking";
-  if (!status.installed) return status.updateKind === null ? "get" : "install";
-  // Signed in only when the CLI (or a sign-in Misty watched finish) says so: one that can't say
-  // asks for a sign-in rather than failing on the first chat.
-  if (signIn?.signedIn !== true && !needsNoSignIn(engine)) return "sign-in";
-  return "ready";
-}
-
-/**
  * One engine on the setup page: its mark and name, then the single thing to do next. Install runs
- * the same plan as Settings › Engines › CLIs (npm in the app, the vendor's installer in a terminal
+ * the same plan as Agents › CLIs (npm in the app, the vendor's installer in a terminal
  * the person watches), and sign-in is the CLI's own login in a terminal.
  */
 export function EngineSetupRow({
@@ -55,20 +30,20 @@ export function EngineSetupRow({
   onState,
   chosen,
   onChoose,
+  unfit,
 }: {
   engine: EngineId;
   onState(engine: EngineId, state: EngineSetupState): void;
   /** With `onChoose`, a ready engine can be picked, as for a new agent; the pick has a check. */
   chosen?: boolean;
   onChoose?(engine: EngineId): void;
+  /** It can't be the default engine (no images, Misty's tools or web search), so isn't picked. */
+  unfit?: boolean;
 }) {
-  const view = useCliVersionStatus(engine);
-  const flow = useCliUpdateFlow(engine);
-  const [signingIn, setSigningIn] = useState<{ provider?: string } | null>(null);
-  const state = engineSetupState(engine, view);
+  const { view, state } = useEngineReadiness(engine);
   const name = ENGINE_NAMES[engine];
   useEffect(() => onState(engine, state), [engine, state, onState]);
-  const choosable = Boolean(onChoose) && state === "ready";
+  const choosable = Boolean(onChoose) && state === "ready" && !unfit;
   const choose = () => onChoose?.(engine);
   return (
     <Surface
@@ -112,29 +87,10 @@ export function EngineSetupRow({
       </span>
       {state === "checking" ? (
         <Skeleton aria-label={`Checking ${name}`} className="h-8 w-22 rounded-md" />
-      ) : state === "failed" ? (
-        <Button icon={RefreshCw} loading={view.loading} onClick={view.refresh}>
-          Check again
-        </Button>
-      ) : state === "install" ? (
-        <Button
-          icon={Download}
-          loading={view.updating}
-          aria-label={`Install ${name}`}
-          onClick={() => void flow.begin()}
-        >
-          Install
-        </Button>
-      ) : state === "get" ? (
-        <Button
-          icon={ExternalLink}
-          aria-label={`Get ${name}`}
-          onClick={() => void openUrl(ENGINE_DOCS_URLS[engine]).catch(() => {})}
-        >
-          Get it
-        </Button>
-      ) : state === "sign-in" ? (
-        <SignInButton engine={engine} label={`Sign in to ${name}`} onSignIn={setSigningIn} />
+      ) : state !== "ready" ? null : onChoose && unfit ? (
+        <Text bare size="meta" tone="muted" className="shrink-0">
+          Can't run Misty's own work
+        </Text>
       ) : onChoose ? (
         // A ready engine that can be picked shows the check only once it is the pick.
         chosen ? (
@@ -148,14 +104,8 @@ export function EngineSetupRow({
           Ready
         </Text>
       )}
-      <CliUpdateDialog engine={engine} flow={flow} plain />
-      <SignInDialog
-        request={signingIn ? { engine, ...signingIn } : null}
-        onClose={() => {
-          setSigningIn(null);
-          view.refresh();
-        }}
-      />
+      {/* Always mounted, so an install or sign-in dialog stays open as the state moves on. */}
+      <EngineNextStep engine={engine} view={view} state={state} />
     </Surface>
   );
 }

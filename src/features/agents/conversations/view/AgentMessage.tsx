@@ -2,7 +2,6 @@ import { memo, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { Flag } from "lucide-react";
 import { MistyMarkdown } from "../../runs/markdown/MistyMarkdown";
-import { MistyActivityStatus } from "../state/MistyActivityStatus";
 import { MistyMessageAttachments } from "../composer/MistyMessageAttachments";
 import type { GlobalAiMessage } from "../state/conversationTypes";
 import { LinkPreviews } from "@/features/files";
@@ -21,7 +20,9 @@ import { AgentNotebookCard } from "./AgentNotebookCard";
 import { AgentRunOutcome } from "./AgentRunOutcome";
 import { GrantCards } from "./grants/GrantCard";
 import { AgentSubagents } from "./AgentSubagents";
+import { EngineThinking } from "./engine/EngineThinking";
 import { EngineTurnParts } from "./engine/EngineTurnParts";
+import { LiveStatus } from "./status/LiveStatus";
 import { CollapsibleText, EarlierReply } from "./AgentTranscriptParts";
 import { visibleConversationContent } from "./conversationTurns";
 import { currentFailureWords, splitFailure } from "./failureSummary";
@@ -80,6 +81,8 @@ function AgentMessageView(props: AgentMessageProps) {
   if (
     !content &&
     !ended &&
+    !progress?.length &&
+    !message.reasoning &&
     !message.appRequest &&
     !message.notebook &&
     !message.subagents?.length &&
@@ -117,7 +120,7 @@ function AgentMessageView(props: AgentMessageProps) {
           // One step above the card surface, which barely separates from the canvas.
           tone="well"
           radius="xl"
-          className="max-w-[min(82%,72ch)] px-3.5 py-2.5 text-control leading-[1.6]"
+          className="max-w-[min(85%,72ch)] px-3.5 py-2.5 text-control leading-[1.6]"
         >
           <Text bare as="div" tone="default">
             <MistyMessageAttachments attachments={message.attachments} />
@@ -166,6 +169,7 @@ function AgentMessageView(props: AgentMessageProps) {
           running={message.state === "pending" || message.state === "streaming"}
           hold={message.appRequest?.state === "pending" ? "waiting_for_you" : undefined}
         />
+        {message.reasoning ? <EngineThinking text={message.reasoning} answering /> : null}
         {message.invocationId ? (
           <EngineTurnParts
             runId={message.invocationId}
@@ -192,13 +196,20 @@ function AgentMessageView(props: AgentMessageProps) {
               enabled={message.state !== "pending" && message.state !== "streaming"}
             />
           </Text>
-        ) : (message.state === "pending" || message.state === "streaming") &&
-          // A running tool's row already says what Misty is doing.
-          !progress?.some((item) => item.type === "tool" && item.state === "running") ? (
-          // Status lines keep a control's height, so the reply doesn't jump when text arrives.
-          <div className="flex min-h-8 items-center">
-            <MistyActivityStatus activity={message.activity} />
-          </div>
+        ) : null}
+        {message.state === "pending" || message.state === "streaming" ? (
+          <LiveStatus
+            // A running step's own row already names it; this line says what kind of work it is.
+            phrase={
+              progress?.some((item) => item.type === "tool" && item.state === "running")
+                ? "Working"
+                : content
+                  ? "Writing"
+                  : "Thinking"
+            }
+            startedAt={message.createdAt}
+            tokens={message.usage?.output}
+          />
         ) : null}
         {ended ? (
           <AgentRunOutcome

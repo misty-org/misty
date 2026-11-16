@@ -39,6 +39,12 @@ export interface DockWidgetDescriptor<TState = unknown> {
 export interface WorkspaceView {
   /** An unused new tab or split can take the next selected destination. */
   placeholder?: boolean;
+  /**
+   * A new tab opened on a page (the "+" button's new chat) and not yet typed or clicked in. Like
+   * a placeholder it takes the next destination picked, even one already open in another tab,
+   * instead of jumping to that tab: a new tab is an invitation to open another.
+   */
+  fresh?: boolean;
   /** Stable identity of this pane’s app group, independent of its label. */
   groupInstanceId?: string;
   id: string;

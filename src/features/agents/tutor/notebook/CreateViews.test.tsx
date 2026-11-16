@@ -24,6 +24,7 @@ const fakes = vi.hoisted(() => ({
 
 vi.mock("@/shared/lib/confirmAction", () => ({ confirmAction: fakes.confirm }));
 vi.mock("../tutorRuns", () => ({ startJob: vi.fn() }));
+vi.mock("../notebookThread", () => ({ startLesson: vi.fn() }));
 vi.mock("../tutorAudio", () => ({
   makeOverviewAudio: fakes.makeOverviewAudio,
   overviewAudioUrl: fakes.overviewAudioUrl,

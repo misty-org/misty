@@ -1,4 +1,4 @@
-import { appZoomBaseline, appZoomFromStoredScale } from "@/shared/hooks/useAppZoom";
+import { appZoomFromStoredScale, appZoomStoredDefault } from "@/shared/hooks/useAppZoom";
 import { booleanSetting, numberSetting, stringSetting } from "../SettingsControls";
 import type { AppThemeMode } from "./appTheme";
 import type { NightLightMode } from "./nightLight";
@@ -11,7 +11,7 @@ export function selectAppearancePreferences(
   const source = document ?? {};
   return {
     appZoom: appZoomFromStoredScale(
-      settingsNumber(source, "appearance", "app_zoom", appZoomBaseline),
+      settingsNumber(source, "appearance", "app_zoom", appZoomStoredDefault),
     ),
     compactModeEnabled: settingsBoolean(source, "appearance", "compact_mode_enabled", false),
     themeMode: themeMode(settingsString(source, "appearance", "theme_mode", "dark")),

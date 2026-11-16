@@ -25,13 +25,16 @@ vi.mock("../conversations/state/localChats", () => ({
 const engines = vi.hoisted(() => ({ list: vi.fn() }));
 vi.mock("../engines/enginesApi", () => ({ listEngines: engines.list, mistyEngine: "misty" }));
 vi.mock("./agentAccount", () => ({ agentAccountId: () => "acct" }));
-// The device's settings rows: a commit lands only on the revision it read, as natively.
-const note = { revision: 0, state: null as { engines: string[] } | null };
+// The device's settings rows, one per scope: a commit lands only on the revision it read, as
+// natively.
+const notes = new Map<string, { revision: number; state: unknown }>();
 vi.mock("@/shared/platform/nativeInvoke", () => ({
   invoke: async (
     command: string,
-    input: { revision?: number; document?: { engines: string[] } },
+    input: { scope: string; revision?: number; document?: unknown },
   ) => {
+    const note = notes.get(input.scope) ?? { revision: 0, state: null };
+    notes.set(input.scope, note);
     if (command === "settings_session_commit") {
       if (input.revision !== note.revision) throw new Error("SETTINGS_REVISION_CONFLICT");
       note.revision += 1;
@@ -45,8 +48,7 @@ import { listPersonalAgents, newAgentOn, personalAgentsApi } from "./personalAge
 
 beforeEach(() => {
   rows.clear();
-  note.revision = 0;
-  note.state = null;
+  notes.clear();
   engines.list.mockResolvedValue([
     { id: "claude", name: "Claude Code", installed: true, version: "2" },
     { id: "codex", name: "Codex", installed: false, version: null },
@@ -55,26 +57,28 @@ beforeEach(() => {
 
 it("makes an agent for each engine found installed, once", async () => {
   const first = await listPersonalAgents("acct");
-  expect(first.map((agent) => agent.name)).toEqual(["Misty", "Claude Code"]);
-  expect(first[1]).toMatchObject({ engine: "claude", default_run_mode: "ask" });
+  // Misty has no agent of its own: only the engines get one, each with a name of its own.
+  expect(first.map((agent) => agent.name)).toEqual(["Juno"]);
+  expect(first[0]).toMatchObject({ engine: "claude", default_run_mode: "ask" });
   // Codex is installed later: it gets its agent then, and Claude Code is not made twice.
   engines.list.mockResolvedValue([
     { id: "claude", name: "Claude Code", installed: true, version: "2" },
     { id: "codex", name: "Codex", installed: true, version: "1" },
   ]);
   const second = await listPersonalAgents("acct");
-  expect(second.map((agent) => agent.name)).toEqual(["Misty", "Claude Code", "Codex"]);
+  expect(second.map((agent) => agent.name)).toEqual(["Juno", "Milo"]);
 });
 
 it("does not bring back an engine's agent the person removed", async () => {
-  const [, claude] = await listPersonalAgents("acct");
+  const [claude] = await listPersonalAgents("acct");
   await personalAgentsApi.remove(claude!.id);
-  expect((await listPersonalAgents("acct")).map((agent) => agent.name)).toEqual(["Misty"]);
+  expect(await listPersonalAgents("acct")).toEqual([]);
 });
 
 it("still lists the agents when the engines can't be asked", async () => {
   engines.list.mockRejectedValue(new Error("no native side"));
-  expect((await listPersonalAgents("acct")).map((agent) => agent.name)).toEqual(["Misty"]);
+  rows.set(key("agent", "personal_own"), JSON.stringify(handMade("personal_own", "2026-01-01T00:00:00.000Z")));
+  expect((await listPersonalAgents("acct")).map((agent) => agent.engine)).toEqual(["codex"]);
 });
 
 it("makes one agent when two listings run at once", async () => {
@@ -143,8 +147,33 @@ it("keeps a copy that is named elsewhere", async () => {
   ).toHaveLength(2);
 });
 
-it("names a new agent after its engine unless given a name", async () => {
+it("keeps Misty's own agent from before, hidden from new work, so its old chats keep it", async () => {
+  const misty = { ...handMade("personal_misty", "2025-01-01T00:00:00.000Z"), name: "Misty" };
+  rows.set(key("agent", misty.id), JSON.stringify({ ...misty, engine: undefined, system_managed: true }));
+  const agents = await listPersonalAgents("acct");
+  expect(agents.find((agent) => agent.id === "personal_misty")).toMatchObject({ system_managed: true });
+});
+
+it("doesn't make Misty's own agent for someone who never had one", async () => {
+  const agents = await listPersonalAgents("acct");
+  expect(agents.some((agent) => agent.system_managed)).toBe(false);
+});
+
+it("gives a new agent a name of its own, never its engine's, unless given one", async () => {
   const codex = { id: "codex", name: "Codex", installed: true, version: "1" };
-  expect(await newAgentOn("acct", codex)).toMatchObject({ name: "Codex", engine: "codex" });
+  expect(await newAgentOn("acct", codex)).toMatchObject({ name: "Juno", engine: "codex" });
+  // The next one takes the next free name.
+  expect(await newAgentOn("acct", codex)).toMatchObject({ name: "Milo" });
   expect(await newAgentOn("acct", codex, "  Reviewer ")).toMatchObject({ name: "Reviewer" });
+});
+
+it("renames an agent still called after its engine once, then leaves its name to the person", async () => {
+  engines.list.mockResolvedValue([{ id: "codex", name: "Codex", installed: true, version: "1" }]);
+  const old = handMade("personal_engine_codex", "2026-01-01T00:00:00.000Z");
+  rows.set(key("agent", old.id), JSON.stringify(old));
+  const [renamed] = await listPersonalAgents("acct");
+  expect(renamed).toMatchObject({ id: old.id, name: "Juno", engine: "codex", version: 2 });
+  // The person names it after the engine again: that is theirs, and stays.
+  rows.set(key("agent", old.id), JSON.stringify({ ...renamed, name: "Codex", version: 3 }));
+  expect((await listPersonalAgents("acct"))[0]?.name).toBe("Codex");
 });

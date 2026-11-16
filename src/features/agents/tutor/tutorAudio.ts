@@ -1,12 +1,13 @@
+import { chosenVoice } from "@/features/voice";
 import { invoke } from "@tauri-apps/api/core";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { useTutorStore } from "./tutorStore";
 import type { Guide } from "./tutorTypes";
 
 /**
- * An audio overview's sound: native code speaks its script on this computer's speech model and key
- * (ElevenLabs or OpenAI, two voices), or with the computer's own voices when there is no key, and
- * keeps the WAV in Misty's folder. Nothing goes to the server.
+ * An audio overview's sound: native code speaks its script in the computer's own voices (the one
+ * chosen in Settings › Voice first) and keeps the WAV in Misty's folder. Nothing goes to the
+ * server, and no key is used.
  */
 export async function makeOverviewAudio(guideId: string): Promise<void> {
   const store = useTutorStore.getState();
@@ -21,6 +22,7 @@ export async function makeOverviewAudio(guideId: string): Promise<void> {
   save({ state: "making" });
   try {
     const seconds = await invoke<number>("tutor_overview_make", {
+      voice: chosenVoice(),
       id: guideId,
       lines: guide.script,
     });
@@ -64,6 +66,7 @@ export async function makeVideoAudio(guideId: string): Promise<void> {
   try {
     for (const [index, scene] of scenes.entries()) {
       const seconds = await invoke<number>("tutor_overview_make", {
+        voice: chosenVoice(),
         id: sceneAudioId(guideId, index),
         lines: [{ speaker: 0, text: scene.narration }],
       });

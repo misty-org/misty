@@ -78,8 +78,8 @@ fn webkit_store_folder(
 /// On macOS, WebKit keeps a store at
 /// `~/Library/WebKit/<bundle id>/WebsiteDataStore/<uuid>`, where the uuid is the store's
 /// identifier in this build (`webkit_store_identifier`). Points `webview` at it so a store's data
-/// is reachable from Misty's folder. The store may not exist yet (WebKit creates it on first
-/// use); the link is then dangling until it does. Never removes anything it does not own.
+/// is reachable from Misty's folder. A store that doesn't exist yet gets its folder first, so the
+/// link never dangles. Never removes anything it does not own.
 ///
 /// A dev build's store that doesn't exist yet starts as a copy of the one every build
 /// shared before stores were separated, so that build stays signed in to its sites.
@@ -103,6 +103,11 @@ pub(crate) fn link_store_data(
             }
         }
     }
+    // A new store's folder is made here rather than left to WebKit: Tauri makes a view's data
+    // folder when it doesn't see one, and through a dangling link that fails with "File exists".
+    if !fs::exists(&target) {
+        fs::create_dir_all(&target).map_err(|error| error.to_string())?;
+    }
     let link = store_home(home, store)?;
     fs::create_dir_all(link.parent().ok_or("Invalid store folder.")?)
         .map_err(|error| error.to_string())?;
@@ -123,7 +128,16 @@ pub(crate) fn link_store_data(
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
         Err(error) => return Err(error.to_string()),
     }
-    fs::symlink(&target, &link).map_err(|error| error.to_string())
+    match fs::symlink(&target, &link) {
+        // Another view of this store linked it first.
+        Err(error)
+            if error.kind() == std::io::ErrorKind::AlreadyExists
+                && fs::read_link(&link).is_ok_and(|current| current == target) =>
+        {
+            Ok(())
+        }
+        result => result.map_err(|error| error.to_string()),
+    }
 }
 
 /// The host supplies a validated 256-bit identity (logical hash or native
@@ -261,9 +275,10 @@ mod tests {
         assert!(target.ends_with(
             "WebKit/com.misty.desktop/WebsiteDataStore/01010101-0101-0101-0101-010101010101"
         ));
-        // A second call keeps it; the store appearing later makes it resolve.
+        // The store's folder is made with the link, so the link never dangles (Tauri would fail
+        // making the view's data folder through it); a second call keeps both.
+        assert!(link.is_dir());
         link_store_data(&home, &library, "com.misty.desktop", Some(&store), &release).unwrap();
-        std::fs::create_dir_all(&target).unwrap();
         std::fs::write(target.join("cookies"), "kept").unwrap();
         assert!(link.join("cookies").is_file());
         // Deleting the profile's folder removes the link, never what it points to.

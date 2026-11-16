@@ -62,7 +62,7 @@ export function MessageContent({
 }
 
 const mentionClassName =
-  "inline-flex items-center rounded-[3px] bg-mention-bg/35 px-1 py-0.5 font-medium";
+  "inline-flex items-center rounded-[0.1875rem] bg-mention-bg/35 px-1 py-0.5 font-medium";
 const plainMentionPattern = /(@[\p{L}\p{N}_.'’-]+(?:\s+[\p{Lu}][\p{L}\p{N}_.'’-]*){0,2})/gu;
 
 /** Keeps older Agent messages legible before mentions were stored as structured spans. */

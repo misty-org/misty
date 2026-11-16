@@ -1,4 +1,5 @@
 import { useAuth } from "@/features/account";
+import { useWorkspaceViewTitle } from "@/features/app-windows";
 import { EmptyState } from "@/shared/ui";
 import { lazy, Suspense, useEffect } from "react";
 import { useLocation } from "react-router-dom";
@@ -30,6 +31,11 @@ const Planner = lazy(() =>
 const Calendar = lazy(() =>
   import("@/features/spaces/calendar/SpaceCalendar").then((m) => ({ default: m.SpaceCalendar })),
 );
+async function loadLab() {
+  const { SpaceLab } = await import("@/features/agents");
+  return { default: SpaceLab };
+}
+const Lab = lazy(loadLab);
 async function loadHome() {
   const { SpaceHome } = await import("../home/SpaceHome");
   return { default: SpaceHome };
@@ -61,8 +67,21 @@ export async function preloadSpaceSection(section: string) {
     case "calendar":
       await import("@/features/spaces/calendar/SpaceCalendar");
       break;
+    case "lab":
+      await loadLab();
+      break;
   }
 }
+
+/** The tab's name for the pages that don't name it themselves (Docs, Drawings, Library and Chat
+ * do), so a tab that moves to one of them never keeps the last page's name. */
+const sectionTabTitles: Record<string, string> = {
+  home: "Space",
+  settings: "Space",
+  planner: "Planner",
+  calendar: "Calendar",
+  lab: "Lab",
+};
 
 /**
  * One Space section, rendered from props rather than the router.
@@ -98,6 +117,7 @@ export function SpaceSectionView(props: {
   useEffect(() => {
     if (spaceId && user) void loadSpace(spaceId);
   }, [loadSpace, spaceId, user]);
+  useWorkspaceViewTitle(props.workspaceTabId, sectionTabTitles[section] ?? "");
 
   // Switching accounts isn't a read of this page: the quiet page holds its place.
   if (transitioning) return <SpacePageLoadingPlaceholder label="Switching accounts" />;
@@ -162,6 +182,8 @@ export function SpaceSectionView(props: {
           <Planner spaceId={spaceId} />
         ) : section === "calendar" ? (
           <Calendar spaceId={spaceId} />
+        ) : section === "lab" ? (
+          <Lab spaceId={spaceId} />
         ) : section === "social" || section === "chat" ? (
           <Chat spaceId={spaceId} spaceName={space.name} workspaceTabId={props.workspaceTabId} />
         ) : (

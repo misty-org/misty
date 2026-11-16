@@ -28,10 +28,10 @@ export function TopEdge(props: { gridColumn: number; side?: "left" | "right" }) 
             radius="lg"
             // The window edge above and on its outer side, the gap toward the sidebar.
             className={cn(
-              "mb-0 mt-[var(--shell-edge,6px)] shrink-0 overflow-hidden",
+              "mb-0 mt-[var(--shell-edge,0.375rem)] shrink-0 overflow-hidden",
               props.side === "right"
-                ? "ml-[var(--shell-edge,6px)] mr-[var(--shell-gap,4px)]"
-                : "ml-[var(--shell-gap,4px)] mr-[var(--shell-edge,6px)]",
+                ? "ml-[var(--shell-edge,0.375rem)] mr-[var(--shell-gap,0.25rem)]"
+                : "ml-[var(--shell-gap,0.25rem)] mr-[var(--shell-edge,0.375rem)]",
             )}
             style={{ height: barHeight }}
             data-misty-window-titlebar-region="true"
@@ -42,7 +42,7 @@ export function TopEdge(props: { gridColumn: number; side?: "left" | "right" }) 
                 windowToolbarClass,
                 // The bar's own padding and the card's margin already count toward the room the
                 // window buttons need.
-                "data-[window-chrome=true]:!pl-[max(0px,calc(var(--window-chrome-left,0px)_-_16px))]",
+                "data-[window-chrome=true]:!pl-[max(0px,calc(var(--window-chrome-left,0px)_-_1rem))]",
               )}
               data-window-toolbar=""
             />

@@ -209,8 +209,13 @@ const allFull = (items: ReadonlyArray<ActionBarItem>): ActionBarPlan => ({
   overflowing: false,
 });
 
+// Whole pixels: WebKit reports fractional widths that shift by a hair as the bar resizes, and a
+// plan made on them can flip with every layout and never settle.
 const widthOf = (element: Element | null | undefined) =>
-  element ? element.getBoundingClientRect().width : 0;
+  element ? Math.ceil(element.getBoundingClientRect().width) : 0;
+
+/** How many plans the bar may make in a row before it waits a frame to measure again. */
+const maxSyncPlans = 8;
 
 function DefaultItem({
   item,
@@ -325,11 +330,41 @@ export function ActionBar({
   const itemsRef = React.useRef(items);
   const itemKey = items.map((item) => `${item.id}${item.render ? "*" : ""}`).join("\n");
   const hasEnd = Boolean(end);
+  // Plans made since the last frame. A layout that answers each plan with a different width
+  // would otherwise re-plan synchronously until React gives up; past the limit the bar waits
+  // for the next frame, so at worst it settles a frame late.
+  const syncPlans = React.useRef(0);
+  const deferred = React.useRef(false);
+  const frame = React.useRef(0);
+  const measureLater = React.useRef<() => void>(() => {});
+  // What is shown now, so a measure knows whether it changes anything.
+  const shownPlan = React.useRef(plan);
+  shownPlan.current = plan;
+  const shownNatural = React.useRef(naturalWidth);
+  shownNatural.current = naturalWidth;
+  React.useEffect(() => () => cancelAnimationFrame(frame.current), []);
+
+  const nextFrame = React.useCallback(() => {
+    if (frame.current) return;
+    frame.current = requestAnimationFrame(() => {
+      frame.current = 0;
+      syncPlans.current = 0;
+      if (deferred.current) {
+        deferred.current = false;
+        measureLater.current();
+      }
+    });
+  }, []);
 
   const measure = React.useCallback(() => {
     const root = rootRef.current;
     const layer = measureRef.current;
     if (!root || !layer) return;
+    if (syncPlans.current >= maxSyncPlans) {
+      deferred.current = true;
+      nextFrame();
+      return;
+    }
     const current = itemsRef.current;
     const endWidth = widthOf(endRef.current);
     const measured = new Map<string, number>();
@@ -351,18 +386,34 @@ export function ActionBar({
       endWidth +
       Math.max(0, current.length + (endRef.current ? 1 : 0) - 1) * gapPx;
     const rounded = Math.ceil(natural);
-    setNaturalWidth((value) => (value === rounded ? value : rounded));
-    const available = widthOf(root);
+    let changed = false;
+    if (shownNatural.current !== rounded) {
+      shownNatural.current = rounded;
+      setNaturalWidth(rounded);
+      changed = true;
+    }
     // Not laid out (hidden, or a test without layout): keep what is shown.
-    if (available === 0) return;
-    const next = planActionBar({
-      available,
-      items: measures.map((item) => (item.id === shrinkId ? item : { ...item, shrink: false })),
-      more: control,
-      end: endWidth,
-    });
-    setPlan((value) => (samePlan(value, next) ? value : next));
-  }, [control]);
+    const available = root.getBoundingClientRect().width;
+    if (available > 0) {
+      const next = planActionBar({
+        // Within a pixel counts as fitting, so the bar sized to its own width always fits it.
+        available: Math.round(available) + 1,
+        items: measures.map((item) => (item.id === shrinkId ? item : { ...item, shrink: false })),
+        more: control,
+        end: endWidth,
+      });
+      if (!samePlan(shownPlan.current, next)) {
+        shownPlan.current = next;
+        setPlan(next);
+        changed = true;
+      }
+    }
+    if (changed) {
+      syncPlans.current += 1;
+      nextFrame();
+    }
+  }, [control, nextFrame]);
+  measureLater.current = measure;
 
   React.useLayoutEffect(() => {
     itemsRef.current = items;

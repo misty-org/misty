@@ -1,10 +1,13 @@
 import { ChevronDown, type LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
-import { OverflowFadeText, Pressable, Text } from "@/shared/ui";
+import { OverflowFadeText, Pressable, RowTools, Text } from "@/shared/ui";
 
 /**
- * A titled group of rows. The title carries its glyph and, at the far end, what it is about (the
- * folder, a count). A group that folds says so with a chevron before its title.
+ * A titled group of rows, after OpenChamber's session card: the header is one row tall, its glyph
+ * in the same column as the rows' glyphs, its title a step brighter and larger than theirs, and at
+ * the far end what it is about (the model, a count) in the rows' value type. A group that folds
+ * says so with a chevron before its title. `tools` show only while the pointer is on the header,
+ * at its far end; the subject gives way to them while they show.
  */
 export function Section(props: {
   title: string;
@@ -12,6 +15,8 @@ export function Section(props: {
   subject?: ReactNode;
   /** A control after the subject, at the header's far end. */
   end?: ReactNode;
+  /** Buttons at the header's far end, shown only while the pointer is on it (RowTools `hover`). */
+  tools?: ReactNode;
   open?: boolean;
   onToggle?(): void;
   children?: ReactNode;
@@ -28,22 +33,22 @@ export function Section(props: {
           />
         </Text>
       ) : Icon ? (
-        <Text bare tone="muted" className="flex flex-none">
+        <Text bare tone="default" className="flex flex-none">
           <Icon aria-hidden="true" />
         </Text>
       ) : null}
-      <Text as="h3" bare size="meta" weight="medium" tone="bright" className="m-0 flex-none">
+      <Text as="h3" bare size="control" weight="medium" tone="bright" className="m-0 flex-none">
         {props.title}
       </Text>
     </>
   );
   return (
     <section className="flex flex-col">
-      <header className="mb-0.5 flex min-h-6 min-w-0 items-center gap-1.5">
+      <header className="group/row relative flex h-7 min-w-0 items-center gap-2">
         {props.onToggle ? (
           <Pressable
             type="button"
-            className="flex flex-none items-center gap-1.5"
+            className="flex flex-none items-center gap-2"
             aria-expanded={props.open}
             onClick={props.onToggle}
           >
@@ -63,6 +68,7 @@ export function Section(props: {
           </Text>
         ) : null}
         {props.end ? <span className="-my-0.5 -mr-1 flex flex-none">{props.end}</span> : null}
+        {props.tools ? <RowTools reveal="hover">{props.tools}</RowTools> : null}
       </header>
       {props.onToggle && !props.open ? null : props.children}
     </section>

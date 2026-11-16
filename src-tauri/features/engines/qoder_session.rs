@@ -1276,28 +1276,68 @@ async fn turn_inner(
             "qoderBin must point to qodercli, not the Qoder IDE launcher (`qoder`)".to_string(),
         );
     }
-    let mut spawned = spawn_acp(bin, &req.workspace, launch_level(req)).await?;
-    // The gate answers asks on this child's stdin, through the registry.
-    core.registry
-        .set_stdin(&core.run_id, Arc::clone(&spawned.acp.stdin));
-    spawned.acp.gate = Some(crate::engines::gate::AcpGate::of(core, req));
-    spawned.acp.reports_as = Some(core.engine_id.clone());
-    let result = handshake_and_prompt(&mut spawned.acp, core, state, view, req, killed).await;
-    teardown(&mut spawned.child).await;
-    match result {
+    // Misty: the chat's qodercli from its last turn, still on this session, takes the prompt
+    // straight away (`warm.rs`): its start-up alone takes seconds.
+    let fingerprint = super::warm::claim(&core.run_id);
+    let mut warm = match super::warm::take_acp(core, req, fingerprint) {
+        Some(warm) => {
+            view.session = warm.item.known.clone();
+            core.dispatch_event(state, EngineEvent::SessionId(warm.item.session_id.clone()));
+            warm
+        }
+        None => {
+            let mut spawned = spawn_acp(bin, &req.workspace, launch_level(req)).await?;
+            // The gate answers asks on this child's stdin, through the registry.
+            core.registry
+                .set_stdin(&core.run_id, Arc::clone(&spawned.acp.stdin));
+            spawned.acp.gate = Some(crate::engines::gate::AcpGate::of(core, req));
+            spawned.acp.reports_as = Some(core.engine_id.clone());
+            let session_id =
+                match handshake(&mut spawned.acp, core, state, view, req, killed).await {
+                    Ok(session_id) => session_id,
+                    Err(error) => {
+                        teardown(&mut spawned.child).await;
+                        return Err(terminal_message(error, view, &spawned.stderr_buf));
+                    }
+                };
+            super::warm::Warm {
+                item: super::warm::WarmAcp {
+                    spawned,
+                    session_id,
+                    effort: None,
+                    known: Default::default(),
+                },
+                token: None,
+                cleanup: Vec::new(),
+            }
+        }
+    };
+    // This run's gate answers the asks, on a process this turn started or one it took over.
+    warm.item.spawned.acp.gate = Some(crate::engines::gate::AcpGate::of(core, req));
+    let session_id = warm.item.session_id.clone();
+    let result = match prompt(&mut warm.item.spawned.acp, core, state, view, req, killed, &session_id)
+        .await
+    {
         Ok(()) => Ok(()),
-        Err(error) => Err(terminal_message(error, view, &spawned.stderr_buf)),
-    }
+        Err(error) => Err(terminal_message(error, view, &warm.item.spawned.stderr_buf)),
+    };
+    warm.item.known = view.session.clone();
+    // A clean turn leaves the process warm for the chat's next message; anything else ends it.
+    let clean = result.is_ok() && !killed.load(Ordering::SeqCst);
+    super::warm::park_acp(core, req, fingerprint, clean, warm);
+    result
 }
 
-async fn handshake_and_prompt(
+/// Opens the turn's session on a new qodercli: `initialize`, the session resumed (or a new one),
+/// then its model, effort and mode. Returns the session id.
+async fn handshake(
     acp: &mut AcpProcess,
     core: &TurnCore,
     state: &mut TurnState,
     view: &mut TurnView,
     req: &SendRequest,
     killed: &AtomicBool,
-) -> Result<(), String> {
+) -> Result<String, String> {
     let agent = acp
         .request(
             "initialize",
@@ -1398,7 +1438,19 @@ async fn handshake_and_prompt(
         .await?;
     }
     view.session = handshake_state(&session_result, req, bypass_set);
+    Ok(session_id)
+}
 
+/// Runs the turn's prompt on an open session.
+async fn prompt(
+    acp: &mut AcpProcess,
+    core: &TurnCore,
+    state: &mut TurnState,
+    view: &mut TurnView,
+    req: &SendRequest,
+    killed: &AtomicBool,
+    session_id: &str,
+) -> Result<(), String> {
     let prompt_blocks = assemble_prompt_blocks(&req.prompt, &req.images, &req.workspace)?;
     let result = acp
         .request(
@@ -1406,7 +1458,7 @@ async fn handshake_and_prompt(
             json!({ "sessionId": session_id, "prompt": prompt_blocks }),
             PROMPT_TIMEOUT,
             killed,
-            Some(&session_id),
+            Some(session_id),
             &mut |params| handle_session_update(core, state, view, params),
         )
         .await?;

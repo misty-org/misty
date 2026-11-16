@@ -28,7 +28,6 @@ export function AgentDefaultsSection() {
         <CollaborationModeRow />
         <PreferenceRow id="agents.plan_deep_thinking" />
         <PanelSideRow />
-        <PreferenceRow id="agents.studio_sounds" />
         <PreferenceRow id="agents.run_notifications" />
       </Section>
       <ScreenLocationSection />

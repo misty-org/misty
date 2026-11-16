@@ -22,50 +22,29 @@ beforeEach(() => {
   mocks.cachedRequest.mockResolvedValue({ grants: [] });
 });
 
-it("runs the apps page and its cards on this computer", async () => {
-  await appsApi.list();
-  expect(mocks.invoke).toHaveBeenLastCalledWith("composio_apps_list", undefined);
-  await appsApi.connect("gmail");
-  expect(mocks.invoke).toHaveBeenLastCalledWith("composio_apps_connect", { app: "gmail" });
+it("runs the cards on this computer", async () => {
   await appsApi.decide("localapprq_1", "remember");
-  expect(mocks.invoke).toHaveBeenLastCalledWith("composio_request_decide", {
+  expect(mocks.invoke).toHaveBeenLastCalledWith("apps_request_decide", {
     id: "localapprq_1",
     decision: "remember",
   });
   await appsApi.request("localapprq_1");
-  expect(mocks.invoke).toHaveBeenLastCalledWith("composio_request_get", { id: "localapprq_1" });
-  await appsApi.requestLink("localapprq_1");
-  expect(mocks.invoke).toHaveBeenLastCalledWith("composio_request_link", { id: "localapprq_1" });
+  expect(mocks.invoke).toHaveBeenLastCalledWith("apps_request_get", { id: "localapprq_1" });
   expect(mocks.apiRequest).not.toHaveBeenCalled();
   expect(mocks.cachedRequest).not.toHaveBeenCalled();
 });
 
-it("calls every page action natively on the local path, and explains a refusal", async () => {
-  await localAppsApi.list();
-  expect(mocks.invoke).toHaveBeenLastCalledWith("composio_apps_list", undefined);
-  await localAppsApi.catalog("gm");
-  expect(mocks.invoke).toHaveBeenLastCalledWith("composio_apps_catalog", {
-    search: "gm",
-    cursor: "",
-  });
-  await localAppsApi.connect("gmail");
-  expect(mocks.invoke).toHaveBeenLastCalledWith("composio_apps_connect", { app: "gmail" });
-  await localAppsApi.disconnect("ca_1");
-  expect(mocks.invoke).toHaveBeenLastCalledWith("composio_apps_disconnect", { id: "ca_1" });
-  mocks.invoke.mockRejectedValue({
-    code: "apps_rejected",
-    message: "Composio said no.",
-    uncertain: false,
-  });
-  await expect(localAppsApi.connect("gmail")).rejects.toThrow("Composio said no.");
+it("explains a refusal", async () => {
+  mocks.invoke.mockRejectedValue({ code: "apps_storage", message: "No.", uncertain: false });
+  await expect(localAppsApi.request("x")).rejects.toThrow("No.");
   mocks.invoke.mockRejectedValue("ipc closed");
-  await expect(localAppsApi.connect("gmail")).rejects.toThrow("That didn’t go through. Try again.");
+  await expect(localAppsApi.request("x")).rejects.toThrow("That didn’t go through. Try again.");
 });
 
 it("revokes a remembered approval where it lives", async () => {
   await grantsApi.revoke("localgrant_1");
-  expect(mocks.invoke).toHaveBeenLastCalledWith("composio_grants_revoke", { id: "localgrant_1" });
+  expect(mocks.invoke).toHaveBeenLastCalledWith("apps_grants_revoke", { id: "localgrant_1" });
   await grantsApi.revokeAll("this_computer");
-  expect(mocks.invoke).toHaveBeenLastCalledWith("composio_grants_revoke", { id: null });
+  expect(mocks.invoke).toHaveBeenLastCalledWith("apps_grants_revoke", { id: null });
   expect(mocks.apiRequest).not.toHaveBeenCalled();
 });

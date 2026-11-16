@@ -56,7 +56,22 @@ const pendingClaimRetryMs = 5000;
  * double it. Returns a function that stops watching.
  */
 export function watchPendingMarkdown(editor: Editor, session?: NoteEditorSession): () => void {
-  if (!session || session.role === "viewer") return () => {};
+  if (!session) return () => {};
+  return followPendingMarkdown(session, {
+    gone: () => editor.isDestroyed,
+    apply: (markdown) => editor.commands.setContent(markdown, { contentType: "markdown" }),
+  });
+}
+
+/**
+ * The same, for any copy that writes the doc's content itself (a Lab notebook does, from its
+ * own types): `apply` gets the server's markdown once this copy holds the lease for it.
+ */
+export function followPendingMarkdown(
+  session: Pick<NoteEditorSession, "role" | "metadata" | "provider">,
+  target: { gone(): boolean; apply(markdown: string): void },
+): () => void {
+  if (session.role === "viewer") return () => {};
   const { metadata, provider } = session;
   let requested = 0;
   let retry: ReturnType<typeof setTimeout> | undefined;
@@ -66,7 +81,7 @@ export function watchPendingMarkdown(editor: Editor, session?: NoteEditorSession
     return pending > applied ? pending : 0;
   };
   const claim = () => {
-    if (!provider.synced || editor.isDestroyed) return;
+    if (!provider.synced || target.gone()) return;
     const pending = pendingVersion();
     if (!pending || pending === requested) return;
     requested = pending;
@@ -89,9 +104,9 @@ export function watchPendingMarkdown(editor: Editor, session?: NoteEditorSession
       }, pendingClaimRetryMs);
       return;
     }
-    if (editor.isDestroyed || pendingVersion() !== requested) return;
+    if (target.gone() || pendingVersion() !== requested) return;
     const markdown = String(metadata.get("pending_markdown") ?? "");
-    editor.commands.setContent(markdown, { contentType: "markdown" });
+    target.apply(markdown);
     metadata.set("applied_version", requested);
   };
   const onSync = (synced: boolean) => {

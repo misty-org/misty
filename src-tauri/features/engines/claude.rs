@@ -94,6 +94,10 @@ use local::local_command_reply;
 #[path = "claude_usage.rs"]
 mod usage;
 use sandbox::{extra_dirs, folder_sandbox_runs, folder_sandbox_settings};
+
+/// Claude Code's limit for one call to Misty's MCP server: longer than a browser_run program's
+/// own deadline (`programs/runProgram.ts`) and its device wait (`tools/deviceJob.ts`, 170 s).
+const MISTY_TOOL_TIMEOUT_MS: u64 = 300_000;
 use usage::{attach_reported_context_window, compact_usage};
 
 /// Claude Code's own permission modes, in its mode switcher's order. `auto` (its classifier)
@@ -136,6 +140,11 @@ impl Engine for ClaudeEngine {
         true
     }
     fn supports_mcp(&self) -> bool {
+        true
+    }
+
+    /// The CLI ships its own web search tool.
+    fn supports_web_search(&self) -> bool {
         true
     }
     fn supports_effort(&self) -> bool {
@@ -238,12 +247,20 @@ impl Engine for ClaudeEngine {
         }
         // Misty's Space MCP server, one --mcp-config carrying it. Its calls come back through the
         // permission ask like any tool, and Misty's own gate decides them under the run's mode.
-        let mcp_servers = req
+        let mut mcp_servers = req
             .mcp_servers
             .as_ref()
             .and_then(Value::as_object)
             .cloned()
             .unwrap_or_default();
+        // A browser_run program may take its full 2 minutes plus a wait for the page, past Claude
+        // Code's default limit for one MCP call (about 2 minutes), which cut it off with "The
+        // operation timed out." while Misty was still running it.
+        if let Some(misty) = mcp_servers.get_mut("misty").and_then(Value::as_object_mut) {
+            misty
+                .entry("timeout")
+                .or_insert(serde_json::json!(MISTY_TOOL_TIMEOUT_MS));
+        }
         let mut cleanup_files = Vec::new();
         if !mcp_servers.is_empty() {
             let config = serde_json::json!({ "mcpServers": mcp_servers });

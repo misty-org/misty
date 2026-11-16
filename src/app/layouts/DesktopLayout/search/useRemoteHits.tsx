@@ -1,14 +1,16 @@
-import { FileCode, FileText, History, Waypoints } from "lucide-react";
+import { FileCode, FileText, History, Plug } from "lucide-react";
 import { useEffect, useState } from "react";
 import {
   agentForPastChat,
   directAppsApi,
   folderName,
+  openAgentsHub,
   openFolderFile,
   resumeInNewChat,
   searchEngineSessions,
   searchFolderFiles,
   searchNotebooks,
+  notebookRoute,
 } from "@/features/agents";
 import { searchSpaceText, spaceEvents, spaceTasks, type SpaceSearchHit } from "@/features/spaces";
 import type { AgentProfile } from "@/shared/schemas";
@@ -99,8 +101,7 @@ export function useRemoteHits({
               excerpt: excerpt(hit.text, words),
               icon: icon(FileText),
               match,
-              open: () =>
-                openRoute(`/agents?view=lab&item=notebook:${encodeURIComponent(notebook.id)}`),
+              open: () => openRoute(notebookRoute(notebook)),
             },
           ];
         });
@@ -136,9 +137,9 @@ export function useRemoteHits({
             title: `Connect ${app.name}`,
             detail: app.description ? undefined : "App",
             excerpt: app.description ? plain(app.description) : undefined,
-            icon: icon(Waypoints),
+            icon: icon(Plug),
             match,
-            open: () => openRoute(`/agents?view=integrations&find=${encodeURIComponent(app.name)}`),
+            open: () => openAgentsHub("apps"),
           },
         ];
       });

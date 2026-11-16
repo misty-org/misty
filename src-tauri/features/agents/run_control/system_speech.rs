@@ -1,6 +1,6 @@
-//! An audio overview spoken by the computer's own voices, for someone with no speech key: `say` on
-//! macOS, the built-in speech engine on Windows, `espeak-ng` on Linux. Everything stays on this
-//! computer. The result is the same 24 kHz, 16-bit mono WAV the speech models give
+//! An audio overview spoken by the computer's own voices, Misty's only voice (it holds no speech
+//! key): `say` on macOS, the built-in speech engine on Windows, `espeak-ng` on Linux. Everything
+//! stays on this computer. The result is a 24 kHz, 16-bit mono WAV
 //! (`calls::tutor_overview_make`), two voices taking turns.
 use std::path::Path;
 
@@ -8,13 +8,17 @@ const RATE: u32 = 24_000;
 /// A short pause between lines, so two voices don't run into each other.
 const PAUSE_SAMPLES: usize = (RATE as usize) / 4;
 
-/// Speaks each line in its speaker's voice and joins them into one WAV.
-pub(crate) async fn speak_dialogue(lines: &[(u8, String)]) -> Result<Vec<u8>, String> {
+/// Speaks each line in its speaker's voice and joins them into one WAV. `first` is the voice the
+/// person chose, for speaker 0; the other speaker gets a different voice of the system's.
+pub(crate) async fn speak_dialogue(
+    lines: &[(u8, String)],
+    first: Option<&str>,
+) -> Result<Vec<u8>, String> {
     let dir = std::env::temp_dir().join(format!("misty-speech-{}", uuid::Uuid::new_v4()));
     file_access::fs_async::create_dir_all(&dir)
         .await
         .map_err(|_| unavailable())?;
-    let spoken = speak_all(&dir, lines).await;
+    let spoken = speak_all(&dir, lines, first).await;
     let _ = file_access::fs::remove_dir_all(&dir);
     let samples = spoken?;
     if samples.is_empty() {
@@ -23,8 +27,17 @@ pub(crate) async fn speak_dialogue(lines: &[(u8, String)]) -> Result<Vec<u8>, St
     Ok(wav(&samples))
 }
 
-async fn speak_all(dir: &Path, lines: &[(u8, String)]) -> Result<Vec<i16>, String> {
-    let voices = voices().await;
+async fn speak_all(
+    dir: &Path,
+    lines: &[(u8, String)],
+    first: Option<&str>,
+) -> Result<Vec<i16>, String> {
+    let mut voices = voices().await;
+    if let Some(chosen) = first.map(str::trim).filter(|voice| !voice.is_empty()) {
+        // The chosen voice speaks first; the other speaker keeps a voice that isn't it.
+        voices.retain(|voice| voice != chosen);
+        voices.insert(0, chosen.to_string());
+    }
     let mut samples = Vec::new();
     for (index, (speaker, text)) in lines.iter().enumerate() {
         let text = text.trim();
@@ -50,10 +63,9 @@ async fn speak_all(dir: &Path, lines: &[(u8, String)]) -> Result<Vec<i16>, Strin
 
 fn unavailable() -> String {
     if cfg!(target_os = "linux") {
-        "This computer has no voice to read it. Install espeak-ng, or add a speech key in Settings → Models."
-            .into()
+        "This computer has no voice to read it. Install espeak-ng.".into()
     } else {
-        "This computer's voices couldn't read it. Add a speech key in Settings → Models.".into()
+        "This computer's voices couldn't read it.".into()
     }
 }
 

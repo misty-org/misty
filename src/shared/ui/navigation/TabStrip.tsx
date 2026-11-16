@@ -43,10 +43,14 @@ export interface TabStripProps {
 
 // Tabs are a sidebar row's height, padding, type and washes. The row is the shared 48px header band, so they
 // have 8px above and below; the first tab's icon lines up with a page header's title, 16px in,
-// and the end controls keep the page header's 16px from the edge.
+// and the end controls keep the page header's 16px from the edge. Every tab starts at the same
+// 144px and all shrink alike when they don't fit, so the row never overflows; a tab too narrow
+// for its closer drops it (a middle click still closes it).
 const tabClass = cn(
-  "group/tab relative flex h-8 min-w-32 max-w-60 flex-none items-center rounded-md",
-  "hover:bg-row-hover data-[selected]:bg-row-active",
+  // An explicit width, not just a flex basis: the tab is a size container (for its closer), so
+  // its content adds nothing to its size, and the row measures tabs by this width.
+  "group/tab @container/tab relative flex h-8 w-36 min-w-0 flex-initial items-center",
+  "overflow-hidden rounded-md hover:bg-row-hover data-[selected]:bg-row-active",
 );
 
 /** The tab a key moves to from `index`, or -1 for a key the strip leaves alone. */
@@ -61,9 +65,9 @@ function nextTabIndex(key: string, index: number, count: number): number {
 /**
  * A row of tabs over a pane: 32px tabs with an icon and a label that fades when long, a closer
  * that shows on hover and on the open tab, arrows and Home/End to move between them, a middle
- * click or the closer to close, dragging (or Alt+Shift and an arrow) to reorder, and the tab's menu on a right-click. The row
- * scrolls sideways when the tabs don't fit, never wrapping. `after` holds a control right after
- * the last tab and `end` controls at the far end.
+ * click or the closer to close, dragging (or Alt+Shift and an arrow) to reorder, and the tab's menu on a right-click. Tabs share
+ * one width and shrink together when they don't fit, never wrapping or scrolling. `after` holds a
+ * control right after the last tab that always stays in view, and `end` controls at the far end.
  *
  * ```tsx
  * <TabStrip label="Terminals" tabs={tabs} active={activeId} onSelect={select} onClose={close}
@@ -117,10 +121,7 @@ export function TabStrip(props: TabStripProps) {
         }}
         role="tablist"
         aria-label={props.label}
-        className={cn(
-          "flex min-w-0 flex-1 items-center overflow-x-auto [scrollbar-width:none]",
-          "gap-1",
-        )}
+        className="flex min-w-0 flex-[0_1_auto] items-center gap-1"
       >
         {props.tabs.map((tab, index) => {
           const selected = tab.id === props.active;
@@ -158,16 +159,18 @@ export function TabStrip(props: TabStripProps) {
                 </Text>
               </Pressable>
               {closable ? (
-                <IconButton
-                  label={tab.closeLabel!}
-                  size="sm"
-                  // Always shown, on every tab, not only the open or hovered one.
-                  className="mr-1"
-                  data-reorder-ignore=""
-                  onClick={() => props.onClose?.(tab.id)}
-                >
-                  <X />
-                </IconButton>
+                // Always shown, on every tab, until the tab is too narrow to hold it.
+                <span className="flex flex-none @max-[5.5rem]/tab:hidden">
+                  <IconButton
+                    label={tab.closeLabel!}
+                    size="sm"
+                    className="mr-1"
+                    data-reorder-ignore=""
+                    onClick={() => props.onClose?.(tab.id)}
+                  >
+                    <X />
+                  </IconButton>
+                </span>
               ) : null}
             </div>
           );
@@ -184,9 +187,12 @@ export function TabStrip(props: TabStripProps) {
             </div>
           );
         })}
-        {props.after ? <div className="flex flex-none items-center">{props.after}</div> : null}
       </div>
-      {props.end ? <div className="flex flex-none items-center gap-1">{props.end}</div> : null}
+      {props.after ? <div className="flex flex-none items-center">{props.after}</div> : null}
+      {/* The end controls keep to the far edge, however few tabs there are. */}
+      {props.end ? (
+        <div className="ml-auto flex flex-none items-center gap-1">{props.end}</div>
+      ) : null}
     </div>
   );
 }

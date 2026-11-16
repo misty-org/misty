@@ -1,15 +1,14 @@
 import { confirmAction } from "@/shared/lib/confirmAction";
 import { createDeviceSetting } from "@/shared/lib/deviceSetting";
-import { Button, ChoiceGroup, IconButton, Surface, Text, useNotice } from "@/shared/ui";
+import { Button, ChoiceGroup, IconButton, PageHeader, Surface, Text, useNotice } from "@/shared/ui";
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
-import { openExternalLink } from "@/shared/platform/openExternalLink";
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import { SpaceCrumb } from "../components/space-row/SpaceCrumb";
 import type { SpaceCalendarEvent, SpaceTask } from "../planner/api";
 import { SpaceTaskDialog } from "../planner/SpaceTaskDialog";
 import { useTaskAssignees } from "../planner/SpacePlanner";
 import { useSpaceTasks } from "../planner/useSpaceTasks";
-import { CalendarConnections } from "./CalendarConnections";
 import {
   calendarEntries,
   dayKey,
@@ -20,7 +19,6 @@ import {
 } from "./calendarDates";
 import { CalendarEventDialog } from "./CalendarEventDialog";
 import { CalendarAgenda, CalendarMonth } from "./CalendarViews";
-import { useConnectedCalendar } from "./useConnectedCalendar";
 import { useSpaceCalendar } from "./useSpaceCalendar";
 
 type View = "month" | "agenda";
@@ -34,10 +32,7 @@ const useCalendarView = createDeviceSetting<{ view: View }>({
   }),
 });
 
-/**
- * The Space's calendar: its own events, the Planner's tasks on the days they are due, and the
- * events of the person's connected Google Calendar, which stay on their computer.
- */
+/** The Space's calendar: its own events, and the Planner's tasks on the days they are due. */
 export function SpaceCalendar({ spaceId }: { spaceId: string }) {
   // A link to one event (search's results) carries its start, so the right month loads first.
   const [params, setParams] = useSearchParams();
@@ -52,7 +47,6 @@ export function SpaceCalendar({ spaceId }: { spaceId: string }) {
   const setView = (next: View) => saveView({ view: next });
   const calendar = useSpaceCalendar(spaceId, anchor);
   const planner = useSpaceTasks(spaceId);
-  const connected = useConnectedCalendar(anchor);
   const assignees = useTaskAssignees(spaceId);
   // An open event dialog: an event to edit, or the day a new one starts on.
   const [editing, setEditing] = useState<{ event: SpaceCalendarEvent | null; day: string }>();
@@ -82,15 +76,13 @@ export function SpaceCalendar({ spaceId }: { spaceId: string }) {
   const entries = useMemo(
     () =>
       calendar.events && planner.tasks
-        ? calendarEntries(calendar.events, planner.tasks, connected.events)
+        ? calendarEntries(calendar.events, planner.tasks)
         : undefined,
-    [calendar.events, planner.tasks, connected.events],
+    [calendar.events, planner.tasks],
   );
   const open = (entry: CalendarEntry) => {
     if (entry.kind === "task") setTask(entry.task);
-    else if (entry.kind === "event") setEditing({ event: entry.event, day: entry.day });
-    // A connected event is edited where it lives.
-    else if (entry.connected.url) void openExternalLink(entry.connected.url);
+    else setEditing({ event: entry.event, day: entry.day });
   };
   const newEvent = (day: string) => setEditing({ event: null, day });
   const removeEvent = async (event: SpaceCalendarEvent) => {
@@ -98,12 +90,27 @@ export function SpaceCalendar({ spaceId }: { spaceId: string }) {
     if (await calendar.remove(event)) setEditing(undefined);
   };
   const View = view === "month" ? CalendarMonth : CalendarAgenda;
-  const error = calendar.error || planner.error || connected.error;
+  const error = calendar.error || planner.error;
   useNotice(Boolean(error), { message: error, tone: "error" });
 
   return (
-    <Surface tone="page" className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)]">
-      {/* The month's controls; the page has no title, since the sidebar and the tab name it. */}
+    <Surface tone="page" className="grid h-full min-h-0 grid-rows-[auto_auto_minmax(0,1fr)]">
+      {/* The bar every Space page wears, with New event; the month's controls sit under it, as
+          a collection page's filters do. */}
+      <PageHeader
+        title={<SpaceCrumb spaceId={spaceId} here="Calendar" />}
+        end={
+          <Button
+            type="button"
+            variant="primary"
+            icon={Plus}
+            onClick={() => newEvent(dayKey(new Date()))}
+            data-tour="calendar-new"
+          >
+            New event
+          </Button>
+        }
+      />
       <div
         role="toolbar"
         aria-label="Calendar"
@@ -135,18 +142,6 @@ export function SpaceCalendar({ spaceId }: { spaceId: string }) {
             onChange={setView}
           />
         </span>
-        <span data-tour="calendar-connect" className="contents">
-          <CalendarConnections onChange={connected.reload} />
-        </span>
-        <Button
-          type="button"
-          variant="primary"
-          icon={Plus}
-          onClick={() => newEvent(dayKey(new Date()))}
-          data-tour="calendar-new"
-        >
-          New event
-        </Button>
       </div>
 
       <div className="min-h-0 overflow-x-auto" data-tour="calendar-grid">

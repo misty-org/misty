@@ -1,35 +1,30 @@
 import { WelcomeNav } from "./WelcomeNav";
 import type { ReactNode } from "react";
 import { PageEnter, Text } from "@/shared/ui";
-import { useFitToHeight } from "./useFitToHeight";
 
+/** A signed-out page: the floating nav, then the page's heading and its card in one centered
+ * column. The signed-out window grows to fit the column (`data-signed-out-page` and
+ * `data-signed-out-content`, useSignedOutWindow); it scrolls only past the screen's height. */
 export default function AuthShell({ title, description, children }: AuthShellProps) {
-  const { panelRef, containerRef, scale } = useFitToHeight<HTMLDivElement, HTMLDivElement>();
   return (
     <div
-      ref={containerRef}
+      data-signed-out-page
       className="relative flex h-full flex-col overflow-y-auto bg-window-chrome px-4 pb-6 pt-20 sm:px-6"
     >
       <WelcomeNav />
-      <div ref={panelRef} style={{ zoom: scale }} className="mx-auto my-auto w-full max-w-md">
-        <PageEnter key={title} className="flex flex-col gap-8">
-          <div className="text-center">
-            <Text
-              bare
-              as="h1"
-              tone="default"
-              className="text-balance text-2xl font-medium tracking-[-0.04em] sm:text-3xl"
-            >
+      <div data-signed-out-content className="mx-auto my-auto w-full max-w-90">
+        <PageEnter key={title} className="flex flex-col gap-6">
+          <div className="flex flex-col items-center gap-2 text-center">
+            <Text as="h1" wrap size="display" weight="medium" tone="bright" className="m-0">
               {title}
             </Text>
             {description ? (
-              <Text bare as="p" tone="muted" className="mt-3 text-sm leading-6 sm:text-base">
+              <Text wrap size="body" tone="muted" className="m-0">
                 {description}
               </Text>
             ) : null}
           </div>
-
-          <div className="flex w-full flex-col">{children}</div>
+          {children}
         </PageEnter>
       </div>
     </div>

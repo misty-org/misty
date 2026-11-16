@@ -11,6 +11,7 @@ mod catalog_schemas;
 mod collaboration;
 mod companion;
 pub use companion::companion_engine_note;
+pub use teach::engine_teach_note;
 mod go_text;
 mod history;
 pub use history::without_cursor_tags;

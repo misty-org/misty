@@ -3,7 +3,13 @@ import { create } from "zustand";
 import { announceDeviceSetting, onDeviceSettingChange } from "@/shared/lib/deviceSetting";
 import { localDocuments } from "../../conversations/state/localChats";
 import { agentAccountId } from "../../personal/agentAccount";
-import { defaultLayout, parseLayout, serializeLayout, type StudioLayout } from "./layout";
+import {
+  defaultLayout,
+  parseLayout,
+  refitDefault,
+  serializeLayout,
+  type StudioLayout,
+} from "./layout";
 
 /**
  * The studio's arrangement belongs to this computer, kept per Space in misty.db with the person's
@@ -27,7 +33,7 @@ function takeOldLayout(space: string): StudioLayout | null {
 async function loadLayout(account: string, space: string): Promise<StudioLayout> {
   if (!localDocuments.available()) return defaultLayout();
   const saved = parseLayout(await localDocuments.get(account, "studio", idOf(space)));
-  if (saved) return saved;
+  if (saved) return refitDefault(saved);
   const old = takeOldLayout(space);
   if (old) await saveLayout(account, space, old);
   return old ?? defaultLayout();
@@ -94,10 +100,13 @@ export function useStudioLayout(space: string): {
     },
     [key, write],
   );
+  // Laid out afresh on the floor it has grown to, which the studio earned.
+  const size = held?.key === key ? held.layout.size : undefined;
   const reset = useCallback(() => {
-    setHeld({ key, layout: defaultLayout() });
-    write(null);
-  }, [key, write]);
+    const fresh = defaultLayout(size);
+    setHeld({ key, layout: fresh });
+    write(fresh);
+  }, [key, write, size]);
   return { layout: held?.key === key ? held.layout : null, change, reset };
 }
 

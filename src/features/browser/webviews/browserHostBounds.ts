@@ -1,4 +1,5 @@
 import { getAppliedAppRenderScale } from "@/shared/hooks/useAppZoom";
+import { cssLengthPx } from "@/shared/lib/uiScale";
 import { opaqueColorHex } from "./opaqueColorHex";
 import type { BrowserBounds } from "@/features/app-windows";
 
@@ -100,7 +101,7 @@ function clipCornerRadii(clip: HTMLElement, rect: DOMRect): [number, number, num
     // custom properties inherit, so only the pane itself reads them.
     const outer =
       clip.dataset.browserCornerClip === "seam"
-        ? parseFloat(style.getPropertyValue(`--pane-corner-${name}`))
+        ? cssLengthPx(style.getPropertyValue(`--pane-corner-${name}`))
         : parseFloat(style.getPropertyValue(`border-${name}-radius`));
     return Math.max(0, (outer || 0) - Math.max(pad[y], pad[x]));
   }) as [number, number, number, number];

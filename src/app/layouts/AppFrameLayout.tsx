@@ -3,7 +3,7 @@ import { useWorkspaceRecoveryState } from "@/features/app-windows";
 import { useWorkspaceRecoveryRetry } from "@/features/app-windows";
 import { SpacesRealtimeBridge } from "@/features/spaces/SpacesRealtimeBridge";
 import { LoadingScreen } from "@/shared/ui";
-import { AgentExecutionSurface } from "@/features/agents";
+import { AgentExecutionSurface, defaultChoices, useEnginesList } from "@/features/agents";
 import { UpdateNotices } from "@/features/updater/UpdateNotices";
 import { EngineUpdatesPrompt } from "@/features/engine-config/clis";
 import { lazy, Suspense, useEffect, useState } from "react";
@@ -55,7 +55,14 @@ export function AppFrameLayout() {
   const here = `${location.pathname}${location.search}${location.hash}`;
   const returnTo = isAuthRoute || location.pathname === routes.root ? undefined : here;
   const signInFirst = !user && !transitioning && !isSignedOutPath(location.pathname);
-  const setUpFirst = Boolean(user) && !transitioning && !welcomed && !isAuthRoute;
+  // Misty has no model of its own: someone set up before that rule, or whose engine is gone, picks
+  // a default engine again before the shell shows.
+  const engines = useEnginesList();
+  const noEngine = Boolean(engines.data) && defaultChoices(engines.data ?? []).length === 0;
+  const onSetup = location.pathname === routes.setup;
+  const engineFirst =
+    Boolean(user) && !transitioning && welcomed && noEngine && !isAuthRoute && !onSetup;
+  const setUpFirst = (Boolean(user) && !transitioning && !welcomed && !isAuthRoute) || engineFirst;
   // Account transitions finish before the shell shows; the window then waits for the account's
   // saved windows and tabs.
   const readyLabel =
@@ -99,7 +106,16 @@ export function AppFrameLayout() {
       />
     );
   if (setUpFirst)
-    return <Navigate to={routes.setup} replace state={returnTo ? { from: returnTo } : null} />;
+    return (
+      <Navigate
+        to={routes.setup}
+        replace
+        state={{
+          ...(returnTo ? { from: returnTo } : {}),
+          ...(engineFirst ? { engineOnly: true } : {}),
+        }}
+      />
+    );
   if (loadingLabel) return <>{leavingScreen}</>;
 
   if (isAuthRoute) {

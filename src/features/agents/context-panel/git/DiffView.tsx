@@ -26,6 +26,7 @@ import {
   type GitStatus,
 } from "./gitApi";
 import type { DiffTarget } from "./store";
+import { uiPx } from "@/shared/lib/uiScale";
 
 const DIFF_TRUNCATE_LINES = 2000;
 /** The before and after of an image, side by side. */
@@ -150,7 +151,7 @@ export function DiffView(props: {
   const rowVirtualizer = useVirtualizer({
     count: virtualize && lines ? lines.length : 0,
     getScrollElement: () => scrollRef.current,
-    estimateSize: () => 20,
+    estimateSize: () => uiPx(20),
     overscan: 30,
   });
   const stepping = view === "steps" && steps !== null && steps.length > 1;

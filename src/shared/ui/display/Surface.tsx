@@ -93,10 +93,10 @@ const toneClass: Record<SurfaceTone, string> = {
   board: "bg-art-white",
   glass: [
     "border border-white/50 bg-[rgb(250_250_250/0.78)] text-art-ink",
-    "shadow-[inset_0_1px_0_rgb(255_255_255/0.56),0_6px_20px_rgb(0_0_0/0.12)]",
-    "backdrop-blur-[18px] backdrop-saturate-[1.2]",
+    "shadow-[inset_0_1px_0_rgb(255_255_255/0.56),0_0.375rem_1.25rem_rgb(0_0_0/0.12)]",
+    "backdrop-blur-[1.125rem] backdrop-saturate-[1.2]",
     "dark:border-white/12 dark:bg-[rgb(32_32_34/0.78)] dark:text-art-paper",
-    "dark:shadow-[inset_0_1px_0_rgb(255_255_255/0.08),0_6px_20px_rgb(0_0_0/0.3)]",
+    "dark:shadow-[inset_0_1px_0_rgb(255_255_255/0.08),0_0.375rem_1.25rem_rgb(0_0_0/0.3)]",
   ].join(" "),
   smoke: "border border-white/12 bg-[rgb(20_20_20/0.96)] text-art-white",
   // The same card as the chat's side cards (sidePanel.css): the sidebar's fill, a faint edge drawn
@@ -105,7 +105,7 @@ const toneClass: Record<SurfaceTone, string> = {
     "bg-charcoal-sidebar text-cream",
     "outline-[0.5px] outline-solid -outline-offset-[0.5px]",
     "outline-[color-mix(in_srgb,var(--misty-theme-text)_9%,transparent)]",
-    "shadow-[0_2px_4px_rgb(0_0_0/0.22),0_1px_2px_rgb(0_0_0/0.22)]",
+    "shadow-[0_0.125rem_0.25rem_rgb(0_0_0/0.22),0_1px_0.125rem_rgb(0_0_0/0.22)]",
   ].join(" "),
   stage: ["bg-[image:var(--surface-stage)]"].join(" "),
   track: "bg-charcoal-border",
@@ -239,9 +239,9 @@ const stateEdge =
   "border-[color:color-mix(in_srgb,var(--tone-waiting)_45%,var(--color-charcoal-border))]";
 
 /** `raised`: a shadow that falls below the card and fades well before its sides. */
-const raisedClass = "shadow-[0_12px_32px_-16px_rgb(0_0_0/0.7)]";
+const raisedClass = "shadow-[0_0.75rem_2rem_-1rem_rgb(0_0_0/0.7)]";
 /** `floating`: a shadow that spreads past every side, over the page under the panel. */
-const floatingClass = "shadow-[0_8px_32px_rgb(0_0_0/0.45)]";
+const floatingClass = "shadow-[0_0.5rem_2rem_rgb(0_0_0/0.45)]";
 
 /**
  * A box with one of the theme's fills and edges: the one way a feature gives something a

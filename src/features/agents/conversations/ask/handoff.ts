@@ -1,4 +1,4 @@
-import { usePersonalAgentsStore } from "../../personal/personalAgentsStore";
+import { defaultAgentOf, usePersonalAgentsStore } from "../../personal/personalAgentsStore";
 import { useMistyStore } from "../state/useMistyStore";
 import { workspaceSurfaceFromRoute } from "@/features/app-windows";
 import { useWorkspaceStore } from "@/features/app-windows";
@@ -92,7 +92,7 @@ async function acceptMistyHandoff(input: MistyHandoff) {
   // Do not retarget a turn that started while the handoff was loading.
   if (state.working) throw new Error("Misty started working. Open its current conversation again.");
   const agentId = input.agentId ?? state.selectedAgentId;
-  const defaultId = usePersonalAgentsStore.getState().agents.find((a) => a.system_managed)?.id;
+  const defaultId = defaultAgentOf(usePersonalAgentsStore.getState().agents)?.id;
   const belongsToAgent = (c: (typeof state.conversations)[number]) =>
     !agentId || c.agentId === agentId || (!c.agentId && agentId === defaultId);
   let conversationId = state.activeConversationId;

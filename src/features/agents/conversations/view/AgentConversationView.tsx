@@ -1,10 +1,10 @@
 import { Fragment, memo, useMemo } from "react";
 import { Text } from "@/shared/ui";
-import { MistyActivityStatus } from "../state/MistyActivityStatus";
 import type { GlobalAiConversation } from "../state/conversationTypes";
 import type { LedgerRow } from "../../checkpoints/ledger";
 import { LessonObjectives } from "../../tutor/lessons/LessonObjectives";
 import { AgentMessage } from "./AgentMessage";
+import { LiveStatus } from "./status/LiveStatus";
 import { SummarizedDivider } from "./AgentTranscriptParts";
 import { conversationTurns } from "./conversationTurns";
 
@@ -75,14 +75,20 @@ export const AgentConversationView = memo(function AgentConversationView(props: 
             </Fragment>
           );
         })}
+        {/* Before the reply exists, the run's live line stands on its own. */}
         {props.working &&
         !props.conversation.messages.some(
           (message) =>
             message.role === "assistant" &&
             (message.state === "pending" || message.state === "streaming"),
         ) ? (
-          <div className="agent-message-assistant flex items-start [&>*]:min-w-0 [&>*]:flex-1">
-            <MistyActivityStatus />
+          <div className="agent-message-assistant">
+            <LiveStatus
+              phrase="Thinking"
+              startedAt={
+                [...props.conversation.messages].reverse().find((m) => m.role === "user")?.createdAt
+              }
+            />
           </div>
         ) : null}
       </div>

@@ -1,5 +1,6 @@
-import { Input, Label } from "@/shared/ui";
+import { Field, Input } from "@/shared/ui";
 
+/** One labeled field on a signed-out form: the shared Field and Input, at their own size. */
 export default function AuthField({
   id,
   label,
@@ -15,10 +16,7 @@ export default function AuthField({
   onChange,
 }: AuthFieldProps) {
   return (
-    <div className="grid gap-2">
-      <Label className="text-sm" htmlFor={id}>
-        {label}
-      </Label>
+    <Field label={label}>
       <Input
         id={id}
         type={type}
@@ -31,9 +29,8 @@ export default function AuthField({
         required={required}
         disabled={disabled}
         onChange={(event) => onChange(event.target.value)}
-        className="h-11 bg-transparent px-3"
       />
-    </div>
+    </Field>
   );
 }
 

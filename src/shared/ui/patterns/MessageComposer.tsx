@@ -10,9 +10,11 @@ import {
 import { ArrowUp, type LucideIcon } from "lucide-react";
 import { Textarea } from "../controls/Textarea";
 import { IconButton, type IconButtonProps } from "../controls/IconButton";
+import { CompactControls } from "../controls/RowContext";
 import { ActionBar, type ActionBarItem, type ActionBarSize } from "../layout/ActionBar";
 import { PathLine, type PathLineSegment } from "../layout/PathLine";
 import { cn } from "../classNames";
+import { uiPx } from "@/shared/lib/uiScale";
 
 /** The text box without its inset and type; the box grows to 160px, then scrolls. */
 const textBaseClass = "block w-full max-h-40 min-w-0 resize-none whitespace-pre-wrap break-words";
@@ -29,24 +31,20 @@ const maxInputPx = 160;
 
 /**
  * plain: a bordered box that sits in its pane. card: the box floats as one roomy rounded card
- * with a faint edge (stronger while typing) and a soft shadow, the text and its bar inset alike
+ * on its raised fill alone (no edge, no shadow), the text and its bar inset alike
  * so the + glyph lines up with the text above it.
  */
 export type MessageComposerVariant = "plain" | "card";
 
 const boxClass = {
   plain: "rounded-xl border",
-  // No border: a hairline ring and a soft shadow lift it off the page, the ring firmer while typing.
-  card: "relative rounded-xl transition-[box-shadow] duration-140",
+  // No border, ring or shadow: its raised fill alone sets it off the page, in light and dark.
+  card: "relative rounded-xl",
 } as const;
 /** The box's edge and fill while nothing is dragged over it. */
 const restingClass = {
   plain: "border-charcoal-border bg-charcoal-card",
-  card: [
-    "bg-charcoal-card",
-    "shadow-[0_0_0_0.5px_color-mix(in_srgb,var(--misty-theme-text)_11%,transparent),0_10px_28px_-14px_rgb(0_0_0/0.6)]",
-    "focus-within:shadow-[0_0_0_0.5px_color-mix(in_srgb,var(--misty-theme-text)_22%,transparent),0_10px_28px_-14px_rgb(0_0_0/0.6)]",
-  ],
+  card: "bg-charcoal-card",
 } as const;
 /** Files dragged over the box. */
 const draggingClass = {
@@ -149,7 +147,8 @@ export const MessageComposer = forwardRef<HTMLDivElement, MessageComposerProps>(
       const input = textareaRef.current;
       if (!input) return;
       input.style.height = "0px";
-      input.style.height = `${Math.min(maxInputPx, Math.max(minInputPx, input.scrollHeight))}px`;
+      // The limits are design pixels; scrollHeight is CSS pixels (shared/lib/uiScale.ts).
+      input.style.height = `${Math.min(uiPx(maxInputPx), Math.max(uiPx(minInputPx), input.scrollHeight))}px`;
       measured.current = input.value;
     }, [textareaRef]);
     useLayoutEffect(() => {
@@ -278,8 +277,33 @@ export function MessageComposerSend({
 }
 
 /**
+ * A button that takes the send button's place, such as Stop while a reply runs: a solid square
+ * like Send, in a soft wash instead of Send's bright fill, so the slot keeps its size and shape.
+ * The tools beside Send (voice input, mention, emoji) are plain quiet IconButtons, washed only
+ * under the pointer.
+ */
+export function MessageComposerAction({
+  className,
+  ...props
+}: Omit<IconButtonProps, "variant" | "size">) {
+  return (
+    <IconButton
+      {...props}
+      variant="quiet"
+      className={cn(
+        // Quiet's fill already reaches under its unseen border, the full 32px, as Send's does.
+        "bg-control-hover text-cream hover:bg-control-active hover:text-cream-bright",
+        "focus-visible:bg-control-active aria-pressed:text-cream-bright",
+        className,
+      )}
+    />
+  );
+}
+
+/**
  * One row at the top of a card composer, about the chat's state: a muted glyph, what it says
- * (fading at the edge), and its actions at the end. 32px, with a hairline under all but the last.
+ * (fading at the edge), and its actions at the end. 32px, with a hairline under all but the last;
+ * the row makes its actions 24px, buttons and icon buttons alike.
  */
 export function ComposerStatusRow(props: {
   icon: LucideIcon;
@@ -300,11 +324,13 @@ export function ComposerStatusRow(props: {
     >
       <Icon aria-hidden className="size-3.5 shrink-0" />
       {props.label ? <span className="shrink-0">{props.label}</span> : null}
-      <span className="min-w-0 flex-1 overflow-hidden whitespace-nowrap text-cream [mask-image:linear-gradient(to_right,black_calc(100%-20px),transparent)]">
+      <span className="min-w-0 flex-1 overflow-hidden whitespace-nowrap text-cream [mask-image:linear-gradient(to_right,black_calc(100%-1.25rem),transparent)]">
         {props.children}
       </span>
       {props.actions ? (
-        <span className="flex shrink-0 items-center gap-0.5">{props.actions}</span>
+        <span className="flex shrink-0 items-center gap-0.5">
+          <CompactControls>{props.actions}</CompactControls>
+        </span>
       ) : null}
     </div>
   );

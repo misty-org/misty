@@ -42,7 +42,6 @@ export function AgentEngineField(props: {
   if (props.model && !offered.some((model) => model.id === props.model))
     modelOptions.push({ value: props.model, label: props.model });
   const options = [
-    { value: mistyEngine, label: "Misty", icon: <EngineMark engine="misty" size={16} /> },
     ...engines.map((item) => ({
       value: item.id,
       label: item.installed ? item.name : `${item.name} (not installed)`,

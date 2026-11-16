@@ -32,7 +32,7 @@ export interface CollaborationAccess {
 export function createYjsProvider(
   initial: CollaborationProviderTicket,
   doc: Y.Doc,
-  party: "note-room" | "drawing-room",
+  party: "note-room" | "drawing-room" | "image-room",
   refresh: () => Promise<CollaborationProviderTicket>,
 ): { provider: YProvider; access: CollaborationAccess } {
   let unusedTicket = initial.ticket;
@@ -91,7 +91,7 @@ export function createYjsProvider(
 /** What a person is told about a doc or drawing they can no longer reach. */
 export function collaborationAccessMessage(
   reason: CollaborationAccessLoss,
-  kind: "doc" | "drawing",
+  kind: "doc" | "drawing" | "image",
 ): string {
   return reason === "deleted"
     ? `This ${kind} was deleted. Changes made here are no longer saved.`

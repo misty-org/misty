@@ -111,7 +111,7 @@ export function FolderAvatar({ path, size = 16 }: { path: string; size?: number 
           referrerPolicy="no-referrer"
           draggable={false}
           onError={() => setFailed(src)}
-          className="absolute inset-0 size-full rounded-[4px] object-cover"
+          className="absolute inset-0 size-full rounded-[0.25rem] object-cover"
         />
       ) : null}
     </span>

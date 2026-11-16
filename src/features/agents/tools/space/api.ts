@@ -92,6 +92,15 @@ export async function writeRoute<T = unknown>(
   }
 }
 
+/** A change made in several requests, such as an upload: a failure is read as a write route's. */
+export async function writeSteps<T>(call: () => Promise<T>): Promise<T> {
+  try {
+    return await call();
+  } catch (error) {
+    throw classify(error, true);
+  }
+}
+
 /** Runs a route and swaps the refusals the model can correct for words that say how. */
 export async function rewordRefusal<T>(
   call: () => Promise<T>,

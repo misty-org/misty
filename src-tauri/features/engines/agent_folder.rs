@@ -1,6 +1,7 @@
 //! Each agent's one folder on this computer: every chat with an agent on an outside engine works
-//! there, in a Space or not. The person picks it in the system's own folder dialog, asked before
-//! the agent's first run, or Misty makes a new one under `Documents/Misty` when they ask for one.
+//! there, in a Space or not. An agent with none gets its own under `Documents/Misty` on its first
+//! run, without asking: chats are just chats, and what they make goes to the Space. Picking a
+//! project folder instead is optional, from the agent's settings (`agent_folder_choose`).
 //! Only native code decides it, never a page, and it lives in `misty.db` (`agent_folders`), never
 //! synced.
 
@@ -152,46 +153,6 @@ fn known_for_run(
         return Ok(Some(named_path.to_path_buf()));
     }
     Ok(None)
-}
-
-/// Before an agent's first run, when it has no folder yet, the person picks where it works in the
-/// system's own folder dialog, which can make a new folder too. Cancelling stops the run: Misty
-/// never picks a folder for them.
-pub(crate) async fn ask_before_first_run(
-    app: &AppHandle,
-    account: &str,
-    agent: &str,
-    agent_name: &str,
-    named: &str,
-) -> Result<(), String> {
-    if agent.is_empty() {
-        return Ok(());
-    }
-    let db = app.state::<MistyRuntime>().environment.store();
-    let known = {
-        let (db, account, agent, named) = (
-            db.clone(),
-            account.to_string(),
-            agent.to_string(),
-            named.to_string(),
-        );
-        blocking(move || known_for_run(&db, &account, &agent, &named)).await?
-    };
-    if known.is_some() {
-        return Ok(());
-    }
-    let name = if agent_name.trim().is_empty() {
-        "this agent"
-    } else {
-        agent_name.trim()
-    };
-    let Some(path) = pick_folder(app, &format!("Choose where {name} works")).await? else {
-        return Err(format!(
-            "{name} needs a folder to work in. Send again to choose one."
-        ));
-    };
-    adopt(app, &db, account, agent, path).await?;
-    Ok(())
 }
 
 /// The system's folder dialog, opening on `Documents`. `None` when the person cancels.

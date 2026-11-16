@@ -1,4 +1,5 @@
-//! Voice: dictation into any app and captures.
+//! Voice: dictation into any app, captures, and speech on this computer (recognizing and speaking,
+//! with no key).
 #[cfg(any(target_os = "macos", windows, target_os = "linux"))]
 mod audio_capture;
 pub mod commands;
@@ -9,6 +10,7 @@ pub mod insert;
 pub(crate) mod linux;
 #[cfg(target_os = "macos")]
 pub(crate) mod macos;
+pub mod speech;
 
 // Glob re-exports carry the `__cmd__*` macros that #[tauri::command] generates
 // beside each function; naming the functions alone leaves generate_handler! blind.

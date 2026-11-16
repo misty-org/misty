@@ -2,7 +2,7 @@
 // See NOTICE.
 
 /**
- * An engine's program in Settings › Channels:
+ * An engine's program in Agents › Channels:
  *   Program path — the program to start instead of the one found on PATH (`binOverrides`). Codex
  *     shows its home folder instead, which also finds `<home>/bin/codex`; DeepSeek Harness keeps
  *     its path beside the host settings.

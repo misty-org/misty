@@ -43,7 +43,7 @@
   }
   & blockquote {
     padding-left: 0.85em;
-    border-left: 2px solid var(--color-charcoal-border);
+    border-left: 0.125rem solid var(--color-charcoal-border);
     color: var(--color-cream-muted);
   }
   & li > :is(ul, ol) {
@@ -84,7 +84,7 @@
     height: 0.95em;
     margin: 0 0.5em 0 0;
     border: 1px solid var(--color-cream-muted);
-    border-radius: 3px;
+    border-radius: 0.1875rem;
     background: transparent;
   }
   & input[type="checkbox"]:checked {
@@ -157,10 +157,10 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: 0.5rem;
   /* The md Copy button's height, so the header and its control are one row. */
-  height: 32px;
-  padding: 0 0 0 12px;
+  height: 2rem;
+  padding: 0 0 0 0.75rem;
   border-bottom: 1px solid var(--color-charcoal-border);
   color: var(--color-cream-muted);
   font-size: var(--text-caption);
@@ -168,7 +168,7 @@
 .misty-markdown-message .misty-markdown-code pre,
 .misty-markdown-code pre {
   margin: 0;
-  padding: 0.75rem 12px;
+  padding: 0.75rem 0.75rem;
   overflow-x: auto;
   border-radius: 0;
   background: transparent;
@@ -224,7 +224,7 @@
   margin: 0.7em 0;
   padding: 0.6em 0.85em;
   border: 1px solid var(--color-charcoal-border);
-  border-left-width: 3px;
+  border-left-width: 0.1875rem;
   border-radius: var(--radius-md);
   background: rgb(255 255 255 / 2.5%);
 }
@@ -238,7 +238,7 @@
 .misty-markdown-callout-title {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 0.375rem;
   margin: 0 0 0.3em !important;
   color: var(--color-cream-bright);
   font-size: var(--text-control);
@@ -279,7 +279,7 @@
   color: inherit;
   text-decoration: underline dotted;
   text-decoration-color: var(--color-cream-muted);
-  text-underline-offset: 3px;
+  text-underline-offset: 0.1875rem;
   cursor: pointer;
 }
 .misty-markdown-file-link:hover {

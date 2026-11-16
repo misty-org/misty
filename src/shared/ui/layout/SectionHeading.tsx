@@ -25,7 +25,7 @@ export type SectionHeadingAction = {
 
 export type SectionHeadingProps = {
   title: string;
-  /** A quiet count after the title, such as the number of chats in the section. */
+  /** A count after the title, in its type, such as the number of chats in the section. */
   count?: number;
   action?: SectionHeadingAction;
   /**
@@ -74,7 +74,8 @@ export function SectionHeading({
       {/* A space for the accessible name ("Chats 4"); flex drops it visually. */}
       {count !== undefined ? " " : null}
       {count !== undefined ? (
-        <span className="shrink-0 tabular-nums text-cream-muted/70">{count}</span>
+        // The count reads as part of the title: same size, weight and color.
+        <span className="shrink-0 tabular-nums">{count}</span>
       ) : null}
     </>
   );

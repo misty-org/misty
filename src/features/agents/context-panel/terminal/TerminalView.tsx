@@ -25,6 +25,7 @@ import {
 import { TerminalContextMenu } from "./TerminalContextMenu";
 import { TERMINAL_GONE, terminalApi } from "./terminalApi";
 import { loadXterm, type XtermModules } from "@/shared/lib/terminal/xtermLoader";
+import { uiPx } from "@/shared/lib/uiScale";
 
 /** The shell hears a new size this long after the last change: one call per frame stalled the
  * native side and made dragging feel sticky. */
@@ -146,7 +147,7 @@ export const TerminalView = memo(function TerminalView({
       const fontFamily = terminalFontFamily();
       const term = new Terminal({
         fontFamily,
-        fontSize: TERMINAL_FONT_SIZE,
+        fontSize: uiPx(TERMINAL_FONT_SIZE),
         cursorBlink: true,
         scrollback: 5000,
         theme: terminalTheme("panel"),
@@ -194,7 +195,7 @@ export const TerminalView = memo(function TerminalView({
 
       safeFit();
       void openSession();
-      refitAfterFontLoad(fontFamily, TERMINAL_FONT_SIZE);
+      refitAfterFontLoad(fontFamily, uiPx(TERMINAL_FONT_SIZE));
 
       // Absolute paths and web addresses in output open with a modifier-click (links.ts).
       disposables.push(

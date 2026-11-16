@@ -83,5 +83,5 @@
 .misty-markdown-message a {
   color: var(--color-cream-bright);
   text-decoration: underline;
-  text-underline-offset: 2px;
+  text-underline-offset: 0.125rem;
 }

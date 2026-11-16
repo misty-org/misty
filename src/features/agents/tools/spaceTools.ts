@@ -1,6 +1,7 @@
 import type { LocalToolHandler } from "./host";
 import { drawingTools } from "./space/drawings";
 import { fileTools } from "./space/files";
+import { imageTools } from "./space/images";
 import { itemTools } from "./space/items";
 import { spaceAdminTools } from "./space/manage";
 import { memberTools } from "./space/members";
@@ -16,6 +17,7 @@ import { threadTools } from "./space/threads";
 export const spaceTools: Record<string, LocalToolHandler> = {
   ...noteTools,
   ...drawingTools,
+  ...imageTools,
   ...fileTools,
   ...messageTools,
   ...threadTools,

@@ -15,7 +15,7 @@ import {
   Text,
   Textarea,
 } from "@/shared/ui";
-import { useLabKeys } from "../labKeys";
+import { useSpeechSupport } from "@/features/voice";
 import { jobTitle } from "../tutorPrompts";
 import { startJob } from "../tutorRuns";
 import {
@@ -34,7 +34,8 @@ type Mode = "choose" | "links" | "text";
 /**
  * Adding sources, after NotebookLM: search the web for them, or bring files, recordings, web pages
  * and videos, or pasted text, or drop files anywhere on it. The bar shows how full the notebook is.
- * Recordings are transcribed on the person's Soniox key, so they're offered only once it's saved.
+ * Recordings are transcribed by the computer's own speech recognition, so they're offered only
+ * where it has one.
  */
 export function AddSourcesDialog({
   notebook,
@@ -55,7 +56,7 @@ export function AddSourcesDialog({
   const [title, setTitle] = useState("");
   const [pasted, setPasted] = useState("");
   const [busy, setBusy] = useState(false);
-  const keys = useLabKeys();
+  const speech = useSpeechSupport();
   const used = notebook.sources.length;
   const close = () => {
     setMode("choose");
@@ -219,7 +220,7 @@ export function AddSourcesDialog({
               >
                 Upload files
               </Button>
-              {keys.recordings ? (
+              {speech?.recognition ? (
                 <Button
                   disabled={busy}
                   size="lg"

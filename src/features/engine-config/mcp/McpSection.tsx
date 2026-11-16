@@ -2,7 +2,7 @@
 // See NOTICE.
 
 /**
- * Settings › Tools › MCP servers: each engine's own MCP servers.
+ * Agents › MCP servers: each engine's own MCP servers.
  *
  * Every engine Misty can run has an entry, whether or not it has MCP: the configured list (what
  * the CLI's files declare, with on/off switches only for sources whose writes were verified) and

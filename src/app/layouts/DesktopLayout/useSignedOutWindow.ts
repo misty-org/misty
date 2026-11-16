@@ -41,8 +41,10 @@ export function useSignedOutWindow(signedOut: boolean) {
       await window.setMaximizable(false);
       return placement;
     })();
+    const stopFitting = fitToSignedOutPage(window, shrink);
     return () => {
       locked = false;
+      stopFitting();
       void shrink
         .then(async (placement) => {
           await window.setResizable(true);
@@ -54,6 +56,64 @@ export function useSignedOutWindow(signedOut: boolean) {
         .catch(() => undefined);
     };
   }, [signedOut]);
+}
+
+/**
+ * Grows the window, while it is the signed-out window, to the height its page needs, so a form
+ * never scrolls: never below the signed-out size, never past the screen's free height. A page
+ * that marks no content (the welcome) gets the signed-out size back. Refits as the page changes
+ * (Sign in to Create account, an extra field, the Google code), once the first shrink is done.
+ */
+function fitToSignedOutPage(window: Window, ready: Promise<unknown>): () => void {
+  let stopped = false;
+  let applied = 0;
+  let frame = 0;
+  const sizeObserver = new ResizeObserver(() => schedule());
+  let observed: Element | null = null;
+
+  const fit = () => {
+    frame = 0;
+    if (stopped) return;
+    const page = document.querySelector<HTMLElement>("[data-signed-out-page]");
+    const content = page?.querySelector<HTMLElement>("[data-signed-out-content]") ?? null;
+    if (content !== observed) {
+      if (observed) sizeObserver.unobserve(observed);
+      if (content) sizeObserver.observe(content);
+      observed = content;
+    }
+    let height = SIGNED_OUT_WINDOW_SIZE.height;
+    if (page && content) {
+      const style = getComputedStyle(page);
+      const padding = parseFloat(style.paddingTop) + parseFloat(style.paddingBottom);
+      // The window's height outside the page (its chrome), plus what the page's column needs.
+      const outside = globalThis.innerHeight - page.clientHeight;
+      height = Math.max(height, Math.ceil(outside + padding + content.offsetHeight));
+    }
+    height = Math.min(height, globalThis.screen.availHeight);
+    if (height === applied) return;
+    applied = height;
+    void window
+      .setSize(new LogicalSize(SIGNED_OUT_WINDOW_SIZE.width, height))
+      .then(() => window.center())
+      .catch(() => undefined);
+  };
+  const schedule = () => {
+    if (!frame && !stopped) frame = requestAnimationFrame(fit);
+  };
+  // Pages swap under the layout without it re-rendering, so watch the document for the swap.
+  const pageObserver = new MutationObserver(schedule);
+  void ready.then(() => {
+    if (stopped) return;
+    applied = SIGNED_OUT_WINDOW_SIZE.height;
+    pageObserver.observe(document.body, { childList: true, subtree: true });
+    schedule();
+  });
+  return () => {
+    stopped = true;
+    cancelAnimationFrame(frame);
+    pageObserver.disconnect();
+    sizeObserver.disconnect();
+  };
 }
 
 /** Misty's own app windows (any profile's), not its overlays and docks. */

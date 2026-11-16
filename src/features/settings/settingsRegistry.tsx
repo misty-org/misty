@@ -6,11 +6,9 @@ import {
   Mic,
   MousePointer2,
   Palette,
-  Plug,
   Server,
   ShieldCheck,
   SlidersHorizontal,
-  SquareTerminal,
   UserCircle,
   Wrench,
   type LucideIcon,
@@ -37,9 +35,7 @@ type SettingsArea =
   | "models"
   | "conversations"
   | "tutor"
-  | "access"
-  | "engines"
-  | "tools";
+  | "access";
 
 interface SettingsAreaInfo {
   label: string;
@@ -55,12 +51,10 @@ export const settingsAreas: Record<SettingsArea, SettingsAreaInfo> = {
   voice: { label: "Voice", icon: Mic },
   privacy: { label: "Privacy", icon: EyeOff },
   advanced: { label: "Advanced", icon: Wrench },
-  models: { label: "Models", icon: Cpu },
+  models: { label: "Engine", icon: Cpu },
   conversations: { label: "Behavior", icon: MessagesSquare },
   tutor: { label: "Tutor", icon: MousePointer2 },
   access: { label: "Access", icon: ShieldCheck },
-  engines: { label: "Engines", icon: SquareTerminal },
-  tools: { label: "Tools", icon: Plug },
 };
 
 /** Sidebar groups, named by feature, in sidebar order. */
@@ -72,7 +66,7 @@ export const settingsGroups: readonly { label: string; areas: readonly SettingsA
   },
   {
     label: "Agents",
-    areas: ["models", "engines", "tools", "conversations", "tutor", "access"],
+    areas: ["models", "conversations", "tutor", "access"],
   },
 ];
 
@@ -111,16 +105,8 @@ const settingsBlocks: readonly SettingsBlock[] = [
   block("advanced", "advanced", "Advanced"),
   block("advanced", "network", "Network"),
   block("advanced", "performance", "Performance"),
-  block("models", "models", "Models"),
-  block("engines", "engine-clis", "CLIs"),
-  block("engines", "engine-channels", "Channels"),
-  block("engines", "engine-env", "Environment variables"),
-  block("engines", "engine-usage", "Usage"),
-  block("tools", "engine-mcp", "MCP servers"),
-  block("tools", "engine-skills", "Skills"),
-  block("tools", "engine-prompts", "Prompts"),
+  block("models", "models", "Engine"),
   block("conversations", "agents-defaults", "Conversations"),
-  block("conversations", "agents-personas", "Personas"),
   block("tutor", "agents-companion", "Tutor"),
   block("access", "agents-permissions", "Access", "resource"),
   block("access", "agents-computer-use", "Computer use"),

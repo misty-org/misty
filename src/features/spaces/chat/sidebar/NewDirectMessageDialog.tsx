@@ -2,7 +2,7 @@ import { useState } from "react";
 import { spacesApi } from "../../api/api";
 import type { SpaceConversation, SpaceMember } from "../../api/dto/entities";
 import { SystemErrorNotice } from "@/shared/platform/systemErrors";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, Pressable, Text } from "@/shared/ui";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, ListRow, Text } from "@/shared/ui";
 
 /** Opens the DM with another person in the Space, starting it if there isn't one yet. */
 export function NewDirectMessageDialog({
@@ -44,20 +44,15 @@ export function NewDirectMessageDialog({
         <div className="misty-transient-scrollbar mt-4 grid max-h-56 gap-1 overflow-y-auto">
           {others.length ? (
             others.map((member) => (
-              <Pressable
+              <ListRow
                 key={member.user_id}
+                label={member.name}
                 disabled={opening}
-                onClick={() => void openWith(member.user_id)}
-                wash="control"
-                className="flex min-h-10 items-center rounded-md px-3 text-left text-sm"
-              >
-                <Text full tone="default" className="min-w-0">
-                  {member.name}
-                </Text>
-              </Pressable>
+                onOpen={() => void openWith(member.user_id)}
+              />
             ))
           ) : (
-            <Text as="p" tone="muted" wrap className="px-3 text-sm">
+            <Text as="p" tone="muted" wrap className="px-2">
               No one else is in this Space yet.
             </Text>
           )}

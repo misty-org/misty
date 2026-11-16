@@ -1,3 +1,4 @@
+import { SpaceCrumb } from "../../components/space-row/SpaceCrumb";
 import { OrderedCollectionFilters as CollectionFilters } from "@/features/settings/OrderedCollectionFilters";
 import type { LibraryItemQuery } from "../../api/dto/entities";
 import { mediaTypeOptions, sortOptions } from "../libraryFilterOptions";
@@ -26,7 +27,7 @@ export function LibraryEntryHeader() {
   return (
     <>
       <CollectionHeading
-        title="Library"
+        title={<SpaceCrumb spaceId={data.spaceId} here="Library" />}
         end={
           <>
             <CollectionSearch

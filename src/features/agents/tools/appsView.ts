@@ -1,4 +1,4 @@
-import type { ActiveAccount, ComposioSearch } from "./appsTools";
+import type { ActiveAccount, AppsSearch } from "./appsTools";
 
 /**
  * What the model sees of connected apps, in the shapes the server gave it, so a run reads the same
@@ -17,21 +17,8 @@ function truncated(value: string, limit: number) {
     .trim()}…`;
 }
 
-// Composio's guidance names its own meta tools; the model knows Misty's.
-const guidanceNames: [string, string][] = [
-  ["COMPOSIO_MULTI_EXECUTE_TOOL", "integration_execute"],
-  ["COMPOSIO_GET_TOOL_SCHEMAS", "integration_schemas"],
-  ["COMPOSIO_MANAGE_CONNECTIONS", "integration_connect"],
-  ["COMPOSIO_WAIT_FOR_CONNECTIONS", "integration_connect"],
-  ["COMPOSIO_SEARCH_TOOLS", "integration_search"],
-  ["COMPOSIO_REMOTE_WORKBENCH", "the code sandbox (unavailable in Misty)"],
-  ["COMPOSIO_REMOTE_BASH_TOOL", "the code sandbox (unavailable in Misty)"],
-];
-
 function guidance(text: string, limit: number) {
-  let named = text.trim();
-  for (const [from, to] of guidanceNames) named = named.split(from).join(to);
-  return truncated(named, limit);
+  return truncated(text.trim(), limit);
 }
 
 function guidanceList(items: string[], count: number) {
@@ -42,8 +29,8 @@ function guidanceList(items: string[], count: number) {
 }
 
 /**
- * Search apps are paid web search services the person would have to sign up for. Misty's own web
- * search runs on the search key in Settings, so an agent asks to connect one only when they name it.
+ * Search apps are paid web search services the person would have to sign up for. Agents search the
+ * web with their own engine's tools, so an agent asks for one only when the person names it.
  */
 const searchApps: Record<string, { name: string; pattern: RegExp }> = {
   exa: { name: "Exa", pattern: /\bexa\b/i },
@@ -69,7 +56,7 @@ export const searchAppRefusal = (app: string) =>
 /** What `integration.search` tells the model to do about an unconnected app. */
 function nextStep(app: string, request: string) {
   return mayConnect(app, request)
-    ? `Call integration_connect with app ${app} before running its tools.`
+    ? `Ask the user to connect ${app} in Misty's Apps page, or use its web page in the browser.`
     : `Do not connect this paid search app unless the user names it. ${searchAppInstead}`;
 }
 
@@ -82,7 +69,7 @@ function byApp(accounts: ActiveAccount[]) {
 }
 
 /** Keeps what the model needs to plan and call tools. */
-export function appsSearchView({ found, accounts }: ComposioSearch, request: string) {
+export function appsSearchView({ found, accounts }: AppsSearch, request: string) {
   const results = found.results.map((item) => ({
     task: item.use_case,
     tools: item.primary_tool_slugs,

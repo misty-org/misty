@@ -133,7 +133,7 @@ async fn capture_displays(app: AppHandle, turn: u64) -> Result<Vec<Value>, Strin
                 match platform::capture_window(m,frame,window) {
                     Ok((bytes,width,height,area)) if width>0 && height>0 && !bytes.is_empty() => {
                         let content_hash=format!("{:x}",Sha256::digest(&bytes));
-                        result.push(json!({"id":uuid::Uuid::new_v4().to_string(),"name":format!("window1 — {} ({} × {})",window_name(window),width,height),"mimeType":"image/jpeg","dataUrl":format!("data:image/jpeg;base64,{}",STANDARD.encode(&bytes)),"width":width,"height":height,"contentHash":content_hash,"capturedAt":captured_at()?,"source":"desktop-window","screen":"window1","primary":false,"display":area,"app":window.app,"title":window.title}));
+                        result.push(json!({"id":uuid::Uuid::new_v4().to_string(),"name":format!("window1 — {} ({} × {})",window_name(window),width,height),"mimeType":"image/jpeg","dataUrl":format!("data:image/jpeg;base64,{}",STANDARD.encode(&bytes)),"width":width,"height":height,"contentHash":content_hash,"capturedAt":captured_at()?,"source":"desktop-window","screen":"window1","primary":false,"display":area,"app":window.app,"title":window.title,"document":platform::front_document()}));
                     }
                     // The displays still answer the turn without the closer look.
                     Ok(_) => {}

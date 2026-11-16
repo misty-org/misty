@@ -1,3 +1,4 @@
+import type { SketchInk } from "@/shared/ui";
 import { sketchBounds, sketchSkeleton, type SketchElement } from "./companionSketch";
 
 /** Space around a drawing inside its SVG, in drawing units. */
@@ -5,12 +6,12 @@ export const SKETCH_PADDING = 16;
 
 /**
  * Renders a sketch to an SVG with Excalidraw's hand-drawn style. Excalidraw loads on
- * the first drawing only. `stroke` is near-black on the whiteboard and white for marks
- * over the screen, where a shadow keeps it readable.
+ * the first drawing only. `ink` is the board's (near-black) or the screen's (white, where a
+ * shadow keeps it readable), with its colors.
  */
 export async function renderSketch(
   elements: SketchElement[],
-  stroke: string,
+  ink: SketchInk,
 ): Promise<
   | { svg: SVGSVGElement; bounds: { x: number; y: number; width: number; height: number } }
   | undefined
@@ -19,13 +20,27 @@ export async function renderSketch(
   const { convertToExcalidrawElements, exportToSvg, getCommonBounds } =
     await import("@excalidraw/excalidraw");
   const scene = convertToExcalidrawElements(
-    sketchSkeleton(elements, stroke) as Parameters<typeof convertToExcalidrawElements>[0],
+    sketchSkeleton(elements, ink) as Parameters<typeof convertToExcalidrawElements>[0],
     { regenerateIds: false },
   );
   if (!scene.length) return undefined;
+  // The pictures the drawing holds, by the id each image element names.
+  const files = Object.fromEntries(
+    elements
+      .filter((e) => e.type === "image" && e.src)
+      .map((e) => [
+        e.id,
+        {
+          id: e.id,
+          dataURL: e.src!,
+          mimeType: e.src!.slice(5, e.src!.indexOf(";")),
+          created: 0,
+        },
+      ]),
+  );
   const svg = await exportToSvg({
     elements: scene,
-    files: null,
+    files: (Object.keys(files).length ? files : null) as Parameters<typeof exportToSvg>[0]["files"],
     exportPadding: SKETCH_PADDING,
     appState: { exportBackground: false, viewBackgroundColor: "transparent" },
   });

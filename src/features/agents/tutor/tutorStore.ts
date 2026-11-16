@@ -56,6 +56,14 @@ interface TutorStore {
 }
 
 const now = () => new Date().toISOString();
+
+/** Notebooks made in this session and not opened yet: the first opening asks for sources. */
+const justMade = new Set<string>();
+
+/** Whether the notebook was just made here and this is its first opening. Asks only once. */
+export function firstOpening(notebookId: string): boolean {
+  return justMade.delete(notebookId);
+}
 const id = (prefix: string) => `${prefix}-${crypto.randomUUID()}`;
 
 /** Tutor's notebooks, decks, guides and runs on this computer (tutorTypes.ts). */
@@ -115,6 +123,14 @@ export const useTutorStore = create<TutorStore>((set, get) => {
         read<TutorJob>("tutor_job"),
       ]);
       if (get().accountId !== accountId) return;
+      // Nothing is being read once Misty has started again: a read cut off by a reload or a quit
+      // isn't still running, so its source stops saying it is (and is read again on opening).
+      for (const [notebookId, notebook] of Object.entries(notebooks))
+        if (notebook.sources.some((source) => source.reading))
+          notebooks[notebookId] = {
+            ...notebook,
+            sources: notebook.sources.map(({ reading: _reading, ...source }) => source),
+          };
       set({ notebooks, decks, guides, jobs, ready: true });
     },
 
@@ -131,6 +147,7 @@ export const useTutorStore = create<TutorStore>((set, get) => {
         updatedAt: at,
       };
       putNotebook(notebook);
+      justMade.add(notebook.id);
       return notebook;
     },
     updateNotebook: changeNotebook,
@@ -260,13 +277,16 @@ export const useTutorStore = create<TutorStore>((set, get) => {
   };
 });
 
-/** Chats that Tutor's runs and notebooks made: Tutor lists them, so the sidebar doesn't. */
+/**
+ * Hidden chats the Lab made before it ran on the default engine (its jobs' and notebooks' own):
+ * lists of chats still skip them. The Lab makes no chats now.
+ */
 export function tutorChatIds(
   jobs: Records<TutorJob>,
   notebooks: Records<Notebook> = {},
 ): Set<string> {
   return new Set([
-    ...Object.values(jobs).map((job) => job.conversationId),
+    ...Object.values(jobs).flatMap((job) => (job.conversationId ? [job.conversationId] : [])),
     ...Object.values(notebooks).flatMap((notebook) => notebook.chats),
   ]);
 }

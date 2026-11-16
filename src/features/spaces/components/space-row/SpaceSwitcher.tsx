@@ -44,7 +44,7 @@ export function SpaceSwitcher({ space }: { space: Space }) {
                 <DropdownMenuContent
                   side="bottom"
                   align="start"
-                  className="w-60 max-w-[calc(100vw-16px)]"
+                  className="w-60 max-w-[calc(100vw-1rem)]"
                 >
                   <SpaceMenuItems space={space} onDialog={setDialog} onCreate={create} />
                 </DropdownMenuContent>

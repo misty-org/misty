@@ -11,7 +11,7 @@ describe("TreeRow", () => {
     const onOpen = vi.fn();
     render(<TreeRow label="App.java" depth={2} onOpen={onOpen} />);
     const open = screen.getByRole("button", { name: "App.java" });
-    expect((open.parentElement as HTMLElement).style.paddingLeft).toBe("40px");
+    expect((open.parentElement as HTMLElement).style.paddingLeft).toBe("2.5rem");
     fireEvent.click(open);
     expect(onOpen).toHaveBeenCalledOnce();
   });

@@ -3,42 +3,51 @@ import type { TutorJob } from "./tutorTypes";
 import {
   chats,
   dismissJob,
-  elsewhere,
   fakes,
   finish,
   follow,
   job,
   jobOf,
   retryJob,
+  runOf,
   setChats,
   startRun,
   tutor,
 } from "./tutorRuns.testFixtures";
 
 describe("a Create job", () => {
-  it("runs in a chat of its own and leaves what the person has open alone", async () => {
+  it("runs on the default engine with no chat, leaving what the person has open alone", async () => {
     await follow();
     const started = await job({ kind: "deck" });
 
-    expect(started.state).toBe("running");
-    expect(fakes.submitAnswer).toHaveBeenCalledTimes(1);
-    const [, , , , target, options] = fakes.submitAnswer.mock.calls[0];
-    expect(target).toMatchObject({ conversationId: started.conversationId });
-    expect(options).toMatchObject({
-      executionMode: "user",
-      collaborationMode: "act",
-      permissionMode: "auto",
+    expect(started).toMatchObject({ state: "running", agentId: "personal_engine_claude" });
+    expect(fakes.runOnEngine).toHaveBeenCalledTimes(1);
+    expect(fakes.runOnEngine.mock.calls[0][0]).toMatchObject({
+      prompt: "Make it",
+      key: `${started.id}:0`,
     });
+    expect(runOf(started.id)).toBe("run-1");
+    expect(fakes.submitAnswer).not.toHaveBeenCalled();
     expect(chats().selectedAgentId).toBe("agent-mine");
-    expect(chats().activeConversationId).toBe(elsewhere.id);
-    expect(chats().conversations.some((chat) => chat.id === started.conversationId)).toBe(true);
+    expect(chats().activeConversationId).toBe("chat-elsewhere");
   });
 
-  it("reads a finished deck reply into a deck in the notebook", async () => {
+  it("fails at once when there's no default engine", async () => {
+    await follow();
+    fakes.engine = undefined;
+    const started = await job({ kind: "deck" });
+    expect(started).toMatchObject({
+      state: "failed",
+      error: "Pick a default engine in Settings › Agents.",
+    });
+    expect(fakes.runOnEngine).not.toHaveBeenCalled();
+  });
+
+  it("reads a finished deck answer into a deck in the notebook", async () => {
     await follow();
     const started = await job({ kind: "deck", title: "Flashcards: Volcanoes" });
-    finish(
-      started.conversationId,
+    await finish(
+      runOf(started.id),
       'Here you go:\n```json\n{"title": "Lava", "cards": [{"front": "Magma?", "back": "Molten rock"}, {"front": "Vent?", "back": "An opening"}]}\n```',
     );
 
@@ -49,10 +58,10 @@ describe("a Create job", () => {
     expect(deck.cards.map((card) => card.front)).toEqual(["Magma?", "Vent?"]);
   });
 
-  it("names a deck after its topic when the reply gives no title", async () => {
+  it("names a deck after its topic when the answer gives no title", async () => {
     await follow();
     const started = await job({ kind: "deck", title: "Flashcards: Volcanoes" });
-    finish(started.conversationId, '{"cards": [{"front": "a", "back": "b"}]}');
+    await finish(runOf(started.id), '{"cards": [{"front": "a", "back": "b"}]}');
     expect(tutor().decks[jobOf(started.id).resultId!].title).toBe("Volcanoes");
   });
 
@@ -124,30 +133,26 @@ describe("a Create job", () => {
   ];
 
   it.each(replies)(
-    "reads a finished $name reply into what Create shows",
+    "reads a finished $name answer into what Create shows",
     async ({ kind, report, reply, expected }) => {
       await follow();
       const started = await job({ kind, report });
-      finish(started.conversationId, reply);
+      await finish(runOf(started.id), reply);
 
       const done = jobOf(started.id);
       expect(done.state).toBe("done");
-      expect(tutor().guides[done.resultId!]).toMatchObject({
-        ...expected,
-        notebookId: "n1",
-        conversationId: started.conversationId,
-      });
+      expect(tutor().guides[done.resultId!]).toMatchObject({ ...expected, notebookId: "n1" });
     },
   );
 
   it("starts the narration of an audio or video overview once its script is in", async () => {
     await follow();
     const overview = await job({ kind: "overview" });
-    finish(overview.conversationId, replies.find((item) => item.kind === "overview")!.reply);
+    await finish(runOf(overview.id), replies.find((item) => item.kind === "overview")!.reply);
     expect(fakes.makeOverviewAudio).toHaveBeenCalledWith(jobOf(overview.id).resultId);
 
     const video = await job({ kind: "video" });
-    finish(video.conversationId, replies.find((item) => item.kind === "video")!.reply);
+    await finish(runOf(video.id), replies.find((item) => item.kind === "video")!.reply);
     expect(fakes.makeVideoAudio).toHaveBeenCalledWith(jobOf(video.id).resultId);
   });
 
@@ -159,10 +164,10 @@ describe("a Create job", () => {
     ["infographic", "No drawing here."],
     ["video", '{"scenes": [{"heading": "One", "narration": "Only one."}]}'],
     ["overview", '{"lines": [{"speaker": "A", "text": "Alone"}]}'],
-  ] as const)("fails a %s reply it can't use, and makes nothing", async (kind, reply) => {
+  ] as const)("fails a %s answer it can't use, and makes nothing", async (kind, reply) => {
     await follow();
     const started = await job({ kind });
-    finish(started.conversationId, reply);
+    await finish(runOf(started.id), reply);
 
     expect(jobOf(started.id)).toMatchObject({
       state: "failed",
@@ -173,93 +178,83 @@ describe("a Create job", () => {
   });
 
   it.each([
-    ["failed", "The model is over its rate limit.", "The model is over its rate limit."],
-    ["failed", '{"title": "half a de', "This run stopped before it finished."],
-    ["failed", "", "This run stopped before it finished."],
-    ["canceled", "", "This run was stopped."],
-  ] as const)("says why a %s reply failed", async (state, content, error) => {
+    ["", "The model is over its rate limit.", "The model is over its rate limit."],
+    [
+      '{"title": "half a de',
+      "This run stopped before it finished.",
+      "This run stopped before it finished.",
+    ],
+    ["", "Stopped.", "Stopped."],
+  ] as const)("says why a run that ended with %j failed", async (text, error, expected) => {
     await follow();
     const started = await job({ kind: "deck" });
-    finish(started.conversationId, content, state);
-    expect(jobOf(started.id)).toMatchObject({ state: "failed", error });
+    await finish(runOf(started.id), text, error);
+    expect(jobOf(started.id)).toMatchObject({ state: "failed", error: expected });
   });
 
-  it("fails with the reason when the turn can't start", async () => {
+  it("fails with the reason when the run can't start", async () => {
     await follow();
-    fakes.submitAnswer.mockRejectedValueOnce(new Error("No engine is signed in."));
+    fakes.runOnEngine.mockRejectedValueOnce(new Error("No engine is signed in."));
     const started = await job({ kind: "deck" });
-    expect(started).toMatchObject({ state: "failed", error: "No engine is signed in." });
+    await vi.waitFor(() =>
+      expect(jobOf(started.id)).toMatchObject({
+        state: "failed",
+        error: "No engine is signed in.",
+      }),
+    );
   });
 });
 
-describe("waiting for a turn", () => {
-  it("waits while another turn is working, then starts when it ends", async () => {
+describe("several jobs", () => {
+  it("run side by side, with no turn to wait for", async () => {
     await follow();
     setChats({ working: true });
-    const waiting = await job({ kind: "deck" });
-
-    expect(waiting.state).toBe("queued");
-    expect(fakes.submitAnswer).not.toHaveBeenCalled();
-
-    setChats({ working: false });
-    await vi.waitFor(() => expect(jobOf(waiting.id).state).toBe("running"));
-    expect(fakes.submitAnswer).toHaveBeenCalledTimes(1);
-  });
-
-  it("runs two jobs one after the other", async () => {
-    await follow();
     const first = await job({ kind: "deck" });
     const second = await job({ kind: "quiz" });
 
     expect(first.state).toBe("running");
-    expect(jobOf(second.id).state).toBe("queued");
-    expect(fakes.submitAnswer).toHaveBeenCalledTimes(1);
-
-    finish(first.conversationId, '{"cards": [{"front": "a", "back": "b"}]}');
-    await vi.waitFor(() => expect(jobOf(second.id).state).toBe("running"));
-    expect(fakes.submitAnswer).toHaveBeenCalledTimes(2);
+    expect(second.state).toBe("running");
+    expect(fakes.runOnEngine).toHaveBeenCalledTimes(2);
   });
 });
 
 describe("trying again", () => {
-  it("reads a reply that finished again before starting a new turn", async () => {
+  it("starts a new run for a job that failed", async () => {
     await follow();
     const started = await job({ kind: "deck" });
-    // Read as unusable once, then the reply is read again as it stands.
-    finish(started.conversationId, "nothing");
-    expect(jobOf(started.id).state).toBe("failed");
-    finish(started.conversationId, '{"cards": [{"front": "a", "back": "b"}]}');
+    await finish(runOf(started.id), "", "The model is over its rate limit.");
 
     const retried = await retryJob(jobOf(started.id));
-    expect(retried.state).toBe("done");
-    expect(tutor().decks[retried.resultId!].cards).toHaveLength(1);
-    expect(fakes.submitAnswer).toHaveBeenCalledTimes(1);
+    expect(retried).toMatchObject({ state: "running", error: undefined, restarts: 1 });
+    expect(fakes.runOnEngine).toHaveBeenCalledTimes(2);
+    expect(fakes.runOnEngine.mock.calls[1][0]).toMatchObject({ key: `${started.id}:1` });
+
+    await finish(runOf(started.id), '{"cards": [{"front": "a", "back": "b"}]}');
+    expect(jobOf(started.id).state).toBe("done");
   });
 
-  it("starts a new turn in the same chat when there is nothing to read", async () => {
+  it("stops a running job's run and drops the job", async () => {
     await follow();
     const started = await job({ kind: "deck" });
-    finish(started.conversationId, "The model is over its rate limit.", "failed");
-
-    const retried = await retryJob(jobOf(started.id));
-    expect(retried).toMatchObject({ state: "running", error: undefined });
-    expect(fakes.submitAnswer).toHaveBeenCalledTimes(2);
-    expect(fakes.submitAnswer.mock.calls[1][4]).toMatchObject({
-      conversationId: started.conversationId,
-    });
-  });
-
-  it("drops a job and its chat", async () => {
-    await follow();
-    const started = await job({ kind: "deck" });
+    const runId = runOf(started.id);
     await dismissJob(jobOf(started.id));
-    expect(fakes.deleteConversation).toHaveBeenCalledWith(started.conversationId);
+    expect(fakes.stopEngineRun).toHaveBeenCalledWith(runId);
     expect(jobOf(started.id)).toBeUndefined();
+  });
+
+  it("ignores an answer that arrives after the job was dropped", async () => {
+    await follow();
+    const started = await job({ kind: "deck" });
+    const runId = runOf(started.id);
+    await dismissJob(jobOf(started.id));
+    await finish(runId, '{"cards": [{"front": "a", "back": "b"}]}');
+    expect(jobOf(started.id)).toBeUndefined();
+    expect(Object.keys(tutor().decks)).toHaveLength(0);
   });
 });
 
-describe("a Teach me lesson", () => {
-  it("opens as a teach-mode chat the person reads", async () => {
+describe("a chat turn (a pick-up's draft)", () => {
+  it("opens as a teach-mode chat when asked to", async () => {
     const run = await startRun({
       agentId: "agent-1",
       title: "Volcanoes",

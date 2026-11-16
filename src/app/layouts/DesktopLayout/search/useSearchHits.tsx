@@ -15,7 +15,6 @@ import {
   Settings,
   SquarePen,
   TerminalSquare,
-  Waypoints,
   type LucideIcon,
 } from "lucide-react";
 import { useMemo } from "react";
@@ -28,8 +27,10 @@ import {
   tutorChatIds,
   useLessonStore,
   useMistyStore,
+  defaultAgentOf,
   usePersonalAgentsStore,
   useTutorStore,
+  notebookRoute,
 } from "@/features/agents";
 import { useCommands } from "@/features/commands";
 import { openSettings, searchSettings } from "@/features/settings";
@@ -54,8 +55,7 @@ import type { SearchHit, SearchKind } from "./searchTypes";
 const pages: { label: string; icon: LucideIcon; route(base: string): string; space?: boolean }[] = [
   { label: "Space", icon: Galaxy, route: (base) => base, space: true },
   { label: "Studio", icon: Armchair, route: () => "/agents?view=studio" },
-  { label: "Lab", icon: FlaskConical, route: () => "/agents?view=lab" },
-  { label: "Integrations", icon: Waypoints, route: () => "/agents?view=integrations" },
+  { label: "Lab", icon: FlaskConical, route: (base) => `${base}/lab`, space: true },
   { label: "Chat", icon: MessagesSquare, route: (base) => `${base}/chat`, space: true },
   { label: "Docs", icon: FileText, route: (base) => `${base}/notes`, space: true },
   { label: "Planner", icon: KanbanSquare, route: (base) => `${base}/planner`, space: true },
@@ -126,13 +126,7 @@ export function useSearchHits(context: SearchContext): SearchResults {
       (agentId ? undefined : agents.find((agent) => agent.system_managed)),
     [agents],
   );
-  const defaultAgent = useMemo(
-    () =>
-      agents.find((agent) => agent.engine && agent.enabled && !agent.system_managed) ??
-      agents.find((agent) => agent.system_managed) ??
-      agents[0],
-    [agents],
-  );
+  const defaultAgent = useMemo(() => defaultAgentOf(agents) ?? agents[0], [agents]);
 
   // What lives here: matched on every keystroke.
   const local = useMemo(() => {
@@ -177,7 +171,8 @@ export function useSearchHits(context: SearchContext): SearchResults {
     }
 
     for (const chat of conversations) {
-      if (!chat.messages.length || lessons[chat.id] || tutorMade.has(chat.id)) continue;
+      if (!chat.messages.length || chat.place === "studio") continue;
+      if (lessons[chat.id] || tutorMade.has(chat.id)) continue;
       const agent = agentOf(chat.agentId);
       if (!agent) continue;
       const title = chat.title || "New conversation";
@@ -275,7 +270,7 @@ export function useSearchHits(context: SearchContext): SearchResults {
         icon: notebook.emoji ? <span aria-hidden>{notebook.emoji}</span> : icon(NotebookPen),
         updatedAt: notebook.updatedAt,
         match,
-        open: () => openRoute(`/agents?view=lab&item=notebook:${encodeURIComponent(notebook.id)}`),
+        open: () => openRoute(notebookRoute(notebook)),
       });
     }
 

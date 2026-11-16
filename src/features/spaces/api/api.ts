@@ -126,7 +126,7 @@ export function spaceErrorMessage(code: string | undefined, fallback: string): s
     storage_limit_reached: accountLimitMessages.storage_limit_reached!,
     account_suspended: accountLimitMessages.account_suspended!,
     account_closing: accountLimitMessages.account_closing!,
-    model_key_needed: "Add a model key in Settings → Models.",
+    model_key_needed: "Pick a default engine in Settings › Agents.",
     library_uploads_disabled: "Library uploads are temporarily unavailable.",
     library_media_processor_unavailable: "Edited media rendering is temporarily unavailable.",
     upload_verification_failed: "Misty could not verify the uploaded file.",
@@ -136,7 +136,7 @@ export function spaceErrorMessage(code: string | undefined, fallback: string): s
     version_conflict: "Someone else changed this item. Reload it before saving again.",
     offline_reference_only: "Spaces are unavailable while Misty reconnects.",
     agent_model_unavailable:
-      "The model chosen in Settings › Models is unavailable. Choose another one there.",
+      "The engine's model is unavailable. Pick another default engine in Settings › Agents.",
     provider_not_configured:
       "This provider’s sign-in is not available on the current Misty server.",
     invite_expired: "That invitation has expired.",

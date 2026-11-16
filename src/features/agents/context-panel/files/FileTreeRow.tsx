@@ -16,6 +16,7 @@ import type { FileTreeColor, RepositorySummary } from "./filesApi";
 import { getFileTreeIconSvg } from "./fileIcons";
 import { useFilesStore } from "./filesStore";
 import type { VisibleNode } from "./visibleNodes";
+import { remCss } from "@/shared/lib/uiScale";
 
 /** The badge's words for a repository: `branch, clean` or `branch, 2 changed, 1 new`. */
 function repositoryLabel(repo: RepositorySummary): string {
@@ -138,7 +139,7 @@ export const TreeRow = memo(function TreeRow({
       wash={selected ? "control" : "row"}
       data-selected={selected || undefined}
       className="group/row flex h-8 w-full min-w-0 items-center gap-1 pr-1 text-meta"
-      style={{ paddingLeft: 8 + node.depth * 14 }}
+      style={{ paddingLeft: remCss(8 + node.depth * 14) }}
       onContextMenu={(event: MouseEvent<HTMLElement>) => onContextMenu(event, node)}
     >
       <Tooltip content={node.path}>

@@ -11,6 +11,8 @@ vi.mock("@/features/agents/conversations/context/contextBridge", () => ({
   })),
 }));
 vi.mock("@/features/agents/personal/personalAgentsStore", () => ({
+  defaultAgentOf: (agents: { system_managed?: boolean; engine?: string }[]) =>
+    agents.find((agent) => agent.engine) ?? agents.find((agent) => agent.system_managed),
   usePersonalAgentsStore: {
     getState: () => ({
       accountId: "account-a",

@@ -1,0 +1,20 @@
+[package]
+name = "voice_speech"
+version = "0.1.0"
+description = "Speech recognition on this computer: a recorded file or the microphone, live, with no key."
+edition = "2021"
+license = "AGPL-3.0-or-later"
+publish = false
+rust-version = "1.80"
+
+[lib]
+name = "voice_speech"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Apple's Speech and AVFAudio frameworks, called from Rust; the same versions as the app's.
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6.4"
+block2 = "0.6.2"

@@ -116,7 +116,7 @@ export function HappeningNow(props: {
   return (
     <section className={props.className} aria-label="Happening now">
       {props.heading}
-      <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-3">
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(16.25rem,1fr))] gap-3">
         {sorted.map((run) => {
           const runSteps: RunStep[] = steps?.[run.runId] ?? [];
           const latest = runSteps[runSteps.length - 1];

@@ -1,8 +1,7 @@
 import { developmentServer } from "@/api/deployment/serverChoice";
 import AuthField from "../components/AuthField";
 import AuthMessage from "../components/AuthMessage";
-import { authButtonClass } from "../components/authButtonClass";
-import { Button, Spinner } from "@/shared/ui";
+import { Button } from "@/shared/ui";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { useState, type FormEvent } from "react";
 import { parseServerAddress } from "./serverAddress";
@@ -43,7 +42,7 @@ export function OwnServerScreen(props: {
   }
 
   return (
-    <form className="flex flex-col gap-3.5" onSubmit={(event) => void submit(event)}>
+    <form className="flex flex-col gap-4" onSubmit={(event) => void submit(event)}>
       <AuthField
         id="setup-server"
         label="Server address"
@@ -67,11 +66,9 @@ export function OwnServerScreen(props: {
         type="submit"
         variant="primary"
         size="lg"
-        className={authButtonClass}
         disabled={busy || !address.trim()}
-        aria-busy={busy}
+        loading={busy}
       >
-        {busy ? <Spinner size="sm" label={false} /> : null}
         Continue
       </Button>
     </form>

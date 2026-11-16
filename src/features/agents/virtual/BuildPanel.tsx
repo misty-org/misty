@@ -1,26 +1,10 @@
 import { AgentAvatar } from "../personal/AgentAvatar";
-import {
-  Armchair,
-  BookOpen,
-  Coffee,
-  GlassWater,
-  Lamp,
-  Minus,
-  Monitor,
-  Plus,
-  Presentation,
-  RectangleHorizontal,
-  RotateCw,
-  Sofa,
-  Sprout,
-  Table,
-  Trash2,
-  Users,
-  type LucideIcon,
-} from "lucide-react";
+import { Lock, Minus, Plus, RotateCw, Trash2, Users, X } from "lucide-react";
+import { furnitureIcons } from "./furnitureIcons";
 import { Button, IconButton, OptionSelect, Separator, Surface, Text } from "@/shared/ui";
 import { furniture, furnitureKinds, type FurnitureKind } from "./studio/catalog";
-import { ROOM } from "./studio/grid";
+import { ROOM, type RoomSize } from "./studio/grid";
+import { StudioSideHead } from "./StudioHud";
 import {
   addItem,
   assignDesk,
@@ -29,27 +13,26 @@ import {
   rotateItem,
   type StudioLayout,
 } from "./studio/layout";
+import { unlocks, type Progress } from "./studioProgress";
 import type { StudioAgent } from "./useStudioAgents";
 
-const icons: Record<FurnitureKind, LucideIcon> = {
-  desk: Monitor,
-  sofa: Sofa,
-  armchair: Armchair,
-  table: Table,
-  "coffee-table": Coffee,
-  bookshelf: BookOpen,
-  screen: Presentation,
-  plant: Sprout,
-  lamp: Lamp,
-  cooler: GlassWater,
-  rug: RectangleHorizontal,
-};
+const icons = furnitureIcons;
+
+/** The points a piece of furniture is earned at. */
+const earnedAt = new Map<FurnitureKind, number>(
+  unlocks.flatMap((unlock) => ("kind" in unlock ? [[unlock.kind, unlock.at] as const] : [])),
+);
 
 /**
- * The room's own size: wider or deeper a few cells at a time, up to the largest studio, and
- * smaller again as long as no furniture would be left outside the walls.
+ * The room's own size: wider or deeper a few cells at a time, up to the biggest room the studio
+ * has earned (or the size it already is), and smaller again as long as no furniture would be left
+ * outside the walls.
  */
-function RoomSizer(props: { layout: StudioLayout; onLayout(next: StudioLayout): void }) {
+function RoomSizer(props: {
+  layout: StudioLayout;
+  room: RoomSize;
+  onLayout(next: StudioLayout): void;
+}) {
   const { layout } = props;
   const sides = [
     { label: "Width", key: "w", value: layout.size.w },
@@ -61,7 +44,8 @@ function RoomSizer(props: { layout: StudioLayout; onLayout(next: StudioLayout): 
       <div className="grid gap-0.5 pt-1.5 pr-1 pb-0.5 pl-2.5">
         {sides.map(({ label, key, value }) => {
           const smaller = resizeRoom(layout, { [key]: -ROOM.step });
-          const bigger = resizeRoom(layout, { [key]: ROOM.step });
+          const grown = resizeRoom(layout, { [key]: ROOM.step });
+          const bigger = grown.size[key] > Math.max(props.room[key], value) ? layout : grown;
           return (
             <div key={key} className="flex min-h-7 items-center gap-1">
               <Text bare tone="muted" className="flex-1 text-ui">
@@ -104,8 +88,12 @@ export function BuildPanel(props: {
   onPick(id: string | null): void;
   onLayout(next: StudioLayout): void;
   onReset(): void;
+  /** What the studio has earned: which pieces can be placed and how big the room may grow. */
+  progress: Progress;
+  /** Back to walking the studio. Esc does the same. */
+  onClose(): void;
 }) {
-  const { layout } = props;
+  const { layout, progress } = props;
   const picked = layout.items.find((item) => item.id === props.picked);
   const add = (kind: FurnitureKind) => {
     const added = addItem(layout, kind);
@@ -119,25 +107,45 @@ export function BuildPanel(props: {
         as="aside"
         tone="scene-panel"
         radius="2xl"
-        className="absolute top-3 left-3 z-[var(--stack-overlay)] grid max-h-[calc(100%-6rem)] w-55 gap-0.5 overflow-y-auto p-2"
-        aria-label="Furniture"
+        className="absolute top-2 left-2 z-[var(--stack-overlay)] grid max-h-[calc(100%-1rem)] w-55 gap-0.5 overflow-y-auto p-2"
+        aria-label="Build"
       >
+        <StudioSideHead title="Build">
+          <IconButton label="Done" size="sm" shortcut="Esc" onClick={props.onClose}>
+            <X aria-hidden="true" />
+          </IconButton>
+        </StudioSideHead>
         {furnitureKinds.map((kind) => {
           const Icon = icons[kind];
+          const locked = !progress.kinds.has(kind);
           return (
             <Button
               key={kind}
               variant="quiet"
               justify="start"
+              disabled={locked}
               onClick={() => add(kind)}
               icon={Icon}
             >
               <span className="flex-1 text-left">{furniture[kind].label}</span>
-              <Plus aria-hidden="true" className="opacity-60" />
+              {locked ? (
+                <Text
+                  bare
+                  as="span"
+                  tone="muted"
+                  className="flex items-center gap-1 text-micro tabular-nums"
+                  aria-label={`Unlocks at ${earnedAt.get(kind)} points`}
+                >
+                  <Lock aria-hidden="true" />
+                  {earnedAt.get(kind)}
+                </Text>
+              ) : (
+                <Plus aria-hidden="true" className="opacity-60" />
+              )}
             </Button>
           );
         })}
-        <RoomSizer layout={layout} onLayout={props.onLayout} />
+        <RoomSizer layout={layout} room={progress.room} onLayout={props.onLayout} />
         <Button className="mt-1" onClick={props.onReset}>
           Reset layout
         </Button>
@@ -146,7 +154,7 @@ export function BuildPanel(props: {
         <Surface
           tone="scene-panel"
           radius="xl"
-          className="absolute inset-x-0 bottom-19 z-[var(--stack-overlay)] mx-auto flex w-fit items-center gap-1.5 py-1.5 pr-2 pl-3"
+          className="absolute inset-x-0 bottom-2 z-[var(--stack-overlay)] mx-auto flex w-fit items-center gap-1.5 py-1.5 pr-2 pl-3"
           role="toolbar"
           aria-label={furniture[picked.kind].label}
         >

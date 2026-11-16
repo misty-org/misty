@@ -44,6 +44,8 @@ describe("claims", () => {
   it("warns about a teammate's working agent on the same file", () => {
     const mate = (state: TeammateAgent["state"]): TeammateAgent => ({
       key: "u:a",
+      userId: "u",
+      agentId: "a",
       name: "Kai",
       owner: "Alex",
       state,

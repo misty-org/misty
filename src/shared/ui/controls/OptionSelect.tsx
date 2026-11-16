@@ -22,6 +22,8 @@ type OptionSelectProps = {
   value: string;
   options: readonly SelectOption[];
   onValueChange: (value: string) => void;
+  /** The list opening and closing, for a native view that has to step aside while it shows. */
+  onOpenChange?: (open: boolean) => void;
   disabled?: boolean;
   placeholder?: string;
   className?: string;
@@ -55,6 +57,7 @@ function OptionSelect({
   value,
   options,
   onValueChange,
+  onOpenChange,
   placeholder,
   className,
   ...props
@@ -64,6 +67,7 @@ function OptionSelect({
       value={toItem(value)}
       disabled={props.disabled}
       onValueChange={(next) => onValueChange(fromItem(next))}
+      onOpenChange={onOpenChange}
     >
       <SelectTrigger
         id={props.id}

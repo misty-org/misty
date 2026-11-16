@@ -21,11 +21,16 @@
   --misty-theme-text-bright: #f1f1f1;
   --misty-theme-text-muted: #8c8c8c;
   --misty-theme-danger: #c94747;
-  /* The top band every surface shares: the sidebar's head, a page's bar, a panel's title row. */
-  --ui-header: 40px;
+  /* The top band every surface shares: the sidebar's head, the tab strip, a page's bar, a panel's
+     title row. 48px, so a 32px tab or row in it has 8px above and below. */
+  --ui-header: 3rem;
+  /* The bar along the bottom: compact by default, with 24px controls (4px above and below);
+     the window's bar can be set to the standard height in Settings › Interface › Bottom bar. */
+  --ui-bottom-bar: 2rem;
+  --ui-bottom-bar-standard: 2.5rem;
 }
 
-/* Type. One face for the whole interface, the system font. Monospace (`font-mono`) is for code
+/* Type. One face for the whole interface, Inter (bundled; the system font is only its fallback). Monospace (`font-mono`) is for code
    itself: code blocks, the editor, diffs and the terminal, never URLs, paths, IDs, model names or
    shortcuts. Sizes come from roles, each with its own line height, and never `text-[Npx]`:
      micro 11 · caption 12 (badges, shortcut text) · meta 13 (times, counts, the path line,
@@ -33,32 +38,41 @@
      (messages, notes, prose) · page 16 (page text, reading) · title 18 · display 24.
    Tailwind's own steps (`text-xs` to `text-3xl`, `text-base`) are not used: use the roles. */
 @theme {
-  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+  --font-sans: "Inter Variable", -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
   --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
 
-  --text-micro: 11px;
-  --text-micro--line-height: 14px;
-  --text-caption: 12px;
-  --text-caption--line-height: 16px;
-  --text-meta: 13px;
-  --text-meta--line-height: 18px;
-  --text-control: 14px;
-  --text-control--line-height: 20px;
-  --text-body: 15px;
-  --text-body--line-height: 22px;
-  --text-page: 16px;
-  --text-page--line-height: 24px;
-  --text-title: 18px;
-  --text-title--line-height: 24px;
-  --text-display: 24px;
-  --text-display--line-height: 30px;
+  --text-micro: 0.6875rem;
+  --text-micro--line-height: 0.875rem;
+  --text-caption: 0.75rem;
+  --text-caption--line-height: 1rem;
+  --text-meta: 0.8125rem;
+  --text-meta--line-height: 1.125rem;
+  --text-control: 0.875rem;
+  --text-control--line-height: 1.25rem;
+  --text-body: 0.9375rem;
+  --text-body--line-height: 1.375rem;
+  --text-page: 1rem;
+  --text-page--line-height: 1.5rem;
+  --text-title: 1.125rem;
+  --text-title--line-height: 1.5rem;
+  --text-display: 1.5rem;
+  --text-display--line-height: 1.875rem;
 
   /* Corners, after OpenChamber's scale: 4 for marks and chips inside rows, 7 for controls and
      rows, 9 for fields and menus, 12 for panels and dialogs. */
-  --radius-sm: 4px;
-  --radius-md: 7px;
-  --radius-lg: 9px;
-  --radius-xl: 12px;
+  --radius-sm: 0.25rem;
+  --radius-md: 0.4375rem;
+  --radius-lg: 0.5625rem;
+  --radius-xl: 0.75rem;
+
+  /* Window-width breakpoints, a step up from Tailwind's (40, 48, 64, 80, 96rem): media queries
+     ignore the main window's 110% root, so these keep layouts switching at the window widths
+     they did when the step up was a page zoom. Container queries (@sm, @lg) follow the root. */
+  --breakpoint-sm: 44rem;
+  --breakpoint-md: 52.8rem;
+  --breakpoint-lg: 70.4rem;
+  --breakpoint-xl: 88rem;
+  --breakpoint-2xl: 105.6rem;
 }
 
 @theme inline {
@@ -216,7 +230,7 @@
     var(--color-charcoal-workspace) 72%
   );
   /* Long text in a stylesheet fades at its end like OverflowFadeText, never an ellipsis. */
-  --mask-fade-end: linear-gradient(to right, black calc(100% - 18px), transparent);
+  --mask-fade-end: linear-gradient(to right, black calc(100% - 1.125rem), transparent);
   --layer-drag-shield: 2147483400;
   --layer-drag-preview: 2147483500;
   --layer-drag-indicator: 2147483501;

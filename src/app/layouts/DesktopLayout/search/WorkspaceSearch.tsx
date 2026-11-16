@@ -161,7 +161,7 @@ function SearchBody({ onOpen, close }: { onOpen(view: WorkspaceView): void; clos
   return (
     <Command
       // Search: an input, the type row, the list and a foot of key hints, in one rounded panel.
-      className="flex max-h-[min(560px,calc(100dvh_-_8rem))] flex-col"
+      className="flex max-h-[min(35rem,calc(100dvh_-_8rem))] flex-col"
       shouldFilter={false}
       loop
       onKeyDown={(event) => {

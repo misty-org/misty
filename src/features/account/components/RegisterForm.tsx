@@ -1,3 +1,4 @@
+import { Text } from "@/shared/ui";
 import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
 import { useAuth } from "../AuthContext";
@@ -67,16 +68,16 @@ export default function RegisterForm(props: { onSuccess: () => void }) {
 
   if (confirming) {
     return (
-      <p role="status" className="text-sm text-foreground">
+      <Text wrap role="status" size="control" tone="default" className="m-0">
         {waitEnded
           ? "Misty couldn't sign you in. Open the link in your email, then sign in with your password."
           : `We sent a link to ${email}. Open it to finish creating your account.`}
-      </p>
+      </Text>
     );
   }
 
   return (
-    <form className="flex flex-col gap-5" onSubmit={handleSubmit}>
+    <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
       <AuthField
         id="register-username"
         label="Username"

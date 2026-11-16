@@ -1,7 +1,9 @@
 /**
  * Tutor: a place to learn with agents. Notebooks gather sources and notes; agents turn them into
- * guides, flashcards, quizzes and lessons. Everything here lives on this computer in misty.db,
- * beside the chats, and never syncs.
+ * guides, flashcards, quizzes and lessons. A notebook lives in its Lab agent's home Space, where
+ * everyone in that Space works in it live (notebookDoc.ts); this computer keeps a copy of it in
+ * misty.db with what stays the person's own: their chats, which sources their AI reads, and their
+ * review progress.
  */
 
 /** How much of a source a notebook's agent runs get: none, its summary, or all of it. */
@@ -33,6 +35,10 @@ export interface NotebookSource {
   /** A news story the notebook's follow brought in, and when it was published. */
   news?: boolean;
   published?: string;
+  /** Who added it, in a notebook people work in together. */
+  addedBy?: string;
+  /** The agent that found it, when an agent did: its id and name. */
+  agent?: { id: string; name: string };
   createdAt: string;
 }
 
@@ -46,6 +52,12 @@ export interface NotebookNote {
   /** The transformation that wrote it, and the source it ran on. */
   transformation?: string;
   sourceId?: string;
+  /** Who wrote or added it, in a notebook people work in together. */
+  authorId?: string;
+  /** The agent that wrote it, when an agent did: its id and name. */
+  agent?: { id: string; name: string };
+  /** The question a shown answer was asked with. */
+  fromQuestion?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -87,16 +99,21 @@ export interface Notebook {
   /** The chats asked from this notebook, newest first. */
   chats: string[];
   /** The conversation open in the notebook now, with the questions as the person asked them
-   * (the turns themselves carry the sources too). */
-  thread?: { conversationId: string; questions: string[] };
+   * (the turns themselves carry the sources too), and for each question the source ids in the
+   * order they were numbered, so "[2]" keeps pointing at its source when others add or remove. */
+  thread?: { conversationId: string; questions: string[]; cites?: string[][] };
   /** One emoji for the notebook's cover, the agent's pick until the person chooses one. */
   emoji?: string;
-  /**
-   * Shared into a Space as a doc, at the person's request: the doc is rewritten as the notebook
-   * changes, until they stop sharing. Notebooks otherwise stay on this computer.
-   */
+  /** The Space doc the notebook lives in, where everyone in that Space works in it live. */
+  space?: { spaceId: string; docId: string };
+  /** The Space chat its people talk in, made the first time anyone opens it. */
+  discussionId?: string;
+  /** Who made it. */
+  createdBy?: string;
+  /** Before notebooks lived in their Space: a notebook once shared into one by hand. Read only
+   * to move it into its Space (notebookMove.ts). */
   shared?: { spaceId: string; spaceName: string; docId: string; sharedAt: string };
-  /** Saved from a notebook someone shared into a Space: that doc. */
+  /** Before notebooks lived in their Space: a copy saved from a shared one. Read only to move it. */
   savedFrom?: { spaceId: string; docId: string };
   /** How its chat answers; unset answers in the default way. */
   chatStyle?: NotebookChatStyle;
@@ -139,6 +156,8 @@ export interface Deck {
   notebookId?: string;
   /** The chat whose agent made it. */
   conversationId?: string;
+  /** Who made it, in a notebook people work in together. */
+  by?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -196,6 +215,8 @@ export interface Guide {
   audio?: { state: "making" | "ready" | "failed"; seconds?: number; error?: string };
   notebookId?: string;
   conversationId?: string;
+  /** Who made it, in a notebook people work in together. */
+  by?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -224,7 +245,10 @@ export interface TutorJob {
   kind: TutorJobKind;
   title: string;
   agentId: string;
-  conversationId: string;
+  /** Before the default engine: the hidden chat it ran in. */
+  conversationId?: string;
+  /** The engine run doing it, to follow again after a restart or to stop. */
+  runId?: string;
   prompt: string;
   notebookId?: string;
   /** The source a summary or transformation ran on. */

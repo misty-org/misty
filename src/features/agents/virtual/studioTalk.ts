@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useStudioQuests } from "./studioQuests";
 import { create } from "zustand";
 import type { AgentProfile } from "@/shared/schemas";
 import { runtimeAiApi } from "../AgentsRuntime";
@@ -18,10 +19,14 @@ import { steerRunningTask } from "../conversations/view/conversationSend";
 import { chatDeviceGrants } from "../personal/deviceGrants";
 
 /**
- * Talking to an agent from the studio. What is said there goes into one of the agent's ordinary
- * chats, kept in misty.db like any other, so the chat page shows it too; its run is followed in
- * the background, so several agents can be talked to at once.
+ * Talking to an agent from the studio. What is said there is the studio's own talk with it, kept
+ * in misty.db on this device but never listed with the chats (`place: "studio"`); its run is
+ * followed in the background, so several agents can be talked to at once. What was said aloud
+ * is answered aloud, in the agent's own voice (`studioVoices.ts`).
  */
+
+/** Replies to something said aloud, by message id: each is spoken once it's done. */
+export const spokenReplies = new Set<string>();
 
 const set = useMistyStore.setState;
 const get = useMistyStore.getState;
@@ -84,10 +89,10 @@ export function chooseChat(agentId: string, chatId: string) {
   });
 }
 
-/** An agent's chats, newest first. */
+/** An agent's talks in the studio, newest first. Its chats elsewhere aren't among them. */
 export const chatsOf = (conversations: readonly GlobalAiConversation[], agentId: string) =>
   conversations
-    .filter((chat) => chat.agentId === agentId)
+    .filter((chat) => chat.agentId === agentId && chat.place === "studio")
     .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
 
 const firstLine = (text: string) => (text.trim().split("\n")[0] ?? "").slice(0, 56);
@@ -101,13 +106,17 @@ export async function talkTo(
   agent: AgentProfile,
   prompt: string,
   chatId: string | undefined,
+  /** Said aloud, so the answer is spoken back. */
+  spoken = false,
 ): Promise<string> {
   const text = prompt.trim();
   if (!text) throw new Error("Say something first.");
   if (!agent.enabled) throw new Error(`${agent.name} is turned off. Turn it on in its settings.`);
   const store = get();
   const accountId = store.accountId;
-  const known = chatId ? store.conversations.find((chat) => chat.id === chatId) : undefined;
+  const known = chatId
+    ? store.conversations.find((chat) => chat.id === chatId && chat.place === "studio")
+    : undefined;
   if (known && store.working && store.invocationConversationId === known.id) {
     await steerRunningTask(accountId, store.invocationId, text, known.id);
     return known.id;
@@ -129,7 +138,7 @@ export async function talkTo(
     }));
   } else {
     chat = {
-      ...newLocalConversation(firstLine(text) || agent.name, undefined, agent.id),
+      ...newLocalConversation(firstLine(text) || agent.name, undefined, agent.id, "studio"),
       messages: [asked, reply],
     };
     set({ conversations: [chat, ...get().conversations] });
@@ -139,6 +148,7 @@ export async function talkTo(
     delete fresh[agent.id];
     return { chats: { ...state.chats, [agent.id]: chat.id }, fresh };
   });
+  if (spoken) spokenReplies.add(reply.id);
   try {
     const created = await runtimeAiApi.createInvocation({
       mode: "drawer",
@@ -156,6 +166,8 @@ export async function talkTo(
     });
     patchConversationMessage(set, get, chat.id, reply.id, { invocationId: created.invocationId });
     followReply(chat.id, reply.id, created.invocationId);
+    // Talking to an agent counts toward today's quest.
+    useStudioQuests.getState().talked(agent.id);
   } catch (error) {
     settleConversationMessage(set, get, chat.id, reply.id, {
       state: "failed",
@@ -194,6 +206,7 @@ export async function huddle(
     }));
   }
   const made: Huddle = { id: crypto.randomUUID(), task, chats, startedAt: Date.now() };
+  useStudioQuests.getState().grouped();
   useStudioTalk.setState((state) => ({ huddles: [...state.huddles, made] }));
   return made;
 }

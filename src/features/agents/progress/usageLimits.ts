@@ -4,7 +4,7 @@ import type { AiProgressItem } from "../runs/invocations/invocationTypes";
  * A tool refused because the account used its monthly allowance.
  * The server words the result for the agent, starting with its code; the agent relays it and
  * carries on. The person gets a plain line in the chat too, with what to do next. Web search
- * runs on the device's own search key, so only app actions have an allowance.
+ * is the engine's own, so only app actions have an allowance.
  */
 const limits = [
   {

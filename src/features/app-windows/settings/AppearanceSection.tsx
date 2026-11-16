@@ -1,5 +1,5 @@
 import {
-  appZoomRenderScale,
+  appZoomToStoredScale,
   appZoomMax,
   appZoomMin,
   appZoomStep,
@@ -108,7 +108,7 @@ export function AppearanceSection(props: SettingsContentProps) {
             onCommit={(value) => {
               setAppZoom(value);
               setAppZoomDraft(null);
-              props.onSettingChange("appearance", "app_zoom", appZoomRenderScale(value));
+              props.onSettingChange("appearance", "app_zoom", appZoomToStoredScale(value));
             }}
           />
         </SettingsRow>

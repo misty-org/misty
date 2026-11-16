@@ -50,5 +50,5 @@
   "src/features/agents/context-panel/files/filesStore.test.ts": 592,
   "src/features/agents/context-panel/files/filesStore.ts": 673,
   "src/features/app-windows/tabs/useWorkspaceStore.test.ts": 619,
-  "src/features/engine-config/skills/SkillsSection.test.tsx": 562
+  "src/features/engine-config/skills/SkillsHub.test.tsx": 562
 }

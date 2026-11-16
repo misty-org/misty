@@ -18,7 +18,7 @@ export function GallerySection(props: { title: string; children: ReactNode }) {
 /** One sample row: what it shows on the left, the components on the right. */
 export function GalleryRow(props: { label: string; children: ReactNode }) {
   return (
-    <div className="grid grid-cols-[160px_minmax(0,1fr)] items-center gap-4">
+    <div className="grid grid-cols-[10rem_minmax(0,1fr)] items-center gap-4">
       <Text size="meta" tone="muted">
         {props.label}
       </Text>
@@ -38,7 +38,7 @@ export function GalleryWidths(props: {
   children: (width: number) => ReactNode;
 }) {
   return (
-    <div className="grid grid-cols-[160px_minmax(0,1fr)] items-start gap-4">
+    <div className="grid grid-cols-[10rem_minmax(0,1fr)] items-start gap-4">
       <Text size="meta" tone="muted" className="pt-1">
         {props.label}
       </Text>

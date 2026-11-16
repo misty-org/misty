@@ -42,7 +42,7 @@ export function NotePreviewView(props: NotePreviewProps & { runtime: NotePreview
   return (
     <Surface
       tone="page"
-      className="grid h-full min-h-0 grid-rows-[48px_minmax(0,1fr)] overflow-hidden"
+      className="grid h-full min-h-0 grid-rows-[3rem_minmax(0,1fr)] overflow-hidden"
     >
       <Surface
         tone="card"

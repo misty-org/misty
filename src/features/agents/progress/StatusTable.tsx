@@ -1,6 +1,7 @@
 import { Check, Circle, CircleAlert, CircleMinus, CircleX, LoaderCircle } from "lucide-react";
 import type { ReactNode } from "react";
 import { cn, Surface, Text, type TextTone } from "@/shared/ui";
+import { remCss } from "@/shared/lib/uiScale";
 
 /**
  * Every list of steps in a conversation (checklist, sub-agents, plan, requests,
@@ -108,7 +109,7 @@ export function StatusRow({
       tone="muted"
       className="flex items-baseline gap-2 px-3.5 py-2"
       data-state={state}
-      style={depth ? { paddingLeft: 14 + depth * 18 } : undefined}
+      style={depth ? { paddingLeft: remCss(14 + depth * 18) } : undefined}
     >
       {Icon ? (
         // The icon sits on the first line of its row, however far the text wraps.

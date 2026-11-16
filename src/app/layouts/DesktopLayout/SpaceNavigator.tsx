@@ -1,13 +1,5 @@
-import {
-  Armchair,
-  Bot,
-  FlaskConical,
-  Plus,
-  Search,
-  Waypoints,
-  type LucideIcon,
-} from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { Armchair, Bot, Plus, Search, type LucideIcon } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   openAgentsHub,
   useChatStatuses,
@@ -17,7 +9,6 @@ import {
   useMistyStore,
   tutorChatIds,
   useTutorStore,
-  watchSharedNotebooks,
   usePersonalAgentsStore,
 } from "@/features/agents";
 import { dockLeaves, useWorkspaceStore, type WorkspaceView } from "@/features/app-windows";
@@ -36,16 +27,13 @@ import {
   openWorkspaceRouteIn,
 } from "./spaceNavigation";
 
-/** The sidebar's places: search, the Agents window (picking and setting up agents and their
- * CLIs), the window's Space, the agents' studio, the person's Lab, and the integrations agents
- * can use. */
+/** The sidebar's places: search, the Agents window (picking and setting up agents, their CLIs
+ * and everything they can use), the window's Space, the agents' studio and the person's Lab. */
 const placeNames: Record<SidebarPlaceId, { label: string; icon: LucideIcon }> = {
   search: { label: "Search", icon: Search },
   agents: { label: "Agents", icon: Bot },
   space: { label: "Space", icon: spaceIcons.space },
   studio: { label: "Studio", icon: Armchair },
-  lab: { label: "Lab", icon: FlaskConical },
-  integrations: { label: "Integrations", icon: Waypoints },
 };
 
 /** The route of the page the person is looking at: the focused pane's open view. */
@@ -119,7 +107,7 @@ export function SpaceNavigator({ onOpen }: { onOpen(view: WorkspaceView): void }
   useEffect(() => {
     void usePersonalAgentsStore.getState().load(accountId);
     void useLessonStore.getState().load(accountId);
-    void useTutorStore.getState().load(accountId).then(watchSharedNotebooks);
+    void useTutorStore.getState().load(accountId);
     void useChatSectionsStore
       .getState()
       .load(accountId)
@@ -136,13 +124,26 @@ export function SpaceNavigator({ onOpen }: { onOpen(view: WorkspaceView): void }
 
   const chats = useMemo(() => {
     const made = tutorChatIds(tutorJobs, tutorNotebooks);
-    return conversations
-      .filter((chat) => chat.messages.length > 0 && !lessons[chat.id] && !made.has(chat.id))
-      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+    return (
+      conversations
+        // Studio talks are the studio's own, never listed with the chats.
+        .filter(
+          (chat) =>
+            chat.messages.length > 0 &&
+            chat.place !== "studio" &&
+            !lessons[chat.id] &&
+            !made.has(chat.id),
+        )
+        .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+    );
   }, [conversations, lessons, tutorJobs, tutorNotebooks]);
-  const agentOf = (agentId?: string) =>
-    agents.find((agent) => agent.id === agentId) ??
-    (agentId ? undefined : agents.find((agent) => agent.system_managed));
+  // Stable while the agents are, so the sidebar groups chats by agent only when something changed.
+  const agentOf = useCallback(
+    (agentId?: string) =>
+      agents.find((agent) => agent.id === agentId) ??
+      (agentId ? undefined : agents.find((agent) => agent.system_managed)),
+    [agents],
+  );
   const [path, query = ""] = route.split("?");
   const params = new URLSearchParams(query);
   const view = path === "/agents" ? params.get("view") : null;

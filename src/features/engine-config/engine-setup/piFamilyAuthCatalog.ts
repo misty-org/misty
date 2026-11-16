@@ -2,7 +2,7 @@
 // See NOTICE.
 
 /**
- * Pi's and Oh My Pi's providers for Settings › Channels.
+ * Pi's and Oh My Pi's providers for Agents › Channels.
  *
  * - `id` matches the native catalog (`engines/pi_family_auth.rs`): Pi's auth.json entry key, Oh My
  *   Pi's `auth_credentials.provider`.

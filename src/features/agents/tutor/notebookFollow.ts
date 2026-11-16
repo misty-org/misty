@@ -5,7 +5,7 @@ import type { Notebook, NotebookFollow } from "./tutorTypes";
 
 /**
  * A notebook that follows something takes in recent news each time it opens (or on Refresh)
- * through the person's own search key. Stories land as dated link sources the agent can cite, and
+ * found by the default engine with its own web search. Stories land as dated link sources the agent can cite, and
  * they show in its sources like any other. Nothing runs in the background.
  */
 

@@ -12,8 +12,11 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use serde_json::{json, Map, Value};
 
-use super::{engine_bin, parse_version, probe_local_version, route_for, routes, ProgressReporter};
-use crate::engines::support::paths::app_home;
+use super::{
+    engine_bin, hermes_launchers, parse_version, probe_local_version, route_for, routes,
+    ProgressReporter,
+};
+use crate::engines::support::paths::{app_home, InstallRoot};
 
 /// The oldest version of each engine this build works with. An adapter adds its engine here when
 /// it relies on something an older release of that engine doesn't have.
@@ -25,6 +28,9 @@ const LOCK_STALE: Duration = Duration::from_secs(15 * 60);
 /// Brings `engine` up to this build's minimum when Misty installed it and it is older. A failed
 /// update is returned; the caller decides whether the run goes ahead with the older engine.
 pub(crate) async fn ensure_minimum(engine: &str) -> Result<(), String> {
+    if engine == "hermes" {
+        repair_moved_hermes().await?;
+    }
     let Some(needed) = MINIMUMS
         .iter()
         .find(|(name, _)| *name == engine)
@@ -52,6 +58,48 @@ pub(crate) async fn ensure_minimum(engine: &str) -> Result<(), String> {
     let reporter = ProgressReporter::new(format!("upkeep-{engine}"), engine.to_owned());
     routes::run(engine, route, &bin, &reporter).await?;
     forget(engine);
+    Ok(())
+}
+
+/// Layout v1 moved `~/.misty/engines` into `shared/` (`database/misty_profiles.rs`), but Hermes
+/// Agent's installer writes its checkout's path into the launchers it keeps in the checkout, and
+/// keys the checkout's dependency environment (`~/.hermes/installs/<hash of the path>`) by it.
+/// A checkout Misty installed before the move can't start where it is now: its launchers still
+/// point at the old place, and the new place has no environment ("no dependency environment is
+/// committed"). Hermes's own script, run again on the checkout (the update route of Settings ›
+/// Engines), writes both for where it is now. The wrappers an older install left in
+/// `~/.local/bin` for the old place go too: nothing is there any more.
+async fn repair_moved_hermes() -> Result<(), String> {
+    let Some(before) = file_access::paths::misty_root_dir()
+        .map(|misty| misty.join("engines").join("hermes").join("hermes-agent"))
+    else {
+        return Ok(());
+    };
+    let checkout = InstallRoot::here().checkout_dir("hermes");
+    let launcher = checkout.join(".hermes").join("bin").join("hermes");
+    let moved = |launcher: &Path| {
+        file_access::fs::is_file(launcher) && hermes_launchers::wrapper_names(launcher, &before)
+    };
+    if before == checkout || !moved(&launcher) {
+        return Ok(());
+    }
+    let Some(_lock) = UpdateLock::take("hermes") else {
+        // Another build is repairing it right now; this run uses what is there.
+        return Ok(());
+    };
+    if !moved(&launcher) {
+        return Ok(());
+    }
+    let bin = launcher.to_string_lossy().into_owned();
+    let route = route_for("hermes", &bin, true)
+        .ok_or_else(|| "Misty can't repair Hermes Agent for you.".to_string())?;
+    let reporter = ProgressReporter::new("upkeep-hermes".to_owned(), "hermes".to_owned());
+    routes::run("hermes", route, &bin, &reporter).await?;
+    forget("hermes");
+    hermes_launchers::remove_wrappers(&hermes_launchers::dirs(), &before);
+    if moved(&launcher) {
+        return Err("Hermes Agent still starts from the folder it was moved out of. Reinstall it in Settings › Engines.".into());
+    }
     Ok(())
 }
 

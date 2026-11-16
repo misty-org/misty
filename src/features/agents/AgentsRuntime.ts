@@ -1,8 +1,6 @@
 import { runtimeProperty } from "@/shared/lib/runtimeProperty";
-import type { agentsApi } from "./api/api";
 import type { aiSurfaceApi, subscribeToAiInvocation } from "./runs/invocations/api";
 interface AgentsRuntime {
-  agentsApi: typeof agentsApi;
   aiSurfaceApi: typeof aiSurfaceApi;
   subscribeToAiInvocation: typeof subscribeToAiInvocation;
   readImage(id: string): Promise<Blob>;
@@ -38,7 +36,6 @@ function service<K extends keyof AgentsRuntime>(name: K): AgentsRuntime[K] {
     },
   ) as AgentsRuntime[K];
 }
-export const runtimeAgentsApi = service("agentsApi"),
-  runtimeAiApi = service("aiSurfaceApi"),
+export const runtimeAiApi = service("aiSurfaceApi"),
   subscribeAgentsInvocation = service("subscribeToAiInvocation"),
   readAgentsImage = service("readImage");

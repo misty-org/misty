@@ -126,7 +126,7 @@ export function DesktopUpdaterSettings() {
         label="Version"
         description={updateNote ? `${version} · ${updateNote}` : version}
       >
-        <div className="grid w-full max-w-sm justify-items-end gap-2 max-[760px]:justify-items-start">
+        <div className="grid w-full max-w-sm justify-items-end gap-2 max-[836px]:justify-items-start">
           <div className="flex min-w-0 items-center justify-end gap-2">
             {state === "error" ? (
               <SystemErrorNotice

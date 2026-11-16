@@ -1,5 +1,7 @@
 @import "tailwindcss" source("../../");
 @import "tw-animate-css";
+/* Inter, bundled (weight and optical-size axes), so every window has it with no download and no install. */
+@import "@fontsource-variable/inter/opsz.css";
 @import "./scrollbars.css";
 @import "./theme.css";
 @import "./overlays.css";

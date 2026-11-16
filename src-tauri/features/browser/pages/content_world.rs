@@ -12,7 +12,18 @@ pub(crate) async fn evaluate_in_content_world(
     world_name: &'static str,
     function_body: String,
 ) -> Result<String, String> {
-    evaluate_in(webview, world_name, function_body, None).await
+    evaluate_in(webview, Some(world_name), function_body, None).await
+}
+
+/// Runs `function_body` in the page's own world, beside the page's scripts and their globals.
+/// Only for a page whose scripts are the person's own choice to trust with what is read back,
+/// such as the studio's music player; what it returns is the page's word, never Misty's.
+#[cfg(target_os = "macos")]
+pub(crate) async fn evaluate_in_page_world(
+    webview: Webview,
+    function_body: String,
+) -> Result<String, String> {
+    evaluate_in(webview, None, function_body, None).await
 }
 
 /// Runs `function_body` in the named world of one cross-origin frame the tab announced
@@ -24,7 +35,7 @@ pub(crate) async fn evaluate_in_frame(
     function_body: String,
     frame: u64,
 ) -> Result<String, String> {
-    let result = evaluate_in(webview.clone(), world_name, function_body, Some(frame)).await;
+    let result = evaluate_in(webview.clone(), Some(world_name), function_body, Some(frame)).await;
     if result.is_err() {
         let _ = webview.with_webview(move |platform| unsafe {
             crate::browser::agent_pages::frames::forget(&*platform.inner().cast(), frame);
@@ -95,7 +106,7 @@ fn answer(
 #[cfg(target_os = "macos")]
 async fn evaluate_in(
     webview: Webview,
-    world_name: &'static str,
+    world_name: Option<&'static str>,
     function_body: String,
     frame: Option<u64>,
 ) -> Result<String, String> {
@@ -124,15 +135,18 @@ async fn evaluate_in(
                 return;
             };
             let view: &WKWebView = &*platform_webview.inner().cast();
-            let world = WORLDS.with(|worlds| {
-                worlds
-                    .borrow_mut()
-                    .entry(world_name)
-                    .or_insert_with(|| {
-                        WKContentWorld::worldWithName(&NSString::from_str(world_name), mtm)
-                    })
-                    .clone()
-            });
+            let world = match world_name {
+                Some(world_name) => WORLDS.with(|worlds| {
+                    worlds
+                        .borrow_mut()
+                        .entry(world_name)
+                        .or_insert_with(|| {
+                            WKContentWorld::worldWithName(&NSString::from_str(world_name), mtm)
+                        })
+                        .clone()
+                }),
+                None => WKContentWorld::pageWorld(mtm),
+            };
             let frame = match frame {
                 Some(id) => match crate::browser::agent_pages::frames::info(view, id) {
                     Some(info) => Some(info),

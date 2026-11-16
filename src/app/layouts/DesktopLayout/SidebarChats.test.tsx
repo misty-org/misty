@@ -182,7 +182,7 @@ it("groups pinned, sectioned and archived chats", () => {
   expect(within(menu("Chat three")).getByRole("menuitem", { name: /Unarchive/ })).toBeTruthy();
 });
 
-it("names each chat's agent beside its title, so chats with one title read apart", () => {
+it("groups chats under the agent each is with, so chats with one title read apart", () => {
   const claude = { id: "a2", name: "Claude" } as AgentProfile;
   render(
     <SidebarChats
@@ -198,7 +198,11 @@ it("names each chat's agent beside its title, so chats with one title read apart
       onOpenGone={onOpenGone}
     />,
   );
-  fireEvent.click(screen.getByRole("button", { name: /hello,\s?Claude/ }));
+  // Each agent heads its own chats, in the order its chats come.
+  const heads = screen.getAllByRole("region").map((region) => region.getAttribute("aria-label"));
+  expect(heads).toEqual(["Codex", "Claude"]);
+  fireEvent.click(
+    within(screen.getByRole("region", { name: "Claude" })).getByRole("button", { name: /hello/ }),
+  );
   expect(onOpen).toHaveBeenCalledWith(claude, "y");
-  expect(screen.getByRole("button", { name: /hello,\s?Codex/ })).toBeTruthy();
 });

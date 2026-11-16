@@ -103,6 +103,7 @@ which = "7"
 sandbox = { path = "features/sandbox" }
 # Microphone, system and per-process capture for dictation, live transcription and recording.
 voice_capture = { path = "features/voice/capture" }
+voice_speech = { path = "features/voice/speech_recognition" }
 # Screen capture for computer use and captures (X11 and PipeWire on Linux).
 xcap = "0.9"
 # Computer use: mouse and keyboard input for an outside engine's screen control (MIT; X11 on Linux).

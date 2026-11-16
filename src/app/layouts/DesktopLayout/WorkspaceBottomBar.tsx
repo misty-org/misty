@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, type CSSProperties } from "react";
 import { useShallow } from "zustand/react/shallow";
 import type { WorkspaceView } from "@/features/app-windows";
 import { BottomBar, CustomizableBar, type BarItem, type BarLayout } from "@/shared/ui";
@@ -7,6 +7,7 @@ import {
   bottomBarDefaults,
   bottomBarItemIds,
   useBottomBar,
+  useBottomBarCompact,
   type BottomBarItemId,
 } from "./bottomBarStore";
 import { closedHeight } from "./spaceBarTiming";
@@ -38,6 +39,7 @@ export function WorkspaceBottomBar(props: {
   const { start, end } = useBottomBar(
     useShallow((state) => ({ start: state.start, end: state.end })),
   );
+  const compact = useBottomBarCompact((state) => state.value);
   useEffect(() => void useBottomBar.getState().load(), []);
   const hidden = bottomBarItemIds.filter((id) => !start.includes(id) && !end.includes(id));
   // Each end is its own bar: what it shows, then what it would show if the person showed it.
@@ -62,12 +64,28 @@ export function WorkspaceBottomBar(props: {
       className={side === "start" ? "min-w-0 flex-1 gap-2 self-stretch" : "gap-2 self-stretch"}
     />
   );
-  // The tab strip's mirror: the header's height, then the window edge the top edge keeps above
-  // the tabs, so a control sits as far from the bottom as the tabs' sit from the top.
+  // Lighter than the tab strip: compact unless the person chose the standard height, then the
+  // window edge the top edge keeps above the tabs.
   return (
     <BottomBarOpenContext.Provider value={props.onOpen}>
-      <div style={{ gridColumn: props.gridColumn, gridRow: 4, paddingBottom: closedHeight }}>
-        <BottomBar aria-label="Window bar" start={bar("start")}>
+      <div
+        style={
+          {
+            gridColumn: props.gridColumn,
+            gridRow: 4,
+            paddingBottom: closedHeight,
+            // As tall as the sidebar's account row beside it (the header band's 48px), so the
+            // bar's controls sit level with the account button at either size.
+            "--ui-bottom-bar": "var(--ui-header)",
+            "--ui-bottom-bar-standard": "var(--ui-header)",
+          } as CSSProperties
+        }
+      >
+        <BottomBar
+          aria-label="Window bar"
+          size={compact ? "compact" : "standard"}
+          start={bar("start")}
+        >
           {bar("end")}
         </BottomBar>
       </div>

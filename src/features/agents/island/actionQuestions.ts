@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow, UserAttentionType } from "@tauri-apps/api/window";
+import { useMemo } from "react";
 import { create } from "zustand";
 import { rememberSiteGrant } from "../grants/localSiteGrants";
 import { hasTauriInternals } from "@/shared/platform/tauri";
@@ -10,7 +11,7 @@ import { startTellingNativeTheAccount } from "../personal/agentAccount";
  * pauses an agent's page step natively and asks here; the control island shows
  * the question until the person answers or it times out.
  */
-interface ActionQuestion {
+export interface ActionQuestion {
   id: string;
   /** "action": any other step, which Ask mode stops before. */
   kind: "payment" | "send" | "delete" | "publish" | "action";
@@ -26,6 +27,35 @@ interface ActionQuestion {
 }
 
 export const useActionQuestions = create<{ items: ActionQuestion[] }>(() => ({ items: [] }));
+
+/**
+ * Agents whose chat is open and shows their questions above its composer (`PermissionDock`).
+ * Counted, since two panes may show the same agent's chat; the island leaves those questions out.
+ */
+export const useDockedQuestionAgents = create<{ counts: Record<string, number> }>(() => ({
+  counts: {},
+}));
+
+/** Claims an agent's questions for an open chat; the returned function gives them back. */
+export function dockQuestionsFor(agentId: string) {
+  const change = (by: number) =>
+    useDockedQuestionAgents.setState((state) => {
+      const next = (state.counts[agentId] ?? 0) + by;
+      const counts = { ...state.counts };
+      if (next > 0) counts[agentId] = next;
+      else delete counts[agentId];
+      return { counts };
+    });
+  change(1);
+  return () => change(-1);
+}
+
+/** The questions the island shows: those no open chat shows itself. */
+export function useIslandQuestions(): ActionQuestion[] {
+  const items = useActionQuestions((state) => state.items);
+  const docked = useDockedQuestionAgents((state) => state.counts);
+  return useMemo(() => items.filter((item) => !docked[item.agentId]), [items, docked]);
+}
 
 let listening = false;
 export function listenForActionQuestions() {

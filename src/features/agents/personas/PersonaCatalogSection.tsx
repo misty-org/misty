@@ -1,6 +1,6 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 /**
- * Settings › Behavior › Personas: the bundled agency-agents catalog. Each persona can be switched
+ * Agents › Personas: the bundled agency-agents catalog. Each persona can be switched
  * off for the `#` menu, read in full, or made into one of the person's own agents. Divisions
  * filter the list and switch a whole division at once.
  */

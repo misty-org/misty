@@ -68,8 +68,8 @@ export function LogoPlate({ logo, children }: { logo: string; children: ReactNod
         flexShrink: 0,
         alignItems: "center",
         justifyContent: "center",
-        padding: 2,
-        borderRadius: 4,
+        padding: "0.125rem",
+        borderRadius: "0.25rem",
         ...plateStyle[theme],
       }}
     >

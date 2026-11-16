@@ -105,24 +105,16 @@ pub(crate) use crate::agents::chats::commands::{
     agent_chats_delete, agent_chats_get, agent_chats_list, agent_chats_put, agent_chats_swap,
 };
 pub(crate) use crate::agents::connected_apps::commands::{
-    __cmd__composio_apps_catalog, __cmd__composio_apps_connect, __cmd__composio_apps_disconnect,
-    __cmd__composio_apps_list, __cmd__composio_calendar_events, __cmd__composio_grants_list,
-    __cmd__composio_grants_revoke, __cmd__composio_request_decide, __cmd__composio_request_get,
-    __cmd__composio_request_link, __cmd__composio_request_show, __cmd__composio_tool_connect,
-    __cmd__composio_tool_connected, __cmd__composio_tool_execute, __cmd__composio_tool_schemas,
-    __cmd__composio_tool_search, __tauri_command_name_composio_apps_catalog,
-    __tauri_command_name_composio_apps_connect, __tauri_command_name_composio_apps_disconnect,
-    __tauri_command_name_composio_apps_list, __tauri_command_name_composio_calendar_events,
-    __tauri_command_name_composio_grants_list, __tauri_command_name_composio_grants_revoke,
-    __tauri_command_name_composio_request_decide, __tauri_command_name_composio_request_get,
-    __tauri_command_name_composio_request_link, __tauri_command_name_composio_request_show,
-    __tauri_command_name_composio_tool_connect, __tauri_command_name_composio_tool_connected,
-    __tauri_command_name_composio_tool_execute, __tauri_command_name_composio_tool_schemas,
-    __tauri_command_name_composio_tool_search, composio_apps_catalog, composio_apps_connect,
-    composio_apps_disconnect, composio_apps_list, composio_calendar_events, composio_grants_list,
-    composio_grants_revoke, composio_request_decide, composio_request_get, composio_request_link,
-    composio_request_show, composio_tool_connect, composio_tool_connected, composio_tool_execute,
-    composio_tool_schemas, composio_tool_search,
+    __cmd__apps_grants_list, __cmd__apps_grants_revoke, __cmd__apps_request_decide,
+    __cmd__apps_request_get, __cmd__apps_request_show, __cmd__apps_tool_connected,
+    __cmd__apps_tool_execute, __cmd__apps_tool_schemas, __cmd__apps_tool_search,
+    __tauri_command_name_apps_grants_list, __tauri_command_name_apps_grants_revoke,
+    __tauri_command_name_apps_request_decide, __tauri_command_name_apps_request_get,
+    __tauri_command_name_apps_request_show, __tauri_command_name_apps_tool_connected,
+    __tauri_command_name_apps_tool_execute, __tauri_command_name_apps_tool_schemas,
+    __tauri_command_name_apps_tool_search, apps_grants_list, apps_grants_revoke,
+    apps_request_decide, apps_request_get, apps_request_show, apps_tool_connected,
+    apps_tool_execute, apps_tool_schemas, apps_tool_search,
 };
 pub(crate) use crate::agents::connected_apps::direct::commands::{
     __cmd__direct_apps_catalog, __cmd__direct_apps_check, __cmd__direct_apps_connect,
@@ -139,16 +131,20 @@ pub(crate) use crate::agents::cursor::{
     __cmd__cursor_companion_capture_region, __cmd__cursor_companion_configure,
     __cmd__cursor_companion_interrupt, __cmd__cursor_companion_present,
     __cmd__cursor_companion_snap, __cmd__cursor_companion_snapshot,
-    __cmd__cursor_companion_watch_clicks, __tauri_command_name_cursor_companion_bind_task,
+    __cmd__cursor_companion_ask_close, __cmd__cursor_companion_trail,
+    __cmd__cursor_companion_watch_clicks, __tauri_command_name_cursor_companion_ask_close,
+    __tauri_command_name_cursor_companion_bind_task,
     __tauri_command_name_cursor_companion_capture,
     __tauri_command_name_cursor_companion_capture_region,
     __tauri_command_name_cursor_companion_configure,
     __tauri_command_name_cursor_companion_interrupt, __tauri_command_name_cursor_companion_present,
     __tauri_command_name_cursor_companion_snap, __tauri_command_name_cursor_companion_snapshot,
+    __tauri_command_name_cursor_companion_trail,
     __tauri_command_name_cursor_companion_watch_clicks, cursor_companion_bind_task,
     cursor_companion_capture, cursor_companion_capture_region, cursor_companion_configure,
     cursor_companion_interrupt, cursor_companion_present, cursor_companion_snap,
-    cursor_companion_snapshot, cursor_companion_watch_clicks,
+    cursor_companion_ask_close, cursor_companion_snapshot, cursor_companion_trail,
+    cursor_companion_watch_clicks,
 };
 #[cfg(windows)]
 pub(crate) use crate::agents::desktop_control::windows::overlays::{
@@ -165,33 +161,15 @@ pub(crate) use crate::agents::live_pages_memory::{
     __cmd__system_memory_pressure, __tauri_command_name_system_memory_pressure,
     system_memory_pressure,
 };
-pub(crate) use crate::agents::models::keys::{
-    __cmd__model_keys_add, __cmd__model_keys_models, __tauri_command_name_model_keys_add,
-    __tauri_command_name_model_keys_models, model_keys_add, model_keys_models,
-};
-pub(crate) use crate::agents::models::{
-    __cmd__model_keys_remove, __cmd__model_keys_save, __cmd__model_keys_saved,
-    __tauri_command_name_model_keys_remove, __tauri_command_name_model_keys_save,
-    __tauri_command_name_model_keys_saved, model_keys_remove, model_keys_save, model_keys_saved,
-};
 pub(crate) use crate::agents::run_control::calls::{
-    __cmd__agent_runtime_call, __cmd__tutor_overview_audio, __cmd__tutor_overview_delete,
-    __cmd__tutor_overview_make, __cmd__tutor_transcribe_sources,
-    __tauri_command_name_agent_runtime_call, __tauri_command_name_tutor_overview_audio,
+    __cmd__tutor_overview_audio, __cmd__tutor_overview_delete, __cmd__tutor_overview_make,
+    __cmd__tutor_transcribe_sources, __tauri_command_name_tutor_overview_audio,
     __tauri_command_name_tutor_overview_delete, __tauri_command_name_tutor_overview_make,
-    __tauri_command_name_tutor_transcribe_sources, agent_runtime_call, tutor_overview_audio,
-    tutor_overview_delete, tutor_overview_make, tutor_transcribe_sources,
+    __tauri_command_name_tutor_transcribe_sources, tutor_overview_audio, tutor_overview_delete,
+    tutor_overview_make, tutor_transcribe_sources,
 };
 pub(crate) use crate::agents::run_control::host_lookup::{
     __cmd__agent_host_missing, __tauri_command_name_agent_host_missing, agent_host_missing,
-};
-pub(crate) use crate::agents::run_control::live::{
-    __cmd__agent_runtime_live_open, __cmd__agent_runtime_session_close,
-    __cmd__agent_runtime_session_send, __cmd__agent_runtime_voice_open,
-    __tauri_command_name_agent_runtime_live_open, __tauri_command_name_agent_runtime_session_close,
-    __tauri_command_name_agent_runtime_session_send, __tauri_command_name_agent_runtime_voice_open,
-    agent_runtime_live_open, agent_runtime_session_close, agent_runtime_session_send,
-    agent_runtime_voice_open,
 };
 pub(crate) use crate::agents::run_control::local_runs::{
     __cmd__agent_run_cancel, __cmd__agent_run_contexts, __cmd__agent_run_end_proposal,

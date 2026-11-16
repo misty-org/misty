@@ -101,6 +101,79 @@ fn rename_session_in(
     Ok(())
 }
 
+fn session_file(db: &crate::engines::support::db::Db, engine: &str, session_id: &str) -> Option<String> {
+    db.read()
+        .query_row(
+            "SELECT file_path FROM cli_sessions WHERE engine=?1 AND session_id=?2",
+            rusqlite::params![engine, session_id],
+            |r| r.get(0),
+        )
+        .ok()
+}
+
+/// One session's messages as its engine's own file holds them, read from the file each time, so a
+/// chat can show turns that happened outside Misty. A session the index doesn't know yet is
+/// looked for with one scan first.
+pub async fn read_session(
+    state: tauri::State<'_, crate::engines::support::EngineState>,
+    engine: String,
+    session_id: String,
+) -> Result<Vec<super::Message>, String> {
+    let db = Arc::clone(&state.db);
+    let sink = Arc::clone(&state.sink);
+    tauri::async_runtime::spawn_blocking(move || {
+        let path = match session_file(&db, &engine, &session_id) {
+            Some(path) => path,
+            None => {
+                super::scanner::scan_now(&db, &sink)?;
+                session_file(&db, &engine, &session_id)
+                    .ok_or_else(|| "CCGUI_SESSION_NOT_FOUND".to_string())?
+            }
+        };
+        super::parse_session_file(&engine, std::path::Path::new(&path)).map(|parsed| {
+            parsed
+                .messages
+                .into_iter()
+                .map(|mut message| {
+                    message.images = std::mem::take(&mut message.images)
+                        .into_iter()
+                        .filter_map(|image| image_data_url(&image))
+                        .collect();
+                    message
+                })
+                .collect()
+        })
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// An image a session names as a data URL the chat can draw: data URLs as they are, a file the
+/// engine saved (Kimi, Codex) read in. Missing files, other kinds and anything over 8 MB are left
+/// out.
+fn image_data_url(image: &str) -> Option<String> {
+    use base64::Engine as _;
+    if image.starts_with("data:image/") {
+        return Some(image.to_string());
+    }
+    let path = std::path::Path::new(image);
+    let mime = match path.extension()?.to_str()?.to_ascii_lowercase().as_str() {
+        "png" => "image/png",
+        "jpg" | "jpeg" => "image/jpeg",
+        "webp" => "image/webp",
+        "gif" => "image/gif",
+        _ => return None,
+    };
+    if std::fs::metadata(path).ok()?.len() > 8 * 1024 * 1024 {
+        return None;
+    }
+    let bytes = std::fs::read(path).ok()?;
+    Some(format!(
+        "data:{mime};base64,{}",
+        base64::engine::general_purpose::STANDARD.encode(bytes)
+    ))
+}
+
 /// Registers a linked folder as a workspace, so the scan matches its engine sessions to it.
 pub(crate) fn add_workspace_inner(
     db: &Arc<crate::engines::support::db::Db>,

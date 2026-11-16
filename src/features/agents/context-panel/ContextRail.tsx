@@ -4,7 +4,6 @@ import {
   GaugeCircle,
   Globe,
   ListOrdered,
-  MonitorPlay,
   SquarePen,
   SquareTerminal,
   type LucideIcon,
@@ -31,12 +30,11 @@ const panels: [ContextPanelTab, string, LucideIcon][] = [
   ["changes", "Changes", GitCompareArrows],
   ["files", "Files", FolderTree],
   ["terminal", "Terminal", SquareTerminal],
-  ["preview", "Preview", MonitorPlay],
 ];
 
 /**
  * The one column of controls down the chat's right edge: a new task, the chat's goal, the session
- * card and steps, the project folder's views, then the browser and the local preview, evenly
+ * card and steps, the project folder's views, then the browser, evenly
  * spaced with nothing parting them. The person drags them into their own order and hides what they
  * don't use from a right-click on the rail (`railLayoutStore`). Every button is the size of the
  * tab row's layout button and sits on the same line under it. One view at a time floats beside
@@ -125,7 +123,7 @@ export function ContextRail(props: {
     <nav
       // Its 32px buttons are the tab row's layout button's size, 12px from the page's edge like
       // it, the first centred on the header band (`--ui-header`) the tab row centres its buttons in.
-      className="flex flex-none flex-col pt-[calc((var(--ui-header)-32px)/2)] pr-3 pb-2 pl-1"
+      className="flex flex-none flex-col pt-[calc((var(--ui-header)-2rem)/2)] pr-3 pb-2 pl-1"
       aria-label="Panels"
       data-misty-window-drag-block="true"
       data-tour="chat-panels"

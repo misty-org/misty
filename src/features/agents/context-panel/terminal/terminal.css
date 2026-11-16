@@ -11,7 +11,7 @@
   flex: 1;
   min-width: 0;
   align-items: center;
-  gap: 2px;
+  gap: 0.125rem;
   overflow-x: auto;
   scrollbar-width: none;
 }
@@ -19,9 +19,9 @@
   display: flex;
   flex: none;
   align-items: center;
-  gap: 2px;
-  height: 26px;
-  padding: 0 4px 0 0;
+  gap: 0.125rem;
+  height: 1.625rem;
+  padding: 0 0.25rem 0 0;
   border-radius: var(--radius-md);
   color: var(--color-cream-muted);
 }
@@ -37,19 +37,19 @@
   display: flex;
   height: 100%;
   align-items: center;
-  padding: 0 4px 0 10px;
+  padding: 0 0.25rem 0 0.625rem;
   border-radius: var(--radius-md);
   font-size: var(--text-caption);
   white-space: nowrap;
 }
 .terminal-tab-title {
-  max-width: 160px;
+  max-width: 10rem;
   overflow: hidden;
   -webkit-mask-image: var(--mask-fade-end);
   mask-image: var(--mask-fade-end);
 }
 .terminal-tab-input {
-  width: 120px;
+  width: 7.5rem;
   font-size: var(--text-caption);
 }
 .terminal-tab-close {
@@ -70,7 +70,7 @@
    text starts where the header's does (12px in), and the last line runs to the bottom edge. */
 .terminal-host {
   position: absolute;
-  inset: 8px 4px 0 12px;
+  inset: 0.5rem 0.25rem 0 0.75rem;
 }
 .terminal-host .xterm,
 .terminal-host .xterm-viewport {

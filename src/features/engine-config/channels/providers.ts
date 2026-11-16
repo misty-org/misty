@@ -1,7 +1,7 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 // See NOTICE.
 
-/** The channel model behind Settings › Engines › Channels. */
+/** The channel model behind Agents › Channels. */
 
 import type { ChannelView, EngineChannels } from "./api";
 import type { EngineId } from "./engines";

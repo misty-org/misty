@@ -2,7 +2,7 @@
 // See NOTICE.
 
 /**
- * Settings › Engines › Usage: plan limits with reset times, read through each CLI, and usage by
+ * Agents › Usage: plan limits with reset times, read through each CLI, and usage by
  * day, engine, model and folder from the CLIs' own logs, priced from LiteLLM's table. In
  * desktop-cc-gui this view ships as a separate plugin on the same native data; here it is a
  * Settings block.

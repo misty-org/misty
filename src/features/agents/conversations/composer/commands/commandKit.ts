@@ -1,5 +1,6 @@
 import { notify } from "@/shared/ui";
 import { openSettings, type SettingsSection } from "@/features/settings";
+import { openAgentsHub, type AgentsHubPage } from "../../../hub/agentsHubStore";
 import { useContextPanel, type ContextPanelTab } from "../../../context-panel/contextPanelStore";
 import type { GlobalAiMessage } from "../../state/conversationTypes";
 
@@ -75,5 +76,11 @@ export const showPanel = (tab: ContextPanelTab) => {
 
 export const settings = (section: SettingsSection) => {
   openSettings(section);
+  return null;
+};
+
+/** Opens the Agents window on one page: the engines' CLIs, MCP servers, and so on. */
+export const hub = (page: AgentsHubPage) => {
+  openAgentsHub(page);
   return null;
 };

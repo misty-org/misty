@@ -31,6 +31,34 @@ export const searchEngineSessions = (query: string) =>
     limit: 50,
   });
 
+/** One row of a session as native code parsed it from the engine's own file. */
+export interface EngineHistoryMessage {
+  seq: number;
+  /** `user`, `assistant`, `tool` (its name in `text`) or the engine's reasoning. */
+  role: string;
+  text: string;
+  ts?: string | null;
+  path?: string;
+  args?: unknown;
+  result?: unknown;
+  usage?: unknown;
+  model?: string;
+  durationMs?: number;
+  /** A prompt's pictures, as data URLs. */
+  images?: string[];
+}
+
+/** A session's messages, read from the engine's own file. */
+export const readEngineSession = (engine: string, sessionId: string) =>
+  invoke<EngineHistoryMessage[]>("engine_history_messages", { engine, sessionId });
+
+/** The engine session a chat runs, if it has started one. */
+export const readChatSession = (conversation: string) =>
+  invoke<{ engine: string; sessionId: string } | null>(
+    "engine_chat_session",
+    { account: agentAccountId(), conversation },
+  );
+
 /** Renames a session, written back where the engine keeps its own title. */
 export const renameEngineSession = (engine: string, sessionId: string, title: string) =>
   invoke<void>("engine_history_rename", { engine, sessionId, title });

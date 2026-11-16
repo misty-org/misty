@@ -2,6 +2,13 @@ import { spacesApi } from "../../api/api";
 import type { SpaceLibraryItem } from "../../api/dto/entities";
 import { File } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import {
+  cachedContent,
+  cachedContentType,
+  holdContent,
+  libraryViewKey,
+  loadContent,
+} from "../library-viewer/libraryContentCache";
 import { libraryItemThumbnailEligible } from "../libraryThumbnail";
 import { LibraryTextPreview } from "./LibraryTextPreview";
 import { libraryItemMIME } from "./libraryMediaTypes";
@@ -14,6 +21,10 @@ import { PlaceholderIcon, Surface } from "@/shared/ui";
  *
  * PDFs are rendered through <object> rather than <img>, so the blob's own type
  * decides which element is used rather than the item's declared MIME.
+ *
+ * What it loads stays in the Library's cache (libraryContentCache.ts): an image's thumbnail is
+ * the same preview the viewer shows, so opening it shows at once, and scrolling back to a
+ * thumbnail doesn't download it again.
  */
 export function LibraryItemThumbnail({
   spaceId,
@@ -24,7 +35,6 @@ export function LibraryItemThumbnail({
   item: SpaceLibraryItem;
   api?: Pick<typeof spacesApi, "libraryPreview" | "libraryContent">;
 }) {
-  const [preview, setPreview] = useState<{ url: string; kind: "image" | "pdf" } | null>(null);
   const mimeType = libraryItemMIME(item);
   const size = Number(item.file.intrinsic_metadata.byte_size ?? 0);
   const textKind =
@@ -42,49 +52,68 @@ export function LibraryItemThumbnail({
     [api, spaceId, item.id, item.version],
   );
 
+  // An image's thumbnail is the viewer's preview, under the viewer's key; anything else's is
+  // its own.
+  const key = !visual
+    ? ""
+    : mimeType.startsWith("image/")
+      ? libraryViewKey(spaceId, item.id, item.version)
+      : `${libraryViewKey(spaceId, item.id, item.version)}:thumbnail`;
+  const kindOf = (type: string | undefined): "image" | "pdf" =>
+    type === "application/pdf" || (mimeType === "application/pdf" && !type?.startsWith("image/"))
+      ? "pdf"
+      : "image";
+  const [preview, setPreview] = useState<{
+    key: string;
+    url: string;
+    kind: "image" | "pdf";
+  } | null>(() => {
+    const url = key ? cachedContent(key) : undefined;
+    return url ? { key, url, kind: kindOf(cachedContentType(key)) } : null;
+  });
+
   useEffect(() => {
-    if (!visual) {
+    if (!key) {
       setPreview(null);
       return;
     }
     let current = true;
-    let objectUrl = "";
-    void api
-      .libraryPreview(spaceId, item.id, item.version)
-      .catch(() =>
-        mimeType.startsWith("image/") || mimeType === "application/pdf"
-          ? api.libraryContent(spaceId, item.id)
-          : Promise.reject(new Error("The file reader could not load this item")),
-      )
-      .then((blob) => {
+    let release = () => {};
+    void loadContent(key, () =>
+      api
+        .libraryPreview(spaceId, item.id, item.version)
+        .catch(() =>
+          mimeType.startsWith("image/") || mimeType === "application/pdf"
+            ? api.libraryContent(spaceId, item.id)
+            : Promise.reject(new Error("The file reader could not load this item")),
+        ),
+    )
+      .then((url) => {
         if (!current) return;
-        objectUrl = URL.createObjectURL(blob);
-        setPreview({
-          url: objectUrl,
-          kind:
-            blob.type === "application/pdf" ||
-            (mimeType === "application/pdf" && !blob.type.startsWith("image/"))
-              ? "pdf"
-              : "image",
-        });
+        release = holdContent(key);
+        setPreview({ key, url, kind: kindOf(cachedContentType(key)) });
       })
-      .catch(() => setPreview(null));
+      .catch(() => current && setPreview(null));
     return () => {
       current = false;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
+      // The URL stays in the cache for the next time it's shown, so it isn't revoked here.
+      release();
     };
-  }, [api, item.id, item.version, mimeType, spaceId, visual]);
+    // `kindOf` reads only `mimeType`; the item is read through its id and version, in the key.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [api, key, mimeType]);
 
   if (textKind)
     return <LibraryTextPreview kind={textKind} name={item.display_name} load={loadText} />;
-  if (preview?.kind === "image")
-    return <img className="size-full object-cover" src={preview.url} alt="" />;
-  if (preview?.kind === "pdf")
+  const shown = preview?.key === key ? preview : null;
+  if (shown?.kind === "image")
+    return <img className="size-full object-cover" src={shown.url} alt="" />;
+  if (shown?.kind === "pdf")
     return (
       <Surface tone="active" className="pointer-events-none size-full">
         <object
           className="size-full"
-          data={preview.url}
+          data={shown.url}
           type="application/pdf"
           aria-label={`PDF thumbnail for ${item.display_name}`}
         />

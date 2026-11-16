@@ -3,7 +3,11 @@ import { cn, Pressable, Skeleton, Surface, Text, Tooltip } from "@/shared/ui";
 import { overviewRowClass } from "./homeLayout";
 import { HomeSection, OverviewDot } from "./HomeSection";
 
-/** One block of the Space overview: the shared heading, then its rows on a panel. */
+/**
+ * One block of the Space overview: the shared heading, then its rows on the page itself, with no
+ * panel around them. Each row washes under the pointer; the rows sit a step out to each side so
+ * their marks and titles line up with the heading above them.
+ */
 export function OverviewCard(props: {
   title: string;
   /** How many things the card holds, shown quietly after the heading. */
@@ -19,23 +23,28 @@ export function OverviewCard(props: {
       attention={props.tone === "attention"}
       action={props.action}
     >
-      <Surface
-        tone="card"
-        edge="hairline"
-        radius="xl"
-        state={props.tone === "attention" ? "waiting" : undefined}
-        className="grid min-w-0 content-start p-1"
-      >
+      {/* Something waiting shows in the heading's dot, not an edge: there is no panel to edge. */}
+      <div className="-mx-2 grid min-w-0 content-start has-[>[data-overview-empty]]:content-stretch">
         {props.children}
-      </Surface>
+      </div>
     </HomeSection>
   );
 }
 
-/** What an empty panel says, on one quiet line. */
+/**
+ * What an empty block says, on one quiet line in the middle of the room the block takes, so a
+ * block beside a fuller one doesn't leave its words stranded at the top corner.
+ */
 export function OverviewEmpty({ children }: { children: ReactNode }) {
   return (
-    <Text as="p" bare size="meta" tone="muted" className="m-0 flex min-h-13 items-center px-2.5">
+    <Text
+      as="p"
+      bare
+      size="meta"
+      tone="muted"
+      data-overview-empty=""
+      className="m-0 flex h-full min-h-24 items-center justify-center px-2 text-center"
+    >
       {children}
     </Text>
   );
@@ -55,7 +64,7 @@ export function OverviewRow(props: {
     <Surface
       as={Pressable}
       tone="none"
-      radius="lg"
+      radius="md"
       wash="control"
       className={overviewRowClass}
       onClick={props.onOpen}

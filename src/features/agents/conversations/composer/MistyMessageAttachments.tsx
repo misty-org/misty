@@ -20,11 +20,11 @@ export function MistyMessageAttachments({
 }
 
 function MistyMessageImage({ attachment }: { attachment: MistyImageAttachment }) {
-  const [source, setSource] = useState(
-    attachment.previewUrl.startsWith("blob:") ? attachment.previewUrl : "",
-  );
+  // A blob is this session's own upload; a data URL is a picture from an engine's own session.
+  const inline = /^(blob|data):/.test(attachment.previewUrl);
+  const [source, setSource] = useState(inline ? attachment.previewUrl : "");
   useEffect(() => {
-    if (attachment.previewUrl.startsWith("blob:")) return;
+    if (inline) return;
     let active = true;
     let objectURL = "";
     void readAgentsImage(attachment.id)
@@ -38,7 +38,7 @@ function MistyMessageImage({ attachment }: { attachment: MistyImageAttachment })
       active = false;
       if (objectURL) URL.revokeObjectURL(objectURL);
     };
-  }, [attachment.id, attachment.previewUrl]);
+  }, [attachment.id, attachment.previewUrl, inline]);
   return source ? (
     <img
       src={source}

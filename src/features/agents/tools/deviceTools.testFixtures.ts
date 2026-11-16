@@ -46,6 +46,8 @@ vi.mock("../personal/useAgentsStore", () => ({
 }));
 vi.mock("../tabs/agentTabs", () => ({ agentTab: () => undefined }));
 vi.mock("../personal/personalAgentsStore", () => ({
+  defaultAgentOf: (agents: { system_managed?: boolean; engine?: string }[]) =>
+    agents.find((agent) => agent.engine) ?? agents.find((agent) => agent.system_managed),
   usePersonalAgentsStore: { getState: () => ({ agents: [] }) },
 }));
 

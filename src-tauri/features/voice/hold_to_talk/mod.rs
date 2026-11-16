@@ -121,7 +121,68 @@ pub enum HotkeyEvent {
     Down,
     Up,
     Click(f64, f64),
+    /// Control tapped twice on its own, quickly (opens Tutor's text box). Shortcuts like
+    /// Control+C or Control and a click never count. macOS and Windows only.
+    DoubleTap,
     Error(String),
+}
+
+/// Two taps of Control on its own, each short, close together.
+#[derive(Default)]
+pub(crate) struct DoubleTap {
+    /// When Control went down alone, and whether nothing else has happened since.
+    down: Option<(std::time::Instant, bool)>,
+    /// When the last clean tap ended.
+    last: Option<std::time::Instant>,
+}
+
+impl DoubleTap {
+    const TAP: std::time::Duration = std::time::Duration::from_millis(300);
+    const BETWEEN: std::time::Duration = std::time::Duration::from_millis(450);
+
+    /// A modifier change; true when it completes a double tap.
+    pub fn modifiers(&mut self, modifiers: &Modifiers, now: std::time::Instant) -> bool {
+        let control = modifiers.left_control || modifiers.right_control;
+        let others = modifiers.left_option
+            || modifiers.right_option
+            || modifiers.left_command
+            || modifiers.right_command
+            || modifiers.shift
+            || modifiers.function;
+        if control && !others {
+            if self.down.is_none() {
+                self.down = Some((now, true));
+            }
+            return false;
+        }
+        if others {
+            self.interrupt();
+            return false;
+        }
+        // Everything is up.
+        let Some((since, clean)) = self.down.take() else {
+            return false;
+        };
+        if !clean || now.duration_since(since) > Self::TAP {
+            self.last = None;
+            return false;
+        }
+        match self.last.take() {
+            Some(previous) if now.duration_since(previous) <= Self::BETWEEN => true,
+            _ => {
+                self.last = Some(now);
+                false
+            }
+        }
+    }
+
+    /// Any other key, a click or a scroll: no tap is under way.
+    pub fn interrupt(&mut self) {
+        if let Some((_, clean)) = self.down.as_mut() {
+            *clean = false;
+        }
+        self.last = None;
+    }
 }
 
 /// Turns modifier state into Down/Up transitions for each registered chord.
@@ -164,6 +225,7 @@ impl Tracker {
 
 struct Hub {
     tracker: Tracker,
+    taps: DoubleTap,
     subscribers: Vec<(u64, Sender<HotkeyEvent>)>,
     next: u64,
     started: bool,
@@ -174,6 +236,7 @@ fn hub() -> &'static Arc<Mutex<Hub>> {
     HUB.get_or_init(|| {
         Arc::new(Mutex::new(Hub {
             tracker: Tracker::default(),
+            taps: DoubleTap::default(),
             subscribers: Vec::new(),
             next: 1,
             started: false,
@@ -224,6 +287,9 @@ pub fn subscribe(chord: Chord) -> Subscription {
 pub(crate) enum Input {
     Modifiers(Modifiers),
     Click(f64, f64),
+    /// Any key that isn't a modifier, or a scroll: only breaks a double tap.
+    #[cfg_attr(not(any(target_os = "macos", windows)), allow(dead_code))]
+    Key,
     Error(String),
 }
 
@@ -245,8 +311,18 @@ fn dispatch(input: Input) {
                     let _ = tx.send(event);
                 }
             }
+            // Linux's hook sees only modifiers, so it can't tell Control+C from a tap.
+            if cfg!(any(target_os = "macos", windows))
+                && state.taps.modifiers(&modifiers, std::time::Instant::now())
+            {
+                broadcast(&state, HotkeyEvent::DoubleTap);
+            }
         }
-        Input::Click(x, y) => broadcast(&state, HotkeyEvent::Click(x, y)),
+        Input::Key => state.taps.interrupt(),
+        Input::Click(x, y) => {
+            state.taps.interrupt();
+            broadcast(&state, HotkeyEvent::Click(x, y))
+        }
         Input::Error(message) => broadcast(&state, HotkeyEvent::Error(message)),
     }
 }

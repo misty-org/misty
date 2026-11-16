@@ -3,12 +3,13 @@ import { useEffect, useId, type KeyboardEvent } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { DesktopSettingsRow as Row, DesktopSettingsSection as Section } from "@/features/settings";
 import { usePointerReorder } from "@/shared/hooks/usePointerReorder";
-import { Button, cn, IconButton, Pressable, Surface, Text, Tooltip } from "@/shared/ui";
+import { Button, cn, IconButton, Pressable, Surface, Switch, Text, Tooltip } from "@/shared/ui";
 import { bottomBarItems } from "./BottomBarItems";
 import {
   bottomBarDefaults,
   bottomBarItemIds,
   useBottomBar,
+  useBottomBarCompact,
   type BottomBarItemId,
 } from "./bottomBarStore";
 
@@ -23,6 +24,7 @@ export function BottomBarSettings() {
   const { start, end } = useBottomBar(
     useShallow((state) => ({ start: state.start, end: state.end })),
   );
+  const compact = useBottomBarCompact((state) => state.value);
   useEffect(() => void useBottomBar.getState().load(), []);
   const hidden = bottomBarItemIds.filter((id) => !start.includes(id) && !end.includes(id));
   const scope = useId();
@@ -50,6 +52,13 @@ export function BottomBarSettings() {
       title="Bottom bar"
       description="What the bar along the bottom of the window shows. Drag items between its ends, or down to hide them."
     >
+      <Row label="Compact" description="A shorter bar with smaller buttons.">
+        <Switch
+          aria-label="Compact"
+          checked={compact}
+          onCheckedChange={(next) => useBottomBarCompact.getState().set(next)}
+        />
+      </Row>
       <Row label="Bar" description="Left for the whole window, right for the page in view." stacked>
         <Surface
           tone="well"

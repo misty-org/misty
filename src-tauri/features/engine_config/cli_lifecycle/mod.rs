@@ -652,6 +652,11 @@ fn sign_in_status_args(engine: &str) -> Option<&'static [&'static str]> {
     match engine {
         "claude" => Some(&["auth", "status"]),
         "codex" => Some(&["login", "status"]),
+        // Qoder CLI's `status` prints "Account: Not logged in" until it is signed in.
+        "qoder" | "qoder-cn" => Some(&["status"]),
+        // Grok Build has no status command, but `grok models` starts with "You are not
+        // authenticated." until it is signed in, and lists the models after.
+        "grok" => Some(&["models"]),
         _ => None,
     }
 }
@@ -660,10 +665,22 @@ fn sign_in_status_args(engine: &str) -> Option<&'static [&'static str]> {
 /// code says it, and a "not logged in" line wins over a zero exit.
 fn parse_sign_in(output: &ProcOutput) -> (Option<bool>, Option<String>) {
     let text = format!("{}\n{}", output.stdout, output.stderr);
-    let detail = text
+    let lines: Vec<&str> = text
         .lines()
         .map(str::trim)
-        .find(|line| !line.is_empty() && !line.starts_with('{'))
+        .filter(|line| !line.is_empty() && !line.starts_with('{'))
+        .collect();
+    // The line about the account where the CLI prints one among others (Qoder's version line,
+    // Grok's model list), else the first.
+    let detail = lines
+        .iter()
+        .find(|line| {
+            let lower = line.to_ascii_lowercase();
+            ["account", "logged", "signed", "authenticated"]
+                .iter()
+                .any(|word| lower.contains(word))
+        })
+        .or(lines.first())
         .map(|line| line.chars().take(200).collect::<String>());
     if let Ok(value) = serde_json::from_str::<serde_json::Value>(output.stdout.trim()) {
         if let Some(logged_in) = value.get("loggedIn").and_then(serde_json::Value::as_bool) {
@@ -677,7 +694,10 @@ fn parse_sign_in(output: &ProcOutput) -> (Option<bool>, Option<String>) {
         }
     }
     let lower = text.to_ascii_lowercase();
-    if lower.contains("not logged in") || lower.contains("not signed in") {
+    if ["not logged in", "not signed in", "not authenticated"]
+        .iter()
+        .any(|marker| lower.contains(marker))
+    {
         return (Some(false), detail);
     }
     match output.status {

@@ -19,14 +19,17 @@ import { LibraryViewerStage } from "./library-viewer/LibraryViewerStage";
 import { LibraryViewerToolbar } from "./library-viewer/LibraryViewerToolbar";
 import { useLibraryEditActions } from "./library-viewer/useLibraryEditActions";
 import { useLibraryEditVersions } from "./library-viewer/useLibraryEditVersions";
-import { useLibraryItemContent } from "./library-viewer/useLibraryItemContent";
+import {
+  useLibraryItemContent,
+  usePrefetchLibraryNeighbors,
+} from "./library-viewer/useLibraryItemContent";
 import { useLibraryViewerKeyboard } from "./library-viewer/useLibraryViewerKeyboard";
 import { useLibraryViewerPlayback } from "./library-viewer/useLibraryViewerPlayback";
 import { libraryItemMIME } from "./SpaceLibraryPrimitives";
 import { libraryEditStyle, normalizeLibraryEdit } from "./SpaceLibraryViewerUtils";
 const dialogClass = [
-  "grid h-[min(860px,calc(100dvh-32px))] min-h-0 w-[min(1320px,calc(100vw-32px))] max-w-none",
-  "grid-cols-[minmax(0,1fr)_minmax(300px,340px)] grid-rows-[56px_minmax(0,1fr)] gap-0 overflow-hidden",
+  "grid h-[min(53.75rem,calc(100dvh-2rem))] min-h-0 w-[min(82.5rem,calc(100vw-2rem))] max-w-none",
+  "grid-cols-[minmax(0,1fr)_minmax(18.75rem,21.25rem)] grid-rows-[3.5rem_minmax(0,1fr)] gap-0 overflow-hidden",
   "rounded-xl p-0 shadow-lg sm:max-w-none [&>button]:hidden",
 ].join(" ");
 export function SpaceLibraryViewer(props: LibraryItemViewerProps) {
@@ -60,6 +63,12 @@ function LibraryItemViewerContent(
     editing,
     itemIsImage: isImage,
     renditionState: activeEdit?.rendition_state,
+  });
+  usePrefetchLibraryNeighbors({
+    spaceId,
+    items,
+    index,
+    ready: isImage && Boolean(content.contentUrl),
   });
   const edits = useLibraryEditActions({
     spaceId,
@@ -111,6 +120,8 @@ function LibraryItemViewerContent(
         onClose={onClose}
         onReplaceItem={props.onReplaceItem}
         onRenditionReady={props.onRenditionReady}
+        onPrevious={index > 0 ? goPrevious : undefined}
+        onNext={index >= 0 && index < items.length - 1 ? goNext : undefined}
       />
     );
   return (

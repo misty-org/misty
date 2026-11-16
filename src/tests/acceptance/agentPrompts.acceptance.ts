@@ -4,7 +4,7 @@ import { defaultAgentId, MistyClient, seedSpaceMember, type InvocationRun } from
 import { writeAcceptanceReport } from "./report";
 
 // Phases 1–3 of the live acceptance prompts, sent to the local development
-// server (its runtime, model and Composio project) as a fresh account with
+// server (its runtime and model) as a fresh account with
 // known notes and a team chat. Phase 4 runs separately in
 // src/features/agents/desktop-control/screenAct.acceptance.ts.
 
@@ -108,23 +108,30 @@ describe.skipIf(!liveAcceptanceEnabled)("acceptance prompts on the local server"
     expect(run.text).not.toMatch(refusal);
   });
 
-  it("phase 2: reaches Gmail through Composio, with a connect card when needed", async () => {
-    const run = await ask("phase2-gmail", "just tell me what emails I missed");
+  it("phase 2: reaches Gmail through a connected app or its web page", async () => {
+    const run = await ask("phase2-gmail", "just tell me what emails I missed", {
+      window_label: "main",
+    });
     expect(run.terminal).toBe("invocation.completed");
-    expect(has(run, "app.request") || ran(run, "integration_execute")).toBe(true);
+    expect(
+      has(run, "app.request") ||
+        has(run, "screen.request") ||
+        ran(run, "integration_execute", "integration_search"),
+    ).toBe(true);
+    expect(run.text).not.toMatch(refusal);
   });
 
-  it("phase 2: the Google Drive request uses notes and Composio Drive", async () => {
+  it("phase 2: the Google Drive request uses notes, then Drive as it can", async () => {
     const run = await ask(
       "phase2-drive",
       'check spaces, gather my two latest notes and upload them to my google drive and move them to a folder called "misty space notes"',
     );
     expect(run.terminal).toBe("invocation.completed");
     expect(ran(run, "note_search", "note_read")).toBe(true);
-    expect(has(run, "app.request") || ran(run, "integration_execute")).toBe(true);
+    expect(run.text).not.toMatch(refusal);
   });
 
-  it("phase 2–3: researches with Composio or a screen, never a refusal", async () => {
+  it("phase 2–3: researches with an app or a screen, never a refusal", async () => {
     const run = await ask("phase23-research", "Research GothamChess's latest uploads", {
       window_label: "main",
     });

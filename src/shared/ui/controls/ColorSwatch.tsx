@@ -10,8 +10,8 @@ const swatchClass = (shape: SwatchShape) =>
     "hover:border-cream-muted focus-visible:border-cream",
     // The selected mark is a shadow, not a ring: the app clears rings on focus, and the swatch
     // just picked keeps focus.
-    "aria-pressed:shadow-[0_0_0_1px_var(--color-charcoal-card),0_0_0_3px_var(--color-cream)]",
-    "aria-checked:shadow-[0_0_0_1px_var(--color-charcoal-card),0_0_0_3px_var(--color-cream)]",
+    "aria-pressed:shadow-[0_0_0_1px_var(--color-charcoal-card),0_0_0_0.1875rem_var(--color-cream)]",
+    "aria-checked:shadow-[0_0_0_1px_var(--color-charcoal-card),0_0_0_0.1875rem_var(--color-cream)]",
     shape === "circle" ? "rounded-full" : "rounded-md",
   );
 

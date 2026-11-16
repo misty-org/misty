@@ -31,7 +31,7 @@
 //!   <label|[labels]>}}`, or `{outcome:"cancelled"}` to dismiss.
 
 use std::collections::HashMap;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
@@ -115,7 +115,17 @@ pub(super) async fn run_acp_turn(
     // keys pinning a concurrency slot until app exit.
     let _registry_guard =
         VirtualRunGuard::new(Arc::clone(&core.registry), core.run_id.clone(), virtual_pid);
-    let result = turn_inner(&core, &mut state, &mut view, &req, &mut command, &killed).await;
+    let mut cleanup_files = cleanup_files;
+    let result = turn_inner(
+        &core,
+        &mut state,
+        &mut view,
+        &req,
+        &mut command,
+        &killed,
+        &mut cleanup_files,
+    )
+    .await;
     // Pending questions and parked plan reviews die with the turn: settle the
     // cards and expire the reviews BEFORE any terminal dispatch, or the
     // monotonic saw_done/saw_error guard in dispatch_event would drop these
@@ -152,6 +162,8 @@ pub(super) async fn run_acp_turn(
     core.sink.flush();
     // The staged GROK_HOME channel dir holds this send's credentials and is
     // private to this run; the CLI is gone, so nothing may read it again.
+    // Misty: a process kept warm took its files along (`warm.rs`), removed when it ends; a
+    // warm process this turn reused never read this send's.
     super::cleanup_staged_files(&cleanup_files);
 }
 
@@ -177,32 +189,72 @@ async fn turn_inner(
     req: &SendRequest,
     command: &mut Command,
     killed: &Arc<AtomicBool>,
+    cleanup_files: &mut Vec<PathBuf>,
 ) -> Result<(), String> {
-    let mut spawned = spawn_piped_acp(command, &core.engine_id, &req.workspace)?;
-    spawned.acp.reports_as = Some(core.engine_id.clone());
-    // The registry entry exists before this task runs, so a parked question's
-    // answer always finds this child's stdin (and the session-id alias clones
-    // it later, making `answer_question` work by either key).
-    core.registry
-        .set_stdin(&core.run_id, Arc::clone(&spawned.acp.stdin));
-    let result = handshake_and_prompt(&mut spawned.acp, core, state, view, req, killed).await;
-    // ACP is a session protocol: the CLI stays resident after the prompt
-    // response, so every exit path tears the tree down.
-    teardown(&mut spawned.child).await;
-    match result {
-        Ok(()) => Ok(()),
-        Err(error) => Err(terminal_message(error, &spawned.stderr_buf)),
-    }
+    // Misty: the chat's process from its last turn, still on this session, takes the prompt
+    // straight away (`warm.rs`); otherwise one starts and opens the session.
+    let fingerprint = super::warm::claim(&core.run_id);
+    let mut warm = match super::warm::take_acp(core, req, fingerprint) {
+        Some(warm) => warm,
+        None => {
+            let mut spawned = spawn_piped_acp(command, &core.engine_id, &req.workspace)?;
+            spawned.acp.reports_as = Some(core.engine_id.clone());
+            // The registry entry exists before this task runs, so a parked question's
+            // answer always finds this child's stdin (and the session-id alias clones
+            // it later, making `answer_question` work by either key).
+            core.registry
+                .set_stdin(&core.run_id, Arc::clone(&spawned.acp.stdin));
+            let (session_id, effort) = match handshake(&mut spawned.acp, core, req, killed).await
+            {
+                Ok(opened) => opened,
+                Err(error) => {
+                    // ACP is a session protocol: the CLI stays resident after the prompt
+                    // response, so every exit path tears the tree down.
+                    teardown(&mut spawned.child).await;
+                    return Err(terminal_message(error, &spawned.stderr_buf));
+                }
+            };
+            super::warm::Warm {
+                item: super::warm::WarmAcp {
+                    spawned,
+                    session_id,
+                    effort,
+                    known: Default::default(),
+                },
+                token: None,
+                cleanup: std::mem::take(cleanup_files),
+            }
+        }
+    };
+    let session_id = warm.item.session_id.clone();
+    let effort = warm.item.effort.clone();
+    let result = prompt(
+        &mut warm.item.spawned.acp,
+        core,
+        state,
+        view,
+        req,
+        killed,
+        &session_id,
+        effort,
+    )
+    .await
+    .map_err(|error| terminal_message(error, &warm.item.spawned.stderr_buf));
+    // A clean turn leaves the process warm for the chat's next message; anything else ends it.
+    let clean = result.is_ok() && !killed.load(Ordering::SeqCst);
+    super::warm::park_acp(core, req, fingerprint, clean, warm);
+    result
 }
 
-async fn handshake_and_prompt(
+/// Opens the turn's session on a new process: `initialize`, then the session re-attached (or a
+/// new one), with the model and mode an engine takes over ACP. Returns the session id and the
+/// effort the handshake reported.
+async fn handshake(
     acp: &mut AcpProcess,
     core: &TurnCore,
-    state: &mut TurnState,
-    view: &mut TurnView,
     req: &SendRequest,
     killed: &AtomicBool,
-) -> Result<(), String> {
+) -> Result<(String, Option<String>), String> {
     let agent = acp
         .routed(
             "initialize",
@@ -223,16 +275,12 @@ async fn handshake_and_prompt(
         _ => agent,
     };
     let servers = crate::engines::gate::acp_mcp_servers(req, &agent);
-    let gate = crate::engines::gate::AcpGate::of(core, req);
     // Kimi and Antigravity set their model, effort and mode in their own handshakes.
     let (session_id, effort) = match core.engine_id.as_str() {
         "kimi" => super::kimi_acp::attach_session(acp, req, servers, killed).await?,
         "agy" => super::agy::attach_session(acp, req, servers, killed).await?,
         _ => (attach_session(acp, req, servers, killed).await?, None),
     };
-    if let Some(effort) = effort {
-        core.dispatch_event(state, EngineEvent::Effort(effort));
-    }
     // Hermes takes the chosen model over ACP (`set_session_model`); the others take it as a flag.
     if let Some(model) = req.model.as_deref().filter(|_| core.engine_id == "hermes") {
         super::hermes::set_model(acp, &session_id, model, killed).await?;
@@ -241,9 +289,28 @@ async fn handshake_and_prompt(
     if core.engine_id == "hermes" {
         super::hermes::set_mode(acp, &session_id, req.permission.as_deref(), killed).await?;
     }
-    core.dispatch_event(state, EngineEvent::SessionId(session_id.clone()));
+    Ok((session_id, effort))
+}
+
+/// Runs the turn's prompt on an open session.
+#[allow(clippy::too_many_arguments)]
+async fn prompt(
+    acp: &mut AcpProcess,
+    core: &TurnCore,
+    state: &mut TurnState,
+    view: &mut TurnView,
+    req: &SendRequest,
+    killed: &AtomicBool,
+    session_id: &str,
+    effort: Option<String>,
+) -> Result<(), String> {
+    let gate = crate::engines::gate::AcpGate::of(core, req);
+    if let Some(effort) = effort {
+        core.dispatch_event(state, EngineEvent::Effort(effort));
+    }
+    core.dispatch_event(state, EngineEvent::SessionId(session_id.to_string()));
     if core.engine_id == "agy" {
-        view.subagents = Some(super::agy::Subagents::of(&session_id));
+        view.subagents = Some(super::agy::Subagents::of(session_id));
     }
 
     // Gemini runs no custom TOML command over ACP: Misty expands it into its prompt first.
@@ -272,7 +339,7 @@ async fn handshake_and_prompt(
             prompt,
             PROMPT_TIMEOUT,
             killed,
-            Some(&session_id),
+            Some(session_id),
             &mut router,
         )
         .await?

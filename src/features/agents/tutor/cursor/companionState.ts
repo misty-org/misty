@@ -30,6 +30,19 @@ export type CompanionControl =
     }
   | {
       kind: "retry";
+    }
+  | {
+      kind: "captions";
+      captions: boolean;
+    }
+  | {
+      kind: "tint";
+      tint: string;
+    }
+  | {
+      /** Starts Tutor's hands-on tour, or stops it. */
+      kind: "tour";
+      start: boolean;
     };
 export const initialCompanionPresentation: Presentation = {
   generation: 0,

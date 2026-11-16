@@ -19,7 +19,7 @@ export function ChatMessagesSkeleton({ framed = false }: { framed?: boolean }) {
       aria-busy="true"
       role="status"
       className={cn(
-        framed && "min-h-0 flex-1 overflow-hidden px-[clamp(16px,2.5vw,32px)] pb-3 pt-4",
+        framed && "min-h-0 flex-1 overflow-hidden px-[clamp(1rem,2.5vw,2rem)] pb-3 pt-4",
       )}
     >
       <span className="sr-only">Loading conversation</span>
@@ -27,7 +27,7 @@ export function ChatMessagesSkeleton({ framed = false }: { framed?: boolean }) {
         <div
           key={index}
           aria-hidden="true"
-          className="mt-4 grid min-h-10 grid-cols-[44px_minmax(0,1fr)] gap-x-4 py-1 first:mt-0"
+          className="mt-4 grid min-h-10 grid-cols-[2.75rem_minmax(0,1fr)] gap-x-4 py-1 first:mt-0"
         >
           <Skeleton className="mt-0.5 size-10 justify-self-end rounded-full" />
           <div className="min-w-0">

@@ -1,5 +1,4 @@
-import { mistyWebsite } from "@/api/deployment/serverChoice";
-import { openSystemExternalLink } from "@/shared/platform/openExternalLink";
+import { openOnWebsite } from "@/features/account";
 import { reportSystemError } from "@/shared/platform/systemErrors";
 import { Button, Text } from "@/shared/ui";
 import { Rocket } from "lucide-react";
@@ -23,7 +22,7 @@ export function spaceLevelLine(level: NonNullable<SpaceBoostsState["level"]>): s
 /**
  * The Space's level and a way to boost it, on a server with Space levels (Misty Cloud). A
  * self-hosted server has none, answers enabled false, and this shows nothing. Boosts are given
- * and bought on the website, in its Boosts settings for this Space.
+ * and bought on the website, in its Boosts settings for this Space, which opens signed in.
  */
 export function SpaceBoosts({ spaceId }: { spaceId: string }) {
   const [state, setState] = useState<SpaceBoostsState | null>(null);
@@ -46,9 +45,7 @@ export function SpaceBoosts({ spaceId }: { spaceId: string }) {
   if (!state?.enabled || !state.level) return null;
 
   const boost = () =>
-    void openSystemExternalLink(
-      `${mistyWebsite()}/settings/boosts?space=${encodeURIComponent(spaceId)}`,
-    ).catch((error: unknown) => {
+    void openOnWebsite(`/settings/boosts?space=${encodeURIComponent(spaceId)}`).catch((error: unknown) => {
       reportSystemError({ scope: "spaces:boost", title: "Boosts could not be opened", error });
     });
 

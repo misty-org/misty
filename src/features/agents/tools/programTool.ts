@@ -36,7 +36,13 @@ export async function runProgramTool(request: LocalToolRequest, entry: RunEntry)
       callId: request.callId,
       node: "browser_run",
       operation: "browser.run",
-      input: { scopeId: target.opaqueRef, conversationId: entry.conversationId, code },
+      input: {
+        scopeId: target.opaqueRef,
+        conversationId: entry.conversationId,
+        code,
+        // An outside engine's run saves the whole value to a file (engines/mcp.rs), so it isn't cut.
+        ...(typeof request.input.saveAs === "string" ? { saveAs: request.input.saveAs } : {}),
+      },
       config: browserToolConfig(entry, request.policyCall),
       waitMs: browserRunMs,
     }),

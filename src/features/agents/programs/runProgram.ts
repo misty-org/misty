@@ -15,6 +15,8 @@ import { runInSandbox } from "./sandbox";
 const PROGRAM_MS = 120_000;
 const MAX_CODE = 20_000;
 const MAX_VALUE = 20_000;
+/** A value an outside engine saves to a file (`saveAs`, engines/mcp.rs) never enters its context. */
+const MAX_SAVED_VALUE = 8_000_000;
 
 /**
  * browser.run: runs the agent's program in a sandbox on
@@ -31,6 +33,7 @@ export async function runProgram(
     code?: unknown;
     conversationId?: unknown;
     scopeId?: unknown;
+    saveAs?: unknown;
   };
   const code = typeof input.code === "string" ? input.code : "";
   if (!code.trim() || code.length > MAX_CODE)
@@ -80,13 +83,14 @@ export async function runProgram(
   const started = Date.now();
   const result = await runInSandbox(programPrelude, code, pageHost(state), { deadline });
   const value = JSON.stringify(result.value ?? null);
+  const limit = typeof input.saveAs === "string" ? MAX_SAVED_VALUE : MAX_VALUE;
   return {
     ok: result.ok,
     ...(result.ok
       ? {
           value:
-            value.length > MAX_VALUE
-              ? `${value.slice(0, MAX_VALUE)}… (cut: return less, or note() rows)`
+            value.length > limit
+              ? `${value.slice(0, limit)}… (cut: return less, or note() rows)`
               : (result.value ?? null),
         }
       : { error: result.error }),

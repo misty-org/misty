@@ -18,8 +18,7 @@ import { useSpaceWindowStore } from "@/features/app-windows";
 import { spacesGateway } from "../../spaces-gateway/spacesGateway";
 import { HandOffDialog } from "./HandOffDialog";
 import { formatCost } from "../../context-panel/chatUsage";
-import { tookText } from "./meta/format";
-import { modelName } from "../../engines/modelNames";
+import { formatTokens, tookText } from "./meta/format";
 
 const timeFormat = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" });
 const fullFormat = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" });
@@ -215,23 +214,16 @@ function MessageTime({ message }: { message: GlobalAiMessage }) {
   );
 }
 
-/** How long a run took, as a reply's facts say it: "8s", "2m 5s", "1h 4m". */
 /**
- * A reply's facts, in view under it: the model the engine says answered, how long the run took
- * and what it cost when the engine said. The time it was sent is the tooltip on how long it took,
- * or stands alone when there is nothing else to say.
+ * A reply's facts, in view under it: how long the run took, the tokens it wrote and what it cost
+ * when the engine said. The model isn't one: the chat's model is in the composer.
+ * The time it was sent is the tooltip on how long it took, or stands alone when there is nothing
+ * else to say.
  */
 function ReplyFacts({ message }: { message: GlobalAiMessage }) {
   const date = new Date(message.createdAt);
   const sent = Number.isNaN(date.getTime()) ? "" : fullFormat.format(date);
   const facts: ReactNode[] = [];
-  // Named the way the model picker names it: the engine's own name from its catalog, else its id.
-  if (message.model)
-    facts.push(
-      <Tooltip key="model" content={message.model}>
-        <span>{modelName(message.model, message.model)}</span>
-      </Tooltip>,
-    );
   if (message.durationMs)
     facts.push(
       sent ? (
@@ -242,7 +234,14 @@ function ReplyFacts({ message }: { message: GlobalAiMessage }) {
         <span key="took">{tookText(message.durationMs)}</span>
       ),
     );
-  const cost = message.usage?.costUsd;
+  const usage = message.usage;
+  if (usage?.output)
+    facts.push(
+      <Tooltip key="tokens" content={tokenBreakdown(usage)}>
+        <span className="tabular-nums">{formatTokens(usage.output)} tokens</span>
+      </Tooltip>,
+    );
+  const cost = usage?.costUsd;
   if (typeof cost === "number" && cost > 0) facts.push(<span key="cost">{formatCost(cost)}</span>);
   if (!message.durationMs) facts.push(<MessageTime key="time" message={message} />);
   return (
@@ -255,6 +254,18 @@ function ReplyFacts({ message }: { message: GlobalAiMessage }) {
       ))}
     </>
   );
+}
+
+/** The tokens a reply's usage report counts, for the tooltip on its total. */
+function tokenBreakdown(usage: NonNullable<GlobalAiMessage["usage"]>) {
+  return [
+    usage.input ? `${formatTokens(usage.input)} in` : "",
+    usage.output ? `${formatTokens(usage.output)} out` : "",
+    usage.reasoning ? `${formatTokens(usage.reasoning)} reasoning` : "",
+    usage.cacheRead ? `${formatTokens(usage.cacheRead)} cached` : "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
 }
 
 /** Speech reads prose, not Markdown punctuation. */

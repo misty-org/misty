@@ -152,6 +152,30 @@ async function listenToNative(
     if (s.pointPending) s.pointer.clear();
   });
   listen<CompanionClick>("misty://cursor-click", (payload) => s.pointer.clicked(payload));
+  // The tour's dictation step waits for a dictation to finish anywhere.
+  listen<{ phase: string }>("misty://dictation", (payload) => {
+    if (payload.phase === "finish") s.tour.dictated();
+  });
+  // A question typed in the text box beside the pointer (tap Control twice): answered like a
+  // spoken one, aloud and in captions.
+  listen<{ turn: number; text: string }>("misty://cursor-ask", (payload) => {
+    if (payload.turn < s.turn || !payload.text.trim()) return;
+    const current = useMistyStore.getState();
+    s.recordingOrigin = {
+      conversationId: current.activeConversationId,
+      agentId: current.selectedAgentId,
+    };
+    s.turn = payload.turn;
+    s.captures = [];
+    s.invocationId = undefined;
+    s.captionNextAnswer = true;
+    void s.interrupt(false).catch((e) => s.fail(payload.turn, e));
+    s.change({ visible: true, phase: "processing", error: undefined });
+    void voice
+      .start()
+      .submitText(payload.text)
+      .catch((e) => s.fail(payload.turn, e));
+  });
   const control = createCompanionControl(s, voice);
   useCompanionState.setState({
     accountId,

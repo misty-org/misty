@@ -15,12 +15,16 @@ import {
   setBrowserWebviewsSuspended,
 } from "@/features/app-windows";
 import { cn, Surface } from "@/shared/ui";
+import { designPx, uiPx } from "@/shared/lib/uiScale";
 import { dockingMetrics } from "./dockingGeometry";
 
 /** The sidebar header shares the Space bar's centerline, so the window buttons that sit on it drop
- * to that line whichever side the tabs are on. */
-const lightsDrop =
-  dockingMetrics.edge + dockingMetrics.spaceBar / 2 - trafficLightRestY + trafficLightGlyphDrop;
+ * to that line whichever side the tabs are on. The bar is in design pixels (uiPx gives its CSS
+ * pixels, which are the window's points); the native offsets are points already. */
+const lightsDrop = () =>
+  uiPx(dockingMetrics.edge + dockingMetrics.spaceBar / 2) -
+  trafficLightRestY +
+  trafficLightGlyphDrop;
 /** The first button's frame is 22pt from the window edge: 3pt right of the panel's content edge
  * (8 + 1 + 10 = 19pt), because the circle sits inside its frame, so the circle's edge lines up
  * with the address field's. */
@@ -111,7 +115,7 @@ export function SidebarDrawer(props: { side: "left" | "right"; children: ReactNo
   useEffect(() => {
     if (props.side !== "left" || !hasTauriInternals()) return;
     const nativeWindow = getCurrentWindow();
-    void enableModernWindowStyle(nativeWindow, { x: lightsInset, y: lightsDrop }).catch(
+    void enableModernWindowStyle(nativeWindow, { x: lightsInset, y: lightsDrop() }).catch(
       () => undefined,
     );
     return () =>
@@ -148,7 +152,7 @@ export function SidebarDrawer(props: { side: "left" | "right"; children: ReactNo
         // left edge until the window settles, and the gap would show the host behind it. Only a
         // sidebar too wide to leave the page 240px gives way. It goes as narrow as the person drags
         // it (sidebarWidth.ts).
-        "[--sidebar-w:max(200px,min(var(--shell-side-tabs,280px),calc(100vw_-_240px)))]",
+        "[--sidebar-w:max(12.5rem,min(var(--shell-side-tabs,17.5rem),calc(100vw_-_15rem)))]",
         "relative flex-none transition-[width]",
         motion,
         // Collapsed, the column animates shut and the panel waits off its edge.
@@ -169,7 +173,7 @@ export function SidebarDrawer(props: { side: "left" | "right"; children: ReactNo
         tone="chrome"
         aria-hidden="true"
         className={cn(
-          "absolute top-0 z-[var(--stack-above)] h-[calc(var(--pane-seam-top,8px)_-_1px)] w-screen",
+          "absolute top-0 z-[var(--stack-above)] h-[calc(var(--pane-seam-top,0.5rem)_-_1px)] w-screen",
           left ? "left-0" : "right-0",
         )}
         data-misty-window-titlebar-region="true"
@@ -183,9 +187,11 @@ export function SidebarDrawer(props: { side: "left" | "right"; children: ReactNo
         ref={panel}
         className={cn(
           "absolute top-0 bottom-0 z-[var(--stack-overlay-raised)] flex w-[var(--sidebar-w)]",
-          "py-[var(--pane-frame,6px)] transition-[transform,opacity]",
+          "py-[var(--pane-frame,0.375rem)] transition-[transform,opacity]",
           motion,
-          left ? "left-0 pl-[var(--pane-frame,6px)]" : "right-0 pr-[var(--pane-frame,6px)]",
+          left
+            ? "left-0 pl-[var(--pane-frame,0.375rem)]"
+            : "right-0 pr-[var(--pane-frame,0.375rem)]",
           hidden &&
             cn(
               "pointer-events-none opacity-0",
@@ -223,8 +229,10 @@ export function SidebarDrawer(props: { side: "left" | "right"; children: ReactNo
             // Native pages step aside so they cannot swallow the drag.
             setBrowserWebviewsSuspended(true, "sidebar-resize");
             const move = (e: PointerEvent) => {
-              const width =
-                props.side === "left" ? e.clientX - origin.left : origin.right - e.clientX;
+              // Measured in CSS pixels; the width is kept in design pixels (uiScale.ts).
+              const width = designPx(
+                props.side === "left" ? e.clientX - origin.left : origin.right - e.clientX,
+              );
               // Pulled well past the narrowest it goes, in the closing direction, it closes.
               if (width < sidebarWidthMin - sidebarCloseDistance) {
                 end();

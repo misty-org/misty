@@ -12,6 +12,15 @@ export const furnitureKinds = [
   "lamp",
   "cooler",
   "rug",
+  // Walls inside the room, which make it rooms: a gap between two is a doorway.
+  "wall",
+  // Earned as the team gets work done (studioProgress.ts).
+  "beanbag",
+  "arcade",
+  "aquarium",
+  "trophies",
+  "vending",
+  "tree",
 ] as const;
 
 export type FurnitureKind = (typeof furnitureKinds)[number];
@@ -72,6 +81,19 @@ export const furniture: Record<FurnitureKind, FurnitureSpec> = {
   lamp: { label: "Lamp", w: 1, d: 1, solidRows: 1 },
   cooler: { label: "Water cooler", w: 1, d: 1, solidRows: 1, gather: "front" },
   rug: { label: "Rug", w: 4, d: 3, solidRows: 0, flat: true },
+  wall: { label: "Wall", w: 4, d: 1, solidRows: 1 },
+  beanbag: {
+    label: "Beanbag",
+    w: 1,
+    d: 1,
+    solidRows: 1,
+    seats: [{ x: 0, z: 0.04, y: 0.26, yaw: 0 }],
+  },
+  arcade: { label: "Arcade cabinet", w: 1, d: 1, solidRows: 1, gather: "front" },
+  aquarium: { label: "Aquarium", w: 2, d: 1, solidRows: 1, gather: "front" },
+  trophies: { label: "Trophy shelf", w: 2, d: 1, solidRows: 1, gather: "front" },
+  vending: { label: "Snack machine", w: 1, d: 1, solidRows: 1, gather: "front" },
+  tree: { label: "Indoor tree", w: 1, d: 1, solidRows: 1, gather: "front" },
 };
 
 export const isFurnitureKind = (value: unknown): value is FurnitureKind =>

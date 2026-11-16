@@ -206,7 +206,7 @@ export function FolderPicker({ compact = false }: { compact?: boolean }) {
           chevron={!compact}
           plain={compact}
         />
-        <DropdownMenuContent align="start" className="w-72 max-w-[calc(100vw-16px)]">
+        <DropdownMenuContent align="start" className="w-72 max-w-[calc(100vw-1rem)]">
           {active.map((path, index) => (
             <MenuSubmenu
               key={path}
@@ -309,7 +309,7 @@ export function AgentFolderPicker({
         chevron={!compact}
         plain={compact}
       />
-      <DropdownMenuContent align="start" className="w-72 max-w-[calc(100vw-16px)]">
+      <DropdownMenuContent align="start" className="w-72 max-w-[calc(100vw-1rem)]">
         <MenuItem
           icon={<FolderOpen />}
           label="Choose a folder"

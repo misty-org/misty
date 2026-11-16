@@ -1,10 +1,4 @@
-import { deviceModelCall } from "@/api/runtime/device-models";
-
-type Completion = {
-  model?: string;
-  choices: Array<{ message: { role: string; content: string } }>;
-  usage?: Record<string, number>;
-};
+import { screenModelOnEngine } from "../engines/mistyCalls";
 
 // Midscene resolves these like environment variables. A separate planning
 // slot keeps planning free of element-locating calls: actions carry their own
@@ -28,8 +22,8 @@ export const screenModelConfig = {
 const maxCalls = 80;
 
 /**
- * An OpenAI-style client whose every completion is one call to the agent runtime on this
- * computer, on the run's device's agent model.
+ * An OpenAI-style client whose every completion is one run on the default engine, which sees the
+ * screenshots. Misty has no model of its own.
  */
 export function screenModelClient() {
   let call = 0;
@@ -42,9 +36,8 @@ export function screenModelClient() {
         ) => {
           if (call >= maxCalls) throw new Error("This screen task used all of its model calls.");
           call++;
-          const response = await deviceModelCall<Completion>(
-            "screen-model",
-            { messages: request.messages },
+          const response = await screenModelOnEngine(
+            request.messages as Parameters<typeof screenModelOnEngine>[0],
             options?.signal,
           );
           if (!request.stream) return response;
@@ -53,7 +46,6 @@ export function screenModelClient() {
             yield {
               model: response.model,
               choices: [{ delta: { content: text } }],
-              usage: response.usage,
             };
           })();
         },

@@ -1,11 +1,10 @@
 import { invoke } from "@/native/invoke";
 import type { AgentGrant } from "../grants/api";
-import type { AppRequest, AppRequestDecision, CatalogApp, ConnectedApp } from "./api";
+import type { AppRequest, AppRequestDecision } from "./api";
 
 /**
- * Connected apps on this computer, on the person's own Composio key.
- * Native code holds the key and calls Composio; this side never sees it. Cards and remembered
- * approvals live in misty.db, and native code decides what an answer allows.
+ * Cards and remembered approvals for app actions, kept in misty.db; native code decides what an
+ * answer allows.
  */
 
 const grantIdPrefix = "localgrant_";
@@ -25,16 +24,10 @@ async function call<T>(command: string, args?: Record<string, unknown>): Promise
 }
 
 export const localAppsApi = {
-  list: () => call<{ available: boolean; apps: ConnectedApp[] }>("composio_apps_list"),
-  catalog: (search: string, cursor = "") =>
-    call<{ apps: CatalogApp[]; next_cursor: string }>("composio_apps_catalog", { search, cursor }),
-  connect: (app: string) => call<{ url: string }>("composio_apps_connect", { app }),
-  disconnect: (id: string) => call<void>("composio_apps_disconnect", { id }),
-  request: (id: string) => call<{ request: AppRequest }>("composio_request_get", { id }),
-  requestLink: (id: string) => call<{ url: string }>("composio_request_link", { id }),
+  request: (id: string) => call<{ request: AppRequest }>("apps_request_get", { id }),
   decide: (id: string, decision: AppRequestDecision) =>
-    call<{ request: AppRequest }>("composio_request_decide", { id, decision }),
-  grants: () => call<{ grants: AgentGrant[] }>("composio_grants_list"),
-  revokeGrant: (id: string) => call<void>("composio_grants_revoke", { id }),
-  revokeAllGrants: () => call<void>("composio_grants_revoke", { id: null }),
+    call<{ request: AppRequest }>("apps_request_decide", { id, decision }),
+  grants: () => call<{ grants: AgentGrant[] }>("apps_grants_list"),
+  revokeGrant: (id: string) => call<void>("apps_grants_revoke", { id }),
+  revokeAllGrants: () => call<void>("apps_grants_revoke", { id: null }),
 };

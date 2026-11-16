@@ -28,6 +28,8 @@ import {
   Text,
   Tooltip,
   useNotice,
+  rowShapeWrap,
+  cn,
 } from "@/shared/ui";
 import type { BranchInfo } from "./gitApi";
 import { useGitStore } from "./store";
@@ -36,7 +38,7 @@ import { useGitStore } from "./store";
 const headRowClass = "flex min-w-0 flex-1 items-center gap-1";
 
 /** A row of the branch picker: the check column, the name, then where the branch lives. */
-const branchRowClass = "flex min-h-7.5 w-full min-w-0 items-center gap-2 rounded-md px-2 text-meta";
+const branchRowClass = cn(rowShapeWrap, "w-full text-meta");
 
 interface ChangesPanelHeaderProps {
   workspacePath: string;

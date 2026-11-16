@@ -80,6 +80,14 @@ export interface GlobalAiMessage {
   folderGrants?: FolderGrant[];
   /** The person's rating of this reply, kept with the chat on this device. */
   rating?: "good" | "bad";
+  /**
+   * Shown from an engine's own session (`engine:sessionId`): turns that happened outside Misty,
+   * read from the CLI's files when the chat resumed the session or was synced. Shown only; the
+   * engine has them already.
+   */
+  importedFrom?: string;
+  /** The engine's reasoning for a reply shown from its own session (live runs keep theirs apart). */
+  reasoning?: string;
 }
 
 /** A folder an engine was refused (`permission.denied`), and what the person did about it. */
@@ -154,6 +162,9 @@ export interface GlobalAiConversation {
   pinnedAt?: string;
   /** When it was archived, which keeps it out of the sidebar's lists. */
   archivedAt?: string;
+  /** Where it was started. A talk in the studio is the studio's own: it stays in the studio's
+   * talk panel, spoken and heard there, and is never listed with the chats. */
+  place?: "studio";
   /** The device that keeps this chat; absent while it waits in the server's inbox. */
   keptOnDeviceId?: string;
   /** Running notes on turns too old to send, written by this device's model; opaque here. */

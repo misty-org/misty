@@ -7,6 +7,7 @@ import {
 } from "@/native";
 import { useWindowDockingLayout } from "@/features/app-windows";
 import { dockingMetrics } from "./dockingGeometry";
+import { uiPx } from "@/shared/lib/uiScale";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -57,7 +58,7 @@ export function useWindowStyleSetup() {
       const verticalDrawerOffset =
         drawerButtonCenter !== null ? drawerButtonCenter - trafficLightRestY : sideTabInset;
       const verticalOffset =
-        tabs === "left" ? verticalDrawerOffset : edge + spaceBar / 2 - trafficLightRestY;
+        tabs === "left" ? verticalDrawerOffset : uiPx(edge + spaceBar / 2) - trafficLightRestY;
       await enableModernWindowStyle(getCurrentWindow(), {
         x: trafficLightOffsetDefault.x + (tabs === "left" ? sideTabTrafficLightNudgeX : 0),
         y: trafficLightOffsetDefault.y + verticalOffset,

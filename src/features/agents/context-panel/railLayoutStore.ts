@@ -13,7 +13,6 @@ export const railItemIds = [
   "files",
   "terminal",
   "browser",
-  "preview",
 ] as const;
 export type RailItemId = (typeof railItemIds)[number];
 

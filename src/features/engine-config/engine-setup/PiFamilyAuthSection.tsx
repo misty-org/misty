@@ -3,7 +3,7 @@
 // See NOTICE.
 
 /**
- * Pi's and Oh My Pi's providers in Settings › Channels:
+ * Pi's and Oh My Pi's providers in Agents › Channels:
  *
  * - Subscriptions: which are signed in, as the CLI's own store says, and signing in or out. The
  *   CLI does that itself (Pi's `/login`, `omp auth-broker login`) in the sign-in terminal; Misty

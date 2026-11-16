@@ -6,6 +6,7 @@ import { Text } from "../display/Text";
 import { Portal } from "./Portal";
 import { popupMotionClass, popupSurfaceClass } from "./popupStyles";
 import { ViewportLayer } from "./ViewportLayer";
+import { uiPx } from "@/shared/lib/uiScale";
 
 /** One stop on a tour: the control it lights up, and what to say about it. */
 export type TourStep = {
@@ -106,22 +107,26 @@ function rectOf(element: HTMLElement | null): Rect | null {
  * covers as little of what is around the control as it can. With nothing lit, centered.
  */
 function cardPosition(rect: Rect | null, cardHeight: number): React.CSSProperties {
+  // The card's size and spacing are design pixels; the window and the lit control are CSS pixels.
+  const cardWidth = uiPx(CARD_WIDTH);
+  const margin = uiPx(MARGIN);
+  const gap = uiPx(GAP);
   const width = window.innerWidth;
   const height = window.innerHeight;
-  const clampTop = (top: number) => Math.max(MARGIN, Math.min(top, height - cardHeight - MARGIN));
-  const clampLeft = (left: number) => Math.max(MARGIN, Math.min(left, width - CARD_WIDTH - MARGIN));
+  const clampTop = (top: number) => Math.max(margin, Math.min(top, height - cardHeight - margin));
+  const clampLeft = (left: number) => Math.max(margin, Math.min(left, width - cardWidth - margin));
   if (!rect) {
-    return { top: clampTop((height - cardHeight) / 2), left: clampLeft((width - CARD_WIDTH) / 2) };
+    return { top: clampTop((height - cardHeight) / 2), left: clampLeft((width - cardWidth) / 2) };
   }
-  const right = rect.left + rect.width + GAP;
-  const left = rect.left - GAP - CARD_WIDTH;
-  const below = rect.top + rect.height + GAP;
-  const above = rect.top - GAP - cardHeight;
+  const right = rect.left + rect.width + gap;
+  const left = rect.left - gap - cardWidth;
+  const below = rect.top + rect.height + gap;
+  const above = rect.top - gap - cardHeight;
   const sides = {
-    right: right + CARD_WIDTH + MARGIN <= width && { top: clampTop(rect.top), left: right },
-    left: left >= MARGIN && { top: clampTop(rect.top), left },
-    below: below + cardHeight + MARGIN <= height && { top: below, left: clampLeft(rect.left) },
-    above: above >= MARGIN && { top: above, left: clampLeft(rect.left) },
+    right: right + cardWidth + margin <= width && { top: clampTop(rect.top), left: right },
+    left: left >= margin && { top: clampTop(rect.top), left },
+    below: below + cardHeight + margin <= height && { top: below, left: clampLeft(rect.left) },
+    above: above >= margin && { top: above, left: clampLeft(rect.left) },
   };
   const alongLeftEdge = rect.left + rect.width < width / 3;
   const order = alongLeftEdge
@@ -250,7 +255,7 @@ function TourLayer({
           {rect ? (
             <div
               aria-hidden="true"
-              className="pointer-events-none fixed rounded-lg shadow-[0_0_0_9999px_var(--color-scrim)] ring-2 ring-cream-bright transition-all duration-200"
+              className="pointer-events-none fixed rounded-lg shadow-[0_0_0_624.9375rem_var(--color-scrim)] ring-2 ring-cream-bright transition-all duration-200"
               style={rect}
             />
           ) : (

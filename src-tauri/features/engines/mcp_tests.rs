@@ -7,7 +7,12 @@ fn offers_space_tools_under_names_clients_accept() {
         .filter_map(|tool| tool["name"].as_str())
         .collect();
     assert!(names.contains(&"note_read"));
+    assert!(names.contains(&"file_create"));
     assert!(names.contains(&ASK_MISTY));
+    // Every engine can move its own figure in the studio, with or without the browser.
+    for studio in ["studio_go", "studio_emote", "studio_say", "studio_release"] {
+        assert!(names.contains(&studio), "{studio}");
+    }
     assert!(names.iter().all(|name| name
         .chars()
         .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')));
@@ -31,6 +36,8 @@ fn offers_the_browser_only_to_a_run_it_was_attached_to() {
         computer: false,
     };
     assert!(plain.offers(&json!({ "name": "note_read" })));
+    assert!(plain.offers(&json!({ "name": "studio_go" })));
+    assert!(plain.instructions().contains("studio_go"));
     // Without the Browser attachment a run has no browser at all.
     for name in ["screen_open", "browser_snapshot", "browser_steps"] {
         assert!(!plain.offers(&json!({ "name": name })), "{name}");
@@ -92,5 +99,15 @@ fn knows_its_own_tools_however_an_engine_spells_them() {
         "screen_open",
     ] {
         assert!(!names_misty_tool(other, &Value::Null), "{other}");
+    }
+}
+
+#[test]
+fn a_studio_move_is_known_by_its_name_alone() {
+    for spelled in ["mcp__misty__studio_go", "misty_studio_say", "Misty: studio_release"] {
+        assert!(names_studio_tool(spelled), "{spelled}");
+    }
+    for other in ["mcp__misty__note_create", "studio_go", "mcp__misty__studio_go_and_more"] {
+        assert!(!names_studio_tool(other), "{other}");
     }
 }

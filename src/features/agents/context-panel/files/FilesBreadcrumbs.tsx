@@ -62,7 +62,7 @@ export function FilesBreadcrumbs(props: { folder: string; picker: ReactNode }) {
           <Between />
           <DropdownMenu>
             <MenuTrigger iconOnly size="sm" label="Folders above" icon={MoreHorizontal} />
-            <DropdownMenuContent align="start" className="w-60 max-w-[calc(100vw-16px)]">
+            <DropdownMenuContent align="start" className="w-60 max-w-[calc(100vw-1rem)]">
               {folded.map((dir) => (
                 <MenuItem
                   key={dir}

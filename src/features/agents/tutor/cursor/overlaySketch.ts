@@ -1,5 +1,6 @@
-import { cn, screenMarkClass } from "@/shared/ui";
+import { cn, screenMarkClass, sketchInk } from "@/shared/ui";
 import { mapSketch } from "./companionSketch";
+import { createModelView, type ModelView } from "./modelView";
 import { boardCardBox } from "./pointLayout";
 import type { DisplayFrame, PresentedSketch } from "./protocol";
 import { renderSketch, SKETCH_PADDING } from "./sketchRender";
@@ -7,14 +8,21 @@ import { renderSketch, SKETCH_PADDING } from "./sketchRender";
 /**
  * Paints the reply's drawing on one display's overlay. A board is a whiteboard card
  * beside the cursor, placed once when it first appears so it does not chase the
- * pointer. Screen marks are drawn where they belong, in white with a shadow. Each new
- * line of the drawing re-renders it, so it builds up while Misty explains.
+ * pointer; a model is the same card holding a 3D model (modelView.ts). Screen marks are
+ * drawn where they belong, in white with a shadow. Each new line of the drawing re-renders
+ * it, so it builds up while Misty explains.
  */
 export function createSketchPainter(layer: HTMLDivElement) {
   let seen = "";
   let render = 0;
   let card: { id: string; x: number; y: number; width: number; height: number } | undefined;
   let frame: HTMLDivElement | undefined;
+  /** The model on the card, made once per drawing. */
+  let model: { id: string; view: Promise<ModelView | undefined> } | undefined;
+  const dropModel = () => {
+    void model?.view.then((view) => view?.dispose());
+    model = undefined;
+  };
   return (
     sketch: PresentedSketch | undefined,
     display: Pick<DisplayFrame, "id" | "x" | "y" | "width" | "height">,
@@ -34,18 +42,22 @@ export function createSketchPainter(layer: HTMLDivElement) {
         card = undefined;
         frame = undefined;
         render++;
+        dropModel();
         layer.replaceChildren();
       }
       return;
     }
-    const key = `${sketch.id}:${sketch.elements.length}:${sketch.done}:${display.id}:${factor}`;
+    const pictures = sketch.elements.filter((e) => e.src).length;
+    const key = `${sketch.id}:${sketch.elements.length}:${pictures}:${sketch.done}:${display.id}:${factor}`;
     if (key === seen) return;
     seen = key;
     const ticket = ++render;
-    if (sketch.surface === "board") {
+    if (model && model.id !== sketch.id) dropModel();
+    if (sketch.surface === "board" || sketch.surface === "model") {
       // One card per drawing, placed once beside where the cursor is (the middle when
       // it is elsewhere); each new line only redraws what is inside it.
       if (!onCard || !frame) {
+        dropModel();
         const anchor = cursorHere ? mouse : { x: width / 2, y: height / 2 };
         card = { id: sketch.id, ...boardCardBox(anchor, width, height) };
         frame = document.createElement("div");
@@ -67,7 +79,25 @@ export function createSketchPainter(layer: HTMLDivElement) {
         layer.replaceChildren(frame);
       }
       const board = frame;
-      void renderSketch(sketch.elements, "#1e1e1e").then((drawn) => {
+      if (sketch.surface === "model") {
+        if (!model) {
+          const stage = document.createElement("div");
+          stage.className = "min-h-0 w-full flex-1";
+          board.append(stage);
+          model = {
+            id: sketch.id,
+            view: createModelView(stage, { draggable: false }).catch(() => undefined),
+          };
+        }
+        const parts = sketch.elements;
+        // The part being talked about is the last one with words of its own.
+        const current = [...parts].reverse().find((part) => part.say)?.id;
+        void model.view.then((view) => {
+          if (ticket === render) view?.update(parts, current);
+        });
+        return;
+      }
+      void renderSketch(sketch.elements, sketchInk.board).then((drawn) => {
         if (ticket !== render || !drawn) return;
         drawn.svg.classList.add("min-h-0", "w-full", "h-full", "flex-1");
         drawn.svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
@@ -77,13 +107,14 @@ export function createSketchPainter(layer: HTMLDivElement) {
       return;
     }
     frame = undefined;
+    dropModel();
     const local = mapSketch(sketch.elements, {
       scaleX: 1 / factor,
       scaleY: 1 / factor,
       dx: -display.x / factor,
       dy: -display.y / factor,
     });
-    void renderSketch(local, "#ffffff").then((drawn) => {
+    void renderSketch(local, sketchInk.screen).then((drawn) => {
       if (ticket !== render) return;
       if (!drawn) return void layer.replaceChildren();
       drawn.svg.classList.add(

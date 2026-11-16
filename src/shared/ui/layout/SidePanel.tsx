@@ -15,6 +15,7 @@ import { cn } from "../classNames";
 import { IconButton } from "../controls/IconButton";
 import { HeaderSlot, InPanel } from "./sidePanelContext";
 import "./sidePanel.css";
+import { designPx, remCss, uiPx } from "@/shared/lib/uiScale";
 
 /** Width steps the keyboard takes on the resize edge. */
 const KEY_STEP = 16;
@@ -78,13 +79,15 @@ export function SidePanel(props: {
     ...data
   } = props;
   const [slot, setSlot] = useState<HTMLElement | null>(null);
+  // Widths, `minWidth` and `keep` are design pixels; the boxes are measured in CSS pixels, so the
+  // math runs in CSS pixels and the result goes back through designPx (shared/lib/uiScale.ts).
   const room = (panel: HTMLElement) => {
     const before = panel.previousElementSibling as HTMLElement | null;
-    const spare = before ? before.getBoundingClientRect().width - keep : 0;
+    const spare = before ? before.getBoundingClientRect().width - uiPx(keep) : 0;
     return panel.getBoundingClientRect().width + Math.max(0, spare);
   };
   const clamp = (value: number, panel: HTMLElement) =>
-    Math.min(Math.max(value, minWidth), Math.max(minWidth, room(panel)));
+    Math.min(Math.max(value, uiPx(minWidth)), Math.max(uiPx(minWidth), room(panel)));
   const drag = (event: PointerEvent<HTMLDivElement>) => {
     if (!onResize || event.button !== 0) return;
     const handle = event.currentTarget;
@@ -93,11 +96,13 @@ export function SidePanel(props: {
     event.preventDefault();
     const startX = event.clientX;
     const startWidth = panel.getBoundingClientRect().width;
-    const most = Math.max(minWidth, room(panel));
+    const most = Math.max(uiPx(minWidth), room(panel));
     handle.setPointerCapture(event.pointerId);
     handle.dataset.dragging = "";
     const move = (next: globalThis.PointerEvent) =>
-      onResize(Math.min(Math.max(startWidth + (startX - next.clientX), minWidth), most));
+      onResize(
+        designPx(Math.min(Math.max(startWidth + (startX - next.clientX), uiPx(minWidth)), most)),
+      );
     const end = () => {
       delete handle.dataset.dragging;
       handle.removeEventListener("pointermove", move);
@@ -114,7 +119,7 @@ export function SidePanel(props: {
     if (!panel) return;
     event.preventDefault();
     const step = event.key === "ArrowLeft" ? KEY_STEP : -KEY_STEP;
-    onResize(clamp(panel.getBoundingClientRect().width + step, panel));
+    onResize(designPx(clamp(panel.getBoundingClientRect().width + uiPx(step), panel)));
   };
   return (
     <aside
@@ -124,7 +129,7 @@ export function SidePanel(props: {
       data-expanded={expanded || undefined}
       className={cn("misty-side-panel", className)}
       style={
-        { "--side-panel-width": `${width}px`, "--side-panel-keep": `${keep}px` } as CSSProperties
+        { "--side-panel-width": remCss(width), "--side-panel-keep": remCss(keep) } as CSSProperties
       }
       onKeyDown={(event) => {
         if (event.key !== "Escape" || event.defaultPrevented) return;

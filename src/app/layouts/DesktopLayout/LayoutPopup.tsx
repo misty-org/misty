@@ -316,7 +316,7 @@ export function LayoutPopup(props: { onApplied: () => void }) {
         onDragOver={contained}
         onDrop={contained}
         className={cn(
-          "h-[min(560px,calc(100dvh-8rem))] w-[min(900px,calc(100vw-4rem))] max-w-none",
+          "h-[min(35rem,calc(100dvh-8rem))] w-[min(56.25rem,calc(100vw-4rem))] max-w-none",
           "gap-0 overflow-hidden rounded-xl p-0",
           "[&>[data-slot=dialog-close]]:hidden",
         )}
@@ -326,7 +326,7 @@ export function LayoutPopup(props: { onApplied: () => void }) {
           Drag tabs onto the canvas to split the window. Nothing changes until you apply.
         </DialogDescription>
         <div className="flex h-full min-h-0 flex-col">
-          <div className="relative grid min-h-0 flex-1 grid-cols-[240px_minmax(0,1fr)]">
+          <div className="relative grid min-h-0 flex-1 grid-cols-[15rem_minmax(0,1fr)]">
             <div className="relative flex min-h-0 flex-col gap-2 border-r p-3">
               <ul
                 className="-mx-1 flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-1"

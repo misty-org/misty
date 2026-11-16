@@ -169,7 +169,7 @@ export const deviceToolSchemas: Record<string, Schema> = {
     },
     ["documentId", "fields"],
   ),
-  "browser.run": object({ code: text(1, 20000) }, ["code"]),
+  "browser.run": object({ code: text(1, 20000), saveAs: text(1, 200) }, ["code"]),
   "folder.list": object({ folder, path }, ["folder"]),
   "folder.read": object({ folder, path }, ["folder", "path"]),
   "folder.send": object({ folder, path }, ["folder", "path"]),

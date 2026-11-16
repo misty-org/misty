@@ -65,6 +65,15 @@ fn scan_with_sink(
     )
 }
 
+/// A scan run here and now, for a read that needs a session the index doesn't know yet (a chat
+/// Misty started since the last scan). Waits for one already running.
+pub(crate) fn scan_now(
+    db: &crate::engines::support::db::Db,
+    sink: &Arc<crate::engines::support::event_sink::EventSink>,
+) -> Result<(), String> {
+    scan_with_sink(db, sink).map(|_| ())
+}
+
 /// The scan itself, decoupled from the event sink for testing.
 #[cfg(test)]
 pub fn scan_with(

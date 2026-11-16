@@ -19,12 +19,10 @@ import { terminalChatKey } from "./terminal/terminalStore";
 import "./codeViews.css";
 
 const TerminalPanel = lazy(() => import("./terminal/TerminalPanel"));
-const PreviewPanel = lazy(() => import("../preview/PreviewPanel"));
 
 /**
  * What the chat's side panel shows for a context view: the Space's linked project folder as
- * files, as Git changes, or as a terminal, the run's steps, or the person's running app in the
- * preview, which needs no folder. Agents on outside engines work in the same folder, so this is
+ * files, as Git changes, or as a terminal, or the run's steps. Agents on outside engines work in the same folder, so this is
  * where their work shows. A folder's own tools sit at the end of the panel's header row; Files puts
  * its path there too, starting with the folder as a menu that switches to another.
  */
@@ -38,7 +36,7 @@ export function AgentContextPanel(props: {
   if (props.tab === "steps") return <StepsPanel conversationId={props.conversationId} />;
   return (
     <>
-      {folder && props.tab !== "preview" ? (
+      {folder ? (
         <SidePanelHeader>
           {props.tab === "files" ? (
             <FilesBreadcrumbs
@@ -59,11 +57,7 @@ export function AgentContextPanel(props: {
           </div>
         </SidePanelHeader>
       ) : null}
-      {props.tab === "preview" ? (
-        <Suspense fallback={<ContextPanelSkeleton tab="preview" />}>
-          <PreviewPanel conversationId={props.conversationId} />
-        </Suspense>
-      ) : failed ? (
+      {failed ? (
         <ErrorState
           title="Couldn't read the Space's folders"
           line="Something went wrong on this computer. Try again in a moment."

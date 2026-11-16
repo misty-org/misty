@@ -45,6 +45,7 @@ vi.mock("@/features/agents", () => {
     return hook;
   };
   return {
+    defaultAgentOf: (list: typeof agents) => list.find((agent) => agent.engine),
     AgentAvatar: () => <span />,
     askInNewChat: async (agent: string, prompt: string) => {
       calls.asked.push([agent, prompt]);

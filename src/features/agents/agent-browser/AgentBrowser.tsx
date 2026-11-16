@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { Hand, PictureInPicture2, Play } from "lucide-react";
+import { Hand, MousePointerClick, PictureInPicture2, Play } from "lucide-react";
 import { useState } from "react";
 import { aiSurfaceApi } from "../runs/invocations/api";
 import { BrowserNavigationButtons } from "@/features/browser";
@@ -12,11 +12,14 @@ import { hostAddress } from "./hostAddress";
 import { navigateShownTab } from "../tabs/agentPersonTabs";
 import { agentTab } from "../tabs/agentTabs";
 import { detachAgentBrowser, useAgentBrowser } from "./agentBrowserStore";
+import { ErrorNotice } from "../conversations/ErrorNotice";
+import { PickedElementCard } from "./PickedElementCard";
+import { useElementPick } from "./useElementPick";
 
 /**
  * The agent browser in the chat's side panel: a small copy of Misty's own browser beside the
- * open chat. Its views' switcher sits above; the side card holds
- * back, forward and reload, the address and the shown view's tabs; the page fills the rest. The
+ * open chat. Its views' switcher sits above; the shown view's tabs are on top, then back, forward
+ * and reload with the address; the page fills the rest. The
  * person reads and scrolls; while the agent acts, its page takes no input until they take over.
  */
 export function AgentBrowser({ conversationId }: { conversationId?: string }) {
@@ -26,9 +29,10 @@ export function AgentBrowser({ conversationId }: { conversationId?: string }) {
   const tabs = useAgentBrowser((state) => state.tabs);
   // The run whose page the person holds; a later run, or the same one ended, isn't held.
   const [heldRun, setHeldRun] = useState<string>();
-  if (!chat?.expanded || chat.hidden || !chat.views.length) return null;
-  const view = chat.views.find((item) => item.id === chat.shownView) ?? chat.views[0]!;
-  const shown = tabs[view.shownScope];
+  const view = chat?.views.find((item) => item.id === chat.shownView) ?? chat?.views[0];
+  const shown = view ? tabs[view.shownScope] : undefined;
+  const elementPick = useElementPick(shown?.viewId ?? "", shown?.url, Boolean(shown?.loading));
+  if (!chat?.expanded || chat.hidden || !view) return null;
   const runId = agentTab(view.shownScope)?.runId;
   const working = view.status === "working";
   const takenOver = working && Boolean(runId) && heldRun === runId;
@@ -65,6 +69,17 @@ export function AgentBrowser({ conversationId }: { conversationId?: string }) {
   );
   const hands = (
     <>
+      {/* Only a tab showing the person's own local app can be picked from. */}
+      {elementPick.local && (
+        <IconButton
+          label={elementPick.picking ? "Cancel picking" : "Pick an element"}
+          aria-pressed={elementPick.picking}
+          disabled={locked}
+          onClick={elementPick.toggle}
+        >
+          <MousePointerClick />
+        </IconButton>
+      )}
       {working && runId && !takenOver && (
         <IconButton label="Take over" onClick={() => void hold(true)}>
           <Hand />
@@ -101,22 +116,32 @@ export function AgentBrowser({ conversationId }: { conversationId?: string }) {
     // Its gaps and padding are the page's: the live page is placed over the stage's measured box.
     // The sidebar card's head starts after the window buttons; here it is far from them.
     <section
-      className="flex min-h-0 min-w-0 flex-1 flex-col gap-1.5 p-1.5 [--shell-tab-height:30px] [--window-chrome-left:0px]"
+      className="flex min-h-0 min-w-0 flex-1 flex-col gap-1.5 p-1.5 [--shell-tab-height:1.875rem] [--window-chrome-left:0px]"
       aria-label="Agent browser"
     >
       <AgentViewSwitcher chat={chat} />
       <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2">
-        <AgentBrowserTabs conversationId={chat.conversationId} view={view} />
-        {/* Travel, the address and the hands are the panel's header row. */}
+        {/* The tabs are the panel's header row, beside its widen and close, as a browser's tab
+            strip sits beside its window buttons. Travel, the address and the hands go under them. */}
         <SidePanelHeader>
-          <div className="flex min-w-0 flex-1 shrink-0 items-center gap-1">
-            {head}
-            {address}
-            {hands}
-            {foot}
-          </div>
+          <AgentBrowserTabs conversationId={chat.conversationId} view={view} />
         </SidePanelHeader>
+        <div className="flex min-w-0 shrink-0 items-center gap-1">
+          {head}
+          {address}
+          {hands}
+          {foot}
+        </div>
         <AgentBrowserStage scopeId={view.shownScope} locked={locked} picture={view.picture} />
+        {elementPick.pick ? (
+          <PickedElementCard
+            pick={elementPick.pick}
+            sent={elementPick.sent}
+            onSend={elementPick.send}
+            onClear={elementPick.clear}
+          />
+        ) : null}
+        <ErrorNotice message={elementPick.error} onDismiss={elementPick.dismissError} />
       </div>
     </section>
   );
@@ -141,7 +166,7 @@ function AddressField(props: {
       spellCheck={false}
       autoCapitalize="off"
       autoCorrect="off"
-      className="min-w-0 flex-1 px-3 text-left text-sm"
+      className="min-w-0 flex-1 px-3 text-sm"
       onFocus={(event) => {
         setDraft(props.url);
         const field = event.currentTarget;

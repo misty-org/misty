@@ -88,7 +88,17 @@ pub(super) async fn run_acp_turn(
     // keys pinning a concurrency slot until app exit.
     let _registry_guard =
         VirtualRunGuard::new(Arc::clone(&core.registry), core.run_id.clone(), virtual_pid);
-    let result = turn_inner(&core, &mut state, &mut view, &req, &mut command, &killed).await;
+    let mut cleanup_files = cleanup_files;
+    let result = turn_inner(
+        &core,
+        &mut state,
+        &mut view,
+        &req,
+        &mut command,
+        &killed,
+        &mut cleanup_files,
+    )
+    .await;
     // Pending questions die with the turn: settle their cards BEFORE any
     // terminal dispatch, or the monotonic saw_done/saw_error guard in
     // dispatch_event would drop these and leave answerable cards pointing at
@@ -139,32 +149,64 @@ async fn turn_inner(
     req: &SendRequest,
     command: &mut tokio::process::Command,
     killed: &Arc<AtomicBool>,
+    cleanup_files: &mut Vec<std::path::PathBuf>,
 ) -> Result<(), String> {
-    let mut spawned = spawn_piped_acp(command, &core.engine_id, &req.workspace)?;
-    spawned.acp.reports_as = Some(core.engine_id.clone());
-    // The registry entry exists before this task runs, so a parked question's
-    // answer always finds this child's stdin (and the session-id alias clones
-    // it later, making `answer_question` work by either key).
-    core.registry
-        .set_stdin(&core.run_id, Arc::clone(&spawned.acp.stdin));
-    let result = handshake_and_prompt(&mut spawned.acp, core, state, view, req, killed).await;
-    // ACP is a session protocol: the CLI stays resident after the prompt
-    // response, so every exit path tears the tree down.
-    teardown(&mut spawned.child).await;
-    match result {
-        Ok(()) => Ok(()),
-        Err(error) => Err(terminal_message(error, &spawned.stderr_buf)),
-    }
+    // Misty: the chat's process from its last turn, still on this session, takes the prompt
+    // straight away (`warm.rs`); otherwise one starts and opens the session.
+    let fingerprint = super::warm::claim(&core.run_id);
+    let mut warm = match super::warm::take_acp(core, req, fingerprint) {
+        Some(warm) => {
+            core.dispatch_event(state, EngineEvent::SessionId(warm.item.session_id.clone()));
+            warm
+        }
+        None => {
+            let mut spawned = spawn_piped_acp(command, &core.engine_id, &req.workspace)?;
+            spawned.acp.reports_as = Some(core.engine_id.clone());
+            // The registry entry exists before this task runs, so a parked question's
+            // answer always finds this child's stdin (and the session-id alias clones
+            // it later, making `answer_question` work by either key).
+            core.registry
+                .set_stdin(&core.run_id, Arc::clone(&spawned.acp.stdin));
+            let session_id = match handshake(&mut spawned.acp, core, state, req, killed).await {
+                Ok(session_id) => session_id,
+                Err(error) => {
+                    // ACP is a session protocol: the CLI stays resident after the prompt
+                    // response, so every exit path tears the tree down.
+                    teardown(&mut spawned.child).await;
+                    return Err(terminal_message(error, &spawned.stderr_buf));
+                }
+            };
+            super::warm::Warm {
+                item: super::warm::WarmAcp {
+                    spawned,
+                    session_id,
+                    effort: None,
+                    known: Default::default(),
+                },
+                token: None,
+                cleanup: std::mem::take(cleanup_files),
+            }
+        }
+    };
+    let session_id = warm.item.session_id.clone();
+    let result = prompt(&mut warm.item.spawned.acp, core, state, view, req, killed, &session_id)
+        .await
+        .map_err(|error| terminal_message(error, &warm.item.spawned.stderr_buf));
+    // A clean turn leaves the process warm for the chat's next message; anything else ends it.
+    let clean = result.is_ok() && !killed.load(Ordering::SeqCst);
+    super::warm::park_acp(core, req, fingerprint, clean, warm);
+    result
 }
 
-async fn handshake_and_prompt(
+/// Opens the turn's session on a new process: `initialize`, the session re-attached (or a new
+/// one), then its configuration. Returns the session id.
+async fn handshake(
     acp: &mut AcpProcess,
     core: &TurnCore,
     state: &mut TurnState,
-    view: &mut TurnView,
     req: &SendRequest,
     killed: &AtomicBool,
-) -> Result<(), String> {
+) -> Result<String, String> {
     let agent = acp
         .routed(
             "initialize",
@@ -176,12 +218,24 @@ async fn handshake_and_prompt(
         )
         .await?;
     let servers = crate::engines::gate::acp_mcp_servers(req, &agent);
-    let gate = crate::engines::gate::AcpGate::of(core, req);
     let (session_id, session_result) = attach_session(acp, req, servers, killed).await?;
     core.dispatch_event(state, EngineEvent::SessionId(session_id.clone()));
 
     apply_session_config(acp, &session_id, &session_result, req, core, state, killed).await?;
+    Ok(session_id)
+}
 
+/// Runs the turn's prompt on an open session.
+async fn prompt(
+    acp: &mut AcpProcess,
+    core: &TurnCore,
+    state: &mut TurnState,
+    view: &mut TurnView,
+    req: &SendRequest,
+    killed: &AtomicBool,
+    session_id: &str,
+) -> Result<(), String> {
+    let gate = crate::engines::gate::AcpGate::of(core, req);
     let blocks = prompt_blocks(&req.prompt, &req.images, &req.workspace);
     let workspace = req.workspace.clone();
     // One router for the whole prompt: updates, agent requests and the
@@ -214,7 +268,7 @@ async fn handshake_and_prompt(
             json!({ "sessionId": session_id, "prompt": blocks }),
             PROMPT_TIMEOUT,
             killed,
-            Some(&session_id),
+            Some(session_id),
             &mut router,
         )
         .await?;

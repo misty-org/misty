@@ -6,19 +6,29 @@ import type { TutorActions } from "../TutorPage";
 import { jobTitle, notebookContext } from "../tutorPrompts";
 import { startJob } from "../tutorRuns";
 import { briefKey, briefPrompt } from "../tutorStudio";
-import { useTutorStore } from "../tutorStore";
+import { firstOpening, useTutorStore } from "../tutorStore";
 import type { Notebook } from "../tutorTypes";
 import { AddSourcesDialog } from "./AddSourcesDialog";
 import { ChatPanel } from "./ChatPanel";
 import { CustomizeNotebook } from "./CustomizeNotebook";
 import { NotebookBar } from "./NotebookBar";
+import { spacesGateway } from "../../spaces-gateway/spacesGateway";
+import { claimRun, useHeldNotebook } from "../notebookLive";
+import { setPresence, usePeople, usePublishPointer } from "../notebookPresence";
+import { useNotebookAgents, usePublishAgents } from "../notebookAgents";
+import { LivePointers } from "./LivePeople";
+import { NotebookPeople } from "./NotebookPeople";
 import { NoteReader, SourceReader } from "./Reader";
 import { SourcesPanel, type Opened } from "./SourcesPanel";
 import { StudioPanel } from "./StudioPanel";
 import "./tutorPresentation.css";
+import { designPx, remCss } from "@/shared/lib/uiScale";
 
-/** Starts the notebook's overview when its sources changed since the last one. */
-function useBrief(notebook: Notebook, agentId: string) {
+/**
+ * Starts the notebook's overview when its sources changed since the last one. In a notebook
+ * people work in together, one computer writes it for everyone (`claimRun`), once its doc is here.
+ */
+function useBrief(notebook: Notebook, agentId: string, ready: boolean) {
   const jobs = useTutorStore((state) => state.jobs);
   const briefing = Object.values(jobs).some(
     (job) =>
@@ -37,12 +47,18 @@ function useBrief(notebook: Notebook, agentId: string) {
       prompt: briefPrompt(notebook, notebookContext(notebook)),
     });
   useEffect(() => {
-    if (!key || reading || briefing || notebook.brief?.sources === key) return;
+    if (!ready || !key || reading || briefing || notebook.brief?.sources === key) return;
     // A moment's wait, so adding several sources asks for one overview.
-    const timer = window.setTimeout(() => void start().catch(() => undefined), 2500);
+    const timer = window.setTimeout(
+      () =>
+        void claimRun(notebook.id, "brief")
+          .then((mine) => (mine ? start() : undefined))
+          .catch(() => undefined),
+      2500,
+    );
     return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, reading, briefing, notebook.brief?.sources]);
+  }, [ready, key, reading, briefing, notebook.brief?.sources]);
   return { briefing, start };
 }
 
@@ -85,7 +101,12 @@ function PaneHandle({
     const origin = event.clientX;
     handle.setPointerCapture(event.pointerId);
     const move = (next: globalThis.PointerEvent) =>
-      onDrag(side === "left" ? at + next.clientX - origin : at - (next.clientX - origin));
+      // Widths are design pixels (shared/lib/uiScale.ts); the pointer moves in CSS pixels.
+      onDrag(
+        side === "left"
+          ? at + designPx(next.clientX - origin)
+          : at - designPx(next.clientX - origin),
+      );
     const end = () => {
       handle.removeEventListener("pointermove", move);
       handle.removeEventListener("pointerup", end);
@@ -116,7 +137,7 @@ function PaneHandle({
         "group/handle absolute inset-y-0 z-[var(--stack-above-2)] w-1.5 cursor-col-resize " +
         "touch-none outline-none"
       }
-      style={side === "left" ? { left: at - 3 } : { right: at - 3 }}
+      style={side === "left" ? { left: remCss(at - 3) } : { right: remCss(at - 3) }}
       onPointerDown={start}
       onKeyDown={key}
     >
@@ -158,7 +179,10 @@ export function NotebookWorkspace({
   useEffect(() => {
     const element = frame.current;
     if (!element) return;
-    const observer = new ResizeObserver(([entry]) => setFrameWidth(entry.contentRect.width));
+    // In design pixels, like the pane widths it is weighed against.
+    const observer = new ResizeObserver(([entry]) =>
+      setFrameWidth(designPx(entry.contentRect.width)),
+    );
     observer.observe(element);
     return () => observer.disconnect();
   }, []);
@@ -197,27 +221,58 @@ export function NotebookWorkspace({
     setDragging(false);
     usePaneWidths.getState().set(latestWidths.current);
   };
-  const { briefing, start } = useBrief(notebook, actions.agentId);
-  // A new, empty notebook opens on adding its first sources, unless its agent is finding them.
+  // The notebook's doc in its Space, where everyone in it works on it live.
+  const live = useHeldNotebook(notebook);
+  const ready = !notebook.space || Boolean(live);
+  const { briefing, start } = useBrief(notebook, actions.agentId, ready);
+  // A notebook just made here opens on adding its first sources, unless its agent is finding
+  // them. One in a Space waits for its doc, which may already hold what others added.
+  const askedForSources = useRef(false);
   useEffect(() => {
+    if (!ready || askedForSources.current) return;
+    askedForSources.current = true;
+    // Only the first time it opens after being made here; an empty notebook opened later, or
+    // one someone else made, opens on its chat.
+    if (!firstOpening(notebook.id)) return;
     const finding = Object.values(useTutorStore.getState().jobs).some(
       (job) => job.notebookId === notebook.id && job.kind === "research" && job.state !== "failed",
     );
-    if (!notebook.sources.length && !notebook.notes.length && !finding) setAdding(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [notebook.id]);
+    const current = useTutorStore.getState().notebooks[notebook.id];
+    if (current && !current.sources.length && !current.notes.length && !finding) setAdding(true);
+  }, [notebook.id, ready]);
 
-  // A notebook that follows something takes in recent news as it opens.
+  // A notebook that follows something takes in recent news as it opens, on one computer.
   useEffect(() => {
-    if (!followIsStale(notebook.follow)) return;
-    void lookForNews(notebook.id).then((failed) => failed && setError(failed));
+    if (!ready || !followIsStale(notebook.follow)) return;
+    void claimRun(notebook.id, "news", 5 * 60_000).then(
+      (mine) => mine && lookForNews(notebook.id).then((failed) => failed && setError(failed)),
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [notebook.id]);
+  }, [notebook.id, ready]);
 
   const source =
     opened?.kind === "source" ? notebook.sources.find((item) => item.id === opened.id) : undefined;
   const note =
     opened?.kind === "note" ? notebook.notes.find((item) => item.id === opened.id) : undefined;
+
+  // Everyone else in the notebook, and what this person is doing in it for them.
+  const people = usePeople(notebook.id);
+  usePublishPointer(notebook.id, frame);
+  // Agents are in the notebook too: this person's say what they're doing, and everyone's show.
+  usePublishAgents(notebook.id);
+  const agents = useNotebookAgents(notebook.id);
+  const spaceId = notebook.space?.spaceId;
+  const docId = notebook.space?.docId;
+  const openItem = source?.id ?? note?.id ?? viewing?.id;
+  useEffect(() => {
+    if (live) setPresence(notebook.id, { item: openItem });
+  }, [live, notebook.id, openItem]);
+  useEffect(() => {
+    const gateway = spacesGateway.maybe();
+    if (!gateway || !spaceId || !docId) return;
+    gateway.setPlace({ spaceId, place: "lab", itemId: docId });
+    return () => gateway.leavePlace("lab", docId);
+  }, [spaceId, docId]);
 
   return (
     <Surface tone="page" className="flex h-full min-h-0 min-w-0 flex-1 flex-col">
@@ -227,6 +282,7 @@ export function NotebookWorkspace({
         onCustomize={() => setCustomizing(true)}
         onRebrief={() => void start().catch(() => undefined)}
         onError={setError}
+        people={<NotebookPeople notebook={notebook} people={people} agents={agents} />}
       />
       <div
         ref={frame}
@@ -238,7 +294,7 @@ export function NotebookWorkspace({
         data-left={leftClosed ? "closed" : "open"}
         data-right={rightClosed ? "closed" : viewing ? "wide" : "open"}
         data-dragging={dragging ? "true" : undefined}
-        style={{ gridTemplateColumns: `${left}px minmax(0, 1fr) ${right}px` }}
+        style={{ gridTemplateColumns: `${remCss(left)} minmax(0, 1fr) ${remCss(right)}` }}
       >
         <SourcesPanel
           notebook={notebook}
@@ -250,8 +306,13 @@ export function NotebookWorkspace({
           onOpen={setOpened}
           onNewNote={() => setOpened({ kind: "new-note" })}
           onError={setError}
+          people={people}
+          agents={agents}
         />
-        <div className="relative flex min-h-0 min-w-0">
+        <div
+          className="relative flex min-h-0 min-w-0"
+          data-live-pane={source || note || opened?.kind === "new-note" ? "reader" : "chat"}
+        >
           {source ? (
             <SourceReader
               notebook={notebook}
@@ -261,19 +322,27 @@ export function NotebookWorkspace({
               onError={setError}
             />
           ) : opened?.kind === "new-note" || note ? (
-            <NoteReader notebook={notebook} note={note} onClose={() => setOpened(undefined)} />
+            <NoteReader
+              notebook={notebook}
+              note={note}
+              people={people}
+              onClose={() => setOpened(undefined)}
+            />
           ) : (
             <ChatPanel
               notebook={notebook}
               actions={actions}
               briefing={briefing}
-              onCite={(index) => {
-                const cited = notebook.sources[index - 1];
-                if (cited) setOpened({ kind: "source", id: cited.id });
+              onCite={(cited) => {
+                const id = typeof cited === "string" ? cited : notebook.sources[cited - 1]?.id;
+                if (id && notebook.sources.some((item) => item.id === id))
+                  setOpened({ kind: "source", id });
               }}
               onAdd={() => setAdding(true)}
               onBrief={() => void start().catch(() => undefined)}
               onError={setError}
+              people={people}
+              agents={agents}
             />
           )}
         </div>
@@ -285,6 +354,8 @@ export function NotebookWorkspace({
           onCollapse={setRightClosed}
           onView={setViewing}
           onError={setError}
+          people={people}
+          agents={agents}
         />
         {leftClosed ? null : (
           <PaneHandle
@@ -304,6 +375,7 @@ export function NotebookWorkspace({
             onDone={keepWidths}
           />
         )}
+        <LivePointers frame={frame} people={people} />
         <AddSourcesDialog
           notebook={notebook}
           agentId={actions.agentId}

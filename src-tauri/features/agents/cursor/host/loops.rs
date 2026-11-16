@@ -15,9 +15,17 @@ pub(super) fn start(app: AppHandle, state: Arc<CursorCompanionState>) {
             }
             match event {
                 Shortcut::Click(x, y) => forward_click(&events_app, &events_state, x, y),
+                // Not while the talk keys are held: that's a spoken turn.
+                Shortcut::Type if !events_state.held.load(Ordering::SeqCst) => {
+                    ask::open(&events_app)
+                }
+                Shortcut::Type => {}
                 Shortcut::Held(held) => {
                     if events_state.held.swap(held, Ordering::SeqCst) == held {
                         continue;
+                    }
+                    if held {
+                        events_state.trail.lock().unwrap().clear();
                     }
                     let turn = if held {
                         events_state.turn.fetch_add(1, Ordering::SeqCst) + 1
@@ -150,6 +158,16 @@ pub(super) fn start(app: AppHandle, state: Arc<CursorCompanionState>) {
         loop {
             if state.enabled.load(Ordering::SeqCst) {
                 if let Some((x, y)) = platform::cursor() {
+                    // The trail the person draws while they ask, skipping a pointer at rest.
+                    if state.held.load(Ordering::SeqCst) {
+                        let mut trail = state.trail.lock().unwrap();
+                        let moved = trail
+                            .last()
+                            .map_or(true, |(lx, ly)| (x - lx).hypot(y - ly) >= 2.0);
+                        if moved && trail.len() < TRAIL_POINTS {
+                            trail.push((x, y));
+                        }
+                    }
                     let displays = state.data.lock().unwrap().displays.clone();
                     let payload = json!({"x":x,"y":y,"displays":displays});
                     for (label, w) in app.webview_windows() {

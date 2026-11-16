@@ -62,6 +62,7 @@ const LOCAL_TOOLS: &[&str] = &[
     "drawing.create",
     "drawing.list",
     "drawing.read",
+    "file.create",
     "file.promote_attachment",
     "file.read",
     "file.search",
@@ -69,6 +70,9 @@ const LOCAL_TOOLS: &[&str] = &[
     "folder.list",
     "folder.read",
     "folder.send",
+    "image.edit",
+    "image.read",
+    "image.save",
     "integration.connect",
     "integration.connected",
     "integration.execute",
@@ -97,6 +101,10 @@ const LOCAL_TOOLS: &[&str] = &[
     "space.manage",
     "space.member.list",
     "space.member.resolve",
+    "studio.emote",
+    "studio.go",
+    "studio.release",
+    "studio.say",
     "thread.create",
     "thread.list",
     "thread.post",
@@ -132,12 +140,19 @@ pub(super) const READ_ONLY: &[&str] = &[
     "note.search",
     "drawing.list",
     "drawing.read",
+    "image.read",
     "file.read",
     "file.search",
     "message.search",
     "search.all",
     "thread.list",
     "thread.read",
+    // The agent's figure in the studio: what it shows changes nothing kept, and showing it again
+    // is harmless.
+    "studio.go",
+    "studio.emote",
+    "studio.say",
+    "studio.release",
 ];
 
 /// What the window answers. `Failed` means nothing happened, so the model may correct the call;
@@ -403,8 +418,23 @@ pub fn agent_tool_host_ready(app: AppHandle, webview: tauri::Webview) -> Result<
     if !crate::browser::app_windows::is_person_window(webview.label()) {
         return Err("Only a profile's window can run agent tools.".into());
     }
-    *HOST.lock().unwrap_or_else(PoisonError::into_inner) = Some(webview.label().to_owned());
-    let again = after_page_load(&mut pending().lock().unwrap_or_else(PoisonError::into_inner));
+    let before = HOST
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+        .replace(webview.label().to_owned());
+    let mut calls = pending().lock().unwrap_or_else(PoisonError::into_inner);
+    let running = calls.len();
+    let again = after_page_load(&mut calls);
+    drop(calls);
+    // A call ended this way reads to the agent as "Misty closed while this was running": say why here.
+    if running > again.len() {
+        eprintln!(
+            "agent tool host: {} announced itself (was {}), ending {} running call(s) that can't be repeated",
+            webview.label(),
+            before.as_deref().unwrap_or("none"),
+            running - again.len(),
+        );
+    }
     for asked in again {
         let _ = app.emit_to(webview.label(), "misty://agent-tool-call", asked);
     }

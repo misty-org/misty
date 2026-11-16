@@ -1,8 +1,9 @@
 import { confirmAction } from "@/shared/lib/confirmAction";
-import { Button, EmptyState, SearchField, Surface, useNotice } from "@/shared/ui";
+import { Button, EmptyState, PageHeader, SearchField, Surface, useNotice } from "@/shared/ui";
 import { Plus } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import { SpaceCrumb } from "../components/space-row/SpaceCrumb";
 import { useSpacesStore } from "../list/useSpacesStore";
 import { useSpaceAgentMembers } from "../members/agents/useSpaceAgentMembers";
 import type { SpaceTask, SpaceTaskStatus } from "./api";
@@ -85,35 +86,34 @@ export function SpacePlanner({ spaceId }: { spaceId: string }) {
 
   return (
     <Surface tone="page" className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)]">
-      {/* Search and New task; the page has no title, since the sidebar and the tab name it.
-          While the board is empty its empty state offers New task, so the bar holds neither. */}
-      <div
-        role="toolbar"
-        aria-label="Planner"
-        className="flex min-h-12 items-center gap-3 px-4 py-1.5"
-      >
-        {empty ? null : (
-          <>
-            <SearchField
-              data-tour="planner-search"
-              containerClassName="ml-auto w-56"
-              aria-label="Search tasks"
-              placeholder="Search tasks"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-            />
-            <Button
-              type="button"
-              variant="primary"
-              icon={Plus}
-              onClick={newTask}
-              data-tour="planner-new"
-            >
-              New task
-            </Button>
-          </>
-        )}
-      </div>
+      {/* The bar every Space page wears, then search and New task. While the board is empty its
+          empty state offers New task, so the bar holds neither. */}
+      <PageHeader
+        title={<SpaceCrumb spaceId={spaceId} here="Planner" />}
+        end={
+          empty ? null : (
+            <>
+              <SearchField
+                data-tour="planner-search"
+                containerClassName="w-56"
+                aria-label="Search tasks"
+                placeholder="Search tasks"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+              />
+              <Button
+                type="button"
+                variant="primary"
+                icon={Plus}
+                onClick={newTask}
+                data-tour="planner-new"
+              >
+                New task
+              </Button>
+            </>
+          )
+        }
+      />
 
       {empty ? (
         <span data-tour="planner-new" className="contents">

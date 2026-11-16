@@ -10,6 +10,7 @@ export function newLocalConversation(
   title: string,
   spaceId?: string,
   agentId?: string,
+  place?: GlobalAiConversation["place"],
 ): GlobalAiConversation {
   const now = new Date().toISOString();
   const here = spaceForNewItems();
@@ -21,6 +22,7 @@ export function newLocalConversation(
     spaceId: space,
     personalSpace: personal || undefined,
     agentId,
+    place,
     createdAt: now,
     updatedAt: now,
     messages: [],

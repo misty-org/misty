@@ -29,9 +29,10 @@ const FONT_CHANGE_EVENT = "misty:font-change";
 /** The stored family that means "the picked file". */
 export const CUSTOM_FONT_VALUE = "custom";
 
-/** Misty's own stacks (src/styles/theme.css), kept after a chosen family as its fallbacks. */
+/** Misty's own stacks (src/styles/theme.css), kept after a chosen family as its fallbacks: Inter, which Misty
+ * bundles, then the system font. */
 const UI_SYSTEM_STACK =
-  '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif';
+  '"Inter Variable", -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif';
 const CODE_SYSTEM_STACK = 'ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace';
 
 /** Names for picked files: one per row, so one file picked for both registers twice, and stable

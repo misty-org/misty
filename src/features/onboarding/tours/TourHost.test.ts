@@ -6,7 +6,7 @@ describe("tourForPage", () => {
     expect(tourForPage("/agents", "")).toBe("welcome");
     expect(tourForPage("/agents", "?view=lab")).toBe("lab");
     expect(tourForPage("/agents", "?view=studio")).toBe("studio");
-    expect(tourForPage("/agents", "?view=integrations")).toBe("integrations");
+    expect(tourForPage("/agents", "?view=integrations")).toBe("welcome");
     expect(tourForPage("/agents", "?view=office")).toBe("studio");
     expect(tourForPage("/agents", "?view=automations")).toBe("welcome");
     expect(tourForPage("/agents", "?view=lab&item=notebook:n1")).toBe("notebook");
@@ -18,6 +18,8 @@ describe("tourForPage", () => {
     expect(tourForPage("/spaces/abc/drawings", "")).toBe("docs");
     expect(tourForPage("/spaces/abc/drawings/d1", "")).toBe("drawing");
     expect(tourForPage("/spaces/abc/library", "")).toBe("library");
+    expect(tourForPage("/spaces/abc/lab", "")).toBe("lab");
+    expect(tourForPage("/spaces/abc/lab", "?item=notebook:n1")).toBe("notebook");
     expect(tourForPage("/spaces/abc/planner", "")).toBe("planner");
     expect(tourForPage("/spaces/abc/calendar", "")).toBe("calendar");
     expect(tourForPage("/spaces/abc/members", "")).toBeNull();

@@ -57,6 +57,7 @@ export default defineConfig(({ command, mode }) => {
   }
   const tauriDevHost = env.TAURI_DEV_HOST;
   const desktopDevPort = Number(env.MISTY_DESKTOP_DEV_PORT ?? 5173);
+  const frozen = env.MISTY_DEV_FROZEN === "1";
   const accountApiProxyTarget = env.MISTY_ACCOUNT_API_PROXY_TARGET?.trim();
   const publicApiUrl = (env.MISTY_PUBLIC_API_URL ?? env.VITE_MISTY_PUBLIC_API_URL)?.trim();
   const isDev =
@@ -149,22 +150,28 @@ export default defineConfig(({ command, mode }) => {
             },
           }
         : undefined,
-      watch: {
-        // Backend tsconfigs and generated review HTML are outside the frontend
-        // graph. Watching them makes Vite reload every open development app.
-        ignored: [
-          resolve(import.meta.dirname, "../dist/**"),
-          "**/target/**",
-          resolve(import.meta.dirname, "../.impeccable/**"),
-        ],
-      },
-      hmr: tauriDevHost
-        ? {
-            protocol: "ws",
-            host: tauriDevHost,
-            port: desktopDevPort,
-          }
-        : undefined,
+      // MISTY_DEV_FROZEN=1 serves the app as it was when the server started: no file watching and no
+      // reloads, so a benchmark or long agent run isn't cut off when someone edits the checkout.
+      watch: frozen
+        ? null
+        : {
+            // Backend tsconfigs and generated review HTML are outside the frontend
+            // graph. Watching them makes Vite reload every open development app.
+            ignored: [
+              resolve(import.meta.dirname, "../dist/**"),
+              "**/target/**",
+              resolve(import.meta.dirname, "../.impeccable/**"),
+            ],
+          },
+      hmr: frozen
+        ? false
+        : tauriDevHost
+          ? {
+              protocol: "ws",
+              host: tauriDevHost,
+              port: desktopDevPort,
+            }
+          : undefined,
     },
   };
 });

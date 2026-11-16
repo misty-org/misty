@@ -46,7 +46,7 @@ export function WorkspaceSidebar(props: {
           <div
             className={cn(
               "misty-sidebar-head flex h-(--ui-header) min-h-(--ui-header) shrink-0 items-center gap-0.5",
-              "pl-[max(0px,calc(var(--window-chrome-left,0px)_-_var(--pane-frame,6px)_-_12px))]",
+              "pl-[max(0px,calc(var(--window-chrome-left,0px)_-_var(--pane-frame,0.375rem)_-_0.75rem))]",
             )}
             data-misty-window-titlebar-region="true"
           >

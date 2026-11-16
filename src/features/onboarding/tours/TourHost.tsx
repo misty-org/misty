@@ -54,7 +54,6 @@ export function tourForPage(pathname: string, search: string): TourId | null {
     if (view === "office" || view === "studio") return "studio";
     if (view === "lab" || view === "tutor" || view === "notebooks")
       return params.get("item")?.startsWith("notebook:") ? "notebook" : "lab";
-    if (view === "integrations") return "integrations";
     // No view, a retired one or an unknown one: the chat.
     return "welcome";
   }
@@ -79,12 +78,14 @@ export function tourForPage(pathname: string, search: string): TourId | null {
         return "planner";
       case "calendar":
         return "calendar";
+      case "lab":
+        return params.get("item")?.startsWith("notebook:") ? "notebook" : "lab";
     }
   }
   return null;
 }
 
-/** The tour for a workspace tab's route, such as `/agents?view=lab`, if its page has one. */
+/** The tour for a workspace tab's route, such as `/spaces/:id/lab`, if its page has one. */
 export function tourForRoute(route: string): TourId | null {
   const url = new URL(route, "misty://app");
   return tourForPage(url.pathname, url.search);

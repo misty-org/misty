@@ -21,12 +21,12 @@ import {
   IconButton,
   OverflowFadeText,
   Pressable,
+  Skeleton,
   Surface,
   Text,
   type Tint,
 } from "@/shared/ui";
 import { shortAgo } from "../../page/useChatStatuses";
-import { useMistyStore } from "../../conversations/state/useMistyStore";
 import { DeckView, ReviewSession } from "../TutorDecks";
 import { GuideView, OverviewView, QuizView } from "../TutorGuides";
 import type { TutorActions } from "../TutorPage";
@@ -38,7 +38,8 @@ import {
   quizPrompt,
   teachPrompt,
 } from "../tutorPrompts";
-import { dismissJob, retryJob, startJob, startRun } from "../tutorRuns";
+import { startLesson } from "../notebookThread";
+import { dismissJob, retryJob, startJob } from "../tutorRuns";
 import {
   infographicPrompt,
   mindmapPrompt,
@@ -50,6 +51,11 @@ import {
 import { useTutorStore } from "../tutorStore";
 import type { Deck, Guide, Notebook, TutorJob, TutorJobKind } from "../tutorTypes";
 import { paneClass, paneHeadClass, paneScrollClass, railClass } from "./panes";
+import { spacesGateway } from "../../spaces-gateway/spacesGateway";
+import { useOthersMaking } from "../notebookLive";
+import type { NotebookAgent } from "../notebookAgents";
+import type { Person } from "../notebookPresence";
+import { PaneFaces, RowFaces } from "./LivePeople";
 import { MindMapView, SlidesView } from "./StudioViews";
 import { InfographicView, VideoView } from "./VideoView";
 import { useNow } from "@/shared/hooks/useNow";
@@ -80,6 +86,14 @@ const outputClass = "flex items-center gap-2.5 px-2.5 py-2 text-left";
 /** A made thing's name over its detail line. */
 const outputTextClass = "flex min-w-0 flex-1 flex-col gap-0.5 text-left";
 
+/** "Quiz" → "a quiz", "Audio overview" → "an audio overview", for "Sam is making a quiz". */
+function madeWord(label: string): string {
+  const word = label.toLowerCase().replace(/^reports$/, "report");
+  return /^(flashcards|slides)$/.test(word)
+    ? word
+    : `${/^[aeiou]/.test(word) ? "an" : "a"} ${word}`;
+}
+
 function tileOf(kind: TutorJobKind | Guide["kind"] | "deck", report?: string): Tile {
   if (kind === "guide")
     return tiles.find((tile) => tile.id === (report === "data-table" ? "data-table" : "reports"))!;
@@ -101,6 +115,8 @@ export function StudioPanel({
   onCollapse,
   onView,
   onError,
+  people = [],
+  agents = [],
 }: {
   notebook: Notebook;
   actions: TutorActions;
@@ -109,8 +125,18 @@ export function StudioPanel({
   onCollapse(collapsed: boolean): void;
   onView(viewing?: Viewing): void;
   onError(message: string): void;
+  /** The others in the notebook, for the faces on what they have open. */
+  people?: Person[];
+  /** The agents at work in it: on the pane while making something. */
+  agents?: NotebookAgent[];
 }) {
   const now = useNow();
+  const spaceId = notebook.space?.spaceId;
+  const othersMaking = useOthersMaking(notebook.id);
+  const gateway = spacesGateway.maybe();
+  const me = gateway?.me()?.userId;
+  const nameOf = (userId?: string) =>
+    userId && userId !== me && spaceId && gateway ? gateway.memberName(spaceId, userId) : "";
   const jobs = useTutorStore((state) => state.jobs);
   const guides = useTutorStore((state) => state.guides);
   const decks = useTutorStore((state) => state.decks);
@@ -169,20 +195,13 @@ export function StudioPanel({
   const press = (tile: Tile) => {
     if (tile.id === "reports") return setChoosing(!choosing);
     if (tile.id === "data-table") return make("guide", "data-table");
+    // A lesson is a thread of the notebook's own, in the Space, not a chat.
     if (tile.id === "teach")
-      return void startRun({
-        agentId: actions.agentId,
-        title: notebook.title,
-        prompt: teachPrompt(notebook.title, context),
-        mode: "teach",
-        background: false,
-      })
-        .then((run) => {
-          if (run.error) return onError(run.error);
-          if (!run.started) return onError("Another turn is working. Try again when it finishes.");
-          actions.onChat(actions.agentId, run.conversationId);
-        })
-        .catch(fail);
+      return void startLesson(
+        notebook,
+        teachPrompt(notebook.title, context),
+        `Teach me ${notebook.title}`,
+      ).catch(fail);
     make(tile.id as TutorJobKind);
   };
 
@@ -260,18 +279,20 @@ export function StudioPanel({
       className={`${paneClass} tutor-studio-pane border-0 border-l`}
       aria-label="Create"
       data-tour="notebook-create"
+      data-live-pane="studio"
     >
       <header className={paneHeadClass}>
         <Text as="h2" size="control" weight="medium" tone="bright" className="ml-1 flex-1">
           Create
         </Text>
+        <PaneFaces spaceId={spaceId} people={people} agents={agents} pane="studio" />
         <IconButton label="Hide Create" onClick={() => onCollapse(true)}>
           <PanelRightClose />
         </IconButton>
       </header>
       <div className={paneScrollClass}>
         {/* Two tiles a row while each label fits whole, one when the pane is too narrow. */}
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(152px,1fr))] gap-2 px-1">
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(9.5rem,1fr))] gap-2 px-1">
           {tiles.map((tile) => (
             <Surface
               key={tile.id}
@@ -334,8 +355,28 @@ export function StudioPanel({
         ) : null}
 
         <div className="mt-4 flex flex-col gap-0.5">
+          {othersMaking.map((item) => {
+            const tile = tileOf(item.kind);
+            return (
+              <Surface key={item.id} tone="none" radius="xl" className={outputClass}>
+                <Text bare tint={tile.tint} className="inline-flex flex-none">
+                  <tile.icon />
+                </Text>
+                <Text bare size="meta" tone="default" className={outputTextClass}>
+                  <OverflowFadeText className="misty-shimmer">
+                    {`${
+                      item.agent
+                        ? `${nameOf(item.by) || "Someone"}'s ${item.agent.name}`
+                        : nameOf(item.by) || "Someone"
+                    } is making ${madeWord(tile.label)}`}
+                  </OverflowFadeText>
+                  <Skeleton className="h-3 w-24" />
+                </Text>
+              </Surface>
+            );
+          })}
           {making.map((job) => (
-            <JobOutput key={job.id} job={job} actions={actions} />
+            <JobOutput key={job.id} job={job} />
           ))}
           {made.map((output) => {
             const tile =
@@ -348,6 +389,7 @@ export function StudioPanel({
                 : output.item.kind === "guide"
                   ? (reports.find((item) => item.id === output.item.report)?.title ?? "Report")
                   : tile.label;
+            const by = nameOf(output.item.by);
             return (
               <Surface
                 key={output.item.id}
@@ -356,6 +398,7 @@ export function StudioPanel({
                 radius="xl"
                 wash="control"
                 className={outputClass}
+                data-live-anchor={output.item.id}
                 onClick={() => onView({ id: output.item.id })}
               >
                 <Text bare tint={tile.tint} className="inline-flex flex-none">
@@ -364,9 +407,11 @@ export function StudioPanel({
                 <Text bare size="meta" tone="default" className={outputTextClass}>
                   <Text full>{output.item.title}</Text>
                   <Text bare size="caption" tone="muted" className="flex-none">
-                    {meta} · {shortAgo(output.item.createdAt, now)}
+                    {meta} · {by ? `${by} · ` : ""}
+                    {shortAgo(output.item.createdAt, now)}
                   </Text>
                 </Text>
+                <RowFaces spaceId={spaceId} people={people} itemId={output.item.id} />
               </Surface>
             );
           })}
@@ -384,35 +429,24 @@ export function StudioPanel({
   );
 }
 
-function JobOutput({ job, actions }: { job: TutorJob; actions: TutorActions }) {
+function JobOutput({ job }: { job: TutorJob }) {
   const tile = tileOf(job.kind, job.report);
   const failed = job.state === "failed";
-  // A queued run whose chat already has its turn is starting, not waiting.
-  const started = useMistyStore((state) =>
-    state.conversations.some((chat) => chat.id === job.conversationId && chat.messages.length > 0),
-  );
   return (
     <Surface tone="none" radius="xl" wash="control" className={outputClass} data-state={job.state}>
       <Text bare tint={tile.tint} className="inline-flex flex-none">
         <tile.icon size={16} />
       </Text>
-      <Pressable
-        className="flex min-w-0 flex-1"
-        onClick={() => actions.onChat(job.agentId, job.conversationId)}
-      >
+      <span className="flex min-w-0 flex-1">
         <Text bare size="meta" tone="default" className={outputTextClass}>
           <OverflowFadeText className={failed ? undefined : "misty-shimmer"}>
             {job.title}
           </OverflowFadeText>
           <Text size="caption" tone="muted" className="flex-none">
-            {failed
-              ? (job.error ?? "Failed")
-              : job.state === "queued" && !started
-                ? "Waiting for a turn to end"
-                : "Making"}
+            {failed ? (job.error ?? "Failed") : "Making"}
           </Text>
         </Text>
-      </Pressable>
+      </span>
       {failed ? (
         <>
           <IconButton label="Try again" onClick={() => void retryJob(job)}>

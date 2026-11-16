@@ -1,12 +1,11 @@
 import { accountApi } from "../api/api";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { BrandIcon, Button, cn, Input, Label, Separator, Text, useNotice } from "@/shared/ui";
+import { BrandIcon, Button, Field, Input, Separator, Text, useNotice } from "@/shared/ui";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "../AuthContext";
 import { deliverGoogleSignInCode } from "../google/googleSignInCode";
 import { accountGoogleSignIn, accountGoogleReauthenticate } from "../sessions/useAccountStore";
-import { authFormButtonClass } from "./authButtonClass";
 
 export default function GoogleSignInButton({
   disabled,
@@ -98,12 +97,13 @@ export default function GoogleSignInButton({
   // The "or" rule belongs to the button: with Google sign-in off, nothing dangles under the form.
   if (!available) return null;
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-4">
       <Text
         bare
         as="div"
+        size="meta"
         tone="muted"
-        className="flex items-center gap-3 text-sm"
+        className="flex items-center gap-3"
         aria-hidden="true"
       >
         <Separator className="flex-1" />
@@ -114,41 +114,32 @@ export default function GoogleSignInButton({
         type="button"
         variant="secondary"
         size="lg"
-        className={cn(authFormButtonClass, "gap-2.5")}
+        icon={<BrandIcon brand="google-logo" size={16} aria-hidden />}
         // The form is busy while Google is open, but this is how to leave it.
         disabled={disabled && !pending}
         onClick={() => (pending ? controller.current?.abort() : void signIn())}
       >
-        <BrandIcon brand="google-logo" size={18} aria-hidden />
         {pending ? "Cancel Google sign-in" : "Continue with Google"}
       </Button>
       {pending && awaitingCode ? (
         // Not a <form>: this button can sit inside the sign-up form.
-        <div className="grid gap-2">
-          <Label className="text-sm" htmlFor="google-sign-in-code">
-            Code from your browser
-          </Label>
-          <Input
-            id="google-sign-in-code"
-            value={code}
-            autoComplete="one-time-code"
-            placeholder="ABCDE-FGHJK"
-            maxLength={11}
-            onChange={(event) => setCode(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key !== "Enter") return;
-              event.preventDefault();
-              submitCode();
-            }}
-            className="h-11 bg-transparent px-3.5"
-          />
-          <Button
-            type="button"
-            variant="secondary"
-            size="lg"
-            className={authFormButtonClass}
-            onClick={submitCode}
-          >
+        <div className="flex flex-col gap-4">
+          <Field label="Code from your browser">
+            <Input
+              id="google-sign-in-code"
+              value={code}
+              autoComplete="one-time-code"
+              placeholder="ABCDE-FGHJK"
+              maxLength={11}
+              onChange={(event) => setCode(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key !== "Enter") return;
+                event.preventDefault();
+                submitCode();
+              }}
+            />
+          </Field>
+          <Button type="button" variant="secondary" size="lg" onClick={submitCode}>
             Finish signing in
           </Button>
         </div>

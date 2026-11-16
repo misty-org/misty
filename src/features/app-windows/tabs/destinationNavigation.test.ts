@@ -44,6 +44,25 @@ it("fills a fresh tab even when the selected destination is already open", () =>
   expect(store().navigatePane(-1)).toBeNull();
 });
 
+it("fills a new chat tab from + with a Space already open in another tab", () => {
+  const first = go("/spaces/family/chat");
+  const fresh = store().newTab("/agents?agent=misty&new=1");
+  const layoutId = store().layout.activeTabId;
+  const second = go("/spaces/family/chat");
+  expect(second.id).not.toBe(first.id);
+  expect(store().layout.activeTabId).toBe(layoutId);
+  expect(allLayoutViews(store().layout).some((view) => view.id === fresh.id)).toBe(false);
+  expect(layoutTabs(store().layout)).toHaveLength(2);
+});
+
+it("treats a new chat tab as any other once something is typed or clicked in it", () => {
+  const first = go("/spaces/family/chat");
+  const fresh = store().newTab("/agents?agent=misty&new=1");
+  store().commitPlaceholder(fresh.id);
+  expect(go("/spaces/family/chat").id).toBe(first.id);
+  expect(allLayoutViews(store().layout).some((view) => view.id === fresh.id)).toBe(true);
+});
+
 it("fills a fresh split and later restores the whole split without replacing occupied panes", () => {
   const first = go("/spaces/family/chat");
   const splitTabId = store().layout.activeTabId;

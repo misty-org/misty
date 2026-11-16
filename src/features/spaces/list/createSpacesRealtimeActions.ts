@@ -6,7 +6,7 @@ import { readRealtimeCursor } from "../api/realtime-cursor";
 import { resolveSpacesApiBase, SpaceRequestError, spacesApi } from "../api/api";
 import { errorText } from "@/shared/lib/format";
 import type { SpacesStore } from "./spacesStoreTypes";
-import { spaceTypingScopeKey, type RealtimeEnvelope } from "./realtimeTypes";
+import { spaceTypingScopeKey, type PresencePlace, type RealtimeEnvelope } from "./realtimeTypes";
 import { spacesResyncEvent } from "./spacesResync";
 import { realtimePlannerEvent } from "../planner/plannerEvents";
 import { setSpacesConnection, useSpacesConnection } from "./spacesConnection";
@@ -106,8 +106,7 @@ export function createSpacesRealtimeActions(
             set((state) => ({ error: state.snapshotReady ? null : state.error }));
             if (!get().snapshotReady || get().referenceOnly)
               void get().load({ force: true, accountId });
-            if (currentViewingSpaceId)
-              sendViewingMessage(currentViewingSpaceId, currentViewingActive);
+            if (currentViewingSpaceId || currentPlace) sendViewing();
           };
           socket.onmessage = (message) => {
             if (
@@ -205,7 +204,7 @@ export function createSpacesRealtimeActions(
     setViewingSpace: (spaceId) => {
       if (currentViewingSpaceId === spaceId) return;
       currentViewingSpaceId = spaceId;
-      sendViewingMessage(spaceId, currentViewingActive);
+      sendViewing();
     },
     sendTyping: (spaceId, conversationId, active) => {
       if (realtimeSocket?.readyState !== WebSocket.OPEN) return;
@@ -309,10 +308,46 @@ export function sendAgentStatuses(spaceId: string, agents: MemberAgentStatus[]):
   }
 }
 
-function sendViewingMessage(spaceId: string, active: boolean): void {
+/**
+ * Where in Misty the person is (the Studio, or a Lab notebook) and for which Space. The Studio and
+ * the Lab aren't inside a Space's workspace, so a place brings its own Space: it is what the
+ * person is viewing while no Space workspace is.
+ */
+let currentPlace: { spaceId: string; place: PresencePlace; itemId?: string } | null = null;
+
+/** Says which place the person is in now, or none. Only the place's name and a doc id go out. */
+export function setViewingPlace(
+  next: { spaceId: string; place: PresencePlace; itemId?: string } | null,
+): void {
+  const same =
+    currentPlace?.spaceId === next?.spaceId &&
+    currentPlace?.place === next?.place &&
+    currentPlace?.itemId === next?.itemId;
+  if (same) return;
+  currentPlace = next;
+  sendViewing();
+}
+
+/** Leaves a place, unless the person has since gone somewhere else (another pane's page). */
+export function leaveViewingPlace(place: PresencePlace, itemId?: string): void {
+  if (currentPlace?.place !== place) return;
+  if (itemId !== undefined && (currentPlace.itemId ?? "") !== itemId) return;
+  setViewingPlace(null);
+}
+
+function sendViewing(): void {
+  const spaceId = currentViewingSpaceId || currentPlace?.spaceId || "";
   if (realtimeSocket?.readyState !== WebSocket.OPEN) return;
+  const place = currentPlace && currentPlace.spaceId === spaceId ? currentPlace : null;
   try {
-    realtimeSocket.send(JSON.stringify({ type: "viewing", space_id: spaceId, active }));
+    realtimeSocket.send(
+      JSON.stringify({
+        type: "viewing",
+        space_id: spaceId,
+        active: currentViewingActive,
+        ...(place ? { place: place.place, item_id: place.itemId ?? "" } : {}),
+      }),
+    );
   } catch {
     /* the connection will retry and re-send on the next open */
   }
@@ -329,7 +364,7 @@ function handleViewingActivityChange(): void {
   const active = computeViewingActivity();
   if (active === currentViewingActive) return;
   currentViewingActive = active;
-  if (currentViewingSpaceId) sendViewingMessage(currentViewingSpaceId, currentViewingActive);
+  if (currentViewingSpaceId || currentPlace) sendViewing();
 }
 
 if (typeof document !== "undefined") {

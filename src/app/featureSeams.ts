@@ -1,7 +1,9 @@
 import { accountResets, deviceDataErasers, setupFlow } from "@/features/account";
 import {
+  cleanupOnEngine,
   MistyMarkdown,
   resetAiSurfaceAccountState,
+  runOnEngine,
   useLinkedFolders,
   watchAllRunEvents,
 } from "@/features/agents";
@@ -20,11 +22,13 @@ import {
   tourCorner,
 } from "@/features/agents";
 import { browserLibrary } from "@/features/browser";
-import { noteAsk, vocativeRouting, voiceDevice } from "@/features/voice";
+import { noteAsk, vocativeRouting, voiceCleanup, voiceDevice, voiceEngine } from "@/features/voice";
 import { SetupStepBody, setupStepCopy, TourInfoButton, useSetupSteps } from "@/features/onboarding";
 import {
+  arcadeGateway,
   drawingsApi,
   handoffGateway,
+  liveGateway,
   MistyLibraryPicker,
   resetNotesAccountState,
   resetSpacesAccountState,
@@ -58,7 +62,9 @@ setupFlow.provide({
 spacesDirectory.provide(useSpacesStore);
 
 spacesGateway.provide({
+  ...arcadeGateway,
   ...handoffGateway,
+  ...liveGateway,
   uploadLibraryPath,
   uploadLibraryBlob,
   async createDrawing(spaceId, title, elements) {
@@ -71,6 +77,11 @@ spacesGateway.provide({
 });
 
 vocativeRouting.provide({ findVocative, routeToAgent });
+
+// Voice's own writing (capture notes, dictation tidying) runs on the default engine.
+voiceEngine.provide({ run: (input) => runOnEngine(input) });
+
+voiceCleanup.provide(cleanupOnEngine);
 
 voiceDevice.provide(async () => {
   const snapshot = await agentsDeviceSnapshot();

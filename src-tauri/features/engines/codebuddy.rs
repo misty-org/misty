@@ -203,6 +203,10 @@ impl Engine for CodeBuddyEngine {
     fn supports_mcp(&self) -> bool {
         true
     }
+    /// The CLI ships its own web search tool.
+    fn supports_web_search(&self) -> bool {
+        true
+    }
     fn supports_effort(&self) -> bool {
         true
     }

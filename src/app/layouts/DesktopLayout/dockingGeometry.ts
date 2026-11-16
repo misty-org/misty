@@ -1,6 +1,8 @@
 import type { CSSProperties } from "react";
 import type { DockingLayout } from "@/app/shell/dockingLayout";
+import { remCss } from "@/shared/lib/uiScale";
 
+/** Design pixels, drawn in rem so they grow with the window's root (src/shared/lib/uiScale.ts). */
 export const dockingMetrics = {
   titlebar: 38,
   /** Top inset shared by the sidebar and its native window controls: none, it meets the edge. */
@@ -32,13 +34,13 @@ export function dockingGeometry({
   const { titlebar, gap, edge, paneRadius } = dockingMetrics;
   const frame: ShellStyle = {
     gridTemplateColumns: "0px minmax(0, 1fr) 0px",
-    gridTemplateRows: `${titlebar}px 0px minmax(0, 1fr) 0px`,
-    "--shell-titlebar": `${titlebar}px`,
-    "--shell-side-tabs": `${sideTabsWidth}px`,
-    "--shell-side-tab-inset": `${dockingMetrics.sideTabInset}px`,
-    "--shell-tab-height": `${dockingMetrics.tab}px`,
-    "--shell-gap": `${gap}px`,
-    "--shell-edge": `${edge}px`,
+    gridTemplateRows: `${remCss(titlebar)} 0px minmax(0, 1fr) 0px`,
+    "--shell-titlebar": remCss(titlebar),
+    "--shell-side-tabs": remCss(sideTabsWidth),
+    "--shell-side-tab-inset": remCss(dockingMetrics.sideTabInset),
+    "--shell-tab-height": remCss(dockingMetrics.tab),
+    "--shell-gap": remCss(gap),
+    "--shell-edge": remCss(edge),
     "--shell-motion-duration": `${dockingMotion.duration}ms`,
     "--shell-motion-easing": dockingMotion.easing,
   };
@@ -49,14 +51,14 @@ export function dockingGeometry({
     left: navigation === "right" ? gap : edge,
     right: navigation === "right" ? edge : gap,
   };
-  frame["--pane-frame"] = `${edge}px`;
+  frame["--pane-frame"] = remCss(edge);
   frame["--pane-seam-color"] = "transparent";
   for (const side of ["top", "right", "bottom", "left"] as const)
-    frame[`--pane-seam-${side}`] = `${seams[side]}px`;
+    frame[`--pane-seam-${side}`] = remCss(seams[side]);
   // A pane's corner is its margin plus the page's own radius, so the page curve sits inside it.
   for (const y of ["top", "bottom"] as const)
     for (const x of ["left", "right"] as const)
-      frame[`--pane-corner-${y}-${x}`] = `${Math.max(seams[y], seams[x]) + paneRadius}px`;
+      frame[`--pane-corner-${y}-${x}`] = remCss(Math.max(seams[y], seams[x]) + paneRadius);
   const content: CSSProperties = { gridColumn: 2, gridRow: "1 / 4" };
   // Native window buttons sit on the left, so the right side reaches the window's top edge.
   const railFlush = navigation === "right";

@@ -12,7 +12,7 @@ import { routes } from "@/app/shell";
 import type { AgentProfile } from "@/shared/schemas/native-agents";
 import { EmptyState, StarterPrompts, Text, type StarterPrompt } from "@/shared/ui";
 import { useMistyStore } from "../conversations/state/useMistyStore";
-import { useSavedModelKeys } from "../models/modelKeys";
+import { useDefaultEngine } from "../engines/defaultEngine";
 import { useNow } from "@/shared/hooks/useNow";
 
 /**
@@ -41,12 +41,12 @@ export function greetingFor(date: Date): string {
 }
 
 /**
- * When the chat's agent is Misty's own and there is no model key to run it, there is no AI to talk
- * to yet. Only a keychain that answered "no keys" counts.
+ * When the chat's agent has no engine of its own and there is no default engine to run it on,
+ * there is no AI to talk to yet: Misty has no model of its own. Only a read engine list counts.
  */
 function useNeedsSetup(agent: AgentProfile): boolean {
-  const { saved, unreadable } = useSavedModelKeys();
-  return !agent.engine && !unreadable && saved !== null && saved.length === 0;
+  const { engine, ready } = useDefaultEngine();
+  return (!agent.engine || agent.engine === "misty") && ready && !engine;
 }
 
 /**

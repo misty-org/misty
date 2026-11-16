@@ -90,8 +90,11 @@ export interface CliVersionStatusView {
   update: (runId: string) => Promise<void>;
 }
 
+/** An empty `engine` (a chat with no outside engine) probes nothing and stays unknown. */
 export function useCliVersionStatus(engine: string): CliVersionStatusView {
-  const resource = useCachedResource(keyOf(engine), () => probe(engine), { persist: "device" });
+  const resource = useCachedResource(engine ? keyOf(engine) : null, () => probe(engine), {
+    persist: "device",
+  });
   const local = useSyncExternalStore(subscribe, () => updates.get(engine) ?? IDLE);
   return {
     status: resource.data?.status ?? null,

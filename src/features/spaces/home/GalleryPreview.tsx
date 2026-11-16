@@ -1,4 +1,11 @@
-import { FilePenLine, FileText, Image as ImageIcon, MessagesSquare, PenLine } from "lucide-react";
+import {
+  FilePenLine,
+  FileText,
+  FlaskConical,
+  Image as ImageIcon,
+  MessagesSquare,
+  PenLine,
+} from "lucide-react";
 import type { ComponentType, ReactNode } from "react";
 import { LibraryItemThumbnail } from "../library";
 import { itemTones, Surface, Text, type ItemTone } from "@/shared/ui";
@@ -12,6 +19,13 @@ export const kindIcon: Record<GalleryKind, { Icon: KindIcon; tone: ItemTone; lab
   image: { Icon: ImageIcon, tone: itemTones.image, label: "Image" },
   file: { Icon: FileText, tone: itemTones.document, label: "File" },
 };
+
+/** An item's glyph and kind: a Lab notebook's doc reads as a notebook, not a doc. */
+export function itemIcon(item: Pick<GalleryItem, "kind" | "notebook">) {
+  return item.notebook
+    ? { Icon: FlaskConical, tone: itemTones.note, label: "Notebook" }
+    : kindIcon[item.kind];
+}
 
 /** What a card shows instead of an icon: the item itself, as far as it can be drawn. */
 export function GalleryPreview({

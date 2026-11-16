@@ -1,5 +1,3 @@
-import { RuntimeSocket } from "@/api/runtime/runtimeSocket";
-
 export interface ConversationTool {
   callId: string;
   name: "start_task" | "steer_task" | "cancel_task" | "get_task_status";
@@ -26,19 +24,31 @@ export function deferred() {
   return { promise, resolve, reject };
 }
 
-/**
- * Opens the voice conversation on the agent runtime on this computer, which hears, answers and
- * speaks on this device's own models. `current` throws once the session it
- * was opened for has gone.
- */
-export async function openVoiceSocket(current: () => void) {
-  const socket = new RuntimeSocket({ kind: "voice" });
-  await socket.opened;
-  try {
-    current();
-  } catch (error) {
-    socket.close();
-    throw error;
+/** Bytes of one second of the companion's recording: 24 kHz mono PCM16. */
+export const recordedRate = 24_000;
+/** What the computer's recognizer takes: 16 kHz mono PCM16. */
+export const recognizedRate = 16_000;
+
+/** Base64 PCM16 at the recording's rate, as base64 PCM16 at the recognizer's. */
+export function toRecognizerRate(audio: string): string {
+  const raw = atob(audio);
+  const count = Math.floor(raw.length / 2);
+  const input = new Int16Array(count);
+  for (let at = 0; at < count; at++) {
+    const low = raw.charCodeAt(at * 2);
+    const high = raw.charCodeAt(at * 2 + 1);
+    input[at] = (((high << 8) | low) << 16) >> 16;
   }
-  return socket;
+  const ratio = recordedRate / recognizedRate;
+  const length = Math.floor(count / ratio);
+  let out = "";
+  for (let at = 0; at < length; at++) {
+    const position = at * ratio;
+    const before = Math.floor(position);
+    const after = Math.min(before + 1, count - 1);
+    const weight = position - before;
+    const sample = Math.round(input[before]! * (1 - weight) + input[after]! * weight);
+    out += String.fromCharCode(sample & 0xff, (sample >> 8) & 0xff);
+  }
+  return btoa(out);
 }

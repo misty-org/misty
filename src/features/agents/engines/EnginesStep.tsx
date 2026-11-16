@@ -4,11 +4,12 @@ import { DisclosureButton, ListCard } from "@/shared/ui";
 import { EngineSetupRow, type EngineSetupState } from "./EngineSetupRow";
 
 /**
- * Shown first, the rest wait behind More: the two that cost nothing (Antigravity on any Google
- * account, OpenCode's free models with no account), then the two most people already pay for.
- * Gemini CLI stopped taking personal Google accounts in June 2026, so it waits under More.
+ * Shown first, the rest wait behind More: the two most people already pay for, which can run
+ * Misty's own work, then the two that cost nothing (Antigravity on any Google account, OpenCode's
+ * free models with no account). Gemini CLI stopped taking personal Google accounts in June 2026,
+ * so it waits under More.
  */
-const FEATURED_ENGINES: readonly EngineId[] = ["agy", "opencode", "codex", "claude"];
+const FEATURED_ENGINES: readonly EngineId[] = ["claude", "codex", "agy", "opencode"];
 // Read when shown: the engine list belongs to a feature that imports this one.
 const otherEngines = (first: readonly EngineId[]) =>
   ENGINE_IDS.filter((engine) => !first.includes(engine));
@@ -19,6 +20,7 @@ export function EnginesStep({
   first = FEATURED_ENGINES,
   chosen,
   onChoose,
+  unfit,
 }: {
   onState(engine: EngineId, state: EngineSetupState): void;
   /** The engines listed before More; the featured ones unless the caller knows better. */
@@ -26,6 +28,8 @@ export function EnginesStep({
   /** With `onChoose`, one ready engine can be picked. */
   chosen?: EngineId;
   onChoose?(engine: EngineId): void;
+  /** Engines that can't be picked (they can't be the default engine). */
+  unfit?(engine: EngineId): boolean;
 }) {
   const [more, setMore] = useState(false);
   const row = (engine: EngineId) => (
@@ -35,6 +39,7 @@ export function EnginesStep({
       onState={onState}
       chosen={chosen === engine}
       onChoose={onChoose}
+      unfit={unfit?.(engine)}
     />
   );
   const role = onChoose ? "radiogroup" : undefined;

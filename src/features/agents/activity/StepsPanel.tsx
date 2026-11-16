@@ -1,7 +1,7 @@
 import { ChevronRight } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useCachedResource } from "@/api/cache/cached-resource";
-import { cn, Pressable, Text } from "@/shared/ui";
+import { cn, Pressable, Text, rowShapeWrap } from "@/shared/ui";
 import { useProjectFolder } from "../context-panel/FolderPicker";
 import { activityApi, type RunRow } from "./activityApi";
 import { RunSteps, RunStepsEmpty } from "./RunSteps";
@@ -42,7 +42,7 @@ function RunStepsBody(props: { run: RunRow; folder?: string }) {
 }
 
 /** A run's head: when it started and its state, on a 30px line in the steps' inset. */
-const headClass = "flex min-h-7.5 items-center gap-2 rounded-lg px-2.5";
+const headClass = rowShapeWrap;
 
 /**
  * The context panel's "Steps": what this chat's agent did in each run, step by step in plain

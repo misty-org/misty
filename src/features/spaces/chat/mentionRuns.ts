@@ -15,7 +15,7 @@ import type { MentionableAgent } from "./useSpaceMessageSpansStore";
  */
 
 const maxAgents = 3;
-const startFailed = "couldn't start this. Check Settings › Models and ask again.";
+const startFailed = "couldn't start this. Check its engine in Settings › Agents and ask again.";
 
 type Span = SpaceMessage["content"][number];
 

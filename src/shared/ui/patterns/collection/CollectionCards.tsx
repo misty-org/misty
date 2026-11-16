@@ -9,7 +9,7 @@ import { collectionIconTone, hasItemActions, type CollectionItem } from "./colle
 
 function CollectionGrid({ children }: { children: ReactNode }) {
   return (
-    <div className="grid grid-cols-[repeat(auto-fill,minmax(min(180px,100%),1fr))] gap-3">
+    <div className="grid grid-cols-[repeat(auto-fill,minmax(min(11.25rem,100%),1fr))] gap-3">
       {children}
     </div>
   );

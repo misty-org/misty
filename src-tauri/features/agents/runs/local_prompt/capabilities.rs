@@ -124,5 +124,9 @@ pub(super) fn agent_capability_guidance(tools: &[String], desktop_control: bool,
     } else if !has_prefix("browser.") {
         out.push_str("\n\nNo browser or screen is available in this run; website and on-screen work need the Misty desktop app. Never claim to have visited a site.");
     }
+    if has("studio.go") {
+        // A person who says "take a coffee break" means the figure they watch, not a refusal.
+        out.push_str("\n\nStudio: your person watches you as a figure in Misty's studio, a virtual office. When they tell you to go somewhere or take a break (\"go to your desk and work on...\", \"take a coffee break\", \"come here\"), call studio_go, then carry on with the work they asked for.");
+    }
     out
 }

@@ -104,7 +104,7 @@ export function EmbeddedUniversalPreviewView(props: {
         tone="card"
         edge="hairline"
         radius="xl"
-        className="grid w-[min(520px,90%)] justify-items-center gap-5 p-8 text-center shadow-xs"
+        className="grid w-[min(32.5rem,90%)] justify-items-center gap-5 p-8 text-center shadow-xs"
       >
         <Text bare tone="muted" className="text-5xl">
           ♫
@@ -242,14 +242,14 @@ function PreviewSkeleton({ kind }: { kind: "media" | "audio" | "pdf" | "document
           tone="card"
           edge="hairline"
           radius="xl"
-          className="grid w-[min(520px,90%)] justify-items-center gap-5 p-8"
+          className="grid w-[min(32.5rem,90%)] justify-items-center gap-5 p-8"
         >
           <Skeleton className="size-12 rounded-full" />
           <Skeleton className="h-4 w-40" />
           <Skeleton className="h-14 w-full rounded-full" />
         </Surface>
       ) : (
-        <Skeleton className="aspect-[8.5/11] w-[min(100%,640px)] self-start rounded-md" />
+        <Skeleton className="aspect-[8.5/11] w-[min(100%,40rem)] self-start rounded-md" />
       )}
     </div>
   );

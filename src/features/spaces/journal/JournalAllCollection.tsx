@@ -1,3 +1,4 @@
+import { SpaceCrumb } from "../components/space-row/SpaceCrumb";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { FileText, PencilRuler, Plus, Trash2 } from "lucide-react";
@@ -122,7 +123,7 @@ export function JournalAllCollection(props: {
   return (
     <CollectionPage>
       <CollectionHeading
-        title="Docs"
+        title={<SpaceCrumb spaceId={props.spaceId} here="Docs" />}
         end={
           <>
             <CollectionSearch

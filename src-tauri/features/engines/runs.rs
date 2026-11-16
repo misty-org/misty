@@ -39,6 +39,9 @@ struct LiveRun {
     /// The turn ended in the chat, but its engine process lives on for a background task
     /// (`bridge.rs`, follow-up parking): its request still answers for that process.
     parked: bool,
+    /// Parked with nothing running: the process only waits, warm, for the chat's next message,
+    /// so the run isn't working in its folder.
+    warm: bool,
 }
 
 static LIVE: LazyLock<Mutex<HashMap<String, LiveRun>>> =
@@ -57,6 +60,14 @@ pub(crate) fn request_of(run_id: &str) -> Option<Value> {
     held.get(&bridge::chat_run_of(run_id))
         .or_else(|| held.get(run_id))
         .map(|run| run.body.clone())
+}
+
+/// The folder a live run on an outside engine works in.
+pub(crate) fn folder_of(run_id: &str) -> Option<PathBuf> {
+    let held = live();
+    held.get(&bridge::chat_run_of(run_id))
+        .or_else(|| held.get(run_id))
+        .map(|run| PathBuf::from(&run.folder))
 }
 
 /// Whether this request names an outside engine, and so belongs here and not to Misty's runtime.
@@ -91,13 +102,27 @@ fn kill(run_id: &str) {
     }
 }
 
-/// Multi-run: the live runs working in exactly this folder (multirun.rs).
+/// Multi-run: the live runs working in exactly this folder (multirun.rs). A process only
+/// waiting, warm, for the chat's next message isn't working.
 pub(crate) fn live_in(folder: &std::path::Path) -> Vec<String> {
     live()
         .iter()
-        .filter(|(_, run)| std::path::Path::new(&run.folder) == folder)
+        .filter(|(_, run)| !run.warm && std::path::Path::new(&run.folder) == folder)
         .map(|(id, _)| id.clone())
         .collect()
+}
+
+/// Multi-run: ends the warm processes waiting in this folder, before it is removed.
+pub(crate) fn end_warm_in(folder: &std::path::Path) {
+    let warm: Vec<String> = live()
+        .iter()
+        .filter(|(_, run)| run.warm && std::path::Path::new(&run.folder) == folder)
+        .map(|(id, _)| id.clone())
+        .collect();
+    for run in warm {
+        kill(&run);
+    }
+    super::warm::retire_in(folder);
 }
 
 pub fn stop_all() {
@@ -123,8 +148,10 @@ async fn decide(app: &AppHandle, run_id: &str, tool: &str, input: &Value) -> Dec
     };
     let facts = RunFacts::of_request(run_id, &body);
     // A call into Misty's own server is journaled and gated there, under this run's mode, so the
-    // person isn't asked once here and once more by the tool itself. A plan still changes nothing.
-    if super::mcp::names_misty_tool(tool, input) && !facts.planning {
+    // person isn't asked once here and once more by the tool itself. A plan still changes nothing,
+    // though the agent may still move its figure in the studio.
+    let misty = super::mcp::names_misty_tool(tool, input);
+    if misty && (!facts.planning || super::mcp::names_studio_tool(tool)) {
         return Decision::Allow;
     }
     match (facts.planning, facts.auto) {
@@ -220,12 +247,26 @@ pub(crate) fn install(app: &AppHandle) -> Result<support::EngineState, String> {
     Ok(state)
 }
 
+/// Whether a run is a turn of Tutor's own spoken conversation (`companionConversation.ts`): a
+/// companion turn under a conversation id no chat ever has, so its engine session carries on to
+/// the conversation's next turn, and its process stays warm for it, without the pointing rules
+/// ever reaching a chat.
+fn tutor_voice(body: &Value) -> bool {
+    body["mode"].as_str() == Some("companion")
+        && body["conversation_id"]
+            .as_str()
+            .is_some_and(|id| id.starts_with("misty_tutor:"))
+}
+
 /// What the bridge reports about a run: its engine session, and its end.
 fn note(run_id: &str, note: RunNote) {
     match note {
         RunNote::Session(session) => {
-            // The cursor companion's turn keeps no session for the chat (`start`).
-            let companion = |run: &LiveRun| run.body["mode"].as_str() == Some("companion");
+            // The cursor companion's turn keeps no session for the chat (`start`); Tutor's spoken
+            // conversation keeps its own.
+            let companion = |run: &LiveRun| {
+                run.body["mode"].as_str() == Some("companion") && !tutor_voice(&run.body)
+            };
             let Some(run) = live().get(run_id).filter(|run| !companion(run)).map(|run| {
                 (
                     run.account.clone(),
@@ -259,9 +300,16 @@ fn note(run_id: &str, note: RunNote) {
                 run.parked = true;
             }
         }
+        RunNote::Warm => {
+            if let Some(run) = live().get_mut(run_id) {
+                run.parked = true;
+                run.warm = true;
+            }
+        }
         RunNote::Resumed => {
             if let Some(run) = live().get_mut(run_id) {
                 run.parked = false;
+                run.warm = false;
             }
         }
         RunNote::Ended => {
@@ -315,20 +363,10 @@ pub(crate) async fn start(app: &AppHandle, run_id: String, body: Value) -> Resul
     let conversation = body["conversation_id"].as_str().unwrap_or("").to_string();
     let fresh = body["engine"]["fresh"].as_bool() == Some(true);
     // The cursor companion's turn runs apart from the chat's engine session, so its pointing
-    // rules never stay in what the chat's later turns resume.
+    // rules never stay in what the chat's later turns resume. Tutor's spoken conversation has a
+    // session of its own, which it carries on.
     let companion_turn = body["mode"].as_str() == Some("companion");
-    // An agent's first run asks the person where it works. Tutor's pointing turns don't stop to
-    // ask: they keep to the folder Misty makes.
-    if !companion_turn {
-        super::agent_folder::ask_before_first_run(
-            app,
-            &facts.account,
-            &facts.agent_id,
-            &agent_name,
-            &named,
-        )
-        .await?;
-    }
+    let tutor_voice = tutor_voice(&body);
     // Every chat with an agent works in that agent's one folder, worked out here in native code
     // (`agent_folder.rs`): a page can't point an engine at a folder the person didn't choose. A
     // run with no agent works in Misty's own workspace folder.
@@ -355,7 +393,7 @@ pub(crate) async fn start(app: &AppHandle, run_id: String, body: Value) -> Resul
                     }
                 };
             let folder_text = folder.to_string_lossy().into_owned();
-            let session = if companion_turn {
+            let session = if companion_turn && !tutor_voice {
                 None
             } else if fresh {
                 let _ = store::forget_session(&db, &account, &conversation);
@@ -403,6 +441,12 @@ pub(crate) async fn start(app: &AppHandle, run_id: String, body: Value) -> Resul
         Some(note) => format!("{prompt}\n\n{note}"),
         None => prompt,
     };
+    // Teach mode's lesson rules and the lesson so far, so a lesson runs on an engine as it does on
+    // Misty's own runtime.
+    let prompt = match agent_runs::engine_teach_note(&body) {
+        Some(note) => format!("{prompt}\n\n{note}"),
+        None => prompt,
+    };
     // PDFs and documents are saved as files the engine opens with its own tools.
     let prompt = with_attached_files(prompt, &save_files(&body["attachments"], &run_id));
     // `/compact` on Oh My Pi is its native compaction call; other engines take the command as
@@ -425,10 +469,12 @@ pub(crate) async fn start(app: &AppHandle, run_id: String, body: Value) -> Resul
             folder: folder_text.clone(),
             images: images.clone(),
             parked: false,
+            warm: false,
         },
     );
-    // Claude Code in a chat may stay alive past its turn for a background task (bridge.rs).
-    bridge::open(&run_id, engine == "claude");
+    // Claude Code in a chat may stay alive past its turn for a background task (bridge.rs), and
+    // Claude Code or CodeBuddy stays warm for the chat's next message.
+    bridge::open(&run_id, matches!(engine.as_str(), "claude" | "codebuddy"));
     let mut mcp_servers = super::mcp::servers_for(app, &run_id).await;
     // The agent's own MCP servers go in the same per-run config as Misty's Space server.
     if !agent_servers.is_empty() {
@@ -484,7 +530,14 @@ pub(crate) async fn start(app: &AppHandle, run_id: String, body: Value) -> Resul
         Some(run_id.clone()),
         mcp_servers,
         allowed_tools,
-        super::LaunchExtras { args, key },
+        super::LaunchExtras {
+            args,
+            key,
+            // The chat's next message resumes this session: its process stays warm for it, as
+            // it does for Tutor's next spoken turn. Tutor's other pointing turns keep no session,
+            // so theirs ends with the turn.
+            warm: !companion_turn || tutor_voice,
+        },
     )
     .await;
     if let Err(error) = sent {

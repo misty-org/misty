@@ -50,7 +50,8 @@ pub(super) fn companion_system_prompt(request: &RunRequest, tools: &[String]) ->
 /// engine answers and points across every display. `captures` is each screenshot's name
 /// (screen1, screen2, window1) with its width and height in pixels.
 pub fn companion_engine_note(captures: &[(String, u32, u32)]) -> String {
-    let mut note = format!("{}\n", TEACH_PROMPT.trim());
+    // Drawing rides along with pointing, so an engine draws exactly as Misty's own runtime does.
+    let mut note = format!("{}\n{}\n", TEACH_PROMPT.trim(), SKETCH_PROMPT.trim());
     if captures.is_empty() {
         note.push_str("No screenshots came with this turn. For a question about the user's screen, say you can't see it right now and use [POINT:none].\n");
         return note;
@@ -82,6 +83,7 @@ mod engine_note_tests {
             ("window1".into(), 1200, 800),
         ]);
         assert!(note.contains("[POINT:x,y:label:screenN]"));
+        assert!(note.contains("```misty-sketch"));
         assert!(note.contains("1. screen1: 1512x982 pixels, the primary display"));
         assert!(note.contains("2. screen2: 1920x1080 pixels, another display"));
         assert!(note.contains("3. window1: 1200x800 pixels, the window the person is working in"));

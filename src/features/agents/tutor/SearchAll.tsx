@@ -6,8 +6,7 @@ import { searchNotebooks, type SearchHit } from "./tutorSearch";
 import { useTutorStore } from "./tutorStore";
 
 /**
- * One search box for every notebook: by meaning with an embedding model on this computer, by words
- * without one. A result opens its notebook.
+ * One search box for every notebook, matching words. A result opens its notebook.
  */
 export function SearchAll({ actions }: { actions: TutorActions }) {
   const notebooks = useTutorStore((state) => state.notebooks);
@@ -34,12 +33,12 @@ export function SearchAll({ actions }: { actions: TutorActions }) {
     };
   }, [query]);
   return (
-    // It leads the home's tools row, and its results drop under it.
-    <div className="relative min-w-55 max-w-90 flex-1">
+    // It sits in the Lab's bar, and its results drop under it.
+    <div className="relative w-56 min-w-0">
       <SearchField
         containerClassName="w-full"
-        aria-label="Search all notebooks"
-        placeholder="Search all notebooks"
+        aria-label="Search notebooks"
+        placeholder="Search notebooks"
         value={query}
         onChange={(event) => setQuery(event.target.value)}
       />
@@ -49,7 +48,7 @@ export function SearchAll({ actions }: { actions: TutorActions }) {
           edge="hairline"
           radius="xl"
           raised
-          className="absolute top-full right-0 left-0 z-[var(--stack-sticky)] mt-1.5 flex max-h-105 flex-col gap-0.5 overflow-auto p-1.5"
+          className="absolute top-full right-0 z-[var(--stack-sticky)] mt-1.5 w-90 max-w-[calc(100vw-2rem)] flex max-h-105 flex-col gap-0.5 overflow-auto p-1.5"
           role="listbox"
           aria-label="Results"
         >
@@ -109,11 +108,6 @@ export function SearchAll({ actions }: { actions: TutorActions }) {
               Nothing found.
             </Text>
           )}
-          {result && !result.byMeaning ? (
-            <Text as="p" size="caption" tone="muted" wrap className="px-2.5 pt-1.5 pb-0.5">
-              Matched by words. Choose an embedding model in Settings → Models to search by meaning.
-            </Text>
-          ) : null}
         </Surface>
       ) : null}
     </div>

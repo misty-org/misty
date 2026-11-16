@@ -240,11 +240,11 @@ pub(super) fn sign_in_plan(
 
 /// Engines whose sign-in Misty remembers, having no way to ask the CLI: a sign-in it watched
 /// finish, or one the person said they finished in the CLI's own screen. Pi and Oh My Pi say
-/// it in their own stores (`engine_cli_signed_in`).
+/// it in their own stores, and Qoder CLI and Grok Build through a command (`engine_cli_signed_in`).
 pub(super) fn remembers_sign_in(engine: &str) -> bool {
     matches!(
         engine,
-        "agy" | "hermes" | "kimi" | "grok" | "qoder" | "qoder-cn" | "codebuddy" | "minimax"
+        "agy" | "hermes" | "kimi" | "codebuddy" | "minimax"
     )
 }
 

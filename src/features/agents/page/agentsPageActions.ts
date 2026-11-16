@@ -1,6 +1,7 @@
 import type { AgentSettingsTab } from "../personal/AgentSettingsModal";
 import { useMistyStore } from "../conversations/state/useMistyStore";
 import type { AgentsPageState } from "./useAgentsPageState";
+import { openAgentsHub } from "../hub/agentsHubStore";
 
 /* Actions for the Agents page. Each runs through the change guard so unsaved edits are confirmed first. */
 export function createAgentsPageActions(state: AgentsPageState) {
@@ -81,14 +82,14 @@ export function createAgentsPageActions(state: AgentsPageState) {
     await load(user.id);
   };
   // Pages are links, so the sidebar shows where the person is.
-  const openPage = (page: "studio" | "integrations" | "lab") =>
+  const openPage = (page: "studio" | "lab") =>
     change(() => {
       setWorkspacePage(page);
       const next = new URLSearchParams(params);
       next.set("view", page);
       setParams(next);
     }, false);
-  const openApps = () => openPage("integrations");
+  const openApps = () => openAgentsHub("apps");
   return {
     openSettingsModal,
     select,

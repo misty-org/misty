@@ -198,53 +198,179 @@ const corner = (n: number, x: number, z: number): StudioItem[] => [
   item(`lamp-${n}`, "lamp", x + 3, z),
 ];
 
-/** The studio as it is before anyone rearranges it: a lounge by the bookshelf on the left, six
- * pairs of facing desks along the back, two meeting tables under their screens in the middle, and
- * two more sitting corners at the front. */
-export function defaultLayout(): StudioLayout {
-  const size = { ...ROOM.start };
+/** Where walls four cells long go end to end from `from` toward `to` (either way), short of it,
+ * nearest the start first. */
+function wallRun(from: number, to: number): number[] {
+  const out: number[] = [];
+  if (to >= from) for (let at = from; at + 4 <= to; at += 4) out.push(at);
+  else for (let at = from; at >= to; at -= 4) out.push(at);
+  return out;
+}
+
+/**
+ * The studio as it is before anyone rearranges it, measured from the floor it is given: rooms
+ * with doorways between them, so walking through it goes somewhere. Along the back, the office:
+ * rows of facing desks, a second row in a deep room, with a sofa corner at each end of the aisle
+ * in front of them. Across the front, rooms that keep their share of the floor as it grows: the
+ * lounge at the left, where resting agents sit; the meeting room at the right, two tables under
+ * their screens, where agents work out a task given to several; between them the games corner,
+ * open to the office and empty for what the studio earns (`addItem` puts new pieces near there).
+ * The way in is the door in the left wall, onto the office.
+ */
+export function defaultLayout(given: RoomSize = ROOM.start): StudioLayout {
+  const size = roomSize(given);
   applyRoomSize(size);
-  const desks = [9, 12, 15, 18, 21, 24].flatMap((x, pair) => [
-    item(`desk-${pair * 2 + 1}`, "desk", x, 1, 2),
-    item(`desk-${pair * 2 + 2}`, "desk", x, 3, 0),
-  ]);
+  const { w, d } = size;
+  /** The row of walls between the office and the rooms across the front. */
+  const row = Math.round(d * 0.54);
+  /** Where the lounge ends and the meeting room starts. */
+  const lounge = Math.round(w * 0.3);
+  const meeting = w - Math.round(w * 0.39);
+  const pairs = Math.max(1, Math.min(10, Math.floor((w - 17) / 3)));
+  const deskRows = row >= 17 ? [1, 7] : [1];
+  let deskCount = 0;
+  const desks = deskRows.flatMap((z) =>
+    Array.from({ length: pairs }, (_, pair) => 13 + pair * 3).flatMap((x) => [
+      item(`desk-${++deskCount}`, "desk", x, z, 2),
+      item(`desk-${++deskCount}`, "desk", x, z + 2, 0),
+    ]),
+  );
+  let walls = 0;
+  const across = (x: number) => item(`wall-${++walls}`, "wall", x, row);
+  const down = (x: number) => (z: number) => item(`wall-${++walls}`, "wall", x, z, 1);
+  const corners = row - 6;
+  const wanted: StudioItem[] = [
+    // The office.
+    ...desks,
+    item("bookshelf-1", "bookshelf", 0, 0),
+    item("lamp-1", "lamp", 4, 0),
+    item("cooler-1", "cooler", 6, 0),
+    item("plant-1", "plant", 0, 6),
+    item("plant-2", "plant", w - 1, 0),
+    ...corner(3, 14, corners),
+    ...corner(4, w - 11, corners),
+    item("bookshelf-2", "bookshelf", w - 3, row - 8),
+    item("plant-8", "plant", w - 1, row - 2),
+    // The walls that make the rooms, with their doorways left open: the lounge's into the office
+    // by its corner and into the games corner at the front; the meeting room's into the office
+    // after its first stretch, and into the games corner halfway down.
+    ...wallRun(0, lounge - 3).map(across),
+    across(meeting),
+    ...wallRun(w - 4, meeting + 6)
+      .reverse()
+      .map(across),
+    ...wallRun(row + 1, d - 2).map(down(lounge)),
+    down(meeting - 1)(row + 1),
+    ...wallRun(d - 4, row + 7)
+      .reverse()
+      .map(down(meeting - 1)),
+    // The lounge.
+    ...corner(2, 2, row + 3),
+    item("armchair-5", "armchair", lounge - 4, row + 4, 3),
+    item("cooler-3", "cooler", 0, row + 1),
+    item("bookshelf-3", "bookshelf", lounge - 5, row + 1),
+    item("plant-3", "plant", 0, d - 1),
+    item("plant-4", "plant", lounge - 1, d - 1),
+    // The games corner.
+    item("rug-5", "rug", lounge + 3, row + 5),
+    item("plant-5", "plant", lounge + 1, d - 1),
+    item("plant-6", "plant", meeting - 2, d - 1),
+    // The meeting room.
+    item("screen-1", "screen", meeting + 2, row + 1),
+    item("table-1", "table", meeting + 2, row + 3),
+    item("screen-2", "screen", w - 5, row + 1),
+    item("table-2", "table", w - 5, row + 3),
+    item("plant-7", "plant", w - 1, d - 1),
+    item("plant-9", "plant", meeting, d - 1),
+  ];
+  // Anything a small floor has no room for is left out rather than piled up.
+  const items: StudioItem[] = [];
+  for (const next of wanted) if (canPlace(items, next)) items.push(next);
+  return { size, items };
+}
+
+/** A layout's pieces without whose desk is whose, to tell whether it was ever rearranged. */
+const arrangement = (items: readonly StudioItem[]) =>
+  JSON.stringify(
+    items
+      .map(({ id, kind, x, z, rot }) => [id, kind, x, z, rot])
+      .sort((a, b) => String(a[0]).localeCompare(String(b[0]))),
+  );
+
+/** Works something out on a floor of another size, then puts the floor back as it was. */
+function onFloor<T>(size: RoomSize, work: () => T): T {
+  const before = { w: GRID.w, d: GRID.d };
+  applyRoomSize(size);
+  try {
+    return work();
+  } finally {
+    applyRoomSize(before);
+  }
+}
+
+/**
+ * The default layout for `size` if `layout` is still the default as it came (for its own size, or
+ * the starting room it was first laid out in before the floor grew), keeping whose desk is whose;
+ * otherwise null.
+ */
+function freshDefault(layout: StudioLayout, size: RoomSize): StudioLayout | null {
+  const now = arrangement(layout.items);
+  const untouched = onFloor(
+    layout.size,
+    () =>
+      now === arrangement(defaultLayout(layout.size).items) ||
+      now === arrangement(defaultLayout(ROOM.start).items),
+  );
+  if (!untouched) return null;
+  const owners = new Map(
+    layout.items.flatMap((entry) => (entry.agent ? [[entry.id, entry.agent] as const] : [])),
+  );
+  const fresh = onFloor(size, () => defaultLayout(size));
   return {
-    size,
-    items: [
-      ...desks,
-      item("bookshelf-1", "bookshelf", 0, 0),
-      item("lamp-1", "lamp", 4, 0),
-      item("sofa-1", "sofa", 2, 1),
-      item("rug-1", "rug", 1, 2),
-      item("coffee-table-1", "coffee-table", 2, 3),
-      item("armchair-1", "armchair", 0, 3, 1),
-      item("armchair-5", "armchair", 5, 3, 3),
-      item("cooler-1", "cooler", 6, 0),
-      item("plant-1", "plant", 0, 6),
-      item("plant-2", "plant", 27, 0),
-      item("screen-1", "screen", 12, 7),
-      item("table-1", "table", 12, 9),
-      item("plant-4", "plant", 15, 7),
-      item("screen-2", "screen", 19, 7),
-      item("table-2", "table", 19, 9),
-      item("bookshelf-2", "bookshelf", 25, 7),
-      item("cooler-2", "cooler", 23, 7),
-      ...corner(2, 5, 12),
-      ...corner(3, 13, 13),
-      ...corner(4, 21, 12),
-      item("plant-3", "plant", 27, 17),
-      item("plant-5", "plant", 10, 17),
-      item("plant-6", "plant", 0, 17),
-      item("plant-7", "plant", 18, 17),
-    ],
+    size: fresh.size,
+    items: fresh.items.map((entry) =>
+      owners.has(entry.id) ? { ...entry, agent: owners.get(entry.id) } : entry,
+    ),
   };
 }
 
-/** The room made wider or deeper, or smaller when nothing would be left outside it. Furniture
- * keeps its cells: the room grows and shrinks at its right and front walls. */
+/**
+ * A saved layout that is still the starting default on a floor that has since grown, laid out
+ * afresh for that floor. Anything rearranged is kept as it is.
+ */
+export function refitDefault(layout: StudioLayout): StudioLayout {
+  if (layout.size.w === ROOM.start.w && layout.size.d === ROOM.start.d) return layout;
+  return freshDefault(layout, layout.size) ?? layout;
+}
+
+/**
+ * The room made wider or deeper, or smaller when nothing would be left outside it. A room still
+ * as it came is laid out afresh for its new size, keeping whose desk is whose. Otherwise, growing,
+ * the rooms along the front keep to the front wall and the meeting room to the right one, so the
+ * new floor opens up inside the rooms rather than as an empty strip along the edge; the desks stay
+ * where they are. Shrinking keeps every piece in its cells.
+ */
 export function resizeRoom(layout: StudioLayout, by: Partial<RoomSize>): StudioLayout {
   const size = roomSize({ w: layout.size.w + (by.w ?? 0), d: layout.size.d + (by.d ?? 0) });
   if (size.w === layout.size.w && size.d === layout.size.d) return layout;
+  const fresh = freshDefault(layout, size);
+  if (fresh) return fresh;
+  if (size.w >= layout.size.w && size.d >= layout.size.d) {
+    const dw = size.w - layout.size.w;
+    const dd = size.d - layout.size.d;
+    const moved = layout.items.map((entry) => {
+      if (entry.kind === "desk") return entry;
+      const at = middle(entry);
+      const x = entry.x + (at.x > layout.size.w * 0.6 ? dw : 0);
+      const z = entry.z + (at.z > layout.size.d * 0.5 ? dd : 0);
+      return x === entry.x && z === entry.z ? entry : { ...entry, x, z };
+    });
+    if (
+      moved.some((entry, index) => entry !== layout.items[index]) &&
+      onFloor(size, () => moved.every((entry) => canPlace(moved, entry)))
+    )
+      return { size, items: moved };
+  }
   const fits = layout.items.every((entry) =>
     itemCells(entry).every(({ cell }) => cell.x < size.w && cell.z < size.d),
   );

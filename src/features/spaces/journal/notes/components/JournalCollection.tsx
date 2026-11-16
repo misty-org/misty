@@ -1,3 +1,4 @@
+import { SpaceCrumb } from "../../../components/space-row/SpaceCrumb";
 import { OrderedCollectionFilters as CollectionFilters } from "@/features/settings/OrderedCollectionFilters";
 import type { ComponentProps } from "react";
 import { JournalAllCollection, journalSections } from "../../JournalAllCollection";
@@ -89,7 +90,7 @@ export function JournalCollection(props: {
   return (
     <CollectionPage>
       <CollectionHeading
-        title="Docs"
+        title={<SpaceCrumb spaceId={props.spaceId} here="Docs" />}
         end={
           <>
             <CollectionSearch

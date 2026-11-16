@@ -44,7 +44,7 @@ export function ApprovalActions({
           {request.paymentCap ? ` (each payment up to ${formatCap(request.paymentCap)})` : ""}.
           {request.permissionMode === "ask"
             ? " This chat's mode checks with you first, so it still asks every time; remembered approvals apply in a mode that works without asking."
-            : " You can revoke it in Settings › Agents › Permissions."}
+            : " You can revoke it in Settings › Access."}
         </Text>
       ) : null}
     </div>

@@ -1,12 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { refinePoint, snapPoint } from "./companionSharpen";
 
-const mocks = vi.hoisted(() => ({ invoke: vi.fn(), deviceModelCall: vi.fn() }));
+const mocks = vi.hoisted(() => ({ invoke: vi.fn(), refineOnEngine: vi.fn() }));
 vi.mock("@tauri-apps/api/core", () => ({ invoke: mocks.invoke }));
-vi.mock("@/api/runtime/device-models", () => ({ deviceModelCall: mocks.deviceModelCall }));
+// The crop is looked at by the default engine (engines/mistyCalls.ts).
+vi.mock("../../engines/mistyCalls", () => ({ refinePointOnEngine: mocks.refineOnEngine }));
 afterEach(() => {
   mocks.invoke.mockReset();
-  mocks.deviceModelCall.mockReset();
+  mocks.refineOnEngine.mockReset();
   vi.useRealTimers();
 });
 
@@ -48,7 +49,7 @@ describe("refinePoint", () => {
       height: 560,
       region: { x: 360, y: 160, width: 280, height: 280 },
     });
-    mocks.deviceModelCall.mockResolvedValue({ found: true, x: 300, y: 260 });
+    mocks.refineOnEngine.mockResolvedValue({ found: true, x: 300, y: 260 });
     await expect(refinePoint(estimate, "invocation_1", 4)).resolves.toEqual({
       ...estimate,
       x: 510,
@@ -61,12 +62,11 @@ describe("refinePoint", () => {
       y: 300,
       size: 280,
     });
-    const [name, body] = mocks.deviceModelCall.mock.calls[0];
-    expect(name).toBe("refine-point");
+    const [body] = mocks.refineOnEngine.mock.calls[0];
     expect(body).toEqual({
       image: {
-        mime_type: "image/jpeg",
-        data_url: "data:image/jpeg;base64,AA==",
+        mimeType: "image/jpeg",
+        dataUrl: "data:image/jpeg;base64,AA==",
         width: 560,
         height: 560,
       },
@@ -82,11 +82,11 @@ describe("refinePoint", () => {
       height: 280,
       region: { x: 360, y: 160, width: 280, height: 280 },
     });
-    mocks.deviceModelCall.mockResolvedValue({ found: false, x: 0, y: 0 });
+    mocks.refineOnEngine.mockResolvedValue({ found: false, x: 0, y: 0 });
     await expect(refinePoint(estimate, "invocation_1", 4)).resolves.toBeUndefined();
     await expect(
       refinePoint({ ...estimate, label: " " }, "invocation_1", 4),
     ).resolves.toBeUndefined();
-    expect(mocks.deviceModelCall).toHaveBeenCalledOnce();
+    expect(mocks.refineOnEngine).toHaveBeenCalledOnce();
   });
 });

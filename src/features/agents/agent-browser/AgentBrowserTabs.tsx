@@ -40,7 +40,7 @@ function AgentTabIcon({ tab, active }: { tab: AgentBrowserTab | undefined; activ
   if (tab?.loading)
     return (
       <Text bare tone={active ? "bright" : "muted"} className="flex shrink-0">
-        <Spinner label={false} style={{ width: 16, height: 16 }} />
+        <Spinner label={false} style={{ width: "1rem", height: "1rem" }} />
       </Text>
     );
   if (icon && !failed)

@@ -1,39 +1,6 @@
-//! This computer's model calls outside runs, on the crate. The renderer sees the codes and statuses
-//! in `DeviceCallFailure`.
-use agent_runs::device::DEVICE_CALL_NAMES;
+//! The Lab's media on this computer: recordings recognized on-device, and audio overviews spoken in
+//! the system voice. Misty holds no keys, so nothing here calls a model.
 use serde::Serialize;
-use serde_json::Value;
-
-/// What a device call answered: its status and body, so the renderer can tell a missing key
-/// from a provider failure.
-#[derive(Serialize)]
-pub struct CallReply {
-    pub(super) status: u16,
-    pub(super) body: Value,
-}
-
-/// One model call on this computer's runtime, with this device's models and keys. The body is the
-/// renderer's JSON as text, because a run's schema goes to the model in its own key order, and a
-/// parsed `Value` would sort it.
-#[tauri::command]
-pub async fn agent_runtime_call(
-    app: tauri::AppHandle,
-    name: String,
-    body: String,
-) -> Result<CallReply, String> {
-    if !DEVICE_CALL_NAMES.contains(&name.as_str()) {
-        return Err("Misty doesn't know this model call.".into());
-    }
-    let running = super::ensure(&app).await?;
-    let answered = super::contained(async move { running.calls.device_call(&name, &body).await });
-    Ok(match answered.await? {
-        Ok(body) => CallReply { status: 200, body },
-        Err(failure) => CallReply {
-            status: failure.status,
-            body: failure.body,
-        },
-    })
-}
 
 /// One recording a Tutor notebook took as a source: who said what, as text.
 #[derive(Serialize)]
@@ -46,7 +13,7 @@ pub struct TranscribedSource {
     error: Option<String>,
 }
 
-/// Soniox reads a file of at most this many bytes in one call; the body carries it as base64.
+/// The largest recording read as a source.
 const MAX_MEDIA_BYTES: u64 = 28 << 20;
 
 fn media_type(path: &std::path::Path) -> Option<&'static str> {
@@ -66,36 +33,15 @@ fn media_type(path: &std::path::Path) -> Option<&'static str> {
     })
 }
 
-/// "Who: words" lines from the diarized call's turns, or its plain text when it found no speakers.
-fn transcript_text(body: &Value) -> String {
-    let turns = body.get("turns").and_then(Value::as_array);
-    match turns.filter(|turns| turns.len() > 1) {
-        Some(turns) => turns
-            .iter()
-            .filter_map(|turn| {
-                let text = turn.get("text")?.as_str()?.trim();
-                let speaker = turn.get("speaker").and_then(Value::as_str).unwrap_or("?");
-                (!text.is_empty()).then(|| format!("Speaker {speaker}: {text}"))
-            })
-            .collect::<Vec<_>>()
-            .join("\n"),
-        None => body
-            .get("text")
-            .and_then(Value::as_str)
-            .unwrap_or("")
-            .trim()
-            .to_owned(),
-    }
-}
-
 /// Tutor's audio and video sources: the person picks recordings in the system dialog, and each is
-/// transcribed with speakers on this device's Soniox key. The window never names a path.
+/// transcribed by this computer's own speech recognition (no key; speakers aren't told apart).
+/// The window never names a path. `language` is the one chosen in Settings › Voice.
 #[tauri::command]
 pub async fn tutor_transcribe_sources(
     app: tauri::AppHandle,
     webview: tauri::Webview,
+    language: Option<String>,
 ) -> Result<Vec<TranscribedSource>, String> {
-    use base64::Engine;
     use tauri_plugin_dialog::DialogExt;
     if !crate::browser::app_windows::is_person_window(webview.label()) {
         return Err("Only Misty's own windows can add sources.".into());
@@ -117,7 +63,6 @@ pub async fn tutor_transcribe_sources(
     let Some(files) = receive.await.ok().flatten() else {
         return Ok(Vec::new());
     };
-    let running = super::ensure(&app).await?;
     let mut sources = Vec::new();
     for file in files.into_iter().take(10) {
         let Ok(path) = file.into_path() else { continue };
@@ -144,39 +89,21 @@ pub async fn tutor_transcribe_sources(
             ));
             continue;
         }
-        let bytes = match tokio::fs::read(&path).await {
-            Ok(bytes) => bytes,
-            Err(_) => {
-                sources.push(failed("It couldn't be read.".into()));
-                continue;
-            }
-        };
-        let body = serde_json::json!({
-            "mediaType": mime_type,
-            "audio": base64::engine::general_purpose::STANDARD.encode(bytes),
+        let file = path.to_string_lossy().into_owned();
+        let language = language.clone();
+        let heard = tokio::task::spawn_blocking(move || {
+            voice_speech::recognize_file(&file, language.as_deref())
         })
-        .to_string();
-        let calls = running.clone();
-        let answered =
-            super::contained(
-                async move { calls.calls.device_call("transcribe-diarized", &body).await },
-            )
-            .await?;
-        sources.push(match answered {
-            Ok(body) => TranscribedSource {
+        .await
+        .unwrap_or_else(|_| Err(voice_speech::reason("failed")));
+        sources.push(match heard {
+            Ok(text) => TranscribedSource {
                 name,
                 mime_type: mime_type.to_owned(),
-                text: transcript_text(&body),
+                text,
                 error: None,
             },
-            Err(failure) => failed(
-                failure
-                    .body
-                    .get("message")
-                    .and_then(Value::as_str)
-                    .unwrap_or("Soniox couldn't transcribe it. Check the key in Settings → Models.")
-                    .to_owned(),
-            ),
+            Err(error) => failed(error),
         });
     }
     Ok(sources)
@@ -205,7 +132,8 @@ fn overview_path(app: &tauri::AppHandle, id: &str) -> Result<std::path::PathBuf,
         .join(format!("{id}.wav")))
 }
 
-/// Speaks an audio overview's script on this device's speech model and key, and keeps the audio.
+/// Speaks an audio overview's script in this computer's own voices and keeps the audio: Misty
+/// holds no speech key. `voice` is the person's chosen system voice, for the first speaker.
 /// Answers how many seconds it runs.
 #[tauri::command]
 pub async fn tutor_overview_make(
@@ -213,6 +141,7 @@ pub async fn tutor_overview_make(
     webview: tauri::Webview,
     id: String,
     lines: Vec<OverviewLine>,
+    voice: Option<String>,
 ) -> Result<f64, String> {
     if !crate::browser::app_windows::is_person_window(webview.label()) {
         return Err("Only Misty's own windows can make overviews.".into());
@@ -223,41 +152,7 @@ pub async fn tutor_overview_make(
         .take(120)
         .map(|line| (line.speaker.min(1), line.text.chars().take(3000).collect()))
         .collect();
-    let spoken = match super::ensure(&app).await {
-        Ok(running) => {
-            let lines = lines.clone();
-            super::contained(async move { running.calls.speak_dialogue(&lines).await })
-                .await
-                .and_then(|result| {
-                    result.map_err(|error| {
-                        let failure = agent_runs::device::model_call_failure(&error);
-                        failure
-                            .body
-                            .get("message")
-                            .and_then(Value::as_str)
-                            .unwrap_or(
-                                "The speech model couldn't read it. Check Settings → Models.",
-                            )
-                            .to_owned()
-                    })
-                })
-        }
-        Err(error) => Err(error),
-    };
-    // With no speech key (or a model that failed), the computer's own voices read it, so an
-    // overview never needs anything bought.
-    let audio = match spoken {
-        Ok(audio) => audio,
-        Err(error) => super::system_speech::speak_dialogue(&lines)
-            .await
-            .map_err(|fallback| {
-                if speech_key_missing(&error) {
-                    fallback
-                } else {
-                    error
-                }
-            })?,
-    };
+    let audio = super::system_speech::speak_dialogue(&lines, voice.as_deref()).await?;
     if let Some(folder) = path.parent() {
         tokio::fs::create_dir_all(folder)
             .await
@@ -268,13 +163,6 @@ pub async fn tutor_overview_make(
         .await
         .map_err(|error| error.to_string())?;
     Ok(seconds)
-}
-
-/// Whether a speech call failed only because no speech model or key is set up, so the system
-/// voices' own reason is the one worth showing.
-fn speech_key_missing(error: &str) -> bool {
-    let error = error.to_ascii_lowercase();
-    error.contains("settings") || error.contains("key") || error.contains("speech model")
 }
 
 /// An overview's audio, as raw WAV bytes.

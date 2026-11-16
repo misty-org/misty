@@ -16,7 +16,7 @@ interface PageStageProps {
    */
   framed?: boolean;
   /**
-   * A page set into a SidePanel (the local preview): a 6px margin of the panel round it and its
+   * A page set into a SidePanel: a 6px margin of the panel round it and its
    * corners rounded just inside the panel's, with a neutral outline while picking. Once the page is
    * on screen the panel lets it show beneath the renderer under a menu or dialog (sidePanel.css),
    * and this margin keeps the panel's fill.
@@ -46,7 +46,7 @@ export function PageStage(props: PageStageProps) {
         props.inset &&
           cn(
             "p-1.5",
-            "has-[[data-browser-page-presented]]:shadow-[inset_0_0_0_6px_var(--color-charcoal-sidebar)]",
+            "has-[[data-browser-page-presented]]:shadow-[inset_0_0_0_0.375rem_var(--color-charcoal-sidebar)]",
           ),
       )}
     >

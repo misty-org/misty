@@ -23,6 +23,11 @@
 //! occupied" and left running. CC GUI never looks up and kills whatever
 //! listens on a port: v1.2.0 did (`netstat` + `taskkill /T /F`, `lsof` +
 //! `kill -KILL`) on every launch and took down other apps' services on 3080.
+//! The one exception is Misty's own leftover: a `dsh web` serving this very
+//! port from a `dsh` inside Misty's data root (`~/.misty`), which an earlier
+//! session started and never stopped (it quit or crashed first). Its cookie
+//! is gone with that session, so it answers 401 and would hold the port for
+//! good; [`stop_own_leftover`] stops it, and only it.
 
 use std::collections::BTreeMap;
 use std::fs::{File, OpenOptions};
@@ -680,6 +685,83 @@ fn ensure_action(probe: &ProbeOutcome, ours: bool) -> EnsureAction {
     }
 }
 
+/// Whether a process's command line is Misty's own `dsh web` serving `port`: the program is a `dsh`
+/// somewhere under Misty's data root (any build's or layout's install, such as
+/// `~/.misty/shared/engines/dsh` or the older `~/.misty/engines/dsh`), run as `web` on that port.
+fn leftover_own_dsh(command: &str, misty_root: &str, port: u16) -> bool {
+    if misty_root.is_empty() {
+        return false;
+    }
+    let Some(at) = command.find(misty_root) else {
+        return false;
+    };
+    let program = command[at..].split_whitespace().next().unwrap_or("");
+    let is_dsh = program
+        .split(['/', '\\'])
+        .any(|part| part == "dsh" || part == "dsh.js" || part == "dsh.cmd");
+    let words: Vec<&str> = command.split_whitespace().collect();
+    let port = port.to_string();
+    let serves_port = words
+        .windows(2)
+        .any(|pair| pair[0] == "--port" && pair[1] == port)
+        || words.iter().any(|word| *word == format!("--port={port}"));
+    is_dsh && words.contains(&"web") && serves_port
+}
+
+/// Stops a `dsh web` that Misty started in an earlier session and never stopped, when it is what
+/// holds `port` ([`leftover_own_dsh`]). Anything else listening there is left alone. Returns
+/// whether one was stopped.
+#[cfg(unix)]
+async fn stop_own_leftover(port: u16) -> bool {
+    let Some(root) = file_access::paths::misty_root_dir() else {
+        return false;
+    };
+    let root = root.to_string_lossy().into_owned();
+    let Ok(listening) = tokio::process::Command::new("lsof")
+        .args(["-nP", &format!("-iTCP:{port}"), "-sTCP:LISTEN", "-t"])
+        .stdin(Stdio::null())
+        .output()
+        .await
+    else {
+        return false;
+    };
+    let mut stopped = false;
+    for pid in String::from_utf8_lossy(&listening.stdout)
+        .lines()
+        .filter_map(|line| line.trim().parse::<i32>().ok())
+        .filter(|pid| *pid > 1)
+    {
+        let Ok(shown) = tokio::process::Command::new("ps")
+            .args(["-p", &pid.to_string(), "-o", "command="])
+            .stdin(Stdio::null())
+            .output()
+            .await
+        else {
+            continue;
+        };
+        let command = String::from_utf8_lossy(&shown.stdout);
+        if !leftover_own_dsh(command.trim(), &root, port) {
+            continue;
+        }
+        eprintln!("[dsh] stopping Misty's own leftover dsh web (pid {pid}) on port {port}");
+        // SAFETY: plain signals to a process (and the group it leads, as Misty spawns it) whose
+        // command line was just checked; no memory touched.
+        unsafe {
+            libc::kill(-pid, libc::SIGTERM);
+            libc::kill(pid, libc::SIGTERM);
+        }
+        stopped = true;
+    }
+    stopped
+}
+
+/// Windows lists no command lines cheaply enough to tell Misty's own leftover apart, so the port
+/// is only ever reported there.
+#[cfg(not(unix))]
+async fn stop_own_leftover(_port: u16) -> bool {
+    false
+}
+
 fn occupied_message(port: u16, detail: &str) -> String {
     format!(
         "Port {port} is in use by another program ({detail}). Misty only stops the dsh web it started itself, never other programs: close the program using the port, or choose another port in the settings."
@@ -1000,7 +1082,24 @@ pub(crate) async fn ensure_host(
     let ours = host_state.spawned_origin().as_deref() == Some(cfg.origin.as_str());
     match ensure_action(&probe_describe(&cfg.origin).await, ours) {
         EnsureAction::Adopt => return Ok(()),
-        EnsureAction::Occupied(detail) => return Err(occupied_message(cfg.port, &detail)),
+        EnsureAction::Occupied(detail) => {
+            // Misty's own dsh web from an earlier session is stopped and replaced; anything else
+            // on the port is only reported.
+            if !stop_own_leftover(cfg.port).await {
+                return Err(occupied_message(cfg.port, &detail));
+            }
+            let mut freed = false;
+            for _ in 0..10 {
+                sleep(Duration::from_millis(300)).await;
+                if matches!(probe_describe(&cfg.origin).await, ProbeOutcome::Down(_)) {
+                    freed = true;
+                    break;
+                }
+            }
+            if !freed {
+                return Err(occupied_message(cfg.port, &detail));
+            }
+        }
         EnsureAction::RestartOwn => {
             host_state.kill_spawned();
             sleep(Duration::from_millis(600)).await;
@@ -1330,6 +1429,34 @@ mod tests {
     }
 
     use super::*;
+
+    #[test]
+    fn only_mistys_own_dsh_web_on_that_port_counts_as_its_leftover() {
+        let root = "/Users/me/.misty";
+        let own = "node /Users/me/.misty/engines/dsh/node_modules/.bin/dsh web --host 127.0.0.1 --port 3080 --no-open";
+        assert!(leftover_own_dsh(own, root, 3080));
+        let shared =
+            "/Users/me/.misty/shared/engines/dsh/node_modules/.bin/dsh web --port=3080 --no-open";
+        assert!(leftover_own_dsh(shared, root, 3080));
+        // Another port, another command, another install, or another program: never.
+        assert!(!leftover_own_dsh(own, root, 3081));
+        assert!(!leftover_own_dsh(
+            "node /Users/me/.misty/engines/dsh/node_modules/.bin/dsh chat --port 3080",
+            root,
+            3080
+        ));
+        assert!(!leftover_own_dsh(
+            "node /usr/local/bin/dsh web --port 3080",
+            root,
+            3080
+        ));
+        assert!(!leftover_own_dsh(
+            "node /Users/me/.misty/apps/server.js web --port 3080",
+            root,
+            3080
+        ));
+        assert!(!leftover_own_dsh(own, "", 3080));
+    }
     use serde_json::json;
 
     #[test]

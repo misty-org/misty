@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Document, Page, pdfjs } from "react-pdf";
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
+import { uiPx } from "@/shared/lib/uiScale";
 
 // Bundle the pdf.js worker as a same-origin asset so it loads under the app's
 // strict CSP (no external script hosts). Its version is pinned to react-pdf's
@@ -41,7 +42,7 @@ export default function PdfViewerView({
     const element = scrollRef.current;
     if (!element) return;
     const update = () =>
-      setBaseWidth(Math.min(element.clientWidth - (compact ? 16 : 48), MAX_PAGE_WIDTH));
+      setBaseWidth(Math.min(element.clientWidth - uiPx(compact ? 16 : 48), uiPx(MAX_PAGE_WIDTH)));
     update();
     const observer = new ResizeObserver(update);
     observer.observe(element);

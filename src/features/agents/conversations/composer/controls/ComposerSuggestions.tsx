@@ -14,12 +14,8 @@ import { mistyEngine } from "../../../engines/enginesApi";
 import { commandIcon } from "../commands/commandIcons";
 import { catalogFor, mistyCommandsFor } from "../commands/engineCommands";
 import { matchMentionEntries, mentionIndex, prefetchMentionIndex } from "./mentionFiles";
-import {
-  matchPrompts,
-  PROMPTS_SETTINGS_SECTION,
-  promptsFor,
-} from "@/features/engine-config/prompts";
-import { openSettings, type SettingsSection } from "@/features/settings";
+import { matchPrompts, promptsFor } from "@/features/engine-config/prompts";
+import { openAgentsHub } from "../../../hub/agentsHubStore";
 import { applyTrigger, filterItems, mentionOf, triggerAt, type Trigger } from "./composerTriggers";
 import { PersonaMakeAgent, personaSuggestions } from "../../../personas/PersonaSuggestions";
 
@@ -65,7 +61,7 @@ const computerCommand: Suggestion = {
 
 const sourceLabel = { builtin: "", user: "Yours", project: "Project" } as const;
 
-/** The `!` menu's last row, which opens Settings on the prompt library. */
+/** The `!` menu's last row, which opens the prompt library in the Agents window. */
 const newPrompt: Suggestion = {
   key: "prompt:new",
   name: "New prompt",
@@ -250,7 +246,7 @@ export function useComposerSuggestions(input: {
     if (!trigger) return;
     if (item.action === "new-prompt") {
       setTrigger(undefined);
-      openSettings(PROMPTS_SETTINGS_SECTION as SettingsSection);
+      openAgentsHub("prompts");
       return;
     }
     if (item.action) input.onAction?.(item.action);

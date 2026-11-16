@@ -142,7 +142,7 @@
   :root:not(.dark) .misty-site-icon[data-tone="light"] {
     box-sizing: border-box;
     padding: 1px;
-    border-radius: 3px;
+    border-radius: 0.1875rem;
     background-color: var(--misty-theme-text-bright);
   }
 }
@@ -151,7 +151,7 @@
    never draws it. It sits outside the layers, so it shows on controls whose utilities say
    `outline-none` (Button, Pressable, a list row's open target) and needs no class of its own. */
 :focus-visible {
-  outline: 2px solid var(--misty-theme-text-muted);
+  outline: 0.125rem solid var(--misty-theme-text-muted);
   outline-offset: 1px;
 }
 /* Where focus already shows itself: the caret and edge of a field, the highlight of a menu or

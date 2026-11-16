@@ -1,14 +1,5 @@
 import { useEffect, useState } from "react";
-import {
-  ArrowLeft,
-  Check,
-  Layers,
-  ListChecks,
-  MessageSquare,
-  RotateCcw,
-  Trash2,
-  X,
-} from "lucide-react";
+import { ArrowLeft, Check, Layers, ListChecks, RotateCcw, Trash2, X } from "lucide-react";
 import { confirmAction } from "@/shared/lib/confirmAction";
 import {
   Button,
@@ -22,7 +13,8 @@ import {
   type TextTone,
 } from "@/shared/ui";
 import { MistyMarkdown } from "../runs/markdown/MistyMarkdown";
-import { deckPrompt, jobTitle, quizPrompt } from "./tutorPrompts";
+import { startLesson } from "./notebookThread";
+import { deckPrompt, jobTitle, quizPrompt, teachPrompt } from "./tutorPrompts";
 import { startJob } from "./tutorRuns";
 import { useTutorStore } from "./tutorStore";
 import type { Guide } from "./tutorTypes";
@@ -50,6 +42,9 @@ export function GuideView({
   actions: TutorActions;
   onClose(): void;
 }) {
+  const notebook = useTutorStore((state) =>
+    guide.notebookId ? state.notebooks[guide.notebookId] : undefined,
+  );
   const remove = async () => {
     if (!(await confirmAction(`Delete “${guide.title}”? This can’t be undone.`))) return;
     useTutorStore.getState().removeGuide(guide.id);
@@ -82,19 +77,21 @@ export function GuideView({
           >
             Quiz me
           </Button>
-          <Button
-            variant="quiet"
-            onClick={() => actions.onLearn(`Teach me “${guide.title}”, step by step.`)}
-          >
-            Teach me
-          </Button>
-          {guide.conversationId ? (
-            <IconButton
-              label="Open the chat that wrote it"
-              onClick={() => actions.onChat(actions.agentId, guide.conversationId!)}
+          {notebook ? (
+            // A lesson on the guide, in the notebook's own thread in the Space.
+            <Button
+              variant="quiet"
+              onClick={() => {
+                void startLesson(
+                  notebook,
+                  teachPrompt(guide.title, `The study guide “${guide.title}”:\n\n${guide.body}`),
+                  `Teach me ${guide.title}`,
+                );
+                onClose();
+              }}
             >
-              <MessageSquare />
-            </IconButton>
+              Teach me
+            </Button>
           ) : null}
           <IconButton label="Delete guide" onClick={() => void remove()}>
             <Trash2 />

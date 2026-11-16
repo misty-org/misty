@@ -1,6 +1,4 @@
-import { ExternalLink } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { openExternalLink } from "@/shared/platform/openExternalLink";
 import { BrandIcon, Button, useNotice } from "@/shared/ui";
 import { StatusRow, StatusTable, type StatusState } from "../progress/StatusTable";
 import { appsApi, type AppRequest, type AppRequestDecision } from "./api";
@@ -23,13 +21,9 @@ function stateLabel(request: AppRequest, expired: boolean) {
   }
 }
 
-// How often a Connect card checks for the finished sign-in.
-const connectPollMs = 3_000;
-
 /**
- * In-chat card for something the agent needs: connect an app or approve one action.
- * `onResolved` hears every answer, including a sign-in finished in the browser, so the
- * conversation can continue.
+ * In-chat card for something the agent needs: approve one action in a connected app.
+ * `onResolved` hears every answer, so the conversation can continue.
  */
 export function AppRequestCard({
   request,
@@ -41,7 +35,6 @@ export function AppRequestCard({
   const now = useNow();
   const [current, setCurrent] = useState(request);
   const [busy, setBusy] = useState(false);
-  const [opened, setOpened] = useState(false);
   const [error, setError] = useState("");
   useEffect(() => setCurrent(request), [request]);
   const expired = current.state === "pending" && Date.parse(current.expiresAt) <= now;
@@ -52,24 +45,6 @@ export function AppRequestCard({
     setCurrent(next);
     if (next.state !== "pending") resolved.current?.(next);
   };
-  // After sign-in opens, check until the app is connected or the card expires.
-  useEffect(() => {
-    if (!pending || current.kind !== "connect" || !opened) return;
-    let stopped = false;
-    const timer = setInterval(() => {
-      void appsApi
-        .request(current.id)
-        .then(({ request: next }) => {
-          if (!stopped && next.state !== "pending") answered(next);
-        })
-        .catch(() => undefined);
-    }, connectPollMs);
-    return () => {
-      stopped = true;
-      clearInterval(timer);
-    };
-  }, [pending, current.kind, current.id, opened]);
-
   async function act(operation: () => Promise<void>) {
     if (busy) return;
     setBusy(true);
@@ -82,17 +57,15 @@ export function AppRequestCard({
       setBusy(false);
     }
   }
-  const connect = () =>
-    act(async () => {
-      const { url } = await appsApi.requestLink(current.id);
-      await openExternalLink(url);
-      setOpened(true);
-    });
   const decide = (decision: AppRequestDecision) =>
     act(async () => answered((await appsApi.decide(current.id, decision)).request));
 
   const logo = current.subject ? (
-    <BrandIcon brand={current.subject} size={16} className="mr-1.5 inline-block align-[-3px]" />
+    <BrandIcon
+      brand={current.subject}
+      size={16}
+      className="mr-1.5 inline-block align-[-0.1875rem]"
+    />
   ) : null;
   const row: StatusState = pending
     ? "waiting"
@@ -102,15 +75,11 @@ export function AppRequestCard({
         ? "skipped"
         : "failed";
   const actions = pending ? (
+    // A Connect card from before apps were only connected directly can only be put aside.
     current.kind === "connect" ? (
-      <>
-        <Button variant="primary" disabled={busy} onClick={() => void connect()}>
-          <ExternalLink /> {opened ? "Open sign-in again" : "Connect"}
-        </Button>
-        <Button variant="quiet" disabled={busy} onClick={() => void decide("deny")}>
-          Not now
-        </Button>
-      </>
+      <Button variant="quiet" disabled={busy} onClick={() => void decide("deny")}>
+        Not now
+      </Button>
     ) : (
       <ApprovalActions
         request={current}
@@ -127,16 +96,15 @@ export function AppRequestCard({
           state={row}
           verb={pending ? "Waiting for you" : stateLabel(current, expired)}
           sub={
-            (pending && current.kind === "connect" && opened
-              ? "Finish signing in in your browser. Misty continues when you’re done."
-              : current.summary && (
-                  <span
-                    className="mt-1.5 block max-h-64 overflow-auto whitespace-pre-wrap [overflow-wrap:anywhere]"
-                    tabIndex={0}
-                  >
-                    {current.summary}
-                  </span>
-                )) || undefined
+            (current.summary && (
+              <span
+                className="mt-1.5 block max-h-64 overflow-auto whitespace-pre-wrap [overflow-wrap:anywhere]"
+                tabIndex={0}
+              >
+                {current.summary}
+              </span>
+            )) ||
+            undefined
           }
         >
           {logo}

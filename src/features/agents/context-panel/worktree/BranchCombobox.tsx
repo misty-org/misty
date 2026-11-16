@@ -11,11 +11,12 @@ import {
   Pressable,
   Text,
   Tooltip,
+  rowShape,
 } from "@/shared/ui";
 import type { BranchInfo } from "./worktreeApi";
 
 /** A branch row: the check column, the name, then where it lives or why it can't be picked. */
-const rowClass = "flex h-7.5 min-w-0 items-center gap-2 rounded-md px-2 text-meta";
+const rowClass = cn(rowShape, "text-meta");
 
 /** A branch picker with a search field, like the changes panel's. `blocked` names show as
  * disabled rows with the reason, never as buttons that do nothing. */

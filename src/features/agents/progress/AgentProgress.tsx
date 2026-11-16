@@ -46,7 +46,7 @@ import { countEditLines } from "./payload/editLineStats";
 import { hasToolPayload, ToolPayloadViewer } from "./payload/ToolPayloadViewer";
 
 /** Each kind of step's icon: what the step is, never a generic sparkle. */
-const kindIcons: Record<ToolKind, LucideIcon> = {
+export const kindIcons: Record<ToolKind, LucideIcon> = {
   command: SquareTerminal,
   read: FileText,
   search: Search,
@@ -69,9 +69,8 @@ type Entry =
 
 /**
  * How a reply got its answer, after OpenChamber's turn: the first thing Misty said (its plan)
- * stays in view, then the turn's one line. While the run is live the line names what it is doing
- * now and opens on the latest steps; once it ends it folds to what it did ("Read 3 files · ran 2
- * commands"). Opened, it lists every step in order as one quiet row each, with what Misty wrote
+ * stays in view, then its steps. While the run is live they show as rows, the latest ones in view;
+ * once it ends they fold to one line of what it did ("Read 3 files · ran 2 commands"). Opened, it lists every step in order as one quiet row each, with what Misty wrote
  * between them; a step with output opens under its row. The answer itself follows below.
  */
 export function AgentProgress({ items, live = true }: { items: AiProgressItem[]; live?: boolean }) {
@@ -139,51 +138,52 @@ function Turn({
   const [chosen, setChosen] = useState<boolean>();
   const [all, setAll] = useState(false);
   const listId = useId();
-  // Open while the run works, unless the person folded it; folded once it ends.
-  const open = chosen ?? live;
+  // Folded once the turn ends, unless the person opened it.
+  const open = chosen ?? false;
   const hidden = live && !all ? Math.max(0, entries.length - LIVE_ROWS) : 0;
   const shown = hidden ? entries.slice(-LIVE_ROWS) : entries;
-  const running = [...tools].reverse().find((tool) => tool.state === "running");
-  const summary = live
-    ? running
-      ? `${toolParts(running.name, true).verb} ${stepTarget(running)}`.trim()
-      : "Working"
-    : turnSummary(tools);
+  const rows = (
+    <ToolList id={live ? listId : undefined} label="Steps">
+      {shown.map((entry) =>
+        entry.type === "note" ? (
+          <li key={entry.key}>
+            <ToolNote>
+              <MistyMarkdown>{entry.text}</MistyMarkdown>
+            </ToolNote>
+          </li>
+        ) : (
+          <Step key={entry.key} step={entry.step} />
+        ),
+      )}
+    </ToolList>
+  );
+  // A live turn lists its steps as they run, as OpenChamber does: no line over them repeating
+  // the running step (the status above the composer says it). Earlier steps wait behind one line.
+  if (live)
+    return (
+      <div className="agent-turn">
+        {hidden ? (
+          <TurnFold
+            summary="Earlier steps"
+            open={false}
+            more={hidden}
+            controls={listId}
+            onToggle={() => setAll(true)}
+          />
+        ) : null}
+        {rows}
+      </div>
+    );
   return (
     <div className="agent-turn">
       <TurnFold
-        summary={summary}
-        live={live}
+        summary={turnSummary(tools)}
         open={open}
-        more={open ? hidden : undefined}
         controls={listId}
-        onToggle={() => {
-          // Open with earlier steps hidden, the line shows them all before it folds.
-          if (open && hidden) setAll(true);
-          else setChosen(!open);
-        }}
+        onToggle={() => setChosen(!open)}
       />
-      <Fold
-        id={listId}
-        open={open}
-        onReveal={() => {
-          setChosen(true);
-          setAll(true);
-        }}
-      >
-        <ToolList label="Steps">
-          {shown.map((entry) =>
-            entry.type === "note" ? (
-              <li key={entry.key}>
-                <ToolNote>
-                  <MistyMarkdown>{entry.text}</MistyMarkdown>
-                </ToolNote>
-              </li>
-            ) : (
-              <Step key={entry.key} step={entry.step} />
-            ),
-          )}
-        </ToolList>
+      <Fold id={listId} open={open} onReveal={() => setChosen(true)}>
+        {rows}
       </Fold>
     </div>
   );

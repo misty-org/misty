@@ -27,6 +27,7 @@ import {
   type EngineSession,
 } from "./engineHistory";
 import { agentForPastChat, pastChatRoute } from "./pastChats";
+import { syncEngineSession } from "./engineSessionImport";
 
 /** Before the first read: two folders' heads (name and path), each over its chats. */
 const historySkeleton = (
@@ -113,6 +114,7 @@ export function EngineHistoryDialog(props: {
       const there = { ...chat, workspacePath: chosen.folder };
       if (chosen.agentId === props.agentId && props.conversationId) {
         await resumeEngineSession(props.conversationId, there);
+        await syncEngineSession(props.conversationId, there).catch(() => undefined);
         props.onResumed?.();
         return;
       }

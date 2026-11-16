@@ -90,7 +90,7 @@ export function NoteReadingPaneView(
       <div
         className={cn(
           "grid min-h-0 overflow-hidden",
-          inspector ? "grid-cols-[minmax(0,1fr)_minmax(300px,380px)]" : "grid-cols-1",
+          inspector ? "grid-cols-[minmax(0,1fr)_minmax(18.75rem,23.75rem)]" : "grid-cols-1",
         )}
       >
         <div className={cn("misty-scrollbar min-h-0 overflow-auto overscroll-contain", false)}>

@@ -48,6 +48,7 @@ mod minimax;
 mod opencode;
 mod pi;
 mod qoder;
+pub(crate) mod usable;
 
 pub(crate) use acp::{acp_modes, acp_thought_levels};
 
@@ -395,8 +396,20 @@ async fn codex_catalog() -> EngineCatalog {
                     model.context_window = Some(window);
                 }
             }
-            return EngineCatalog::authoritative(with_default_first(models, configured))
-                .with_details(details);
+            // Only the models Codex lists for the account: a config `model` it doesn't list
+            // can't run on it (`usable.rs`). One on a provider of the person's own
+            // (`model_provider`) is theirs, so it still leads the list.
+            let own_provider =
+                configured.is_some() && usable::configured_default("codex").is_none();
+            let models = if own_provider {
+                with_default_first(models, configured)
+            } else {
+                models
+            };
+            return usable::settle(
+                "codex",
+                EngineCatalog::authoritative(models).with_details(details),
+            );
         }
     }
     EngineCatalog::authoritative(codex::codex_config_model().into_iter().collect())
@@ -455,17 +468,21 @@ async fn pi_family_catalog(engine: &str) -> EngineCatalog {
     let configured = pi::configured_models(engine).unwrap_or_default();
     if let Ok((models, details)) = pi::run_models_json(&bin).await {
         if !models.is_empty() {
-            return EngineCatalog::authoritative(pi::merge_configured_models(models, configured))
-                .with_details(details);
+            return usable::settle(
+                engine,
+                EngineCatalog::authoritative(pi::merge_configured_models(models, configured))
+                    .with_details(details),
+            );
         }
     }
     // Fresh binaries skip extension boot; old ones fall back to a bare run.
     for extra in [&["--no-extensions"][..], &[][..]] {
         if let Ok(models) = pi::run_list_models(&bin, extra).await {
             if !models.is_empty() {
-                return EngineCatalog::authoritative(pi::merge_configured_models(
-                    models, configured,
-                ));
+                return usable::settle(
+                    engine,
+                    EngineCatalog::authoritative(pi::merge_configured_models(models, configured)),
+                );
             }
         }
     }

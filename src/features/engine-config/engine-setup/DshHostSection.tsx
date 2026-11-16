@@ -3,7 +3,7 @@
 // See NOTICE.
 
 /**
- * DeepSeek Harness in Settings › Channels: its local host, `dsh web`, and how Misty reaches it.
+ * DeepSeek Harness in Agents › Channels: its local host, `dsh web`, and how Misty reaches it.
  * A host already running on the address is adopted; otherwise Misty can start one, now or with
  * the app. Its providers and keys live in the host's own web page, not here. Probes run when the
  * page opens and when asked, never on a timer: the host has no push channel.

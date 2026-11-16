@@ -3,6 +3,7 @@ import { useAuth } from "@/features/account";
 import { useEffect, useRef } from "react";
 import { useSpacesStore } from "./list/useSpacesStore";
 import { SpaceAgentsBroadcast } from "./list/SpaceAgentsBroadcast";
+import { SpaceStudioPeople } from "./list/SpaceStudioPeople";
 
 let pendingRealtimeDisconnectTimer: number | null = null;
 
@@ -68,7 +69,12 @@ export function SpacesRealtimeBridge() {
     return () => window.clearTimeout(timeout);
   }, [accountId, clearError, error, loading, snapshotReady, transitioning, user]);
 
-  return accountId && !transitioning ? <SpaceAgentsBroadcast /> : null;
+  return accountId && !transitioning ? (
+    <>
+      <SpaceAgentsBroadcast />
+      <SpaceStudioPeople />
+    </>
+  ) : null;
 }
 
 function isAccountSwitchError(message: string): boolean {

@@ -3,6 +3,7 @@ import * as React from "react";
 
 import { cn } from "../classNames";
 import { controlFrame } from "./controlFrame";
+import { useCompactControls } from "./RowContext";
 import { Spinner } from "../feedback/Spinner";
 
 /**
@@ -55,6 +56,11 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
    * cut (an `OverflowFadeText` label), as a breadcrumb's folder does.
    */
   shrink?: boolean;
+  /**
+   * Hugs a picture at its start (a Space's mark, a person's face), as a breadcrumb's place does:
+   * the picture sits near the button's edge, so the button's edge lines up with the page's gutter.
+   */
+  snug?: boolean;
   /** Styles its one child instead, such as a router Link. */
   asChild?: boolean;
   /** Defaults to "button": a form's submit button says `type="submit"`. */
@@ -128,6 +134,13 @@ const sizeClass: Record<ButtonSize, string> = {
   ),
 };
 
+// A snug button's picture sits close to its edges, the label a little further in.
+const snugClass: Record<ButtonSize, string> = {
+  sm: "pr-1.5 has-data-[icon=inline-start]:pl-0.5",
+  md: "pr-2 has-data-[icon=inline-start]:pl-1",
+  lg: "pr-3 has-data-[icon=inline-start]:pl-1.5",
+};
+
 const justifyClass: Record<ButtonJustify, string> = {
   center: "justify-center",
   start: "justify-start",
@@ -178,6 +191,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       caption,
       loading = false,
       shrink = false,
+      snug = false,
       asChild = false,
       children,
       onClick,
@@ -188,7 +202,9 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ) => {
     const Comp = asChild ? Slot : "button";
     const resolvedVariant = variant ?? "secondary";
-    const resolvedSize = size ?? "md";
+    // A compact bar (the bottom bar) makes its buttons 24px, whatever the feature passed.
+    const compact = useCompactControls();
+    const resolvedSize = compact ? "sm" : (size ?? "md");
     const resolvedJustify = justify ?? "center";
     const start = loading ? (
       <Spinner label={false} data-icon="inline-start" />
@@ -210,6 +226,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
           cn(
             caption != null && "h-12 min-w-24 flex-col gap-0",
             shrink && "min-w-0 shrink",
+            snug && snugClass[resolvedSize],
             className,
           ),
         )}

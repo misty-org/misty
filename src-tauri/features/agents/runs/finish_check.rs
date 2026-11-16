@@ -20,7 +20,7 @@ static REQUESTED_ACTION: LazyLock<Regex> = LazyLock::new(|| js_regex(r"\b(draft|
 static CLAIMED_ACTION: LazyLock<Regex> = LazyLock::new(|| js_regex(r"\bI(?:'ve| have)?\s+(created|drafted|saved|posted|sent|scheduled|booked|added|filed|opened|made|put|labeled|invited|replied)\b", true));
 /// The request naming where the thing belongs, so text in the answer can't stand in for it.
 static NAMED_PLACE: LazyLock<Regex> = LazyLock::new(|| js_regex(r"\b(gmail|e-?mail|inbox|slack|channel|github|issue|calendar|linkedin|notion|drive|jira|linear)\b", true));
-/// Composio actions that only read.
+/// App actions that only read.
 static READ_ACTION: LazyLock<Regex> = LazyLock::new(|| js_regex(r"_(FETCH|LIST|GET|SEARCH|FIND|READ|QUERY|RETRIEVE|DOWNLOAD|CHECK|LOOKUP|DESCRIBE|COUNT)(_|$)", false));
 /// Bookkeeping tools that change nothing the person asked for.
 static BOOKKEEPING: LazyLock<Regex> = LazyLock::new(|| js_regex(r"^(log_work_|agent_|memory_)", false));
@@ -28,7 +28,7 @@ static BOOKKEEPING: LazyLock<Regex> = LazyLock::new(|| js_regex(r"^(log_work_|ag
 /// Whether a tool only reads, from the catalog.
 pub(crate) type ReadOnly<'a> = &'a (dyn Fn(&str) -> bool + Sync);
 
-/// Whether a call changed something: a non-read Composio action, or a tool the catalog marks as a
+/// Whether a call changed something: a non-read app action, or a tool the catalog marks as a
 /// write.
 pub(crate) fn is_write(tool_name: &str, input: &RawJson, read_only: ReadOnly) -> bool {
     if BOOKKEEPING.is_match(tool_name) {
@@ -150,7 +150,7 @@ mod tests {
     }
 
     #[test]
-    fn tells_reads_from_writes_including_composio_actions() {
+    fn tells_reads_from_writes_including_app_actions() {
         assert!(!is_write("integration_execute", &raw(r#"{"tool_slug":"GMAIL_FETCH_EMAILS"}"#), &read_only));
         assert!(is_write("integration_execute", &raw(r#"{"tool_slug":"GMAIL_CREATE_EMAIL_DRAFT"}"#), &read_only));
         assert!(is_write("task_create", &raw("{}"), &read_only));

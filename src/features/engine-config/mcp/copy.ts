@@ -2,7 +2,7 @@
 // See NOTICE.
 
 /**
- * The words of Settings › Tools › MCP servers, from desktop-cc-gui's English strings. Kept in one
+ * The words of Agents › MCP servers, from desktop-cc-gui's English strings. Kept in one
  * place so the settings block and the dialogs say the same thing.
  */
 import type { McpConfigEntry, McpConfigSource, McpRuntimeStatus } from "./types";

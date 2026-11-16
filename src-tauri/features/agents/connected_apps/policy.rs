@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 
-use super::{api::ToolInfo, client::truncate};
+use super::{api::ToolInfo, text::truncate};
 use crate::agents::run_control::tool_question::{shown_fields, MAX_SHOWN};
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize)]
@@ -75,7 +75,7 @@ const PAYMENT: &[&str] = &[
     "REFUND", "CAPTURE",
 ];
 
-/// Composio's behavior tags first, then the action the slug names. It classifies a tool, never the
+/// The tool's behavior tags first, then the action the slug names. It classifies a tool, never the
 /// person's request.
 pub fn classify(slug: &str, tags: &[String]) -> Kind {
     let tagged = |tag: &str| tags.iter().any(|item| item == tag);

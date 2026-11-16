@@ -1,14 +1,10 @@
-import { embedOnDevice, queryVector } from "@/api/runtime/device-embeddings";
-import { localChats } from "../conversations/state/localChats";
 import { notebookContext, passagesContext } from "./tutorPrompts";
 import { useTutorStore } from "./tutorStore";
 import type { Notebook } from "./tutorTypes";
 
 /**
- * Search across every notebook. With an embedding model on this computer it searches by meaning:
- * each notebook's sources and notes are cut into passages, embedded on the device, and the vectors
- * kept in misty.db beside the notebook, so only new or changed passages are embedded again.
- * Without one it matches words.
+ * Search across every notebook, by words: each notebook's sources and notes are cut into passages
+ * and matched against what was asked. Misty holds no embedding model of its own.
  */
 
 interface Passage {
@@ -18,17 +14,6 @@ interface Passage {
   itemId: string;
   title: string;
   text: string;
-}
-
-interface Indexed extends Passage {
-  hash: string;
-  vector: number[];
-}
-
-interface NotebookIndex {
-  id: string;
-  model: string;
-  passages: Indexed[];
 }
 
 export interface SearchHit extends Passage {
@@ -104,37 +89,6 @@ export function cosine(a: number[], b: number[]): number {
   return left && right ? dot / Math.sqrt(left * right) : 0;
 }
 
-/** The notebook's passages with vectors from `model`, embedding only the ones it lacks. */
-async function indexOf(account: string, notebook: Notebook, model: string): Promise<Indexed[]> {
-  const saved = (
-    await localChats.tutor<NotebookIndex>(account, "tutor_index").catch(() => [])
-  ).find((index) => index.id === notebook.id);
-  const known = new Map(
-    (saved?.model === model ? saved.passages : []).map((passage) => [passage.hash, passage.vector]),
-  );
-  const passages = notebookPassages(notebook).map((passage) => ({
-    ...passage,
-    hash: hashOf(passage.text),
-  }));
-  const missing = passages.filter((passage) => !known.has(passage.hash));
-  for (let at = 0; at < missing.length; at += 32) {
-    const batch = missing.slice(at, at + 32);
-    const { embeddings } = await embedOnDevice(batch.map((passage) => passage.text));
-    batch.forEach((passage, index) => {
-      if (embeddings[index]) known.set(passage.hash, embeddings[index]);
-    });
-  }
-  const indexed = passages.flatMap((passage) => {
-    const vector = known.get(passage.hash);
-    return vector ? [{ ...passage, vector }] : [];
-  });
-  if (missing.length || !saved || saved.passages.length !== indexed.length) {
-    const index: NotebookIndex = { id: notebook.id, model, passages: indexed };
-    await localChats.saveTutor(account, "tutor_index", index).catch(() => undefined);
-  }
-  return indexed;
-}
-
 function wordSearch(query: string, notebooks: Notebook[]): SearchHit[] {
   const words = query
     .toLowerCase()
@@ -151,30 +105,13 @@ function wordSearch(query: string, notebooks: Notebook[]): SearchHit[] {
     .filter((hit) => hit.score > 0);
 }
 
-/** The best passages across all notebooks, and whether they were found by meaning. */
+/** The best passages across all notebooks. `byMeaning` is always false: matching is by words. */
 export async function searchNotebooks(
   query: string,
   signal?: AbortSignal,
 ): Promise<{ hits: SearchHit[]; byMeaning: boolean }> {
-  const { accountId, notebooks } = useTutorStore.getState();
-  const all = Object.values(notebooks);
-  const found = await queryVector(query, signal);
-  let hits: SearchHit[];
-  let byMeaning = false;
-  if (found) {
-    try {
-      const indexed = (
-        await Promise.all(all.map((notebook) => indexOf(accountId, notebook, found.model)))
-      ).flat();
-      hits = indexed.map(({ vector, hash: _hash, ...passage }) => ({
-        ...passage,
-        score: cosine(found.vector, vector),
-      }));
-      byMeaning = true;
-    } catch {
-      hits = wordSearch(query, all);
-    }
-  } else hits = wordSearch(query, all);
+  const all = Object.values(useTutorStore.getState().notebooks);
+  const hits = wordSearch(query, all);
   signal?.throwIfAborted();
   // One hit per item: its best passage.
   const best = new Map<string, SearchHit>();
@@ -182,7 +119,7 @@ export async function searchNotebooks(
     const key = `${hit.notebookId}:${hit.itemId}`;
     if (!best.has(key)) best.set(key, hit);
   }
-  return { hits: [...best.values()].slice(0, 12), byMeaning };
+  return { hits: [...best.values()].slice(0, 12), byMeaning: false };
 }
 
 /** Under this, a question sends every included source whole; over it, only the passages it needs. */
@@ -190,7 +127,7 @@ const wholeLimit = 60_000;
 
 /**
  * The sources a question about a notebook sends: all of them when they fit, otherwise the twelve
- * passages that bear on it most, by meaning when there is an embedding model, by words otherwise.
+ * passages that share the most words with it.
  */
 export async function questionContext(notebook: Notebook, question: string): Promise<string> {
   const whole = notebookContext(notebook);
@@ -200,23 +137,7 @@ export async function questionContext(notebook: Notebook, question: string): Pro
     sources: notebook.sources.filter((source) => source.context !== "off"),
     notes: [],
   };
-  const keep = new Set(included.sources.map((source) => source.id));
-  let ranked: SearchHit[] = [];
-  const found = await queryVector(question);
-  if (found) {
-    try {
-      const { accountId } = useTutorStore.getState();
-      ranked = (await indexOf(accountId, notebook, found.model))
-        .filter((passage) => passage.kind === "source" && keep.has(passage.itemId))
-        .map(({ vector, hash: _hash, ...passage }) => ({
-          ...passage,
-          score: cosine(found.vector, vector),
-        }));
-    } catch {
-      ranked = [];
-    }
-  }
-  if (!ranked.length) ranked = wordSearch(question, [included]);
+  const ranked = wordSearch(question, [included]);
   const top = ranked.sort((a, b) => b.score - a.score).slice(0, 12);
   return passagesContext(notebook, top);
 }

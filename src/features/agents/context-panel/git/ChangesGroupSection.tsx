@@ -15,7 +15,9 @@ import { Checkbox, Pressable, Surface, Text } from "@/shared/ui";
 import { buildGitTree, flattenGitTree } from "./git-tree";
 import type { GitFileEntry, GitStatus } from "./gitApi";
 import { DirectoryRow, FileRow } from "./GitTreeRow";
+import { uiPx } from "@/shared/lib/uiScale";
 
+/** A row's height in design pixels; uiPx gives the CSS pixels the virtualizer places rows by. */
 const ROW_HEIGHT = 32;
 
 /** A group's text action (Stage all, Discard all) in its sticky head. */
@@ -141,7 +143,7 @@ export const GroupSection = memo(function GroupSection(props: GroupSectionProps)
   const virtualizer = useVirtualizer({
     count: itemCount,
     getScrollElement: () => scrollElement,
-    estimateSize: () => ROW_HEIGHT,
+    estimateSize: () => uiPx(ROW_HEIGHT),
     getItemKey,
     overscan: 5,
     scrollMargin,
@@ -156,8 +158,8 @@ export const GroupSection = memo(function GroupSection(props: GroupSectionProps)
     : Array.from({ length: itemCount }, (_, index) => ({
         key: getItemKey(index),
         index,
-        start: index * ROW_HEIGHT + scrollMargin,
-        size: ROW_HEIGHT,
+        start: index * uiPx(ROW_HEIGHT) + scrollMargin,
+        size: uiPx(ROW_HEIGHT),
       }));
 
   return (
@@ -217,7 +219,7 @@ export const GroupSection = memo(function GroupSection(props: GroupSectionProps)
         </Text>
       </Surface>
       {open ? (
-        <ul ref={listRef} className="relative" style={{ height: itemCount * ROW_HEIGHT }}>
+        <ul ref={listRef} className="relative" style={{ height: itemCount * uiPx(ROW_HEIGHT) }}>
           {rows.map((row) => {
             const style = {
               position: "absolute" as const,

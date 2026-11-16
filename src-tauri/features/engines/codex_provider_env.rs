@@ -6,7 +6,9 @@
 //! `model_providers.*.env_key`; resolve only those validated names and inject
 //! missing values into the Codex child process.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap};
+use std::sync::{LazyLock, Mutex};
+use std::time::{Duration, Instant};
 
 use tokio::process::Command;
 
@@ -34,16 +36,51 @@ pub(crate) async fn apply(command: &mut Command) {
     if missing.is_empty() {
         return;
     }
-    let Some(probe) = login_probe() else {
-        return;
-    };
-    let Some(resolved) = resolve_from_shell(&probe, &missing).await else {
-        return;
-    };
-    for (key, value) in resolved {
-        command.env(key, value);
+    // Misty: what the login shell said, for a while. Asking it starts an interactive login
+    // shell, which took up to its five-second limit before every Codex message; a variable the
+    // shell doesn't have is remembered too, so it isn't asked again each time.
+    let mut known = HashMap::new();
+    let mut unknown = Vec::new();
+    {
+        let mut cache = CACHE.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        cache.retain(|_, (at, _)| at.elapsed() < CACHE_TTL);
+        for key in missing {
+            match cache.get(&key) {
+                Some((_, value)) => {
+                    known.insert(key, value.clone());
+                }
+                None => unknown.push(key),
+            }
+        }
+    }
+    if !unknown.is_empty() {
+        let Some(probe) = login_probe() else {
+            return;
+        };
+        if let Some(resolved) = resolve_from_shell(&probe, &unknown).await {
+            let now = Instant::now();
+            let mut cache = CACHE.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+            for key in unknown {
+                let value = resolved.get(&key).cloned();
+                cache.insert(key.clone(), (now, value.clone()));
+                known.insert(key, value);
+            }
+        }
+    }
+    for (key, value) in known {
+        if let Some(value) = value {
+            command.env(key, value);
+        }
     }
 }
+
+/// As long as a warm process keeps what it was started with (`warm.rs`).
+const CACHE_TTL: Duration = super::registry::WARM_IDLE;
+
+/// The login shell's answer per variable name: its value, or None when it has none. In memory
+/// only, never written or logged.
+static CACHE: LazyLock<Mutex<HashMap<String, (Instant, Option<String>)>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
 
 fn collect_env_keys(contents: &str) -> BTreeSet<String> {
     let Ok(value) = toml::from_str::<toml::Value>(contents) else {

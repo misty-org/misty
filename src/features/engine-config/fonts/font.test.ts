@@ -30,7 +30,7 @@ describe("fonts", () => {
 
   it("keeps Misty's stacks after a chosen family", () => {
     expect(uiFontStack("")).toBeNull();
-    expect(uiFontStack("Inter")).toMatch(/^Inter, -apple-system/);
+    expect(uiFontStack("Inter")).toMatch(/^Inter, "Inter Variable", -apple-system/);
     expect(codeFontStack("custom")).toBe(
       `${JSON.stringify(CUSTOM_CODE_FONT_FAMILY)}, ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace`,
     );

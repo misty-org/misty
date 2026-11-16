@@ -71,7 +71,7 @@ export function pageHost(state: ProgramState) {
     // The tab's record follows the page, so tabs lists and the finish check see where it is now.
     const page = (output.page ?? output) as { url?: unknown; title?: unknown };
     // Google answers searches from busy agents with a robot check. It is never solved: the run's
-    // web_search tool (on the device's search key) gives the same results, and their pages open directly.
+    // engine's own web search gives the same results, and their pages open directly.
     if (
       typeof page.url === "string" &&
       /^https:\/\/(www\.)?google\.[a-z.]+\/sorry\//.test(page.url)

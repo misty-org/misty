@@ -72,6 +72,7 @@ pub mod slash;
 pub mod store;
 pub mod support;
 pub mod turn;
+mod warm;
 
 pub(crate) use resolve::command_for_binary;
 
@@ -257,6 +258,12 @@ pub trait Engine: Send + Sync {
     fn supports_mcp(&self) -> bool {
         false
     }
+    /// Whether the engine's CLI brings its own web search, which Misty's own work (finding
+    /// sources, news) relies on, since Misty holds no search key. Declared by each adapter from
+    /// the tools its CLI ships; no engine reports it.
+    fn supports_web_search(&self) -> bool {
+        false
+    }
     /// Whether this engine supports reasoning effort configuration.
     fn supports_effort(&self) -> bool {
         false
@@ -408,6 +415,8 @@ pub struct EngineInfo {
     pub supports_mcp: bool,
     /// Whether this engine supports reasoning effort configuration.
     pub supports_effort: bool,
+    /// Whether the engine's CLI brings its own web search.
+    pub supports_web_search: bool,
     /// The engine's own modes offered here (id, label and kind), in its own order, for the
     /// composer's mode menu. What each one passes to the engine is decided in native code.
     pub modes: Vec<modes::NamedMode>,
@@ -519,6 +528,7 @@ fn list_engines_blocking() -> Vec<(EngineInfo, String)> {
                 supports_images: engine.supports_images(),
                 supports_mcp: engine.supports_mcp(),
                 supports_effort: engine.supports_effort(),
+                supports_web_search: engine.supports_web_search(),
                 modes: modes::named(engine.as_ref()),
                 plan: engine.plan_approval(),
             };
@@ -696,6 +706,7 @@ pub async fn shutdown() {
     runs::stop_all();
     if let Some(state) = support::state() {
         state.processes.kill_all();
+        warm::shutdown();
         state.opencode_server.kill_spawned();
         state.dsh_host.kill_spawned();
     }
@@ -729,6 +740,8 @@ fn ensure_plan_approval(
 /// Resolved launch parameters for one send: request, binary, built command.
 struct Launch {
     comparison_model: Option<Option<String>>,
+    /// Which channel the launch runs on, for telling launches apart (`warm::fingerprint`).
+    channel: u64,
     req: SendRequest,
     bin: String,
     built: BuiltCommand,
@@ -902,8 +915,15 @@ fn prepare_launch(
             &req.workspace,
         )
     });
+    let channel = {
+        use std::hash::{Hash, Hasher};
+        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        provider.as_ref().map(Value::to_string).hash(&mut hasher);
+        hasher.finish()
+    };
     Ok(Launch {
         comparison_model,
+        channel,
         req,
         bin,
         built,
@@ -986,6 +1006,10 @@ pub async fn send_message_inner(
 pub struct LaunchExtras {
     pub args: Vec<String>,
     pub key: Vec<String>,
+    /// A chat turn whose session the chat's next message resumes: the engine's process stays
+    /// warm after the turn (`warm.rs`, and Claude Code's follow-up parking), so that message
+    /// skips the CLI's start-up, handshake and session load.
+    pub warm: bool,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -1008,18 +1032,32 @@ async fn send_message_inner_with_sink(
     allowed_tools: Option<Vec<String>>,
     extras: LaunchExtras,
 ) -> Result<SendResult, String> {
+    // A chat that names no model runs the engine's own pick, unless its config names one the
+    // account can't run: then the first model the engine lists for it (`models/usable.rs`). A
+    // provider channel runs models of its own, so it is left as it is.
+    let model = match model.filter(|model| !model.trim().is_empty()) {
+        Some(model) => Some(model),
+        None if provider_id.is_none() => models::usable::model_for_run(&engine).await,
+        None => None,
+    };
     // A claude process may still be alive for a background task's follow-up
     // turn on this very session. A new process would stop that task, so the
     // prompt goes into the live one instead; the bridge shows its events under
     // this send's run id (`bridge::redirect`). Chat sends only.
-    let followup =
-        (engine == "claude" && Arc::ptr_eq(&sink, &state.sink)).then(|| registry::FollowupPrefs {
+    // Misty: a chat's Claude Code or CodeBuddy process also stays warm after a plain turn
+    // (`FollowupPrefs::warm`), and the chat's next message goes into it the same way. Both take
+    // the same stream-json user frame.
+    let followup = (matches!(engine.as_str(), "claude" | "codebuddy")
+        && Arc::ptr_eq(&sink, &state.sink))
+    .then(|| registry::FollowupPrefs {
             model: model.clone(),
             effort: effort.clone(),
             permission: permission.clone(),
             provider_id: provider_id.clone(),
             allowed_tools: allowed_tools.clone(),
             launch: extras.key.clone(),
+            dirs: launch_dirs(state, run_id.as_deref()),
+            warm: extras.warm,
         });
     if let Some(prefs) = followup.as_ref() {
         let workspace = PathBuf::from(&workspace_path);
@@ -1107,6 +1145,7 @@ async fn send_message_inner_with_sink(
         allowed_tools,
         extras.args,
         followup,
+        extras.warm.then_some(extras.key),
     )
     .await;
     if result.is_err() {
@@ -1114,6 +1153,21 @@ async fn send_message_inner_with_sink(
     }
     result
 }
+/// Every user-granted directory rides along as a launch argument, so a grant approved
+/// mid-conversation takes effect on the next launch; a warm process launched without it isn't
+/// reused (`FollowupPrefs::dirs`, `warm::fingerprint`).
+fn launch_dirs(state: &crate::engines::support::EngineState, run_id: Option<&str>) -> Vec<String> {
+    let mut dirs = state.db.granted_roots().unwrap_or_default();
+    // The documents attached to this turn, so the engine may read them (run_prompt.rs).
+    if let Some(run_id) = run_id {
+        let attached = run_prompt::attached_files_dir(run_id);
+        if file_access::fs::is_dir(&attached) {
+            dirs.push(attached.to_string_lossy().into_owned());
+        }
+    }
+    dirs
+}
+
 /// Write a new prompt into the process that settled its turn but stays alive
 /// for a background task's follow-up turn on `session_id`. Returns that run's
 /// id, or None when no such process exists, its launch settings no longer
@@ -1150,7 +1204,14 @@ async fn deliver_to_idle_followup(
         Err(error) => {
             // The process stays parked for a later send; only this one failed.
             if let Some(id) = session_id {
-                registry.set_awaiting_followup(id, &idle_run, awaiting.prefs);
+                registry.restore_awaiting_followup(
+                    id,
+                    registry::AwaitingFollowup {
+                        run_id: idle_run,
+                        prefs: awaiting.prefs,
+                        idle_since: awaiting.idle_since,
+                    },
+                );
             }
             return Err(error);
         }
@@ -1191,6 +1252,7 @@ async fn send_reserved(
     allowed_tools: Option<Vec<String>>,
     extra_args: Vec<String>,
     followup: Option<registry::FollowupPrefs>,
+    warm: Option<Vec<String>>,
 ) -> Result<SendResult, String> {
     let mut launch = prepare_launch(
         &engine,
@@ -1203,18 +1265,7 @@ async fn send_reserved(
         model,
         effort,
         permission,
-        // Every user-granted directory rides along as a launch argument, so
-        // a grant approved mid-conversation takes effect on the next send
-        // (each send is a fresh process).
-        {
-            let mut dirs = state.db.granted_roots().unwrap_or_default();
-            // The documents attached to this turn, so the engine may read them (run_prompt.rs).
-            let attached = run_prompt::attached_files_dir(&run_id);
-            if file_access::fs::is_dir(&attached) {
-                dirs.push(attached.to_string_lossy().into_owned());
-            }
-            dirs
-        },
+        launch_dirs(state, Some(&run_id)),
         provider_id,
         mcp_servers,
         allowed_tools,
@@ -1250,7 +1301,7 @@ async fn send_reserved(
         if engine == "codex" && !codex_read_only::requested(&launch.req) {
             codex_provider_env::apply(&mut launch.built.command).await;
         }
-        return send_host_stream(state, launch, engine, run_id, killed, reader_abort).await;
+        return send_host_stream(state, launch, engine, run_id, killed, reader_abort, warm).await;
     }
     let mut command = launch.built.command;
     let cleanup_files = launch.built.cleanup_files;
@@ -1411,7 +1462,19 @@ async fn send_host_stream(
     run_id: String,
     killed: Arc<std::sync::atomic::AtomicBool>,
     reader_abort: Arc<std::sync::OnceLock<tokio::task::AbortHandle>>,
+    warm: Option<Vec<String>>,
 ) -> Result<SendResult, String> {
+    // A chat turn's process may stay warm for the chat's next message (`warm.rs`); the driver
+    // claims this as it starts. dsh and opencode keep one host of their own for every turn, and
+    // an OMP plan session is never resumed, so its process has no next message to wait for.
+    if let Some(launch_key) =
+        warm.filter(|_| !matches!(engine.as_str(), "dsh" | "opencode" | "omp"))
+    {
+        warm::intend(
+            &run_id,
+            warm::fingerprint(&engine, &launch.bin, &launch.req, launch.channel, &launch_key),
+        );
+    }
     let pid = next_virtual_pid();
     let entry = ChildEntry {
         child: None,
@@ -2137,8 +2200,7 @@ mod permission_tests {
         // Images ride the prompt command's base64 field (covered by load_image); plain text is enough here.
         let mut request = req(None);
         request.prompt = "first line\nsecond line".to_string();
-        let built = build(&pi_family::omp(), &request)
-            .unwrap();
+        let built = build(&pi_family::omp(), &request).unwrap();
         let args: Vec<String> = built
             .command
             .as_std()
@@ -2210,8 +2272,7 @@ mod permission_tests {
             .iter()
             .any(|a| a == "--service-tier"));
         request.service_tier = Some("invalid".into());
-        assert!(build(&pi_family::omp(), &request)
-            .is_err());
+        assert!(build(&pi_family::omp(), &request).is_err());
     }
 
     #[test]
@@ -2418,6 +2479,8 @@ mod retry_lifecycle_tests {
             provider_id: None,
             allowed_tools: None,
             launch: Vec::new(),
+            dirs: Vec::new(),
+            warm: false,
         }
     }
 

@@ -45,7 +45,9 @@ pub(super) fn with_history(prompt: String, history: &Value) -> String {
 
 /// What a turn with the Browser attachment adds after the prompt.
 const BROWSER_HINT: &str = "\n\n(Use Misty's browser for this, through the misty MCP server: open a tab with \
-screen_open, read it with browser_snapshot and act with browser_steps. I can watch it and take over.)";
+screen_open, read it with browser_snapshot and act with browser_steps, or do several page steps in one \
+browser_run program. Save what a program collects with its saveAs option rather than copying it into \
+files yourself. I can watch it and take over.)";
 
 /// The prompt an engine gets. With the Browser attachment it is told to work in Misty's browser,
 /// whose tools the Space's MCP server offers only then (mcp.rs).

@@ -41,7 +41,11 @@ vi.mock("@/api/client", () => ({
   apiRequest: mocks.request,
   resolveRequiredApiBase: async () => "https://api.example.test",
 }));
-vi.mock("@/api/runtime/device-models", () => ({ deviceModelCall: mocks.deviceCall }));
+// The default engine decides where a follow-up goes (engines/mistyCalls.ts); the stand-in keeps
+// the call's name so tests can answer by it.
+vi.mock("../../engines/mistyCalls", () => ({
+  followUpOnEngine: (body: unknown) => mocks.deviceCall("follow-up", body),
+}));
 vi.mock("../../artifacts/taskArtifacts", () => ({ trackTaskArtifacts: async () => {} }));
 vi.mock("../../personal/useAgentsStore", () => ({ agentsDeviceSnapshot: mocks.deviceSnapshot }));
 vi.mock("../../personal/useAgentDeviceStore", () => ({

@@ -3,14 +3,7 @@ import { readDeviceState, updateDeviceState } from "@/features/agents";
 import { announceDeviceSetting, onDeviceSettingChange } from "@/shared/lib/deviceSetting";
 
 /** The sidebar rows a person can pin. Whatever is not pinned waits under More. */
-export const sidebarPlaceIds = [
-  "search",
-  "agents",
-  "space",
-  "integrations",
-  "studio",
-  "lab",
-] as const;
+export const sidebarPlaceIds = ["search", "agents", "space", "studio"] as const;
 export type SidebarPlaceId = (typeof sidebarPlaceIds)[number];
 
 /** Every row in the person's order, and which of them are pinned. */
@@ -22,17 +15,22 @@ interface SidebarPins {
 const scope = "sidebar-pins";
 export const sidebarPinDefaults: SidebarPins = {
   order: [...sidebarPlaceIds],
-  // The Lab is where someone new learns with their AI, so it is in view from the start. Agents,
-  // where engines are installed and set up, is too.
-  pinned: ["search", "agents", "space", "lab", "integrations"],
+  // Agents, where engines are installed and set up, is in view from the start. The Lab is a page
+  // of the Space, so the Space's row leads to it.
+  pinned: ["search", "agents", "space"],
 };
 
 const known = (id: unknown): id is SidebarPlaceId => sidebarPlaceIds.includes(id as SidebarPlaceId);
-/** The studio was called the office, and the Lab was Tutor, then Notebooks. */
+/**
+ * The studio was called the office. The Lab (once Tutor, then Notebooks) became a page of the
+ * Space, and Integrations folded into the Agents window, so their rows become those.
+ */
 const formerly: Record<string, SidebarPlaceId> = {
   office: "studio",
-  tutor: "lab",
-  notebooks: "lab",
+  tutor: "space",
+  notebooks: "space",
+  lab: "space",
+  integrations: "agents",
 };
 const renamed = (ids: unknown[] = []) =>
   ids.map((id) => (typeof id === "string" && formerly[id]) || id);

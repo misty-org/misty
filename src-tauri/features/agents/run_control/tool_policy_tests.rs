@@ -375,3 +375,26 @@ fn an_engine_opens_pages_freely_in_ask_mode_and_asks_before_acting() {
         assert!(asks(&decide(&engine, &taint, name, &json!({}))), "{name}");
     }
 }
+
+#[test]
+fn the_studio_figure_moves_in_every_mode_and_a_new_file_asks() {
+    let taint = Taint::default();
+    let planning = RunFacts {
+        planning: true,
+        ..run(true)
+    };
+    let listed = RunFacts {
+        allowed_tools: vec!["note.read".into()],
+        ..run(false)
+    };
+    for name in ["studio.go", "studio.emote", "studio.say", "studio.release"] {
+        for facts in [&run(false), &run(true), &planning, &listed] {
+            assert_eq!(decide(facts, &taint, name, &json!({})), Decision::Run, "{name}");
+        }
+    }
+    assert!(asks(&decide(&run(false), &taint, "file.create", &json!({}))));
+    assert_eq!(
+        decide(&run(true), &taint, "file.create", &json!({})),
+        Decision::Run
+    );
+}

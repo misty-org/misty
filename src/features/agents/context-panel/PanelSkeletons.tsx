@@ -142,23 +142,6 @@ function TerminalSkeleton() {
   );
 }
 
-/** The preview: its address field in the header row, and a page. */
-function PreviewSkeleton() {
-  return (
-    <>
-      <SidePanelHeader>
-        <div className="flex min-w-0 flex-1 items-center gap-1" aria-hidden="true">
-          <Skeleton className="h-8 min-w-0 flex-1 rounded-lg" />
-          <SkeletonControl kind="icon" />
-          <SkeletonControl kind="icon" />
-          <SkeletonControl kind="button" className="w-36" />
-        </div>
-      </SidePanelHeader>
-      <SkeletonDocument label="Preview" />
-    </>
-  );
-}
-
 /**
  * The open view's skeleton, with the folder's tools in the header for the views a folder has.
  * `tools` is false where the panel already shows them.
@@ -171,7 +154,6 @@ export function ContextPanelSkeleton({
   tools?: boolean;
 }) {
   if (tab === "steps") return <StepsSkeleton />;
-  if (tab === "preview") return <PreviewSkeleton />;
   return (
     <>
       {tools ? <FolderToolsSkeleton /> : null}

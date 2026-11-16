@@ -2,5 +2,4 @@
 // See NOTICE.
 
 export { PromptsSection } from "./PromptsSection";
-export { PROMPTS_SETTINGS_SECTION } from "./promptsApi";
 export { matchPrompts, promptsFor } from "./promptStore";

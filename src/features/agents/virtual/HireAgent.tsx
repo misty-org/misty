@@ -1,7 +1,17 @@
-import { Check, Lock } from "lucide-react";
+import { Check, Lock, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { AgentProfile, AgentProfileInput } from "@/shared/schemas";
-import { Button, ChoiceTile, Field, Input, Skeleton, Text, Tooltip, useNotice } from "@/shared/ui";
+import {
+  Button,
+  ChoiceTile,
+  Field,
+  IconButton,
+  Input,
+  Skeleton,
+  Text,
+  Tooltip,
+  useNotice,
+} from "@/shared/ui";
 import { EngineMark, hasEngineMark } from "@/features/engine-config/EngineMark";
 import { mistyEngine, useEnginesList } from "../engines/enginesApi";
 import { personalAgentsApi } from "../personal/personalAgentsApi";
@@ -79,6 +89,8 @@ export function HirePanel(props: {
   /** The free desk it was opened from, which the new agent gets. */
   deskId?: string;
   onHired(agent: AgentProfile, deskId?: string): void;
+  /** Back to the studio without hiring anyone. Esc does the same. */
+  onClose(): void;
 }) {
   // The last engine list paints at once and a fresh one follows; null only on the first load.
   const list = useEnginesList();
@@ -136,7 +148,11 @@ export function HirePanel(props: {
   const cards = engines ?? [];
   return (
     <StudioSide className="w-75 overflow-y-auto" aria-label="Hire an agent">
-      <StudioSideHead title={props.deskId ? "Hire for this desk" : "Hire an agent"} />
+      <StudioSideHead title={props.deskId ? "Hire for this desk" : "Hire an agent"}>
+        <IconButton label="Close" size="sm" shortcut="Esc" onClick={props.onClose}>
+          <X aria-hidden="true" />
+        </IconButton>
+      </StudioSideHead>
       <form
         className="grid gap-4"
         onSubmit={(event) => {

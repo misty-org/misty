@@ -1,4 +1,4 @@
-import { usePersonalAgentsStore } from "@/features/agents";
+import { defaultAgentOf, usePersonalAgentsStore } from "@/features/agents";
 import {
   useWorkspaceStore,
   workspaceSurfaceFromRoute,
@@ -49,7 +49,7 @@ function newChatRoute() {
   const agent =
     agents.find((item) => item.id === selected.global && item.enabled && !item.system_managed) ??
     agents.find((item) => item.engine && item.enabled) ??
-    agents.find((item) => item.system_managed) ??
+    defaultAgentOf(agents) ??
     agents[0];
   return agent ? agentChatRoute(agent.id, undefined, true) : "/agents";
 }
@@ -61,12 +61,11 @@ export function openNewChat(onOpen: (view: WorkspaceView) => void) {
 
 /**
  * Opens a new tab on a new chat with the agent last used, not on an idle pane: a new tab is
- * almost always for asking something, so it starts where you can type.
+ * almost always for asking something, so it starts where you can type. Until something is typed
+ * or clicked in it, the tab stays `fresh`: a page picked next opens in it, even one another tab
+ * already shows, instead of jumping to that tab.
  */
 export function openNewTab(onOpen: (view: WorkspaceView) => void) {
-  const workspace = useWorkspaceStore.getState();
-  const view = workspace.newTab();
-  const route = newChatRoute();
-  workspace.updateViewRoute(view.id, route, true);
-  onOpen({ ...view, route });
+  const view = useWorkspaceStore.getState().newTab(newChatRoute());
+  onOpen(view);
 }

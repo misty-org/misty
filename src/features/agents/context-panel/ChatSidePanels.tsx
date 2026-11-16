@@ -4,15 +4,13 @@ import {
   GitCompareArrows,
   Globe,
   ListOrdered,
-  MonitorPlay,
-  PanelRightClose,
   Pin,
   SquareTerminal,
   type LucideIcon,
 } from "lucide-react";
 import { lazy, Suspense, useEffect, useRef } from "react";
 import type { AgentProfile } from "@/shared/schemas";
-import { cn, IconButton, RowTools, SideCard, SidePanel } from "@/shared/ui";
+import { cn, IconButton, SideCard, SidePanel } from "@/shared/ui";
 import { AgentBrowser } from "../agent-browser/AgentBrowser";
 import {
   closeAgentBrowser,
@@ -34,7 +32,6 @@ const SessionPanel = lazy(async () => ({
 /** What the panel's header names when the open view puts nothing in it. */
 const surfaces: Record<ContextPanelSurface | "browser", [name: string, icon: LucideIcon]> = {
   browser: ["Browser", Globe],
-  preview: ["Preview", MonitorPlay],
   steps: ["Steps", ListOrdered],
   changes: ["Changes", GitCompareArrows],
   files: ["Files", FolderTree],
@@ -73,14 +70,14 @@ export function useSidePanelShown(conversationId: string) {
 // since the shared panel's own geometry is in its stylesheet.
 /** On a narrow page the open panel covers the chat instead of squeezing it. */
 const narrowPanelClass = cn(
-  "@max-[761px]/agent-studio:absolute!",
-  "@max-[761px]/agent-studio:inset-[--spacing(2)_--spacing(1)_--spacing(2)_--spacing(2)]!",
-  "@max-[761px]/agent-studio:w-auto! @max-[761px]/agent-studio:max-w-none!",
-  "@max-[761px]/agent-studio:m-0!",
+  "@max-[47.5625rem]/agent-studio:absolute!",
+  "@max-[47.5625rem]/agent-studio:inset-[--spacing(2)_--spacing(1)_--spacing(2)_--spacing(2)]!",
+  "@max-[47.5625rem]/agent-studio:w-auto! @max-[47.5625rem]/agent-studio:max-w-none!",
+  "@max-[47.5625rem]/agent-studio:m-0!",
 );
 /**
  * The right side of a chat, after the chat column and before the rail: the floating side panel
- * (the agent browser, the preview, steps, or the project folder's changes, files and terminal).
+ * (the agent browser, steps, or the project folder's changes, files and terminal).
  * The session card floats over the chat itself (`ChatSessionCard`), so it takes no width here.
  */
 export function ChatSidePanels(props: { conversationId: string; agent: AgentProfile }) {
@@ -105,9 +102,7 @@ export function ChatSidePanels(props: { conversationId: string; agent: AgentProf
           expanded={expanded}
           onResize={panel.setWidth}
           onToggleExpanded={panel.toggleExpanded}
-          onClose={() =>
-            surface === "browser" ? closeAgentBrowser(browserChat) : panel.close()
-          }
+          onClose={() => (surface === "browser" ? closeAgentBrowser(browserChat) : panel.close())}
           className={cn("agent-studio-context context-panel", narrowPanelClass)}
           data-panel={surface}
         >
@@ -132,8 +127,9 @@ export function ChatSidePanels(props: { conversationId: string; agent: AgentProf
 /**
  * The session card, a narrow glance at the chat's usage and where it works, floating over the
  * chat's top right corner: it takes none of the chat's width, and goes behind any side panel
- * while one is open (`useSidePanelShown`). Its parent is the chat's positioned column. Its corner button tucks
- * it off the chat's edge, where resting the pointer brings it back; pressed there, it stays.
+ * while one is open (`useSidePanelShown`). Its parent is the chat's positioned column. Its pin, shown
+ * only while the pointer is on the card's first header, keeps it open (filled) or lets it tuck off
+ * the chat's edge (outlined), where resting the pointer brings it back.
  */
 export function ChatSessionCard(props: { conversationId: string; agent: AgentProfile }) {
   const session = useContextPanel((state) => state.session);
@@ -142,16 +138,18 @@ export function ChatSessionCard(props: { conversationId: string; agent: AgentPro
   // Never beside a side panel: it stays open underneath and shows again once the panel closes.
   const covered = useSidePanelShown(props.conversationId);
   if (!session || covered) return null;
+  // One pin for both states, as any toggle: filled while the card is pinned open.
+  const pinned = !tucked;
   const corner = (
-    <RowTools>
-      <IconButton
-        label={tucked ? "Keep open" : "Hide to the edge"}
-        tooltipSide="bottom"
-        onClick={() => setTucked(!tucked)}
-      >
-        {tucked ? <Pin /> : <PanelRightClose />}
-      </IconButton>
-    </RowTools>
+    <IconButton
+      label={pinned ? "Unpin" : "Pin open"}
+      hint={pinned ? "Unpin: hide to the edge" : "Pin open"}
+      tooltipSide="bottom"
+      aria-pressed={pinned}
+      onClick={() => setTucked(pinned)}
+    >
+      <Pin fill={pinned ? "currentColor" : "none"} />
+    </IconButton>
   );
   return (
     <SideCard

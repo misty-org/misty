@@ -5,7 +5,7 @@ import "../personal/agentCloudAvatars.testFixtures";
 import type * as AgentsRuntimeModule from "../AgentsRuntime";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, vi } from "vitest";
-import { MemoryRouter, useNavigate, type NavigateFunction } from "react-router-dom";
+import { MemoryRouter, useLocation, useNavigate, type NavigateFunction } from "react-router-dom";
 import { useMistyStore } from "@/features/agents/conversations/state/useMistyStore";
 import { Button } from "@/shared/ui";
 import AgentsPage from "./AgentsPage";
@@ -24,6 +24,8 @@ const fixture = vi.hoisted(() => ({
     model_mode: "automatic",
     model_id: "",
     enabled: true,
+    /** Its home Space; empty for one made before agents had one. */
+    space_id: "",
   },
 }));
 vi.mock("@/features/account", () => ({ useAuth: () => ({ user: { id: "owner" } }) }));
@@ -51,6 +53,8 @@ vi.mock("../AgentsRuntime", async (original) => ({
   runtimeAiApi: { activity: async () => ({ entries: [] }) },
 }));
 vi.mock("../personal/personalAgentsStore", () => ({
+  defaultAgentOf: (agents: { system_managed?: boolean; engine?: string }[]) =>
+    agents.find((agent) => agent.engine) ?? agents.find((agent) => agent.system_managed),
   usePersonalAgentsStore: () => ({
     agents: [
       fixture.agent,
@@ -90,6 +94,7 @@ beforeEach(() => {
   fixture.save.mockClear();
   fixture.submit.mockClear();
   fixture.agent.avatar = {};
+  fixture.agent.space_id = "";
   Element.prototype.scrollIntoView = vi.fn();
   useMistyStore.setState({
     accountId: "owner",
@@ -106,10 +111,16 @@ afterEach(cleanup);
 export { fixture };
 
 let navigateTo: NavigateFunction | undefined;
+let location = "";
 function NavigationProbe() {
   navigateTo = useNavigate();
+  const here = useLocation();
+  location = `${here.pathname}${here.search}`;
   return null;
 }
+
+/** Where the page's router is now: its path and query. */
+export const currentLocation = () => location;
 
 export function renderAgentsPage(entry = "/agents") {
   return render(
@@ -121,7 +132,7 @@ export function renderAgentsPage(entry = "/agents") {
 }
 
 /** Follows a link to the page, as the window's sidebar does. */
-export function openPage(page: "studio" | "integrations" | "lab") {
+export function openPage(page: "studio" | "lab") {
   act(() => void navigateTo?.(`/agents?view=${page}`));
 }
 

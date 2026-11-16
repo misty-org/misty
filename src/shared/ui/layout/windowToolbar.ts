@@ -9,5 +9,5 @@
  * ```
  */
 export const windowToolbarClass =
-  "data-[window-chrome=true]:!pl-[max(var(--window-toolbar-base-left,8px),var(--window-chrome-left,0px))] " +
-  "data-[window-chrome=true]:!pr-[max(var(--window-toolbar-base-right,8px),var(--window-chrome-right,0px))]";
+  "data-[window-chrome=true]:!pl-[max(var(--window-toolbar-base-left,0.5rem),var(--window-chrome-left,0px))] " +
+  "data-[window-chrome=true]:!pr-[max(var(--window-toolbar-base-right,0.5rem),var(--window-chrome-right,0px))]";

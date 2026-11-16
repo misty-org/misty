@@ -38,7 +38,7 @@ describe("studio places", () => {
   });
 
   it("finds seats, meeting room, places to hang about and room by the door", () => {
-    expect(places.lounge).toHaveLength(13);
+    expect(places.lounge).toHaveLength(10);
     expect(places.meeting.length).toBeGreaterThanOrEqual(6);
     expect(places.mingle.length).toBeGreaterThan(8);
     expect(places.door.length).toBeGreaterThan(4);
@@ -87,6 +87,31 @@ describe("studio behaviour", () => {
       expect(places.meeting).toContain(goal.spot);
     }
     expect(new Set([...goals.values()].map((goal) => goal.spot.id)).size).toBe(3);
+  });
+
+  it("stands a member by their agents: at the table while one works, waving when they arrive", () => {
+    const member = (more: Partial<Actor> = {}) =>
+      actor("member:sam", "resting", { guest: true, kind: "member", ownerId: "sam", ...more });
+    const working = planGoals(
+      [actor("guest:sam:nova", "working", { guest: true, ownerId: "sam" }), member()],
+      places,
+      desks,
+      0,
+    );
+    expect(working.get("member:sam")?.activity).toBe("talk");
+    expect(places.meeting).toContain(working.get("member:sam")?.spot);
+
+    const arriving = planGoals(
+      [actor("guest:sam:nova", "resting", { guest: true, ownerId: "sam" }), member({ arrived: true })],
+      places,
+      desks,
+      0,
+    );
+    expect(arriving.get("member:sam")?.activity).toBe("wave");
+    expect(arriving.get("member:sam")?.spot.id).not.toBe(arriving.get("guest:sam:nova")?.spot.id);
+
+    const alone = planGoals([member()], places, desks, 0);
+    expect(alone.get("member:sam")?.activity).toBe("relax");
   });
 
   it("lines up the ones that need their person at the door, waving", () => {

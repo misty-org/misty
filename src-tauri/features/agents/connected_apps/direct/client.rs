@@ -112,7 +112,7 @@ impl Session<'_> {
             let text = error["message"]
                 .as_str()
                 .unwrap_or("The app refused the request.");
-            return Err(CallError::Failed(super::super::client::truncate(text, 600)));
+            return Err(CallError::Failed(super::super::text::truncate(text, 600)));
         }
         Ok(message["result"].clone())
     }

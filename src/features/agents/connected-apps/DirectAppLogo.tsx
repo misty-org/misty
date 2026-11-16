@@ -26,7 +26,7 @@ function logoOf(url: string): Promise<string | null> {
 
 /**
  * An app's official logo: Misty's own artwork of the brand when it has one, else the logo the
- * maker (or Composio, for its apps) published, which native code fetches once and keeps; the app's initial until then, and
+ * maker published, which native code fetches once and keeps; the app's initial until then, and
  * if the image turns out not to draw.
  */
 export function DirectAppLogo({
@@ -60,7 +60,7 @@ export function DirectAppLogo({
         alt=""
         width={size}
         height={size}
-        className="rounded-[4px] object-contain"
+        className="rounded-[0.25rem] object-contain"
         draggable={false}
       />
     );

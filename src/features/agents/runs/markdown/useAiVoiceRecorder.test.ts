@@ -2,15 +2,14 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { settleDeviceSettings } from "@/tests/fakeDeviceSettings";
 
-const { transcribeVoice } = vi.hoisted(() => ({ transcribeVoice: vi.fn() }));
+const { recognizeAudio } = vi.hoisted(() => ({ recognizeAudio: vi.fn() }));
 const db = await vi.hoisted(async () =>
   (await import("@/tests/fakeDeviceSettings")).fakeDeviceSettings(),
 );
 vi.mock("@/shared/platform/nativeInvoke", () => ({ invoke: db.invoke }));
 
-vi.mock("@/features/agents/AgentsRuntime", () => ({
-  runtimeAgentsApi: { transcribeVoice },
-}));
+// Voice is recognized on this computer, through the voice feature.
+vi.mock("@/features/voice", () => ({ recognizeAudio }));
 
 import { microphoneSettingsHint } from "@/shared/platform/desktopOs";
 import { useAiVoiceRecorder } from "./useAiVoiceRecorder";
@@ -21,7 +20,7 @@ describe("useAiVoiceRecorder", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     window.localStorage.clear();
-    transcribeVoice.mockResolvedValue({ transcript: "hello Misty" });
+    recognizeAudio.mockResolvedValue("hello Misty");
     Object.defineProperty(navigator, "mediaDevices", {
       configurable: true,
       value: {
@@ -56,12 +55,8 @@ describe("useAiVoiceRecorder", () => {
     act(() => result.current.stop());
     await waitFor(() => expect(onTranscript).toHaveBeenCalledWith("hello Misty"));
 
-    expect(transcribeVoice).toHaveBeenCalledWith(
-      expect.any(Blob),
-      expect.any(Number),
-      expect.any(AbortSignal),
-    );
-    expect((transcribeVoice.mock.calls[0]?.[0] as Blob).type).toBe("audio/mp4;codecs=mp4a.40.2");
+    expect(recognizeAudio).toHaveBeenCalledWith(expect.any(Blob));
+    expect((recognizeAudio.mock.calls[0]?.[0] as Blob).type).toBe("audio/mp4;codecs=mp4a.40.2");
     expect(onActivityChange).toHaveBeenLastCalledWith(false);
     expect(trackStop).toHaveBeenCalled();
   });
@@ -86,13 +81,13 @@ describe("useAiVoiceRecorder", () => {
     });
     expect(trackStop).toHaveBeenCalled();
     expect(result.current.recording).toBe(false);
-    expect(transcribeVoice).not.toHaveBeenCalled();
+    expect(recognizeAudio).not.toHaveBeenCalled();
     expect(onTranscript).not.toHaveBeenCalled();
   });
 
-  it("aborts transcription and ignores a late transcript after Stop", async () => {
-    let finish!: (value: { transcript: string }) => void;
-    transcribeVoice.mockReturnValueOnce(
+  it("ignores a late transcript after Stop", async () => {
+    let finish!: (value: string) => void;
+    recognizeAudio.mockReturnValueOnce(
       new Promise((resolve) => {
         finish = resolve;
       }),
@@ -101,10 +96,8 @@ describe("useAiVoiceRecorder", () => {
     const { result } = renderHook(() => useAiVoiceRecorder({ onTranscript, onError: vi.fn() }));
     await act(async () => result.current.start());
     act(() => result.current.stop());
-    const signal = transcribeVoice.mock.calls[0][2] as AbortSignal;
     act(() => result.current.cancel());
-    expect(signal.aborted).toBe(true);
-    await act(async () => finish({ transcript: "obsolete request" }));
+    await act(async () => finish("obsolete request"));
     expect(onTranscript).not.toHaveBeenCalled();
     expect(result.current.transcribing).toBe(false);
   });

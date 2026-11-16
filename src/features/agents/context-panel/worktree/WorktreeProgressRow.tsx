@@ -1,6 +1,6 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 import { X } from "lucide-react";
-import { Button, IconButton, Spinner, Text, Tooltip } from "@/shared/ui";
+import { Button, IconButton, Spinner, Text, Tooltip, rowShape, cn } from "@/shared/ui";
 import { useWorktreeStore, type PendingCreation } from "./worktreeStore";
 
 /** Each fixed failure code the native side sends, as words. */
@@ -24,7 +24,7 @@ const ERROR_TEXT: Record<string, string> = {
 };
 
 /** A creation's one line in the worktree menu, as tall as a worktree's row. */
-const rowClass = "flex h-8 min-w-0 items-center gap-1.5 rounded-md pr-1 pl-2 text-meta";
+const rowClass = cn(rowShape, "text-meta");
 
 /** Why a creation failed: the native wording where the code alone says too little. */
 function failureReason(pending: PendingCreation): string {

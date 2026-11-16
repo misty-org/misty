@@ -4,6 +4,7 @@ import { measureElement as defaultMeasureElement, useVirtualizer } from "@tansta
 import { joinPath, useFilesStore } from "./filesStore";
 import { useTreePreferences } from "./treePreferences";
 import { buildVisibleNodes, type VisibleNode } from "./visibleNodes";
+import { uiPx } from "@/shared/lib/uiScale";
 
 /**
  * Derives the visible row list from the store (`visibleNodes.ts`, honoring
@@ -65,7 +66,7 @@ export function useFileTreeVirtualList() {
   const virtualizer = useVirtualizer({
     count: visible.length,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => 28,
+    estimateSize: () => uiPx(28),
     overscan: 10,
     // Rows are recreated on every store update; key measurements by path so
     // expand/collapse/refresh never reassigns a cached size to the wrong row.

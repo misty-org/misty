@@ -29,3 +29,4 @@ export { setupFlow, type SetupStep } from "./setup/setupFlow";
 export { deliverGoogleSignInCode } from "./google/googleSignInCode";
 export { notifyAccountScopeReset } from "./sessions/accountStore";
 export { openSetupDeepLink } from "./setup/setupLinks";
+export { openOnWebsite } from "./openOnWebsite";

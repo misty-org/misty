@@ -67,7 +67,7 @@ export function SettingsSearchResults(props: {
   return (
     <div
       aria-label="Settings search results"
-      className="misty-scrollbar grid min-h-0 flex-1 content-start gap-1 overflow-y-auto px-3 [scrollbar-gutter:stable] max-[680px]:px-2"
+      className="misty-scrollbar grid min-h-0 flex-1 content-start gap-1 overflow-y-auto px-3 [scrollbar-gutter:stable] max-[748px]:px-2"
     >
       {props.results.map((result) => {
         const page = settingsPage(result.page)!;

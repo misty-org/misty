@@ -28,7 +28,8 @@ import { workspaceViewActions } from "./workspaceViewActions";
 export interface WorkspaceStore extends WorkspaceWindowsState {
   lastUsedViewByGroup: Partial<Record<WorkspaceGroupKey, string>>;
   closedItems: ClosedWorkspaceItem[];
-  newTab: () => WorkspaceView;
+  /** A new tab: idle, or with `route` already open on that page (still `fresh`). */
+  newTab: (route?: string) => WorkspaceView;
   navigatePane: (delta: number, paneId?: string) => WorkspaceView | null;
   detachPaneToTab: (viewId: string) => boolean;
   selectTab: (id: string) => WorkspaceView | null;

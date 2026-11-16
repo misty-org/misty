@@ -121,6 +121,12 @@ impl Engine for GeminiEngine {
         true
     }
 
+    /// Gemini CLI ships `google_web_search`; Qwen Code's needs a key of its own, so it isn't
+    /// counted.
+    fn supports_web_search(&self) -> bool {
+        self.id == "gemini"
+    }
+
     /// The CLI's approval modes (`--approval-mode`). YOLO only where the CLI's own Seatbelt
     /// sandbox runs.
     fn modes(&self) -> &'static [super::modes::EngineMode] {

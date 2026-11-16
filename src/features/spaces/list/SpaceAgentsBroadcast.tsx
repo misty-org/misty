@@ -44,6 +44,8 @@ export function SpaceAgentsBroadcast() {
         memberAgentsIn({ bySpace: { [spaceId]: heard ?? {} } }, spaceId).map(
           ({ userId, agent }) => ({
             key: `${userId}:${agent.id}`,
+            userId,
+            agentId: agent.id,
             name: agent.name,
             owner: person(userId),
             ownerPicture: faces[userId] ?? undefined,

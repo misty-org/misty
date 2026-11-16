@@ -1,5 +1,4 @@
 import type { AiArtifact, AiSelectionSnapshot, AiSurfaceAdapter } from "@/features/agents";
-import { JournalAttribution } from "../..";
 import { EmptyState, Surface } from "@/shared/ui";
 import { DrawingCanvasSkeleton } from "./DrawingCanvasSkeleton";
 import { Suspense, useMemo, useState } from "react";
@@ -124,11 +123,6 @@ export function DrawingWorkspace(props: {
         onRename={props.onRename}
       />
       <div className="relative min-h-0 overflow-hidden">
-        <JournalAttribution
-          technology="Excalidraw"
-          href="https://excalidraw.com/"
-          className="absolute right-3 top-3 z-20 shadow-sm"
-        />
         {room.notice ? (
           <Surface
             tone="page"

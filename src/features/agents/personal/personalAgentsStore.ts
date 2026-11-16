@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { useSpaceWindowStore } from "@/features/app-windows";
 import { invoke } from "@/native/invoke";
 import type { AgentProfile } from "@/shared/schemas";
+import { useSettingsStore } from "@/features/settings";
 import { listPersonalAgents, newEngineAgents, personalAgentsApi } from "./personalAgentsApi";
 
 interface PersonalAgentsState {
@@ -83,13 +84,29 @@ useSpaceWindowStore.subscribe((state, previous) => {
   if (agents.some((agent) => !agent.space_id)) void load(accountId);
 });
 
+/**
+ * The agent new work goes to when none is chosen: the default engine's own agent, else any agent
+ * on that engine, else any on an outside engine. Misty's own agent from before is the last
+ * resort, only so old chats keep an agent; its runs go to the default engine.
+ */
+export function defaultAgentOf(agents: readonly AgentProfile[]): AgentProfile | undefined {
+  const document = useSettingsStore.getState().settings?.document as
+    Record<string, Record<string, unknown> | undefined> | undefined;
+  const engine = String(document?.agent?.default_engine ?? "");
+  return (
+    agents.find((a) => engine && a.id === `personal_engine_${engine}` && a.enabled) ??
+    agents.find((a) => engine && a.engine === engine && a.enabled) ??
+    agents.find((a) => a.engine && a.engine !== "misty" && a.enabled && !a.system_managed) ??
+    agents.find((a) => a.system_managed)
+  );
+}
+
 export function selectedPersonalAgent(_spaceId: string) {
   const state = usePersonalAgentsStore.getState();
   return (
     state.agents.find((a) => a.id === state.selected.global && a.enabled && !a.system_managed) ??
-    // Misty's own runtime is never the default; it is the last resort when no engine agent exists.
-    state.agents.find((a) => a.engine && a.enabled) ??
-    state.agents.find((a) => a.system_managed)
+    // Misty has no agent of its own: the default engine's agent, else any agent on an engine.
+    defaultAgentOf(state.agents)
   );
 }
 

@@ -44,7 +44,7 @@ export default function SignInForm(props: {
   }
 
   return (
-    <form className="flex flex-col gap-5" onSubmit={handleSubmit}>
+    <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
       <AuthField
         id="signin-email"
         label="Email"

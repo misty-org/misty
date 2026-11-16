@@ -586,6 +586,439 @@
   "annotations": {
    "readOnlyHint": true
   },
+  "description": "Read a Space Library image's live edit, the one everyone editing it shares: its size, crop, turn, light and color settings, filter, the size it saves at, and the marks drawn on it, with who is editing it now. Mark coordinates are fractions of the original image's longer side, from its top left, before any turn or crop.",
+  "inputSchema": {
+   "properties": {
+    "item_id": {
+     "description": "The Library item id of the image.",
+     "maxLength": 200,
+     "minLength": 1,
+     "type": "string"
+    },
+    "space": {
+     "description": "Your home Space's name or id. Omit it: these tools act in your home Space and no other.",
+     "maxLength": 200,
+     "minLength": 1,
+     "type": "string"
+    }
+   },
+   "required": [
+    "item_id"
+   ],
+   "type": "object"
+  },
+  "name": "image.read",
+  "outputSchema": {
+   "type": "object"
+  }
+ },
+ {
+  "_meta": {
+   "misty/layer": "public",
+   "misty/locality": "routed",
+   "misty/risk": "write"
+  },
+  "annotations": {
+   "readOnlyHint": false
+  },
+  "description": "Edit a Space Library image live, alongside anyone who has it open: they see each change land as it happens. Set any of adjust (each -100 to 100), filter with filter_strength, rotate, flip, straighten, crop (fractions of the turned image), resize, add_marks (coordinates are fractions of the original image's longer side, from its top left, as image_read gives them), remove_mark_ids, clear_marks, or reset to start over. Nothing changes the image file until image_save.",
+  "inputSchema": {
+   "properties": {
+    "add_marks": {
+     "items": {
+      "properties": {
+       "at": {
+        "description": "text: the top left of its first line.",
+        "properties": {
+         "x": {
+          "type": "number"
+         },
+         "y": {
+          "type": "number"
+         }
+        },
+        "required": [
+         "x",
+         "y"
+        ],
+        "type": "object"
+       },
+       "box": {
+        "description": "rect, ellipse and redact: the box it fills.",
+        "properties": {
+         "height": {
+          "minimum": 0,
+          "type": "number"
+         },
+         "width": {
+          "minimum": 0,
+          "type": "number"
+         },
+         "x": {
+          "type": "number"
+         },
+         "y": {
+          "type": "number"
+         }
+        },
+        "required": [
+         "x",
+         "y",
+         "width",
+         "height"
+        ],
+        "type": "object"
+       },
+       "color": {
+        "description": "A CSS color, such as #ff3b30. Defaults to red.",
+        "maxLength": 64,
+        "type": "string"
+       },
+       "fill": {
+        "description": "rect and ellipse: filled rather than outlined.",
+        "type": "boolean"
+       },
+       "from": {
+        "description": "line and arrow: where it starts.",
+        "properties": {
+         "x": {
+          "type": "number"
+         },
+         "y": {
+          "type": "number"
+         }
+        },
+        "required": [
+         "x",
+         "y"
+        ],
+        "type": "object"
+       },
+       "kind": {
+        "enum": [
+         "pen",
+         "line",
+         "arrow",
+         "rect",
+         "ellipse",
+         "text",
+         "redact"
+        ],
+        "type": "string"
+       },
+       "points": {
+        "description": "pen: the stroke's points.",
+        "items": {
+         "properties": {
+          "x": {
+           "type": "number"
+          },
+          "y": {
+           "type": "number"
+          }
+         },
+         "required": [
+          "x",
+          "y"
+         ],
+         "type": "object"
+        },
+        "maxItems": 5000,
+        "type": "array"
+       },
+       "size": {
+        "description": "Stroke width, or text size, as a fraction of the image's longer side (0.006 is a regular stroke, 0.04 regular text).",
+        "maximum": 0.5,
+        "minimum": 0.0005,
+        "type": "number"
+       },
+       "text": {
+        "description": "text: what it says; new lines start new lines.",
+        "maxLength": 2000,
+        "type": "string"
+       },
+       "to": {
+        "description": "line and arrow: where it ends; an arrow points here.",
+        "properties": {
+         "x": {
+          "type": "number"
+         },
+         "y": {
+          "type": "number"
+         }
+        },
+        "required": [
+         "x",
+         "y"
+        ],
+        "type": "object"
+       }
+      },
+      "required": [
+       "kind"
+      ],
+      "type": "object"
+     },
+     "maxItems": 200,
+     "type": "array"
+    },
+    "adjust": {
+     "additionalProperties": false,
+     "properties": {
+      "brightness": {
+       "maximum": 100,
+       "minimum": -100,
+       "type": "number"
+      },
+      "contrast": {
+       "maximum": 100,
+       "minimum": -100,
+       "type": "number"
+      },
+      "exposure": {
+       "maximum": 100,
+       "minimum": -100,
+       "type": "number"
+      },
+      "highlights": {
+       "maximum": 100,
+       "minimum": -100,
+       "type": "number"
+      },
+      "saturation": {
+       "maximum": 100,
+       "minimum": -100,
+       "type": "number"
+      },
+      "shadows": {
+       "maximum": 100,
+       "minimum": -100,
+       "type": "number"
+      },
+      "sharpness": {
+       "maximum": 100,
+       "minimum": -100,
+       "type": "number"
+      },
+      "tint": {
+       "maximum": 100,
+       "minimum": -100,
+       "type": "number"
+      },
+      "vibrance": {
+       "maximum": 100,
+       "minimum": -100,
+       "type": "number"
+      },
+      "vignette": {
+       "maximum": 100,
+       "minimum": -100,
+       "type": "number"
+      },
+      "warmth": {
+       "maximum": 100,
+       "minimum": -100,
+       "type": "number"
+      }
+     },
+     "type": "object"
+    },
+    "aspect": {
+     "enum": [
+      "free",
+      "original",
+      "square",
+      "4:3",
+      "3:2",
+      "16:9"
+     ],
+     "type": "string"
+    },
+    "clear_marks": {
+     "type": "boolean"
+    },
+    "crop": {
+     "description": "The part kept, as fractions (0 to 1) of the turned image.",
+     "properties": {
+      "height": {
+       "minimum": 0,
+       "type": "number"
+      },
+      "width": {
+       "minimum": 0,
+       "type": "number"
+      },
+      "x": {
+       "type": "number"
+      },
+      "y": {
+       "type": "number"
+      }
+     },
+     "required": [
+      "x",
+      "y",
+      "width",
+      "height"
+     ],
+     "type": "object"
+    },
+    "filter": {
+     "enum": [
+      "none",
+      "vivid",
+      "dramatic",
+      "warm",
+      "cool",
+      "fade",
+      "mono",
+      "noir"
+     ],
+     "type": "string"
+    },
+    "filter_strength": {
+     "maximum": 100,
+     "minimum": 0,
+     "type": "number"
+    },
+    "flip": {
+     "enum": [
+      "horizontal",
+      "vertical"
+     ],
+     "type": "string"
+    },
+    "item_id": {
+     "description": "The Library item id of the image.",
+     "maxLength": 200,
+     "minLength": 1,
+     "type": "string"
+    },
+    "remove_mark_ids": {
+     "items": {
+      "maxLength": 128,
+      "minLength": 1,
+      "type": "string"
+     },
+     "maxItems": 500,
+     "type": "array"
+    },
+    "reset": {
+     "description": "Start the edit over from the image as it is saved, before applying the rest.",
+     "type": "boolean"
+    },
+    "resize": {
+     "description": "The size it saves at: width and height in pixels, or scale of the crop. Omit both to keep the crop's own size.",
+     "properties": {
+      "height": {
+       "maximum": 16384,
+       "minimum": 1,
+       "type": "integer"
+      },
+      "scale": {
+       "maximum": 16,
+       "minimum": 0.01,
+       "type": "number"
+      },
+      "width": {
+       "maximum": 16384,
+       "minimum": 1,
+       "type": "integer"
+      }
+     },
+     "type": "object"
+    },
+    "rotate": {
+     "description": "A quarter turn.",
+     "enum": [
+      "left",
+      "right"
+     ],
+     "type": "string"
+    },
+    "space": {
+     "description": "Space name or id of the item or audience, as returned with it.",
+     "maxLength": 200,
+     "minLength": 1,
+     "type": "string"
+    },
+    "straighten": {
+     "description": "Degrees.",
+     "maximum": 45,
+     "minimum": -45,
+     "type": "number"
+    }
+   },
+   "required": [
+    "item_id",
+    "space"
+   ],
+   "type": "object"
+  },
+  "name": "image.edit",
+  "outputSchema": {
+   "type": "object"
+  }
+ },
+ {
+  "_meta": {
+   "misty/layer": "public",
+   "misty/locality": "routed",
+   "misty/risk": "write"
+  },
+  "annotations": {
+   "readOnlyHint": false
+  },
+  "description": "Save a Space Library image's live edit into an image file. mode replace overwrites the item with the edited image, and the live edit starts again from it; mode copy adds the edited image to the Library as a new item named name.",
+  "inputSchema": {
+   "properties": {
+    "item_id": {
+     "description": "The Library item id of the image.",
+     "maxLength": 200,
+     "minLength": 1,
+     "type": "string"
+    },
+    "mode": {
+     "enum": [
+      "replace",
+      "copy"
+     ],
+     "type": "string"
+    },
+    "name": {
+     "description": "copy: the new item's name, without an extension.",
+     "maxLength": 200,
+     "minLength": 1,
+     "type": "string"
+    },
+    "space": {
+     "description": "Space name or id of the item or audience, as returned with it.",
+     "maxLength": 200,
+     "minLength": 1,
+     "type": "string"
+    }
+   },
+   "required": [
+    "item_id",
+    "space",
+    "mode"
+   ],
+   "type": "object"
+  },
+  "name": "image.save",
+  "outputSchema": {
+   "type": "object"
+  }
+ },
+ {
+  "_meta": {
+   "misty/layer": "public",
+   "misty/locality": "routed",
+   "misty/risk": "read"
+  },
+  "annotations": {
+   "readOnlyHint": true
+  },
   "description": "Read metadata, caption, tags, and file facts for one visible Library item in a Space.",
   "inputSchema": {
    "additionalProperties": false,
@@ -607,6 +1040,67 @@
    "type": "object"
   },
   "name": "file.read",
+  "outputSchema": {
+   "type": "object"
+  }
+ },
+ {
+  "_meta": {
+   "misty/layer": "public",
+   "misty/locality": "routed",
+   "misty/risk": "write"
+  },
+  "annotations": {
+   "readOnlyHint": false
+  },
+  "description": "Save a new text file into your home Space's Library: a single-file HTML page or game, Markdown, plain text, JSON, CSV or SVG. Pass the whole file as content (up to 1.5 MB) and a name ending in .html, .md, .txt, .json, .csv or .svg. For a game, write one self-contained .html file, with its CSS, JavaScript and images inline and nothing loaded from other sites, and set game true: it then shows in the arcade cabinet in Misty's studio, where your person can play it. Returns the new item's id and name; change its name, caption or tags later with file_update.",
+  "inputSchema": {
+   "additionalProperties": false,
+   "properties": {
+    "caption": {
+     "description": "A line or two about the file, shown with it in the Library.",
+     "maxLength": 4000,
+     "type": "string"
+    },
+    "content": {
+     "description": "The whole file, as text.",
+     "maxLength": 1500000,
+     "minLength": 1,
+     "type": "string"
+    },
+    "game": {
+     "description": "True for a playable game: the file must be a single .html page, and it is tagged game.",
+     "type": "boolean"
+    },
+    "name": {
+     "description": "The file name, with its extension, such as \"Space Dodge.html\" or \"notes.md\".",
+     "maxLength": 200,
+     "minLength": 1,
+     "type": "string"
+    },
+    "space": {
+     "description": "Your home Space's name or id. Omit it: these tools act in your home Space and no other.",
+     "maxLength": 200,
+     "minLength": 1,
+     "type": "string"
+    },
+    "tags": {
+     "items": {
+      "maxLength": 60,
+      "minLength": 1,
+      "type": "string"
+     },
+     "maxItems": 30,
+     "type": "array"
+    }
+   },
+   "required": [
+    "name",
+    "content"
+   ],
+   "type": "object"
+  },
+  "name": "file.create",
   "outputSchema": {
    "type": "object"
   }
@@ -2903,6 +3397,131 @@
    "type": "object"
   },
   "name": "agent.wait",
+  "outputSchema": {
+   "type": "object"
+  }
+ },
+ {
+  "_meta": {
+   "misty/layer": "public",
+   "misty/locality": "device",
+   "misty/risk": "read"
+  },
+  "annotations": {
+   "readOnlyHint": true
+  },
+  "description": "Move your own figure in Misty's studio, the virtual office your person watches you work in. Call it whenever your person tells you to go somewhere or take a break (\"go to your desk and work on...\", \"take a coffee break\", \"come here\", \"everyone to the meeting table\"), then carry on with any work they asked for. desk = your own desk, where you work; lounge = the sofas, for a rest; meeting = the meeting table; door = the front door, to head out or greet someone; cooler = the water cooler, for a coffee break or a chat; bookshelf = the bookshelf, to read up on something; arcade = the arcade cabinet, to play the Space's games; person = over to your person (\"come here\", \"come to me\"). The place holds for the rest of this task and a few minutes after it; studio_release lets you move on your own again.",
+  "inputSchema": {
+   "additionalProperties": false,
+   "properties": {
+    "place": {
+     "description": "Where to go.",
+     "enum": [
+      "desk",
+      "lounge",
+      "meeting",
+      "door",
+      "cooler",
+      "bookshelf",
+      "arcade",
+      "person"
+     ],
+     "type": "string"
+    }
+   },
+   "required": [
+    "place"
+   ],
+   "type": "object"
+  },
+  "name": "studio.go",
+  "outputSchema": {
+   "type": "object"
+  }
+ },
+ {
+  "_meta": {
+   "misty/layer": "public",
+   "misty/locality": "device",
+   "misty/risk": "read"
+  },
+  "annotations": {
+   "readOnlyHint": true
+  },
+  "description": "Act something out with your own figure in Misty's studio, where it stands: wave, cheer, dance, clap, think or point. Use it when your person asks (\"wave hello\", \"do a little dance\") or to mark a moment, such as a cheer when a long task is done. It lasts a few seconds and changes nothing else.",
+  "inputSchema": {
+   "additionalProperties": false,
+   "properties": {
+    "emote": {
+     "description": "What to act out.",
+     "enum": [
+      "wave",
+      "cheer",
+      "dance",
+      "clap",
+      "think",
+      "point"
+     ],
+     "type": "string"
+    }
+   },
+   "required": [
+    "emote"
+   ],
+   "type": "object"
+  },
+  "name": "studio.emote",
+  "outputSchema": {
+   "type": "object"
+  }
+ },
+ {
+  "_meta": {
+   "misty/layer": "public",
+   "misty/locality": "device",
+   "misty/risk": "read"
+  },
+  "annotations": {
+   "readOnlyHint": true
+  },
+  "description": "Show a short speech bubble over your own figure in Misty's studio for a few seconds. Keep it brief and in character (\"On it!\", \"Back in five.\") and use it only when it adds something, such as answering a greeting or saying where you are off to. Your answer still goes in your reply.",
+  "inputSchema": {
+   "additionalProperties": false,
+   "properties": {
+    "text": {
+     "description": "What the bubble says.",
+     "maxLength": 140,
+     "minLength": 1,
+     "type": "string"
+    }
+   },
+   "required": [
+    "text"
+   ],
+   "type": "object"
+  },
+  "name": "studio.say",
+  "outputSchema": {
+   "type": "object"
+  }
+ },
+ {
+  "_meta": {
+   "misty/layer": "public",
+   "misty/locality": "device",
+   "misty/risk": "read"
+  },
+  "annotations": {
+   "readOnlyHint": true
+  },
+  "description": "Let your figure in Misty's studio move on its own again after studio_go: to its desk while you work, and wherever it likes while you rest. Call it when your person says you can go back to normal (\"back to work as usual\", \"you can leave the lounge\").",
+  "inputSchema": {
+   "additionalProperties": false,
+   "properties": {},
+   "required": [],
+   "type": "object"
+  },
+  "name": "studio.release",
   "outputSchema": {
    "type": "object"
   }

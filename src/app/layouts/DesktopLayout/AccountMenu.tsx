@@ -6,8 +6,8 @@ import {
   useUserStore,
 } from "@/features/account";
 import { reportSystemError } from "@/shared/platform/systemErrors";
-import { openSystemExternalLink } from "@/shared/platform/openExternalLink";
-import { isMistyCloud, mistyWebsite, useServerChoice } from "@/api/deployment/serverChoice";
+import { isMistyCloud, useServerChoice } from "@/api/deployment/serverChoice";
+import { openOnWebsite } from "@/features/account";
 import { routes } from "@/app/shell";
 import { useNativeSessionStore } from "@/features/account";
 import {
@@ -63,7 +63,7 @@ function AccountMenuItems(props: {
 }) {
   const navigate = useNavigate();
   const currentPath = useLocation().pathname;
-  // Misty Cloud's plans are bought and changed on the website, in its account settings.
+  // Misty Cloud's plans are bought and changed on the website.
   const cloud = useServerChoice((state) => isMistyCloud(state.choice));
   const currentUser = useNativeSessionStore((state) => state.status?.current_user ?? null);
   const { user, accounts, transitioning, switchAccount } = useAuth();
@@ -109,6 +109,14 @@ function AccountMenuItems(props: {
     window.setTimeout(() => useHelpDialog.getState().setOpen(true), 0);
   };
 
+  // Plans are bought and changed on the website, which the app opens signed in as this account.
+  const openWebsite = (path: string) => {
+    props.onClose();
+    void openOnWebsite(path).catch((error: unknown) => {
+      reportSystemError({ scope: "account:plan", title: "Plan and billing could not be opened", error });
+    });
+  };
+
   // Signing out asks first, with an option to remove what's on this computer.
   const signOut = () => {
     props.onClose();
@@ -138,21 +146,15 @@ function AccountMenuItems(props: {
         onSelect={props.onOpenAccountSettings}
       />
       {cloud ? (
-        <MenuItem
-          icon={<CreditCard />}
-          label="Plan and billing"
-          onSelect={() =>
-            void openSystemExternalLink(`${mistyWebsite()}/settings/subscription`).catch(
-              (error: unknown) => {
-                reportSystemError({
-                  scope: "account:plan",
-                  title: "Plan and billing could not be opened",
-                  error,
-                });
-              },
-            )
-          }
-        />
+        <MenuSubmenu icon={<CreditCard />} label="Plan and billing">
+          <MenuItem label="Get Misty+ monthly" onSelect={() => openWebsite("/pricing?checkout=plus")} />
+          <MenuItem
+            label="Get Misty+ yearly"
+            onSelect={() => openWebsite("/pricing?checkout=plus_yearly")}
+          />
+          <DropdownMenuSeparator />
+          <MenuItem label="Manage plan" onSelect={() => openWebsite("/settings/subscription")} />
+        </MenuSubmenu>
       ) : null}
       <MenuSubmenu icon={<Repeat2 />} label="Switch accounts" width="lg" disabled={transitioning}>
         <DropdownMenuLabel>Switch accounts</DropdownMenuLabel>

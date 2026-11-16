@@ -171,6 +171,21 @@ pub(super) fn teach_system_prompt(request: &RunRequest, now: &str) -> String {
     system
 }
 
+/// Teach mode for an outside engine's turn (Claude Code, Codex and the like): the tutor's lesson
+/// rules and the lesson so far, which Misty's own runtime puts in its system prompt and user turn.
+/// None outside Teach mode. `body` is the run's request, as the engine run receives it.
+pub fn engine_teach_note(body: &serde_json::Value) -> Option<String> {
+    let request = RunRequest::from_json(body);
+    if !request.teach() {
+        return None;
+    }
+    Some(format!(
+        "{}\n\n{}",
+        TEACH_MODE_PROMPT.trim(),
+        teach_lesson_context(&request).trim()
+    ))
+}
+
 /// The lesson part of the user turn, ahead of the request.
 pub(super) fn teach_lesson_context(request: &RunRequest) -> String {
     let mut out = match request.lesson.as_ref().filter(|lesson| lesson.status != "finished") {

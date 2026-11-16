@@ -1,26 +1,42 @@
 import type { ThreeEvent } from "@react-three/fiber";
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
+import { CanvasTexture, RepeatWrapping } from "three";
 import { DOOR, GRID } from "./grid";
 import { footprint, itemCenter, type StudioItem } from "./layout";
 import { FLOOR_MARK } from "./parts";
 
-/** The floor grid drawn as thin lines, one square per cell. */
-function GridLines() {
-  const points = useMemo(() => {
-    const list: number[] = [];
-    for (let x = 0; x <= GRID.w; x += 1)
-      list.push(x - GRID.w / 2, 0, -GRID.d / 2, x - GRID.w / 2, 0, GRID.d / 2);
-    for (let z = 0; z <= GRID.d; z += 1)
-      list.push(-GRID.w / 2, 0, z - GRID.d / 2, GRID.w / 2, 0, z - GRID.d / 2);
-    return new Float32Array(list);
+/** One cell's edge, drawn on a small canvas and repeated over the floor. */
+function useCellTexture(): CanvasTexture {
+  const texture = useMemo(() => {
+    const canvas = document.createElement("canvas");
+    canvas.width = canvas.height = 64;
+    const pen = canvas.getContext("2d");
+    if (pen) {
+      pen.fillStyle = "rgba(74, 52, 33, 0.5)";
+      pen.fillRect(0, 0, 64, 2);
+      pen.fillRect(0, 0, 2, 64);
+    }
+    const made = new CanvasTexture(canvas);
+    made.wrapS = made.wrapT = RepeatWrapping;
+    made.anisotropy = 8;
+    return made;
   }, []);
+  useEffect(() => () => texture.dispose(), [texture]);
+  return texture;
+}
+
+/**
+ * The floor grid, one square per cell. It is a texture rather than lines: a texture is smoothed
+ * as it gets smaller with distance, where hairlines a pixel wide shimmer as the camera moves.
+ */
+function GridLines() {
+  const texture = useCellTexture();
+  texture.repeat.set(GRID.w, GRID.d);
   return (
-    <lineSegments position={[0, FLOOR_MARK, 0]}>
-      <bufferGeometry>
-        <bufferAttribute attach="attributes-position" args={[points, 3]} />
-      </bufferGeometry>
-      <lineBasicMaterial color="#4a3421" transparent opacity={0.45} depthWrite={false} />
-    </lineSegments>
+    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, FLOOR_MARK, 0]}>
+      <planeGeometry args={[GRID.w, GRID.d]} />
+      <meshBasicMaterial map={texture} transparent depthWrite={false} />
+    </mesh>
   );
 }
 

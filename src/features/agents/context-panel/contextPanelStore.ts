@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { createDeviceSetting } from "@/shared/lib/deviceSetting";
 
 /** What the panel beside a chat can show. */
-export type ContextPanelTab = "session" | "steps" | "files" | "changes" | "terminal" | "preview";
+export type ContextPanelTab = "session" | "steps" | "files" | "changes" | "terminal";
 
 /** The views that take the floating panel; the session card is a column of its own beside it. */
 export type ContextPanelSurface = Exclude<ContextPanelTab, "session">;
@@ -62,7 +62,7 @@ interface SavedContextPanel {
   expanded: boolean;
 }
 
-const surfaces: ContextPanelSurface[] = ["steps", "files", "changes", "terminal", "preview"];
+const surfaces: ContextPanelSurface[] = ["steps", "files", "changes", "terminal"];
 
 const savedPanel = createDeviceSetting<SavedContextPanel>({
   scope: "context-panel",

@@ -32,8 +32,10 @@ export function workspaceOpenActions(
         findDockLeaf(current.layout.root, request.paneId ?? current.layout.focusedPaneId) ??
         dockLeaves(current.layout.root)[0];
       const previous = pane.views[0];
+      // A new tab nothing was done in yet takes the page instead of keeping its own.
       const replacePane =
-        Boolean(previous?.placeholder) && (!request.forceNew || Boolean(request.paneId));
+        Boolean(previous?.placeholder || previous?.fresh) &&
+        (!request.forceNew || Boolean(request.paneId));
       const existing =
         !replacePane && !request.forceNew
           ? allLayoutViews(current.layout)
@@ -88,8 +90,9 @@ export function workspaceOpenActions(
     },
     openDestination: (request) => {
       const current = get();
-      // An explicit new tab/split is an invitation to create another instance.
-      if (!activeLayoutView(current.layout)?.placeholder) {
+      // An explicit new tab/split is an invitation to create another instance, until it's used.
+      const active = activeLayoutView(current.layout);
+      if (!active?.placeholder && !active?.fresh) {
         const spaceId = request.surfaceId === "space" ? request.groupKey.split(":")[1] : null;
         const existing = allLayoutViews(current.layout)
           .filter(
@@ -107,18 +110,25 @@ export function workspaceOpenActions(
       }
       return get().openSurface({ ...request, syncExistingRoute: false });
     },
+    // Typing or clicking in a new tab makes it a tab like any other.
     commitPlaceholder: (tabId) => {
-      if (!allLayoutViews(get().layout).some((tab) => tab.id === tabId && tab.placeholder)) return;
+      if (
+        !allLayoutViews(get().layout).some(
+          (tab) => tab.id === tabId && (tab.placeholder || tab.fresh),
+        )
+      )
+        return;
       set((current) => ({
         layout: mapLayoutViews(current.layout, (tab) =>
-          tab.id === tabId ? { ...tab, placeholder: false } : tab,
+          tab.id === tabId ? { ...tab, placeholder: false, fresh: false } : tab,
         ),
       }));
     },
     addSurface: (request) => get().openSurface({ ...request, forceNew: true }),
-    newTab: () => {
+    newTab: (route) => {
       const current = get(),
-        view = createDefaultWorkspaceView();
+        idle = createDefaultWorkspaceView(),
+        view = route ? { ...idle, route, placeholder: false, fresh: true } : idle;
       set(withLayout(current, appendTab(current.layout, singleViewTab(view))));
       return view;
     },

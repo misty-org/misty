@@ -1,9 +1,13 @@
 import { create } from "zustand";
 import { createDeviceSetting } from "@/shared/lib/deviceSetting";
 
-/** The Agents window's pages: the person's agents, then what their engines' CLIs need. */
+/**
+ * The Agents window's pages: the person's agents and the personas they can start from, their
+ * engines, then what those engines can use: plugins, skills, prompts, MCP servers and apps.
+ */
 export type AgentsHubPage =
   | "agents"
+  | "personas"
   | "clis"
   | "channels"
   | "environment"
@@ -11,18 +15,21 @@ export type AgentsHubPage =
   | "plugins"
   | "mcp"
   | "skills"
-  | "prompts";
+  | "prompts"
+  | "apps";
 
 const hubPages: AgentsHubPage[] = [
   "agents",
+  "personas",
   "clis",
   "channels",
   "environment",
   "usage",
   "plugins",
-  "mcp",
   "skills",
   "prompts",
+  "mcp",
+  "apps",
 ];
 
 /** The page last shown, kept for the device in misty.db; the window itself always starts closed. */

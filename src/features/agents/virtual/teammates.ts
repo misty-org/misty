@@ -5,6 +5,9 @@ import type { StudioState } from "./useStudioAgents";
 export interface TeammateAgent {
   /** Unique across members: the same agent id can exist on two people's computers. */
   key: string;
+  /** The member it belongs to, and its own id on their computer. */
+  userId: string;
+  agentId: string;
   name: string;
   /** The person it belongs to. An agent's name is free text, so whose it is always shows. */
   owner: string;

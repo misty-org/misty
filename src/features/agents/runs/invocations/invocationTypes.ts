@@ -174,6 +174,13 @@ export interface AiSurfaceAdapter {
   openCitation?: (citation: AiCitation) => void;
 }
 export interface AiInvocationRequest {
+  /**
+   * The engine a run for Misty's own work goes to (the default engine), when it names no agent
+   * on one. An agent's own engine wins.
+   */
+  engineId?: string;
+  /** Images handed to the run as they are, for Misty's own work (pointing, reading a page). */
+  images?: { mimeType: string; dataUrl: string }[];
   /** The Space of the window it came from; a new conversation joins it. */
   spaceId?: string;
   /** The profile of the window it came from, whose sign-ins the run uses. */

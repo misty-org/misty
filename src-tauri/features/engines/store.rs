@@ -122,6 +122,21 @@ pub fn session(
         .ok()
 }
 
+/// The engine session a chat last kept, with its engine, wherever it ran: `(engine, session)`.
+pub fn chat_session(store: &Store, account: &str, conversation: &str) -> Option<(String, String)> {
+    store
+        .connect()
+        .ok()?
+        .query_row(
+            "SELECT engine, session_id FROM engine_sessions
+             WHERE account = ?1 AND conversation_id = ?2
+             ORDER BY updated_at DESC LIMIT 1",
+            [account, conversation],
+            |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
+        )
+        .ok()
+}
+
 pub fn keep_session(
     store: &Store,
     account: &str,

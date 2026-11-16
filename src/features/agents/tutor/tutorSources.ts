@@ -1,3 +1,4 @@
+import { recognitionLanguage } from "@/features/voice";
 import { invoke } from "@tauri-apps/api/core";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { useTutorStore } from "./tutorStore";
@@ -5,7 +6,7 @@ import type { NotebookSource } from "./tutorTypes";
 
 /**
  * Every way a notebook takes a source. Files and recordings are read in native code (the confined
- * document worker, Soniox on the person's key); links are read by Misty itself, so the notebook
+ * document worker, the computer's own speech recognition); links are read by Misty itself, so the notebook
  * keeps their text; pasted text is kept as it is.
  */
 
@@ -89,10 +90,12 @@ export async function addDroppedFiles(notebookId: string, files: File[]): Promis
   return failed;
 }
 
-/** Recordings, transcribed with speakers. Answers what couldn't be read. */
+/** Recordings, transcribed by this computer's own speech recognition. Answers what couldn't be read. */
 export async function addRecordings(notebookId: string): Promise<string[]> {
   if (!hasTauriInternals()) throw desktopOnly("Recordings");
-  const recordings = await invoke<TranscribedSource[]>("tutor_transcribe_sources");
+  const recordings = await invoke<TranscribedSource[]>("tutor_transcribe_sources", {
+    language: recognitionLanguage(),
+  });
   for (const recording of recordings.slice(0, room(notebookId)))
     if (!recording.error && recording.text)
       useTutorStore.getState().addSource(notebookId, {
@@ -128,15 +131,26 @@ export function addLink(notebookId: string, url: string, title?: string): Promis
   return readLink(notebookId, source);
 }
 
+/** A page that hasn't answered by then won't: the source stops reading and says so. */
+const readLimitMs = 45_000;
+
 /** Reads a link source's text into it. Answers why it couldn't, if it couldn't. */
 export async function readLink(notebookId: string, source: NotebookSource): Promise<string | null> {
   if (!hasTauriInternals() || !source.url) return null;
   useTutorStore.getState().updateSource(notebookId, source.id, { reading: true });
+  let timer: ReturnType<typeof setTimeout> | undefined;
   try {
-    const read = await invoke<{ title: string; text: string; truncated: boolean }>(
-      "tutor_read_link",
-      { url: source.url },
-    );
+    const read = await Promise.race([
+      invoke<{ title: string; text: string; truncated: boolean }>("tutor_read_link", {
+        url: source.url,
+      }),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(
+          () => reject(new Error("The page took too long to answer.")),
+          readLimitMs,
+        );
+      }),
+    ]);
     useTutorStore.getState().updateSource(notebookId, source.id, {
       text: read.text,
       truncated: read.truncated,
@@ -147,5 +161,7 @@ export async function readLink(notebookId: string, source: NotebookSource): Prom
   } catch (reason) {
     useTutorStore.getState().updateSource(notebookId, source.id, { reading: false });
     return `${source.title}: ${reason instanceof Error ? reason.message : String(reason)}`;
+  } finally {
+    clearTimeout(timer);
   }
 }

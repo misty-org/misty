@@ -13,7 +13,7 @@ function Glyph({ children }: { children: ReactNode }) {
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden="true"
-      style={{ width: 16, height: 16 }}
+      style={{ width: "1rem", height: "1rem" }}
     >
       {children}
     </svg>

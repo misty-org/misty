@@ -3,17 +3,29 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 const APP_ZOOM_STORAGE_KEY = "misty.app.zoom";
 export const appZoomDefault = 1;
-/** 100% renders at 1.1: the person found the type, controls and rows read best a step up from
- * the raw CSS sizes, so that step is the default and every percentage is relative to it. */
-export const appZoomBaseline = 1.1;
-/** UI percentages are relative to the product baseline. */
+/**
+ * 100% renders at 1: the page zoom is the person's own and nothing else. The step up the type,
+ * controls and rows read best at (once a hidden 1.1× page zoom) is in the CSS now: the main
+ * window's root is 110% (src/styles/App.css) and every size is in rem, so it grows with it.
+ */
+export const appZoomBaseline = 1;
+/** The render scale for a zoom, the factor the webview's page zoom is set to. */
 export function appZoomRenderScale(zoom: number): number {
   return Math.round(zoom * appZoomBaseline * 1000) / 1000;
 }
-/** Persist physical scale for compatibility with existing settings. */
+/**
+ * Saved zooms keep the unit they were first written in, when 100% was a 1.1× page zoom, so a
+ * zoom someone chose before keeps its percentage: 1.1 saved is 100%, 1.32 is 120%.
+ */
+const storedZoomUnit = 1.1;
+/** What a zoom is saved as, in the storage and in the device preference. */
+export const appZoomStoredDefault = storedZoomUnit;
+export function appZoomToStoredScale(zoom: number): number {
+  return Math.round(zoom * storedZoomUnit * 1000) / 1000;
+}
 export function appZoomFromStoredScale(scale: number): number {
   if (scale === 1) return appZoomDefault;
-  return clampAppZoom(scale / appZoomBaseline);
+  return clampAppZoom(scale / storedZoomUnit);
 }
 export const appZoomMin = 0.8;
 export const appZoomMax = 2;
@@ -177,7 +189,7 @@ function loadStoredAppZoom(): number {
 function saveStoredAppZoom(zoom: number): void {
   try {
     if (zoom === appZoomDefault) window.localStorage.removeItem(APP_ZOOM_STORAGE_KEY);
-    else window.localStorage.setItem(APP_ZOOM_STORAGE_KEY, String(appZoomRenderScale(zoom)));
+    else window.localStorage.setItem(APP_ZOOM_STORAGE_KEY, String(appZoomToStoredScale(zoom)));
   } catch {
     // Browser privacy modes can disable localStorage; zoom still works for the session.
   }

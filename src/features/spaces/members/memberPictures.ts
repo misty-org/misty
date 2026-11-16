@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { accountFetchAvatar } from "@/features/account";
 import { spacesApi } from "../api/api";
 
 /**
@@ -15,6 +16,23 @@ export function memberPicture(spaceId: string, userId: string, version: number) 
   if (!picture) {
     picture = spacesApi
       .memberAvatar(spaceId, userId)
+      .then((blob) => (blob.size ? URL.createObjectURL(blob) : null))
+      .catch(() => null);
+    pictures.set(key, picture);
+  }
+  return picture;
+}
+
+/**
+ * The person's own profile picture, from their account, so their face is theirs on every page
+ * even before a Space has their picture. Fetched once per picture version, like a member's.
+ */
+export function myPicture(version: number) {
+  if (!version) return Promise.resolve(null);
+  const key = `me:${version}`;
+  let picture = pictures.get(key);
+  if (!picture) {
+    picture = accountFetchAvatar()
       .then((blob) => (blob.size ? URL.createObjectURL(blob) : null))
       .catch(() => null);
     pictures.set(key, picture);

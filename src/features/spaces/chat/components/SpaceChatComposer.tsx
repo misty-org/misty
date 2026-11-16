@@ -101,7 +101,7 @@ export function SpaceChatComposer(props: SpaceChatComposerProps) {
     }
   };
   return (
-    <Surface tone="page" className="shrink-0 px-[clamp(16px,2.5vw,32px)] pt-2 pb-5">
+    <Surface tone="page" className="shrink-0 px-[clamp(1rem,2.5vw,2rem)] pt-2 pb-5">
       {props.typingLabel ? (
         <Text
           as="p"
@@ -165,7 +165,7 @@ export function SpaceChatComposer(props: SpaceChatComposerProps) {
                           as="mark"
                           tone="active"
                           key={index}
-                          className="-mx-1 rounded-[3px] px-1 py-0.5"
+                          className="-mx-1 rounded-[0.1875rem] px-1 py-0.5"
                         >
                           <Text bare tone="default">
                             {segment.text}

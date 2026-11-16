@@ -1,4 +1,13 @@
-import { IconButton, PlaceholderIcon, Pressable, Skeleton, Surface, Text } from "@/shared/ui";
+import {
+  cn,
+  IconButton,
+  PlaceholderIcon,
+  Pressable,
+  rowShape,
+  Skeleton,
+  Surface,
+  Text,
+} from "@/shared/ui";
 import { ChevronRight, FileText, Link2, PanelRightClose } from "lucide-react";
 import { useSpaceResource } from "../../../api/spaceResource";
 import type { UnifiedNote } from "../noteTypes";
@@ -68,8 +77,8 @@ function BacklinksInspector(props: {
       <div className="misty-scrollbar min-h-0 flex-1 overflow-auto p-3">
         {loading ? (
           <div className="grid gap-1" aria-hidden="true">
-            <Skeleton className="h-9 w-full rounded-lg" />
-            <Skeleton className="h-9 w-4/5 rounded-lg" />
+            <Skeleton className="h-8 w-full rounded-md" />
+            <Skeleton className="h-8 w-4/5 rounded-md" />
           </div>
         ) : links.length ? (
           <div className="grid gap-1">
@@ -77,7 +86,7 @@ function BacklinksInspector(props: {
               <Pressable
                 key={backlink.id}
                 wash="row"
-                className="flex items-center rounded-lg px-3 py-2"
+                className={cn(rowShape, "w-full text-left")}
                 onClick={() => props.onSelectNote?.(`misty:${backlink.id}`)}
               >
                 <FileText />

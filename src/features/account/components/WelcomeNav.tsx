@@ -1,6 +1,6 @@
 import { routes } from "@/app/shell";
 import { MistyBrandIcon } from "@/features/app-windows";
-import { IconButton, Pressable, Text } from "@/shared/ui";
+import { Button, IconButton, Surface, Text } from "@/shared/ui";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import type { ComponentType, SVGProps } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -27,21 +27,25 @@ export function WelcomeNav() {
   const navigate = useNavigate();
   const location = useLocation();
   return (
-    <nav
+    <Surface
+      as="nav"
       aria-label="Misty"
-      className="absolute inset-x-4 top-1 z-10 mx-auto flex h-14 max-w-5xl items-center gap-2 rounded-2xl border px-4 sm:inset-x-8"
+      tone="none"
+      edge="hairline"
+      radius="xl"
+      className="absolute inset-x-4 top-1 z-10 mx-auto flex h-(--ui-header) max-w-5xl items-center gap-2 px-2 sm:inset-x-8"
     >
-      <Pressable
+      <Button
+        variant="quiet"
         aria-label="Misty home"
-        className="flex items-center gap-2.5 rounded-lg px-1.5 py-1"
+        icon={<MistyBrandIcon aria-hidden />}
         onClick={() => navigate(routes.welcome, { state: location.state })}
       >
-        <MistyBrandIcon size={26} aria-hidden />
-        <Text bare tone="bright" className="text-lg font-semibold tracking-[-0.02em]">
+        <Text bare size="page" weight="semibold" tone="bright">
           Misty
         </Text>
-      </Pressable>
-      <div className="ml-auto flex items-center gap-0.5">
+      </Button>
+      <div className="ml-auto flex items-center gap-1">
         {socialAccounts.map(({ label, icon: Icon, href }) => (
           <IconButton
             key={label}
@@ -53,6 +57,6 @@ export function WelcomeNav() {
           </IconButton>
         ))}
       </div>
-    </nav>
+    </Surface>
   );
 }

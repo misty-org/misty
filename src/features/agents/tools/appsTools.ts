@@ -10,10 +10,10 @@ import {
 } from "./host";
 
 /**
- * `integration.*` on this computer. Native code holds the Composio
- * key and decides what a call may do; here are the checks on what the model sent, the wait while the
- * person answers a card, and the words the model gets back. With no key native code refuses every call
- * with `apps_not_connected`, saying to use the app's web page.
+ * `integration.*` on this computer, over the apps the person connected directly (`directApi`).
+ * Native code decides what a call may do; here are the checks on what the model sent, the wait while
+ * the person answers a card, and the words the model gets back. With no app connected native code
+ * refuses every call with `apps_not_connected`, saying to use the app's web page.
  */
 
 export interface ActiveAccount {
@@ -23,7 +23,7 @@ export interface ActiveAccount {
   status: string;
 }
 
-export interface ComposioSearch {
+export interface AppsSearch {
   found: {
     results: {
       use_case: string;
@@ -44,13 +44,11 @@ export interface ComposioSearch {
   accounts: ActiveAccount[];
 }
 
-type Connect = { state: "connected" } | { state: "card"; name: string; request: AppRequest };
 type Executed =
   { state: "done"; result: unknown } | { state: "waiting"; title: string; request: AppRequest };
 
 /** One call waits this long for the person, then the run hands off and the card stays. */
 const holdMs = 40_000;
-const connectCheckMs = 2_000;
 const approvalCheckMs = 1_000;
 
 const toolSlug = /^[A-Z][A-Z0-9_]{2,127}$/;
@@ -84,7 +82,7 @@ async function read<T>(command: string, args?: Record<string, unknown>): Promise
 /** A failure native code didn't explain counts as unknown, which the host reports as uncertain. */
 async function execute(args: Record<string, unknown>): Promise<Executed> {
   try {
-    return await invoke<Executed>("composio_tool_execute", args);
+    return await invoke<Executed>("apps_tool_execute", args);
   } catch (cause) {
     throw refusal(cause) ?? new LocalToolUncertain(String(cause));
   }
@@ -92,7 +90,7 @@ async function execute(args: Record<string, unknown>): Promise<Executed> {
 
 /** Native code raises the card from what it holds, so a window can't make one up. */
 function showCard(runId: string, request: AppRequest) {
-  void invoke("composio_request_show", { runId, id: request.id }).catch(() => undefined);
+  void invoke("apps_request_show", { runId, id: request.id }).catch(() => undefined);
 }
 
 function pause(ms: number, signal: AbortSignal) {
@@ -122,9 +120,8 @@ async function hold(
     if (signal.aborted) {
       throw new LocalToolRejected("cancelled", "The run stopped waiting for this.");
     }
-    current = (
-      await read<{ request: AppRequest }>("composio_request_get", { id: current.id, runId })
-    ).request;
+    current = (await read<{ request: AppRequest }>("apps_request_get", { id: current.id, runId }))
+      .request;
   }
   return current;
 }
@@ -139,7 +136,7 @@ const search: LocalToolHandler = async ({ runId, input }) => {
   ) {
     throw invalid();
   }
-  const found = await read<ComposioSearch>("composio_tool_search", { runId, queries });
+  const found = await read<AppsSearch>("apps_tool_search", { runId, queries });
   return appsSearchView(found, await appRunRequest(runId));
 };
 
@@ -153,11 +150,11 @@ const schemas: LocalToolHandler = async ({ runId, input }) => {
   ) {
     throw invalid();
   }
-  return appsBounded(await read("composio_tool_schemas", { runId, toolSlugs: slugs }));
+  return appsBounded(await read("apps_tool_schemas", { runId, toolSlugs: slugs }));
 };
 
 const connected: LocalToolHandler = async ({ runId }) => {
-  const items = await read<ActiveAccount[]>("composio_tool_connected", { runId });
+  const items = await read<ActiveAccount[]>("apps_tool_connected", { runId });
   return {
     connected: items.map(({ app, account, alias, status }) => ({ app, account, alias, status })),
   };
@@ -165,37 +162,22 @@ const connected: LocalToolHandler = async ({ runId }) => {
 
 const connectedResult = (app: string) => ({ app, status: "connected", connected: true });
 
-const connect: LocalToolHandler = async ({ runId, input, signal }) => {
+/**
+ * Apps are connected by the person, in Misty's Apps page, never from a run: an app already connected
+ * answers so; any other is the person's to connect, and meanwhile the agent uses its web page.
+ */
+const connect: LocalToolHandler = async ({ runId, input }) => {
   const app = (typeof input.app === "string" ? input.app : "").trim().toLowerCase();
   if (!appSlug.test(app)) {
     throw invalid("app must be an app slug from integration_search, such as googledrive");
   }
-  if (!mayConnect(app, await appRunRequest(runId))) {
-    const accounts = await read<ActiveAccount[]>("composio_tool_connected", { runId });
-    if (accounts.some((item) => item.app === app)) return connectedResult(app);
-    throw invalid(searchAppRefusal(app));
-  }
-  const opened = await read<Connect>("composio_tool_connect", { runId, subject: app });
-  if (opened.state === "connected") return connectedResult(app);
-  const { name, request } = opened;
-  const dismissed = () =>
-    invalid(
-      `The user dismissed using ${name} here. Continue without it, or ask what they would prefer.`,
-    );
-  if (request.state === "declined") throw dismissed();
-  showCard(runId, request);
-  const answered = await hold(runId, request, connectCheckMs, signal);
-  if (answered.state === "connected") {
-    showCard(runId, answered);
-    return connectedResult(app);
-  }
-  if (answered.state === "declined") throw dismissed();
-  return {
-    app,
-    status: "waiting_for_user",
-    message: `A ${request.title} card is showing in the chat. This run ends here and Misty continues once the user connects ${name}.`,
-    user_message: `${request.summary} Use the card above; Misty continues once it's done.`,
-  };
+  const accounts = await read<ActiveAccount[]>("apps_tool_connected", { runId });
+  if (accounts.some((item) => item.app === app)) return connectedResult(app);
+  if (!mayConnect(app, await appRunRequest(runId))) throw invalid(searchAppRefusal(app));
+  throw new LocalToolRejected(
+    "apps_not_connected",
+    `${app} isn't connected. The user connects apps in Misty's Apps page; use the app's web page in the browser meanwhile.`,
+  );
 };
 
 const run: LocalToolHandler = async ({ runId, input, signal }: LocalToolRequest) => {

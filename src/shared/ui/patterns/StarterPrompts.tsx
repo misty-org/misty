@@ -1,6 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 import { useLayoutEffect, useRef } from "react";
 import { cn } from "../classNames";
+import { rowShape } from "../display/rowShape";
 
 export type StarterPrompt = {
   /** What the idea is, in a few words: the row's label. */
@@ -53,7 +54,8 @@ export function StarterPrompts({
                 type="button"
                 onClick={() => onPick(item)}
                 className={cn(
-                  "flex h-9 w-full min-w-0 items-center gap-2.5 rounded-md px-3 text-left",
+                  rowShape,
+                  "w-full text-left",
                   "text-control text-cream outline-none transition-colors",
                   "hover:bg-control-hover hover:text-cream-bright",
                   "focus-visible:bg-control-hover focus-visible:text-cream-bright",

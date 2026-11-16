@@ -98,6 +98,28 @@ pub fn close_browser_webview(
     let Some(webview) = app.get_webview(&webview_label(&request.id)?) else {
         return Ok(());
     };
+    silence_page(&webview);
+    unregister_browser_cursor_ownership(&webview)?;
+    #[cfg(target_os = "macos")]
+    crate::browser::pages::url_observer::remove(&webview, &request.id);
+    close_page(&webview)
+}
+
+/// A window closed with its pages: forget the pages its renderer can no longer close.
+pub(crate) fn forget_closed_pages(app: &AppHandle) {
+    if let Some(state) = app.try_state::<BrowserSessionState>() {
+        if let Ok(mut sessions) = state.sessions.lock() {
+            sessions.retain(|id, _| {
+                crate::browser::webview_label(id)
+                    .is_ok_and(|label| app.get_webview(&label).is_some())
+            });
+        }
+    }
+}
+
+/// Stops a page for good: mutes and pauses its media, stops loading, puts it out of sight and
+/// blanks it.
+pub(in crate::browser) fn silence_page(webview: &Webview) {
     #[cfg(target_os = "macos")]
     let _ = webview.with_webview(|platform_webview| unsafe {
         let view: &objc2::runtime::AnyObject = &*platform_webview.inner().cast();
@@ -121,9 +143,10 @@ pub fn close_browser_webview(
     if let Ok(blank) = tauri::Url::parse("about:blank") {
         let _ = webview.navigate(blank);
     }
-    unregister_browser_cursor_ownership(&webview)?;
-    #[cfg(target_os = "macos")]
-    crate::browser::pages::url_observer::remove(&webview, &request.id);
+}
+
+/// Closes a page and its WebKit page process.
+pub(in crate::browser) fn close_page(webview: &Webview) -> Result<(), String> {
     // Close the page itself last, which lets go of its WebKit page process. Removing the view
     // alone left every closed tab's process running (40 to 470 MB each), since something still
     // held the view; the app reached 250 page processes for 54 open pages.
@@ -134,18 +157,5 @@ pub fn close_browser_webview(
             let _: () = objc2::msg_send![view, _close];
         }
     });
-    webview.close().map_err(|error| error.to_string())?;
-    Ok(())
-}
-
-/// A window closed with its pages: forget the pages its renderer can no longer close.
-pub(crate) fn forget_closed_pages(app: &AppHandle) {
-    if let Some(state) = app.try_state::<BrowserSessionState>() {
-        if let Ok(mut sessions) = state.sessions.lock() {
-            sessions.retain(|id, _| {
-                crate::browser::webview_label(id)
-                    .is_ok_and(|label| app.get_webview(&label).is_some())
-            });
-        }
-    }
+    webview.close().map_err(|error| error.to_string())
 }

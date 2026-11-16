@@ -60,6 +60,19 @@ vi.mock("@/shared/platform/nativeInvoke", () => ({
         };
       case "direct_apps_list":
         return [];
+      // What each engine can do: only one with images, Misty's tools and web search can be the
+      // default engine (OpenCode, here, has no web search).
+      case "engines_list":
+        return ["claude", "codex", "agy", "opencode"].map((id) => ({
+          id,
+          name: id,
+          installed: mocks.installed.has(id),
+          version: null,
+          supportsImages: true,
+          supportsMcp: true,
+          supportsWebSearch: id !== "opencode" && id !== "agy",
+          modes: [],
+        }));
       default:
         throw new Error(`unexpected ${command}`);
     }
@@ -153,20 +166,58 @@ it("explains how Misty works before the engines, and comes back to it", async ()
   expect(screen.getAllByRole("listitem", { name: /^Step \d of 3$/ }).length).toBe(3);
   expect(screen.queryByRole("button", { name: "Install Claude Code" })).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Continue" }));
-  expect(await screen.findByRole("heading", { name: "Pick an AI to start with" })).toBeTruthy();
+  expect(await screen.findByRole("heading", { name: "Pick your default engine" })).toBeTruthy();
   expect(await screen.findByRole("button", { name: "Install Claude Code" })).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Back" }));
   expect(screen.getByRole("heading", { name: "How Misty works" })).toBeTruthy();
 });
 
-it("needs one ready engine to continue, and offers to skip without one", async () => {
+it("needs a ready engine that can run Misty to continue, with no way to skip", async () => {
   renderSetup();
   expect(await screen.findByRole("button", { name: "Install Claude Code" })).toBeTruthy();
   expect(screen.getByRole("button", { name: "Continue" }).hasAttribute("disabled")).toBe(true);
-  fireEvent.click(screen.getByRole("button", { name: "Skip for now" }));
-  expect(
-    await screen.findByRole("heading", { name: "Which apps should agents use?" }),
-  ).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Skip for now" })).toBeNull();
+});
+
+it("doesn't count a ready engine that can't run Misty's own work", async () => {
+  // OpenCode is ready with no account, but brings no web search of its own.
+  mocks.installed.add("opencode");
+  renderSetup();
+  expect(await screen.findByText("Can't run Misty's own work")).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Continue" }).hasAttribute("disabled")).toBe(true);
+});
+
+it("picks the first capable engine as the default, and lets another be chosen", async () => {
+  mocks.installed.add("claude").add("codex");
+  mocks.signedIn.set("claude", true).set("codex", true);
+  renderSetup();
+  const claude = await screen.findByRole("radio", { name: /claude/i });
+  await waitFor(() => expect(claude.getAttribute("aria-checked")).toBe("true"));
+  const codex = screen.getByRole("radio", { name: /codex/i });
+  expect(codex.getAttribute("aria-checked")).toBe("false");
+  fireEvent.click(codex);
+  await waitFor(() => expect(codex.getAttribute("aria-checked")).toBe("true"));
+  expect(claude.getAttribute("aria-checked")).toBe("false");
+});
+
+it("opens on the engines alone for someone sent back to pick a default engine", async () => {
+  mocks.installed.add("claude");
+  mocks.signedIn.set("claude", true);
+  render(
+    <MemoryRouter initialEntries={[{ pathname: "/setup", state: { engineOnly: true } }]}>
+      <Routes>
+        <Route path="/setup" element={<SetupPage />} />
+        <Route path="*" element={<Where />} />
+      </Routes>
+    </MemoryRouter>,
+  );
+  expect(screen.getByRole("heading", { name: "Pick your default engine" })).toBeTruthy();
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "Continue" }).hasAttribute("disabled")).toBe(false),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+  await waitFor(() => expect(screen.getByTestId("where").textContent).toBe("/agents"));
+  expect(screen.queryByRole("heading", { name: "Which apps should agents use?" })).toBeNull();
 });
 
 it("shows a signed-out engine's sign-in, and a signed-in one as ready", async () => {
@@ -191,9 +242,6 @@ it("offers only the direct sign-ins, which need no key, then ends the welcome", 
   // Apps that sign in directly come first; one that needs a key of Misty's never shows.
   expect(await screen.findByRole("button", { name: "Connect Notion" })).toBeTruthy();
   expect(screen.queryByRole("button", { name: "Connect Asana" })).toBeNull();
-  // Composio needs a developer key, so it waits for the integrations settings.
-  expect(screen.queryByRole("button", { name: /Composio/ })).toBeNull();
-  expect(screen.queryByLabelText("Composio key")).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Start using Misty" }));
   await waitFor(() => expect(screen.getByTestId("where").textContent).toBe("/agents"));
   expect(useSetupStore.getState().welcomed).toBe(true);

@@ -1,5 +1,12 @@
-import { engineFolder, engineModels, mistyEngine, modelNamed } from "../../engines/enginesApi";
+import {
+  engineFolder,
+  engineModels,
+  mistyEngine,
+  modelNamed,
+  usablePick,
+} from "../../engines/enginesApi";
 import { effectiveEffort } from "../../conversations/composer/controls/engineOptions";
+import { defaultEngineId } from "../../engines/engineRun";
 import { engineModesFor, resolveEngineMode } from "../../engines/engineModes";
 import { personaInstructions } from "../../personas/catalogApi";
 import { assembleAgentPrompt } from "../../bots/botPrompt";
@@ -106,9 +113,22 @@ export async function buildRunBody(
   // the engine's own modes (an older Ask, Auto, Plan or Bypass maps to the engine's own here).
   const saved = input.permissionMode ?? (state.permissionMode || agent?.default_run_mode || "ask");
   const chosenCollaboration = input.collaborationMode ?? (conversationId ? state.mode : undefined);
-  const onEngine = Boolean(agent?.engine && agent.engine !== mistyEngine);
+  // A run for Misty's own work (the Lab, Tutor) names its engine itself and may have no agent.
+  // Misty has no model of its own: an agent with no outside engine (one made before, or Misty's own
+  // from before) runs on the default engine too.
+  const engineId =
+    agent?.engine && agent.engine !== mistyEngine
+      ? agent.engine
+      : input.engineId || (await defaultEngineId().catch(() => "")) || undefined;
+  const onEngine = Boolean(engineId);
+  // The engine's own list, and the chat's model (else its agent's) as it can run there: a saved
+  // pick the account can no longer run gives way to the engine's own (`usablePick`).
+  const listedModels = engineId ? await engineModels(engineId) : [];
+  const modelId = engineId
+    ? usablePick(engineId, listedModels, choices.model || agent?.engine_model || "")
+    : "";
   const mode = resolveEngineMode(
-    await engineModesFor(onEngine ? agent?.engine : mistyEngine),
+    await engineModesFor(onEngine ? engineId : mistyEngine),
     saved,
     chosenCollaboration === "plan",
   );
@@ -130,7 +150,7 @@ export async function buildRunBody(
     conversation_id: conversationId,
     now: goNow(server.timezone, new Date(now)),
     signed_in: signedIn,
-    composio_key: await composioKeySaved(),
+    apps_connected: await appsConnected(),
     device_names: names,
     collaboration: collaborationOf(state, now),
     conversation_title: chat.title,
@@ -156,28 +176,25 @@ export async function buildRunBody(
     // (`engines/agent_folder.rs`); the Space's folder named here is only what an agent with none
     // yet takes.
     engine:
-      agent?.engine && onEngine
+      engineId && onEngine
         ? {
-            id: agent.engine,
+            id: engineId,
             // The composer's choice for this chat wins over the agent's default.
-            model: choices.model || agent.engine_model || "",
+            model: modelId,
             // The level the composer shows for that model, which may take fewer than the engine.
             effort: effectiveEffort({
-              engine: agent.engine,
-              modelId: choices.model || agent.engine_model || "",
-              model: modelNamed(
-                await engineModels(agent.engine),
-                choices.model || agent.engine_model || "",
-              ),
+              engine: engineId,
+              modelId,
+              model: modelNamed(listedModels, modelId),
               chosen: choices.effort,
-              agentEffort: agent.reasoning_effort,
+              agentEffort: agent?.reasoning_effort,
             }),
             // A multi-run lane's chat works in the lane's own worktree, not the linked folder.
             folder: (await multirunFolderOf(conversationId)) ?? (await engineFolder(spaceId)),
             // A bot's runtime: extra arguments and MCP servers for the engine, by name. Native
             // code decides which it passes.
-            args: agent.runtime_args?.length ? agent.runtime_args : undefined,
-            mcp_servers: agent.mcp_servers?.length ? agent.mcp_servers : undefined,
+            args: agent?.runtime_args?.length ? agent.runtime_args : undefined,
+            mcp_servers: agent?.mcp_servers?.length ? agent.mcp_servers : undefined,
             // In a shared Space: the files teammates' agents are changing now, from their run
             // events. Native code puts it before the prompt (`engines/runs.rs`).
             teammates: teammateClaimsNote() || undefined,
@@ -185,13 +202,22 @@ export async function buildRunBody(
         : undefined,
     resolved_context: sources.map(({ kind, title, content }) => ({ kind, title, content })),
     prior_write_receipts: await priorWriteReceipts(chat.priorRuns, input.agentId),
-    attachments,
+    // Images a run for Misty's own work hands over directly (a crop to point at, a page to read).
+    attachments: [
+      ...attachments,
+      ...(input.images ?? []).map((image, index) => ({
+        name: `image-${index + 1}`,
+        mime_type: image.mimeType,
+        data_url: image.dataUrl,
+      })),
+    ],
     ...(import.meta.env.DEV && input.evalTurnLimit ? { eval_turn_limit: input.evalTurnLimit } : {}),
   };
   return { body, sources, requestedKind, permissionMode, collaborationMode };
 }
 
-async function composioKeySaved(): Promise<boolean> {
-  const saved = await invoke<string[]>("model_keys_saved").catch(() => [] as string[]);
-  return saved.includes("composio");
+/** Whether the person connected any app directly, so `integration.*` is worth offering. */
+async function appsConnected(): Promise<boolean> {
+  const apps = await invoke<unknown[]>("direct_apps_list").catch(() => [] as unknown[]);
+  return apps.length > 0;
 }

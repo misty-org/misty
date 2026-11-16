@@ -51,7 +51,8 @@ import {
 } from "@/shared/ui";
 import { ChatRow, pressMenuKey, RenameRow, SectionNameDialog } from "./SidebarChatRows";
 import type { OpenPlace } from "./spaceNavigation";
-import { chatSectionClass } from "./styles";
+import { useCollapsedAgents, toggleAgentChats } from "./collapsedAgents";
+import { chatSectionClass, markSlotClass } from "./styles";
 
 export interface SidebarChat {
   id: string;
@@ -65,6 +66,12 @@ export interface SidebarChat {
   lastReadAt?: string;
 }
 
+/** Whether a group's chats are on screen: Archived opens on demand, an agent's folds away. */
+function groupOpen(group: Group, archivedOpen: boolean, collapsedAgents: readonly string[]) {
+  if (group.agent) return !collapsedAgents.includes(group.agent.id);
+  return !group.collapsible || archivedOpen;
+}
+
 /** The unfiled chats' value in the Move to section menu. */
 const unfiled = "";
 
@@ -74,11 +81,14 @@ interface Group {
   chats: SidebarChat[];
   section?: ChatSection;
   collapsible?: boolean;
+  /** The agent every chat in it is with: its heading names the agent, so rows drop its mark. */
+  agent?: AgentProfile;
 }
 
 /**
- * The sidebar's chats: pinned ones first, then each section the person made, then the rest, and
- * archived ones folded away at the end. A click opens a chat; Command- or Control-click picks
+ * The sidebar's chats: pinned ones first, then each section the person made, then the rest under
+ * the agent each is with (an agent's name is its own, its engine only its mark), the agent with
+ * the latest chat first, and archived ones folded away at the end. A click opens a chat; Command- or Control-click picks
  * several and Shift-click a run of them, which only highlights them. Right-click a chat for
  * everything else (open it elsewhere, pin, mark unread, rename, fork, file, archive or delete),
  * each with a one-letter key; on a picked chat it acts on all of them.
@@ -93,13 +103,14 @@ export function SidebarChats(props: {
   /** The open chat was deleted, so the page needs somewhere else to be. */
   onOpenGone(): void;
 }) {
-  const { chats, openChat } = props;
+  const { chats, openChat, agentOf } = props;
   const sections = useChatSectionsStore((state) => state.folders);
   const [selected, setSelected] = useState<string[]>([]);
   const [renaming, setRenaming] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string[] | null>(null);
   const [naming, setNaming] = useState<{ ids: string[] } | { section: ChatSection } | null>(null);
   const [archivedOpen, setArchivedOpen] = useState(false);
+  const collapsedAgents = useCollapsedAgents((state) => state.value);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   useNotice(Boolean(error), { message: error, tone: "error", onDismiss: () => setError("") });
@@ -120,19 +131,35 @@ export function SidebarChats(props: {
     const rest = live.filter(
       (chat) => !chat.pinnedAt && !(chat.folderId && filed.has(chat.folderId)),
     );
-    if (rest.length || !list.length) list.push({ id: "chats", name: "Chats", chats: rest });
+    // One group per agent, in the order their chats come (latest first); chats whose agent is
+    // gone stay together under Chats at the end.
+    const byAgent = new Map<string, { agent?: AgentProfile; chats: SidebarChat[] }>();
+    for (const chat of rest) {
+      const agent = agentOf(chat.agentId);
+      const key = agent?.id ?? "";
+      const held = byAgent.get(key) ?? { agent, chats: [] };
+      held.chats.push(chat);
+      byAgent.set(key, held);
+    }
+    const unknown = byAgent.get("");
+    byAgent.delete("");
+    for (const [id, held] of byAgent)
+      list.push({ id: `agent:${id}`, name: held.agent!.name, chats: held.chats, agent: held.agent });
+    if (unknown || !list.length)
+      list.push({ id: "chats", name: "Chats", chats: unknown?.chats ?? [] });
     const archived = chats.filter((chat) => chat.archivedAt);
     if (archived.length)
       list.push({ id: "archived", name: "Archived", chats: archived, collapsible: true });
     return list;
-  }, [chats, sections]);
+  }, [chats, sections, agentOf]);
+  const isOpen = (group: Group) => groupOpen(group, archivedOpen, collapsedAgents);
   // Every row on screen in order, for a Shift-click run.
   const shown = useMemo(
     () =>
       groups.flatMap((group) =>
-        group.collapsible && !archivedOpen ? [] : group.chats.map((chat) => chat.id),
+        groupOpen(group, archivedOpen, collapsedAgents) ? group.chats.map((chat) => chat.id) : [],
       ),
-    [groups, archivedOpen],
+    [groups, archivedOpen, collapsedAgents],
   );
   const picked = selected.filter((id) => shown.includes(id));
 
@@ -331,17 +358,37 @@ export function SidebarChats(props: {
   };
 
   const head = (group: Group) => {
+    const { agent } = group;
     const name = (
       <NavGroupHeading
-        name={group.name}
+        // An agent's group leads with its mark, the one place it shows: the rows under it are
+        // that agent's chats, so they don't repeat it.
+        name={
+          agent ? (
+            <>
+              <span className={markSlotClass}>
+                <AgentAvatar agent={agent} compact />
+              </span>
+              {group.name}
+            </>
+          ) : (
+            group.name
+          )
+        }
         collapsible={
-          group.collapsible
+          agent
             ? {
-                open: archivedOpen,
+                open: isOpen(group),
                 count: group.chats.length,
-                onToggle: () => setArchivedOpen((open) => !open),
+                onToggle: () => toggleAgentChats(agent.id),
               }
-            : undefined
+            : group.collapsible
+              ? {
+                  open: archivedOpen,
+                  count: group.chats.length,
+                  onToggle: () => setArchivedOpen((open) => !open),
+                }
+              : undefined
         }
       />
     );
@@ -396,11 +443,11 @@ export function SidebarChats(props: {
       {groups.map((group) => (
         <section key={group.id} aria-label={group.name} className={chatSectionClass}>
           {head(group)}
-          {group.collapsible && !archivedOpen
+          {!isOpen(group)
             ? null
             : group.chats.map((chat) => {
                 const agent = props.agentOf(chat.agentId);
-                const mark = <AgentAvatar agent={agent} compact />;
+                const mark = group.agent ? null : <AgentAvatar agent={agent} compact />;
                 if (renaming === chat.id)
                   return (
                     <RenameRow
@@ -417,7 +464,6 @@ export function SidebarChats(props: {
                         <ChatRow
                           chat={chat}
                           mark={mark}
-                          agentName={agent?.name.trim() || undefined}
                           status={props.statuses[chat.id]}
                           current={openChat === chat.id}
                           selected={picked.includes(chat.id)}

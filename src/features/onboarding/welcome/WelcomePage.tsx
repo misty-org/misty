@@ -1,5 +1,4 @@
 import { routes } from "@/app/shell";
-import { authButtonClass } from "@/features/account/authButtonClass";
 import { mistyPublicPage } from "@/shared/platform/mistyPublicUrl";
 import { Button, FlyingMisty, HeroPage, InlineLink } from "@/shared/ui";
 import { openUrl } from "@tauri-apps/plugin-opener";
@@ -39,24 +38,19 @@ export function WelcomePage() {
       actions={
         addingAccount ? (
           <>
-            <Button variant="primary" className={authButtonClass} size="lg" onClick={signIn}>
+            <Button variant="primary" size="lg" onClick={signIn}>
               Sign in
             </Button>
-            <Button
-              variant="secondary"
-              className={authButtonClass}
-              size="lg"
-              onClick={createAccount}
-            >
+            <Button variant="secondary" size="lg" onClick={createAccount}>
               Create account
             </Button>
           </>
         ) : (
           <>
-            <Button variant="primary" className={authButtonClass} size="lg" onClick={createAccount}>
+            <Button variant="primary" size="lg" onClick={createAccount}>
               Get started
             </Button>
-            <Button variant="secondary" className={authButtonClass} size="lg" onClick={signIn}>
+            <Button variant="secondary" size="lg" onClick={signIn}>
               Sign in
             </Button>
           </>

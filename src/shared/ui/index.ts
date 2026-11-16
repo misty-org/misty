@@ -81,6 +81,7 @@ export * from "./layout/windowToolbar";
 
 // display
 export * from "./display/Avatar";
+export * from "./display/LivePointer";
 export * from "./display/Badge";
 export * from "./display/Card";
 export * from "./display/CodeBlock";
@@ -125,6 +126,7 @@ export {
 // navigation
 export * from "./navigation/TabStrip";
 export * from "./navigation/NavRow";
+export { rowShape, rowShapeTwoLine, rowShapeWrap } from "./display/rowShape";
 
 // icons
 export * from "./icons/BrandIcon";
@@ -144,18 +146,26 @@ export * from "./patterns/RenameItemDialog";
 export * from "./patterns/MessageActions";
 export * from "./patterns/QuestionPanel";
 export * from "./patterns/FindBar";
+export * from "./patterns/ImageCropFrame";
+export * from "./patterns/ShapeSelection";
+export * from "./patterns/ZoomControl";
+export * from "./patterns/MediaPlayerCard";
 export * from "./patterns/findHighlights";
 export * from "./patterns/StarterPrompts";
 export * from "./patterns/ToolTimeline";
 export * from "./patterns/ModelPicker";
 export * from "./patterns/StepPage";
 export * from "./patterns/HeroPage";
+export * from "./patterns/home/HomeSection";
+export * from "./patterns/home/homeLayout";
+export * from "./patterns/home/ItemCard";
 
 export * from "./classNames";
 
 export {
   ComposerStatusRow,
   MessageComposer,
+  MessageComposerAction,
   MessageComposerSend,
   messageComposerTextClass,
 } from "./patterns/MessageComposer";

@@ -1,10 +1,9 @@
 //! A direct connection's tools as agents see them: found by `integration_search`, listed by
-//! `integration_connected` and run by `integration_execute`, beside Composio's and through the
-//! same approval rules (`execute::approve_and_run`).
+//! `integration_connected` and run by `integration_execute`, through the approval rules
+//! (`execute::approve_and_run`).
 //!
-//! A tool's slug is `MCP_<APP>_<TOOL>` in Composio's alphabet (`MCP_NOTION_NOTION_SEARCH`), so the
-//! model and the handlers treat both kinds the same; the server's own tool name is looked up again
-//! from the slug, never taken from the model.
+//! A tool's slug is `MCP_<APP>_<TOOL>` in upper snake case (`MCP_NOTION_NOTION_SEARCH`); the server's
+//! own tool name is looked up again from the slug, never taken from the model.
 use std::collections::{BTreeMap, HashMap};
 use std::sync::{Mutex, PoisonError};
 use std::time::{Duration, Instant};
@@ -261,8 +260,7 @@ fn score(query: &[String], connection: &Connection, tool: &DirectTool) -> usize 
         .sum()
 }
 
-/// Adds the direct connections' tools that fit each query to Composio's answer (or to an empty
-/// one when there is no Composio key).
+/// Adds the direct connections' tools that fit each query to the search's answer.
 pub async fn search_into(
     account: &str,
     queries: &[String],
@@ -302,7 +300,7 @@ pub async fn search_into(
                 tool.slug.clone(),
                 SearchSchema {
                     toolkit: connection.app.clone(),
-                    description: super::super::client::truncate(&tool.description, 600),
+                    description: super::super::text::truncate(&tool.description, 600),
                     input_schema: Some(tool.input_schema.clone()),
                     has_full_schema: true,
                 },
@@ -415,7 +413,7 @@ fn shaped(slug: &str, result: &Value) -> Result<Value, Failure> {
             if message.trim().is_empty() {
                 "The app reported that this failed.".to_owned()
             } else {
-                super::super::client::truncate(&message, 600)
+                super::super::text::truncate(&message, 600)
             },
         ));
     }
@@ -429,13 +427,13 @@ fn shaped(slug: &str, result: &Value) -> Result<Value, Failure> {
     } else {
         json!({
             "tool": slug,
-            "data_preview": super::super::client::truncate(&serialized, RESULT_LIMIT),
+            "data_preview": super::super::text::truncate(&serialized, RESULT_LIMIT),
             "note": "The result is larger than Misty passes to the model. Narrow the request.",
         })
     })
 }
 
-/// Runs a direct tool through the same rules as a Composio one.
+/// Runs a direct tool through the approval rules.
 pub async fn execute(account: &str, store: &Store, call: ExecuteCall) -> Result<Executed, Failure> {
     let (connection, tool) = resolve(account, &call.tool_slug, &call.account).await?;
     let mut tags = Vec::new();

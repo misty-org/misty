@@ -1,5 +1,4 @@
-import { needsModelKey } from "../models/ModelKeyNeeded";
-import { openModelSettings } from "../models/modelKeys";
+import { needsDefaultEngine, openEngineSettings } from "../engines/engineNeeded";
 import { ErrorNotice } from "../conversations/ErrorNotice";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useEffect, useRef, useState } from "react";
@@ -121,8 +120,8 @@ export function AgentExecutionSurface() {
             <ErrorNotice
               message={error}
               action={
-                needsModelKey(error)
-                  ? { label: "Open Models settings", onSelect: openModelSettings }
+                needsDefaultEngine(error)
+                  ? { label: "Open engine settings", onSelect: openEngineSettings }
                   : undefined
               }
               onDismiss={() => setError("")}

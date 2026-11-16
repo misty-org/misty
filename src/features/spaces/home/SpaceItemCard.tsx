@@ -3,11 +3,10 @@ import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuTrigger,
+  ItemCard,
   OverflowFadeText,
-  Pressable,
   Skeleton,
   Surface,
-  Text,
   Tooltip,
   cn,
   itemToneClass,
@@ -16,7 +15,7 @@ import { homeItemsClass, homeItemsWrapClass } from "./homeLayout";
 import type { ItemVisibility } from "../api/visibility";
 import { VisibilityMenu } from "../components/VisibilityMenu";
 import { editedLabel, type GalleryItem } from "./galleryItems";
-import { GalleryPreview, kindIcon } from "./GalleryPreview";
+import { GalleryPreview, itemIcon } from "./GalleryPreview";
 import type { MouseEvent, ReactNode } from "react";
 import { useNow } from "@/shared/hooks/useNow";
 
@@ -41,7 +40,7 @@ export function SpaceItemCard(props: {
 }) {
   const now = useNow();
   const { item } = props;
-  const { Icon, tone, label } = kindIcon[item.kind];
+  const { Icon, tone, label } = itemIcon(item);
   const isPrivate = props.solo || Boolean(item.private) || item.visibility === "private";
   const Access = isPrivate ? Lock : Users;
   const access = isPrivate
@@ -50,53 +49,26 @@ export function SpaceItemCard(props: {
       : "Private to you"
     : "Shared with everyone in this Space";
   const card = (
-    <Surface
-      tone={props.selected ? "active" : "card"}
-      // A selected card's strong edge stands in for the card's own hairline, which lifts on hover.
-      edge={props.selected ? "strong" : "none"}
-      radius="xl"
-      className="group/card relative min-w-0 overflow-hidden"
+    <ItemCard
+      selected={props.selected}
+      label={`${label}: ${item.title}`}
+      onClick={(event) => {
+        if (item.remove && props.onSelect) props.onSelect(event, item.key, props.onOpen);
+        else props.onOpen();
+      }}
+      cover={<GalleryPreview item={item} spaceId={props.spaceId} />}
+      glyph={<Icon className={itemToneClass(tone)} />}
+      title={item.title}
+      meta={
+        <>
+          <Tooltip content={access}>
+            <Access aria-label={access} className="size-4 shrink-0" />
+          </Tooltip>
+          <span aria-hidden>·</span>
+          <OverflowFadeText>Edited {editedLabel(item.updatedAt, now)}</OverflowFadeText>
+        </>
+      }
     >
-      <Pressable
-        wash="card"
-        onClick={(event) => {
-          if (item.remove && props.onSelect) props.onSelect(event, item.key, props.onOpen);
-          else props.onOpen();
-        }}
-        aria-label={`${label}: ${item.title}`}
-        className={cn(
-          "flex w-full min-w-0 flex-col rounded-xl text-left",
-          !props.selected && "border",
-        )}
-      >
-        <Surface as="span" tone="page" className="relative block h-36 border-b">
-          <span className="block size-full overflow-hidden">
-            <GalleryPreview item={item} spaceId={props.spaceId} />
-          </span>
-          <Surface
-            as="span"
-            aria-hidden
-            tone="card"
-            edge="hairline"
-            radius="lg"
-            className="absolute -bottom-4 left-4 grid size-9 place-items-center"
-          >
-            <Icon className={itemToneClass(tone)} />
-          </Surface>
-        </Surface>
-        <span className="block px-4 pb-3.5 pt-7">
-          <Text full tone="bright" className="text-base">
-            {item.title}
-          </Text>
-          <Text bare tone="muted" className="mt-1.5 flex items-center gap-1.5 text-sm">
-            <Tooltip content={access}>
-              <Access aria-label={access} className="size-4 shrink-0" />
-            </Tooltip>
-            <span aria-hidden>·</span>
-            <OverflowFadeText>Edited {editedLabel(item.updatedAt, now)}</OverflowFadeText>
-          </Text>
-        </span>
-      </Pressable>
       {props.onVisibilityChange && (
         // The menu sits on a card fill so it reads over the preview.
         <Surface
@@ -114,7 +86,7 @@ export function SpaceItemCard(props: {
           />
         </Surface>
       )}
-    </Surface>
+    </ItemCard>
   );
   if (!props.contextMenu) return card;
   return (
@@ -129,8 +101,8 @@ const titleWidths = ["w-3/4", "w-2/3", "w-1/2", "w-3/5"];
 
 /**
  * The Space home's cards while its first set of items loads, shaped like `SpaceItemCard`: the
- * 144px preview with the 36px kind tile over its edge, then the title's line and the access line
- * under it, in the home grid's own columns.
+ * cover, then the glyph and title's line and the access line under it, in the home grid's own
+ * columns.
  */
 export function SpaceItemCardsSkeleton({ cards = 8 }: { cards?: number }) {
   return (
@@ -138,19 +110,18 @@ export function SpaceItemCardsSkeleton({ cards = 8 }: { cards?: number }) {
       <span className="sr-only">Space contents</span>
       <div className={homeItemsClass} aria-hidden="true">
         {Array.from({ length: cards }, (_, index) => (
-          <Surface key={index} tone="card" radius="xl" className="min-w-0 border">
-            <div className="relative h-36 border-b">
-              <Skeleton className="absolute -bottom-4 left-4 size-9 rounded-lg" />
-            </div>
-            <div className="px-4 pb-3.5 pt-7">
-              <div className="flex h-6 items-center">
+          <div key={index} className="min-w-0">
+            <Surface tone="card" radius="xl" className="aspect-[16/10] w-full" />
+            <div className="px-0.5 pt-2.5">
+              <div className="flex h-6 items-center gap-2">
+                <Skeleton className="size-4 shrink-0 rounded-sm" />
                 <Skeleton className={cn("h-4", titleWidths[index % titleWidths.length])} />
               </div>
-              <div className="mt-1.5 flex h-5 items-center">
+              <div className="mt-1 flex h-5 items-center">
                 <Skeleton className="h-3.5 w-1/2" />
               </div>
             </div>
-          </Surface>
+          </div>
         ))}
       </div>
     </div>

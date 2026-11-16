@@ -257,6 +257,11 @@ function describeStep(step: RunStep, options: { folder?: string; page?: string }
     return action.includes("read") || action.includes("list")
       ? "Looked at a drawing"
       : "Drew on a drawing";
+  if (key.startsWith("image.")) {
+    if (action.includes("read")) return "Looked at an image's edit";
+    if (action.includes("save")) return "Saved an edited image";
+    return "Edited an image";
+  }
   if (key.startsWith("message.") || key.startsWith("thread.")) {
     if (action.includes("search")) return "Searched the Space chat";
     if (action.includes("read") || action.includes("list")) return "Read the Space chat";

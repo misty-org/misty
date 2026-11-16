@@ -1,19 +1,28 @@
 import { useAiSurfaceAdapter } from "@/features/agents";
-import { PhotoEditor } from "@/features/files";
+import {
+  PhotoEditor,
+  applyLibraryEditDefinition,
+  imageDocParts,
+  readImageEdit,
+  writeImageEdit,
+} from "@/features/files";
 import type { AiArtifact, AiSurfaceAdapter } from "@/features/agents";
 import { spacesApi } from "../../api/api";
 import type { SpaceLibraryItem } from "../../api/dto/entities";
 import { editedImageFilename, editedImageMimeType } from "./libraryMediaKind";
 import { defaultLibraryEdit } from "../SpaceLibraryViewerUtils";
 import type { LibraryEditDefinition } from "../../api/dto/common";
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
+import { useLibraryImageCollaboration } from "./useLibraryImageCollaboration";
 
 /**
- * The image path: filerobot renders in the browser and we upload the result.
+ * The image path: Misty's photo editor renders in the browser and the result is uploaded.
  *
- * "Save" replaces the original in place, "Save as a copy" uploads a new item.
- * No server-side edit rendering is involved. Errors propagate so the editor
- * surfaces them itself.
+ * Everyone with the image open edits it together, live, with their agents: the edit is shared
+ * in the image's room until someone saves it. It shows the item's preview and saves from its
+ * full-size file. "Save" replaces the item in place, "Save as copy" and "Save as" upload a new
+ * item. No server-side edit rendering is involved. Errors propagate so the editor surfaces them
+ * itself.
  */
 export function LibraryPhotoEditorView({
   spaceId,
@@ -27,6 +36,8 @@ export function LibraryPhotoEditorView({
   onClose,
   onReplaceItem,
   onRenditionReady,
+  onPrevious,
+  onNext,
 }: {
   spaceId: string;
   item: SpaceLibraryItem;
@@ -39,8 +50,25 @@ export function LibraryPhotoEditorView({
   onClose: () => void;
   onReplaceItem: (item: SpaceLibraryItem) => void;
   onRenditionReady: () => void;
+  /** The image before and after this one in the Library, when there are any. */
+  onPrevious?: () => void;
+  onNext?: () => void;
 }) {
   const filename = () => editedImageFilename(item.display_name, mimeType);
+  // The parent hands new callbacks on every render. The adapter calls the latest ones through a
+  // ref instead of depending on them: a new adapter is pushed into the AI pane host, which
+  // re-renders the Library, which hands new callbacks again ("Maximum update depth exceeded").
+  const callbacks = useRef({ onReplaceItem, onRenditionReady });
+  callbacks.current = { onReplaceItem, onRenditionReady };
+  const live = useLibraryImageCollaboration(spaceId, item.id, item.version, canEdit);
+  // The adapter reaches the live edit through a ref, for the same reason as the callbacks.
+  const liveDoc = useRef<ReturnType<typeof imageDocParts> | null>(null);
+  liveDoc.current = live.state === "live" ? imageDocParts(live.session.doc) : null;
+  const metadataSize = {
+    width: Number(item.file.intrinsic_metadata.width ?? 0),
+    height: Number(item.file.intrinsic_metadata.height ?? 0),
+  };
+  const naturalSize = metadataSize.width > 0 && metadataSize.height > 0 ? metadataSize : undefined;
   const aiAdapter = useMemo<AiSurfaceAdapter>(() => {
     const metadata = JSON.stringify({
       asset_id: item.id,
@@ -126,15 +154,27 @@ export function LibraryPhotoEditorView({
         const definition = applicableEdit(artifact);
         if (!definition)
           throw new Error("The image version changed. Ask your agent to regenerate this edit.");
+        // With the editor open the edit lands in it, live for everyone, as one step undo takes back.
+        const parts = liveDoc.current;
+        if (parts) {
+          writeImageEdit(
+            parts,
+            applyLibraryEditDefinition(
+              readImageEdit(parts),
+              definition as unknown as Record<string, unknown>,
+            ),
+          );
+          return;
+        }
         const result = await spacesApi.createEditVersion(spaceId, item, definition);
         if (!result.edit || !result.item)
           throw new Error("Misty could not create the image version.");
         await spacesApi.renderEditVersion(spaceId, item.id, result.edit.id);
-        onReplaceItem(result.item);
-        onRenditionReady();
+        callbacks.current.onReplaceItem(result.item);
+        callbacks.current.onRenditionReady();
       },
     };
-  }, [canEdit, item, mimeType, onRenditionReady, onReplaceItem, spaceId]);
+  }, [canEdit, item, mimeType, spaceId]);
   useAiSurfaceAdapter(aiAdapter);
 
   return (
@@ -146,11 +186,18 @@ export function LibraryPhotoEditorView({
         indexLabel={indexLabel}
         tags={item.tags}
         outputMimeType={editedImageMimeType(mimeType)}
+        naturalSize={naturalSize}
+        collaboration={live.state === "live" ? live.collaboration : null}
         loading={contentLoading}
         error={contentError || undefined}
-        readonly={!canEdit}
+        // The image shows as soon as it's loaded; editing waits for the live edit, so nothing
+        // done in the first moment is made apart from everyone else's.
+        readonly={!canEdit || live.state === "opening"}
+        loadOriginal={() => spacesApi.libraryContent(spaceId, item.id)}
         onClose={onClose}
         onCancel={onClose}
+        onPrevious={onPrevious}
+        onNext={onNext}
         onSave={async (rendered: Blob) => {
           const result = await spacesApi.replaceLibraryItemContent(
             spaceId,
@@ -160,9 +207,11 @@ export function LibraryPhotoEditorView({
           );
           if (result.item) onReplaceItem(result.item);
           onRenditionReady();
+          // The shared edit starts again from the version just saved.
+          return String(result.item?.version ?? item.version + 1);
         }}
-        onSaveAsCopy={async (rendered: Blob) => {
-          await spacesApi.uploadLibraryBlob(spaceId, rendered, filename(), "library");
+        onSaveAsCopy={async (rendered: Blob, name?: string) => {
+          await spacesApi.uploadLibraryBlob(spaceId, rendered, name ?? filename(), "library");
           onRenditionReady();
         }}
       />

@@ -1,19 +1,7 @@
-import type { ConnectedCalendarEvent } from "@/features/agents/connectedAppsPublic";
 import type { SpaceCalendarEvent, SpaceTask } from "../planner/api";
 
-/**
- * One thing on a day: an event of the Space's calendar, a task that is due, or an event of the
- * person's own connected calendar, which only they see.
- */
+/** One thing on a day: an event of the Space's calendar, or a task that is due. */
 export type CalendarEntry =
-  | {
-      kind: "connected";
-      id: string;
-      day: string;
-      title: string;
-      time: string;
-      connected: ConnectedCalendarEvent;
-    }
   | {
       kind: "event";
       id: string;
@@ -94,7 +82,6 @@ const timeLabel = (value: string) =>
 export function calendarEntries(
   events: SpaceCalendarEvent[],
   tasks: SpaceTask[],
-  connected: ConnectedCalendarEvent[] = [],
 ): Map<string, CalendarEntry[]> {
   const entries: CalendarEntry[] = [
     ...events.map((event): CalendarEntry => ({
@@ -115,19 +102,10 @@ export function calendarEntries(
         time: "",
         task,
       })),
-    ...connected.map((event): CalendarEntry => ({
-      kind: "connected",
-      id: event.id,
-      day: event.all_day ? event.day : dayKey(event.starts_at),
-      title: event.title,
-      time: event.all_day ? "" : timeLabel(event.starts_at),
-      connected: event,
-    })),
   ];
   // Whatever has no clock time leads its day; the rest follow by when they start.
   const start = (entry: CalendarEntry) => {
-    const timed =
-      entry.kind === "event" ? entry.event : entry.kind === "connected" ? entry.connected : null;
+    const timed = entry.kind === "event" ? entry.event : null;
     return timed && !timed.all_day ? new Date(timed.starts_at).getTime() : 0;
   };
   entries.sort((a, b) => start(a) - start(b) || a.title.localeCompare(b.title));

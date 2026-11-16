@@ -2,6 +2,8 @@ import { useEffect, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { StudioPage, StudioPageScroll } from "../methods/StudioPage";
 import { useAgentAccountId } from "../personal/agentAccount";
+import { homeSpaceOf } from "../personal/agentHomeSpace";
+import { listSpaceNotebooks, useNotebooksInSpace } from "./notebookSpace";
 import { useLessonStore } from "./lessons/lessonStore";
 import { NotebookWorkspace } from "./notebook/NotebookWorkspace";
 import { DeckView, ReviewSession } from "./TutorDecks";
@@ -15,6 +17,8 @@ import { useTutorStore } from "./tutorStore";
 export interface TutorActions {
   /** The agent Tutor's runs go to: the one the person last chose. */
   agentId: string;
+  /** That agent's home Space, where this Lab's notebooks live and everyone in it works on them. */
+  spaceId: string;
   /** Opens a chat with an agent, such as a lesson's. */
   onChat(agentId: string, conversationId: string): void;
   /** Starts a Teach chat with this request in its composer. */
@@ -32,14 +36,19 @@ export interface TutorActions {
  */
 export function TutorPage({
   agentId,
+  agentSpaceId,
   onLesson,
   onLearn,
 }: {
   agentId: string;
+  /** The agent's home Space, as its profile says; unset for one made before agents had one. */
+  agentSpaceId?: string;
   onLesson(agentId: string, conversationId: string): void;
   onLearn(prompt: string): void;
 }) {
   const accountId = useAgentAccountId();
+  const spaceId = homeSpaceOf(accountId, { space_id: agentSpaceId ?? "" });
+  useNotebooksInSpace(spaceId || undefined);
   const [params, setParams] = useSearchParams();
   const item = params.get("item") ?? "";
   const notebooks = useTutorStore((state) => state.notebooks);
@@ -53,6 +62,7 @@ export function TutorPage({
   const actions: TutorActions = useMemo(
     () => ({
       agentId,
+      spaceId,
       onChat: onLesson,
       onLearn,
       open(next) {
@@ -64,8 +74,37 @@ export function TutorPage({
         });
       },
     }),
-    [agentId, onLesson, onLearn, setParams],
+    [agentId, spaceId, onLesson, onLearn, setParams],
   );
+
+  // Opened from a notebook's doc in Spaces: find the notebook for that doc, listing its Space's
+  // notebooks first when this Lab hasn't seen it yet.
+  const docParam = params.get("doc");
+  const spaceParam = params.get("space");
+  const ready = useTutorStore((state) => state.ready);
+  useEffect(() => {
+    if (!docParam || !ready) return;
+    const listIn = spaceParam ?? spaceId;
+    const find = () =>
+      Object.values(useTutorStore.getState().notebooks).find(
+        (candidate) => candidate.space?.docId === docParam,
+      );
+    const show = () => {
+      const found = find();
+      setParams((current) => {
+        const updated = new URLSearchParams(current);
+        updated.delete("doc");
+        updated.delete("space");
+        if (found) updated.set("item", `notebook:${found.id}`);
+        return updated;
+      });
+    };
+    if (find() || !listIn) return show();
+    void listSpaceNotebooks(listIn)
+      .catch(() => undefined)
+      .then(show);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [docParam, spaceParam, ready]);
 
   const notebook = item.startsWith("notebook:")
     ? notebooks[item.slice("notebook:".length)]
@@ -77,16 +116,19 @@ export function TutorPage({
       </StudioPage>
     );
 
+  // The home is a page of the Space, which scrolls itself under its sticky bar.
+  if (!item.startsWith("made:"))
+    return (
+      <StudioPage>
+        <TutorHome actions={actions} />
+      </StudioPage>
+    );
   return (
     <StudioPage>
       <StudioPageScroll>
-        {item.startsWith("made:") ? (
-          <div className="mx-auto flex w-full max-w-220 flex-col gap-7 px-6 pt-7 pb-10">
-            <Made id={item.slice("made:".length)} actions={actions} decks={decks} guides={guides} />
-          </div>
-        ) : (
-          <TutorHome actions={actions} />
-        )}
+        <div className="mx-auto flex w-full max-w-220 flex-col gap-7 px-6 pt-7 pb-10">
+          <Made id={item.slice("made:".length)} actions={actions} decks={decks} guides={guides} />
+        </div>
       </StudioPageScroll>
     </StudioPage>
   );

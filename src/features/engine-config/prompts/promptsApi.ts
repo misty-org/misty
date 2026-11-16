@@ -51,6 +51,3 @@ export const movePromptFile = (folder: string, promptPath: string, scope: Prompt
 /** Opens one scope's prompts folder in the file manager. */
 export const revealPrompts = (folder: string, scope: PromptScope) =>
   invoke<void>("engine_prompts_reveal", { path: folder, scope });
-
-/** The Settings block that manages prompts, opened from the composer's "New prompt" row. */
-export const PROMPTS_SETTINGS_SECTION = "engine-prompts";

@@ -1,5 +1,5 @@
 import * as React from "react";
-import { useOnRow } from "./RowContext";
+import { useCompactControls, useOnRow } from "./RowContext";
 
 import { cn } from "../classNames";
 import { Spinner } from "../feedback/Spinner";
@@ -43,9 +43,10 @@ const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(
     },
     ref,
   ) => {
-    // On a row every IconButton is the row's size (RowTools), whatever the feature passed.
+    // On a row or in a compact bar every IconButton is 24px, whatever the feature passed.
     const onRow = useOnRow();
-    const resolvedSize = onRow ? "sm" : (size ?? "md");
+    const compact = useCompactControls();
+    const resolvedSize = onRow || compact ? "sm" : (size ?? "md");
     return (
       <Tooltip content={hint || label} shortcut={shortcut} side={tooltipSide}>
         <Button

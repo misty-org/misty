@@ -4,6 +4,7 @@ import { Lock, Mic, MicOff } from "lucide-react";
 import { useEffect, useState } from "react";
 import { IconButton, Spinner, Surface } from "@/shared/ui";
 import type { PillState } from "../dictationEngine";
+import { remCss } from "@/shared/lib/uiScale";
 
 const initial: PillState = {
   phase: "listening",
@@ -50,7 +51,9 @@ export function DictationPill() {
               tone="none"
               radius="sm"
               className="block w-1 bg-current transition-[height] duration-80 ease-linear"
-              style={{ height: `${Math.max(2, Math.round(16 * bar * (listening ? level : 0)))}px` }}
+              style={{
+                height: remCss(Math.max(2, Math.round(16 * bar * (listening ? level : 0)))),
+              }}
             />
           ))}
         </span>

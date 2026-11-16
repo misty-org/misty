@@ -20,8 +20,11 @@ function CursorOverlay() {
   const meter = useRef<HTMLDivElement>(null);
   const focus = useRef<HTMLDivElement>(null);
   const sketch = useRef<HTMLDivElement>(null);
+  const trail = useRef<HTMLDivElement>(null);
+  const caption = useRef<HTMLDivElement>(null);
   useEffect(
-    () => startCursorOverlayLoop({ latest, group, bubble, marker, meter, focus, sketch }),
+    () =>
+      startCursorOverlayLoop({ latest, group, bubble, marker, meter, focus, sketch, trail, caption }),
     [],
   );
   return (
@@ -30,6 +33,8 @@ function CursorOverlay() {
       marker={marker}
       focus={focus}
       sketch={sketch}
+      trail={trail}
+      caption={caption}
       group={group}
       bubble={bubble}
       meter={meter}

@@ -17,7 +17,13 @@ export interface VoiceSettings {
   dictionary: string[];
   agentHandoff: boolean;
   captureSources: CaptureSources;
+  /** The system voice that speaks for Misty; empty is the system's own default. */
+  systemVoice: string;
+  /** How fast it speaks: 1 is the voice's usual pace. */
+  speakingRate: number;
 }
+
+const rates = ["0.75", "1", "1.25", "1.5"];
 
 const styles: DictationStyle[] = ["plain", "casual", "formal"];
 const sources: CaptureSources[] = ["mic", "mic-system", "system"];
@@ -43,5 +49,9 @@ export function voiceSettings(document: Record<string, unknown> | undefined): Vo
       .slice(0, 200),
     agentHandoff: booleanSetting(doc, "voice", "agent_handoff", true),
     captureSources: sources.includes(capture) ? capture : "mic-system",
+    systemVoice: stringSetting(doc, "voice", "system_voice", ""),
+    speakingRate: Number(
+      rates.find((rate) => rate === stringSetting(doc, "voice", "speaking_rate", "1")) ?? "1",
+    ),
   };
 }

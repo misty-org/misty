@@ -311,7 +311,6 @@ pub mod desktop_control;
 pub mod keep_awake;
 pub mod live_pages_memory;
 pub mod models;
-pub mod notebook_news;
 pub mod run_control;
 pub mod screen_context;
 pub mod shell;

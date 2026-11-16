@@ -167,7 +167,7 @@ export function startGesture(
                 opacity: "0.2",
                 border: "1px solid currentColor",
                 // Matches the panes' own corners.
-                borderRadius: drag.scope === "workspace-panes" ? "12px" : "",
+                borderRadius: drag.scope === "workspace-panes" ? "0.75rem" : "",
               }
             : axis === "x"
               ? {

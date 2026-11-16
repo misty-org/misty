@@ -1,4 +1,4 @@
-import { usePersonalAgentsStore } from "../../personal/personalAgentsStore";
+import { defaultAgentOf, usePersonalAgentsStore } from "../../personal/personalAgentsStore";
 import { adoptDraftChat } from "./draftChat";
 import type { MistyState } from "./mistyState";
 
@@ -7,9 +7,9 @@ export function currentConversationForPrompt(
   state: Pick<MistyState, "conversations" | "activeConversationId" | "selectedAgentId">,
 ): string | undefined {
   const current = state.conversations.find((item) => item.id === state.activeConversationId);
-  const defaultAgent = usePersonalAgentsStore
-    .getState()
-    .agents.find((agent) => agent.system_managed)?.id;
+  const defaultAgent =
+    usePersonalAgentsStore.getState().agents.find((agent) => agent.system_managed)?.id ??
+    defaultAgentOf(usePersonalAgentsStore.getState().agents)?.id;
   const differentAgent =
     state.selectedAgentId &&
     (current?.agentId

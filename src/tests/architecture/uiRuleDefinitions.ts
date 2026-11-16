@@ -92,9 +92,7 @@ const presentedMedia = [
 const contentStylesheets = [
   ...codeStylesheets,
   ...presentedMedia,
-  // Skins for a third-party widget's own DOM (the photo editor, Excalidraw), which shared
-  // components can't reach.
-  /^src\/features\/files\/photo-editor\/photoEditor\.css$/,
+  // Skins for a third-party widget's own DOM (Excalidraw), which shared components can't reach.
   /^src\/features\/spaces\/journal\/drawings\/components\/collaborativeDrawingCanvas\.css$/,
 ] as const;
 

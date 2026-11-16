@@ -1,8 +1,9 @@
 //! The agent runtime on this computer.
 //!
-//! Agents run here, not on the server, on the `misty-agent` crate inside this process. The app gives
-//! it this device's model keys and choices and starts its runs (`local_runs`). Its runs are kept under
-//! `~/.misty/runtime/runs`, so a run continues after Misty quits and opens again.
+//! Misty's own runtime, the `misty-agent` crate inside this process. Misty holds no keys and has no
+//! model of its own, so it gets an empty model document and no run is started on it
+//! (`local_runs`); every run goes to an outside engine. It stays in the code. Runs it kept from
+//! before are under `~/.misty/runtime/runs`.
 //!
 //! A run failing must never take down the browser. The crate runs each one as its own task, and
 //! everything called from here goes through [`contained`] or a session's task. That rests on panics
@@ -15,7 +16,6 @@ compile_error!(
 pub mod calls;
 pub mod engine_modes;
 pub mod host_lookup;
-pub mod live;
 pub mod local_runs;
 pub mod local_tools;
 mod log;

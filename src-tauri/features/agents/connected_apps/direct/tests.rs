@@ -151,7 +151,7 @@ fn answers_are_read_from_json_or_an_event_stream() {
 }
 
 #[test]
-fn tools_get_composio_shaped_slugs() {
+fn tools_get_upper_snake_case_slugs() {
     assert_eq!(
         slug_of("notion", "notion-search"),
         "MCP_NOTION_NOTION_SEARCH"

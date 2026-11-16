@@ -13,6 +13,13 @@ export interface EngineInfo {
   name: string;
   installed: boolean;
   version: string | null;
+  /** Whether it takes images (screenshots, a crop to point at). */
+  supportsImages?: boolean;
+  /** Whether it mounts Misty's MCP tools (the Space, the browser). */
+  supportsMcp?: boolean;
+  /** Whether its CLI brings its own web search. */
+  supportsWebSearch?: boolean;
+  supportsEffort?: boolean;
   /** The engine's own modes offered here (`engineModes.ts`); native code decides what each passes. */
   modes?: Array<{ id: string; label: string; kind: "asks" | "edits" | "plans" | "no_asking" }>;
 }
@@ -78,7 +85,7 @@ export interface EngineEffort {
   badge?: string;
 }
 
-/** The engine's own models, then the model names the person added for it in Settings › Engines. */
+/** The engine's own models, then the model names the person added for it in Agents › Channels. */
 export async function listEngineModels(engine: string): Promise<EngineModel[]> {
   const [models, settings] = await Promise.all([
     invoke<EngineModel[]>("engine_models", { engine }),
@@ -98,7 +105,7 @@ export async function listEngineModels(engine: string): Promise<EngineModel[]> {
 }
 
 const modelCache = new Map<string, Promise<EngineModel[]>>();
-// Settings › Engines changed (a channel, or the model names the person added): read them again.
+// Agents › Channels changed (a channel, or the model names the person added): read them again.
 if (typeof window !== "undefined")
   window.addEventListener("misty:engine-channels-changed", () => modelCache.clear());
 
@@ -110,6 +117,26 @@ export function engineModels(engine: string): Promise<EngineModel[]> {
     modelCache.set(engine, pending);
   }
   return pending;
+}
+
+/**
+ * Engines whose model list is exactly what the person's account can run (Codex, Pi and Oh My Pi:
+ * `models/usable.rs`). A model saved earlier that it no longer lists can't run there.
+ */
+const ACCOUNT_LISTED = new Set(["codex", "omp", "pi"]);
+
+/**
+ * A saved model pick as it can run: on an engine that lists exactly what the account runs, one
+ * it no longer lists is set aside (""), so the chat shows and runs the engine's own pick instead.
+ * Any other engine, or a list that hasn't loaded or is empty, keeps the pick as it is.
+ */
+export function usablePick(
+  engine: string,
+  models: readonly EngineModel[] | undefined,
+  id: string,
+): string {
+  if (!id || !ACCOUNT_LISTED.has(engine) || !models?.length) return id;
+  return models.some((model) => model.id === id) ? id : "";
 }
 
 /** The model a chat runs: the one named, else the engine's own default. */

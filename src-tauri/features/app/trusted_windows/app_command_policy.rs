@@ -5,11 +5,17 @@
 use crate::browser::app_windows;
 
 pub fn allows(label: &str) -> bool {
-    app_windows::is_app_window(label) || is_cursor_overlay(label) || label == PET_WINDOW
+    app_windows::is_app_window(label)
+        || is_cursor_overlay(label)
+        || label == PET_WINDOW
+        || label == TUTOR_ASK_WINDOW
 }
 
 /// The desktop pet's own window (`pets/overlay.rs`), held to its few commands by `pet-overlay.json`.
 const PET_WINDOW: &str = "misty-pet";
+/// Tutor's text box beside the pointer (`cursor/host/ask.rs`), held to closing itself by
+/// `tutor-ask.json`.
+const TUTOR_ASK_WINDOW: &str = "misty-tutor-ask";
 
 fn is_cursor_overlay(label: &str) -> bool {
     label
@@ -30,7 +36,7 @@ mod tests {
         include_str!("../handlers.rs"),
         include_str!("../handlers/more_commands.rs"),
     ];
-    const CAPABILITIES: [&str; 7] = [
+    const CAPABILITIES: [&str; 8] = [
         include_str!("../../../tauri-permissions/capabilities/default.json"),
         include_str!("../../../tauri-permissions/capabilities/person-window-actions.json"),
         include_str!("../../../tauri-permissions/capabilities/cursor-companion.json"),
@@ -38,6 +44,7 @@ mod tests {
         include_str!("../../../tauri-permissions/capabilities/dictation-pill.json"),
         include_str!("../../../tauri-permissions/capabilities/kiri.json"),
         include_str!("../../../tauri-permissions/capabilities/pet-overlay.json"),
+        include_str!("../../../tauri-permissions/capabilities/tutor-ask.json"),
     ];
 
     fn capability(identifier: &str) -> serde_json::Value {
@@ -165,26 +172,6 @@ mod tests {
             })
             .collect();
         assert_eq!(app_commands, ["allow-cursor-companion-snapshot"]);
-    }
-
-    /// Voice and live transcription are a person's own: the commands behind them belong to the voice
-    /// set, which only a person's window has, and each one checks the window again.
-    #[test]
-    fn voice_sessions_open_only_in_a_persons_window() {
-        let sets = action_sets();
-        let voice = &sets["action-voice"];
-        for command in [
-            "agent_runtime_voice_open",
-            "agent_runtime_live_open",
-            "agent_runtime_session_send",
-            "agent_runtime_session_close",
-        ] {
-            assert!(voice.iter().any(|name| name == command), "{command}");
-            assert!(commands_for("person-window-actions").contains(command));
-        }
-        assert!(app_windows::is_person_window("window-1"));
-        assert!(!app_windows::is_person_window("incognito-1"));
-        assert!(!app_windows::is_person_window("misty-browser-a"));
     }
 
     /// Capabilities scoped by window would also cover website views attached to that window, and one

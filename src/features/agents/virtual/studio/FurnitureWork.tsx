@@ -8,12 +8,14 @@ const WOOD_DARK = "#a9794d";
 const METAL = "#4a4f5a";
 
 /** A desk with its chair. The desk fills the back half of its footprint and the chair stands in
- * the front half, facing it. The screen lights up while the desk's agent works. */
+ * the front half, facing it. The screen lights up while the desk's agent works, and a parcel
+ * waits on it while a finished task's result hasn't been collected. */
 export function Desk({
   id,
   screen,
   still,
   decor,
+  parcel,
 }: {
   id: string;
   /** What its monitor shows; off when nobody is at work there. */
@@ -21,6 +23,8 @@ export function Desk({
   still: boolean;
   /** What its agent put on it; anything not chosen is the desk's own. */
   decor?: DeskLook;
+  /** A result waits on it to be collected. */
+  parcel?: boolean;
 }) {
   const quirk = hashOf(id);
   const mug = decor?.mug ?? ["#e76f51", "#2a9d8f", "#e9c46a", "#f4f1de", "#7768ae"][quirk % 5]!;
@@ -113,7 +117,33 @@ export function Desk({
           />
         </>
       )}
+      {parcel ? <Parcel /> : null}
       <Chair />
+    </group>
+  );
+}
+
+/** A finished task's result, as a parcel by the keyboard: a box with a lit ribbon round it. */
+function Parcel() {
+  return (
+    <group position={[-0.3, 0.64, -0.5]} rotation={[0, 0.3, 0]}>
+      <Box size={[0.28, 0.18, 0.22]} at={[0, 0.09, 0]} color="#c89b62" round={0.015} />
+      <Box
+        size={[0.29, 0.185, 0.045]}
+        at={[0, 0.09, 0]}
+        color="#ffd166"
+        glow="#ffd166"
+        glowPower={0.6}
+        shadow={false}
+      />
+      <Box
+        size={[0.045, 0.185, 0.225]}
+        at={[0, 0.09, 0]}
+        color="#ffd166"
+        glow="#ffd166"
+        glowPower={0.6}
+        shadow={false}
+      />
     </group>
   );
 }

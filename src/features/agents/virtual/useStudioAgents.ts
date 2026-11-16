@@ -23,12 +23,16 @@ export interface StudioAgent {
   doingCode: string;
   /** The chat its latest run belongs to, to open when it is picked. */
   conversationId: string;
+  /** Its latest run; empty when it has not run. */
+  runId: string;
   /** What its latest run was asked to do; empty when it has not run. */
   task: string;
   /** The last few things that run did, newest first, in the same plain words. */
   steps: string[];
   /** How its latest run ended, while it is resting: done, failed, or nothing to show. */
   outcome: Outcome;
+  /** What that run handed back when it finished, as its engine said it; empty otherwise. */
+  result: string;
   /** When that run last reported, in ms; 0 when it has not run. */
   endedAt: number;
   /** The files its working run is changing, relative to the Space's linked folder: its claim,
@@ -85,17 +89,26 @@ function placeAgents(
         doing: state === "needs-you" ? "Needs you" : doing.words,
         doingCode: doing.code,
         conversationId: entry?.conversation_id ?? "",
+        runId: entry?.run_id ?? "",
         task: entry?.title ?? "",
         steps: entry ? stepsOf(entry) : [],
         outcome: state === "resting" ? outcomeOf(entry?.state) : "",
+        result: state === "resting" && entry?.state === "completed" ? (entry.result ?? "") : "",
         endedAt: entry ? Date.parse(entry.updated_at) || 0 : 0,
         files: state === "resting" ? [] : claimedFiles(work, folders, now),
       };
     });
 }
 
+const noEntries: readonly MistyActivityEntry[] = [];
+
 /** The person's agents and what each is doing now, kept current as runs report. */
-export function useStudioAgents(): { agents: StudioAgent[]; loading: boolean } {
+export function useStudioAgents(): {
+  agents: StudioAgent[];
+  loading: boolean;
+  /** Every run the activity reports, for the studio's record of finished work. */
+  entries: readonly MistyActivityEntry[];
+} {
   const accountId = useAgentAccountId();
   const profiles = usePersonalAgentsStore((state) => state.agents);
   const profilesLoading = usePersonalAgentsStore((state) => state.loading);
@@ -147,5 +160,9 @@ export function useStudioAgents(): { agents: StudioAgent[]; loading: boolean } {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `minute` only re-reads the clock
     [profiles, entries, runs, folders, minute],
   );
-  return { agents, loading: entries === null || (profilesLoading && !profiles.length) };
+  return {
+    agents,
+    loading: entries === null || (profilesLoading && !profiles.length),
+    entries: entries ?? noEntries,
+  };
 }

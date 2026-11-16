@@ -1,4 +1,6 @@
 pub mod commands;
+pub mod studio_music;
+pub mod studio_music_media;
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -191,6 +193,7 @@ pub mod input;
 pub mod kiri_link;
 pub mod link_previews;
 pub mod menus;
+pub mod page_pick;
 pub mod page_text;
 pub mod pages;
 #[cfg(desktop)]

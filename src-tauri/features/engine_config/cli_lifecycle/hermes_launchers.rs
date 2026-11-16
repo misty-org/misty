@@ -137,7 +137,7 @@ pub(super) fn wrapper_names(path: &Path, folder: &Path) -> bool {
 /// Deletes the shell wrappers left for `checkout`, and only those: one that names another
 /// checkout is someone else's. They sit in a program folder outside the file gate.
 #[allow(clippy::disallowed_methods)]
-fn remove_wrappers(dirs: &[PathBuf], checkout: &Path) {
+pub(super) fn remove_wrappers(dirs: &[PathBuf], checkout: &Path) {
     for dir in dirs {
         for name in COMMANDS {
             let wrapper = dir.join(name);

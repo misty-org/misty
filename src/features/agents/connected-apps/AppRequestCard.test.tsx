@@ -2,14 +2,11 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   request: vi.fn(),
-  requestLink: vi.fn(async () => ({ url: "https://connect.example.test" })),
   decide: vi.fn(),
-  open: vi.fn(async () => {}),
 }));
 vi.mock("./api", () => ({
-  appsApi: { request: mocks.request, requestLink: mocks.requestLink, decide: mocks.decide },
+  appsApi: { request: mocks.request, decide: mocks.decide },
 }));
-vi.mock("@/shared/platform/openExternalLink", () => ({ openExternalLink: mocks.open }));
 import { AppRequestCard } from "./AppRequestCard";
 import type { AppRequest } from "./api";
 
@@ -28,22 +25,12 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-it("checks for the finished sign-in and reports the connected card", async () => {
-  const onResolved = vi.fn();
-  mocks.request
-    .mockResolvedValueOnce({ request: connect })
-    .mockResolvedValueOnce({ request: { ...connect, state: "connected" } });
-  render(<AppRequestCard request={connect} onResolved={onResolved} />);
-  expect(mocks.request).not.toHaveBeenCalled();
-  await act(async () => fireEvent.click(screen.getByRole("button", { name: /Connect/ })));
-  expect(mocks.open).toHaveBeenCalledWith("https://connect.example.test");
-  await act(async () => vi.advanceTimersByTimeAsync(3_000));
-  expect(onResolved).not.toHaveBeenCalled();
-  await act(async () => vi.advanceTimersByTimeAsync(3_000));
-  expect(onResolved).toHaveBeenCalledWith(expect.objectContaining({ state: "connected" }));
-  expect(screen.getByText("Connected")).toBeTruthy();
-  await act(async () => vi.advanceTimersByTimeAsync(9_000));
-  expect(mocks.request).toHaveBeenCalledTimes(2);
+it("lets an old Connect card only be put aside", async () => {
+  mocks.decide.mockResolvedValueOnce({ request: { ...connect, state: "declined" } });
+  render(<AppRequestCard request={connect} />);
+  expect(screen.queryByRole("button", { name: /Connect/ })).toBeNull();
+  await act(async () => fireEvent.click(screen.getByRole("button", { name: "Not now" })));
+  expect(mocks.decide).toHaveBeenCalledWith("apprq-1", "deny");
 });
 
 it("reports an approval decision", async () => {

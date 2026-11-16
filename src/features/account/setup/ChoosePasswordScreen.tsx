@@ -2,8 +2,7 @@ import { useAuth } from "../sessions/authState";
 import AuthField from "../components/AuthField";
 import AuthMessage from "../components/AuthMessage";
 import { accountSetFirstPassword } from "../sessions/accountPassword";
-import { authButtonClass } from "../components/authButtonClass";
-import { Button, Spinner } from "@/shared/ui";
+import { Button } from "@/shared/ui";
 import { useState, type FormEvent } from "react";
 
 /**
@@ -45,7 +44,7 @@ export function ChoosePasswordScreen(props: {
   }
 
   return (
-    <form className="flex flex-col gap-3.5" onSubmit={(event) => void submit(event)}>
+    <form className="flex flex-col gap-4" onSubmit={(event) => void submit(event)}>
       <AuthField
         id="first-password"
         label="Password"
@@ -71,11 +70,9 @@ export function ChoosePasswordScreen(props: {
         type="submit"
         variant="primary"
         size="lg"
-        className={authButtonClass}
         disabled={busy || !password || !confirmation}
-        aria-busy={busy}
+        loading={busy}
       >
-        {busy ? <Spinner size="sm" label={false} /> : null}
         Continue
       </Button>
     </form>

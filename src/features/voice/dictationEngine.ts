@@ -1,8 +1,8 @@
 import { invoke } from "@tauri-apps/api/core";
 import { emitTo, listen, type UnlistenFn } from "@tauri-apps/api/event";
-import { voiceApi, voiceDeviceId } from "./api";
+import { voiceApi } from "./api";
 import { insertIntoFocusedField } from "./insertText";
-import { LiveTranscriber } from "./liveTranscriber";
+import { listen as listenToSpeech, type Listening } from "./systemSpeech";
 import type { VoiceSettings } from "./voiceSettings";
 import { findVocative, routeToAgent } from "./vocativeRoute";
 
@@ -23,21 +23,14 @@ const PILL = "misty-dictation-pill";
 /** Cleanup is skipped for a word or two: nothing to tidy. */
 const CLEANUP_MIN_WORDS = 3;
 
-function decode(base64: string) {
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  return bytes;
-}
-
 /**
- * Runs dictation in the main window: the native side reports the shortcut
- * and streams microphone audio; this opens the live relay, keeps the pill
+ * Runs dictation in the main window: the native side reports the shortcut and the microphone's
+ * level; this listens through the computer's own speech recognition (no key), keeps the pill
  * current, then cleans up, routes or inserts the words.
  */
 export class DictationController {
   private turn = 0;
-  private live?: LiveTranscriber;
+  private live?: Promise<Listening | undefined>;
   private pill: PillState = {
     phase: "listening",
     text: "",
@@ -55,11 +48,12 @@ export class DictationController {
         "misty://dictation",
         ({ payload }) => void this.onPhase(payload.turn, payload.phase, payload.message),
       ),
+      // The native side's microphone only drives the pill's level now; the words come from the
+      // system's recognizer.
       listen<{ turn: number; pcm: string; power: number }>(
         "misty://dictation-audio",
         ({ payload }) => {
           if (payload.turn !== this.turn) return;
-          this.live?.push("mic", decode(payload.pcm));
           this.show({ power: payload.power });
         },
       ),
@@ -81,7 +75,7 @@ export class DictationController {
   }
 
   dispose() {
-    this.live?.close();
+    this.drop();
     for (const remove of this.removers) void remove.then((fn) => fn());
     void invoke("voice_dictation_configure", {
       enabled: false,
@@ -109,15 +103,21 @@ export class DictationController {
     if (turn !== this.turn) return;
     if (phase === "lock") return this.show({ locked: true });
     if (phase === "finish") return this.end(turn);
-    this.live?.close();
-    this.live = undefined;
+    this.drop();
     if (phase === "error") this.show({ phase: "notice", note: message || "Dictation stopped." });
     else void invoke("voice_dictation_pill_hide").catch(() => {});
   }
 
+  /** Stops listening and throws away what was heard. */
+  private drop() {
+    const live = this.live;
+    this.live = undefined;
+    void live?.then((listening) => listening?.stop()).catch(() => undefined);
+  }
+
   private async begin(turn: number) {
     this.turn = turn;
-    this.live?.close();
+    this.drop();
     this.show({
       phase: "listening",
       text: "",
@@ -126,53 +126,30 @@ export class DictationController {
       locked: false,
       note: undefined,
     });
-    const live = new LiveTranscriber({
-      onChange: (transcript) => {
-        const segments = transcript.segments();
+    const live = listenToSpeech((heard) => {
+      if (turn !== this.turn) return;
+      if (heard.error) return this.show({ phase: "notice", note: "Dictation stopped." });
+      // The recognizer revises the whole utterance as it goes: it's all provisional until done.
+      this.show(heard.final ? { text: heard.text, provisional: "" } : { provisional: heard.text });
+    }).catch((error: unknown) => {
+      if (turn === this.turn) {
         this.show({
-          text: segments
-            .filter((s) => s.final)
-            .map((s) => s.sourceText.trim())
-            .join(" "),
-          provisional: segments
-            .filter((s) => !s.final)
-            .map((s) => s.sourceText.trim())
-            .join(" "),
+          phase: "notice",
+          note: error instanceof Error ? error.message : "Dictation couldn't start.",
         });
-      },
-      onNotice: (note) => this.show({ phase: "notice", note }),
+        void invoke("voice_dictation_stop").catch(() => {});
+      }
+      return undefined;
     });
     this.live = live;
-    try {
-      // The microphone is already open; its audio waits in the transcriber
-      // while the session opens, so the first words are kept.
-      await voiceDeviceId();
-      if (turn !== this.turn) return;
-      await live.connect(
-        { channels: ["mic"], language: this.settings.language },
-        {
-          language: this.settings.language,
-          context: this.settings.dictionary.length
-            ? { terms: this.settings.dictionary }
-            : undefined,
-        },
-      );
-    } catch (error) {
-      if (turn !== this.turn) return;
-      live.close();
-      this.show({
-        phase: "notice",
-        note: error instanceof Error ? error.message : "Dictation couldn't start.",
-      });
-      void invoke("voice_dictation_stop").catch(() => {});
-    }
   }
 
   private async end(turn: number) {
     const live = this.live;
+    this.live = undefined;
     if (!live) return;
     this.show({ phase: "finishing" });
-    const heard = await live.finish();
+    const heard = ((await (await live)?.stop().catch(() => "")) ?? "").trim();
     if (turn !== this.turn) return;
     if (!heard) return this.show({ phase: "notice", note: "Didn't catch anything." });
     const vocative = this.settings.agentHandoff ? findVocative(heard) : null;

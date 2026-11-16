@@ -1,3 +1,12 @@
+/* The main window's type, controls and rows read best a step up from the scale's sizes, so its
+   root is 110%: every size in the app is in rem and grows with it, and the page zoom at 100% is 1.
+   The overlay windows (pets, the cursor, the desktop overlay) don't load this file and stay at
+   the scale's own sizes. Lengths in JS that sit beside CSS sizes go through uiPx and remCss
+   (src/shared/lib/uiScale.ts). */
+html {
+  font-size: 110%;
+}
+
 .app-pages-root {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
@@ -20,11 +29,11 @@
 /* Sidebar metrics the Agents sidebar's stylesheets still read until they move to ListRow, which
    has the same 32px rows at the control text size. */
 :root {
-  --misty-sidebar-row-height: 32px;
-  --misty-sidebar-row-padding: 10px;
+  --misty-sidebar-row-height: 2rem;
+  --misty-sidebar-row-padding: 0.625rem;
   --misty-sidebar-label-size: var(--text-control);
-  --misty-sidebar-icon-size: 16px;
-  --misty-sidebar-badge-size: 7px;
+  --misty-sidebar-icon-size: 1rem;
+  --misty-sidebar-badge-size: 0.4375rem;
   /* Deprecated: the agent state tones under their older names (theme.css --tone-*). */
   --misty-status-idle: var(--tone-idle);
   --misty-status-attention: var(--tone-waiting);
@@ -35,8 +44,8 @@
    icon-sizing UI rule); a shared component that needs another size sets it with a class, which
    wins over this zero-specificity default. A size prop's width and height attributes never do. */
 :where(svg.lucide) {
-  width: 16px;
-  height: 16px;
+  width: 1rem;
+  height: 1rem;
   flex-shrink: 0;
   stroke-width: 2;
 }

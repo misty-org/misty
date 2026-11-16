@@ -7,12 +7,10 @@ import type { TourId } from "./tours";
 interface ToursState {
   /** Tours shown here, finished or skipped: each opens by itself only once. */
   seen: TourId[];
-  /** The Getting started list on a Space's home was put away. */
-  checklistHidden: boolean;
 }
 
 const scope = "tours";
-const empty: ToursState = { seen: [], checklistHidden: false };
+const empty: ToursState = { seen: [] };
 
 /** Asks the window's tour host to show a tour now; "here" is the tour for the page in view. */
 export const startTourEvent = "misty:start-tour";
@@ -29,7 +27,6 @@ export const useTours = create<
     open(id: TourId): void;
     /** The tour on screen ended, finished or skipped; either way it counts as seen. */
     close(): void;
-    hideChecklist(): void;
   }
 >((set, get) => {
   // Saves still in flight, and a count bumped as each starts and ends, so a read that raced
@@ -37,7 +34,7 @@ export const useTours = create<
   let saving = 0;
   let saveEvents = 0;
   const save = (change: (state: ToursState) => ToursState) => {
-    set(change({ seen: get().seen, checklistHidden: get().checklistHidden }));
+    set(change({ seen: get().seen }));
     saving++;
     saveEvents++;
     void updateDeviceState<ToursState>(scope, () => empty, change)
@@ -62,7 +59,6 @@ export const useTours = create<
         if (saving || saveEvents !== started) return;
         set({
           seen: stored?.seen ?? [],
-          checklistHidden: stored?.checklistHidden ?? false,
           loaded: true,
         });
       } catch {
@@ -78,9 +74,6 @@ export const useTours = create<
       set({ active: null });
       if (id && !get().seen.includes(id))
         save((state) => ({ ...state, seen: [...new Set([...state.seen, id])] }));
-    },
-    hideChecklist() {
-      save((state) => ({ ...state, checklistHidden: true }));
     },
   };
 });

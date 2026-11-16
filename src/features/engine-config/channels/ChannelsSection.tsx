@@ -2,7 +2,7 @@
 // See NOTICE.
 
 /**
- * Settings › Engines › Channels: a third-party API an engine CLI starts against instead of its
+ * Agents › Channels: a third-party API an engine CLI starts against instead of its
  * own sign-in, per engine.
  *
  *   CC Switch banner (when its store changed)
@@ -307,7 +307,7 @@ function ChannelsSkeleton({ engine }: { engine: EngineId }) {
   );
 }
 
-/** Settings › Engines › Channels. */
+/** Agents › Channels. */
 export function ChannelsSection() {
   const [engine, setEngine] = useState<EngineId>("claude");
   const cli = useCliConfig(engine);

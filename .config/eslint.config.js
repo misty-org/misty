@@ -54,9 +54,59 @@ const forbidRawButtonRule = {
   },
 };
 
+/**
+ * A component declared inside another function is a new component type on every render, so
+ * React unmounts and remounts its whole subtree each time. With Radix primitives (whose refs set
+ * state on mount) that loops into "Maximum update depth exceeded". Declare components at module
+ * level and pass what they need as props.
+ */
+const noNestedComponentRule = {
+  meta: {
+    type: "problem",
+    docs: { description: "Forbid component definitions nested inside another function" },
+    schema: [],
+    messages: {
+      nested:
+        "'{{name}}' is a component declared inside another function, so it remounts on every render. Move it to module level and pass what it needs as props.",
+    },
+  },
+  create(context) {
+    const isComponentName = (name) => /^[A-Z]/.test(name);
+    const insideFunction = (node) => {
+      for (let parent = node.parent; parent; parent = parent.parent) {
+        if (
+          parent.type === "FunctionDeclaration" ||
+          parent.type === "FunctionExpression" ||
+          parent.type === "ArrowFunctionExpression"
+        )
+          return true;
+      }
+      return false;
+    };
+    return {
+      FunctionDeclaration(node) {
+        if (node.id && isComponentName(node.id.name) && insideFunction(node))
+          context.report({ node: node.id, messageId: "nested", data: { name: node.id.name } });
+      },
+      VariableDeclarator(node) {
+        const init = node.init;
+        if (
+          node.id.type === "Identifier" &&
+          isComponentName(node.id.name) &&
+          init &&
+          (init.type === "ArrowFunctionExpression" || init.type === "FunctionExpression") &&
+          insideFunction(node)
+        )
+          context.report({ node: node.id, messageId: "nested", data: { name: node.id.name } });
+      },
+    };
+  },
+};
+
 const sharedUiPlugin = {
   rules: {
     "no-raw-button": forbidRawButtonRule,
+    "no-nested-component": noNestedComponentRule,
   },
 };
 
@@ -116,6 +166,7 @@ export default tseslint.config(
       "no-empty": ["error", { allowEmptyCatch: true }],
 
       "shared-ui/no-raw-button": "warn",
+      "shared-ui/no-nested-component": "error",
     },
   },
 
@@ -207,6 +258,8 @@ export default tseslint.config(
     rules: {
       "@typescript-eslint/no-explicit-any": "off",
       "no-restricted-imports": "off",
+      // Test harness components often close over the test's own state.
+      "shared-ui/no-nested-component": "off",
     },
   },
 

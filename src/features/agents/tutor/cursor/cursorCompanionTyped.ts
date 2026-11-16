@@ -1,6 +1,11 @@
 import { useMistyStore } from "../../conversations/state/useMistyStore";
 import { lessonConversation } from "../lessons/lessonEntry";
-import { nextStepPrompt, type CompanionGuideStep } from "./companionGuide";
+import {
+  GUIDE_SETTLE_MS,
+  nextStepPrompt,
+  walkthroughFor,
+  type CompanionGuideStep,
+} from "./companionGuide";
 import { companionStage } from "./companionStage";
 import type { CompanionSubmission } from "./companionState";
 import type { CursorCompanionSession } from "./cursorCompanionSession";
@@ -146,12 +151,17 @@ export class CursorCompanionTypedTurns {
   }
 
   /** The next walkthrough step, from a fresh look at the screen after its target was clicked. */
-  continueGuide = (step: CompanionGuideStep) =>
-    this.submit({
-      prompt: nextStepPrompt(step.point),
+  continueGuide = async (step: CompanionGuideStep) => {
+    const generation = this.s.turn;
+    // A click often opens a page or a menu: look again once it has had a moment to load.
+    await new Promise((settled) => setTimeout(settled, GUIDE_SETTLE_MS));
+    if (!this.s.active(generation)) return;
+    return this.submit({
+      prompt: nextStepPrompt(step.point, walkthroughFor(step.conversationId)),
       conversationId: step.conversationId,
       look: true,
       continuation: true,
       voice: step.voice,
     });
+  };
 }

@@ -10,7 +10,9 @@ export { SpaceChatPanel } from "./chat/SpaceChatPanel";
 // What other features import from here.
 export { uploadLibraryBlob, uploadLibraryPath } from "./api/library-upload";
 
+export { arcadeGateway } from "./handoffs/arcadeGateway";
 export { handoffGateway } from "./handoffs/handoffGateway";
+export { liveGateway } from "./handoffs/liveGateway";
 export { drawingsApi } from "./journal/drawings/api/api";
 export { resetNotesAccountState } from "./journal/notes";
 export { MistyLibraryPicker } from "./library";

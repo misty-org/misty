@@ -1,22 +1,28 @@
-import { beforeEach, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
-const native = vi.hoisted(() => ({ invoke: vi.fn() }));
-vi.mock("@/shared/platform/nativeInvoke", () => ({ invoke: native.invoke }));
+vi.mock("../engines/engineRun", () => ({ runOnEngine: vi.fn() }));
 
-import { latestNews } from "./notebookNews";
+import { newsPrompt, parseNews } from "./notebookNews";
 
-beforeEach(() => native.invoke.mockReset());
-
-it("searches news with or without a period", async () => {
-  native.invoke.mockResolvedValue([]);
-  await latestNews("AI agents", "week");
-  expect(native.invoke).toHaveBeenLastCalledWith("notebook_news", {
-    query: "AI agents",
-    recency: "week",
+describe("notebook news", () => {
+  it("asks the default engine for recent stories from its own searches", () => {
+    const prompt = newsPrompt("solar power", "day");
+    expect(prompt).toContain("solar power");
+    expect(prompt).toContain("the past day");
+    expect(prompt).toContain("don't open the pages");
   });
-  await latestNews("AI agents");
-  expect(native.invoke).toHaveBeenLastCalledWith("notebook_news", {
-    query: "AI agents",
-    recency: null,
+
+  it("reads the stories with a web address, and drops the rest", () => {
+    const reply =
+      '```json\n{"stories": [{"title": "Panels get cheaper", "url": "https://example.com/a", ' +
+      '"source": "Example", "published": "2 hours ago"}, {"title": "No link", "url": "nope"}]}\n```';
+    expect(parseNews(reply)).toEqual([
+      {
+        title: "Panels get cheaper",
+        url: "https://example.com/a",
+        source: "Example",
+        published: "2 hours ago",
+      },
+    ]);
   });
 });

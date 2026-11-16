@@ -16,6 +16,7 @@ import type { DockSplitDirection } from "@/features/app-windows";
 import { minimumForWorkspaceViews } from "./dockSplitFit";
 import { closeWindow, openNewWindow } from "@/features/app-windows";
 import { flushWorkspaceRecovery } from "@/features/app-windows";
+import { designPx } from "@/shared/lib/uiScale";
 
 /** Pane and window keyboard shortcuts for the workspace. */
 export function useWorkspaceCanvasShortcuts(actions: {
@@ -47,7 +48,9 @@ export function useWorkspaceCanvasShortcuts(actions: {
       const pane = findDockLeaf(state.layout.root, state.layout.focusedPaneId);
       const bounds = paneBoundsFromDocument().find((candidate) => candidate.id === pane?.id);
       if (!pane || !bounds) return false;
-      return canFitDockSplit(bounds, direction, minimumForWorkspaceViews(pane.views), {
+      // The pane is measured in CSS pixels; the minimums are design pixels.
+      const room = { width: designPx(bounds.width), height: designPx(bounds.height) };
+      return canFitDockSplit(room, direction, minimumForWorkspaceViews(pane.views), {
         width: 360,
         height: 240,
       });

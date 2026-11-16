@@ -1,5 +1,8 @@
-import { ArrowUp, MessageSquare, Settings, Shirt, Square, X } from "lucide-react";
+import { ArrowUp, Mic, Settings, Shirt, Square, X } from "lucide-react";
+import { AgentRecordRow } from "./AgentRecordRow";
+import type { AgentRecord } from "./studioProgress";
 import { useEffect, useRef, useState } from "react";
+import { listen, useSpeechSupport, type Listening } from "@/features/voice";
 import {
   ActionBar,
   Button,
@@ -42,7 +45,11 @@ import {
   useStudioTalk,
 } from "./studioTalk";
 import type { StudioAgent } from "./useStudioAgents";
+import type { StudioResult } from "./studioResults";
 import { studioInputClass } from "./StudioBox";
+import { AskTeammate } from "./AskTeammate";
+import { talkPanelClass } from "./talkPanel";
+import { useTeammateAgents } from "./teammates";
 
 const stateWords = { working: "Working", "needs-you": "Needs you", resting: "Free" } as const;
 /** The dot before the state's words: green at work, amber waiting on the person. */
@@ -51,7 +58,7 @@ const stateDot = { working: "green", "needs-you": "amber", resting: undefined } 
 const SHOWN = 8;
 
 /** An agent's questions waiting for its person, answered right here: nothing runs until they are. */
-function Questions(props: { agentId: string; name: string }) {
+export function Questions(props: { agentId: string; name: string }) {
   const all = useActionQuestions((state) => state.items);
   const questions = all.filter((question) => question.agentId === props.agentId);
   const [busy, setBusy] = useState("");
@@ -110,6 +117,43 @@ function Questions(props: { agentId: string; name: string }) {
         </Text>
       ) : null}
     </div>
+  );
+}
+
+/**
+ * A finished task's result waiting on the agent's desk: what the task was and, when the chat below
+ * isn't the one it finished in, what it handed back. Collecting it takes it off the desk.
+ */
+function ResultCard(props: { result: StudioResult; inChat: boolean; onCollect(): void }) {
+  const { result } = props;
+  return (
+    <Surface
+      artWash="green"
+      radius="xl"
+      className="grid gap-2 p-2.5"
+      role="group"
+      aria-label="Result"
+    >
+      {result.task ? (
+        <Text size="meta" tone="bright" lines={2}>
+          {result.task}
+        </Text>
+      ) : null}
+      {result.text && !props.inChat ? (
+        <Text
+          bare
+          as="div"
+          size="meta"
+          tone="bright"
+          className="max-h-40 overflow-y-auto overscroll-contain [overflow-wrap:anywhere]"
+        >
+          <MistyMarkdown>{result.text}</MistyMarkdown>
+        </Text>
+      ) : null}
+      <Button variant="primary" onClick={props.onCollect}>
+        Collect
+      </Button>
+    </Surface>
   );
 }
 
@@ -183,6 +227,12 @@ export function AgentTalk(props: {
   /** Opens the agent's settings: its engine, model and instructions. */
   onSettings?(): void;
   onClose(): void;
+  /** Its record in the studio: level, tasks done, streaks. */
+  record?: AgentRecord;
+  /** A finished task's result waiting on its desk. */
+  result?: StudioResult;
+  /** Takes the waiting result off its desk. */
+  onCollect?(): void;
 }) {
   const { actor, item, name } = props;
   const agent = item?.agent;
@@ -214,12 +264,12 @@ export function AgentTalk(props: {
     if (box) box.scrollTop = box.scrollHeight;
   }, [last?.id, last?.content]);
 
-  const send = async () => {
-    if (!agent || sending || !draft.trim()) return;
+  const send = async (text = draft, spoken = false) => {
+    if (!agent || sending || !text.trim()) return;
     setSending(true);
     setError("");
     try {
-      await talkTo(agent, draft, chat?.id);
+      await talkTo(agent, text, chat?.id, spoken);
       setDraft("");
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : String(reason));
@@ -227,24 +277,56 @@ export function AgentTalk(props: {
       setSending(false);
     }
   };
-  const open = () => agent && props.onOpenChat(agent.id, chat?.id ?? item?.conversationId ?? "");
+  // What it waits on is in the chat its run is in.
+  const open = () => agent && props.onOpenChat(agent.id, item?.conversationId || chat?.id || "");
+
+  // The microphone: what is said shows in the box as it's heard, and goes to the agent once the
+  // person stops, to be answered aloud. Recognized on this computer, with no key.
+  const speech = useSpeechSupport();
+  const [hearing, setHearing] = useState<Listening | null>(null);
+  const heard = useRef<Listening | null>(null);
+  const typed = useRef("");
+  useEffect(() => () => void heard.current?.stop().catch(() => undefined), []);
+  const withTyped = (said: string) => [typed.current.trim(), said.trim()].filter(Boolean).join(" ");
+  const toggleMic = async () => {
+    const listening = heard.current;
+    if (listening) {
+      heard.current = null;
+      setHearing(null);
+      const said = await listening.stop().catch(() => "");
+      const text = withTyped(said);
+      setDraft(text);
+      if (said.trim()) void send(text, true);
+      return;
+    }
+    typed.current = draft;
+    setError("");
+    try {
+      const started = await listen((now) => {
+        if (now.error) setError(now.error);
+        else setDraft(withTyped(now.text));
+      });
+      heard.current = started;
+      setHearing(started);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : String(reason));
+    }
+  };
   const now =
     actor.state === "working"
       ? [actor.doing || "Working", actor.task].filter(Boolean).join(" · ")
       : "";
+  // A visiting agent is asked for through its person, who decides whether to pass it on.
+  const visitor = useTeammateAgents((state) =>
+    actor.guest ? state.agents.find((mate) => `guest:${mate.key}` === actor.id) : undefined,
+  );
 
   return (
     <Surface
       as="section"
       tone="scene-panel"
       radius="2xl"
-      className={cn(
-        // Docked on the right under the bar; on a narrow window, along the bottom instead.
-        "absolute top-3 right-[calc(0.75rem+var(--window-chrome-right,0px))] z-[var(--stack-overlay)]",
-        "flex max-h-[calc(100%-6rem)] w-90 max-w-[calc(100%-1.5rem)] flex-col gap-2.5 p-3",
-        "max-[720px]:inset-x-3 max-[720px]:top-auto max-[720px]:bottom-4 max-[720px]:max-h-[60%]",
-        "max-[720px]:w-auto max-[720px]:max-w-none",
-      )}
+      className={talkPanelClass}
       data-state={actor.state}
       aria-label={`Talk to ${name}`}
       onKeyDown={(event) => {
@@ -305,14 +387,6 @@ export function AgentTalk(props: {
                         }),
                       ]
                     : []),
-                  iconBarItem({
-                    id: "open",
-                    icon: MessageSquare,
-                    label: "Open chat",
-                    size: "sm",
-                    priority: 2,
-                    onSelect: open,
-                  }),
                 ]
               : []
           }
@@ -325,6 +399,7 @@ export function AgentTalk(props: {
       </header>
       {/* The one Space this agent works and saves in, whichever Space the window shows. */}
       {agent ? <AgentHomeSpaceLine agent={agent} /> : null}
+      {agent ? <AgentRecordRow record={props.record} /> : null}
       {agent ? (
         <ChatSwitcher
           agentId={agent.id}
@@ -333,14 +408,35 @@ export function AgentTalk(props: {
           onPicked={() => input.current?.focus()}
         />
       ) : null}
-      {now ? (
-        <Surface tone="faint" radius="lg" className="px-2.5 py-2">
-          <Text as="p" size="caption" tone="default" lines={2}>
-            {now}
-          </Text>
+      {now || actor.clash ? (
+        <Surface tone="faint" radius="lg" className="grid gap-1 px-2.5 py-2">
+          {now ? (
+            <Text as="p" size="caption" tone="default" lines={2}>
+              {now}
+            </Text>
+          ) : null}
+          {actor.clash ? (
+            <Text as="p" size="caption" tone="waiting" lines={2} data-clash="true">
+              {actor.clash}
+            </Text>
+          ) : null}
         </Surface>
       ) : null}
+      {visitor ? (
+        <AskTeammate
+          member={{ userId: visitor.userId, name: visitor.owner }}
+          agents={[visitor]}
+          focus={props.focus}
+        />
+      ) : null}
       {agent ? <Questions agentId={agent.id} name={name} /> : null}
+      {agent && props.result && props.onCollect ? (
+        <ResultCard
+          result={props.result}
+          inChat={Boolean(chat && chat.id === props.result.conversationId)}
+          onCollect={props.onCollect}
+        />
+      ) : null}
       {agent && actor.state === "needs-you" && !answering ? (
         <Button onClick={open}>Answer in chat</Button>
       ) : null}
@@ -452,9 +548,24 @@ export function AgentTalk(props: {
               <Square aria-hidden="true" />
             </IconButton>
           ) : (
-            <IconButton label="Send" type="submit" disabled={sending || !draft.trim()}>
-              <ArrowUp aria-hidden="true" />
-            </IconButton>
+            <>
+              {speech?.recognition && agent.enabled ? (
+                <IconButton
+                  label={hearing ? "Stop and send" : "Speak"}
+                  type="button"
+                  aria-pressed={Boolean(hearing)}
+                  disabled={sending}
+                  onClick={() => void toggleMic()}
+                >
+                  {hearing ? <Square aria-hidden="true" /> : <Mic aria-hidden="true" />}
+                </IconButton>
+              ) : null}
+              {hearing ? null : (
+                <IconButton label="Send" type="submit" disabled={sending || !draft.trim()}>
+                  <ArrowUp aria-hidden="true" />
+                </IconButton>
+              )}
+            </>
           )}
         </Surface>
       ) : null}

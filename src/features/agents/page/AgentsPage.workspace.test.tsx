@@ -1,6 +1,7 @@
 import {
   composer,
   conversation,
+  currentLocation,
   fixture,
   openAgentSettings,
   openChat,
@@ -67,8 +68,8 @@ it("preserves one conversation draft across catalogs", () => {
   renderAgentsPage();
   const draft = composer();
   typeDraft("Keep this while I browse");
-  openPage("integrations");
-  expect(document.querySelector(".agent-studio")?.getAttribute("data-page")).toBe("integrations");
+  openPage("studio");
+  expect(document.querySelector(".agent-studio")?.getAttribute("data-page")).toBe("studio");
   expect(screen.queryByRole("alertdialog")).toBeNull();
   expect(composer()).toBe(draft);
   expect(draft.value).toBe("Keep this while I browse");
@@ -88,13 +89,18 @@ it("opens the existing profile editor from the workspace and guards page changes
   expect(nameField().value).toBe("Unsaved identity");
 });
 
-it("opens Integrations and the Lab from links, with no title bar", () => {
-  renderAgentsPage("/agents?view=lab");
-  expect(screen.queryByRole("heading", { name: "Lab", level: 1 })).toBeNull();
-  expect(screen.getByRole("heading", { name: "Notebooks" })).toBeTruthy();
+it("sends the Lab tab to the agent's home Space's Lab, keeping the notebook asked for", () => {
+  fixture.agent.space_id = "space-1";
+  renderAgentsPage("/agents?view=lab&item=notebook:n1");
+  expect(currentLocation()).toBe("/spaces/space-1/lab?item=notebook%3An1");
+  expect(useMistyStore.getState().selectedAgentId).toBe("communications");
+});
+
+it("opens the studio from links, with no title bar", () => {
+  renderAgentsPage();
   const page = () => document.querySelector(".agent-studio")?.getAttribute("data-page");
-  openPage("integrations");
-  expect(page()).toBe("integrations");
+  openPage("studio");
+  expect(page()).toBe("studio");
   expect(document.querySelector(".agent-studio-bar")).toBeNull();
   openChat();
   expect(page()).toBe("task");

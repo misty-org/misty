@@ -12,6 +12,7 @@ import type { MouseEvent as ReactMouseEvent } from "react";
 import { formatBytes, formatTime } from "../libraryFormat";
 import { useSpaceLibraryContext } from "../SpaceLibraryContext";
 import { libraryFileTypeLabel, LibraryItemThumbnail } from "../SpaceLibraryPrimitives";
+import { uiPx } from "@/shared/lib/uiScale";
 
 export const ITEM_ACTION_MENU_WIDTH = 224;
 
@@ -32,8 +33,7 @@ export function LibraryItemCard({
   onSelect: (event: ReactMouseEvent, id: string, onOpen: () => void) => void;
 }) {
   const {
-    data: { spaceId, itemMenu, libraryViewerTriggerRef, setSelectedItemId },
-    itemActions: { toggleSelectedItem },
+    data: { itemMenu },
   } = useSpaceLibraryContext();
   return (
     <Surface
@@ -59,7 +59,7 @@ export function LibraryItemCard({
           onShowMenu={onShowMenu}
         />
       </div>
-      <LibraryItemPreview item={item} selected={selected} />
+      <LibraryItemPreview item={item} selected={selected} onSelect={onSelect} />
       <CollectionCardMetadata
         category={`${libraryFileTypeLabel(item)} · ${formatBytes(Number(item.file.intrinsic_metadata.byte_size ?? 0))}`}
         updated={formatTime(item.updated_at || item.added_at)}
@@ -68,33 +68,50 @@ export function LibraryItemCard({
       />
     </Surface>
   );
-  function LibraryItemPreview({ item, selected }: { item: SpaceLibraryItem; selected: boolean }) {
-    return (
-      <div className="relative mt-2 w-full min-w-0 flex-1">
-        <Pressable
-          className="relative grid aspect-[4/3] min-h-32 w-full place-items-center overflow-hidden rounded-lg [&>svg]:size-10"
-          onClick={(event) => {
-            onSelect(event, item.id, () => {
-              libraryViewerTriggerRef.current = event.currentTarget;
-              setSelectedItemId(item.id);
-            });
-          }}
-          aria-label={`Open ${item.display_name}`}
-        >
-          <LibraryItemThumbnail spaceId={spaceId} item={item} />
-        </Pressable>
-        <Checkbox
-          className={selectionToggleClassName(selected)}
-          aria-label={`${selected ? "Deselect" : "Select"} ${item.display_name}`}
-          checked={selected}
-          onClick={(event) => {
-            event.stopPropagation();
-            toggleSelectedItem(item.id);
-          }}
-        />
-      </div>
-    );
-  }
+}
+/**
+ * The card's thumbnail and its selection checkbox. Declared at module level: a component defined
+ * inside another one is a new type on every render, so React remounted the Radix checkbox each
+ * time and its mount-time updates looped ("Maximum update depth exceeded").
+ */
+function LibraryItemPreview({
+  item,
+  selected,
+  onSelect,
+}: {
+  item: SpaceLibraryItem;
+  selected: boolean;
+  onSelect: (event: ReactMouseEvent, id: string, onOpen: () => void) => void;
+}) {
+  const {
+    data: { spaceId, libraryViewerTriggerRef, setSelectedItemId },
+    itemActions: { toggleSelectedItem },
+  } = useSpaceLibraryContext();
+  return (
+    <div className="relative mt-2 w-full min-w-0 flex-1">
+      <Pressable
+        className="relative grid aspect-[4/3] min-h-32 w-full place-items-center overflow-hidden rounded-lg [&>svg]:size-10"
+        onClick={(event) => {
+          onSelect(event, item.id, () => {
+            libraryViewerTriggerRef.current = event.currentTarget;
+            setSelectedItemId(item.id);
+          });
+        }}
+        aria-label={`Open ${item.display_name}`}
+      >
+        <LibraryItemThumbnail spaceId={spaceId} item={item} />
+      </Pressable>
+      <Checkbox
+        className={selectionToggleClassName(selected)}
+        aria-label={`${selected ? "Deselect" : "Select"} ${item.display_name}`}
+        checked={selected}
+        onClick={(event) => {
+          event.stopPropagation();
+          toggleSelectedItem(item.id);
+        }}
+      />
+    </div>
+  );
 }
 function LibraryItemActions({
   item,
@@ -127,7 +144,7 @@ function LibraryItemActions({
           const rect = event.currentTarget.getBoundingClientRect();
           onShowMenu(
             item.id,
-            rect.right - ITEM_ACTION_MENU_WIDTH,
+            rect.right - uiPx(ITEM_ACTION_MENU_WIDTH),
             rect.bottom + 4,
             event.currentTarget,
           );

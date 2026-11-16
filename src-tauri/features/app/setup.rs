@@ -35,6 +35,8 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     let runtime = MistyRuntime::new();
     #[cfg(desktop)]
     database::retired_coding_data::remove_once_in_background(&runtime.environment);
+    // Misty holds no keys now: the ones an older Misty kept are removed once, off the main thread.
+    tauri::async_runtime::spawn_blocking(crate::agents::models::forget_old_keys);
     #[cfg(desktop)]
     runtime.agents.restore_folder_grants();
     crate::engines::commands::allow_linked_folders(&runtime.environment.store());
@@ -59,6 +61,7 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     app.manage(voice::DictationState::default());
     #[cfg(any(target_os = "macos", windows, target_os = "linux"))]
     app.manage(voice::CaptureState::default());
+    app.manage(voice::speech::SpeechState::default());
     #[cfg(desktop)]
     app.manage(BrowserExecutionState::default());
     // The floating Misty window is intentionally not created during

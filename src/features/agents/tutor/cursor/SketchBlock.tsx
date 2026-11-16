@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { PenLine } from "lucide-react";
-import { Button, Skeleton, Surface, Text } from "@/shared/ui";
+import { PenLine, Play } from "lucide-react";
+import { openReading } from "@/features/voice";
+import { Button, Skeleton, sketchInk, Surface, Text } from "@/shared/ui";
 import {
   spacesSnapshot,
   useWorkspaceStore,
@@ -8,13 +9,16 @@ import {
   workspaceSurfaceFromRoute,
 } from "@/features/app-windows";
 import { spacesGateway } from "../../spaces-gateway/spacesGateway";
+import { withPictures } from "./companionPictures";
 import { parseSketch, sketchSkeleton } from "./companionSketch";
+import { createModelView, type ModelView } from "./modelView";
 import { renderSketch } from "./sketchRender";
 
 /**
- * A reply's drawing in the transcript (companionSketch.ts): the whiteboard itself, or
- * the marks Misty drew over the screen without the screenshot under them. Save as
- * drawing makes it a Space drawing anyone in the Space can keep editing.
+ * A reply's drawing in the transcript (companionSketch.ts): the whiteboard itself, the
+ * marks Misty drew over the screen without the screenshot under them, or a 3D model that
+ * can be dragged around. Save as drawing makes a board or marks a Space drawing anyone in
+ * the Space can keep editing.
  */
 export function SketchBlock({ source }: { source: string }) {
   const sketch = useMemo(() => parseSketch("```misty-sketch\n" + source + "\n```"), [source]);
@@ -23,15 +27,58 @@ export function SketchBlock({ source }: { source: string }) {
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState("");
   const count = sketch?.elements.length ?? 0;
+  const isModel = sketch?.header.surface === "model";
+  // Bumped as each picture in the drawing arrives, to draw it again with the picture.
+  const [pictures, setPictures] = useState(0);
+  const model = useRef<Promise<ModelView | undefined> | undefined>(undefined);
+  // While a replay runs, how many elements are back on the board; undefined shows them all.
+  const [replay, setReplay] = useState<number | undefined>(undefined);
+  // What was said as it was drawn, so the drawing still explains itself when read.
+  const narration = sketch?.elements
+    .map((e) => e.say)
+    .filter(Boolean)
+    .join(" ");
   // Redraw when a line completes, not on every token of the reply.
   const latest = useRef(sketch);
   latest.current = sketch;
 
   useEffect(() => {
-    const elements = latest.current?.elements;
-    if (!elements?.length) return;
+    const drawing = latest.current;
+    if (!drawing?.elements.length || drawing.header.surface !== "model" || !canvas.current) return;
+    if (!model.current) {
+      const stage = document.createElement("div");
+      stage.className = "size-full";
+      canvas.current.replaceChildren(stage);
+      model.current = createModelView(stage, { draggable: true }).catch(() => undefined);
+    }
+    const parts = replay === undefined ? drawing.elements : drawing.elements.slice(0, replay);
+    void model.current.then((view) => {
+      if (!view) return setNotice("This model couldn't be shown.");
+      view.update(parts);
+      setDrawn(true);
+    });
+  }, [count, replay]);
+
+  // The model goes with the block.
+  useEffect(
+    () => () => {
+      void model.current?.then((view) => view?.dispose());
+      model.current = undefined;
+    },
+    [],
+  );
+
+  useEffect(() => {
+    const drawing = latest.current;
+    if (!drawing?.elements.length || drawing.header.surface === "model") return;
+    const all = withPictures(drawing.elements, () => setPictures((n) => n + 1));
+    const elements = replay === undefined ? all : all.slice(0, replay);
+    if (!elements.length) {
+      canvas.current?.replaceChildren();
+      return;
+    }
     let current = true;
-    void renderSketch(elements, "#1e1e1e")
+    void renderSketch(elements, sketchInk.board)
       .then((result) => {
         if (!current || !result || !canvas.current) return;
         result.svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
@@ -46,9 +93,35 @@ export function SketchBlock({ source }: { source: string }) {
     return () => {
       current = false;
     };
-  }, [count]);
+  }, [count, pictures, replay]);
 
   if (!sketch) return null;
+
+  /** Draws it again from nothing while its narration is read, each part as its sentence begins. */
+  const play = async () => {
+    const elements = sketch.elements;
+    const reading = openReading();
+    // Which sentence brings in each element: a narrated one starts the next sentence.
+    const sentenceOf: number[] = [];
+    let said = -1;
+    for (const element of elements) {
+      if (element.say) {
+        said++;
+        reading.add(element.say);
+      }
+      sentenceOf.push(Math.max(said, 0));
+    }
+    setReplay(0);
+    let readingDone = false;
+    const ended = reading.end().finally(() => (readingDone = true));
+    while (!readingDone) {
+      const started = await reading.started();
+      setReplay(sentenceOf.filter((sentence) => sentence < started).length);
+      await new Promise((wait) => setTimeout(wait, 100));
+    }
+    await ended.catch(() => undefined);
+    setReplay(undefined);
+  };
 
   const save = async () => {
     const spaceId = windowSpace(spacesSnapshot().spaces)?.id;
@@ -96,20 +169,38 @@ export function SketchBlock({ source }: { source: string }) {
       >
         {!drawn && <Skeleton className="size-full" />}
       </Surface>
-      <div className="mt-2 flex items-center gap-2.5">
-        <Button
-          icon={PenLine}
-          disabled={!sketch.done || !count || saving}
-          onClick={() => void save()}
-        >
-          Save as drawing
-        </Button>
-        {notice && (
-          <Text role="status" size="caption" tone="muted" wrap>
-            {notice}
-          </Text>
-        )}
-      </div>
+      {narration ? (
+        <Text as="p" size="body" wrap className="mt-2">
+          {narration}
+        </Text>
+      ) : null}
+      {(!isModel || notice || narration) && (
+        <div className="mt-2 flex items-center gap-2.5">
+          {narration ? (
+            <Button
+              icon={Play}
+              disabled={!sketch.done || replay !== undefined}
+              onClick={() => void play()}
+            >
+              Replay
+            </Button>
+          ) : null}
+          {!isModel && (
+            <Button
+              icon={PenLine}
+              disabled={!sketch.done || !count || saving}
+              onClick={() => void save()}
+            >
+              Save as drawing
+            </Button>
+          )}
+          {notice && (
+            <Text role="status" size="caption" tone="muted" wrap>
+              {notice}
+            </Text>
+          )}
+        </div>
+      )}
     </figure>
   );
 }

@@ -2,29 +2,29 @@
 // See NOTICE.
 
 /**
- * Settings › Engines › CLIs: each engine CLI's version on this computer, the latest one on npm,
+ * Agents › CLIs: each engine CLI's version on this computer, the latest one on npm,
  * whether the person is signed in (as the CLI itself says), and installing or updating it.
  *
- * One row per engine: its mark and name, then its sign-in pill with a sign-in button while it is
- * signed out (the CLI's own login, in a terminal), a status pill (checking, not installed, or the
- * version with a check or an arrow), the install or update button naming the target, and the
- * docs and refresh buttons, and, for an engine Misty installed in `~/.misty/shared/engines`, Remove in
- * the row's ⋯ menu. Versions are checked when the page opens and on refresh, never on a timer.
+ * One settings row per engine: its mark and name, one quiet line under the name with what is true
+ * (its version, signed in or out, an update waiting), then at most one button for what to do next
+ * (Install, else Sign in, else Update), and a ⋯ menu with the rest: updating when Sign in took the
+ * button, the docs, checking again and, for an engine Misty installed in `~/.misty/shared/engines`,
+ * Remove. Versions are checked when the page opens and on refresh, never on a timer.
  */
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { ArrowUp, BookOpen, Check, Download, RefreshCw, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { ArrowUp, BookOpen, Download, MoreHorizontal, RefreshCw, Trash2 } from "lucide-react";
+import { Fragment, useState, type ReactNode } from "react";
 import { EngineMark, hasEngineMark } from "../EngineMark";
-import { DesktopSettingsSection as Section } from "@/features/settings";
+import { DesktopSettingsRow, DesktopSettingsSection as Section } from "@/features/settings";
 import {
-  Badge,
   Button,
-  cn,
   ConfirmDeleteDialog,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuSeparator,
   MenuItem,
+  MenuTrigger,
   SkeletonControl,
-  IconButton,
-  RowActions,
   Text,
   Tooltip,
 } from "@/shared/ui";
@@ -40,36 +40,55 @@ function openDocs(url: string) {
   void openUrl(url).catch(() => {});
 }
 
-function VersionPill({ status, error }: { status: CliVersionStatus | null; error: string | null }) {
+/**
+ * A version as people read it. CLIs print theirs in their own words ("codex-cli 0.147.0",
+ * "2.1.325 (Claude Code)", "grok 1.0.77 (50ca579fa996)"); only the number is kept.
+ */
+export function versionText(raw: string): string {
+  const number = raw.match(/\d+(?:\.\d+)+(?:-[0-9A-Za-z.]+)?/);
+  return `v${number ? number[0] : raw.trim().replace(/^v/i, "")}`;
+}
+
+/** The row's one line under the name: what is true about this CLI now. */
+function StatusLine({
+  status,
+  error,
+  signedIn,
+  signInDetail,
+}: {
+  status: CliVersionStatus | null;
+  error: string | null;
+  signedIn: boolean | null;
+  signInDetail: string | null;
+}) {
   if (status === null) {
     return error ? (
       <Tooltip content={error}>
-        <Badge variant="outline">Check failed</Badge>
+        <span>Couldn’t check</span>
       </Tooltip>
     ) : (
-      <SkeletonControl kind="badge" className="w-16" />
+      <>Checking…</>
     );
   }
-  if (!status.installed) return <Badge variant="outline">Not installed</Badge>;
-  if (!status.localVersion) return <Badge variant="outline">Installed</Badge>;
+  if (!status.installed) return <>Not installed</>;
+  const facts: ReactNode[] = [status.localVersion ? versionText(status.localVersion) : "Installed"];
+  if (signedIn !== null)
+    facts.push(
+      <Tooltip key="sign-in" content={signInDetail ?? ""}>
+        <span>{signedIn ? "Signed in" : "Signed out"}</span>
+      </Tooltip>,
+    );
+  if (status.updateAvailable && status.latestVersion)
+    facts.push(`${versionText(status.latestVersion)} available`);
   return (
-    <Badge variant="outline">
-      {status.updateAvailable ? (
-        <ArrowUp aria-label="Update available" />
-      ) : status.latestVersion ? (
-        <Check aria-label="Up to date" />
-      ) : null}
-      v{status.localVersion.replace(/^v/, "")}
-    </Badge>
-  );
-}
-
-function SignInPill({ signedIn, detail }: { signedIn: boolean | null; detail: string | null }) {
-  if (signedIn === null) return null;
-  return (
-    <Tooltip content={detail ?? ""}>
-      <Badge variant="outline">{signedIn ? "Signed in" : "Signed out"}</Badge>
-    </Tooltip>
+    <>
+      {facts.map((fact, index) => (
+        <Fragment key={index}>
+          {index ? " · " : null}
+          {fact}
+        </Fragment>
+      ))}
+    </>
   );
 }
 
@@ -88,58 +107,79 @@ function CliRow({ engine }: { engine: EngineId }) {
   // its providers in its own web page (Channels › DeepSeek Harness).
   const canSignIn =
     status?.installed === true && signIn !== null && signIn.signedIn !== true && engine !== "dsh";
+  const installing = canAct && !status.installed;
+  // One button: Install, else Sign in, else Update. An update Sign in pushed out is in the menu.
+  const updateInMenu = canAct && status.installed && canSignIn && !updating;
+  const updateLabel = `Update to ${status?.latestVersion ? versionText(status.latestVersion) : "latest"}`;
+  let action: ReactNode = null;
+  if (installing || (canAct && !canSignIn) || updating)
+    action = (
+      <Button
+        icon={installing ? Download : ArrowUp}
+        loading={updating}
+        disabled={updating || loading}
+        onClick={() => void flow.begin()}
+      >
+        {updating ? "Updating" : installing ? "Install" : updateLabel}
+      </Button>
+    );
+  else if (canSignIn)
+    action = <SignInButton engine={engine} disabled={updating} onSignIn={setSigningIn} />;
   return (
-    <div className="group/row flex min-h-13 items-center gap-3 border-b px-3 py-2.5 last:border-b-0">
-      <Text bare tone="default" className="flex size-8 shrink-0 items-center justify-center">
-        {hasEngineMark(engine) ? (
-          <EngineMark engine={engine} size={16} />
-        ) : (
-          <span className="text-xs font-semibold">{name.charAt(0)}</span>
-        )}
-      </Text>
-      <Text as="p" tone="bright" full className="min-w-0 flex-1 text-sm">
-        {ENGINE_NAMES[engine]}
-      </Text>
-      {/* Before the first probe answers, the sign-in pill and the install button hold their
-          places, so the row doesn't move when they arrive. */}
-      {status === null && !error ? <SkeletonControl kind="badge" className="w-16" /> : null}
-      <SignInPill
-        signedIn={status?.installed ? (signIn?.signedIn ?? null) : null}
-        detail={signIn?.detail ?? null}
-      />
-      {canSignIn ? (
-        <SignInButton engine={engine} disabled={updating} onSignIn={setSigningIn} />
-      ) : null}
-      <VersionPill status={status} error={error} />
-      {status === null && !error ? <SkeletonControl kind="button" /> : null}
-      {canAct ? (
-        <Button variant="primary" disabled={updating || loading} onClick={() => void flow.begin()}>
-          {updating ? null : status.installed ? <ArrowUp /> : <Download />}
-          {updating
-            ? "Updating"
-            : status.installed
-              ? `Update to ${status.latestVersion ?? "latest"}`
-              : "Install"}
-        </Button>
-      ) : null}
-      <IconButton
-        label={`${ENGINE_NAMES[engine]} docs`}
-        onClick={() => openDocs(ENGINE_DOCS_URLS[engine])}
+    <>
+      <DesktopSettingsRow
+        label={name}
+        leading={
+          <Text bare tone="default" className="flex size-8 shrink-0 items-center justify-center">
+            {hasEngineMark(engine) ? (
+              <EngineMark engine={engine} size={16} />
+            ) : (
+              <span className="text-xs font-semibold">{name.charAt(0)}</span>
+            )}
+          </Text>
+        }
+        description={
+          <StatusLine
+            status={status}
+            error={error}
+            signedIn={status?.installed ? (signIn?.signedIn ?? null) : null}
+            signInDetail={signIn?.detail ?? null}
+          />
+        }
       >
-        <BookOpen />
-      </IconButton>
-      <IconButton
-        label={`Check ${ENGINE_NAMES[engine]} again`}
-        disabled={loading || updating}
-        onClick={refresh}
-      >
-        <RefreshCw className={cn(loading && "animate-spin")} />
-      </IconButton>
-      {canRemove ? (
-        <RowActions label={`${name} actions`}>
-          <MenuItem icon={Trash2} label="Remove" danger onSelect={() => setRemoving(true)} />
-        </RowActions>
-      ) : null}
+        {/* Before the first probe answers, the button holds its place so the row doesn't move. */}
+        {status === null && !error ? <SkeletonControl kind="button" /> : action}
+        <DropdownMenu>
+          <MenuTrigger label={`${name} actions`} iconOnly icon={MoreHorizontal} />
+          <DropdownMenuContent align="end">
+            {updateInMenu ? (
+              <MenuItem
+                icon={ArrowUp}
+                label={updateLabel}
+                disabled={loading}
+                onSelect={() => void flow.begin()}
+              />
+            ) : null}
+            <MenuItem
+              icon={BookOpen}
+              label="Docs"
+              onSelect={() => openDocs(ENGINE_DOCS_URLS[engine])}
+            />
+            <MenuItem
+              icon={RefreshCw}
+              label="Check again"
+              disabled={loading || updating}
+              onSelect={refresh}
+            />
+            {canRemove ? (
+              <>
+                <DropdownMenuSeparator />
+                <MenuItem icon={Trash2} label="Remove" danger onSelect={() => setRemoving(true)} />
+              </>
+            ) : null}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </DesktopSettingsRow>
       <ConfirmDeleteDialog
         open={removing}
         onOpenChange={setRemoving}
@@ -159,11 +199,11 @@ function CliRow({ engine }: { engine: EngineId }) {
           refresh();
         }}
       />
-    </div>
+    </>
   );
 }
 
-/** Settings › Engines › CLIs. */
+/** Agents › CLIs. */
 export function ClisSection() {
   return (
     <Section title="CLIs">

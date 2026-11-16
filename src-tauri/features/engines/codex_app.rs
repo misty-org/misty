@@ -122,6 +122,9 @@ enum Handled {
 /// Per-run projection state: what streamed, and what to report at settle time.
 #[derive(Default)]
 struct TurnView {
+    /// The reply that opened the turn's thread: set by the handshake, or carried in from a warm
+    /// app-server that already holds the thread, which then skips its handshake.
+    thread_reply: Option<Value>,
     /// Item id whose text already streamed as deltas. A completed
     /// `agentMessage` repeats that text in full, and a `message` row appends as
     /// a settled snapshot (the UI collapses the live row first), so replaying
@@ -1458,14 +1461,48 @@ async fn drive(
                 .map_err(|_| "Cannot verify isolated Codex home")?,
         );
     }
-    let mut spawned = spawn_app_server(command, &req.workspace)?;
+    // Misty: an ordinary chat turn may run on the app-server its chat's last turn left warm,
+    // which already holds the thread (`warm.rs`). Planning, its decisions and read-only runs
+    // open their own, as before.
+    let ordinary = decision.is_none()
+        && !codex_read_only::requested(req)
+        && req.permission.as_deref() != Some("plan");
+    let fingerprint = super::warm::claim(&core.run_id).filter(|_| ordinary);
+    let taken = fingerprint
+        .zip(req.session_id.as_deref())
+        .and_then(|(fingerprint, thread)| {
+            WARM.take(&super::warm::key(&core.engine_id, thread), fingerprint)
+        })
+        .and_then(|mut warm| {
+            if warm.item.alive() {
+                Some(warm)
+            } else {
+                warm.retire();
+                None
+            }
+        });
+    let mut warm = match taken {
+        Some(warm) => {
+            warm.hand_to(&core.run_id);
+            view.thread_reply = Some(warm.item.thread.clone());
+            warm
+        }
+        None => super::warm::Warm {
+            item: WarmCodex {
+                spawned: spawn_app_server(command, &req.workspace)?,
+                thread: Value::Null,
+            },
+            token: None,
+            cleanup: Vec::new(),
+        },
+    };
     view.exit_unconfirmed = true;
     // The answer command writes a parked question's response on this same pipe,
     // so the registry gets the writer from the first frame on.
     core.registry
-        .set_stdin(&core.run_id, Arc::clone(&spawned.server.stdin));
+        .set_stdin(&core.run_id, Arc::clone(&warm.item.spawned.server.stdin));
     let result = handshake_and_turn(
-        &mut spawned.server,
+        &mut warm.item.spawned.server,
         core,
         state,
         view,
@@ -1474,12 +1511,73 @@ async fn drive(
         decision,
     )
     .await;
+    // A clean turn leaves the app-server warm, holding its thread, for the chat's next message.
+    if let (Ok(()), Some(fingerprint), Some(thread_id), Some(reply)) = (
+        &result,
+        fingerprint,
+        view.main_thread.clone(),
+        view.thread_reply.clone(),
+    ) {
+        if !killed.load(Ordering::SeqCst) && warm.item.alive() {
+            warm.item.thread = reply;
+            if warm.token.is_none() {
+                warm.token = super::mcp::token_in(req.mcp_servers.as_ref());
+            }
+            WARM.park(
+                super::warm::key(&core.engine_id, &thread_id),
+                req.workspace.clone(),
+                fingerprint,
+                warm,
+            );
+            // The process stays on purpose: the turn's end needn't wait for it to exit.
+            view.exit_unconfirmed = false;
+            return Ok(());
+        }
+    }
+    let spawned = &mut warm.item.spawned;
     teardown(&mut spawned.child).await;
     view.exit_unconfirmed = !matches!(spawned.child.try_wait(), Ok(Some(_)));
     match result {
         Ok(()) => Ok(()),
         Err(error) => Err(terminal_message(error, &spawned.stderr_buf)),
     }
+}
+
+/// A Codex app-server idling after a clean turn, its thread still open.
+struct WarmCodex {
+    spawned: SpawnedCodex,
+    /// The reply that opened the thread, which the next turn announces again.
+    thread: Value,
+}
+
+impl WarmCodex {
+    fn alive(&mut self) -> bool {
+        matches!(self.spawned.child.try_wait(), Ok(None))
+    }
+}
+
+impl super::warm::Retire for WarmCodex {
+    fn retire(mut self, cleanup: Vec<PathBuf>) {
+        tokio::spawn(async move {
+            teardown(&mut self.spawned.child).await;
+            super::cleanup_staged_files(&cleanup);
+        });
+    }
+    fn kill_now(mut self, cleanup: Vec<PathBuf>) {
+        super::warm::kill_child_now(&mut self.spawned.child, &cleanup);
+    }
+}
+
+static WARM: super::warm::Pool<WarmCodex> = super::warm::Pool::new();
+
+/// Ends the warm app-servers, as the app quits.
+pub(super) fn kill_warm() {
+    WARM.kill_all();
+}
+
+/// Ends the warm app-servers working in `folder`.
+pub(super) fn retire_warm_in(folder: &Path) {
+    WARM.retire_in(folder);
 }
 
 /// `initialize` → thread → turn, projecting everything through `route`.
@@ -1557,6 +1655,39 @@ async fn handshake_and_start(
     decision: Option<&DecisionCheck>,
     ack_timeout: Option<Duration>,
 ) -> Result<Option<TurnStarted>, String> {
+    // Misty: a warm app-server (`drive`) already holds the thread, opened on an earlier turn:
+    // its reply stands in for the handshake, and the turn starts straight away.
+    let (result, method) = match view.thread_reply.clone() {
+        Some(reply) => (reply, "thread/resume"),
+        None => open_thread(server, core, state, view, req, killed, decision).await?,
+    };
+    view.thread_reply = Some(result.clone());
+    start_on_thread(
+        server,
+        core,
+        state,
+        view,
+        req,
+        killed,
+        decision,
+        ack_timeout,
+        result,
+        method,
+    )
+    .await
+}
+
+/// `initialize`, then the thread resumed or started: the thread's reply and the method that
+/// opened it.
+async fn open_thread(
+    server: &mut AppServer,
+    core: &TurnCore,
+    state: &mut TurnState,
+    view: &mut TurnView,
+    req: &SendRequest,
+    killed: &Arc<AtomicBool>,
+    decision: Option<&DecisionCheck>,
+) -> Result<(Value, &'static str), String> {
     let deadline = Instant::now() + RPC_HANDSHAKE_TIMEOUT;
     // collaborationMode and the plan items are EXPERIMENTAL in the 0.154.0
     // schema: the client must opt into the experimental API to negotiate
@@ -1672,6 +1803,23 @@ async fn handshake_and_start(
     if codex_read_only::requested(req) {
         codex_read_only::validate_thread(&result)?;
     }
+    Ok((result, method))
+}
+
+/// What the thread's reply says, announced to the chat, then the turn started on it.
+#[allow(clippy::too_many_arguments)]
+async fn start_on_thread(
+    server: &mut AppServer,
+    core: &TurnCore,
+    state: &mut TurnState,
+    view: &mut TurnView,
+    req: &SendRequest,
+    killed: &Arc<AtomicBool>,
+    decision: Option<&DecisionCheck>,
+    ack_timeout: Option<Duration>,
+    result: Value,
+    method: &str,
+) -> Result<Option<TurnStarted>, String> {
     let thread_id = result
         .pointer("/thread/id")
         .and_then(Value::as_str)

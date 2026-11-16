@@ -9,6 +9,7 @@ const MARKED: &[&str] = &[
     "drawing.read",
     "file.read",
     "file.search",
+    "image.read",
     "integration.execute",
     "message.search",
     "note.read",

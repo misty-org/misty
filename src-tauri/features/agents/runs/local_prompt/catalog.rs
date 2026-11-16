@@ -24,8 +24,8 @@ const CATALOG: &str = include_str!("catalog.json");
 pub(crate) struct CatalogInputs {
     /// Spaces and everything else kept on the server appear only after sign-in.
     pub(crate) signed_in: bool,
-    /// The person has a Composio key, so `integration.*` can run.
-    pub(crate) composio_key: bool,
+    /// The person has connected an app directly, so `integration.*` can run.
+    pub(crate) apps_connected: bool,
     /// The search provider this computer has a key for, which adds `web.search`.
     pub(crate) search: Option<SearchProviderId>,
     /// Their computers' names by device id, for folder labels and the `device` choice.
@@ -123,7 +123,7 @@ fn offered(row: &JsValue, request: &RunRequest, inputs: &CatalogInputs, grants: 
     let registered = match name {
         _ if is_screen_tool(name) => !request.window_label.is_empty(),
         _ if is_granted_browser_tool(name) => !grants.labels.is_empty() && grants.capabilities.iter().any(|capability| capability == name),
-        _ if name.starts_with("integration.") => inputs.composio_key,
+        _ if name.starts_with("integration.") => inputs.apps_connected,
         _ if name.starts_with("folder.") => contexts.iter().any(|device| device.kind == "local_folder"),
         "shell.run" => contexts.iter().any(|device| device.kind == "workspace"),
         "log.work.checklist" => !request.planning() && (has_conversation || !request.delegated_from.is_empty()),

@@ -1,41 +1,37 @@
 import { useFrame } from "@react-three/fiber";
-import {
-  AppWindow,
-  Brain,
-  Ellipsis,
-  FileText,
-  Globe,
-  Monitor,
-  Plug,
-  Plus,
-  Search,
-  SquareTerminal,
-  StickyNote,
-  Users,
-  type LucideIcon,
-} from "lucide-react";
+import { Ellipsis, Plus, TriangleAlert } from "lucide-react";
 import { useMemo } from "react";
 import { Vector3 } from "three";
 import { SceneBubble, SceneNameTag, SceneSign } from "@/shared/ui";
 import { EngineMark } from "@/features/engine-config/EngineMark";
+import { doingIcons } from "../doingIcons";
 import type { Actor } from "./behaviour";
-import { spreadLabels, type Label } from "./spread";
+import { MemberTag } from "./MemberTag";
+import { stackLabels, type Label } from "./spread";
 
 /**
  * Keeps every label, which is ordinary page content laid over the scene, by its figure: names
- * under the feet and bubbles over the head. Labels that would cover each other are moved apart,
- * the ones that matter most keeping their place (`spreadLabels`).
+ * under the feet and bubbles over the head. A figure's own labels stack (`stackLabels`); different
+ * figures' labels may overlap, nearer ones and the ones that matter most drawn on top, and never
+ * move or hide to make room. Off (`shown`), none of them shows.
  */
 export function TagProjector(props: {
   anchors: Map<string, Vector3>;
   tags: Map<string, HTMLElement>;
+  /** Name tags and what figures say; off, they all stay hidden. */
+  shown: boolean;
 }) {
   const point = useMemo(() => new Vector3(), []);
   useFrame(({ camera, size }) => {
     const labels: (Label & { element: HTMLElement; depth: number })[] = [];
     for (const [key, element] of props.tags) {
+      if (!props.shown) {
+        element.style.visibility = "hidden";
+        continue;
+      }
       // A label can hang from another's point: a speech bubble from its figure's head.
-      const anchor = props.anchors.get(element.dataset.anchor ?? key);
+      const anchorKey = element.dataset.anchor ?? key;
+      const anchor = props.anchors.get(anchorKey);
       if (!anchor) continue;
       point.copy(anchor).project(camera);
       if (point.z >= 1) {
@@ -53,9 +49,10 @@ export function TagProjector(props: {
         h: label?.offsetHeight ?? 0,
         priority: Number(element.dataset.priority ?? 3),
         up: element.dataset.up === "true",
+        anchor: anchorKey,
       });
     }
-    const placed = spreadLabels(labels);
+    const placed = stackLabels(labels);
     for (const label of labels) {
       const at = placed.get(label.id);
       const { element } = label;
@@ -64,16 +61,16 @@ export function TagProjector(props: {
       element.style.zIndex = String(
         (4 - label.priority) * 100000 + Math.round((1 - label.depth) * 99999),
       );
-      element.style.visibility = at?.hidden ? "hidden" : "visible";
+      element.style.visibility = "visible";
     }
   });
   return null;
 }
 
-/** How much a figure's label matters, which decides who keeps their place when labels crowd. */
+/** How much a figure's label matters, which decides whose is drawn on top when labels overlap. */
 export function labelPriority(actor: Actor, selected: boolean): number {
   if (selected) return 0;
-  if (actor.state === "needs-you") return 1;
+  if (actor.state === "needs-you" || actor.clash) return 1;
   return actor.state === "working" ? 2 : 3;
 }
 
@@ -106,8 +103,15 @@ export function ActorTag(props: {
   onPick(id: string): void;
 }) {
   const { actor, selected } = props;
-  const line = tagLine(actor);
-  const Icon = actor.state === "working" ? (doingIcons[actor.doingCode] ?? Ellipsis) : null;
+  if (actor.kind === "member") return <MemberTag {...props} />;
+  // A teammate's agent changing the same file shows instead of the work, in the waiting color:
+  // a warning, never a stop.
+  const line = actor.clash || tagLine(actor);
+  const Icon = actor.clash
+    ? TriangleAlert
+    : actor.state === "working"
+      ? (doingIcons[actor.doingCode] ?? Ellipsis)
+      : null;
   const outcome = actor.state === "resting" && actor.outcome ? outcomeWords[actor.outcome] : "";
   const spoken = [props.name, outcome, line].filter(Boolean).join(", ");
   return (
@@ -117,7 +121,7 @@ export function ActorTag(props: {
       mark={actor.engine ? <EngineMark engine={actor.engine} size={11} /> : null}
       line={line || undefined}
       lineIcon={Icon ? <Icon aria-hidden="true" /> : null}
-      state={actor.state === "needs-you" ? "waiting" : actor.state}
+      state={actor.state === "needs-you" || actor.clash ? "waiting" : actor.state}
       outcome={actor.outcome || undefined}
       selected={selected}
       data-state={actor.state}
@@ -142,20 +146,6 @@ export function FreeDeskMarker(props: { onHire(): void }) {
     </SceneSign>
   );
 }
-
-const doingIcons: Record<string, LucideIcon> = {
-  browser: Globe,
-  web: Search,
-  shell: SquareTerminal,
-  files: FileText,
-  space: StickyNote,
-  computer: Monitor,
-  app: Plug,
-  agents: Users,
-  memory: Brain,
-  working: AppWindow,
-  thinking: Ellipsis,
-};
 
 /** What an agent is saying over its head while it answers something asked in the studio. */
 export function SpeechBubble(props: { speech: string }) {

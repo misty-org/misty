@@ -27,7 +27,7 @@ export function workspaceViewActions(
           const view = pane.views[0];
           return view.route === route
             ? pane
-            : pushPaneView(pane, { ...view, route, placeholder: false }, replace);
+            : pushPaneView(pane, { ...view, route, placeholder: false, fresh: false }, replace);
         }),
       }));
       set({ layout: activateTab({ ...layout, tabs }, layout.activeTabId ?? tabs[0].id) });

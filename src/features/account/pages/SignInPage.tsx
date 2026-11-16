@@ -1,8 +1,18 @@
 import { routes } from "@/app/shell";
-import { Avatar, AvatarFallback, Button, IconButton, Pressable, Spinner, Text } from "@/shared/ui";
+import {
+  Avatar,
+  AvatarFallback,
+  Button,
+  InlineLink,
+  ListCard,
+  ListRow,
+  MenuItem,
+  Spinner,
+  Text,
+} from "@/shared/ui";
 import { Trash2, UserPlus } from "lucide-react";
 import { useState } from "react";
-import { Navigate, NavLink, useLocation } from "react-router-dom";
+import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../AuthContext";
 import { SavedAccountSessionUnavailableError } from "../sessions/sessionErrors";
 import AuthCard from "../components/AuthCard";
@@ -15,6 +25,7 @@ import type { SavedAccountSession } from "../sessions/accountVault";
 
 export default function SignIn() {
   const location = useLocation();
+  const navigate = useNavigate();
   const { accounts, user, transitioning, resumeAccount, removeAccount } = useAuth();
   const routeState = location.state as {
     from?: string;
@@ -97,50 +108,39 @@ export default function SignIn() {
     return (
       <AuthShell title="Choose an account">
         <AuthCard>
-          <div className="flex flex-col gap-2">
-            {accounts.map((account) => (
-              <div
-                key={account.id}
-                className={
-                  "group flex items-center gap-1 rounded-lg border p-1 " +
-                  "transition-colors hover:bg-control-hover focus-within:bg-control-hover"
-                }
-              >
-                <Pressable
-                  className="flex min-w-0 flex-1 items-center gap-3 rounded-md p-1.5"
-                  onClick={() => void handleSelect(account)}
-                  disabled={Boolean(busyAccountId) || transitioning}
-                >
-                  <Avatar className="size-9 shrink-0">
-                    <AvatarFallback className="text-xs font-semibold">
-                      {accountInitials(account.username || account.email)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <span className="min-w-0 flex-1">
-                    <Text tone="default" className="text-sm font-medium">
-                      {account.username || account.email}
-                    </Text>
-                    <Text tone="muted" className="text-xs">
-                      {account.email}
-                    </Text>
-                  </span>
-                  {busyAccountId === account.id ? (
-                    <Text bare tone="muted" className="mr-1 flex">
-                      <Spinner label="Signing in" />
-                    </Text>
-                  ) : null}
-                </Pressable>
-                <IconButton
-                  label={`Remove ${account.email}`}
-                  hint="Remove from this computer"
-                  className="mr-1 shrink-0 opacity-0 transition-opacity focus-visible:opacity-100 group-hover:opacity-100"
-                  onClick={() => void handleRemove(account)}
-                  disabled={Boolean(busyAccountId) || transitioning}
-                >
-                  <Trash2 />
-                </IconButton>
-              </div>
-            ))}
+          <div className="flex flex-col gap-4">
+            <ListCard aria-label="Saved accounts">
+              {accounts.map((account) => (
+                <li key={account.id}>
+                  <ListRow
+                    label={account.username || account.email}
+                    description={account.username ? account.email : undefined}
+                    leading={
+                      <Avatar size="sm">
+                        <AvatarFallback>
+                          {accountInitials(account.username || account.email)}
+                        </AvatarFallback>
+                      </Avatar>
+                    }
+                    state={
+                      busyAccountId === account.id
+                        ? { kind: "working", label: "Signing in" }
+                        : undefined
+                    }
+                    disabled={Boolean(busyAccountId) || transitioning}
+                    onOpen={() => void handleSelect(account)}
+                    menuLabel={`Actions for ${account.email}`}
+                    menu={
+                      <MenuItem
+                        icon={Trash2}
+                        label="Remove from this computer"
+                        onSelect={() => void handleRemove(account)}
+                      />
+                    }
+                  />
+                </li>
+              ))}
+            </ListCard>
             {transitioning && !busyAccountId ? (
               <Text bare as="div" tone="muted" className="flex">
                 <Spinner label="Updating session" />
@@ -151,8 +151,6 @@ export default function SignIn() {
               variant="secondary"
               icon={UserPlus}
               size="lg"
-              justify="start"
-              className="mt-1"
               disabled={Boolean(busyAccountId) || transitioning}
               onClick={() => {
                 setError("");
@@ -180,15 +178,12 @@ export default function SignIn() {
     >
       <AuthCard
         footer={
-          <NavLink
-            to="/register"
-            state={{ from, addingAccount }}
-            className="text-sm font-medium underline-offset-4 hover:underline"
-          >
-            <Text bare tone="default">
-              Don&apos;t have an account? Create one
-            </Text>
-          </NavLink>
+          <Text bare size="control" tone="muted">
+            Don&apos;t have an account?{" "}
+            <InlineLink onClick={() => navigate("/register", { state: { from, addingAccount } })}>
+              Create one
+            </InlineLink>
+          </Text>
         }
       >
         <SignInForm

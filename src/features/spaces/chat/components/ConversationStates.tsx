@@ -1,4 +1,5 @@
-import { EmptyState, ErrorState, Skeleton, Surface, Text } from "@/shared/ui";
+import { EmptyState, ErrorState, PageHeader, Skeleton, Surface } from "@/shared/ui";
+import { SpaceCrumb } from "../../components/space-row/SpaceCrumb";
 import { ChatMessagesSkeleton } from "./ChatMessagesSkeleton";
 
 /**
@@ -15,9 +16,7 @@ export function ConversationLoadState(props: {
     return (
       <Surface tone="page" className="flex h-full min-h-0 flex-col overflow-hidden">
         {props.panel ? null : (
-          <div className="flex min-h-12 shrink-0 items-center px-4 py-1.5" aria-hidden="true">
-            <Skeleton className="h-3.5 w-32" />
-          </div>
+          <PageHeader title={<Skeleton className="h-4 w-32" aria-hidden="true" />} />
         )}
         <ChatMessagesSkeleton framed />
       </Surface>
@@ -46,17 +45,10 @@ export function ConversationUnavailable(props: { onBack: () => void }) {
   );
 }
 
-/** The open chat's name above its messages; the chat sidebar switches chats. */
-export function ChatTitleBar(props: { title: string }) {
-  return (
-    <Surface
-      as="header"
-      tone="page"
-      className="flex min-h-12 shrink-0 items-center gap-2 px-3 py-1.5"
-    >
-      <Text as="h1" full tone="bright" className="m-0 min-w-0 flex-1 px-1 text-sm font-medium">
-        {props.title}
-      </Text>
-    </Surface>
-  );
+/**
+ * The bar every Space page wears, over the open chat: the Space, then the chat's name. The chat
+ * sidebar switches chats.
+ */
+export function ChatTitleBar(props: { spaceId: string; title: string }) {
+  return <PageHeader title={<SpaceCrumb spaceId={props.spaceId} here={props.title} />} />;
 }

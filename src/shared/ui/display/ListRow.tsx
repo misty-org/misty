@@ -10,6 +10,7 @@ import { OverflowFadeText } from "../layout/OverflowFadeText";
 import { RowActions } from "../overlays/RowActions";
 import { SkeletonControl, trailingControls, type SkeletonTrailing } from "../feedback/Skeleton";
 import { StateMark, type StateMarkKind } from "./StateMark";
+import { rowShape, rowShapeTwoLine } from "./rowShape";
 
 /**
  * What a row shows at its right end. A row has one state at a time: the agent working on it, the
@@ -203,8 +204,9 @@ const ListRow = React.forwardRef<HTMLElement, ListRowProps>(
         data-disabled={disabled || undefined}
         data-two-line={description ? true : undefined}
         className={cn(
-          "group/row relative flex min-w-0 items-center gap-2 rounded-md px-2",
-          description ? "min-h-12 py-1.5" : "h-8",
+          "group/row relative",
+          // One line is the shared row; a description makes it two lines, with the same edges.
+          description ? rowShapeTwoLine : rowShape,
           "text-control text-cream transition-colors",
           "hover:bg-control-hover has-[:focus-visible]:bg-control-hover",
           "data-[selected]:bg-control-active data-[selected]:text-cream-bright",

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { sketchInk } from "@/shared/ui";
 import {
   mapSketch,
   MAX_SKETCH_ELEMENTS,
@@ -78,7 +79,7 @@ describe("companion sketches", () => {
           ],
         },
       ],
-      "#ffffff",
+      sketchInk.screen,
     );
     expect(free).toMatchObject({
       x: 700,
@@ -87,7 +88,7 @@ describe("companion sketches", () => {
         [0, 0],
         [-140, 110],
       ],
-      strokeColor: "#ffffff",
+      strokeColor: sketchInk.screen.ink,
     });
   });
 

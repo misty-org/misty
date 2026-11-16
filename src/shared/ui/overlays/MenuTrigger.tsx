@@ -88,8 +88,9 @@ const MenuTrigger = React.forwardRef<HTMLButtonElement, MenuTriggerProps>(
             aria-label={value === undefined ? undefined : label}
             className={cn(
               "inline-flex min-w-0 max-w-full items-center rounded-md px-0.5",
-              "text-caption font-normal whitespace-nowrap text-cream-muted",
-              "data-[state=open]:text-cream",
+              // The type of the value it sits with (a session card row's value), brighter open.
+              "text-meta font-normal whitespace-nowrap text-cream",
+              "data-[state=open]:text-cream-bright",
               className,
             )}
             {...rest}

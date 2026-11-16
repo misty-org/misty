@@ -477,7 +477,7 @@ impl TurnCore {
                     &self.run_id,
                     &self.engine_id,
                     "error",
-                    Value::String(error),
+                    Value::String(plain_error_text(error)),
                 );
                 // The turn failed terminally: the frontend settles (send
                 // button back to idle) on this event, so a still-running
@@ -882,20 +882,36 @@ impl TurnCore {
                 if let Some(id) = session_id {
                     self.adopt_session_id(state, &id, false);
                 }
-                let park_prefs = if state.pending_background_tasks > 0 {
-                    self.followup.clone()
-                } else {
-                    None
-                };
+                let background = state.pending_background_tasks > 0;
+                let park_prefs = self.followup.clone().filter(|prefs| {
+                    background || (prefs.warm && state.native_session_id.is_some())
+                });
+                let warm = park_prefs.is_some() && !background;
                 if let Some(prefs) = park_prefs {
                     // A background task is still running: the CLI opens a
                     // follow-up turn by itself when it finishes. Settle the
                     // visible turn now so the UI is usable, but keep stdin and
                     // the reader alive (saw_done stays false) so that turn is
                     // still received; `turn_resumed` reopens the run for it.
+                    // Misty: with none running, a chat's process stays warm the same way, so its
+                    // next message is written into it instead of starting the CLI again.
                     state.awaiting_followup = true;
                     if let Some(id) = state.native_session_id.as_deref() {
-                        self.registry.set_awaiting_followup(id, &self.run_id, prefs);
+                        if warm {
+                            let (since, evicted) =
+                                self.registry.set_warm_followup(id, &self.run_id, prefs);
+                            for run in evicted {
+                                self.registry.close_stdin(&run);
+                            }
+                            super::registry::reap_when_idle(
+                                Arc::clone(&self.registry),
+                                id.to_string(),
+                                self.run_id.clone(),
+                                since,
+                            );
+                        } else {
+                            self.registry.set_awaiting_followup(id, &self.run_id, prefs);
+                        }
                     }
                 } else {
                     state.saw_done = true;
@@ -911,7 +927,7 @@ impl TurnCore {
                     &self.run_id,
                     &self.engine_id,
                     "done",
-                    serde_json::json!({ "usage": usage }),
+                    serde_json::json!({ "usage": usage, "warm": warm }),
                     gen_ms,
                 );
             }
@@ -966,6 +982,26 @@ impl RunContext {
         self.core.dispatch_event(state, event);
     }
 }
+/// An engine's error as the person reads it. Some CLIs pass the provider's raw JSON reply on as
+/// their message (Codex: `{"type":"error","status":400,"error":{"message":"The 'x' model is not
+/// supported…"}}`): its own message is what the chat shows. Anything else is kept as it came.
+pub(crate) fn plain_error_text(error: String) -> String {
+    let trimmed = error.trim();
+    if !trimmed.starts_with('{') {
+        return error;
+    }
+    let Ok(value) = serde_json::from_str::<Value>(trimmed) else {
+        return error;
+    };
+    ["/error/message", "/message", "/error"]
+        .iter()
+        .find_map(|pointer| value.pointer(pointer).and_then(Value::as_str))
+        .map(str::trim)
+        .filter(|message| !message.is_empty())
+        .map(str::to_string)
+        .unwrap_or(error)
+}
+
 /// Abort-safe registry cleanup for virtual (host-stream) runs, which own no
 /// [`RunContext`]: their settle code sits at the end of the transport task,
 /// so an abort (`kill`'s force-abort, shutdown) or a panic inside the turn
@@ -1935,3 +1971,21 @@ mod terminal_event_tests {
 #[cfg(test)]
 #[path = "reader_plan_dispatch_tests.rs"]
 mod plan_dispatch_tests;
+
+#[cfg(test)]
+mod plain_error_tests {
+    use super::plain_error_text;
+
+    #[test]
+    fn a_provider_json_reply_shows_its_own_message() {
+        let raw = r#"{"type":"error","status":400,"error":{"type":"invalid_request_error","message":"The 'gpt-6.1-sol' model is not supported when using Codex with a ChatGPT account.","code":"model_not_found"}}"#;
+        assert_eq!(
+            plain_error_text(raw.into()),
+            "The 'gpt-6.1-sol' model is not supported when using Codex with a ChatGPT account."
+        );
+        assert_eq!(plain_error_text(r#"{"message":"quota"}"#.into()), "quota");
+        assert_eq!(plain_error_text("Not signed in".into()), "Not signed in");
+        assert_eq!(plain_error_text("{not json".into()), "{not json");
+        assert_eq!(plain_error_text(r#"{"code":1}"#.into()), r#"{"code":1}"#);
+    }
+}

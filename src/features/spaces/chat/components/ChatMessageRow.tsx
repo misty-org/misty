@@ -115,7 +115,7 @@ function ChatMessageRowView({
         tone="none"
         wash="control"
         className={[
-          "group/chat-message relative -mx-3 grid min-h-10 grid-cols-[44px_minmax(0,1fr)] gap-x-4 rounded-md px-3 py-1",
+          "group/chat-message relative -mx-3 grid min-h-10 grid-cols-[2.75rem_minmax(0,1fr)] gap-x-4 rounded-md px-3 py-1",
           "focus-visible:outline-none",
           // `first:` covers the message that opens a thread with no date
           // divider above it, whose top margin would double the scroller's.

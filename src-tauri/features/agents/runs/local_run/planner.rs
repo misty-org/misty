@@ -28,7 +28,7 @@ impl PromptPlanner {
             .unwrap_or_default();
         CatalogInputs {
             signed_in: request.get("signed_in").and_then(Value::as_bool).unwrap_or(false),
-            composio_key: request.get("composio_key").and_then(Value::as_bool).unwrap_or(false),
+            apps_connected: request.get("apps_connected").and_then(Value::as_bool).unwrap_or(false),
             search: self.models.search().map(|saved| saved.provider),
             device_names,
         }

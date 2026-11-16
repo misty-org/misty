@@ -19,6 +19,8 @@ export function HandoffActions(props: {
   me: string;
   handoffId: string;
   text: string;
+  /** The agent the sender asked for, when it is one of this person's own: offered first. */
+  agentId?: string;
   onError: (message: string) => void;
 }) {
   const agents = usePersonalAgentsStore((state) => state.agents);
@@ -27,7 +29,10 @@ export function HandoffActions(props: {
     const account = agentAccountId();
     if (store.accountId !== account || !store.agents.length) void store.load(account);
   }, []);
-  const mine = agents.filter((agent) => agent.enabled);
+  const enabled = agents.filter((agent) => agent.enabled);
+  // The agent asked for goes first, so a click on the menu's top row hands it on.
+  const asked = enabled.find((agent) => agent.id === props.agentId);
+  const mine = asked ? [asked, ...enabled.filter((agent) => agent !== asked)] : enabled;
   const done = () => markHandoffHandled(props.me, props.spaceId, props.handoffId);
   const give = (agentId: string) => {
     const problem = draftRequestForAgent(agentId, props.text);
@@ -45,7 +50,11 @@ export function HandoffActions(props: {
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start">
             {mine.map((agent) => (
-              <MenuItem key={agent.id} label={agent.name} onSelect={() => give(agent.id)} />
+              <MenuItem
+                key={agent.id}
+                label={agent === asked ? `${agent.name} (asked for)` : agent.name}
+                onSelect={() => give(agent.id)}
+              />
             ))}
           </DropdownMenuContent>
         </DropdownMenu>
@@ -56,7 +65,7 @@ export function HandoffActions(props: {
           disabled={!mine.length}
           onClick={() => mine[0] && give(mine[0].id)}
         >
-          Give to my agent
+          {asked ? `Give to ${asked.name}` : "Give to my agent"}
         </Button>
       )}
       <Button type="button" variant="quiet" onClick={done}>

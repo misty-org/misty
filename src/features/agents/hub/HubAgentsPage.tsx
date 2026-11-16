@@ -1,12 +1,20 @@
-import { Plus } from "lucide-react";
+import { MoreHorizontal, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { EngineMark, hasEngineMark } from "@/features/engine-config/EngineMark";
 import { DesktopSettingsRow, DesktopSettingsSection as Section } from "@/features/settings";
 import type { AgentProfile } from "@/shared/schemas";
 import {
   Button,
+  ConfirmDeleteDialog,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuSeparator,
   FieldError,
   Input,
+  MenuItem,
+  MenuTrigger,
+  notify,
+  RenameItemDialog,
   Select,
   SelectContent,
   SelectItem,
@@ -14,10 +22,17 @@ import {
   SelectValue,
   Skeleton,
 } from "@/shared/ui";
+import type { EngineId } from "@/features/engine-config/channels";
+import { blocksAgent, useEngineReadiness } from "../engines/engineReadiness";
+import { EngineNextStep } from "../engines/EngineNextStep";
 import { mistyEngine, useEnginesList, type EngineInfo } from "../engines/enginesApi";
+import { useMistyStore } from "../conversations/state/useMistyStore";
+import { syncAgentChats } from "../conversations/view/engine/engineSessionImport";
+import { personalAgentsApi } from "../personal/personalAgentsApi";
 import { AgentAvatar } from "../personal/AgentAvatar";
+import { freshAgentName } from "../personal/agentNames";
 import { usePersonalAgentsStore } from "../personal/personalAgentsStore";
-import { saveAgent } from "../virtual/HireAgent";
+import { saveAgent, updateAgent } from "../virtual/HireAgent";
 import { useAgentsHub } from "./agentsHubStore";
 import {
   AgentFolderChoice,
@@ -90,11 +105,14 @@ function engineIcon(engine: EngineInfo) {
 }
 
 /**
- * A new agent: the engine it runs on and its name, which is the engine's until the person gives
- * another. An engine that isn't installed can't be picked; its CLI is installed from the CLIs page.
+ * A new agent: the engine it runs on and its name, one of its own (`freshAgentName`) until the
+ * person gives another, never the engine's. An engine that isn't installed can't be picked; its
+ * CLI is installed from the CLIs page.
  */
 function NewAgent({ onMade }: { onMade(agent: AgentProfile): void }) {
   const engines = useEngines();
+  const agents = usePersonalAgentsStore((state) => state.agents);
+  const suggested = useMemo(() => freshAgentName(agents.map((agent) => agent.name)), [agents]);
   const [engine, setEngine] = useState("");
   const [name, setName] = useState("");
   const [folder, setFolder] = useState<NewAgentFolder>("new");
@@ -110,7 +128,7 @@ function NewAgent({ onMade }: { onMade(agent: AgentProfile): void }) {
     setError("");
     try {
       const agent = await saveAgent({
-        name: name.trim() || picked.name,
+        name: name.trim() || suggested,
         role: "",
         description: "",
         instructions: "",
@@ -164,7 +182,7 @@ function NewAgent({ onMade }: { onMade(agent: AgentProfile): void }) {
         <Input
           aria-label="Name"
           className="w-56"
-          placeholder={picked?.name ?? "Name"}
+          placeholder={suggested}
           value={name}
           onChange={(event) => setName(event.target.value)}
           onKeyDown={(event) => {
@@ -192,6 +210,121 @@ function NewAgent({ onMade }: { onMade(agent: AgentProfile): void }) {
 }
 
 /**
+ * Deletes an agent and its chats: a chat can't be opened without its agent, so none is left
+ * behind. The chats go first, so a failure part way leaves the agent to try again with.
+ */
+async function deleteAgent(agent: AgentProfile) {
+  const store = useMistyStore.getState();
+  for (const chat of store.conversations.filter((chat) => chat.agentId === agent.id))
+    await store.deleteConversation(chat.id);
+  await personalAgentsApi.remove(agent.id);
+  usePersonalAgentsStore.setState((state) => ({
+    agents: state.agents.filter((known) => known.id !== agent.id),
+    selected: state.selected.global === agent.id ? {} : state.selected,
+  }));
+}
+
+/**
+ * One of the person's agents. Until its engine is installed and signed in it stays disabled:
+ * New chat gives way to the engine's next step (Install, Get it or Sign in), so a chat never
+ * starts on an engine that can't answer.
+ */
+function AgentRow({
+  agent,
+  engineName,
+  onChat,
+}: {
+  agent: AgentProfile;
+  engineName: string;
+  onChat(agent: AgentProfile): void;
+}) {
+  const engine = agent.engine && agent.engine !== mistyEngine ? agent.engine : "";
+  const { view, state } = useEngineReadiness(engine);
+  // One button at a time: a failed check leaves New chat, so it offers no Check again here.
+  const held = blocksAgent(state);
+  const [syncing, setSyncing] = useState(false);
+  const [renaming, setRenaming] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const chatCount = useMistyStore(
+    (state) => state.conversations.filter((chat) => chat.agentId === agent.id).length,
+  );
+  // Pulls into each of this agent's chats what happened in its engine session outside Misty.
+  const sync = async () => {
+    setSyncing(true);
+    try {
+      const synced = await syncAgentChats(agent.id);
+      notify({
+        message:
+          synced === 0
+            ? `${agent.name} has no chats with ${engineName || "its engine"} to sync`
+            : `Synced ${synced} ${synced === 1 ? "chat" : "chats"} from ${engineName || "its engine"}`,
+      });
+    } catch (error) {
+      notify({ message: message(error), tone: "error" });
+    } finally {
+      setSyncing(false);
+    }
+  };
+  return (
+    <DesktopSettingsRow
+      label={agent.name}
+      // The engine under the agent, by name (its mark is already the agent's picture), and what
+      // keeps an agent that isn't ready from working.
+      description={
+        held
+          ? `${engineName} · ${state === "sign-in" ? "Not signed in" : "Not installed"}`
+          : engineName
+      }
+      // Not ready yet (its engine isn't installed or signed in): shown dimmed beside its next step.
+      muted={held}
+      leading={<AgentAvatar agent={agent} />}
+      density="compact"
+    >
+      {held ? null : <Button onClick={() => onChat(agent)}>New chat</Button>}
+      {engine ? (
+        <EngineNextStep engine={engine as EngineId} view={view} state={held ? state : "ready"} />
+      ) : null}
+      <DropdownMenu>
+        <MenuTrigger label={`${agent.name} actions`} iconOnly icon={MoreHorizontal} />
+        <DropdownMenuContent align="end">
+          <MenuItem icon={Pencil} label="Rename" onSelect={() => setRenaming(true)} />
+          {engine ? (
+            <MenuItem
+              icon={RefreshCw}
+              label="Sync chats"
+              disabled={syncing}
+              onSelect={() => void sync()}
+            />
+          ) : null}
+          <DropdownMenuSeparator />
+          <MenuItem icon={Trash2} label="Delete" danger onSelect={() => setDeleting(true)} />
+        </DropdownMenuContent>
+      </DropdownMenu>
+      {renaming ? (
+        <RenameItemDialog
+          key={agent.id}
+          title="Rename agent"
+          initialName={agent.name}
+          onConfirm={(name) => updateAgent(agent, { name })}
+          onClose={() => setRenaming(false)}
+        />
+      ) : null}
+      <ConfirmDeleteDialog
+        open={deleting}
+        onOpenChange={setDeleting}
+        title={`Delete “${agent.name}”?`}
+        what={
+          chatCount
+            ? `${agent.name} and its ${chatCount === 1 ? "chat" : `${chatCount} chats`} will be deleted from this computer. This can't be undone.`
+            : `${agent.name} will be deleted from this computer. This can't be undone.`
+        }
+        onConfirm={() => deleteAgent(agent)}
+      />
+    </DesktopSettingsRow>
+  );
+}
+
+/**
  * The Agents window's first page: the person's agents, each a click from a new chat, and making
  * another. The agent picked here is the one New starts a chat with from then on.
  */
@@ -214,15 +347,12 @@ export function HubAgentsPage({ onChat }: { onChat(agent: AgentProfile): void })
             <AgentRowsSkeleton />
           ) : (
             listed.map((agent) => (
-              <DesktopSettingsRow
+              <AgentRow
                 key={agent.id}
-                label={agent.name}
-                description={engineName(agent.engine)}
-                leading={<AgentAvatar agent={agent} />}
-                density="compact"
-              >
-                <Button onClick={() => chat(agent)}>New chat</Button>
-              </DesktopSettingsRow>
+                agent={agent}
+                engineName={engineName(agent.engine)}
+                onChat={chat}
+              />
             ))
           )}
         </Section>

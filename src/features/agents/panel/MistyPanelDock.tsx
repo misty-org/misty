@@ -10,6 +10,7 @@ import {
 } from "react";
 import { setBrowserWebviewsSuspended } from "@/features/app-windows";
 import { cn, Surface } from "@/shared/ui";
+import { designPx, remCss } from "@/shared/lib/uiScale";
 import type { MistyPanelSide } from "./mistyPanelSide";
 import {
   MISTY_PANEL_MAX_WIDTH,
@@ -137,7 +138,8 @@ export function MistyPanelDock({
           "transition-[width] ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none",
       )}
       style={{
-        width: expanded ? column + panelGap : 0,
+        // The width and gap are design pixels, drawn in rem (shared/lib/uiScale.ts).
+        width: expanded ? remCss(column + panelGap) : 0,
         // Set only while sliding: without a property list, a duration alone would
         // animate every width change, including each step of a drag.
         ...(sliding ? { transitionDuration: `${slideMs}ms` } : {}),
@@ -151,16 +153,18 @@ export function MistyPanelDock({
           "flex h-full w-full overflow-hidden",
           side === "left" ? "justify-end" : "justify-start",
         )}
-        style={side === "left" ? { paddingRight: panelGap } : { paddingLeft: panelGap }}
+        style={
+          side === "left" ? { paddingRight: remCss(panelGap) } : { paddingLeft: remCss(panelGap) }
+        }
       >
         <div
           className="flex h-full min-h-0 shrink-0 flex-col"
-          style={{ width: column }}
+          style={{ width: remCss(column) }}
           data-misty-panel-stack
         >
           {list.map((view, index) => (
             <Fragment key={view}>
-              {index > 0 ? <div className="shrink-0" style={{ height: panelGap }} /> : null}
+              {index > 0 ? <div className="shrink-0" style={{ height: remCss(panelGap) }} /> : null}
               <div
                 className={cn(
                   "relative flex min-h-0 basis-0",
@@ -170,7 +174,7 @@ export function MistyPanelDock({
                   {
                     // Stacked panels share the column's height equally.
                     flexGrow: 1,
-                    "--misty-panel-width": `${column}px`,
+                    "--misty-panel-width": remCss(column),
                   } as CSSProperties
                 }
                 data-misty-panel-card={view}
@@ -199,7 +203,8 @@ function MistyPanelResizer({ side, width }: { side: MistyPanelSide; width: numbe
   const down = (event: PointerEvent<HTMLDivElement>) => {
     const origin = { x: event.clientX, width };
     start(event, (next, end) => {
-      const dragged = origin.width + direction * (next.clientX - origin.x);
+      // The pointer moves in CSS pixels; the width is kept in design pixels.
+      const dragged = origin.width + direction * designPx(next.clientX - origin.x);
       // Pulled well past the narrowest it goes, in the closing direction, it closes.
       if (dragged < MISTY_PANEL_MIN_WIDTH - closeDistance) {
         end();
@@ -232,7 +237,7 @@ function MistyPanelResizer({ side, width }: { side: MistyPanelSide; width: numbe
       data-side={side}
       data-dragging={dragging || undefined}
       // Centred on the card's inner edge, wherever the card sits in the column.
-      style={side === "right" ? { right: width - 6 } : { left: width - 6 }}
+      style={side === "right" ? { right: remCss(width - 6) } : { left: remCss(width - 6) }}
       onPointerDown={down}
       onDoubleClick={() => {
         setWidth(MISTY_PANEL_WIDTH);

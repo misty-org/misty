@@ -1,18 +1,23 @@
 import {
   Blocks,
   ChartColumn,
-  MessageSquareText,
+  FileText,
+  Plug,
   Route,
   ScrollText,
   Server,
   SquareTerminal,
+  UserRound,
   Users,
   Variable,
 } from "lucide-react";
 import { useEffect, type ComponentType } from "react";
 import {
+  AppsPage,
   EngineMarketplace,
   HubAgentsPage,
+  PersonaCatalogSection,
+  showSkillCatalog,
   useAgentsHub,
   type AgentsHubPage,
 } from "@/features/agents";
@@ -21,7 +26,7 @@ import { ClisSection } from "@/features/engine-config/clis";
 import { EnvironmentSection } from "@/features/engine-config/environment";
 import { McpSection } from "@/features/engine-config/mcp";
 import { PromptsSection } from "@/features/engine-config/prompts";
-import { SkillsSection } from "@/features/engine-config/skills";
+import { SkillsHub } from "@/features/engine-config/skills";
 import { UsageSection } from "@/features/engine-config/usage";
 import type { WorkspaceView } from "@/features/app-windows";
 import { startTour, TourInfoButton, useTours } from "@/features/onboarding";
@@ -30,7 +35,13 @@ import { WorkspaceOverlay } from "@/shared/ui";
 import { agentChatRoute, openWorkspaceRoute } from "./spaceNavigation";
 
 const groups: DesktopSettingsNavGroup<AgentsHubPage>[] = [
-  { label: "Agents", items: [{ id: "agents", label: "Your agents", icon: Users }] },
+  {
+    label: "Agents",
+    items: [
+      { id: "agents", label: "Your agents", icon: Users },
+      { id: "personas", label: "Personas", icon: UserRound },
+    ],
+  },
   {
     label: "Engines",
     items: [
@@ -44,29 +55,36 @@ const groups: DesktopSettingsNavGroup<AgentsHubPage>[] = [
     label: "Tools",
     items: [
       { id: "plugins", label: "Plugins", icon: Blocks },
-      { id: "mcp", label: "MCP servers", icon: Server },
       { id: "skills", label: "Skills", icon: ScrollText },
-      { id: "prompts", label: "Prompts", icon: MessageSquareText },
+      { id: "prompts", label: "Prompts", icon: FileText },
+      { id: "mcp", label: "MCP servers", icon: Server },
+      { id: "apps", label: "Apps", icon: Plug },
     ],
   },
 ];
 
-/** Each engine page is the same block Settings shows, so the two never drift apart. */
+/**
+ * Every page but Your agents. Each is the one place its subject lives: Settings keeps only
+ * switches, and nothing here is shown again anywhere else.
+ */
 const enginePages: Record<Exclude<AgentsHubPage, "agents">, ComponentType> = {
+  personas: PersonaCatalogSection,
   clis: ClisSection,
   channels: ChannelsSection,
   environment: () => <EnvironmentSection />,
   usage: UsageSection,
   plugins: EngineMarketplace,
   mcp: McpSection,
-  skills: SkillsSection,
+  skills: () => <SkillsHub onBrowse={showSkillCatalog} />,
   prompts: PromptsSection,
+  apps: AppsPage,
 };
 
 /**
  * The Agents window, opened from the sidebar's Agents row: the person's agents to start a chat
- * with or make, then everything their engines' CLIs take, in one place: installing, updating and
- * signing in, channels, environment variables, usage, plugins, MCP servers, skills and prompts.
+ * with or make and the personas to make one from, then everything their engines' CLIs take, in
+ * one place: installing, updating and signing in, channels, environment variables, usage,
+ * plugins, skills, prompts, MCP servers and the apps agents sign in to.
  * It opens over the window like Settings, and the first time it opens its tour shows around.
  */
 export function AgentsHub({ onOpen }: { onOpen(view: WorkspaceView): void }) {
@@ -79,13 +97,16 @@ export function AgentsHub({ onOpen }: { onOpen(view: WorkspaceView): void }) {
     if (tours.loaded && !tours.seen.includes("agents")) startTour("agents");
   }, [open]);
   const Page = page === "agents" ? null : enginePages[page];
+  // The top bar names the page, as Settings does.
+  const title =
+    groups.flatMap((group) => group.items).find((item) => item.id === page)?.label ?? "";
   return (
     <WorkspaceOverlay open={open} onClose={close} ariaLabel="Agents">
       <DesktopSettingsFrame
         presentation="overlay"
         ariaLabel="Agents"
         navigationLabel="Agents"
-        title=""
+        title={title}
         groups={groups}
         activeId={page}
         onSelect={(next) => useAgentsHub.getState().setPage(next)}

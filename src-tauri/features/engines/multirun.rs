@@ -367,6 +367,8 @@ pub async fn multirun_discard(
         for run in super::runs::live_in(Path::new(&row.path)) {
             stopped |= super::runs::cancel(&run);
         }
+        // A process kept warm there would hold the folder it is about to lose.
+        super::runs::end_warm_in(Path::new(&row.path));
     }
     if stopped {
         // An engine told to stop takes a moment to let go of its folder.

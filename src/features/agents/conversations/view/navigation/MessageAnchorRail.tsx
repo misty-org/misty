@@ -90,7 +90,7 @@ export function MessageAnchorRail({
       className={cn(
         "pointer-events-none absolute top-[calc(var(--agent-conversation-inset,0px)+3.5rem)] bottom-35 left-3",
         "z-[var(--stack-sticky)] flex w-10 flex-col items-start justify-center-safe gap-0.5 overflow-visible",
-        "max-[900px]:hidden",
+        "max-[990px]:hidden",
       )}
       onMouseLeave={() => setPreviewAnchorId(null)}
     >

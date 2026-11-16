@@ -1,14 +1,13 @@
 import { Reply, X } from "lucide-react";
 import type { GlobalAiConversation } from "../state/conversationTypes";
 import { useMistyStore } from "../state/useMistyStore";
-import { needsModelKey } from "../../models/ModelKeyNeeded";
-import { openModelSettings } from "../../models/modelKeys";
+import { needsDefaultEngine, openEngineSettings } from "../../engines/engineNeeded";
 import { IconButton, Surface, Text } from "@/shared/ui";
 import { ErrorNotice } from "../ErrorNotice";
 
 /**
  * The conversation's last error as a notice that stays while it holds, with the one way out it
- * has: adding a model key, or reconnecting to a running task the window lost.
+ * has: picking a default engine, or reconnecting to a running task the window lost.
  */
 export function AgentComposeError({
   error,
@@ -23,8 +22,8 @@ export function AgentComposeError({
     <ErrorNotice
       message={error}
       action={
-        needsModelKey(error)
-          ? { label: "Open Models settings", onSelect: openModelSettings }
+        needsDefaultEngine(error)
+          ? { label: "Open engine settings", onSelect: openEngineSettings }
           : reconnect
             ? {
                 label: "Reconnect to task",

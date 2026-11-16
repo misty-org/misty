@@ -70,13 +70,20 @@ pub(crate) fn run(dispatch: fn(Input)) {
             CGEventTapLocation::Session,
             CGEventTapPlacement::HeadInsertEventTap,
             CGEventTapOptions::ListenOnly,
-            vec![CGEventType::FlagsChanged, CGEventType::LeftMouseDown],
+            vec![
+                CGEventType::FlagsChanged,
+                CGEventType::LeftMouseDown,
+                CGEventType::KeyDown,
+                CGEventType::ScrollWheel,
+            ],
             move |_, kind, event| {
                 match kind {
                     CGEventType::LeftMouseDown => {
                         let p = event.location();
                         dispatch(Input::Click(p.x, p.y));
                     }
+                    // Control+C or Control and a scroll is a shortcut, not a tap.
+                    CGEventType::KeyDown | CGEventType::ScrollWheel => dispatch(Input::Key),
                     // Only modifier changes move chords: arrow keys also carry
                     // the Fn flag, but on KeyDown, never on FlagsChanged.
                     CGEventType::FlagsChanged => dispatch(Input::Modifiers(modifiers_from_flags(

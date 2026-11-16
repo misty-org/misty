@@ -1,8 +1,9 @@
-/** How big a studio may be, in cells: what a new one starts as and how far it can grow. */
+/** How big a studio may be, in cells: what a new one starts as and how far it can grow. A new one
+ * starts big enough to walk about in with a full team, with rooms of its own (`defaultLayout`). */
 export const ROOM = {
-  start: { w: 28, d: 18 },
+  start: { w: 36, d: 24 },
   least: { w: 20, d: 13 },
-  most: { w: 48, d: 32 },
+  most: { w: 56, d: 36 },
   /** Cells added or taken away at a time. */
   step: 4,
 } as const;

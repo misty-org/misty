@@ -1,29 +1,33 @@
 import type { ReactNode } from "react";
 
-import { Surface, Text } from "@/shared/ui";
+import { Separator, Surface, Text } from "@/shared/ui";
 
+/** The card a signed-out page's form sits in: a raised card with a hairline edge, no shadow. */
 export default function AuthCard({ title, description, children, footer }: AuthCardProps) {
   return (
-    <Surface tone="card" edge="hairline" radius="xl" className="w-full p-6 shadow-xl">
+    <Surface tone="card" edge="hairline" radius="xl" className="flex w-full flex-col gap-6 p-6">
       {title || description ? (
-        <div className="mb-7">
+        <div className="flex flex-col gap-1">
           {title ? (
-            <Text bare as="h2" tone="default" className="text-2xl font-semibold">
+            <Text as="h2" wrap size="title" weight="semibold" tone="bright" className="m-0">
               {title}
             </Text>
           ) : null}
           {description ? (
-            <Text bare as="p" tone="muted" className="mt-2 text-sm leading-6">
+            <Text wrap size="control" tone="muted" className="m-0">
               {description}
             </Text>
           ) : null}
         </div>
       ) : null}
 
-      <div>{children}</div>
+      {children}
 
       {footer ? (
-        <div className="mt-6 flex items-center justify-center border-t pt-6">{footer}</div>
+        <>
+          <Separator />
+          <div className="flex items-center justify-center">{footer}</div>
+        </>
       ) : null}
     </Surface>
   );

@@ -13,6 +13,7 @@ import {
   type Point,
 } from "./motion";
 import { createSketchPainter } from "./overlaySketch";
+import { createTrailPainter } from "./overlayTrail";
 import { focusBoxes, pointBubbleText, pointLayout, type PointLayout } from "./pointLayout";
 import type { CursorSample, Presentation } from "./protocol";
 
@@ -26,6 +27,10 @@ type CursorOverlayRefs = {
   focus?: RefObject<HTMLDivElement | null>;
   /** A reply's drawing: a whiteboard card or marks on the screen. */
   sketch?: RefObject<HTMLDivElement | null>;
+  /** The paint the pointer leaves while the person asks. */
+  trail?: RefObject<HTMLDivElement | null>;
+  /** The caption at the bottom of the screen. */
+  caption?: RefObject<HTMLDivElement | null>;
 };
 
 function paintWaveform(meter: HTMLDivElement | null, power: number) {
@@ -45,9 +50,12 @@ export function startCursorOverlayLoop({
   meter,
   focus,
   sketch,
+  trail,
+  caption,
 }: CursorOverlayRefs): () => void {
   let focusSeen = "";
   let paintSketch: ReturnType<typeof createSketchPainter> | undefined;
+  let paintTrail: ReturnType<typeof createTrailPainter> | undefined;
   let disposed = false;
   let lastMeterFrame = 0;
   const inputs: CursorInputs = { sample: undefined, power: 0, meterTurn: -1 };
@@ -140,6 +148,20 @@ export function startCursorOverlayLoop({
     if (sketch?.current) {
       paintSketch ??= createSketchPainter(sketch.current);
       paintSketch(state.sketch, d, factor, mouse);
+    }
+    if (caption?.current) {
+      // The caption shows on the display the person is looking at: the one with the pointer.
+      const here = mouse.x >= 0 && mouse.y >= 0 && mouse.x < width && mouse.y < height;
+      const line = here ? state.caption : undefined;
+      if (line && caption.current.textContent !== line.text) caption.current.textContent = line.text;
+      caption.current.toggleAttribute("data-hidden", !line);
+      caption.current.toggleAttribute("data-tip", Boolean(line?.tip));
+    }
+    if (trail?.current) {
+      // What the person circles while they ask, painted on the display they're drawing on.
+      paintTrail ??= createTrailPainter(trail.current);
+      const here = mouse.x >= 0 && mouse.y >= 0 && mouse.x < width && mouse.y < height;
+      paintTrail(state.phase === "listening" && here, mouse);
     }
     const key = `${state.generation}:${JSON.stringify(state.point)}`;
     if (key !== seen) {

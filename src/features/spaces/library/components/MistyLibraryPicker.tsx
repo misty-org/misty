@@ -29,7 +29,7 @@ import { MistyLibraryPickerTile } from "./MistyLibraryPickerTile";
 
 const pickerStyles = {
   dialog: [
-    "grid h-[min(640px,calc(100vh-64px))] w-[min(720px,calc(100vw-32px))] max-w-none",
+    "grid h-[min(40rem,calc(100vh-4rem))] w-[min(45rem,calc(100vw-2rem))] max-w-none",
     "grid-rows-[auto_auto_minmax(0,1fr)_auto] gap-0 overflow-hidden p-0",
     "max-sm:h-screen max-sm:w-screen max-sm:rounded-none",
   ].join(" "),
@@ -174,7 +174,7 @@ export function MistyLibraryPicker({
         <div className="p-4">
           {loading ? (
             <div
-              className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-3"
+              className="grid grid-cols-[repeat(auto-fill,minmax(9.375rem,1fr))] gap-3"
               aria-label="Loading Library"
             >
               {Array.from({ length: 12 }, (_, index) => (
@@ -209,7 +209,7 @@ export function MistyLibraryPicker({
               }
             />
           ) : (
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-3">
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(9.375rem,1fr))] gap-3">
               {filteredItems.map((item) => {
                 const selected = selection.includes(item.id);
                 const unavailable = !selected && selection.length >= maximumSelected;

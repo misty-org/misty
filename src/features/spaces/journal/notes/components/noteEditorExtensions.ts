@@ -13,15 +13,20 @@ import { Markdown } from "@tiptap/markdown";
 import { StarterKit } from "@tiptap/starter-kit";
 import { journalImage } from "./journalImage";
 import { collaborationUser } from "./noteEditorContent";
-import type { NoteBlockEditorProps, NoteEditorSession } from "./noteEditorTypes";
+import type { NoteEditorRuntime, NoteEditorSession } from "./noteEditorTypes";
 
-export function createNoteEditorExtensions(
-  props: Pick<NoteBlockEditorProps, "runtime" | "accountId"> & {
-    session?: NoteEditorSession;
-    /** The name others see on this person's caret. */
-    userName?: string;
-  },
-) {
+export function createNoteEditorExtensions(props: {
+  runtime: Pick<NoteEditorRuntime, "resolveAsset">;
+  accountId?: string;
+  /** The shared content: a doc's own fragment, or one fragment of a Lab notebook's doc. */
+  session?: Pick<NoteEditorSession, "fragment"> & {
+    provider: Pick<NoteEditorSession["provider"], "awareness">;
+  };
+  /** The name others see on this person's caret. */
+  userName?: string;
+  /** The caret's color, when the surface gives each person one (a Lab notebook does). */
+  caretColor?: string;
+}) {
   return [
     StarterKit.configure({
       undoRedo: props.session ? false : undefined,
@@ -76,7 +81,10 @@ export function createNoteEditorExtensions(
           }),
           CollaborationCaret.configure({
             provider: props.session.provider as never,
-            user: collaborationUser(props.accountId, props.userName),
+            user: {
+              ...collaborationUser(props.accountId, props.userName),
+              ...(props.caretColor ? { color: props.caretColor } : {}),
+            },
           }),
         ]
       : []),

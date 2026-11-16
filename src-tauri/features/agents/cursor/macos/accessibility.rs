@@ -22,7 +22,6 @@ impl Element {
         Self(unsafe { AXUIElement::new_system_wide() })
     }
 
-    #[cfg(test)]
     pub(crate) fn application(pid: i32) -> Self {
         // SAFETY: returns a new application element.
         Self(unsafe { AXUIElement::new_application(pid) })
@@ -93,6 +92,13 @@ impl Element {
             .and_then(|value| value.downcast::<CFArray>().ok())
             .map(|list| elements(&list))
             .unwrap_or_default()
+    }
+
+    /// An application element's focused window.
+    pub(crate) fn focused_window(&self) -> Option<Element> {
+        self.attribute("AXFocusedWindow")
+            .and_then(|value| value.downcast::<AXUIElement>().ok())
+            .map(Element)
     }
 
     /// The title of the window that holds this element.

@@ -180,7 +180,7 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
     >
       <header
         className={cn(
-          "absolute inset-x-0 top-0 z-[var(--stack-pane-top)] h-[var(--shell-titlebar,38px)]",
+          "absolute inset-x-0 top-0 z-[var(--stack-pane-top)] h-[var(--shell-titlebar,2.375rem)]",
           isAuthRoute ? "pointer-events-auto border-b-0 bg-transparent" : "pointer-events-none",
         )}
         data-shared-chrome={!isAuthRoute}

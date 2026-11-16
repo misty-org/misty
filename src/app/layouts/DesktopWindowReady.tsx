@@ -16,7 +16,7 @@ export function DesktopWindowReady() {
   useEffect(() => {
     // Modals keep clear of the macOS traffic lights, which float above every web layer.
     if (hasTauriInternals() && platform() === "macos")
-      document.documentElement.style.setProperty("--misty-modal-inset-top", "44px");
+      document.documentElement.style.setProperty("--misty-modal-inset-top", "2.75rem");
     if (!hasTauriInternals() || !["macos", "windows", "linux"].includes(platform())) return;
     let disposed = false;
     // Color the native window behind the renderer without making the renderer
@@ -48,9 +48,13 @@ export function DesktopWindowReady() {
     window.addEventListener("resize", scheduleBackground);
     const prepare = async () => {
       await syncBackground();
+      // `fonts.ready` alone can settle before Inter has even started loading (a face loads
+      // once text first asks for it), and the text then reflows from the fallback face right
+      // after the window shows. Ask for Inter by name so the first frame is already in it.
+      await document.fonts.load?.('1em "Inter Variable"').catch(() => undefined);
       await document.fonts.ready;
-      // Child webview bounds use this same physical render scale, including
-      // the product baseline (displayed 100% currently renders at 1.1x).
+      // Child webview bounds use this same physical render scale (displayed
+      // 100% renders at 1; the UI's step up is in the CSS, App.css's 110% root).
       await getCurrentWebview().setZoom(getAppliedAppRenderScale());
       if (!disposed) window.dispatchEvent(new Event(appZoomChangedEvent));
       // A hidden webview may not deliver animation frames. Let the committed

@@ -3,7 +3,7 @@
 // See NOTICE.
 
 /**
- * What an engine's page in Settings › Channels holds besides its channels: its program (path,
+ * What an engine's page in Agents › Channels holds besides its channels: its program (path,
  * Codex's home, custom models) and how it signs in. Pi and Oh My Pi list their providers,
  * CodeBuddy opens its own `/login`, DeepSeek Harness shows its local host.
  */

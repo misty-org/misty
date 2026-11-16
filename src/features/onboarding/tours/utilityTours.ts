@@ -1,30 +1,10 @@
 import type { TourStep } from "@/shared/ui";
 
 /**
- * The tours of Misty's utility surfaces: help, search, the layout popup and the agents dialogs.
+ * The tours of Misty's utility surfaces: search, the layout popup and the agents dialogs.
  * Settings has none: it is a list of labeled rows that explains itself. They join the rest in `tours` (tours.ts), written the same way.
  */
 export const utilityTours = {
-  help: {
-    label: "Help tour",
-    steps: [
-      {
-        target: "help-start",
-        title: "Getting started",
-        body: "Take a tour of the page you're on, or set up your AI and apps again.",
-      },
-      {
-        target: "help-recover",
-        title: "When something's stuck",
-        body: "Safe fixes for when a tab goes missing or the app stops responding. Your work isn't deleted.",
-      },
-      {
-        target: "help-feedback",
-        title: "Tell us",
-        body: "Report a problem or share an idea. You can save a file that helps us find the problem; nothing is sent by itself.",
-      },
-    ],
-  },
   search: {
     label: "Search tour",
     steps: [

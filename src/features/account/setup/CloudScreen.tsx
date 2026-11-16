@@ -4,9 +4,8 @@ import { currentApiBase } from "@/api/deployment/serverChoice";
 import { useAuth } from "../sessions/authState";
 import AuthField from "../components/AuthField";
 import AuthMessage from "../components/AuthMessage";
-import { authButtonClass } from "../components/authButtonClass";
 import { accountFinishSetupKey, accountRedeemSetupKey } from "../sessions/useAccountStore";
-import { Button, Spinner } from "@/shared/ui";
+import { Button } from "@/shared/ui";
 import { useEffect, useState, type FormEvent } from "react";
 import { isSetupKey, parseServerAddress, parseSetupLink } from "./serverAddress";
 import { takeSetupLink, useSetupLinkStore } from "./setupLinkStore";
@@ -74,7 +73,7 @@ export function CloudScreen(props: {
 
   const disabled = busy || transitioning;
   return (
-    <form className="flex flex-col gap-3.5" onSubmit={(event) => void submit(event)}>
+    <form className="flex flex-col gap-4" onSubmit={(event) => void submit(event)}>
       <AuthField
         id="setup-link"
         label="Sign-in link"
@@ -100,11 +99,9 @@ export function CloudScreen(props: {
         type="submit"
         variant="primary"
         size="lg"
-        className={authButtonClass}
         disabled={disabled || !ready}
-        aria-busy={busy}
+        loading={busy}
       >
-        {busy ? <Spinner size="sm" label={false} /> : null}
         Continue
       </Button>
     </form>

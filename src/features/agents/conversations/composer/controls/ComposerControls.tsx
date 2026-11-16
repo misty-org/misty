@@ -37,6 +37,7 @@ import {
   engineModels,
   mistyEngine,
   modelNamed,
+  usablePick,
   type EngineModel,
 } from "../../../engines/enginesApi";
 import { modelName } from "../../../engines/modelNames";
@@ -215,9 +216,14 @@ export function modelEffortItem(props: {
 }): ActionBarItem | null {
   const engine = props.engine;
   if (!engine || engine === mistyEngine) return null;
-  const currentId = props.choices.model || props.agentModel || "";
+  // A pick the account can no longer run gives way to the engine's own (`usablePick`).
+  const currentId = usablePick(
+    engine,
+    props.models,
+    props.choices.model || props.agentModel || "",
+  );
   const current = modelNamed(props.models, currentId);
-  // A model saved earlier that the engine no longer lists still shows, by its id.
+  // Elsewhere, a model saved earlier that the engine no longer lists still shows, by its id.
   const list = [...(props.models ?? [])];
   if (currentId && !current)
     list.unshift({ id: currentId, label: modelName(currentId, currentId), default: false });

@@ -217,7 +217,7 @@ function LineCounts({ git }: { git: GitStatus }) {
 export function SessionPanel(props: {
   conversationId: string;
   agent: AgentProfile;
-  /** The card's own control, at the end of its first header row. */
+  /** The card's own control, over the end of its first header row while the pointer is there. */
   corner?: ReactNode;
 }) {
   const engineId = props.agent.engine || mistyEngine;
@@ -251,14 +251,14 @@ export function SessionPanel(props: {
   );
   return (
     // Groups parted by space alone; the card scrolls, never showing a scrollbar of its own.
-    <div className="flex min-h-0 flex-[0_1_auto] flex-col gap-5 px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+    <div className="flex min-h-0 flex-[0_1_auto] flex-col gap-4 px-2 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       <Section
         title="Session"
         icon={MessageSquare}
-        end={props.corner}
+        tools={props.corner}
         subject={
           <span className="flex min-w-0 items-center gap-1.5">
-            {props.agent.engine ? <EngineMark engine={props.agent.engine} size={13} /> : null}
+            {props.agent.engine ? <EngineMark engine={props.agent.engine} /> : null}
             <OverflowFadeText>
               {outside ? turn?.model || props.agent.engine_model || engineName : engineName}
             </OverflowFadeText>
@@ -273,7 +273,15 @@ export function SessionPanel(props: {
             )}
           </>
         ) : (
-          <Empty>Nothing sent yet.</Empty>
+          <Row
+            icon={CircleGauge}
+            label="Context"
+            value={
+              <Text bare tone="muted">
+                Nothing sent yet
+              </Text>
+            }
+          />
         )}
         {usage.replies ? (
           <Row
@@ -382,9 +390,7 @@ export function SessionPanel(props: {
             ) : null}
           </>
         ) : null}
-        {folder ? (
-          <StartCommandRows conversationId={props.conversationId} folder={folder} />
-        ) : null}
+        {folder ? <StartCommandRows conversationId={props.conversationId} folder={folder} /> : null}
       </Section>
 
       <ContextSources engine={engineId} folder={folder} branch={git?.branch} />

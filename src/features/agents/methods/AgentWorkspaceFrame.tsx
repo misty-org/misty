@@ -1,21 +1,14 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 import type { MistyActivityEntry } from "../conversations/state/activity";
 import type { AgentProfile } from "@/shared/schemas";
 import { useSessionGoalRunner } from "../goals/sessionGoals";
 import { VirtualStudio } from "../virtual/VirtualStudio";
 import { ContextRail } from "../context-panel/ContextRail";
-import {
-  ChatSessionCard,
-  ChatSidePanels,
-  useSidePanelShown,
-} from "../context-panel/ChatSidePanels";
+import { ChatSessionCard, ChatSidePanels } from "../context-panel/ChatSidePanels";
 import { isUnread, markConversationRead } from "./conversationReads";
-import { IntegrationsPage } from "../connected-apps/IntegrationsPage";
-import { TutorPage } from "../tutor/TutorPage";
+import { LabInSpace } from "../tutor/LabInSpace";
 import { cn, Surface } from "@/shared/ui";
-import { useContextPanel } from "../context-panel/contextPanelStore";
-import { StudioPage, StudioPageScroll } from "./StudioPage";
 
 /**
  * A new chat in the workspace starts a little way down the canvas, its greeting over the composer
@@ -34,15 +27,12 @@ const emptyChatClass = cn(
   "[&_.agent-conversation[data-empty=true]_.agent-compose-area]:max-w-[calc(100%-var(--spacing)*12)]",
   "[&_.agent-conversation[data-empty=true]_.agent-compose-area]:shrink-0",
   "[&_.agent-conversation[data-empty=true]_.agent-compose-area]:p-0",
-  // With the session card kept open over the chat's top right, the greeting and composer center
-  // in the room left of it, where there is room for both.
-  "@min-[1000px]/agent-studio:[&[data-session-card]_.agent-conversation[data-empty=true]]:pr-[calc(--spacing(72)+var(--misty-scrollbar-size)+--spacing(3))]",
 );
 
 /** Queued or working: read state doesn't apply yet. */
 const isRunInProgress = (state?: string) => state === "running" || state === "queued";
 
-export type AgentWorkspacePage = "task" | "integrations" | "studio" | "lab";
+export type AgentWorkspacePage = "task" | "studio" | "lab";
 type RecentConversation = {
   id: string;
   title?: string;
@@ -52,8 +42,8 @@ type RecentConversation = {
 };
 
 /**
- * The Agents page: a chat with its agent, or one of the pages the sidebar opens (studio, notebooks,
- * and integrations from the studio). Only the chat has a bar (the chat column draws it, over its
+ * The Agents page: a chat with its agent, or one of the pages the sidebar opens (the studio and
+ * the Lab). Only the chat has a bar (the chat column draws it, over its
  * conversation) and the context panel for the folder's files, changes and a terminal. The other
  * pages have no title bar, since the sidebar and the tab already name them, and the studio, where
  * agents are hired and set up, floats its few buttons over the room. The chats are listed in the
@@ -71,7 +61,6 @@ export function AgentWorkspaceFrame({
   onPageChange,
   onNewTask,
   onConversation,
-  onLearn,
   onAgentSettings,
 }: {
   agent: AgentProfile;
@@ -85,8 +74,6 @@ export function AgentWorkspaceFrame({
   onPageChange(page: AgentWorkspacePage): void;
   onNewTask(): void;
   onConversation(id: string): void;
-  /** Starts a Teach chat that opens with this request. */
-  onLearn(prompt: string): void;
   /** Opens an agent's settings, from its desk in the studio. */
   onAgentSettings(agentId: string): void;
 }) {
@@ -110,17 +97,8 @@ export function AgentWorkspaceFrame({
     document.addEventListener("visibilitychange", read);
     return () => document.removeEventListener("visibilitychange", read);
   }, [activeId, readable]);
-  // The session card kept open over the chat, so a new chat's greeting and composer stay clear of it.
-  // Not while a side panel is open: the card is behind it then, so the chat keeps its full width.
-  const sidePanel = useSidePanelShown(conversationId);
-  const sessionCard =
-    useContextPanel((state) => state.session && !state.sessionTucked) && !sidePanel;
   const [, setParams] = useSearchParams();
   useSessionGoalRunner(activeId ?? "");
-  // Integrations mounts the first time it is opened, then stays mounted while hidden. Mounted
-  // up front, every chat paid for its plugin lists and their refresh calls.
-  const [integrationsOpened, setIntegrationsOpened] = useState(page === "integrations");
-  if (page === "integrations" && !integrationsOpened) setIntegrationsOpened(true);
   return (
     // A main column (a body: the chat, under its floating bar, or another view and, when open, the
     // context panel at its right) beside the rail, which runs the page's full height. Bar, chat,
@@ -132,7 +110,6 @@ export function AgentWorkspaceFrame({
         emptyChatClass,
       )}
       data-page={page}
-      data-session-card={(page === "task" && sessionCard) || undefined}
     >
       <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
         {/* The chat, then the side panel and the session card, each 8px off the chat. */}
@@ -148,17 +125,8 @@ export function AgentWorkspaceFrame({
             {page === "task" ? (
               <ChatSessionCard conversationId={conversationId} agent={agent} />
             ) : null}
-            {page === "lab" ? (
-              <TutorPage
-                agentId={agent.id}
-                onLesson={(agentId, id) => {
-                  onPageChange("task");
-                  if (agentId === agent.id) onConversation(id);
-                  else setParams({ agent: agentId, conversation: id });
-                }}
-                onLearn={onLearn}
-              />
-            ) : null}
+            {/* The Lab is a page of the agent's home Space; its tab goes there. */}
+            {page === "lab" ? <LabInSpace agent={agent} /> : null}
             {page === "studio" ? (
               <VirtualStudio
                 onAgentSettings={onAgentSettings}
@@ -169,15 +137,6 @@ export function AgentWorkspaceFrame({
                     setParams(chat ? { agent: agentId, conversation: chat } : { agent: agentId });
                 }}
               />
-            ) : null}
-            {integrationsOpened ? (
-              <div className="h-full" hidden={page !== "integrations"}>
-                <StudioPage className="integrations">
-                  <StudioPageScroll>
-                    <IntegrationsPage />
-                  </StudioPageScroll>
-                </StudioPage>
-              </div>
             ) : null}
           </Surface>
           {/* The chat's side panel, between the chat and the rail. */}

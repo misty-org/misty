@@ -33,7 +33,7 @@ function SecretFieldSamples() {
           onRemove={() => {}}
         />
         <SecretField
-          label="Composio key"
+          label="Access token"
           className="w-60"
           saved={false}
           error="That key was refused. Check it and paste it again."

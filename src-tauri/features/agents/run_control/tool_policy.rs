@@ -93,9 +93,12 @@ const ASK_MODE_STOPS: &[&str] = &[
     "browser.upload",
     "drawing.apply",
     "drawing.create",
+    "file.create",
     "file.promote_attachment",
     "file.update",
     "folder.send",
+    "image.edit",
+    "image.save",
     "item.delete",
     "item.rename",
     "message.send",
@@ -149,11 +152,13 @@ pub(crate) const COMPUTER_ACTS: &[&str] = &[
 ];
 
 /// Whether a tool is allowed by the run's list. The tools a run needs to talk to the person and
-/// to report are never left out.
+/// to report are never left out, and neither is its figure in the studio (`studio.*`), which only
+/// shows the person where the agent is.
 fn allowed_by_list(facts: &RunFacts, name: &str) -> bool {
     const ALWAYS: &[&str] = &["conversation.ask_user", "log.work.write"];
     facts.allowed_tools.is_empty()
         || ALWAYS.contains(&name)
+        || name.starts_with("studio.")
         || facts.allowed_tools.iter().any(|allowed| {
             allowed == name
                 || allowed

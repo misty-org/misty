@@ -7,6 +7,7 @@ import { EditorContent, EditorContext, useEditor } from "@tiptap/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createNoteAiAdapter, updateAiSelection } from "./noteAiAdapter";
 import { NoteBlockHandle } from "./NoteBlockHandle";
+import { LabNotebookDocView, useIsLabNotebook } from "./LabNotebookDocView";
 import { NoteDocumentSkeleton } from "./NoteDocumentSkeleton";
 import {
   collectNoteLinks,
@@ -45,11 +46,20 @@ function CollaborativeNoteEditor(
     props.spaceId,
     props.noteId,
   );
+  const labNotebook = useIsLabNotebook(session?.doc);
   if (error) {
     return <>{props.runtime.renderError(error, props.spaceId, props.noteId)}</>;
   }
   // The doc's live copy is still being joined: the editor's own shape stands in.
   if (!session) return <NoteDocumentSkeleton label="Opening doc" toolbar={props.editable} />;
+  if (labNotebook)
+    return (
+      <LabNotebookDocView
+        spaceId={props.spaceId}
+        noteId={props.noteId}
+        markdown={session.markdown}
+      />
+    );
   return (
     <div className="relative h-full">
       {notice ? (

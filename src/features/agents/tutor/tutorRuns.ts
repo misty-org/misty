@@ -1,10 +1,10 @@
 import { newLocalConversation } from "../conversations/state/localConversation";
-import type { GlobalAiConversation } from "../conversations/state/conversationTypes";
 import { useMistyStore } from "../conversations/state/useMistyStore";
 import { readRunState } from "../runs/invocations/invocationSubscription";
 import { useCollaborationStore } from "../plans/store";
 import { makeOverviewAudio, makeVideoAudio } from "./tutorAudio";
 import { parseDeck, parseMarkdown, parseOverview, parseQuiz } from "./tutorPrompts";
+import { agentTag } from "./agentTag";
 import { addLink } from "./tutorSources";
 import {
   briefKey,
@@ -17,12 +17,23 @@ import {
 } from "./tutorStudio";
 import { useTutorStore } from "./tutorStore";
 import type { TutorJob, TutorJobKind } from "./tutorTypes";
+import { defaultEngineAgent } from "../engines/defaultEngine";
+import {
+  defaultEngineId,
+  followEngineRun,
+  noDefaultEngine,
+  runOnEngine,
+  stopEngineRun,
+  type EngineRunResult,
+} from "../engines/engineRun";
+
+/** Why a run failed when it answered with nothing Misty could read into what it was making. */
+export const unusableReply = "The reply had nothing Misty could use.";
 
 /**
- * Tutor's agent runs. Each is an ordinary turn on the person's own agent (its engine, its keys) in a
- * chat of its own. A run that makes something is kept out of the
- * sidebar and read into a guide, deck, quiz or note when its reply finishes; a question or a lesson
- * opens as a chat the person reads.
+ * The Lab's runs. A job (a guide, deck, quiz, overview, sources found) runs on the default engine
+ * with no agent chat behind it and is read into what it makes when its answer is in (`startJob`).
+ * `startRun` is an ordinary agent chat turn, kept for what is a chat (a pick-up's draft).
  */
 
 type Started = { conversationId: string; started: boolean; error?: string };
@@ -91,11 +102,15 @@ export async function startRun(input: {
   return { conversationId, started, error: started ? undefined : (after.error ?? undefined) };
 }
 
-/** Starts a run that makes something for Tutor; it waits if another turn is working. */
+/**
+ * Starts a run that makes something for the Lab, on the default engine. It's Misty's own work, so
+ * there's no agent chat behind it, and runs go side by side.
+ */
 export async function startJob(input: {
   kind: TutorJobKind;
   title: string;
-  agentId: string;
+  /** Kept for callers from before the default engine; the default engine runs every job. */
+  agentId?: string;
   prompt: string;
   notebookId?: string;
   sourceId?: string;
@@ -103,94 +118,96 @@ export async function startJob(input: {
   report?: string;
 }): Promise<TutorJob> {
   const now = new Date().toISOString();
-  const conversation = newLocalConversation(input.title, undefined, input.agentId);
-  useMistyStore.setState((state) => ({ conversations: [conversation, ...state.conversations] }));
+  const engineId = await defaultEngineId().catch(() => "");
   const job: TutorJob = {
     ...input,
+    agentId: (engineId && defaultEngineAgent(engineId)) || engineId,
     id: `job-${crypto.randomUUID()}`,
-    conversationId: conversation.id,
-    state: "queued",
+    state: engineId ? "running" : "failed",
+    ...(engineId ? {} : { error: noDefaultEngine }),
     createdAt: now,
     updatedAt: now,
   };
-  // Saved first, so the sidebar never shows its chat.
   useTutorStore.getState().saveJob(job);
-  return launch(job);
+  if (engineId) void run(job);
+  return job;
 }
 
-/** Runs being started now, so a sweep during the start doesn't start them again. */
-const launching = new Set<string>();
+/** Jobs being followed now, so a restart or a second window doesn't follow one twice. */
+const following = new Set<string>();
 
-async function launch(job: TutorJob): Promise<TutorJob> {
-  // One run starts at a time: two turns starting together trip each other's account check. A
-  // run that waits stays queued, and the sweep after this start finishes starts it.
-  if (launching.size > 0) return job;
-  launching.add(job.id);
+/** The Space a job's notebook lives in, for the engine's Space tools. */
+const spaceOf = (job: TutorJob) =>
+  job.notebookId ? useTutorStore.getState().notebooks[job.notebookId]?.space?.spaceId : undefined;
+
+/** Runs the job on the default engine and reads its answer into what it makes. */
+async function run(job: TutorJob, existingRun?: string): Promise<void> {
+  if (following.has(job.id)) return;
+  following.add(job.id);
   try {
-    return await launchNow(job);
+    const result = existingRun
+      ? await followEngineRun(existingRun)
+      : await runOnEngine({
+          prompt: job.prompt,
+          key: `${job.id}:${job.restarts ?? 0}`,
+          spaceId: spaceOf(job),
+          onStarted: (runId) => {
+            const current = useTutorStore.getState().jobs[job.id];
+            if (current) useTutorStore.getState().saveJob({ ...current, runId });
+          },
+        });
+    finish(job.id, result);
+  } catch (reason) {
+    finish(job.id, {
+      runId: "",
+      text: "",
+      error: reason instanceof Error ? reason.message : String(reason),
+    });
   } finally {
-    launching.delete(job.id);
-    sweep();
+    following.delete(job.id);
   }
 }
 
-async function launchNow(job: TutorJob): Promise<TutorJob> {
-  const started = await startRun({
-    agentId: job.agentId,
-    title: job.title,
-    prompt: job.prompt,
-    mode: "act",
-    background: true,
-    conversationId: job.conversationId,
-  });
-  // The latest copy: the reply may already have been read while the start was settling.
-  const current = useTutorStore.getState().jobs[job.id] ?? job;
-  if (current.state !== "queued") return current;
-  const next: TutorJob = started.started
-    ? { ...job, state: "running", updatedAt: new Date().toISOString() }
-    : started.error
-      ? { ...job, state: "failed", error: started.error, updatedAt: new Date().toISOString() }
-      : job;
-  if (next !== job) {
-    useTutorStore.getState().saveJob(next);
-    // A reply that finished during the start is read now, not at the next change.
-    sweep();
+function finish(jobId: string, result: EngineRunResult) {
+  const current = useTutorStore.getState().jobs[jobId];
+  // Dismissed meanwhile, or already read.
+  if (!current || current.state !== "running") return;
+  const now = new Date().toISOString();
+  if (result.error && !result.text.trim()) {
+    useTutorStore
+      .getState()
+      .saveJob({ ...current, state: "failed", error: result.error, updatedAt: now });
+    return;
   }
-  return next;
-}
-
-/** Drops a run and its chat. */
-export async function dismissJob(job: TutorJob): Promise<void> {
-  await useMistyStore
+  const resultId = settle(current, result.text);
+  useTutorStore
     .getState()
-    .deleteConversation(job.conversationId)
-    .catch(() => undefined);
+    .saveJob(
+      resultId
+        ? { ...current, state: "done", error: undefined, resultId, updatedAt: now }
+        : { ...current, state: "failed", error: result.error || unusableReply, updatedAt: now },
+    );
+}
+
+/** Stops a job and drops it. */
+export async function dismissJob(job: TutorJob): Promise<void> {
+  if (job.state === "running" && job.runId) await stopEngineRun(job.runId);
   useTutorStore.getState().removeJob(job.id);
 }
 
-/** Tries a failed run again in its own chat. */
+/** Tries a failed job again, as a new run. */
 export function retryJob(job: TutorJob): Promise<TutorJob> {
-  // A finished reply is read again first: Tutor may read it now where it couldn't before.
-  const conversation = useMistyStore
-    .getState()
-    .conversations.find((chat) => chat.id === job.conversationId);
-  const reply = finalReply(conversation);
-  if (reply?.state === "completed" && reply.content) {
-    const resultId = settle(job, reply.content);
-    if (resultId) {
-      const done: TutorJob = { ...job, state: "done", error: undefined, resultId };
-      useTutorStore.getState().saveJob(done);
-      return Promise.resolve(done);
-    }
-  }
-  const queued: TutorJob = { ...job, state: "queued", error: undefined };
-  useTutorStore.getState().saveJob(queued);
-  return launch(queued);
-}
-
-function finalReply(conversation: GlobalAiConversation | undefined) {
-  const last = conversation?.messages[conversation.messages.length - 1];
-  return last?.role === "assistant" ? last : undefined;
+  const again: TutorJob = {
+    ...job,
+    state: "running",
+    error: undefined,
+    runId: undefined,
+    restarts: (job.restarts ?? 0) + 1,
+    updatedAt: new Date().toISOString(),
+  };
+  useTutorStore.getState().saveJob(again);
+  void run(again);
+  return Promise.resolve(again);
 }
 
 /** Reads a finished reply into what the run makes; false when the reply had no usable result. */
@@ -199,7 +216,6 @@ function settle(job: TutorJob, reply: string): string | undefined {
   const now = new Date().toISOString();
   const base = {
     notebookId: job.notebookId,
-    conversationId: job.conversationId,
     createdAt: now,
     updatedAt: now,
   };
@@ -266,7 +282,8 @@ function settle(job: TutorJob, reply: string): string | undefined {
       const added = useTutorStore
         .getState()
         .notebooks[notebookId]?.sources.find((source) => source.url === item.url);
-      if (added) tutor.updateSource(notebookId, added.id, { why: item.why });
+      if (added)
+        tutor.updateSource(notebookId, added.id, { why: item.why, agent: agentTag(job.agentId) });
     }
     return notebookId;
   }
@@ -342,58 +359,8 @@ function settle(job: TutorJob, reply: string): string | undefined {
     origin: "agent",
     transformation: job.transformation,
     sourceId: job.sourceId,
+    agent: agentTag(job.agentId),
   }).id;
-}
-
-/** Checks each unfinished run against its chat: reads finished replies, starts waiting runs. */
-function sweep() {
-  const { jobs, ready } = useTutorStore.getState();
-  if (!ready) return;
-  const chats = useMistyStore.getState();
-  // Only once this window's chats are loaded can a run start again in its own chat.
-  const settled = !chats.conversationsLoading && chats.conversations.length > 0;
-  for (const job of Object.values(jobs)) {
-    if (
-      settled &&
-      job.state === "failed" &&
-      interrupted(job.error) &&
-      (job.restarts ?? 0) < 1 &&
-      !launching.has(job.id)
-    ) {
-      void retryJob({ ...job, restarts: (job.restarts ?? 0) + 1 });
-      continue;
-    }
-    if (job.state === "queued") {
-      if (!chats.working && !launching.has(job.id)) void launch(job);
-      continue;
-    }
-    if (job.state !== "running") continue;
-    const conversation = chats.conversations.find((c) => c.id === job.conversationId);
-    if (!conversation) continue;
-    const reply = finalReply(conversation);
-    if (!reply || reply.state === "pending" || reply.state === "streaming") continue;
-    const now = new Date().toISOString();
-    if (reply.state === "completed") {
-      const resultId = settle(job, reply.content);
-      useTutorStore.getState().saveJob(
-        resultId
-          ? { ...job, state: "done", resultId, updatedAt: now }
-          : {
-              ...job,
-              state: "failed",
-              error: "The reply had nothing Misty could use.",
-              updatedAt: now,
-            },
-      );
-    } else {
-      useTutorStore.getState().saveJob({
-        ...job,
-        state: "failed",
-        error: reply.state === "canceled" ? "This run was stopped." : failureOf(reply.content),
-        updatedAt: now,
-      });
-    }
-  }
 }
 
 /** Whether a run failed because Misty closed or restarted under it, not because of its work. */
@@ -404,58 +371,40 @@ export function interrupted(error?: string): boolean {
 }
 
 /**
- * What a failed reply says went wrong. A reply cut off part way (it began its answer) failed
- * because its run stopped, not with a message of its own.
+ * Picks up the jobs that were running when Misty closed: one whose run native code still knows is
+ * followed to its end (its answer is kept), one it doesn't is started again once, and one from
+ * before the default engine (queued in a chat) starts fresh.
  */
-function failureOf(content: string): string {
-  const text = content.trim();
-  if (!text || text.startsWith("```") || text.startsWith("{") || text.length > 400)
-    return "This run stopped before it finished.";
-  return text;
-}
-
-/**
- * A run Misty closed under leaves its reply waiting forever, so its job looks busy for good. Once
- * this window's chats load, each busy job's run is asked how it stands; one native code no longer
- * runs, with its reply still waiting, failed as stopped, and the sweep starts it again once.
- */
-async function settleOrphans() {
-  for (let tries = 0; tries < 20; tries++) {
-    const chats = useMistyStore.getState();
-    if (!chats.conversationsLoading && chats.conversations.length) break;
-    await new Promise((resolve) => setTimeout(resolve, 500));
-  }
+async function resumeJobs() {
   for (const job of Object.values(useTutorStore.getState().jobs)) {
+    if (job.state === "queued") {
+      void retryJob({ ...job, restarts: (job.restarts ?? 0) - 1 });
+      continue;
+    }
     if (job.state !== "running") continue;
-    const conversation = useMistyStore
-      .getState()
-      .conversations.find((chat) => chat.id === job.conversationId);
-    const reply = finalReply(conversation);
-    if (!reply || (reply.state !== "pending" && reply.state !== "streaming")) continue;
-    const state = reply.invocationId
-      ? await readRunState(reply.invocationId).catch(() => "unknown")
-      : "unknown";
-    if (state === "running") continue;
-    const current = useTutorStore.getState().jobs[job.id];
-    if (current?.state !== "running") continue;
-    useTutorStore.getState().saveJob({
-      ...current,
-      state: "failed",
-      error: "This run stopped before it finished.",
-      updatedAt: new Date().toISOString(),
-    });
+    const state = job.runId ? await readRunState(job.runId).catch(() => "missing") : "missing";
+    if (state !== "missing" && job.runId) {
+      void run(job, job.runId);
+      continue;
+    }
+    if ((job.restarts ?? 0) < 1) void retryJob(job);
+    else
+      useTutorStore.getState().saveJob({
+        ...job,
+        state: "failed",
+        error: "This run stopped before it finished.",
+        updatedAt: new Date().toISOString(),
+      });
   }
-  sweep();
 }
 
-/** Keeps Tutor's runs in step with their chats while this window is open. */
+/** Keeps the Lab's jobs going while this window is open. */
 export function followTutorJobs(accountId: string): () => void {
   void useTutorStore
     .getState()
     .load(accountId)
     .then(() => {
-      void settleOrphans();
-      sweep();
+      void resumeJobs();
       // Audio that was being spoken when Misty closed is made again.
       const tutor = useTutorStore.getState();
       for (const guide of Object.values(tutor.guides)) {
@@ -463,25 +412,5 @@ export function followTutorJobs(accountId: string): () => void {
           void (guide.kind === "video" ? makeVideoAudio(guide.id) : makeOverviewAudio(guide.id));
       }
     });
-  // What changed is read from the store itself, not from the listener's arguments, so a store
-  // that notifies without them (as some tests' do) still works.
-  let seen = useMistyStore.getState();
-  const offChats = useMistyStore.subscribe(() => {
-    const state = useMistyStore.getState();
-    const previous = seen;
-    seen = state;
-    if (!state || state.accountId !== accountId) return;
-    if (state.conversations !== previous?.conversations || state.working !== previous?.working)
-      sweep();
-  });
-  let wasReady = useTutorStore.getState().ready;
-  const offTutor = useTutorStore.subscribe(() => {
-    const ready = useTutorStore.getState().ready;
-    if (ready && !wasReady) sweep();
-    wasReady = ready;
-  });
-  return () => {
-    offChats();
-    offTutor();
-  };
+  return () => undefined;
 }

@@ -38,7 +38,7 @@ export function EngineGlyph({
       aria-hidden
       tone="active"
       style={{ width: size, height: size, fontSize: Math.max(8, Math.round(size * 0.6)) }}
-      className="inline-grid shrink-0 place-items-center rounded-[4px]"
+      className="inline-grid shrink-0 place-items-center rounded-[0.25rem]"
     >
       {/* The initial is drawn from an attribute, so it stays out of the text around it. */}
       <Text

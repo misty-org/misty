@@ -64,13 +64,43 @@ pub(crate) struct FollowupPrefs {
     pub allowed_tools: Option<Vec<String>>,
     /// Misty: the agent's engine arguments and what else the launch carried (`LaunchExtras::key`).
     pub launch: Vec<String>,
+    /// The folders the launch let the CLI into (`--add-dir`): a live process can't take more.
+    pub dirs: Vec<String>,
+    /// The chat's next message may reuse this process even with no background task running
+    /// (`LaunchExtras::warm`), so it skips the CLI's start-up.
+    pub warm: bool,
 }
-/// A settled run kept alive for the CLI's self-started follow-up turn.
+/// A settled run kept alive for the CLI's self-started follow-up turn, or kept warm for the
+/// chat's next message.
 #[derive(Debug, Clone)]
 pub(crate) struct AwaitingFollowup {
     pub run_id: String,
     /// Compared when a live process could take the next prompt.
     pub prefs: FollowupPrefs,
+    /// When a warm process went idle, for its idle timeout; `None` while a background task
+    /// keeps it, which the CLI ends on its own.
+    pub idle_since: Option<std::time::Instant>,
+}
+
+/// How long a warm process waits for the chat's next message before it is let go.
+pub(crate) const WARM_IDLE: std::time::Duration = std::time::Duration::from_secs(10 * 60);
+/// The most warm processes kept at once, across every engine; the longest idle goes first.
+pub(crate) const WARM_MAX: usize = 6;
+
+/// Ends a warm process that no message took within [`WARM_IDLE`]: its stdin closes, so the CLI
+/// exits on its own and its reader settles the process as for any parked run.
+pub(crate) fn reap_when_idle(
+    registry: Arc<ProcessRegistry>,
+    session_id: String,
+    run_id: String,
+    since: std::time::Instant,
+) {
+    tokio::spawn(async move {
+        tokio::time::sleep(WARM_IDLE).await;
+        if registry.expire_warm_followup(&session_id, &run_id, since) {
+            registry.close_stdin(&run_id);
+        }
+    });
 }
 
 #[derive(Default)]
@@ -276,9 +306,72 @@ impl ProcessRegistry {
                 AwaitingFollowup {
                     run_id: run_id.to_string(),
                     prefs,
+                    idle_since: None,
                 },
             );
         }
+    }
+
+    /// Put back a parked run a send took but couldn't use, as it was.
+    pub(crate) fn restore_awaiting_followup(&self, session_id: &str, awaiting: AwaitingFollowup) {
+        if let Ok(mut map) = self.2.lock() {
+            map.insert(session_id.to_string(), awaiting);
+        }
+    }
+
+    /// Record that `run_id` finished its turn and idles, warm, for the chat's next message on
+    /// `session_id`. Returns when it went idle, for [`reap_when_idle`], and the runs pushed out
+    /// past [`WARM_MAX`], longest idle first, whose stdin the caller closes.
+    pub(crate) fn set_warm_followup(
+        &self,
+        session_id: &str,
+        run_id: &str,
+        prefs: FollowupPrefs,
+    ) -> (std::time::Instant, Vec<String>) {
+        let since = std::time::Instant::now();
+        let Ok(mut map) = self.2.lock() else {
+            return (since, Vec::new());
+        };
+        map.insert(
+            session_id.to_string(),
+            AwaitingFollowup {
+                run_id: run_id.to_string(),
+                prefs,
+                idle_since: Some(since),
+            },
+        );
+        let mut idle: Vec<(std::time::Instant, String)> = map
+            .iter()
+            .filter_map(|(session, waiting)| waiting.idle_since.map(|at| (at, session.clone())))
+            .collect();
+        idle.sort();
+        let over = idle.len().saturating_sub(WARM_MAX);
+        let evicted = idle
+            .into_iter()
+            .take(over)
+            .filter_map(|(_, session)| map.remove(&session).map(|waiting| waiting.run_id))
+            .collect();
+        (since, evicted)
+    }
+
+    /// Let go of a warm run still idle since `since`: it is no longer offered to a send, and
+    /// the caller closes its stdin. False when a send took it or it parked again since.
+    pub(crate) fn expire_warm_followup(
+        &self,
+        session_id: &str,
+        run_id: &str,
+        since: std::time::Instant,
+    ) -> bool {
+        let Ok(mut map) = self.2.lock() else {
+            return false;
+        };
+        let idle = map
+            .get(session_id)
+            .is_some_and(|waiting| waiting.run_id == run_id && waiting.idle_since == Some(since));
+        if idle {
+            map.remove(session_id);
+        }
+        idle
     }
 
     /// The run no longer waits (follow-up arrived, run settled or exited).

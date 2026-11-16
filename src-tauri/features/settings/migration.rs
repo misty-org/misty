@@ -8,7 +8,7 @@ use serde_json::{Map, Value};
 
 /// Bumped whenever a key is retired, so the prune below runs exactly once per
 /// user rather than on every launch.
-pub(super) const SETTINGS_SCHEMA_VERSION: i64 = 14;
+pub(super) const SETTINGS_SCHEMA_VERSION: i64 = 15;
 
 /// Whole sections that no longer exist. `account` and `ai` were never read.
 /// Schema 6: the Code workspace (`editor`, `terminal`), the file manager
@@ -73,11 +73,14 @@ const RETIRED_KEYS: &[(&str, &str)] = &[
     // Schema 11: Misty sends no usage analytics or crash reports (PostHog was removed).
     ("privacy", "anonymous_usage_analytics_enabled"),
     ("privacy", "anonymous_error_reporting_enabled"),
+    // Schema 15: the studio has no sounds; its agents speak instead.
+    ("agent", "office_sounds"),
+    ("agent", "studio_sounds"),
 ];
 
 /// Keys that moved to a new name, as (section, old key, new key). A value already under the new
-/// name wins. Schema 13: the virtual office is called the studio.
-const RENAMED_KEYS: &[(&str, &str, &str)] = &[("agent", "office_sounds", "studio_sounds")];
+/// name wins. None at the moment: the one there was (Schema 13, `office_sounds`) was retired.
+const RENAMED_KEYS: &[(&str, &str, &str)] = &[];
 
 /// Removes retired keys from an existing settings file and moves renamed ones.
 ///
@@ -179,12 +182,15 @@ mod tests {
     }
 
     #[test]
-    fn moves_renamed_keys() {
-        let mut root = object(json!({ "agent": { "office_sounds": true } }));
+    fn retires_studio_sounds() {
+        let mut root = object(json!({
+            "agent": { "office_sounds": true, "studio_sounds": true, "panel_side": "left" }
+        }));
         assert!(prune_retired_settings(&mut root));
         let agent = root.get("agent").and_then(Value::as_object).unwrap();
         assert!(!agent.contains_key("office_sounds"));
-        assert_eq!(agent.get("studio_sounds").and_then(Value::as_bool), Some(true));
+        assert!(!agent.contains_key("studio_sounds"));
+        assert_eq!(agent.get("panel_side").and_then(Value::as_str), Some("left"));
     }
 
     #[test]

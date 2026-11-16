@@ -8,6 +8,7 @@ import {
   iconBarItem,
   Pressable,
   RowTools,
+  rowShape,
   Surface,
   Text,
   Tooltip,
@@ -16,6 +17,7 @@ import {
 import { getFileTreeIconSvg } from "../files/fileIcons";
 import type { GitTreeDirNode } from "./git-tree";
 import type { GitFileEntry } from "./gitApi";
+import { remCss } from "@/shared/lib/uiScale";
 
 /** The one-letter mark Git uses for each state, shown before the name. */
 const LETTERS: Record<GitFileEntry["status"], string> = {
@@ -37,7 +39,8 @@ function statusTone(status: string): TextTone {
 const glyphCell = "grid size-4 flex-none place-items-center";
 
 /** A row of the changes list: 32px, the name taking the room, its actions over its end. */
-const rowClass = "group/row relative flex h-8 min-w-0 items-center gap-1.5 pr-2 text-meta";
+// The shared row; its left padding is the tree indent, set inline.
+const rowClass = cn(rowShape, "group/row relative text-meta");
 
 type SelectedState = "all" | "some" | "none";
 
@@ -206,7 +209,7 @@ export const FileRow = memo(function FileRow({
       as="li"
       tone="none"
       wash="row"
-      style={{ ...style, paddingLeft: indent ?? 12 }}
+      style={{ ...style, paddingLeft: remCss(indent ?? 12) }}
       className={rowClass}
       data-git-row={entry.path}
     >
@@ -287,7 +290,7 @@ export const DirectoryRow = memo(function DirectoryRow({
       as="li"
       tone="none"
       wash="row"
-      style={{ ...style, paddingLeft: indent ?? 12 }}
+      style={{ ...style, paddingLeft: remCss(indent ?? 12) }}
       className={rowClass}
     >
       <Pressable

@@ -12,7 +12,7 @@ const zoomMocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@/shared/hooks/useAppZoom", () => ({
-  appZoomRenderScale: (zoom: number) => Math.round(zoom * 110) / 100,
+  appZoomToStoredScale: (zoom: number) => Math.round(zoom * 110) / 100,
   appZoomMin: 0.8,
   appZoomMax: 2,
   appZoomStep: 0.1,

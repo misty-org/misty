@@ -23,6 +23,7 @@ import { useDraftStatus } from "./useDraftStatus";
 import { useFollowLatestMessage } from "./useFollowLatestMessage";
 import { replyPrompt } from "./replyQuote";
 import { RunStatusStrip } from "./status/RunStatusStrip";
+import { PermissionDock } from "./PermissionDock";
 import { ConversationNavigation } from "./navigation/ConversationNavigation";
 import { useChatShortcuts } from "./navigation/useChatShortcuts";
 import { recordPrompt } from "../composer/promptHistory";
@@ -39,6 +40,7 @@ import { CommandReportDialog } from "../composer/commands/CommandReportDialog";
 import { EngineQueueChips } from "./engine/EngineQueueChips";
 import { EngineHistoryDialog } from "./engine/EngineHistoryDialog";
 import { useEngineQueue } from "./engine/engineQueue";
+import { syncChat } from "./engine/engineSessionImport";
 export type { AgentVoiceControl } from "./useConversationVoice";
 /**
  * The conversation's column, and the rhythm of the Markdown replies in it: only the person's
@@ -298,7 +300,7 @@ export function AgentWorkspaceConversation({
       aria-label={`${agent?.name || "Misty"} conversation`}
     >
       <div
-        className="agent-conversation-scroll min-h-0 flex-1 overflow-auto overscroll-contain"
+        className="agent-conversation-scroll misty-scrollbar-flush min-h-0 flex-1 overflow-auto overscroll-contain"
         ref={scrollRef}
       >
         <AgentConversationTranscript
@@ -366,6 +368,7 @@ export function AgentWorkspaceConversation({
             conversationId={conversation?.id}
           />
         ) : null}
+        <PermissionDock agentId={agent?.id} />
         <AgentReplyTarget
           agentName={agent?.name || "Misty"}
           reply={reply}
@@ -385,6 +388,13 @@ export function AgentWorkspaceConversation({
           working={state.working}
           send={() => void send()}
           reportError={reportError}
+          onOpenHistory={() => setHistoryOpen(true)}
+          onSync={() => {
+            if (!conversation?.id) return;
+            void syncChat(conversation.id).catch((error: unknown) =>
+              reportError(error instanceof Error ? error.message : String(error)),
+            );
+          }}
           status={
             <EngineQueueChips
               conversationId={conversation?.id}

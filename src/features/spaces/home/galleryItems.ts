@@ -32,7 +32,12 @@ export interface GalleryItem {
   /** Removal operation when the current person is allowed to remove this item. */
   remove?: () => Promise<unknown>;
   removeLabel?: string;
+  /** A Lab notebook's doc: it opens in the Lab, where its people work in it. */
+  notebook?: boolean;
 }
+
+/** A Lab notebook's doc is titled with this, the way the Lab finds them among a Space's docs. */
+const notebookPrefix = "Notebook: ";
 
 type GalleryFilter = "all" | "chats" | "notes" | "drawings" | "images" | "files";
 
@@ -79,6 +84,19 @@ export function chatItem(
 
 export function noteItem(spaceId: string, note: ServerSpaceNote): GalleryItem {
   const text = (note.plain_text ?? note.markdown ?? "").replace(/\s+/g, " ").trim();
+  if (note.title.startsWith(notebookPrefix))
+    return {
+      key: `note:${note.id}`,
+      kind: "note",
+      notebook: true,
+      title: note.title.slice(notebookPrefix.length).trim() || "Untitled notebook",
+      updatedAt: note.updated_at ?? note.created_at ?? "",
+      creatorId: note.creator_user_id,
+      href: `${base(spaceId)}/lab?doc=${encodeURIComponent(note.id)}`,
+      excerpt: text.slice(0, 220),
+      visibility: note.visibility,
+      toggle: { kind: "note", id: note.id },
+    };
   return {
     key: `note:${note.id}`,
     kind: "note",

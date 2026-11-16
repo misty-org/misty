@@ -1,5 +1,10 @@
 import { useMistyStore } from "../../conversations/state/useMistyStore";
-import { CompanionGuideStep, type CompanionClick } from "./companionGuide";
+import {
+  beginWalkthrough,
+  CompanionGuideStep,
+  walkthroughStepDone,
+  type CompanionClick,
+} from "./companionGuide";
 import { companionReply, resolveFocus, resolvePoint } from "./companionReply";
 import { withoutSketch } from "./companionSketch";
 import { refinePoint, REFINE_MIN_MOVE, snapPoint, type SharpenedPoint } from "./companionSharpen";
@@ -88,10 +93,13 @@ export class CursorCompanionPointer {
     s.change({ point: presented });
     const expected = s.turn;
     if (awaiting) {
+      const conversationId = useMistyStore.getState().activeConversationId;
+      // A walkthrough's first step starts its log, with what the person asked as its goal.
+      if (point.guide?.step === 1) beginWalkthrough(conversationId, lastAsk(conversationId));
       const step: CompanionGuideStep = new CompanionGuideStep(
         presented,
         expected,
-        useMistyStore.getState().activeConversationId,
+        conversationId,
         voice,
         () => {
           if (this.step === step && s.active(expected)) this.clear();
@@ -122,6 +130,20 @@ export class CursorCompanionPointer {
     this.token++;
     this.s.pointPending = false;
     this.s.change({ point: undefined });
+    walkthroughStepDone(step.conversationId, step.point);
     this.onStep?.(step);
   };
+}
+
+/** What the person last asked in a chat, as a walkthrough's goal. */
+function lastAsk(conversationId: string) {
+  const messages =
+    useMistyStore.getState().conversations.find((c) => c.id === conversationId)?.messages ?? [];
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const message = messages[i]!;
+    // A step's own "I did step…" message isn't what the walkthrough is for.
+    if (message.role === "user" && message.content.trim() && !message.content.startsWith("I did step"))
+      return message.content;
+  }
+  return "";
 }

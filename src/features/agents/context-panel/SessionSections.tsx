@@ -24,10 +24,10 @@ import { useCachedResource } from "@/api/cache/cached-resource";
 import { useWorkspaceViewId } from "@/features/app-windows";
 import { readonlyReasonText, useMcpInventory } from "@/features/engine-config/mcp";
 import { useInstalledSkills } from "@/features/engine-config/skills";
-import { openSettings } from "@/features/settings";
 import { openExternalLink } from "@/shared/platform/openExternalLink";
 import { Switch, Tooltip } from "@/shared/ui";
 import { formatTokens, tookText } from "../conversations/view/meta/format";
+import { openAgentsHub } from "../hub/agentsHubStore";
 import { useMistyStore } from "../conversations/state/useMistyStore";
 import { mistyEngine } from "../engines/enginesApi";
 import { formatCost, turnStats } from "./chatUsage";
@@ -47,7 +47,11 @@ export function StartCommandRows(props: { conversationId: string; folder: string
   const entries = useLaunchScripts((state) => state.byFolder[props.folder] ?? noScripts);
   const chat = terminalChatKey(props.conversationId, useWorkspaceViewId());
   useEffect(() => {
-    if (props.folder) void useLaunchScripts.getState().load(props.folder).catch(() => undefined);
+    if (props.folder)
+      void useLaunchScripts
+        .getState()
+        .load(props.folder)
+        .catch(() => undefined);
   }, [props.folder]);
   return entries.map((entry) => (
     <Row
@@ -91,7 +95,8 @@ function useEngineSkills(engine: string): number | null {
  */
 export function ContextSources(props: { engine: string; folder: string; branch?: string }) {
   const [open, setOpen] = useState(true);
-  const prKey = props.folder && props.branch ? `agents/branch-pr:${props.folder}:${props.branch}` : null;
+  const prKey =
+    props.folder && props.branch ? `agents/branch-pr:${props.folder}:${props.branch}` : null;
   const pr = useCachedResource(prKey, () => gitApi.pullRequest(props.folder)).data ?? null;
   const skills = useEngineSkills(props.engine);
   if (!pr && skills === null) return null;
@@ -133,7 +138,7 @@ export function ContextSources(props: { engine: string; folder: string; branch?:
           icon={ScrollText}
           label="Skills"
           value={String(skills)}
-          onOpen={() => openSettings("engine-skills")}
+          onOpen={() => openAgentsHub("skills")}
         />
       )}
     </Section>
@@ -193,7 +198,7 @@ export function McpServers(props: { engine: string; folder: string }) {
           />
         );
       })}
-      <Row icon={Plug} label="All MCP servers" onOpen={() => openSettings("engine-mcp")} />
+      <Row icon={Plug} label="All MCP servers" onOpen={() => openAgentsHub("mcp")} />
     </Section>
   );
 }
@@ -218,7 +223,9 @@ export function TurnStats(props: { conversationId: string }) {
       <Row
         icon={MessagesSquare}
         label="Replies"
-        value={stats.stopped ? `${stats.finished} · ${stats.stopped} stopped` : String(stats.finished)}
+        value={
+          stats.stopped ? `${stats.finished} · ${stats.stopped} stopped` : String(stats.finished)
+        }
       />
       {stats.lastMs ? <Row icon={Clock} label="Last turn" value={tookText(stats.lastMs)} /> : null}
       {stats.averageMs ? (

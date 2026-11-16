@@ -1,10 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@/api/client", () => ({ apiRequest: vi.fn() }));
-vi.mock("@/api/runtime/device-embeddings", () => ({
-  embedOnDevice: vi.fn(),
-  queryVector: vi.fn(),
-}));
 
 import { parseOverview } from "./tutorPrompts";
 import { cosine, hashOf, passagesOf } from "./tutorSearch";
@@ -54,7 +50,7 @@ describe("search passages", () => {
     expect(passagesOf("   ")).toEqual([]);
   });
 
-  it("fingerprints text so a changed passage is embedded again", () => {
+  it("fingerprints text so a changed passage is told apart", () => {
     expect(hashOf("a passage")).toBe(hashOf("a passage"));
     expect(hashOf("a passage")).not.toBe(hashOf("a passage."));
   });
@@ -90,16 +86,22 @@ describe("passages for a question", () => {
 
 describe("citations in an answer", () => {
   it("turns [n] into a link to source n, for sources that exist", async () => {
-    vi.doMock("../runs/markdown/MistyMarkdown", () => ({ MistyMarkdown: () => null }));
-    const { citeLinks } = await import("./notebook/ChatPanel");
+    const { citeLinks } = await import("./notebook/citations");
     expect(citeLinks("Cells divide [1][2], see [9] and [x](y).", 2)).toBe(
       "Cells divide [[1]](#tutor-source-1)[[2]](#tutor-source-2), see [9] and [x](y).",
     );
     expect(citeLinks("Already [1](#a).", 2)).toBe("Already [1](#a).");
   });
 
+  it("links a source by its id when the question kept how it numbered them", async () => {
+    const { citeLinks } = await import("./notebook/citations");
+    expect(citeLinks("See [2] and [3].", ["s-a", "s-b"])).toBe(
+      "See [[2]](#tutor-source-id-s-b) and [3].",
+    );
+  });
+
   it("turns LaTeX brackets into math Misty draws", async () => {
-    const { mathMarkdown } = await import("./notebook/ChatPanel");
+    const { mathMarkdown } = await import("./notebook/citations");
     expect(mathMarkdown(String.raw`So \[ 2H_2O \rightarrow O_2 \] and \(x\).`)).toBe(
       String.raw`So $$2H_2O \rightarrow O_2$$ and $$x$$.`,
     );

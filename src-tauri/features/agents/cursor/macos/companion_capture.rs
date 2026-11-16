@@ -75,6 +75,28 @@ pub(crate) fn capture_display(display_id: u32) -> Value {
 /// The frontmost app's frontmost ordinary window, in CG global display points
 /// (top-left origin, like cursor samples). Window numbers in `ignored` are
 /// Misty's own companion, overlay and panel windows. None when none qualifies.
+/// The document or web page in the frontmost app's focused window, as the app reports it
+/// (AXDocument: a file:// address for a PDF or document, a web address in Safari), so the
+/// companion can read all of it rather than what's on screen. Needs Accessibility; a slow app
+/// gets a quarter second.
+pub(crate) fn front_document() -> Option<String> {
+    use super::accessibility::{trusted, Element};
+    if !trusted() {
+        return None;
+    }
+    let pid = NSWorkspace::sharedWorkspace()
+        .frontmostApplication()
+        .map(|app| app.processIdentifier())
+        .filter(|pid| *pid > 0 && *pid != std::process::id() as i32)?;
+    let app = Element::application(pid);
+    app.set_timeout(0.25);
+    let window = app.focused_window()?;
+    window.set_timeout(0.25);
+    let document = window.string("AXDocument");
+    (document.starts_with("file://") || document.starts_with("http"))
+        .then(|| document.chars().take(2_000).collect())
+}
+
 pub(crate) fn foreground_window(ignored: &[i64]) -> Option<Value> {
     let front = NSWorkspace::sharedWorkspace()
         .frontmostApplication()

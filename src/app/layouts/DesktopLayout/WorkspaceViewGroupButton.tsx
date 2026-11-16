@@ -1,8 +1,8 @@
 import { spaceWorkspaceToolFromRoute, type WorkspaceView } from "@/features/app-windows";
 import { workspaceAppIcon } from "@/features/app-windows";
 import { appIconStrokeWidth, BrandIcon, brandIconAsset, Text } from "@/shared/ui";
-import { Armchair, FlaskConical, Waypoints, type LucideIcon } from "lucide-react";
-import { AgentAvatar, usePersonalAgentsStore } from "@/features/agents";
+import { Armchair, FlaskConical, type LucideIcon } from "lucide-react";
+import { AgentAvatar, defaultAgentOf, usePersonalAgentsStore } from "@/features/agents";
 import { DestinationIcon } from "./NavigatorDestinationIcon";
 function getViewAppId(tab: WorkspaceView | undefined): string {
   if (!tab) return "";
@@ -21,7 +21,6 @@ function getViewIcon(tab: WorkspaceView | undefined, fallback: LucideIcon): Luci
 const agentsPlaceIcons: Record<string, LucideIcon> = {
   lab: FlaskConical,
   studio: Armchair,
-  integrations: Waypoints,
 };
 
 /**
@@ -37,7 +36,7 @@ function ChatAgentIcon({ route }: { route: string }) {
           (item) => item.id === state.selected.global && item.enabled && !item.system_managed,
         ) ??
         state.agents.find((item) => item.engine && item.enabled) ??
-        state.agents.find((item) => item.system_managed)),
+        defaultAgentOf(state.agents)),
   );
   return <AgentAvatar agent={agent} compact />;
 }

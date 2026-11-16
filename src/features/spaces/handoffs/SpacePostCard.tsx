@@ -57,6 +57,11 @@ export function SpacePostCard(props: {
           me={me}
           handoffId={message.id}
           text={post.text}
+          agentId={
+            message.content.find(
+              (span): span is Extract<typeof span, { agent_id: string }> => "agent_id" in span,
+            )?.agent_id
+          }
           onError={props.onError}
         />
       )}

@@ -162,7 +162,7 @@ function PromptRowsSkeleton() {
 }
 
 /**
- * Settings › Tools › Prompts: the prompts the composer's `!` menu offers. Folder prompts belong to
+ * Agents › Prompts: the prompts the composer's `!` menu offers. Folder prompts belong to
  * the folder this Space works in; global ones show in every chat. The store refreshes itself after
  * each change, so the section never asks it to.
  */

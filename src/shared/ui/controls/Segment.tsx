@@ -19,8 +19,8 @@ const lookClass: Record<SegmentLook, string> = {
   track: cn(
     controlFrame.md,
     "gap-1.5 px-3 text-meta font-medium",
-    "aria-checked:bg-charcoal-hover aria-checked:shadow-[0_1px_2px_rgb(0_0_0/25%)]",
-    "aria-selected:bg-charcoal-hover aria-selected:shadow-[0_1px_2px_rgb(0_0_0/25%)]",
+    "aria-checked:bg-charcoal-hover aria-checked:shadow-[0_1px_0.125rem_rgb(0_0_0/25%)]",
+    "aria-selected:bg-charcoal-hover aria-selected:shadow-[0_1px_0.125rem_rgb(0_0_0/25%)]",
   ),
   outline: cn(
     "h-7 gap-1 rounded-md border border-charcoal-border px-2.5 text-caption",

@@ -13,18 +13,18 @@
 }
 @keyframes misty-fly-x {
   from {
-    transform: translateX(calc(min(40cqw, 560px) * -1));
+    transform: translateX(calc(min(40cqw, 35rem) * -1));
   }
   to {
-    transform: translateX(min(40cqw, 560px));
+    transform: translateX(min(40cqw, 35rem));
   }
 }
 @keyframes misty-fly-y {
   from {
-    transform: translateY(calc(min(30cqh, 120px) * -1)) rotate(-8deg);
+    transform: translateY(calc(min(30cqh, 7.5rem) * -1)) rotate(-8deg);
   }
   to {
-    transform: translateY(min(35cqh, 150px)) rotate(8deg);
+    transform: translateY(min(35cqh, 9.375rem)) rotate(8deg);
   }
 }
 @media (prefers-reduced-motion: reduce) {

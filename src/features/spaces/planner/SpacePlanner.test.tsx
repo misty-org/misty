@@ -75,33 +75,6 @@ vi.mock("../members/agents/useSpaceAgentMembers", () => ({
     agents: [{ agent_id: "agent-1", agent_name: "Researcher", owner_name: "Matt" }],
   }),
 }));
-vi.mock("@/features/agents/connectedAppsPublic", () => ({
-  appsApi: { list: vi.fn(), connect: vi.fn(), disconnect: vi.fn() },
-  useConnectedApps: () => ({
-    data: { available: true, apps: [] },
-    fetchedAt: undefined,
-    error: undefined,
-    loading: false,
-    refreshing: false,
-    reload: vi.fn(),
-    set: vi.fn(),
-  }),
-  connectedCalendarEvents: () =>
-    Promise.resolve([
-      {
-        id: "ca_1:e1",
-        account: "ca_1",
-        title: "Dentist",
-        location: "",
-        starts_at: "",
-        ends_at: "",
-        all_day: true,
-        day: todayKey,
-        url: "",
-      },
-    ]),
-}));
-
 import { SpaceCalendar } from "../calendar/SpaceCalendar";
 import { SpacePlanner } from "./SpacePlanner";
 
@@ -208,8 +181,6 @@ describe("a Space's planner and calendar", () => {
     const day = host.querySelector<HTMLElement>(`section[aria-label="${now.toDateString()}"]`)!;
     expect(day.textContent).toContain("Planning call");
     expect(day.textContent).toContain("Write the brief");
-    // The person's own connected calendar is drawn with the Space's.
-    expect(day.textContent).toContain("Dentist");
     const [from, to] = api.events.mock.calls[0].slice(1) as string[];
     expect(new Date(to).getTime() - new Date(from).getTime()).toBeGreaterThan(41 * 86_400_000);
   });

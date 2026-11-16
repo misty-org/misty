@@ -1,0 +1,16 @@
+{
+  "identifier": "tutor-ask",
+  "description": "Tutor's text box beside the pointer: it only closes itself, handing on what was typed",
+  "platforms": [
+    "macOS",
+    "windows"
+  ],
+  "webviews": [
+    "misty-tutor-ask"
+  ],
+  "permissions": [
+    "core:event:default",
+    "allow-cursor-companion-ask-close"
+  ],
+  "$schema": "../../gen/schemas/desktop-schema.json"
+}

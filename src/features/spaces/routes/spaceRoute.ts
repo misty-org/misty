@@ -9,6 +9,7 @@ const validSections = new Set([
   "drawings",
   "planner",
   "calendar",
+  "lab",
   "library",
   "members",
   "settings",

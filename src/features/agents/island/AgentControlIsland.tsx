@@ -8,7 +8,7 @@ import { AgentActionQuestions } from "./AgentActionQuestions";
 import { AgentControlComposer } from "./AgentControlComposer";
 import { AgentControlQuestions } from "./AgentControlQuestions";
 import { AgentControlTaskControls } from "./AgentControlTaskControls";
-import { listenForActionQuestions, useActionQuestions } from "./actionQuestions";
+import { listenForActionQuestions, useIslandQuestions } from "./actionQuestions";
 import { useLocalExecution } from "../runs/local-execution/localExecution";
 import { usePersonalAgentsStore } from "../personal/personalAgentsStore";
 import { islandClass, liveStep, settled, statusText, liveReply } from "./agentControlStatus";
@@ -26,7 +26,7 @@ import { useAgentControlDesktop } from "./useAgentControlDesktop";
  */
 export function AgentControlIsland() {
   const execution = useLocalExecution((state) => state.execution);
-  const questions = useActionQuestions((state) => state.items.length);
+  const questions = useIslandQuestions().length;
   useEffect(() => listenForActionQuestions(), []);
   const agents = usePersonalAgentsStore((state) => state.agents);
   const step = useMistyStore(liveStep);

@@ -21,7 +21,7 @@ function apiErrorMessage(code: string | undefined, fallback: string): string {
     account_changed: "Wait for the account switch to finish.",
     invalid_request: "Misty could not validate that request.",
     internal_error: "Misty could not complete that request. Try again in a moment.",
-    model_key_needed: "Add a model key in Settings → Models.",
+    model_key_needed: "Pick a default engine in Settings › Agents.",
     mail_provider_mailbox_unavailable:
       "This Microsoft account has no Outlook mailbox. Use it in Files for OneDrive, or connect an Outlook.com or Microsoft 365 mailbox.",
     mail_provider_authorization_failed: "Reconnect this email account.",

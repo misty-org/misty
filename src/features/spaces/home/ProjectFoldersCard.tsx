@@ -12,10 +12,20 @@ import {
 } from "@/features/agents";
 import { Button, OverflowFadeText, Text, useNotice } from "@/shared/ui";
 import { useGitStatuses } from "./useOverviewData";
-import { OverviewCard, OverviewEmpty, OverviewRow, OverviewRowsSkeleton } from "./OverviewCard";
+import { OverviewCard, OverviewRow, OverviewRowsSkeleton } from "./OverviewCard";
 import { gitSummary, shortPath } from "./overviewData";
 
 const noFolders: string[] = [];
+
+/**
+ * Links a folder on this computer to the open Space, then offers an agent to work in it. From the
+ * card, and from the Space's ⋯ menu while no folder is linked yet (the card hides then).
+ */
+export async function linkSpaceFolder() {
+  const space = currentSpaceKey();
+  const path = await useSpaceFolders.getState().link(space);
+  if (path) await offerAgentForFolder(space, path);
+}
 
 /**
  * The folders linked to this Space on this computer, each with its Git branch and how many files
@@ -45,11 +55,7 @@ export function ProjectFoldersCard() {
 
   const link = () => {
     setError("");
-    void useSpaceFolders
-      .getState()
-      .link(space)
-      .then((path) => (path ? offerAgentForFolder(space, path) : undefined))
-      .catch(() => setError("Couldn't link that folder. Try again."));
+    void linkSpaceFolder().catch(() => setError("Couldn't link that folder. Try again."));
   };
   const open = (path: string) => {
     useSpaceFolders.getState().choose(space, path);
@@ -66,11 +72,13 @@ export function ProjectFoldersCard() {
     </Button>
   );
 
+  // No folder yet: the home leaves the block out, and Link a folder is in the Space's ⋯ menu.
+  if ((loaded || settled) && !folders.length) return null;
   return (
     <OverviewCard title="Project folders" action={linkButton}>
       {!loaded && !settled ? (
         <OverviewRowsSkeleton rows={2} kind="folder" trailing="w-20" />
-      ) : folders.length ? (
+      ) : (
         folders.map((path) => {
           const summary = gitSummary(git[path]);
           return (
@@ -99,8 +107,6 @@ export function ProjectFoldersCard() {
             />
           );
         })
-      ) : (
-        <OverviewEmpty>No folders linked</OverviewEmpty>
       )}
     </OverviewCard>
   );

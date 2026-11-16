@@ -1,5 +1,5 @@
 import { observeAccountChanges } from "@/api/account-events";
-import { appsApi, type ConnectedApp } from "../connected-apps/api";
+import { directAppsApi, type DirectConnection } from "../connected-apps/directApi";
 import { agentsDeviceSnapshot } from "./useAgentsStore";
 import type { AgentDeviceSnapshot } from "./agentScope";
 import { hasTauriInternals } from "@/shared/platform/tauri";
@@ -14,11 +14,6 @@ type AccessConnection = {
   name: string;
   status: string;
   detail?: string;
-};
-const appStatus = {
-  active: "Connected app",
-  pending: "Waiting for sign-in",
-  needs_attention: "Needs attention",
 };
 
 type AccessSnapshot = {
@@ -38,13 +33,13 @@ const emptyAccess = (accountId: string): AccessSnapshot => ({
   deviceError: false,
 });
 
-const toConnections = (apps: ConnectedApp[]) =>
+const toConnections = (apps: DirectConnection[]) =>
   apps.map((app): AccessConnection => ({
     id: app.id,
     app: app.app,
-    name: app.alias || app.account ? `${app.name} · ${app.alias || app.account}` : app.name,
-    status: app.status,
-    detail: appStatus[app.status],
+    name: app.name,
+    status: "active",
+    detail: "Connected app",
   }));
 
 /** The last access each account showed this session, so reopening setup paints it at once. */
@@ -77,17 +72,8 @@ export function useAgentAccess(accountId: string, agentId = "") {
         return;
       }
       setState((previous) => (previous.accountId === accountId ? previous : lastAccess(accountId)));
-      // The saved list paints only while nothing is shown; the fresh one follows.
-      const showSaved = (saved: { apps: ConnectedApp[] }) => {
-        if (!live || current !== request) return;
-        setState((previous) =>
-          previous.accountId === accountId && previous.loading
-            ? { ...previous, connections: toConnections(saved.apps), loading: false }
-            : previous,
-        );
-      };
       const [apps, device] = await Promise.allSettled([
-        appsApi.list(showSaved),
+        directAppsApi.list(),
         hasTauriInternals() ? agentsDeviceSnapshot() : Promise.resolve(undefined),
       ]);
       if (!live || current !== request) return;
@@ -95,8 +81,7 @@ export function useAgentAccess(accountId: string, agentId = "") {
         const kept = previous.accountId === accountId ? previous : lastAccess(accountId);
         return {
           accountId,
-          connections:
-            apps.status === "fulfilled" ? toConnections(apps.value.apps) : kept.connections,
+          connections: apps.status === "fulfilled" ? toConnections(apps.value) : kept.connections,
           device: device.status === "fulfilled" ? device.value : kept.device,
           loading: false,
           connectionsError: apps.status === "rejected",

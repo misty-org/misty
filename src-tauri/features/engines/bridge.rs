@@ -55,6 +55,8 @@ struct RunView {
     ended: bool,
     /// Background tasks the engine still has running (Claude Code's `run_in_background`).
     pending: u64,
+    /// The engine kept its process warm for the chat's next message (`done`'s `warm`).
+    warm: bool,
 }
 
 /// What the bridge tells the run's owner (`runs.rs`) as it happens.
@@ -66,6 +68,9 @@ pub(crate) enum RunNote {
     /// The turn ended in the chat, but the engine's process lives on for a background task: the
     /// next message is written into it, or the engine's own follow-up turn reopens this one.
     Parked,
+    /// The turn ended in the chat, and the engine's process stays warm for the chat's next
+    /// message with nothing running: as `Parked`, but idle.
+    Warm,
     /// A parked turn reopened for the engine's own follow-up turn.
     Resumed,
 }
@@ -118,6 +123,13 @@ pub(crate) fn engine_run_of(chat_run: &str) -> String {
 pub(crate) fn redirect(engine_run: &str, chat_run: &str) {
     held(&ALIAS).insert(engine_run.to_string(), chat_run.to_string());
     let parked = held(&PARKED).remove(engine_run);
+    // A chat turn that showed this process before (not its first, which owns the process's
+    // access until it ends) is over now that another turn took the process.
+    if let Some((before, _, _)) = parked.as_ref() {
+        if before != engine_run && before != chat_run {
+            notify(before, RunNote::Ended);
+        }
+    }
     if let (Some((_, _, pending)), Some(view)) = (parked, runs().get_mut(chat_run)) {
         view.pending = pending;
     }
@@ -484,7 +496,12 @@ fn route(payload: &Value) {
             run_id,
             json!({ "type": "assistant.status", "phase": "working" }),
         ),
-        "done" => finish(run_id, Ok(()), false),
+        "done" => {
+            if let Some(view) = runs().get_mut(run_id) {
+                view.warm = data["warm"].as_bool() == Some(true);
+            }
+            finish(run_id, Ok(()), false)
+        }
         "error" => finish(
             run_id,
             Err(data.as_str().unwrap_or("The engine failed.").to_string()),
@@ -728,7 +745,7 @@ fn close_tool(
 /// Settles the run in the chat, once: open tool rows end, the reply is set, and the run ends as
 /// finished, failed or stopped.
 fn finish(run_id: &str, outcome: Result<(), String>, stopped: bool) {
-    let (open, answer, sent, took, model, pending) = {
+    let (open, answer, sent, took, model, pending, warm) = {
         let mut held = runs();
         let Some(view) = held.get_mut(run_id) else {
             return;
@@ -744,12 +761,16 @@ fn finish(run_id: &str, outcome: Result<(), String>, stopped: bool) {
             view.began.map(|began| began.elapsed().as_millis() as u64),
             view.model.clone(),
             view.pending,
+            view.warm,
         )
     };
     let engine_run = engine_run_of(run_id);
-    // The engine layer keeps the process for the background task's follow-up turn.
-    let parked =
-        !stopped && outcome.is_ok() && pending > 0 && held(&PARKABLE).contains(&engine_run);
+    // The engine layer keeps the process for the background task's follow-up turn, or warm
+    // for the chat's next message.
+    let parked = !stopped
+        && outcome.is_ok()
+        && (pending > 0 || warm)
+        && held(&PARKABLE).contains(&engine_run);
     let mut sent = sent;
     let mut next = |event: Value| {
         sent += 1;
@@ -788,7 +809,14 @@ fn finish(run_id: &str, outcome: Result<(), String>, stopped: bool) {
     runs().remove(run_id);
     if parked {
         held(&PARKED).insert(engine_run, (run_id.to_string(), sent, pending));
-        notify(run_id, RunNote::Parked);
+        notify(
+            run_id,
+            if pending > 0 {
+                RunNote::Parked
+            } else {
+                RunNote::Warm
+            },
+        );
     } else {
         notify(run_id, RunNote::Ended);
         release(&engine_run);

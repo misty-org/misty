@@ -5,6 +5,7 @@ import * as React from "react";
 
 import { cn } from "../classNames";
 import { IconButton } from "../controls/IconButton";
+import { PageDimmedContext } from "./pageDimmed";
 
 function cleanupPointerEvents() {
   if (typeof document === "undefined") return;
@@ -150,6 +151,8 @@ const DialogContent = React.forwardRef<
     ref,
   ) => {
     const scrolls = layout === "scroll" || size === "media";
+    // Over a dialog that already dims the page, this one doesn't dim it (and that dialog) again.
+    const dimmed = React.useContext(PageDimmedContext);
     // A tour shown over the dialog lives outside it; stepping through it must not close the dialog.
     const fromTour = (event: Event) =>
       event.target instanceof Element && event.target.closest('[data-slot="tour"]') !== null;
@@ -164,7 +167,9 @@ const DialogContent = React.forwardRef<
 
     return (
       <DialogPortal container={container}>
-        {backdrop ? <DialogOverlay className={container ? "absolute inset-0" : undefined} /> : null}
+        {backdrop && !dimmed ? (
+          <DialogOverlay className={container ? "absolute inset-0" : undefined} />
+        ) : null}
         {/* Flex layout centers the panel on whole pixels; a 50% translate would land odd
           sizes on a half pixel and blur their text on 1x displays. */}
         <div
@@ -210,7 +215,9 @@ const DialogContent = React.forwardRef<
               onFocusOutside?.(event);
             }}
           >
-            <OutOfRow>{children}</OutOfRow>
+            <PageDimmedContext.Provider value={dimmed || backdrop}>
+              <OutOfRow>{children}</OutOfRow>
+            </PageDimmedContext.Provider>
             {hideClose ? null : (
               <DialogPrimitive.Close asChild>
                 <IconButton

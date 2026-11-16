@@ -33,7 +33,7 @@ fn inputs_of(fixture: &Value) -> CatalogInputs {
     let names: Option<HashMap<String, String>> = serde_json::from_value(inputs["device_names"].clone()).ok();
     CatalogInputs {
         signed_in: true,
-        composio_key: inputs["composio"].as_bool().unwrap(),
+        apps_connected: inputs["apps_connected"].as_bool().unwrap(),
         search: inputs["web_search"].as_bool().unwrap().then_some(SearchProviderId::Serper),
         device_names: names.unwrap_or_default(),
     }

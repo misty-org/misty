@@ -164,6 +164,23 @@ pub fn engine_config_locations() -> (Vec<PathBuf>, Vec<(PathBuf, &'static str)>)
     if let Some(config) = std::env::var_os("XDG_CONFIG_HOME").filter(|v| !v.is_empty()) {
         folders.push(PathBuf::from(config).join("opencode"));
     }
+    // OpenCode keeps its sessions in the system's data folder on macOS and Windows
+    // (`~/Library/Application Support/opencode`), or `$OPENCODE_HOME`, where the chat history
+    // finds them (`history/discovery.rs`, `opencode_data_roots`).
+    let opencode_data = [dirs::data_dir(), dirs::data_local_dir()]
+        .into_iter()
+        .flatten()
+        .map(|dir| dir.join("opencode"))
+        .chain(
+            std::env::var_os("OPENCODE_HOME")
+                .filter(|v| !v.is_empty())
+                .map(PathBuf::from),
+        );
+    for folder in opencode_data {
+        if !folders.contains(&folder) {
+            folders.push(folder);
+        }
+    }
     let files = vec![
         (home.clone(), ".claude.json"),
         (home.clone(), ".mcp.json"),

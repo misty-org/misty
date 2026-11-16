@@ -344,8 +344,8 @@ pub fn from_registry(page: &Value) -> Vec<CatalogApp> {
             title.trim().to_owned()
         };
         found.push(CatalogApp {
-            name: super::super::client::truncate(&shown, 60),
-            description: super::super::client::truncate(
+            name: super::super::text::truncate(&shown, 60),
+            description: super::super::text::truncate(
                 server["description"].as_str().unwrap_or_default(),
                 200,
             ),

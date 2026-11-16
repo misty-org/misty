@@ -14,6 +14,7 @@ import {
   SkeletonControl,
 } from "@/shared/ui";
 import { useEnginesList } from "../engines/enginesApi";
+import { openAgentsHub } from "../hub/agentsHubStore";
 import {
   hasPlugins,
   kindsFor,
@@ -50,11 +51,18 @@ const useMarketView = createDeviceSetting<{ kind: MarketKind; sort: MarketSort }
   },
 });
 
+/** Opens the Plugins page on the Skills catalog, from the Skills page's "Browse skills". */
+export function showSkillCatalog() {
+  useMarketView.getState().set((current) => ({ ...current, kind: "skills" }));
+  openAgentsHub("plugins");
+}
+
 /**
  * What each installed engine can take: its own plugins, where its CLI has marketplaces, and Agent
  * Skills, which the skills hub syncs into its skills folder. A rail picks the engine and shows its
  * marketplaces; the catalog beside it is that one engine's. Nothing is shared between engines
- * unless the person installs it in each.
+ * unless the person installs it in each. The skills already installed are listed once, on the
+ * Skills page, so the Skills catalog here has no Installed filter.
  */
 export function EngineMarketplace() {
   const list = useEnginesList();
@@ -100,7 +108,8 @@ export function EngineMarketplace() {
     return (
       <EmptyState
         title="No engines to add to yet"
-        line="Install an engine in Settings › Engines, and its plugins and skills show here."
+        line="Install one under CLIs, and its plugins and skills show here."
+        action={{ label: "Open CLIs", onClick: () => openAgentsHub("clis") }}
       />
     );
 
@@ -113,11 +122,7 @@ export function EngineMarketplace() {
 
   return (
     <div className="flex flex-wrap items-start gap-8">
-      <nav
-        aria-label="Engines and marketplaces"
-        data-tour="integrations-rail"
-        className="grid max-w-60 grow basis-52 gap-6"
-      >
+      <nav aria-label="Engines and marketplaces" className="grid max-w-60 grow basis-52 gap-6">
         <EngineRail
           engines={engines}
           engine={engine}
@@ -132,7 +137,7 @@ export function EngineMarketplace() {
       </nav>
 
       <div className="grid min-w-0 grow-999 basis-140 gap-6">
-        <div className="flex min-w-0 items-center gap-2" data-tour="integrations-bar">
+        <div className="flex min-w-0 items-center gap-2">
           {kinds.length > 1 ? (
             <ChoiceGroup
               label="Kind"
@@ -157,27 +162,31 @@ export function EngineMarketplace() {
             aria-label={`Find a ${name} ${noun}`}
           />
           {/* Past the search's narrowest, the Installed filter folds into ⋯; the order and
-              Refresh stay. */}
+              Refresh stay. Skills have no Installed filter: the Skills page lists those. */}
           <ActionBar
             label="Catalog controls"
             width="content"
-            items={[
-              {
-                id: "installed",
-                icon: PackageCheck,
-                label: "Installed",
-                priority: 1,
-                pressed: installedOnly,
-                onSelect: () => setInstalledOnly(!installedOnly),
-                render: () => (
-                  <FilterChip
-                    label="Installed"
-                    pressed={installedOnly}
-                    onPressedChange={setInstalledOnly}
-                  />
-                ),
-              },
-            ]}
+            items={
+              plugins
+                ? [
+                    {
+                      id: "installed",
+                      icon: PackageCheck,
+                      label: "Installed",
+                      priority: 1,
+                      pressed: installedOnly,
+                      onSelect: () => setInstalledOnly(!installedOnly),
+                      render: () => (
+                        <FilterChip
+                          label="Installed"
+                          pressed={installedOnly}
+                          onPressedChange={setInstalledOnly}
+                        />
+                      ),
+                    },
+                  ]
+                : []
+            }
             end={
               plugins ? (
                 <>
@@ -205,13 +214,7 @@ export function EngineMarketplace() {
             refreshes={refreshes}
           />
         ) : target ? (
-          <EngineSkills
-            key={target}
-            target={target}
-            engineName={name}
-            query={query}
-            installedOnly={installedOnly}
-          />
+          <EngineSkills key={target} target={target} engineName={name} query={query} />
         ) : null}
       </div>
     </div>

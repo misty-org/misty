@@ -9,20 +9,20 @@ export { MistyPanelDock } from "./panel/MistyPanelDock";
 export { useMistyPanelSide } from "./panel/mistyPanelSide";
 export { useMistyPanelStore, type MistyPanelView } from "./panel/mistyPanelStore";
 
-export { usePersonalAgentsStore } from "./personal/personalAgentsStore";
+export { defaultAgentOf, usePersonalAgentsStore } from "./personal/personalAgentsStore";
 export { agentInFolder, offerAgentForFolder } from "./shared-folders/folderAgents";
 export { openAgentsHub, useAgentsHub, type AgentsHubPage } from "./hub/agentsHubStore";
 export { HubAgentsPage } from "./hub/HubAgentsPage";
-export { EngineMarketplace } from "./marketplace/EngineMarketplace";
+export { EngineMarketplace, showSkillCatalog } from "./marketplace/EngineMarketplace";
 
 export type { AppRequest } from "./connected-apps/api";
 export { appsApi, type ConnectedApp } from "./connected-apps/api";
 export { AppLogo } from "./connected-apps/ConnectedAppRows";
 export { DirectApps } from "./connected-apps/DirectApps";
+export { AppsPage } from "./connected-apps/AppsPage";
 export { AgentAvatar, AgentMark } from "./personal/AgentAvatar";
 export { useLessonStore } from "./tutor/lessons/lessonStore";
 export { tutorChatIds, useTutorChatIds, useTutorStore } from "./tutor/tutorStore";
-export { watchSharedNotebooks } from "./tutor/notebookShare";
 
 // Public surface used by other features.
 export { BrowserContextMenuBridge } from "./conversations/context/BrowserContextMenuBridge";
@@ -54,7 +54,6 @@ export { AiSelectionMenu } from "./runs/markdown/AiSelectionMenu";
 export { MistyMarkdown } from "./runs/markdown/MistyMarkdown";
 
 // Public surface used by other features.
-export { ModelsSection } from "./models/ModelsSection";
 export {
   AgentDefaultsSection,
   AgentPermissionsSection,
@@ -74,10 +73,22 @@ export { useAgentAccountId } from "./personal/agentAccount";
 export { AgentsNow } from "./virtual/AgentsNow";
 export { useStudioAgents } from "./virtual/useStudioAgents";
 export { useTeammateAgents } from "./virtual/teammates";
+export {
+  useStudioOpen,
+  useStudioRequests,
+  useTeamMembers,
+  type StudioRequest,
+  type TeamMember,
+} from "./virtual/teamMembers";
 export { shortAgo, useChatStatuses, type ChatStatus } from "./page/useChatStatuses";
 export { EnginesStep } from "./engines/EnginesStep";
-export { engineSetupState, type EngineSetupState } from "./engines/EngineSetupRow";
-export { EngineReadyProbe, isEngineId } from "./engines/EngineReadyProbe";
+export {
+  blocksAgent,
+  engineSetupState,
+  useEngineReadiness,
+  type EngineSetupState,
+} from "./engines/engineReadiness";
+export { EngineNextStep } from "./engines/EngineNextStep";
 // The Space home's overview reads runs and linked folders.
 export { runtimeAiApi } from "./AgentsRuntime";
 export type { MistyActivityEntry } from "./conversations/state/activity";
@@ -87,6 +98,7 @@ export {
   currentSpaceKey,
   folderName,
   folderOf,
+  useEnginesList,
   useLinkedFolders,
   useSpaceFolders,
 } from "./engines/enginesApi";
@@ -112,6 +124,20 @@ export {
 export { PickUpDialog } from "./pickup/PickUpDialog";
 export { pickUpRequest, pickUpTopic } from "./pickup/pickUp";
 export { HappeningNow } from "./activity/HappeningNow";
+export { LabDoing } from "./tutor/LabDoing";
+export { SpaceLab } from "./tutor/SpaceLab";
+export { runOnEngine } from "./engines/engineRun";
+export { cleanupOnEngine } from "./engines/mistyCalls";
+export { EngineSection } from "./engines/EngineSection";
+export {
+  canBeDefault,
+  defaultChoices,
+  setDefaultEngine,
+  useDefaultEngine,
+} from "./engines/defaultEngine";
+export { notebookRoute } from "./tutor/notebookSpace";
+export { PersonAvatar } from "./tutor/notebook/LivePeople";
+export { personTone } from "./tutor/personTone";
 export { useSpaceRuns } from "./activity/useSpaceRuns";
 export { AgentActivitySettings } from "./activity/AgentActivitySettings";
 

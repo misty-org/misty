@@ -12,11 +12,12 @@ import { requestFolderGrant } from "../../view/grants/folderGrants";
 import { useComposerChoices } from "../controls/composerChoices";
 import { useComposerVim } from "../controls/composerVim";
 import { useCommandReport, type CommandSection } from "./commandOutput";
-import { done, openControl, settings, showPanel, type MistyCommand } from "./commandKit";
+import { done, hub, openControl, settings, showPanel, type MistyCommand } from "./commandKit";
 import { goalCommands } from "./goalCommands";
 
 export {
   done,
+  hub,
   openControl,
   settings,
   showPanel,
@@ -58,7 +59,7 @@ function usageSections(messages: GlobalAiMessage[]): CommandSection[] {
   if (usage.costUsd !== undefined) rows.push({ label: "Cost", value: formatCost(usage.costUsd) });
   return [
     { heading: "This chat", rows },
-    { text: "Plan limits for each engine are in Settings › Engines › Usage." },
+    { text: "Plan limits for each engine are in Agents › Usage." },
   ];
 }
 
@@ -210,7 +211,7 @@ export const mistyCommands: readonly MistyCommand[] = [
     description: "Manage MCP servers",
     on: "all",
     wins: "bare",
-    run: () => settings("engine-mcp"),
+    run: () => hub("mcp"),
   },
   {
     name: "usage",
@@ -376,7 +377,7 @@ export const mistyCommands: readonly MistyCommand[] = [
     aliases: ["settings"],
     description: "Open this engine's settings",
     on: "all",
-    run: () => settings("engine-clis"),
+    run: () => hub("clis"),
   },
   {
     name: "login",
@@ -384,7 +385,7 @@ export const mistyCommands: readonly MistyCommand[] = [
     description: "Sign in or out of the engine",
     on: "outside",
     wins: "always",
-    run: () => settings("engine-clis"),
+    run: () => hub("clis"),
   },
   {
     name: "theme",

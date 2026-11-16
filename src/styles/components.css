@@ -110,12 +110,12 @@
    is set only while the text overflows, so a label that fits stays crisp to its last letter.
    It sits at the end the text runs to, which is the left in right-to-left text. */
 @utility fade-end {
-  -webkit-mask-image: linear-gradient(to right, black calc(100% - 18px), transparent);
-  mask-image: linear-gradient(to right, black calc(100% - 18px), transparent);
+  -webkit-mask-image: linear-gradient(to right, black calc(100% - 1.125rem), transparent);
+  mask-image: linear-gradient(to right, black calc(100% - 1.125rem), transparent);
 
   &:where([dir="rtl"], [dir="rtl"] *) {
-    -webkit-mask-image: linear-gradient(to left, black calc(100% - 18px), transparent);
-    mask-image: linear-gradient(to left, black calc(100% - 18px), transparent);
+    -webkit-mask-image: linear-gradient(to left, black calc(100% - 1.125rem), transparent);
+    mask-image: linear-gradient(to left, black calc(100% - 1.125rem), transparent);
   }
 }
 
@@ -124,9 +124,9 @@
 /* Any number of lines: every line but the last stays whole, and the last fades at its end. */
 @utility fade-end-lines {
   -webkit-mask-image:
-    linear-gradient(black, black), linear-gradient(to right, black calc(100% - 18px), transparent);
+    linear-gradient(black, black), linear-gradient(to right, black calc(100% - 1.125rem), transparent);
   mask-image:
-    linear-gradient(black, black), linear-gradient(to right, black calc(100% - 18px), transparent);
+    linear-gradient(black, black), linear-gradient(to right, black calc(100% - 1.125rem), transparent);
   -webkit-mask-size:
     100% calc(100% - 1lh),
     100% 1lh;
@@ -144,17 +144,17 @@
 
   &:where([dir="rtl"], [dir="rtl"] *) {
     -webkit-mask-image:
-      linear-gradient(black, black), linear-gradient(to left, black calc(100% - 18px), transparent);
+      linear-gradient(black, black), linear-gradient(to left, black calc(100% - 1.125rem), transparent);
     mask-image:
-      linear-gradient(black, black), linear-gradient(to left, black calc(100% - 18px), transparent);
+      linear-gradient(black, black), linear-gradient(to left, black calc(100% - 1.125rem), transparent);
   }
 }
 
 @utility fade-end-2 {
   -webkit-mask-image:
-    linear-gradient(black, black), linear-gradient(to right, black calc(100% - 18px), transparent);
+    linear-gradient(black, black), linear-gradient(to right, black calc(100% - 1.125rem), transparent);
   mask-image:
-    linear-gradient(black, black), linear-gradient(to right, black calc(100% - 18px), transparent);
+    linear-gradient(black, black), linear-gradient(to right, black calc(100% - 1.125rem), transparent);
   -webkit-mask-size: 100% 50%;
   mask-size: 100% 50%;
   -webkit-mask-position:
@@ -168,9 +168,9 @@
 
   &:where([dir="rtl"], [dir="rtl"] *) {
     -webkit-mask-image:
-      linear-gradient(black, black), linear-gradient(to left, black calc(100% - 18px), transparent);
+      linear-gradient(black, black), linear-gradient(to left, black calc(100% - 1.125rem), transparent);
     mask-image:
-      linear-gradient(black, black), linear-gradient(to left, black calc(100% - 18px), transparent);
+      linear-gradient(black, black), linear-gradient(to left, black calc(100% - 1.125rem), transparent);
   }
 }
 
@@ -181,7 +181,7 @@
 [data-file-drop-area][data-file-dragging]::after {
   content: "";
   position: absolute;
-  inset: 4px;
+  inset: 0.25rem;
   z-index: 40;
   border: 1px dashed var(--color-cream-muted);
   border-radius: var(--radius-xl);

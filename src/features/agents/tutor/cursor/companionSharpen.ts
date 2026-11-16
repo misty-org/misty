@@ -1,4 +1,4 @@
-import { deviceModelCall } from "@/api/runtime/device-models";
+import { refinePointOnEngine } from "../../engines/mistyCalls";
 import { invoke } from "@tauri-apps/api/core";
 import type { PointFrame, PresentedPoint } from "./protocol";
 
@@ -73,9 +73,8 @@ function spendRefinement(invocationId: string, now = Date.now()): boolean {
 }
 
 /**
- * Places the point again from a full-resolution crop around the estimate,
- * through the answer's own vision model. Undefined when the model cannot
- * see the control there or the crop is unavailable.
+ * Places the point again from a full-resolution crop around the estimate, on the default engine.
+ * Undefined when the engine can't see the control there or the crop is unavailable.
  */
 export async function refinePoint(
   point: ModelPoint,
@@ -94,10 +93,11 @@ export async function refinePoint(
   const scaleX = crop.width / crop.region.width,
     scaleY = crop.height / crop.region.height;
   if (!spendRefinement(invocationId)) return undefined;
-  const result = await deviceModelCall<{ found: boolean; x: number; y: number }>("refine-point", {
+  if (crop.mimeType !== "image/jpeg" && crop.mimeType !== "image/png") return undefined;
+  const result = await refinePointOnEngine({
     image: {
-      mime_type: crop.mimeType,
-      data_url: crop.dataUrl,
+      mimeType: crop.mimeType,
+      dataUrl: crop.dataUrl,
       width: crop.width,
       height: crop.height,
     },

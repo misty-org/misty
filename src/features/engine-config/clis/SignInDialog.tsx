@@ -40,6 +40,7 @@ import {
 import { engineName } from "../channels/engines";
 import { signInChoiceLabel } from "./SignInButton";
 import { listenSignIn, signInApi, type SignInRequest, type SignInStarted } from "./signInApi";
+import { uiPx } from "@/shared/lib/uiScale";
 
 const errorText = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
@@ -353,7 +354,7 @@ export function CliTerminal({
         if (disposed) return;
         term = new Terminal({
           fontFamily: terminalFontFamily(),
-          fontSize: TERMINAL_FONT_SIZE,
+          fontSize: uiPx(TERMINAL_FONT_SIZE),
           cursorBlink: true,
           scrollback: 2000,
           theme: terminalTheme(),

@@ -11,7 +11,7 @@ import {
 } from "./grid";
 import { hashOf } from "./look";
 import { footprint, itemCells, itemCenter, itemPoint, type StudioItem } from "./layout";
-import { isWalkable, type NavGrid } from "./pathfinding";
+import { bodyFree, isWalkable, nearestWalkable, type NavGrid } from "./pathfinding";
 
 /** A place a figure can be: where exactly, which way it looks, and whether it sits there. */
 export interface Spot extends Point {
@@ -35,6 +35,9 @@ export interface StudioPlaces {
   mingle: Spot[];
   /** In front of the door, where an agent waits for its person. */
   door: Spot[];
+  /** The places in front of each kind of piece that is gathered in front of (the water cooler,
+   * the arcade cabinet), so a figure can be sent to one. They are among `mingle` too. */
+  byKind?: Map<string, Spot[]>;
 }
 
 const standing = (id: string, at: Point, yaw: number): Spot => ({
@@ -71,7 +74,8 @@ function cellsAround(item: StudioItem, grid: NavGrid): Cell[] {
 }
 
 /** The floor a figure steps into a seat from: in front of it when that is free, else beside it,
- * else behind it. A desk chair faces its desk, so it is entered from the side. */
+ * else behind it, else the nearest free floor. A desk chair faces its desk, so it is entered from
+ * the side. Wherever it is, a figure standing there touches no furniture. */
 function seatEntry(seat: Point, yaw: number, grid: NavGrid): Point {
   const reach = 0.9;
   const turns = [0, Math.PI / 2, -Math.PI / 2, Math.PI];
@@ -81,14 +85,23 @@ function seatEntry(seat: Point, yaw: number, grid: NavGrid): Point {
   }));
   const free = spots.find((spot) => {
     const cell = cellOf(spot);
-    return isWalkable(grid, cell) && !isDoorCell(cell);
+    return isWalkable(grid, cell) && !isDoorCell(cell) && bodyFree(grid, spot);
   });
-  return free ?? spots[0]!;
+  if (free) return free;
+  const near = nearestWalkable(grid, cellOf(seat));
+  return near ? cellCenter(near) : spots[0]!;
 }
 
 /** Every place in the studio a figure may go to, worked out from where the furniture stands. */
 export function studioPlaces(items: StudioItem[], grid: NavGrid): StudioPlaces {
-  const places: StudioPlaces = { desks: new Map(), lounge: [], meeting: [], mingle: [], door: [] };
+  const places: StudioPlaces = {
+    desks: new Map(),
+    lounge: [],
+    meeting: [],
+    mingle: [],
+    door: [],
+    byKind: new Map(),
+  };
   const used = new Set<string>();
   const stand = (list: Spot[], id: string, cell: Cell, toward: Point) => {
     const key = `${cell.x},${cell.z}`;
@@ -129,9 +142,13 @@ export function studioPlaces(items: StudioItem[], grid: NavGrid): StudioPlaces {
           Math.hypot(cellCenter(b).x - front.x, cellCenter(b).z - front.z),
       );
       // One place per cell of frontage, the nearest to the piece's front first.
+      const before = places.mingle.length;
       cells.slice(0, Math.max(size.w, size.d) > 1 ? 2 : 1).forEach((cell, index) => {
         stand(places.mingle, `${item.id}:${index}`, cell, center);
       });
+      const byKind = (places.byKind ??= new Map());
+      const added = places.mingle.slice(before);
+      byKind.set(item.kind, [...(byKind.get(item.kind) ?? []), ...added]);
     }
   }
   for (const item of items) {

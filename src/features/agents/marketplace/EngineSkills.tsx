@@ -83,18 +83,16 @@ const inEngine = (entry: SkillEntry, target: SkillTargetId) =>
 /**
  * Agent Skills for one engine, from the skills hub: the hub keeps one copy of each skill and syncs
  * it into each engine's own skills folder. The list starts with the hub's repositories (credible
- * defaults the person can change in Settings › Skills) and searches skills.sh as the person types.
+ * defaults the person can change in Agents › Skills) and searches skills.sh as the person types.
  */
 export function EngineSkills({
   target,
   engineName,
   query,
-  installedOnly,
 }: {
   target: SkillTargetId;
   engineName: string;
   query: string;
-  installedOnly: boolean;
 }) {
   // A typed search waits for a pause; browsing lists at once.
   const [term, setTerm] = useState(() => query.trim());
@@ -143,9 +141,8 @@ export function EngineSkills({
 
   const list = useMemo(() => {
     if (!found || !installed) return null;
-    const all = entries(found, installed);
-    return installedOnly ? all.filter((entry) => inEngine(entry, target)) : all;
-  }, [found, installed, installedOnly, target]);
+    return entries(found, installed);
+  }, [found, installed]);
 
   const install = async (entry: SkillEntry) => {
     setBusy(entry.key);
@@ -208,13 +205,7 @@ export function EngineSkills({
         }}
       />
     );
-  if (!list.length)
-    return (
-      <EmptyState
-        title="No skills found"
-        line={installedOnly ? `No skills are installed in ${engineName} yet.` : "Try other words."}
-      />
-    );
+  if (!list.length) return <EmptyState title="No skills found" line="Try other words." />;
   // Grouped by where the skills come from, each group under its repository's logo and link.
   const groups = new Map<string, SkillEntry[]>();
   for (const entry of list) {

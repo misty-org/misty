@@ -1,3 +1,4 @@
+mod ask;
 mod audio;
 mod capture;
 mod loops;
@@ -17,7 +18,7 @@ use std::{
     time::{Duration, Instant},
 };
 use tauri::{AppHandle, Emitter, Manager, Webview};
-pub use {capture::*, platform::show_overlay, pointing::*};
+pub use {ask::*, capture::*, platform::show_overlay, pointing::*};
 
 const PREFIX: &str = "misty-cursor-";
 #[derive(Clone, Serialize, PartialEq)]
@@ -48,10 +49,18 @@ pub struct CursorCompanionState {
     /// Click positions leave the native hook only while a walkthrough step waits.
     watch_clicks: AtomicBool,
     click_turn: AtomicU64,
+    /// Where the pointer went while the talk keys were held, in global units: the person can
+    /// circle or scribble over what they mean while they ask (`cursor_companion_trail`).
+    trail: Mutex<Vec<(f64, f64)>>,
 }
+
+/// The most of a trail kept: about a minute of the pointer moving.
+const TRAIL_POINTS: usize = 4_000;
 pub enum Shortcut {
     Held(bool),
     Click(f64, f64),
+    /// Control tapped twice: open the text box.
+    Type,
     Error(String),
 }
 fn require_main(webview: &Webview) -> Result<(), String> {

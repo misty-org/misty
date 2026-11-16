@@ -10,6 +10,7 @@ import { useEffect, useState } from "react";
 import { AgentAvatarPicker } from "./AgentAvatarPicker";
 import { AgentBotFields, ExportBotButton } from "../bots/AgentBotFields";
 import { AgentSpaceField } from "./AgentSpaceField";
+import { AgentVoiceField } from "../virtual/AgentVoiceField";
 
 const emptyProfile: AgentProfileInput = {
   name: "",
@@ -181,6 +182,8 @@ export function AgentEditor({
       ) : null}
       {/* The one Space it works and saves in. A new agent gets the window's. */}
       {profile ? <AgentSpaceField agent={profile} /> : null}
+      {/* How it sounds when it answers aloud in the studio. */}
+      {profile ? <AgentVoiceField agent={profile} /> : null}
       <span data-tour="agent-permissions" className="contents">
         <AgentPermissionsField
           engine={draft.engine}

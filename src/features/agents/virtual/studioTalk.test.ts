@@ -3,7 +3,14 @@ import type { GlobalAiConversation } from "../conversations/state/conversationTy
 import { BOARD_MS, boardOf, chatsOf, speechOf, studioChatOf } from "./studioTalk";
 
 const chat = (id: string, agentId: string, updatedAt: string) =>
-  ({ id, agentId, updatedAt, title: id, messages: [] }) as unknown as GlobalAiConversation;
+  ({
+    id,
+    agentId,
+    updatedAt,
+    title: id,
+    messages: [],
+    place: "studio",
+  }) as unknown as GlobalAiConversation;
 
 const chats = [
   chat("old", "ada", "2026-11-01T00:00:00Z"),
@@ -13,8 +20,13 @@ const chats = [
 ];
 
 describe("which chat the studio talks in", () => {
-  it("lists an agent's own chats, newest first", () => {
+  it("lists an agent's own studio talks, newest first", () => {
     expect(chatsOf(chats, "ada").map((item) => item.id)).toEqual(["new", "run", "old"]);
+  });
+
+  it("leaves its chats from elsewhere out", () => {
+    const elsewhere = { ...chats[1]!, id: "page", place: undefined };
+    expect(chatsOf([...chats, elsewhere], "ada").map((item) => item.id)).not.toContain("page");
   });
 
   it("prefers the chat picked in the studio, then its latest run's, then its newest", () => {

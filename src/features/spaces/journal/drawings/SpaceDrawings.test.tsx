@@ -47,7 +47,6 @@ vi.mock("@/features/agents/runs/markdown/AiPaneHost", async (importOriginal) => 
 }));
 vi.mock("@/features/spaces/journal", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  JournalAttribution: () => null,
   JournalDeleteDialog: () => null,
 }));
 vi.mock("@/features/spaces", async (importOriginal) => ({

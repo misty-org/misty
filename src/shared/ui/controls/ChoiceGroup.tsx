@@ -31,7 +31,7 @@ export type ChoiceGroupProps<T extends string> = {
   /** sm 24, md 32 (default). The track is inside that height. */
   size?: "sm" | "md";
   disabled?: boolean;
-  /** Stretch the options to fill the row; long labels then fade. */
+  /** Stretch the options to fill the row in equal parts; long labels then fade. */
   fill?: boolean;
   /** Layout only: margins or alignment. */
   className?: string;
@@ -111,7 +111,8 @@ export function ChoiceGroup<T extends string>({
               "[&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
               itemSize[size],
               iconOnly && iconOnlySize[size],
-              fill && !iconOnly && "flex-1",
+              // Filling, the options split the track evenly, whatever their labels' length.
+              fill && !iconOnly && "flex-1 basis-0",
             )}
           >
             {renderIcon(option.icon)}
@@ -122,7 +123,9 @@ export function ChoiceGroup<T extends string>({
         if (option.disabled && option.reason)
           return (
             <Tooltip key={option.value} content={option.reason}>
-              <span className={cn("flex min-w-0", fill && !iconOnly && "flex-1")}>{item}</span>
+              <span className={cn("flex min-w-0", fill && !iconOnly && "flex-1 basis-0")}>
+                {item}
+              </span>
             </Tooltip>
           );
         if (iconOnly || option.shortcut)

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ArrowDownAZ,
   CalendarPlus,
@@ -12,31 +12,39 @@ import { confirmAction } from "@/shared/lib/confirmAction";
 import { createDeviceSetting } from "@/shared/lib/deviceSetting";
 import {
   Button,
+  CollectionHeading,
+  CollectionPage,
   CollectionSortMenu,
   CollectionViewToggle,
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
   EmptyState,
+  FilterChip,
+  HomeSection,
+  homeItemsClass,
+  homeItemsWrapClass,
   IconButton,
   MenuItem,
-  Pressable,
   Skeleton,
+  spaceHomeClass,
   Surface,
   Text,
   ToolbarDivider,
+  Tooltip,
   useNotice,
 } from "@/shared/ui";
-import { shortAgo } from "../page/useChatStatuses";
+import { spacesGateway } from "../spaces-gateway/spacesGateway";
+import { useStudioOpen, useTeamMembers, type TeamMember } from "../virtual/teamMembers";
+import { PersonAvatar } from "./notebook/LivePeople";
+import { NotebookCard, NotebookRow } from "./NotebookCard";
+import { deleteNotebook } from "./notebookSpace";
+import { personTone } from "./personTone";
 import { SearchAll } from "./SearchAll";
-import { NotebookShareItems, SharedNotebooks } from "./SharedNotebooks";
 import { TopicStart } from "./TopicStart";
-import { TutorLessons } from "./TutorLessons";
 import type { TutorActions } from "./TutorPage";
 import { useTutorStore } from "./tutorStore";
 import type { Notebook } from "./tutorTypes";
-import { useNow } from "@/shared/hooks/useNow";
 
 const sorts: readonly { value: "recent" | "title" | "created"; label: string; icon: LucideIcon }[] =
   [
@@ -69,16 +77,12 @@ function ordered(notebooks: Notebook[], sort: Sort): Notebook[] {
   );
 }
 
-/** A notebook as a card in the grid: its emoji at the top, its name and details at the foot. */
-const cardClass = "relative flex min-h-47.5 flex-col gap-1.5 p-4.5 text-left";
-/** A notebook as a row: emoji, title, sources, last opened, and room for its menu. */
-const rowGrid = "grid grid-cols-[28px_minmax(0,1fr)_120px_140px_32px] items-center gap-3 px-2";
+/** A notebook as a row: its mark, title over what's happening, its facts, who, its menu. */
+const rowGrid =
+  "grid w-full grid-cols-[1.75rem_minmax(0,1fr)_minmax(0,13.75rem)_4.5rem_2rem] items-center gap-3 px-2 " +
+  "@max-[38.75rem]:grid-cols-[1.75rem_minmax(0,1fr)_4.5rem_2rem] @max-[38.75rem]:[&>:nth-child(3)]:hidden";
 /** Each row stands on a hairline. */
-const rowEdge = "border-0 border-b";
-
-const sourcesLabel = (count: number) => `${count} ${count === 1 ? "source" : "sources"}`;
-const dateLabel = (iso: string) =>
-  new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+const rowEdge = "min-h-12 border-0 border-b text-left";
 
 /** A notebook's own menu, on its card or row. */
 function NotebookMenu({
@@ -91,8 +95,13 @@ function NotebookMenu({
   onError(message: string): void;
 }) {
   const remove = async () => {
-    const message = `Delete “${notebook.title}”, its sources and notes? This can’t be undone.`;
-    if (await confirmAction(message)) useTutorStore.getState().removeNotebook(notebook.id);
+    const message = notebook.space
+      ? `Delete “${notebook.title}”, its sources and notes, for everyone in this Space? This can’t be undone.`
+      : `Delete “${notebook.title}”, its sources and notes? This can’t be undone.`;
+    if (!(await confirmAction(message))) return;
+    await deleteNotebook(notebook.id).catch((error: unknown) =>
+      onError(error instanceof Error ? error.message : "The notebook couldn’t be deleted."),
+    );
   };
   return (
     <DropdownMenu>
@@ -106,22 +115,53 @@ function NotebookMenu({
         </IconButton>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" data-misty-layer-portal>
-        <NotebookShareItems notebook={notebook} onError={onError} />
-        <DropdownMenuSeparator />
         <MenuItem icon={Trash2} label="Delete notebook" danger onSelect={() => void remove()} />
       </DropdownMenuContent>
     </DropdownMenu>
   );
 }
 
+/** Who else is in the Lab now, as faces, each saying which notebook they're in. */
+function LabFaces({ spaceId, members }: { spaceId: string; members: TeamMember[] }) {
+  if (!members.length) return null;
+  return (
+    <span className="flex flex-none items-center -space-x-1.5" aria-label="In the Lab now">
+      {members.slice(0, 4).map((member) => (
+        <Tooltip
+          key={member.userId}
+          content={member.notebook ? `${member.name} · ${member.notebook}` : member.name}
+        >
+          <span className="inline-flex">
+            <PersonAvatar
+              spaceId={spaceId}
+              person={{ id: member.userId, name: member.name, tone: personTone(member.userId) }}
+            />
+          </span>
+        </Tooltip>
+      ))}
+    </span>
+  );
+}
+
 /**
- * the Lab's home, after NotebookLM's: a search across every notebook, the view, the order and
- * a new notebook; then what to research and the topics to start from
- * (TopicStart); then the notebooks as cards or rows, then any lessons. With no notebooks yet, an
- * empty state offers the first one in their place, and the bar keeps only the search.
+ * The Lab's home, a page of its Space, built like the Space's home: a bar with the Space and the
+ * Lab, who's in it now, a search and a new notebook; then what to explore and the topics to start
+ * from (TopicStart); then the notebooks, all of them or only yours, as the Space's own cards or as
+ * rows. Nothing is shared by hand: a notebook is the Space's from the start.
  */
 export function TutorHome({ actions }: { actions: TutorActions }) {
-  const now = useNow();
+  // Who else is in the Lab and in which notebook, for the faces; and that this person is in the
+  // Lab, for theirs.
+  useEffect(() => useStudioOpen.getState().enter(), []);
+  useEffect(() => {
+    const gateway = spacesGateway.maybe();
+    if (!gateway || !actions.spaceId) return;
+    gateway.setPlace({ spaceId: actions.spaceId, place: "lab" });
+    return () => gateway.leavePlace("lab", "");
+  }, [actions.spaceId]);
+  const gateway = spacesGateway.maybe();
+  const me = gateway?.me()?.userId;
+  const inLab = useTeamMembers((state) => state.members).filter((member) => member.place === "lab");
   const notebooks = useTutorStore((state) => state.notebooks);
   const ready = useTutorStore((state) => state.ready);
   const { view, sort } = useHomeLayout((state) => state.value);
@@ -129,181 +169,127 @@ export function TutorHome({ actions }: { actions: TutorActions }) {
     useHomeLayout.getState().set((current) => ({ ...current, view: next }));
   const setSort = (next: Sort) =>
     useHomeLayout.getState().set((current) => ({ ...current, sort: next }));
+  const [yours, setYours] = useState(false);
   const [error, setError] = useState("");
   useNotice(Boolean(error), { message: error, tone: "error", onDismiss: () => setError("") });
-  const list = ordered(Object.values(notebooks), sort);
+  // This Lab shows its Space's notebooks, and any not given a Space yet (they get this one).
+  const inSpace = Object.values(notebooks).filter(
+    (notebook) => !notebook.space || notebook.space.spaceId === actions.spaceId,
+  );
+  const list = ordered(
+    yours
+      ? inSpace.filter((notebook) => !notebook.createdBy || notebook.createdBy === me)
+      : inSpace,
+    sort,
+  );
   const open = (notebook: Notebook) => actions.open(`notebook:${notebook.id}`);
   const create = () => open(useTutorStore.getState().createNotebook("Untitled notebook"));
-  const empty = ready && list.length === 0;
+  const empty = ready && inSpace.length === 0;
+  const Crumb = gateway?.SpaceCrumb;
+
+  const controls = empty ? null : (
+    <>
+      <FilterChip size="sm" label="All" pressed={!yours} onPressedChange={() => setYours(false)} />
+      <FilterChip size="sm" label="Yours" pressed={yours} onPressedChange={() => setYours(true)} />
+      <ToolbarDivider />
+      <CollectionSortMenu value={sort} options={sorts} onChange={setSort} />
+      <ToolbarDivider />
+      <CollectionViewToggle value={view} onChange={setView} />
+    </>
+  );
 
   return (
-    <div className="@container/library mx-auto flex w-full max-w-295 flex-col gap-4.5 px-8 pt-7 pb-12">
-      {/* The search beside the controls, or above them when the page is too narrow for both. */}
-      <div className="flex items-center gap-2 @max-lg/library:flex-col @max-lg/library:items-stretch">
-        <SearchAll actions={actions} />
-        {/* Nothing to order or lay out yet, and the empty state has the one Create button. */}
-        {empty ? null : (
-          <div className="ml-auto flex items-center justify-end gap-1.5">
-            <CollectionSortMenu value={sort} options={sorts} onChange={setSort} />
-            <ToolbarDivider />
-            <CollectionViewToggle value={view} onChange={setView} />
-            <Button
-              variant="primary"
-              className="mr-1"
-              onClick={create}
-              icon={Plus}
-              data-tour="lab-new"
-            >
-              Create notebook
+    <CollectionPage className="flex-1">
+      <CollectionHeading
+        title={Crumb && actions.spaceId ? <Crumb spaceId={actions.spaceId} here="Lab" /> : "Lab"}
+        end={
+          <div className="flex min-w-0 items-center gap-2">
+            <LabFaces spaceId={actions.spaceId} members={inLab} />
+            <SearchAll actions={actions} />
+            <Button variant="primary" icon={Plus} onClick={create} data-tour="lab-new">
+              New notebook
             </Button>
           </div>
-        )}
-      </div>
-
-      <span data-tour="lab-start" className="contents">
-        <TopicStart actions={actions} onError={setError} />
-      </span>
-
-      {empty ? (
-        <span data-tour="lab-new" className="contents">
-          <EmptyState
-            inline
-            title="No notebooks yet"
-            line="A notebook keeps what you learn about one topic: its sources, notes and questions."
-            action={{ label: "Create notebook", icon: Plus, onClick: create }}
-          />
+        }
+      />
+      <div className={spaceHomeClass}>
+        <span data-tour="lab-start" className="contents">
+          <TopicStart actions={actions} onError={setError} />
         </span>
-      ) : (
-        <>
-          <Text as="h2" size="title" weight="medium" tone="bright" className="mt-1.5">
-            Notebooks
-          </Text>
-          {view === "grid" ? (
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-4">
-              {!ready
-                ? // The card itself, holding its emoji, title and detail line as placeholders.
-                  [0, 1, 2, 3, 4, 5].map((index) => (
-                    <Surface
-                      key={index}
-                      tone="card"
-                      edge="hairline"
-                      radius="xl"
-                      className={cardClass}
-                      aria-hidden="true"
-                    >
-                      <Skeleton className="size-6 rounded-md" />
-                      <div className="mt-auto flex h-5 items-center">
+
+        <HomeSection title="Notebooks" count={ready ? list.length : undefined} action={controls}>
+          {empty ? (
+            <EmptyState
+              inline
+              title="No notebooks yet"
+              line="A notebook keeps what you learn about one topic: its sources, notes and questions."
+              action={{ label: "New notebook", icon: Plus, onClick: create, variant: "secondary" }}
+            />
+          ) : !ready ? (
+            <div className={homeItemsWrapClass} aria-busy="true">
+              <div className={homeItemsClass} aria-hidden="true">
+                {[0, 1, 2, 3].map((index) => (
+                  <div key={index} className="min-w-0">
+                    <Surface tone="card" radius="xl" className="aspect-[16/10] w-full" />
+                    <div className="px-0.5 pt-2.5">
+                      <div className="flex h-6 items-center gap-2">
+                        <Skeleton className="size-4 shrink-0 rounded-sm" />
                         <Skeleton className={index % 2 ? "h-4 w-1/2" : "h-4 w-2/3"} />
                       </div>
-                      <div className="flex h-4 items-center">
-                        <Skeleton className="h-3 w-2/5" />
+                      <div className="mt-1 flex h-5 items-center">
+                        <Skeleton className="h-3.5 w-3/5" />
                       </div>
-                    </Surface>
-                  ))
-                : list.map((notebook) => (
-                    <div key={notebook.id} className="relative">
-                      <Surface
-                        as={Pressable}
-                        tone="card"
-                        edge="hairline"
-                        radius="xl"
-                        wash="card"
-                        className={`${cardClass} w-full`}
-                        onClick={() => open(notebook)}
-                      >
-                        <Text bare size="display" className="leading-none" aria-hidden="true">
-                          {notebook.emoji ?? "📓"}
-                        </Text>
-                        <Text
-                          lines={2}
-                          size="page"
-                          weight="medium"
-                          tone="bright"
-                          className="mt-auto leading-[1.3]"
-                        >
-                          {notebook.title}
-                        </Text>
-                        <Text bare size="caption" tone="muted" className="flex-none">
-                          {dateLabel(notebook.createdAt)} · {sourcesLabel(notebook.sources.length)}
-                          {notebook.shared ? ` · Shared with ${notebook.shared.spaceName}` : null}
-                        </Text>
-                      </Surface>
-                      <NotebookMenu
-                        notebook={notebook}
-                        className="absolute top-2 right-2"
-                        onError={setError}
-                      />
+                      <div className="mt-1.5 flex h-5 items-center">
+                        <Skeleton className="h-3.5 w-1/3" />
+                      </div>
                     </div>
-                  ))}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : !list.length ? (
+            <Text bare tone="muted" className="py-6 text-center text-sm">
+              You haven’t made a notebook in this Space yet.
+            </Text>
+          ) : view === "grid" ? (
+            <div className={homeItemsWrapClass}>
+              <div className={homeItemsClass}>
+                {list.map((notebook) => (
+                  <NotebookCard key={notebook.id} notebook={notebook} onOpen={() => open(notebook)}>
+                    <Surface
+                      tone="card"
+                      radius="md"
+                      className={
+                        "absolute top-2 right-2 opacity-0 group-hover/card:opacity-100 " +
+                        "group-focus-within/card:opacity-100 has-[[data-state=open]]:opacity-100"
+                      }
+                    >
+                      <NotebookMenu notebook={notebook} onError={setError} />
+                    </Surface>
+                  </NotebookCard>
+                ))}
+              </div>
             </div>
           ) : (
-            <div className="flex flex-col" role="list">
-              <Surface tone="none" edge="hairline" className={rowEdge} aria-hidden="true">
-                <Text
-                  as="div"
-                  bare
-                  size="caption"
-                  tone="muted"
-                  className={`${rowGrid} min-h-9 text-left`}
+            <div className="@container flex flex-col" role="list">
+              {list.map((notebook) => (
+                <NotebookRow
+                  key={notebook.id}
+                  notebook={notebook}
+                  className={`${rowGrid} ${rowEdge}`}
+                  onOpen={() => open(notebook)}
                 >
-                  <span />
-                  <span>Title</span>
-                  <span>Sources</span>
-                  <span>Last opened</span>
-                  <span />
-                </Text>
-              </Surface>
-              {!ready
-                ? // The row's own cells: emoji, title, sources and when it was last opened.
-                  [0, 1, 2, 3, 4, 5].map((index) => (
-                    <Surface
-                      key={index}
-                      tone="none"
-                      edge="hairline"
-                      className={`${rowGrid} ${rowEdge} min-h-12 text-left`}
-                      aria-hidden="true"
-                    >
-                      <Skeleton className="size-5 rounded-md" />
-                      <Skeleton className={index % 2 ? "h-3.5 w-1/2" : "h-3.5 w-2/3"} />
-                      <Skeleton className="h-3 w-16" />
-                      <Skeleton className="h-3 w-12" />
-                      <span />
-                    </Surface>
-                  ))
-                : list.map((notebook) => (
-                    <div key={notebook.id} className="relative" role="listitem">
-                      <Surface
-                        as={Pressable}
-                        tone="none"
-                        edge="hairline"
-                        wash="control"
-                        className={`${rowGrid} ${rowEdge} min-h-12 w-full text-left`}
-                        onClick={() => open(notebook)}
-                      >
-                        <span aria-hidden="true">{notebook.emoji ?? "📓"}</span>
-                        <Text tone="bright">{notebook.title}</Text>
-                        <Text bare size="caption" tone="muted" className="flex-none">
-                          {sourcesLabel(notebook.sources.length)}
-                        </Text>
-                        <Text bare size="caption" tone="muted" className="flex-none">
-                          {shortAgo(notebook.updatedAt, now)}
-                        </Text>
-                        <span />
-                      </Surface>
-                      <NotebookMenu
-                        notebook={notebook}
-                        className="absolute top-2 right-2"
-                        onError={setError}
-                      />
-                    </div>
-                  ))}
+                  <NotebookMenu
+                    notebook={notebook}
+                    className="absolute top-2 right-2"
+                    onError={setError}
+                  />
+                </NotebookRow>
+              ))}
             </div>
           )}
-        </>
-      )}
-
-      <SharedNotebooks onOpen={(notebookId) => actions.open(`notebook:${notebookId}`)} />
-      <TutorLessons onLesson={actions.onChat} />
-    </div>
+        </HomeSection>
+      </div>
+    </CollectionPage>
   );
 }

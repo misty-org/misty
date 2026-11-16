@@ -22,8 +22,12 @@ export interface DisplayCapture extends AiCaptureAttachment {
   /** The focused window's app and title, on window1. */
   app?: string;
   title?: string;
+  /** The document or web page that window has open, where the app says (a file:// or web address). */
+  document?: string | null;
   /** Misty's own visible controls on this screen, in this capture's pixels. */
   controls?: ScreenControl[];
+  /** The trail the person drew while asking is drawn on this screenshot (companionTrail.ts). */
+  trail?: boolean;
 }
 /** A Misty control named by its interface; x and y are its center. */
 export interface ScreenControl {
@@ -59,6 +63,15 @@ export interface Presentation {
   focus?: PresentedFocus[];
   /** A drawing the reply is making (companionSketch.ts), drawn as it streams. */
   sketch?: PresentedSketch;
+  /** The companion's color (Settings › Tutor, `companionTints`); white when unset. */
+  tint?: string;
+  /** Captions while Misty talks (Settings › Tutor). Defaults off. */
+  captions?: boolean;
+  /**
+   * The line at the bottom of the screen: the sentence being said (with captions on), or what
+   * the tour asks for next (`tip`).
+   */
+  caption?: { text: string; tip?: boolean };
 }
 /**
  * A drawing on its way to the overlay. A board sits beside the cursor; screen marks
@@ -67,7 +80,7 @@ export interface Presentation {
 export interface PresentedSketch {
   /** Changes with each reply, so the overlay starts a fresh card. */
   id: string;
-  surface: "board" | "screen";
+  surface: "board" | "screen" | "model";
   title?: string;
   displayId?: number;
   elements: SketchElement[];

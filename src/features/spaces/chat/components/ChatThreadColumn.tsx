@@ -74,7 +74,7 @@ export function ChatThreadColumn({
       as="aside"
       tone="page"
       aria-label="Replies"
-      className="flex w-[min(360px,40%)] shrink-0 flex-col border-l"
+      className="flex w-[min(22.5rem,40%)] shrink-0 flex-col border-l"
     >
       <header className="flex min-h-12 items-center gap-2 border-b px-3 py-1.5">
         <Text bare as="h2" tone="bright" className="m-0 min-w-0 flex-1 text-sm font-medium">

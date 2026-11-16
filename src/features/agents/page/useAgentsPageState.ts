@@ -8,9 +8,10 @@ import { useAgentAccess } from "../personal/AgentAccess";
 import type { AgentSettingsTab } from "../personal/AgentSettingsModal";
 import type { AgentVoiceControl } from "../conversations/view/AgentWorkspaceConversation";
 import { useAgentFolderSync } from "../shared-folders/useAgentFolderSync";
-import { usePersonalAgentsStore } from "../personal/personalAgentsStore";
+import { defaultAgentOf, usePersonalAgentsStore } from "../personal/personalAgentsStore";
 import { useAgentActivity } from "./useAgentActivity";
 import { useAgentChangeGuard } from "./useAgentChangeGuard";
+import { openAgentsHub, useAgentsHub } from "../hub/agentsHubStore";
 import type { AgentWorkspacePage } from "../methods/AgentWorkspaceFrame";
 import { useViewConversation, useViewTitle } from "./useViewConversation";
 
@@ -34,7 +35,8 @@ export function useAgentsPageState() {
   const [selected, setSelected] = useState<string>();
   const [params, setParams] = useSearchParams();
   const workspaceRef = useRef<HTMLElement>(null);
-  // Links: ?view=studio, integrations or lab open that page; anything else the task.
+  // Links: ?view=studio or lab open that page; anything else the task. The retired
+  // ?view=integrations opens the Agents window on its Plugins page instead.
   const linkedView = params.get("view") ?? "";
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
   const [settingsModalTab, setSettingsModalTab] = useState<AgentSettingsTab>("settings");
@@ -133,7 +135,7 @@ export function useAgentsPageState() {
     agents.find((a) => a.id === selected) ??
     agents.find((a) => a.id === workingAgentId) ??
     agents.find((a) => a.engine && a.enabled) ??
-    agents.find((a) => a.system_managed) ??
+    defaultAgentOf(agents) ??
     agents[0];
   useEffect(() => {
     shownAgentId.current = profile?.id;
@@ -143,12 +145,26 @@ export function useAgentsPageState() {
     settingsModalOpen && settingsModalMode === "create" ? undefined : profile?.id,
   );
   const accessRetry = access.retry;
-  const previousWorkspacePage = useRef(workspacePage);
+  // Apps are connected in the Agents window: when it closes, read this agent's access again.
+  const hubOpen = useAgentsHub((state) => state.open);
+  const hubWasOpen = useRef(hubOpen);
   useEffect(() => {
-    if (previousWorkspacePage.current === "integrations" && workspacePage !== "integrations")
-      accessRetry();
-    previousWorkspacePage.current = workspacePage;
-  }, [workspacePage, accessRetry]);
+    if (hubWasOpen.current && !hubOpen) accessRetry();
+    hubWasOpen.current = hubOpen;
+  }, [hubOpen, accessRetry]);
+  // A saved tab or link from when Integrations was a page of its own.
+  useEffect(() => {
+    if (linkedView !== "integrations") return;
+    openAgentsHub("plugins");
+    setParams(
+      (current) => {
+        const next = new URLSearchParams(current);
+        next.delete("view");
+        return next;
+      },
+      { replace: true },
+    );
+  }, [linkedView, setParams]);
   const agentConversations = conversations.filter(
     (c) => c.agentId === profile?.id || (!c.agentId && profile?.system_managed),
   );
@@ -164,9 +180,7 @@ export function useAgentsPageState() {
   );
   useViewTitle(
     viewConversation.viewId,
-    workspacePage === "task"
-      ? chatTitle?.trim() || "New chat"
-      : workspacePageTitles[workspacePage],
+    workspacePage === "task" ? chatTitle?.trim() || "New chat" : workspacePageTitles[workspacePage],
   );
   // Feeds the Recents status dots.
   const activity = useAgentActivity(accountId, profile?.id);
@@ -214,7 +228,6 @@ export type AgentsPageState = ReturnType<typeof useAgentsPageState>;
 
 const workspacePageTitles: Record<Exclude<AgentWorkspacePage, "task">, string> = {
   studio: "Studio",
-  integrations: "Integrations",
   lab: "Lab",
 };
 
@@ -222,6 +235,6 @@ const workspacePageTitles: Record<Exclude<AgentWorkspacePage, "task">, string> =
 function pageFromView(view: string): AgentWorkspacePage | undefined {
   if (view === "office") return "studio";
   if (view === "tutor" || view === "notebooks") return "lab";
-  if (view === "studio" || view === "integrations" || view === "lab") return view;
+  if (view === "studio" || view === "lab") return view;
   return undefined;
 }

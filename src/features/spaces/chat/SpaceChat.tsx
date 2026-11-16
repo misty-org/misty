@@ -248,6 +248,7 @@ export function SpaceChat({
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         {panel ? null : (
           <ChatTitleBar
+            spaceId={spaceId}
             title={
               scope.activeConversation
                 ? conversationName(scope.activeConversation, user?.id)

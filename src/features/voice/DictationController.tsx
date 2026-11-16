@@ -2,15 +2,22 @@ import { useEffect, useMemo, useRef } from "react";
 import { useSettingsStore } from "@/features/settings";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { DictationController as Controller } from "./dictationEngine";
+import { useSpeechSupport } from "./systemSpeech";
 import { voiceSettings } from "./voiceSettings";
 
 /**
  * Mounts dictation in the main window while the account is signed in. The
- * native shortcut is registered only while Settings › Voice › Dictation is on.
+ * native shortcut is registered only while Settings › Voice › Dictation is on, and only on a
+ * computer that can recognize speech.
  */
 export function DictationController() {
   const document = useSettingsStore((state) => state.settings?.document);
-  const settings = useMemo(() => voiceSettings(document), [document]);
+  const speech = useSpeechSupport();
+  const recognizes = Boolean(speech?.recognition);
+  const settings = useMemo(() => {
+    const chosen = voiceSettings(document);
+    return { ...chosen, dictation: chosen.dictation && recognizes };
+  }, [document, recognizes]);
   const controller = useRef<Controller | null>(null);
   const enabled = hasTauriInternals();
 

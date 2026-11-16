@@ -1,139 +1,14 @@
-use std::sync::{Arc, Mutex};
-
 use serde_json::{json, Value};
-use tokio::{
-    io::{AsyncReadExt, AsyncWriteExt},
-    net::TcpListener,
-};
 
 use super::AccountStore as Store;
 use super::{
-    api::{connect_link_allowed, valid_tool_slug, valid_toolkit, ToolInfo},
-    client::{truncate, Client},
+    api::{valid_tool_slug, ToolInfo},
     policy,
     requests::{self, Draft},
+    text::truncate,
 };
 
 const SEND: &str = "GMAIL_SEND_EMAIL";
-
-#[derive(Clone, Debug)]
-pub(super) struct Heard {
-    pub(super) line: String,
-    pub(super) key: String,
-    pub(super) body: Value,
-}
-
-/// A stand-in for Composio: answers by the first rule whose text the request line holds.
-pub(super) struct Fake {
-    pub(super) base: String,
-    pub(super) heard: Arc<Mutex<Vec<Heard>>>,
-}
-
-impl Fake {
-    pub(super) fn lines(&self) -> Vec<String> {
-        self.heard
-            .lock()
-            .unwrap()
-            .iter()
-            .map(|item| item.line.clone())
-            .collect()
-    }
-
-    pub(super) fn calls(&self, text: &str) -> Vec<Heard> {
-        self.heard
-            .lock()
-            .unwrap()
-            .iter()
-            .filter(|item| item.line.contains(text))
-            .cloned()
-            .collect()
-    }
-}
-
-pub(super) async fn fake(rules: Vec<(&'static str, u16, Value)>) -> Fake {
-    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-    let address = listener.local_addr().unwrap();
-    let heard = Arc::new(Mutex::new(Vec::new()));
-    let log = heard.clone();
-    let rules = Arc::new(rules);
-    tokio::spawn(async move {
-        while let Ok((mut socket, _)) = listener.accept().await {
-            let log = log.clone();
-            let rules = rules.clone();
-            tokio::spawn(async move {
-                let mut buffer = Vec::new();
-                let mut chunk = [0u8; 4096];
-                let head_end = loop {
-                    let Ok(read) = socket.read(&mut chunk).await else {
-                        return;
-                    };
-                    if read == 0 {
-                        return;
-                    }
-                    buffer.extend_from_slice(&chunk[..read]);
-                    if let Some(at) = buffer.windows(4).position(|part| part == b"\r\n\r\n") {
-                        break at + 4;
-                    }
-                };
-                let head = String::from_utf8_lossy(&buffer[..head_end]).to_string();
-                let header = |name: &str| {
-                    head.lines()
-                        .find_map(|line| {
-                            let (found, value) = line.split_once(':')?;
-                            found
-                                .eq_ignore_ascii_case(name)
-                                .then(|| value.trim().to_owned())
-                        })
-                        .unwrap_or_default()
-                };
-                let length: usize = header("content-length").parse().unwrap_or(0);
-                while buffer.len() < head_end + length {
-                    let Ok(read) = socket.read(&mut chunk).await else {
-                        return;
-                    };
-                    if read == 0 {
-                        break;
-                    }
-                    buffer.extend_from_slice(&chunk[..read]);
-                }
-                let line = head.lines().next().unwrap_or_default().to_owned();
-                log.lock().unwrap().push(Heard {
-                    line: line.clone(),
-                    key: header("x-api-key"),
-                    body: serde_json::from_slice(&buffer[head_end..]).unwrap_or(Value::Null),
-                });
-                let (status, body) = rules
-                    .iter()
-                    .find(|(text, _, _)| line.contains(text))
-                    .map_or((404, json!({})), |(_, status, body)| {
-                        (*status, body.clone())
-                    });
-                let text = body.to_string();
-                let answer = format!(
-                    "HTTP/1.1 {status} X\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{text}",
-                    text.len()
-                );
-                let _ = socket.write_all(answer.as_bytes()).await;
-            });
-        }
-    });
-    Fake {
-        base: format!("http://{address}/api/v3.1/"),
-        heard,
-    }
-}
-
-pub(super) fn client_of(fake: &Fake) -> Client {
-    Client::at(&fake.base, "ak_test".to_owned(), "misty_here".to_owned())
-}
-
-pub(super) fn account(id: &str, toolkit: &str, status: &str) -> Value {
-    json!({
-        "id": id, "user_id": "misty_here", "status": status, "alias": "", "is_disabled": false,
-        "created_at": "2099-01-01T00:00:00Z", "toolkit": { "slug": toolkit },
-        "state": { "authScheme": "OAUTH2", "val": { "access_token": "secret-token" } },
-    })
-}
 
 pub(super) fn store() -> (tempfile::TempDir, Store) {
     let directory = tempfile::tempdir().unwrap();
@@ -409,47 +284,10 @@ fn one_accounts_requests_and_approvals_are_not_anothers() {
 }
 
 #[test]
-fn slugs_links_and_text_are_checked() {
+fn slugs_and_text_are_checked() {
     assert!(valid_tool_slug(SEND));
     assert!(!valid_tool_slug("gmail_send"));
     assert!(!valid_tool_slug("GMAIL/../SEND"));
-    assert!(valid_toolkit("googledrive"));
-    assert!(!valid_toolkit("Google Drive"));
-    assert!(connect_link_allowed(
-        "https://connect.composio.dev/link/abc"
-    ));
-    assert!(connect_link_allowed("https://composio.dev/x"));
-    for bad in [
-        "http://composio.dev/x",
-        "https://composio.dev.evil.example/x",
-        "https://a:b@composio.dev/x",
-        "https://composio.dev:8443/x",
-        "not a link",
-    ] {
-        assert!(!connect_link_allowed(bad), "{bad}");
-    }
     assert_eq!(truncate("héllo wörld", 6), "héllo…");
     assert_eq!(truncate("short", 6), "short");
-}
-
-#[tokio::test]
-async fn a_redirect_never_carries_the_key_elsewhere() {
-    let elsewhere = fake(vec![("GET", 200, json!({ "items": [] }))]).await;
-    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-    let address = listener.local_addr().unwrap();
-    let target = format!("{}connected_accounts", elsewhere.base);
-    tokio::spawn(async move {
-        let (mut socket, _) = listener.accept().await.unwrap();
-        let mut buffer = [0u8; 4096];
-        let _ = socket.read(&mut buffer).await;
-        let answer = format!("HTTP/1.1 302 Found\r\nlocation: {target}\r\ncontent-length: 0\r\nconnection: close\r\n\r\n");
-        let _ = socket.write_all(answer.as_bytes()).await;
-    });
-    let client = Client::at(
-        &format!("http://{address}/api/v3.1/"),
-        "ak_test".to_owned(),
-        "misty_here".to_owned(),
-    );
-    assert!(client.accounts("").await.is_err());
-    assert!(elsewhere.lines().is_empty());
 }

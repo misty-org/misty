@@ -7,13 +7,16 @@ import {
   DropdownMenuTrigger,
   MenuItem,
 } from "@/shared/ui";
+import { useSpeechSupport } from "../systemSpeech";
 import { captureMicrophone, captureSystemAudio } from "./startCapture";
 import { useCaptureStore } from "./useCaptureStore";
 
 /** "Listen" beside New note: hear what's said and turn it into a Note. */
 export function CaptureMenu() {
   const phase = useCaptureStore((state) => state.phase);
-  if (!hasTauriInternals()) return null;
+  const speech = useSpeechSupport();
+  // What's heard is recognized by this computer; where it can't, there's nothing to listen with.
+  if (!hasTauriInternals() || !speech?.recognition) return null;
   const busy = phase !== "idle" && phase !== "done";
   return (
     <DropdownMenu>

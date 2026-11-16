@@ -7,8 +7,7 @@
 <p align="center"><strong>Build together with AI.</strong></p>
 
 Misty is a collaborative workspace for building with agents. Pick an engine and build on your
-own, or invite others to build with you in a space you all share. It's open source and runs on
-macOS and Windows.
+own, or invite others to build with you in a space you all share.
 
 [Website](https://mistysys.com) · [Discord](https://discord.gg/B5WgSw6uX) · [Roadmap](https://github.com/orgs/misty-org/projects/1) · [Contributing](CONTRIBUTING.md)
 

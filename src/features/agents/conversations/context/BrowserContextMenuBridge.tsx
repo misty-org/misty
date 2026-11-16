@@ -1,5 +1,4 @@
-import { needsModelKey } from "../../models/ModelKeyNeeded";
-import { openModelSettings } from "../../models/modelKeys";
+import { needsDefaultEngine, openEngineSettings } from "../../engines/engineNeeded";
 import { ErrorNotice } from "../ErrorNotice";
 import { useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
@@ -89,7 +88,7 @@ export function BrowserContextMenuView({
         width="lg"
         // Stay within the space left in the window so the last items (Inspect
         // Page, Extensions) scroll into view instead of running off-screen.
-        className="max-h-[min(560px,var(--radix-dropdown-menu-content-available-height))]"
+        className="max-h-[min(35rem,var(--radix-dropdown-menu-content-available-height))]"
         onCloseAutoFocus={(event) => event.preventDefault()}
         onPointerDown={(event) => event.stopPropagation()}
       >
@@ -191,12 +190,12 @@ export function BrowserContextMenuBridge() {
       <ErrorNotice
         message={error}
         action={
-          needsModelKey(error)
+          needsDefaultEngine(error)
             ? {
-                label: "Open Models settings",
+                label: "Open engine settings",
                 onSelect: () => {
                   setError(null);
-                  openModelSettings();
+                  openEngineSettings();
                 },
               }
             : undefined

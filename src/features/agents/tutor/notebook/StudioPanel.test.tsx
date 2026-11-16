@@ -7,12 +7,18 @@ import { StudioPanel } from "./StudioPanel";
 
 const fakes = vi.hoisted(() => ({
   startJob: vi.fn(),
-  startRun: vi.fn(),
   retryJob: vi.fn(),
   dismissJob: vi.fn(),
+  startLesson: vi.fn(),
 }));
 
-vi.mock("../tutorRuns", () => fakes);
+vi.mock("../tutorRuns", () => ({
+  startJob: fakes.startJob,
+  retryJob: fakes.retryJob,
+  dismissJob: fakes.dismissJob,
+}));
+// A lesson is a thread of the notebook's own, in its Space (notebookThread.ts).
+vi.mock("../notebookThread", () => ({ startLesson: fakes.startLesson }));
 vi.mock("../../conversations/state/useMistyStore", async () => {
   const { create } = await import("zustand");
   return { useMistyStore: create(() => ({ conversations: [] })) };
@@ -62,7 +68,7 @@ const deck = (change: Partial<Deck> & Pick<Deck, "id">): Deck => ({
 const job = (change: Partial<TutorJob> & Pick<TutorJob, "id" | "kind" | "state">): TutorJob => ({
   title: `${change.id} title`,
   agentId: "a1",
-  conversationId: `chat-${change.id}`,
+  runId: `run-${change.id}`,
   prompt: "",
   notebookId: "n1",
   createdAt: at(1),
@@ -98,7 +104,14 @@ beforeEach(() => {
   fakes.startJob.mockResolvedValue(undefined);
   fakes.retryJob.mockResolvedValue(undefined);
   fakes.dismissJob.mockResolvedValue(undefined);
-  actions = { agentId: "a1", onChat: vi.fn(), onLearn: vi.fn(), open: vi.fn() };
+  fakes.startLesson.mockResolvedValue(undefined);
+  actions = {
+    agentId: "a1",
+    spaceId: "space-1",
+    onChat: vi.fn(),
+    onLearn: vi.fn(),
+    open: vi.fn(),
+  };
   props = { onCollapse: vi.fn(), onView: vi.fn(), onError: vi.fn() };
   useTutorStore.setState({ accountId: "acct", jobs: {}, guides: {}, decks: {} });
   useMistyStore.setState({ conversations: [] });
@@ -180,28 +193,24 @@ describe("making something", () => {
     await vi.waitFor(() => expect(props.onError).toHaveBeenCalledWith("No engine is signed in."));
   });
 
-  it("opens Teach me as a lesson chat", async () => {
-    fakes.startRun.mockResolvedValue({ conversationId: "lesson-1", started: true });
+  it("starts Teach me as a lesson in the notebook, not a chat", async () => {
     panel();
     fireEvent.click(button("Teach me"));
-    expect(fakes.startRun.mock.calls[0][0]).toMatchObject({
-      agentId: "a1",
-      mode: "teach",
-      background: false,
-    });
-    await vi.waitFor(() => expect(actions.onChat).toHaveBeenCalledWith("a1", "lesson-1"));
+    await vi.waitFor(() => expect(fakes.startLesson).toHaveBeenCalledTimes(1));
+    const [lessonNotebook, prompt, shown] = fakes.startLesson.mock.calls[0];
+    expect(lessonNotebook).toBe(notebook);
+    expect(prompt).toContain("Volcanoes");
+    expect(shown).toBe("Teach me Volcanoes");
+    expect(actions.onChat).not.toHaveBeenCalled();
   });
 
-  it("asks to wait when Teach me can't start over another turn", async () => {
-    fakes.startRun.mockResolvedValue({ conversationId: "lesson-1", started: false });
+  it("says why Teach me couldn't start", async () => {
+    fakes.startLesson.mockRejectedValueOnce(new Error("Pick a default engine in Settings › Agents."));
     panel();
     fireEvent.click(button("Teach me"));
     await vi.waitFor(() =>
-      expect(props.onError).toHaveBeenCalledWith(
-        "Another turn is working. Try again when it finishes.",
-      ),
+      expect(props.onError).toHaveBeenCalledWith("Pick a default engine in Settings › Agents."),
     );
-    expect(actions.onChat).not.toHaveBeenCalled();
   });
 
   it("starts runs from the folded rail too, and unfolds", () => {
@@ -226,22 +235,13 @@ describe("what is being made", () => {
     });
     panel();
     expect(screen.getByText("Flashcards: Lava")).toBeTruthy();
-    expect(screen.getByText("Making")).toBeTruthy();
-    expect(screen.getByText("Waiting for a turn to end")).toBeTruthy();
+    // Jobs run side by side on the default engine: one from before that was waiting is making too.
+    expect(screen.getAllByText("Making")).toHaveLength(2);
+    expect(screen.queryByText("Waiting for a turn to end")).toBeNull();
     expect(screen.queryByText("Finding sources: Lava")).toBeNull();
     expect(screen.queryByText("Elsewhere")).toBeNull();
     expect(screen.queryByText("Slides: Lava")).toBeNull();
     expect(screen.queryByText("Nothing made yet")).toBeNull();
-  });
-
-  it("calls a queued run whose turn has begun Making", () => {
-    useTutorStore.setState({ jobs: { b: job({ id: "b", kind: "quiz", state: "queued" }) } });
-    // A stand-in chat: only its id and that it has a turn matter here.
-    useMistyStore.setState({
-      conversations: [{ id: "chat-b", messages: [{ id: "q", role: "user" }] }],
-    } as never);
-    panel();
-    expect(screen.getByText("Making")).toBeTruthy();
   });
 
   it("shows a failed run's reason with Try again and Dismiss", () => {
@@ -260,11 +260,11 @@ describe("what is being made", () => {
     expect(fakes.dismissJob).toHaveBeenCalledWith(failed);
   });
 
-  it("opens a run's chat", () => {
+  it("doesn't open a chat for a run: the Lab makes none", () => {
     useTutorStore.setState({ jobs: { a: job({ id: "a", kind: "deck", state: "running" }) } });
     panel();
     fireEvent.click(screen.getByText("a title"));
-    expect(actions.onChat).toHaveBeenCalledWith("a1", "chat-a");
+    expect(actions.onChat).not.toHaveBeenCalled();
   });
 });
 
@@ -272,7 +272,13 @@ describe("what was made", () => {
   it("lists this notebook's things newest first, each with what it is", () => {
     useTutorStore.setState({
       guides: {
-        old: guide({ id: "old", kind: "guide", report: "faq", title: "Lava FAQ", createdAt: at(1) }),
+        old: guide({
+          id: "old",
+          kind: "guide",
+          report: "faq",
+          title: "Lava FAQ",
+          createdAt: at(1),
+        }),
         map: guide({ id: "map", kind: "mindmap", title: "Lava map", createdAt: at(3) }),
         other: guide({ id: "other", kind: "slides", title: "Not here", notebookId: "n2" }),
       },
@@ -327,7 +333,12 @@ describe("what was made", () => {
       "First.",
     ],
     [
-      guide({ id: "o", kind: "overview", title: "Lava talk", script: [{ speaker: 0, text: "Hi" }] }),
+      guide({
+        id: "o",
+        kind: "overview",
+        title: "Lava talk",
+        script: [{ speaker: 0, text: "Hi" }],
+      }),
       "No audio yet",
     ],
   ])("opens a made thing in place (%#)", (item, shows) => {
@@ -339,9 +350,11 @@ describe("what was made", () => {
   });
 
   it("opens a deck, and reviews it", () => {
-    const made = useTutorStore.getState().newDeck({ title: "Lava cards", notebookId: "n1" }, [
-      { front: "Magma?", back: "Molten rock" },
-    ]);
+    const made = useTutorStore
+      .getState()
+      .newDeck({ title: "Lava cards", notebookId: "n1" }, [
+        { front: "Magma?", back: "Molten rock" },
+      ]);
     const view = panel({ viewing: { id: made.id } });
     fireEvent.click(button("Review 1"));
     expect(props.onView).toHaveBeenCalledWith({ id: made.id, review: true });

@@ -22,7 +22,7 @@ pub(crate) mod device_models;
 pub(crate) mod instance_model;
 pub mod local_run;
 pub(crate) mod local_prompt;
-pub use local_prompt::{companion_engine_note, without_cursor_tags};
+pub use local_prompt::{companion_engine_note, engine_teach_note, without_cursor_tags};
 pub mod local_tools;
 pub(crate) mod logger;
 pub(crate) mod tool_gateway;

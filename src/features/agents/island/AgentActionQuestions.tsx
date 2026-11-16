@@ -6,7 +6,7 @@ import {
   actionQuestionText,
   actionQuestionVerb,
   answerActionQuestion,
-  useActionQuestions,
+  useIslandQuestions,
 } from "./actionQuestions";
 import { usePersonalAgentsStore } from "../personal/personalAgentsStore";
 import { StatusRow, StatusTable } from "../progress/StatusTable";
@@ -17,7 +17,7 @@ import { StatusRow, StatusTable } from "../progress/StatusTable";
  * minutes means no.
  */
 export function AgentActionQuestions() {
-  const questions = useActionQuestions((state) => state.items);
+  const questions = useIslandQuestions();
   const agents = usePersonalAgentsStore((state) => state.agents);
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");

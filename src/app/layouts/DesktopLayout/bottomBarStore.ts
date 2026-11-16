@@ -1,6 +1,10 @@
 import { create } from "zustand";
 import { readDeviceState, updateDeviceState } from "@/features/agents";
-import { announceDeviceSetting, onDeviceSettingChange } from "@/shared/lib/deviceSetting";
+import {
+  announceDeviceSetting,
+  createDeviceSetting,
+  onDeviceSettingChange,
+} from "@/shared/lib/deviceSetting";
 
 /** Everything the window's bottom bar can show. `bottomBarItems` says what each one is. */
 export const bottomBarItemIds = [
@@ -106,3 +110,13 @@ export const useBottomBar = create<
 }));
 
 onDeviceSettingChange(scope, () => void useBottomBar.getState().load());
+
+/**
+ * How tall the window's bottom bar is: compact (32px, 24px buttons) unless the person turned that
+ * off for the standard 40px. Kept for this device in `misty.db`.
+ */
+export const useBottomBarCompact = createDeviceSetting<boolean>({
+  scope: "bottom-bar-compact",
+  defaults: true,
+  normalize: (stored) => stored !== false,
+});

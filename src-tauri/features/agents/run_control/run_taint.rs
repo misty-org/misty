@@ -25,7 +25,7 @@ pub(crate) struct Taint {
 pub(crate) fn reads_private(name: &str, input: &Value) -> bool {
     match name {
         "folder.read" | "shell.run" | "note.read" | "note.search" | "file.read" | "file.search"
-        | "drawing.read" | "drawing.list" | "message.search" | "thread.read" | "thread.list"
+        | "drawing.read" | "drawing.list" | "image.read" | "message.search" | "thread.read" | "thread.list"
         | "search.all" => true,
         "integration.execute" => {
             let slug = input.get("tool_slug").and_then(Value::as_str).unwrap_or("");

@@ -70,6 +70,9 @@ unsafe extern "system" fn keyboard(code: i32, message: WPARAM, data: LPARAM) -> 
                     modifiers.shift &= system.shift;
                     if apply(modifiers, event.vkCode as u16, event.scanCode, down) {
                         dispatch(Input::Modifiers(*modifiers));
+                    } else if down {
+                        // Control+C is a shortcut, not a tap.
+                        dispatch(Input::Key);
                     }
                 }
             });

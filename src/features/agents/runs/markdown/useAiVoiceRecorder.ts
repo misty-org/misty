@@ -1,4 +1,4 @@
-import { runtimeAgentsApi as agentsApi } from "@/features/agents/AgentsRuntime";
+import { recognizeAudio } from "@/features/voice";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createDeviceSetting } from "@/shared/lib/deviceSetting";
@@ -127,19 +127,19 @@ export function useAiVoiceRecorder({
         if (discardRecordingRef.current || !mountedRef.current || epoch !== generation.current)
           return;
         setRecording(false);
-        const duration = Math.max(1, Math.min(60_000, Date.now() - startedAtRef.current));
         const blob = new Blob(chunksRef.current, { type: recorder.mimeType || "audio/webm" });
         if (blob.size === 0) {
           onActivityChangeRef.current?.(false);
           return void onError("No audio was recorded.");
         }
         setTranscribing(true);
+        // Recognized on this computer: Misty holds no transcription key.
         const controller = new AbortController();
         transcription.current = controller;
-        void agentsApi
-          .transcribeVoice(blob, duration, controller.signal)
-          .then((result) => {
-            if (mountedRef.current && generation.current === epoch) onTranscript(result.transcript);
+        void recognizeAudio(blob)
+          .then((transcript) => {
+            if (controller.signal.aborted) return;
+            if (mountedRef.current && generation.current === epoch) onTranscript(transcript);
           })
           .catch((reason) => {
             if (mountedRef.current && generation.current === epoch)
@@ -213,7 +213,8 @@ function saveInputDevice(deviceId: string): void {
 
 function preferredRecordingMimeType(): string | undefined {
   if (typeof MediaRecorder === "undefined" || !MediaRecorder.isTypeSupported) return undefined;
-  return ["audio/webm;codecs=opus", "audio/mp4;codecs=mp4a.40.2", "audio/mp4", "audio/webm"].find(
+  // The system recognizer reads MP4 audio; WebM is only a last resort.
+  return ["audio/mp4;codecs=mp4a.40.2", "audio/mp4", "audio/webm;codecs=opus", "audio/webm"].find(
     (mimeType) => MediaRecorder.isTypeSupported(mimeType),
   );
 }

@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { deviceModelCall } from "@/api/runtime/device-models";
+import { extractOnEngine } from "../../engines/mistyCalls";
 import { pictureAgentTab } from "../../tabs/agentTabPictures";
 import { agentTab, noteAgentTabJob, wakeAgentTab } from "../../tabs/agentTabs";
 import { touchHostedSession } from "../hosted-sessions/hostedSessionsState";
@@ -68,8 +68,8 @@ export async function executeBrowserJob(
 }
 
 /**
- * `browser.extract` reads the page, then the extraction runs on this computer's agent model; the
- * server checks the links against the page it is sent with.
+ * `browser.extract` reads the page, then the extraction runs on the default engine; the server
+ * checks the links against the page it is sent with.
  */
 async function withExtraction(
   job: ClaimedWorkflowNodeJob["job"],
@@ -79,8 +79,7 @@ async function withExtraction(
   const input = (job.input ?? {}) as { instruction?: unknown; schema?: unknown };
   if (typeof input.instruction !== "string" || !input.schema) return page;
   const text = (value: unknown) => (typeof value === "string" ? value : "");
-  const { data } = await deviceModelCall<{ data: unknown }>(
-    "extract",
+  const { data } = await extractOnEngine(
     {
       instruction: input.instruction,
       schema: input.schema,

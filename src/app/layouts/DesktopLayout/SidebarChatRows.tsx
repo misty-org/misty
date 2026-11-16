@@ -17,7 +17,6 @@ import {
   Input,
   NavRow,
   NavRowLabel,
-  OverflowFadeText,
   Text,
   Tooltip,
   type TextTone,
@@ -43,13 +42,13 @@ const statusTones: Record<ChatStatus, TextTone | undefined> = {
   done: undefined,
 };
 
-/** A chat's row: its agent's mark, its title with its agent's name beside it (so two chats with
- * the same title, from different agents, read apart), and what its agent is doing or when it was
- * last touched. A selected row is washed like the open one; an unread one has a brighter title. */
+/** A chat's row: its agent's mark (which already says whose chat it is; none under its agent's
+ * own heading, where every row would repeat it), its title, and what its agent is doing or when
+ * it was last touched. A selected row is washed like the open one; an
+ * unread one has a brighter title. */
 export function ChatRow(props: {
   chat: SidebarChat;
   mark: ReactNode;
-  agentName?: string;
   status?: ChatStatus;
   current: boolean;
   selected: boolean;
@@ -68,22 +67,13 @@ export function ChatRow(props: {
       data-status={props.status}
       onClick={props.onPress}
     >
-      <span className={markSlotClass}>{props.mark}</span>
-      {/* The title gives way first; the agent's name keeps up to 40% of the row. */}
+      {props.mark ? <span className={markSlotClass}>{props.mark}</span> : null}
       <NavRowLabel
         bright={props.current || props.selected || props.unread}
-        className={cn(props.agentName ? "flex-initial" : "flex-1", props.unread && "font-medium")}
+        className={cn("flex-1", props.unread && "font-medium")}
       >
         {props.chat.title || "New conversation"}
       </NavRowLabel>
-      {props.agentName ? (
-        // The chat's agent, after its title and dimmer than it, so two chats with one title from
-        // different agents read apart.
-        <OverflowFadeText className="mr-auto max-w-[40%] flex-none text-control opacity-60">
-          <span className="sr-only">, </span>
-          {props.agentName}
-        </OverflowFadeText>
-      ) : null}
       {props.status && word ? (
         // The one place the sidebar uses color: what a chat's agent is doing, as a dot alone. The
         // word stays for screen readers and the tooltip.
@@ -147,7 +137,7 @@ export function RenameRow(props: {
   return (
     // Renaming in place: the title becomes a field the same size, on the open chat's wash.
     <NavRow still selected data-renaming="true">
-      <span className={markSlotClass}>{props.mark}</span>
+      {props.mark ? <span className={markSlotClass}>{props.mark}</span> : null}
       <Text bare tone="chrome" className="contents">
         <Input
           ref={field}

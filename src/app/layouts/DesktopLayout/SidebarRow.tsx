@@ -19,7 +19,7 @@ export const SidebarRow = forwardRef<
       <OverflowFadeText>{label}</OverflowFadeText>
       {shortcut ? (
         // A key hint, as in "Search ⌘K". A narrow sidebar drops it; the row keeps its label.
-        <Kbd size="micro" outline={false} className="ml-auto @max-[230px]/misty-sidebar:hidden">
+        <Kbd size="micro" outline={false} className="ml-auto @max-[14.375rem]/misty-sidebar:hidden">
           {shortcut.replace("Meta+", "⌘")}
         </Kbd>
       ) : null}

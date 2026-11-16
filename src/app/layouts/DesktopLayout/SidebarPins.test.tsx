@@ -21,7 +21,7 @@ const opened: string[] = [];
 const places = Object.fromEntries(
   sidebarPlaceIds.map((id): [SidebarPlaceId, SidebarPlace] => [
     id,
-    { label: id, icon: Search, current: id === "lab", open: () => void opened.push(id) },
+    { label: id, icon: Search, current: id === "studio", open: () => void opened.push(id) },
   ]),
 ) as Record<SidebarPlaceId, SidebarPlace>;
 
@@ -30,18 +30,19 @@ beforeEach(() => {
   opened.length = 0;
   useSidebarPins.setState({
     order: [...sidebarPlaceIds],
-    pinned: ["search", "agents", "space", "integrations"],
+    pinned: ["search", "agents", "space"],
   });
 });
 
 describe("sidebar pins", () => {
   it("drops unknown rows, renames old ones and adds new ones as they are by default", async () => {
-    stored.value = { order: ["tutor", "gone", "space"], pinned: ["tutor", "gone"] };
+    // The Lab, once Tutor, is a page of the Space now: its row becomes the Space's.
+    stored.value = { order: ["studio", "tutor", "gone", "lab"], pinned: ["lab", "gone"] };
     await useSidebarPins.getState().load();
     const { order, pinned } = useSidebarPins.getState();
-    expect(order.slice(0, 2)).toEqual(["lab", "space"]);
+    expect(order).toEqual(["studio", "space", "search", "agents"]);
     expect(order).toHaveLength(sidebarPlaceIds.length);
-    expect(pinned).toEqual(["lab", "search", "agents", "integrations"]);
+    expect(pinned).toEqual(["space", "search", "agents"]);
   });
 
   it("lists the rows that are not pinned under More and marks the open one", async () => {
@@ -54,7 +55,7 @@ describe("sidebar pins", () => {
     const items = within(menu)
       .getAllByRole("menuitem")
       .map((item) => item.textContent);
-    expect(items).toEqual(["studio", "lab", "Reorder pins"]);
+    expect(items).toEqual(["studio", "Reorder pins"]);
     fireEvent.click(within(menu).getByRole("menuitem", { name: "studio" }));
     expect(opened).toEqual(["studio"]);
   });
@@ -69,7 +70,7 @@ describe("sidebar pins", () => {
     fireEvent.keyDown(within(list).getByRole("button", { name: "Move studio" }), {
       key: "ArrowUp",
     });
-    expect(useSidebarPins.getState().order.indexOf("studio")).toBe(3);
-    expect((stored.value as { order: string[] }).order[3]).toBe("studio");
+    expect(useSidebarPins.getState().order.indexOf("studio")).toBe(2);
+    expect((stored.value as { order: string[] }).order[2]).toBe("studio");
   });
 });

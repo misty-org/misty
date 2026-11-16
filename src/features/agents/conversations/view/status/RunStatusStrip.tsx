@@ -2,13 +2,13 @@
 import { memo, useEffect, useMemo, useState, type ReactNode } from "react";
 import { ListChecks, Network, Pencil } from "lucide-react";
 import {
-  OverflowFadeText,
   Pressable,
   StepDot,
   Surface,
   Text,
   Tooltip,
   type StepDotState,
+  rowShapeWrap,
 } from "@/shared/ui";
 import { checklistForInvocation } from "../../../plans/checklists";
 import { useCollaborationStore } from "../../../plans/store";
@@ -16,7 +16,7 @@ import type { ChecklistItem } from "../../../plans/planTypes";
 import type { AgentSubagent } from "../../../runs/invocations/invocationTypes";
 import type { GlobalAiMessage } from "../../state/conversationTypes";
 import { RollingStat } from "./RollingStat";
-import { createEditedFilesBuilder, latestReply, liveStep, type EditedFile } from "./runStatus";
+import { createEditedFilesBuilder, latestReply, type EditedFile } from "./runStatus";
 
 type SectionId = "todo" | "subagent" | "files";
 
@@ -88,7 +88,7 @@ const todoDot: Record<ChecklistItem["status"], StepDotState> = {
 /** A pill's list, in the panel over the strip. */
 const rowsClass = "m-0 grid list-none gap-0.5 p-1";
 /** A row of a pill's list: its mark, its name fading at the end, and what's after it. */
-const rowClass = "flex min-h-8 items-center gap-2 rounded-lg px-2";
+const rowClass = rowShapeWrap;
 
 const todoState: Record<ChecklistItem["status"], string> = {
   pending: "Next",
@@ -167,7 +167,7 @@ function FileRows({ files }: { files: EditedFile[] }) {
 }
 
 /**
- * Above the composer: what the latest run is doing now, then pills for its checklist, its
+ * Above the composer: pills for its checklist, its
  * sub-agents and the files the chat edited (with +/- counts that roll as they grow). A pill opens
  * its list in a panel that floats above the strip, so the transcript never moves; another pill
  * switches, the same pill or Escape closes. Counts stay after a run ends until a newer one adds to
@@ -182,7 +182,6 @@ export const RunStatusStrip = memo(function RunStatusStrip({
 }) {
   const reply = latestReply(messages);
   const live = reply?.state === "pending" || reply?.state === "streaming";
-  const step = liveStep(reply);
   const buildFiles = useMemo(createEditedFilesBuilder, [conversationId]);
   const { files, total } = useMemo(() => buildFiles(messages), [buildFiles, messages]);
   const collaboration = useCollaborationStore((state) =>
@@ -213,7 +212,7 @@ export const RunStatusStrip = memo(function RunStatusStrip({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [section]);
-  if (!step && !todos.length && !subagents.length && !files.length) return null;
+  if (!todos.length && !subagents.length && !files.length) return null;
   const toggle = (id: SectionId) => setSection((current) => (current === id ? null : id));
   const todosDone = todos.filter((item) => item.status === "done" || item.status === "skipped");
   const childrenDone = subagents.filter((child) => child.state === "completed");
@@ -246,19 +245,8 @@ export const RunStatusStrip = memo(function RunStatusStrip({
           </Surface>
         </div>
       </div>
-      {/* The step fades first; the pills keep their width. */}
+      {/* What the run is doing now is said in the transcript, at the end of the live reply. */}
       <div className="flex min-h-7 items-center gap-2 px-1 pb-2">
-        {step ? (
-          <Text
-            bare
-            size="meta"
-            className="inline-flex min-w-0 items-center gap-2 overflow-hidden whitespace-nowrap"
-            aria-live="polite"
-          >
-            <StepDot state="working" size="sm" />
-            <OverflowFadeText className="misty-shimmer">{step}</OverflowFadeText>
-          </Text>
-        ) : null}
         <Text
           bare
           as="div"

@@ -1,4 +1,4 @@
-import { usePersonalAgentsStore } from "../../personal/personalAgentsStore";
+import { defaultEngineAgent, savedDefaultEngine } from "../../engines/defaultEngine";
 import { effectiveValues, useDevicePreferences } from "@/features/settings/preferenceAccess";
 import { useMistyStore } from "../../conversations/state/useMistyStore";
 import { invoke } from "@tauri-apps/api/core";
@@ -9,6 +9,7 @@ import { captureScreens, savedPresentation, withLessonCloseUp } from "./cursorCo
 import { CursorCompanionPointer } from "./cursorCompanionPointer";
 import { CursorCompanionSketch } from "./cursorCompanionSketch";
 import type { DisplayCapture, Presentation, PresentedFocus } from "./protocol";
+import { TutorTour } from "./tutorTour";
 
 export type CompanionOrigin = { conversationId: string; agentId?: string };
 
@@ -43,6 +44,9 @@ export class CursorCompanionSession {
   readonly pointer: CursorCompanionPointer = new CursorCompanionPointer(this);
   /** A reply's drawing, drawn while it streams. */
   readonly sketch: CursorCompanionSketch = new CursorCompanionSketch(this);
+  readonly tour: TutorTour = new TutorTour(this);
+  /** Whether the tour has been taken (or started) on this device. */
+  toured = true;
   hideTimer: ReturnType<typeof setTimeout> | undefined;
   pointTimer: ReturnType<typeof setTimeout> | undefined;
   focusTimer: ReturnType<typeof setTimeout> | undefined;
@@ -117,7 +121,10 @@ export class CursorCompanionSession {
       size: normalizeCompanionSize(values["agents.companion.size"]),
       ask: values["agents.companion.ask"] === true,
       teach: values["agents.companion.teach"] === true,
+      captions: values["agents.companion.captions"] === true,
+      tint: String(values["agents.companion.tint"] ?? "white"),
     });
+    this.toured = values["agents.companion.toured"] === true;
   };
 
   /**
@@ -146,7 +153,51 @@ export class CursorCompanionSession {
     this.voicePending ||
     this.pointPending ||
     this.state.phase !== "idle" ||
-    Boolean(this.state.focus || this.state.sketch);
+    Boolean(this.state.focus || this.state.sketch || this.state.caption);
+
+  /** The tour's line, shown at the bottom whenever Misty isn't talking. */
+  private tip: string | undefined;
+  /** The sentence being said, shown at the bottom while captions are on. */
+  private spoken: string | undefined;
+
+  private noticeTimer: ReturnType<typeof setTimeout> | undefined;
+
+  /** A short line at the bottom of the screen for a moment, such as where an unheard answer went. */
+  notice = (text: string, holdMs = 6_000) => {
+    if (this.tour.running) return;
+    this.setTip(text);
+    clearTimeout(this.noticeTimer);
+    this.noticeTimer = setTimeout(() => {
+      if (!this.tour.running && this.tip === text) this.setTip(undefined);
+    }, holdMs);
+  };
+
+  /** Shows the tour's next ask at the bottom of the screen, or clears it. */
+  setTip = (tip?: string) => {
+    this.tip = tip;
+    this.showCaption();
+  };
+
+  /** The one display Tutor looks at, after "only this monitor"; every display when unset. */
+  onlyDisplay: number | undefined;
+
+  /** A typed question's answer is captioned whatever the setting, as a chat would show it. */
+  captionNextAnswer = false;
+
+  /** The sentence the voice is on now, for captions; undefined once it stops. */
+  setSpoken = (sentence?: string) => {
+    this.spoken = this.state.captions || this.captionNextAnswer ? sentence : undefined;
+    if (sentence === undefined) this.captionNextAnswer = false;
+    this.showCaption();
+  };
+
+  private showCaption = () => {
+    const text = this.spoken ?? this.tip;
+    this.change({
+      caption: text ? { text, ...(this.spoken ? {} : { tip: true }) } : undefined,
+      ...(text ? { visible: true } : {}),
+    });
+  };
 
   /** Hides the cursor once the turn has nothing left to show. */
   maybeHide = () => {
@@ -281,9 +332,7 @@ export class CursorCompanionSession {
   capture = (generation: number, signal: AbortSignal) => captureScreens(generation, signal);
 }
 
-/** No selection means Misty's own agent; a prompt fills it in when it starts work. */
+/** No selection means the default engine's agent; a prompt fills it in when it starts work. */
 function orDefaultAgent(agentId: string | undefined) {
-  return (
-    agentId || usePersonalAgentsStore.getState().agents.find((agent) => agent.system_managed)?.id
-  );
+  return agentId || defaultEngineAgent(savedDefaultEngine());
 }

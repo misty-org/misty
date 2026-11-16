@@ -1,16 +1,9 @@
 import { Button } from "@/shared/ui";
-import { authFormButtonClass } from "./authButtonClass";
 
+/** The form's one primary button. The form's column stretches it to the fields' width. */
 export default function AuthSubmitButton({ idleLabel, loading, disabled }: AuthSubmitButtonProps) {
   return (
-    <Button
-      type="submit"
-      disabled={disabled}
-      loading={loading}
-      variant="primary"
-      size="lg"
-      className={authFormButtonClass}
-    >
+    <Button type="submit" disabled={disabled} loading={loading} variant="primary" size="lg">
       {idleLabel}
     </Button>
   );

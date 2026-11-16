@@ -13,7 +13,6 @@ export type TourId =
   | "lab"
   | "notebook"
   | "studio"
-  | "integrations"
   | "space-chat"
   | "docs"
   | "doc"
@@ -21,7 +20,6 @@ export type TourId =
   | "library"
   | "planner"
   | "calendar"
-  | "help"
   | "search"
   | "layout"
   | "add-sources"
@@ -131,11 +129,6 @@ export const tours: Record<TourId, { label: string; steps: readonly TourStep[] }
         body: "Start a doc or a drawing that everyone here can edit at the same time.",
       },
       {
-        target: "space-get-started",
-        title: "Your first steps",
-        body: "A few things to try. Each one checks itself off once you've done it.",
-      },
-      {
         target: "space-switcher",
         title: "Invite friends",
         body: "If you made this space, invite people from this menu. They see what you share and what your agents are doing, never your chats.",
@@ -190,8 +183,8 @@ export const tours: Record<TourId, { label: string; steps: readonly TourStep[] }
       },
       {
         target: "notebook-share",
-        title: "Share it",
-        body: "Share this notebook with your space, or change how it looks and behaves.",
+        title: "Work on it together",
+        body: "Everyone in this Space can open this notebook. See who's here, talk it over, or change how it looks and behaves.",
       },
     ],
   },
@@ -210,45 +203,29 @@ export const tours: Record<TourId, { label: string; steps: readonly TourStep[] }
       {
         target: "studio-ask",
         title: "Talk to them",
-        body: "Click an agent to chat, or type @ and their names in the box at the bottom to give a few of them one task.",
+        body: "Click an agent to chat, or type @ and their names in the box at the bottom left to give a few of them one task.",
       },
       {
-        target: "studio-mode",
-        title: "Look, hire or build",
-        body: "Look around, hire a new agent, or rearrange the room.",
+        target: "studio-hotbar",
+        title: "Your hotbar",
+        body: "Emote, play the Space's games, put on music, or rearrange the room. Keys 1 to 3 and B work too.",
       },
       {
-        target: "studio-camera",
-        title: "Move around",
-        body: "See the whole room at once, or walk around in it.",
+        target: "studio-level",
+        title: "Level up",
+        body: "Finished tasks, new agents, teammates and today's quests earn points that unlock furniture and a bigger room.",
+      },
+      {
+        title: "Hire at a free desk",
+        body: "Walk up to a free desk and press E to hire someone for it, or use Hire someone in your team list.",
+      },
+      {
+        title: "Walk around",
+        body: "WASD to walk, Space to jump, drag to look, scroll to step behind yourself. Walk up to an agent and press E to talk, and it follows you while you do.",
       },
       {
         title: "Friends drop by",
         body: "Friends' agents visit while those friends are in this space too, so you can see what everyone's up to.",
-      },
-    ],
-  },
-  integrations: {
-    label: "Integrations tour",
-    steps: [
-      {
-        target: "integrations-tabs",
-        title: "Give your AI more to work with",
-        body: "Plugins add new skills. Apps let your AI use things like your notes once you sign in.",
-      },
-      {
-        target: "integrations-rail",
-        title: "One engine at a time",
-        body: "Pick the AI to add to. Each one installs its own plugins, from the marketplaces listed under it.",
-      },
-      {
-        target: "integrations-bar",
-        title: "Find and install",
-        body: "Search, filter to what you have, and press Install on any card. Its link shows where it comes from.",
-      },
-      {
-        title: "You're in charge",
-        body: "Your AI uses an app only after you've signed in to it, and you can disconnect it whenever you like.",
       },
     ],
   },
@@ -399,11 +376,6 @@ export const tours: Record<TourId, { label: string; steps: readonly TourStep[] }
         target: "calendar-view",
         title: "Month or list",
         body: "See the whole month, or a list of what's coming up.",
-      },
-      {
-        target: "calendar-connect",
-        title: "Bring your calendars",
-        body: "Show your Google or other calendar here too.",
       },
     ],
   },

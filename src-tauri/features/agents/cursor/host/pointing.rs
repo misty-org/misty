@@ -42,6 +42,22 @@ pub fn cursor_companion_watch_clicks(
     state.watch_clicks.store(watching, Ordering::SeqCst);
     Ok(())
 }
+/// Where the pointer went while the talk keys were held for `turn`, in global units: what the
+/// person circled or scribbled over as they asked. Empty for any other turn.
+#[tauri::command]
+pub fn cursor_companion_trail(
+    webview: Webview,
+    app: AppHandle,
+    turn: u64,
+) -> Result<Vec<[f64; 2]>, String> {
+    require_main(&webview)?;
+    let state = host_state(&app);
+    if !current(&state, turn) {
+        return Ok(Vec::new());
+    }
+    let trail = state.trail.lock().unwrap();
+    Ok(trail.iter().map(|&(x, y)| [x, y]).collect())
+}
 /// The real control at or near a pointed-at spot, or null.
 #[tauri::command]
 pub async fn cursor_companion_snap(

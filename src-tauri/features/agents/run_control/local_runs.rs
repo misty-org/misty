@@ -214,11 +214,12 @@ pub async fn agent_run_start(
     super::run_ledger::note_start(&app, &run_id, &body);
     // The folder the turn works in is saved first, so a rewind can put its files back.
     super::turn_rewind::before_run(&app, &run_id, &body).await;
-    // A request that names an outside engine goes to its adapter, and reports the same events.
+    // Every run goes to an outside engine (the agent's, or the default engine): Misty has no model
+    // of its own, so its runtime isn't started for a run (it stays in the code, unused).
     let started = if crate::engines::runs::wants(&body) {
         crate::engines::runs::start(&app, run_id.clone(), body).await
     } else {
-        start_on_runtime(&app, run_id.clone(), body).await
+        Err("Pick a default engine in Settings › Agents.".to_owned())
     };
     // A run that never started has no events to end its row, which would say it is going for good.
     if started.is_err() {
@@ -227,6 +228,7 @@ pub async fn agent_run_start(
     started
 }
 
+#[allow(dead_code)]
 async fn start_on_runtime(app: &AppHandle, run_id: String, body: Value) -> Result<(), String> {
     let running = super::ensure(app).await?;
     super::contained(async move { running.runtime.start_local(&run_id, body).await })

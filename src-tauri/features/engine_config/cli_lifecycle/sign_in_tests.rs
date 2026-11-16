@@ -160,16 +160,15 @@ fn engines_without_a_status_command_remember_a_sign_in() {
         "agy",
         "hermes",
         "kimi",
-        "grok",
-        "qoder",
-        "qoder-cn",
         "codebuddy",
         "minimax",
     ] {
         assert!(remembers_sign_in(engine), "{engine}");
         assert!(remembered_sign_in(engine).is_some_and(|(signed_in, _)| signed_in.is_some()));
     }
-    for engine in ["claude", "codex", "gemini", "qwen", "opencode", "pi", "omp"] {
+    for engine in [
+        "claude", "codex", "gemini", "qwen", "opencode", "pi", "omp", "grok", "qoder", "qoder-cn",
+    ] {
         assert!(!remembers_sign_in(engine), "{engine}");
     }
     // Ways of their own: a status command, settings, or nothing to sign in to.

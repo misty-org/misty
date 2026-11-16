@@ -7,7 +7,7 @@ const settingsOverlayLayerClass = [
   "animate-in fade-in-0 duration-200",
 ].join(" ");
 const settingsOverlayPanelClass = [
-  "h-[min(900px,calc(100dvh-24px-max(24px,var(--misty-modal-inset-top,0px))))] w-[min(1200px,calc(100dvw-96px))]",
+  "h-[min(56.25rem,calc(100dvh-1.5rem-max(1.5rem,var(--misty-modal-inset-top,0px))))] w-[min(75rem,calc(100dvw-6rem))]",
   "min-w-0 overflow-hidden rounded-xl border border-charcoal-border bg-charcoal-card shadow-2xl",
   "misty-dialog-motion",
 ].join(" ");

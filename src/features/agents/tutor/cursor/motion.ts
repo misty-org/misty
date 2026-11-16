@@ -3,7 +3,7 @@ export interface Point {
   x: number;
   y: number;
 }
-export const POINT_HOLD_MS = 3000;
+export const POINT_HOLD_MS = 2000;
 export const BUBBLE_FADE_MS = 500;
 export function flight(from: Point, to: Point, elapsedMs: number) {
   const distance = Math.hypot(to.x - from.x, to.y - from.y);

@@ -12,13 +12,13 @@ export function StandaloneRouteSurface(props: { title: string; children: ReactNo
     <Surface
       as="section"
       tone="page"
-      className="grid h-full min-h-0 grid-rows-[38px_minmax(0,1fr)] overflow-hidden"
+      className="grid h-full min-h-0 grid-rows-[2.375rem_minmax(0,1fr)] overflow-hidden"
     >
       <Surface
         as="header"
         tone="workspace"
         data-window-toolbar
-        className={cn(windowToolbarClass, "flex h-10 items-center border-b px-3")}
+        className={cn(windowToolbarClass, "flex h-(--ui-header) items-center border-b px-3")}
       >
         <Text bare tone="bright" className="text-sm font-medium">
           {props.title}

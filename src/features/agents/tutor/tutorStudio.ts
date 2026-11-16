@@ -82,10 +82,13 @@ export function researchPrompt(topic: string, have: string[] = [], focus = ""): 
     focus
       ? `Find the best sources on the web for researching: ${topic}`
       : `Find the best sources on the web for learning about: ${topic}`,
-    "Search the web and pick six to ten pages, papers or videos that together cover it well: " +
-      "an overview, the fundamentals, worked examples, and one or two deeper ones. Prefer " +
-      "primary sources, official documentation, reputable courses and well-known explainers. " +
-      "Only include addresses you actually found and opened.",
+    // Opening each page is what made a search take minutes: Misty reads every link itself as it
+    // lands, so the agent only searches and picks from what the searches return.
+    "Search the web, two or three searches at most, and pick six to eight pages, papers or " +
+      "videos from the results that together cover it well: an overview, the fundamentals, " +
+      "worked examples, and one or two deeper ones. Prefer primary sources, official " +
+      "documentation, reputable courses and well-known explainers. Don't open the pages: Misty " +
+      "reads each one itself. Only include addresses that came back in your search results.",
     focus,
     have.length ? `The notebook already has these; don't repeat them:\n${have.join("\n")}` : "",
     jsonReply(
@@ -113,6 +116,13 @@ export function briefPrompt(notebook: Notebook, context: string): string {
 
 /** Which sources an overview was written from, so a change asks for a new one. */
 export function briefKey(notebook: Notebook): string {
+  // In a Space everyone shares one overview, so it follows the shared sources, not which ones
+  // this person's AI reads or the text a link read as on this computer.
+  if (notebook.space)
+    return notebook.sources
+      .map((source) => `${source.id}:${source.kind === "link" ? 0 : (source.text ?? "").length}`)
+      .sort()
+      .join(",");
   return notebook.sources
     .filter((source) => source.context !== "off")
     .map((source) => `${source.id}:${(source.text ?? "").length}`)

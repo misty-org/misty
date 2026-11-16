@@ -16,6 +16,7 @@ import { ITEM_ACTION_MENU_WIDTH, LibraryItemCard } from "./LibraryItemCard";
 import { hasLibraryItemMenuRows, LibraryItemMenuRows } from "./LibraryItemContextMenu";
 import { useLibraryItemMenuActions } from "./useLibraryItemMenuActions";
 import { useRangeSelection } from "@/shared/hooks/useRangeSelection";
+import { remCss, uiPx } from "@/shared/lib/uiScale";
 const ITEM_ACTION_MENU_HEIGHT = 336;
 function clampMenuPosition(left: number, top: number, anchor?: Element) {
   const pane = anchor?.closest<HTMLElement>("[data-workspace-pane]");
@@ -26,8 +27,11 @@ function clampMenuPosition(left: number, top: number, anchor?: Element) {
     bottom: window.innerHeight,
   };
   return {
-    left: Math.max(bounds.left + 8, Math.min(left, bounds.right - ITEM_ACTION_MENU_WIDTH - 8)),
-    top: Math.max(bounds.top + 8, Math.min(top, bounds.bottom - ITEM_ACTION_MENU_HEIGHT - 8)),
+    left: Math.max(
+      bounds.left + 8,
+      Math.min(left, bounds.right - uiPx(ITEM_ACTION_MENU_WIDTH) - 8),
+    ),
+    top: Math.max(bounds.top + 8, Math.min(top, bounds.bottom - uiPx(ITEM_ACTION_MENU_HEIGHT) - 8)),
   };
 }
 export function SpaceLibraryItems() {
@@ -153,7 +157,7 @@ export function SpaceLibraryItems() {
       style={{
         gridTemplateColumns: listLayout
           ? "1fr"
-          : `repeat(auto-fill,minmax(${gridColumnWidth(itemScale)}px,1fr))`,
+          : `repeat(auto-fill,minmax(${remCss(gridColumnWidth(itemScale))},1fr))`,
       }}
     >
       {displayItems.map((item, itemIndex) => {

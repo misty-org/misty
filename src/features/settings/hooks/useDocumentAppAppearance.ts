@@ -1,6 +1,6 @@
 import {
   appZoomChangedEvent,
-  appZoomRenderScale,
+  appZoomToStoredScale,
   getAppliedAppZoom,
   setAppZoom,
 } from "@/shared/hooks/useAppZoom";
@@ -94,7 +94,7 @@ export function useDocumentAppAppearance() {
       if (zoom === savedZoom.current) return;
       savedZoom.current = zoom;
       echoes.current = [...echoes.current.slice(-9), zoom];
-      void writeDevicePreference("app.zoom", appZoomRenderScale(zoom)).catch(() => undefined);
+      void writeDevicePreference("app.zoom", appZoomToStoredScale(zoom)).catch(() => undefined);
     };
     window.addEventListener(appZoomChangedEvent, save);
     return () => window.removeEventListener(appZoomChangedEvent, save);

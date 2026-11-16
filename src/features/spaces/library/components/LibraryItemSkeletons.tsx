@@ -1,4 +1,5 @@
 import { CollectionSkeleton, Skeleton, Surface, cn } from "@/shared/ui";
+import { remCss } from "@/shared/lib/uiScale";
 
 /** The narrowest a grid card goes at each item size, the grid's own column minimums. */
 export const GRID_COLUMN_WIDTHS = [172, 224, 300] as const;
@@ -57,7 +58,7 @@ export function LibraryItemsSkeleton({
     <div
       className="grid gap-3.5"
       style={{
-        gridTemplateColumns: `repeat(auto-fill,minmax(${gridColumnWidth(scale)}px,1fr))`,
+        gridTemplateColumns: `repeat(auto-fill,minmax(${remCss(gridColumnWidth(scale))},1fr))`,
       }}
       aria-busy="true"
       role="status"

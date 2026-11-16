@@ -40,7 +40,7 @@ export function MessageReplyPreview({
       bare
       as="div"
       tone="muted"
-      className="col-span-2 col-start-1 row-start-1 grid h-7 grid-cols-[44px_minmax(0,1fr)] gap-x-4"
+      className="col-span-2 col-start-1 row-start-1 grid h-7 grid-cols-[2.75rem_minmax(0,1fr)] gap-x-4"
     >
       <div aria-hidden="true" className="relative">
         {/* The elbow: only its left and top edges are drawn. */}

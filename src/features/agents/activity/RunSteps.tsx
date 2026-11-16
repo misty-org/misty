@@ -18,7 +18,16 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createDeviceSetting } from "@/shared/lib/deviceSetting";
-import { Button, cn, IconButton, OverflowFadeText, Pressable, Surface, Text } from "@/shared/ui";
+import {
+  Button,
+  cn,
+  IconButton,
+  OverflowFadeText,
+  Pressable,
+  Surface,
+  Text,
+  rowShapeWrap,
+} from "@/shared/ui";
 import type { RunStep } from "./activityApi";
 import { describeSteps, offsetLabel, type DescribedStep, type StepVerb } from "./stepSentences";
 import { useStepPicture } from "./useRunSteps";
@@ -190,7 +199,7 @@ export function RunSteps(props: {
                   type="button"
                   wash="control"
                   selected={selected}
-                  className="flex min-h-7.5 w-full min-w-0 items-center gap-2 rounded-lg px-2.5 py-1"
+                  className={cn(rowShapeWrap, "w-full")}
                   aria-current={selected ? "step" : undefined}
                   data-failed={step.failed || undefined}
                   data-running={step.running || undefined}

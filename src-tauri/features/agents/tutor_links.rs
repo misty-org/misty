@@ -120,6 +120,45 @@ async fn pdf(bytes: &[u8], address: &url::Url) -> Result<ReadLink, String> {
     })
 }
 
+/// The largest picture Tutor shows in a drawing; it's shrunk before it's drawn.
+const PICTURE_BYTES: usize = 8 << 20;
+
+fn picture_type(content_type: &str) -> bool {
+    // No SVG: a drawing only shows pictures, never documents that can carry scripts.
+    matches!(
+        content_type.split(';').next().unwrap_or("").trim(),
+        "image/png" | "image/jpeg" | "image/webp" | "image/gif"
+    )
+}
+
+/// A picture from the web for one of Tutor's drawings (a photo the engine found), as a data URL.
+/// Fetched like a link: public addresses only, with no cookies or sign-ins.
+#[tauri::command]
+pub async fn tutor_picture(webview: tauri::Webview, url: String) -> Result<String, String> {
+    use base64::{engine::general_purpose::STANDARD, Engine};
+    if !crate::browser::app_windows::is_person_window(webview.label()) {
+        return Err("Only Misty's own windows can show pictures.".into());
+    }
+    let _ = rustls::crypto::ring::default_provider().install_default();
+    let parsed = url::Url::parse(url.trim()).map_err(|_| "That isn't a web address.".to_owned())?;
+    if !matches!(parsed.scheme(), "http" | "https") {
+        return Err("Only web addresses can be shown.".into());
+    }
+    let response = fetch_raw(
+        parsed.as_str(),
+        "image/webp,image/png,image/jpeg,image/gif;q=0.9",
+        PICTURE_BYTES,
+        picture_type,
+    )
+    .await
+    .map_err(|_| "Misty couldn't reach that picture.".to_owned())?;
+    let kind = response.content_type.split(';').next().unwrap_or("").trim().to_owned();
+    if response.status >= 400 || response.truncated || !picture_type(&kind) || response.body.is_empty() {
+        return Err("That isn't a picture Misty can show.".into());
+    }
+    Ok(format!("data:{kind};base64,{}", STANDARD.encode(&response.body)))
+}
+
 /// A file dropped on a notebook: its bytes come as the request body and its name in a header, so
 /// the window hands over only what the person dropped, never a path. Parsed by the confined
 /// document worker from a temporary copy.

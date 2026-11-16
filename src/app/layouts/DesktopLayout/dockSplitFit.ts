@@ -9,6 +9,7 @@ import {
   type WorkspacePane,
   type WorkspaceView,
 } from "@/features/app-windows";
+import { designPx } from "@/shared/lib/uiScale";
 
 export function dropZoneAt(rect: DOMRect, x: number, y: number): DockDropZone {
   const localX = (x - rect.left) / Math.max(1, rect.width);
@@ -33,8 +34,9 @@ export function dockSplitFits(
   if (!splitKeepsGrid(root, pane.id, zone)) return false;
   const remaining = pane.views.filter((tab) => tab.id !== movingTab.id);
   if (!remaining.length) return false;
+  // Panes are measured in CSS pixels; the minimums are design pixels (shared/lib/uiScale.ts).
   return canFitDockSplit(
-    available,
+    { width: designPx(available.width), height: designPx(available.height) },
     zone,
     minimumForWorkspaceViews(remaining),
     dockWidgetRegistry.get(movingTab.surfaceId).minimumSize,

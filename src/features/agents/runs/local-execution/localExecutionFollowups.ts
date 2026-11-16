@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { deviceModelCall } from "@/api/runtime/device-models";
+import { followUpOnEngine } from "../../engines/mistyCalls";
 import type { GlobalAiConversation } from "../../conversations/state/conversationTypes";
 import {
   executionGeneration,
@@ -41,8 +41,8 @@ export async function routeLocalFollowup(prompt: string): Promise<string> {
   if (!execution || !conversationId) throw new Error("Open the active task conversation first.");
   await pauseLocalExecution(execution.taskId);
   const routingGeneration = executionGeneration();
-  // The device's fast model decides; the chat's last turns give it the task's context.
-  const { route } = await deviceModelCall<{ route: "steer" | "queue" | "stop" }>("follow-up", {
+  // The default engine decides; the chat's last turns give it the task's context.
+  const { route } = await followUpOnEngine({
     conversation: recentTurns(useMistyStore.getState().conversations, conversationId),
     new_message: prompt,
   });

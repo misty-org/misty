@@ -1,9 +1,10 @@
 import { expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({ call: vi.fn() }));
-vi.mock("@/api/runtime/device-models", () => ({ deviceModelCall: mocks.call }));
+// Every model call goes to the default engine (engines/mistyCalls.ts).
+vi.mock("../engines/mistyCalls", () => ({ screenModelOnEngine: mocks.call }));
 import { screenModelClient, screenModelConfig } from "./screenModel";
 
-it("sends every model call to the runtime on this computer", async () => {
+it("sends every model call to the default engine", async () => {
   mocks.call.mockResolvedValue({
     model: "m",
     choices: [{ message: { role: "assistant", content: "<plan/>" } }],
@@ -17,9 +18,9 @@ it("sends every model call to the runtime on this computer", async () => {
   })) as AsyncGenerator<{ choices: Array<{ delta: { content: string } }> }>;
   const chunks = [];
   for await (const chunk of stream) chunks.push(chunk.choices[0].delta.content);
-  expect(mocks.call.mock.calls.map(([name, body]) => [name, body])).toEqual([
-    ["screen-model", { messages: [{ role: "user", content: "look" }] }],
-    ["screen-model", { messages: [{ role: "user", content: "again" }] }],
+  expect(mocks.call.mock.calls.map(([messages]) => messages)).toEqual([
+    [{ role: "user", content: "look" }],
+    [{ role: "user", content: "again" }],
   ]);
   expect(chunks).toEqual(["<plan/>"]);
   expect(model.calls()).toBe(2);

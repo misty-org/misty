@@ -57,7 +57,6 @@ describe("settings routing", () => {
   it("lands every “manage it in Settings” link on the page that holds it", () => {
     const links: Record<string, [SettingsSection, string]> = {
       "update notice": ["updates", "general"],
-      "MCP servers": ["engine-mcp", "tools"],
     };
     for (const [link, [section, area]] of Object.entries(links))
       expect(settingsPage(section)?.area, link).toBe(area);

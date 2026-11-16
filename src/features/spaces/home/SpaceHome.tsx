@@ -1,3 +1,4 @@
+import { SpaceCrumb } from "../components/space-row/SpaceCrumb";
 import { Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -12,6 +13,7 @@ import {
   CollectionSearch,
   CollectionSkeleton,
   CollectionViewToggle,
+  EmptyState,
   MenuItem,
   useCollectionRefinement,
   useNotice,
@@ -25,17 +27,16 @@ import { useSpaceItemCreator } from "../overview/useSpaceItemCreator";
 import { SpaceOptionsMenu } from "../components/space-row/SpaceOptionsMenu";
 import { SpaceSwitcher } from "../components/space-row/SpaceSwitcher";
 import { editedLabel, galleryFilters, type GalleryItem, isGalleryFilter } from "./galleryItems";
-import { GalleryPreview, kindIcon } from "./GalleryPreview";
-import { GetStartedCard } from "./GetStartedCard";
+import { GalleryPreview, itemIcon } from "./GalleryPreview";
 import { useHomePreferences } from "./homePreferences";
-import { HomeSectionHead } from "./HomeSection";
+import { HomeSection } from "./HomeSection";
 import { homeItemsClass, homeItemsWrapClass, spaceHomeClass } from "./homeLayout";
 import { MakeSomethingNew } from "./MakeSomethingNew";
 import { SpaceItemCard, SpaceItemCardsSkeleton } from "./SpaceItemCard";
 import { SpaceOverview } from "./SpaceOverview";
 import { SpacePlaces } from "./SpacePlaces";
-import { SpaceTeamwork } from "./SpaceTeamwork";
 import { useSpaceGallery } from "./useSpaceGallery";
+import { HereFaces, useHereNow } from "./HereNow";
 import { useNow } from "@/shared/hooks/useNow";
 
 const journalKinds = ["note", "drawing"] as const;
@@ -73,10 +74,10 @@ const scopes = [
 ];
 
 /**
- * A Space's page: its pages, what waits for the person, their agents, chats and folders. Its title
- * switches the window to another Space. Its
- * items live on their own pages and show here only as search results, in Misty's collection
- * layout. All or Yours picks whose things show; the filter menu narrows by type and sets the
+ * A Space's page, laid out like the Lab's home: its pages, then what's going on in the Space
+ * (see SpaceOverview), then its things as the page's one collection, in Misty's collection
+ * layout. Its title switches the window to another Space. A search narrows the collection and
+ * puts it at the top. All or Yours picks whose things show; the filter menu narrows by type and sets the
  * order. This device remembers the view, All or Yours, and the filter menu's picks. New in the
  * head makes a note or drawing, or adds files. As the Journal it holds the Space's docs and
  * drawings, without the home's overview.
@@ -95,6 +96,8 @@ export function SpaceHome({ space, journal = false }: { space: Space; journal?: 
   const me = user?.id ?? "";
   const referenceOnly = useSpacesStore((state) => state.referenceOnly);
   const gallery = useSpaceGallery(space.id, me, !referenceOnly, space.role === "owner");
+  // Who is in the Space now and where, for the bar's faces and the Here now panel.
+  const here = useHereNow(space.id, gallery.items);
   const maker = useSpaceItemCreator(space.id);
   const { view, scope } = useHomePreferences((state) => state.value);
   const setHomePreferences = useHomePreferences((state) => state.set);
@@ -102,8 +105,7 @@ export function SpaceHome({ space, journal = false }: { space: Space; journal?: 
   const [openError, setOpenError] = useState("");
   const [deleteError, setDeleteError] = useState("");
   const [deleting, setDeleting] = useState(false);
-  // On the home, items show only as search results.
-  const showItems = journal || Boolean(query.trim());
+  const searching = Boolean(query.trim());
 
   const searched = useMemo(() => {
     const words = query.trim().toLocaleLowerCase();
@@ -217,7 +219,7 @@ export function SpaceHome({ space, journal = false }: { space: Space; journal?: 
     tone: "error",
     onDismiss: () => setOpenError(""),
   });
-  useNotice(showItems && gallery.failed.length > 0, {
+  useNotice(gallery.failed.length > 0, {
     message: `Couldn't load ${gallery.failed.join(" and ")}. The rest is shown.`,
     tone: "error",
     action: { label: "Retry", onSelect: gallery.reload },
@@ -228,7 +230,7 @@ export function SpaceHome({ space, journal = false }: { space: Space; journal?: 
       <CollectionHeading
         title={
           journal ? (
-            "Docs"
+            <SpaceCrumb spaceId={space.id} here="Docs" />
           ) : (
             <span data-tour="space-switcher" className="contents">
               <SpaceSwitcher space={space} />
@@ -237,6 +239,7 @@ export function SpaceHome({ space, journal = false }: { space: Space; journal?: 
         }
         end={
           <div className="flex min-w-0 items-center gap-2">
+            {!journal && <HereFaces spaceId={space.id} here={here} />}
             <CollectionSearch
               data-tour="space-search"
               aria-label={journal ? "Search the journal" : "Search this Space"}
@@ -259,58 +262,61 @@ export function SpaceHome({ space, journal = false }: { space: Space; journal?: 
           </div>
         }
       />
-      {!showItems && (
-        <div className={spaceHomeClass}>
-          <span data-tour="space-places" className="contents">
-            <SpacePlaces spaceId={space.id} />
-          </span>
-          <GetStartedCard
-            space={space}
-            wroteDoc={gallery.items.some((item) => item.kind === "note" && item.creatorId === me)}
-          />
-          <SpaceOverview
-            spaceId={space.id}
-            solo={space.member_count <= 1}
-            items={gallery.items}
-            itemsLoading={gallery.loading}
-          />
-          {space.is_shared && <SpaceTeamwork spaceId={space.id} />}
-        </div>
-      )}
-      {/* Home shows only its overview; the items themselves live on their pages. */}
-      {showItems && (
-        <>
-          {!journal && (
-            <div className="mt-3 -mb-1.5">
-              <HomeSectionHead title="Results" />
-            </div>
-          )}
-          <span data-tour="space-filters" className="contents">
-            <OrderedCollectionFilters
-              collectionId="space"
-              options={scopes}
-              value={scope}
-              onChange={(next) =>
-                setHomePreferences((current) => ({
-                  ...current,
-                  scope: next === "yours" ? "yours" : "all",
-                }))
-              }
-              filterControl={refinement.control}
-              actions={
-                <CollectionViewToggle
-                  value={view}
-                  onChange={(next) => setHomePreferences((current) => ({ ...current, view: next }))}
-                />
-              }
-            />
-          </span>
+      {/* After the Lab's home: the Space's pages to go to, what is going on in it, then its
+          things as the page's one collection, with their count, whose, filters and view. */}
+      <div className={spaceHomeClass}>
+        {!journal && !searching && (
+          <>
+            <span data-tour="space-places" className="contents">
+              <SpacePlaces spaceId={space.id} />
+            </span>
+            <SpaceOverview spaceId={space.id} shared={space.is_shared} here={here} />
+          </>
+        )}
+        <HomeSection
+          title={searching ? "Results" : journal ? "Docs" : "In this Space"}
+          count={gallery.loading ? undefined : refinement.items.length}
+          action={
+            <span data-tour="space-filters" className="contents">
+              <OrderedCollectionFilters
+                collectionId="space"
+                options={scopes}
+                value={scope}
+                onChange={(next) =>
+                  setHomePreferences((current) => ({
+                    ...current,
+                    scope: next === "yours" ? "yours" : "all",
+                  }))
+                }
+                filterControl={refinement.control}
+                actions={
+                  <CollectionViewToggle
+                    value={view}
+                    onChange={(next) =>
+                      setHomePreferences((current) => ({ ...current, view: next }))
+                    }
+                  />
+                }
+              />
+            </span>
+          }
+        >
           {gallery.loading ? (
             view === "grid" ? (
               <SpaceItemCardsSkeleton />
             ) : (
               <CollectionSkeleton label="Space contents" view="list" icons />
             )
+          ) : !refinement.items.length ? (
+            <EmptyState
+              inline
+              title={searching ? "Nothing matches" : "Nothing here yet"}
+              line={
+                searching
+                  ? "Try other words, or show everyone's things."
+                  : "Docs, drawings, notebooks and files made in this Space show up here."
+              }
+            />
           ) : view === "grid" ? (
             <div className={homeItemsWrapClass}>
               <div className={homeItemsClass}>
@@ -343,7 +349,7 @@ export function SpaceHome({ space, journal = false }: { space: Space; journal?: 
               sortResetKey={refinement.sortKey}
               categoryLabel="Type"
               items={refinement.items.map((item) => {
-                const { Icon, tone, label } = kindIcon[item.kind];
+                const { Icon, tone, label } = itemIcon(item);
                 return {
                   id: item.key,
                   title: item.title,
@@ -368,8 +374,8 @@ export function SpaceHome({ space, journal = false }: { space: Space; journal?: 
               onSelect={selection.select}
             />
           )}
-        </>
-      )}
+        </HomeSection>
+      </div>
     </CollectionPage>
   );
 }

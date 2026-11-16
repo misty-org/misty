@@ -13,6 +13,9 @@ import { readLink } from "../tutorSources";
 import { useTutorStore } from "../tutorStore";
 import type { Notebook, NotebookNote, NotebookSource, SourceContext } from "../tutorTypes";
 import { middleScrollClass, paneClass } from "./panes";
+import type { Person } from "../notebookPresence";
+import { LiveNoteBody } from "./LiveNoteBody";
+import { RowFaces } from "./LivePeople";
 
 /** A box in a source's guide: its summary, its transformations, its text. */
 const cardClass = "flex flex-col gap-2 px-3.5 py-3 text-control leading-[1.6]";
@@ -84,7 +87,7 @@ export function SourceReader({
 
   return (
     <section className={`${paneClass} flex-1`} aria-label={source.title}>
-      <div className={middleScrollClass}>
+      <div className={middleScrollClass} data-live-anchor={`reader:${source.id}`}>
         <div className={headClass}>
           <IconButton label="Back to chat" onClick={onClose}>
             <ArrowLeft />
@@ -245,13 +248,19 @@ export function SourceReader({
 export function NoteReader({
   notebook,
   note,
+  people = [],
   onClose,
 }: {
   notebook: Notebook;
   note?: NotebookNote;
+  /** The others in the notebook, for who else is in this note. */
+  people?: Person[];
   onClose(): void;
 }) {
   const store = useTutorStore.getState();
+  // In a notebook people work in together, a note is always open to type in, with everyone's
+  // carets; its title is saved as it's left.
+  const together = Boolean(note && notebook.space);
   const [editing, setEditing] = useState(!note);
   const [title, setTitle] = useState(note?.title ?? "");
   const [body, setBody] = useState(note?.body ?? "");
@@ -266,6 +275,44 @@ export function NoteReader({
     setEditing(false);
     if (!note) onClose();
   };
+  if (together && note)
+    return (
+      <section className={`${paneClass} flex-1`} aria-label="Note">
+        <div className={middleScrollClass} data-live-anchor={`reader:${note.id}`}>
+          <div className={headClass}>
+            <IconButton label="Back to chat" onClick={onClose}>
+              <ArrowLeft />
+            </IconButton>
+            <Input
+              variant="title"
+              className="flex-1 px-1.5 text-title font-semibold"
+              aria-label="Title"
+              placeholder="Untitled note"
+              value={title}
+              onChange={(event) => setTitle(event.target.value)}
+              onBlur={() => {
+                const next = title.trim() || "Untitled note";
+                if (next !== note.title)
+                  store.saveNote(notebook.id, { id: note.id, title: next, body: note.body });
+              }}
+            />
+            <RowFaces spaceId={notebook.space?.spaceId} people={people} itemId={note.id} />
+            <IconButton
+              label="Delete note"
+              onClick={() => {
+                store.removeNote(notebook.id, note.id);
+                onClose();
+              }}
+            >
+              <Trash2 />
+            </IconButton>
+          </div>
+          <Text bare as="div" size="control" tone="default" className="max-w-190 leading-[1.7]">
+            <LiveNoteBody notebookId={notebook.id} note={note} />
+          </Text>
+        </div>
+      </section>
+    );
   return (
     <section className={`${paneClass} flex-1`} aria-label="Note">
       <div className={middleScrollClass}>

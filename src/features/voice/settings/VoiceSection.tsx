@@ -1,4 +1,5 @@
 import { AudioLines, Keyboard, Languages, Mic, MonitorSpeaker } from "lucide-react";
+import { useSpeechSupport } from "../systemSpeech";
 import { voiceSettings } from "../voiceSettings";
 import {
   DesktopSettingsRow as SettingsRow,
@@ -24,7 +25,7 @@ const shortcuts = [
     : [{ value: "RightControl", label: "Right Ctrl", icon: Keyboard }]),
 ];
 const languages = [
-  { value: "auto", label: "Detect automatically", icon: Languages },
+  { value: "auto", label: "System language", icon: Languages },
   { value: "en", label: "English", icon: Languages },
   { value: "es", label: "Spanish", icon: Languages },
   { value: "fr", label: "French", icon: Languages },
@@ -44,9 +45,32 @@ const sources = [
   { value: "system", label: "System audio only", icon: MonitorSpeaker },
 ];
 
-/** Settings › Voice: dictation everywhere and voice captures. Device-only. */
+const rates = [
+  { value: "0.75", label: "Slower" },
+  { value: "1", label: "Normal" },
+  { value: "1.25", label: "Faster" },
+  { value: "1.5", label: "Fastest" },
+];
+
+/**
+ * Settings › Voice: dictation everywhere, voice captures, and the computer's own voice that
+ * speaks for Misty (Tutor, read aloud, audio overviews). Speech is recognized and spoken on this
+ * computer, with no key. Device-only.
+ */
 export function VoiceSection(props: SettingsContentProps) {
   const voice = voiceSettings(props.document);
+  const speech = useSpeechSupport();
+  // The system's voices in its own order, each by name and language; empty is its default.
+  const voices = [
+    { value: "", label: "System default" },
+    ...(speech?.voices ?? []).map((item) => ({
+      value: item.id,
+      label: `${item.name} (${item.language})`,
+    })),
+  ];
+  const chosenVoice = voices.some((item) => item.value === voice.systemVoice)
+    ? voice.systemVoice
+    : "";
   const set = (key: string, value: string | boolean) => props.onSettingChange("voice", key, value);
   const dictationOff = props.working || !voice.dictation;
   return (
@@ -80,7 +104,7 @@ export function VoiceSection(props: SettingsContentProps) {
         </SettingsRow>
         <SettingsRow
           label="AI cleanup"
-          description="Fixes punctuation and drops filler words before typing, in the style you pick. Uses your fast model."
+          description="Fixes punctuation and drops filler words before typing, in the style you pick. Runs on your default engine."
           muted={!voice.dictation}
         >
           <ChoiceControl
@@ -126,10 +150,28 @@ export function VoiceSection(props: SettingsContentProps) {
         >
           <TextAreaControl
             value={voice.dictionary.join("\n")}
-            placeholder={"Misty\nSoniox"}
+            placeholder={"Misty\nAntigravity"}
             rows={4}
             disabled={props.working}
             onCommit={(value) => set("dictionary", value)}
+          />
+        </SettingsRow>
+      </SettingsSectionBlock>
+      <SettingsSectionBlock title="Speaking">
+        <SettingsRow label="Voice">
+          <DropdownControl
+            value={chosenVoice}
+            options={voices}
+            disabled={props.working || !speech}
+            onValueChange={(value) => set("system_voice", value)}
+          />
+        </SettingsRow>
+        <SettingsRow label="Speaking rate">
+          <ChoiceControl
+            value={String(voice.speakingRate)}
+            options={rates}
+            disabled={props.working}
+            onValueChange={(value) => set("speaking_rate", value)}
           />
         </SettingsRow>
       </SettingsSectionBlock>

@@ -5,6 +5,7 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { X } from "lucide-react";
 import * as React from "react";
 import { IconButton } from "../controls/IconButton";
+import { PageDimmedContext } from "./pageDimmed";
 
 const Sheet = SheetPrimitive.Root;
 
@@ -77,9 +78,11 @@ const SheetContent = React.forwardRef<
     },
     ref,
   ) => {
+    // Over a dialog that already dims the page, a sheet doesn't dim it (and that dialog) again.
+    const dimmed = React.useContext(PageDimmedContext);
     const content = (
       <>
-        {overlay ? <SheetOverlay /> : null}
+        {overlay && !dimmed ? <SheetOverlay /> : null}
         <SheetPrimitive.Content
           ref={ref}
           data-slot="sheet-content"
@@ -99,7 +102,9 @@ const SheetContent = React.forwardRef<
               </IconButton>
             </SheetPrimitive.Close>
           ) : null}
-          <OutOfRow>{children}</OutOfRow>
+          <PageDimmedContext.Provider value={dimmed || overlay}>
+            <OutOfRow>{children}</OutOfRow>
+          </PageDimmedContext.Provider>
         </SheetPrimitive.Content>
       </>
     );

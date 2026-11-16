@@ -6,6 +6,7 @@ import * as React from "react";
 
 import { Button, type ButtonProps } from "../controls/Button";
 import { cn } from "../classNames";
+import { PageDimmedContext } from "./pageDimmed";
 
 const AlertDialog = AlertDialogPrimitive.Root;
 
@@ -37,32 +38,38 @@ const alertDialogSizeClass: Record<AlertDialogSize, string> = { sm: "max-w-sm", 
 const AlertDialogContent = React.forwardRef<
   React.ElementRef<typeof AlertDialogPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof AlertDialogPrimitive.Content> & { size?: AlertDialogSize }
->(({ className, size = "md", children, ...props }, ref) => (
-  <AlertDialogPortal>
-    <AlertDialogOverlay />
-    <div
-      data-slot="alert-dialog-positioner"
-      className="pointer-events-none fixed inset-0 layer-blocking-popup flex items-center justify-center pt-[var(--misty-modal-inset-top,0px)]"
-    >
-      <AlertDialogPrimitive.Content
-        ref={ref}
-        data-slot="alert-dialog-content"
-        data-size={size}
-        className={cn(
-          "pointer-events-auto relative grid",
-          "max-h-[calc(100dvh-4rem-var(--misty-modal-inset-top,0px))] w-[calc(100%-2rem)]",
-          alertDialogSizeClass[size],
-          "gap-4 overflow-y-auto rounded-xl bg-charcoal-card p-6",
-          "text-body text-cream shadow-xl ring-1 ring-cream/10 misty-dialog-motion",
-          className,
-        )}
-        {...props}
+>(({ className, size = "md", children, ...props }, ref) => {
+  // Over a dialog that already dims the page, an alert doesn't dim it (and that dialog) again.
+  const dimmed = React.useContext(PageDimmedContext);
+  return (
+    <AlertDialogPortal>
+      {dimmed ? null : <AlertDialogOverlay />}
+      <div
+        data-slot="alert-dialog-positioner"
+        className="pointer-events-none fixed inset-0 layer-blocking-popup flex items-center justify-center pt-[var(--misty-modal-inset-top,0px)]"
       >
-        <OutOfRow>{children}</OutOfRow>
-      </AlertDialogPrimitive.Content>
-    </div>
-  </AlertDialogPortal>
-));
+        <AlertDialogPrimitive.Content
+          ref={ref}
+          data-slot="alert-dialog-content"
+          data-size={size}
+          className={cn(
+            "pointer-events-auto relative grid",
+            "max-h-[calc(100dvh-4rem-var(--misty-modal-inset-top,0px))] w-[calc(100%-2rem)]",
+            alertDialogSizeClass[size],
+            "gap-4 overflow-y-auto rounded-xl bg-charcoal-card p-6",
+            "text-body text-cream shadow-xl ring-1 ring-cream/10 misty-dialog-motion",
+            className,
+          )}
+          {...props}
+        >
+          <PageDimmedContext.Provider value>
+            <OutOfRow>{children}</OutOfRow>
+          </PageDimmedContext.Provider>
+        </AlertDialogPrimitive.Content>
+      </div>
+    </AlertDialogPortal>
+  );
+});
 AlertDialogContent.displayName = AlertDialogPrimitive.Content.displayName;
 
 const AlertDialogHeader = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (

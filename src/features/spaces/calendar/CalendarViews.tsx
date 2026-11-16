@@ -11,18 +11,10 @@ type ViewProps = {
 };
 
 const entryLabel = (entry: CalendarEntry) =>
-  entry.kind === "task"
-    ? `Due: ${entry.title}`
-    : entry.kind === "connected"
-      ? `${entry.title} (Google Calendar)`
-      : entry.title;
+  entry.kind === "task" ? `Due: ${entry.title}` : entry.title;
 
 const entryLocation = (entry: CalendarEntry) =>
-  entry.kind === "event"
-    ? entry.event.location
-    : entry.kind === "connected"
-      ? entry.connected.location || "Google Calendar"
-      : "";
+  entry.kind === "event" ? entry.event.location : "";
 
 /** A month as six weeks of days, each with what is on it. */
 export function CalendarMonth({ anchor, entries, onOpen, onNew }: ViewProps) {
@@ -99,7 +91,6 @@ export function CalendarMonth({ anchor, entries, onOpen, onNew }: ViewProps) {
                           className={cn(
                             "flex min-w-0 flex-1 items-center gap-1 rounded px-1.5 py-0.5 text-left text-2xs",
                             entry.kind === "task" && "border border-dashed",
-                            entry.kind === "connected" && "border",
                           )}
                           onClick={() => onOpen(entry)}
                         >

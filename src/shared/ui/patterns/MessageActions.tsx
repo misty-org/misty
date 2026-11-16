@@ -126,7 +126,9 @@ function MessageActions({
       className={cn(
         "flex h-6 min-w-0 items-center gap-1",
         align === "end" ? "justify-end" : "justify-start",
-        "opacity-0 transition-opacity focus-within:opacity-100 data-[visible]:opacity-100",
+        // No fade: a fading bar gets its own WebKit layer, which snaps the icons' own layers
+        // (App.css) by a pixel each time it comes and goes, so they jiggle on hover.
+        "opacity-0 focus-within:opacity-100 data-[visible]:opacity-100",
         "[[data-message]:hover_&]:opacity-100 [[data-message]:focus-within_&]:opacity-100",
         // Without hover (touch screens) there is nothing to reveal it, so it stays.
         "[@media(hover:none)]:opacity-100",

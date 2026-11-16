@@ -1,18 +1,23 @@
 import { useLayoutEffect, type RefObject } from "react";
+import { remCss, uiPx } from "@/shared/lib/uiScale";
 import { dockingMetrics } from "./dockingGeometry";
 
-/** Native controls only exclude the part of a toolbar they actually overlap. */
+/** Native controls only exclude the part of a toolbar they actually overlap. The bounds and the
+ * native controls' widths are measured CSS pixels; the titlebar and the 8px clearance are design
+ * pixels, so they go through uiPx. */
 export function windowChromeInsets(
   bounds: { left: number; right: number; top: number; bottom: number },
   width: number,
   left: number,
   right: number,
 ) {
-  const touchesTitlebar = bounds.top < dockingMetrics.titlebar && bounds.bottom > 0;
+  const touchesTitlebar = bounds.top < uiPx(dockingMetrics.titlebar) && bounds.bottom > 0;
+  const clearance = uiPx(8);
   return {
     touchesTitlebar,
-    left: touchesTitlebar ? Math.max(0, left + 8 - bounds.left) : 0,
-    right: touchesTitlebar && right > 0 ? Math.max(0, bounds.right - (width - right - 8)) : 0,
+    left: touchesTitlebar ? Math.max(0, left + clearance - bounds.left) : 0,
+    right:
+      touchesTitlebar && right > 0 ? Math.max(0, bounds.right - (width - right - clearance)) : 0,
   };
 }
 
@@ -106,7 +111,7 @@ export function useMergedTitlebar(
         if (sideTabs)
           element.style.setProperty(
             "--window-chrome-top",
-            insets.left || insets.right ? `${dockingMetrics.titlebar}px` : "0px",
+            insets.left || insets.right ? remCss(dockingMetrics.titlebar) : "0px",
           );
         else if (fallback) element.dataset.windowTitlebarFallbackActive = "true";
         else element.dataset.mistyWindowTitlebarRegion = "true";
