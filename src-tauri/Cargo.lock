@@ -3497,7 +3497,7 @@ dependencies = [
 [[package]]
 name = "misty_page_runtime"
 version = "0.1.0"
-source = "git+https://github.com/misty-org/misty-browser-harness?rev=eb1a85e76121fa4eed4225d9d36c58bde623121b#eb1a85e76121fa4eed4225d9d36c58bde623121b"
+source = "git+https://github.com/misty-org/misty-browser-harness?rev=304b7a969de0e9f3d3cf2c8c97be7e89f8ea5cd7#304b7a969de0e9f3d3cf2c8c97be7e89f8ea5cd7"
 dependencies = [
  "serde_json",
 ]
