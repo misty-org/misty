@@ -94,7 +94,10 @@
     const W = watch();
     const target = args.ref ? S.refs.get(args.ref)?.el : null;
     S.effect = { token: S.docToken, at: performance.now(), url: location.href, count: W.count, focus: P.focused(), target, value: valueNow(target), checked: checkedNow(target) };
-    return { ok: true, token: S.docToken };
+    // What the step acts on, as a person would name it, for the run's browser log.
+    const role = target ? P.role(target) : "";
+    const name = target ? P.clip(P.name(target, role), 120) : "";
+    return { ok: true, token: S.docToken, ...(target ? { target: [role || target.tagName.toLowerCase(), name && `"${name}"`].filter(Boolean).join(" ") } : {}) };
   };
 
   /**
@@ -223,6 +226,9 @@
     const signIn = P.signInNote().trimEnd();
     if (signIn) header.push(signIn);
     if (before) header.push("- note: Lines starting with * are controls that are new since your last read of this page.");
+    const position = P.pagePosition();
+    if (position.pagesAbove >= 0.1 || position.pagesBelow >= 0.1)
+      header.push(`- note: The window shows part of the page: ${position.pagesAbove} window heights above it, ${position.pagesBelow} below.`);
     return {
       ok: true, compact: true, documentId: S.documentId, url: location.href, title: document.title || "",
       tree: [...header, body || "- text: (the page shows no readable content)"].join("\n"),
@@ -230,7 +236,7 @@
       ...(omitted ? { omitted } : {}),
       newRefs: before ? marked.filter((item) => item.ref && !before.has(item.ref)).length : 0,
       refCount: built.interactive.length, focused: P.focused(),
-      scroll: { y: Math.round(scrollY), height: Math.round(document.documentElement.scrollHeight), viewport: Math.round(innerHeight) },
+      scroll: P.pagePosition(),
     };
   };
 })(globalThis.__mistyAgentPageV1 ??= {});

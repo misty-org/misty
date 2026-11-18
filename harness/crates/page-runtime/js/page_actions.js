@@ -94,6 +94,8 @@
         editable: P.editable(el), consequence: args.consequenceOf ? P.consequence(args.consequenceOf, args.action) : consequence,
         consequenceKind: args.consequenceOf ? P.consequenceKind(args.consequenceOf, args.action) : consequenceKind,
         describe: P.describe(args.consequenceOf || el), scrolled, locator: P.locatorOf(args.consequenceOf || el),
+        // A link or form that opens its page in a new tab: the step says so, so the agent looks there.
+        ...(el.closest?.("a[target=_blank], area[target=_blank]") || (el.form && el.form.target === "_blank") ? { opensNewTab: true } : {}),
       };
     }
     // A covered link still names where it goes: the step can open that address instead.
@@ -111,13 +113,14 @@
   };
 
   // detail is the click count a browser reports; button 2 is the right button.
-  const mouse = (el, point, types, detail = 1, button = 0) => {
+  // `proceed` carries a cancelled pointerdown across calls that split one press; returned for the next.
+  const mouse = (el, point, types, detail = 1, button = 0, proceedFrom = true) => {
     const view = el.ownerDocument.defaultView;
     const rect = el.getBoundingClientRect();
     const init = { clientX: point?.x ?? rect.left + rect.width / 2, clientY: point?.y ?? rect.top + rect.height / 2,
       bubbles: true, cancelable: true, composed: true, button };
     const pressed = button === 2 ? 2 : 1;
-    let proceed = true;
+    let proceed = proceedFrom;
     for (const type of types) {
       if (!el.isConnected) break;
       if (type.startsWith("pointer")) {
@@ -129,6 +132,23 @@
         el.dispatchEvent(new view.MouseEvent(type, { ...init, buttons: type === "mousedown" ? pressed : 0, detail: counted ? detail : 0 }));
       }
     }
+    return proceed;
+  };
+
+  /** The innermost element at a click's point inside el, or el itself. */
+  const innermost = (el, point) => {
+    if (!point) return el;
+    const view = el.ownerDocument.defaultView;
+    const hit = deepHit(el.ownerDocument, point.x, point.y);
+    return hit && hit !== el && composedContains(el, hit) && hit instanceof view.Element ? hit : el;
+  };
+  /** The pointer leaves what the last script click went to, as it would moving elsewhere. */
+  let lastClicked = null;
+  const leaveLast = (next) => {
+    const last = lastClicked?.deref();
+    lastClicked = new WeakRef(next);
+    if (!last || last === next || !last.isConnected) return;
+    mouse(last, null, ["pointerout", "pointerleave", "mouseout", "mouseleave"]);
   };
 
   const fill = (el, text) => {
@@ -254,25 +274,43 @@
       return { ok: true, attempted: true, scrolled: true };
     }
     const pages = Math.max(0.1, Math.min(10, Number(step.amount) || 1));
-    let scroller = el;
     const horizontal = step.direction === "left" || step.direction === "right";
     const sign = step.direction === "up" || step.direction === "left" ? -1 : 1;
-    while (scroller) {
-      const style = scroller.ownerDocument.defaultView.getComputedStyle(scroller);
-      const root = scroller === scroller.ownerDocument.scrollingElement;
-      const can = horizontal ? scroller.scrollWidth > scroller.clientWidth + 1 && (root || /(auto|scroll|overlay)/.test(style.overflowX))
-        : scroller.scrollHeight > scroller.clientHeight + 1 && (root || /(auto|scroll|overlay)/.test(style.overflowY));
-      if (can) break;
-      scroller = scroller.parentElement || scroller.ownerDocument.defaultView?.frameElement || null;
+    // A box scrolls on that axis when it has room and its overflow (or a scrollbar style of its
+    // own, after page-agent's dom_tree, MIT; see NOTICE) says it does; the document's root always may.
+    const can = (box) => {
+      const style = box.ownerDocument.defaultView.getComputedStyle(box);
+      const root = box === box.ownerDocument.scrollingElement;
+      const signal = (style.scrollbarWidth && style.scrollbarWidth !== "auto") || (style.scrollbarGutter && style.scrollbarGutter !== "auto");
+      return horizontal ? box.scrollWidth > box.clientWidth + 1 && (root || signal || /(auto|scroll|overlay)/.test(style.overflowX))
+        : box.scrollHeight > box.clientHeight + 1 && (root || signal || /(auto|scroll|overlay)/.test(style.overflowY));
+    };
+    let scroller = el;
+    while (scroller && !can(scroller)) scroller = scroller.parentElement || scroller.ownerDocument.defaultView?.frameElement || null;
+    let target = scroller || document.scrollingElement || document.documentElement;
+    // An app shell (mail, chat, dashboards) keeps the document still and scrolls one big box: with
+    // no ref, that box is what "scroll the page" means (after page-agent's actions.ts, MIT; see
+    // NOTICE). The one under the middle of the window first, else the first that covers half of it.
+    let container = "";
+    if (!el && !can(target)) {
+      const big = (box) => (horizontal ? box.clientWidth >= innerWidth * 0.5 : box.clientHeight >= innerHeight * 0.5) && can(box);
+      let box = deepHit(document, innerWidth / 2, innerHeight / 2);
+      while (box && box !== document.body && box !== document.documentElement && !big(box)) box = box.parentElement || box.host || null;
+      if (!box || box === document.body || box === document.documentElement) box = Array.from(document.querySelectorAll("*")).find(big) || null;
+      if (box) { target = box; container = P.describe(box) || box.tagName.toLowerCase(); }
     }
-    const target = scroller || document.scrollingElement || document.documentElement;
     const isRoot = target === target.ownerDocument.scrollingElement;
     const size = horizontal ? (isRoot ? target.ownerDocument.defaultView.innerWidth : target.clientWidth) : (isRoot ? target.ownerDocument.defaultView.innerHeight : target.clientHeight);
     const before = horizontal ? target.scrollLeft : target.scrollTop;
     const delta = Math.round(sign * pages * size * 0.85);
     target.scrollBy({ left: horizontal ? delta : 0, top: horizontal ? 0 : delta, behavior: "instant" });
     const after = horizontal ? target.scrollLeft : target.scrollTop;
-    return { ok: true, attempted: true, scrolled: after !== before, atEnd: !horizontal && Math.ceil(target.scrollTop + target.clientHeight) >= target.scrollHeight - 1 };
+    const max = horizontal ? target.scrollWidth - target.clientWidth : target.scrollHeight - target.clientHeight;
+    return {
+      ok: true, attempted: true, scrolled: after !== before, moved: Math.round(after - before),
+      atStart: after <= 1, atEnd: after >= max - 1,
+      ...(container ? { container, note: `The page itself doesn't scroll; scrolled its main area (${container}).` } : {}),
+    };
   };
 
   const keyCodes = { Enter: 13, Escape: 27, Tab: 9, Backspace: 8, Delete: 46, ArrowUp: 38, ArrowDown: 40, ArrowLeft: 37, ArrowRight: 39, Home: 36, End: 35, PageUp: 33, PageDown: 34, Space: 32 };
@@ -306,13 +344,20 @@
       case "click": {
         if (!el) return fail("Give the ref to click.");
         // As a browser does: each press counts up, a second one adds dblclick,
-        // and the right button opens a context menu instead of clicking.
+        // and the right button opens a context menu instead of clicking. Events go to the
+        // innermost element at the point, as a real click's do, the control takes focus between
+        // press and release, and the control clicked before is left (after page-agent's
+        // actions.ts, MIT; see NOTICE).
         const count = Math.min(3, Math.max(1, Math.trunc(Number(step.clickCount)) || 1));
         const right = step.button === "right";
-        mouse(el, args.point, ["pointerover", "pointerenter", "mouseover", "pointermove", "mousemove"]);
-        for (let press = 1; press <= count && el.isConnected; press++) {
-          mouse(el, args.point, ["pointerdown", "mousedown", "pointerup", "mouseup", right ? "contextmenu" : "click"], press, right ? 2 : 0);
-          if (press === 2 && !right) mouse(el, args.point, ["dblclick"], 2);
+        const target = innermost(el, args.point);
+        leaveLast(target);
+        mouse(target, args.point, ["pointerover", "pointerenter", "mouseover", "pointermove", "mousemove"]);
+        for (let press = 1; press <= count && target.isConnected; press++) {
+          const proceed = mouse(target, args.point, ["pointerdown", "mousedown"], press, right ? 2 : 0);
+          if (press === 1 && proceed && el.isConnected && typeof el.focus === "function") el.focus({ preventScroll: true });
+          mouse(target, args.point, ["pointerup", "mouseup", right ? "contextmenu" : "click"], press, right ? 2 : 0, proceed);
+          if (press === 2 && !right) mouse(target, args.point, ["dblclick"], 2);
         }
         return { ok: true, attempted: true, input: "script" };
       }

@@ -81,6 +81,9 @@
   const nameFromContent = new Set(["button", "link", "checkbox", "radio", "switch", "option", "menuitem", "menuitemcheckbox",
     "menuitemradio", "tab", "heading", "cell", "gridcell", "columnheader", "rowheader", "treeitem", "tooltip", "row", "clickable"]);
 
+  // Controls that act on their own when they sit inside a link or card.
+  const OWN_CONTROLS = "button,input:not([type=hidden]),select,textarea,[role=button],[role=checkbox],[role=switch],[role=menuitem],[role=tab],[role=combobox]";
+
   const textOf = (node, budget = 400) => {
     // innerText respects CSS; fall back to textContent where layout is absent.
     const value = node.innerText ?? node.textContent ?? "";
@@ -125,7 +128,15 @@
     if (tag === "fieldset") return clip(el.querySelector(":scope > legend")?.textContent || "", 160);
     if (tag === "table") return clip(el.querySelector(":scope > caption")?.textContent || "", 160);
     if (nameFromContent.has(role) || tag === "summary") {
-      const text = textOf(el, 160);
+      // A link or clickable card holding controls of its own (page_tree.js lists them under it):
+      // its name is its own words, not theirs, so a product link doesn't read "… Add to cart".
+      const inner = (role === "link" || role === "clickable") && el.querySelector(OWN_CONTROLS);
+      let text = textOf(el, 160);
+      if (inner) {
+        const copy = el.cloneNode(true);
+        for (const control of copy.querySelectorAll(OWN_CONTROLS)) control.remove();
+        text = clip(copy.textContent, 160) || text;
+      }
       if (text) return text;
       const image = el.querySelector("img[alt],svg[aria-label],[role=img][aria-label]");
       if (image) return clip(image.getAttribute("alt") || image.getAttribute("aria-label"), 160);

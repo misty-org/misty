@@ -3,6 +3,7 @@
 ((P) => {
   const S = P.state;
   const MAX_SCAN = 25000;
+  const quote = (text) => `"${String(text).replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
   // Roles that become a line of their own even without a ref.
   const STRUCTURE = new Set(["navigation", "main", "complementary", "form", "dialog", "alertdialog", "alert", "region",
     "article", "banner", "contentinfo", "search", "group", "radiogroup", "toolbar", "menu", "menubar", "tablist",
@@ -11,6 +12,17 @@
   // Interactive roles whose name already says everything inside them.
   const LEAF = new Set(["button", "link", "checkbox", "radio", "switch", "textbox", "searchbox", "spinbutton", "slider",
     "option", "menuitem", "menuitemcheckbox", "menuitemradio", "tab", "heading", "img", "clickable", "columnheader"]);
+  // Cursors a page sets on what it means to be dragged, resized, zoomed or clicked (after
+  // page-agent's dom_tree, MIT; see NOTICE). Only where the cursor starts counts: a card's
+  // children inherit its pointer, and listing each of them would repeat the card.
+  const INTERACTIVE_CURSORS = new Set(["pointer", "move", "grab", "grabbing", "cell", "zoom-in", "zoom-out",
+    "col-resize", "row-resize", "ew-resize", "ns-resize", "all-scroll", "crosshair", "context-menu"]);
+  // What a control inside a link, a button or a clickable card must be to get a ref of its own
+  // there: a "favourite" button inside a product link, a row's checkbox, a card's "⋯" menu.
+  const DISTINCT_TAGS = new Set(["BUTTON", "INPUT", "SELECT", "TEXTAREA", "SUMMARY"]);
+  const DISTINCT_ROLES = new Set(["button", "checkbox", "radio", "switch", "menuitem", "menuitemcheckbox",
+    "menuitemradio", "tab", "combobox", "textbox", "searchbox", "spinbutton", "slider"]);
+  const OWN_STATE = ["aria-haspopup", "aria-expanded", "aria-checked", "aria-pressed"];
   const cursorCache = new WeakMap();
   const cursorOf = (el) => {
     if (!cursorCache.has(el)) cursorCache.set(el, el.ownerDocument.defaultView.getComputedStyle(el).cursor);
@@ -34,6 +46,23 @@
     if (aria("aria-invalid") === "true" || (el.validity && el.willValidate && !el.validity.valid && el.value)) props.push("invalid");
     if (el.readOnly || aria("aria-readonly") === "true") props.push("readonly");
     if (role === "textbox" && (el.tagName === "TEXTAREA" || aria("aria-multiline") === "true" || el.isContentEditable)) props.push("multiline");
+    // What a name can't say (after page-agent's attribute list, MIT; see NOTICE): the kind of value
+    // a field takes, a hint that isn't its name, a date format, the popup a control opens, a link
+    // that opens a new tab, and a component's own open/closed state where ARIA says none.
+    if (el.tagName === "INPUT") {
+      const type = (el.getAttribute("type") || "").toLowerCase();
+      if (["date", "time", "datetime-local", "month", "week", "number", "email", "tel", "url", "color"].includes(type)) props.push(`type=${type}`);
+    }
+    const hint = el.getAttribute("placeholder");
+    if (hint && hint.trim() && hint.trim() !== node.name) props.push(`hint=${quote(P.clip(hint.trim(), 60))}`);
+    const format = el.getAttribute("data-date-format") || (el.tagName === "INPUT" && el.getAttribute("pattern"));
+    if (format) props.push(`format=${quote(P.clip(format, 40))}`);
+    const popup = aria("aria-haspopup");
+    if (popup && popup !== "false" && role !== "combobox") props.push(`popup=${popup === "true" ? "menu" : popup}`);
+    if (role === "link" && el.closest("a[target=_blank], area[target=_blank]")) props.push("new tab");
+    const state = el.getAttribute("data-state");
+    if (state && /^(open|closed|on|off|checked|unchecked|active|inactive)$/.test(state) &&
+      !aria("aria-expanded") && !aria("aria-checked") && !aria("aria-pressed") && !aria("aria-selected")) props.push(`state=${state}`);
   };
 
   const valueOf = (el, role) => {
@@ -58,6 +87,48 @@
       const url = new URL(href, el.baseURI);
       return P.clip(url.origin === location.origin ? url.pathname + url.search + url.hash : url.href, 120);
     } catch { return ""; }
+  };
+
+  /**
+   * How far a block can still scroll, or null when it doesn't (after page-agent's dom_tree, MIT;
+   * see NOTICE). A box scrolls when its overflow says so, or when it sets its scrollbar's width or
+   * gutter, which only boxes made to scroll do (some only turn overflow on under the pointer).
+   * Less than 4px of room is no room.
+   */
+  const scrollRoom = (el, style) => {
+    const signal = (style.scrollbarWidth && style.scrollbarWidth !== "auto") ||
+      (style.scrollbarGutter && style.scrollbarGutter !== "auto");
+    const y = /(auto|scroll|overlay)/.test(style.overflowY) || signal;
+    const x = /(auto|scroll|overlay)/.test(style.overflowX) || signal;
+    const height = el.scrollHeight - el.clientHeight;
+    const width = el.scrollWidth - el.clientWidth;
+    const roomY = y && height >= 4;
+    const roomX = x && width >= 4;
+    if (!roomY && !roomX) return null;
+    const parts = [];
+    const px = (value) => `${Math.round(value)}px`;
+    if (roomY) {
+      const below = height - el.scrollTop;
+      if (below >= 4) parts.push(`${px(below)} below`);
+      if (el.scrollTop >= 4) parts.push(`${px(el.scrollTop)} above`);
+    }
+    if (roomX) {
+      const right = width - el.scrollLeft;
+      if (right >= 4) parts.push(`${px(right)} right`);
+      if (el.scrollLeft >= 4) parts.push(`${px(el.scrollLeft)} left`);
+    }
+    return { text: parts.join(", ") };
+  };
+
+  /** Whether a control inside a named leaf acts on its own, apart from the leaf. */
+  const distinct = (el) => {
+    if (DISTINCT_TAGS.has(el.tagName)) return !(el.tagName === "INPUT" && el.type === "hidden");
+    const role = el.getAttribute("role");
+    if (role && DISTINCT_ROLES.has(role)) return true;
+    if (el.isContentEditable && el.getAttribute("contenteditable") !== null) return true;
+    if (OWN_STATE.some((name) => el.hasAttribute(name) && el.getAttribute(name) !== "false")) return true;
+    const style = el.ownerDocument.defaultView.getComputedStyle(el);
+    return !style.display.startsWith("inline") && scrollRoom(el, style) !== null;
   };
 
   /** Builds the visible accessibility tree under root, registering refs. */
@@ -86,6 +157,19 @@
         if (scanLimited) return;
         if (child.nodeType === 3) { if (!textHidden) pushText(parent, child.data); }
         else if (child.nodeType === 1) visit(child, parent);
+      }
+    };
+    /** Under a named leaf: lists the controls inside it that act on their own, nothing else. */
+    const visitDistinct = (el, parent) => {
+      const kids = el.shadowRoot ? el.shadowRoot.childNodes
+        : el.tagName === "SLOT" ? el.assignedNodes({ flatten: true }) : el.childNodes;
+      for (const child of kids) {
+        if (scanLimited) return;
+        if (child.nodeType !== 1) continue;
+        if (++scanned > MAX_SCAN) { scanLimited = true; return; }
+        if (P.hiddenSelf(child)) continue;
+        if (distinct(child)) visit(child, parent);
+        else visitDistinct(child, parent);
       }
     };
     const visit = (el, parent) => {
@@ -120,13 +204,19 @@
       if (!role && !invisible && el !== el.ownerDocument.body) {
         const parentEl = el.parentElement;
         const tabbable = el.hasAttribute("tabindex") && el.tabIndex >= 0;
-        const pointer = cursorOf(el) === "pointer" && (!parentEl || cursorOf(parentEl) !== "pointer");
-        clickable = tabbable || el.hasAttribute("onclick") || pointer;
+        const cursor = cursorOf(el);
+        const pointer = INTERACTIVE_CURSORS.has(cursor) && (!parentEl || cursorOf(parentEl) !== cursor);
+        // A toggle that names the popup it opens is clickable whatever its cursor (Bootstrap's
+        // dropdowns, unroled menu buttons).
+        const toggle = (el.hasAttribute("aria-haspopup") && el.getAttribute("aria-haspopup") !== "false") ||
+          el.getAttribute("data-toggle") === "dropdown";
+        clickable = tabbable || toggle || pointer ||
+          el.hasAttribute("onclick") || el.hasAttribute("onmousedown") || el.hasAttribute("onmouseup");
         if (clickable) role = "clickable";
       }
-      const scrollable = block && el !== el.ownerDocument.body && el !== el.ownerDocument.documentElement &&
-        ((/(auto|scroll|overlay)/.test(style.overflowY) && el.scrollHeight > el.clientHeight + 1) ||
-         (/(auto|scroll|overlay)/.test(style.overflowX) && el.scrollWidth > el.clientWidth + 1));
+      const scroll = block && el !== el.ownerDocument.body && el !== el.ownerDocument.documentElement
+        ? scrollRoom(el, style) : null;
+      const scrollable = Boolean(scroll);
       const acts = !invisible && (P.interactiveRoles.has(role) || clickable);
       if (!acts && !scrollable && !STRUCTURE.has(role)) {
         visitChildren(el, parent, invisible);
@@ -138,7 +228,7 @@
         if (secret) node.props.push(`${secret} — only the person may enter it`);
         else if (refs < maxRefs) { node.ref = P.register(el); refs++; }
       }
-      if (scrollable) node.props.push("scrollable");
+      if (scroll) node.props.push(scroll.text ? `scrollable: ${scroll.text}` : "scrollable");
       if (role) states(el, role, node);
       if (!secret) {
         const value = valueOf(el, role);
@@ -153,6 +243,9 @@
         }
       } else if (!(LEAF.has(node.role) && (node.name || node.ref))) {
         visitChildren(el, node, invisible);
+      } else if (!invisible) {
+        // The name says what the control is; only controls of their own inside it are listed.
+        visitDistinct(el, node);
       }
       if (node.ref) interactive.push(node);
       const empty = !node.name && !node.ref && !node.children.length && !node.value;
@@ -164,7 +257,6 @@
     return { tree, interactive, scanLimited, refLimited: refs >= maxRefs };
   };
 
-  const quote = (text) => `"${String(text).replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
   P.line = (node) => {
     let line = `- ${node.role}`;
     if (node.name) line += ` ${quote(node.name)}`;
@@ -256,6 +348,20 @@
     return P.describe(el) + (ref && S.refs.has(ref) ? ` [ref=${ref}]` : "");
   };
 
+  /**
+   * Where the window is on the page, in pixels and in window heights above and below it (after
+   * page-agent's page info, MIT; see NOTICE), for a read that shows only part of the page.
+   */
+  P.pagePosition = () => {
+    const root = document.scrollingElement || document.documentElement;
+    const viewport = Math.max(1, innerHeight);
+    const below = Math.max(0, root.scrollHeight - (scrollY + innerHeight));
+    return {
+      y: Math.round(scrollY), x: Math.round(scrollX), height: Math.round(root.scrollHeight), width: Math.round(root.scrollWidth),
+      viewport: Math.round(innerHeight), pagesAbove: Math.round((scrollY / viewport) * 10) / 10, pagesBelow: Math.round((below / viewport) * 10) / 10,
+    };
+  };
+
   P.snapshot = (args) => {
     if (!S.documentId) S.documentId = args.candidateId;
     // A cross-origin frame numbers its refs from its own range, so one snapshot never
@@ -317,7 +423,7 @@
       refCount: built.interactive.length, dialogs: P.dialogs(), focused: P.focused(),
       // Pattern and app skills that apply to this page (page_skills.js).
       ...(root === document && P.detectSkills ? { skills: P.detectSkills() } : {}),
-      scroll: { y: Math.round(scrollY), height: Math.round(document.documentElement.scrollHeight), viewport: Math.round(innerHeight) },
+      scroll: P.pagePosition(),
     };
   };
 

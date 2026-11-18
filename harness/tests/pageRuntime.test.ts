@@ -68,7 +68,7 @@ describe("agent page runtime", () => {
     expect(documentId).toBe("doc-1");
     expect(text).toContain('- heading "Checkout" [level=1]');
     expect(text).toMatch(/- navigation "Main":\n\s+- link "Home" \[ref=e\d+\] \[url=\/home\]/);
-    expect(text).toMatch(/- textbox "Email" \[ref=e\d+\]: "ada@example.com"/);
+    expect(text).toMatch(/- textbox "Email" \[type=email\] \[ref=e\d+\]: "ada@example.com"/);
     expect(text).toMatch(/- checkbox "Keep me posted" \[checked\] \[ref=e\d+\]/);
     expect(text).toMatch(/- combobox "Size" \[ref=e\d+\]: "Large"/);
     expect(text).toMatch(/- button "Place order" \[ref=e\d+\]/);
@@ -475,6 +475,77 @@ describe("agent page runtime", () => {
     expect(page.call("waitCheck", { text: "saved" }).met).toBe(false);
     document.body.innerHTML = "<p>Saved</p>";
     expect(page.call("waitCheck", { text: "saved", textGone: "saving" }).met).toBe(true);
+  });
+
+  it("lists the controls inside a link or card that act on their own, and nothing else there", () => {
+    const page = load(`
+      <a href="/p/1">
+        <img alt="Lamp">
+        <span>Desk lamp $35</span>
+        <button aria-label="Add to favourites">♡</button>
+        <span role="checkbox" aria-checked="false" aria-label="Compare"></span>
+      </a>`);
+    const { tree: text } = snapshot(page);
+    expect(text).toMatch(/- link "Desk lamp \$35" \[ref=e\d+\] \[url=\/p\/1\]:\n\s+- button "Add to favourites" \[ref=e\d+\]\n\s+- checkbox "Compare" \[unchecked\] \[ref=e\d+\]/);
+    // The link's own words stay its name, not lines of their own.
+    expect(text).not.toMatch(/^\s+- text: Desk lamp/m);
+  });
+
+  it("names what a field's name can't: its kind, hint, popup and a new tab", () => {
+    const page = load(`
+      <label>Arrival <input type="date" placeholder="dd/mm/yyyy" data-date-format="dd/mm/yyyy"></label>
+      <input aria-label="Search" placeholder="Search">
+      <button aria-haspopup="menu">More</button>
+      <a href="https://example.com/help" target="_blank">Help</a>
+      <div data-toggle="dropdown">Sort by</div>`);
+    const { tree: text } = snapshot(page);
+    expect(text).toMatch(/- textbox "Arrival" \[type=date\] \[hint="dd\/mm\/yyyy"\] \[format="dd\/mm\/yyyy"\] \[ref=e\d+\]/);
+    // A placeholder that only repeats the name adds nothing.
+    expect(text).toMatch(/- textbox "Search" \[ref=e\d+\]$/m);
+    expect(text).toMatch(/- button "More" \[popup=menu\] \[ref=e\d+\]/);
+    expect(text).toMatch(/- link "Help" \[new tab\] \[ref=e\d+\]/);
+    // A dropdown toggle with no role or cursor still gets a ref.
+    expect(text).toMatch(/- clickable "Sort by" \[ref=e\d+\]/);
+  });
+
+  it("clicks the innermost element at the point, focuses the control and leaves the one before", () => {
+    const page = load(`<button id="a"><span id="label">Save</span></button><button id="b">Cancel</button>`);
+    const { tree: text, documentId } = snapshot(page);
+    const save = refFor(text, /button "Save"/);
+    const cancel = refFor(text, /button "Cancel"/);
+    const label = document.getElementById("label")!;
+    const seen: string[] = [];
+    label.addEventListener("mousedown", () => seen.push("label:mousedown"));
+    label.addEventListener("click", () => seen.push(`label:click:${document.activeElement?.id}`));
+    document.getElementById("a")!.addEventListener("click", () => seen.push("a:click"));
+    document.getElementById("a")!.addEventListener("mouseleave", () => seen.push("a:leave"));
+    (document.elementFromPoint as ReturnType<typeof vi.fn>).mockReturnValue(label);
+    page.call("perform", { documentId, step: { action: "click", ref: save }, point: { x: 60, y: 25 } });
+    // The press lands on the label inside the button and bubbles to it; the button has focus by the click.
+    expect(seen).toEqual(["label:mousedown", "label:click:a", "a:click"]);
+    seen.length = 0;
+    (document.elementFromPoint as ReturnType<typeof vi.fn>).mockReturnValue(document.getElementById("b"));
+    page.call("perform", { documentId, step: { action: "click", ref: cancel }, point: { x: 60, y: 25 } });
+    expect(seen).toContain("a:leave");
+  });
+
+  it("scrolls an app shell's main area when the page itself can't scroll", () => {
+    const page = load(`<div id="main" style="overflow-y: auto"><p>Inbox</p></div>`);
+    const main = document.getElementById("main")!;
+    let top = 0;
+    Object.defineProperties(main, {
+      scrollHeight: { configurable: true, get: () => 3000 },
+      clientHeight: { configurable: true, get: () => 700 },
+      scrollTop: { configurable: true, get: () => top, set: (value: number) => (top = value) },
+    });
+    main.scrollBy = ((options: ScrollToOptions) => (top = Math.min(2300, top + (options.top ?? 0)))) as Element["scrollBy"];
+    Object.defineProperty(window, "innerHeight", { configurable: true, value: 800 });
+    (document.elementFromPoint as ReturnType<typeof vi.fn>).mockReturnValue(main.querySelector("p"));
+    const { documentId } = snapshot(page);
+    const result = page.call("perform", { documentId, step: { action: "scroll", direction: "down", amount: 1 } });
+    expect(result).toMatchObject({ ok: true, scrolled: true, atStart: false, atEnd: false });
+    expect(result.moved).toBeGreaterThan(0);
+    expect(result.note).toContain("main area");
   });
 });
 
