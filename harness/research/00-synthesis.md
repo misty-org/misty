@@ -842,6 +842,8 @@ All of this phase goes into the existing in-process path (`crates/page-runtime` 
 
 ### 8.1 Skyvern (AGPL-3.0)
 
+**Decision (2026-11-18): ideas only.** The harness takes no Skyvern code. Its mechanisms are reimplemented from their idea in this runtime's own code, so no file carries a Skyvern header and `NOTICE` has no Skyvern entry. The rest of this section applies only if code is ever copied or closely translated from Skyvern, which needs a new decision first. Source paths cited in these reports are research references, not derivations.
+
 - **Root license.** The root `LICENSE` is AGPL-3.0. There are no per-directory licenses, and the anti-bot code is absent from the repo, not differently licensed (`README.md:589-590`).
 - **Copyright holder.** The repo has no explicit copyright line. Name "Skyvern AI" (`pyproject.toml:5`) and the repo URL.
 - **Areas we derive from:**
@@ -1131,7 +1133,7 @@ One limit on the evidence: the 0.x checkout has no `agent/service.py`. Claims ab
 
 The overall position holds.
 
-- **Skyvern.**
+- **Skyvern.** Ideas only since 2026-11-18 (see 8.1); the points below apply only if its code is ever copied.
   - Only `./LICENSE` exists in Skyvern, so `cli/mcp_tools`, `skills/`, `browser_extension/` and `taskv3/` are all AGPL-3.0.
   - Skyvern names no license version. Under AGPL §14, any published version may be chosen, so combining with Misty's -or-later is fine.
   - Label derived files: "Skyvern portions: AGPL-3.0, version unspecified, §14."
