@@ -39,8 +39,16 @@ browsing, so the score measures the engine's model with Misty's harness. Always 
    ```
 
    ```bash
-   MISTY_PROFILE=benchmark MISTY_BROWSER_EVAL_BRIDGE_PORT=47123 npm run tauri dev
+   MISTY_DEV_FROZEN=1 MISTY_PROFILE=benchmark MISTY_BROWSER_EVAL_BRIDGE_PORT=47123 npm run tauri -- dev --no-watch
    ```
+
+   If the app quits during a run, the runner marks that task `misty_quit`, leaves the rest
+   unrun, and does not grade the cut-short task. The terminal's last lines say how Misty ended,
+   and a panic, with its backtrace, is in `~/.misty/dev/benchmark/logs/crash.log`.
+
+   `MISTY_DEV_FROZEN=1` and `--no-watch` keep the app as it was built: an edit to the checkout
+   would otherwise reload the window or rebuild the app, and Misty ends the tool calls a reload
+   interrupts ("Misty closed while this was running"), which a task then counts as failures.
 
 3. In that app, sign in to your Misty account (agents and chats are kept per account; signed
    out, the runner can't find them), then send the agent you'll benchmark (for example the

@@ -30,6 +30,11 @@ from pathlib import Path
 
 import httpx
 
+# browser_use, which the benchmark's modules import, measures the screen with AppKit for a browser
+# it would launch; Misty's browser does the browsing here. Loading AppKit makes macOS show Python
+# in the Dock as an app, so it is kept out: browser_use then falls back to its default size.
+sys.modules["AppKit"] = None
+
 HERE = Path(__file__).resolve()
 HARNESS = HERE.parents[2]
 # The Misty checkout the debug app runs from: the bridge loads the app's modules from its src/.
@@ -68,9 +73,28 @@ if (!agent) {
 const folder = await invoke("agent_folder", { account: agentAccountId(), agent: agent.id });
 return { agent: { id: agent.id, name: agent.name, engine: agent.engine ?? "", folder: folder ?? null } };
 """
+# Each run starts as a desktop chat message with Misty's browser attached does
+# (`conversations/ask/startInvocation.ts`): from this computer and its window, with its signed
+# Misty-browser grant, and with the Browser attachment, without which an outside engine isn't
+# offered the browser's tools (misty `engines/mcp.rs`). The attachment is used up by one message,
+# so it is set for every run.
 START_SCRIPT = """
 const { aiSurfaceApi } = await module("features/agents/runs/invocations/api.ts");
-return aiSurfaceApi.createInvocation(request);
+const { useBrowserAttachment } = await module("features/agents/conversations/composer/controls/composerChoices.ts");
+const { desktopDeviceGrants } = await module("features/agents/personal/deviceGrants.ts");
+const { thisComputerDeviceId } = await module("features/agents/personal/useAgentsStore.ts");
+const deviceContexts = await desktopDeviceGrants();
+if (!deviceContexts.length) throw new Error("This computer has no Misty-browser grant to give the run");
+useBrowserAttachment.getState().set(undefined, true);
+const windowLabel = window.__TAURI_INTERNALS__?.metadata?.currentWindow?.label;
+if (!windowLabel) throw new Error("The bridge's window has no label to start the run from");
+return aiSurfaceApi.createInvocation({
+  ...request,
+  // The window the run belongs to: its browser tab opens there (`tools/screenTools.ts`).
+  windowLabel,
+  deviceContexts,
+  originDeviceId: (await thisComputerDeviceId()) ?? undefined,
+});
 """
 STEPS_SCRIPT = """
 const { activityApi } = await module("features/agents/activity/activityApi.ts");
@@ -81,10 +105,13 @@ const { activityApi } = await module("features/agents/activity/activityApi.ts");
 return activityApi.picture(request.runId, request.picture);
 """
 # The window's profile, whose website data store the runs' pages browse in.
+# Also whether a run started there could have Misty's browser (the grant START_SCRIPT sends).
 PROFILE_SCRIPT = """
 const { invoke } = await module("native/invoke.ts");
+const { desktopDeviceGrants } = await module("features/agents/personal/deviceGrants.ts");
 const info = await invoke("profile_window_info");
-return { window: info.label, profile: info.profile.name };
+const grants = await desktopDeviceGrants();
+return { window: info.label, profile: info.profile.name, browser: grants.some((grant) => grant.kind === "workspace") };
 """
 # Clears that profile's cookies, site storage and cache (Settings, Clear website data), so a task
 # starts in a clean browser as BrowserCode's do.
@@ -128,19 +155,33 @@ def write_json(path: Path, data) -> None:
     temporary.replace(path)
 
 
+class MistyGone(RuntimeError):
+    """The eval bridge stopped answering: the app quit, crashed or was closed."""
+
+
 class Bridge:
     """The debug app's eval bridge: scripts in a window, and following or cancelling a run."""
 
     def __init__(self, client: httpx.AsyncClient, token: str, window: str | None):
         self.client, self.token, self.window = client, token, window
+        # Set once the app is gone; tasks not yet started are then left unrun.
+        self.gone = False
 
     async def call(self, path: str, body: dict, timeout: float = 60):
-        response = await self.client.post(
-            BRIDGE + path,
-            json=body,
-            headers={"authorization": f"Bearer {self.token}"},
-            timeout=timeout,
-        )
+        try:
+            response = await self.client.post(
+                BRIDGE + path,
+                json=body,
+                headers={"authorization": f"Bearer {self.token}"},
+                timeout=timeout,
+            )
+        except (httpx.ConnectError, httpx.RemoteProtocolError, httpx.ReadError) as exc:
+            self.gone = True
+            raise MistyGone(
+                "Misty stopped answering on the eval bridge: the app quit, crashed or was closed. "
+                "Its terminal says how it ended, and a panic is in logs/crash.log in its data "
+                "folder (~/.misty/dev/benchmark with MISTY_PROFILE=benchmark)."
+            ) from exc
         if response.status_code == 401:
             raise RuntimeError("The eval bridge refused the token; check MISTY_BROWSER_EVAL_BRIDGE_TOKEN")
         reply = response.json()
@@ -350,6 +391,9 @@ async def execute(bridge: Bridge, task: dict, task_dir: Path, *, agent: dict, ar
                 await bridge.call("/run-cancel", {"runId": run_id})
             elif ending != "invocation.completed":
                 errors.append(f"The run ended with {ending}")
+        except MistyGone:
+            # Grading a run the app cut short would score Misty's crash as the agent's work.
+            raise
         except Exception as exc:  # noqa: BLE001 - grade whatever the run left
             errors.append(f"{type(exc).__name__}: {exc}")
         finally:
@@ -409,6 +453,11 @@ async def run_task(bridge, task, semaphore, *, run_dir, agent, args, judge_llm):
             "cost": 0.0,
             "status": "execution_error",
         }
+        if bridge.gone:
+            result.update(status="not_run", error="Not run: Misty had quit during an earlier task")
+            write_json(task_dir / "result.json", result)
+            print(f"{task['task_id']}: not run (Misty had quit)", flush=True)
+            return result
         phase = "execution"
         try:
             if args.store == "fresh":
@@ -425,6 +474,8 @@ async def run_task(bridge, task, semaphore, *, run_dir, agent, args, judge_llm):
             phase = "judge"
             result.update(await judge_trace(task, executed["trace"], judge_llm, artifact_dir=task_dir))
             result["status"] = "judged" if result["score"] is not None else "evidence_incomplete"
+        except MistyGone as exc:
+            result.update(status="misty_quit", error=str(exc))
         except Exception as exc:  # noqa: BLE001 - keep each task's failure and go on
             result.update(
                 status=f"{phase}_error",
@@ -494,6 +545,11 @@ async def main(args) -> None:
                 f"{agent['name']} has no folder yet. Send it one message in the app so it gets one, then run again."
             )
         window = await bridge.run_script(PROFILE_SCRIPT)
+        if not window.get("browser"):
+            raise SystemExit(
+                "This computer has no Misty-browser grant for runs, so the agent would get no browser tools. "
+                "Sign in to Misty in the app window, then run again."
+            )
         if args.store == "fresh" and window["profile"] != args.profile:
             raise SystemExit(
                 f"--store fresh clears the website data of {window['window']}'s profile, "
@@ -560,6 +616,11 @@ async def main(args) -> None:
                 print(
                     f"Incomplete evaluation: {summary['tasks_unscored']} unscored tasks; {summary['tasks_scored']} scored"
                 )
+            quit_in = [r["task_id"] for r in results if r["status"] == "misty_quit"]
+            if quit_in:
+                unrun = sum(r["status"] == "not_run" for r in results)
+                print(f"Misty quit during {', '.join(quit_in)}; {unrun} tasks after it were not run.")
+                print(next(r["error"] for r in results if r["status"] == "misty_quit"))
             print(f"Results and evidence: {run_dir}")
             if summary["tasks_unscored"]:
                 raise SystemExit(1)
