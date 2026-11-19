@@ -35,6 +35,19 @@ const dialogClass = [
   "grid-cols-[minmax(0,1fr)_minmax(18.75rem,21.25rem)] grid-rows-[3.5rem_minmax(0,1fr)] gap-0 overflow-hidden",
   "rounded-xl p-0 shadow-lg sm:max-w-none [&>button]:hidden",
 ].join(" ");
+/**
+ * Photos, video projects and (where this computer can edit video) videos open in their editors,
+ * which take the Media page's content area instead of floating over it.
+ */
+export function libraryItemOpensInEditor(item: SpaceLibraryItem, canEdit: boolean): boolean {
+  const mimeType = libraryItemMIME(item);
+  const { isImage, isVideo } = libraryMediaKind(mimeType, item.file.intrinsic_metadata);
+  return (
+    isImage ||
+    isVideoProjectFile(mimeType, item.file.original_filename) ||
+    (isVideo && canEdit && canEditVideo())
+  );
+}
 export function SpaceLibraryViewer(props: LibraryItemViewerProps) {
   if (!props.item) return null;
   return <LibraryItemViewerContent {...props} item={props.item} />;

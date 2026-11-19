@@ -1,28 +1,20 @@
 import {
   Blocks,
   Cable,
-  ChartColumn,
   CodeXml,
-  Cpu,
   EyeOff,
   FileText,
   Keyboard,
-  MessagesSquare,
   Mic,
-  MousePointer2,
   Palette,
   Plug,
-  Route,
   ScrollText,
   Search,
   Server,
-  ShieldCheck,
   SlidersHorizontal,
   SquareTerminal,
   UserCircle,
-  UserRound,
   Users,
-  Variable,
   Wrench,
   type LucideIcon,
 } from "lucide-react";
@@ -50,15 +42,7 @@ type SettingsArea =
   | "space"
   | "code"
   | "agents"
-  | "personas"
-  | "models"
-  | "conversations"
-  | "tutor"
-  | "access"
-  | "clis"
-  | "channels"
-  | "environment"
-  | "usage"
+  | "engines"
   | "plugins"
   | "skills"
   | "prompts"
@@ -82,16 +66,8 @@ export const settingsAreas: Record<SettingsArea, SettingsAreaInfo> = {
   search: { label: "Search", icon: Search },
   space: { label: "Space", icon: spaceIcons.space },
   code: { label: "Code", icon: CodeXml },
-  agents: { label: "Team", icon: Users },
-  personas: { label: "Personas", icon: UserRound },
-  models: { label: "Engine", icon: Cpu },
-  conversations: { label: "Behavior", icon: MessagesSquare },
-  tutor: { label: "Tutor", icon: MousePointer2 },
-  access: { label: "Access", icon: ShieldCheck },
-  clis: { label: "Setup", icon: SquareTerminal },
-  channels: { label: "Channels", icon: Route },
-  environment: { label: "Environment", icon: Variable },
-  usage: { label: "Usage", icon: ChartColumn },
+  agents: { label: "Agents", icon: Users },
+  engines: { label: "Engines", icon: SquareTerminal },
   plugins: { label: "Plugins", icon: Blocks },
   skills: { label: "Skills", icon: ScrollText },
   prompts: { label: "Prompts", icon: FileText },
@@ -101,9 +77,10 @@ export const settingsAreas: Record<SettingsArea, SettingsAreaInfo> = {
 
 /**
  * Sidebar groups, named by feature, in sidebar order. Pages holds one page for each of the app's
- * places, with that place's name and icon, so what each can adjust is easy to find. Agents,
- * Engines and Tools are what the Agents window held: the person's agents and personas and how
- * they behave, the engines' CLIs, and everything those engines can use.
+ * places, with that place's name and icon, so what each can adjust is easy to find. Agents is one
+ * page holding the person's team, personas, engine, behavior, tutor and access. Engines is one
+ * page for the engines' CLIs, channels, environment and usage. Tools holds everything those
+ * engines can use.
  */
 export const settingsGroups: readonly { label: string; areas: readonly SettingsArea[] }[] = [
   { label: "Account", areas: ["account", "server"] },
@@ -111,12 +88,7 @@ export const settingsGroups: readonly { label: string; areas: readonly SettingsA
     label: "App",
     areas: ["general", "appearance", "shortcuts", "voice", "privacy", "advanced"],
   },
-  { label: "Pages", areas: ["search", "space", "code"] },
-  {
-    label: "Agents",
-    areas: ["agents", "personas", "models", "conversations", "tutor", "access"],
-  },
-  { label: "Engines", areas: ["clis", "channels", "environment", "usage"] },
+  { label: "Pages", areas: ["search", "space", "code", "agents", "engines"] },
   { label: "Tools", areas: ["plugins", "skills", "prompts", "mcp", "apps"] },
 ];
 
@@ -159,16 +131,16 @@ const settingsBlocks: readonly SettingsBlock[] = [
   block("space", "space", "Home"),
   block("code", "editor", "Editor"),
   block("agents", "agents-list", "Team", "resource"),
-  block("personas", "agents-personas", "Personas", "resource"),
-  block("models", "models", "Engine"),
-  block("conversations", "agents-defaults", "Conversations"),
-  block("tutor", "agents-companion", "Tutor"),
-  block("access", "agents-permissions", "Access", "resource"),
-  block("access", "agents-computer-use", "Computer use"),
-  block("clis", "engines-clis", "Setup", "resource"),
-  block("channels", "engines-channels", "Channels", "resource"),
-  block("environment", "engines-environment", "Environment", "resource"),
-  block("usage", "engines-usage", "Usage", "resource"),
+  block("agents", "agents-personas", "Personas", "resource"),
+  block("agents", "models", "Engine"),
+  block("agents", "agents-defaults", "Conversations"),
+  block("agents", "agents-companion", "Tutor"),
+  block("agents", "agents-permissions", "Access", "resource"),
+  block("agents", "agents-computer-use", "Computer use"),
+  block("engines", "engines-clis", "Setup", "resource"),
+  block("engines", "engines-channels", "Channels", "resource"),
+  block("engines", "engines-environment", "Environment", "resource"),
+  block("engines", "engines-usage", "Usage", "resource"),
   block("plugins", "tools-plugins", "Plugins", "resource"),
   block("skills", "tools-skills", "Skills", "resource"),
   block("prompts", "tools-prompts", "Prompts", "resource"),

@@ -32,8 +32,6 @@ describe("settings registry", () => {
       "Account",
       "App",
       "Pages",
-      "Agents",
-      "Engines",
       "Tools",
     ]);
     for (const group of settingsGroups)

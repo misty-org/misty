@@ -46,7 +46,7 @@ const placeNames: Record<SidebarPlaceId, { label: string; icon: LucideIcon }> = 
   search: { label: "Search", icon: Search },
   space: { label: "Space", icon: spaceIcons.space },
   code: { label: "Code", icon: CodeXml },
-  chat: { label: "Space chat", icon: spaceIcons.chat },
+  chat: { label: "Chat", icon: spaceIcons.chat },
   docs: { label: "Docs", icon: spaceIcons.docs },
   slides: { label: "Slides", icon: spaceIcons.slides },
   data: { label: "Data", icon: spaceIcons.data },

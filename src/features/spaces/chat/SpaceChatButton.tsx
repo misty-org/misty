@@ -17,7 +17,7 @@ export function SpaceChatButton({ spaceId }: { spaceId: string }) {
   return (
     <span className="relative inline-flex" data-tour="space-chat-button">
       <IconButton
-        label={unread ? `Space chat, ${unread >= 100 ? "99+" : unread} unread` : "Space chat"}
+        label={unread ? `Chat, ${unread >= 100 ? "99+" : unread} unread` : "Chat"}
         onPointerEnter={() => void preloadSpaceSection("chat").catch(() => undefined)}
         onClick={() => navigate(spaceChatPath(spaceId))}
       >

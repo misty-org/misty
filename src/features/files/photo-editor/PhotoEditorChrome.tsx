@@ -11,7 +11,6 @@ import {
   SplitButton,
   Text,
   Tooltip,
-  WorkspaceOverlay,
   ZoomControl,
 } from "@/shared/ui";
 import {
@@ -26,15 +25,16 @@ import {
   Share,
 } from "lucide-react";
 import type { ReactNode } from "react";
+import { EditorPane } from "../EditorPane";
 import type { ImagePerson } from "./imagePresence";
 import type { Viewport } from "./useViewport";
 
-/** The editor over the window, as the video editor sits: its bar, then the editor's panes. */
+/** The editor in its page, as the video editor sits: its bar, then the editor's panes. */
 export function EditorFrame(props: { name: string; onClose: () => void; children: ReactNode }) {
   return (
-    <WorkspaceOverlay open ariaLabel={`Edit ${props.name}`} onClose={props.onClose}>
-      <div className="flex size-full min-h-0 flex-col">{props.children}</div>
-    </WorkspaceOverlay>
+    <EditorPane name={props.name} onEscape={props.onClose}>
+      {props.children}
+    </EditorPane>
   );
 }
 

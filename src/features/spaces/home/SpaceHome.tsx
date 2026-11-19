@@ -118,7 +118,8 @@ export function SpaceHome({ space, page }: { space: Space; page?: SpaceMadeKind 
     const words = query.trim().toLocaleLowerCase();
     return gallery.items.filter(
       (item) =>
-        (!page || item.kind === page) &&
+        // Lab notebooks are kept as docs, but they belong to the Lab, not the Docs page.
+        (!page || (item.kind === page && !item.notebook)) &&
         (scope !== "yours" || item.creatorId === me) &&
         (!words ||
           item.title.toLocaleLowerCase().includes(words) ||
@@ -136,7 +137,7 @@ export function SpaceHome({ space, page }: { space: Space; page?: SpaceMadeKind 
       ? undefined
       : {
           label: "Type",
-          value: (item) => item.kind,
+          value: (item) => (item.notebook ? "notebook" : item.kind),
           options: galleryFilters.map((option) => ({
             value: option.kind ?? "all",
             label: option.kind ? option.label : "Everything",

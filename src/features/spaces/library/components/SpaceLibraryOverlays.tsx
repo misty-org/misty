@@ -2,26 +2,22 @@ import { MistyFilePicker } from "@/features/files";
 
 import { useSpaceLibraryContext } from "../SpaceLibraryContext";
 import { SpaceLibraryDialogs } from "../SpaceLibraryDialogs";
-import { SpaceLibraryViewer } from "../SpaceLibraryViewer";
+import { libraryItemOpensInEditor } from "../SpaceLibraryViewer";
+import { openLibraryItem, SpaceLibraryItemViewer } from "./SpaceLibraryItemViewer";
 import { LibraryItemContextMenu } from "./LibraryItemContextMenu";
 import { useLibraryItemMenuActions } from "./useLibraryItemMenuActions";
 
 export function SpaceLibraryOverlays() {
   const { data, itemActions, collectionActions } = useSpaceLibraryContext();
   const {
-    spaceId,
     canUploadLibrary,
     canEditLibrary,
     items,
     visibleItems,
-    displayItems,
     itemMenu,
     setItemMenu,
     filePickerOpen,
     setFilePickerOpen,
-    selectedItemId,
-    setSelectedItemId,
-    libraryViewerTriggerRef,
     metadataDialogAction,
     setMetadataDialogAction,
     selectedItems,
@@ -40,12 +36,11 @@ export function SpaceLibraryOverlays() {
     setTextDialog,
     textDialogSaving,
     textDialogError,
-    setCopiedEditDefinition,
-    setReloadKey,
   } = data;
-  const { uploadFiles, updateItem, replaceItem, trashItem, saveBulkMetadata } = itemActions;
+  const { uploadFiles, saveBulkMetadata } = itemActions;
   const { submitTextDialog } = collectionActions;
   const menuActions = useLibraryItemMenuActions();
+  const opened = openLibraryItem(data);
   const menuItem = itemMenu
     ? (items.find((item) => item.id === itemMenu.itemId) ??
       visibleItems.find((item) => item.id === itemMenu.itemId) ??
@@ -77,26 +72,9 @@ export function SpaceLibraryOverlays() {
           }}
         />
       ) : null}
-      {selectedItemId ? (
-        <SpaceLibraryViewer
-          spaceId={spaceId}
-          item={
-            displayItems.find((item) => item.id === selectedItemId) ??
-            items.find((item) => item.id === selectedItemId) ??
-            null
-          }
-          items={displayItems}
-          canEdit={canEditLibrary}
-          canCopy
-          returnFocusRef={libraryViewerTriggerRef}
-          onCopyEdit={(definition) => setCopiedEditDefinition(structuredClone(definition))}
-          onClose={() => setSelectedItemId("")}
-          onSelect={setSelectedItemId}
-          onUpdate={updateItem}
-          onReplaceItem={replaceItem}
-          onRenditionReady={() => setReloadKey((current) => current + 1)}
-          onTrash={trashItem}
-        />
+      {/* Photos and videos open in their editors in the page itself (SpaceLibrary). */}
+      {opened && !libraryItemOpensInEditor(opened, canEditLibrary) ? (
+        <SpaceLibraryItemViewer item={opened} />
       ) : null}
       <SpaceLibraryDialogs
         metadata={{

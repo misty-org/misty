@@ -57,7 +57,7 @@ export interface PhotoKeyTargets {
 }
 
 /**
- * The editor's keys (Escape is the overlay's): ⌘Z and ⇧⌘Z undo and redo, ⌘S saves, the zoom
+ * The editor's keys (Escape is the editor pane's): ⌘Z and ⇧⌘Z undo and redo, ⌘S saves, the zoom
  * keys, ← and → for the neighboring images, the markup tools' letters, C to crop and Enter to
  * keep it, and Space held to move the image. `blocked` while a dialog of the editor's is open.
  */

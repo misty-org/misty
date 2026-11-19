@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { SetupState, WorkspaceOverlay, lazyTool, ToolSuspense } from "@/shared/ui";
+import { SetupState, lazyTool, ToolSuspense } from "@/shared/ui";
+import { EditorPane } from "../EditorPane";
 import { loadOpencutWasm } from "@opencut/wasm/load";
 import { canEditVideo, VIDEO_EDITING_UNAVAILABLE } from "./support";
 import type { VideoEditorProps } from "./videoEditorTypes";
@@ -9,7 +10,7 @@ const VideoEditorSession = lazyTool(() => import("./VideoEditorSession"));
 
 /**
  * Misty's video editor: OpenCut's editor (vendor/opencut), laid out as OpenCut lays it out,
- * over the window like Settings. It opens a file as a new video with that file on its timeline;
+ * in the page that opened it. It opens a file as a new video with that file on its timeline;
  * exporting saves the finished video where the opener says.
  */
 export function VideoEditor(props: VideoEditorProps) {
@@ -31,12 +32,12 @@ export function VideoEditor(props: VideoEditorProps) {
   // A web view that can't encode video can't edit it; trying again wouldn't change that.
   if (!canEditVideo())
     return (
-      <WorkspaceOverlay open ariaLabel={`Edit ${props.name}`} onClose={props.onClose}>
+      <EditorPane name={props.name} onEscape={props.onClose}>
         <SetupState tool="video editor" error={new Error(VIDEO_EDITING_UNAVAILABLE)} />
-      </WorkspaceOverlay>
+      </EditorPane>
     );
   return (
-    <WorkspaceOverlay open ariaLabel={`Edit ${props.name}`} onClose={props.onClose}>
+    <EditorPane name={props.name} onEscape={props.onClose}>
       {core === "ready" ? (
         <ToolSuspense tool="video editor">
           <VideoEditorSession {...props} />
@@ -51,15 +52,15 @@ export function VideoEditor(props: VideoEditorProps) {
           }}
         />
       )}
-    </WorkspaceOverlay>
+    </EditorPane>
   );
 }
 
-/** The editor over the window, setting up, while what it opens is still being reached. */
+/** The editor in its page, setting up, while what it opens is still being reached. */
 export function VideoEditorOpening(props: { name: string; onClose: () => void }) {
   return (
-    <WorkspaceOverlay open ariaLabel={`Edit ${props.name}`} onClose={props.onClose}>
+    <EditorPane name={props.name} onEscape={props.onClose}>
       <SetupState tool="video editor" />
-    </WorkspaceOverlay>
+    </EditorPane>
   );
 }

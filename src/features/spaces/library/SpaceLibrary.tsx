@@ -5,6 +5,8 @@ import { CollectionPage } from "@/shared/ui";
 import { useEffect, useMemo, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { SpaceLibraryOverlays } from "./components/SpaceLibraryOverlays";
+import { openLibraryItem, SpaceLibraryItemViewer } from "./components/SpaceLibraryItemViewer";
+import { libraryItemOpensInEditor } from "./SpaceLibraryViewer";
 import { SpaceLibraryStatus } from "./components/SpaceLibraryStatus";
 import { LibraryEntryHeader } from "./components/LibraryEntryHeader";
 import { LibraryItemsRegion } from "./library-surfaces/LibraryItemsRegion";
@@ -96,6 +98,9 @@ export function SpaceLibrary({
   }, [data.selectedItems, spaceId]);
   useAiSurfaceAdapter(aiAdapter);
   useLibraryItemLink(data, itemActions.loadMore);
+  const opened = openLibraryItem(data);
+  const editorItem =
+    opened && libraryItemOpensInEditor(opened, data.canEditLibrary) ? opened : null;
   useEffect(() => {
     if (searchParams.get("upload") !== "1") {
       uploadQueryConsumedRef.current = false;
@@ -119,7 +124,10 @@ export function SpaceLibrary({
       }}
     >
       <LibraryCanEditContext.Provider value={data.canEditLibrary}>
-        <CollectionPage>
+        {/* A photo or video opens in its editor here, in the page's place; the grid stays
+            mounted underneath so it comes back where it was. */}
+        {editorItem ? <SpaceLibraryItemViewer item={editorItem} /> : null}
+        <CollectionPage className={editorItem ? "hidden" : undefined}>
           <>
             <LibraryEntryHeader />
             <SpaceLibraryStatus />
