@@ -29,7 +29,7 @@ browsing, so the score measures the engine's model with Misty's harness. Always 
 
 2. Start Misty's debug app (from `misty/`) with the eval bridge on, in a dev folder of its own.
    `MISTY_PROFILE=benchmark` opens `~/.misty/dev/benchmark` for that launch only: its own database,
-   chats, agent folders and WebKit store, apart from the folder `~/.misty/misty.conf` names, so
+   chats, chat folders and WebKit store, apart from the folder `~/.misty/misty.conf` names, so
    `--store fresh` only ever clears the benchmark's browser. It leaves `misty.conf` as it is, and
    engine installs (`~/.misty/shared/engines`) are shared as for every build. The token is any
    random string of at least 24 characters; the bridge isn't compiled into release builds.
@@ -51,10 +51,11 @@ browsing, so the score measures the engine's model with Misty's harness. Always 
    interrupts ("Misty closed while this was running"), which a task then counts as failures.
 
 3. In that app, sign in to your Misty account (agents and chats are kept per account; signed
-   out, the runner can't find them), then send the agent you'll benchmark (for example the
-   Claude Code agent) one message, so it has a folder. Deliverables are saved in `<agent folder>/bu-bench/<run>/` during a task,
-   then copied out and deleted. Its one browser profile is `Personal`, so runs pass
-   `--profile Personal`.
+   out, the runner can't find them). Each task is a new chat with the agent you benchmark (the
+   Claude Code agent by default), working in that chat's own scratch folder
+   (`~/.misty/dev/benchmark/chats/<chat id>`). Deliverables are saved in its `bu-bench-outputs/`
+   during the task, then copied out and deleted. The app's one browser profile is `Personal`, so
+   runs pass `--profile Personal`.
 
 ## Running
 

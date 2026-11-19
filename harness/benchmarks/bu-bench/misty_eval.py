@@ -58,8 +58,6 @@ Task: {task}"""
 # request (`request`). Module paths are relative to misty/src.
 AGENT_SCRIPT = """
 const { personalAgentsApi } = await module("features/agents/personal/personalAgentsApi.ts");
-const { agentAccountId } = await module("features/agents/personal/agentAccount.ts");
-const { invoke } = await module("native/invoke.ts");
 const { agents } = await personalAgentsApi.list();
 // A named agent, else the engine's agent: its built-in id, or the one agent on that engine.
 const onEngine = agents.filter((candidate) => candidate.engine === request.engine);
@@ -70,9 +68,19 @@ const agent = request.agentId
 if (!agent) {
   return { agent: null, agents: agents.map((candidate) => `${candidate.id} (${candidate.name}, ${candidate.engine || "no engine"})`) };
 }
-const folder = await invoke("agent_folder", { account: agentAccountId(), agent: agent.id });
-return { agent: { id: agent.id, name: agent.name, engine: agent.engine ?? "", folder: folder ?? null } };
+return { agent: { id: agent.id, name: agent.name, engine: agent.engine ?? "" } };
 """
+# The folder a run's chat works in: its own scratch folder in Misty's data folder
+# (misty `engines/chat_folder.rs`). Agents own no folders; each task's run is a new chat.
+FOLDER_SCRIPT = """
+const { agentAccountId } = await module("features/agents/personal/agentAccount.ts");
+const { invoke } = await module("native/invoke.ts");
+const folder = await invoke("chat_folder", { account: agentAccountId(), conversation: request.conversationId });
+return folder.path;
+"""
+# Where a run saves its deliverables, inside its chat's folder. The chat has no id, and so no
+# folder, until its run starts, so the prompt names the folder relative to where the engine works.
+OUTPUTS_DIR = "bu-bench-outputs"
 # Each run starts as a desktop chat message with Misty's browser attached does
 # (`conversations/ask/startInvocation.ts`): from this computer and its window, with its signed
 # Misty-browser grant, and with the Browser attachment, without which an outside engine isn't
@@ -111,7 +119,25 @@ const { invoke } = await module("native/invoke.ts");
 const { desktopDeviceGrants } = await module("features/agents/personal/deviceGrants.ts");
 const info = await invoke("profile_window_info");
 const grants = await desktopDeviceGrants();
-return { window: info.label, profile: info.profile.name, browser: grants.some((grant) => grant.kind === "workspace") };
+// Agent tools run in the window's job worker, which welcome, sign-in and setup don't mount
+// (misty `DesktopLayout`), so a window left there answers every browser call with
+// "Misty has no open window". A signed-in window is moved to the Agents page.
+const { isAuthPath, routes } = await module("app/shell/routes.ts");
+let moved = false;
+if (isAuthPath(location.pathname) && grants.length) {
+  history.pushState({}, "", routes.agents);
+  dispatchEvent(new PopStateEvent("popstate", { state: history.state }));
+  await new Promise((done) => setTimeout(done, 2000));
+  moved = true;
+}
+return {
+  window: info.label,
+  profile: info.profile.name,
+  browser: grants.some((grant) => grant.kind === "workspace"),
+  page: location.pathname,
+  toolsHost: !isAuthPath(location.pathname),
+  moved,
+};
 """
 # Clears that profile's cookies, site storage and cache (Settings, Clear website data), so a task
 # starts in a clean browser as BrowserCode's do.
@@ -344,15 +370,12 @@ async def execute(bridge: Bridge, task: dict, task_dir: Path, *, agent: dict, ar
     outputs = task_dir / "workspace" / "outputs"
     for path in (shots, outputs):
         path.mkdir(parents=True, exist_ok=False)
-    # The engine works in its agent's folder, so deliverables are saved there and copied here.
-    agent_outputs = Path(agent["folder"]) / "bu-bench" / args.run_stamp / task["task_id"] / "outputs"
-    agent_outputs.mkdir(parents=True, exist_ok=False)
-
     request = {
         "mode": "drawer",
         "surfaceId": "global",
         "trigger": "message",
-        "prompt": PRE_PROMPT.format(outputs=agent_outputs, task=task["confirmed_task"]),
+        # The engine works in its chat's folder, so deliverables are saved there and copied here.
+        "prompt": PRE_PROMPT.format(outputs=f"./{OUTPUTS_DIR}/ in your working folder", task=task["confirmed_task"]),
         "context": [],
         "agentId": agent["id"],
         "executionMode": args.execution_mode,
@@ -379,11 +402,13 @@ async def execute(bridge: Bridge, task: dict, task_dir: Path, *, agent: dict, ar
     errors: list[str] = []
     start = time.monotonic()
     run_id = None
+    conversation_id = None
     with (task_dir / "events.jsonl").open("w") as events_file:
         trajectory = Trajectory(events_file)
         try:
             created = await bridge.run_script(START_SCRIPT, request)
             run_id = created["invocationId"]
+            conversation_id = created.get("conversationId")
             write_json(task_dir / "run.json", {"runId": run_id, "conversationId": created.get("conversationId")})
             ending = await follow_run(bridge, run_id, trajectory, args.task_timeout)
             if ending == "timeout":
@@ -416,9 +441,19 @@ async def execute(bridge: Bridge, task: dict, task_dir: Path, *, agent: dict, ar
             trace["screenshot_steps"] = None
     write_json(task_dir / "screenshot_manifest.json", frames)
 
-    # Copy, then remove, the deliverables, so no task material is left in the agent's folder.
-    shutil.copytree(agent_outputs, outputs, symlinks=True, dirs_exist_ok=True)
-    shutil.rmtree(agent_outputs.parent, ignore_errors=True)
+    # Copy, then remove, the deliverables, so no task material is left in the chat's folder.
+    if conversation_id:
+        try:
+            chat_outputs = Path(await bridge.run_script(FOLDER_SCRIPT, {"conversationId": conversation_id})) / OUTPUTS_DIR
+            if chat_outputs.is_dir():
+                shutil.copytree(chat_outputs, outputs, symlinks=True, dirs_exist_ok=True)
+                shutil.rmtree(chat_outputs, ignore_errors=True)
+        except MistyGone:
+            raise
+        except Exception as exc:  # noqa: BLE001 - grade without deliverables
+            trace["evidence_errors"].append(f"Deliverables: {type(exc).__name__}: {exc}")
+    elif run_id:
+        trace["evidence_errors"].append("Deliverables: the run named no chat, so its folder is unknown")
     trace["output_files_text"], trace["output_images"], file_errors = collect_outputs(outputs)
     trace["evidence_errors"].extend(file_errors)
 
@@ -540,16 +575,19 @@ async def main(args) -> None:
                 f"No {'agent ' + args.agent if args.agent else 'single ' + args.engine + ' agent'} in the app; "
                 f"pass --agent with one of: {', '.join(found.get('agents') or [])}"
             )
-        if not agent.get("folder"):
-            raise SystemExit(
-                f"{agent['name']} has no folder yet. Send it one message in the app so it gets one, then run again."
-            )
         window = await bridge.run_script(PROFILE_SCRIPT)
         if not window.get("browser"):
             raise SystemExit(
                 "This computer has no Misty-browser grant for runs, so the agent would get no browser tools. "
                 "Sign in to Misty in the app window, then run again."
             )
+        if not window.get("toolsHost"):
+            raise SystemExit(
+                f"{window['window']} is on {window['page']}, where Misty doesn't run agent tools, so every "
+                "browser call would fail. Open the Agents page in that window, then run again."
+            )
+        if window.get("moved"):
+            print(f"Moved {window['window']} from Misty's setup or sign-in screen to {window['page']}, where agent tools run.")
         if args.store == "fresh" and window["profile"] != args.profile:
             raise SystemExit(
                 f"--store fresh clears the website data of {window['window']}'s profile, "
@@ -625,7 +663,6 @@ async def main(args) -> None:
             if summary["tasks_unscored"]:
                 raise SystemExit(1)
         finally:
-            shutil.rmtree(Path(agent["folder"]) / "bu-bench" / args.run_stamp, ignore_errors=True)
             judge_client = getattr(judge, "client", None)
             if judge_client is not None:
                 await judge_client.close()
