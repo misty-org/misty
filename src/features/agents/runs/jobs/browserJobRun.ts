@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { recordBrowserLog } from "../../browser-log/recordBrowserLog";
 import { extractOnEngine } from "../../engines/mistyCalls";
 import { pictureAgentTab } from "../../tabs/agentTabPictures";
 import { agentTab, noteAgentTabJob, wakeAgentTab } from "../../tabs/agentTabs";
@@ -42,6 +43,23 @@ const pageUrl = (output: Record<string, unknown>) =>
  * read "about:blank" for twenty turns while its tab showed the site.
  */
 export async function executeBrowserJob(
+  job: ClaimedWorkflowNodeJob["job"],
+  signal: AbortSignal,
+  leaseExpiresAt: string | null | undefined,
+): Promise<Record<string, unknown>> {
+  // Every action goes in the run's browser log, a browser_run program's page calls included.
+  const started = Date.now();
+  try {
+    const output = await executeLooking(job, signal, leaseExpiresAt);
+    recordBrowserLog(job, { output }, Date.now() - started);
+    return output;
+  } catch (error) {
+    recordBrowserLog(job, { error }, Date.now() - started);
+    throw error;
+  }
+}
+
+async function executeLooking(
   job: ClaimedWorkflowNodeJob["job"],
   signal: AbortSignal,
   leaseExpiresAt: string | null | undefined,
@@ -140,6 +158,9 @@ async function executeOnce(
     }
     throw error;
   } finally {
+    // Used until the job ends, not only when it starts: a page call that ran long must not leave
+    // its session looking idle and closed the moment it returns.
+    touchHostedSession(job.scopeId, job.runId);
     noteAgentTabJob(job.scopeId, job.runId, false);
     void pictureAgentTab(job.scopeId);
     signal.removeEventListener("abort", cancel);

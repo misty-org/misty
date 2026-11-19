@@ -81,12 +81,20 @@ function watchRequests(_accountId: string) {
 
 function keepAlive(session: HostedSession) {
   clearInterval(timers.get(session.taskId));
+  let lastTick = Date.now();
   timers.set(
     session.taskId,
     setInterval(() => {
       const current = hostedSessionForTask(session.taskId);
       if (!current) return;
-      if (Date.now() - current.lastUsed > idleMs || agentAccountId() !== current.accountId) {
+      // A tick long after the last one means the computer slept or the window's timers were held
+      // back: the wall clock moved but the agent didn't idle, so its idle time starts again.
+      const now = Date.now();
+      const missed = now - lastTick > 3 * renewMs;
+      lastTick = now;
+      if (missed) touchHostedSession(current.scopeId, current.runId);
+      const lastUsed = missed ? now : current.lastUsed;
+      if (now - lastUsed > idleMs || agentAccountId() !== current.accountId) {
         void endHostedSession(current.taskId);
         return;
       }
@@ -200,12 +208,14 @@ export async function startHostedSession(
     touchHostedSession(session.scopeId, job.runId);
   }
   // Another tab of the agent's own beside the first, when the run asks to keep a page open.
-  // A page one of its tabs already shows is that tab, not a second one.
+  // A page one of its tabs already shows is that tab, not a second one. A blank tab is always a
+  // new one: helper agents working at the same time each ask for one, and would otherwise share
+  // whichever tab still shows the start page.
   let tabScope = session.scopeId;
   if (input.newTab === true && typeof input.url === "string") {
     const url = startUrl(input.url);
     tabScope =
-      tabShowing(session.taskId, url) ??
+      (input.url ? tabShowing(session.taskId, url) : undefined) ??
       (session.childViews.length < maxOwnTabs - 1
         ? await openSessionTab(session, url, signal)
         : session.scopeId);

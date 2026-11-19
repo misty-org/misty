@@ -114,4 +114,9 @@ const getTab = (which) => __tabPromise((async () => new Tab(await __call("tab", 
 /** Records a finding (any object) in the run's results; returned with the program's answer. */
 const note = (row) => __call("note", { row });
 const sleep = (ms) => __call("sleep", { ms });
+/** The browser's timer, on sleep: programs written as for a page (await new Promise((r) => setTimeout(r, 500))) work as is. */
+const setTimeout = (callback, ms, ...args) => {
+  sleep(Math.max(0, Number(ms) || 0)).then(() => callback(...args));
+  return 0;
+};
 `;
