@@ -40,6 +40,8 @@ vi.mock("./videoExport", async (actual) => ({
 }));
 vi.mock("../../conversations/state/localChats", () => ({
   localChats: {
+    // No native store in tests: chat syncing stays off.
+    available: () => false,
     saveTutor: () => Promise.resolve(),
     deleteTutor: () => Promise.resolve(),
     tutor: () => Promise.resolve([]),
@@ -254,7 +256,11 @@ describe("flashcards", () => {
     fireEvent.change(front, { target: { value: "Crater?" } });
     fireEvent.change(back, { target: { value: "A bowl" } });
     fireEvent.click(button("Add card"));
-    expect(current(deck.id).cards.map((card) => card.front)).toEqual(["Magma?", "Vent?", "Crater?"]);
+    expect(current(deck.id).cards.map((card) => card.front)).toEqual([
+      "Magma?",
+      "Vent?",
+      "Crater?",
+    ]);
 
     fireEvent.click(screen.getAllByRole("button", { name: "Edit card" })[0]);
     const editor = screen.getAllByRole("textbox", { name: "Front" })[1];
@@ -376,9 +382,7 @@ describe("video overview", () => {
     fakes.recordVideo.mockRejectedValue(new Error("This system can't record video."));
     render(<VideoView video={video} onClose={onClose} />);
     fireEvent.click(button("Save as a video"));
-    await vi.waitFor(() =>
-      expect(button("Save as a video").hasAttribute("disabled")).toBe(false),
-    );
+    await vi.waitFor(() => expect(button("Save as a video").hasAttribute("disabled")).toBe(false));
     expect(fakes.saveBytes).not.toHaveBeenCalled();
   });
 
@@ -401,9 +405,9 @@ describe("infographic", () => {
 
   it("shows the drawing fit or at full size", () => {
     render(<InfographicView infographic={infographic} onClose={onClose} />);
-    expect(
-      screen.getByRole("img", { name: "Lava at a glance" }).getAttribute("src"),
-    ).toMatch(/^data:image\/svg\+xml/);
+    expect(screen.getByRole("img", { name: "Lava at a glance" }).getAttribute("src")).toMatch(
+      /^data:image\/svg\+xml/,
+    );
     fireEvent.click(button("Show at full size"));
     expect(button("Fit to the panel")).toBeTruthy();
   });

@@ -45,12 +45,57 @@ interface Held {
 
 const held = new Map<string, Held>();
 const opening = new Map<string, Promise<Held | null>>();
+/** Why a notebook's live doc couldn't open, until it's tried again or opens. */
+const failures = new Map<string, string>();
+/** How many times each notebook's open was tried again, so its holders hold it afresh. */
+const attempts = new Map<string, number>();
 let mirroring = false;
 const listeners = new Set<() => void>();
 const changed = () => listeners.forEach((listener) => listener());
 
 /** The live doc of an open notebook, once it's there. */
 export const liveNotebook = (notebookId: string) => held.get(notebookId);
+
+/** Why a notebook's live doc couldn't open, if it couldn't. */
+export const liveNotebookError = (notebookId: string) => failures.get(notebookId);
+
+/** Opens a notebook's live doc again after it failed to open. */
+export function retryLiveNotebook(notebookId: string) {
+  failures.delete(notebookId);
+  attempts.set(notebookId, (attempts.get(notebookId) ?? 0) + 1);
+  changed();
+}
+
+/** How long a notebook's room has to sync before its open counts as failed. */
+const syncTimeoutMs = 30_000;
+
+/** Settles once the doc has synced; fails when it's lost first or doesn't sync in time. */
+function syncedInTime(live: LiveDoc): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const lostError = () =>
+      new Error(
+        live.lost() === "deleted"
+          ? "This notebook was deleted."
+          : "You no longer have access to this notebook.",
+      );
+    if (live.lost()) return reject(lostError());
+    const finish = (error?: Error) => {
+      window.clearTimeout(timer);
+      stop();
+      if (error) reject(error);
+      else resolve();
+    };
+    const timer = window.setTimeout(
+      () =>
+        finish(new Error("Couldn't reach the shared note. Check your connection and try again.")),
+      syncTimeoutMs,
+    );
+    const stop = live.onLost(() => {
+      if (live.lost()) finish(lostError());
+    });
+    void live.synced.then(() => finish());
+  });
+}
 
 /** Re-renders when a notebook's live doc arrives or goes. */
 export function useLiveNotebook(notebookId: string): Held | undefined {
@@ -210,12 +255,6 @@ async function open(notebookId: string): Promise<Held | null> {
   const me = gateway?.me();
   if (!gateway || !notebook?.space || !me) return null;
   const live = await gateway.openLiveDoc(notebook.space.spaceId, notebook.space.docId);
-  await live.synced;
-  live.awareness.setLocalStateField("user", {
-    id: me.userId,
-    name: me.name,
-    color: personColor(me.userId),
-  });
   const entry: Held = {
     live,
     notebookId,
@@ -226,8 +265,20 @@ async function open(notebookId: string): Promise<Held | null> {
     stop: [],
     read: new Set(),
   };
-  await seed(entry);
-  mirror(entry);
+  try {
+    await syncedInTime(live);
+    live.awareness.setLocalStateField("user", {
+      id: me.userId,
+      name: me.name,
+      color: personColor(me.userId),
+    });
+    await seed(entry);
+    mirror(entry);
+  } catch (error) {
+    // A doc that never opened is let go, so trying again opens a fresh one.
+    live.close();
+    throw error;
+  }
   let pending = 0;
   const onRemote = (events: Y.YEvent<Y.AbstractType<unknown>>[], transaction: Y.Transaction) => {
     if (transaction.origin === localOrigin) return;
@@ -290,8 +341,13 @@ export async function hold(notebookId: string): Promise<Held | null> {
     promise = open(notebookId).finally(() => opening.delete(notebookId));
     opening.set(notebookId, promise);
   }
-  const entry = await promise.catch(() => null);
+  const entry = await promise.catch((reason: unknown) => {
+    failures.set(notebookId, reason instanceof Error ? reason.message : String(reason));
+    changed();
+    return null;
+  });
   if (!entry) return null;
+  failures.delete(notebookId);
   if (!held.has(notebookId)) held.set(notebookId, entry);
   const kept = held.get(notebookId)!;
   kept.refs += 1;
@@ -315,6 +371,8 @@ export function release(notebookId: string, all = false) {
 export function useHeldNotebook(notebook: Notebook): Held | undefined {
   const entry = useLiveNotebook(notebook.id);
   const docId = notebook.space?.docId;
+  // Trying a failed open again holds the notebook afresh.
+  const attempt = attempts.get(notebook.id) ?? 0;
   useEffect(() => {
     if (!docId) return;
     let kept = false;
@@ -327,7 +385,7 @@ export function useHeldNotebook(notebook: Notebook): Held | undefined {
       gone = true;
       if (kept) release(notebook.id);
     };
-  }, [notebook.id, docId]);
+  }, [notebook.id, docId, attempt]);
   return entry;
 }
 

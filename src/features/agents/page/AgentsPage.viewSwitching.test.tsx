@@ -73,8 +73,8 @@ it("opens a page from the sidebar while a chat is open, and the chat again after
   expect(page()).toBe("lab");
   expect(route()).toBe("/agents?view=lab");
 
-  follow("/agents?view=studio");
-  expect(page()).toBe("studio");
+  follow("/agents?view=code");
+  expect(page()).toBe("code");
 
   follow(agentChatRoute("research", "second"));
   expect(page()).toBe("task");
@@ -141,8 +141,8 @@ it("sends the sidebar's links to the focused pane of a split, and leaves the oth
         .getState()
         .focusView(viewIn(useWorkspaceStore.getState().layout, left)!.id),
   );
-  follow("/agents?view=studio");
-  expect(pageIn(left)).toBe("studio");
+  follow("/agents?view=code");
+  expect(pageIn(left)).toBe("code");
   expect(pageIn(right)).toBe("lab");
   expect(routeIn(right)).toBe("/agents?view=lab");
 });

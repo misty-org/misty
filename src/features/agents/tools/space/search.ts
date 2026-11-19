@@ -8,7 +8,11 @@ const searchAll: LocalToolHandler = async (request) => {
   onlyFields(input, ["query", "space", "kinds", "limit"]);
   const query = text(input, "query", { required: true, min: 1, max: 500 }).trim();
   if (!query) throw refuse(BAD_SCHEMA);
-  const kinds = textList(input, "kinds", { max: 5, allowed: ["note", "message"] }) ?? [];
+  const kinds =
+    textList(input, "kinds", {
+      max: 6,
+      allowed: ["note", "message", "drawing", "deck", "workbook"],
+    }) ?? [];
   const limit = integer(input, "limit", 1, 50) ?? 20;
   const reference = spaceArgument(input);
   const params = new URLSearchParams({ q: query, limit: String(limit) });

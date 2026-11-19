@@ -2,13 +2,15 @@
 import { invoke } from "@/native/invoke";
 import { useContextPanel } from "../../../context-panel/contextPanelStore";
 import { useFilesStore } from "../../../context-panel/files/filesStore";
-import { currentSpaceKey, folderOf, useSpaceFolders } from "../../../engines/enginesApi";
+import { useMistyStore } from "../../../conversations/state/useMistyStore";
+import { useChatFolder } from "../../../shared-folders/chatFolder";
 import { agentAccountId } from "../../../personal/agentAccount";
 import { resolveChatFileLink } from "./fileLinkResolution";
 
-/** The folder this window's chats work in, which relative links in replies are anchored at. */
-export function useChatFolder(): string {
-  return useSpaceFolders((state) => folderOf(state, currentSpaceKey())) ?? "";
+/** The open chat's folder, which relative links in its replies are anchored at. */
+export function useReplyFolder(): string {
+  const conversationId = useMistyStore((state) => state.activeConversationId);
+  return useChatFolder(conversationId).folder;
 }
 
 /**

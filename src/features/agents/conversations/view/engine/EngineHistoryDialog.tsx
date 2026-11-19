@@ -16,7 +16,9 @@ import {
   Skeleton,
   Text,
 } from "@/shared/ui";
+import { defaultEngineAgent } from "../../../engines/defaultEngine";
 import { folderName } from "../../../engines/enginesApi";
+import { useChatFolders } from "../../../shared-folders/chatFolder";
 import { resumeInNewChat } from "../../startChat";
 import {
   listEngineSessions,
@@ -26,7 +28,6 @@ import {
   sessionsByFolder,
   type EngineSession,
 } from "./engineHistory";
-import { agentForPastChat, pastChatRoute } from "./pastChats";
 import { syncEngineSession } from "./engineSessionImport";
 
 /** Before the first read: two folders' heads (name and path), each over its chats. */
@@ -47,12 +48,15 @@ const historySkeleton = (
 const titleOf = (session: { title: string; customTitle?: string | null }) =>
   session.customTitle?.trim() || session.title.trim() || "Untitled session";
 
+/** The route of an agent's chat. */
+const chatRoute = (agentId: string, conversationId: string) =>
+  `/agents?${new URLSearchParams({ agent: agentId, conversation: conversationId })}`;
+
 /**
  * Past chats from this engine's own history, from every folder they ran in, grouped by folder:
- * search them, rename one (written back to the CLI's own files), or continue one. A chat from
- * this agent's folder continues here; one from a folder another agent on this engine works in
- * continues in a new chat with that agent; from any other folder the person is asked first which
- * agent gets the folder.
+ * search them, rename one (written back to the CLI's own files), or continue one. It continues in
+ * the open chat, or in a new chat with this agent when none is open. A session from one of the
+ * person's projects works there; one from any other folder works in the chat's scratch folder.
  */
 export function EngineHistoryDialog(props: {
   open: boolean;
@@ -106,20 +110,23 @@ export function EngineHistoryDialog(props: {
 
   const resume = async (session: EngineSession) => {
     const chat = { ...session, title: titleOf(session) };
-    // The folder question is its own dialog, so this one closes first.
     props.onOpenChange(false);
     try {
-      const chosen = await agentForPastChat(chat, props.agentId);
-      if (!chosen) return;
-      const there = { ...chat, workspacePath: chosen.folder };
-      if (chosen.agentId === props.agentId && props.conversationId) {
-        await resumeEngineSession(props.conversationId, there);
-        await syncEngineSession(props.conversationId, there).catch(() => undefined);
+      if (props.conversationId) {
+        await resumeEngineSession(props.conversationId, chat);
+        // Native code may have made the session's project the chat's folder.
+        void useChatFolders
+          .getState()
+          .load(props.conversationId)
+          .catch(() => undefined);
+        await syncEngineSession(props.conversationId, chat).catch(() => undefined);
         props.onResumed?.();
         return;
       }
-      const conversation = await resumeInNewChat(chosen.agentId, there);
-      void navigate(pastChatRoute(chosen.agentId, conversation));
+      const agentId = props.agentId ?? defaultEngineAgent(chat.engine);
+      if (!agentId) throw new Error("Set up an agent on this engine first.");
+      const conversation = await resumeInNewChat(agentId, chat);
+      void navigate(chatRoute(agentId, conversation));
     } catch (reason) {
       setResumeError(reason instanceof Error ? reason.message : String(reason));
       props.onOpenChange(true);

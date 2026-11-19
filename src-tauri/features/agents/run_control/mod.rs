@@ -13,6 +13,7 @@ compile_error!(
     "Misty needs panics to unwind: with panic=abort, one failed agent run closes the whole browser."
 );
 
+pub(crate) mod browser_log;
 pub mod calls;
 pub mod engine_modes;
 pub mod host_lookup;

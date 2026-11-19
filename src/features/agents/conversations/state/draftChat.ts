@@ -9,8 +9,7 @@ import { useSessionGoals } from "../../goals/sessionGoals";
 export const DRAFT_CHAT = "draft";
 
 /** The key a chat's goal and browser live under: its id, or `DRAFT_CHAT` before it has one. */
-export const chatKey = (conversationId: string | null | undefined) =>
-  conversationId || DRAFT_CHAT;
+export const chatKey = (conversationId: string | null | undefined) => conversationId || DRAFT_CHAT;
 
 /** The first message gave the chat its id: what was set on it while empty becomes its own. */
 export function adoptDraftChat(conversationId: string) {

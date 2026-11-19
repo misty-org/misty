@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import * as Y from "yjs";
-import { Skeleton } from "@/shared/ui";
+import { SetupState } from "@/shared/ui";
 import { spacesGateway } from "../../spaces-gateway/spacesGateway";
 import { noteMap, noteSeed, setNoteMarkdown, takeLease } from "../notebookDoc";
-import { useLiveNotebook } from "../notebookLive";
+import { liveNotebookError, retryLiveNotebook, useLiveNotebook } from "../notebookLive";
 import { setPresence } from "../notebookPresence";
 import { personColor } from "../personTone";
 import type { NotebookNote } from "../tutorTypes";
@@ -33,12 +33,15 @@ export function LiveNoteBody({ notebookId, note }: { notebookId: string; note: N
   }, [entry, map, note.id]);
   useEffect(() => () => setPresence(notebookId, { editing: undefined }), [notebookId]);
   if (!entry || !gateway || !me || !(fragment instanceof Y.XmlFragment))
+    // The shared doc opening and syncing: a step that can fail, said in words, never a skeleton.
     return (
-      <div className="flex flex-col gap-2" aria-hidden="true">
-        <Skeleton className="h-4 w-4/5" />
-        <Skeleton className="h-4 w-3/5" />
-        <Skeleton className="h-4 w-2/3" />
-      </div>
+      <SetupState
+        tool="shared note"
+        label="Opening the shared note"
+        size="inline"
+        error={entry ? null : liveNotebookError(notebookId)}
+        onRetry={() => retryLiveNotebook(notebookId)}
+      />
     );
   const Editor = gateway.NoteBodyEditor;
   return (

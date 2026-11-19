@@ -75,16 +75,40 @@ export function recognizeFile(path: string): Promise<string> {
   return invoke<string>("speech_recognize_file", { path, language: recognitionLanguage() });
 }
 
-/** Recognizes a recording held in memory, such as the chat microphone's. */
-export async function recognizeAudio(audio: Blob): Promise<string> {
+/** A recording's bytes as base64, the way the recognizer commands take them. */
+async function base64Of(audio: Blob): Promise<string> {
   const bytes = new Uint8Array(await audio.arrayBuffer());
   let binary = "";
   for (let at = 0; at < bytes.length; at += 0x8000)
     binary += String.fromCharCode(...bytes.subarray(at, at + 0x8000));
+  return btoa(binary);
+}
+
+/** Recognizes a recording held in memory, such as the chat microphone's. */
+export async function recognizeAudio(audio: Blob): Promise<string> {
   return invoke<string>("speech_recognize_audio", {
-    audio: btoa(binary),
+    audio: await base64Of(audio),
     mime: audio.type,
     language: recognitionLanguage(),
+  });
+}
+
+/** A word heard in a recording, and when: seconds from the recording's start. */
+export interface HeardWord {
+  text: string;
+  start: number;
+  end: number;
+}
+
+/**
+ * Recognizes a recording held in memory word by word, with each word's time, for captions. The
+ * language (a code such as "en") is Settings › Voice's when not given.
+ */
+export async function recognizeAudioWords(audio: Blob, language?: string): Promise<HeardWord[]> {
+  return invoke<HeardWord[]>("speech_recognize_audio_words", {
+    audio: await base64Of(audio),
+    mime: audio.type,
+    language: language ? (regions[language] ?? language) : recognitionLanguage(),
   });
 }
 

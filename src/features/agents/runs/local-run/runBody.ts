@@ -1,10 +1,4 @@
-import {
-  engineFolder,
-  engineModels,
-  mistyEngine,
-  modelNamed,
-  usablePick,
-} from "../../engines/enginesApi";
+import { engineModels, mistyEngine, modelNamed, usablePick } from "../../engines/enginesApi";
 import { effectiveEffort } from "../../conversations/composer/controls/engineOptions";
 import { defaultEngineId } from "../../engines/engineRun";
 import { engineModesFor, resolveEngineMode } from "../../engines/engineModes";
@@ -12,6 +6,7 @@ import { personaInstructions } from "../../personas/catalogApi";
 import { assembleAgentPrompt } from "../../bots/botPrompt";
 import { takeComputerUseAttachment } from "@/features/computer-use/computerUseAttachment";
 import { multirunFolderOf } from "../../multirun/multirunFolders";
+import { chatProjectOf, isProjectChat } from "../../shared-folders/chatFolder";
 import { agentAccountId, isSignedIn } from "../../personal/agentAccount";
 import { blankConversationState, collaborationOf, readConversationState } from "../../localRun";
 import { computerName } from "../../localRun";
@@ -30,7 +25,7 @@ import type {
 import { inferredArtifactKind } from "./artifactSpecs";
 import { resolveContext, type ResolvedSource } from "./resolvedContext";
 import { goNow } from "./runIdentity";
-import { teammateClaimsNote } from "../../virtual/teammates";
+import { teammateClaimsNote } from "../../now/teammates";
 import { useMistyStore } from "../../conversations/state/useMistyStore";
 
 /**
@@ -44,6 +39,17 @@ interface ChatFacts {
   title: string | null;
   priorRuns: string[];
 }
+
+/**
+ * What an agent in a chat (not Code) knows about where it works: the chat's scratch folder, and
+ * that a project of the person's own belongs in Code, which it offers with `open_in_code`.
+ */
+const SCRATCH_CHAT_NOTE =
+  "# Where you work\nThis is a chat. You work in its own scratch folder, which is deleted with the " +
+  "chat. When the work becomes a project the person will keep (a repository, an app or tool they " +
+  "will run again, files that belong together), call the open_in_code tool to offer moving this " +
+  "chat into Code, where it gets a project folder of its own, rather than building the project " +
+  "here. Never move or copy the files yourself: the person decides.";
 
 async function chatFacts(conversationId: string, runId: string): Promise<ChatFacts> {
   const chat = useMistyStore.getState().conversations.find((item) => item.id === conversationId);
@@ -89,7 +95,6 @@ export async function buildRunBody(
 }> {
   const account = agentAccountId();
   const signedIn = isSignedIn();
-  const spaceId = input.spaceId ?? "";
   const agentId = input.agentId ?? "";
   const now = Date.now();
   const server = toServerInvocation(input);
@@ -109,6 +114,10 @@ export async function buildRunBody(
     // Personas the message names with `#` from the bundled catalog (`agents/personas`).
     personaInstructions(input.prompt).catch(() => ""),
   ]);
+  // A chat in a project is Code's: its agent works quietly there, with its rules and no persona.
+  const multirunFolder = await multirunFolderOf(conversationId);
+  const inCode =
+    Boolean(conversationId) && (multirunFolder !== undefined || isProjectChat(conversationId));
   // A turn that chooses nothing takes the chat's choice, then its agent's default, read as one of
   // the engine's own modes (an older Ask, Auto, Plan or Bypass maps to the engine's own here).
   const saved = input.permissionMode ?? (state.permissionMode || agent?.default_run_mode || "ask");
@@ -159,8 +168,13 @@ export async function buildRunBody(
         ? {
             name: agent?.name ?? "",
             role: agent?.role ?? "",
-            // The agent's soul and rules (`agents/bots`), then any `#` personas.
-            instructions: [agent ? assembleAgentPrompt({ agent }).text : "", personas]
+            // The agent's soul and rules (`agents/bots`), only its rules in Code, then any `#`
+            // personas, then where a chat works.
+            instructions: [
+              agent ? assembleAgentPrompt({ agent, quiet: inCode }).text : "",
+              personas,
+              conversationId && !inCode && engineId ? SCRATCH_CHAT_NOTE : "",
+            ]
               .filter(Boolean)
               .join("\n\n"),
           }
@@ -172,9 +186,8 @@ export async function buildRunBody(
     computer_use: input.computerUse || takeComputerUseAttachment(conversationId) || undefined,
     // The person attached Misty's browser to this message; only then does an engine get its tools.
     browser: takeBrowserAttachment(conversationId) || undefined,
-    // An agent on an outside engine works in its own folder, which native code decides
-    // (`engines/agent_folder.rs`); the Space's folder named here is only what an agent with none
-    // yet takes.
+    // The chat works in its own folder, which native code decides (`engines/chat_folder.rs`):
+    // the folder named here, else the chat's saved project, else its scratch folder.
     engine:
       engineId && onEngine
         ? {
@@ -189,8 +202,12 @@ export async function buildRunBody(
               chosen: choices.effort,
               agentEffort: agent?.reasoning_effort,
             }),
-            // A multi-run lane's chat works in the lane's own worktree, not the linked folder.
-            folder: (await multirunFolderOf(conversationId)) ?? (await engineFolder(spaceId)),
+            // A multi-run lane's chat works in the lane's own worktree; any other chat in the
+            // project it chose, or "" for native code to use its saved folder or scratch.
+            folder: multirunFolder ?? chatProjectOf(conversationId),
+            // The Space the run works in: native code lets the engine read that Space's shared
+            // folders this computer downloaded (`spaces_folders`), beside its own folder.
+            space: input.spaceId || undefined,
             // A bot's runtime: extra arguments and MCP servers for the engine, by name. Native
             // code decides which it passes.
             args: agent?.runtime_args?.length ? agent.runtime_args : undefined,

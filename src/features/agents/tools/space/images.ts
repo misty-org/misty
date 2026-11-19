@@ -1,40 +1,52 @@
+import { invoke } from "@tauri-apps/api/core";
 import {
+  ImageChangeRejected,
+  applyImageChanges,
+  canRemoveBackground,
   canvasToBlob,
+  clearImageEdit,
   defaultImageEdit,
   imageDocParts,
   loadPhoto,
-  normalizeImageEdit,
-  normalizeMark,
   outputSize,
   readImageEdit,
-  renderFinal,
+  removeBackground,
+  renderEdit,
   writeImageEdit,
+  type ImageDocParts,
   type ImageEdit,
   type ImagePeerState,
   type Mark,
 } from "@/features/files";
 import { spacesGateway, type LiveLibraryImage } from "../../spaces-gateway/spacesGateway";
 import { agentTag } from "../../tutor/agentTag";
-import type { LocalToolHandler, LocalToolRequest } from "../host";
+import { LocalToolRejected, type LocalToolHandler, type LocalToolRequest } from "../host";
 import { loadRunEntry } from "../runContexts";
-import { BAD_SCHEMA, refuse } from "./api";
-import { flag, text, textList } from "./args";
+import { refuse } from "./api";
+import { integer, text, textList } from "./args";
 import { routedTool, type SpaceRow } from "./routing";
 
 /**
  * An agent editing a Space Library image works in the same live edit as the people who have it
  * open: it joins the image's room, shows there as itself while it works, and its changes land in
- * front of everyone, who can undo them. Nothing reaches the image file until a save.
+ * front of everyone, who can undo them. Nothing reaches the image file until a save, a cutout or
+ * a file of the agent's own saved over it.
  */
 
 /** How long to wait for the room's copy of the edit before giving up. */
 const syncWaitMs = 8000;
 /** How long the agent stays visible in the room after a change, so people see who made it. */
 const lingerMs = 1200;
+/** The most images one edit changes, and how many rooms it has open at once. */
+const batchMost = 50;
+const batchAtOnce = 4;
 
 const UNAVAILABLE =
   "Live image editing isn't available here: the Space's server doesn't support it yet, or the image can't be reached.";
 const VIEW_ONLY = "This image can only be viewed here, not edited.";
+const NO_CUTOUT =
+  "This computer can't remove backgrounds: it needs a Mac with macOS 14 or later, and the Misty app.";
+const NOT_AN_IMAGE = "That file isn't a PNG, JPEG, WebP or GIF image.";
 
 const itemId = (input: Record<string, unknown>) => {
   const id = text(input, "item_id", { max: 200 }).trim();
@@ -50,11 +62,10 @@ async function agentPerson(request: LocalToolRequest): Promise<ImagePeerState["u
 
 /** Opens the image's live edit for the length of `work`, and always lets it go after. */
 async function withImage<T>(
-  request: LocalToolRequest,
   space: SpaceRow,
+  id: string,
   work: (image: LiveLibraryImage) => Promise<T>,
 ): Promise<T> {
-  const id = itemId(request.input);
   const gateway = spacesGateway.maybe();
   if (!gateway) throw refuse(UNAVAILABLE, "unavailable");
   let image: LiveLibraryImage;
@@ -136,129 +147,27 @@ function roundMark(mark: Omit<Mark, "z">): Record<string, unknown> {
 }
 
 const read = routedTool("read", async (request, space) =>
-  withImage(request, space, async (image) =>
+  withImage(space, itemId(request.input), async (image) =>
     describe(image, readImageEdit(imageDocParts(image.doc))),
   ),
 );
 
-const adjustIds = [
-  "exposure",
-  "brightness",
-  "contrast",
-  "highlights",
-  "shadows",
-  "saturation",
-  "vibrance",
-  "warmth",
-  "tint",
-  "sharpness",
-  "vignette",
-] as const;
+/** What the edit tool reads itself, beside the change. */
+const editTargets = ["item_id", "item_ids", "space"] as const;
 
-const finite = (value: unknown, low: number, high: number) => {
-  if (typeof value !== "number" || !Number.isFinite(value) || value < low || value > high)
-    throw refuse(BAD_SCHEMA);
-  return value;
-};
-
-const plainObject = (value: unknown) => {
-  if (!value || typeof value !== "object" || Array.isArray(value)) throw refuse(BAD_SCHEMA);
-  return value as Record<string, unknown>;
-};
-
-/** The edit after the model's changes, checked field by field. */
-function applyChanges(
+/** The model's change applied to an edit; a malformed one is refused with what was wrong. */
+function changed(
   current: ImageEdit,
   input: Record<string, unknown>,
   author: string,
+  natural: { width: number; height: number } | null,
 ): ImageEdit {
-  let next: ImageEdit = flag(input, "reset") ? { ...defaultImageEdit } : { ...current };
-  if (input.adjust !== undefined) {
-    const adjust = plainObject(input.adjust);
-    const values = { ...next.adjust };
-    for (const [id, value] of Object.entries(adjust)) {
-      if (!adjustIds.includes(id as (typeof adjustIds)[number])) throw refuse(BAD_SCHEMA);
-      values[id as (typeof adjustIds)[number]] = Math.round(finite(value, -100, 100));
-    }
-    next.adjust = values;
+  try {
+    return applyImageChanges(current, input, { author, natural, ignore: editTargets });
+  } catch (error) {
+    if (error instanceof ImageChangeRejected) throw refuse(error.message);
+    throw error;
   }
-  const filter = text(input, "filter", {
-    allowed: ["none", "vivid", "dramatic", "warm", "cool", "fade", "mono", "noir"],
-  });
-  if (filter) next.filter = filter as ImageEdit["filter"];
-  if (input.filter_strength !== undefined)
-    next.filterStrength = finite(input.filter_strength, 0, 100);
-  const rotate = text(input, "rotate", { allowed: ["left", "right"] });
-  if (rotate) {
-    const { x, y, width, height } = next.crop;
-    const clockwise = rotate === "right";
-    next = {
-      ...next,
-      rotation: ((next.rotation + (clockwise ? 90 : 270)) % 360) as ImageEdit["rotation"],
-      crop: clockwise
-        ? { x: 1 - y - height, y: x, width: height, height: width }
-        : { x: y, y: 1 - x - width, width: height, height: width },
-      resize:
-        next.resize && "width" in next.resize
-          ? { width: next.resize.height, height: next.resize.width }
-          : next.resize,
-    };
-  }
-  const flip = text(input, "flip", { allowed: ["horizontal", "vertical"] });
-  if (flip === "horizontal") {
-    const { x, y, width, height } = next.crop;
-    next = { ...next, flipX: !next.flipX, crop: { x: 1 - x - width, y, width, height } };
-  } else if (flip === "vertical") {
-    const { x, y, width, height } = next.crop;
-    next = { ...next, flipY: !next.flipY, crop: { x, y: 1 - y - height, width, height } };
-  }
-  if (input.straighten !== undefined) next.straighten = finite(input.straighten, -45, 45);
-  if (input.crop !== undefined) {
-    const crop = plainObject(input.crop);
-    next.crop = {
-      x: finite(crop.x, 0, 1),
-      y: finite(crop.y, 0, 1),
-      width: finite(crop.width, 0.01, 1),
-      height: finite(crop.height, 0.01, 1),
-    };
-  }
-  const aspect = text(input, "aspect", {
-    allowed: ["free", "original", "square", "4:3", "3:2", "16:9"],
-  });
-  if (aspect) next.aspect = aspect as ImageEdit["aspect"];
-  if (input.resize !== undefined) {
-    const resize = plainObject(input.resize);
-    if (resize.scale !== undefined) next.resize = { scale: finite(resize.scale, 0.01, 16) };
-    else if (resize.width !== undefined && resize.height !== undefined)
-      next.resize = {
-        width: Math.round(finite(resize.width, 1, 16_384)),
-        height: Math.round(finite(resize.height, 1, 16_384)),
-      };
-    else next.resize = null;
-  }
-  const marks = { ...next.marks };
-  if (flag(input, "clear_marks")) for (const id of Object.keys(marks)) delete marks[id];
-  for (const id of textList(input, "remove_mark_ids", { max: 500, itemMin: 1, itemMax: 128 }) ?? [])
-    delete marks[id];
-  if (input.add_marks !== undefined) {
-    if (!Array.isArray(input.add_marks) || input.add_marks.length > 200) throw refuse(BAD_SCHEMA);
-    let z = Math.max(0, ...Object.values(marks).map((mark) => mark.z));
-    for (const raw of input.add_marks) {
-      const fields = plainObject(raw);
-      const id = crypto.randomUUID();
-      const mark = normalizeMark({
-        color: "#ff3b30",
-        ...fields,
-        id,
-        z: ++z,
-        author,
-      } as unknown as Mark);
-      if (!mark) throw refuse(BAD_SCHEMA);
-      marks[id] = mark;
-    }
-  }
-  next.marks = marks;
-  return normalizeImageEdit(next);
 }
 
 /** Where the agent's pointer rests while it is in the room: on what it just added, or the middle. */
@@ -278,13 +187,28 @@ function pointerFor(before: ImageEdit, after: ImageEdit) {
   }
 }
 
-const edit = routedTool("change", async (request, space) => {
-  const me = await agentPerson(request);
-  return withImage(request, space, async (image) => {
+/**
+ * The original's size, for a change that crops to an aspect: from the Library when it knows, else
+ * read from the image itself.
+ */
+async function naturalSize(image: LiveLibraryImage, input: Record<string, unknown>) {
+  if (image.width > 0 && image.height > 0) return { width: image.width, height: image.height };
+  if (input.aspect === undefined || input.crop !== undefined) return null;
+  const photo = await loadPhoto(await image.original());
+  return { width: photo.width, height: photo.height };
+}
+
+async function editOne(
+  request: LocalToolRequest,
+  space: SpaceRow,
+  id: string,
+  me: ImagePeerState["user"],
+) {
+  return withImage(space, id, async (image) => {
     if (image.role === "viewer") throw refuse(VIEW_ONLY, "not_allowed");
     const parts = imageDocParts(image.doc);
     const before = readImageEdit(parts);
-    const after = applyChanges(before, request.input, me.name);
+    const after = changed(before, request.input, me.name, await naturalSize(image, request.input));
     // The agent shows in the editor as itself while its change lands, then leaves.
     image.awareness.setLocalState({
       user: me,
@@ -297,48 +221,224 @@ const edit = routedTool("change", async (request, space) => {
     image.awareness.setLocalState(null);
     return describe(image, readImageEdit(parts));
   });
+}
+
+/** The images one edit is for: `item_id`, or 1 to 50 `item_ids` (each once, in their order). */
+function editItems(input: Record<string, unknown>): { one: string } | { many: string[] } {
+  const many = textList(input, "item_ids", { min: 1, max: batchMost, itemMin: 1, itemMax: 200 });
+  const one = text(input, "item_id", { max: 200 }).trim();
+  if (many && one) throw refuse("pass item_id or item_ids, not both");
+  if (many) return { many: [...new Set(many.map((id) => id.trim()).filter(Boolean))] };
+  if (!one) throw refuse("item_id or item_ids is required");
+  return { one };
+}
+
+/** Runs `work` over every item, a few at a time, answering in the items' order. */
+async function eachInTurn<T>(ids: string[], work: (id: string) => Promise<T>): Promise<T[]> {
+  const results = new Array<T>(ids.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < ids.length) {
+      const index = next++;
+      results[index] = await work(ids[index]);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(batchAtOnce, ids.length) }, worker));
+  return results;
+}
+
+const edit = routedTool("change", async (request, space) => {
+  const items = editItems(request.input);
+  const me = await agentPerson(request);
+  // A change that can't apply is refused before any image is touched.
+  changed(defaultImageEdit, request.input, me.name, null);
+  if ("one" in items) return editOne(request, space, items.one, me);
+  // Each image on its own: one that fails is reported and the rest still change.
+  const results = await eachInTurn(items.many, async (id) => {
+    try {
+      return { item_id: id, ...(await editOne(request, space, id, me)) };
+    } catch (error) {
+      const code = error instanceof LocalToolRejected ? error.code : "failed";
+      const message =
+        error instanceof Error && error.message ? error.message : "This image couldn't be changed.";
+      return { item_id: id, error: { code, message } };
+    }
+  });
+  const failed = results.filter((result) => "error" in result).length;
+  return { edited: results.length - failed, failed, results };
 });
+
+// ---------------------------------------------------------------------------------------------
+// Saving
+
+const formats = {
+  png: { mimeType: "image/png", extension: "png" },
+  jpeg: { mimeType: "image/jpeg", extension: "jpg" },
+  webp: { mimeType: "image/webp", extension: "webp" },
+} as const;
+type FormatId = keyof typeof formats;
+
+const extensionOf = (mimeType: string) =>
+  mimeType === "image/jpeg"
+    ? "jpg"
+    : mimeType === "image/webp"
+      ? "webp"
+      : mimeType === "image/gif"
+        ? "gif"
+        : "png";
+
+const stemOf = (name: string) => name.replace(/\.[^./\\]+$/, "") || "image";
+
+/** What an image file is, by the first bytes of it, never by its name. */
+export function imageFileKind(bytes: Uint8Array): { mimeType: string; extension: string } | null {
+  const starts = (...values: number[]) => values.every((value, index) => bytes[index] === value);
+  const ascii = (from: number, word: string) =>
+    [...word].every((letter, index) => bytes[from + index] === letter.charCodeAt(0));
+  if (starts(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a))
+    return { mimeType: "image/png", extension: "png" };
+  if (starts(0xff, 0xd8, 0xff)) return { mimeType: "image/jpeg", extension: "jpg" };
+  if (ascii(0, "GIF87a") || ascii(0, "GIF89a")) return { mimeType: "image/gif", extension: "gif" };
+  if (ascii(0, "RIFF") && ascii(8, "WEBP")) return { mimeType: "image/webp", extension: "webp" };
+  return null;
+}
+
+/** An image file the agent's own tools made in the chat's folder. Only a chat's agent has one. */
+async function chatImage(request: LocalToolRequest, path: string): Promise<Blob> {
+  const run = await loadRunEntry(request.runId).catch(() => null);
+  if (!run?.conversationId)
+    throw refuse("Only a chat's agent has a folder to save an image from.", "not_allowed");
+  let loaded: ArrayBuffer | number[];
+  try {
+    loaded = await invoke<ArrayBuffer | number[]>("chat_media_load", {
+      account: run.account,
+      conversation: run.conversationId,
+      path,
+    });
+  } catch (error) {
+    throw refuse(typeof error === "string" ? error : "That file can't be read.");
+  }
+  const bytes = loaded instanceof ArrayBuffer ? new Uint8Array(loaded) : Uint8Array.from(loaded);
+  const kind = imageFileKind(bytes);
+  if (!kind) throw refuse(NOT_AN_IMAGE);
+  return new Blob([bytes], { type: kind.mimeType });
+}
+
+/** The format and quality `image.save` was asked for, if any. */
+function saveFormat(input: Record<string, unknown>) {
+  const format = text(input, "format", { allowed: Object.keys(formats) }) as FormatId | "";
+  const quality = integer(input, "quality", 1, 100);
+  return { format: format ? formats[format] : null, quality: quality ? quality / 100 : undefined };
+}
+
+/** An image file in another format, drawn again. */
+async function reencoded(file: Blob, mimeType: string, quality?: number): Promise<Blob> {
+  const photo = await loadPhoto(file);
+  const canvas = document.createElement("canvas");
+  canvas.width = photo.width;
+  canvas.height = photo.height;
+  canvas.getContext("2d")?.drawImage(photo.image, 0, 0, photo.width, photo.height);
+  return canvasToBlob(canvas, mimeType, quality);
+}
+
+/** The image with its live edit, at full size, its stickers loaded. */
+async function renderLive(image: LiveLibraryImage, parts: ImageDocParts) {
+  return renderEdit(await loadPhoto(await image.original()), readImageEdit(parts));
+}
+
+/**
+ * Keeps an image made from the item: over it as a new version, where the live edit starts again
+ * from it, or beside it as a new item named `name`, else `fallback`.
+ */
+async function keep(
+  image: LiveLibraryImage,
+  parts: ImageDocParts,
+  blob: Blob,
+  mode: string,
+  name: string,
+  fallback: string,
+) {
+  if (mode === "replace") {
+    const version = await image.replace(blob);
+    // The edit is in the image now: everyone starts again from the saved image.
+    clearImageEdit(parts, String(version), { image: "saved" });
+    return { saved: "replaced", name: image.name, version };
+  }
+  const stem = (name || fallback).replace(/\.(png|jpe?g|webp|gif)$/i, "");
+  const filename = `${stem}.${extensionOf(blob.type)}`;
+  const created = await image.saveCopy(blob, filename);
+  return { saved: "copy", name: filename, item_id: created?.id ?? null };
+}
 
 const save = routedTool("change", async (request, space) => {
   const mode = text(request.input, "mode", { required: true, allowed: ["replace", "copy"] });
   const name = text(request.input, "name", { min: 1, max: 200 }).trim();
-  return withImage(request, space, async (image) => {
+  const path = text(request.input, "path", { min: 1, max: 4000 }).trim();
+  const { format, quality } = saveFormat(request.input);
+  const id = itemId(request.input);
+  // The agent's own file is read first, so a wrong one is refused before the room opens.
+  const file = path ? await chatImage(request, path) : null;
+  return withImage(space, id, async (image) => {
     if (image.role === "viewer") throw refuse(VIEW_ONLY, "not_allowed");
     const parts = imageDocParts(image.doc);
-    const current = readImageEdit(parts);
-    const mimeType =
-      image.mimeType === "image/jpeg" || image.mimeType === "image/webp"
-        ? image.mimeType
-        : "image/png";
-    const extension =
-      mimeType === "image/jpeg" ? "jpg" : mimeType === "image/webp" ? "webp" : "png";
-    const original = await loadPhoto(await image.original());
-    const blob = await canvasToBlob(renderFinal(original, current), mimeType);
-    if (mode === "replace") {
-      const version = await image.replace(blob);
-      // The edit is in the image now: everyone starts again from the saved image.
-      image.doc.transact(
-        () => {
-          parts.edit.clear();
-          parts.adjust.clear();
-          parts.marks.clear();
-          parts.meta.set("base", String(version));
-        },
-        { image: "saved" },
-      );
-      return { saved: "replaced", name: image.name, version };
+    let blob: Blob;
+    if (file) blob = format ? await reencoded(file, format.mimeType, quality) : file;
+    else {
+      const own = Object.values(formats).find((known) => known.mimeType === image.mimeType);
+      const mimeType = (format ?? own ?? formats.png).mimeType;
+      blob = await canvasToBlob(await renderLive(image, parts), mimeType, quality);
     }
-    const stem = (name || `${image.name.replace(/\.[^./\\]+$/, "")} edited`).replace(
-      /\.(png|jpe?g|webp)$/i,
-      "",
-    );
-    const created = await image.saveCopy(blob, `${stem}.${extension}`);
-    return { saved: "copy", name: `${stem}.${extension}`, item_id: created?.id ?? null };
+    return keep(image, parts, blob, mode, name, `${stemOf(image.name)} edited`);
   });
 });
 
+/**
+ * The background taken out on this computer, as the Remove background tab does: the image with
+ * its live edit, with only its subject left over transparency, as a PNG.
+ */
+const cutout = routedTool("change", async (request, space) => {
+  const mode = text(request.input, "mode", { required: true, allowed: ["replace", "copy"] });
+  const name = text(request.input, "name", { min: 1, max: 200 }).trim();
+  const id = itemId(request.input);
+  if (!(await canRemoveBackground())) throw refuse(NO_CUTOUT, "unavailable");
+  return withImage(space, id, async (image) => {
+    if (image.role === "viewer") throw refuse(VIEW_ONLY, "not_allowed");
+    const parts = imageDocParts(image.doc);
+    const rendered = await canvasToBlob(await renderLive(image, parts), "image/png");
+    let made: Blob;
+    try {
+      made = await removeBackground(rendered);
+    } catch (error) {
+      throw refuse(error instanceof Error ? error.message : "The background couldn't be removed.");
+    }
+    return keep(image, parts, made, mode, name, `${stemOf(image.name)} (no background)`);
+  });
+});
+
+/** How wide an image an agent is shown: enough to judge it, small enough for its context. */
+const VIEW_WIDTH = 1024;
+
+/** The image as it looks now, with the live edit applied, so an agent edits what it can see. */
+const view = routedTool("read", async (request, space) =>
+  withImage(space, itemId(request.input), async (image) => {
+    const full = await renderLive(image, imageDocParts(image.doc));
+    const scale = Math.min(1, VIEW_WIDTH / Math.max(full.width, full.height));
+    const shown = document.createElement("canvas");
+    shown.width = Math.max(1, Math.round(full.width * scale));
+    shown.height = Math.max(1, Math.round(full.height * scale));
+    shown.getContext("2d")?.drawImage(full, 0, 0, shown.width, shown.height);
+    return {
+      name: image.name,
+      shown_at: { width: shown.width, height: shown.height },
+      saves_at: { width: full.width, height: full.height },
+      image: { dataUrl: shown.toDataURL("image/png") },
+    };
+  }),
+);
+
 export const imageTools: Record<string, LocalToolHandler> = {
+  "image.view": view,
   "image.read": read,
   "image.edit": edit,
   "image.save": save,
+  "image.cutout": cutout,
 };

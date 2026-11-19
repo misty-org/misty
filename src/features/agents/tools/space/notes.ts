@@ -1,11 +1,14 @@
 import type { LocalToolHandler } from "../host";
 import { readRoute, refuse, rewordRefusal, segment, spacePath, writeRoute } from "./api";
 import { integer, onlyFields, text, textList } from "./args";
-import { routedTool } from "./routing";
+import { routedTool, type SpaceRow } from "./routing";
+import { itemTools } from "./madeItems";
 
 interface Note {
   id: string;
   space_id: string;
+  creator_user_id?: string;
+  visibility?: "public" | "private";
   title: string;
   markdown?: string;
   created_at: string;
@@ -44,11 +47,44 @@ const read = routedTool("read", async (request, space) => {
   };
 });
 
+/**
+ * Writes the doc's body into its live room now, so a doc an agent made is whole before anyone
+ * opens it (plan C1). The server keeps the Markdown either way, and an editor that opens the doc
+ * still claims it if this couldn't reach the room, so a failure here loses nothing.
+ */
+async function writeBody(space: SpaceRow, id: string, markdown: string) {
+  try {
+    const tools = await itemTools();
+    await tools.edit("note", space.id, id, (doc) => tools.writeNoteMarkdown(doc, markdown));
+  } catch {
+    // The room fills the body the first time the doc opens.
+  }
+}
+
+/**
+ * Refuses a body whose `::embed{…}` lines may not go into this doc: a shared doc takes only
+ * shared items, and agents never change an item's visibility to make one fit.
+ */
+async function checkEmbeds(space: SpaceRow, host: Note | undefined, markdown: string) {
+  if (!markdown.includes("::embed")) return;
+  const tools = await itemTools();
+  const reasons = await tools.embedRefusals(
+    space.id,
+    // A new doc starts on the Space's shared layer.
+    { visibility: host?.visibility ?? "public", creatorId: host?.creator_user_id },
+    markdown,
+  );
+  if (reasons.length) throw refuse(reasons.join(" "));
+}
+
 const create = routedTool("create", async (request, space) => {
   const title = text(request.input, "title", { max: 500 });
   const markdown = text(request.input, "markdown", { max: 100_000 });
   if (!title.trim() || !markdown.trim()) throw refuse("note title and markdown are required");
-  return writeRoute(request, notesPath(space.id), "POST", { title, markdown });
+  await checkEmbeds(space, undefined, markdown);
+  const note = await writeRoute<Note>(request, notesPath(space.id), "POST", { title, markdown });
+  if (note?.id) await writeBody(space, note.id, markdown);
+  return note;
 });
 
 const update = routedTool("change", async (request, space) => {
@@ -60,11 +96,24 @@ const update = routedTool("change", async (request, space) => {
   if (markdown && append) {
     throw refuse("use markdown to replace the body or append to add to it, not both");
   }
-  return writeRoute(request, notesPath(space.id, `/${segment(id)}/content`), "PUT", {
+  if ((markdown + append).includes("::embed")) {
+    const host = await readRoute<Note>(request, notesPath(space.id, `/${segment(id)}`));
+    await checkEmbeds(space, host, markdown + "\n" + append);
+  }
+  const result = await writeRoute(request, notesPath(space.id, `/${segment(id)}/content`), "PUT", {
     title,
     markdown,
     append,
   });
+  if (markdown || append) {
+    // An append's whole body is the server's to say.
+    const body = append
+      ? ((await readRoute<Note>(request, notesPath(space.id, `/${segment(id)}`)).catch(() => null))
+          ?.markdown ?? "")
+      : markdown;
+    if (body) await writeBody(space, id, body);
+  }
+  return result;
 });
 
 const tag = routedTool("change", async (request, space) => {

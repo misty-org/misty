@@ -20,7 +20,7 @@ import { EngineNextStep } from "../../engines/EngineNextStep";
 import { chooseEngineMode, type usePermissionMode } from "../../plans/permissionMode";
 import { resolveEngineMode, useEngineModes } from "../../engines/engineModes";
 import type { useCollaborationComposer } from "../../plans/useCollaborationComposer";
-import { currentSpaceKey, mistyEngine } from "../../engines/enginesApi";
+import { mistyEngine } from "../../engines/enginesApi";
 import {
   BrowserChip,
   captureRegionFile,
@@ -31,8 +31,7 @@ import {
 } from "../composer/controls/ComposerControls";
 import { useComposerSuggestions } from "../composer/controls/ComposerSuggestions";
 import { handleVimKey, useComposerVim } from "../composer/controls/composerVim";
-import { useEngineFolder } from "../composer/controls/FolderSegment";
-import { useAgentFolder, useAgentFolders } from "../../shared-folders/agentFolder";
+import { useChatFolder } from "../../shared-folders/chatFolder";
 import {
   useBrowserAttached,
   useBrowserAttachment,
@@ -114,18 +113,9 @@ export function AgentConversationComposer({
   const mode = resolveEngineMode(modes, permission, collaboration.mode === "plan");
   const planning = mode?.kind === "plans";
   const teaching = collaboration.mode === "teach";
-  const space = currentSpaceKey();
-  // Every chat with an agent works in its one folder. One it doesn't have yet takes the Space's
-  // folder on its first run, so that is what `@` mentions read until then.
-  const spaceFolder = useEngineFolder(space, Boolean(engine));
-  const ownFolder = useAgentFolder(agent);
-  const folder = !engine || ownFolder === undefined ? "" : (ownFolder ?? spaceFolder);
-  const agentId = agent?.id;
-  // A first run may have given the agent its folder: read it again once a reply ends.
-  useEffect(() => {
-    if (engine && agentId && !working && ownFolder === null)
-      useAgentFolders.getState().refresh(agentId);
-  }, [engine, agentId, working, ownFolder]);
+  // The chat's own folder, which `@` mentions read: a project, or its scratch folder once its
+  // first run has made it.
+  const { folder } = useChatFolder(conversationId);
   useEffect(() => {
     watchContextUsage();
     if (conversationId) void useComposerChoices.getState().load(accountId, conversationId);
@@ -314,8 +304,7 @@ export function AgentConversationComposer({
                   listening ? "Stop recording" : voiceBusy ? "Transcribing" : "Start voice input"
                 }
                 aria-pressed={listening || undefined}
-                loading={voiceBusy}
-                disabled={disabled || working}
+                disabled={disabled || working || voiceBusy}
                 onClick={() => (listening ? voice.stop() : void voice.start())}
               >
                 {listening ? <Square /> : <Mic />}

@@ -1,13 +1,12 @@
 import { useEffect, type ReactNode } from "react";
-import { useSearchParams } from "react-router-dom";
 import type { MistyActivityEntry } from "../conversations/state/activity";
 import type { AgentProfile } from "@/shared/schemas";
 import { useSessionGoalRunner } from "../goals/sessionGoals";
-import { VirtualStudio } from "../virtual/VirtualStudio";
 import { ContextRail } from "../context-panel/ContextRail";
 import { ChatSessionCard, ChatSidePanels } from "../context-panel/ChatSidePanels";
 import { isUnread, markConversationRead } from "./conversationReads";
 import { LabInSpace } from "../tutor/LabInSpace";
+import { CodePage } from "../code/CodePage";
 import { cn, Surface } from "@/shared/ui";
 
 /**
@@ -32,7 +31,7 @@ const emptyChatClass = cn(
 /** Queued or working: read state doesn't apply yet. */
 const isRunInProgress = (state?: string) => state === "running" || state === "queued";
 
-export type AgentWorkspacePage = "task" | "studio" | "lab";
+export type AgentWorkspacePage = "task" | "lab" | "code";
 type RecentConversation = {
   id: string;
   title?: string;
@@ -42,13 +41,12 @@ type RecentConversation = {
 };
 
 /**
- * The Agents page: a chat with its agent, or one of the pages the sidebar opens (the studio and
- * the Lab). Only the chat has a bar (the chat column draws it, over its
+ * The Agents page: a chat with its agent, or one of the pages the sidebar opens (the Lab and Code,
+ * the editor for the Space's folder). Only the chat has a bar (the chat column draws it, over its
  * conversation) and the context panel for the folder's files, changes and a terminal. The other
- * pages have no title bar, since the sidebar and the tab already name them, and the studio, where
- * agents are hired and set up, floats its few buttons over the room. The chats are listed in the
- * window's sidebar, so this page has no list of its own. Presentation only: conversation and
- * account actions remain owned by AgentsPage.
+ * pages have no title bar, since the sidebar and the tab already name them. The chats are listed
+ * in the window's sidebar, so this page has no list of its own. Presentation only: conversation
+ * and account actions remain owned by AgentsPage.
  */
 export function AgentWorkspaceFrame({
   agent,
@@ -58,10 +56,7 @@ export function AgentWorkspaceFrame({
   conversationId,
   disabled,
   children,
-  onPageChange,
   onNewTask,
-  onConversation,
-  onAgentSettings,
 }: {
   agent: AgentProfile;
   page: AgentWorkspacePage;
@@ -71,11 +66,7 @@ export function AgentWorkspaceFrame({
   conversationId: string;
   disabled: boolean;
   children: ReactNode;
-  onPageChange(page: AgentWorkspacePage): void;
   onNewTask(): void;
-  onConversation(id: string): void;
-  /** Opens an agent's settings, from its desk in the studio. */
-  onAgentSettings(agentId: string): void;
 }) {
   // The open conversation is read once its run settles while the window is in view.
   const activeId = page === "task" ? conversationId : undefined;
@@ -97,7 +88,6 @@ export function AgentWorkspaceFrame({
     document.addEventListener("visibilitychange", read);
     return () => document.removeEventListener("visibilitychange", read);
   }, [activeId, readable]);
-  const [, setParams] = useSearchParams();
   useSessionGoalRunner(activeId ?? "");
   return (
     // A main column (a body: the chat, under its floating bar, or another view and, when open, the
@@ -127,17 +117,7 @@ export function AgentWorkspaceFrame({
             ) : null}
             {/* The Lab is a page of the agent's home Space; its tab goes there. */}
             {page === "lab" ? <LabInSpace agent={agent} /> : null}
-            {page === "studio" ? (
-              <VirtualStudio
-                onAgentSettings={onAgentSettings}
-                onOpenChat={(agentId, chat) => {
-                  onPageChange("task");
-                  if (agentId === agent.id && chat) onConversation(chat);
-                  else
-                    setParams(chat ? { agent: agentId, conversation: chat } : { agent: agentId });
-                }}
-              />
-            ) : null}
+            {page === "code" ? <CodePage /> : null}
           </Surface>
           {/* The chat's side panel, between the chat and the rail. */}
           {page === "task" ? (

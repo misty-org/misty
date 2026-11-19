@@ -29,7 +29,9 @@ export function EngineFastItem({ engine, model }: { engine?: string; model?: Eng
   }, [offered]);
   if (!offered || !fast || !settings) return null;
   const on =
-    engine === "claude" ? settings.claudeFastMode === true : settings.codexServiceTier === fast.tier;
+    engine === "claude"
+      ? settings.claudeFastMode === true
+      : settings.codexServiceTier === fast.tier;
   const toggle = (next: boolean) => {
     const changed =
       engine === "claude"

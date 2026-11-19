@@ -54,9 +54,13 @@ pub fn reason(code: &str) -> String {
 #[cfg(target_os = "macos")]
 mod macos;
 #[cfg(target_os = "macos")]
-pub use macos::{listen, recognize_file, stream, supported, Listening, Speaker, Streaming};
+pub use macos::{
+    listen, recognize_file, recognize_file_phrases, stream, supported, Listening, Speaker, Streaming,
+};
 
 #[cfg(not(target_os = "macos"))]
 mod unsupported;
 #[cfg(not(target_os = "macos"))]
-pub use unsupported::{listen, recognize_file, stream, supported, Listening, Speaker, Streaming};
+pub use unsupported::{
+    listen, recognize_file, recognize_file_phrases, stream, supported, Listening, Speaker, Streaming,
+};

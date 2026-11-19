@@ -127,23 +127,22 @@ pub(crate) use crate::agents::connected_apps::direct::commands::{
 };
 #[cfg(any(target_os = "macos", windows, target_os = "linux"))]
 pub(crate) use crate::agents::cursor::{
-    __cmd__cursor_companion_bind_task, __cmd__cursor_companion_capture,
-    __cmd__cursor_companion_capture_region, __cmd__cursor_companion_configure,
-    __cmd__cursor_companion_interrupt, __cmd__cursor_companion_present,
-    __cmd__cursor_companion_snap, __cmd__cursor_companion_snapshot,
-    __cmd__cursor_companion_ask_close, __cmd__cursor_companion_trail,
+    __cmd__cursor_companion_ask_close, __cmd__cursor_companion_bind_task,
+    __cmd__cursor_companion_capture, __cmd__cursor_companion_capture_region,
+    __cmd__cursor_companion_configure, __cmd__cursor_companion_interrupt,
+    __cmd__cursor_companion_present, __cmd__cursor_companion_snap,
+    __cmd__cursor_companion_snapshot, __cmd__cursor_companion_trail,
     __cmd__cursor_companion_watch_clicks, __tauri_command_name_cursor_companion_ask_close,
-    __tauri_command_name_cursor_companion_bind_task,
-    __tauri_command_name_cursor_companion_capture,
+    __tauri_command_name_cursor_companion_bind_task, __tauri_command_name_cursor_companion_capture,
     __tauri_command_name_cursor_companion_capture_region,
     __tauri_command_name_cursor_companion_configure,
     __tauri_command_name_cursor_companion_interrupt, __tauri_command_name_cursor_companion_present,
     __tauri_command_name_cursor_companion_snap, __tauri_command_name_cursor_companion_snapshot,
     __tauri_command_name_cursor_companion_trail,
-    __tauri_command_name_cursor_companion_watch_clicks, cursor_companion_bind_task,
-    cursor_companion_capture, cursor_companion_capture_region, cursor_companion_configure,
-    cursor_companion_interrupt, cursor_companion_present, cursor_companion_snap,
-    cursor_companion_ask_close, cursor_companion_snapshot, cursor_companion_trail,
+    __tauri_command_name_cursor_companion_watch_clicks, cursor_companion_ask_close,
+    cursor_companion_bind_task, cursor_companion_capture, cursor_companion_capture_region,
+    cursor_companion_configure, cursor_companion_interrupt, cursor_companion_present,
+    cursor_companion_snap, cursor_companion_snapshot, cursor_companion_trail,
     cursor_companion_watch_clicks,
 };
 #[cfg(windows)]
@@ -186,6 +185,12 @@ pub(crate) use crate::agents::run_control::local_runs::{
 pub(crate) use crate::agents::run_control::local_tools::{
     __cmd__agent_tool_finish, __cmd__agent_tool_host_ready, __tauri_command_name_agent_tool_finish,
     __tauri_command_name_agent_tool_host_ready, agent_tool_finish, agent_tool_host_ready,
+};
+pub(crate) use crate::agents::run_control::browser_log::{
+    __cmd__agent_browser_log, __cmd__agent_browser_log_picture, __cmd__agent_browser_log_record,
+    __tauri_command_name_agent_browser_log, __tauri_command_name_agent_browser_log_picture,
+    __tauri_command_name_agent_browser_log_record, agent_browser_log, agent_browser_log_picture,
+    agent_browser_log_record,
 };
 pub(crate) use crate::agents::run_control::run_ledger::{
     __cmd__agent_run_timeline, __tauri_command_name_agent_run_timeline, agent_run_timeline,

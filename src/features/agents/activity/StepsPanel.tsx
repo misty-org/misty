@@ -1,42 +1,60 @@
 import { ChevronRight } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useCachedResource } from "@/api/cache/cached-resource";
-import { cn, Pressable, Text, rowShapeWrap } from "@/shared/ui";
-import { useProjectFolder } from "../context-panel/FolderPicker";
+import { Button, cn, ErrorState, Pressable, Text, rowShapeWrap } from "@/shared/ui";
+import { useChatFolder } from "../shared-folders/chatFolder";
 import { activityApi, type RunRow } from "./activityApi";
 import { RunSteps, RunStepsEmpty } from "./RunSteps";
 import { RunStateBadge, runWhen } from "./RunLabels";
 import { StepRowsSkeleton, StepsSkeleton } from "./StepsSkeleton";
 import { runStepsKey, useRunEvents } from "./useRunSteps";
 import { useNow } from "@/shared/hooks/useNow";
+import { openBrowserLog } from "../browser-log/browserLogStore";
+import { chatKey } from "../conversations/state/draftChat";
 
 /**
  * This chat's runs on this computer, newest first, kept current while one goes on. The runs read
- * before show at once and are read again behind them; null only on the very first read.
+ * before show at once and are read again behind them; `runs` is null only on the very first read,
+ * and `failed` says that read didn't come.
  */
-function useChatRuns(conversationId: string): RunRow[] | null {
+function useChatRuns(conversationId: string) {
   const runs = useCachedResource(`agents/run-timeline:${conversationId}`, () =>
     activityApi.timeline([conversationId], 50),
   );
   useRunEvents(null, runs.reload);
-  // A first read that failed shows the empty panel, not a skeleton that never ends.
-  return runs.data ?? (runs.loading ? null : []);
+  return {
+    runs: runs.data ?? null,
+    failed: !runs.data && !runs.loading,
+    retry: () => void runs.reload(),
+  };
 }
 
 /** One run's steps, from the last read while they are read again. */
-function RunStepsBody(props: { run: RunRow; folder?: string }) {
+function RunStepsBody(props: { run: RunRow; folder?: string; conversationId: string }) {
   const { runId } = props.run;
   const steps = useCachedResource(runStepsKey(runId), () => activityApi.steps(runId));
   const runIds = useMemo(() => [runId], [runId]);
   useRunEvents(runIds, steps.reload);
   if (!steps.data && steps.loading) return <StepRowsSkeleton />;
+  if (!steps.data)
+    return (
+      <div role="alert" className="flex min-w-0 items-center gap-2 px-2.5 py-1.5">
+        <Text wrap size="meta" tone="removed" className="min-w-0 flex-1">
+          This run's steps couldn't be read.
+        </Text>
+        <Button size="sm" variant="secondary" onClick={() => void steps.reload()}>
+          Try again
+        </Button>
+      </div>
+    );
   return (
     <RunSteps
       runId={runId}
-      steps={steps.data ?? []}
+      steps={steps.data}
       startedAt={props.run.startedAt}
       folder={props.folder}
       pictures
+      onOpenBrowserLog={(callId) => openBrowserLog(chatKey(props.conversationId), runId, callId)}
     />
   );
 }
@@ -49,12 +67,20 @@ const headClass = rowShapeWrap;
  * sentences, beside the chat's own tool rows. The latest run is open; earlier ones open on demand.
  */
 export function StepsPanel({ conversationId }: { conversationId: string }) {
-  const runs = useChatRuns(conversationId);
-  const { folder } = useProjectFolder();
+  const { runs, failed, retry } = useChatRuns(conversationId);
+  const { folder } = useChatFolder(conversationId);
   const [open, setOpen] = useState<Set<string>>(new Set());
   const latest = runs?.[0]?.runId ?? "";
   const now = useNow();
 
+  if (failed)
+    return (
+      <ErrorState
+        title="Couldn't read this chat's steps"
+        line="Something went wrong on this computer. Try again in a moment."
+        action={{ label: "Try again", onClick: retry }}
+      />
+    );
   if (!runs) return <StepsSkeleton />;
   if (!runs.length) {
     return <RunStepsEmpty>Each step the agent takes shows here, as it happens.</RunStepsEmpty>;
@@ -98,7 +124,9 @@ export function StepsPanel({ conversationId }: { conversationId: string }) {
                 <RunStateBadge state={run.state} />
               </Pressable>
             )}
-            {expanded ? <RunStepsBody run={run} folder={folder} /> : null}
+            {expanded ? (
+              <RunStepsBody run={run} folder={folder} conversationId={conversationId} />
+            ) : null}
           </section>
         );
       })}

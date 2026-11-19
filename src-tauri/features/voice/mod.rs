@@ -11,6 +11,7 @@ pub(crate) mod linux;
 #[cfg(target_os = "macos")]
 pub(crate) mod macos;
 pub mod speech;
+pub mod speech_words;
 
 // Glob re-exports carry the `__cmd__*` macros that #[tauri::command] generates
 // beside each function; naming the functions alone leaves generate_handler! blind.

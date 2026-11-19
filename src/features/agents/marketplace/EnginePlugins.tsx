@@ -326,7 +326,6 @@ export function EnginePlugins({
                         ) : (
                           <Button
                             icon={Download}
-                            loading={busy === item.id}
                             disabled={busy !== null}
                             aria-label={`Install ${item.name}`}
                             onClick={() => void install(item)}

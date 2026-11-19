@@ -36,6 +36,10 @@ export interface DescribedStep {
   nested: boolean;
   /** The page or file the step worked on, for folding a check into the step it checks. */
   place: string;
+  /** A step in the agent's browser, whose actions the run's browser log has. */
+  browser: boolean;
+  /** The tool calls folded into it, as the browser log keys them. */
+  calls: string[];
 }
 
 /** Misty's tool namespaces, as an outside engine sees them over MCP (`browser_navigate`). */
@@ -45,6 +49,8 @@ const namespaces = [
   "folder",
   "note",
   "drawing",
+  "deck",
+  "workbook",
   "message",
   "thread",
   "space",
@@ -77,6 +83,8 @@ const codeTools = ["js", "javascript", "node", "python", "code_interpreter", "re
 /** Calls that only set up or check the agent's own state. */
 const housekeeping = new Set([
   "ask_misty",
+  // Its card under the reply is how it shows.
+  "open_in_code",
   "misty_wait",
   "agent.wait",
   "agent.list",
@@ -149,7 +157,13 @@ export function verbOf(tool: string): StepVerb {
   }
   if (space === "computer")
     return action.includes("type") || action.includes("key") ? "type" : "click";
-  if (space === "file" || space === "folder" || space === "drawing") {
+  if (
+    space === "file" ||
+    space === "folder" ||
+    space === "drawing" ||
+    space === "deck" ||
+    space === "workbook"
+  ) {
     return /read|list|search/.test(action)
       ? action.includes("search")
         ? "search"
@@ -255,8 +269,19 @@ function describeStep(step: RunStep, options: { folder?: string; page?: string }
   }
   if (key.startsWith("drawing."))
     return action.includes("read") || action.includes("list")
-      ? "Looked at a drawing"
-      : "Drew on a drawing";
+      ? "Looked at a whiteboard"
+      : "Drew on a whiteboard";
+  if (key.startsWith("deck.")) {
+    if (action.includes("read") || action.includes("list")) return "Looked at a deck";
+    if (action.includes("create")) return "Made slides";
+    return "Changed a deck";
+  }
+  if (key.startsWith("workbook.")) {
+    if (action.includes("read") || action.includes("list")) return "Read a workbook";
+    if (action.includes("create")) return "Made a workbook";
+    if (action.includes("import")) return "Imported data into a workbook";
+    return "Changed a workbook";
+  }
   if (key.startsWith("image.")) {
     if (action.includes("read")) return "Looked at an image's edit";
     if (action.includes("save")) return "Saved an edited image";
@@ -388,6 +413,7 @@ export function describeSteps(
       previous.place === place;
     if (previous && (repeats || checks)) {
       previous.seqs.push(step.seq);
+      if (step.callId) previous.calls.push(step.callId);
       if (step.picture) previous.picture = step.picture;
       previous.running = step.state === "running";
       continue;
@@ -403,6 +429,8 @@ export function describeSteps(
       hidden,
       nested: step.nested,
       place,
+      browser: key.startsWith("browser."),
+      calls: step.callId ? [step.callId] : [],
     });
   }
   return { steps: described, hiddenCount };

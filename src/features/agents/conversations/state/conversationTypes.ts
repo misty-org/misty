@@ -13,6 +13,8 @@ type GlobalAiCitationKind =
   | "conversation"
   | "calendar"
   | "drawing"
+  | "deck"
+  | "workbook"
   | "library"
   | "folder"
   | "file"

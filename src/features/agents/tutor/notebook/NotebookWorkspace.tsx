@@ -244,9 +244,11 @@ export function NotebookWorkspace({
   // A notebook that follows something takes in recent news as it opens, on one computer.
   useEffect(() => {
     if (!ready || !followIsStale(notebook.follow)) return;
-    void claimRun(notebook.id, "news", 5 * 60_000).then(
-      (mine) => mine && lookForNews(notebook.id).then((failed) => failed && setError(failed)),
-    );
+    void claimRun(notebook.id, "news", 5 * 60_000).then(async (mine) => {
+      if (!mine) return;
+      const failed = await lookForNews(notebook.id);
+      if (failed) setError(failed);
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [notebook.id, ready]);
 

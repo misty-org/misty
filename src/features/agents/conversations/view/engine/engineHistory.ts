@@ -25,6 +25,9 @@ interface EngineSearchHit {
 
 export const listEngineSessions = () => invoke<EngineSession[]>("engine_history_list");
 
+/** Every session, after the engines' files are read again, so none started since is missed. */
+export const rescanEngineSessions = () => invoke<EngineSession[]>("engine_history_rescan");
+
 export const searchEngineSessions = (query: string) =>
   invoke<{ hits: EngineSearchHit[]; hasMore: boolean }>("engine_history_search", {
     query,
@@ -54,10 +57,10 @@ export const readEngineSession = (engine: string, sessionId: string) =>
 
 /** The engine session a chat runs, if it has started one. */
 export const readChatSession = (conversation: string) =>
-  invoke<{ engine: string; sessionId: string } | null>(
-    "engine_chat_session",
-    { account: agentAccountId(), conversation },
-  );
+  invoke<{ engine: string; sessionId: string } | null>("engine_chat_session", {
+    account: agentAccountId(),
+    conversation,
+  });
 
 /** Renames a session, written back where the engine keeps its own title. */
 export const renameEngineSession = (engine: string, sessionId: string, title: string) =>

@@ -1,7 +1,8 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 import { invoke } from "@/native/invoke";
 import { agentAccountId } from "../../../personal/agentAccount";
-import { currentSpaceKey, useSpaceFolders } from "../../../engines/enginesApi";
+import { currentSpaceKey } from "../../../engines/enginesApi";
+import { useChatFolders } from "../../../shared-folders/chatFolder";
 import type { AiInvocationEvent } from "../../../runs/invocations/invocationTypes";
 import type { FolderGrant } from "../../state/conversationTypes";
 import { useMistyStore } from "../../state/useMistyStore";
@@ -70,9 +71,9 @@ export const folderGrantScope = (path: string) =>
   invoke<string>("space_folder_grant_scope", { path });
 
 /**
- * Asks native code to allow the folder `path` is in for this Space. Native code asks the person
- * in a system dialog and links the folder only if they agree; nothing here can say yes for them.
- * Resolves to the folder linked, or null when they declined.
+ * Asks native code to allow the folder `path` is in. Native code asks the person in a system
+ * dialog and adds the folder as one of their projects only if they agree; nothing here can say
+ * yes for them. Resolves to the folder allowed, or null when they declined.
  */
 export async function requestFolderGrant(path: string): Promise<string | null> {
   const space = currentSpaceKey();
@@ -82,9 +83,9 @@ export async function requestFolderGrant(path: string): Promise<string | null> {
     path,
   });
   if (folder)
-    await useSpaceFolders
+    await useChatFolders
       .getState()
-      .load(space)
+      .loadProjects()
       .catch(() => undefined);
   return folder;
 }

@@ -49,7 +49,6 @@ fn a_reload_asks_again_only_what_is_safe_to_repeat() {
     assert!(repeats_safely("agent.delegate"));
     assert!(repeats_safely("agent.wait"));
     assert!(repeats_safely("note.read"));
-    assert!(repeats_safely("studio.go"));
     assert!(!repeats_safely("file.create"));
     assert!(!repeats_safely("log.work.write"));
     assert!(!repeats_safely("shell.run"));

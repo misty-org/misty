@@ -13,7 +13,7 @@ import {
   copyChatFilePath,
   openChatFilePath,
   revealChatFilePath,
-  useChatFolder,
+  useReplyFolder,
 } from "./openChatFile";
 
 const revealLabel =
@@ -37,7 +37,7 @@ export function FileLink({
   path: string;
   children: ReactNode;
 }) {
-  const folder = useChatFolder();
+  const folder = useReplyFolder();
   const resolved = resolveFilePath(path, folder);
   return (
     <ContextMenu>

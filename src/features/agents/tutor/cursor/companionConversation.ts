@@ -23,6 +23,7 @@ import {
   type ConversationTool,
   type SavedVoiceTurn,
 } from "./companionVoiceSocket";
+import { voiceRules } from "./companionVoiceRules";
 
 export type { ConversationTool, SavedVoiceTurn } from "./companionVoiceSocket";
 interface Options {
@@ -103,29 +104,11 @@ function openDocument(screens: DisplayCapture[]) {
 const READING_POLL_MS = 100;
 const tags = replyTags;
 /** An answer as the chat keeps it: no tags, its drawing kept, so the chat shows the drawing. */
-const keptText = (reply: string) => reply.replace(tags, "").replace(/\n{3,}/g, "\n\n").trim();
-
-/** What the engine is asked to do on top of the companion lane's own pointing rules. */
-const voiceRules = [
-  "You are Misty, speaking with the person at their cursor. Answer in one to three short spoken sentences: plain words, no lists, no markdown. When you draw, the drawing's narration carries the explanation instead.",
-  "Point at what you mention, as the screen rules say.",
-  "When they ask for work to be done (writing, changing files, research, anything that " +
-    "takes more than an answer), don't do it yourself: reply with [TASK: <the request, in " +
-    "their words, complete enough to act on>] and one short sentence saying you've started " +
-    "it.",
-  "When they ask you to do it in front of them and show them how (\"do it and show me\", " +
-    "\"drive it for me\"), reply with [DRIVE: <the request, complete enough to act on>] and one " +
-    "short sentence saying you'll do it while they watch.",
-  "When they ask you to open or pull up a web page, end with [OPEN:<the page's https address>], " +
-    "only an address you found with your tools or know for certain.",
-  "When they ask to change how you talk or behave (talk slower or faster, another voice, " +
-    "captions, the shortcut, your size), say which setting does it and end with " +
-    "[SETTINGS:voice], [SETTINGS:tutor], [SETTINGS:shortcuts] or [SETTINGS:appearance] to open " +
-    "that page for them.",
-  "Point at each thing as you mention it: put its POINT tag right after the sentence that names " +
-    "it, up to four in an answer; a walkthrough step points at one thing.",
-  "Don't create or edit any files.",
-].join(" ");
+const keptText = (reply: string) =>
+  reply
+    .replace(tags, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 
 export { spokenText } from "./companionSentences";
 
@@ -278,7 +261,8 @@ export class CompanionConversation {
     // is shown as the sentence that names it begins. The last point, which may start a
     // walkthrough step, is presented with the whole answer once its sentence is reached.
     let answer = "";
-    let reply: string | undefined;
+    // Set once the whole answer is in; the reading loop reads it before then.
+    let reply = undefined as string | undefined;
     let begun = 0;
     let readingOpen = true;
     let pointed = 0;
@@ -390,7 +374,8 @@ export class CompanionConversation {
     const page = /\[OPEN:\s*(https?:\/\/[^\]\s]+)\s*\]/i.exec(text)?.[1];
     if (page) this.options.openPage?.(page);
     const settings = /\[SETTINGS:\s*([a-z]+)\s*\]/i.exec(text)?.[1]?.toLowerCase();
-    if (settings && settingsPages[settings]) this.options.openSettingsPage?.(settingsPages[settings]);
+    if (settings && settingsPages[settings])
+      this.options.openSettingsPage?.(settingsPages[settings]);
     answer = text;
     reply = text;
     sentences.finish(spokenParts(text).text);
@@ -411,11 +396,19 @@ export class CompanionConversation {
     // An answer nobody could hear waits on the clipboard.
     if (await muted) {
       const words = spokenText(text);
-      if (words) await copyAnswer(words).then(() => this.options.onMuted?.(), () => undefined);
+      if (words)
+        await copyAnswer(words).then(
+          () => this.options.onMuted?.(),
+          () => undefined,
+        );
     }
     if (generation !== this.generation) return;
     this.finish({ id, prompt, reply: keptText(text), interrupted: false });
-    this.options.onAnswered?.({ prompt, reply: text, trail: screens.some((screen) => screen.trail) });
+    this.options.onAnswered?.({
+      prompt,
+      reply: text,
+      trail: screens.some((screen) => screen.trail),
+    });
   }
   private async speak(text: string, generation: number) {
     if (!text || generation !== this.generation || this.canceled) return;

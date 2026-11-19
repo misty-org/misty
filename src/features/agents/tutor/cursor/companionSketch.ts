@@ -18,14 +18,7 @@ interface SketchHeader {
 }
 
 type SketchElementType =
-  | "rectangle"
-  | "ellipse"
-  | "diamond"
-  | "text"
-  | "arrow"
-  | "line"
-  | "image"
-  | "part";
+  "rectangle" | "ellipse" | "diamond" | "text" | "arrow" | "line" | "image" | "part";
 
 /** A 3D part's form: `size` is its width, height and depth around its center `at`. */
 export type ModelShape = "box" | "sphere" | "cylinder" | "cone" | "torus" | "capsule" | "arrow";
@@ -235,16 +228,42 @@ export function sketchSkeleton(elements: SketchElement[], ink: SketchInk = sketc
     if (e.type === "part") return [];
     if (e.type === "image") {
       const caption = e.label
-        ? [{ type: "text", id: `${e.id}:label`, x: e.x!, y: e.y! + e.height! + 8, text: e.label, ...style }]
+        ? [
+            {
+              type: "text",
+              id: `${e.id}:label`,
+              x: e.x!,
+              y: e.y! + e.height! + 8,
+              text: e.label,
+              ...style,
+            },
+          ]
         : [];
       // A picture that couldn't be fetched (or hasn't arrived) holds its place as a frame.
       if (!e.src)
         return [
-          { type: "rectangle", id: e.id, x: e.x!, y: e.y!, width: e.width!, height: e.height!, ...style },
+          {
+            type: "rectangle",
+            id: e.id,
+            x: e.x!,
+            y: e.y!,
+            width: e.width!,
+            height: e.height!,
+            ...style,
+          },
           ...caption,
         ];
       return [
-        { type: "image", id: e.id, x: e.x!, y: e.y!, width: e.width!, height: e.height!, fileId: e.id, status: "saved" },
+        {
+          type: "image",
+          id: e.id,
+          x: e.x!,
+          y: e.y!,
+          width: e.width!,
+          height: e.height!,
+          fileId: e.id,
+          status: "saved",
+        },
         ...caption,
       ];
     }

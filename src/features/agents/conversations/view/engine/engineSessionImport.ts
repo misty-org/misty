@@ -198,22 +198,3 @@ export async function syncChat(conversationId: string) {
   if (!session) throw new Error("This chat hasn’t started a session with its engine yet.");
   await syncEngineSession(conversationId, session);
 }
-
-/**
- * Sync for every chat with one agent, from the Agents panel: each chat that has started a
- * session with its engine pulls in what happened there outside Misty, one after another. Says
- * how many chats it synced; a chat with no session yet is skipped.
- */
-export async function syncAgentChats(agentId: string): Promise<number> {
-  const chats = useMistyStore
-    .getState()
-    .conversations.filter((conversation) => conversation.agentId === agentId);
-  let synced = 0;
-  for (const chat of chats) {
-    const session = await readChatSession(chat.id);
-    if (!session) continue;
-    await syncEngineSession(chat.id, session);
-    synced += 1;
-  }
-  return synced;
-}

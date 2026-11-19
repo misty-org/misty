@@ -16,20 +16,20 @@ import { cn, Surface, windowToolbarClass } from "@/shared/ui";
  * The conversation's content starts below the header instead: `--agent-conversation-inset` is how
  * far, for the scroller and for anything floating over the conversation.
  */
-const floatingHeaderClass = cn(
+export const floatingHeaderClass = cn(
   "absolute inset-[0_var(--misty-scrollbar-size)_auto_0] z-[var(--stack-raised)]",
   "h-[var(--agents-chat-header)] min-h-0",
 );
 
 /** The studio bar: plain buttons in one row on the window's own surface. */
-const studioBarClass = "box-border flex flex-none items-center gap-2 px-3";
+export const studioBarClass = "box-border flex flex-none items-center gap-2 px-3";
 
 /**
  * The chat column. Rows keep their content height so the column overflows and scrolls instead of
  * squeezing; the conversation fills what is left. The agent browser's picture-in-picture floats
- * over the column, clear of the header.
+ * over the column, clear of the header. The Code page's chat column is built the same way.
  */
-const chatColumnClass = cn(
+export const chatColumnClass = cn(
   "agents-chat relative flex min-h-0 min-w-90 flex-1 flex-col overflow-hidden",
   "[&>:not(.agent-conversation)]:shrink-0",
   "[--agents-chat-header:0px] [--agent-conversation-inset:var(--agents-chat-header)]",

@@ -11,8 +11,16 @@ import {
 import { onlyFields, text } from "./args";
 import { listSpaces, namedSpace, spaceArgument, spaceTargets, type SpaceRow } from "./routing";
 
-const DELETE_KINDS = ["note", "drawing", "thread", "library_item", "shared_file"] as const;
-const RENAME_KINDS = ["drawing", "thread"] as const;
+const DELETE_KINDS = [
+  "note",
+  "drawing",
+  "deck",
+  "workbook",
+  "thread",
+  "library_item",
+  "shared_file",
+] as const;
+const RENAME_KINDS = ["drawing", "deck", "workbook", "thread"] as const;
 
 interface Found<T> {
   space: SpaceRow;
@@ -20,7 +28,7 @@ interface Found<T> {
 }
 
 /**
- * Notes and drawings are found by id alone. Routes are under a Space, so this looks in the run's
+ * Notes, drawings, decks and workbooks are found by id alone. Routes are under a Space, so this looks in the run's
  * one Space, which is all `listSpaces` gives.
  */
 async function findInSpaces<T>(
@@ -43,6 +51,14 @@ async function findInSpaces<T>(
 const notePath = (space: SpaceRow, id: string) => spacePath(space.id, `/notes/${segment(id)}`);
 const drawingPath = (space: SpaceRow, id: string) =>
   spacePath(space.id, `/drawings/${segment(id)}`);
+/** Where a note, drawing, deck or workbook lives, found by id alone. */
+const ownPaths = {
+  note: notePath,
+  drawing: drawingPath,
+  deck: (space: SpaceRow, id: string) => spacePath(space.id, `/decks/${segment(id)}`),
+  workbook: (space: SpaceRow, id: string) => spacePath(space.id, `/workbooks/${segment(id)}`),
+} as const;
+const hasOwnPath = (kind: string): kind is keyof typeof ownPaths => kind in ownPaths;
 const threadPath = (space: SpaceRow, id: string) =>
   spacePath(space.id, `/conversations/${segment(id)}`);
 
@@ -65,9 +81,8 @@ async function findDoomed(
   kind: string,
   id: string,
 ): Promise<Doomed | undefined> {
-  if (kind === "note" || kind === "drawing") {
-    const isNote = kind === "note";
-    const path = (space: SpaceRow) => (isNote ? notePath : drawingPath)(space, id);
+  if (hasOwnPath(kind)) {
+    const path = (space: SpaceRow) => ownPaths[kind](space, id);
     const found = await findInSpaces<{ title: string }>(request, path);
     if (!found) return undefined;
     return {
@@ -136,20 +151,21 @@ const renameItem: LocalToolHandler = async (request) => {
   const name = text(request.input, "name", { required: true, min: 1, max: 200 }).trim();
   const missing = `no ${kind} ${id} that you can rename`;
   const anyRefusal = () => missing;
-  if (kind === "drawing") {
+  if (hasOwnPath(kind)) {
+    const path = ownPaths[kind];
     const found = await rewordRefusal(
-      () => findInSpaces(request, (space) => drawingPath(space, id)),
+      () => findInSpaces(request, (space) => path(space, id)),
       anyRefusal,
     );
     if (!found) throw refuse(missing);
-    const drawing = await rewordRefusal(
+    const item = await rewordRefusal(
       () =>
-        writeRoute<{ id: string; title: string }>(request, drawingPath(found.space, id), "PATCH", {
+        writeRoute<{ id: string; title: string }>(request, path(found.space, id), "PATCH", {
           title: name,
         }),
       anyRefusal,
     );
-    return { renamed: "drawing", id: drawing.id, name: drawing.title };
+    return { renamed: kind, id: item.id, name: item.title };
   }
   const space = await namedSpace(request);
   const title = await rewordRefusal(() => threadTitle(request, space, id), anyRefusal);

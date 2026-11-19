@@ -100,7 +100,12 @@ export class CursorCompanionSketch {
       ...drawn,
       elements: withPictures(drawn.elements, () => {
         const last = this.last;
-        if (last && last.turn === turn && this.s.active(turn) && this.s.state.sketch?.id === last.id)
+        if (
+          last &&
+          last.turn === turn &&
+          this.s.active(turn) &&
+          this.s.state.sketch?.id === last.id
+        )
           this.publish(last.sketch, last.id);
       }),
     };

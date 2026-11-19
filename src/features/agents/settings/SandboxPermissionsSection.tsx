@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useCachedResource } from "@/api/cache/cached-resource";
 import { downloadsGrantId, sandboxPermissionSet, sandboxPermissionsList } from "@/native/sandbox";
 import { confirmAction } from "@/shared/lib/confirmAction";
-import { Button, useNotice } from "@/shared/ui";
+import { Button, ErrorState, useNotice } from "@/shared/ui";
 import {
   DesktopSettingsRow as Row,
   DesktopSettingsRowSkeleton,
@@ -19,14 +19,11 @@ export function SandboxPermissionsSection() {
   const listing = useCachedResource("agents/sandbox-permissions", sandboxPermissionsList, {
     persist: "device",
   });
-  const rows = listing.data ?? (listing.loading ? null : []);
+  const rows = listing.data ?? null;
+  // Permissions never read say so in place of their rows; a failed refresh keeps them shown.
+  const loadFailed = !listing.data && !listing.loading && Boolean(listing.error);
   const [working, setWorking] = useState("");
-  const [actionError, setError] = useState("");
-  const error =
-    actionError ||
-    (listing.error && !listing.refreshing
-      ? "Misty couldn’t load these permissions. Try again."
-      : "");
+  const [error, setError] = useState("");
   const refresh = listing.reload;
   const change = async (id: string, on: boolean) => {
     setWorking(id);
@@ -50,6 +47,17 @@ export function SandboxPermissionsSection() {
       await change(downloadsGrantId, false);
   };
   useNotice(Boolean(error), { message: error, tone: "error", onDismiss: () => setError("") });
+  if (loadFailed)
+    return (
+      <Section title="This computer">
+        <ErrorState
+          inline
+          title="Couldn't read these permissions"
+          line="Something went wrong on this computer. Try again in a moment."
+          action={{ label: "Try again", onClick: () => void refresh() }}
+        />
+      </Section>
+    );
   if (rows === null)
     return (
       <Section title="This computer">

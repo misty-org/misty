@@ -205,7 +205,9 @@ describe("making something", () => {
   });
 
   it("says why Teach me couldn't start", async () => {
-    fakes.startLesson.mockRejectedValueOnce(new Error("Pick a default engine in Settings › Agents."));
+    fakes.startLesson.mockRejectedValueOnce(
+      new Error("Pick a default engine in Settings › Agents."),
+    );
     panel();
     fireEvent.click(button("Teach me"));
     await vi.waitFor(() =>

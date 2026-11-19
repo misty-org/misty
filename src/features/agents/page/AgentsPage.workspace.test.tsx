@@ -32,11 +32,13 @@ it("opens straight into the agent's New task conversation without a directory", 
   expect(screen.queryByRole("button", { name: "Spaces" })).toBeNull();
 });
 
-it("opens an agent's settings from the Studio, not from the chat", async () => {
+it("opens an agent's settings from a link, not from the chat", async () => {
   renderAgentsPage();
   expect(screen.queryByRole("button", { name: "Communications settings" })).toBeNull();
   openAgentSettings();
   await waitFor(() => expect(nameField().value).toBe("Communications"));
+  // The link is used up once the settings are open, so going back doesn't open them again.
+  expect(currentLocation()).not.toContain("agentSettings");
 });
 
 it("has no Details panel beside the conversation", () => {
@@ -68,8 +70,8 @@ it("preserves one conversation draft across catalogs", () => {
   renderAgentsPage();
   const draft = composer();
   typeDraft("Keep this while I browse");
-  openPage("studio");
-  expect(document.querySelector(".agent-studio")?.getAttribute("data-page")).toBe("studio");
+  openPage("code");
+  expect(document.querySelector(".agent-studio")?.getAttribute("data-page")).toBe("code");
   expect(screen.queryByRole("alertdialog")).toBeNull();
   expect(composer()).toBe(draft);
   expect(draft.value).toBe("Keep this while I browse");
@@ -96,14 +98,20 @@ it("sends the Lab tab to the agent's home Space's Lab, keeping the notebook aske
   expect(useMistyStore.getState().selectedAgentId).toBe("communications");
 });
 
-it("opens the studio from links, with no title bar", () => {
+it("opens Code from links, with no title bar", () => {
   renderAgentsPage();
   const page = () => document.querySelector(".agent-studio")?.getAttribute("data-page");
-  openPage("studio");
-  expect(page()).toBe("studio");
+  openPage("code");
+  expect(page()).toBe("code");
   expect(document.querySelector(".agent-studio-bar")).toBeNull();
   openChat();
   expect(page()).toBe("task");
   expect(document.querySelector(".agent-studio-bar")).toBeTruthy();
   expect(composer()).toBeTruthy();
+});
+
+it("opens the chat from an old studio link", () => {
+  renderAgentsPage("/agents?view=studio");
+  expect(currentLocation()).toBe("/agents");
+  expect(document.querySelector(".agent-studio")?.getAttribute("data-page")).toBe("task");
 });

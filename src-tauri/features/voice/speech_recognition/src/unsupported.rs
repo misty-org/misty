@@ -1,12 +1,16 @@
 //! Systems with no recognizer here yet: every call says so.
 
-use crate::{reason, Heard, StreamHeard};
+use crate::{reason, Heard, Phrase, StreamHeard};
 
 pub fn supported() -> bool {
     false
 }
 
 pub fn recognize_file(_path: &str, _locale: Option<&str>) -> Result<String, String> {
+    Err(reason("unsupported"))
+}
+
+pub fn recognize_file_phrases(_path: &str, _locale: Option<&str>) -> Result<Vec<Phrase>, String> {
     Err(reason("unsupported"))
 }
 

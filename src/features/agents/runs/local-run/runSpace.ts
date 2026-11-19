@@ -17,7 +17,8 @@ async function agentOf(account: string, agentId: string) {
 }
 
 /**
- * The one Space a run works in: its agent's home Space, never the chat's or the window's. Empty
+ * The Space a run works in when it wasn't asked for in one (`startRun.ts`): its agent's home
+ * Space, never the chat's or the window's. Empty
  * only while the account's Spaces haven't loaded for an agent that has none yet; its Space tools
  * then work in the person's own Space (`tools/space/routing.ts`).
  */

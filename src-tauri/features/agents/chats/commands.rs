@@ -88,6 +88,17 @@ pub async fn agent_chats_delete(
     id: String,
 ) -> Result<(), String> {
     require_person_window(&webview)?;
+    // A deleted chat takes its folder record, engine sessions and scratch folder with it
+    // (`engines/chat_folder.rs`); a project it worked in is the person's and stays.
+    if kind == "conversation" {
+        let (db, owner, chat) = (state.environment.store(), account.clone(), id.clone());
+        tokio::task::spawn_blocking(move || {
+            crate::engines::chat_folder::forget_chat(&db, &owner, &chat)
+        })
+        .await
+        .map_err(|error| error.to_string())?
+        .unwrap_or_else(|error| eprintln!("[chats] couldn't clear a deleted chat's folder: {error}"));
+    }
     state.agent_chats.delete(account, kind, id).await
 }
 

@@ -4,12 +4,14 @@ import { EngineMark } from "@/features/engine-config/EngineMark";
 import { openExternalLink } from "@/shared/platform/openExternalLink";
 import {
   Button,
+  ErrorState,
   ListRow,
   NavList,
   NavRow,
   notify,
   OverflowFadeText,
   SectionHeading,
+  Skeleton,
 } from "@/shared/ui";
 import { failureText, marketApi, unaddedSuggestions, type MarketEngine } from "./api";
 import { MakerLogo, pluginMaker } from "./PluginMaker";
@@ -59,7 +61,23 @@ export function MarketplaceRail({ engine, onManage }: { engine: MarketEngine; on
   const listing = useEngineMarket(engine);
   const [adding, setAdding] = useState<string | null>(null);
   const market = listing.data;
-  if (!market?.ready) return null;
+  if (!market && listing.loading) return <MarketplaceRailSkeleton />;
+  if (!market?.ready)
+    return (
+      <section className="grid gap-1" aria-label="Marketplaces">
+        <SectionHeading title="Marketplaces" as="h3" />
+        <ErrorState
+          inline
+          title="Marketplaces couldn't load"
+          line={market?.error ?? failureText(listing.error, "The marketplaces couldn't be listed.")}
+          action={{
+            label: "Try again",
+            variant: "secondary",
+            onClick: () => void listing.reload(),
+          }}
+        />
+      </section>
+    );
   const suggestions = unaddedSuggestions(engine, market.sources);
 
   const add = async (source: string, name: string) => {
@@ -117,7 +135,6 @@ export function MarketplaceRail({ engine, onManage }: { engine: MarketEngine; on
                     size="sm"
                     variant="quiet"
                     aria-label={`Add ${suggestion.name}`}
-                    loading={adding === suggestion.source}
                     disabled={adding !== null}
                     onClick={() => void add(suggestion.source, suggestion.name)}
                   >
@@ -129,6 +146,25 @@ export function MarketplaceRail({ engine, onManage }: { engine: MarketEngine; on
           })}
         </section>
       ) : null}
+    </section>
+  );
+}
+
+const sourceNameWidths = ["w-1/2", "w-2/3", "w-2/5"];
+
+/** The marketplaces before the engine has listed them: its heading over a few rows. */
+function MarketplaceRailSkeleton() {
+  return (
+    <section className="grid gap-1" aria-label="Marketplaces" aria-busy="true">
+      <SectionHeading title="Marketplaces" as="h3" />
+      <NavList aria-hidden="true">
+        {sourceNameWidths.map((width) => (
+          <NavRow key={width} still tone="page">
+            <Skeleton className="size-4 shrink-0 rounded-sm" />
+            <Skeleton className={`h-3 ${width}`} />
+          </NavRow>
+        ))}
+      </NavList>
     </section>
   );
 }

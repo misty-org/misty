@@ -47,11 +47,19 @@ function identityText(agent: Pick<AgentProfile, "name" | "role" | "description">
   return lines.join("\n");
 }
 
-export function assembleAgentPrompt(input: { agent: PromptAgent }): AssembledPrompt {
-  const { agent } = input;
+/**
+ * `quiet` is for Code: the agent keeps how it works (its rules) and leaves out who it is and its
+ * soul, so it works on the code as the engine itself would, with no persona or voice.
+ */
+export function assembleAgentPrompt(input: {
+  agent: PromptAgent;
+  quiet?: boolean;
+}): AssembledPrompt {
+  const { agent, quiet = false } = input;
+  const voiced = !quiet && Boolean(agent.soul?.trim());
   const drafts: { id: PromptBlockId; title: string; body: string }[] = [
-    { id: "identity", title: "Who you are", body: agent.soul?.trim() ? identityText(agent) : "" },
-    { id: "soul", title: "Your soul", body: (agent.soul ?? "").trim() },
+    { id: "identity", title: "Who you are", body: voiced ? identityText(agent) : "" },
+    { id: "soul", title: "Your soul", body: voiced ? (agent.soul ?? "").trim() : "" },
     { id: "instructions", title: "How you work", body: (agent.instructions ?? "").trim() },
   ];
   const blocks = drafts.map((draft) => ({
@@ -62,8 +70,8 @@ export function assembleAgentPrompt(input: { agent: PromptAgent }): AssembledPro
     omitted: draft.body.length === 0,
     preview: firstLine(draft.body),
   }));
-  // An agent with no soul keeps its instructions exactly as written, as before bots.
-  const text = agent.soul?.trim()
+  // An agent with no soul (or a quiet one) keeps its instructions exactly as written.
+  const text = voiced
     ? blocks
         .filter((block) => !block.omitted)
         .map((block) => `# ${block.title}\n${block.text}`)

@@ -172,7 +172,7 @@ export function useConversationActions({
               <Button type="button" disabled={busy} onClick={close}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={disabled || !title.trim()} loading={busy}>
+              <Button type="submit" disabled={disabled || !title.trim() || busy}>
                 Save
               </Button>
             </DialogFooter>
@@ -193,12 +193,7 @@ export function useConversationActions({
           <FieldError message={error} />
           <AlertDialogFooter>
             <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
-            <Button
-              variant="danger"
-              disabled={disabled}
-              loading={busy}
-              onClick={() => void submit()}
-            >
+            <Button variant="danger" disabled={disabled || busy} onClick={() => void submit()}>
               Delete
             </Button>
           </AlertDialogFooter>

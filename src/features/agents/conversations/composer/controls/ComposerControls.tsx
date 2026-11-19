@@ -217,11 +217,7 @@ export function modelEffortItem(props: {
   const engine = props.engine;
   if (!engine || engine === mistyEngine) return null;
   // A pick the account can no longer run gives way to the engine's own (`usablePick`).
-  const currentId = usablePick(
-    engine,
-    props.models,
-    props.choices.model || props.agentModel || "",
-  );
+  const currentId = usablePick(engine, props.models, props.choices.model || props.agentModel || "");
   const current = modelNamed(props.models, currentId);
   // Elsewhere, a model saved earlier that the engine no longer lists still shows, by its id.
   const list = [...(props.models ?? [])];

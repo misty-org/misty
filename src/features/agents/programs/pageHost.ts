@@ -3,6 +3,7 @@ import { executeBrowserJob } from "../runs/jobs/browserJobRun";
 import { agentTab, agentTabsForTask, closeAgentTab, keepAgentTab } from "../tabs/agentTabs";
 import { removeHostedChildTab } from "../runs/hosted-sessions/hostedSessionsState";
 import type { ClaimedWorkflowNodeJob } from "../runs/jobs/workerBrowserJobs";
+import { addressWithoutHost } from "../tools/browserTools";
 import { pageTarget } from "./pageTarget";
 import { unwrapSearchRedirect } from "./searchRedirect";
 
@@ -171,6 +172,7 @@ export function pageHost(state: ProgramState) {
         if (!/^https?:\/\//.test(url)) throw new Error("open(url) takes an http or https address.");
         if (++state.calls > MAX_CALLS)
           throw new Error(`A program makes at most ${MAX_CALLS} page calls.`);
+        await addressWithoutHost(url);
         const scopeId = await state.openTab(url);
         const tab = agentTab(scopeId);
         return { id: scopeId, url: tab?.url ?? url, title: tab?.title ?? "" };
@@ -222,9 +224,12 @@ export function pageHost(state: ProgramState) {
       }
       case "goto": {
         const scopeId = ownTab(args.tab);
-        const landed = await operate("browser.navigate", scopeId, {
-          url: unwrapSearchRedirect(String(args.url ?? "")),
-        });
+        const url = unwrapSearchRedirect(String(args.url ?? ""));
+        // As browser_navigate does: an address with no such host throws here. Left to the tab, it
+        // kept showing the page before while reporting the address it was given, and a program
+        // read that old page as where the address led.
+        await addressWithoutHost(url);
+        const landed = await operate("browser.navigate", scopeId, { url });
         const snapshot = (landed.snapshot ?? {}) as Record<string, unknown>;
         const note =
           typeof snapshot.tree === "string" && snapshot.tree.startsWith("- note:")

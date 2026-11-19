@@ -32,9 +32,8 @@ import { AgentQuestionCard } from "../../plans/AgentQuestionCard";
 import { WaitingForYouCard } from "../../interventions/WaitingForYouCard";
 import { useCollaborationComposer } from "../../plans/useCollaborationComposer";
 import { takeBrowserCommand } from "../composer/controls/composerChoices";
-import { currentSpaceKey, mistyEngine } from "../../engines/enginesApi";
-import { useEngineFolder } from "../composer/controls/FolderSegment";
-import { useAgentFolder } from "../../shared-folders/agentFolder";
+import { mistyEngine } from "../../engines/enginesApi";
+import { useChatFolder } from "../../shared-folders/chatFolder";
 import { runComposerCommand } from "../composer/commands/engineCommands";
 import { CommandReportDialog } from "../composer/commands/CommandReportDialog";
 import { EngineQueueChips } from "./engine/EngineQueueChips";
@@ -124,9 +123,7 @@ export function AgentWorkspaceConversation({
   const permission = usePermissionMode(conversation?.id, agent?.default_run_mode);
   // The folder the chat works in, as the composer reads it, for the commands that need it.
   const outsideEngine = agent?.engine && agent.engine !== mistyEngine ? agent.engine : "";
-  const spaceFolder = useEngineFolder(currentSpaceKey(), Boolean(outsideEngine));
-  const ownFolder = useAgentFolder(agent);
-  const folder = !outsideEngine || ownFolder === undefined ? "" : (ownFolder ?? spaceFolder);
+  const { folder } = useChatFolder(conversation?.id);
   const reportError = (error: string) =>
     useMistyStore.setState({
       error: error || null,

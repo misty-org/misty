@@ -53,29 +53,32 @@ fn snapshot_locked(root: &Path, folder: &Path) -> Result<git2::Oid, String> {
     snapshots::snapshot(root, folder)
 }
 
-/// The folder a run can change: an engine's linked folder (or its multi-run worktree), or the
+/// The folder a run can change: an engine chat's own folder (or its multi-run worktree), or the
 /// shared folder Misty's own agent was given to write in. Nothing for a run with neither.
 async fn folder_of(app: &AppHandle, account: &str, body: &Value) -> Option<PathBuf> {
     let runtime = app.try_state::<MistyRuntime>()?;
     if crate::engines::runs::wants(body) {
-        let folder = PathBuf::from(
-            body["engine"]["folder"]
-                .as_str()
-                .filter(|f| !f.is_empty())?,
-        );
-        let (db, account, checked) = (
-            runtime.environment.store(),
-            account.to_owned(),
-            folder.clone(),
-        );
-        // Only a folder the person linked, as the engine itself checks before it starts.
-        let linked = tokio::task::spawn_blocking(move || {
-            crate::engines::store::is_linked(&db, &account, &checked).unwrap_or(false)
-                || crate::engines::multirun::is_worktree(&db, &account, &checked)
+        let named = PathBuf::from(body["engine"]["folder"].as_str().unwrap_or(""));
+        let conversation = body["conversation_id"].as_str().unwrap_or("").to_owned();
+        let (db, account) = (runtime.environment.store(), account.to_owned());
+        // The folder the engine will work in, as `chat_folder::for_run` decides it: a multi-run
+        // worktree, else the chat's own folder. A chat's first run has none yet, so nothing to
+        // take back.
+        let folder = tokio::task::spawn_blocking(move || {
+            if !named.as_os_str().is_empty()
+                && crate::engines::multirun::is_worktree(&db, &account, &named)
+            {
+                return Some(named);
+            }
+            if conversation.is_empty() {
+                return None;
+            }
+            crate::engines::chat_folder::current(&db, &account, &conversation)
         })
         .await
-        .unwrap_or(false);
-        return (linked && file_access::fs::is_dir(&folder)).then_some(folder);
+        .ok()
+        .flatten()?;
+        return file_access::fs::is_dir(&folder).then_some(folder);
     }
     let scope = body["device_contexts"].as_array()?.iter().find(|context| {
         context["kind"] == "local_folder"

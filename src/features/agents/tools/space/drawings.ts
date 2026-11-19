@@ -1,7 +1,8 @@
 import type { LocalToolHandler } from "../host";
-import { BAD_SCHEMA, readRoute, refuse, segment, spacePath, writeRoute } from "./api";
+import { BAD_SCHEMA, readRoute, refuse, segment, spacePath, writeRoute, writeSteps } from "./api";
 import { flag, integer, text, textList } from "./args";
 import { routedTool } from "./routing";
+import { itemTools } from "./madeItems";
 
 interface Drawing {
   title: string;
@@ -88,9 +89,19 @@ const apply = routedTool("change", async (request, space) => {
   });
 });
 
+/** A Mermaid flowchart, sequence or class diagram, drawn as whiteboard shapes people can move. */
+const fromMermaid = routedTool("change", async (request, space) => {
+  const id = drawingId(request.input);
+  const mermaid = text(request.input, "mermaid", { max: 50_000 }).trim();
+  if (!mermaid) throw refuse("mermaid is required");
+  const tools = await itemTools();
+  return writeSteps(() => tools.mermaidToDrawing(space.id, id, mermaid));
+});
+
 export const drawingTools: Record<string, LocalToolHandler> = {
   "drawing.list": list,
   "drawing.create": create,
   "drawing.read": read,
   "drawing.apply": apply,
+  "drawing.from_mermaid": fromMermaid,
 };

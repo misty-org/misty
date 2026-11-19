@@ -191,6 +191,57 @@ pub fn supported() -> bool {
 
 /// Recognizes a recorded file; blocks until done.
 pub fn recognize_file(path: &str, locale: Option<&str>) -> Result<String, String> {
+    recognize_file_as(path, locale, result_words, String::is_empty)
+}
+
+/// Recognizes a recorded file word by word, each with its time in seconds from the start;
+/// blocks until done. For captions.
+pub fn recognize_file_phrases(path: &str, locale: Option<&str>) -> Result<Vec<Phrase>, String> {
+    recognize_file_as(path, locale, result_phrases, Vec::is_empty)
+}
+
+/// The words of a recognition result, each with when it was said, and whether they're final.
+fn result_phrases(result: &AnyObject) -> (Vec<Phrase>, bool) {
+    // SAFETY: SFSpeechRecognitionResult's best transcription, its NSArray of
+    // SFTranscriptionSegment, and each segment's substring, timestamp and duration.
+    unsafe {
+        let done: bool = msg_send![result, isFinal];
+        let best: Option<Retained<AnyObject>> = msg_send![result, bestTranscription];
+        let Some(best) = best else {
+            return (Vec::new(), done);
+        };
+        let segments: Option<Retained<AnyObject>> = msg_send![&best, segments];
+        let Some(segments) = segments else {
+            return (Vec::new(), done);
+        };
+        let count: usize = msg_send![&segments, count];
+        let mut phrases = Vec::with_capacity(count);
+        for index in 0..count {
+            let segment: Retained<AnyObject> = msg_send![&segments, objectAtIndex: index];
+            let text: Option<Retained<AnyObject>> = msg_send![&segment, substring];
+            let start: f64 = msg_send![&segment, timestamp];
+            let duration: f64 = msg_send![&segment, duration];
+            let text = rust_string(text.as_deref());
+            if !text.trim().is_empty() {
+                phrases.push(Phrase {
+                    text,
+                    start,
+                    end: start + duration,
+                });
+            }
+        }
+        (phrases, done)
+    }
+}
+
+/// Recognizes a recorded file and reads what was heard with `read`; blocks until done. What a
+/// late failure leaves behind still counts unless `is_empty` says nothing was heard.
+fn recognize_file_as<T: Clone + Default + Send + 'static>(
+    path: &str,
+    locale: Option<&str>,
+    read: fn(&AnyObject) -> (T, bool),
+    is_empty: fn(&T) -> bool,
+) -> Result<T, String> {
     autoreleasepool(|_| {
         if !authorized() {
             return Err(reason("denied"));
@@ -212,12 +263,12 @@ pub fn recognize_file(path: &str, locale: Option<&str>) -> Result<String, String
         let _: () = unsafe { msg_send![&request, setShouldReportPartialResults: false] };
         prepare(&request, &made);
 
-        struct Seen {
-            text: String,
+        struct Seen<T> {
+            value: T,
             failed: bool,
         }
         let seen = Arc::new(Mutex::new(Seen {
-            text: String::new(),
+            value: T::default(),
             failed: false,
         }));
         let (finish, finished) = mpsc::channel::<()>();
@@ -227,8 +278,8 @@ pub fn recognize_file(path: &str, locale: Option<&str>) -> Result<String, String
                 let mut seen = seen.lock().unwrap();
                 // SAFETY: the framework passes a live result, or nil.
                 if let Some(result) = unsafe { result.as_ref() } {
-                    let (text, done) = result_words(result);
-                    seen.text = text;
+                    let (value, done) = read(result);
+                    seen.value = value;
                     if done {
                         let _ = finish.send(());
                     }
@@ -247,11 +298,11 @@ pub fn recognize_file(path: &str, locale: Option<&str>) -> Result<String, String
             return Err(reason("failed"));
         }
         let seen = seen.lock().unwrap();
-        // Words heard before a late failure are still the recording's words.
-        if seen.text.is_empty() && seen.failed {
+        // What was heard before a late failure is still the recording's.
+        if is_empty(&seen.value) && seen.failed {
             return Err(reason("failed"));
         }
-        Ok(seen.text.clone())
+        Ok(seen.value.clone())
     })
 }
 

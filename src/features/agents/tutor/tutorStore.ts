@@ -18,6 +18,8 @@ type Records<T> = Record<string, T>;
 interface TutorStore {
   accountId: string;
   ready: boolean;
+  /** Why the last load failed, until it is tried again; `ready` stays false beside it. */
+  error: string;
   notebooks: Records<Notebook>;
   decks: Records<Deck>;
   guides: Records<Guide>;
@@ -104,24 +106,32 @@ export const useTutorStore = create<TutorStore>((set, get) => {
   return {
     accountId: "",
     ready: false,
+    error: "",
     notebooks: {},
     decks: {},
     guides: {},
     jobs: {},
     async load(accountId) {
       if (get().accountId === accountId && get().ready) return;
-      set({ accountId, ready: false, notebooks: {}, decks: {}, guides: {}, jobs: {} });
+      set({ accountId, ready: false, error: "", notebooks: {}, decks: {}, guides: {}, jobs: {} });
       const read = <T extends { id: string }>(kind: TutorKind) =>
         localChats
           .tutor<T>(accountId, kind)
-          .catch(() => [] as T[])
           .then((items) => Object.fromEntries(items.map((item) => [item.id, item])));
-      const [notebooks, decks, guides, jobs] = await Promise.all([
-        read<Notebook>("tutor_notebook"),
-        read<Deck>("tutor_deck"),
-        read<Guide>("tutor_guide"),
-        read<TutorJob>("tutor_job"),
-      ]);
+      let loaded;
+      try {
+        loaded = await Promise.all([
+          read<Notebook>("tutor_notebook"),
+          read<Deck>("tutor_deck"),
+          read<Guide>("tutor_guide"),
+          read<TutorJob>("tutor_job"),
+        ]);
+      } catch (error) {
+        if (get().accountId === accountId)
+          set({ error: error instanceof Error ? error.message : String(error) });
+        return;
+      }
+      const [notebooks, decks, guides, jobs] = loaded;
       if (get().accountId !== accountId) return;
       // Nothing is being read once Misty has started again: a read cut off by a reload or a quit
       // isn't still running, so its source stops saying it is (and is read again on opening).

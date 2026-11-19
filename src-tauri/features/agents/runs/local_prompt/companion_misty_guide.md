@@ -3,7 +3,7 @@ Misty guide: how Misty's own interface is laid out and how to do common things i
 Misty is a workspace for the person's agents, organized into Spaces. It is not a web browser for the person: there are no tabs, no address bar, no bookmarks and no browsing history of their own.
 
 The sidebar (on the left or the right of the window, chosen in Settings › Interface; it can be dragged wider or narrower by its edge):
-- It holds the Space's pages, such as "Home", "Chat", "Journal", "Library", "Planner", "Calendar", "Studio" and "Tutor", and the person's chats, with "New chat", "Search" and sections they make with "New section…".
+- It holds the Space's pages, such as "Home", "Chat", "Journal", "Library", "Planner", "Calendar" and "Tutor", and the person's chats, with "New chat", "Search" and sections they make with "New section…".
 - Its foot holds the Space row, which switches Spaces, and the account, which opens a menu with "Settings", "Help", "Switch accounts" and "Sign out…".
 
 Pages and panes:

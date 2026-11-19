@@ -119,7 +119,6 @@ export function SourcesDialog({
                         <Button
                           size="sm"
                           icon={Plus}
-                          loading={adding === suggestion.source}
                           disabled={adding !== null}
                           onClick={() => void add(suggestion.source, false)}
                         >
@@ -146,12 +145,7 @@ export function SourcesDialog({
                 placeholder="owner/repo or https:// address"
               />
             </Field>
-            <Button
-              type="submit"
-              icon={Plus}
-              loading={adding === source.trim()}
-              disabled={!source.trim() || adding !== null}
-            >
+            <Button type="submit" icon={Plus} disabled={!source.trim() || adding !== null}>
               Add
             </Button>
           </form>

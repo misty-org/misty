@@ -29,7 +29,8 @@ const driveNote =
 /** "Only this monitor" and the like: what was said picks the one screen to look at from now on. */
 const oneMonitor =
   /\b(?:only|just)\b[^.?!]{0,30}\b(?:this|that|my|the)\s+(?:main\s+)?(?:monitor|screen|display)\b|\b(?:this|that)\s+(?:monitor|screen|display)\s+only\b/i;
-const everyMonitor = /\b(?:all|both|every)\s+(?:of\s+)?(?:my\s+|the\s+)?(?:monitors|screens|displays)\b/i;
+const everyMonitor =
+  /\b(?:all|both|every)\s+(?:of\s+)?(?:my\s+|the\s+)?(?:monitors|screens|displays)\b/i;
 
 /**
  * The spoken conversation: one voice session per Misty conversation, heard by this computer's

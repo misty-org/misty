@@ -11,7 +11,8 @@ import { useAgentFolderSync } from "../shared-folders/useAgentFolderSync";
 import { defaultAgentOf, usePersonalAgentsStore } from "../personal/personalAgentsStore";
 import { useAgentActivity } from "./useAgentActivity";
 import { useAgentChangeGuard } from "./useAgentChangeGuard";
-import { openAgentsHub, useAgentsHub } from "../hub/agentsHubStore";
+import { useSettingsOpen } from "@/features/settings";
+import { openAgentsHub } from "../hub/agentsHubStore";
 import type { AgentWorkspacePage } from "../methods/AgentWorkspaceFrame";
 import { useViewConversation, useViewTitle } from "./useViewConversation";
 
@@ -35,8 +36,8 @@ export function useAgentsPageState() {
   const [selected, setSelected] = useState<string>();
   const [params, setParams] = useSearchParams();
   const workspaceRef = useRef<HTMLElement>(null);
-  // Links: ?view=studio or lab open that page; anything else the task. The retired
-  // ?view=integrations opens the Agents window on its Plugins page instead.
+  // Links: ?view=lab or code open that page; anything else the task. The retired
+  // ?view=integrations opens Settings on its Plugins page instead.
   const linkedView = params.get("view") ?? "";
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
   const [settingsModalTab, setSettingsModalTab] = useState<AgentSettingsTab>("settings");
@@ -120,7 +121,7 @@ export function useAgentsPageState() {
     // The account settles after a reload (signed out scope, then the person's), and switching it
     // clears the open chat, so the link is applied again for the account that is now in place.
   }, [accountId, linkedAgentId, linkedConversationId, linkedNew, isFocused, applyUnfocusedLink]);
-  // The sidebar opens Studio and Tutor by link; a link naming a page wins over the chat.
+  // The sidebar opens Code and the Lab by link; a link naming a page wins over the chat.
   // Leaving a page's link for one without a view goes back to the chat.
   const viewed = useRef(linkedView);
   useEffect(() => {
@@ -129,6 +130,18 @@ export function useAgentsPageState() {
     else if (pageFromView(viewed.current)) setWorkspacePage("task");
     viewed.current = linkedView;
   }, [linkedView]);
+  // A saved tab or link to the studio, which Misty no longer has, stays on the chat.
+  useEffect(() => {
+    if (!isStudioView(linkedView)) return;
+    setParams(
+      (current) => {
+        const next = new URLSearchParams(current);
+        next.delete("view");
+        return next;
+      },
+      { replace: true },
+    );
+  }, [linkedView, setParams]);
   // With no agent in the URL, reopen the last-used agent, then one on the person's
   // own engines, then Misty.
   const profile =
@@ -145,8 +158,8 @@ export function useAgentsPageState() {
     settingsModalOpen && settingsModalMode === "create" ? undefined : profile?.id,
   );
   const accessRetry = access.retry;
-  // Apps are connected in the Agents window: when it closes, read this agent's access again.
-  const hubOpen = useAgentsHub((state) => state.open);
+  // Apps are connected in Settings: when it closes, read this agent's access again.
+  const hubOpen = useSettingsOpen((state) => state.open);
   const hubWasOpen = useRef(hubOpen);
   useEffect(() => {
     if (hubWasOpen.current && !hubOpen) accessRetry();
@@ -227,14 +240,18 @@ export function useAgentsPageState() {
 export type AgentsPageState = ReturnType<typeof useAgentsPageState>;
 
 const workspacePageTitles: Record<Exclude<AgentWorkspacePage, "task">, string> = {
-  studio: "Studio",
   lab: "Lab",
+  code: "Code",
 };
 
-/** The page a link's ?view= opens; the earlier office opens the studio, and tutor or notebooks the Lab. */
+/**
+ * The page a link's ?view= opens; tutor or notebooks open the Lab.
+ */
 function pageFromView(view: string): AgentWorkspacePage | undefined {
-  if (view === "office") return "studio";
   if (view === "tutor" || view === "notebooks") return "lab";
-  if (view === "studio" || view === "lab") return view;
+  if (view === "lab" || view === "code") return view;
   return undefined;
 }
+
+/** Whether a link's ?view= asked for the studio (once the office), which Misty no longer has. */
+export const isStudioView = (view: string | null) => view === "studio" || view === "office";

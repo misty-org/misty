@@ -70,7 +70,8 @@ type Entry =
 /**
  * How a reply got its answer, after OpenChamber's turn: the first thing Misty said (its plan)
  * stays in view, then its steps. While the run is live they show as rows, the latest ones in view;
- * once it ends they fold to one line of what it did ("Read 3 files · ran 2 commands"). Opened, it lists every step in order as one quiet row each, with what Misty wrote
+ * once it ends they fold to one line of what it did ("Read 3 files · ran 2 commands"). Opened,
+ * it lists every step in order as one quiet row each, with what Misty wrote
  * between them; a step with output opens under its row. The answer itself follows below.
  */
 export function AgentProgress({ items, live = true }: { items: AiProgressItem[]; live?: boolean }) {

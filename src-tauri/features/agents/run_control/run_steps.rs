@@ -90,7 +90,7 @@ fn page_of(result: &Value) -> (String, String) {
 }
 
 /// The run a run's steps are filed under: the first one up its chain with no parent.
-fn root_of(connection: &Connection, run_id: &str) -> rusqlite::Result<(String, bool)> {
+pub(super) fn root_of(connection: &Connection, run_id: &str) -> rusqlite::Result<(String, bool)> {
     let mut current = run_id.to_owned();
     for _ in 0..MAX_DEPTH {
         let parent: Option<String> = connection
@@ -128,6 +128,7 @@ pub(super) fn record_start(
         "DELETE FROM agent_run_parents WHERE at < ?1",
         params![oldest],
     )?;
+    super::browser_log::prune(connection, oldest)?;
     Ok(())
 }
 
@@ -288,6 +289,8 @@ pub struct StepRow {
     pub duration_ms: i64,
     pub nested: bool,
     pub picture: String,
+    /// The tool call, as the browser log keys its actions (`<run>:<call>`).
+    pub call_id: String,
 }
 
 pub(super) fn rows(
@@ -296,7 +299,7 @@ pub(super) fn rows(
     run_id: &str,
 ) -> rusqlite::Result<Vec<StepRow>> {
     let mut statement = connection.prepare(
-        "SELECT seq, at, tool, target, title, state, duration_ms, nested, picture
+        "SELECT seq, at, tool, target, title, state, duration_ms, nested, picture, call_id
          FROM agent_run_steps WHERE run_id = ?1 AND account = ?2 ORDER BY seq",
     )?;
     let rows = statement.query_map(params![run_id, account], |row| {
@@ -310,6 +313,7 @@ pub(super) fn rows(
             duration_ms: row.get(6)?,
             nested: row.get(7)?,
             picture: row.get(8)?,
+            call_id: row.get(9)?,
         })
     })?;
     rows.collect()
@@ -322,7 +326,7 @@ pub(super) fn latest(
     run_ids: &[String],
 ) -> rusqlite::Result<Vec<(String, StepRow)>> {
     let mut statement = connection.prepare(
-        "SELECT seq, at, tool, target, title, state, duration_ms, nested, picture
+        "SELECT seq, at, tool, target, title, state, duration_ms, nested, picture, call_id
          FROM agent_run_steps WHERE run_id = ?1 AND account = ?2 ORDER BY seq DESC LIMIT 1",
     )?;
     let mut found = Vec::new();
@@ -339,6 +343,7 @@ pub(super) fn latest(
                     duration_ms: row.get(6)?,
                     nested: row.get(7)?,
                     picture: row.get(8)?,
+                    call_id: row.get(9)?,
                 })
             })
             .optional()?;
@@ -362,6 +367,7 @@ pub(super) fn clear(connection: &Connection, account: &str) -> rusqlite::Result<
         "DELETE FROM agent_run_steps WHERE account = ?1",
         params![account],
     )?;
+    super::browser_log::clear(connection, account)?;
     Ok(runs)
 }
 

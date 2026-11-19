@@ -7,6 +7,7 @@ import { newLocalConversation } from "../state/localConversation";
 import type { MistyGet, MistySet } from "../state/mistyStoreUpdates";
 import { updateMistyDraftAttachments } from "../composer/draftAttachments";
 import { localChats } from "../state/localChats";
+import { useChatFolders } from "../../shared-folders/chatFolder";
 import { submissionEpoch } from "./mistySubmissionEpoch";
 
 import { createLoadConversations } from "../state/loadConversations";
@@ -51,6 +52,8 @@ export function createMistyConversationActions(
         context: [],
         error: null,
       });
+      // The project picked on the empty chat is now this chat's folder.
+      useChatFolders.getState().adoptDraft(conversation.id);
       return conversation.id;
     },
     selectConversation: (activeConversationId) =>

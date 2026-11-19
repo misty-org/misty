@@ -1,7 +1,6 @@
 import { watchAllRunEvents } from "../runs/local-run/localRunEvents";
 import { finishWithProposal } from "../runs/local-run/localRunParts";
 import { agentAccountId } from "../personal/agentAccount";
-import { followStudioOrders } from "../virtual/studioOrders";
 import { agentTools } from "./agentTools";
 import { appsTools } from "./appsTools";
 import { cancelSubAgentsOf, delegationTools } from "./delegationTools";
@@ -9,7 +8,6 @@ import { deviceTools } from "./deviceTools";
 import { registerLocalTools, type LocalToolHandler } from "./host";
 import { runStateTools } from "./runStateTools";
 import { spaceTools } from "./spaceTools";
-import { studioTools } from "./studioTools";
 
 /**
  * Every tool a run can call, in one place: the same list as `LOCAL_TOOLS` in
@@ -23,7 +21,6 @@ const allLocalTools: Record<string, LocalToolHandler> = {
   ...runStateTools,
   ...appsTools,
   ...spaceTools,
-  ...studioTools,
   ...agentTools,
   ...delegationTools,
 };
@@ -33,8 +30,6 @@ const ended = new Set(["invocation.completed", "invocation.failed", "invocation.
 /** Starts what the window running tools owes every run. Returns how to stop. */
 export function startLocalRunWork(): () => void {
   registerLocalTools(allLocalTools);
-  // The studio tools build on this window's copy of the orders, so it follows the studio's.
-  followStudioOrders();
   const stop = watchAllRunEvents((runId, event) => {
     if (event.type === "local.artifact_answer")
       void finishWithProposal(runId, event.text, agentAccountId());

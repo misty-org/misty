@@ -63,9 +63,9 @@ function sessionOpened(
     ...fields,
     message:
       `${opened} (scopeId ${scopeId}). Browser tools act on it from your next step; pass its scopeId. ` +
-      `${next}, and keep working in this run. Your open tabs: ${list.join(", ")}. Open a new tab ` +
-      `(screen_open with its url, up to 32) only for a page the person wants kept open; read other ` +
-      `pages by navigating a tab you have.`,
+      `${next}, and keep working in this run. Your open tabs: ${list.join(", ")}. Each screen_open ` +
+      `opens another tab (up to 32): use one for a page the person wants kept open or for each ` +
+      `helper working at the same time; otherwise read other pages by navigating a tab you have.`,
   };
 }
 
@@ -125,9 +125,10 @@ function openInOwnTab(request: LocalToolRequest, runId: string, url: string, rea
     // A page opened again goes back to its tab rather than a duplicate of it.
     const already = url ? own.find((item) => item.metadata.opened_url === url) : undefined;
     if (already) return sessionOpened(already.opaqueRef, url, true, programs, list);
-    if (own.length && (!url || own.length >= maxOwnTabs)) {
-      return sessionOpened(list[0], url, true, programs, list);
-    }
+    // A call without an address gets a tab of its own too. One engine's helper agents (Claude
+    // Code's subagents) share this run and each open a tab to work in; handing them all the first
+    // tab had them navigating it from under one another and reading each other's pages.
+    if (own.length >= maxOwnTabs) return sessionOpened(list[0], url, true, programs, list);
     const scope = await openOwnTab(request, entry, target, url, reason.trim(), own.length > 0);
     return sessionOpened(scope, url, list.includes(scope), programs, [
       ...new Set([...list, scope]),

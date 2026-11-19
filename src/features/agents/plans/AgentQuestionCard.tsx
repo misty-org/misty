@@ -200,8 +200,7 @@ export function AgentQuestionCard({
         {index > 0 && <BackButton onClick={() => setIndex(index - 1)} />}
         <Button
           variant={last ? "primary" : "secondary"}
-          disabled={!answered(answer) || (last && !answers.every(answered))}
-          loading={busy}
+          disabled={!answered(answer) || (last && !answers.every(answered)) || busy}
           onClick={advance}
         >
           {last ? "Submit" : "Next"}

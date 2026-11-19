@@ -1,7 +1,7 @@
 // Layout adapted from OpenChamber (MIT, Copyright (c) 2025 Bohdan Triapitsyn).
 import { useEffect, useMemo, useState } from "react";
 import { Check, CircleHelp, Clock, X } from "lucide-react";
-import { Button, CodeText, Surface, Text, Tooltip } from "@/shared/ui";
+import { Button, CodeText, OverflowFadeText, Surface, Text, Tooltip } from "@/shared/ui";
 import { useWorkspaceViewShown } from "@/features/app-windows";
 import { ErrorNotice } from "../ErrorNotice";
 import {
@@ -111,11 +111,13 @@ export function PermissionDock({ agentId }: { agentId?: string }) {
     >
       <div className="flex min-h-8 items-center gap-2 px-3 pt-1.5">
         <Text bare tone="waiting" className="flex shrink-0">
-          <CircleHelp aria-hidden="true" className="size-3.5" />
+          <CircleHelp aria-hidden="true" />
         </Text>
-        <Text bare size="control" tone="default" className="min-w-0 flex-1 truncate font-medium">
-          Permission required
-        </Text>
+        <OverflowFadeText className="min-w-0 flex-1">
+          <Text bare size="control" tone="default" weight="medium">
+            Permission required
+          </Text>
+        </OverflowFadeText>
         {questions.length > 1 ? (
           <Text bare size="caption" tone="muted" className="shrink-0 tabular-nums">
             1 of {questions.length}
@@ -123,7 +125,7 @@ export function PermissionDock({ agentId }: { agentId?: string }) {
         ) : null}
         {parts.tool ? (
           <Text bare size="meta" tone="muted" className="flex shrink-0 items-center gap-1.5">
-            {ToolIcon ? <ToolIcon aria-hidden="true" className="size-3.5" /> : null}
+            {ToolIcon ? <ToolIcon aria-hidden="true" /> : null}
             {parts.tool}
           </Text>
         ) : null}
@@ -144,9 +146,15 @@ export function PermissionDock({ agentId }: { agentId?: string }) {
         ) : null}
       </div>
       <ErrorNotice message={error} onDismiss={() => setError("")} />
-      <div className="flex flex-wrap items-center gap-1.5 px-3 pt-1 pb-2.5">
+      <div className="flex items-center gap-1.5 px-3 pt-1 pb-2.5">
         <Tooltip content="Deny" shortcut="⌥⌫">
-          <Button variant="quiet" size="sm" icon={X} disabled={closed} onClick={() => answer(false)}>
+          <Button
+            variant="quiet"
+            size="sm"
+            icon={X}
+            disabled={closed}
+            onClick={() => answer(false)}
+          >
             Deny
           </Button>
         </Tooltip>
@@ -172,7 +180,6 @@ export function PermissionDock({ agentId }: { agentId?: string }) {
             variant="primary"
             size="sm"
             icon={Check}
-            loading={closed}
             disabled={closed}
             onClick={() => answer(true)}
           >

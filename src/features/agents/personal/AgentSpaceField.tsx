@@ -88,10 +88,15 @@ export function AgentSpaceField({ agent }: { agent: AgentProfile }) {
   );
 }
 
-/** Where an agent works, as one quiet line: its home Space. Nothing until the Spaces load. */
+/**
+ * Where an agent works, as one quiet line: its home Space. Nothing until the Spaces load, and
+ * nothing when it is the Space the window shows, where the agent's home goes without saying.
+ */
 export function AgentHomeSpaceLine({ agent }: { agent: AgentProfile | undefined }) {
   const home = useAgentHomeSpace(agent);
+  const here = useSpaceWindowStore((state) => state.identity);
   if (!home) return null;
+  if (here.personal ? home.personal : home.space && home.id === here.spaceId) return null;
   return (
     <PathLine
       label="Where this agent works"

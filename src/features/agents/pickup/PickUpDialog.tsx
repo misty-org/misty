@@ -14,14 +14,8 @@ import {
   Textarea,
 } from "@/shared/ui";
 import type { AgentProfile } from "@/shared/schemas";
-import {
-  currentSpaceKey,
-  folderLabel,
-  folderOf,
-  mistyEngine,
-  useEnginesList,
-  useSpaceFolders,
-} from "../engines/enginesApi";
+import { folderName, mistyEngine, useEnginesList } from "../engines/enginesApi";
+import { useChatFolder } from "../shared-folders/chatFolder";
 import { draftPickUp, pickUpMarkdown, pickUpTitle, sendPickUp } from "./pickUp";
 
 /**
@@ -47,6 +41,9 @@ export function PickUpDialog(props: {
   const [attempt, setAttempt] = useState(0);
   // The engine's name for the note, from the list this computer last read.
   const engines = useEnginesList();
+  // The project the chat works in, named in the note; a scratch folder is named by nothing.
+  const chatFolder = useChatFolder(props.conversationId);
+  const project = chatFolder.kind === "project" ? chatFolder.folder : "";
 
   useEffect(() => {
     if (!props.open) return;
@@ -72,9 +69,6 @@ export function PickUpDialog(props: {
     setSending(true);
     setError("");
     try {
-      const space = currentSpaceKey();
-      const folders = useSpaceFolders.getState();
-      const folder = folderOf(folders, space);
       const engineId = props.agent?.engine ?? "";
       const engine =
         engineId && engineId !== mistyEngine
@@ -83,7 +77,7 @@ export function PickUpDialog(props: {
       const markdown = pickUpMarkdown(text, {
         agentName: props.agent?.name ?? "Agent",
         engine,
-        folder: folder ? folderLabel(folders, space, folder) : "",
+        folder: project ? folderName(project) : "",
         at: new Date(),
       });
       const note = await sendPickUp(props.spaceId, title.trim() || pickUpTitle(""), markdown);
@@ -152,8 +146,7 @@ export function PickUpDialog(props: {
           ) : (
             <Button
               type="button"
-              disabled={drafting || !text.trim()}
-              loading={sending}
+              disabled={drafting || !text.trim() || sending}
               onClick={() => void send()}
             >
               Send to Space

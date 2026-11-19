@@ -4,6 +4,7 @@ import { useMistyStore } from "@/features/agents/conversations/state/useMistySto
 import type { AgentProfile } from "@/shared/schemas";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
+import type * as ActionQuestions from "@/features/agents/island/actionQuestions";
 import { NoticeViewport } from "@/shared/ui";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { initialCompanionPresentation, useCompanionState } from "../../tutor/cursor/companionState";
@@ -32,6 +33,11 @@ vi.mock("@/features/agents/runs/local-execution/localExecution", () => ({
 }));
 vi.mock("@/shared/platform/tauri", () => ({
   hasTauriInternals: () => true,
+}));
+// No native window here to hear the device's action questions from.
+vi.mock("@/features/agents/island/actionQuestions", async (importOriginal) => ({
+  ...(await importOriginal<typeof ActionQuestions>()),
+  listenForActionQuestions: () => undefined,
 }));
 const submit = vi.fn(async (..._args: unknown[]) => {});
 const companionSubmit = vi.fn(async () => {});

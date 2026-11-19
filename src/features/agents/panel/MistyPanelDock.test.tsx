@@ -2,6 +2,7 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { settleDeviceSettings } from "@/tests/fakeDeviceSettings";
 import { MistyPanelDock } from "./MistyPanelDock";
+import { remCss } from "@/shared/lib/uiScale";
 import {
   MISTY_PANEL_MAX_WIDTH,
   MISTY_PANEL_MIN_WIDTH,
@@ -56,7 +57,7 @@ describe("Chat panel width", () => {
     // A drag never animates: the width follows the pointer at once.
     const dock = edge.closest<HTMLElement>("[data-misty-panel-dock]")!;
     // The dock is the panel plus the margin of window chrome beside it.
-    expect(dock.style.width).toBe(`${MISTY_PANEL_WIDTH + 100 + 6}px`);
+    expect(dock.style.width).toBe(remCss(MISTY_PANEL_WIDTH + 100 + 6));
     expect(dock.style.transitionDuration).toBe("");
     pointer(window, "pointermove", { clientX: 640 });
     expect(useMistyPanelStore.getState().width).toBe(MISTY_PANEL_WIDTH - 40);
@@ -87,7 +88,7 @@ describe("Chat panel width", () => {
     });
     expect(useMistyPanelStore.getState().width).toBe(MISTY_PANEL_WIDTH);
     const card = screen.getByTestId("chat").closest<HTMLElement>("[data-misty-panel-card]")!;
-    expect(card.style.getPropertyValue("--misty-panel-width")).toBe(`${MISTY_PANEL_WIDTH}px`);
+    expect(card.style.getPropertyValue("--misty-panel-width")).toBe(remCss(MISTY_PANEL_WIDTH));
   });
 
   it("remembers its width and whether it is open on this device, once a drag rests", async () => {

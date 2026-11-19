@@ -59,7 +59,18 @@ const words: Record<string, { kind: string; needsSelection?: boolean; any: strin
   extensions: { kind: "extension_action", any: ["install", "configure", "run", "enable"] },
   "photo-editor": {
     kind: "image_edit",
-    any: ["edit", "enhance", "bright", "contrast", "filter", "warm", "cool"],
+    any: [
+      "edit",
+      "enhance",
+      "bright",
+      "contrast",
+      "filter",
+      "warm",
+      "cool",
+      "crop",
+      "rotate",
+      "straighten",
+    ],
   },
 };
 

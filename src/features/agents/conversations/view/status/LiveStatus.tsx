@@ -1,4 +1,4 @@
-import { StepDot, Text } from "@/shared/ui";
+import { OverflowFadeText, StepDot, Text } from "@/shared/ui";
 import { useNow } from "@/shared/hooks/useNow";
 import { tookText } from "../meta/format";
 import { RollingStat } from "./RollingStat";
@@ -33,7 +33,7 @@ export function LiveStatus({
       aria-live="polite"
     >
       <StepDot state="working" size="sm" />
-      <span className="misty-shimmer min-w-0 truncate">{phrase}</span>
+      <OverflowFadeText className="misty-shimmer min-w-0">{phrase}</OverflowFadeText>
       {elapsed >= 1000 ? <span className="shrink-0">· {tookText(elapsed)}</span> : null}
       {tokens > 0 ? (
         <span className="inline-flex shrink-0 items-center gap-1">

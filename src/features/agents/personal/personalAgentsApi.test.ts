@@ -77,7 +77,10 @@ it("does not bring back an engine's agent the person removed", async () => {
 
 it("still lists the agents when the engines can't be asked", async () => {
   engines.list.mockRejectedValue(new Error("no native side"));
-  rows.set(key("agent", "personal_own"), JSON.stringify(handMade("personal_own", "2026-01-01T00:00:00.000Z")));
+  rows.set(
+    key("agent", "personal_own"),
+    JSON.stringify(handMade("personal_own", "2026-01-01T00:00:00.000Z")),
+  );
   expect((await listPersonalAgents("acct")).map((agent) => agent.engine)).toEqual(["codex"]);
 });
 
@@ -149,9 +152,14 @@ it("keeps a copy that is named elsewhere", async () => {
 
 it("keeps Misty's own agent from before, hidden from new work, so its old chats keep it", async () => {
   const misty = { ...handMade("personal_misty", "2025-01-01T00:00:00.000Z"), name: "Misty" };
-  rows.set(key("agent", misty.id), JSON.stringify({ ...misty, engine: undefined, system_managed: true }));
+  rows.set(
+    key("agent", misty.id),
+    JSON.stringify({ ...misty, engine: undefined, system_managed: true }),
+  );
   const agents = await listPersonalAgents("acct");
-  expect(agents.find((agent) => agent.id === "personal_misty")).toMatchObject({ system_managed: true });
+  expect(agents.find((agent) => agent.id === "personal_misty")).toMatchObject({
+    system_managed: true,
+  });
 });
 
 it("doesn't make Misty's own agent for someone who never had one", async () => {

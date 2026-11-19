@@ -26,11 +26,12 @@ import { resolveContextMax } from "./conversations/view/meta/contextWindowMemory
 import { usageBreakdown } from "./conversations/view/meta/usageBreakdown";
 import { chatUsage, formatCost } from "./context-panel/chatUsage";
 import { useContextPanel } from "./context-panel/contextPanelStore";
+import { LineCounts } from "./context-panel/git/LineCounts";
 import { useGitStore } from "./context-panel/git/store";
 import { mistyEngine } from "./engines/enginesApi";
 import { usePersonalAgentsStore } from "./personal/personalAgentsStore";
 import { watchAllRunEvents } from "./runs/local-run/localRunEvents";
-import { useAgentFolder } from "./shared-folders/agentFolder";
+import { useChatFolder } from "./shared-folders/chatFolder";
 import { setCompanionOn, useCompanionOn } from "./tutor/cursor/companionOn";
 import { useCompanionState } from "./tutor/cursor/companionState";
 import { useLessonStore } from "./tutor/lessons/lessonStore";
@@ -250,7 +251,7 @@ export function CostStatus({ conversationId }: FocusedChat) {
 
 /** The focused chat's folder, by name. Opens Files. */
 export function FolderStatus({ conversationId }: FocusedChat) {
-  const folder = useAgentFolder(useChatAgent(conversationId));
+  const { folder, kind } = useChatFolder(conversationId);
   if (!folder) return null;
   return (
     <Tooltip content={folder}>
@@ -259,7 +260,7 @@ export function FolderStatus({ conversationId }: FocusedChat) {
         icon={FolderOpen}
         onClick={() => useContextPanel.getState().toggle("files")}
       >
-        {folder.split(/[\\/]/).filter(Boolean).pop() ?? folder}
+        {kind === "scratch" ? "Scratch" : (folder.split(/[\\/]/).filter(Boolean).pop() ?? folder)}
       </Button>
     </Tooltip>
   );
@@ -267,25 +268,22 @@ export function FolderStatus({ conversationId }: FocusedChat) {
 
 /** The focused chat's folder's branch and its uncommitted lines. Opens Changes. */
 export function BranchStatus({ conversationId }: FocusedChat) {
-  const folder = useAgentFolder(useChatAgent(conversationId));
+  const { folder } = useChatFolder(conversationId);
   const status = useGitStore((state) => (folder ? state.statusByWorkspace[folder] : undefined));
   useEffect(() => {
     if (folder) void useGitStore.getState().refresh(folder);
   }, [folder]);
   if (!status?.branch) return null;
-  let added = 0;
-  let removed = 0;
-  for (const file of [...status.staged, ...status.unstaged, ...status.untracked]) {
-    added += file.additions ?? 0;
-    removed += file.deletions ?? 0;
-  }
   return (
     <Button
       variant="quiet"
       icon={GitBranch}
       onClick={() => useContextPanel.getState().toggle("changes")}
     >
-      {added || removed ? `${status.branch} +${added} −${removed}` : status.branch}
+      <span className="flex items-center gap-1.5">
+        {status.branch}
+        <LineCounts git={status} />
+      </span>
     </Button>
   );
 }

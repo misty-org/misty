@@ -86,14 +86,15 @@ enum Group {
 // The person's Misty data and its social tools: about 50 of a run's 65 tools and
 // 9,000 tokens on every turn of a web task that never uses them.
 // They load up front when the request is about Misty's own things, and otherwise on request.
-const MISTY_DATA: [&str; 14] = [
-    "drawing.", "image.", "note.", "thread.", "file.", "voice.", "message.", "space.",
-    "item.", "search.all", "agent.configure", "agent.request", "agent.directory", "agent.list",
+const MISTY_DATA: [&str; 16] = [
+    "drawing.", "deck.", "workbook.", "image.", "note.", "thread.", "file.", "voice.", "message.",
+    "space.", "item.", "search.all", "agent.configure", "agent.request", "agent.directory",
+    "agent.list",
 ];
 
 static MISTY_REQUEST: LazyLock<Regex> = LazyLock::new(|| {
     js_regex(
-        r"\b(my|our|this|the person's) (own )?(notes?|notebook|drawings?|sketch(es)?|files?|documents in misty|chats?|threads?|messages in misty|spaces?|memory|memories|preferences|recordings?|voice notes?|schedules?|agents?)\b|\b(in|on|from|to) misty\b|\bmisty('s)? (notes?|files?|chat|spaces?|drawings?)\b|\bremember (that|this|my|me)\b|\bweather\b|\b(a|the|this) space\b",
+        r"\b(my|our|this|the person's) (own )?(notes?|notebook|drawings?|whiteboards?|decks?|slides|presentations?|workbooks?|spreadsheets?|sketch(es)?|files?|documents in misty|chats?|threads?|messages in misty|spaces?|memory|memories|preferences|recordings?|voice notes?|schedules?|agents?)\b|\b(in|on|from|to) misty\b|\bmisty('s)? (notes?|files?|chat|spaces?|drawings?|whiteboards?|decks?|slides|workbooks?|data)\b|\bremember (that|this|my|me)\b|\bweather\b|\b(a|the|this) space\b",
         true,
     )
 });

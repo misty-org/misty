@@ -20,7 +20,7 @@ const EVERY: Duration = Duration::from_millis(1200);
 /// A picture larger than this isn't kept.
 const MAX_BYTES: usize = 400_000;
 
-fn folder(app: &AppHandle) -> Option<PathBuf> {
+pub(super) fn folder(app: &AppHandle) -> Option<PathBuf> {
     Some(
         app.try_state::<crate::app::runtime::MistyRuntime>()?
             .environment
@@ -30,7 +30,7 @@ fn folder(app: &AppHandle) -> Option<PathBuf> {
     )
 }
 
-fn store_of(app: &AppHandle) -> Option<database::store::Store> {
+pub(super) fn store_of(app: &AppHandle) -> Option<database::store::Store> {
     Some(
         app.try_state::<crate::app::runtime::MistyRuntime>()?
             .environment
@@ -39,7 +39,7 @@ fn store_of(app: &AppHandle) -> Option<database::store::Store> {
 }
 
 /// A run id as a folder name: anything but letters, digits, `-` and `_` becomes `_`.
-fn safe(name: &str) -> String {
+pub(super) fn safe(name: &str) -> String {
     name.chars()
         .map(|c| {
             if c.is_ascii_alphanumeric() || c == '-' || c == '_' {

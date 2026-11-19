@@ -13,7 +13,11 @@ const SKETCH_FENCE = "```misty-sketch";
 
 /** Words to read: no tags, no blocks, one space between words. */
 function speakable(prose: string) {
-  return prose.replace(fenced, " ").replace(tags, "").replace(/\[[^\]]*$/, "").replace(/\s+/g, " ");
+  return prose
+    .replace(fenced, " ")
+    .replace(tags, "")
+    .replace(/\[[^\]]*$/, "")
+    .replace(/\s+/g, " ");
 }
 
 /** What an answer says aloud so far, and where in it each drawn element comes in. */

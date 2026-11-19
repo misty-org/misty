@@ -1,5 +1,6 @@
 import { agentAccountId } from "../../personal/agentAccount";
 import { rememberRun } from "@/features/agents/localRun";
+import { spacesSnapshot } from "@/features/app-windows";
 import { invoke } from "@/native/invoke";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { withDeviceRunGrants } from "../invocations/deviceRunGrants";
@@ -17,8 +18,14 @@ import { runHomeSpace } from "./runSpace";
 export async function startLocalRun(input: AiInvocationRequest): Promise<AiInvocationCreated> {
   if (!hasTauriInternals()) throw new Error("Agents run in the Misty app.");
   const account = agentAccountId();
-  // The run works in its agent's home Space, whichever Space its chat or the window is in.
-  const spaceId = await runHomeSpace(account, input.agentId);
+  // Work asked for in a Space (an @mention in its chat, a Lab notebook, a Tutor job there) works
+  // in and saves into that Space, when the person is in it. Everything else (a private chat, the
+  // Code page, the companion) works in the agent's home Space, whichever Space the window shows.
+  const asked =
+    input.spaceId && spacesSnapshot().spaces.some((space) => space.id === input.spaceId)
+      ? input.spaceId
+      : "";
+  const spaceId = asked || (await runHomeSpace(account, input.agentId));
   const runId = await runIdFor(account, input.idempotencyKey);
   // A sub-agent is in no chat: it has nobody to ask, and reports to its parent.
   const conversationId = input.delegatedFrom

@@ -45,9 +45,7 @@ describe("saving a video", () => {
   it("looks for MP4 first, then WebM", async () => {
     const isTypeSupported = vi.fn((type: string) => type === "video/webm");
     vi.stubGlobal("MediaRecorder", { isTypeSupported });
-    const getContext = vi
-      .spyOn(HTMLCanvasElement.prototype, "getContext")
-      .mockReturnValue(null);
+    const getContext = vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null);
     await expect(
       recordVideo(
         { id: "v", kind: "video", title: "Lava", body: "", createdAt: "", updatedAt: "" },

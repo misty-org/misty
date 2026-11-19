@@ -91,16 +91,22 @@ const ASK_MODE_STOPS: &[&str] = &[
     "browser.skill",
     "browser.steps",
     "browser.upload",
+    "deck.apply",
+    "deck.create",
     "drawing.apply",
     "drawing.create",
+    "drawing.from_mermaid",
     "file.create",
     "file.promote_attachment",
     "file.update",
+    "file.upload",
     "folder.send",
+    "image.cutout",
     "image.edit",
     "image.save",
     "item.delete",
     "item.rename",
+    "media.fetch",
     "message.send",
     "note.create",
     "note.tag",
@@ -109,6 +115,12 @@ const ASK_MODE_STOPS: &[&str] = &[
     "space.manage",
     "thread.create",
     "thread.post",
+    "video.duplicate",
+    "video.edit",
+    "video.export",
+    "workbook.apply",
+    "workbook.create",
+    "workbook.import",
 ];
 
 /// What a planning mode refuses whatever the catalog offered: tools that change something on this computer.
@@ -122,6 +134,7 @@ const PLAN_REFUSES: &[&str] = &[
     "browser.steps",
     "browser.upload",
     "folder.send",
+    "media.fetch",
     "screen.open",
     "shell.run",
 ];
@@ -152,13 +165,11 @@ pub(crate) const COMPUTER_ACTS: &[&str] = &[
 ];
 
 /// Whether a tool is allowed by the run's list. The tools a run needs to talk to the person and
-/// to report are never left out, and neither is its figure in the studio (`studio.*`), which only
-/// shows the person where the agent is.
+/// to report are never left out.
 fn allowed_by_list(facts: &RunFacts, name: &str) -> bool {
     const ALWAYS: &[&str] = &["conversation.ask_user", "log.work.write"];
     facts.allowed_tools.is_empty()
         || ALWAYS.contains(&name)
-        || name.starts_with("studio.")
         || facts.allowed_tools.iter().any(|allowed| {
             allowed == name
                 || allowed

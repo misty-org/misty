@@ -1,5 +1,11 @@
 import type { CSSProperties, RefObject } from "react";
-import { cn, companionTints, screenMarkClass, ViewportLayer, type CompanionTint } from "@/shared/ui";
+import {
+  cn,
+  companionTints,
+  screenMarkClass,
+  ViewportLayer,
+  type CompanionTint,
+} from "@/shared/ui";
 import { normalizeCompanionSize } from "./companionSize";
 import type { Presentation } from "./protocol";
 

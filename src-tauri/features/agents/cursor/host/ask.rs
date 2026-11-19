@@ -35,18 +35,20 @@ fn show(app: &AppHandle) -> Result<(), String> {
     remember_front();
     let window = match app.get_webview_window(ASK_LABEL) {
         Some(window) => window,
-        None => WebviewWindowBuilder::new(app, ASK_LABEL, WebviewUrl::App("companion.html#ask".into()))
-            .title("Ask Misty")
-            .transparent(true)
-            .decorations(false)
-            .shadow(false)
-            .resizable(false)
-            .always_on_top(true)
-            .skip_taskbar(true)
-            .visible(false)
-            .inner_size(WIDTH, HEIGHT)
-            .build()
-            .map_err(|e| e.to_string())?,
+        None => {
+            WebviewWindowBuilder::new(app, ASK_LABEL, WebviewUrl::App("companion.html#ask".into()))
+                .title("Ask Misty")
+                .transparent(true)
+                .decorations(false)
+                .shadow(false)
+                .resizable(false)
+                .always_on_top(true)
+                .skip_taskbar(true)
+                .visible(false)
+                .inner_size(WIDTH, HEIGHT)
+                .build()
+                .map_err(|e| e.to_string())?
+        }
     };
     if let Some((x, y)) = platform::cursor() {
         // macOS reports the pointer in points, Windows in pixels.

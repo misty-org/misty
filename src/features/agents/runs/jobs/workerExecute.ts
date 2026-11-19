@@ -1,4 +1,5 @@
 import { devicesNative } from "@/features/devices";
+import { recordBrowserLog } from "../../browser-log/recordBrowserLog";
 import { executeBrowserJob } from "./browserJobRun";
 import { deviceAgentOperations, runDeviceAgentOperation } from "../../personal/deviceAgentTools";
 import { DeviceOperationNotAttempted, type ClaimedWorkflowNodeJob } from "./workerBrowserJobs";
@@ -28,8 +29,19 @@ export async function executeWorkflowNodeOnDevice(
     return (await import("./spawnChildTabs")).spawnChildTabs(job, signal);
   }
   if (job.operation === "browser.act") {
-    // One goal runs as a local loop: Midscene plans, Misty's native input acts.
-    return (await import("../../desktop-control/screenActJob")).runScreenAct(job, signal);
+    // One goal runs as a local loop: Midscene plans, Misty's native input acts. It goes in the
+    // run's browser log as one action, the goal it worked toward.
+    const started = Date.now();
+    try {
+      const output = await (
+        await import("../../desktop-control/screenActJob")
+      ).runScreenAct(job, signal);
+      recordBrowserLog(job, { output }, Date.now() - started);
+      return output;
+    } catch (error) {
+      recordBrowserLog(job, { error }, Date.now() - started);
+      throw error;
+    }
   }
   if (job.operation === "browser.run") {
     // A program the agent wrote, run in a sandbox against its own tabs (programs/runProgram.ts).

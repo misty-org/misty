@@ -36,6 +36,7 @@ export function buildDeviceJob(args: {
     id: `devicejob_${crypto.randomUUID()}`,
     runId: entry.runId,
     nodeId: `${node}_${callId}`,
+    callId,
     scopeId: context.opaqueRef,
     operation,
     contextId: context.id,

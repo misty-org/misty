@@ -10,13 +10,12 @@ export { useMistyPanelSide } from "./panel/mistyPanelSide";
 export { useMistyPanelStore, type MistyPanelView } from "./panel/mistyPanelStore";
 
 export { defaultAgentOf, usePersonalAgentsStore } from "./personal/personalAgentsStore";
-export { agentInFolder, offerAgentForFolder } from "./shared-folders/folderAgents";
-export { openAgentsHub, useAgentsHub, type AgentsHubPage } from "./hub/agentsHubStore";
+export { agentsHubSections, openAgentsHub, type AgentsHubPage } from "./hub/agentsHubStore";
 export { HubAgentsPage } from "./hub/HubAgentsPage";
 export { EngineMarketplace, showSkillCatalog } from "./marketplace/EngineMarketplace";
 
 export type { AppRequest } from "./connected-apps/api";
-export { appsApi, type ConnectedApp } from "./connected-apps/api";
+export { appsApi } from "./connected-apps/api";
 export { AppLogo } from "./connected-apps/ConnectedAppRows";
 export { DirectApps } from "./connected-apps/DirectApps";
 export { AppsPage } from "./connected-apps/AppsPage";
@@ -63,6 +62,9 @@ export {
 // Public surface used by other features.
 export { spaceAgentsApi, type SpaceAgent } from "./api/space-agents";
 export { spacesGateway } from "./spaces-gateway/spacesGateway";
+export type { ItemDocKind, SpaceItemTools } from "./spaces-gateway/spacesGateway";
+export { EditorSettings } from "./code/vim/EditorSettings";
+export { openCodeChat } from "./code/sessions/CodeChatColumn";
 export { findVocative, routeToAgent } from "./tutor/cursor/vocativeRoute";
 
 // Public surface used by other features.
@@ -70,16 +72,10 @@ export { openMisty } from "./conversations/ask/handoff";
 export { draftRequestForAgent } from "./conversations/ask/draftRequest";
 export { conversationInSpace } from "./conversations/state/conversationSpace";
 export { useAgentAccountId } from "./personal/agentAccount";
-export { AgentsNow } from "./virtual/AgentsNow";
-export { useStudioAgents } from "./virtual/useStudioAgents";
-export { useTeammateAgents } from "./virtual/teammates";
-export {
-  useStudioOpen,
-  useStudioRequests,
-  useTeamMembers,
-  type StudioRequest,
-  type TeamMember,
-} from "./virtual/teamMembers";
+export { AgentsNow } from "./now/AgentsNow";
+export { useStudioAgents } from "./now/useStudioAgents";
+export { useTeammateAgents } from "./now/teammates";
+export { useStudioOpen, useTeamMembers, type TeamMember } from "./now/teamMembers";
 export { shortAgo, useChatStatuses, type ChatStatus } from "./page/useChatStatuses";
 export { EnginesStep } from "./engines/EnginesStep";
 export {
@@ -94,14 +90,9 @@ export { runtimeAiApi } from "./AgentsRuntime";
 export type { MistyActivityEntry } from "./conversations/state/activity";
 export type { GlobalAiConversation } from "./conversations/state/conversationTypes";
 export { watchAllRunEvents } from "./runs/local-run/localRunEvents";
-export {
-  currentSpaceKey,
-  folderName,
-  folderOf,
-  useEnginesList,
-  useLinkedFolders,
-  useSpaceFolders,
-} from "./engines/enginesApi";
+export { currentSpaceKey, folderName, useEnginesList } from "./engines/enginesApi";
+export { isProjectChat, useLinkedFolders, useProjectChats } from "./shared-folders/chatFolder";
+export { useProjectsHome, useProjectsHomePath } from "./shared-folders/projectsHome";
 export { RunNotifier } from "./runs/notices/RunNotifier";
 // Personas from the bundled catalog, and their page in Settings.
 export { PersonaCatalogSection } from "./personas";
@@ -125,7 +116,7 @@ export { PickUpDialog } from "./pickup/PickUpDialog";
 export { pickUpRequest, pickUpTopic } from "./pickup/pickUp";
 export { HappeningNow } from "./activity/HappeningNow";
 export { LabDoing } from "./tutor/LabDoing";
-export { SpaceLab } from "./tutor/SpaceLab";
+export { SpaceLab, SpaceLabSkeleton } from "./tutor/SpaceLab";
 export { runOnEngine } from "./engines/engineRun";
 export { cleanupOnEngine } from "./engines/mistyCalls";
 export { EngineSection } from "./engines/EngineSection";
@@ -137,7 +128,7 @@ export {
 } from "./engines/defaultEngine";
 export { notebookRoute } from "./tutor/notebookSpace";
 export { PersonAvatar } from "./tutor/notebook/LivePeople";
-export { personTone } from "./tutor/personTone";
+export { personColor, personTone } from "./tutor/personTone";
 export { useSpaceRuns } from "./activity/useSpaceRuns";
 export { AgentActivitySettings } from "./activity/AgentActivitySettings";
 
@@ -146,8 +137,7 @@ export { askInNewChat, resumeInNewChat } from "./conversations/startChat";
 export { requestChatFind } from "./conversations/view/navigation/chatFind";
 export { messageSearchText } from "./conversations/view/navigation/timelineSearch";
 export { searchEngineSessions } from "./conversations/view/engine/engineHistory";
-export { agentForPastChat } from "./conversations/view/engine/pastChats";
-export { PastChatFolderHost } from "./conversations/view/engine/PastChatFolderHost";
+export { defaultEngineAgent } from "./engines/defaultEngine";
 export { searchNotebooks } from "./tutor/tutorSearch";
 export { directAppsApi } from "./connected-apps/directApi";
 export { openFolderFile, searchFolderFiles } from "./context-panel/files/folderFileSearch";
@@ -164,3 +154,20 @@ export {
   TutorStatus,
   UnreadStatus,
 } from "./BottomBarStatus";
+export {
+  CodeBranchStatus,
+  CodeCursorStatus,
+  CodeLanguageStatus,
+  CodeLiveStatus,
+  CodeProblemsStatus,
+  CodeServerStatus,
+  CodeTerminalButton,
+  CodeThemeStatus,
+  CodeVimStatus,
+} from "./code/CodeBarStatus";
+export {
+  ImageAgentPanel,
+  VideoAgentPanel,
+  revertVideoTurn,
+  useMediaAgent,
+} from "./video/VideoAgentPanel";

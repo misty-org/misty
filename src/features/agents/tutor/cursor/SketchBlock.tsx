@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { PenLine, Play } from "lucide-react";
+import { Play } from "lucide-react";
 import { openReading } from "@/features/voice";
-import { Button, Skeleton, sketchInk, Surface, Text } from "@/shared/ui";
+import { Button, SetupState, sketchInk, spaceMadeKind, Surface, Text } from "@/shared/ui";
 import {
   spacesSnapshot,
   useWorkspaceStore,
@@ -17,13 +17,15 @@ import { renderSketch } from "./sketchRender";
 /**
  * A reply's drawing in the transcript (companionSketch.ts): the whiteboard itself, the
  * marks Misty drew over the screen without the screenshot under them, or a 3D model that
- * can be dragged around. Save as drawing makes a board or marks a Space drawing anyone in
+ * can be dragged around. Save as whiteboard makes a board or marks a Space whiteboard anyone in
  * the Space can keep editing.
  */
 export function SketchBlock({ source }: { source: string }) {
   const sketch = useMemo(() => parseSketch("```misty-sketch\n" + source + "\n```"), [source]);
   const canvas = useRef<HTMLDivElement>(null);
   const [drawn, setDrawn] = useState(false);
+  // The drawing or model couldn't be shown: the notice says so, and nothing is still setting up.
+  const [failed, setFailed] = useState(false);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState("");
   const count = sketch?.elements.length ?? 0;
@@ -53,7 +55,10 @@ export function SketchBlock({ source }: { source: string }) {
     }
     const parts = replay === undefined ? drawing.elements : drawing.elements.slice(0, replay);
     void model.current.then((view) => {
-      if (!view) return setNotice("This model couldn't be shown.");
+      if (!view) {
+        setFailed(true);
+        return setNotice("This model couldn't be shown.");
+      }
       view.update(parts);
       setDrawn(true);
     });
@@ -88,7 +93,9 @@ export function SketchBlock({ source }: { source: string }) {
         setDrawn(true);
       })
       .catch(() => {
-        if (current) setNotice("This drawing couldn't be shown.");
+        if (!current) return;
+        setFailed(true);
+        setNotice("This drawing couldn't be shown.");
       });
     return () => {
       current = false;
@@ -126,7 +133,7 @@ export function SketchBlock({ source }: { source: string }) {
   const save = async () => {
     const spaceId = windowSpace(spacesSnapshot().spaces)?.id;
     if (!spaceId) {
-      setNotice("Open a Space in this window to save drawings there.");
+      setNotice("Open a Space in this window to save sketches there as whiteboards.");
       return;
     }
     setSaving(true);
@@ -137,7 +144,7 @@ export function SketchBlock({ source }: { source: string }) {
         .get()
         .createDrawing(
           spaceId,
-          sketch.header.title || "Drawing from Misty",
+          sketch.header.title || "Sketch from Misty",
           convertToExcalidrawElements(
             sketchSkeleton(sketch.elements) as Parameters<typeof convertToExcalidrawElements>[0],
           ),
@@ -147,7 +154,7 @@ export function SketchBlock({ source }: { source: string }) {
       );
       if (surface) useWorkspaceStore.getState().openSurface({ ...surface, forceNew: true });
     } catch {
-      setNotice("Misty couldn't save this drawing. Try again.");
+      setNotice("Misty couldn't save this sketch. Try again.");
     } finally {
       setSaving(false);
     }
@@ -164,10 +171,15 @@ export function SketchBlock({ source }: { source: string }) {
         tone="board"
         edge="hairline"
         radius="xl"
-        className="grid h-70 place-items-center overflow-hidden p-3"
-        ref={canvas}
+        className="relative grid h-70 place-items-center overflow-hidden p-3"
       >
-        {!drawn && <Skeleton className="size-full" />}
+        {/* The drawing is put in here by hand, so it shares no parent with what React draws. */}
+        <div ref={canvas} className="grid size-full place-items-center" />
+        {!drawn && !failed && (
+          <div className="absolute inset-0">
+            <SetupState tool="sketch" label="Drawing the sketch" />
+          </div>
+        )}
       </Surface>
       {narration ? (
         <Text as="p" size="body" wrap className="mt-2">
@@ -187,11 +199,11 @@ export function SketchBlock({ source }: { source: string }) {
           ) : null}
           {!isModel && (
             <Button
-              icon={PenLine}
+              icon={spaceMadeKind("drawing").icon}
               disabled={!sketch.done || !count || saving}
               onClick={() => void save()}
             >
-              Save as drawing
+              Save as whiteboard
             </Button>
           )}
           {notice && (

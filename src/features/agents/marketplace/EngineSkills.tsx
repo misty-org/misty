@@ -274,7 +274,6 @@ export function EngineSkills({
                           <Button
                             icon={Download}
                             aria-label={`Install ${entry.name}`}
-                            loading={busy === entry.key}
                             disabled={busy !== null}
                             onClick={() => void install(entry)}
                           >

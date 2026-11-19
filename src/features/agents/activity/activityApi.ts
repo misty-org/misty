@@ -21,6 +21,8 @@ export interface RunStep {
   nested: boolean;
   /** The picture of the page after the step, if one was taken. */
   picture: string;
+  /** The tool call, as the browser log keys its actions (`<run>:<call>`). */
+  callId?: string;
 }
 
 /** One run in a Space's timeline. */

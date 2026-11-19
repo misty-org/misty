@@ -142,7 +142,11 @@ function lastAsk(conversationId: string) {
   for (let i = messages.length - 1; i >= 0; i--) {
     const message = messages[i]!;
     // A step's own "I did step…" message isn't what the walkthrough is for.
-    if (message.role === "user" && message.content.trim() && !message.content.startsWith("I did step"))
+    if (
+      message.role === "user" &&
+      message.content.trim() &&
+      !message.content.startsWith("I did step")
+    )
       return message.content;
   }
   return "";

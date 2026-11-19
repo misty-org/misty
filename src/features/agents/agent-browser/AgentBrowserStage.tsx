@@ -2,7 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useRef, useState } from "react";
 import { usePresentedPageHost } from "@/features/browser";
 import { useBrowserRuntimeStore } from "@/features/app-windows";
-import { SkeletonDocument, Surface, Text } from "@/shared/ui";
+import { SetupState, Surface, Text } from "@/shared/ui";
 import { agentTab, setShownAgentTab, wakeAgentTab } from "../tabs/agentTabs";
 import { useAgentBrowser } from "./agentBrowserStore";
 import { agentPageKey, useAgentPageGeometry } from "./useAgentPageGeometry";
@@ -35,6 +35,8 @@ export function AgentBrowserStage({
   // through a popup or menu, and never flashes an opaque host.
   usePresentedPageHost(agentPageKey(viewId), Boolean(viewId) && presented);
   const [closed, setClosed] = useState(false);
+  // Trying again asks for the page once more, when making it stalls.
+  const [attempt, setAttempt] = useState(0);
   // The picture is of the tab shown last: after a switch, the one taken before it belongs to the
   // tab left behind, so only a picture taken since stands in for this one.
   const [switched, setSwitched] = useState({ scopeId, before: undefined as string | undefined });
@@ -51,14 +53,19 @@ export function AgentBrowserStage({
     setClosed(false);
     setShownAgentTab(scopeId);
     if (!blank)
-      void wakeAgentTab(scopeId).then((open) => {
-        if (current) setClosed(!open);
-      });
+      void wakeAgentTab(scopeId).then(
+        (open) => {
+          if (current) setClosed(!open);
+        },
+        () => {
+          if (current) setClosed(true);
+        },
+      );
     return () => {
       current = false;
       setShownAgentTab(undefined);
     };
-  }, [scopeId, blank]);
+  }, [scopeId, blank, attempt]);
 
   useAgentPageGeometry(ref, viewId, { handoff: true });
 
@@ -93,7 +100,8 @@ export function AgentBrowserStage({
         data-agent-page-awaiting={presented ? undefined : ""}
       >
         {/* Until the live page is on screen, its last picture stands in for it: while the tab
-            wakes, and for good once it can't open again. Only a page never seen has a skeleton. */}
+            wakes, and for good once it can't open again. A page never seen says the browser is
+            setting up while its view is made. */}
         {presented ? null : blank && !viewId ? (
           <Text bare as="p" size="meta" tone="muted" className={noteClass}>
             Open a URL for the agent to use
@@ -109,7 +117,9 @@ export function AgentBrowserStage({
             This page is closed.
           </Text>
         ) : (
-          <SkeletonDocument label="Page" className="absolute inset-0" />
+          <div className="absolute inset-0">
+            <SetupState tool="browser" onRetry={() => setAttempt((value) => value + 1)} />
+          </div>
         )}
       </Surface>
     </Surface>

@@ -205,7 +205,6 @@ export function PluginDetailsDialog({
                   <Button
                     variant="primary"
                     icon={Download}
-                    loading={busy === item.id}
                     disabled={busy !== null}
                     onClick={() => onInstall(item)}
                   >

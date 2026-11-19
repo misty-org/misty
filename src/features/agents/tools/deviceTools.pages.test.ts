@@ -132,6 +132,15 @@ describe("tabs that join a run", () => {
     expect(mocks.execute).not.toHaveBeenCalled();
   });
 
+  it("gives a call without an address a new tab, so helpers never share the first", async () => {
+    await start({}, [workspace, tab("agent-scope-1", { remote_session: true })]);
+    mocks.execute.mockResolvedValueOnce({ tabs: [opened("agent-scope-2")] });
+    await expect(call("screen.open", { reason: "a helper's tab" })).resolves.toMatchObject({
+      scopeId: "agent-scope-2",
+    });
+    expect(lastJob().input).toMatchObject({ url: "", newTab: true });
+  });
+
   it("refuses a tab the device opened without a grant", async () => {
     await start({}, [workspace]);
     mocks.execute.mockResolvedValueOnce({

@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { Hand, MousePointerClick, PictureInPicture2, Play } from "lucide-react";
+import { Globe, Hand, MousePointerClick, PictureInPicture2, Play, ScrollText } from "lucide-react";
 import { useState } from "react";
 import { aiSurfaceApi } from "../runs/invocations/api";
 import { BrowserNavigationButtons } from "@/features/browser";
@@ -13,6 +13,8 @@ import { navigateShownTab } from "../tabs/agentPersonTabs";
 import { agentTab } from "../tabs/agentTabs";
 import { detachAgentBrowser, useAgentBrowser } from "./agentBrowserStore";
 import { ErrorNotice } from "../conversations/ErrorNotice";
+import { BrowserLog } from "../browser-log/BrowserLog";
+import { closeBrowserLog, openBrowserLog, useBrowserLog } from "../browser-log/browserLogStore";
 import { PickedElementCard } from "./PickedElementCard";
 import { useElementPick } from "./useElementPick";
 
@@ -32,6 +34,25 @@ export function AgentBrowser({ conversationId }: { conversationId?: string }) {
   const view = chat?.views.find((item) => item.id === chat.shownView) ?? chat?.views[0];
   const shown = view ? tabs[view.shownScope] : undefined;
   const elementPick = useElementPick(shown?.viewId ?? "", shown?.url, Boolean(shown?.loading));
+  const log = useBrowserLog((state) => (conversationId ? state.chats[conversationId] : undefined));
+  // The run's browser log takes the page's place, even after the run's tabs have closed.
+  if (log && conversationId) {
+    return (
+      <section
+        className="flex min-h-0 min-w-0 flex-1 flex-col gap-2 p-1.5"
+        aria-label="Browser log"
+      >
+        {view ? (
+          <div className="flex min-w-0 shrink-0 items-center gap-1">
+            <Button variant="quiet" icon={Globe} onClick={() => closeBrowserLog(conversationId)}>
+              Back to the page
+            </Button>
+          </div>
+        ) : null}
+        <BrowserLog key={log.runId} runId={log.runId} callId={log.callId} openedAt={log.openedAt} />
+      </section>
+    );
+  }
   if (!chat?.expanded || chat.hidden || !view) return null;
   const runId = agentTab(view.shownScope)?.runId;
   const working = view.status === "working";
@@ -90,6 +111,11 @@ export function AgentBrowser({ conversationId }: { conversationId?: string }) {
           Resume
         </Button>
       )}
+      {runId && (
+        <IconButton label="Browser log" onClick={() => openBrowserLog(chat.conversationId, runId)}>
+          <ScrollText />
+        </IconButton>
+      )}
     </>
   );
   // The address field: the site of a secure page at rest, the full address while typing. The person
@@ -105,10 +131,7 @@ export function AgentBrowser({ conversationId }: { conversationId?: string }) {
   );
   // The panel around it has the close button; shrinking to a picture is the browser's own.
   const foot = (
-    <IconButton
-      label="Shrink to a picture"
-      onClick={() => detachAgentBrowser(chat.conversationId)}
-    >
+    <IconButton label="Shrink to a picture" onClick={() => detachAgentBrowser(chat.conversationId)}>
       <PictureInPicture2 />
     </IconButton>
   );

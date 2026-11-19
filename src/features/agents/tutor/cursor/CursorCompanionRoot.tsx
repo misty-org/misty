@@ -24,7 +24,17 @@ function CursorOverlay() {
   const caption = useRef<HTMLDivElement>(null);
   useEffect(
     () =>
-      startCursorOverlayLoop({ latest, group, bubble, marker, meter, focus, sketch, trail, caption }),
+      startCursorOverlayLoop({
+        latest,
+        group,
+        bubble,
+        marker,
+        meter,
+        focus,
+        sketch,
+        trail,
+        caption,
+      }),
     [],
   );
   return (

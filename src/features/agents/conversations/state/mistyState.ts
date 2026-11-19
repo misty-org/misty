@@ -30,6 +30,9 @@ export interface MistyState {
   query: string;
   working: boolean;
   conversationsLoading: boolean;
+  /** Why the chats couldn't be read, once several reads in a row have failed; reads go on behind
+   * it, and the first that succeeds clears it. */
+  conversationsError: string | null;
   error: string | null;
   context: GlobalAiContextRef[];
   conversations: GlobalAiConversation[];

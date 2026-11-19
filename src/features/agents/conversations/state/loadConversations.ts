@@ -17,6 +17,33 @@ import { syncLocalChats } from "./localChatSync";
 import { submissionEpoch } from "../ask/mistySubmissionEpoch";
 
 /**
+ * A read that fails (right after a reload the native side can still be starting) is tried again,
+ * waiting twice as long each time up to 30s, until one succeeds or the account changes. A failed
+ * read is never taken for "no chats": the list keeps loading, and after `failuresShown` failures
+ * in a row it says the chats couldn't be read (`conversationsError`) while the reads go on.
+ */
+let retryTimer: ReturnType<typeof setTimeout> | null = null;
+let retryAttempt = 0;
+const retryMaxMs = 30_000;
+const failuresShown = 3;
+
+function retryLater(get: MistyGet, accountId: string, reconnect: boolean) {
+  if (retryTimer) clearTimeout(retryTimer);
+  const delay = Math.min(retryMaxMs, 1_000 * 2 ** retryAttempt);
+  retryAttempt += 1;
+  retryTimer = setTimeout(() => {
+    retryTimer = null;
+    if (get().accountId === accountId) void get().loadConversations(reconnect);
+  }, delay);
+}
+
+function settledRetries() {
+  if (retryTimer) clearTimeout(retryTimer);
+  retryTimer = null;
+  retryAttempt = 0;
+}
+
+/**
  * Loads this device's chats and re-attaches to a run still going. `reconnect` keeps the open conversation; `expected` names the run to rejoin.
  */
 export function createLoadConversations(
@@ -30,13 +57,15 @@ export function createLoadConversations(
     set({
       conversationsLoading: true,
     });
+    // Whether this read reached the list; a failure before it tries again.
+    let read = false;
     try {
       // Chats live on this device.
       // Native code may ask the person first, which the chats on this account don't wait for.
       void adoptSignedOutAgents(accountId).then((moved) => {
         if (moved > 0 && get().accountId === accountId) void get().loadConversations(reconnect);
       });
-      const saved = await localChats.conversations(accountId).catch(() => []);
+      const saved = await localChats.conversations(accountId);
       const local = saved.map(normalizeConversation);
       markStoredChats(local);
       if (get().accountId === accountId && !get().working && !get().conversations.length)
@@ -44,7 +73,10 @@ export function createLoadConversations(
       const response = {
         conversations: await syncLocalChats(accountId, local, () => get().invocationId),
       };
+      read = true;
+      settledRetries();
       if (get().accountId !== accountId) return;
+      if (get().conversationsError) set({ conversationsError: null });
       if ((get().working && !reconnect) || epoch !== submissionEpoch()) {
         set({
           conversationsLoading: false,
@@ -163,11 +195,19 @@ export function createLoadConversations(
           }),
         );
       }
-    } catch {
-      if (get().accountId === accountId)
-        set({
-          conversationsLoading: false,
-        });
+    } catch (error) {
+      if (get().accountId !== accountId) return;
+      if (!read) {
+        // Still loading, so the sidebar keeps its skeleton rather than showing no chats, until
+        // enough reads have failed to say so; it keeps trying behind the message.
+        retryLater(get, accountId, reconnect);
+        if (retryAttempt >= failuresShown)
+          set({ conversationsError: error instanceof Error ? error.message : String(error) });
+        return;
+      }
+      set({
+        conversationsLoading: false,
+      });
     }
   };
 }

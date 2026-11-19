@@ -153,7 +153,8 @@ export function startCursorOverlayLoop({
       // The caption shows on the display the person is looking at: the one with the pointer.
       const here = mouse.x >= 0 && mouse.y >= 0 && mouse.x < width && mouse.y < height;
       const line = here ? state.caption : undefined;
-      if (line && caption.current.textContent !== line.text) caption.current.textContent = line.text;
+      if (line && caption.current.textContent !== line.text)
+        caption.current.textContent = line.text;
       caption.current.toggleAttribute("data-hidden", !line);
       caption.current.toggleAttribute("data-tip", Boolean(line?.tip));
     }

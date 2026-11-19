@@ -179,8 +179,13 @@ describe("what a failed call tells the run", () => {
 describe("the tool list", () => {
   it("has every Space tool and none of the removed agent requests", () => {
     expect(Object.keys(spaceTools).sort()).toEqual([
+      "deck.apply",
+      "deck.create",
+      "deck.list",
+      "deck.read",
       "drawing.apply",
       "drawing.create",
+      "drawing.from_mermaid",
       "drawing.list",
       "drawing.read",
       "file.create",
@@ -188,11 +193,15 @@ describe("the tool list", () => {
       "file.read",
       "file.search",
       "file.update",
+      "file.upload",
+      "image.cutout",
       "image.edit",
       "image.read",
       "image.save",
+      "image.view",
       "item.delete",
       "item.rename",
+      "media.fetch",
       "message.search",
       "message.send",
       "note.create",
@@ -209,6 +218,18 @@ describe("the tool list", () => {
       "thread.list",
       "thread.post",
       "thread.read",
+      "video.analysis",
+      "video.duplicate",
+      "video.edit",
+      "video.export",
+      "video.frames",
+      "video.read",
+      "video.transcript",
+      "workbook.apply",
+      "workbook.create",
+      "workbook.import",
+      "workbook.list",
+      "workbook.read",
     ]);
   });
 });

@@ -1,5 +1,7 @@
 import { modelInk, screenMarkClass, sketchInk } from "@/shared/ui";
 import type { SketchElement, Vector3 } from "./companionSketch";
+import type * as ThreeModule from "three";
+import type { OrbitControls as OrbitControlsType } from "three/addons/controls/OrbitControls.js";
 
 /**
  * A drawing's 3D model (surface "model"), drawn with three.js, which loads with the first model.
@@ -19,11 +21,11 @@ const ARRIVE_MS = 450;
 /** How fast the model turns on its own, in radians a second. */
 const SPIN = 0.3;
 
-type Three = typeof import("three");
+type Three = typeof ThreeModule;
 
 interface Shown {
-  object: import("three").Object3D;
-  materials: import("three").MeshStandardMaterial[];
+  object: ThreeModule.Object3D;
+  materials: ThreeModule.MeshStandardMaterial[];
   label: HTMLDivElement | undefined;
   since: number;
 }
@@ -59,7 +61,7 @@ export async function createModelView(
   const target = new THREE.Vector3();
 
   const still = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
-  let controls: import("three/addons/controls/OrbitControls.js").OrbitControls | undefined;
+  let controls: OrbitControlsType | undefined;
   let touched = false;
   if (draggable) {
     const { OrbitControls } = await import("three/addons/controls/OrbitControls.js");
@@ -82,7 +84,10 @@ export async function createModelView(
       case "sphere":
         return { geometry: new THREE.SphereGeometry(0.5, 32, 16), scale: [w, h, d] as Vector3 };
       case "cylinder":
-        return { geometry: new THREE.CylinderGeometry(0.5, 0.5, 1, 32), scale: [w, h, d] as Vector3 };
+        return {
+          geometry: new THREE.CylinderGeometry(0.5, 0.5, 1, 32),
+          scale: [w, h, d] as Vector3,
+        };
       case "cone":
         return { geometry: new THREE.ConeGeometry(0.5, 1, 32), scale: [w, h, d] as Vector3 };
       case "torus":
@@ -101,7 +106,7 @@ export async function createModelView(
     }
   };
 
-  const outline = (geometry: import("three").BufferGeometry) =>
+  const outline = (geometry: ThreeModule.BufferGeometry) =>
     new THREE.LineSegments(
       new THREE.EdgesGeometry(geometry, 28),
       new THREE.LineBasicMaterial({ color: modelInk.edge, transparent: true, opacity: 0.7 }),
@@ -115,7 +120,7 @@ export async function createModelView(
       emissive: new THREE.Color(modelInk.glow),
       emissiveIntensity: 0,
     });
-    let object: import("three").Object3D;
+    let object: ThreeModule.Object3D;
     if (part.shape === "arrow" && part.ends) {
       // A shaft and a head from the tail to the head, for a force or a flow.
       const [tail, head] = part.ends.map((end) => new THREE.Vector3(...end));
@@ -123,7 +128,10 @@ export async function createModelView(
       const length = Math.max(0.05, direction.length());
       const tip = Math.min(length * 0.35, 0.45);
       const group = new THREE.Group();
-      const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, length - tip, 12), material);
+      const shaft = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.04, 0.04, length - tip, 12),
+        material,
+      );
       shaft.position.y = (length - tip) / 2;
       const point = new THREE.Mesh(new THREE.ConeGeometry(0.13, tip, 16), material);
       point.position.y = length - tip / 2;
@@ -170,7 +178,10 @@ export async function createModelView(
     const sphere = box.getBoundingSphere(new THREE.Sphere());
     target.copy(sphere.center);
     const distance = (Math.max(sphere.radius, 0.5) / Math.sin((camera.fov * Math.PI) / 360)) * 1.1;
-    const direction = camera.position.clone().sub(controls?.target ?? target).normalize();
+    const direction = camera.position
+      .clone()
+      .sub(controls?.target ?? target)
+      .normalize();
     if (direction.lengthSq() < 0.01) direction.set(0, 0.25, 1).normalize();
     camera.position.copy(target).addScaledVector(direction, distance);
     camera.near = Math.max(0.01, distance / 100);
@@ -234,9 +245,9 @@ export async function createModelView(
       resized.disconnect();
       controls?.dispose();
       model.traverse((object) => {
-        const mesh = object as import("three").Mesh;
+        const mesh = object as ThreeModule.Mesh;
         mesh.geometry?.dispose();
-        const material = mesh.material as import("three").Material | undefined;
+        const material = mesh.material as ThreeModule.Material | undefined;
         material?.dispose?.();
       });
       renderer.dispose();

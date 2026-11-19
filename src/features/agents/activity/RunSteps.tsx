@@ -9,6 +9,7 @@ import {
   PencilLine,
   Play,
   Plug,
+  ScrollText,
   Search,
   SquareTerminal,
   TriangleAlert,
@@ -109,6 +110,8 @@ export function RunSteps(props: {
   folder?: string;
   /** Show the pictures and playback; a compact list leaves them out. */
   pictures?: boolean;
+  /** Opens the run's browser log at a browser step's actions; browser steps get a way there. */
+  onOpenBrowserLog?: (callId: string) => void;
 }) {
   const showHidden = useShowHiddenSteps((state) => state.value);
   const described = useMemo(
@@ -193,13 +196,13 @@ export function RunSteps(props: {
                 data-step={step.seqs[0]}
                 data-hidden={step.hidden || undefined}
                 data-nested={step.nested || undefined}
-                className="data-[nested]:pl-3.5"
+                className="group/step flex min-w-0 items-center gap-0.5 data-[nested]:pl-3.5"
               >
                 <Pressable
                   type="button"
                   wash="control"
                   selected={selected}
-                  className={cn(rowShapeWrap, "w-full")}
+                  className={cn(rowShapeWrap, "min-w-0 flex-1")}
                   aria-current={selected ? "step" : undefined}
                   data-failed={step.failed || undefined}
                   data-running={step.running || undefined}
@@ -222,6 +225,22 @@ export function RunSteps(props: {
                   {step.seqs.length > 1 ? <Figure>×{step.seqs.length}</Figure> : null}
                   <Figure>{offsetLabel(step.at, props.startedAt)}</Figure>
                 </Pressable>
+                {/* A browser step points into the browser log, at what it did there. Shown on the
+                    row the pointer is on and on the chosen one. */}
+                {props.onOpenBrowserLog && step.browser && step.calls[0] ? (
+                  <IconButton
+                    label="Open in browser log"
+                    className={cn(
+                      "pointer-events-none opacity-0",
+                      "group-hover/step:pointer-events-auto group-hover/step:opacity-100",
+                      "focus-visible:pointer-events-auto focus-visible:opacity-100",
+                      selected && "pointer-events-auto opacity-100",
+                    )}
+                    onClick={() => props.onOpenBrowserLog?.(step.calls[0]!)}
+                  >
+                    <ScrollText aria-hidden="true" />
+                  </IconButton>
+                ) : null}
               </Text>
             );
           })}

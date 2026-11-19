@@ -11,6 +11,7 @@ export function createMistyPanelState(
   | "query"
   | "working"
   | "conversationsLoading"
+  | "conversationsError"
   | "error"
   | "context"
   | "conversations"
@@ -25,6 +26,7 @@ export function createMistyPanelState(
     query: "",
     working: false,
     conversationsLoading: false,
+    conversationsError: null,
     error: null,
     context: [],
     conversations: [],
@@ -37,6 +39,7 @@ export function createMistyPanelState(
         query: "",
         working: false,
         conversationsLoading: false,
+        conversationsError: null,
         error: null,
         context: [],
         conversations: [],

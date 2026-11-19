@@ -29,9 +29,9 @@ function notebook(sources: Partial<NotebookSource>[]): Notebook {
 }
 
 describe("research topics", () => {
-  it("each have questions and guidance", () => {
+  it("each have a hint and guidance", () => {
     for (const topic of notebookTopics) {
-      expect(topic.questions.length).toBeGreaterThan(0);
+      expect(topic.placeholder.trim()).not.toBe("");
       expect(topic.focus).not.toBe("");
     }
   });

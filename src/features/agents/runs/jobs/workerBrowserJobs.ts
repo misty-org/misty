@@ -19,6 +19,8 @@ export interface ClaimedWorkflowNodeJob {
     id: string;
     runId: string;
     nodeId: string;
+    /** The tool call the job belongs to (the engine's id for it), for the run's browser log. */
+    callId?: string;
     scopeId: string;
     operation: string;
     contextId?: string;

@@ -283,8 +283,13 @@ describe("native companion lifecycle", () => {
   });
 
   it("publishes native startup failures in Agents and retries through the page control", async () => {
-    mocks.invoke.mockImplementationOnce(async (name: string) => {
-      if (name === "cursor_companion_configure") throw new Error("Native overlay failed");
+    // The first native setup fails, whichever native call comes before it.
+    const native = mocks.invoke.getMockImplementation()!;
+    let failing = true;
+    mocks.invoke.mockImplementation((name, args) => {
+      if (name !== "cursor_companion_configure" || !failing) return native(name, args);
+      failing = false;
+      return Promise.reject(new Error("Native overlay failed"));
     });
     const view = render(<CursorCompanionController accountId="account" />);
     await waitFor(() =>
@@ -305,6 +310,7 @@ describe("native companion lifecycle", () => {
     expect(useCompanionState.getState().presentation.error).toBeUndefined();
     expect(useCompanionState.getState().presentation.enabled).toBe(true);
     view.unmount();
+    mocks.invoke.mockImplementation(native);
   });
   it("the Agents page shares Ask changes and interrupts a typed request first", async () => {
     const view = await mounted();

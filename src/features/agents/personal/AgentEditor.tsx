@@ -1,8 +1,6 @@
 import { personalAgentsApi } from "./personalAgentsApi";
 import { AgentPermissionsField } from "./AgentPermissionsField";
 import { AgentEngineField } from "../engines/AgentEngineField";
-import { mistyEngine } from "../engines/enginesApi";
-import { AgentFolderPicker } from "../context-panel/FolderPicker";
 import type { AgentProfile, AgentProfileInput } from "@/shared/schemas";
 import { Button, useNotice, Field, Input, Text, Textarea } from "@/shared/ui";
 import { Trash2 } from "lucide-react";
@@ -10,7 +8,6 @@ import { useEffect, useState } from "react";
 import { AgentAvatarPicker } from "./AgentAvatarPicker";
 import { AgentBotFields, ExportBotButton } from "../bots/AgentBotFields";
 import { AgentSpaceField } from "./AgentSpaceField";
-import { AgentVoiceField } from "../virtual/AgentVoiceField";
 
 const emptyProfile: AgentProfileInput = {
   name: "",
@@ -173,17 +170,8 @@ export function AgentEditor({
           onModel={(model) => update("engine_model", model)}
         />
       </span>
-      {/* Every chat with an agent on an outside engine works in its one folder. A saved agent
-          only: a new one gets its folder from its first run, or here once it exists. */}
-      {profile && draft.engine && draft.engine !== mistyEngine ? (
-        <Field label="Folder">
-          <AgentFolderPicker agent={{ ...profile, name: draft.name || profile.name }} />
-        </Field>
-      ) : null}
       {/* The one Space it works and saves in. A new agent gets the window's. */}
       {profile ? <AgentSpaceField agent={profile} /> : null}
-      {/* How it sounds when it answers aloud in the studio. */}
-      {profile ? <AgentVoiceField agent={profile} /> : null}
       <span data-tour="agent-permissions" className="contents">
         <AgentPermissionsField
           engine={draft.engine}
@@ -210,7 +198,7 @@ export function AgentEditor({
       </details>
       <div className="flex flex-wrap gap-3 empty:hidden">
         {(!profile || dirty) && (
-          <Button loading={busy} disabled={!draft.name.trim()} type="submit">
+          <Button disabled={!draft.name.trim() || busy} type="submit">
             {profile ? "Save changes" : "Create agent"}
           </Button>
         )}

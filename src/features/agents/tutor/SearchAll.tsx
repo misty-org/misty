@@ -5,15 +5,23 @@ import type { TutorActions } from "./TutorPage";
 import { searchNotebooks, type SearchHit } from "./tutorSearch";
 import { useTutorStore } from "./tutorStore";
 
+/** What the Lab's search found: undefined while the first answer is on its way. */
+export interface NotebookSearch {
+  query: string;
+  setQuery(value: string): void;
+  /** Three letters or more: the page shows results in place of its notebooks. */
+  searching: boolean;
+  result?: { hits: SearchHit[]; byMeaning: boolean };
+}
+
 /**
- * One search box for every notebook, matching words. A result opens its notebook.
+ * Searches every notebook's words as the person types. A typed search keeps its last answer on
+ * screen until the next one arrives; only the first search shows placeholders.
  */
-export function SearchAll({ actions }: { actions: TutorActions }) {
-  const notebooks = useTutorStore((state) => state.notebooks);
+export function useNotebookSearch(): NotebookSearch {
   const [query, setQuery] = useState("");
-  // A typed search keeps its last answer on screen until the next one arrives; only the first
-  // search shows placeholders.
-  const [result, setResult] = useState<{ hits: SearchHit[]; byMeaning: boolean }>();
+  const [result, setResult] = useState<NotebookSearch["result"]>();
+  const searching = query.trim().length >= 3;
   useEffect(() => {
     const text = query.trim();
     if (text.length < 3) {
@@ -32,84 +40,92 @@ export function SearchAll({ actions }: { actions: TutorActions }) {
       controller.abort();
     };
   }, [query]);
+  return { query, setQuery, searching, result };
+}
+
+/** The Lab bar's search field. Its results show in the page itself, never in a popup. */
+export function SearchAll({ search }: { search: NotebookSearch }) {
   return (
-    // It sits in the Lab's bar, and its results drop under it.
-    <div className="relative w-56 min-w-0">
-      <SearchField
-        containerClassName="w-full"
-        aria-label="Search notebooks"
-        placeholder="Search notebooks"
-        value={query}
-        onChange={(event) => setQuery(event.target.value)}
-      />
-      {query.trim().length >= 3 ? (
+    <SearchField
+      containerClassName="w-56"
+      aria-label="Search notebooks"
+      placeholder="Search notebooks"
+      value={search.query}
+      onChange={(event) => search.setQuery(event.target.value)}
+    />
+  );
+}
+
+/** What the search found, in the page where the notebooks were: each opens its notebook. */
+export function NotebookSearchResults({
+  search,
+  actions,
+}: {
+  search: NotebookSearch;
+  actions: TutorActions;
+}) {
+  const notebooks = useTutorStore((state) => state.notebooks);
+  const result = search.result;
+  if (!result) {
+    // A result's own shape: its icon, title and notebook, then two lines of snippet.
+    return (
+      <div className="flex flex-col gap-0.5" aria-busy="true">
+        {[0, 1, 2].map((index) => (
+          <div key={index} className="flex flex-col items-stretch gap-1 px-2.5 py-2" aria-hidden>
+            <span className="flex min-w-0 items-center gap-2">
+              <Skeleton className="size-4 shrink-0 rounded-sm" />
+              <span className="flex h-4.5 items-center">
+                <Skeleton className={index % 2 ? "h-3 w-32" : "h-3 w-44"} />
+              </span>
+              <Skeleton className="h-2.5 w-20 shrink-0" />
+            </span>
+            <span className="grid">
+              <span className="flex h-4 items-center">
+                <Skeleton className="h-2.5 w-full" />
+              </span>
+              <span className="flex h-4 items-center">
+                <Skeleton className="h-2.5 w-3/4" />
+              </span>
+            </span>
+          </div>
+        ))}
+      </div>
+    );
+  }
+  if (!result.hits.length) {
+    return (
+      <Text as="p" size="meta" tone="muted" wrap className="py-6 text-center">
+        Nothing found.
+      </Text>
+    );
+  }
+  return (
+    <div className="flex flex-col gap-0.5" role="list" aria-label="Results">
+      {result.hits.map((hit) => (
         <Surface
-          tone="card"
-          edge="hairline"
-          radius="xl"
-          raised
-          className="absolute top-full right-0 z-[var(--stack-sticky)] mt-1.5 w-90 max-w-[calc(100vw-2rem)] flex max-h-105 flex-col gap-0.5 overflow-auto p-1.5"
-          role="listbox"
-          aria-label="Results"
+          as={Pressable}
+          key={`${hit.notebookId}:${hit.itemId}`}
+          tone="none"
+          radius="lg"
+          wash="control"
+          role="listitem"
+          className="flex flex-col items-stretch gap-1 px-2.5 py-2 text-left"
+          onClick={() => actions.open(`notebook:${hit.notebookId}`)}
         >
-          {!result ? (
-            // A result's own shape: its icon, title and notebook, then two lines of snippet.
-            [0, 1, 2].map((index) => (
-              <div
-                key={index}
-                className="flex flex-col items-stretch gap-1 px-2.5 py-2"
-                aria-hidden="true"
-              >
-                <span className="flex min-w-0 items-center gap-2">
-                  <Skeleton className="size-4 shrink-0 rounded-sm" />
-                  <span className="flex h-4.5 items-center">
-                    <Skeleton className={index % 2 ? "h-3 w-32" : "h-3 w-44"} />
-                  </span>
-                  <Skeleton className="h-2.5 w-20 shrink-0" />
-                </span>
-                <span className="grid">
-                  <span className="flex h-4 items-center">
-                    <Skeleton className="h-2.5 w-full" />
-                  </span>
-                  <span className="flex h-4 items-center">
-                    <Skeleton className="h-2.5 w-3/4" />
-                  </span>
-                </span>
-              </div>
-            ))
-          ) : result?.hits.length ? (
-            result.hits.map((hit) => (
-              <Surface
-                as={Pressable}
-                key={`${hit.notebookId}:${hit.itemId}`}
-                tone="none"
-                radius="lg"
-                wash="control"
-                role="option"
-                className="flex flex-col items-stretch gap-1 px-2.5 py-2 text-left"
-                onClick={() => actions.open(`notebook:${hit.notebookId}`)}
-              >
-                <Text bare size="meta" tone="default" className="flex min-w-0 items-center gap-2">
-                  <Text bare tone="muted" className="flex flex-none">
-                    {hit.kind === "note" ? <StickyNote /> : <FileText />}
-                  </Text>
-                  <OverflowFadeText>{hit.title}</OverflowFadeText>
-                  <Text size="caption" tone="muted" className="flex-none">
-                    {notebooks[hit.notebookId]?.title}
-                  </Text>
-                </Text>
-                <Text size="caption" tone="muted" lines={2}>
-                  {hit.text.slice(0, 220)}
-                </Text>
-              </Surface>
-            ))
-          ) : (
-            <Text as="p" size="meta" tone="muted" wrap className="px-0.5 py-4.5">
-              Nothing found.
+          <Text bare size="meta" tone="default" className="flex min-w-0 items-center gap-2">
+            <Text bare tone="muted" className="flex flex-none">
+              {hit.kind === "note" ? <StickyNote /> : <FileText />}
             </Text>
-          )}
+            <OverflowFadeText>{hit.title}</OverflowFadeText>
+            <Text size="caption" tone="muted" className="flex-none">
+              {notebooks[hit.notebookId]?.title}
+            </Text>
+          </Text>
+          <Text size="caption" tone="muted" lines={2}>
+            {hit.text.slice(0, 220)}
+          </Text>
         </Surface>
-      ) : null}
+      ))}
     </div>
   );
 }

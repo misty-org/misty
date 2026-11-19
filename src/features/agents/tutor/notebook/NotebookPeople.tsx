@@ -58,6 +58,8 @@ export function lastActivity(
     })),
     ...outputs.map((output) => ({
       by: output.by ?? "",
+      // Made by the person themselves; an agent's own work is a source or a note.
+      agent: undefined,
       kind: "made" as const,
       title: output.title,
       at: output.createdAt,

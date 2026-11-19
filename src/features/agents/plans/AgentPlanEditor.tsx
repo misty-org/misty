@@ -153,7 +153,7 @@ export function AgentPlanEditor({
       </Button>
       <ErrorNotice message={error} onDismiss={() => setError("")} />
       <div className="flex items-center gap-1.5">
-        <Button variant="primary" disabled={!valid} loading={busy} onClick={() => void save()}>
+        <Button variant="primary" disabled={!valid || busy} onClick={() => void save()}>
           Save as new version
         </Button>
         <Button variant="quiet" disabled={busy} onClick={onCancel}>

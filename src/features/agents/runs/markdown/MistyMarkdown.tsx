@@ -1,6 +1,6 @@
 import "katex/dist/katex.min.css";
 import "./mistyMarkdown.css";
-import { Button, IconButton, Skeleton } from "@/shared/ui";
+import { Button, IconButton, lazyTool, ToolSuspense } from "@/shared/ui";
 import {
   Check,
   CircleAlert,
@@ -13,10 +13,8 @@ import {
 } from "lucide-react";
 import {
   isValidElement,
-  lazy,
   memo,
   startTransition,
-  Suspense,
   useEffect,
   useMemo,
   useRef,
@@ -39,7 +37,7 @@ import type { StreamReveal } from "./streaming/streamReveal";
 import { useLiveReveal } from "./streaming/useLiveReveal";
 
 // Drawings are rare and their renderer is large: it loads when the first one appears.
-const SketchBlock = lazy(() =>
+const SketchBlock = lazyTool(() =>
   import("@/features/agents/tutor/cursor/SketchBlock").then(({ SketchBlock }) => ({
     default: SketchBlock,
   })),
@@ -98,14 +96,6 @@ const remarkPlugins: ComponentProps<typeof ReactMarkdown>["remarkPlugins"] = [
 ];
 type PluginList = NonNullable<ComponentProps<typeof ReactMarkdown>["rehypePlugins"]>;
 
-/** A drawing while its code loads: the board at its size, then its button row. */
-const sketchSkeleton = (
-  <div className="my-3 grid gap-2" aria-hidden="true">
-    <Skeleton className="h-70 w-full rounded-xl" />
-    <Skeleton className="h-8 w-36 rounded-md" />
-  </div>
-);
-
 /** The components every reply shares; the streaming ones are added per message. */
 const baseComponents: Components = {
   pre: ({ node, children }) => {
@@ -120,9 +110,13 @@ const baseComponents: Components = {
     // A companion drawing (companionSketch.ts) shows as the drawing, not its source.
     if (language === "misty-sketch")
       return (
-        <Suspense fallback={sketchSkeleton}>
+        <ToolSuspense
+          tool="sketch"
+          label="Drawing the sketch"
+          frame={(state) => <div className="my-3 h-70">{state}</div>}
+        >
           <SketchBlock source={hastText(code)} />
-        </Suspense>
+        </ToolSuspense>
       );
     return <CodeBlock language={language}>{children}</CodeBlock>;
   },

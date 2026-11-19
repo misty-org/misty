@@ -7,7 +7,6 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, beforeEach, vi } from "vitest";
 import { MemoryRouter, useLocation, useNavigate, type NavigateFunction } from "react-router-dom";
 import { useMistyStore } from "@/features/agents/conversations/state/useMistyStore";
-import { Button } from "@/shared/ui";
 import AgentsPage from "./AgentsPage";
 
 const fixture = vi.hoisted(() => ({
@@ -73,21 +72,8 @@ vi.mock("@/features/agents/personal/personalAgentsApi", () => ({
   },
 }));
 vi.mock("@/features/agents/conversations/ask/handoff", () => ({ openMisty: async () => {} }));
-// The room itself is three.js; the page only needs each agent's card and its settings button.
-vi.mock("../virtual/VirtualStudio", () => ({
-  VirtualStudio: (props: { onAgentSettings(agentId: string): void }) => (
-    <div>
-      {[
-        fixture.agent,
-        ...(fixture.includeSecond ? [{ id: "research", name: "Research" }] : []),
-      ].map((agent) => (
-        <Button key={agent.id} onClick={() => props.onAgentSettings(agent.id)}>
-          {`${agent.name} settings`}
-        </Button>
-      ))}
-    </div>
-  ),
-}));
+// The Code page is its own editor; these tests only need to tell which page shows.
+vi.mock("../code/CodePage", () => ({ CodePage: () => <div>Code page</div> }));
 
 beforeEach(() => {
   fixture.includeSecond = false;
@@ -132,7 +118,7 @@ export function renderAgentsPage(entry = "/agents") {
 }
 
 /** Follows a link to the page, as the window's sidebar does. */
-export function openPage(page: "studio" | "lab") {
+export function openPage(page: "lab" | "code") {
   act(() => void navigateTo?.(`/agents?view=${page}`));
 }
 
@@ -143,10 +129,16 @@ export function openChat(agentId = "communications", conversationId?: string) {
   act(() => void navigateTo?.(`/agents?${params}`));
 }
 
-/** An agent's settings open from its card in the Studio, never from the chat. */
+/**
+ * An agent's settings open by a link that keeps the page where it is and names the agent, never
+ * from the chat.
+ */
 export function openAgentSettings(agent = "Communications") {
-  openPage("studio");
-  fireEvent.click(screen.getByRole("button", { name: `${agent} settings` }));
+  const id = agent === "Research" ? "research" : fixture.agent.id;
+  const [path, query = ""] = location.split("?");
+  const params = new URLSearchParams(query);
+  params.set("agentSettings", id);
+  act(() => void navigateTo?.(`${path}?${params}`));
 }
 
 /** Opens the ⋯ menu in the conversation header (Recents has its own) and chooses an action. */

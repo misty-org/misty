@@ -7,6 +7,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuTrigger,
+  ErrorState,
   IconButton,
   MenuItem,
   SearchField,
@@ -73,25 +74,30 @@ export function DirectApps({ limit, find = "" }: { limit?: number; find?: string
   } | null>(null);
   const extra = more?.term === term && firstPage.data ? more : null;
   const catalog = useMemo(() => {
-    if (!page) return firstPage.error ? [] : null;
+    if (!page) return null;
     if (!extra) return page.apps;
     const known = new Set(page.apps.map((app) => app.url));
     return [...page.apps, ...extra.apps.filter((app) => !known.has(app.url))];
-  }, [page, extra, firstPage.error]);
+  }, [page, extra]);
   const total = extra?.total ?? page?.total ?? 0;
   const [loadingMore, setLoadingMore] = useState(false);
   const [access, setAccess] = useState<Record<string, DirectAccess>>({});
-  const connections = connectionsList.data ?? (connectionsList.error ? [] : null);
+  const connections = connectionsList.data ?? null;
   const [pending, setPending] = useState<{ url: string; name: string } | null>(null);
   const [opened, setOpened] = useState(false);
-  const [actionError, setError] = useState("");
-  // A list that never came says so; one on screen stays beside a failed refresh.
-  const error =
-    actionError ||
-    (connectionsList.error && !connectionsList.data
+  const [error, setError] = useState("");
+  // A list that never came says so in its place; one on screen stays beside a failed refresh.
+  const loadError =
+    (!connectionsList.data && !connectionsList.loading && connectionsList.error
       ? message(connectionsList.error, "Connected apps could not be loaded.")
       : "") ||
-    (firstPage.error && !page ? message(firstPage.error, "The app list could not be loaded.") : "");
+    (!page && !firstPage.loading && firstPage.error
+      ? message(firstPage.error, "The app list could not be loaded.")
+      : "");
+  const retryLoad = () => {
+    if (!connectionsList.data) void connectionsList.reload();
+    if (!page) void firstPage.reload();
+  };
   const loadConnections = connectionsList.reload;
 
   // The shipped apps loaded so far: the next page starts after them.
@@ -210,69 +216,78 @@ export function DirectApps({ limit, find = "" }: { limit?: number; find?: string
           Finish signing in to {pending.name} in your browser, then come back here.
         </Text>
       ) : null}
-      <ul
-        aria-label="Apps"
-        aria-busy={loading || checking > 0}
-        className="grid grid-cols-2 gap-x-4 gap-y-0.5"
-      >
-        {own.map((connection) => (
-          <li key={connection.id} className={tileClass}>
-            <AppTileLogo
-              app={connection.app}
-              name={connection.name}
-              icon={byUrl.get(connection.url)?.icon}
-            />
-            <Text as="p" full tone="bright" className="min-w-0 flex-1 text-sm font-medium">
-              {connection.name}
-            </Text>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <IconButton label={`${connection.name} connected`}>
-                  <Check />
-                </IconButton>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <MenuItem
-                  icon={Unplug}
-                  label="Disconnect"
-                  onSelect={() => void disconnect(connection)}
-                />
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </li>
-        ))}
-        {shown.map((app) => (
-          <Tooltip key={app.url} content={app.description ?? ""}>
-            <li className={tileClass}>
-              <AppTileLogo app={app.app} name={app.name} icon={app.icon} />
+      {loadError ? (
+        <ErrorState
+          inline
+          title="Apps couldn't load"
+          line={loadError}
+          action={{ label: "Try again", variant: "secondary", onClick: retryLoad }}
+        />
+      ) : (
+        <ul
+          aria-label="Apps"
+          aria-busy={loading || checking > 0}
+          className="grid grid-cols-2 gap-x-4 gap-y-0.5"
+        >
+          {own.map((connection) => (
+            <li key={connection.id} className={tileClass}>
+              <AppTileLogo
+                app={connection.app}
+                name={connection.name}
+                icon={byUrl.get(connection.url)?.icon}
+              />
               <Text as="p" full tone="bright" className="min-w-0 flex-1 text-sm font-medium">
-                {app.name}
+                {connection.name}
               </Text>
-              <IconButton
-                label={`Connect ${app.name}`}
-                disabled={pending?.url === app.url}
-                onClick={() => void connect(app)}
-              >
-                <Plus />
-              </IconButton>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <IconButton label={`${connection.name} connected`}>
+                    <Check />
+                  </IconButton>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <MenuItem
+                    icon={Unplug}
+                    label="Disconnect"
+                    onSelect={() => void disconnect(connection)}
+                  />
+                </DropdownMenuContent>
+              </DropdownMenu>
             </li>
-          </Tooltip>
-        ))}
-        {loading || checking > 0 || loadingMore
-          ? Array.from(
-              { length: loading ? 6 : loadingMore ? 4 : Math.min(checking, 4) },
-              (_, index) => (
-                <li key={`skeleton-${index}`} className={tileClass} aria-hidden="true">
-                  <Skeleton className="size-7 shrink-0 rounded-md" />
-                  <div className="min-w-0 flex-1">
-                    <Skeleton className="h-3 w-1/2" />
-                  </div>
-                  <SkeletonControl kind="icon" />
-                </li>
-              ),
-            )
-          : null}
-      </ul>
+          ))}
+          {shown.map((app) => (
+            <Tooltip key={app.url} content={app.description ?? ""}>
+              <li className={tileClass}>
+                <AppTileLogo app={app.app} name={app.name} icon={app.icon} />
+                <Text as="p" full tone="bright" className="min-w-0 flex-1 text-sm font-medium">
+                  {app.name}
+                </Text>
+                <IconButton
+                  label={`Connect ${app.name}`}
+                  disabled={pending?.url === app.url}
+                  onClick={() => void connect(app)}
+                >
+                  <Plus />
+                </IconButton>
+              </li>
+            </Tooltip>
+          ))}
+          {loading || checking > 0 || loadingMore
+            ? Array.from(
+                { length: loading ? 6 : loadingMore ? 4 : Math.min(checking, 4) },
+                (_, index) => (
+                  <li key={`skeleton-${index}`} className={tileClass} aria-hidden="true">
+                    <Skeleton className="size-7 shrink-0 rounded-md" />
+                    <div className="min-w-0 flex-1">
+                      <Skeleton className="h-3 w-1/2" />
+                    </div>
+                    <SkeletonControl kind="icon" />
+                  </li>
+                ),
+              )
+            : null}
+        </ul>
+      )}
       {!loading && !checking && !own.length && !offered.length ? (
         <Text bare as="p" tone="muted" className="text-sm">
           No app by that name takes a direct sign-in yet.

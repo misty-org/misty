@@ -13,7 +13,7 @@ import {
 } from "@/shared/ui";
 import { shortAgo } from "../page/useChatStatuses";
 import { spacesGateway } from "../spaces-gateway/spacesGateway";
-import { useTeamMembers } from "../virtual/teamMembers";
+import { useTeamMembers } from "../now/teamMembers";
 import { usePersonalAgentsStore } from "../personal/personalAgentsStore";
 import { agentsAtWork, workWords } from "./notebookAgents";
 import { hold, release, useOthersMaking } from "./notebookLive";
@@ -159,8 +159,7 @@ function WorkedOn({ spaceId, people }: { spaceId?: string; people: string[] }) {
   return (
     <span className="ml-auto flex flex-none items-center -space-x-1">
       {people.slice(0, 3).map((userId) => {
-        const name =
-          userId === self?.userId ? self.name : gateway.memberName(spaceId, userId);
+        const name = userId === self?.userId ? self.name : gateway.memberName(spaceId, userId);
         return (
           <Tooltip key={userId} content={name}>
             <span className="inline-flex">
