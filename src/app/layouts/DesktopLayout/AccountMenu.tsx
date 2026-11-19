@@ -113,7 +113,11 @@ function AccountMenuItems(props: {
   const openWebsite = (path: string) => {
     props.onClose();
     void openOnWebsite(path).catch((error: unknown) => {
-      reportSystemError({ scope: "account:plan", title: "Plan and billing could not be opened", error });
+      reportSystemError({
+        scope: "account:plan",
+        title: "Plan and billing could not be opened",
+        error,
+      });
     });
   };
 
@@ -147,7 +151,10 @@ function AccountMenuItems(props: {
       />
       {cloud ? (
         <MenuSubmenu icon={<CreditCard />} label="Plan and billing">
-          <MenuItem label="Get Misty+ monthly" onSelect={() => openWebsite("/pricing?checkout=plus")} />
+          <MenuItem
+            label="Get Misty+ monthly"
+            onSelect={() => openWebsite("/pricing?checkout=plus")}
+          />
           <MenuItem
             label="Get Misty+ yearly"
             onSelect={() => openWebsite("/pricing?checkout=plus_yearly")}

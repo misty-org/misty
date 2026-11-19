@@ -1,7 +1,6 @@
-import { Armchair, Bot, Plus, Search, type LucideIcon } from "lucide-react";
+import { CodeXml, Plus, Search, type LucideIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  openAgentsHub,
   useChatStatuses,
   useAgentAccountId,
   useChatSectionsStore,
@@ -10,14 +9,28 @@ import {
   tutorChatIds,
   useTutorStore,
   usePersonalAgentsStore,
+  useProjectChats,
 } from "@/features/agents";
 import { dockLeaves, useWorkspaceStore, type WorkspaceView } from "@/features/app-windows";
 import { useWindowSpace } from "@/features/spaces";
-import { cn, CustomizableBar, NavGroupHeading, NavRow, Skeleton, spaceIcons } from "@/shared/ui";
+import {
+  cn,
+  CustomizableBar,
+  ErrorState,
+  NavGroupHeading,
+  NavRow,
+  Skeleton,
+  spaceIcons,
+} from "@/shared/ui";
 import { SidebarChats } from "./SidebarChats";
 import { SidebarMore, type SidebarPlace } from "./SidebarPins";
 import { SidebarRow as Row } from "./SidebarRow";
-import { sidebarPinDefaults, useSidebarPins, type SidebarPlaceId } from "./sidebarPinsStore";
+import {
+  sidebarPinDefaults,
+  spacePageSections,
+  useSidebarPins,
+  type SidebarPlaceId,
+} from "./sidebarPinsStore";
 import { chatSectionClass, markSlotClass } from "./styles";
 import { useSearchDialog } from "./search/searchStore";
 import {
@@ -27,13 +40,21 @@ import {
   openWorkspaceRouteIn,
 } from "./spaceNavigation";
 
-/** The sidebar's places: search, the Agents window (picking and setting up agents, their CLIs
- * and everything they can use), the window's Space, the agents' studio and the person's Lab. */
+/** The sidebar's places, Misty's main ones: search, the window's Space and Code, the editor for
+ * the Space's folder. Agents are set up in Settings. */
 const placeNames: Record<SidebarPlaceId, { label: string; icon: LucideIcon }> = {
   search: { label: "Search", icon: Search },
-  agents: { label: "Agents", icon: Bot },
   space: { label: "Space", icon: spaceIcons.space },
-  studio: { label: "Studio", icon: Armchair },
+  code: { label: "Code", icon: CodeXml },
+  chat: { label: "Space chat", icon: spaceIcons.chat },
+  docs: { label: "Docs", icon: spaceIcons.docs },
+  slides: { label: "Slides", icon: spaceIcons.slides },
+  data: { label: "Data", icon: spaceIcons.data },
+  whiteboards: { label: "Whiteboards", icon: spaceIcons.whiteboards },
+  lab: { label: "Lab", icon: spaceIcons.lab },
+  planner: { label: "Planner", icon: spaceIcons.planner },
+  calendar: { label: "Calendar", icon: spaceIcons.calendar },
+  media: { label: "Media", icon: spaceIcons.media },
 };
 
 /** The route of the page the person is looking at: the focused pane's open view. */
@@ -96,6 +117,7 @@ export function SpaceNavigator({ onOpen }: { onOpen(view: WorkspaceView): void }
   const agents = usePersonalAgentsStore((state) => state.agents);
   const conversations = useMistyStore((state) => state.conversations);
   const conversationsLoading = useMistyStore((state) => state.conversationsLoading);
+  const conversationsError = useMistyStore((state) => state.conversationsError);
   // The account whose chats have been read once, so the skeleton covers only the first read: a
   // later reload keeps the list on screen.
   const [chatsReadFor, setChatsReadFor] = useState<string | null>(null);
@@ -104,6 +126,8 @@ export function SpaceNavigator({ onOpen }: { onOpen(view: WorkspaceView): void }
   const tutorNotebooks = useTutorStore((state) => state.notebooks);
   const route = useFocusedRoute();
   const statuses = useChatStatuses();
+  // Chats that work in a project are Code's: the Code page lists them, by project.
+  const projectChats = useProjectChats();
   useEffect(() => {
     void usePersonalAgentsStore.getState().load(accountId);
     void useLessonStore.getState().load(accountId);
@@ -120,7 +144,8 @@ export function SpaceNavigator({ onOpen }: { onOpen(view: WorkspaceView): void }
       .finally(() => setChatsReadFor(accountId));
   }, [accountId]);
   const chatsPending =
-    !conversations.length && (conversationsLoading || chatsReadFor !== accountId);
+    (!conversations.length && (conversationsLoading || chatsReadFor !== accountId)) ||
+    projectChats === null;
 
   const chats = useMemo(() => {
     const made = tutorChatIds(tutorJobs, tutorNotebooks);
@@ -131,12 +156,13 @@ export function SpaceNavigator({ onOpen }: { onOpen(view: WorkspaceView): void }
           (chat) =>
             chat.messages.length > 0 &&
             chat.place !== "studio" &&
+            !projectChats?.[chat.id] &&
             !lessons[chat.id] &&
             !made.has(chat.id),
         )
         .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
     );
-  }, [conversations, lessons, tutorJobs, tutorNotebooks]);
+  }, [conversations, projectChats, lessons, tutorJobs, tutorNotebooks]);
   // Stable while the agents are, so the sidebar groups chats by agent only when something changed.
   const agentOf = useCallback(
     (agentId?: string) =>
@@ -150,12 +176,25 @@ export function SpaceNavigator({ onOpen }: { onOpen(view: WorkspaceView): void }
   const openChat = path === "/agents" && !view ? params.get("conversation") : null;
   const base = space ? `/spaces/${encodeURIComponent(space.id)}` : "";
   const open = (target: string) => openWorkspaceRoute(target, onOpen);
-  // Search and Agents open windows over the page, not pages of their own.
-  type Page = Exclude<SidebarPlaceId, "search" | "agents">;
-  const isPage = (id: SidebarPlaceId): id is Page => id !== "search" && id !== "agents";
-  const current = (id: Page) =>
-    id === "space" ? Boolean(base) && (path === base || path.startsWith(`${base}/`)) : view === id;
-  const target = (id: Page) => (id === "space" ? base : `/agents?view=${id}`);
+  // Search opens a window over the page, not a page of its own.
+  type Page = Exclude<SidebarPlaceId, "search">;
+  const isPage = (id: SidebarPlaceId): id is Page => id !== "search";
+  const current = (id: Page) => {
+    const section = spacePageSections[id];
+    if (section) return Boolean(base) && path.startsWith(`${base}/${section}`);
+    if (id !== "space") return view === id;
+    // The Space's row is lit for its pages that have no row of their own pinned.
+    const pinnedPage = Object.entries(spacePageSections).some(
+      ([place, page]) =>
+        pinned.includes(place as SidebarPlaceId) && path.startsWith(`${base}/${page}`),
+    );
+    return Boolean(base) && (path === base || path.startsWith(`${base}/`)) && !pinnedPage;
+  };
+  const target = (id: Page) => {
+    const section = spacePageSections[id];
+    if (section) return `${base}/${section}`;
+    return id === "space" ? base : `/agents?view=${id}`;
+  };
   const order = useSidebarPins((state) => state.order);
   const pinned = useSidebarPins((state) => state.pinned);
   useEffect(() => void useSidebarPins.getState().load(), []);
@@ -165,12 +204,7 @@ export function SpaceNavigator({ onOpen }: { onOpen(view: WorkspaceView): void }
       {
         ...placeNames[id],
         current: isPage(id) && current(id),
-        open: () =>
-          isPage(id)
-            ? open(target(id))
-            : id === "search"
-              ? useSearchDialog.getState().setOpen(true)
-              : openAgentsHub(),
+        open: () => (isPage(id) ? open(target(id)) : useSearchDialog.getState().setOpen(true)),
       },
     ]),
   ) as Record<SidebarPlaceId, SidebarPlace>;
@@ -241,7 +275,19 @@ export function SpaceNavigator({ onOpen }: { onOpen(view: WorkspaceView): void }
         aria-label="Chats"
         data-misty-window-drag-block="true"
       >
-        {chatsPending ? (
+        {conversationsError && !conversations.length ? (
+          // The reads go on behind this; the first that works brings the list.
+          <ErrorState
+            inline
+            title="Chats couldn't load"
+            line={conversationsError}
+            action={{
+              label: "Try again",
+              variant: "secondary",
+              onClick: () => void useMistyStore.getState().loadConversations(),
+            }}
+          />
+        ) : chatsPending ? (
           <ChatSkeletons />
         ) : (
           // With no chats yet, the list still shows its "Chats" heading.
@@ -254,6 +300,7 @@ export function SpaceNavigator({ onOpen }: { onOpen(view: WorkspaceView): void }
             onOpenIn={(agent, chatId, place) =>
               openWorkspaceRouteIn(agentChatRoute(agent.id, chatId), place, onOpen)
             }
+            dragRoute={(agent, chatId) => agentChatRoute(agent.id, chatId)}
             onOpenGone={() => openNewChat(onOpen)}
           />
         )}

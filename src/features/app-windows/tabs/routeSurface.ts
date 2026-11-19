@@ -35,21 +35,7 @@ export function workspaceSurfaceFromRoute(pathname: string): OpenWorkspaceSurfac
     return request(
       "space",
       spaceId ? `space:${spaceId}:${tool}` : "tool:space",
-      tool === "social"
-        ? "Chat"
-        : tool === "journal"
-          ? "Docs"
-          : tool === "planner"
-            ? "Planner"
-            : tool === "calendar"
-              ? "Calendar"
-              : tool === "library"
-                ? "Library"
-                : tool === "lab"
-                  ? "Lab"
-                  : spaceId
-                    ? "Space"
-                    : "Spaces",
+      tool === "space" && !spaceId ? "Spaces" : spaceToolTitles[tool],
       pathname,
       spaceId ? `${spaceId}:${tool}` : "spaces",
       "single",
@@ -69,12 +55,29 @@ export function workspaceSurfaceFromRoute(pathname: string): OpenWorkspaceSurfac
 
 type SpaceWorkspaceTool =
   | "journal"
+  | "slides"
+  | "data"
+  | "whiteboards"
   | "social"
   | "planner"
   | "calendar"
-  | "library"
+  | "media"
   | "lab"
   | "space";
+
+/** A Space tab's name, by the tool it shows. */
+const spaceToolTitles: Record<SpaceWorkspaceTool, string> = {
+  journal: "Docs",
+  slides: "Slides",
+  data: "Data",
+  whiteboards: "Whiteboards",
+  social: "Chat",
+  planner: "Planner",
+  calendar: "Calendar",
+  media: "Media",
+  lab: "Lab",
+  space: "Space",
+};
 
 export function spaceWorkspaceToolFromRoute(pathname: string): SpaceWorkspaceTool {
   return spaceToolFromSection(pathname.split(/[?#]/)[0].split("/").filter(Boolean)[2]);
@@ -102,14 +105,13 @@ function request(
 /** Which of a Space's tabs a section opens in. Home is the bare Space (its gallery); it never
  * shares Chat's tab, or opening one would swap the other's page under the wrong name. */
 function spaceToolFromSection(section: string | undefined): SpaceWorkspaceTool {
-  if (section === "notes" || section === "drawings") return "journal";
+  // Docs, Slides, Data and Whiteboards are pages of their own, each in its own tab.
+  if (section === "notes") return "journal";
+  if (section === "slides" || section === "data") return section;
+  if (section === "drawings") return "whiteboards";
   if (section === "chat" || section === "social") return "social";
-  if (
-    section === "planner" ||
-    section === "calendar" ||
-    section === "library" ||
-    section === "lab"
-  )
-    return section;
+  // The Library became Media; a tab saved under the old name opens Media.
+  if (section === "media" || section === "library" || section === "files") return "media";
+  if (section === "planner" || section === "calendar" || section === "lab") return section;
   return "space";
 }

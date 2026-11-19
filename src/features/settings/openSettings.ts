@@ -1,3 +1,4 @@
+import { create } from "zustand";
 import type { SettingsSection } from "./settingsTypes";
 
 export const openSettingsEvent = "misty:open-settings";
@@ -15,3 +16,6 @@ export function openSettings(section?: SettingsSection, focus?: string) {
     new CustomEvent<OpenSettingsDetail>(openSettingsEvent, { detail: { section, focus } }),
   );
 }
+
+/** Whether the Settings overlay is open in this window; the window's layout keeps it current. */
+export const useSettingsOpen = create<{ open: boolean }>(() => ({ open: false }));

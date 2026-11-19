@@ -9,12 +9,9 @@
 use tauri::{plugin::TauriPlugin, Manager, Runtime};
 use url::Url;
 
-/// Webviews that host remote websites and enforce their own `on_navigation`: browser pages, and
-/// the studio's music player, which keeps to its service's sites (`browser/studio_music.rs`).
+/// Webviews that host remote websites and enforce their own `on_navigation`: browser pages.
 pub(crate) fn hosts_websites(label: &str) -> bool {
-    label.starts_with("misty-browser-")
-        || label == "render-control"
-        || label == crate::browser::studio_music::LABEL
+    label.starts_with("misty-browser-") || label == "render-control"
 }
 
 /// Whether a privileged webview may navigate to `url`. `dev_origin` is the

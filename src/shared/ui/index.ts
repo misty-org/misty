@@ -74,6 +74,7 @@ export * from "./layout/SidePanel";
 export * from "./layout/PageStage";
 export * from "./layout/IconBarItem";
 export * from "./layout/ScrollArea";
+export * from "./layout/SidewaysScroll";
 export * from "./layout/SplitHandle";
 export * from "./layout/Separator";
 export * from "./layout/PaneFrame";
@@ -81,6 +82,7 @@ export * from "./layout/windowToolbar";
 
 // display
 export * from "./display/Avatar";
+export * from "./display/RoleName";
 export * from "./display/LivePointer";
 export * from "./display/Badge";
 export * from "./display/Card";
@@ -110,6 +112,8 @@ export * from "./feedback/QuietPane";
 export * from "./feedback/LoadingScreen";
 export * from "./feedback/Progress";
 export * from "./feedback/RingMeter";
+export * from "./feedback/SetupState";
+export * from "./feedback/ToolSuspense";
 export * from "./feedback/Skeleton";
 export * from "./feedback/Spinner";
 export * from "./feedback/StateView";
@@ -136,6 +140,7 @@ export * from "./icons/PlaceholderIcon";
 export * from "./icons/appIcons";
 export * from "./icons/brandIcons";
 export * from "./icons/itemTones";
+export * from "./icons/spaceKinds";
 
 // patterns
 export * from "./patterns/CatalogCard";
@@ -144,6 +149,8 @@ export * from "./patterns/CollectionWorkspace";
 export * from "./patterns/CollectionFilterMenu";
 export * from "./patterns/RenameItemDialog";
 export * from "./patterns/MessageActions";
+export * from "./patterns/channel/ChannelLayout";
+export * from "./patterns/channel/MemberList";
 export * from "./patterns/QuestionPanel";
 export * from "./patterns/FindBar";
 export * from "./patterns/ImageCropFrame";

@@ -2,6 +2,7 @@ import { createDragPreview } from "./pointerDragPreview";
 import { startReorderMotion, settleReorderMotion } from "./pointerReorderMotion";
 import {
   contains,
+  dragFor,
   dropTargets,
   visibleRect,
   type DropTarget,
@@ -97,8 +98,9 @@ export function startGesture(
     }
     cancelCurrent = undefined;
     motion?.finish(preview);
-    if (commit && active && current && dropTargets.has(current.target))
-      current.target.drop(drag, current.hit);
+    const dropped = current && dragFor(drag, current.target.scope);
+    if (commit && active && current && dropped && dropTargets.has(current.target))
+      current.target.drop(dropped, current.hit);
   };
   const cancel = () => stop();
   const preventNative = (e: Event) => {
@@ -123,10 +125,11 @@ export function startGesture(
         ? { x: placement.hitX, y: placement.hitY }
         : point;
     // The smallest matching region wins, so tab headers beat pane docking zones.
+    // A target in another scope takes the drag as what it carries for that scope.
     const candidates = [...dropTargets]
       .filter(
         (t) =>
-          t.scope === drag.scope &&
+          dragFor(drag, t.scope) !== null &&
           t.element.isConnected &&
           contains(visibleRect(t.element), hitPoint(t).x, hitPoint(t).y),
       )
@@ -137,7 +140,7 @@ export function startGesture(
       });
     for (const target of candidates) {
       const at = hitPoint(target);
-      const hit = target.hit(at.x, at.y, drag);
+      const hit = target.hit(at.x, at.y, dragFor(drag, target.scope)!);
       if (hit) {
         current = { target, hit };
         break;
@@ -153,7 +156,31 @@ export function startGesture(
     }
     if (indicator) {
       indicator.hidden = !current || current.target.element === motion?.list;
-      if (current) {
+      // A labeled hit is a split preview: the part of the pane the page will take, named.
+      const label = current?.hit.label;
+      indicator.classList.toggle("pointer-dock-indicator", Boolean(label));
+      if (indicator.dataset.label !== (label ?? "")) {
+        indicator.dataset.label = label ?? "";
+        indicator.replaceChildren();
+        if (label) {
+          const pill = document.createElement("span");
+          pill.className = "pointer-dock-label";
+          pill.textContent = label;
+          indicator.append(pill);
+        }
+      }
+      if (current && label) {
+        const r = current.hit.previewRect ?? current.hit.rect;
+        Object.assign(indicator.style, {
+          left: `${r.left}px`,
+          top: `${r.top}px`,
+          width: `${r.width}px`,
+          height: `${r.height}px`,
+          opacity: "",
+          border: "",
+          borderRadius: "",
+        });
+      } else if (current) {
         const { rect, after, axis } = current.hit;
         const r = current.hit.previewRect ?? rect;
         Object.assign(

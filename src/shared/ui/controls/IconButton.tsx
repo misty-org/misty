@@ -2,7 +2,7 @@ import * as React from "react";
 import { useCompactControls, useOnRow } from "./RowContext";
 
 import { cn } from "../classNames";
-import { Spinner } from "../feedback/Spinner";
+import { Badge } from "../display/Badge";
 import { Tooltip, type TooltipSide } from "../overlays/Tooltip";
 import { Button, type ButtonLook, type ButtonProps } from "./Button";
 
@@ -35,14 +35,16 @@ const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(
       hint,
       shortcut,
       tooltipSide,
-      loading = false,
       size,
       type = "button",
       variant,
+      count,
       ...props
     },
     ref,
   ) => {
+    // Kept to two digits so the bubble stays a corner mark and never covers the icon.
+    const shownCount = count && count > 0 ? (count > 99 ? "99+" : String(count)) : null;
     // On a row or in a compact bar every IconButton is 24px, whatever the feature passed.
     const onRow = useOnRow();
     const compact = useCompactControls();
@@ -54,17 +56,25 @@ const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(
           type={type}
           variant={variant ?? "quiet"}
           size={resolvedSize}
-          aria-label={ariaLabel ?? label}
-          aria-busy={loading || undefined}
+          aria-label={ariaLabel ?? (shownCount ? `${label} (${shownCount})` : label)}
           className={cn(
             "shrink-0 justify-center gap-0 p-0 shadow-none",
+            shownCount && "relative",
             sizeClass[resolvedSize],
-            loading && "pointer-events-none",
             className,
           )}
           {...props}
         >
-          {loading ? <Spinner label={false} /> : children}
+          {children}
+          {shownCount ? (
+            <Badge
+              variant="count"
+              aria-hidden="true"
+              className="pointer-events-none absolute -right-1.5 -bottom-1"
+            >
+              {shownCount}
+            </Badge>
+          ) : null}
         </Button>
       </Tooltip>
     );
@@ -75,7 +85,7 @@ export { IconButton };
 
 export type IconButtonProps = Omit<
   ButtonProps,
-  "size" | "variant" | "icon" | "iconEnd" | "loading" | "title"
+  "size" | "variant" | "icon" | "iconEnd" | "title"
 > & {
   /** The icon, at 16px. */
   children: React.ReactNode;
@@ -94,6 +104,6 @@ export type IconButtonProps = Omit<
   variant?: IconButtonVariant | null;
   /** Defaults to md (32). */
   size?: IconButtonSize | null;
-  /** Working on the click: a spinner replaces the icon and clicks wait. */
-  loading?: boolean;
+  /** A count over the icon's corner, such as a view's changed files; nothing at zero. */
+  count?: number;
 };

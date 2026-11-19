@@ -1,4 +1,7 @@
-import { DesktopSettingsRow as Row } from "../components/DesktopSettingsUI";
+import {
+  DesktopSettingsRow as Row,
+  DesktopSettingsRowSkeleton,
+} from "../components/DesktopSettingsUI";
 import { definitionById, fromLegacy } from "../device-preferences/registry";
 import { useDevicePreferences } from "../device-preferences/store";
 import { ChoiceControl, SwitchControl, TextControl } from "../SettingsControls";
@@ -9,7 +12,16 @@ export function PreferenceRow({ id, description }: { id: string; description?: s
   const d = definitionById.get(id)!;
   const store = useSettingsStore();
   const ready = useDevicePreferences((s) => s.ready);
-  const section = store.settings?.document[d.section] as Record<string, unknown> | undefined;
+  // Until the settings are read, the row's shape, never its default posing as the value.
+  if (!store.settings)
+    return (
+      <DesktopSettingsRowSkeleton
+        label={d.label}
+        description={Boolean(description)}
+        control={d.type === "boolean" ? "switch" : d.enum ? "select" : "field"}
+      />
+    );
+  const section = store.settings.document[d.section] as Record<string, unknown> | undefined;
   const value = fromLegacy(d, section?.[d.key]);
   const update = (next: string | number | boolean) =>
     store.updateSetting(

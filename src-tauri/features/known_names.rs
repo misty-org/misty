@@ -10,3 +10,5 @@ pub const KIMI_PRIMARY_AGENT: &str = "main";
 /// The section Claude Code's account catalog puts its main models in, and the name an engine's
 /// model carries for its menu's main section (the rest are "more", for its "More models").
 pub const MAIN_MODEL_SECTION: &str = "main";
+/// SQLite's name for a connection's own database, the schema a table sits in unless it was attached.
+pub const SQLITE_MAIN_SCHEMA: &str = "main";

@@ -1,19 +1,33 @@
 import {
+  Blocks,
+  Cable,
+  ChartColumn,
+  CodeXml,
   Cpu,
   EyeOff,
+  FileText,
   Keyboard,
   MessagesSquare,
   Mic,
   MousePointer2,
   Palette,
+  Plug,
+  Route,
+  ScrollText,
+  Search,
   Server,
   ShieldCheck,
   SlidersHorizontal,
+  SquareTerminal,
   UserCircle,
+  UserRound,
+  Users,
+  Variable,
   Wrench,
   type LucideIcon,
 } from "lucide-react";
 import type { ComponentType } from "react";
+import { spaceIcons } from "@/shared/ui";
 import type { SettingOwnership } from "./device-preferences/registry";
 import type { SettingsContentProps, SettingsSection } from "./settingsTypes";
 
@@ -32,10 +46,24 @@ type SettingsArea =
   | "voice"
   | "privacy"
   | "advanced"
+  | "search"
+  | "space"
+  | "code"
+  | "agents"
+  | "personas"
   | "models"
   | "conversations"
   | "tutor"
-  | "access";
+  | "access"
+  | "clis"
+  | "channels"
+  | "environment"
+  | "usage"
+  | "plugins"
+  | "skills"
+  | "prompts"
+  | "mcp"
+  | "apps";
 
 interface SettingsAreaInfo {
   label: string;
@@ -51,23 +79,45 @@ export const settingsAreas: Record<SettingsArea, SettingsAreaInfo> = {
   voice: { label: "Voice", icon: Mic },
   privacy: { label: "Privacy", icon: EyeOff },
   advanced: { label: "Advanced", icon: Wrench },
+  search: { label: "Search", icon: Search },
+  space: { label: "Space", icon: spaceIcons.space },
+  code: { label: "Code", icon: CodeXml },
+  agents: { label: "Team", icon: Users },
+  personas: { label: "Personas", icon: UserRound },
   models: { label: "Engine", icon: Cpu },
   conversations: { label: "Behavior", icon: MessagesSquare },
   tutor: { label: "Tutor", icon: MousePointer2 },
   access: { label: "Access", icon: ShieldCheck },
+  clis: { label: "Setup", icon: SquareTerminal },
+  channels: { label: "Channels", icon: Route },
+  environment: { label: "Environment", icon: Variable },
+  usage: { label: "Usage", icon: ChartColumn },
+  plugins: { label: "Plugins", icon: Blocks },
+  skills: { label: "Skills", icon: ScrollText },
+  prompts: { label: "Prompts", icon: FileText },
+  mcp: { label: "Connectors", icon: Cable },
+  apps: { label: "Apps", icon: Plug },
 };
 
-/** Sidebar groups, named by feature, in sidebar order. */
+/**
+ * Sidebar groups, named by feature, in sidebar order. Pages holds one page for each of the app's
+ * places, with that place's name and icon, so what each can adjust is easy to find. Agents,
+ * Engines and Tools are what the Agents window held: the person's agents and personas and how
+ * they behave, the engines' CLIs, and everything those engines can use.
+ */
 export const settingsGroups: readonly { label: string; areas: readonly SettingsArea[] }[] = [
   { label: "Account", areas: ["account", "server"] },
   {
     label: "App",
     areas: ["general", "appearance", "shortcuts", "voice", "privacy", "advanced"],
   },
+  { label: "Pages", areas: ["search", "space", "code"] },
   {
     label: "Agents",
-    areas: ["models", "conversations", "tutor", "access"],
+    areas: ["agents", "personas", "models", "conversations", "tutor", "access"],
   },
+  { label: "Engines", areas: ["clis", "channels", "environment", "usage"] },
+  { label: "Tools", areas: ["plugins", "skills", "prompts", "mcp", "apps"] },
 ];
 
 interface SettingsBlock {
@@ -105,11 +155,25 @@ const settingsBlocks: readonly SettingsBlock[] = [
   block("advanced", "advanced", "Advanced"),
   block("advanced", "network", "Network"),
   block("advanced", "performance", "Performance"),
+  block("search", "search", "Sources"),
+  block("space", "space", "Home"),
+  block("code", "editor", "Editor"),
+  block("agents", "agents-list", "Team", "resource"),
+  block("personas", "agents-personas", "Personas", "resource"),
   block("models", "models", "Engine"),
   block("conversations", "agents-defaults", "Conversations"),
   block("tutor", "agents-companion", "Tutor"),
   block("access", "agents-permissions", "Access", "resource"),
   block("access", "agents-computer-use", "Computer use"),
+  block("clis", "engines-clis", "Setup", "resource"),
+  block("channels", "engines-channels", "Channels", "resource"),
+  block("environment", "engines-environment", "Environment", "resource"),
+  block("usage", "engines-usage", "Usage", "resource"),
+  block("plugins", "tools-plugins", "Plugins", "resource"),
+  block("skills", "tools-skills", "Skills", "resource"),
+  block("prompts", "tools-prompts", "Prompts", "resource"),
+  block("mcp", "tools-mcp", "Connectors", "resource"),
+  block("apps", "tools-apps", "Apps", "resource"),
 ];
 
 /**

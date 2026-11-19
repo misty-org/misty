@@ -1,9 +1,36 @@
 import { create } from "zustand";
 import { readDeviceState, updateDeviceState } from "@/features/agents";
 import { announceDeviceSetting, onDeviceSettingChange } from "@/shared/lib/deviceSetting";
+import { spaceMadeKinds } from "@/shared/ui";
 
-/** The sidebar rows a person can pin. Whatever is not pinned waits under More. */
-export const sidebarPlaceIds = ["search", "agents", "space", "studio"] as const;
+/**
+ * The sidebar rows a person can pin: Misty's main places, then shortcuts to the window's Space's
+ * own pages and its chat. Whatever is not pinned waits under More. Agents are set up in Settings
+ * and picked in the composer.
+ */
+export const sidebarPlaceIds = [
+  "search",
+  "space",
+  "code",
+  "chat",
+  "docs",
+  "slides",
+  "data",
+  "whiteboards",
+  "lab",
+  "planner",
+  "calendar",
+  "media",
+] as const;
+/** The rows that open a page of the window's Space, by the section they open. */
+export const spacePageSections: Partial<Record<SidebarPlaceId, string>> = {
+  chat: "chat",
+  ...Object.fromEntries(spaceMadeKinds.map((made) => [made.place, made.section])),
+  lab: "lab",
+  planner: "planner",
+  calendar: "calendar",
+  media: "media",
+};
 export type SidebarPlaceId = (typeof sidebarPlaceIds)[number];
 
 /** Every row in the person's order, and which of them are pinned. */
@@ -15,35 +42,49 @@ interface SidebarPins {
 const scope = "sidebar-pins";
 export const sidebarPinDefaults: SidebarPins = {
   order: [...sidebarPlaceIds],
-  // Agents, where engines are installed and set up, is in view from the start. The Lab is a page
-  // of the Space, so the Space's row leads to it.
-  pinned: ["search", "agents", "space"],
+  // The Space's pages wait under More until the person pins them.
+  pinned: ["search", "space", "code"],
 };
 
 const known = (id: unknown): id is SidebarPlaceId => sidebarPlaceIds.includes(id as SidebarPlaceId);
 /**
- * The studio was called the office. The Lab (once Tutor, then Notebooks) became a page of the
- * Space, and Integrations folded into the Agents window, so their rows become those.
+ * Tutor and Notebooks became the Space's Lab, which has a row of its own again.
+ * Agents (and Integrations, folded into it) moved into Settings, and the Studio (once the office)
+ * is gone, so their rows are dropped.
  */
 const formerly: Record<string, SidebarPlaceId> = {
-  office: "studio",
-  tutor: "space",
-  notebooks: "space",
-  lab: "space",
-  integrations: "agents",
+  tutor: "lab",
+  notebooks: "lab",
+};
+/** Rows that were once part of another one: Whiteboards were Docs' drawings. */
+const splitFrom: Partial<Record<SidebarPlaceId, SidebarPlaceId>> = { whiteboards: "docs" };
+/** Where a newer page goes: right after the page it belongs beside, Docs' kin after Docs. */
+const placedAfter: Partial<Record<SidebarPlaceId, SidebarPlaceId>> = {
+  slides: "docs",
+  data: "slides",
+  whiteboards: "data",
 };
 const renamed = (ids: unknown[] = []) =>
   ids.map((id) => (typeof id === "string" && formerly[id]) || id);
 
-/** Drops rows that no longer exist and puts new ones at the end, pinned when they are by default. */
+/**
+ * Drops rows that no longer exist and adds new ones: beside the page they belong with
+ * (`placedAfter`) when it's there, else at the end. A new row is pinned when it is by default, or
+ * when the stored row it was split from (`splitFrom`) is pinned.
+ */
 function normalize(stored: Partial<SidebarPins> | null): SidebarPins {
   if (!stored) return sidebarPinDefaults;
   const order = [...new Set(renamed(stored.order).filter(known))];
   const pinned = new Set(renamed(stored.pinned).filter(known));
+  const kept = new Set(order);
   for (const id of sidebarPlaceIds) {
     if (order.includes(id)) continue;
-    order.push(id);
-    if (sidebarPinDefaults.pinned.includes(id)) pinned.add(id);
+    const beside = placedAfter[id];
+    const at = beside ? order.indexOf(beside) : -1;
+    order.splice(at < 0 ? order.length : at + 1, 0, id);
+    const from = splitFrom[id];
+    const splitOff = from && kept.has(from) && pinned.has(from);
+    if (sidebarPinDefaults.pinned.includes(id) || splitOff) pinned.add(id);
   }
   return { order, pinned: order.filter((id) => pinned.has(id)) };
 }

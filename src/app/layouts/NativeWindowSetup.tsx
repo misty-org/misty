@@ -1,53 +1,35 @@
 import { appThemeChangedEvent, appThemeSnapshot } from "@/features/settings";
-import { revealMainWindow } from "@/native";
+import { revealMainWindow, setWindowSurface } from "@/native";
 import { appZoomChangedEvent, getAppliedAppRenderScale } from "@/shared/hooks/useAppZoom";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
-import { getCurrentWindow } from "@tauri-apps/api/window";
 import { platform } from "@/shared/platform/os";
 import { useEffect } from "react";
-import { windowSurfaceBackground } from "./windowSurfaceBackground";
 
 /** Prepare native chrome and saved zoom once, independently of the active route.
  * The window starts hidden and reveals once its background matches the theme
  * (on macOS, also after native traffic-light layout completes).
  */
-export function DesktopWindowReady() {
+export function NativeWindowSetup() {
   useEffect(() => {
     // Modals keep clear of the macOS traffic lights, which float above every web layer.
     if (hasTauriInternals() && platform() === "macos")
       document.documentElement.style.setProperty("--misty-modal-inset-top", "2.75rem");
     if (!hasTauriInternals() || !["macos", "windows", "linux"].includes(platform())) return;
     let disposed = false;
-    // Color the native window behind the renderer without making the renderer
-    // opaque: embedded Browser views need transparency.
-    let lastBackground = "";
-    let backgroundTimer: ReturnType<typeof setTimeout> | undefined;
-    const syncBackground = async () => {
-      const color = windowSurfaceBackground(appThemeSnapshot().tokens.background);
-      if (disposed || color === lastBackground) return;
-      await getCurrentWindow().setBackgroundColor(color);
-      lastBackground = color;
+    // Every page sits on the theme's background, so the window behind them is that color too:
+    // it shows at the grown edge while a resize catches up. It changes only with the theme.
+    let lastSurface = "";
+    const syncSurface = async () => {
+      const color = appThemeSnapshot().tokens.background;
+      if (disposed || color === lastSurface) return;
+      await setWindowSurface(color);
+      lastSurface = color;
     };
-    // DOM changes can be frequent (chat streams, animations). Sample only once
-    // they settle, never measure layout or send native IPC per resize frame.
-    const scheduleBackground = () => {
-      clearTimeout(backgroundTimer);
-      backgroundTimer = setTimeout(() => {
-        void syncBackground().catch(console.error);
-      }, 120);
-    };
-    const backgroundObserver = new MutationObserver(scheduleBackground);
-    backgroundObserver.observe(document.documentElement, {
-      subtree: true,
-      childList: true,
-      attributes: true,
-      attributeFilter: ["class", "style", "hidden", "data-state", "data-misty-browser-background"],
-    });
-    window.addEventListener(appThemeChangedEvent, scheduleBackground);
-    window.addEventListener("resize", scheduleBackground);
+    const themeChanged = () => void syncSurface().catch(console.error);
+    window.addEventListener(appThemeChangedEvent, themeChanged);
     const prepare = async () => {
-      await syncBackground();
+      await syncSurface();
       // `fonts.ready` alone can settle before Inter has even started loading (a face loads
       // once text first asks for it), and the text then reflows from the fallback face right
       // after the window shows. Ask for Inter by name so the first frame is already in it.
@@ -70,10 +52,7 @@ export function DesktopWindowReady() {
     });
     return () => {
       disposed = true;
-      clearTimeout(backgroundTimer);
-      backgroundObserver.disconnect();
-      window.removeEventListener(appThemeChangedEvent, scheduleBackground);
-      window.removeEventListener("resize", scheduleBackground);
+      window.removeEventListener(appThemeChangedEvent, themeChanged);
     };
   }, []);
   return null;

@@ -61,6 +61,7 @@ pub fn run_event(app: &AppHandle, event: RunEvent) {
         crate::agents::run_control::stop();
         // Outside engines and terminals are this app's own processes and end with it.
         crate::project::terminal::close_all();
+        crate::code::lsp::close_all();
         tauri::async_runtime::block_on(crate::engines::shutdown());
         crate::engine_config::shutdown();
     }

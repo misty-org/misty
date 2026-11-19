@@ -27,8 +27,23 @@ export const settingsSections = [
   "updates",
   "advanced",
   "fonts",
+  "editor",
   "network",
   "performance",
+  "search",
+  "space",
+  // What was the Agents window: the person's agents and personas, their engines and their tools.
+  "agents-list",
+  "agents-personas",
+  "engines-clis",
+  "engines-channels",
+  "engines-environment",
+  "engines-usage",
+  "tools-plugins",
+  "tools-skills",
+  "tools-prompts",
+  "tools-mcp",
+  "tools-apps",
 ] as const;
 
 export type SettingsSection = (typeof settingsSections)[number];

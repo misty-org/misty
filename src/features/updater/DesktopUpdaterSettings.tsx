@@ -138,7 +138,7 @@ export function DesktopUpdaterSettings() {
             {state === "available" || state === "installing" ? (
               <Button
                 type="button"
-                loading={state === "installing"}
+                disabled={state === "installing"}
                 onClick={() => void installUpdate()}
               >
                 Install and restart
@@ -147,8 +147,7 @@ export function DesktopUpdaterSettings() {
               <Button
                 type="button"
                 variant="secondary"
-                disabled={!supported}
-                loading={state === "checking"}
+                disabled={!supported || state === "checking"}
                 onClick={() => void checkForUpdates()}
               >
                 Check now

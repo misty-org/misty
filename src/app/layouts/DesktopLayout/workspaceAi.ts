@@ -31,8 +31,9 @@ function aiSurfaceForView(tab: WorkspaceView): AiSurfaceId {
   const section = parts[2] ?? "";
   if (section === "notes") return "notes";
   if (section === "drawings") return "drawings";
+  if (section === "slides" || section === "data") return section;
   if (section === "social" || section === "chat") return "space.chat";
-  if (section === "library") return "library";
+  if (section === "media" || section === "library") return "media";
   return "settings";
 }
 
@@ -88,18 +89,42 @@ const workspaceAiActions: Partial<Record<AiSurfaceId, AiSuggestedAction[]>> = {
       "Explain the attached browser page in plain language.",
     ),
   ],
+  slides: [
+    action(
+      "slides.tighten",
+      "Tighten slides",
+      "Read this deck and fix every slide its lint flags: split crowded slides and shorten overflowing text.",
+    ),
+    action(
+      "slides.notes",
+      "Write speaker notes",
+      "Write short speaker notes for each slide of this deck that has none.",
+    ),
+  ],
+  data: [
+    action(
+      "data.explain",
+      "Explain data",
+      "Read this workbook and explain what its sheets show, with the key figures.",
+    ),
+    action(
+      "data.chart",
+      "Suggest charts",
+      "Suggest and add the charts that best show this workbook's data, and pin them to the dashboard.",
+    ),
+  ],
   drawings: [
     action(
       "drawings.summarize",
       "Summarize board",
-      "Summarize the selected or visible drawing objects.",
+      "Summarize the selected or visible whiteboard objects.",
     ),
   ],
-  library: [
+  media: [
     action(
-      "library.synthesize",
+      "media.synthesize",
       "Synthesize",
-      "Synthesize the visible Library sources with citations.",
+      "Synthesize the visible Media sources with citations.",
     ),
   ],
 };

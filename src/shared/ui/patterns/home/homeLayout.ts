@@ -16,6 +16,12 @@ export const homeItemsWrapClass = "@container";
 /** A block: its heading, then whatever it holds, the holder taking the rest of the height. */
 export const homeSectionClass = "grid min-w-0 grid-rows-[auto_1fr] content-start gap-2.5";
 
+/** A block set in a panel: room inside its edge, its heading a little tighter at the top. */
+export const homePanelClass = "px-4 pt-2.5 pb-3";
+
+/** A block that starts a new part of the page: a hairline above it, with the home's gap past it. */
+export const homeDividedClass = "border-t border-charcoal-border pt-7";
+
 /** The Space's pages: two, three, then six across. */
 export const homePlacesClass =
   "grid grid-cols-2 gap-3 @min-[32.5rem]:grid-cols-3 @min-[50rem]:grid-cols-6";

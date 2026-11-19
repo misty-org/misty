@@ -62,13 +62,7 @@ export function OwnServerScreen(props: {
         How to set up a server
       </Button>
       {error ? <AuthMessage tone="error" message={error} /> : null}
-      <Button
-        type="submit"
-        variant="primary"
-        size="lg"
-        disabled={busy || !address.trim()}
-        loading={busy}
-      >
+      <Button type="submit" variant="primary" size="lg" disabled={busy || !address.trim()}>
         Continue
       </Button>
     </form>

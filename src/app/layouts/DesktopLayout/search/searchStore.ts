@@ -1,16 +1,24 @@
 import { create } from "zustand";
 import { readDeviceState, updateDeviceState } from "@/features/agents";
 import { announceDeviceSetting, onDeviceSettingChange } from "@/shared/lib/deviceSetting";
+import type { SearchScope } from "@/shared/lib/scopedSearch";
 
-/** Whether ⌘K search is open, and the words it opens with. The sidebar row and ⌘K both set it. */
+/** Whether ⌘K search is open, the words it opens with, and the page scope it is narrowed to (a
+ * chip, as ⌘P opens it on the Code page). The sidebar row and ⌘K open it unscoped. */
 export const useSearchDialog = create<{
   open: boolean;
   initial: string;
+  scope: SearchScope | null;
   setOpen(open: boolean, initial?: string): void;
+  openScoped(scope: SearchScope): void;
+  clearScope(): void;
 }>((set) => ({
   open: false,
   initial: "",
-  setOpen: (open, initial = "") => set({ open, initial }),
+  scope: null,
+  setOpen: (open, initial = "") => set({ open, initial, scope: null }),
+  openScoped: (scope) => set({ open: true, initial: "", scope }),
+  clearScope: () => set({ scope: null }),
 }));
 
 type Uses = Record<string, { count: number; last: number }>;

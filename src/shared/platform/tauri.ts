@@ -9,10 +9,11 @@ export function hasTauriInternals(): boolean {
   return typeof getTauriInternals()?.invoke === "function";
 }
 
-export function safeTauriAssetUrl(path: string): string {
+/** `path` as a URL of Tauri's asset protocol, or of another of Misty's protocols (`protocol`). */
+export function safeTauriAssetUrl(path: string, protocol?: string): string {
   const internals = getTauriInternals();
   if (internals?.convertFileSrc) {
-    return internals.convertFileSrc(path);
+    return internals.convertFileSrc(path, protocol);
   }
   return path;
 }

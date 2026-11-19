@@ -13,7 +13,7 @@ export type EmptyStateAction = {
    */
   variant?: "primary" | "secondary";
   disabled?: boolean;
-  /** Working on the click: the label stays and a spinner takes the icon's place. */
+  /** Working on the click: the button is disabled until it finishes. */
   loading?: boolean;
 };
 
@@ -56,8 +56,7 @@ function PaneState({
             size="lg"
             variant={action.variant ?? "primary"}
             icon={action.icon}
-            disabled={action.disabled}
-            loading={action.loading}
+            disabled={action.disabled || action.loading}
             onClick={action.onClick}
             className="mt-5"
           >

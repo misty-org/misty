@@ -110,7 +110,8 @@ describe("ChoiceGroup shortcut", () => {
 });
 
 describe("AlertDialogAction", () => {
-  it("passes loading to its button", () => {
+  // A button never shows loading (controls/Button.tsx): while the work runs it is only disabled.
+  it("is disabled while its work runs, with no spinner", () => {
     render(
       <AlertDialog open>
         <AlertDialogContent aria-describedby={undefined}>
@@ -120,7 +121,7 @@ describe("AlertDialogAction", () => {
       </AlertDialog>,
     );
     const action = screen.getByRole("button", { name: "Leave" });
-    expect(action.dataset.loading).toBe("true");
-    expect(action.getAttribute("aria-busy")).toBe("true");
+    expect(action).toHaveProperty("disabled", true);
+    expect(action.dataset.loading).toBeUndefined();
   });
 });

@@ -6,6 +6,7 @@ mod app;
 pub mod bots;
 #[cfg(desktop)]
 pub mod browser;
+pub mod code;
 #[cfg(any(target_os = "macos", windows, target_os = "linux"))]
 pub mod computer_use;
 pub mod devices;
@@ -13,8 +14,11 @@ pub mod engine_config;
 pub mod engines;
 pub mod known_names;
 #[cfg(desktop)]
+pub mod media;
+#[cfg(desktop)]
 pub mod pets;
 pub mod project;
+pub mod spaces_folders;
 #[cfg(desktop)]
 pub mod sync;
 mod voice;
@@ -57,6 +61,8 @@ pub fn run() {
     // The credential store lives in the same database as every other store, so both must
     // resolve the same data root (tests can move it).
     if let Some(home) = file_access::paths::misty_home_dir() {
+        // As soon as this build's folder is known, so a panic from here on leaves a record.
+        app::crash_log::install(&home);
         // Before anything can open the database. Going on after a failed move would start from an
         // empty store and leave the person's real one behind, so Misty stops and tries next launch.
         misty_credential_store::move_out_of_dot_local(&home)

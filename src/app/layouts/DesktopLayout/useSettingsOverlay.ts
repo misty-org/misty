@@ -1,6 +1,7 @@
 import {
   blockIfUnsaved,
   openSettingsEvent,
+  useSettingsOpen,
   useSettingsStore,
   type OpenSettingsDetail,
 } from "@/features/settings";
@@ -26,6 +27,9 @@ export function useSettingsOverlay(options: { refreshUser: () => Promise<unknown
     useSettingsStore.getState().setActiveSection("account");
     setSettingsOpen(true);
   }, []);
+
+  // Other features follow whether Settings is open: what they show may have changed in it.
+  useEffect(() => useSettingsOpen.setState({ open: settingsOpen }), [settingsOpen]);
 
   useEffect(() => {
     const handleOpenSettings = (event: Event) => {

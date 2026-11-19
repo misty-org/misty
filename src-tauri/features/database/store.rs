@@ -777,6 +777,79 @@ const MIGRATIONS: &[&str] = &[
          updated_at INTEGER NOT NULL,
          PRIMARY KEY (account, agent_id)
      ) WITHOUT ROWID;",
+    // 38: a chat owns its working folder, not its agent (engines/chat_folder.rs): a project the
+    // person picked, or the chat's own scratch folder in Misty's data folder. Project folders are
+    // the ones the person picked on this computer. Space folders are shared through the Space
+    // now, so the old device-only links go. Agent folders stay until the one-time move at start.
+    "CREATE TABLE chat_folders (
+         account TEXT NOT NULL,
+         conversation_id TEXT NOT NULL,
+         path TEXT NOT NULL,
+         kind TEXT NOT NULL CHECK (kind IN ('project', 'scratch')),
+         updated_at INTEGER NOT NULL,
+         PRIMARY KEY (account, conversation_id)
+     ) WITHOUT ROWID;
+     CREATE TABLE project_folders (
+         account TEXT NOT NULL,
+         path TEXT NOT NULL,
+         added_at INTEGER NOT NULL,
+         last_used_at INTEGER NOT NULL,
+         PRIMARY KEY (account, path)
+     ) WITHOUT ROWID;
+     DROP TABLE IF EXISTS space_folders;",
+    // 39: the folder new projects go in (engines/open_in_code.rs), chosen in the system's dialog
+    // during setup. Only a project made inside it is reached; the folder itself never is.
+    "CREATE TABLE projects_home (
+         account TEXT NOT NULL PRIMARY KEY,
+         path TEXT NOT NULL,
+         updated_at INTEGER NOT NULL
+     ) WITHOUT ROWID;",
+    // 40: chats and Code are two places now: a chat in its scratch folder is the sidebar's, a chat
+    // in a project is Code's. The chats that already worked in a project go, once, as the person
+    // asked: the chat, its plans and notebook, its link to an engine session and its folder record.
+    // The project folders and the engines' own session files stay, so those sessions still show in
+    // Code's history.
+    "DELETE FROM agent_chats
+         WHERE kind IN ('conversation', 'collaboration')
+           AND EXISTS (SELECT 1 FROM chat_folders f
+                       WHERE f.kind = 'project' AND f.account = agent_chats.account
+                         AND f.conversation_id = agent_chats.id);
+     DELETE FROM agent_chats
+         WHERE kind = 'notebook'
+           AND EXISTS (SELECT 1 FROM chat_folders f
+                       WHERE f.kind = 'project' AND f.account = agent_chats.account
+                         AND 'conversation:' || f.conversation_id = agent_chats.id);
+     DELETE FROM engine_sessions
+         WHERE EXISTS (SELECT 1 FROM chat_folders f
+                       WHERE f.kind = 'project' AND f.account = engine_sessions.account
+                         AND f.conversation_id = engine_sessions.conversation_id);
+     DELETE FROM chat_folders WHERE kind = 'project';",
+    // 41: each run's browser log on this computer (agents/run_control/browser_log.rs): every action
+    // the agent took in its tabs, the page it was on, what the action did and a picture after it,
+    // filed under the run its steps go under and keyed to their tool call. Never typed text, never
+    // synced.
+    "CREATE TABLE agent_browser_log (
+         run_id TEXT NOT NULL,
+         seq INTEGER NOT NULL,
+         account TEXT NOT NULL,
+         call_id TEXT NOT NULL,
+         at INTEGER NOT NULL,
+         scope_id TEXT NOT NULL DEFAULT '',
+         operation TEXT NOT NULL,
+         target TEXT NOT NULL DEFAULT '',
+         url TEXT NOT NULL DEFAULT '',
+         title TEXT NOT NULL DEFAULT '',
+         verdict TEXT NOT NULL DEFAULT '',
+         state TEXT NOT NULL,
+         error TEXT NOT NULL DEFAULT '',
+         note TEXT NOT NULL DEFAULT '',
+         duration_ms INTEGER NOT NULL DEFAULT 0,
+         nested INTEGER NOT NULL DEFAULT 0,
+         picture TEXT NOT NULL DEFAULT '',
+         PRIMARY KEY (run_id, seq)
+     ) WITHOUT ROWID;
+     CREATE INDEX agent_browser_log_call ON agent_browser_log(run_id, call_id);
+     CREATE INDEX agent_browser_log_account ON agent_browser_log(account, at);",
 ];
 
 #[derive(Debug, Clone)]

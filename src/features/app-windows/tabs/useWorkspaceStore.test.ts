@@ -299,9 +299,9 @@ describe("desktop dock store", () => {
     expect(store.openSurface(workspaceSurfaceFromRoute("/spaces/one/notes")!).id).toBe(first.id);
   });
 
-  it("opens Docs and Files as separate reusable tabs in one Space", () => {
+  it("opens Docs and Media as separate reusable tabs in one Space", () => {
     const journalRequest = workspaceSurfaceFromRoute("/spaces/one/notes");
-    const plannerRequest = workspaceSurfaceFromRoute("/spaces/one/library");
+    const plannerRequest = workspaceSurfaceFromRoute("/spaces/one/media");
     expect(journalRequest).not.toBeNull();
     expect(plannerRequest).not.toBeNull();
 
@@ -317,24 +317,31 @@ describe("desktop dock store", () => {
         }),
         expect.objectContaining({
           id: planner.id,
-          groupKey: "space:one:library",
-          title: "Library",
+          groupKey: "space:one:media",
+          title: "Media",
         }),
       ]),
     );
     useWorkspaceStore.getState().focusView(journal.id);
     const rememberedJournal = useWorkspaceStore
       .getState()
-      .openSurface(workspaceSurfaceFromRoute("/spaces/one/drawings/drawing-2?view=list")!);
+      .openSurface(workspaceSurfaceFromRoute("/spaces/one/notes?note=note-2")!);
     expect(rememberedJournal.id).toBe(journal.id);
-    expect(rememberedJournal.route).toBe("/spaces/one/drawings/drawing-2?view=list");
+    expect(rememberedJournal.route).toBe("/spaces/one/notes?note=note-2");
 
     useWorkspaceStore.getState().focusView(planner.id);
     useWorkspaceStore.getState().focusView(journal.id);
     expect(
       allLayoutViews(useWorkspaceStore.getState().layout).find((tab) => tab.id === journal.id)
         ?.route,
-    ).toBe("/spaces/one/drawings/drawing-2?view=list");
+    ).toBe("/spaces/one/notes?note=note-2");
+
+    // Whiteboards are a page of their own: a whiteboard opens in its own tab, not Docs'.
+    const board = useWorkspaceStore
+      .getState()
+      .openSurface(workspaceSurfaceFromRoute("/spaces/one/drawings/drawing-2")!);
+    expect(board.id).not.toBe(journal.id);
+    expect(board).toMatchObject({ groupKey: "space:one:whiteboards", title: "Whiteboards" });
   });
 
   it("does not reuse a Space tool tab as the Space Home tab", () => {

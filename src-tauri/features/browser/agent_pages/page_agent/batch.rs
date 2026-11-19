@@ -117,15 +117,16 @@ async fn run_batch(
         )?;
         resolve_agent_webview(app, state, request)?;
         // Arms the step's verdict (page_effects.js); read after the step settles.
-        let token = call(
-            view,
-            "effectStart",
-            json!({"ref": step.reference}),
-            false,
-        )
-        .await
-        .ok()
-        .and_then(|armed| armed["token"].as_str().map(str::to_owned));
+        let armed = call(view, "effectStart", json!({"ref": step.reference}), false)
+            .await
+            .ok();
+        let token = armed
+            .as_ref()
+            .and_then(|armed| armed["token"].as_str().map(str::to_owned));
+        // The element the step acts on, named as a person would (`button "Search"`).
+        let target = armed
+            .as_ref()
+            .and_then(|armed| armed["target"].as_str().map(str::to_owned));
         let outcome = match run_step(
             app,
             state,
@@ -150,6 +151,9 @@ async fn run_batch(
         if let Some(reference) = &step.reference {
             record["ref"] = json!(reference);
         }
+        if let Some(target) = &target {
+            record["target"] = json!(target);
+        }
         for field in [
             "error",
             "errorCode",
@@ -163,6 +167,11 @@ async fn run_batch(
             "met",
             "inputSelected",
             "locator",
+            "opensNewTab",
+            "moved",
+            "atStart",
+            "container",
+            "note",
         ] {
             if !outcome[field].is_null() {
                 record[field] = outcome[field].clone();

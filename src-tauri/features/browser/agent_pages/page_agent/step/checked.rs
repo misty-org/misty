@@ -128,10 +128,14 @@ pub(super) async fn run_step_checked(
             }
             let input = json!({"kind": "click", "x": prepared["point"]["x"], "y": prepared["point"]["y"],
                 "button": step.button.as_deref().unwrap_or("left"), "clickCount": step.click_count.unwrap_or(1)});
+            // A link or form that opens its page in a new tab: the step says so.
+            let new_tab = prepared["opensNewTab"] == true;
             if let Some(result) = native(input, prepared.clone()).await? {
-                return Ok(
-                    json!({"ok": true, "attempted": true, "input": "native", "cursor": result["cursor"]}),
-                );
+                let mut done = json!({"ok": true, "attempted": true, "input": "native", "cursor": result["cursor"]});
+                if new_tab {
+                    done["opensNewTab"] = json!(true);
+                }
+                return Ok(done);
             }
             if let Some(cursor) = cursor_script(&prepared).filter(|_| frame.is_none()) {
                 // The person watching sees the cursor reach the control before it is pressed.
@@ -139,7 +143,12 @@ pub(super) async fn run_step_checked(
                     tokio::time::sleep(std::time::Duration::from_millis(CURSOR_GLIDE_MS)).await;
                 }
             }
-            call_at(view, frame, "perform", step_args(document, step), false).await
+            let mut done =
+                call_at(view, frame, "perform", step_args(document, step), false).await?;
+            if new_tab && done["ok"] == true {
+                done["opensNewTab"] = json!(true);
+            }
+            Ok(done)
         }
         "key" => {
             if step.reference.is_some() {

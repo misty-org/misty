@@ -5,6 +5,7 @@ import {
   AgentDefaultsSection,
   AgentPermissionsSection,
   CompanionSection,
+  EditorSettings,
   EngineSection,
 } from "@/features/agents";
 import { AdvancedSection, AppearanceSection } from "@/features/app-windows";
@@ -23,7 +24,10 @@ import { UpdatesSection } from "@/features/updater";
 import { VoiceSection } from "@/features/voice";
 import { ComputerUseSection } from "@/features/computer-use";
 import { PetsSection } from "@/features/pets";
+import { SpaceSettings } from "@/features/spaces";
+import { agentsSettingsSections } from "./AgentsSettingsSections";
 import { BottomBarSettings } from "./layouts/DesktopLayout/BottomBarSettings";
+import { SearchSettings } from "./layouts/DesktopLayout/search/SearchSettings";
 
 /**
  * Each feature owns the settings blocks of its own area. The settings page only knows block ids,
@@ -36,6 +40,7 @@ const sections: Partial<Record<SettingsSection, ComponentType<SettingsContentPro
   server: ServerSection,
   appearance: AppearanceSection,
   fonts: FontsSection,
+  editor: EditorSettings,
   shortcuts: ShortcutsSection,
   voice: VoiceSection,
   privacy: PrivacySection,
@@ -50,6 +55,9 @@ const sections: Partial<Record<SettingsSection, ComponentType<SettingsContentPro
   "agents-computer-use": ComputerUseSection,
   pets: PetsSection,
   "bottom-bar": BottomBarSettings,
+  search: SearchSettings,
+  space: SpaceSettings,
+  ...agentsSettingsSections,
 };
 
 registerSettingsSections(sections);

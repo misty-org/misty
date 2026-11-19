@@ -11,16 +11,18 @@ import "./pressable.css";
  * - `card`: a bordered card lifts, as collection cards do.
  * - `strong`: the pressed fill and bright text, for a control that must answer clearly.
  * - `tint`: a tinted surface (Surface's `tint`) takes more of its color.
+ * - `panel`: a solid panel that is the button itself, edge to edge (a scene panel's Team button):
+ *   the control wash laid over its own fill, so what is behind never shows through.
  * A `data-hover` attribute shows the wash without the pointer, for a hover the page can't see.
  */
-export type PressableWash = "row" | "control" | "text" | "card" | "strong" | "tint";
+export type PressableWash = "row" | "control" | "text" | "card" | "strong" | "tint" | "panel";
 
 export type PressableProps = React.ComponentPropsWithoutRef<"button"> & {
   /** The shared hover look. Without it the content draws its own. */
   wash?: PressableWash;
   /**
    * The item shown now in a list of them (the step whose picture is on screen): it keeps its
-   * wash's pressed fill, hovered or not. For `row` and `control` washes.
+   * wash's pressed fill, hovered or not. For `row`, `control` and `panel` washes.
    */
   selected?: boolean;
 };

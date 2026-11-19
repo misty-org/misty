@@ -197,7 +197,7 @@ const DialogContent = React.forwardRef<
               dialogSizeClass[size],
               "gap-4 rounded-xl p-6",
               tone === "page" ? "bg-charcoal-bg" : "bg-charcoal-card",
-              "text-body text-cream shadow-xl ring-1 ring-cream/10 misty-dialog-motion",
+              "text-body text-cream misty-dialog-motion",
               "data-[state=closed]:pointer-events-none",
               className,
             )}

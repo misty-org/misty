@@ -1,7 +1,7 @@
 import { spaceWorkspaceToolFromRoute, type WorkspaceView } from "@/features/app-windows";
 import { workspaceAppIcon } from "@/features/app-windows";
 import { appIconStrokeWidth, BrandIcon, brandIconAsset, Text } from "@/shared/ui";
-import { Armchair, FlaskConical, type LucideIcon } from "lucide-react";
+import { Armchair, CodeXml, FlaskConical, type LucideIcon } from "lucide-react";
 import { AgentAvatar, defaultAgentOf, usePersonalAgentsStore } from "@/features/agents";
 import { DestinationIcon } from "./NavigatorDestinationIcon";
 function getViewAppId(tab: WorkspaceView | undefined): string {
@@ -21,6 +21,7 @@ function getViewIcon(tab: WorkspaceView | undefined, fallback: LucideIcon): Luci
 const agentsPlaceIcons: Record<string, LucideIcon> = {
   lab: FlaskConical,
   studio: Armchair,
+  code: CodeXml,
 };
 
 /**

@@ -14,12 +14,12 @@
 .misty-pane-frame::before {
   z-index: var(--layer-pane-corners);
   background:
-    radial-gradient(circle at 100% 100%, transparent 0.7188rem, var(--pane-chrome) 0.75rem) top left /
-      var(--pane-corner-top-left) var(--pane-corner-top-left) no-repeat,
+    radial-gradient(circle at 100% 100%, transparent 0.7188rem, var(--pane-chrome) 0.75rem) top
+      left / var(--pane-corner-top-left) var(--pane-corner-top-left) no-repeat,
     radial-gradient(circle at 0 100%, transparent 0.7188rem, var(--pane-chrome) 0.75rem) top right /
       var(--pane-corner-top-right) var(--pane-corner-top-right) no-repeat,
-    radial-gradient(circle at 100% 0, transparent 0.7188rem, var(--pane-chrome) 0.75rem) bottom left /
-      var(--pane-corner-bottom-left) var(--pane-corner-bottom-left) no-repeat,
+    radial-gradient(circle at 100% 0, transparent 0.7188rem, var(--pane-chrome) 0.75rem) bottom
+      left / var(--pane-corner-bottom-left) var(--pane-corner-bottom-left) no-repeat,
     radial-gradient(circle at 0 0, transparent 0.7188rem, var(--pane-chrome) 0.75rem) bottom right /
       var(--pane-corner-bottom-right) var(--pane-corner-bottom-right) no-repeat;
   box-shadow:

@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { cn } from "../classNames";
 import { CompactControls } from "../controls/RowContext";
+import { SidewaysScroll } from "./SidewaysScroll";
 
 /**
  * The bar along the bottom of the window, a popup or an overlay, which keeps room there so nothing
@@ -8,7 +9,9 @@ import { CompactControls } from "../controls/RowContext";
  * bar's closes it. It is lighter than a top bar: compact by default (32px, its buttons 24px), or
  * `standard` (40px, its buttons 32px) where the person chose that for the window's bar.
  * Its controls are centered in it, 12px in from the right, the "i" for the surface's tour last.
- * `start` holds anything that belongs at its other end.
+ * `start` holds anything that belongs at its other end. When the two ends don't fit side by side,
+ * the bar scrolls sideways (SidewaysScroll) rather than shrink its items or let one end slide
+ * over the other.
  *
  * ```tsx
  * <BottomBar aria-label="Layout">
@@ -36,10 +39,15 @@ export function BottomBar(props: {
       )}
     >
       <CompactControls on={compact}>
-        {props.start ? (
-          <div className="flex min-w-0 flex-1 items-center gap-2">{props.start}</div>
-        ) : null}
-        <div className="ml-auto flex shrink-0 items-center gap-2">{props.children}</div>
+        <SidewaysScroll className="flex-1 gap-2 self-stretch">
+          {/* Never narrower than its items: past that the row scrolls instead. */}
+          {props.start ? (
+            <div className="flex flex-[1_0_auto] items-center gap-2 self-stretch">
+              {props.start}
+            </div>
+          ) : null}
+          <div className="ml-auto flex flex-none items-center gap-2">{props.children}</div>
+        </SidewaysScroll>
       </CompactControls>
     </footer>
   );

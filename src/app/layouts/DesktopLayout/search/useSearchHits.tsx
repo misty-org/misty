@@ -1,11 +1,11 @@
 import {
   Armchair,
+  CodeXml,
   CalendarDays,
   CalendarPlus,
-  FileText,
+  Clapperboard,
   GraduationCap,
   KanbanSquare,
-  Library,
   ListPlus,
   MessagesSquare,
   NotebookPen,
@@ -31,6 +31,8 @@ import {
   usePersonalAgentsStore,
   useTutorStore,
   notebookRoute,
+  openCodeChat,
+  useProjectChats,
 } from "@/features/agents";
 import { useCommands } from "@/features/commands";
 import { openSettings, searchSettings } from "@/features/settings";
@@ -42,7 +44,7 @@ import {
   useSpaceGallery,
   useWindowSpace,
 } from "@/features/spaces";
-import { itemToneClass } from "@/shared/ui";
+import { itemToneClass, spaceMadeKinds } from "@/shared/ui";
 import { agentChatRoute } from "../spaceNavigation";
 import { excerpt, fieldScore, matchScore, rank } from "./searchRank";
 import { useSearchUses } from "./searchStore";
@@ -55,12 +57,18 @@ import type { SearchHit, SearchKind } from "./searchTypes";
 const pages: { label: string; icon: LucideIcon; route(base: string): string; space?: boolean }[] = [
   { label: "Space", icon: Galaxy, route: (base) => base, space: true },
   { label: "Studio", icon: Armchair, route: () => "/agents?view=studio" },
+  { label: "Code", icon: CodeXml, route: () => "/agents?view=code" },
   { label: "Lab", icon: FlaskConical, route: (base) => `${base}/lab`, space: true },
   { label: "Chat", icon: MessagesSquare, route: (base) => `${base}/chat`, space: true },
-  { label: "Docs", icon: FileText, route: (base) => `${base}/notes`, space: true },
+  ...spaceMadeKinds.map((made) => ({
+    label: made.page,
+    icon: made.pageIcon,
+    route: (base: string) => `${base}/${made.section}`,
+    space: true,
+  })),
   { label: "Planner", icon: KanbanSquare, route: (base) => `${base}/planner`, space: true },
   { label: "Calendar", icon: CalendarDays, route: (base) => `${base}/calendar`, space: true },
-  { label: "Library", icon: Library, route: (base) => `${base}/library`, space: true },
+  { label: "Media", icon: Clapperboard, route: (base) => `${base}/media`, space: true },
 ];
 
 /** How the order weighs a kind's match against the others'. */
@@ -70,6 +78,10 @@ const weights: Record<string, number> = {
   Chats: 1.2,
   Agents: 1.1,
   Notes: 1.1,
+  Docs: 1.1,
+  Slides: 1.1,
+  Data: 1.1,
+  Whiteboards: 1.1,
   Tasks: 1.1,
   Events: 1,
   Space: 1,
@@ -86,6 +98,8 @@ const weights: Record<string, number> = {
 interface SearchContext {
   query: SearchQuery;
   kind: SearchKind;
+  /** The kind the page in front holds; its hits rank a step higher while typing. */
+  here?: SearchKind;
   /** Opens a page of the window in the focused pane. */
   openRoute(route: string): void;
   onNewChat(): void;
@@ -113,6 +127,7 @@ export function useSearchHits(context: SearchContext): SearchResults {
   const base = spaceId ? `/spaces/${encodeURIComponent(spaceId)}` : "";
   const agents = usePersonalAgentsStore((state) => state.agents);
   const conversations = useMistyStore((state) => state.conversations);
+  const projectChats = useProjectChats();
   const lessons = useLessonStore((state) => state.lessons);
   const tutorJobs = useTutorStore((state) => state.jobs);
   const notebooks = useTutorStore((state) => state.notebooks);
@@ -176,18 +191,24 @@ export function useSearchHits(context: SearchContext): SearchResults {
       const agent = agentOf(chat.agentId);
       if (!agent) continue;
       const title = chat.title || "New conversation";
-      const route = agentChatRoute(agent.id, chat.id);
+      // A chat in a project is Code's: it opens beside the Code page's editor.
+      const inCode = Boolean(projectChats?.[chat.id]);
+      const route = inCode ? "/agents?view=code" : agentChatRoute(agent.id, chat.id);
+      const go = () => {
+        if (inCode) openCodeChat(chat.id);
+        openRoute(route);
+      };
       if (!typed) {
         hits.push({
           id: `chat:${chat.id}`,
           kind: "chats",
           group: "Chats",
           title,
-          detail: agent.name,
+          detail: inCode ? "Code" : agent.name,
           icon: <AgentAvatar agent={agent} compact />,
           updatedAt: chat.updatedAt,
           match: 0,
-          open: () => openRoute(route),
+          open: go,
         });
         continue;
       }
@@ -211,14 +232,14 @@ export function useSearchHits(context: SearchContext): SearchResults {
         kind: "chats",
         group: "Chats",
         title,
-        detail: agent.name,
+        detail: inCode ? "Code" : agent.name,
         excerpt: inside ? excerpt(said, words) : undefined,
         icon: <AgentAvatar agent={agent} compact />,
         updatedAt: chat.updatedAt,
         match,
         open: () => {
           if (inside) requestChatFind(chat.id, words);
-          openRoute(route);
+          go();
         },
       });
     }
@@ -315,6 +336,7 @@ export function useSearchHits(context: SearchContext): SearchResults {
     base,
     commands,
     conversations,
+    projectChats,
     lessons,
     tutorJobs,
     notebooks,
@@ -425,7 +447,7 @@ export function useSearchHits(context: SearchContext): SearchResults {
         return Math.max(Date.parse(hit.updatedAt ?? "") || 0, use?.last ?? 0) + (use?.count ?? 0);
       return rank({
         match: hit.match,
-        weight: weights[hit.group] ?? 1,
+        weight: (weights[hit.group] ?? 1) * (context.here && hit.kind === context.here ? 1.3 : 1),
         updatedAt: hit.updatedAt,
         uses: use?.count,
         now,
@@ -442,7 +464,7 @@ export function useSearchHits(context: SearchContext): SearchResults {
       ...ranked,
       ...doing.filter((hit) => hit.match < 10),
     ];
-  }, [local, remote, remoteKey, kind, uses, words, actions]);
+  }, [local, remote, remoteKey, kind, uses, words, actions, context.here]);
 
   return {
     hits,

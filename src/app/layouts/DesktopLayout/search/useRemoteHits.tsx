@@ -1,7 +1,7 @@
 import { FileCode, FileText, History, Plug } from "lucide-react";
 import { useEffect, useState } from "react";
 import {
-  agentForPastChat,
+  defaultEngineAgent,
   directAppsApi,
   folderName,
   openAgentsHub,
@@ -13,6 +13,8 @@ import {
   notebookRoute,
 } from "@/features/agents";
 import { searchSpaceText, spaceEvents, spaceTasks, type SpaceSearchHit } from "@/features/spaces";
+import { useSettingsStore } from "@/features/settings";
+import { selectSearchSources } from "./searchSources";
 import type { AgentProfile } from "@/shared/schemas";
 import { agentChatRoute } from "../spaceNavigation";
 import { excerpt, fieldScore, matchScore, type Part } from "./searchRank";
@@ -22,9 +24,9 @@ import { icon, spaceGroups, spaceIcons } from "./SearchIcons";
 const plain = (text: string): Part[] => (text ? [{ text, marked: false }] : []);
 
 /**
- * What other places answer a search: the Space's server, the linked folder's files, the
- * notebooks' index, apps that take a direct sign-in, and the engines' own history. Each answers
- * on its own; `waiting` counts the ones still out.
+ * What other places answer a search: the Space's server, the files in the person's project
+ * folders, the notebooks' index, apps that take a direct sign-in, and the engines' own history.
+ * Each answers on its own; `waiting` counts the ones still out.
  */
 export function useRemoteHits({
   spaceId,
@@ -48,7 +50,10 @@ export function useRemoteHits({
   });
   // What follows `@agent` is a prompt, and prompts never leave this computer except to the
   // agent's own engine: only a plain search asks the server and the other sources.
-  const remoteKey = `${spaceId}\n${asking ? "" : words}`;
+  // Which sources the person searches is part of the key, so a change in Settings asks again.
+  const searchSettings = useSettingsStore((state) => state.settings?.document.search);
+  const include = selectSearchSources({ search: searchSettings });
+  const remoteKey = `${spaceId}\n${include.key}\n${asking ? "" : words}`;
   useEffect(() => {
     if (asking || words.length < 2) {
       setRemote({ key: remoteKey, hits: [], waiting: 0 });
@@ -106,77 +111,74 @@ export function useRemoteHits({
           ];
         });
       });
-    if (spaceId)
+    if (include.files)
       sources.push(async () =>
-        (await searchFolderFiles(spaceId, (name, rel) => fieldScore(words, name, rel))).map(
-          (file) => ({
-            id: `file:${file.path}`,
-            kind: "space" as const,
-            group: "Files",
-            title: file.name,
-            excerpt: plain(file.rel),
-            icon: icon(FileCode),
-            match: file.match,
-            open: () => {
-              openFolderFile(file.path);
-              openRoute("/agents");
-            },
-          }),
-        ),
+        (await searchFolderFiles((name, rel) => fieldScore(words, name, rel))).map((file) => ({
+          id: `file:${file.path}`,
+          kind: "space" as const,
+          group: "Files",
+          title: file.name,
+          excerpt: plain(file.rel),
+          icon: icon(FileCode),
+          match: file.match,
+          open: () => {
+            // The Code page keeps the file when it's up; otherwise a chat's files panel shows it.
+            openRoute(openFolderFile(file.path));
+          },
+        })),
       );
-    sources.push(async () => {
-      const { apps } = await directAppsApi.catalog(words, 0);
-      return apps.slice(0, 6).flatMap((app) => {
-        const match = fieldScore(words, app.name, app.description);
-        if (!match) return [];
-        return [
-          {
-            id: `app:${app.url}`,
-            kind: "apps" as const,
-            group: "Apps",
-            title: `Connect ${app.name}`,
-            detail: app.description ? undefined : "App",
-            excerpt: app.description ? plain(app.description) : undefined,
-            icon: icon(Plug),
-            match,
-            open: () => openAgentsHub("apps"),
-          },
-        ];
-      });
-    });
-    sources.push(async () => {
-      const { hits } = await searchEngineSessions(words);
-      return hits.slice(0, 12).flatMap((hit) => {
-        // A chat from any folder is listed; the agent that continues it is the one working in
-        // its folder, or the one the person gives the folder to when they open it.
-        const agent =
-          agents.find((item) => item.engine === hit.engine && item.enabled) ??
-          agents.find((item) => item.engine === hit.engine);
-        if (!agent) return [];
-        const title = hit.customTitle || hit.title || "Session";
-        const updatedAt = hit.updatedAt ? new Date(hit.updatedAt).toISOString() : undefined;
-        return [
-          {
-            id: `engine:${hit.engine}:${hit.sessionId}`,
-            kind: "chats" as const,
-            group: "Engine history",
-            title,
-            detail: folderName(hit.workspacePath),
-            excerpt: hit.snippet.length ? hit.snippet : undefined,
-            icon: icon(History),
-            updatedAt,
-            match: Math.max(matchScore(title, words), 3),
-            open: async () => {
-              const chosen = await agentForPastChat({ ...hit, title });
-              if (!chosen) return;
-              const chat = { ...hit, title, workspacePath: chosen.folder };
-              const id = await resumeInNewChat(chosen.agentId, chat);
-              openRoute(agentChatRoute(chosen.agentId, id));
+    if (include.apps)
+      sources.push(async () => {
+        const { apps } = await directAppsApi.catalog(words, 0);
+        return apps.slice(0, 6).flatMap((app) => {
+          const match = fieldScore(words, app.name, app.description);
+          if (!match) return [];
+          return [
+            {
+              id: `app:${app.url}`,
+              kind: "apps" as const,
+              group: "Apps",
+              title: `Connect ${app.name}`,
+              detail: app.description ? undefined : "App",
+              excerpt: app.description ? plain(app.description) : undefined,
+              icon: icon(Plug),
+              match,
+              open: () => openAgentsHub("apps"),
             },
-          },
-        ];
+          ];
+        });
       });
-    });
+    if (include.sessions)
+      sources.push(async () => {
+        const { hits } = await searchEngineSessions(words);
+        return hits.slice(0, 12).flatMap((hit) => {
+          // A chat from any folder is listed when an agent on its engine can continue it.
+          if (!agents.some((item) => item.engine === hit.engine)) return [];
+          const title = hit.customTitle || hit.title || "Session";
+          const updatedAt = hit.updatedAt ? new Date(hit.updatedAt).toISOString() : undefined;
+          return [
+            {
+              id: `engine:${hit.engine}:${hit.sessionId}`,
+              kind: "chats" as const,
+              group: "Engine history",
+              title,
+              detail: folderName(hit.workspacePath),
+              excerpt: hit.snippet.length ? hit.snippet : undefined,
+              icon: icon(History),
+              updatedAt,
+              match: Math.max(matchScore(title, words), 3),
+              open: async () => {
+                // The engine's default agent continues it in a new chat: in the session's folder
+                // when that is one of the person's projects, else in the chat's scratch folder.
+                const agentId = defaultEngineAgent(hit.engine);
+                if (!agentId) return;
+                const id = await resumeInNewChat(agentId, { ...hit, title });
+                openRoute(agentChatRoute(agentId, id));
+              },
+            },
+          ];
+        });
+      });
 
     setRemote((current) => ({
       key: remoteKey,

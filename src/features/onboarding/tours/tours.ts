@@ -12,10 +12,14 @@ export type TourId =
   | "space"
   | "lab"
   | "notebook"
-  | "studio"
   | "space-chat"
   | "docs"
   | "doc"
+  | "slides"
+  | "deck"
+  | "data"
+  | "workbook"
+  | "whiteboards"
   | "drawing"
   | "library"
   | "planner"
@@ -59,14 +63,9 @@ export const tours: Record<TourId, { label: string; steps: readonly TourStep[] }
         body: "Start a fresh chat, follow the steps your AI is taking, and see the files it changed and the pages it opened.",
       },
       {
-        target: "sidebar-agents",
-        title: "Your agents",
-        body: "Pick which AI you chat with, add another, and install or set up the engines they run on.",
-      },
-      {
         target: "sidebar-space",
         title: "Your space",
-        body: "Share docs, drawings and files with friends, and see what everyone's agents are working on.",
+        body: "Share docs, whiteboards and files with friends, and see what everyone's agents are working on.",
       },
       {
         target: "sidebar-lab",
@@ -81,7 +80,7 @@ export const tours: Record<TourId, { label: string; steps: readonly TourStep[] }
       {
         target: "sidebar-more",
         title: "More",
-        body: "The studio, where your agents work at little desks, lives in here.",
+        body: "Places you unpinned wait in here. Your agents and their engines are in Settings.",
       },
       {
         target: "account",
@@ -104,9 +103,9 @@ export const tours: Record<TourId, { label: string; steps: readonly TourStep[] }
         body: "Choose the engine it runs on and give it a name. You can have a few on the same engine.",
       },
       {
-        target: "agents-nav",
+        target: "settings-nav",
         title: "Set up their engines",
-        body: "The list on the left installs and updates each engine, signs you in, and adds plugins and more.",
+        body: "Engines and Tools, in the list on the left, install and update each engine, sign you in, and add plugins and more.",
       },
     ],
   },
@@ -126,7 +125,7 @@ export const tours: Record<TourId, { label: string; steps: readonly TourStep[] }
       {
         target: "space-make",
         title: "Make something together",
-        body: "Start a doc or a drawing that everyone here can edit at the same time.",
+        body: "Start a doc or a whiteboard that everyone here can edit at the same time.",
       },
       {
         target: "space-switcher",
@@ -188,47 +187,6 @@ export const tours: Record<TourId, { label: string; steps: readonly TourStep[] }
       },
     ],
   },
-  studio: {
-    label: "Studio tour",
-    steps: [
-      {
-        title: "Your studio",
-        body: "Each agent has a desk here. They type while they work and wave at the door when they need you.",
-      },
-      {
-        target: "studio-team",
-        title: "Your team",
-        body: "Everyone on your team and what they're doing. Click one to go to them.",
-      },
-      {
-        target: "studio-ask",
-        title: "Talk to them",
-        body: "Click an agent to chat, or type @ and their names in the box at the bottom left to give a few of them one task.",
-      },
-      {
-        target: "studio-hotbar",
-        title: "Your hotbar",
-        body: "Emote, play the Space's games, put on music, or rearrange the room. Keys 1 to 3 and B work too.",
-      },
-      {
-        target: "studio-level",
-        title: "Level up",
-        body: "Finished tasks, new agents, teammates and today's quests earn points that unlock furniture and a bigger room.",
-      },
-      {
-        title: "Hire at a free desk",
-        body: "Walk up to a free desk and press E to hire someone for it, or use Hire someone in your team list.",
-      },
-      {
-        title: "Walk around",
-        body: "WASD to walk, Space to jump, drag to look, scroll to step behind yourself. Walk up to an agent and press E to talk, and it follows you while you do.",
-      },
-      {
-        title: "Friends drop by",
-        body: "Friends' agents visit while those friends are in this space too, so you can see what everyone's up to.",
-      },
-    ],
-  },
   "space-chat": {
     label: "Chat tour",
     steps: [
@@ -245,7 +203,7 @@ export const tours: Record<TourId, { label: string; steps: readonly TourStep[] }
       {
         target: "space-chat-composer",
         title: "Say something",
-        body: "Write to everyone here and press return to send. Add files or things from the Library too.",
+        body: "Write to everyone here and press return to send. Add files or things from Media too.",
       },
       {
         target: "space-chat-mention",
@@ -260,7 +218,7 @@ export const tours: Record<TourId, { label: string; steps: readonly TourStep[] }
       {
         target: "space-make",
         title: "Make a doc",
-        body: "Start a doc or a drawing that everyone here can work on together.",
+        body: "Start a doc that everyone here can write in together.",
       },
       {
         target: "space-search",
@@ -299,13 +257,118 @@ export const tours: Record<TourId, { label: string; steps: readonly TourStep[] }
       },
     ],
   },
+  slides: {
+    label: "Slides tour",
+    steps: [
+      {
+        target: "space-make",
+        title: "Make slides",
+        body: "Start a deck, or ask your agent to turn a doc into one.",
+      },
+      {
+        target: "space-search",
+        title: "Find one",
+        body: "Search by a deck's name or the words on its slides.",
+      },
+      {
+        target: "space-filters",
+        title: "Choose what you see",
+        body: "Show everyone's decks or only yours, as pictures or as a list.",
+      },
+    ],
+  },
+  deck: {
+    label: "Deck tour",
+    steps: [
+      {
+        target: "deck-rail",
+        title: "Your slides",
+        body: "Drag a slide to move it. Right-click one to copy, hide or delete it.",
+      },
+      {
+        target: "deck-layout",
+        title: "Pick a layout",
+        body: "Each slide is laid out for you. Change the layout and the words move with it.",
+      },
+      {
+        target: "deck-theme",
+        title: "Pick a look",
+        body: "A theme sets the colors and fonts of every slide at once.",
+      },
+      {
+        target: "deck-present",
+        title: "Present",
+        body: "Show your slides full screen, with your notes on your own screen.",
+      },
+    ],
+  },
+  data: {
+    label: "Data tour",
+    steps: [
+      {
+        target: "space-make",
+        title: "Make a workbook",
+        body: "Start one, or drop in a spreadsheet file to bring its sheets in.",
+      },
+      {
+        target: "space-search",
+        title: "Find one",
+        body: "Search by a workbook's name or the words in its cells.",
+      },
+      {
+        target: "space-filters",
+        title: "Choose what you see",
+        body: "Show everyone's workbooks or only yours, as pictures or as a list.",
+      },
+    ],
+  },
+  workbook: {
+    label: "Workbook tour",
+    steps: [
+      {
+        target: "workbook-grid",
+        title: "Your sheet",
+        body: "Type in any cell. Start with = to work something out, like =SUM(B2:B9).",
+      },
+      {
+        target: "workbook-sheets",
+        title: "More sheets",
+        body: "Keep related tables side by side as sheets of one workbook.",
+      },
+      {
+        target: "workbook-charts",
+        title: "Charts",
+        body: "Select some cells to chart them, then pin charts to the dashboard.",
+      },
+    ],
+  },
+  whiteboards: {
+    label: "Whiteboards tour",
+    steps: [
+      {
+        target: "space-make",
+        title: "Make a whiteboard",
+        body: "Start a board everyone here can draw on together.",
+      },
+      {
+        target: "space-search",
+        title: "Find one",
+        body: "Search by a whiteboard's name or the words on it.",
+      },
+      {
+        target: "space-filters",
+        title: "Choose what you see",
+        body: "Show everyone's whiteboards or only yours, as pictures or as a list.",
+      },
+    ],
+  },
   drawing: {
-    label: "Drawing tour",
+    label: "Whiteboard tour",
     steps: [
       {
         target: "drawing-title",
         title: "Name it",
-        body: "Give your drawing a name everyone will recognize.",
+        body: "Give your whiteboard a name everyone will recognize.",
       },
       {
         target: "drawing-canvas",
@@ -315,7 +378,7 @@ export const tours: Record<TourId, { label: string; steps: readonly TourStep[] }
     ],
   },
   library: {
-    label: "Library tour",
+    label: "Media tour",
     steps: [
       {
         target: "library-upload",

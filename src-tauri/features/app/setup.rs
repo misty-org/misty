@@ -43,6 +43,8 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     crate::engine_config::setup(app.handle());
     app.manage(permissions::Backing(runtime.environment.store()));
     app.manage(runtime);
+    // Once: the folders Misty used to make for agents become projects or go to the Trash.
+    crate::engines::chat_folder::retire_agent_folders(app.handle());
     // The pet reads its settings from the runtime's store, so it starts once that is managed.
     #[cfg(desktop)]
     crate::pets::overlay::init(app.handle());

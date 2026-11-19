@@ -14,7 +14,7 @@ export function DestinationIcon({
   appId,
   item,
 }: {
-  /** The workspace app the destination belongs to, such as "journal" or "library". */
+  /** The workspace app the destination belongs to, such as "journal" or "media". */
   appId: string;
   item: MistyNavigationItem;
 }) {
@@ -26,7 +26,7 @@ export function DestinationIcon({
     const Icon = nativeIcon;
     return <Icon aria-hidden />;
   }
-  if (appId === "library") {
+  if (appId === "media" || appId === "library") {
     const Icon = {
       recent: AllItemsDestinationIcon,
       favorites: FavoritesDestinationIcon,

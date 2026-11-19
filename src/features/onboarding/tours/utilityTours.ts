@@ -14,11 +14,6 @@ export const utilityTours = {
         body: "Type to find a chat, a doc, a file, a setting or something to do.",
       },
       {
-        target: "search-kinds",
-        title: "Narrow it down",
-        body: "Look in one kind of thing at a time.",
-      },
-      {
         target: "search-list",
         title: "Open it",
         body: "Your recent things show here. Press return to open one.",
@@ -26,7 +21,7 @@ export const utilityTours = {
       {
         target: "search-hints",
         title: "Shortcuts",
-        body: "Start with @ to talk to an agent, or / to run a command.",
+        body: "Start with @ to talk to an agent, / to run a command, or # to look only in this Space.",
       },
     ],
   },

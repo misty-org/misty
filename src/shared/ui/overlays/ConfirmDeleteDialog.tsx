@@ -18,7 +18,7 @@ export type ConfirmDeleteOptions = {
   /** The danger button's label; "Delete" unless the action is "Remove" or "Discard". */
   confirmLabel?: string;
   /**
-   * Does the delete. While it runs the button shows a spinner; if it throws, the error shows in
+   * Does the delete. While it runs the button is disabled; if it throws, the error shows in
    * the dialog and the dialog stays open so it can be tried again.
    */
   onConfirm?: () => void | Promise<void>;
@@ -121,8 +121,7 @@ function ConfirmDeleteDialog({
             type="button"
             variant="danger"
             size="lg"
-            loading={running}
-            disabled={confirmDisabled}
+            disabled={confirmDisabled || running}
             aria-describedby={error ? errorId : undefined}
             onClick={() => void confirm()}
           >

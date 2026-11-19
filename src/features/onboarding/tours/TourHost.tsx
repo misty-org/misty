@@ -50,8 +50,6 @@ export function tourForPage(pathname: string, search: string): TourId | null {
   const params = new URLSearchParams(search);
   if (pathname === "/agents") {
     const view = params.get("view");
-    // Old names for the same pages.
-    if (view === "office" || view === "studio") return "studio";
     if (view === "lab" || view === "tutor" || view === "notebooks")
       return params.get("item")?.startsWith("notebook:") ? "notebook" : "lab";
     // No view, a retired one or an unknown one: the chat.
@@ -70,7 +68,12 @@ export function tourForPage(pathname: string, search: string): TourId | null {
       case "notes":
         return params.get("note") ? "doc" : "docs";
       case "drawings":
-        return item ? "drawing" : "docs";
+        return item ? "drawing" : "whiteboards";
+      case "slides":
+        return item ? "deck" : "slides";
+      case "data":
+        return item ? "workbook" : "data";
+      case "media":
       case "library":
       case "files":
         return "library";

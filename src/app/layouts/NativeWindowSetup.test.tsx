@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import macosConfig from "../../../src-tauri/tauri.macos.conf.json";
 import { App } from "../App";
 import { appZoomRenderScale } from "@/shared/hooks/useAppZoom";
-import { DesktopWindowReady } from "./DesktopWindowReady";
+import { NativeWindowSetup } from "./NativeWindowSetup";
 const mocks = vi.hoisted(() => ({
   reveal: vi.fn(),
   zoom: vi.fn(),
@@ -22,13 +22,9 @@ vi.mock("@/features/settings", () => ({
     },
   }),
 }));
-vi.mock("@tauri-apps/api/window", () => ({
-  getCurrentWindow: () => ({
-    setBackgroundColor: mocks.background,
-  }),
-}));
 vi.mock("@/native", () => ({
   revealMainWindow: mocks.reveal,
+  setWindowSurface: mocks.background,
 }));
 vi.mock("@/shared/hooks/useAppZoom", async (importOriginal) => {
   const actual = await importOriginal<typeof AppZoom>();
@@ -86,7 +82,7 @@ describe("main window readiness", () => {
     expect(mocks.reveal).toHaveBeenCalledTimes(1);
   });
   it("matches the native background on launch and theme changes, then cleans up", async () => {
-    const view = render(<DesktopWindowReady />);
+    const view = render(<NativeWindowSetup />);
     await act(async () => {
       await vi.runAllTimersAsync();
     });
@@ -94,7 +90,7 @@ describe("main window readiness", () => {
     mocks.theme = "#fafafa";
     await act(async () => {
       window.dispatchEvent(new Event("misty://app-theme-changed"));
-      await vi.advanceTimersByTimeAsync(120);
+      await vi.runAllTimersAsync();
     });
     expect(mocks.background).toHaveBeenLastCalledWith("#fafafa");
     expect(mocks.background.mock.invocationCallOrder[0]).toBeLessThan(
@@ -124,7 +120,7 @@ describe("main window readiness", () => {
           zoomReady = resolve;
         }),
     );
-    render(<DesktopWindowReady />);
+    render(<NativeWindowSetup />);
     expect(mocks.zoom).not.toHaveBeenCalled();
     expect(mocks.reveal).not.toHaveBeenCalled();
     await act(async () => {
@@ -145,7 +141,7 @@ describe("main window readiness", () => {
     expect(mocks.reveal).toHaveBeenCalledTimes(1);
   });
   it("does not reveal a screen that unmounted while loading", async () => {
-    const view = render(<DesktopWindowReady />);
+    const view = render(<NativeWindowSetup />);
     view.unmount();
     await act(async () => {
       await vi.runAllTimersAsync();
@@ -155,7 +151,7 @@ describe("main window readiness", () => {
   it("still uses the positioned native reveal if restoring zoom fails", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     mocks.zoom.mockRejectedValueOnce(new Error("zoom failed"));
-    render(<DesktopWindowReady />);
+    render(<NativeWindowSetup />);
     await act(async () => {
       await vi.runAllTimersAsync();
     });
@@ -164,7 +160,7 @@ describe("main window readiness", () => {
   it("leaves other platforms' window visibility alone", async () => {
     // macOS, Windows and Linux start hidden; a mobile build shows its window itself.
     mocks.platform.mockReturnValue("ios");
-    render(<DesktopWindowReady />);
+    render(<NativeWindowSetup />);
     await act(async () => {
       await vi.runAllTimersAsync();
     });

@@ -1,9 +1,14 @@
 import { useAppStore } from "@/app/shell";
-import { Button, SearchField } from "@/shared/ui";
+import { Button, ErrorState, SearchField } from "@/shared/ui";
 import { memo, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
-import { DesktopSettingsFrame, DesktopSettingsNotice } from "./components/DesktopSettingsUI";
+import {
+  DesktopSettingsFrame,
+  DesktopSettingsNotice,
+  DesktopSettingsRowSkeleton,
+  DesktopSettingsSection,
+} from "./components/DesktopSettingsUI";
 import { SettingsSaveBar } from "./components/SettingsSaveBar";
 import type { DesktopSettingsNavGroup } from "./components/SettingsNavigation";
 import {
@@ -91,8 +96,9 @@ export const SettingsWorkspace = memo(function SettingsWorkspace(props: Settings
     setQuery("");
   };
   const openResult = (result: SettingsSearchResult) => select(result.page, result.focus);
+  // Pages draw only once the settings are read: never defaults standing in for them.
   const controls: SettingsContentProps = {
-    document: store.settings?.document ?? {},
+    document: settings?.document ?? {},
     launchOnLogin: store.launchOnLogin,
     working: store.working || !preferences.ready,
     onSettingChange: store.updateSetting,
@@ -108,7 +114,9 @@ export const SettingsWorkspace = memo(function SettingsWorkspace(props: Settings
     shortcuts: store.shortcuts,
     app,
   };
-  const error = store.error || preferences.error;
+  const pageTitle = settingsAreas[entry.area].label;
+  // Settings that never came say so in the page; a later failure (a save) is a notice.
+  const error = (settings ? store.error : null) || preferences.error;
 
   return (
     <DesktopSettingsFrame
@@ -116,13 +124,14 @@ export const SettingsWorkspace = memo(function SettingsWorkspace(props: Settings
       ariaLabel="Settings"
       groups={navGroups()}
       navigationLabel="Settings sections"
+      navigationTour="settings-nav"
       onClose={() => {
         if (!blockIfUnsaved()) props.onClose?.();
       }}
       saveBar={<SettingsSaveBar />}
       onSelect={(id) => select(id)}
       presentation={props.presentation}
-      title={settingsAreas[entry.area].label}
+      title={pageTitle}
       navigationHeader={
         <SearchField
           aria-label="Search settings"
@@ -160,22 +169,35 @@ export const SettingsWorkspace = memo(function SettingsWorkspace(props: Settings
       }
     >
       <div ref={content}>
-        {pageEntries.map((item) => {
-          const Block = item.Component;
-          return (
-            <div
-              key={item.id}
-              data-settings-page={item.id}
-              data-settings-target={`page:${item.id}`}
-              tabIndex={-1}
-              className="mb-8 outline-none last:mb-0"
-            >
-              <SettingsPageScope.Provider value={{ page: item.id, owner: item.owner }}>
-                <Block {...controls} />
-              </SettingsPageScope.Provider>
-            </div>
-          );
-        })}
+        {settings ? null : store.error ? (
+          <ErrorState
+            inline
+            title="Settings couldn't load"
+            line="Something went wrong on this computer. Try again in a moment."
+            action={{ label: "Try again", onClick: () => void load() }}
+          />
+        ) : (
+          <DesktopSettingsSection title={pageTitle}>
+            <DesktopSettingsRowSkeleton label={pageTitle} rows={4} control="switch" />
+          </DesktopSettingsSection>
+        )}
+        {settings &&
+          pageEntries.map((item) => {
+            const Block = item.Component;
+            return (
+              <div
+                key={item.id}
+                data-settings-page={item.id}
+                data-settings-target={`page:${item.id}`}
+                tabIndex={-1}
+                className="mb-8 outline-none last:mb-0"
+              >
+                <SettingsPageScope.Provider value={{ page: item.id, owner: item.owner }}>
+                  <Block {...controls} />
+                </SettingsPageScope.Provider>
+              </div>
+            );
+          })}
       </div>
     </DesktopSettingsFrame>
   );

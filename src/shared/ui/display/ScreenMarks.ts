@@ -37,7 +37,8 @@ export const screenMarkClass = {
     "rounded-xl border border-black/12 bg-art-white text-art-muted " +
     "shadow-[0_0.75rem_2rem_rgb(0_0_0/0.28)]",
   /** Strokes drawn straight onto the screen: white, with a dark shadow so they read on any page. */
-  strokes: "[filter:drop-shadow(0_0_1.5px_rgb(0_0_0/0.9))_drop-shadow(0_1px_0.1875rem_rgb(0_0_0/0.5))]",
+  strokes:
+    "[filter:drop-shadow(0_0_1.5px_rgb(0_0_0/0.9))_drop-shadow(0_1px_0.1875rem_rgb(0_0_0/0.5))]",
   /** A pointer's arrow (an SVG path): white with a dark edge. */
   pointer: "fill-art-white stroke-art-ink stroke-2 [stroke-linejoin:round]",
   /** A click's ripple (an SVG circle), spreading out from the pointer's tip once. */
@@ -55,7 +56,7 @@ export const screenMarkClass = {
    * (`data-tip`, a little brighter). Hidden while empty.
    */
   caption:
-    "pointer-events-none absolute bottom-[8%] left-1/2 w-max max-w-[min(48rem,80%)] -translate-x-1/2 " +
+    "pointer-events-none absolute inset-x-0 bottom-[8%] mx-auto w-max max-w-[min(48rem,80%)] " +
     "rounded-xl bg-art-ink/85 px-4 py-2 text-center text-body text-art-paper " +
     "transition-opacity duration-200 data-[tip]:bg-art-ink data-[tip]:font-medium " +
     "data-[hidden]:opacity-0 motion-reduce:transition-none",

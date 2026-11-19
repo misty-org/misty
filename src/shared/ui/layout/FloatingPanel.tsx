@@ -15,7 +15,7 @@ export type FloatingPanelProps = {
    */
   actions?: React.ReactNode;
   /**
-   * The corner of the Studio it floats in, 12px from the edges. `free` leaves placement to the
+   * The corner of the scene it floats in, 12px from the edges. `free` leaves placement to the
    * parent, e.g. a stack of panels in one corner.
    */
   anchor: FloatingPanelAnchor;
@@ -39,9 +39,9 @@ const anchorClass: Record<FloatingPanelAnchor, string> = {
 const widthClass = { sm: "w-64", md: "w-80", lg: "w-96" } as const;
 
 /**
- * A translucent panel floating over the Studio's office, which shows through it blurred. Only the
- * Studio (src/features/agents/virtual) uses it: everywhere else panes are flat. The content may
- * be in full color. It is no dialog: it doesn't trap focus or block the office behind it.
+ * A translucent panel floating over a full-color scene, which shows through it blurred; Misty's own
+ * panes are flat. The content may be in full color. It is no dialog: it doesn't trap focus or
+ * block the scene behind it.
  */
 export function FloatingPanel({
   title,

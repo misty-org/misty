@@ -10,6 +10,7 @@ import {
 import {
   allRules,
   cssRules,
+  sharedCssRuleIds,
   sharedUiRuleIds,
   uiRules,
   type AppUiRuleId,
@@ -44,7 +45,7 @@ export {
 // ---------------------------------------------------------------------------------------------
 // Which files get which rules.
 
-type UiRuleScope = "app" | "shared" | "css";
+type UiRuleScope = "app" | "shared" | "css" | "shared-css";
 
 function uiRuleScope(path: string): UiRuleScope | null {
   if (/\.test\.tsx?$/.test(path) || path.endsWith(".d.ts") || path.startsWith("src/tests/")) {
@@ -52,7 +53,7 @@ function uiRuleScope(path: string): UiRuleScope | null {
   }
   if (path.endsWith(".css")) {
     if (!path.startsWith("src/") || path.startsWith("src/styles/")) return null;
-    return path.startsWith("src/shared/ui/") ? null : "css";
+    return path.startsWith("src/shared/ui/") ? "shared-css" : "css";
   }
   if (!/^src\/.*\.tsx?$/.test(path)) return null;
   return path.startsWith("src/shared/ui/") ? "shared" : "app";
@@ -60,6 +61,7 @@ function uiRuleScope(path: string): UiRuleScope | null {
 
 function rulesFor(scope: UiRuleScope): UiRuleId[] {
   if (scope === "css") return Object.keys(cssRules) as CssRuleId[];
+  if (scope === "shared-css") return [...sharedCssRuleIds];
   if (scope === "shared") return [...sharedUiRuleIds];
   return Object.keys(uiRules) as AppUiRuleId[];
 }
@@ -86,7 +88,7 @@ function countRule(rule: UiRule, text: string, path: string): number {
 export function uiViolationCounts(path: string, text: string): UiViolationCounts {
   const scope = uiRuleScope(path);
   if (!scope) return {};
-  const source = withoutComments(text, scope === "css");
+  const source = withoutComments(text, scope === "css" || scope === "shared-css");
   const counts: UiViolationCounts = {};
   for (const id of rulesFor(scope)) {
     const count = countRule(allRules[id], source, path);

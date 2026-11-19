@@ -1,10 +1,16 @@
 import { X } from "lucide-react";
-import { useId, useRef, type KeyboardEvent, type ReactNode } from "react";
-import { reorderIds, usePointerReorder } from "../../hooks/usePointerReorder";
+import { useEffect, useId, useRef, type KeyboardEvent, type ReactNode } from "react";
+import {
+  createDwell,
+  reorderIds,
+  usePointerDropTarget,
+  usePointerReorder,
+} from "../../hooks/usePointerReorder";
 import { cn } from "../classNames";
 import { IconButton } from "../controls/IconButton";
 import { Pressable } from "../controls/Pressable";
 import { Text } from "../display/Text";
+import { SidewaysScroll } from "../layout/SidewaysScroll";
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from "../overlays/ContextMenu";
 
 export interface TabStripTab {
@@ -36,20 +42,35 @@ export interface TabStripProps {
   end?: ReactNode;
   /**
    * The window's own tab row ends 12px in, like the sidebar's rows at the window's other side, so
-   * the window has one margin on both edges. A page's tab row keeps the page header's 16px.
+   * the window has one margin on both edges and the end button lines up with the chat's panel
+   * rail under it. A page's tab row keeps the page header's 16px.
    */
   windowEdge?: boolean;
+  /**
+   * What a dragged tab is to drop targets beyond the row, by scope (the window's tab carries its
+   * page's view to the panes as `workspace-tabs`), so it can be dropped into a split.
+   */
+  dragCarries?(id: string): Record<string, string> | undefined;
+  /**
+   * A drag paused over a tab for a moment, while still held: the window opens that tab, so the
+   * dragged page can be dropped into its panes. Drags from outside the row (a sidebar chat) that
+   * carry `workspace-tab-switch` pause the same way.
+   */
+  onDragDwell?(id: string): void;
 }
+
+/** The scope a drag from outside a tab row carries to open tabs it pauses over. */
+export const tabSwitchScope = "workspace-tab-switch";
 
 // Tabs are a sidebar row's height, padding, type and washes. The row is the shared 48px header band, so they
 // have 8px above and below; the first tab's icon lines up with a page header's title, 16px in,
 // and the end controls keep the page header's 16px from the edge. Every tab starts at the same
-// 144px and all shrink alike when they don't fit, so the row never overflows; a tab too narrow
-// for its closer drops it (a middle click still closes it).
+// 144px and all shrink alike when they don't fit, down to 96px (still wide enough for the
+// closer); past that the row scrolls sideways.
 const tabClass = cn(
   // An explicit width, not just a flex basis: the tab is a size container (for its closer), so
   // its content adds nothing to its size, and the row measures tabs by this width.
-  "group/tab @container/tab relative flex h-8 w-36 min-w-0 flex-initial items-center",
+  "group/tab @container/tab relative flex h-8 w-36 min-w-24 flex-initial items-center",
   "overflow-hidden rounded-md hover:bg-row-hover data-[selected]:bg-row-active",
 );
 
@@ -66,8 +87,10 @@ function nextTabIndex(key: string, index: number, count: number): number {
  * A row of tabs over a pane: 32px tabs with an icon and a label that fades when long, a closer
  * that shows on hover and on the open tab, arrows and Home/End to move between them, a middle
  * click or the closer to close, dragging (or Alt+Shift and an arrow) to reorder, and the tab's menu on a right-click. Tabs share
- * one width and shrink together when they don't fit, never wrapping or scrolling. `after` holds a
- * control right after the last tab that always stays in view, and `end` controls at the far end.
+ * one width and shrink together when they don't fit, never wrapping; once they reach their least
+ * width the tabs and `after` scroll sideways (a wheel or a swipe, with no scrollbar), the open tab
+ * kept in view. `after` holds a control right after the last tab, and `end` controls at the far
+ * end that never scroll away.
  *
  * ```tsx
  * <TabStrip label="Terminals" tabs={tabs} active={activeId} onSelect={select} onClose={close}
@@ -84,7 +107,12 @@ export function TabStrip(props: TabStripProps) {
     animate: true,
     getDrag: (id) => {
       const tab = props.tabs.find((candidate) => candidate.id === id);
-      return props.onReorder && tab ? { id, label: tab.label } : null;
+      return props.onReorder && tab
+        ? { id, label: tab.label, carries: props.dragCarries?.(id) }
+        : null;
+    },
+    onDwell: (id) => {
+      if (id !== props.active) props.onDragDwell?.(id);
     },
     onDrop: (drag, target, after) => moveTo(drag.id, reorderIds(ids, [drag.id], target, after)),
     onKeyboardMove: (id, direction) => {
@@ -92,6 +120,32 @@ export function TabStrip(props: TabStripProps) {
       if (target) moveTo(id, reorderIds(ids, [id], target, direction === 1));
     },
   });
+
+  // A drag from outside the row (a sidebar chat) opens the tab it pauses over; it never drops here.
+  const dwell = useRef(createDwell());
+  usePointerDropTarget(list, {
+    scope: tabSwitchScope,
+    hit(x, y) {
+      const over = [
+        ...(list.current?.querySelectorAll<HTMLElement>("[data-reorder-item]") ?? []),
+      ].find((item) => {
+        const rect = item.getBoundingClientRect();
+        return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
+      })?.dataset.reorderItem;
+      dwell.current(over && over !== props.active ? over : null, (id) => props.onDragDwell?.(id));
+      return null;
+    },
+    drop() {},
+  });
+
+  // The open tab scrolls into view when it changes, as a newly opened tab lands past the edge.
+  useEffect(() => {
+    if (!props.active) return;
+    list.current
+      ?.querySelector<HTMLElement>(`[data-tab-id="${CSS.escape(props.active)}"]`)
+      ?.closest<HTMLElement>("[data-reorder-item]")
+      ?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
+  }, [props.active, props.tabs.length]);
 
   const focusTab = (id: string) =>
     requestAnimationFrame(() =>
@@ -113,82 +167,88 @@ export function TabStrip(props: TabStripProps) {
         props.windowEdge ? "pr-3" : "pr-4",
       )}
     >
-      <div
-        {...reorder}
-        ref={(element) => {
-          list.current = element;
-          reorder.ref(element);
-        }}
-        role="tablist"
-        aria-label={props.label}
-        className="flex min-w-0 flex-[0_1_auto] items-center gap-1"
-      >
-        {props.tabs.map((tab, index) => {
-          const selected = tab.id === props.active;
-          const closable = Boolean(tab.closeLabel && props.onClose);
-          const body = (
-            <div
-              data-selected={selected || undefined}
-              data-reorder-item={tab.id}
-              data-reorder-handle={props.onReorder ? "" : undefined}
-              data-reorder-preview=""
-              className={tabClass}
-              onAuxClick={(event) => {
-                if (event.button === 1 && closable) props.onClose?.(tab.id);
-              }}
-            >
-              <Pressable
-                role="tab"
-                aria-selected={selected}
-                tabIndex={selected ? 0 : -1}
-                data-tab-id={tab.id}
-                className="flex h-full min-w-0 flex-1 items-center gap-2 pl-2 pr-1"
-                onClick={() => props.onSelect(tab.id)}
-                onKeyDown={(event) => onKeyDown(event, index)}
+      <SidewaysScroll className="flex-[0_1_auto] gap-1 self-stretch">
+        <div
+          {...reorder}
+          ref={(element) => {
+            list.current = element;
+            reorder.ref(element);
+          }}
+          role="tablist"
+          aria-label={props.label}
+          className="flex min-w-0 flex-[0_1_auto] items-center gap-1"
+          // The tabs' least widths and the gaps between them: below this the row scrolls.
+          style={{
+            minWidth: `calc(${props.tabs.length} * 6rem + ${Math.max(0, props.tabs.length - 1)} * 0.25rem)`,
+          }}
+        >
+          {props.tabs.map((tab, index) => {
+            const selected = tab.id === props.active;
+            const closable = Boolean(tab.closeLabel && props.onClose);
+            const body = (
+              <div
+                data-selected={selected || undefined}
+                data-reorder-item={tab.id}
+                data-reorder-handle={props.onReorder ? "" : undefined}
+                data-reorder-preview=""
+                className={tabClass}
+                onAuxClick={(event) => {
+                  if (event.button === 1 && closable) props.onClose?.(tab.id);
+                }}
               >
-                {tab.icon ? (
-                  <span className="flex size-4 flex-none items-center">{tab.icon}</span>
-                ) : null}
-                <Text
-                  size="control"
-                  tone={selected ? "bright" : "muted"}
-                  className="min-w-0 flex-1 text-left"
-                  full={tab.full ?? true}
+                <Pressable
+                  role="tab"
+                  aria-selected={selected}
+                  tabIndex={selected ? 0 : -1}
+                  data-tab-id={tab.id}
+                  className="flex h-full min-w-0 flex-1 items-center gap-2 pl-2 pr-1"
+                  onClick={() => props.onSelect(tab.id)}
+                  onKeyDown={(event) => onKeyDown(event, index)}
                 >
-                  {tab.label}
-                </Text>
-              </Pressable>
-              {closable ? (
-                // Always shown, on every tab, until the tab is too narrow to hold it.
-                <span className="flex flex-none @max-[5.5rem]/tab:hidden">
-                  <IconButton
-                    label={tab.closeLabel!}
-                    size="sm"
-                    className="mr-1"
-                    data-reorder-ignore=""
-                    onClick={() => props.onClose?.(tab.id)}
+                  {tab.icon ? (
+                    <span className="flex size-4 flex-none items-center">{tab.icon}</span>
+                  ) : null}
+                  <Text
+                    size="control"
+                    tone={selected ? "bright" : "muted"}
+                    className="min-w-0 flex-1 text-left"
+                    full={tab.full ?? true}
                   >
-                    <X />
-                  </IconButton>
-                </span>
-              ) : null}
-            </div>
-          );
-          return tab.menu ? (
-            <ContextMenu key={tab.id}>
-              <ContextMenuTrigger asChild>{body}</ContextMenuTrigger>
-              <ContextMenuContent width="sm" aria-label={`${tab.label} actions`}>
-                {tab.menu}
-              </ContextMenuContent>
-            </ContextMenu>
-          ) : (
-            <div key={tab.id} className="contents">
-              {body}
-            </div>
-          );
-        })}
-      </div>
-      {props.after ? <div className="flex flex-none items-center">{props.after}</div> : null}
+                    {tab.label}
+                  </Text>
+                </Pressable>
+                {closable ? (
+                  // Always shown, on every tab, until the tab is too narrow to hold it.
+                  <span className="flex flex-none @max-[5.5rem]/tab:hidden">
+                    <IconButton
+                      label={tab.closeLabel!}
+                      size="sm"
+                      className="mr-1"
+                      data-reorder-ignore=""
+                      onClick={() => props.onClose?.(tab.id)}
+                    >
+                      <X />
+                    </IconButton>
+                  </span>
+                ) : null}
+              </div>
+            );
+            return tab.menu ? (
+              <ContextMenu key={tab.id}>
+                <ContextMenuTrigger asChild>{body}</ContextMenuTrigger>
+                <ContextMenuContent width="sm" aria-label={`${tab.label} actions`}>
+                  {tab.menu}
+                </ContextMenuContent>
+              </ContextMenu>
+            ) : (
+              <div key={tab.id} className="contents">
+                {body}
+              </div>
+            );
+          })}
+        </div>
+        {props.after ? <div className="flex flex-none items-center">{props.after}</div> : null}
+      </SidewaysScroll>
       {/* The end controls keep to the far edge, however few tabs there are. */}
       {props.end ? (
         <div className="ml-auto flex flex-none items-center gap-1">{props.end}</div>

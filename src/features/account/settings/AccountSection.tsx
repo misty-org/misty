@@ -48,8 +48,7 @@ function UsernameRow({ account }: { account: AccountMeResponse }) {
         <Button
           type="submit"
           variant="secondary"
-          disabled={!next || next === account.username}
-          loading={saving}
+          disabled={!next || next === account.username || saving}
         >
           Save
         </Button>

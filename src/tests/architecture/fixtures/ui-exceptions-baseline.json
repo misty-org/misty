@@ -46,7 +46,10 @@
     "css-icon-size",
     "css-button-state",
     "field-restyle",
-    "row-hover-reveal"
+    "row-hover-reveal",
+    "half-pixel-edge",
+    "css-half-pixel-edge",
+    "skeleton-fallback"
   ],
   "locked": [
     "all-caps",
@@ -56,6 +59,7 @@
     "css-button-state",
     "css-ellipsis",
     "css-font-size",
+    "css-half-pixel-edge",
     "css-hex",
     "css-icon-size",
     "css-mono",
@@ -68,6 +72,7 @@
     "field-restyle",
     "font-size-literal",
     "full-screen-overlay",
+    "half-pixel-edge",
     "hand-rolled-spinner",
     "hex-color",
     "icon-only-button",
@@ -90,6 +95,7 @@
     "raw-menu-row",
     "repeated-menu-icon",
     "row-hover-reveal",
+    "skeleton-fallback",
     "small-icon-button",
     "sparkles-icon",
     "status-word",

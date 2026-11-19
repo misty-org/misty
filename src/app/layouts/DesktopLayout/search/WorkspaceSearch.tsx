@@ -1,19 +1,21 @@
 import { TourInfoButton } from "@/features/onboarding";
 import { Command } from "cmdk";
+import { X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { shortAgo, usePersonalAgentsStore } from "@/features/agents";
 import type { WorkspaceView } from "@/features/app-windows";
 import { ShortcutText, useShortcutHandler } from "@/features/shortcuts";
 import {
+  Badge,
   CommandPaletteInput,
   CommandPaletteItem,
   CommandPaletteList,
   CommandPaletteMatch,
-  CommandPaletteTab,
   Dialog,
   DialogContent,
   DialogTitle,
   cn,
+  IconButton,
   Kbd,
   OverflowFadeText,
   Separator,
@@ -28,21 +30,51 @@ import { useSearchDialog, useSearchUses } from "./searchStore";
 import { searchKinds, type SearchHit, type SearchKind } from "./searchTypes";
 import { useSearchHits } from "./useSearchHits";
 import { useNow } from "@/shared/hooks/useNow";
+import { useScopedSearch } from "@/shared/lib/scopedSearch";
+
+/** What the rest of Misty is asked while a page scope narrows the box: nothing typed. */
+const IDLE_QUERY = readQuery("", []);
+
+/** The kind of thing the page in front of the person holds, whose hits rank first: chats on the
+ * agents page, notebooks in the Lab, settings in Settings, the Space's things in a Space. */
+function pageKind(path = ""): SearchKind | undefined {
+  if (path.startsWith("/agents")) return "chats";
+  if (path.startsWith("/settings")) return "settings";
+  if (/^\/spaces\/[^/]+\/lab/.test(path)) return "learn";
+  if (path.startsWith("/spaces/")) return "space";
+  return undefined;
+}
 
 /**
  * ⌘K search: one box for everything in Misty. It finds chats (by what was said in them too),
  * agents, the Space's docs, messages, tasks, events and files, Tutor's notebooks and lessons,
  * apps to connect, settings, commands and pages, and does what the text asks: `@agent …` asks an
  * agent, `task: …` makes a task, ⌘↵ asks the usual agent. With nothing typed it shows what was
- * opened last. Mounted once per window, so ⌘K works with the sidebar hidden.
+ * opened last. A prefix narrows it to one kind (`/` commands, `#` the Space); there is no row of
+ * types, and pages' own search fields only filter what the page shows. The page in front ranks
+ * its own kind first, and a page can open it scoped to its items (⌘P on the Code page). Mounted
+ * once per window, so ⌘K works with the sidebar hidden.
  */
-export function WorkspaceSearch({ onOpen }: { onOpen(view: WorkspaceView): void }) {
+export function WorkspaceSearch({
+  onOpen,
+  path,
+}: {
+  onOpen(view: WorkspaceView): void;
+  /** The focused page's route, so its own things rank first. */
+  path?: string;
+}) {
   const open = useSearchDialog((state) => state.open);
   const setOpen = useSearchDialog((state) => state.setOpen);
   useShortcutHandler("app.command_palette", () => {
     const state = useSearchDialog.getState();
     state.setOpen(!state.open);
   });
+  // A page asks for the box scoped to its own items (⌘P on the Code page).
+  const scopeNonce = useScopedSearch((state) => state.nonce);
+  useEffect(() => {
+    const request = useScopedSearch.getState().request;
+    if (scopeNonce && request) useSearchDialog.getState().openScoped(request);
+  }, [scopeNonce]);
   return (
     <Dialog open={open} onOpenChange={(next) => setOpen(next)}>
       <DialogContent
@@ -51,7 +83,9 @@ export function WorkspaceSearch({ onOpen }: { onOpen(view: WorkspaceView): void 
         aria-describedby={undefined}
       >
         <DialogTitle className="sr-only">Search</DialogTitle>
-        {open ? <SearchBody onOpen={onOpen} close={() => setOpen(false)} /> : null}
+        {open ? (
+          <SearchBody onOpen={onOpen} here={pageKind(path)} close={() => setOpen(false)} />
+        ) : null}
       </DialogContent>
     </Dialog>
   );
@@ -80,11 +114,13 @@ function Marked({ parts }: { parts: Part[] }) {
   );
 }
 
-/** Puts hits under their headings, in the order of each heading's best hit. */
+/** Puts hits under their headings, in the order of each heading's best hit. With nothing typed
+ * the box shows a short list of what was opened last and no actions, which wait for words. */
 function grouped(hits: SearchHit[], kind: SearchKind, typed: boolean) {
   const groups = new Map<string, SearchHit[]>();
-  const cap = kind === "all" ? (typed ? 4 : 8) : 40;
+  const cap = kind === "all" ? (typed ? 4 : 5) : 40;
   for (const hit of hits) {
+    if (!typed && kind === "all" && hit.group === "Actions") continue;
     const heading =
       !typed && hit.group !== "Actions" && kind !== "commands" ? "Recents" : hit.group;
     const list = groups.get(heading) ?? [];
@@ -94,11 +130,18 @@ function grouped(hits: SearchHit[], kind: SearchKind, typed: boolean) {
   return [...groups];
 }
 
-function SearchBody({ onOpen, close }: { onOpen(view: WorkspaceView): void; close(): void }) {
+function SearchBody({
+  onOpen,
+  here,
+  close,
+}: {
+  onOpen(view: WorkspaceView): void;
+  here?: SearchKind;
+  close(): void;
+}) {
   const now = useNow();
   const initial = useSearchDialog((state) => state.initial);
   const [raw, setRaw] = useState(initial);
-  const [picked, setPicked] = useState<SearchKind>("all");
   const [running, setRunning] = useState("");
   const [error, setError] = useState("");
   const agents = usePersonalAgentsStore((state) => state.agents);
@@ -112,12 +155,49 @@ function SearchBody({ onOpen, close }: { onOpen(view: WorkspaceView): void; clos
       ),
     [raw, agents],
   );
-  const kind = query.kind ?? picked;
-  const typed = query.text.length > 0;
+  // A page's scope (⌘P: the Code page's files) searches only its items, under a chip; the rest of
+  // Misty sits idle until Backspace on the empty field drops the chip.
+  const scope = useSearchDialog((state) => state.scope);
+  const [scopeVersion, setScopeVersion] = useState(0);
+  useEffect(() => scope?.subscribe?.(() => setScopeVersion((version) => version + 1)), [scope]);
+  const text = scope ? raw.trim() : query.text;
+  const kind: SearchKind = scope ? "files" : (query.kind ?? "all");
+  const typed = text.length > 0;
   const openRoute = useCallback((route: string) => openWorkspaceRoute(route, onOpen), [onOpen]);
   const onNewChat = useCallback(() => openNewChat(onOpen), [onOpen]);
-  const { hits, waiting } = useSearchHits({ query, kind, openRoute, onNewChat });
-  const groups = useMemo(() => grouped(hits, kind, typed), [hits, kind, typed]);
+  const everything = useSearchHits({
+    query: scope ? IDLE_QUERY : query,
+    kind: scope ? "all" : kind,
+    here,
+    openRoute,
+    onNewChat,
+  });
+  const scopedHits = useMemo<SearchHit[] | null>(() => {
+    if (!scope) return null;
+    // Read again when the scope says its items changed (an index finished loading).
+    void scopeVersion;
+    return scope.search(text).map((hit, index) => ({
+      id: `scope:${hit.id}`,
+      kind: "files",
+      group: scope.label,
+      title: hit.title,
+      detail: hit.detail,
+      icon: hit.icon,
+      match: 1000 - index,
+      open: hit.open,
+    }));
+  }, [scope, scopeVersion, text]);
+  const hits = scopedHits ?? everything.hits;
+  const waiting = scopedHits ? false : everything.waiting;
+  const groups = useMemo(
+    () =>
+      scope
+        ? scopedHits?.length
+          ? ([[scope.label, scopedHits]] as [string, SearchHit[]][])
+          : []
+        : grouped(hits, kind, typed),
+    [scope, scopedHits, hits, kind, typed],
+  );
 
   const run = async (hit: SearchHit) => {
     if (running) return;
@@ -145,22 +225,20 @@ function SearchBody({ onOpen, close }: { onOpen(view: WorkspaceView): void; clos
       setRunning("");
     }
   };
-  /** ⌘↵: what the text asks for, or asking the usual agent. */
-  const primary = hits.find(
-    (hit) =>
-      hit.group === "Actions" &&
-      hit.id.startsWith("action:") &&
-      hit.id !== "action:new-chat" &&
-      (hit.match >= 10 || hit.id === "action:ask"),
-  );
-  const step = (by: number) => {
-    const at = searchKinds.findIndex((item) => item.id === picked);
-    setPicked(searchKinds[(at + by + searchKinds.length) % searchKinds.length].id);
-  };
-
+  /** ⌘↵: what the text asks for, or asking the usual agent. A scoped box only opens items. */
+  const primary = scope
+    ? undefined
+    : hits.find(
+        (hit) =>
+          hit.group === "Actions" &&
+          hit.id.startsWith("action:") &&
+          hit.id !== "action:new-chat" &&
+          (hit.match >= 10 || hit.id === "action:ask"),
+      );
   return (
     <Command
-      // Search: an input, the type row, the list and a foot of key hints, in one rounded panel.
+      // Search: an input, the list and a foot of hints, in one rounded panel. There is no row of
+      // types: a prefix narrows the search (`/` commands, `#` the Space, `@` an agent).
       className="flex max-h-[min(35rem,calc(100dvh_-_8rem))] flex-col"
       shouldFilter={false}
       loop
@@ -168,48 +246,47 @@ function SearchBody({ onOpen, close }: { onOpen(view: WorkspaceView): void; clos
         if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
           event.preventDefault();
           if (primary) void run(primary);
-          return;
         }
-        // The arrows change type while nothing is typed; once there is text they move the caret.
-        if (raw.trim() || (event.key !== "ArrowLeft" && event.key !== "ArrowRight")) return;
-        event.preventDefault();
-        step(event.key === "ArrowLeft" ? -1 : 1);
       }}
     >
-      <CommandPaletteInput
-        data-tour="search-input"
-        className="misty-search-input pt-5 pr-14 pb-2.5 pl-5"
-        placeholder={searchKinds.find((item) => item.id === kind)?.placeholder ?? "Search"}
-        value={raw}
-        onValueChange={(value) => {
-          setRaw(value);
-          setError("");
-        }}
-        autoFocus
-      />
-      <div
-        className="flex gap-0.5 px-3.5 pt-1 pb-3"
-        role="tablist"
-        aria-label="Type"
-        data-tour="search-kinds"
-      >
-        {searchKinds.map((item) => (
-          <CommandPaletteTab
-            key={item.id}
-            aria-selected={kind === item.id}
-            onClick={() => {
-              setPicked(item.id);
-              // A tab replaces a prefix that chose another.
-              if (query.kind && query.kind !== item.id) setRaw(query.text);
-            }}
-          >
-            {item.label}
-          </CommandPaletteTab>
-        ))}
+      <div className="flex min-w-0 items-center">
+        {scope ? (
+          // The scope's chip; its × (or Backspace on the empty field) widens to everything.
+          <span className="flex flex-none items-center gap-0.5 pt-1 pl-5">
+            <Badge variant="outline">{scope.label}</Badge>
+            <IconButton
+              label="Search everything"
+              onClick={() => useSearchDialog.getState().clearScope()}
+            >
+              <X />
+            </IconButton>
+          </span>
+        ) : null}
+        <CommandPaletteInput
+          data-tour="search-input"
+          className={cn("misty-search-input pt-5 pr-14 pb-4", scope ? "pl-2" : "pl-5")}
+          placeholder={
+            scope
+              ? scope.placeholder
+              : (searchKinds.find((item) => item.id === kind)?.placeholder ?? "Search")
+          }
+          value={raw}
+          onValueChange={(value) => {
+            setRaw(value);
+            setError("");
+          }}
+          onKeyDown={(event) => {
+            if (scope && !raw && event.key === "Backspace") {
+              event.preventDefault();
+              useSearchDialog.getState().clearScope();
+            }
+          }}
+          autoFocus
+        />
       </div>
       <Separator />
       <CommandPaletteList className="min-h-0 flex-auto px-2 pt-1.5 pb-2" data-tour="search-list">
-        {!hits.length && !waiting ? (
+        {!hits.length && !waiting && (typed || !scope) ? (
           <Text
             wrap
             as="div"
@@ -217,7 +294,7 @@ function SearchBody({ onOpen, close }: { onOpen(view: WorkspaceView): void; clos
             tone="muted"
             className="px-3 py-7 text-center leading-(--text-body--line-height)"
           >
-            {typed ? `Nothing matches “${query.text}”` : "Nothing here yet"}
+            {typed ? `Nothing matches “${text}”` : "Nothing here yet"}
           </Text>
         ) : null}
         {groups.map(([heading, list]) => (
@@ -240,7 +317,7 @@ function SearchBody({ onOpen, close }: { onOpen(view: WorkspaceView): void; clos
                 </Text>
                 <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                   <OverflowFadeText className="misty-search-title">
-                    {typed ? <Marked parts={markParts(hit.title, query.text)} /> : hit.title}
+                    {typed ? <Marked parts={markParts(hit.title, text)} /> : hit.title}
                   </OverflowFadeText>
                   {hit.excerpt?.length ? (
                     // The words around the match, under the title.
@@ -292,21 +369,16 @@ function SearchBody({ onOpen, close }: { onOpen(view: WorkspaceView): void; clos
         </>
       ) : null}
       <Separator />
-      {/* The foot: its key hints, then the "i" for the search's tour at its end. */}
+      {/* The foot: only what the box understands that nobody would guess (Esc and ↵ go without
+          saying), then the "i" for the search's tour at its end. */}
       <footer className="flex min-h-10 items-center gap-3 py-1 pr-3 pl-4">
         <div
           className="flex min-w-0 flex-1 items-center gap-5 text-caption leading-(--text-body--line-height)"
           aria-hidden
           data-tour="search-hints"
         >
-          <Hint>
-            Close{" "}
-            <Kbd size="micro" className="ml-1">
-              Esc
-            </Kbd>
-          </Hint>
-          {/* What the box understands, said here rather than in its placeholder, until text is typed. */}
-          {typed ? null : (
+          {/* The prefixes, said here rather than in the placeholder, until text is typed. */}
+          {typed || query.kind || scope ? null : (
             <>
               <Hint>
                 Agents{" "}
@@ -320,17 +392,14 @@ function SearchBody({ onOpen, close }: { onOpen(view: WorkspaceView): void; clos
                   /
                 </Kbd>
               </Hint>
+              <Hint>
+                This Space{" "}
+                <Kbd size="micro" className="ml-1">
+                  #
+                </Kbd>
+              </Hint>
             </>
           )}
-          <Hint>
-            Change type{" "}
-            <Kbd size="micro" className="ml-1">
-              ←
-            </Kbd>
-            <Kbd size="micro" className="ml-0.5">
-              →
-            </Kbd>
-          </Hint>
           {primary ? (
             <Hint className="ml-auto">
               {primary.id === "action:ask" ? "Ask" : "Do it"}{" "}
@@ -342,12 +411,6 @@ function SearchBody({ onOpen, close }: { onOpen(view: WorkspaceView): void; clos
               </Kbd>
             </Hint>
           ) : null}
-          <Hint className={primary ? undefined : "ml-auto"}>
-            Open{" "}
-            <Kbd size="micro" className="ml-1">
-              ↵
-            </Kbd>
-          </Hint>
         </div>
         <TourInfoButton tour="search" />
       </footer>

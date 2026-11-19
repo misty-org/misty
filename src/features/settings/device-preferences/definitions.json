@@ -385,8 +385,8 @@
     "platforms": ["desktop"]
   },
   {
-    "id": "collections.tabs.library",
-    "label": "Library tab order",
+    "id": "collections.tabs.media",
+    "label": "Media tab order",
     "page": "appearance",
     "section": "collections",
     "key": "library_tab_order",
@@ -534,5 +534,55 @@
     "platforms": ["desktop"],
     "keywords": ["microphone", "system audio"],
     "enum": ["mic", "mic-tab", "mic-system", "tab", "system"]
+  },
+  {
+    "id": "search.sources.project_files",
+    "label": "Files in your projects",
+    "keywords": ["search", "files", "folders", "code"],
+    "page": "search",
+    "section": "search",
+    "key": "project_files",
+    "default": true,
+    "owner": "device",
+    "type": "boolean",
+    "platforms": ["desktop"]
+  },
+  {
+    "id": "search.sources.apps",
+    "label": "Apps to connect",
+    "keywords": ["search", "apps", "connect"],
+    "page": "search",
+    "section": "search",
+    "key": "apps",
+    "default": true,
+    "owner": "device",
+    "type": "boolean",
+    "platforms": ["desktop"]
+  },
+  {
+    "id": "search.sources.agent_sessions",
+    "label": "Past agent sessions",
+    "keywords": ["search", "history", "sessions", "chats"],
+    "page": "search",
+    "section": "search",
+    "key": "agent_sessions",
+    "default": true,
+    "owner": "device",
+    "type": "boolean",
+    "platforms": ["desktop"]
+  },
+  {
+    "id": "space.home.coming_up_days",
+    "label": "Coming up looks ahead",
+    "keywords": ["space", "tasks", "due", "upcoming", "calendar"],
+    "page": "space",
+    "section": "space",
+    "key": "coming_up_days",
+    "default": 14,
+    "owner": "device",
+    "type": "number",
+    "platforms": ["desktop"],
+    "min": 7,
+    "max": 30
   }
 ]

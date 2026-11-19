@@ -78,7 +78,7 @@ export function UpdatePromptDialog({ update, onLater }: { update: Update; onLate
           <Button variant="quiet" disabled={installing} onClick={onLater}>
             Later
           </Button>
-          <Button variant="primary" autoFocus loading={installing} onClick={() => void install()}>
+          <Button variant="primary" autoFocus disabled={installing} onClick={() => void install()}>
             Install and restart
           </Button>
         </DialogFooter>

@@ -4,6 +4,7 @@
 pub mod app_menu;
 pub mod autostart;
 pub mod commands;
+pub(crate) mod crash_log;
 pub mod dropped_files;
 pub(crate) mod error;
 pub mod handlers;

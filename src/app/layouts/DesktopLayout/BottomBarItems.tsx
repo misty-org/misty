@@ -2,9 +2,11 @@ import {
   Activity,
   AudioLines,
   CircleHelp,
+  CircleX,
   Clock,
   Coins,
   Cpu,
+  FileCode,
   Focus,
   FolderOpen,
   Gauge,
@@ -13,38 +15,44 @@ import {
   Info,
   Keyboard,
   LayoutDashboard,
+  Locate,
   MessageSquareDot,
-  Moon,
   MousePointer2,
   Orbit,
+  Palette,
   PanelLeft,
   PanelRight,
   Plus,
+  RadioTower,
   Search,
   Server,
+  ServerCog,
   ShieldCheck,
   SquarePen,
-  Sun,
+  SquareTerminal,
   SunMoon,
+  TextCursorInput,
   UsersRound,
   WifiOff,
   ZoomIn,
   type LucideIcon,
 } from "lucide-react";
-import { createContext, useContext, type ComponentType } from "react";
-import { useFocusModeStore, useSidebarCollapsedStore } from "@/app/shell";
-import {
-  dockLeaves,
-  setBrowserWebviewsSuspended,
-  useLayoutEditor,
-  useWorkspaceStore,
-  type WorkspaceView,
-} from "@/features/app-windows";
+import type { ComponentType } from "react";
+import { dockLeaves, useWorkspaceStore } from "@/features/app-windows";
 import {
   AgentBrowsingStatus,
   ApprovalsStatus,
   BranchStatus,
   ChatModelStatus,
+  CodeBranchStatus,
+  CodeCursorStatus,
+  CodeLanguageStatus,
+  CodeLiveStatus,
+  CodeProblemsStatus,
+  CodeServerStatus,
+  CodeTerminalButton,
+  CodeThemeStatus,
+  CodeVimStatus,
   ContextStatus,
   CostStatus,
   FolderStatus,
@@ -53,23 +61,30 @@ import {
   TutorStatus,
   UnreadStatus,
   useChatStatuses,
-  useMistyPanelStore,
 } from "@/features/agents";
 import { TourInfoButton, tourForRoute } from "@/features/onboarding";
-import { openSettings, useAppThemeStore, useSettingsStore } from "@/features/settings";
 import { SpaceBarMenu, SpacePresence } from "@/features/spaces";
 import { CaptureBarStatus } from "@/features/voice";
-import { appZoomDefault, setAppZoom, useAppZoomValue } from "@/shared/hooks/useAppZoom";
-import { Button, IconButton, StateMark, Tooltip } from "@/shared/ui";
-import { useHelpDialog } from "./HelpDialog";
-import { useSearchDialog } from "./search/searchStore";
+import { Button, StateMark } from "@/shared/ui";
+import {
+  FocusButton,
+  HelpButton,
+  LayoutButton,
+  MistyPanelButton,
+  NewChatButton,
+  NewTabButton,
+  SearchButton,
+  ShortcutsButton,
+  SidebarButton,
+  ThemeButton,
+  ZoomLevel,
+} from "./BottomBarButtons";
+import { useBottomBarOpen as useOpen } from "./bottomBarOpenContext";
 import { ConnectionProblem, ServerStatus } from "./ServerStatusItems";
-import { agentChatRoute, openNewChat, openNewTab, openWorkspaceRoute } from "./spaceNavigation";
+import { openChatRoute, openWorkspaceRoute } from "./spaceNavigation";
 import type { BottomBarItemId } from "./bottomBarStore";
 
-/** How a bar item opens a page: the canvas's own `openTab`, so it focuses and routes as a tab does. */
-export const BottomBarOpenContext = createContext<(view: WorkspaceView) => void>(() => {});
-const useOpen = () => useContext(BottomBarOpenContext);
+export { BottomBarOpenContext } from "./bottomBarOpenContext";
 
 type BarItem = {
   label: string;
@@ -180,10 +195,10 @@ export const bottomBarItems: Record<BottomBarItemId, BarItem> = {
   },
   branch: {
     label: "Branch",
-    description: "The focused chat's branch, with its uncommitted lines.",
+    description: "The branch of the focused chat or Code page, with its uncommitted lines.",
     icon: GitBranch,
     side: "end",
-    Item: forChat(BranchStatus),
+    Item: Branch,
   },
   folder: {
     label: "Folder",
@@ -198,6 +213,62 @@ export const bottomBarItems: Record<BottomBarItemId, BarItem> = {
     icon: Clock,
     side: "end",
     Item: forChat(RunTimeStatus),
+  },
+  codeVim: {
+    label: "Vim mode",
+    description: "On the Code page with vim on: normal, insert or visual.",
+    icon: TextCursorInput,
+    side: "end",
+    Item: forCode(CodeVimStatus),
+  },
+  codeLive: {
+    label: "Live session",
+    description: "On the Code page: the live session it's in, and who else is there.",
+    icon: RadioTower,
+    side: "end",
+    Item: forCode(CodeLiveStatus),
+  },
+  codeProblems: {
+    label: "Problems",
+    description: "On the Code page: the open file's errors and warnings.",
+    icon: CircleX,
+    side: "end",
+    Item: forCode(CodeProblemsStatus),
+  },
+  codeCursor: {
+    label: "Cursor position",
+    description: "On the Code page: the cursor's line and column.",
+    icon: Locate,
+    side: "end",
+    Item: forCode(CodeCursorStatus),
+  },
+  codeLanguage: {
+    label: "Language",
+    description: "On the Code page: the open file's language.",
+    icon: FileCode,
+    side: "end",
+    Item: forCode(CodeLanguageStatus),
+  },
+  codeServer: {
+    label: "Language server",
+    description: "On the Code page: the open file's language server, and its install.",
+    icon: ServerCog,
+    side: "end",
+    Item: forCode(CodeServerStatus),
+  },
+  codeTheme: {
+    label: "Editor theme",
+    description: "On the Code page: the editor's theme, to switch it in place.",
+    icon: Palette,
+    side: "end",
+    Item: forCode(CodeThemeStatus),
+  },
+  codeTerminal: {
+    label: "Terminal",
+    description: "On the Code page: shows or hides its terminal.",
+    icon: SquareTerminal,
+    side: "end",
+    Item: forCode(CodeTerminalButton),
   },
   newChat: {
     label: "New chat",
@@ -301,7 +372,7 @@ function Browsing() {
 function useOpenChat() {
   const open = useOpen();
   return (agentId: string, conversationId: string) =>
-    openWorkspaceRoute(agentChatRoute(agentId, conversationId), open);
+    openWorkspaceRoute(openChatRoute(agentId, conversationId), open);
 }
 
 /** The focused pane's view, unless it is an unused new tab. */
@@ -327,6 +398,31 @@ function forChat(Status: ComponentType<{ conversationId: string }>): ComponentTy
   };
 }
 
+/** The focused Code page's view id, or null while the focused pane shows something else. */
+function useFocusedCodeView(): string | null {
+  const view = useFocusedView();
+  const [path, query = ""] = (view?.route ?? "").split("?");
+  return view && path === "/agents" && new URLSearchParams(query).get("view") === "code"
+    ? view.id
+    : null;
+}
+
+/** A Code item, drawn only while the focused pane shows the Code page. */
+function forCode(Status: ComponentType<{ viewId: string }>): ComponentType {
+  return function CodeItem() {
+    const viewId = useFocusedCodeView();
+    return viewId ? <Status viewId={viewId} /> : null;
+  };
+}
+
+const ChatBranch = forChat(BranchStatus);
+
+/** The focused Code page's branch there, else the focused chat's. */
+function Branch() {
+  const codeView = useFocusedCodeView();
+  return codeView ? <CodeBranchStatus viewId={codeView} /> : <ChatBranch />;
+}
+
 /** How many agents are working and how many wait on the person, while any do. */
 function AgentActivity() {
   const statuses = Object.values(useChatStatuses());
@@ -346,133 +442,6 @@ function AgentActivity() {
         </Button>
       ) : null}
     </>
-  );
-}
-
-/** The app's zoom, only while it isn't 100%. Resets it. */
-function ZoomLevel() {
-  const zoom = useAppZoomValue();
-  if (zoom === appZoomDefault) return null;
-  return (
-    <Tooltip content="Reset to 100%">
-      <Button variant="quiet" icon={ZoomIn} onClick={() => setAppZoom(appZoomDefault)}>
-        {`${Math.round(zoom * 100)}%`}
-      </Button>
-    </Tooltip>
-  );
-}
-
-function ShortcutsButton() {
-  return (
-    <IconButton label="Shortcuts" onClick={() => openSettings("shortcuts")}>
-      <Keyboard />
-    </IconButton>
-  );
-}
-
-function NewChatButton() {
-  const open = useOpen();
-  return (
-    <IconButton label="New chat" onClick={() => openNewChat(open)}>
-      <SquarePen />
-    </IconButton>
-  );
-}
-
-function NewTabButton() {
-  const open = useOpen();
-  return (
-    <IconButton label="New tab" onClick={() => openNewTab(open)}>
-      <Plus />
-    </IconButton>
-  );
-}
-
-function SearchButton() {
-  return (
-    <IconButton label="Search" onClick={() => useSearchDialog.getState().setOpen(true)}>
-      <Search />
-    </IconButton>
-  );
-}
-
-function LayoutButton() {
-  const active = useLayoutEditor((state) => state.active);
-  return (
-    <IconButton
-      label="Layout"
-      aria-pressed={active}
-      onClick={() => useLayoutEditor.getState().toggle()}
-    >
-      <LayoutDashboard />
-    </IconButton>
-  );
-}
-
-function MistyPanelButton() {
-  const open = useMistyPanelStore((state) => state.chatOpen);
-  return (
-    <IconButton
-      label={open ? "Hide the Misty panel" : "Show the Misty panel"}
-      aria-pressed={open}
-      onClick={() => useMistyPanelStore.getState().toggle()}
-    >
-      <PanelRight />
-    </IconButton>
-  );
-}
-
-function SidebarButton() {
-  const collapsed = useSidebarCollapsedStore((state) => state.collapsed);
-  return (
-    <IconButton
-      label={collapsed ? "Show the sidebar" : "Hide the sidebar"}
-      aria-pressed={!collapsed}
-      onClick={() => useSidebarCollapsedStore.getState().toggle()}
-    >
-      <PanelLeft />
-    </IconButton>
-  );
-}
-
-/** Turns focus mode on; the bar hides with the rest of the chrome, and its shortcut brings it back. */
-function FocusButton() {
-  return (
-    <IconButton
-      label="Focus mode"
-      onClick={() => {
-        // Native pages hide while the chrome animates, as the shortcut does.
-        setBrowserWebviewsSuspended(true, "focus-mode");
-        useFocusModeStore.getState().toggle();
-        window.setTimeout(() => setBrowserWebviewsSuspended(false, "focus-mode"), 320);
-      }}
-    >
-      <Focus />
-    </IconButton>
-  );
-}
-
-function ThemeButton() {
-  const dark = useAppThemeStore((state) => state.resolvedTheme) === "dark";
-  return (
-    <IconButton
-      label={dark ? "Switch to the light theme" : "Switch to the dark theme"}
-      onClick={() =>
-        useSettingsStore
-          .getState()
-          .updateSetting("appearance", "theme_mode", dark ? "light" : "dark")
-      }
-    >
-      {dark ? <Sun /> : <Moon />}
-    </IconButton>
-  );
-}
-
-function HelpButton() {
-  return (
-    <IconButton label="Help" onClick={() => useHelpDialog.getState().setOpen(true)}>
-      <CircleHelp />
-    </IconButton>
   );
 }
 

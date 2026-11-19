@@ -20,7 +20,12 @@ vi.mock("@/features/commands", () => ({
     { id: "theme", title: () => "Toggle theme", keywords: () => ["dark"], run: vi.fn() },
   ],
 }));
-vi.mock("@/features/settings", () => ({ openSettings: vi.fn(), searchSettings: () => [] }));
+vi.mock("@/features/settings", () => ({
+  openSettings: vi.fn(),
+  searchSettings: () => [],
+  // No search preferences saved: every source keeps its default.
+  useSettingsStore: (select: (state: { settings: null }) => unknown) => select({ settings: null }),
+}));
 vi.mock("../spaceNavigation", () => ({
   agentChatRoute: (agent: string, chat?: string) => `/agents?agent=${agent}&conversation=${chat}`,
   openNewChat: vi.fn(),
@@ -46,6 +51,8 @@ vi.mock("@/features/agents", () => {
   };
   return {
     defaultAgentOf: (list: typeof agents) => list.find((agent) => agent.engine),
+    // No chat here works in a project, so every chat is the sidebar's.
+    useProjectChats: () => ({}),
     AgentAvatar: () => <span />,
     askInNewChat: async (agent: string, prompt: string) => {
       calls.asked.push([agent, prompt]);

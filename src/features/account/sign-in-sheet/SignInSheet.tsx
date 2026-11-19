@@ -126,6 +126,7 @@ export function SignInSheet() {
   const setupStepCopy = setupFlow.get().stepCopy;
   const SetupStepBody = setupFlow.get().StepBody;
   const setupStep = screen in setupStepCopy ? (screen as SetupStep) : null;
+  const setupStepDone = setupFlow.get().useStepDone(setupStep);
   // The tab side, asked in the browser, is outside the wizard's list and stands alone.
   const setupIndex = setupSteps.indexOf(screen as SetupStep);
   const lastSetupStep = setupIndex < 0 || setupIndex === setupSteps.length - 1;
@@ -205,7 +206,7 @@ export function SignInSheet() {
             ) : (
               <span />
             )}
-            <Button variant="primary" onClick={nextSetupStep}>
+            <Button variant="primary" disabled={!setupStepDone} onClick={nextSetupStep}>
               {lastSetupStep ? "Done" : "Continue"}
             </Button>
           </footer>

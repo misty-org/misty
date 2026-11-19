@@ -45,6 +45,7 @@ mod dev_responsibility {
         std::thread::spawn(move || loop {
             std::thread::sleep(Duration::from_millis(500));
             if unsafe { libc::getppid() } != parent {
+                eprintln!("Misty: the process that started this copy is gone, so it quits too");
                 std::process::exit(0);
             }
         });
@@ -135,6 +136,16 @@ mod dev_responsibility {
             } else {
                 1
             };
+            // A quit nobody asked for leaves at least this line in the terminal.
+            if libc::WIFSIGNALED(status) {
+                eprintln!("Misty was stopped by signal {}", libc::WTERMSIG(status));
+            } else if code == 101 {
+                eprintln!(
+                    "Misty quit after a panic; the panic is in logs/crash.log in its data folder"
+                );
+            } else if code != 0 {
+                eprintln!("Misty quit with exit code {code}");
+            }
             std::process::exit(code);
         }
     }

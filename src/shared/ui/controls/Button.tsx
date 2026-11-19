@@ -4,12 +4,14 @@ import * as React from "react";
 import { cn } from "../classNames";
 import { controlFrame } from "./controlFrame";
 import { useCompactControls } from "./RowContext";
-import { Spinner } from "../feedback/Spinner";
 
 /**
  * The four roles. primary is the one filled call to action on a surface (at most one);
  * secondary is the bordered everyday button; quiet is a wash on hover and nothing else, for
  * toolbars and inline actions; danger is only for what deletes.
+ *
+ * A button never shows loading. While its work runs it is just disabled, and progress shows
+ * where the work happens: the row, item or content it changes.
  */
 export type ButtonVariant = "primary" | "secondary" | "quiet" | "danger";
 
@@ -21,7 +23,12 @@ export type ButtonSize = "sm" | "md" | "lg";
  * controls drawn over images, video and the Studio, where a role would vanish into the picture.
  * Only media viewers and the Studio use it, usually through IconButton.
  */
-export type ButtonLook = ButtonVariant | "overlay";
+/**
+ * Two looks past the four roles: `overlay` for controls over images and video, and `soft`, a
+ * solid square in a soft wash, for a button that stands in another's place in a slot (Stop in
+ * Send's place while a reply runs).
+ */
+export type ButtonLook = ButtonVariant | "overlay" | "soft";
 
 export type ButtonJustify = "center" | "start" | "end" | "between" | "none";
 
@@ -39,7 +46,7 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
   /** Defaults to md (32). */
   size?: ButtonSize | null;
   justify?: ButtonJustify | null;
-  /** The 16px glyph before the label. A spinner takes its place while `loading`. */
+  /** The 16px glyph before the label. */
   icon?: ButtonIcon;
   /** The 16px glyph after the label, such as a chevron or an arrow. */
   iconEnd?: ButtonIcon;
@@ -49,8 +56,6 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
    * lines, 48px tall and at least 96px wide; every choice in the row has one.
    */
   caption?: React.ReactNode;
-  /** Working on the click: a spinner replaces the icon, the label stays, and clicks wait. */
-  loading?: boolean;
   /**
    * Gives way first when its bar runs short: it narrows below its label, which fades out at the
    * cut (an `OverflowFadeText` label), as a breadcrumb's folder does.
@@ -106,6 +111,11 @@ const variantClass: Record<ButtonLook, string> = {
     "border-charcoal-border-strong bg-transparent text-danger",
     "hover:bg-danger-wash focus-visible:bg-danger-wash",
     "aria-expanded:bg-danger-wash data-[state=open]:bg-danger-wash",
+  ),
+  // A solid square in a soft wash, as big as the button whose place it takes (MessageComposer).
+  soft: cn(
+    "bg-control-hover bg-clip-border text-cream hover:bg-control-active hover:text-cream-bright",
+    "focus-visible:bg-control-active aria-pressed:text-cream-bright",
   ),
   // Controls drawn over images and video: a dark translucent disc that reads on any media.
   overlay: cn(
@@ -189,12 +199,10 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       icon,
       iconEnd,
       caption,
-      loading = false,
       shrink = false,
       snug = false,
       asChild = false,
       children,
-      onClick,
       type,
       ...props
     },
@@ -206,19 +214,12 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     const compact = useCompactControls();
     const resolvedSize = compact ? "sm" : (size ?? "md");
     const resolvedJustify = justify ?? "center";
-    const start = loading ? (
-      <Spinner label={false} data-icon="inline-start" />
-    ) : (
-      renderIcon(icon, "inline-start")
-    );
     return (
       <Comp
         data-slot="button"
         data-variant={resolvedVariant}
         data-size={resolvedSize}
         data-justify={resolvedJustify}
-        data-loading={loading ? "true" : undefined}
-        aria-busy={loading || undefined}
         className={buttonClassName(
           resolvedVariant,
           resolvedSize,
@@ -234,13 +235,9 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         // A plain button unless it says otherwise, so one inside a form never submits it by
         // accident. With `asChild` the child (a link) keeps its own semantics.
         type={type ?? (asChild ? undefined : "button")}
-        // A click while it works would start the same thing twice; a link or submit waits too.
-        onClick={
-          loading ? (event: React.MouseEvent<HTMLButtonElement>) => event.preventDefault() : onClick
-        }
         {...props}
       >
-        {start}
+        {renderIcon(icon, "inline-start")}
         <Slottable>{children}</Slottable>
         {caption != null ? <span className="text-caption text-cream-muted">{caption}</span> : null}
         {renderIcon(iconEnd, "inline-end")}

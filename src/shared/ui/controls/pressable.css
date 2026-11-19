@@ -24,6 +24,14 @@
   ) {
   background-color: var(--color-control-hover);
 }
+/* Over the panel's own fill, not in place of it: the control wash is see-through. */
+[data-wash="panel"]:is(:hover, :focus-visible, :focus-within, [data-hover]):not(
+    :disabled,
+    [aria-current="page"],
+    [aria-current="true"]
+  ) {
+  background-image: linear-gradient(var(--color-control-hover), var(--color-control-hover));
+}
 [data-wash="card"]:is(:hover, :focus-visible, :focus-within, [data-hover]):not(
     :disabled,
     [aria-current="page"],
@@ -42,6 +50,10 @@
 [data-wash="control"][data-selected],
 [data-wash="control"][data-selected]:is(:hover, :focus-visible, :focus-within, [data-hover]) {
   background-color: var(--color-control-active);
+}
+[data-wash="panel"][data-selected],
+[data-wash="panel"][data-selected]:is(:hover, :focus-visible, :focus-within, [data-hover]) {
+  background-image: linear-gradient(var(--color-control-active), var(--color-control-active));
 }
 
 /* `strong`: the pressed fill and bright text, for a control that must answer the pointer clearly

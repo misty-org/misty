@@ -185,16 +185,22 @@ function useEffectiveShortcut(commandId: string) {
   return effectiveShortcut(commandId);
 }
 
-/** A command's shortcut as plain text (such as "⇧⌘T"), for menus. */
-export function ShortcutText(props: { commandId: string; className?: string }) {
+/** A command's shortcut as it reads (such as "⇧⌘T"), or "" while hints are off or it has none. */
+export function useShortcutLabel(commandId: string): string {
   const hintsEnabled = useSettingsStore((state) =>
     settingsBoolean(state.settings?.document ?? {}, "shortcuts", "shortcut_hints_enabled", true),
   );
-  const binding = useEffectiveShortcut(props.commandId);
+  const binding = useEffectiveShortcut(commandId);
   const platform =
     useSettingsStore((state) => state.shortcuts?.detectedPlatform) ?? detectShortcutPlatform();
   const label = formatShortcutLabel(binding.primary, platform);
-  if (!hintsEnabled || !label) return null;
+  return hintsEnabled && label ? label : "";
+}
+
+/** A command's shortcut as plain text (such as "⇧⌘T"), for menus. */
+export function ShortcutText(props: { commandId: string; className?: string }) {
+  const label = useShortcutLabel(props.commandId);
+  if (!label) return null;
   return <span className={props.className}>{label}</span>;
 }
 

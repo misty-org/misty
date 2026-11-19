@@ -85,7 +85,7 @@ export function RenameItemDialog({
             <Button type="button" variant="quiet" size="lg" disabled={busy} onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit" variant="primary" size="lg" loading={busy} disabled={empty}>
+            <Button type="submit" variant="primary" size="lg" disabled={empty || busy}>
               {confirmLabel}
             </Button>
           </DialogFooter>

@@ -190,10 +190,23 @@ export function SidePanel(props: {
  * The open view's own controls, drawn in its SidePanel's header row instead of a first row of its
  * own. Outside a SidePanel it renders in place.
  */
-export function SidePanelHeader({ children }: { children: ReactNode }) {
+export function SidePanelHeader({
+  children,
+  bar = false,
+}: {
+  children: ReactNode;
+  /** Outside a side panel (the Code page's sidebar), stand as a bar of its own at the top of the
+   * view rather than in line with what follows. */
+  bar?: boolean;
+}) {
   const slot = useContext(HeaderSlot);
   const inPanel = useContext(InPanel);
-  if (!inPanel) return <>{children}</>;
+  if (!inPanel)
+    return bar ? (
+      <div className="flex h-10 flex-none items-center px-2">{children}</div>
+    ) : (
+      <>{children}</>
+    );
   return slot ? createPortal(children, slot) : null;
 }
 

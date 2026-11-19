@@ -1,5 +1,6 @@
 import "../ui/patterns/pointerReorder.css";
 import { reorderLayoutRect } from "./pointerReorderMotion";
+import { createDwell } from "./pointerDwell";
 import { startGesture } from "./pointerGesture";
 import { usePointerDropTarget, type ReorderDrag } from "./pointerDropTargets";
 import {
@@ -12,6 +13,17 @@ import {
 } from "react";
 
 export { usePointerDropTarget } from "./pointerDropTargets";
+export { createDwell } from "./pointerDwell";
+
+/**
+ * Starts a drag from a press on a row that isn't in a reorder list (a sidebar chat dragged onto
+ * the panes). The row, or an ancestor, carries `data-reorder-handle`; a plain click still clicks.
+ */
+export function startPointerDrag(event: ReactPointerEvent<HTMLElement>, drag: ReorderDrag) {
+  if (event.button !== 0 || !event.isPrimary || event.metaKey || event.ctrlKey || event.shiftKey)
+    return;
+  startGesture(event, drag);
+}
 
 /**
  * Starts a drag from a pointerdown, or from a pointermove with the primary button held,
@@ -36,7 +48,10 @@ export function usePointerReorder(options: {
   getDrag(id: string, element: HTMLElement): Omit<ReorderDrag, "scope"> | null;
   onDrop(drag: ReorderDrag, targetId: string, after: boolean): void;
   onKeyboardMove(id: string, direction: -1 | 1): void;
+  /** A drag rested on another item for a moment (a tab paused over opens while held). */
+  onDwell?(id: string): void;
 }) {
+  const dwell = useRef(createDwell());
   // Disclosure content mounts independently of the component owning this hook.
   // Track the actual node so closing/reopening a category replaces its drop target.
   const [element, setElement] = useState<HTMLDivElement | null>(null);
@@ -48,7 +63,7 @@ export function usePointerReorder(options: {
     );
   usePointerDropTarget(ref, {
     scope: options.scope,
-    hit(x, y) {
+    hit(x, y, drag) {
       const available = items().filter((item) => item.getBoundingClientRect().height > 0);
       if (!available.length) {
         const rect = ref.current?.getBoundingClientRect();
@@ -69,6 +84,10 @@ export function usePointerReorder(options: {
         }) ?? available[available.length - 1];
       const rect = reorderLayoutRect(item);
       const hit = hitRect(item);
+      if (options.onDwell) {
+        const over = item.dataset.reorderItem!;
+        dwell.current(over === drag.id ? null : over, (id) => options.onDwell?.(id));
+      }
       return {
         id: item.dataset.reorderItem!,
         after:
@@ -115,6 +134,8 @@ export function usePointerReorder(options: {
     },
     onKeyDownCapture: (event: ReactKeyboardEvent<HTMLDivElement>) => {
       if (!event.altKey || !event.shiftKey || event.ctrlKey || event.metaKey) return;
+      // ⌥⇧ and an arrow selects by word in a text field.
+      if ((event.target as Element).closest("input, textarea, [contenteditable=true]")) return;
       const item = (event.target as Element).closest<HTMLElement>("[data-reorder-item]");
       if (!item || item.closest("[data-reorder-list]") !== ref.current) return;
       const direction =

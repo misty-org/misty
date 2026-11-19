@@ -14,7 +14,7 @@ export interface IconBarItemOptions {
   /** A disclosure that is open, such as a find bar's replace row. */
   expanded?: boolean;
   disabled?: boolean;
-  /** Working on the click: the spinner takes the icon's place and clicks wait. */
+  /** Working on the click: the button is disabled until it finishes. */
   loading?: boolean;
   size?: "sm" | "md";
   /** For a button that must not take focus from a field, such as a find bar's. */
@@ -49,8 +49,7 @@ export function iconBarItem(item: IconBarItemOptions): ActionBarItem {
         size={item.size}
         aria-pressed={item.pressed}
         aria-expanded={item.expanded}
-        disabled={item.disabled}
-        loading={item.loading}
+        disabled={item.disabled || item.loading}
         onMouseDown={item.onMouseDown}
         onClick={item.onSelect}
       >

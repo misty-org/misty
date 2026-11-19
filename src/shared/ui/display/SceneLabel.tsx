@@ -157,7 +157,7 @@ export function SceneSign({
       className={cn(
         "group/sign mb-0.5 flex h-7 min-w-7 items-center justify-center gap-1.5 rounded-full px-1.5",
         "pointer-events-auto bg-charcoal-sidebar text-control font-medium text-cream-bright",
-        "outline-[0.5px] outline-solid -outline-offset-[0.5px]",
+        "hairline-outline",
         "outline-[color-mix(in_srgb,var(--misty-theme-text)_14%,transparent)]",
         "shadow-[0_0.125rem_0.5rem_rgb(0_0_0/0.35)] transition-[padding] duration-150",
         "hover:pr-2.5 focus-visible:pr-2.5",
@@ -266,8 +266,8 @@ export function SceneMeter({
  * One slot of a game's hotbar over the scene: a square holding a glyph in its tint and a short
  * word under it, with its number key in the corner, as players expect of a bar along the bottom of
  * a game. `selected` keeps it lit for what is in force now (the order the team is under): the
- * neutral pressed wash and a bar of its tint under it, as a game marks what is equipped. The word
- * is its accessible name unless `aria-label` says more.
+ * neutral pressed wash. `compact` folds the word away and the slot down to 40px, for a hotbar
+ * resting small. The word is its accessible name unless `aria-label` says more.
  */
 export function SceneSlot({
   icon,
@@ -275,6 +275,7 @@ export function SceneSlot({
   tint,
   children,
   selected = false,
+  compact = false,
   className,
   ...props
 }: Omit<PressableProps, "wash" | "selected"> & {
@@ -283,6 +284,8 @@ export function SceneSlot({
   keyName?: string;
   tint?: SceneTint;
   selected?: boolean;
+  /** Just the glyph and its key, 40px tall; the word folds away. */
+  compact?: boolean;
 }) {
   return (
     <Pressable
@@ -291,7 +294,9 @@ export function SceneSlot({
       selected={selected}
       aria-pressed={selected}
       className={cn(
-        "relative grid h-13 w-14 flex-none content-center justify-items-center gap-1 rounded-lg px-1",
+        "relative grid w-14 flex-none content-center justify-items-center rounded-lg px-1",
+        "transition-[height] duration-150 ease-out motion-reduce:transition-none",
+        compact ? "h-10" : "h-13",
         "text-cream",
         className,
       )}
@@ -310,13 +315,15 @@ export function SceneSlot({
       ) : null}
       {tint ? <SceneGlyph tint={tint}>{icon}</SceneGlyph> : icon}
       {/* The word is kept short enough to fit whole: a slot's label is never cut. */}
-      <span className="whitespace-nowrap text-micro font-medium leading-none">{children}</span>
-      {selected && tint ? (
-        <span
-          aria-hidden="true"
-          className={cn("absolute inset-x-3 bottom-0.5 h-0.5 rounded-full", tintFill[tint])}
-        />
-      ) : null}
+      <span
+        className={cn(
+          "overflow-hidden whitespace-nowrap text-micro font-medium leading-none",
+          "transition-[max-height,margin,opacity] duration-150 ease-out motion-reduce:transition-none",
+          compact ? "mt-0 max-h-0 opacity-0" : "mt-1 max-h-4",
+        )}
+      >
+        {children}
+      </span>
     </Pressable>
   );
 }
@@ -334,7 +341,7 @@ export function ScenePrompt({ keyName, children }: { keyName: string; children: 
       className={cn(
         "mb-1.5 flex flex-none items-center gap-1.5 whitespace-nowrap rounded-lg py-1 pr-2.5 pl-1",
         "bg-charcoal-sidebar text-caption font-medium text-cream-bright",
-        "outline-[0.5px] outline-solid -outline-offset-[0.5px]",
+        "hairline-outline",
         "outline-[color-mix(in_srgb,var(--misty-theme-text)_14%,transparent)]",
         "animate-[misty-fade-in_0.15s_ease-out] motion-reduce:animate-none",
       )}
@@ -376,7 +383,7 @@ export function SceneCrosshair({ className }: { className?: string }) {
       data-slot="scene-crosshair"
       aria-hidden="true"
       className={cn(
-        "pointer-events-none absolute top-1/2 left-1/2 size-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full",
+        "pointer-events-none absolute inset-0 m-auto size-1.5 rounded-full",
         "bg-cream-bright ring-1 ring-charcoal-bg/60",
         className,
       )}

@@ -41,14 +41,38 @@ export function WorkspaceDockTree(props: WorkspaceDockTreeProps) {
   );
 }
 
-function DockLayoutNode(props: WorkspaceDockTreeProps) {
+/** How near (as a share of the split) a seam has to come to an even or lined-up spot to snap. */
+const snapReach = 0.025;
+
+/**
+ * Where a split's seam snaps while dragged: halfway, and in a 2 by 2 grid in line with the seam
+ * across from it (`alignRatio`), so each pane resizes on its own and still falls back onto the
+ * grid easily.
+ */
+function snappedRatio(ratio: number, alignRatio?: number): number | null {
+  const spots = alignRatio === undefined ? [0.5] : [0.5, alignRatio];
+  const spot = spots.find((target) => Math.abs(ratio - target) < snapReach);
+  return spot === undefined || Math.abs(ratio - spot) < 0.001 ? null : spot;
+}
+
+/** The ratio of the split across from `node`'s sibling, when the two line up as a grid's rows. */
+function crossRatio(node: WorkspaceDockNode, other: WorkspaceDockNode): number | undefined {
+  return node.type === "split" && other.type === "split" && node.direction === other.direction
+    ? other.ratio
+    : undefined;
+}
+
+function DockLayoutNode(props: WorkspaceDockTreeProps & { alignRatio?: number }) {
   if (props.node.type === "leaf")
     return <div data-pane-layout-slot={props.node.id} className="h-full min-h-0 w-full min-w-0" />;
   return <DockSplitView key={props.node.id} {...props} node={props.node} />;
 }
 
 function DockSplitView(
-  props: WorkspaceDockTreeProps & { node: Extract<WorkspaceDockNode, { type: "split" }> },
+  props: WorkspaceDockTreeProps & {
+    node: Extract<WorkspaceDockNode, { type: "split" }>;
+    alignRatio?: number;
+  },
 ) {
   const edge = props.dockEdge ?? { top: true, left: true, right: true };
   const firstEdge =
@@ -84,7 +108,14 @@ function DockSplitView(
       direction={props.node.direction}
       className="h-full min-h-0 w-full min-w-0"
       onLayout={(sizes) => {
-        pendingRatioRef.current = (sizes[0] ?? 50) / 100;
+        const ratio = (sizes[0] ?? 50) / 100;
+        // Near halfway, or in line with the seam across from it, the seam snaps there.
+        const snapped = snappedRatio(ratio, props.alignRatio);
+        if (snapped !== null) {
+          splitGroupRef.current?.setLayout([snapped * 100, 100 - snapped * 100]);
+          return;
+        }
+        pendingRatioRef.current = ratio;
         if (persistTimerRef.current !== null) window.clearTimeout(persistTimerRef.current);
         persistTimerRef.current = window.setTimeout(() => {
           persistTimerRef.current = null;
@@ -102,6 +133,7 @@ function DockSplitView(
         <DockLayoutNode
           {...props}
           node={props.node.first}
+          alignRatio={crossRatio(props.node.first, props.node.second)}
           dockEdge={firstEdge}
           paneDirection={props.node.direction === "horizontal" ? "left" : "up"}
         />
@@ -109,6 +141,8 @@ function DockSplitView(
       <SplitHandle
         seam
         direction={props.node.direction}
+        // Back onto the grid: the two sides even again.
+        onDoubleClick={() => splitGroupRef.current?.setLayout([50, 50])}
         label={
           props.node.direction === "horizontal"
             ? "Resize panes horizontally"
@@ -125,6 +159,7 @@ function DockSplitView(
         <DockLayoutNode
           {...props}
           node={props.node.second}
+          alignRatio={crossRatio(props.node.second, props.node.first)}
           dockEdge={secondEdge}
           paneDirection={props.node.direction === "horizontal" ? "right" : "down"}
         />

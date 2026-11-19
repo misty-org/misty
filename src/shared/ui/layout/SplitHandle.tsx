@@ -11,10 +11,13 @@ export function SplitHandle(props: {
   direction: "horizontal" | "vertical";
   label: string;
   seam?: boolean;
+  /** A double-click on the seam, such as evening the two panes out again. */
+  onDoubleClick?(): void;
 }) {
   return (
     <PanelResizeHandle
       aria-label={props.label}
+      onDoubleClick={props.onDoubleClick}
       className={cn(
         "relative z-20 transition-colors",
         props.seam ? "bg-charcoal-border" : "bg-transparent",

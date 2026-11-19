@@ -71,7 +71,6 @@ export function ChoosePasswordScreen(props: {
         variant="primary"
         size="lg"
         disabled={busy || !password || !confirmation}
-        loading={busy}
       >
         Continue
       </Button>

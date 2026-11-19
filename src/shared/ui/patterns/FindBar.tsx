@@ -13,6 +13,7 @@ import type { KeyboardEvent, ReactNode, Ref } from "react";
 import { Button } from "../controls/Button";
 import { IconButton } from "../controls/IconButton";
 import { Input } from "../controls/Input";
+import { Surface } from "../display/Surface";
 import { Text } from "../display/Text";
 import { ActionBar, type ActionBarItem } from "../layout/ActionBar";
 import { iconBarItem, type IconBarItemOptions } from "../layout/IconBarItem";
@@ -68,6 +69,11 @@ export interface FindBarProps {
   onClose(): void;
   onKeyDown?(event: KeyboardEvent<HTMLDivElement>): void;
   replace?: FindBarReplaceProps;
+  /**
+   * Floats at the document's top right instead of docking over it, for a document that scrolls
+   * under a see-through header (a chat). It sits `--find-bar-inset` below the top.
+   */
+  floating?: boolean;
 }
 
 function FindField(props: FindBarFieldProps & { placeholder: string; invalid?: boolean }) {
@@ -168,7 +174,25 @@ export function FindBar(props: FindBarProps) {
       </IconButton>
     </>
   );
-  const replace = props.replace;
+  if (props.floating) {
+    return (
+      <Surface
+        role="search"
+        aria-label={props.label}
+        hidden={props.hidden}
+        onKeyDown={props.onKeyDown}
+        tone="card"
+        edge="hairline"
+        radius="xl"
+        className={
+          "absolute top-[calc(var(--find-bar-inset,0px)+0.75rem)] right-4 z-[var(--stack-float)] " +
+          "flex w-96 max-w-[calc(100%-2rem)] flex-col gap-1 p-2"
+        }
+      >
+        <FindBarRows {...props} items={items} end={end} />
+      </Surface>
+    );
+  }
   return (
     <div
       role="search"
@@ -177,6 +201,16 @@ export function FindBar(props: FindBarProps) {
       onKeyDown={props.onKeyDown}
       className="flex flex-none flex-col gap-1 border-b px-2 py-2"
     >
+      <FindBarRows {...props} items={items} end={end} />
+    </div>
+  );
+}
+
+/** The bar's rows, docked or floating: find with its options, then replace when it is open. */
+function FindBarRows(props: FindBarProps & { items: ActionBarItem[]; end: ReactNode }) {
+  const replace = props.replace;
+  return (
+    <>
       <div className="flex min-w-0 items-center gap-1">
         {replace ? (
           <IconButton
@@ -189,7 +223,7 @@ export function FindBar(props: FindBarProps) {
           </IconButton>
         ) : null}
         <FindField {...props.find} placeholder="Find" invalid={props.empty} />
-        <ActionBar label="Find options" width="content" items={items} end={end} />
+        <ActionBar label="Find options" width="content" items={props.items} end={props.end} />
       </div>
       {replace?.open ? (
         <div className="flex min-w-0 items-center gap-1">
@@ -213,6 +247,6 @@ export function FindBar(props: FindBarProps) {
           </Button>
         </div>
       ) : null}
-    </div>
+    </>
   );
 }

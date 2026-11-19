@@ -6,7 +6,20 @@ export type ReorderDrag = {
   scope: string;
   paneId?: string;
   ids?: string[];
+  /**
+   * What the dragged thing is to other drop scopes, by scope: a window tab is its page's view to
+   * the panes (`workspace-tabs`), a chat its route (`workspace-place`). Targets in those scopes
+   * see the drag with that scope and id.
+   */
+  carries?: Record<string, string>;
 };
+
+/** The drag as a target in `scope` sees it: its own, or what it carries for that scope. */
+export function dragFor(drag: ReorderDrag, scope: string): ReorderDrag | null {
+  if (drag.scope === scope) return drag;
+  const id = drag.carries?.[scope];
+  return id === undefined ? null : { ...drag, scope, id, ids: undefined };
+}
 export type ReorderHit = {
   id: string;
   after: boolean;
@@ -15,6 +28,11 @@ export type ReorderHit = {
   axis: "x" | "y";
   /** Highlight the whole region (dropping into it) instead of an insertion line. */
   box?: boolean;
+  /**
+   * What dropping does, shown in the middle of the highlighted region ("Split right"): the
+   * region is then drawn as a split preview, the part of the pane the dropped page will take.
+   */
+  label?: string;
 };
 export type DropTarget = {
   element: HTMLElement;

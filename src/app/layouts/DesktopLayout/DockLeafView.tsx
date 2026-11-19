@@ -17,7 +17,14 @@ import { cn, Surface, Text } from "@/shared/ui";
 import { memo, useMemo, useRef, useState, type DragEvent } from "react";
 import { EmptyWorkspacePane, WorkspaceSurface } from "./WorkspaceSurface";
 import { AiPaneHost } from "@/features/agents";
-import { dockSplitFits, dropZoneAt } from "./dockSplitFit";
+import {
+  dockRouteFits,
+  dockSplitFits,
+  dropZoneAt,
+  dropZoneLabels,
+  dropZoneRect,
+} from "./dockSplitFit";
+import { openWorkspaceRouteAt } from "./spaceNavigation";
 import { workspaceAiAdapter } from "./workspaceAi";
 import type { WorkspaceDockTreeProps } from "./WorkspaceDockTree";
 
@@ -72,6 +79,19 @@ function useRenderedView(view: WorkspaceView): WorkspaceView {
   return rendered.current;
 }
 
+/** A drop on a pane's zone, drawn as the part of the pane the page will take, with its name. */
+function dockHit(rect: DOMRect, zone: DockDropZone) {
+  return {
+    id: zone,
+    after: zone === "right" || zone === "down",
+    rect,
+    previewRect: dropZoneRect(rect, zone),
+    box: true,
+    label: dropZoneLabels[zone],
+    axis: (zone === "left" || zone === "right" ? "x" : "y") as "x" | "y",
+  };
+}
+
 export function DockLeafView(props: WorkspaceDockTreeProps & { pane: WorkspacePane }) {
   const { pane } = props;
   const sectionRef = useRef<HTMLElement | null>(null);
@@ -96,21 +116,30 @@ export function DockLeafView(props: WorkspaceDockTreeProps & { pane: WorkspacePa
       const moving = allLayoutViews(useWorkspaceStore.getState().layout).find(
         (tab) => tab.id === drag.id,
       );
-      if (!moving || (zone !== "center" && !dockSplitFits(pane, paneSize(), zone, moving)))
-        return null;
-      const horizontal = zone === "left" || zone === "right";
-      return {
-        id: zone,
-        after: zone === "right" || zone === "down",
-        rect,
-        axis: horizontal ? "x" : "y",
-      };
+      // A pane already showing the dragged page has nowhere to put it.
+      if (!moving || pane.views.some((view) => view.id === moving.id)) return null;
+      if (zone !== "center" && !dockSplitFits(pane, paneSize(), zone, moving)) return null;
+      return dockHit(rect, zone);
     },
     drop: (drag, hit) => {
       useWorkspaceStore
         .getState()
         .dockViews(drag.ids ?? [drag.id], pane.id, hit.id as DockDropZone);
     },
+  });
+
+  // A page not open yet, by its route (a chat dragged from the sidebar), docks the same way.
+  usePointerDropTarget(sectionRef, {
+    scope: "workspace-place",
+    hit(x, y, drag) {
+      if (!sectionRef.current) return null;
+      const rect = sectionRef.current.getBoundingClientRect(),
+        zone = dropZoneAt(rect, x, y);
+      if (zone !== "center" && !dockRouteFits(pane, paneSize(), zone, drag.id)) return null;
+      return dockHit(rect, zone);
+    },
+    drop: (drag, hit) =>
+      openWorkspaceRouteAt(drag.id, pane.id, hit.id as DockDropZone, props.onOpen),
   });
 
   usePointerDropTarget(sectionRef, {

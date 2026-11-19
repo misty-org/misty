@@ -1,11 +1,11 @@
 import type { ShortcutCommandDefinition } from "./shortcutTypes";
 import { command } from "./factory";
 
-/** Commands scoped to the Library. */
+/** Commands scoped to a Space's Media page. */
 export const libraryCommands: ShortcutCommandDefinition[] = [
-  command("library.copy", "Copy Library selection", {
-    description: "Copy the selected Library content.",
-    category: "Library",
+  command("library.copy", "Copy Media selection", {
+    description: "Copy the selected files in Media.",
+    category: "Media",
     scope: "tool:library",
     mac: "Cmd+C",
     windows: "Ctrl+C",

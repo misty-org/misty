@@ -247,12 +247,7 @@ export function DesktopSettingsRow(props: {
       >
         {props.leading}
         <div className="grid min-w-0 gap-1">
-          <Text
-            bare
-            tone="bright"
-            weight="medium"
-            className="text-md leading-6"
-          >
+          <Text bare tone="bright" weight="medium" className="text-md leading-6">
             {props.label}
           </Text>
           {props.description || reset ? (

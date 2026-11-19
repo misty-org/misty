@@ -21,8 +21,7 @@ import { TopEdge } from "./TopEdge";
 import { LayoutPopup } from "./LayoutPopup";
 import { WorkspaceTabBar } from "./WorkspaceTabBar";
 import { WorkspaceSearch } from "./search/WorkspaceSearch";
-import { AgentsHub } from "./AgentsHub";
-import { agentChatRoute, openNewChat, openWorkspaceRoute } from "./spaceNavigation";
+import { openChatRoute, openNewChat, openWorkspaceRoute } from "./spaceNavigation";
 import { TrayAgentsSync } from "@/features/agents";
 import type { WorkspaceTab } from "@/features/app-windows";
 import { useWorkspaceCanvasShortcuts } from "./useWorkspaceCanvasShortcuts";
@@ -180,11 +179,10 @@ export function WorkspaceCanvas(props: {
         ) : null}
         <PaneSwapMode />
         <LayoutPopup onApplied={navigateToActiveLayoutTab} />
-        <WorkspaceSearch onOpen={openTab} />
-        <AgentsHub onOpen={openTab} />
+        <WorkspaceSearch onOpen={openTab} path={location.pathname} />
         <TrayAgentsSync
           onOpenChat={(agentId, chatId) =>
-            openWorkspaceRoute(agentChatRoute(agentId, chatId), openTab)
+            openWorkspaceRoute(openChatRoute(agentId, chatId), openTab)
           }
           onNewChat={() => openNewChat(openTab)}
         />

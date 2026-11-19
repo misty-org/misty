@@ -21,7 +21,7 @@ export function AdvancedSection(props: SettingsContentProps) {
   const dim = booleanSetting(props.document, "appearance", "dim_inactive_panes", true);
   return (
     <>
-      <SettingsSectionBlock title="Pages">
+      <SettingsSectionBlock title="Links">
         <SettingsRow label="Link previews" description="Cards under links in chats and replies.">
           <SwitchControl {...toggle("general", "browser_link_previews", true)} />
         </SettingsRow>

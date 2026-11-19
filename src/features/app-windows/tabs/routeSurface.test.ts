@@ -38,10 +38,15 @@ describe("browser workspace deep links", () => {
 });
 
 it("restores Space tools as split-capable surfaces in the current global workspace", () => {
-  expect(workspaceSurfaceFromRoute("/spaces/family/library")).toMatchObject({
+  expect(workspaceSurfaceFromRoute("/spaces/family/media")).toMatchObject({
     surfaceId: "space",
-    groupKey: "space:family:library",
-    route: "/spaces/family/library",
+    groupKey: "space:family:media",
+    title: "Media",
+    route: "/spaces/family/media",
+  });
+  // A tab saved while the page was the Library joins Media's tab.
+  expect(workspaceSurfaceFromRoute("/spaces/family/library")).toMatchObject({
+    groupKey: "space:family:media",
   });
   expect(workspaceSurfaceFromRoute("/spaces")).toMatchObject({ surfaceId: "space" });
 });

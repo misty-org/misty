@@ -29,7 +29,7 @@ import { artFillClass, artRingClass, artTintClass, type ArtColor } from "./artPa
  *   with the system rather than the theme, with its own faint edge, shadow and ink.
  * - `smoke`: a near-black panel floating over another app or the desktop, the same in every
  *   theme, with its own faint edge and white text.
- * - `scene-panel`: a panel floating over a full-color scene inside a page (the Studio's office):
+ * - `scene-panel`: a panel floating over a full-color scene inside a page:
  *   the same solid card as the chat's side cards, with their faint edge and soft shadow.
  * - `stage`: the window's own fill lit faintly at its middle, behind a scene drawn in the window.
  * - `track`: the hairline's color as a fill, for the empty part of a meter (a bar's track, its
@@ -103,7 +103,7 @@ const toneClass: Record<SurfaceTone, string> = {
   // as an outline and a soft shadow. Solid, never frosted, so the scene behind it doesn't bleed in.
   "scene-panel": [
     "bg-charcoal-sidebar text-cream",
-    "outline-[0.5px] outline-solid -outline-offset-[0.5px]",
+    "hairline-outline",
     "outline-[color-mix(in_srgb,var(--misty-theme-text)_9%,transparent)]",
     "shadow-[0_0.125rem_0.25rem_rgb(0_0_0/0.22),0_1px_0.125rem_rgb(0_0_0/0.22)]",
   ].join(" "),

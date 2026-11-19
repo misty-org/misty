@@ -22,7 +22,12 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
 }
 export { blockIfUnsaved, useDevicePreferences } from "./device-preferences/store";
 export { resolveSetting } from "./device-preferences/settingResolution";
-export { openSettings, openSettingsEvent, type OpenSettingsDetail } from "./openSettings";
+export {
+  openSettings,
+  openSettingsEvent,
+  useSettingsOpen,
+  type OpenSettingsDetail,
+} from "./openSettings";
 
 // Public surface used by other features.
 export {

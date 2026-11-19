@@ -34,22 +34,26 @@ const maxInputPx = 160;
  * on its raised fill alone (no edge, no shadow), the text and its bar inset alike
  * so the + glyph lines up with the text above it.
  */
-export type MessageComposerVariant = "plain" | "card";
+export type MessageComposerVariant = "plain" | "card" | "channel";
 
 const boxClass = {
   plain: "rounded-xl border",
   // No border, ring or shadow: its raised fill alone sets it off the page, in light and dark.
   card: "relative rounded-xl",
+  // In a channel the page is already the card's fill, so the box steps up once more.
+  channel: "relative rounded-xl",
 } as const;
 /** The box's edge and fill while nothing is dragged over it. */
 const restingClass = {
   plain: "border-charcoal-border bg-charcoal-card",
   card: "bg-charcoal-card",
+  channel: "bg-charcoal-hover",
 } as const;
 /** Files dragged over the box. */
 const draggingClass = {
   plain: "border-cream-muted bg-charcoal-hover",
   card: "bg-charcoal-hover shadow-[0_0_0_1px_var(--color-cream-muted)]",
+  channel: "bg-charcoal-active shadow-[0_0_0_1px_var(--color-cream-muted)]",
 } as const;
 
 /** The card's text: 14px in a 22px line, or body type in a taller box when roomy. */
@@ -178,7 +182,7 @@ export const MessageComposer = forwardRef<HTMLDivElement, MessageComposerProps>(
     }, [textareaRef, resize]);
 
     const hasBar = Boolean(items?.length || end);
-    const card = variant === "card";
+    const card = variant === "card" || variant === "channel";
     const box = (
       <div
         ref={ref}
@@ -266,11 +270,11 @@ export function MessageComposerSend({
   disabled,
   ...props
 }: Omit<IconButtonProps, "children"> & {
-  /** Sending: a spinner replaces the arrow and clicks are held. */
+  /** Sending: the button is disabled until it finishes. */
   busy?: boolean;
 }) {
   return (
-    <IconButton variant="primary" {...props} loading={busy} disabled={disabled || busy}>
+    <IconButton variant="primary" {...props} disabled={disabled || busy}>
       <ArrowUp />
     </IconButton>
   );
@@ -286,18 +290,7 @@ export function MessageComposerAction({
   className,
   ...props
 }: Omit<IconButtonProps, "variant" | "size">) {
-  return (
-    <IconButton
-      {...props}
-      variant="quiet"
-      className={cn(
-        // Quiet's fill already reaches under its unseen border, the full 32px, as Send's does.
-        "bg-control-hover text-cream hover:bg-control-active hover:text-cream-bright",
-        "focus-visible:bg-control-active aria-pressed:text-cream-bright",
-        className,
-      )}
-    />
-  );
+  return <IconButton {...props} variant="soft" className={className} />;
 }
 
 /**

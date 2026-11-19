@@ -5,6 +5,12 @@ export function revealMainWindow(): Promise<void> {
   return invoke("reveal_main_window");
 }
 
+/** Paints the window behind its page in the page's background ("#rrggbb"), which shows at the
+ * grown edge while a resize catches up. */
+export function setWindowSurface(color: string): Promise<void> {
+  return invoke("set_window_surface", { color });
+}
+
 /** Where the window buttons sit relative to their usual spot (20pt from the left, 19pt down):
  * the vertical sidebar moves them onto its panel. Every call to the window style carries the
  * current value, so the order the shell and the sidebar mount in never undoes it. */
@@ -16,13 +22,12 @@ const sidebarContentLeft = 19;
 const trafficLightRestX = 20;
 export const trafficLightRestY = 19;
 export const sideTabTrafficLightNudgeX = 2;
-/** AppKit draws each button's circle about 2pt above the middle of the button's frame, and the
- * native side centers the frame. Lowered by this much, the circles' centers sit on the line of
- * the icons beside them. */
-export const trafficLightGlyphDrop = 2;
+/** The native side centers each button's frame on the line it is given, and the circle sits in
+ * the middle of its frame: given the icons' line, the circles' centers sit on it, with no extra
+ * drop (an earlier 2pt one left them below the sidebar head's icons). */
 export const trafficLightOffsetDefault: TrafficLightOffset = {
   x: sidebarContentLeft - trafficLightRestX,
-  y: trafficLightGlyphDrop,
+  y: 0,
 };
 let trafficLightOffset = trafficLightOffsetDefault;
 let pendingWindowStyle: Promise<void> | null = null;

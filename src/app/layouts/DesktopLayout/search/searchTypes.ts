@@ -2,7 +2,9 @@ import type { ReactNode } from "react";
 import type { Part } from "./searchRank";
 
 /** The types a search narrows to. "All" shows each type's best few. */
-export type SearchKind = "all" | "chats" | "space" | "learn" | "apps" | "settings" | "commands";
+/** `files` is a page scope's (⌘P on the Code page), never a prefix of its own. */
+export type SearchKind =
+  "all" | "chats" | "space" | "learn" | "apps" | "settings" | "commands" | "files";
 
 /** The search's tabs, each with what its field says while empty: what it searches, no syntax. */
 export const searchKinds: { id: SearchKind; label: string; placeholder: string }[] = [

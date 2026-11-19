@@ -61,21 +61,6 @@ describe("Button", () => {
     expect(button.querySelector('[data-icon="inline-end"]')).not.toBeNull();
   });
 
-  it("swaps the icon for a spinner while loading, keeps the label and holds clicks", () => {
-    const onClick = vi.fn();
-    render(
-      <Button icon={Plus} loading onClick={onClick}>
-        Save
-      </Button>,
-    );
-    const button = screen.getByRole("button", { name: "Save" });
-    expect(button.getAttribute("aria-busy")).toBe("true");
-    expect(button.querySelector(".animate-spin")).not.toBeNull();
-    expect(button.querySelectorAll("svg")).toHaveLength(1);
-    fireEvent.click(button);
-    expect(onClick).not.toHaveBeenCalled();
-  });
-
   it("styles its child with asChild and keeps the icon inside it", () => {
     render(
       <Button asChild icon={Plus}>
@@ -156,10 +141,22 @@ describe("IconButton", () => {
         <Plus />
       </IconButton>,
     );
-    // jsdom never matches :focus-visible, like focus handed back after a click.
-    act(() => screen.getByRole("button", { name: "More" }).focus());
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    expect(screen.queryByRole("tooltip")).toBeNull();
+    // Focus handed back after a click is never :focus-visible. The test's DOM can't tell a
+    // pointer's focus from the keyboard's, so the browser's answer for it is given here.
+    const matches = Element.prototype.matches;
+    const spy = vi.spyOn(Element.prototype, "matches").mockImplementation(function (
+      this: Element,
+      selector: string,
+    ) {
+      return selector === ":focus-visible" ? false : matches.call(this, selector);
+    });
+    try {
+      act(() => screen.getByRole("button", { name: "More" }).focus());
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(screen.queryByRole("tooltip")).toBeNull();
+    } finally {
+      spy.mockRestore();
+    }
   });
 
   it("draws at 24 or 32px", () => {

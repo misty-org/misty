@@ -1,6 +1,4 @@
 pub mod commands;
-pub mod studio_music;
-pub mod studio_music_media;
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};

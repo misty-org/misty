@@ -51,39 +51,16 @@ import {
 } from "@/shared/ui";
 import { ChatRow, pressMenuKey, RenameRow, SectionNameDialog } from "./SidebarChatRows";
 import type { OpenPlace } from "./spaceNavigation";
+import { startPointerDrag } from "@/shared/hooks/usePointerReorder";
+import { tabSwitchScope } from "@/shared/ui";
 import { useCollapsedAgents, toggleAgentChats } from "./collapsedAgents";
 import { chatSectionClass, markSlotClass } from "./styles";
+import { groupOpen, sidebarChatGroups, type Group, type SidebarChat } from "./sidebarChatGroups";
 
-export interface SidebarChat {
-  id: string;
-  title: string;
-  updatedAt: string;
-  agentId?: string;
-  folderId?: string;
-  pinnedAt?: string;
-  archivedAt?: string;
-  markedUnread?: boolean;
-  lastReadAt?: string;
-}
-
-/** Whether a group's chats are on screen: Archived opens on demand, an agent's folds away. */
-function groupOpen(group: Group, archivedOpen: boolean, collapsedAgents: readonly string[]) {
-  if (group.agent) return !collapsedAgents.includes(group.agent.id);
-  return !group.collapsible || archivedOpen;
-}
+export type { SidebarChat } from "./sidebarChatGroups";
 
 /** The unfiled chats' value in the Move to section menu. */
 const unfiled = "";
-
-interface Group {
-  id: string;
-  name: string;
-  chats: SidebarChat[];
-  section?: ChatSection;
-  collapsible?: boolean;
-  /** The agent every chat in it is with: its heading names the agent, so rows drop its mark. */
-  agent?: AgentProfile;
-}
 
 /**
  * The sidebar's chats: pinned ones first, then each section the person made, then the rest under
@@ -100,6 +77,11 @@ export function SidebarChats(props: {
   openChat: string | null;
   onOpen(agent: AgentProfile, chatId: string): void;
   onOpenIn(agent: AgentProfile, chatId: string, place: OpenPlace): void;
+  /**
+   * The route a chat dragged out of the list opens: dropped on a pane it docks into a split
+   * there, and paused over a window tab while held it opens that tab first.
+   */
+  dragRoute?(agent: AgentProfile, chatId: string): string;
   /** The open chat was deleted, so the page needs somewhere else to be. */
   onOpenGone(): void;
 }) {
@@ -118,40 +100,10 @@ export function SidebarChats(props: {
   // A menu item that hands focus to a field or dialog keeps the menu from taking it back.
   const keepFocus = useRef(false);
 
-  const groups = useMemo(() => {
-    const live = chats.filter((chat) => !chat.archivedAt);
-    const filed = new Set(sections.map((section) => section.id));
-    const list: Group[] = [];
-    const pinned = live.filter((chat) => chat.pinnedAt);
-    if (pinned.length) list.push({ id: "pinned", name: "Pinned", chats: pinned });
-    for (const section of sections) {
-      const held = live.filter((chat) => !chat.pinnedAt && chat.folderId === section.id);
-      if (held.length) list.push({ id: section.id, name: section.name, chats: held, section });
-    }
-    const rest = live.filter(
-      (chat) => !chat.pinnedAt && !(chat.folderId && filed.has(chat.folderId)),
-    );
-    // One group per agent, in the order their chats come (latest first); chats whose agent is
-    // gone stay together under Chats at the end.
-    const byAgent = new Map<string, { agent?: AgentProfile; chats: SidebarChat[] }>();
-    for (const chat of rest) {
-      const agent = agentOf(chat.agentId);
-      const key = agent?.id ?? "";
-      const held = byAgent.get(key) ?? { agent, chats: [] };
-      held.chats.push(chat);
-      byAgent.set(key, held);
-    }
-    const unknown = byAgent.get("");
-    byAgent.delete("");
-    for (const [id, held] of byAgent)
-      list.push({ id: `agent:${id}`, name: held.agent!.name, chats: held.chats, agent: held.agent });
-    if (unknown || !list.length)
-      list.push({ id: "chats", name: "Chats", chats: unknown?.chats ?? [] });
-    const archived = chats.filter((chat) => chat.archivedAt);
-    if (archived.length)
-      list.push({ id: "archived", name: "Archived", chats: archived, collapsible: true });
-    return list;
-  }, [chats, sections, agentOf]);
+  const groups = useMemo(
+    () => sidebarChatGroups(chats, sections, agentOf),
+    [chats, sections, agentOf],
+  );
   const isOpen = (group: Group) => groupOpen(group, archivedOpen, collapsedAgents);
   // Every row on screen in order, for a Shift-click run.
   const shown = useMemo(
@@ -379,13 +331,11 @@ export function SidebarChats(props: {
           agent
             ? {
                 open: isOpen(group),
-                count: group.chats.length,
                 onToggle: () => toggleAgentChats(agent.id),
               }
             : group.collapsible
               ? {
                   open: archivedOpen,
-                  count: group.chats.length,
                   onToggle: () => setArchivedOpen((open) => !open),
                 }
               : undefined
@@ -468,6 +418,20 @@ export function SidebarChats(props: {
                           current={openChat === chat.id}
                           selected={picked.includes(chat.id)}
                           unread={openChat !== chat.id && isChatUnread(chat)}
+                          onDragStart={
+                            agent && props.dragRoute
+                              ? (event) =>
+                                  startPointerDrag(event, {
+                                    id: chat.id,
+                                    label: chat.title || "New conversation",
+                                    scope: "sidebar-chat",
+                                    carries: {
+                                      "workspace-place": props.dragRoute!(agent, chat.id),
+                                      [tabSwitchScope]: "",
+                                    },
+                                  })
+                              : undefined
+                          }
                           onPress={(event) => {
                             if (event.metaKey || event.ctrlKey || event.shiftKey)
                               pick(chat.id, event);

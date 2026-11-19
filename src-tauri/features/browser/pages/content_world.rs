@@ -15,17 +15,6 @@ pub(crate) async fn evaluate_in_content_world(
     evaluate_in(webview, Some(world_name), function_body, None).await
 }
 
-/// Runs `function_body` in the page's own world, beside the page's scripts and their globals.
-/// Only for a page whose scripts are the person's own choice to trust with what is read back,
-/// such as the studio's music player; what it returns is the page's word, never Misty's.
-#[cfg(target_os = "macos")]
-pub(crate) async fn evaluate_in_page_world(
-    webview: Webview,
-    function_body: String,
-) -> Result<String, String> {
-    evaluate_in(webview, None, function_body, None).await
-}
-
 /// Runs `function_body` in the named world of one cross-origin frame the tab announced
 /// (agent_pages/frames.rs). A frame that no longer answers is forgotten.
 #[cfg(target_os = "macos")]
@@ -35,7 +24,13 @@ pub(crate) async fn evaluate_in_frame(
     function_body: String,
     frame: u64,
 ) -> Result<String, String> {
-    let result = evaluate_in(webview.clone(), Some(world_name), function_body, Some(frame)).await;
+    let result = evaluate_in(
+        webview.clone(),
+        Some(world_name),
+        function_body,
+        Some(frame),
+    )
+    .await;
     if result.is_err() {
         let _ = webview.with_webview(move |platform| unsafe {
             crate::browser::agent_pages::frames::forget(&*platform.inner().cast(), frame);

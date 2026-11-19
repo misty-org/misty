@@ -13,7 +13,8 @@ export async function openOnWebsite(path: string): Promise<void> {
   let link = `${website}${path}`;
   try {
     const { code } = await apiRequest<{ code: string }>("/me/web-handoff", { method: "POST" });
-    if (code) link = `${website}/continue?next=${encodeURIComponent(path)}#code=${encodeURIComponent(code)}`;
+    if (code)
+      link = `${website}/continue?next=${encodeURIComponent(path)}#code=${encodeURIComponent(code)}`;
   } catch {
     // The plain page still works, after signing in there.
   }

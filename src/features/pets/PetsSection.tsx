@@ -8,7 +8,7 @@ import {
 } from "@/features/settings";
 import { confirmAction } from "@/shared/lib/confirmAction";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { Button, cn, Skeleton, SkeletonControl, useNotice } from "@/shared/ui";
+import { Button, cn, ErrorState, Skeleton, SkeletonControl, useNotice } from "@/shared/ui";
 import { DropdownControl, SwitchControl } from "../settings/SettingsControls";
 import type { PetSummary } from "./petAtlas";
 import { normalizePetScale, PET_SCALE_OPTIONS } from "./petScale";
@@ -29,11 +29,15 @@ function usePets() {
   const [busy, setBusy] = useState(false);
 
   const { reload } = listing;
-  // A failed read keeps what is shown; the failure is the notice beside it.
-  const loadError = listing.error;
+  // A failed read keeps what is shown, and the failure is the notice beside it; with nothing to
+  // show, the section says so in place of its rows.
+  const shown = listing.data !== undefined;
+  const refreshError = shown ? listing.error : undefined;
   useEffect(() => {
-    if (loadError) setError(petErrorMessage(loadError));
-  }, [loadError]);
+    if (refreshError) setError(petErrorMessage(refreshError));
+  }, [refreshError]);
+  const loadError =
+    !shown && !listing.loading && listing.error ? petErrorMessage(listing.error) : null;
 
   useEffect(() => {
     // Outside the desktop app (a browser preview, tests) there are no native events to hear.
@@ -61,6 +65,8 @@ function usePets() {
     settings: listing.data?.settings ?? null,
     busy,
     act,
+    loadError,
+    retry: () => void reload(),
   };
 }
 
@@ -109,8 +115,19 @@ function PetsSkeleton() {
  * package (a folder with `pet.json` and its spritesheet) and follows what the person's agents do.
  */
 export function PetsSection(_props: SettingsContentProps) {
-  const { pets, settings, busy, act } = usePets();
+  const { pets, settings, busy, act, loadError, retry } = usePets();
   if (!hasTauriInternals()) return null;
+  if (loadError)
+    return (
+      <Section title="Pet">
+        <ErrorState
+          inline
+          title="Couldn't read your pets"
+          line={loadError}
+          action={{ label: "Try again", onClick: retry }}
+        />
+      </Section>
+    );
   if (!pets || !settings) {
     return (
       <Section title="Pet">

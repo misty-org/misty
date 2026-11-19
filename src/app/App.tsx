@@ -1,5 +1,5 @@
 import { AppRouter } from "./router";
-import { DesktopWindowReady } from "./layouts/DesktopWindowReady";
+import { NativeWindowSetup } from "./layouts/NativeWindowSetup";
 import { NoticeViewport, TooltipProvider } from "@/shared/ui";
 import { McpProbeConfirmHost } from "@/features/engine-config/mcp";
 import { settingsBoolean, useSettingsStore } from "@/features/settings";
@@ -11,7 +11,7 @@ export function App() {
   );
   return (
     <TooltipProvider shortcutHints={shortcutHints}>
-      <DesktopWindowReady />
+      <NativeWindowSetup />
       <AppRouter />
       <McpProbeConfirmHost />
       <NoticeViewport />

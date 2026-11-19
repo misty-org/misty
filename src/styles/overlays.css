@@ -1,6 +1,8 @@
 /* Popup chrome is shared by the host and every app, including portaled menus.
-   Use a real edge rather than the faint utility ring, without changing the
-   ordinary card/divider palette or putting a frame around full-screen views. */
+   The edge is the popup-edge utility's (components.css; keep the two in sync):
+   an outline over the card's rim, above its contents, never a ring outside it
+   or a colored border under them, either of which leaves the rounded corners
+   faint and cut off. No shadow: depth is the edge and the card's fill. */
 :root
   :is(
     [data-slot="dialog-content"],
@@ -13,14 +15,16 @@
     [role="menu"],
     [data-popup-surface]
   ) {
-  border: 1px solid color-mix(in srgb, currentColor 24%, transparent);
+  border: 1px solid transparent;
+  outline: 1px solid color-mix(in srgb, currentColor 24%, transparent);
+  outline-offset: -1px;
   --tw-ring-shadow: 0 0 #0000;
+  box-shadow: none;
 }
 
-/* Children paint above the border, so a filled child flush against the edge
-   (a p-0 popover's list, header or footer) covers the inner half of each
-   rounded corner and the edge thins out there. Clip contents to the rounded
-   edge. This lives in the components layer so a surface's own overflow
+/* Clip contents to the rounded edge, so a filled child flush against it (a
+   p-0 popover's list, header or footer) keeps the card's corner shape; the
+   edge itself is an outline and paints over them. This lives in the components layer so a surface's own overflow
    utility (scrolling menus and dialogs, which already clip) still wins.
    Keep the selector list in sync with the rule above. */
 @layer components {

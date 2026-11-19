@@ -34,7 +34,9 @@ export function WorkspaceSidebar(props: {
         )}
       >
         {/* Its rows follow the card's own width, so a narrow sidebar sheds what doesn't fit. The
-            card keeps 12px from the window's sides. At the bottom it keeps the window bar's inset
+            card keeps 12px from the window's sides: with a row's or button's own 8px around its
+            glyph, each glyph is 20px in, in line with the red window button (20pt in), as the
+            chat's panel rail keeps at the other edge. At the bottom it keeps the window bar's inset
             (the 2px window edge plus 8px), so the account row sits level with the bar's controls,
             as the top rows sit level with the tabs. */}
         <Surface

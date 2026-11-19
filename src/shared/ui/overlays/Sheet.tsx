@@ -32,7 +32,7 @@ SheetOverlay.displayName = SheetPrimitive.Overlay.displayName;
 
 const sheetVariants = cva(
   [
-    "fixed layer-dialog gap-4 bg-charcoal-card p-6 text-body text-cream shadow-xl",
+    "fixed layer-dialog gap-4 bg-charcoal-card p-6 text-body text-cream",
     "transition ease-out data-[state=closed]:duration-200",
     "data-[state=open]:duration-300 data-[state=open]:animate-in",
     "data-[state=closed]:animate-out data-[state=closed]:pointer-events-none",

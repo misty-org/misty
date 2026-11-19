@@ -26,7 +26,7 @@ import {
   Download,
   FileText,
   Folder,
-  LibraryBig,
+  Clapperboard,
   Paperclip,
   Pencil,
   Settings,
@@ -153,8 +153,8 @@ export function RichRowsSection() {
           <CommandList>
             <CommandGroup heading="Add to message">
               <CommandItem
-                icon={LibraryBig}
-                label="Browse Library"
+                icon={Clapperboard}
+                label="Browse Media"
                 description="Select one or more shared items"
               />
               <CommandItem

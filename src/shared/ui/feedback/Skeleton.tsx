@@ -5,13 +5,24 @@ import { controlFrame } from "../controls/controlFrame";
  * One placeholder block. Its fill is the control wash (text at 10%), so it shows on every surface
  * it lands on: the window, the sidebar, a settings card or a dialog.
  *
+ * A skeleton stands in for data only, never for a tool getting ready (an editor's code, a
+ * terminal's shell, a webview, a live room): that is `SetupState`, which says so in words. A failed
+ * load replaces it with an error; a skeleton never stays up for a read that won't finish.
+ *
  * A skeleton stands in for data on its very first load only: once something has been shown, it
  * comes back from the cache (`useCachedResource`) and refreshes behind what is on screen. Every
  * skeleton takes the exact shape of what replaces it, so nothing moves when the data arrives.
  */
-function Skeleton({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
+function Skeleton({
+  as: Tag = "div",
+  className,
+  ...props
+}: React.HTMLAttributes<HTMLElement> & {
+  /** `span` for a skeleton inside a line of text, such as a row's description. */
+  as?: "div" | "span";
+}) {
   return (
-    <div
+    <Tag
       data-slot="skeleton"
       aria-hidden="true"
       className={cn("misty-skeleton rounded-md bg-control-hover", className)}

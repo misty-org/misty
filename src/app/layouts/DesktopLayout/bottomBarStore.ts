@@ -1,10 +1,6 @@
 import { create } from "zustand";
 import { readDeviceState, updateDeviceState } from "@/features/agents";
-import {
-  announceDeviceSetting,
-  createDeviceSetting,
-  onDeviceSettingChange,
-} from "@/shared/lib/deviceSetting";
+import { announceDeviceSetting, onDeviceSettingChange } from "@/shared/lib/deviceSetting";
 
 /** Everything the window's bottom bar can show. `bottomBarItems` says what each one is. */
 export const bottomBarItemIds = [
@@ -24,6 +20,14 @@ export const bottomBarItemIds = [
   "branch",
   "folder",
   "runtime",
+  "codeVim",
+  "codeLive",
+  "codeProblems",
+  "codeCursor",
+  "codeLanguage",
+  "codeServer",
+  "codeTheme",
+  "codeTerminal",
   "newChat",
   "newTab",
   "search",
@@ -51,10 +55,26 @@ export interface BottomBarLayout {
 }
 
 const scope = "bottom-bar";
-/** A lean start: the rest wait in Settings › Interface › Bottom bar for whoever wants them. */
+/**
+ * A lean start: the rest wait in Settings › Interface › Bottom bar for whoever wants them. The
+ * Code items draw only on the Code page, which has no status row of its own.
+ */
 export const bottomBarDefaults: BottomBarLayout = {
   start: ["agents", "server"],
-  end: ["zoom", "shortcuts", "info"],
+  end: [
+    "codeVim",
+    "codeLive",
+    "branch",
+    "codeProblems",
+    "codeCursor",
+    "codeLanguage",
+    "codeServer",
+    "codeTheme",
+    "codeTerminal",
+    "zoom",
+    "shortcuts",
+    "info",
+  ],
   known: [...bottomBarItemIds],
 };
 
@@ -67,11 +87,24 @@ function normalize(stored: Partial<BottomBarLayout> | null): BottomBarLayout {
   const start = [...new Set((stored.start ?? []).filter(known))];
   const end = [...new Set((stored.end ?? []).filter(known))].filter((id) => !start.includes(id));
   const seen = new Set((stored.known ?? []).filter(known));
-  for (const id of bottomBarItemIds) {
-    if (seen.has(id) || start.includes(id) || end.includes(id)) continue;
-    if (bottomBarDefaults.start.includes(id)) start.push(id);
-    else if (bottomBarDefaults.end.includes(id)) end.push(id);
-  }
+  const shown = (id: BottomBarItemId) => start.includes(id) || end.includes(id);
+  // A new item goes where it sits by default: before the next default item this bar shows.
+  const place = (id: BottomBarItemId) => {
+    for (const [list, defaults] of [
+      [start, bottomBarDefaults.start],
+      [end, bottomBarDefaults.end],
+    ] as const) {
+      const at = defaults.indexOf(id);
+      if (at < 0) continue;
+      const next = defaults.slice(at + 1).find((other) => list.includes(other));
+      list.splice(next ? list.indexOf(next) : list.length, 0, id);
+      return;
+    }
+  };
+  // The Code page's own status row moved into this bar: a device meeting its items for the first
+  // time gets the branch that row showed too, even if it had hidden the chat's.
+  if (!seen.has("codeVim") && !shown("branch")) seen.delete("branch");
+  for (const id of bottomBarItemIds) if (!seen.has(id) && !shown(id)) place(id);
   return { start, end, known: [...bottomBarItemIds] };
 }
 
@@ -110,13 +143,3 @@ export const useBottomBar = create<
 }));
 
 onDeviceSettingChange(scope, () => void useBottomBar.getState().load());
-
-/**
- * How tall the window's bottom bar is: compact (32px, 24px buttons) unless the person turned that
- * off for the standard 40px. Kept for this device in `misty.db`.
- */
-export const useBottomBarCompact = createDeviceSetting<boolean>({
-  scope: "bottom-bar-compact",
-  defaults: true,
-  normalize: (stored) => stored !== false,
-});

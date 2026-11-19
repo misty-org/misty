@@ -133,8 +133,8 @@ export function NavList({ className, ...props }: HTMLAttributes<HTMLDivElement>)
 export interface NavGroupHeadingProps extends HTMLAttributes<HTMLDivElement> {
   /** The group's name. Without it the heading holds its `children` alone (a placeholder). */
   name?: ReactNode;
-  /** A group that folds away: its name is a button showing how many it holds, and a chevron. */
-  collapsible?: { open: boolean; count: number; onToggle(): void };
+  /** A group that folds away: its name is a button, with a chevron. */
+  collapsible?: { open: boolean; onToggle(): void };
   tone?: NavRowTone;
   ref?: Ref<HTMLDivElement>;
 }
@@ -164,7 +164,6 @@ export function NavGroupHeading({
       onClick={collapsible.onToggle}
     >
       {name}
-      <span className="tabular-nums">{collapsible.count}</span>
       <ChevronRight
         aria-hidden="true"
         className={cn(

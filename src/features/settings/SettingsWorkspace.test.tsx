@@ -24,6 +24,8 @@ import { settingsAreaEntry, settingsGroups } from "./settingsRegistry";
 const PAGES: SettingsSection[] = settingsGroups.flatMap((group) =>
   group.areas.map((area) => settingsAreaEntry(area)!.id),
 );
+/** Pages whose content comes from the engines or a catalog, which nothing answers here. */
+const fromEngines = new Set<SettingsSection>(["agents-personas", "engines-channels"]);
 const mocks = vi.hoisted(() => {
   const settingsState = {
     activeSection: "general" as SettingsSection,
@@ -137,7 +139,10 @@ describe("SettingsWorkspace", () => {
     expect(groups.map((group) => group.getAttribute("aria-label"))).toEqual([
       "Account",
       "App",
+      "Pages",
       "Agents",
+      "Engines",
+      "Tools",
     ]);
     const entries = [...container.querySelectorAll("[data-settings-nav-entry]")];
     expect(entries.map((entry) => entry.getAttribute("data-settings-nav-entry"))).toEqual(PAGES);
@@ -149,7 +154,10 @@ describe("SettingsWorkspace", () => {
   it.each(PAGES)("renders the %s page with content", async (section) => {
     await render(section);
     const main = container.querySelector("main")!;
-    expect(main.textContent!.length).toBeGreaterThan(20);
+    // These fill from the engines and the persona catalog as they answer, skeletons until then;
+    // here, with nothing to answer, they only have to open.
+    if (!fromEngines.has(section)) expect(main.textContent!.length).toBeGreaterThan(20);
+    expect(main.querySelector(`[data-settings-page="${section}"]`)).not.toBeNull();
     expect(main.textContent).not.toMatch(/coming soon|in progress|Loading…/i);
   });
 

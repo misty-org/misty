@@ -35,13 +35,13 @@ beforeEach(async () => {
 });
 afterEach(cleanup);
 
-it("sets up only the tab side outside the desktop app", () => {
-  expect(renderHook(() => useSetupSteps()).result.current).toEqual(["tabs"]);
+it("asks the tab side, then where projects go, outside the desktop app", () => {
+  expect(renderHook(() => useSetupSteps()).result.current).toEqual(["tabs", "projects"]);
 });
 
-it("sets up the tab side in the desktop app too", () => {
+it("asks the same in the desktop app", () => {
   mocks.native = true;
-  expect(renderHook(() => useSetupSteps()).result.current).toEqual(["tabs"]);
+  expect(renderHook(() => useSetupSteps()).result.current).toEqual(["tabs", "projects"]);
 });
 
 it("keeps asking for the tab side after a restart until it has been asked", async () => {

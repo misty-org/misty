@@ -20,6 +20,7 @@ const iconVariants: ReadonlyArray<Exclude<IconButtonVariant, "overlay">> = [
   "secondary",
   "primary",
   "danger",
+  "soft",
 ];
 const iconSizes: ReadonlyArray<IconButtonSize> = ["sm", "md"];
 
@@ -49,14 +50,6 @@ export function ButtonsSection() {
         columns={buttonSizes.map((size) => `${size} · ${sizePx[size]}px`)}
         rows={[
           ...buttonVariants.map((variant) => ({
-            label: `${variant}, loading`,
-            cells: buttonSizes.map((size) => (
-              <Button key={size} variant={variant} size={size} icon={sampleIcon(variant)} loading>
-                {sampleLabel(variant)}
-              </Button>
-            )),
-          })),
-          ...buttonVariants.map((variant) => ({
             label: `${variant}, disabled`,
             cells: buttonSizes.map((size) => (
               <Button key={size} variant={variant} size={size} icon={sampleIcon(variant)} disabled>
@@ -74,27 +67,8 @@ export function ButtonsSection() {
           Continue
         </Button>
       </GalleryRow>
-      <LoadingButtonRow />
       <IconButtonsRows />
     </GallerySection>
-  );
-}
-
-function LoadingButtonRow() {
-  const [saving, setSaving] = useState(false);
-  const save = () => {
-    setSaving(true);
-    window.setTimeout(() => setSaving(false), 1500);
-  };
-  return (
-    <GalleryRow label="Loading on click">
-      <Button variant="primary" loading={saving} onClick={save}>
-        Save
-      </Button>
-      <Button variant="danger" icon={Trash2} loading={saving} onClick={save}>
-        Delete
-      </Button>
-    </GalleryRow>
   );
 }
 
@@ -138,9 +112,6 @@ function IconButtonsRows() {
           onClick={() => setStarred((value) => !value)}
         >
           <Star fill={starred ? "currentColor" : "none"} />
-        </IconButton>
-        <IconButton label="Downloading" loading>
-          <Download />
         </IconButton>
         <IconButton label="Download" disabled>
           <Download />

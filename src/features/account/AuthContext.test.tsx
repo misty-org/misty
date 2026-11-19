@@ -591,7 +591,9 @@ describe("AuthProvider account switching", () => {
     await act(async () => {
       accountButton().click();
     });
-    expect(container.querySelector('[role="status"][aria-label="Signing in"]')).not.toBeNull();
+    expect(
+      container.querySelector('[data-slot="state-mark"][aria-label="Signing in"]'),
+    ).not.toBeNull();
     expect(accountButton().disabled).toBe(true);
     await act(async () => {
       release(mocks.accountA);

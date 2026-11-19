@@ -11,7 +11,14 @@ import {
   type MenuIcon,
 } from "@/shared/ui";
 
-import { AppWindow, AppWindowMac, ArrowLeftRight, Keyboard, LayoutPanelLeft } from "lucide-react";
+import {
+  AppWindow,
+  AppWindowMac,
+  ArrowLeftRight,
+  CodeXml,
+  Keyboard,
+  LayoutPanelLeft,
+} from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import {
   DesktopSettingsNotice,
@@ -89,8 +96,9 @@ const categoryIcons: Record<string, MenuIcon> = {
   Windows: AppWindowMac,
   Navigation: ArrowLeftRight,
   Spaces: spaceIcons.space,
-  Library: spaceIcons.library,
+  Media: spaceIcons.media,
   Chat: spaceIcons.chat,
+  Code: CodeXml,
 };
 
 export function ShortcutsSection(props: SettingsContentProps) {

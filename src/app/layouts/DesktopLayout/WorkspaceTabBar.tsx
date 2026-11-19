@@ -14,8 +14,10 @@ import { ViewIcon } from "./WorkspaceViewGroupButton";
 
 /**
  * The window's open pages as a row of tabs above the page. A tab selects its page, closes from its
- * closer or a middle click, and drags to a new place in the row. Each tab keeps its own split
- * layout, which the layout button at the row's far end edits.
+ * closer or a middle click, and drags to a new place in the row. Dragged down onto the page, a
+ * tab's page docks into a split there (up to four panes); paused over another tab while held, the
+ * drag opens that tab, so a page can be carried into another tab's layout. Each tab keeps its own
+ * split layout, which the layout button at the row's far end also edits.
  */
 export function WorkspaceTabBar(props: {
   gridColumn: number;
@@ -36,6 +38,10 @@ export function WorkspaceTabBar(props: {
     };
   });
   const store = useWorkspaceStore.getState;
+  const select = (id: string) => {
+    const view = store().selectTab(id);
+    if (view) props.onOpen(view);
+  };
 
   return (
     <div
@@ -47,10 +53,14 @@ export function WorkspaceTabBar(props: {
         label="Open pages"
         tabs={items}
         active={layout.activeTabId ?? null}
-        onSelect={(id) => {
-          const view = store().selectTab(id);
-          if (view) props.onOpen(view);
+        onSelect={select}
+        // A dragged tab is its open page to the panes, which dock it into a split.
+        dragCarries={(id) => {
+          const tab = tabs.find((candidate) => candidate.id === id);
+          const view = tab && activeLayoutView(tab);
+          return view ? { "workspace-tabs": view.id } : undefined;
         }}
+        onDragDwell={select}
         onClose={(id) => {
           if (store().closeTab(id)) props.onClosed();
         }}

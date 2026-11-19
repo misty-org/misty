@@ -26,5 +26,5 @@ export const preferencesWithoutRows: ReadonlySet<string> = new Set([
   "app.shortcuts.bindings",
   "collections.tabs.space",
   "collections.tabs.journal",
-  "collections.tabs.library",
+  "collections.tabs.media",
 ]);

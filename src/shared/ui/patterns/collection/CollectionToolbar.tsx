@@ -7,6 +7,7 @@ import {
   type ComponentProps,
   type ReactNode,
 } from "react";
+import { createPortal } from "react-dom";
 import { ArrowUpDown, Columns3, LayoutGrid, List, ListFilter } from "lucide-react";
 import { usePointerReorder, reorderIds } from "@/shared/hooks/usePointerReorder";
 import { FilterChip } from "../../controls/FilterChip";
@@ -22,7 +23,11 @@ import {
 } from "../../overlays/DropdownMenu";
 import { MenuRadioGroup, MenuRadioItem } from "../../overlays/MenuItem";
 import { cn } from "../../classNames";
-import { CollectionColumnChooser, CollectionColumnsContext } from "./CollectionColumns";
+import {
+  CollectionColumnChooser,
+  CollectionColumnsContext,
+  CollectionHeadingSlotContext,
+} from "./CollectionColumns";
 
 type CollectionHeadingProps = {
   /** The page's name, or a node that stands for it, such as a Space switcher menu. */
@@ -35,13 +40,12 @@ type CollectionHeadingProps = {
   end?: ReactNode;
 };
 
-// The band stays put while the page scrolls under it, edge to edge across CollectionPage's padding.
-const stickyClass = "sticky top-0 z-10 -mx-4 bg-inherit";
-
 /**
  * A collection page's top band: a PageHeader, as tall as every other page's bar and closed by the
- * same hairline. The title fades first, then the actions give way; it never wraps. The title may
- * be a node, such as a Space switcher, with the same bar items beside it.
+ * same hairline. Inside a CollectionPage it draws in the band above the page's scroller, so it
+ * spans the pane like every other page's bar and a scrollbar never narrows it. The title fades
+ * first, then the actions give way; it never wraps. The title may be a node, such as a Space
+ * switcher, with the same bar items beside it.
  *
  * ```tsx
  * <CollectionHeading title="Library" end={<CollectionSearch … />}
@@ -49,15 +53,13 @@ const stickyClass = "sticky top-0 z-10 -mx-4 bg-inherit";
  * ```
  */
 export function CollectionHeading({ title, actions, actionsLabel, end }: CollectionHeadingProps) {
-  return (
-    <PageHeader
-      className={stickyClass}
-      title={title}
-      actions={actions}
-      actionsLabel={actionsLabel}
-      end={end}
-    />
+  const page = useContext(CollectionHeadingSlotContext);
+  const header = (
+    <PageHeader title={title} actions={actions} actionsLabel={actionsLabel} end={end} />
   );
+  if (!page) return header;
+  // In a page, wait the one commit until its band has mounted rather than mount here and move.
+  return page.slot ? createPortal(header, page.slot) : null;
 }
 
 export const CollectionSearch = forwardRef<HTMLInputElement, ComponentProps<typeof SearchField>>(

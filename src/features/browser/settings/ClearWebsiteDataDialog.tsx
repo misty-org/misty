@@ -126,8 +126,7 @@ export function ClearWebsiteDataDialog(props: {
           <Button
             type="button"
             size="lg"
-            disabled={!selected.size}
-            loading={working}
+            disabled={!selected.size || working}
             onClick={() => void clear()}
           >
             Clear data

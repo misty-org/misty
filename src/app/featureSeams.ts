@@ -23,15 +23,23 @@ import {
 } from "@/features/agents";
 import { browserLibrary } from "@/features/browser";
 import { noteAsk, vocativeRouting, voiceCleanup, voiceDevice, voiceEngine } from "@/features/voice";
-import { SetupStepBody, setupStepCopy, TourInfoButton, useSetupSteps } from "@/features/onboarding";
+import {
+  SetupStepBody,
+  setupStepCopy,
+  TourInfoButton,
+  useSetupStepDone,
+  useSetupSteps,
+} from "@/features/onboarding";
 import {
   arcadeGateway,
   drawingsApi,
   handoffGateway,
+  createYjsProvider,
   liveGateway,
   MistyLibraryPicker,
   resetNotesAccountState,
   resetSpacesAccountState,
+  spaceRequest,
   uploadLibraryBlob,
   uploadLibraryPath,
   useSpacesStore,
@@ -57,6 +65,7 @@ setupFlow.provide({
   stepCopy: setupStepCopy,
   useSteps: useSetupSteps,
   StepBody: SetupStepBody,
+  useStepDone: useSetupStepDone,
 });
 
 spacesDirectory.provide(useSpacesStore);
@@ -67,6 +76,9 @@ spacesGateway.provide({
   ...liveGateway,
   uploadLibraryPath,
   uploadLibraryBlob,
+  spaceRequest,
+  openCodeRoom: (ticket, doc, refresh) => createYjsProvider(ticket, doc, "code-room", refresh),
+  itemTools: () => import("@/features/spaces/agentItemTools").then((m) => m.agentItemTools),
   async createDrawing(spaceId, title, elements) {
     const drawing = await drawingsApi.create(spaceId, title);
     const { seedDrawing } =
@@ -96,7 +108,7 @@ function focusedShortcutScope(): ShortcutScope {
   const tab = pane?.views.find((candidate) => candidate.id === pane.activeViewId);
   switch (tab?.surfaceId) {
     case "space":
-      return tab.route.toLowerCase().includes("/library") ? "tool:library" : "tool:space";
+      return /\/(media|library)(\/|\?|#|$)/i.test(tab.route) ? "tool:library" : "tool:space";
     default:
       return "workspace";
   }

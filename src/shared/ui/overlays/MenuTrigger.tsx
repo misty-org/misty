@@ -79,7 +79,7 @@ const MenuTrigger = React.forwardRef<HTMLButtonElement, MenuTriggerProps>(
   ) => {
     const Trigger = kind === "popover" ? PopoverTrigger : DropdownMenuTrigger;
     if (plain) {
-      const { justify: _justify, loading: _loading, ...rest } = props;
+      const { justify: _justify, ...rest } = props;
       return (
         <Trigger asChild>
           <Pressable

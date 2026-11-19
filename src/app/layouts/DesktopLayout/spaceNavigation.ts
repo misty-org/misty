@@ -1,7 +1,13 @@
-import { defaultAgentOf, usePersonalAgentsStore } from "@/features/agents";
+import {
+  defaultAgentOf,
+  isProjectChat,
+  openCodeChat,
+  usePersonalAgentsStore,
+} from "@/features/agents";
 import {
   useWorkspaceStore,
   workspaceSurfaceFromRoute,
+  type DockDropZone,
   type WorkspaceView,
 } from "@/features/app-windows";
 
@@ -34,7 +40,34 @@ export function openWorkspaceRouteIn(
   onOpen({ ...view, route });
 }
 
+/**
+ * Opens a page dropped on a pane (a chat dragged from the sidebar): beside it in a new split, or
+ * in its place for "center", where the pane's page moves to a tab of its own.
+ */
+export function openWorkspaceRouteAt(
+  route: string,
+  paneId: string,
+  zone: DockDropZone,
+  onOpen: (view: WorkspaceView) => void,
+) {
+  const surface = workspaceSurfaceFromRoute(route);
+  if (!surface) return;
+  const view = useWorkspaceStore.getState().addSurface({ ...surface, route });
+  useWorkspaceStore.getState().dockView(view.id, paneId, zone);
+  onOpen({ ...view, route });
+}
+
 /** The route of an agent's chat: one conversation, or with `fresh` a new one. */
+/**
+ * Where an existing chat opens: a chat in a project is Code's, beside the Code page's editor;
+ * any other on its agent's chat page.
+ */
+export function openChatRoute(agentId: string, conversationId: string) {
+  if (!isProjectChat(conversationId)) return agentChatRoute(agentId, conversationId);
+  openCodeChat(conversationId);
+  return "/agents?view=code";
+}
+
 export function agentChatRoute(agentId: string, conversationId?: string, fresh = false) {
   const params = new URLSearchParams({ agent: agentId });
   if (conversationId) params.set("conversation", conversationId);
@@ -44,7 +77,7 @@ export function agentChatRoute(agentId: string, conversationId?: string, fresh =
 }
 
 /** A new chat with the agent last used here, or one on the person's engines. */
-function newChatRoute() {
+export function newChatRoute() {
   const { agents, selected } = usePersonalAgentsStore.getState();
   const agent =
     agents.find((item) => item.id === selected.global && item.enabled && !item.system_managed) ??
@@ -66,6 +99,8 @@ export function openNewChat(onOpen: (view: WorkspaceView) => void) {
  * already shows, instead of jumping to that tab.
  */
 export function openNewTab(onOpen: (view: WorkspaceView) => void) {
-  const view = useWorkspaceStore.getState().newTab(newChatRoute());
+  // With no agent to start a chat with, the new tab waits idle on the Agents page.
+  const route = newChatRoute();
+  const view = useWorkspaceStore.getState().newTab(route === "/agents" ? undefined : route);
   onOpen(view);
 }

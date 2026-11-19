@@ -23,20 +23,42 @@ export const CollectionColumnsContext = createContext<{
   setHidden: React.Dispatch<React.SetStateAction<Record<string, string[]>>>;
 } | null>(null);
 
-export function CollectionPage({ className, ...props }: ComponentProps<"div">) {
+/**
+ * Where a CollectionPage's heading goes: the band above the page's scroller. `null` inside a page
+ * until the band has mounted; outside a page there is none and the heading draws in place.
+ */
+export const CollectionHeadingSlotContext = createContext<{ slot: HTMLElement | null } | null>(
+  null,
+);
+
+/**
+ * A collection page: its CollectionHeading in a band across the whole pane, and the rest in a
+ * scroller under it. The heading lands in the band wherever it is rendered in the page (a
+ * component of its own, like the Library's), so a scrollbar never narrows the bar and every
+ * page's bar spans the same width.
+ */
+export function CollectionPage({ className, children, ...props }: ComponentProps<"div">) {
   const [schema, register] = useState<ColumnSchema | null>(null);
   const [hidden, setHidden] = useState<Record<string, string[]>>({});
+  const [slot, setSlot] = useState<HTMLElement | null>(null);
   const value = useMemo(() => ({ schema, register, hidden, setHidden }), [schema, hidden]);
+  const heading = useMemo(() => ({ slot }), [slot]);
   return (
     <CollectionColumnsContext.Provider value={value}>
-      <div
-        className={cn(
-          "flex h-full min-h-0 min-w-0 flex-col gap-4 overflow-y-auto bg-charcoal-workspace",
-          "px-4 pb-5 text-cream",
-          className,
-        )}
-        {...props}
-      />
+      <CollectionHeadingSlotContext.Provider value={heading}>
+        <div
+          className={cn(
+            "flex h-full min-h-0 min-w-0 flex-col bg-charcoal-workspace text-cream",
+            className,
+          )}
+          {...props}
+        >
+          <div ref={setSlot} className="shrink-0 empty:hidden" />
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-y-auto px-4 pt-4 pb-5">
+            {children}
+          </div>
+        </div>
+      </CollectionHeadingSlotContext.Provider>
     </CollectionColumnsContext.Provider>
   );
 }

@@ -7,11 +7,14 @@ import { cn } from "../classNames";
  */
 
 /**
- * Card, edge, and shadow. The global popup rule in styles.css turns the ring into a real border
- * and clips contents to its rounded edge, so call sites need no `overflow-hidden` for corners.
+ * Card and edge, with no shadow. The edge is `popup-edge` (components.css): a 1px line drawn as
+ * an outline over the card's own rim, above everything inside it. Never a `ring-` (a box shadow
+ * outside the card, which leaves a dark seam where it meets the card's rounded corner) or a
+ * colored border (contents painted over it thin it at the corners). The global popup rule in
+ * overlays.css draws the same edge on every popup primitive and clips contents to the rounded
+ * edge, so call sites need no `overflow-hidden` for corners.
  */
-export const popupSurfaceClass =
-  "rounded-xl bg-charcoal-card text-cream shadow-lg ring-1 ring-cream/10 outline-none";
+export const popupSurfaceClass = "rounded-xl bg-charcoal-card text-cream popup-edge";
 
 /**
  * Fade and a short slide away from the anchor, from literal keyframes in styles.css.

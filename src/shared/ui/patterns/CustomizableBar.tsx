@@ -24,6 +24,11 @@ export interface BarLayout {
  * to show or hide it, and Reset to put the bar back as it came. The caller keeps the layout (for
  * the device); a press that doesn't move is still a click on the item.
  *
+ * `arrangement="dock"` lays a row out as a game's HUD does: the first item at the start, the last
+ * at the end, the rest in the middle, so dragging one past another moves it to that place. A
+ * hidden item (or one with nothing to show right now) keeps its place empty. A text field inside
+ * keeps its own right-click menu.
+ *
  * ```tsx
  * <CustomizableBar label="Panels" axis="y" items={items} layout={layout}
  *   onChange={save} onReset={reset} className="gap-1" />
@@ -38,12 +43,16 @@ export function CustomizableBar(props: {
   layout: BarLayout;
   onChange(layout: BarLayout): void;
   onReset(): void;
+  /** `row` (the default) packs the items in order; `dock` places them at start, middle and end. */
+  arrangement?: "row" | "dock";
   /** Layout only: the gap between items and the bar's padding. */
   className?: string;
   [key: `data-${string}`]: string | undefined;
 }) {
-  const { label, axis, items, layout, onChange, onReset, className, ...data } = props;
-  const available = layout.order.filter((id) => items[id] && items[id].node !== null);
+  const { label, axis, items, layout, onChange, onReset, arrangement, className, ...data } = props;
+  const dock = arrangement === "dock";
+  // A dock keeps every item's place, even one with nothing to show right now.
+  const available = layout.order.filter((id) => items[id] && (dock || items[id].node !== null));
   const shown = available.filter((id) => !layout.hidden.includes(id));
   const move = (id: string, target: string, after: boolean) =>
     onChange({ ...layout, order: reorderIds(layout.order, [id], target, after) });
@@ -70,12 +79,20 @@ export function CustomizableBar(props: {
         <div
           {...reorder}
           {...data}
+          onContextMenuCapture={(event) => {
+            if ((event.target as Element).closest("input, textarea, [contenteditable=true]"))
+              event.stopPropagation();
+          }}
           role="toolbar"
           aria-label={label}
           aria-orientation={axis === "y" ? "vertical" : "horizontal"}
-          className={cn("flex items-center", axis === "y" && "flex-col", className)}
+          className={cn(
+            dock ? "grid grid-cols-[1fr_auto_1fr] items-end" : "flex items-center",
+            !dock && axis === "y" && "flex-col",
+            className,
+          )}
         >
-          {shown.map((id) => (
+          {(dock ? available : shown).map((id, index, placed) => (
             // An item with nothing to say right now draws nothing, and takes no gap either. Down
             // a column an item takes the column's width (a sidebar row runs edge to edge).
             <div
@@ -84,8 +101,9 @@ export function CustomizableBar(props: {
               data-reorder-item={id}
               data-reorder-handle=""
               data-reorder-preview=""
+              style={dock ? dockPlace(index, placed.length) : undefined}
             >
-              {items[id].node}
+              {layout.hidden.includes(id) ? null : items[id].node}
             </div>
           ))}
         </div>
@@ -104,4 +122,14 @@ export function CustomizableBar(props: {
       </ContextMenuContent>
     </ContextMenu>
   );
+}
+
+/** A dock item's cell: the first at the start, the last at the end, the rest in the middle. */
+function dockPlace(index: number, count: number) {
+  const side = index === 0 ? "start" : index === count - 1 ? "end" : "center";
+  return {
+    gridRow: 1,
+    gridColumn: side === "start" ? 1 : side === "end" ? 3 : 2,
+    justifySelf: side,
+  } as const;
 }

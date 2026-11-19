@@ -1,7 +1,7 @@
 /* SidePanel and SideCard: cards docked beside a page's column, on the window's own surface.
    Geometry: 8px from the column, from the top and from the bottom, 4px from what follows (a rail's
    own 4px inset makes that 8px too). They wear the sidebar's surface, so the window's two sides
-   match, with a hairline edge drawn as an outline (content such as a terminal never covers it)
+   match, with a hairline edge (--hairline) drawn as an outline (content such as a terminal never covers it)
    and a soft two-layer shadow. */
 
 .misty-side-panel {
@@ -19,8 +19,8 @@
   border-radius: var(--radius-xl);
   background: var(--color-charcoal-sidebar);
   color: var(--color-cream);
-  outline: 0.5px solid color-mix(in srgb, var(--misty-theme-text) 9%, transparent);
-  outline-offset: -0.5px;
+  outline: var(--hairline) solid color-mix(in srgb, var(--misty-theme-text) 9%, transparent);
+  outline-offset: calc(-1 * var(--hairline));
   box-shadow:
     0 0.125rem 0.25rem rgb(0 0 0 / 0.22),
     0 1px 0.125rem rgb(0 0 0 / 0.22);
@@ -88,7 +88,7 @@
   min-width: 0;
   height: 2.5rem;
   padding: 0 0.25rem 0 0.75rem;
-  border-bottom: 0.5px solid color-mix(in srgb, var(--misty-theme-text) 7%, transparent);
+  border-bottom: var(--hairline) solid color-mix(in srgb, var(--misty-theme-text) 7%, transparent);
 }
 /* A header that opens with a control (SidePanelLead) starts it 4px in, where the rows below start
    their wash, and the control's text 8px inside that, where their icons and names start. */
@@ -165,8 +165,8 @@
   border-radius: var(--radius-xl);
   background: var(--color-charcoal-sidebar);
   color: var(--color-cream);
-  outline: 0.5px solid color-mix(in srgb, var(--misty-theme-text) 9%, transparent);
-  outline-offset: -0.5px;
+  outline: var(--hairline) solid color-mix(in srgb, var(--misty-theme-text) 9%, transparent);
+  outline-offset: calc(-1 * var(--hairline));
   box-shadow:
     0 0.125rem 0.25rem rgb(0 0 0 / 0.22),
     0 1px 0.125rem rgb(0 0 0 / 0.22);

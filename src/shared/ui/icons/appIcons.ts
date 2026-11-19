@@ -1,11 +1,14 @@
 import {
   Brain,
   CalendarDays,
+  Clapperboard,
   FileText,
   FlaskConical,
   Galaxy,
+  ChartColumn,
+  Presentation,
+  Shapes,
   KanbanSquare,
-  Library,
   Package,
   CalendarClock,
   ListTodo,
@@ -52,10 +55,13 @@ export const spaceIcons = {
   space: Galaxy,
   chat: MessagesSquare,
   docs: FileText,
+  slides: Presentation,
+  data: ChartColumn,
+  whiteboards: Shapes,
   lab: FlaskConical,
   planner: KanbanSquare,
   calendar: CalendarDays,
-  library: Library,
+  media: Clapperboard,
 } satisfies Record<string, LucideIcon>;
 
 /** A Space tab's tool (`spaceWorkspaceToolFromRoute`) as `spaceIcons` names it. */
@@ -65,10 +71,15 @@ const spaceTools: Record<string, keyof typeof spaceIcons> = {
   social: "chat",
   chat: "chat",
   journal: "docs",
+  slides: "slides",
+  data: "data",
+  whiteboards: "whiteboards",
   lab: "lab",
   planner: "planner",
   calendar: "calendar",
-  library: "library",
+  // The Library became Media; a tab saved under the old name wears the new icon.
+  library: "media",
+  media: "media",
 };
 
 /** Catalog IDs retain `chat`; workspace routes and navigation use `social`. */

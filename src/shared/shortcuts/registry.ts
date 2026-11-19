@@ -4,6 +4,7 @@ import type {
   ShortcutPlatform,
 } from "./shortcutTypes";
 import { chatCommands } from "./chatCommands";
+import { codeCommands } from "./codeCommands";
 import { command } from "./factory";
 import { focusModeCommands } from "./viewAndTabCommands";
 import { libraryCommands } from "./libraryCommands";
@@ -75,8 +76,9 @@ const shellCommands: ShortcutCommandDefinition[] = [
   }),
 ];
 
-/** The Space home's tabs, on ⌘1 to ⌘4 while a Space is focused (window tabs elsewhere). */
-const spaceSections = ["Home", "Docs", "Drawings", "Files"] as const;
+/** A Space's home, its Docs and Whiteboards pages, and its files, on ⌘1 to ⌘4 while a Space is
+ * focused (window tabs elsewhere). */
+const spaceSections = ["Home", "Docs", "Whiteboards", "Files"] as const;
 
 const tabAndToolCommands = [
   ...spaceSections.map((label, index) =>
@@ -116,6 +118,7 @@ export const shortcutCommandRegistry: ShortcutCommandDefinition[] = [
   ...tabAndToolCommands,
   ...libraryCommands,
   ...chatCommands,
+  ...codeCommands,
 ];
 
 export const shortcutCommandsById = new Map(

@@ -6,7 +6,6 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
   enableModernWindowStyle,
   setTrafficLightsVisible,
-  trafficLightGlyphDrop,
   trafficLightOffsetDefault,
   trafficLightRestY,
 } from "@/native/runtime";
@@ -22,9 +21,7 @@ import { dockingMetrics } from "./dockingGeometry";
  * to that line whichever side the tabs are on. The bar is in design pixels (uiPx gives its CSS
  * pixels, which are the window's points); the native offsets are points already. */
 const lightsDrop = () =>
-  uiPx(dockingMetrics.edge + dockingMetrics.spaceBar / 2) -
-  trafficLightRestY +
-  trafficLightGlyphDrop;
+  uiPx(dockingMetrics.edge + dockingMetrics.spaceBar / 2) - trafficLightRestY;
 /** The first button's frame is 22pt from the window edge: 3pt right of the panel's content edge
  * (8 + 1 + 10 = 19pt), because the circle sits inside its frame, so the circle's edge lines up
  * with the address field's. */

@@ -46,7 +46,7 @@ export function AccountPictureRow({ account }: { account: AccountMeResponse }) {
         aria-label="Profile picture"
         onChange={(event) => upload(event.target.files?.[0])}
       />
-      <Button variant="secondary" loading={working} onClick={() => input.current?.click()}>
+      <Button variant="secondary" disabled={working} onClick={() => input.current?.click()}>
         Change
       </Button>
       {account.avatar_version ? (

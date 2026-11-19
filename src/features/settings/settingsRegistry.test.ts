@@ -17,7 +17,8 @@ const blockIds = new Set(settingsRegistry.map((entry) => entry.id));
 
 describe("settings registry", () => {
   it("keeps a short list of one-word pages, each with its own icon", () => {
-    expect(areas.length).toBeLessThanOrEqual(15);
+    // What was the Agents window (agents, engines and their tools) has its pages here too.
+    expect(areas.length).toBeLessThanOrEqual(28);
     expect(new Set(areas).size).toBe(areas.length);
     expect(Object.keys(settingsAreas).sort()).toEqual([...areas].sort());
     const labels = areas.map((area) => settingsAreas[area].label);
@@ -27,7 +28,14 @@ describe("settings registry", () => {
   });
 
   it("names groups by feature and never echoes a group in its pages", () => {
-    expect(settingsGroups.map((group) => group.label)).toEqual(["Account", "App", "Agents"]);
+    expect(settingsGroups.map((group) => group.label)).toEqual([
+      "Account",
+      "App",
+      "Pages",
+      "Agents",
+      "Engines",
+      "Tools",
+    ]);
     for (const group of settingsGroups)
       for (const area of group.areas)
         expect(settingsAreas[area].label.toLowerCase()).not.toContain(group.label.toLowerCase());

@@ -57,7 +57,7 @@ const AlertDialogContent = React.forwardRef<
             "max-h-[calc(100dvh-4rem-var(--misty-modal-inset-top,0px))] w-[calc(100%-2rem)]",
             alertDialogSizeClass[size],
             "gap-4 overflow-y-auto rounded-xl bg-charcoal-card p-6",
-            "text-body text-cream shadow-xl ring-1 ring-cream/10 misty-dialog-motion",
+            "text-body text-cream misty-dialog-motion",
             className,
           )}
           {...props}
@@ -120,7 +120,7 @@ AlertDialogDescription.displayName = AlertDialogPrimitive.Description.displayNam
 type AlertDialogButtonProps = React.ComponentPropsWithoutRef<typeof AlertDialogPrimitive.Action> & {
   /** `danger` for a delete (ConfirmDeleteDialog already does this); otherwise `primary`. */
   variant?: ButtonProps["variant"];
-  /** Working on the click: a spinner replaces the icon, the label stays, and clicks wait. */
+  /** Working on the click: the button is disabled until it finishes. */
   loading?: boolean;
 };
 
@@ -131,9 +131,9 @@ type AlertDialogButtonProps = React.ComponentPropsWithoutRef<typeof AlertDialogP
 const AlertDialogAction = React.forwardRef<
   React.ElementRef<typeof AlertDialogPrimitive.Action>,
   AlertDialogButtonProps
->(({ className, variant = "primary", loading, children, ...props }, ref) => (
+>(({ className, variant = "primary", loading, disabled, children, ...props }, ref) => (
   <AlertDialogPrimitive.Action ref={ref} data-slot="alert-dialog-action" {...props} asChild>
-    <Button variant={variant} size="lg" loading={loading} className={className}>
+    <Button variant={variant} size="lg" disabled={disabled || loading} className={className}>
       {children}
     </Button>
   </AlertDialogPrimitive.Action>
@@ -144,9 +144,9 @@ AlertDialogAction.displayName = AlertDialogPrimitive.Action.displayName;
 const AlertDialogCancel = React.forwardRef<
   React.ElementRef<typeof AlertDialogPrimitive.Cancel>,
   AlertDialogButtonProps
->(({ className, variant = "quiet", loading, children, ...props }, ref) => (
+>(({ className, variant = "quiet", loading, disabled, children, ...props }, ref) => (
   <AlertDialogPrimitive.Cancel ref={ref} data-slot="alert-dialog-cancel" {...props} asChild>
-    <Button variant={variant} size="lg" loading={loading} className={className}>
+    <Button variant={variant} size="lg" disabled={disabled || loading} className={className}>
       {children}
     </Button>
   </AlertDialogPrimitive.Cancel>

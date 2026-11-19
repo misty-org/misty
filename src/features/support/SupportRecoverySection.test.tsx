@@ -48,8 +48,13 @@ describe("SupportRecoverySection", () => {
       Array.from(container.querySelectorAll("button")).find(
         (candidate) => candidate.textContent?.trim() === text,
       );
+    // A row's button reads its label, then its description.
+    const row = (label: string) =>
+      Array.from(container.querySelectorAll("button")).find((candidate) =>
+        candidate.textContent?.trim().startsWith(label),
+      );
 
-    await act(async () => button("Reset layout")?.click());
+    await act(async () => row("Reset layout")?.click());
     expect(mocks.resetLayout).not.toHaveBeenCalled();
     expect(container.textContent).toContain("Nothing is deleted");
 

@@ -12,6 +12,7 @@ import {
   countStatusWords,
   type Counter,
 } from "./uiRuleCounters.ts";
+import { classToken } from "./uiClassToken.ts";
 
 /**
  * Every UI rule: what it catches, where it doesn't apply, and what to use instead. uiRules.ts
@@ -33,19 +34,6 @@ export interface UiRule {
   jsx?: boolean;
 }
 
-/**
- * A Tailwind class token in a string: preceded by a quote, a space or a brace, followed by one of
- * those, with any variant prefixes (`hover:`, `md:`, `[&_svg]:`, `data-[state=open]:`,
- * `group-hover/row:`) and the `!` modifier. Prose and
- * function names (`truncate(text)`) don't match.
- */
-function classToken(body: string): RegExp {
-  return new RegExp(
-    `(?<=["'\`\\s{])(?:[a-z0-9-]+(?:-\\[[^\\]\\s"'\`]+\\])?(?:\\/[\\w-]+)?:|\\[[^\\]\\s"'\`]+\\]:)*!?(?:${body})(?=["'\`\\s}])`,
-    "g",
-  );
-}
-
 // ---------------------------------------------------------------------------------------------
 // Path allowlists, each with its reason.
 
@@ -56,6 +44,8 @@ const codeViews = [
   /^src\/features\/agents\/context-panel\/git\/DiffView\.tsx$/,
   /^src\/features\/agents\/runs\/markdown\//,
   /^src\/shared\/lib\/terminal\//,
+  // The code editor's own theme, and the Code page's editors and SQL grid built on it.
+  /^src\/shared\/lib\/codemirror\//,
   // A text file's own contents, shown as the file.
   /^src\/features\/spaces\/library\/library-primitives\/LibraryTextPreview\.tsx$/,
   /^src\/features\/files\/preview\/EmbeddedUniversalPreviewView\.tsx$/,
@@ -188,7 +178,7 @@ export const uiRules = {
   },
   "hand-rolled-spinner": {
     pattern: /<(?:Loader2|LoaderCircle)\b[^>]*animate-spin/g,
-    guidance: "use Spinner, or the Button's loading prop",
+    guidance: "use Spinner where the work happens; a button just goes disabled",
   },
   "all-caps": {
     // A class token inside a string on one line, so prose that says "uppercase" is fine.
@@ -298,10 +288,27 @@ export const uiRules = {
       "never the sparkles star (it reads as AI filler): pick an icon for what the thing is, " +
       "such as Cpu for a model, Globe for web research or ScrollText for a skill",
   },
+  "skeleton-fallback": {
+    // A lazy tool's code arriving is the tool getting ready, not data: a skeleton there looks
+    // like content that never comes.
+    pattern: /fallback=\{\s*<\w*Skeleton\b/g,
+    jsx: true,
+    guidance:
+      "load a tool's code with lazyTool inside ToolSuspense, which says \"Setting up the code " +
+      'editor" and offers Try again; never a skeleton fallback, which stands in for data only',
+  },
   duckduckgo: {
     pattern: /duckduckgo/gi,
     allow: searchSiteRecognizers,
     guidance: "the agent browser opens on a blank page and searches with Google, never DuckDuckGo",
+  },
+  "half-pixel-edge": {
+    // Any literal half pixel: an outline, border, ring or shadow spread.
+    pattern: /(?<![\d.])0?\.5px/g,
+    guidance:
+      "an edge is never 0.5px: use var(--hairline) or the hairline-outline utility (1px below " +
+      "2x screens, 0.5px on them); a half pixel fades out on Windows' scaled displays and " +
+      "rounded corners look cut off",
   },
   "arbitrary-px": {
     pattern: classToken(
@@ -364,6 +371,7 @@ export const sharedUiRuleIds = [
   "native-title",
   "ellipsis",
   "arbitrary-px",
+  "half-pixel-edge",
   "sparkles-icon",
   // Shared components compose buttons too (InfoCorner's "i" was drawn round here).
   "button-restyle",
@@ -404,6 +412,13 @@ export const cssRules = {
     pattern: /font-family:[^;}]*mono/g,
     allow: codeStylesheets,
     guidance: "monospace only inside code itself (the editor, diffs, the terminal, code blocks)",
+  },
+  "css-half-pixel-edge": {
+    pattern: /(?<![\d.])0?\.5px/g,
+    guidance:
+      "an edge is never 0.5px: use var(--hairline) or the hairline-outline utility (1px below " +
+      "2x screens, 0.5px on them); a half pixel fades out on Windows' scaled displays and " +
+      "rounded corners look cut off",
   },
   "css-z": {
     pattern: /z-index:\s*-?\d/g,
@@ -466,6 +481,9 @@ export const cssRules = {
 
 export type AppUiRuleId = keyof typeof uiRules;
 export type CssRuleId = keyof typeof cssRules;
+
+/** The one rule shared UI's own stylesheets keep to: they draw the edges everything else wears. */
+export const sharedCssRuleIds = ["css-half-pixel-edge"] as const satisfies readonly CssRuleId[];
 export type UiRuleId = AppUiRuleId | CssRuleId;
 
 export const allRules: Record<UiRuleId, UiRule> = { ...uiRules, ...cssRules };

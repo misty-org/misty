@@ -82,10 +82,10 @@ const handlePlace: Record<Exclude<Handle, "move">, string> = {
   ne: "-right-1 -top-1 cursor-nesw-resize",
   sw: "-bottom-1 -left-1 cursor-nesw-resize",
   se: "-bottom-1 -right-1 cursor-nwse-resize",
-  n: "-top-1 left-1/2 -translate-x-1/2 cursor-ns-resize",
-  s: "-bottom-1 left-1/2 -translate-x-1/2 cursor-ns-resize",
-  w: "-left-1 top-1/2 -translate-y-1/2 cursor-ew-resize",
-  e: "-right-1 top-1/2 -translate-y-1/2 cursor-ew-resize",
+  n: "-top-1 inset-x-0 mx-auto w-fit cursor-ns-resize",
+  s: "-bottom-1 inset-x-0 mx-auto w-fit cursor-ns-resize",
+  w: "-left-1 inset-y-0 my-auto h-fit cursor-ew-resize",
+  e: "-right-1 inset-y-0 my-auto h-fit cursor-ew-resize",
 };
 const handleShape: Record<Exclude<Handle, "move">, string> = {
   nw: "size-4 border-l-4 border-t-4",
@@ -150,7 +150,13 @@ export function ImageCropFrame({
     event.preventDefault();
     event.stopPropagation();
     event.currentTarget.setPointerCapture(event.pointerId);
-    drag.current = { handle, startX: event.clientX, startY: event.clientY, start: rect, last: rect };
+    drag.current = {
+      handle,
+      startX: event.clientX,
+      startY: event.clientY,
+      start: rect,
+      last: rect,
+    };
     setDragging(true);
   };
   const move = (event: React.PointerEvent<HTMLDivElement>) => {
@@ -259,10 +265,7 @@ export function ImageCropFrame({
           <div
             key={handle}
             aria-hidden="true"
-            className={cn(
-              "absolute flex items-center justify-center p-1",
-              handlePlace[handle],
-            )}
+            className={cn("absolute flex items-center justify-center p-1", handlePlace[handle])}
             // Its moves and release bubble to the frame, which follows the drag.
             onPointerDown={begin(handle)}
           >

@@ -1,5 +1,7 @@
 import { appZoomFromStoredScale, appZoomStoredDefault } from "@/shared/hooks/useAppZoom";
-import { booleanSetting, numberSetting, stringSetting } from "../SettingsControls";
+// From the readers' own module, which imports nothing: SettingsControls (which also re-exports
+// them) sits in import cycles, and aliasing through it could copy them before they exist.
+import { booleanSetting, numberSetting, stringSetting } from "../settingsValues";
 import type { AppThemeMode } from "./appTheme";
 import type { NightLightMode } from "./nightLight";
 export const settingsBoolean = booleanSetting;

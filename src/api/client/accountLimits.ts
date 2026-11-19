@@ -5,7 +5,9 @@ import { create } from "zustand";
  * with what to do next. The codes are the server's.
  */
 const storageFull =
-  "Your storage is full. Free some space in your Library, or get more: on Misty Cloud, choose a larger plan in Plan and billing; on your own server, ask whoever runs it. Nothing already stored is lost.";
+  "Your storage is full. Free some space in your Library, or get more: on Misty Cloud, choose a " +
+  "larger plan in Plan and billing; on your own server, ask whoever runs it. Nothing already " +
+  "stored is lost.";
 
 export const accountLimitMessages: Record<string, string> = {
   device_limit_reached:

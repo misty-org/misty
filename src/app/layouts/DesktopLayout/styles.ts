@@ -43,8 +43,10 @@ export function desktopTitlebarNavigationGeometry(
 
 /** Beside a vertical sidebar the caption buttons share its header row, which starts below the
  * pane margin and the card's border; they are centred on that row's 40px. */
-export const windowsTitlebarControlsClass =
-  "misty-windows-caption-controls pointer-events-auto absolute left-0 top-[calc(var(--pane-frame,0.375rem)+1px)] z-[3] flex h-10 w-max flex-nowrap items-center";
+export const windowsTitlebarControlsClass = [
+  "misty-windows-caption-controls pointer-events-auto absolute left-0",
+  "top-[calc(var(--pane-frame,0.375rem)+1px)] z-[3] flex h-10 w-max flex-nowrap items-center",
+].join(" ");
 
 export const windowsTitlebarControlButtonClass =
   "grid h-full w-9 shrink-0 place-items-center border-0 bg-transparent p-0 transition-colors";

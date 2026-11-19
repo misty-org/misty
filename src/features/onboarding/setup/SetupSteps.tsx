@@ -3,10 +3,12 @@ import {
   rememberDockingLayout,
   type TabSide,
 } from "@/app/shell/dockingLayout";
+import { useProjectsHome, useProjectsHomePath } from "@/features/agents";
 import { useWindowDockingLayout, useWorkspaceStore } from "@/features/app-windows";
-import { Pressable, Surface, Text } from "@/shared/ui";
-import { Check } from "lucide-react";
-import type { ReactNode } from "react";
+import { Button, Surface, Text, useNotice } from "@/shared/ui";
+import { FolderOpen } from "lucide-react";
+import { useState } from "react";
+import { PreviewChoice } from "./PreviewChoice";
 import { TabsPreview } from "./SetupPreviews";
 
 import type { SetupStep } from "@/features/account";
@@ -14,16 +16,64 @@ import type { SetupStep } from "@/features/account";
 /** This computer's setup, the step that ends the wizard that follows signing in. */
 export const setupStepCopy: Record<SetupStep, string> = {
   tabs: "Where do you want the sidebar?",
+  projects: "Where do your projects go?",
 };
 
-/** The steps the wizard runs here: the side the sidebar sits on. */
+/** The steps the wizard runs here: the side the sidebar sits on, then where projects go. */
 export function useSetupSteps(): SetupStep[] {
-  return ["tabs"];
+  return ["tabs", "projects"];
+}
+
+/** Whether a step can go on: the projects folder has to be chosen; the sidebar has a side. */
+export function useSetupStepDone(step: SetupStep | null): boolean {
+  const projects = useProjectsHomePath();
+  return step !== "projects" || Boolean(projects);
 }
 
 /** One step's body. */
-export function SetupStepBody(_props: { step: SetupStep; onNext(): void }) {
-  return <TabsStep />;
+export function SetupStepBody(props: { step: SetupStep; onNext(): void }) {
+  return props.step === "projects" ? <ProjectsStep /> : <TabsStep />;
+}
+
+/**
+ * Where "Open in Code" makes a chat's project. The person picks it in the system's dialog, which
+ * opens on their home folder; Misty suggests no place. It stays in Settings.
+ */
+function ProjectsStep() {
+  const path = useProjectsHomePath();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  useNotice(Boolean(error), { message: error, tone: "error", onDismiss: () => setError("") });
+  const choose = () => {
+    setBusy(true);
+    void useProjectsHome
+      .getState()
+      .choose()
+      .catch((reason: unknown) =>
+        setError(reason instanceof Error ? reason.message : String(reason)),
+      )
+      .finally(() => setBusy(false));
+  };
+  return (
+    <div className="flex flex-col gap-3">
+      <Text as="p" size="body" tone="muted" wrap className="m-0">
+        When a chat becomes a project, Misty makes its folder here and opens it in Code.
+      </Text>
+      <div className="flex min-w-0 items-center gap-3">
+        {path ? (
+          <Surface tone="well" radius="md" className="min-w-0 flex-1 px-3 py-2">
+            <Text size="meta" tone="default" as="div">
+              {path}
+            </Text>
+          </Surface>
+        ) : null}
+        <Button disabled={busy} onClick={choose}>
+          <FolderOpen aria-hidden="true" />
+          {path ? "Change…" : "Choose folder…"}
+        </Button>
+      </div>
+    </div>
+  );
 }
 
 const tabSideChoices: Array<{ value: TabSide; label: string }> = [
@@ -39,7 +89,7 @@ function TabsStep() {
     <div className="flex flex-col gap-3">
       <div role="radiogroup" aria-label="Sidebar side" className="grid grid-cols-2 gap-3">
         {tabSideChoices.map((choice) => (
-          <Choice
+          <PreviewChoice
             key={choice.value}
             label={choice.label}
             selected={layout.tabs === choice.value}
@@ -54,40 +104,9 @@ function TabsStep() {
             }}
           >
             <TabsPreview side={choice.value} />
-          </Choice>
+          </PreviewChoice>
         ))}
       </div>
     </div>
-  );
-}
-
-/** A preview tile; the selected one gets a stronger border and a checkmark. */
-function Choice(props: {
-  label: string;
-  selected: boolean;
-  onSelect(): void;
-  children: ReactNode;
-}) {
-  return (
-    <Pressable
-      role="radio"
-      aria-checked={props.selected}
-      onClick={props.onSelect}
-      wash="card"
-      className="flex flex-col rounded-lg text-left transition-colors"
-    >
-      <Surface
-        tone={props.selected ? "well" : "none"}
-        edge={props.selected ? "strong" : "hairline"}
-        radius="lg"
-        className="flex flex-col gap-2 p-2"
-      >
-        {props.children}
-        <Text bare tone="bright" className="flex items-center gap-1.5 px-0.5">
-          <span className="min-w-0 flex-1 text-sm">{props.label}</span>
-          {props.selected ? <Check aria-hidden="true" className="shrink-0" /> : null}
-        </Text>
-      </Surface>
-    </Pressable>
   );
 }

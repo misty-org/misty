@@ -4,7 +4,7 @@ import { Pressable } from "../../controls/Pressable";
 import { OverflowFadeText } from "../../layout/OverflowFadeText";
 import { Surface } from "../../display/Surface";
 import { Text } from "../../display/Text";
-import { homeSectionClass } from "./homeLayout";
+import { homeDividedClass, homePanelClass, homeSectionClass } from "./homeLayout";
 
 /**
  * The one heading every block on a Space's home wears: a title, its count, an optional dot
@@ -40,21 +40,40 @@ export function HomeSectionHead(props: {
   );
 }
 
-/** A block of a Space's home: its heading, then whatever it holds. */
+/**
+ * A block of a Space's home: its heading, then whatever it holds. `panel` sets it in a card with a
+ * hairline edge, for the overview's blocks that sit two to a row, so they read as their own
+ * places on the page. `divided` draws a hairline above it, for the block that starts a new part
+ * of the page (the Space's own things under its overview).
+ */
 export function HomeSection(props: {
   title: string;
   count?: number;
   attention?: boolean;
   action?: ReactNode;
+  panel?: boolean;
+  divided?: boolean;
   className?: string;
   children: ReactNode;
 }) {
-  const { children, className, ...head } = props;
+  const { children, className, panel = false, divided = false, ...head } = props;
   return (
-    <section aria-label={props.title} className={cn(homeSectionClass, className)}>
+    <Surface
+      as="section"
+      aria-label={props.title}
+      tone={panel ? "card" : "none"}
+      edge={panel ? "hairline" : "none"}
+      radius={panel ? "xl" : "none"}
+      className={cn(
+        homeSectionClass,
+        panel && homePanelClass,
+        divided && homeDividedClass,
+        className,
+      )}
+    >
       <HomeSectionHead {...head} />
       {children}
-    </section>
+    </Surface>
   );
 }
 
@@ -127,7 +146,8 @@ export function PlaceChip({
       tone="faint"
       radius="lg"
       wash="control"
-      selected={pressed}
+      // Pressable's `selected`: the picked chip keeps its wash's pressed fill.
+      data-selected={pressed || undefined}
       aria-pressed={pressed}
       className={cn(
         "inline-flex h-8 max-w-full min-w-0 items-center gap-2 px-3 text-control",

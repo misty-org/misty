@@ -38,7 +38,7 @@ pub fn handle<R: Runtime>(
 }
 
 /// The origin Misty's own pages load from, for Access-Control-Allow-Origin.
-fn app_origin<R: Runtime>(app: &tauri::AppHandle<R>) -> String {
+pub(crate) fn app_origin<R: Runtime>(app: &tauri::AppHandle<R>) -> String {
     if cfg!(debug_assertions) {
         if let Some(dev) = app.config().build.dev_url.as_ref() {
             return dev.origin().ascii_serialization();

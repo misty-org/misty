@@ -255,7 +255,10 @@ function TourLayer({
           {rect ? (
             <div
               aria-hidden="true"
-              className="pointer-events-none fixed rounded-lg shadow-[0_0_0_624.9375rem_var(--color-scrim)] ring-2 ring-cream-bright transition-all duration-200"
+              className={cn(
+                "pointer-events-none fixed rounded-lg ring-2 ring-cream-bright",
+                "shadow-[0_0_0_624.9375rem_var(--color-scrim)] transition-all duration-200",
+              )}
               style={rect}
             />
           ) : (

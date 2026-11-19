@@ -51,7 +51,6 @@ export function ServerStep() {
         variant="primary"
         size="lg"
         icon={Cloud}
-        loading={busy}
         disabled={busy}
         onClick={() => void chooseMistyPro()}
       >

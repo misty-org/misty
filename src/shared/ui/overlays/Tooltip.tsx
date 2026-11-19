@@ -64,7 +64,7 @@ const tooltipContentClass = cn(
   popupSurfaceClass,
   popupMotionClass,
   "layer-tooltip flex max-w-80 items-baseline gap-2 rounded-md px-2 py-1",
-  "text-meta font-normal shadow-md select-none [overflow-wrap:anywhere]",
+  "text-meta font-normal select-none [overflow-wrap:anywhere]",
 );
 
 /** The bubble itself: portaled above everything, on the popup surface. */

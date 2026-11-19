@@ -4,6 +4,7 @@ import {
   useState,
   type KeyboardEvent,
   type MouseEvent,
+  type PointerEvent,
   type ReactNode,
 } from "react";
 import { shortAgo, type ChatSection, type ChatStatus } from "@/features/agents";
@@ -54,6 +55,8 @@ export function ChatRow(props: {
   selected: boolean;
   unread: boolean;
   onPress(event: MouseEvent): void;
+  /** Starts dragging the chat onto the window's panes, to open it in a split. */
+  onDragStart?(event: PointerEvent<HTMLElement>): void;
 }) {
   const now = useNow();
   const word = props.status ? statusWords[props.status] : "";
@@ -65,6 +68,8 @@ export function ChatRow(props: {
       data-selected={props.selected || undefined}
       data-unread={props.unread || undefined}
       data-status={props.status}
+      data-reorder-handle={props.onDragStart ? "" : undefined}
+      onPointerDown={props.onDragStart}
       onClick={props.onPress}
     >
       {props.mark ? <span className={markSlotClass}>{props.mark}</span> : null}

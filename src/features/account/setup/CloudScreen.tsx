@@ -95,13 +95,7 @@ export function CloudScreen(props: {
         />
       ) : null}
       {error ? <AuthMessage tone="error" message={error} /> : null}
-      <Button
-        type="submit"
-        variant="primary"
-        size="lg"
-        disabled={disabled || !ready}
-        loading={busy}
-      >
+      <Button type="submit" variant="primary" size="lg" disabled={disabled || !ready || busy}>
         Continue
       </Button>
     </form>
