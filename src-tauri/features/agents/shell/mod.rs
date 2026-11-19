@@ -10,7 +10,7 @@
 mod workspace;
 
 #[cfg(any(target_os = "macos", target_os = "linux"))]
-mod exit_watcher;
+pub(crate) mod exit_watcher;
 #[cfg(target_os = "linux")]
 mod linux;
 #[cfg(target_os = "macos")]

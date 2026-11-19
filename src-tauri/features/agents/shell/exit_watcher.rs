@@ -16,12 +16,12 @@ use tokio::process::{Child, Command};
 /// Takes only the group's number. No part of a command reaches this script.
 const WATCH_SCRIPT: &str = r#"read -r _line; kill -9 -- "-$1""#;
 
-pub(super) struct ExitWatcher(Child);
+pub(crate) struct ExitWatcher(Child);
 
 impl ExitWatcher {
     /// Starts watching for Misty's exit on behalf of process group `group`. If this value is dropped
     /// without `stop`, the pipe closes and the group is killed, so a cancelled run cleans up too.
-    pub(super) fn start(group: i32) -> std::io::Result<Self> {
+    pub(crate) fn start(group: i32) -> std::io::Result<Self> {
         Command::new("/bin/sh")
             .args(["-c", WATCH_SCRIPT, "exit-watcher"])
             .arg(group.to_string())
@@ -37,7 +37,13 @@ impl ExitWatcher {
     }
 
     /// The command has ended, so the group's number means nothing now and must not be killed later.
-    pub(super) async fn stop(mut self) {
+    pub(crate) async fn stop(mut self) {
         let _ = self.0.kill().await;
+    }
+
+    /// `stop` for callers that can't wait, such as a `Drop`: the watcher is killed before its pipe
+    /// closes, so it never signals the group.
+    pub(crate) fn stop_now(mut self) {
+        let _ = self.0.start_kill();
     }
 }

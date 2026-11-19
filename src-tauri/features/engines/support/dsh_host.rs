@@ -101,6 +101,11 @@ pub struct DshHostState {
 struct Spawned {
     child: Child,
     origin: String,
+    /// Stops the host's process group however Misty ends, including a crash or the SIGKILL a
+    /// dev rebuild sends, which never reach [`Drop`]. The host runs in its own group, so nothing
+    /// else would take it down and it would hold the port until the next launch.
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
+    exit_watcher: Option<crate::agents::shell::exit_watcher::ExitWatcher>,
     /// Kill-on-close job guard (Windows): conversation shells (pwsh.exe)
     /// spawned by host sessions can orphan before the taskkill /T walk ever
     /// sees them; dropping this guard closes the job and the kernel sweeps
@@ -114,6 +119,11 @@ struct Spawned {
 impl Drop for Spawned {
     fn drop(&mut self) {
         distrust_origin(&self.origin);
+        // The group is killed right here, so the watcher must not signal its number later.
+        #[cfg(any(target_os = "macos", target_os = "linux"))]
+        if let Some(watcher) = self.exit_watcher.take() {
+            watcher.stop_now();
+        }
         if let Some(pid) = self.child.id() {
             crate::engines::kill_process_group(pid);
         }
@@ -1136,6 +1146,12 @@ pub(crate) async fn ensure_host(
     // sessions' grandchildren escape every tree walk once their parent exits.
     #[cfg(windows)]
     let tree_guard = crate::engines::job::assign_kill_on_close(&child);
+    // Its own group (above) keeps it out of Ctrl+C and app-group signals, so this is what ends it
+    // when Misty dies without quitting. Dropped on a failed start, it takes the group with it.
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
+    let exit_watcher = child
+        .id()
+        .and_then(|pid| crate::agents::shell::exit_watcher::ExitWatcher::start(pid as i32).ok());
     let output = Arc::new(Mutex::new(String::new()));
     let capture = Arc::new(TokenCapture {
         origin: cfg.origin.clone(),
@@ -1181,6 +1197,8 @@ pub(crate) async fn ensure_host(
             *lock(&host_state.spawned) = Some(Spawned {
                 child,
                 origin: cfg.origin.clone(),
+                #[cfg(any(target_os = "macos", target_os = "linux"))]
+                exit_watcher,
                 #[cfg(windows)]
                 _tree_guard: tree_guard,
             });
