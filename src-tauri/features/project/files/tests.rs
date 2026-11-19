@@ -96,16 +96,29 @@ fn reads_text_images_and_binaries_apart() {
     std::fs::write(scratch.0.join("c.bin"), [1, 0, 2]).unwrap();
     let text = read_file_blocking(&scratch.0.join("a.txt")).unwrap();
     assert_eq!((text.kind, text.text.as_deref()), ("text", Some("hello")));
+    assert_eq!(text.size, 5);
     let image = read_file_blocking(&scratch.0.join("b.png")).unwrap();
     assert_eq!(image.kind, "image");
-    assert!(image
-        .data_url
-        .unwrap()
-        .starts_with("data:image/png;base64,"));
+    assert!(image.text.is_none(), "an image's bytes load by URL, not here");
+    assert_eq!(image.size, 4);
+    assert!(image.mtime_ms > 0);
     assert_eq!(
         read_file_blocking(&scratch.0.join("c.bin")).unwrap().kind,
         "binary"
     );
+}
+
+#[test]
+fn an_image_of_any_size_opens_without_reading_its_bytes() {
+    let scratch = Scratch::new();
+    let big = scratch.0.join("huge.jpg");
+    std::fs::File::create(&big)
+        .unwrap()
+        .set_len(64 * 1024 * 1024)
+        .unwrap();
+    let image = read_file_blocking(&big).unwrap();
+    assert_eq!((image.kind, image.size), ("image", 64 * 1024 * 1024));
+    assert_eq!(image_mime(&big), "image/jpeg");
 }
 
 #[test]

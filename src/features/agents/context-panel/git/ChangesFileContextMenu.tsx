@@ -17,6 +17,7 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@/shared/ui";
+import { isCodePageShown } from "../../code/codePageStore";
 import { useContextPanel } from "../contextPanelStore";
 import { filesApi } from "../files/filesApi";
 import { useFilesStore } from "../files/filesStore";
@@ -36,10 +37,10 @@ const isWindows = () => typeof navigator !== "undefined" && navigator.platform.i
 const revealLabel = () =>
   isMac() ? "Reveal in Finder" : isWindows() ? "Show in Explorer" : "Show in file manager";
 
-/** Opens a changed file in the files panel's editor. */
+/** Opens a changed file in the Code page's editor while it shows, else the files panel's. */
 export function openChangedFile(path: string) {
   void useFilesStore.getState().openFile(path);
-  useContextPanel.getState().show("files");
+  if (!isCodePageShown()) useContextPanel.getState().show("files");
 }
 
 /**

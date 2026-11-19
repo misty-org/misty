@@ -44,8 +44,7 @@ export const useContextPanel = create<{
         ? set({ sessionTucked: false })
         : set({ session: !get().session })
       : set({ tab: get().tab === tab ? null : tab, expanded: false }),
-  show: (tab) =>
-    tab === "session" ? set({ session: true, sessionTucked: false }) : set({ tab }),
+  show: (tab) => (tab === "session" ? set({ session: true, sessionTucked: false }) : set({ tab })),
   close: () => set({ tab: null, expanded: false }),
   closeSession: () => set({ session: false }),
   setSessionTucked: (sessionTucked) => set({ sessionTucked }),
@@ -66,7 +65,13 @@ const surfaces: ContextPanelSurface[] = ["steps", "files", "changes", "terminal"
 
 const savedPanel = createDeviceSetting<SavedContextPanel>({
   scope: "context-panel",
-  defaults: { tab: null, session: false, sessionTucked: false, width: PANEL_DEFAULT_WIDTH, expanded: false },
+  defaults: {
+    tab: null,
+    session: false,
+    sessionTucked: false,
+    width: PANEL_DEFAULT_WIDTH,
+    expanded: false,
+  },
   normalize: (stored) => {
     const saved = stored as Partial<SavedContextPanel>;
     const tab = surfaces.find((surface) => surface === saved.tab) ?? null;

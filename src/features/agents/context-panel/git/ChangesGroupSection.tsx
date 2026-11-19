@@ -183,14 +183,16 @@ export const GroupSection = memo(function GroupSection(props: GroupSectionProps)
           onCheckedChange={() => props.onToggleSelectMany(allPaths)}
           aria-label={props.title}
         />
+        {/* The title gives way first in a narrow column: it fades rather than run under the
+            group's actions, and the count stays whole. */}
         <Pressable
-          className="flex min-w-0 flex-1 items-baseline gap-1.5 text-meta"
+          className="flex min-w-0 flex-1 items-baseline gap-1.5 overflow-hidden text-meta"
           onClick={() => setOpen(!open)}
         >
-          <Text bare tone="default" weight="medium">
+          <Text tone="default" weight="medium" className="min-w-0">
             {props.title}
           </Text>
-          <Text bare tone="muted" className="tabular-nums">
+          <Text bare tone="muted" className="flex-none tabular-nums">
             {entries.length}
           </Text>
         </Pressable>

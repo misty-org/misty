@@ -4,6 +4,7 @@
 //!
 //! Modelled on desktop-cc-gui's files, git and terminal backends (MIT). See NOTICE.
 
+pub mod file_protocol;
 pub mod files;
 pub mod git;
 pub mod git_ignore;

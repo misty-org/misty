@@ -111,7 +111,11 @@ const xtermMocks = vi.hoisted(() => {
     dispose() {}
   }
 
-  return { instances, fits, FakeTerminal, FakeFitAddon, FakeWebglAddon };
+  class FakeImageAddon {
+    dispose() {}
+  }
+
+  return { instances, fits, FakeTerminal, FakeFitAddon, FakeWebglAddon, FakeImageAddon };
 });
 
 vi.mock("@/shared/lib/terminal/xtermLoader", () => ({
@@ -119,6 +123,7 @@ vi.mock("@/shared/lib/terminal/xtermLoader", () => ({
     Terminal: xtermMocks.FakeTerminal,
     FitAddon: xtermMocks.FakeFitAddon,
     WebglAddon: xtermMocks.FakeWebglAddon,
+    ImageAddon: xtermMocks.FakeImageAddon,
   }),
 }));
 
@@ -189,9 +194,16 @@ describe("TerminalView wiring", () => {
     await act(async () => {
       root!.render(<TerminalView id={ID} cwd={CWD} onCloseTab={() => {}} />);
     });
-    // loadXterm() → setXterm → setup effect → terminalApi.open.
+    // loadXterm() → setXterm → setup effect.
     await flush();
     await flush();
+  }
+
+  /** The shell starts once the face loads (or briefly later) and the layout settles. */
+  async function started() {
+    await act(async () => {
+      await vi.waitFor(() => expect(apiMocks.open).toHaveBeenCalled(), { timeout: 2000 });
+    });
   }
 
   async function unmount() {
@@ -227,6 +239,7 @@ describe("TerminalView wiring", () => {
 
   it("opens with the code font and waits for it with a legal font shorthand", async () => {
     await mount();
+    await started();
     const term = xtermMocks.instances[0];
     expect(term.options.fontFamily).toBe(DEFAULT_MONO_STACK);
     expect(term.options.fontSize).toBe(TERMINAL_FONT_SIZE);
@@ -262,6 +275,7 @@ describe("TerminalView wiring", () => {
 
   it("debounces resize churn into one shell resize", async () => {
     await mount();
+    await started();
     const term = xtermMocks.instances[0];
     const onChange = resizeMocks.callbacks[0];
     expect(onChange).toBeTypeOf("function");
@@ -360,6 +374,7 @@ describe("TerminalView wiring", () => {
 
   it("starts the shell again and resends input after it ended", async () => {
     await mount();
+    await started();
     apiMocks.write.mockRejectedValueOnce(new Error(TERMINAL_GONE));
     const term = xtermMocks.instances[0];
     await act(async () => {

@@ -16,15 +16,13 @@ import {
   Tooltip,
   useNotice,
 } from "@/shared/ui";
-import { currentSpaceKey, useSpaceFolders } from "../../engines/enginesApi";
+import { useChatFolders, useProjectFolders } from "../../shared-folders/chatFolder";
 import { DeleteWorktreeDialog } from "./DeleteWorktreeDialog";
 import { dirNameOf } from "./prInput";
 import { WorktreeCreateDialog } from "./WorktreeCreateDialog";
 import { WorktreeProgressRow } from "./WorktreeProgressRow";
 import { worktreeApi, type WorktreeInfo, type WorktreeListing } from "./worktreeApi";
 import { ensureWorktreeEvents, useWorktreeStore } from "./worktreeStore";
-
-const noFolders: string[] = [];
 
 const errorText = (reason: unknown) => (reason instanceof Error ? reason.message : String(reason));
 
@@ -51,11 +49,16 @@ const skeletonRows = (
 /**
  * The folder's Git worktrees, as a menu in the panel's head: each worktree (the one the chat
  * works in checked), creations still running, and ways to make or remove one. Picking a
- * worktree linked to the Space switches the chat's folder to it.
+ * worktree that is one of the person's projects switches the chat's folder to it.
  */
-export function WorktreesButton({ folder }: { folder: string }) {
-  const space = currentSpaceKey();
-  const linked = useSpaceFolders((state) => state.folders[space] ?? noFolders);
+export function WorktreesButton({
+  folder,
+  conversationId,
+}: {
+  folder: string;
+  conversationId: string;
+}) {
+  const projects = useProjectFolders();
   const revision = useWorktreeStore((s) => s.revision);
   const notice = useWorktreeStore((s) => s.notice);
   const noticeTone = useWorktreeStore((s) => s.noticeTone);
@@ -89,7 +92,10 @@ export function WorktreesButton({ folder }: { folder: string }) {
 
   const mine = pending.filter((p) => p.folder === folder || p.folder === listing?.repository);
   const choose = (path: string) => {
-    useSpaceFolders.getState().choose(space, path);
+    void useChatFolders
+      .getState()
+      .use(conversationId, path)
+      .catch(() => undefined);
     setOpen(false);
   };
 
@@ -119,7 +125,9 @@ export function WorktreesButton({ folder }: { folder: string }) {
           {listing ? (
             <div className="flex flex-col gap-px" role="list">
               {listing.worktrees.map((worktree) => {
-                const isLinked = linked.includes(worktree.path);
+                const isLinked = Boolean(
+                  projects?.some((project) => project.path === worktree.path),
+                );
                 const current = worktree.path === folder;
                 const name = worktree.isMain
                   ? dirNameOf(worktree.path)
@@ -139,7 +147,7 @@ export function WorktreesButton({ folder }: { folder: string }) {
                           ? "Its folder is gone"
                           : isLinked
                             ? worktree.path
-                            : "Not linked to this Space"
+                            : "Not one of your projects"
                       }
                     >
                       <Pressable
@@ -206,6 +214,7 @@ export function WorktreesButton({ folder }: { folder: string }) {
       {listing && creating ? (
         <WorktreeCreateDialog
           folder={folder}
+          conversationId={conversationId}
           listing={listing}
           open={creating}
           onOpenChange={setCreating}

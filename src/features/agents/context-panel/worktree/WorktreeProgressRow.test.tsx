@@ -5,8 +5,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 const native = vi.hoisted(() => ({ invoke: vi.fn(() => Promise.resolve()) }));
 vi.mock("@/shared/platform/nativeInvoke", () => native);
 vi.mock("../../personal/agentAccount", () => ({ agentAccountId: () => "me" }));
-vi.mock("../../engines/enginesApi", () => ({
-  useSpaceFolders: { getState: () => ({ load: vi.fn(), choose: vi.fn() }) },
+vi.mock("../../shared-folders/chatFolder", () => ({
+  useChatFolders: { getState: () => ({ loadProjects: vi.fn(), use: vi.fn() }) },
 }));
 
 import { WorktreeProgressRow } from "./WorktreeProgressRow";

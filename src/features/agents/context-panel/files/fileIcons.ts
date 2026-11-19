@@ -24,7 +24,8 @@ const icon_folder = svg24(
 );
 
 const icon_folder_open = svg24(
-  '<path d="m6 14 1.45-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.55 6a2 2 0 0 1-1.94 1.5H4a2 2 0 0 1-2-2V5c0-1.1.9-2 2-2h3.93a2 2 0 0 1 1.66.9l.82 1.2a2 2 0 0 0 1.66.9H18a2 2 0 0 1 2 2v2"/>',
+  '<path d="m6 14 1.45-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.55 6a2 2 0 0 1-1.94 1.5H4a2 2 0 0 1-2-2V5c0-1.1.9-2 2-2h3.93a2 2 0 0 1' +
+    ' 1.66.9l.82 1.2a2 2 0 0 0 1.66.9H18a2 2 0 0 1 2 2v2"/>',
 );
 
 const icon_file = svg24(FILE_SHAPE);
@@ -37,11 +38,22 @@ const icon_file_code = svg24(
   `${FILE_SHAPE}<path d="M10 12.5 8 15l2 2.5"/><path d="m14 12.5 2 2.5-2 2.5"/>`,
 );
 
+/** A hex color's rough lightness, 0 to 1. */
+const lightness = (hex: string): number => {
+  const value = parseInt(hex.slice(1), 16);
+  return (
+    (0.299 * ((value >> 16) & 255) + 0.587 * ((value >> 8) & 255) + 0.114 * (value & 255)) / 255
+  );
+};
+
+/** A language's letters standing bare in its brand color, never on a tile (icons stand bare).
+ * A brand color too dark to read takes its lighter second color instead. */
 const badgeText = (bg: string, fg: string, label: string, fontSize?: number): string => {
-  const size = fontSize ?? (label.length > 2 ? 5.5 : 7);
-  const y = size <= 6 ? 10.5 : 10.9;
+  const size = fontSize ?? (label.length > 2 ? 6.5 : 8.5);
+  const color = lightness(bg) < 0.22 ? fg : bg;
   return svg16(
-    `<rect x="1.5" y="1.5" width="13" height="13" rx="3" fill="${bg}"/><text x="8" y="${y}" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif" font-size="${size}" font-weight="700" fill="${fg}">${label}</text>`,
+    `<text x="8" y="11" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif" font-size="${size}"` +
+      ` font-weight="800" letter-spacing="-0.2" fill="${color}">${label}</text>`,
   );
 };
 
@@ -51,13 +63,8 @@ const icon_jsx = badgeText("#00D8FF", "#002C33", "JSX");
 const icon_tsx = badgeText("#3178C6", "#FFFFFF", "TSX");
 const icon_vue = badgeText("#41B883", "#35495E", "Vue");
 
-const icon_java = svg16(
-  '<rect x="1.5" y="1.5" width="13" height="13" rx="3" fill="#EA2D2E"/><path d="M4.5 6.5h5a2 2 0 0 1 2 2v1a1.5 1.5 0 0 1-1.5 1.5h-4A1.5 1.5 0 0 1 4.5 9.5v-3Zm5 1.5h1.2a.8.8 0 0 1 .8.8v.2a.8.8 0 0 1-.8.8H9.5V8ZM4 12.5h7" stroke="#fff" stroke-width="1" stroke-linecap="round" fill="none"/><path d="M6 3.5c-.5.8.5 1.4 0 2m2.5-2c-.5.8.5 1.4 0 2" stroke="#FFC107" stroke-width="0.8" stroke-linecap="round"/>',
-);
-
-const icon_kotlin = svg16(
-  '<rect x="1.5" y="1.5" width="13" height="13" rx="3" fill="#0D0D11"/><polygon points="1.5,1.5 14.5,1.5 8,8 14.5,14.5 1.5,14.5" fill="#7F52FF"/><polygon points="1.5,14.5 8,8 14.5,14.5" fill="#C711E1"/>',
-);
+const icon_java = badgeText("#EA2D2E", "#FFFFFF", "J");
+const icon_kotlin = badgeText("#7F52FF", "#FFFFFF", "KT");
 
 const icon_python = badgeText("#3776AB", "#FFD43B", "Py");
 const icon_rust = badgeText("#CE412B", "#FFFFFF", "RS");
@@ -75,15 +82,21 @@ const icon_properties = badgeText("#3E8E41", "#FFFFFF", "prop");
 const icon_docker = badgeText("#2496ED", "#FFFFFF", "DK");
 
 const icon_json = svg16(
-  '<path d="M6.1 2.4c-1.35 0-2 .68-2 2.02v1.5c0 .9-.45 1.5-1.5 1.72v.72c1.05.22 1.5.82 1.5 1.72v1.5c0 1.34.65 2.02 2 2.02" stroke="#D9A62E" stroke-width="1.25" stroke-linecap="round"/><path d="M9.9 2.4c1.35 0 2 .68 2 2.02v1.5c0 .9.45 1.5 1.5 1.72v.72c-1.05.22-1.5.82-1.5 1.72v1.5c0 1.34-.65 2.02-2 2.02" stroke="#D9A62E" stroke-width="1.25" stroke-linecap="round"/>',
+  '<path d="M6.1 2.4c-1.35 0-2 .68-2 2.02v1.5c0 .9-.45 1.5-1.5 1.72v.72c1.05.22 1.5.82 1.5 1.72v1.5c0 1.34.65 2.02 2 2.02" stroke="#D9A62E"' +
+    ' stroke-width="1.25" stroke-linecap="round"/>' +
+    '<path d="M9.9 2.4c1.35 0 2 .68 2 2.02v1.5c0 .9.45 1.5 1.5 1.72v.72c-1.05.22-1.5.82-1.5 1.72v1.5c0 1.34-.65 2.02-2 2.02" stroke="#D9A62E"' +
+    ' stroke-width="1.25" stroke-linecap="round"/>',
 );
 
 const icon_git = svg16(
-  '<rect x="3.1" y="3.1" width="9.8" height="9.8" rx="1.8" transform="rotate(45 8 8)" fill="#F05133"/><circle cx="8" cy="5.3" r="1.05" fill="#fff"/><circle cx="8" cy="10.7" r="1.05" fill="#fff"/><path d="M8 6.4v3.2" stroke="#fff" stroke-width="1"/>',
+  '<rect x="3.1" y="3.1" width="9.8" height="9.8" rx="1.8" transform="rotate(45 8 8)" fill="#F05133"/>' +
+    '<circle cx="8" cy="5.3" r="1.05" fill="#fff"/><circle cx="8" cy="10.7" r="1.05" fill="#fff"/>' +
+    '<path d="M8 6.4v3.2" stroke="#fff" stroke-width="1"/>',
 );
 
 const icon_markdown = svg16(
-  '<rect x="1" y="3.5" width="14" height="9" rx="1.8" fill="#57534E"/><path d="M3.2 10.1V5.9l1.9 2.2 1.9-2.2v4.2" stroke="#fff" stroke-width="1.05" stroke-linecap="round" stroke-linejoin="round"/><path d="M11.3 5.9v4.2m0 0-1.5-1.6m1.5 1.6 1.5-1.6" stroke="#fff" stroke-width="1.05" stroke-linecap="round" stroke-linejoin="round"/>',
+  '<path d="M2.2 11V5l2.6 3 2.6-3v6" stroke="#A8A29E" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>' +
+    '<path d="M11.6 5v6m0 0-2-2.1m2 2.1 2-2.1" stroke="#A8A29E" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>',
 );
 
 const icon_lock = svg16(
@@ -91,7 +104,8 @@ const icon_lock = svg16(
 );
 
 const icon_image = svg16(
-  '<rect x="2" y="2.75" width="12" height="10.5" rx="1.75" stroke="#4CAF50" stroke-width="1.2"/><circle cx="5.8" cy="6.4" r="1.15" fill="#4CAF50"/><path d="m3.9 12.9 3.3-3.7a.9.9 0 0 1 1.34 0l3.36 3.7" stroke="#4CAF50" stroke-width="1.2" stroke-linecap="round"/>',
+  '<rect x="2" y="2.75" width="12" height="10.5" rx="1.75" stroke="#4CAF50" stroke-width="1.2"/><circle cx="5.8" cy="6.4" r="1.15" fill="#4CAF50"/>' +
+    '<path d="m3.9 12.9 3.3-3.7a.9.9 0 0 1 1.34 0l3.36 3.7" stroke="#4CAF50" stroke-width="1.2" stroke-linecap="round"/>',
 );
 
 const icon_eslint = svg16(
@@ -111,7 +125,8 @@ const icon_html = svg16(
 );
 
 const icon_shell = svg16(
-  '<path d="m2.8 4.6 3.4 3.4-3.4 3.4" stroke="#4CAF50" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M8.4 11.4h4.8" stroke="#4CAF50" stroke-width="1.3" stroke-linecap="round"/>',
+  '<path d="m2.8 4.6 3.4 3.4-3.4 3.4" stroke="#4CAF50" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>' +
+    '<path d="M8.4 11.4h4.8" stroke="#4CAF50" stroke-width="1.3" stroke-linecap="round"/>',
 );
 
 const icon_config = svg24(
@@ -304,9 +319,135 @@ function getFileTreeFileIcon(fileName: string): string {
   return icon_file;
 }
 
+// A folder whose name says what it holds wears that subject's icon (Lucide's shapes), the way a
+// file wears its type's; any other folder is a plain folder.
+const folder_code = svg24('<path d="m16 18 6-6-6-6"/><path d="m8 6-6 6 6 6"/>');
+const folder_docs = svg24(
+  '<path d="M12 7v14"/>' +
+    '<path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/>',
+);
+const folder_tests = svg24(
+  '<path d="M14 2v6a2 2 0 0 0 .245.96l5.51 10.08A2 2 0 0 1 18 22H6a2 2 0 0 1-1.755-2.96l5.51-10.08A2 2 0 0 0 10 8V2"/><path d="M6.453 15h11.094"/>' +
+    '<path d="M8.5 2h7"/>',
+);
+const folder_git = svg24(
+  '<line x1="6" x2="6" y1="3" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/>',
+);
+const folder_hooks = svg24(
+  '<path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0' +
+    ' 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/>',
+);
+const folder_packages = svg24(
+  '<path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/>' +
+    '<path d="M12 22V12"/><path d="m3.3 7 7.703 4.734a2 2 0 0 0 1.994 0L20.7 7"/>',
+);
+const folder_build = svg24(
+  '<rect width="20" height="5" x="2" y="3" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/>',
+);
+const folder_release = svg24(
+  '<path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426' +
+    ' 0 0 0 0-3.42z"/>' +
+    '<circle cx="7.5" cy="7.5" r=".5"/>',
+);
+const folder_config = svg24(
+  '<path d="M21 4h-7"/><path d="M10 4H3"/><path d="M21 12h-9"/><path d="M8 12H3"/><path d="M21 20h-5"/><path d="M12 20H3"/><path d="M14 2v4"/>' +
+    '<path d="M8 10v4"/><path d="M16 18v4"/>',
+);
+const folder_scripts = svg24(
+  '<path d="m7 11 2-2-2-2"/><path d="M11 13h4"/><rect width="18" height="18" x="3" y="3" rx="2"/>',
+);
+const folder_assets = svg24(
+  '<rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>',
+);
+const folder_styles = svg24(
+  '<circle cx="13.5" cy="6.5" r=".5"/><circle cx="17.5" cy="10.5" r=".5"/><circle cx="8.5" cy="7.5" r=".5"/><circle cx="6.5" cy="12.5" r=".5"/>' +
+    '<path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0' +
+    ' 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/>',
+);
+const folder_agents = svg24(
+  '<path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/>',
+);
+const folder_api = svg24(
+  '<path d="M12 22v-5"/><path d="M9 8V2"/><path d="M15 8V2"/><path d="M18 8v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V8Z"/>',
+);
+const folder_cache = svg24(
+  '<path d="M22 12H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>' +
+    '<path d="M6 16h.01"/><path d="M10 16h.01"/>',
+);
+const folder_client = svg24(
+  '<rect width="20" height="14" x="2" y="3" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/>',
+);
+const folder_deploy = svg24(
+  '<path d="M12 13v8"/><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="m8 17 4-4 4 4"/>',
+);
+const folder_components = svg24(
+  '<path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/>' +
+    '<path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/>',
+);
+const folder_database = svg24(
+  '<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5V19A9 3 0 0 0 21 19V5"/><path d="M3 12A9 3 0 0 0 21 12"/>',
+);
+
+const FOLDER_ICONS: Record<string, string> = {
+  src: folder_code,
+  source: folder_code,
+  lib: folder_code,
+  docs: folder_docs,
+  doc: folder_docs,
+  documentation: folder_docs,
+  test: folder_tests,
+  tests: folder_tests,
+  __tests__: folder_tests,
+  spec: folder_tests,
+  e2e: folder_tests,
+  ".git": folder_git,
+  ".github": folder_git,
+  ".gitlab": folder_git,
+  ".githooks": folder_hooks,
+  ".husky": folder_hooks,
+  hooks: folder_hooks,
+  node_modules: folder_packages,
+  vendor: folder_packages,
+  packages: folder_packages,
+  dist: folder_build,
+  build: folder_build,
+  out: folder_build,
+  target: folder_build,
+  release: folder_release,
+  releases: folder_release,
+  ".config": folder_config,
+  config: folder_config,
+  ".vscode": folder_config,
+  ".idea": folder_config,
+  scripts: folder_scripts,
+  bin: folder_scripts,
+  public: folder_assets,
+  assets: folder_assets,
+  static: folder_assets,
+  images: folder_assets,
+  img: folder_assets,
+  icons: folder_assets,
+  styles: folder_styles,
+  css: folder_styles,
+  theme: folder_styles,
+  ".agents": folder_agents,
+  agents: folder_agents,
+  api: folder_api,
+  cache: folder_cache,
+  ".cache": folder_cache,
+  client: folder_client,
+  deployment: folder_deploy,
+  deploy: folder_deploy,
+  components: folder_components,
+  features: folder_components,
+  db: folder_database,
+  database: folder_database,
+  migrations: folder_database,
+};
+
 /**
- * File tree node icon: folders use a gray outline (open variant when expanded),
- * files are colored by type.
+ * File tree node icon: a folder named for a known subject wears that subject's icon, any other a
+ * plain outline (open variant when expanded); files are colored by type.
  */
 export function getFileTreeIconSvg(
   name: string,
@@ -314,7 +455,7 @@ export function getFileTreeIconSvg(
   isOpen: boolean = false,
 ): string {
   if (isFolder) {
-    return isOpen ? icon_folder_open : icon_folder;
+    return FOLDER_ICONS[name.toLowerCase()] ?? (isOpen ? icon_folder_open : icon_folder);
   }
   return getFileTreeFileIcon(name);
 }

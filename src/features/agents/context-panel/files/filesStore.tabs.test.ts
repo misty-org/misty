@@ -4,7 +4,7 @@ import { settleDeviceSettings } from "@/tests/fakeDeviceSettings";
 
 const mocks = vi.hoisted(() => ({
   listDir: vi.fn(),
-  readFile: vi.fn(async () => ({ kind: "text", text: "", dataUrl: null, truncated: false })),
+  readFile: vi.fn(async () => ({ kind: "text", text: "", size: 0, mtimeMs: 0, truncated: false })),
   writeFile: vi.fn(),
   gitTreeStatus: vi.fn(),
 }));
@@ -37,7 +37,8 @@ describe("open files as tabs", () => {
     mocks.readFile.mockImplementation(async () => ({
       kind: "text",
       text: "body",
-      dataUrl: null,
+      size: 0,
+      mtimeMs: 0,
       truncated: false,
     }));
     // Each folder's tabs are remembered in `misty.db`; start these folders with none open.
@@ -129,7 +130,8 @@ describe("open files as tabs", () => {
     mocks.readFile.mockImplementationOnce(async () => ({
       kind: "text",
       text: "x",
-      dataUrl: null,
+      size: 0,
+      mtimeMs: 0,
       truncated: true,
     }));
     await useFilesStore.getState().openFile("/tabs/long.txt");

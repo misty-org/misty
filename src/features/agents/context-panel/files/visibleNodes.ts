@@ -10,6 +10,8 @@ export interface VisibleNode extends DirEntry {
   depth: number;
   expanded: boolean;
   loading: boolean;
+  /** Why this folder's listing failed; its children show an error row with Try again instead. */
+  error?: string;
   /** The branch and counts when this folder is itself the top of a repository. */
   repository?: RepositorySummary;
   /** The name's Git color: a file's state, or blue for a repository's top folder. */
@@ -54,6 +56,7 @@ export function buildVisibleNodes({
     depth: 0,
     expanded: !!expanded[root],
     loading: !!loadingDirs[root],
+    error: dirErrors[root],
     repository: repositories[root],
     // Repo-root rows are blue (the workspace repo root row here; nested
     // repo dirs get theirs from the backend color pass).
@@ -88,6 +91,7 @@ export function buildVisibleNodes({
         depth,
         expanded: e.isDir && isExpanded,
         loading: e.isDir && !!loadingDirs[path],
+        error: e.isDir ? dirErrors[path] : undefined,
         repository: e.isDir ? repositories[path] : undefined,
         // Plain folders never carry color; files take their git state;
         // nested repo dirs take their own repo's status color from the

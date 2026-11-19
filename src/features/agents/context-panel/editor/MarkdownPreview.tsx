@@ -8,11 +8,10 @@ import {
   type MouseEvent as ReactMouseEvent,
 } from "react";
 import { openExternalLink } from "@/shared/platform/openExternalLink";
-import { Input, Text } from "@/shared/ui";
+import { FindBar, Text } from "@/shared/ui";
 import { MistyMarkdown } from "../../runs/markdown/MistyMarkdown";
-import { filesApi } from "../files/filesApi";
+import { imageFileUrl } from "../files/filesApi";
 import { useFilesStore } from "../files/filesStore";
-import { FindCard, FindField, FindRow, FindStatus, FindSteps, FindToggles } from "./FindControls";
 import {
   clearMarkdownSearchHighlights,
   findMarkdownMatches,
@@ -104,27 +103,20 @@ export function MarkdownPreview({
   // Highlights live in one registry for the page: only clear them when this preview painted.
   const paintedRef = useRef(false);
 
-  // Images named relative to the file load through the gate as data URLs; the app's own pages
-  // can't load a linked folder's files directly.
+  // Images named relative to the file load over `misty-file:`, which checks them natively against
+  // the linked folders; the app's own pages can't load a linked folder's files directly.
   useEffect(() => {
     const root = contentRef.current;
     if (!root) return;
-    let live = true;
     for (const image of Array.from(root.querySelectorAll("img"))) {
       const src = image.getAttribute("src") ?? "";
-      if (!src || /^(?:https?:|data:|blob:)/i.test(src) || !IMAGE_RE.test(src)) continue;
+      const loadable = src && !/^(?:https?:|data:|blob:|misty-file:)/i.test(src);
+      if (!loadable || !IMAGE_RE.test(src)) continue;
       const target = resolveMarkdownLinkPath(src, path);
       if (!target) continue;
-      void filesApi
-        .readFile(target)
-        .then((content) => {
-          if (live && content.dataUrl) image.src = content.dataUrl;
-        })
-        .catch(() => undefined);
+      image.decoding = "async";
+      image.src = imageFileUrl(target);
     }
-    return () => {
-      live = false;
-    };
   }, [deferredDraft, path]);
 
   useEffect(() => {
@@ -204,9 +196,8 @@ export function MarkdownPreview({
   return (
     <div className="relative flex min-h-0 flex-1 flex-col">
       {searchOpen ? (
-        <FindCard
-          role="search"
-          aria-label="Find in document"
+        <FindBar
+          label="Find in document"
           onKeyDown={(event) => {
             if (event.key === "Escape") {
               event.preventDefault();
@@ -216,46 +207,36 @@ export function MarkdownPreview({
               step(event.shiftKey ? -1 : 1);
             }
           }}
-        >
-          <FindRow>
-            <FindField>
-              <Input
-                variant="bare"
-                className="flex-1 text-caption"
-                ref={inputRef}
-                value={query}
-                placeholder="Find"
-                aria-label="Find"
-                spellCheck={false}
-                autoCapitalize="off"
-                autoCorrect="off"
-                onChange={(event) => {
-                  setQuery(event.target.value);
-                  setCursor(0);
-                }}
-              />
-              <FindToggles
-                caseSensitive={caseSensitive}
-                wholeWord={wholeWord}
-                regexp={useRegex}
-                onToggle={(option) => {
-                  if (option === "caseSensitive") setCaseSensitive(!caseSensitive);
-                  else if (option === "wholeWord") setWholeWord(!wholeWord);
-                  else setUseRegex(!useRegex);
-                  setCursor(0);
-                }}
-              />
-            </FindField>
-            <FindStatus role="status" empty={Boolean(query.trim()) && matchCount === 0}>
-              {matchCount > 0 ? `${safeCursor + 1}/${matchCount}` : "No results"}
-            </FindStatus>
-            <FindSteps
-              disabled={matchCount === 0}
-              onStep={(direction) => step(direction === "prev" ? -1 : 1)}
-              onClose={() => onSearchOpenChange?.(false)}
-            />
-          </FindRow>
-        </FindCard>
+          find={{
+            value: query,
+            inputRef,
+            onChange: (value) => {
+              setQuery(value);
+              setCursor(0);
+            },
+          }}
+          caseSensitive={caseSensitive}
+          onCaseSensitive={() => {
+            setCaseSensitive(!caseSensitive);
+            setCursor(0);
+          }}
+          wholeWord={wholeWord}
+          onWholeWord={() => {
+            setWholeWord(!wholeWord);
+            setCursor(0);
+          }}
+          regex={useRegex}
+          onRegex={() => {
+            setUseRegex(!useRegex);
+            setCursor(0);
+          }}
+          count={matchCount > 0 ? `${safeCursor + 1}/${matchCount}` : "No results"}
+          empty={Boolean(query.trim()) && matchCount === 0}
+          canStep={matchCount > 0}
+          onPrevious={() => step(-1)}
+          onNext={() => step(1)}
+          onClose={() => onSearchOpenChange?.(false)}
+        />
       ) : null}
       <Text
         bare

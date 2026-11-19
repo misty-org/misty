@@ -23,7 +23,8 @@ import {
 } from "@/shared/ui";
 import { FileTreeSkeleton } from "../PanelSkeletons";
 import { FileTreeContextMenu } from "./FileTreeContextMenu";
-import { TreeRow } from "./FileTreeRow";
+import { TreeChildErrorRow, TreeChildRowsSkeleton, TreeRow } from "./FileTreeRow";
+import { FileTreeToolbar, type FileTreeToolbarOptions } from "./FileTreeToolbar";
 import { fileName, useFilesStore } from "./filesStore";
 import { sendPathToComposer } from "./sendToComposer";
 import { COLLAPSE_ALL_SHORTCUT, EXPAND_LOADED_SHORTCUT } from "./treeShortcuts";
@@ -120,11 +121,13 @@ function NameDialog(props: {
 
 /**
  * The folder's files as a virtualized tree, starting at the folder's own row, which carries the
- * tree's actions. A right-click anywhere opens the file menu: on a row for that row, on empty
- * space for the folder.
+ * tree's actions. With a `toolbar` (the Code page) the actions move to a row of their own above
+ * the tree, the folder is named under them, and the root row goes. A right-click anywhere opens
+ * the file menu: on a row for that row, on empty space for the folder.
  */
-export function FileTree() {
-  const { parentRef, virtualizer, visible } = useFileTreeVirtualList();
+export function FileTree({ toolbar }: { toolbar?: FileTreeToolbarOptions } = {}) {
+  const hideRoot = Boolean(toolbar);
+  const { parentRef, virtualizer, visible } = useFileTreeVirtualList({ hideRoot });
   const ops = useFileTreeOperations();
   useNotice(Boolean(ops.notice), {
     message: ops.notice ?? "",
@@ -188,7 +191,7 @@ export function FileTree() {
         </Button>
       </Text>
     );
-  } else if (rootLoading && visible.length <= 1) {
+  } else if (rootLoading && visible.length <= (hideRoot ? 0 : 1)) {
     // Only a folder never read this session: one shown before comes back as it was.
     body = <FileTreeSkeleton />;
   } else {
@@ -214,6 +217,19 @@ export function FileTree() {
                 onContextMenu={handleRowMenu}
                 onMention={handleMention}
               />
+              {/* An opened folder's children while they're read, or why they couldn't be. The
+                  root has its own skeleton and error above. */}
+              {node.isDir && node.expanded && node.path !== root ? (
+                node.loading ? (
+                  <TreeChildRowsSkeleton depth={node.depth + 1} label={node.name} />
+                ) : node.error ? (
+                  <TreeChildErrorRow
+                    depth={node.depth + 1}
+                    error={node.error}
+                    onRetry={() => void ensureDir(node.path)}
+                  />
+                ) : null
+              ) : null}
             </div>
           );
         })}
@@ -241,6 +257,16 @@ export function FileTree() {
         event.preventDefault();
       }}
     >
+      {toolbar && root ? (
+        <FileTreeToolbar
+          root={root}
+          options={toolbar}
+          onNewFile={ops.startNewFile}
+          onNewFolder={ops.startNewFolder}
+          onReveal={ops.revealPath}
+          onCopyPath={ops.copyPathOf}
+        />
+      ) : null}
       <ContextMenu>
         <ContextMenuTrigger asChild>
           <div

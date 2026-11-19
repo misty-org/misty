@@ -1,5 +1,6 @@
 // The file panel: a linked folder's tree one level at a time with its Git-ignore state, a file's
-// text or image, the tree's new, rename, duplicate, copy and paste, move to trash, and search.
+// text (an image's bytes load by URL; see `file_protocol.rs`), the tree's new, rename, duplicate,
+// copy and paste, move to trash, and search.
 //
 // Adapted from desktop-cc-gui's files.rs (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 // See NOTICE. Every path a window names passes `linked_path` first, and every read and write
@@ -11,7 +12,6 @@ pub mod search;
 #[cfg(test)]
 mod tests;
 
-use base64::Engine as _;
 use serde::Serialize;
 use std::path::Path;
 
@@ -22,7 +22,6 @@ use super::{linked_path, person_window};
 pub(crate) use clipboard::ClipboardFileSnapshot;
 
 pub(crate) const MAX_READ_BYTES: usize = 1024 * 1024;
-pub(crate) const MAX_IMAGE_BYTES: usize = 5 * 1024 * 1024;
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -43,7 +42,10 @@ pub struct FileContent {
     /// `text`, `image` or `binary`.
     pub kind: &'static str,
     pub text: Option<String>,
-    pub data_url: Option<String>,
+    /// The file's size on disk, in bytes.
+    pub size: u64,
+    /// When it last changed; an image's URL carries it, so a change on disk loads anew.
+    pub mtime_ms: i64,
     /// The file is longer than what was read; saving it would cut it short, so it opens read-only.
     pub truncated: bool,
 }
@@ -157,7 +159,7 @@ pub(crate) fn is_image(path: &Path) -> bool {
             .unwrap_or("")
             .to_ascii_lowercase()
             .as_str(),
-        "png" | "jpg" | "jpeg" | "gif" | "webp" | "svg" | "bmp" | "ico"
+        "png" | "apng" | "jpg" | "jpeg" | "gif" | "webp" | "avif" | "svg" | "bmp" | "ico"
     )
 }
 
@@ -172,6 +174,8 @@ pub(crate) fn image_mime(path: &Path) -> &'static str {
         "jpg" | "jpeg" => "image/jpeg",
         "gif" => "image/gif",
         "webp" => "image/webp",
+        "avif" => "image/avif",
+        "apng" => "image/apng",
         "svg" => "image/svg+xml",
         "bmp" => "image/bmp",
         "ico" => "image/x-icon",
@@ -179,26 +183,17 @@ pub(crate) fn image_mime(path: &Path) -> &'static str {
     }
 }
 
-pub(crate) fn data_url(mime: &str, bytes: &[u8]) -> String {
-    format!(
-        "data:{mime};base64,{}",
-        base64::engine::general_purpose::STANDARD.encode(bytes)
-    )
-}
-
 fn read_file_blocking(file: &Path) -> Result<FileContent, String> {
     let meta = file_access::fs::metadata(file)
         .map_err(|error| format!("Couldn't read {}: {error}", file.display()))?;
+    let (size, mtime_ms) = (meta.len(), mtime_ms(&meta));
+    // The webview loads an image itself, over `misty-file:`; only what it is goes back here.
     if is_image(file) {
-        if meta.len() > MAX_IMAGE_BYTES as u64 {
-            return Err("This image is larger than 5 MB, too large to preview.".into());
-        }
-        let bytes = file_access::fs::read(file)
-            .map_err(|error| format!("Couldn't read {}: {error}", file.display()))?;
         return Ok(FileContent {
             kind: "image",
             text: None,
-            data_url: Some(data_url(image_mime(file), &bytes)),
+            size,
+            mtime_ms,
             truncated: false,
         });
     }
@@ -219,19 +214,22 @@ fn read_file_blocking(file: &Path) -> Result<FileContent, String> {
         return Ok(FileContent {
             kind: "binary",
             text: None,
-            data_url: None,
+            size,
+            mtime_ms,
             truncated: false,
         });
     }
     Ok(FileContent {
         kind: "text",
         text: Some(String::from_utf8_lossy(&bytes).to_string()),
-        data_url: None,
+        size,
+        mtime_ms,
         truncated,
     })
 }
 
-/// A file's text up to a megabyte, or an image (up to 5 MB) as a data URL.
+/// A file's text up to a megabyte; for an image only its kind, size and time, since the editor
+/// loads its bytes by URL.
 #[tauri::command]
 pub async fn project_read_file(
     app: tauri::AppHandle,

@@ -186,8 +186,8 @@ pub async fn project_worktree_create(
     }
 }
 
-/// Links a new worktree to the Space, as `space_folder_link` does with a folder the person
-/// picked: the file gate may reach it, and the Space's chats and panels can work in it.
+/// Makes a new worktree one of the person's projects, as a folder they picked would be: the file
+/// gate may reach it, and chats and panels can work in it. `space` only names where it was made.
 async fn link_worktree(
     app: &tauri::AppHandle,
     account: &str,
@@ -197,14 +197,9 @@ async fn link_worktree(
     let real = file_access::fs::canonicalize(target).map_err(|error| error.to_string())?;
     file_access::allow_linked_folder(&real);
     let db = app.state::<MistyRuntime>().environment.store();
-    let (account, space, text) = (
-        account.to_string(),
-        space.to_string(),
-        real.to_string_lossy().into_owned(),
-    );
-    tokio::task::spawn_blocking(move || {
-        crate::engines::store::link_folder(&db, &account, &space, &text)
-    })
+    let _ = space;
+    let (account, text) = (account.to_string(), real.to_string_lossy().into_owned());
+    tokio::task::spawn_blocking(move || crate::engines::store::add_project(&db, &account, &text))
     .await
     .map_err(|error| error.to_string())??;
     Ok(real)
@@ -244,7 +239,7 @@ pub async fn project_worktree_remove(
     delete_branch: bool,
 ) -> Result<WorktreeRemoveResult, String> {
     let repo = linked_repository(&app, &webview, &account, &folder).await?;
-    let space = space_key(&space)?;
+    space_key(&space)?;
     let listed = list_worktrees_cli(&repo).await?;
     let entry = listed
         .iter()
@@ -265,16 +260,16 @@ pub async fn project_worktree_remove(
     }
     let branch = entry.as_ref().and_then(|found| found.branch.clone());
     let result = remove_worktree(&repo, &worktree, branch.as_deref(), delete_branch).await?;
-    // Unlink it from the Space; the gate forgets it when no Space links it any more.
+    // Forget it as a project; the gate forgets it when no account keeps it any more.
     let db = app.state::<MistyRuntime>().environment.store();
     let gone = worktree.clone();
     let canonical = file_access::fs::canonicalize(&worktree)
         .map(|real| real.to_string_lossy().into_owned())
         .unwrap_or_else(|_| worktree.clone());
     let still = tokio::task::spawn_blocking(move || {
-        let mut still = crate::engines::store::unlink_folder(&db, &account, &space, &gone)?;
+        let mut still = crate::engines::store::remove_project(&db, &account, &gone)?;
         if canonical != gone {
-            still = crate::engines::store::unlink_folder(&db, &account, &space, &canonical)?;
+            still = crate::engines::store::remove_project(&db, &account, &canonical)?;
         }
         Ok::<_, String>(still)
     })

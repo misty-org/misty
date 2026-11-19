@@ -9,13 +9,18 @@ vi.mock("../../personal/agentAccount", () => ({ agentAccountId: () => "me" }));
 vi.mock("@tauri-apps/api/webview", () => ({
   getCurrentWebview: () => ({ listen: vi.fn(() => Promise.resolve(() => {})) }),
 }));
-vi.mock("../../engines/enginesApi", () => {
-  const state = { load: vi.fn(() => Promise.resolve([])), choose: vi.fn() };
-  const useSpaceFolders = Object.assign(
+vi.mock("../../engines/enginesApi", () => ({ currentSpaceKey: () => "space-1" }));
+vi.mock("../../shared-folders/chatFolder", () => {
+  const state = {
+    byConversation: {},
+    loadProjects: vi.fn(() => Promise.resolve([])),
+    use: vi.fn(),
+  };
+  const useChatFolders = Object.assign(
     (select: (value: typeof state) => unknown) => select(state),
     { getState: () => state },
   );
-  return { currentSpaceKey: () => "space-1", folderOf: () => "", useSpaceFolders };
+  return { useChatFolders };
 });
 
 import { DeleteWorktreeDialog, warningsFor } from "./DeleteWorktreeDialog";
@@ -47,6 +52,7 @@ describe("WorktreeCreateDialog", () => {
     render(
       <WorktreeCreateDialog
         folder="/repo/app"
+        conversationId="chat-1"
         listing={listing("v1.0.9")}
         open
         onOpenChange={vi.fn()}
@@ -61,6 +67,7 @@ describe("WorktreeCreateDialog", () => {
     render(
       <WorktreeCreateDialog
         folder="/repo/app"
+        conversationId="chat-1"
         listing={listing("main")}
         open
         onOpenChange={vi.fn()}
@@ -76,6 +83,7 @@ describe("WorktreeCreateDialog", () => {
     render(
       <WorktreeCreateDialog
         folder="/repo/app"
+        conversationId="chat-1"
         listing={listing("main")}
         open
         onOpenChange={onOpenChange}

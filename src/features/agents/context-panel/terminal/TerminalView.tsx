@@ -1,9 +1,8 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 import type { IDisposable, Terminal } from "@xterm/xterm";
 import type { FitAddon } from "@xterm/addon-fit";
-import { RotateCw } from "lucide-react";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
-import { ErrorState, Skeleton } from "@/shared/ui";
+import { cn, SetupState } from "@/shared/ui";
 import { errorText } from "../projectApi";
 import {
   TERMINAL_FONT_SIZE,
@@ -73,8 +72,10 @@ export const TerminalView = memo(function TerminalView({
   const liveTermRef = useRef<Terminal | null>(null);
   const getTerminal = useCallback(() => liveTermRef.current, []);
 
-  // xterm loads on first mount; the module-level promise keeps it for every later tab.
+  // xterm loads on first mount; the module-level promise keeps it for every later tab. A failed
+  // load is tried again with the rest of the setup.
   useEffect(() => {
+    if (xterm) return;
     let cancelled = false;
     ensureTerminalOutputListener();
     void loadXterm()
@@ -87,7 +88,7 @@ export const TerminalView = memo(function TerminalView({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [xterm, attempt]);
 
   useEffect(() => {
     const host = hostRef.current;
@@ -143,7 +144,7 @@ export const TerminalView = memo(function TerminalView({
     };
 
     try {
-      const { Terminal, FitAddon, WebglAddon } = xterm;
+      const { Terminal, FitAddon, WebglAddon, ImageAddon } = xterm;
       const fontFamily = terminalFontFamily();
       const term = new Terminal({
         fontFamily,
@@ -171,6 +172,13 @@ export const TerminalView = memo(function TerminalView({
       } catch {
         // No WebGL here: the DOM renderer stays.
       }
+      try {
+        // Pictures a program prints: Sixel and iTerm2's inline images (imgcat, chafa,
+        // `fastfetch --logo-type iterm`). Loaded before the backlog, so images in it draw too.
+        if (ImageAddon) term.loadAddon(new ImageAddon());
+      } catch {
+        // Without it, image data shows as nothing rather than breaking the terminal.
+      }
 
       const backlog = terminalBacklog(id);
       if (backlog) term.write(backlog);
@@ -193,8 +201,26 @@ export const TerminalView = memo(function TerminalView({
             if (!disposed) setError(errorText(reason));
           });
 
+      // The shell starts at its final size: what the person's shell files print at once
+      // (fastfetch, a banner) is laid out for the rows it is told, and a tool that draws upward
+      // over a shorter screen loses its top lines. So wait for the face (briefly) and for the
+      // panel's layout to settle, measure, then start it.
       safeFit();
-      void openSession();
+      void Promise.race([
+        waitForFontLoad(fontFamily, uiPx(TERMINAL_FONT_SIZE)),
+        new Promise((resolve) => window.setTimeout(resolve, 300)),
+      ])
+        .catch(() => undefined)
+        .then(
+          () =>
+            new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+        )
+        .then(() => {
+          if (disposed) return;
+          remeasureFont(fontFamily);
+          safeFit();
+          void openSession();
+        });
       refitAfterFontLoad(fontFamily, uiPx(TERMINAL_FONT_SIZE));
 
       // Absolute paths and web addresses in output open with a modifier-click (links.ts).
@@ -254,28 +280,21 @@ export const TerminalView = memo(function TerminalView({
       <div className="terminal-view">
         <div
           ref={hostRef}
-          className="terminal-host"
+          // Out of sight until the shell answers, so its cursor doesn't blink behind the setup line;
+          // still laid out, so xterm measures the panel and the shell starts at its final size.
+          className={cn("terminal-host", !ready && "invisible")}
           data-testid="terminal-host"
           hidden={Boolean(error)}
         />
-        {error ? (
-          <ErrorState
-            title="The terminal couldn't start"
-            line={error}
-            action={{
-              label: "Try again",
-              icon: RotateCw,
-              onClick: () => {
-                setError(null);
-                setAttempt((value) => value + 1);
-              },
+        {error || !ready ? (
+          <SetupState
+            tool="terminal"
+            error={error}
+            onRetry={() => {
+              setError(null);
+              setAttempt((value) => value + 1);
             }}
           />
-        ) : !ready ? (
-          // The shell is starting: one prompt line where its first line will print.
-          <div role="status" aria-label="Terminal" aria-busy="true" className="pt-2 pr-1 pl-3">
-            <Skeleton className="h-3 w-2/5 rounded-sm" />
-          </div>
         ) : null}
       </div>
     </TerminalContextMenu>

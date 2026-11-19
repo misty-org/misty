@@ -12,7 +12,7 @@ import { uiPx } from "@/shared/lib/uiScale";
  * including the root-load effect and the hidden-panel scroll/measure
  * safeguards.
  */
-export function useFileTreeVirtualList() {
+export function useFileTreeVirtualList({ hideRoot = false }: { hideRoot?: boolean } = {}) {
   const root = useFilesStore((s) => s.root);
   const children = useFilesStore((s) => s.children);
   const expanded = useFilesStore((s) => s.expanded);
@@ -47,20 +47,35 @@ export function useFileTreeVirtualList() {
     visit(root);
   }, [root, expanded, children, loadingDirs, dirErrors, hideIgnored, ensureDir]);
 
-  const visible = useMemo<VisibleNode[]>(
-    () =>
-      buildVisibleNodes({
-        root,
-        children,
-        expanded,
-        loadingDirs,
-        dirErrors,
-        repositories,
-        fileColors,
-        hideIgnored,
-      }),
-    [children, expanded, loadingDirs, dirErrors, repositories, fileColors, root, hideIgnored],
-  );
+  const visible = useMemo<VisibleNode[]>(() => {
+    const nodes = buildVisibleNodes({
+      root,
+      children,
+      expanded,
+      loadingDirs,
+      dirErrors,
+      repositories,
+      fileColors,
+      hideIgnored,
+    });
+    // A page that names the folder above the tree (its toolbar's heading) leaves out the root
+    // row and starts the folder's contents at the left edge.
+    return hideRoot
+      ? nodes
+          .filter((node) => node.path !== root)
+          .map((node) => ({ ...node, depth: node.depth - 1 }))
+      : nodes;
+  }, [
+    children,
+    expanded,
+    loadingDirs,
+    dirErrors,
+    repositories,
+    fileColors,
+    root,
+    hideIgnored,
+    hideRoot,
+  ]);
 
   const parentRef = useRef<HTMLDivElement>(null);
   const virtualizer = useVirtualizer({

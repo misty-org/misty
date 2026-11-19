@@ -12,9 +12,9 @@ vi.mock("@tauri-apps/api/webview", () => ({
   getCurrentWebview: () => ({ listen: listenMock }),
 }));
 
-const folders = vi.hoisted(() => ({ load: vi.fn(), choose: vi.fn() }));
-vi.mock("../../engines/enginesApi", () => ({
-  useSpaceFolders: { getState: () => folders },
+const folders = vi.hoisted(() => ({ loadProjects: vi.fn(), use: vi.fn() }));
+vi.mock("../../shared-folders/chatFolder", () => ({
+  useChatFolders: { getState: () => folders },
 }));
 
 import { useWorktreeStore } from "./worktreeStore";
@@ -37,7 +37,7 @@ function progress(
 }
 
 function startOne(switchAfter = true, args = ARGS): string {
-  useWorktreeStore.getState().start(FOLDER, args, { switchAfter });
+  useWorktreeStore.getState().start(FOLDER, args, { switchAfter, conversationId: "chat-1" });
   return last(useWorktreeStore.getState().pending)!.creationId;
 }
 
@@ -52,8 +52,8 @@ describe("worktree store", () => {
     useWorktreeStore.setState({ pending: [], prefs: { switchAfter: true }, notice: "" });
     native.invoke.mockReset().mockResolvedValue(undefined);
     listenMock.mockReset().mockResolvedValue(() => {});
-    folders.load.mockReset().mockResolvedValue([]);
-    folders.choose.mockReset();
+    folders.loadProjects.mockReset().mockResolvedValue([]);
+    folders.use.mockReset().mockResolvedValue(undefined);
   });
 
   it("start adds a pending row and starts the native pipeline", () => {
@@ -87,23 +87,23 @@ describe("worktree store", () => {
     expect(useWorktreeStore.getState().pending[0].stage).toBe("validate");
   });
 
-  it("done removes the row, reads the Space's folders and switches to the worktree", async () => {
+  it("done removes the row, reads the projects and switches the chat to the worktree", async () => {
     const id = startOne(true);
     useWorktreeStore
       .getState()
       .applyProgress(progress(id, "done", { path: "/repo/app-worktrees/pr-1842-x" }));
     expect(useWorktreeStore.getState().pending).toHaveLength(0);
     await vi.waitFor(() =>
-      expect(folders.choose).toHaveBeenCalledWith("space-1", "/repo/app-worktrees/pr-1842-x"),
+      expect(folders.use).toHaveBeenCalledWith("chat-1", "/repo/app-worktrees/pr-1842-x"),
     );
-    expect(folders.load).toHaveBeenCalledWith("space-1");
+    expect(folders.loadProjects).toHaveBeenCalled();
   });
 
-  it("done without switching reads the folders but keeps the chat's folder", async () => {
+  it("done without switching reads the projects but keeps the chat's folder", async () => {
     const id = startOne(false);
     useWorktreeStore.getState().applyProgress(progress(id, "done", { path: "/x" }));
-    await vi.waitFor(() => expect(folders.load).toHaveBeenCalled());
-    expect(folders.choose).not.toHaveBeenCalled();
+    await vi.waitFor(() => expect(folders.loadProjects).toHaveBeenCalled());
+    expect(folders.use).not.toHaveBeenCalled();
   });
 
   it("failed keeps the row with its error for a retry", () => {
@@ -200,7 +200,7 @@ describe("worktree store", () => {
       deleteBranch: true,
     });
     expect(useWorktreeStore.getState().notice).toContain("Branch x is checked out somewhere else");
-    expect(folders.load).toHaveBeenCalledWith("space-1");
+    expect(folders.loadProjects).toHaveBeenCalled();
   });
 
   it("setPrefs keeps the choice for next time in misty.db", async () => {

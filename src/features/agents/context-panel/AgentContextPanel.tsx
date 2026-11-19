@@ -1,14 +1,14 @@
 import { RotateCw } from "lucide-react";
-import { lazy, Suspense, type ReactNode } from "react";
+import { type ReactNode } from "react";
 import { useWorkspaceViewId } from "@/features/app-windows";
 import type { AgentProfile } from "@/shared/schemas";
-import { ErrorState, SidePanelHeader, Text } from "@/shared/ui";
+import { ErrorState, SidePanelHeader, Text, lazyTool, ToolSuspense } from "@/shared/ui";
 import type { ContextPanelSurface } from "./contextPanelStore";
 import { FilesBreadcrumbs } from "./files/FilesBreadcrumbs";
 import { FilesPanel } from "./files/FilesPanel";
-import { mistyEngine } from "../engines/enginesApi";
-import { worksInFolder } from "../shared-folders/agentFolder";
-import { AgentFolderPicker, FolderPicker, useProjectFolder } from "./FolderPicker";
+import { OpenInCodeButton } from "../code/OpenInCodeDialog";
+import { useChatFolder } from "../shared-folders/chatFolder";
+import { ChatFolderPicker } from "./ChatFolderPicker";
 import { ChangesPanel } from "./git/ChangesPanel";
 import { LaunchScriptButton } from "./launch-script/LaunchScriptActions";
 import { OpenInMenu } from "./open-app/OpenInMenu";
@@ -18,20 +18,22 @@ import { WorktreesButton } from "./worktree/WorktreesButton";
 import { terminalChatKey } from "./terminal/terminalStore";
 import "./codeViews.css";
 
-const TerminalPanel = lazy(() => import("./terminal/TerminalPanel"));
+const TerminalPanel = lazyTool(() => import("./terminal/TerminalPanel"));
 
 /**
- * What the chat's side panel shows for a context view: the Space's linked project folder as
- * files, as Git changes, or as a terminal, or the run's steps. Agents on outside engines work in the same folder, so this is
- * where their work shows. A folder's own tools sit at the end of the panel's header row; Files puts
- * its path there too, starting with the folder as a menu that switches to another.
+ * What the chat's side panel shows for a context view: the chat's folder (a project, or its own
+ * scratch folder) as files, as Git changes, or as a terminal, or the run's steps. The chat's
+ * agent works there, so this is where its work shows. A folder's own tools sit at the end of the
+ * panel's header row; Files puts its path there too, starting with the folder: a project as a
+ * menu that switches to another, a scratch folder by name, with Open in Code to make it a project.
  */
 export function AgentContextPanel(props: {
   tab: ContextPanelSurface;
   conversationId: string;
   agent: AgentProfile;
 }) {
-  const { folder, loaded, failed, retry } = useProjectFolder(props.agent);
+  const { folder, kind, loaded, failed, retry } = useChatFolder(props.conversationId);
+  const scratch = kind === "scratch";
   const chat = terminalChatKey(props.conversationId, useWorkspaceViewId());
   if (props.tab === "steps") return <StepsPanel conversationId={props.conversationId} />;
   return (
@@ -42,16 +44,19 @@ export function AgentContextPanel(props: {
             <FilesBreadcrumbs
               folder={folder}
               picker={
-                worksInFolder(props.agent) ? (
-                  <AgentFolderPicker agent={props.agent} />
+                scratch ? (
+                  <Text size="control" tone="bright" className="px-1">
+                    Scratch
+                  </Text>
                 ) : (
-                  <FolderPicker />
+                  <ChatFolderPicker conversationId={props.conversationId} />
                 )
               }
             />
           ) : null}
           <div className="flex flex-none items-center gap-0.5" data-side-panel-trailing="">
-            <WorktreesButton folder={folder} />
+            {scratch ? <OpenInCodeButton conversationId={props.conversationId} /> : null}
+            <WorktreesButton folder={folder} conversationId={props.conversationId} />
             <LaunchScriptButton chat={chat} folder={folder} />
             <OpenInMenu folder={folder} />
           </div>
@@ -59,38 +64,31 @@ export function AgentContextPanel(props: {
       ) : null}
       {failed ? (
         <ErrorState
-          title="Couldn't read the Space's folders"
+          title="Couldn't read the chat's folder"
           line="Something went wrong on this computer. Try again in a moment."
           action={{ label: "Try again", icon: RotateCw, onClick: retry }}
         />
       ) : !loaded ? (
-        // The Space's folders are on their way: the view as it will be, tools and all.
+        // The chat's folder is on its way: the view as it will be, tools and all.
         <ContextPanelSkeleton tab={props.tab} />
       ) : !folder ? (
-        props.agent.engine && props.agent.engine !== mistyEngine ? (
-          <FolderMissing line="You'll choose its folder when you send the first message.">
-            <AgentFolderPicker agent={props.agent} />
-          </FolderMissing>
-        ) : (
-          <FolderMissing line="Link a project folder to this Space to see its files here.">
-            <FolderPicker />
-          </FolderMissing>
-        )
+        // A new chat has its scratch folder from its first run.
+        <FolderMissing line="This chat gets its own folder when it starts." />
       ) : props.tab === "files" ? (
         <FilesPanel folder={folder} />
       ) : props.tab === "changes" ? (
         <ChangesPanel folder={folder} />
       ) : (
-        <Suspense fallback={<ContextPanelSkeleton tab="terminal" tools={false} />}>
+        <ToolSuspense tool="terminal">
           <TerminalPanel chat={chat} folder={folder} />
-        </Suspense>
+        </ToolSuspense>
       )}
     </>
   );
 }
 
-/** A folder view with no folder yet: centered in the panel, what's missing and the way to link one. */
-function FolderMissing(props: { line: string; children: ReactNode }) {
+/** A folder view with no folder yet: centered in the panel, what's missing and the way to pick one. */
+function FolderMissing(props: { line: string; children?: ReactNode }) {
   return (
     <Text
       as="div"

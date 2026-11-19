@@ -2,7 +2,7 @@
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { create } from "zustand";
 import { createDeviceSetting } from "@/shared/lib/deviceSetting";
-import { useSpaceFolders } from "../../engines/enginesApi";
+import { useChatFolders } from "../../shared-folders/chatFolder";
 import { randomBranchSuffix } from "./prInput";
 import {
   WORKTREE_PROGRESS_EVENT,
@@ -29,6 +29,8 @@ export interface PendingCreation {
   args: WorktreeCreateArgs;
   /** Switch the chat's folder to the worktree once it's linked. */
   switchAfter: boolean;
+  /** The chat that switches. */
+  conversationId?: string;
 }
 
 interface WorktreePrefs {
@@ -64,7 +66,11 @@ interface WorktreeStore {
   /** A note after a removal that worked but left something behind, or an error. */
   notice: string;
   noticeTone: "neutral" | "error";
-  start(folder: string, args: WorktreeCreateArgs, opts: { switchAfter: boolean }): string;
+  start(
+    folder: string,
+    args: WorktreeCreateArgs,
+    opts: { switchAfter: boolean; conversationId?: string },
+  ): string;
   cancel(creationId: string): void;
   retry(creationId: string): void;
   dismiss(creationId: string): void;
@@ -133,6 +139,7 @@ export const useWorktreeStore = create<WorktreeStore>((set, get) => {
         stage: "validate",
         args,
         switchAfter: opts.switchAfter,
+        conversationId: opts.conversationId,
       });
       return creationId;
     },
@@ -176,9 +183,10 @@ export const useWorktreeStore = create<WorktreeStore>((set, get) => {
         set({ notice: errorText(error), noticeTone: "error" });
       } finally {
         set((s) => ({ revision: s.revision + 1 }));
-        await useSpaceFolders
+        // It is no longer one of the person's projects.
+        await useChatFolders
           .getState()
-          .load(space)
+          .loadProjects()
           .catch(() => undefined);
       }
     },
@@ -196,15 +204,15 @@ export const useWorktreeStore = create<WorktreeStore>((set, get) => {
           pending: s.pending.filter((p) => p.creationId !== progress.creationId),
           revision: s.revision + 1,
         }));
-        // It is linked now: read the Space's folders again, and switch to it if asked.
-        const space = target.args.space;
-        void useSpaceFolders
+        // It is one of the person's projects now: read them again, and switch the chat to it if
+        // asked.
+        const { conversationId } = target;
+        void useChatFolders
           .getState()
-          .load(space)
-          .then(() => {
-            if (target.switchAfter && progress.path) {
-              useSpaceFolders.getState().choose(space, progress.path);
-            }
+          .loadProjects()
+          .then(async () => {
+            if (target.switchAfter && progress.path && conversationId)
+              await useChatFolders.getState().use(conversationId, progress.path);
           })
           .catch(() => undefined);
         return;

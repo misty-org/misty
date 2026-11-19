@@ -94,7 +94,8 @@ export function LaunchScriptButton({ chat, folder }: { chat: string; folder: str
     void useLaunchScripts
       .getState()
       .load(folder)
-      .catch((reason) => setError(errorText(reason)));
+      // A failed read settles to none, so the play button still shows beside this.
+      .catch((reason) => setError(`The start commands couldn't be read: ${errorText(reason)}`));
   }, [folder]);
 
   const openEditor = useCallback(

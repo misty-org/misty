@@ -12,9 +12,9 @@
 
 use std::path::{Path, PathBuf};
 
+use base64::Engine as _;
 use regex::Regex;
 
-use super::files::data_url;
 use super::{linked_path, person_window};
 
 /// The page itself, as text.
@@ -27,6 +27,13 @@ const MAX_TOTAL_BYTES: usize = 24 * 1024 * 1024;
 const PREVIEW_CSP: &str = "default-src 'none'; style-src 'unsafe-inline' data:; \
     img-src data: blob:; font-src data:; media-src data: blob:; connect-src 'none'; \
     form-action 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'";
+
+fn data_url(mime: &str, bytes: &[u8]) -> String {
+    format!(
+        "data:{mime};base64,{}",
+        base64::engine::general_purpose::STANDARD.encode(bytes)
+    )
+}
 
 pub(crate) fn is_html(path: &Path) -> bool {
     matches!(

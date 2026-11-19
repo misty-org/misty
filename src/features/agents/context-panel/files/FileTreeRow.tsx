@@ -1,12 +1,13 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
-import { ChevronsDown, ChevronsUp, Plus, RotateCw, Search } from "lucide-react";
+import { ChevronRight, ChevronsDown, ChevronsUp, Plus, RotateCw, Search } from "lucide-react";
 import { memo, useCallback, useMemo, type MouseEvent } from "react";
 import {
+  Button,
   cn,
   IconButton,
   Pressable,
   RowTools,
-  Spinner,
+  Skeleton,
   Surface,
   Text,
   Tooltip,
@@ -34,8 +35,9 @@ const nameTone: Record<FileTreeColor, TextTone> = {
   repository: "working",
 };
 
-/** The root row's refresh. Its spinner follows the store, since a Git action or a retry can start
- * a refresh too; it lives in this small child so only the root row subscribes. */
+/** The root row's refresh. Like every button it shows no loading: it is only disabled while a
+ * refresh runs, following the store, since a Git action or a retry can start one too. It lives in
+ * this small child so only the root row subscribes. */
 function TreeRootRefreshButton() {
   const refreshing = useFilesStore((state) => state.refreshing);
   return (
@@ -47,7 +49,7 @@ function TreeRootRefreshButton() {
         void useFilesStore.getState().refreshTree();
       }}
     >
-      <RotateCw className={refreshing ? "animate-spin" : undefined} aria-hidden />
+      <RotateCw aria-hidden />
     </IconButton>
   );
 }
@@ -125,6 +127,10 @@ export const TreeRow = memo(function TreeRow({
   }, [node.isDir, node.path, node.compactPaths, onToggleDir, onOpenFile, onSelectDir]);
 
   // The icons are constant SVG strings; picking one is a lookup.
+  // The tooltip names the path inside the folder, as VS Code does, never the whole disk path.
+  const root = useFilesStore((state) => state.root);
+  const shownPath =
+    root && node.path.startsWith(`${root}/`) ? node.path.slice(root.length + 1) : node.path;
   const iconSvg = useMemo(
     () => getFileTreeIconSvg(node.name, node.isDir, node.expanded),
     [node.name, node.isDir, node.expanded],
@@ -139,10 +145,10 @@ export const TreeRow = memo(function TreeRow({
       wash={selected ? "control" : "row"}
       data-selected={selected || undefined}
       className="group/row flex h-8 w-full min-w-0 items-center gap-1 pr-1 text-meta"
-      style={{ paddingLeft: remCss(8 + node.depth * 14) }}
+      style={rowInset(node.depth)}
       onContextMenu={(event: MouseEvent<HTMLElement>) => onContextMenu(event, node)}
     >
-      <Tooltip content={node.path}>
+      <Tooltip content={shownPath}>
         <Pressable
           className={cn(
             "flex h-full min-w-0 flex-1 items-center gap-2",
@@ -153,19 +159,30 @@ export const TreeRow = memo(function TreeRow({
           aria-expanded={node.isDir ? node.expanded : undefined}
           onClick={handleClick}
         >
-          {node.loading ? (
-            <Text bare tone="muted" className="flex size-4 flex-none items-center justify-center">
-              <Spinner label={false} />
-            </Text>
-          ) : (
+          {/* Folders wear their subject's icon, so a chevron says open or shut; a file keeps the
+              chevron's room, so names line up down the tree. */}
+          {isRoot ? null : node.isDir ? (
             <Text
               bare
-              tone={node.isDir ? "working" : "muted"}
-              className="inline-flex size-4 flex-none items-center justify-center"
+              tone="muted"
+              className={cn(
+                "inline-flex flex-none transition-transform",
+                node.expanded && "rotate-90",
+              )}
               aria-hidden
-              dangerouslySetInnerHTML={{ __html: iconSvg }}
-            />
+            >
+              <ChevronRight />
+            </Text>
+          ) : (
+            <span className="size-4 flex-none" aria-hidden />
           )}
+          <Text
+            bare
+            tone={node.isDir ? "working" : "muted"}
+            className="inline-flex size-4 flex-none items-center justify-center"
+            aria-hidden
+            dangerouslySetInnerHTML={{ __html: iconSvg }}
+          />
           <Text
             tone={node.color ? nameTone[node.color] : "default"}
             className="max-w-full flex-none"
@@ -226,3 +243,42 @@ export const TreeRow = memo(function TreeRow({
     </Surface>
   );
 });
+
+/** A tree row's left inset at `depth`: 8px, then 14px a level. */
+const rowInset = (depth: number) => ({ paddingLeft: remCss(8 + depth * 14) });
+
+const childNameWidths = ["w-2/5", "w-1/2", "w-1/3"];
+
+/** An opened folder's children before they are read from disk: file rows one level in. */
+export function TreeChildRowsSkeleton({ depth, label }: { depth: number; label: string }) {
+  return (
+    <div role="status" aria-label={label} aria-busy="true">
+      {childNameWidths.map((width, index) => (
+        <div key={index} className="flex h-8 items-center gap-2 pr-1" style={rowInset(depth)}>
+          <span className="size-4 flex-none" aria-hidden />
+          <Skeleton className="size-4 shrink-0 rounded-sm" />
+          <Skeleton className={cn("h-3 rounded-sm", width)} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** An opened folder whose listing failed: the reason, one level in, and Try again. */
+export function TreeChildErrorRow(props: { depth: number; error: string; onRetry(): void }) {
+  return (
+    <div
+      role="alert"
+      className="flex min-h-8 min-w-0 items-center gap-2 py-1 pr-1"
+      style={rowInset(props.depth)}
+    >
+      <span className="size-4 flex-none" aria-hidden />
+      <Text size="caption" tone="removed" className="min-w-0 flex-1">
+        {props.error}
+      </Text>
+      <Button size="sm" variant="secondary" onClick={props.onRetry}>
+        Try again
+      </Button>
+    </div>
+  );
+}

@@ -1,5 +1,6 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 import { invoke } from "@/native/invoke";
+import { safeTauriAssetUrl } from "@/shared/platform/tauri";
 import { agentAccountId } from "../../personal/agentAccount";
 
 export interface DirEntry {
@@ -15,7 +16,10 @@ export interface DirEntry {
 export interface FileContent {
   kind: "text" | "image" | "binary";
   text: string | null;
-  dataUrl: string | null;
+  /** Bytes on disk. */
+  size: number;
+  /** Last changed; an image's URL carries it, so a change on disk loads anew. */
+  mtimeMs: number;
   /** Longer than what was read: it opens read-only, since saving would cut it short. */
   truncated: boolean;
 }
@@ -72,6 +76,15 @@ interface GitTreeStatus {
 }
 
 const account = () => agentAccountId();
+
+/** An image in a linked folder as a URL the webview loads itself, over Misty's `misty-file:`
+ * protocol. The protocol checks the path against the account's linked folders natively and serves
+ * images only. `version` (the file's modified time) makes a change on disk a new URL. */
+export function imageFileUrl(path: string, version?: number): string {
+  const query = new URLSearchParams({ account: account() });
+  if (version !== undefined) query.set("v", String(version));
+  return `${safeTauriAssetUrl(path, "misty-file")}?${query}`;
+}
 
 /** The file panel's native calls. Every path is checked natively against the account's linked folders. */
 export const filesApi = {

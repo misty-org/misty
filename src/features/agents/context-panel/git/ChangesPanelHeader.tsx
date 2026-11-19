@@ -88,7 +88,7 @@ export function ChangesPanelHeader({
   // The branch row is the panel's header row; what is left (another repository's name, a new
   // branch's form) stays a quiet row of its own.
   const branchRow = notRepo ? null : (
-    <SidePanelHeader>
+    <SidePanelHeader bar>
       <div className={headRowClass}>
         <SidePanelLead>
           <BranchPicker
@@ -129,7 +129,6 @@ export function ChangesPanelHeader({
           ) : null}
           <IconButton
             label="Refresh"
-            loading={pending.refresh === true}
             disabled={pending.refresh === true}
             onClick={() => run("refresh", () => git().refresh(workspacePath, true))}
           >
@@ -137,7 +136,6 @@ export function ChangesPanelHeader({
           </IconButton>
           <IconButton
             label="Pull"
-            loading={pending.pull === true}
             disabled={pending.pull === true}
             onClick={() => run("pull", () => git().pull(workspacePath))}
           >
@@ -145,7 +143,6 @@ export function ChangesPanelHeader({
           </IconButton>
           <IconButton
             label="Push"
-            loading={pending.push === true}
             disabled={pending.push === true}
             onClick={() => run("push", () => git().push(workspacePath))}
           >

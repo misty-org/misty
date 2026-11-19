@@ -302,17 +302,23 @@ pub async fn project_terminal_open(
         .openpty(size(cols, rows))
         .map_err(|error| format!("A terminal could not be opened: {error}"))?;
     let mut command = CommandBuilder::new(shell());
-    // An interactive shell, for the person's aliases and prompt. cmd.exe has no such flag.
+    // A login shell, interactive, as macOS Terminal and VS Code start one: a login shell reads
+    // /etc/zprofile (path_helper) and the person's ~/.zprofile (Homebrew's `brew shellenv` and
+    // most PATH setup live there), which an app started from the Dock never inherits; interactive
+    // reads ~/.zshrc for their aliases and prompt. cmd.exe has neither flag.
     #[cfg(not(windows))]
-    command.arg("-i");
+    {
+        command.arg("-l");
+        command.arg("-i");
+    }
     command.cwd(&folder);
     command.env("PATH", crate::engines::resolve::search_path());
     command.env("TERM", "xterm-256color");
     command.env("COLORTERM", "truecolor");
-    let locale = locale();
-    command.env("LANG", &locale);
-    command.env("LC_ALL", &locale);
-    command.env("LC_CTYPE", &locale);
+    command.env("TERM_PROGRAM", "Misty");
+    // Only LANG, and only when what the app was given isn't UTF-8 already: forcing LC_ALL would
+    // override the person's own LC_* choices, which their shell files may set.
+    command.env("LANG", locale());
     let child = pair
         .slave
         .spawn_command(command)

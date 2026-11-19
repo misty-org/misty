@@ -44,6 +44,12 @@ export function createLaunchScriptEntry(label: string, script: string): LaunchSc
   return { id: crypto.randomUUID(), label: label.trim(), script: script.trim() };
 }
 
+/**
+ * Folders whose start commands couldn't be read. They settle to none, so the buttons still show,
+ * and are read again the next time they're asked for.
+ */
+const unread = new Set<string>();
+
 /** Each folder's start commands once read, shared by everything that shows them. */
 export const useLaunchScripts = create<{
   byFolder: Record<string, LaunchScriptEntry[]>;
@@ -53,12 +59,25 @@ export const useLaunchScripts = create<{
   byFolder: {},
   async load(folder) {
     const known = get().byFolder[folder];
-    if (known) return known;
-    const entries = readEntries(await readDeviceState<Stored>(scope(folder)));
+    if (known && !unread.has(folder)) return known;
+    let entries: LaunchScriptEntry[];
+    try {
+      entries = readEntries(await readDeviceState<Stored>(scope(folder)));
+    } catch (error) {
+      // A failed read settles to none, so nothing waits on it; the caller says what went wrong.
+      unread.add(folder);
+      set((state) => ({ byFolder: { ...state.byFolder, [folder]: state.byFolder[folder] ?? [] } }));
+      throw error;
+    }
+    unread.delete(folder);
     set((state) => ({ byFolder: { ...state.byFolder, [folder]: entries } }));
     return entries;
   },
-  async save(folder, entries) {
+  async save(folder, next) {
+    let entries = next;
+    // Shown as none after a failed read: read again first, so a save never drops saved commands.
+    // Every entry then was added here, so they go after the ones read.
+    if (unread.has(folder)) entries = [...(await get().load(folder)), ...next];
     const previous = get().byFolder[folder];
     // Shown at once; a failed save puts the old list back.
     set((state) => ({ byFolder: { ...state.byFolder, [folder]: entries } }));

@@ -82,7 +82,7 @@ export function CommitFooter(props: {
             }
           }}
         />
-        <Button loading={props.busy} disabled={disabled} onClick={props.onCommitSelected}>
+        <Button disabled={disabled || props.busy} onClick={props.onCommitSelected}>
           {props.selectedCount > 0 ? `Commit (${props.selectedCount})` : "Commit"}
         </Button>
       </div>

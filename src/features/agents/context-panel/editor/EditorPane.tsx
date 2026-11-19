@@ -2,15 +2,19 @@
 import { closeSearchPanel, openSearchPanel } from "@codemirror/search";
 import { LanguageDescription } from "@codemirror/language";
 import { languages } from "@codemirror/language-data";
-import { EditorSelection, Prec, type Extension } from "@codemirror/state";
-import { EditorView, keymap, lineNumbers } from "@codemirror/view";
+import { EditorSelection, type Extension } from "@codemirror/state";
+import { EditorView, keymap } from "@codemirror/view";
 import CodeMirror from "@uiw/react-codemirror";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Button, Text } from "@/shared/ui";
 import { EditorSkeleton } from "../PanelSkeletons";
 import { errorText } from "../projectApi";
-import type { FileContent } from "../files/filesApi";
+import { imageFileUrl, type FileContent } from "../files/filesApi";
 import { fileName, useFilesStore } from "../files/filesStore";
+import { editorCommands } from "../../code/editorCommands";
+import type { EditorAddon, EditorAppearance } from "../../code/editorAddons";
+import { useEditorAddons } from "../../code/useEditorAddons";
+import { useEditorWordWrap } from "../../code/vim/editorVimSettings";
 import { BinaryFileView, ImageFileView } from "./EditorFallbackViews";
 import {
   EditorSearchPanel,
@@ -29,46 +33,46 @@ import {
   opensInPreview,
   type EditorViewMode,
 } from "./editorViewMode";
+import { useEditorReveal } from "./editorReveal";
+import {
+  BASIC_SETUP,
+  editorFrameClass,
+  IS_MAC,
+  LINE_SELECTION,
+  PANEL_THEME,
+} from "./editorPaneSetup";
 import { FileEditorHeader } from "./FileEditorHeader";
 import { HtmlPreview } from "./HtmlPreview";
 import { MarkdownPreview } from "./MarkdownPreview";
 
-/** CodeMirror fills the pane; inside the floating context card its own fills give way to the card's. */
-const editorFrameClass = [
-  "context-editor relative flex min-h-0 min-w-0 flex-1",
-  "[&_.cm-editor]:h-full [&_.cm-theme-dark]:h-full",
-  "in-[.agent-studio-context]:[&_.cm-editor]:bg-transparent!",
-  "in-[.agent-studio-context]:[&_.cm-gutters]:bg-transparent!",
-].join(" ");
+/** What the pane holding an editor offers it: closing its tab and quick open (vim's `:q`, `:e`). */
+export interface EditorPaneActions {
+  close(path: string): void;
+  quickOpen(): void;
+}
 
-const IS_MAC = typeof navigator !== "undefined" && navigator.platform.includes("Mac");
-const BASIC_SETUP = { foldGutter: false, highlightActiveLine: true };
-/** A click in the line numbers selects the whole line. */
-const LINE_SELECTION = lineNumbers({
-  domEventHandlers: {
-    mousedown(view, block, event) {
-      if ((event as MouseEvent).button !== 0) return false;
-      const line = view.state.doc.lineAt(block.from);
-      const end = line.to < view.state.doc.length ? line.to + 1 : line.to;
-      view.focus();
-      view.dispatch({ selection: { anchor: line.from, head: end }, userEvent: "select.pointer" });
-      return true;
-    },
-  },
-});
-/** The code at the panel's caption size, its line numbers parted from it by a hairline. */
-const PANEL_THEME = Prec.highest(
-  EditorView.theme({
-    "&": { fontSize: "var(--text-caption)" },
-    ".cm-gutters": { borderRight: "1px solid var(--color-charcoal-border)" },
-  }),
-);
-
-/** One open file: its text in the code editor, an image, or why it can't be shown. */
-export default function EditorPane({ path }: { path: string }) {
+/**
+ * One open file: its text in the code editor, an image, or why it can't be shown. `appearance`
+ * says where it is shown: the chat's floating panel, or the Code page, which brings its own theme,
+ * language servers and live sessions (`code/useEditorAddons.ts`).
+ */
+export default function EditorPane({
+  path,
+  appearance = "panel",
+  actions,
+}: {
+  path: string;
+  appearance?: EditorAppearance;
+  actions?: EditorPaneActions;
+}) {
   const entry = useFilesStore((state) => state.fileStates[path]);
+  const root = useFilesStore((state) => state.root);
   const reloadFile = useFilesStore((state) => state.reloadFile);
-  const [wordWrap, setWordWrap] = useState(false);
+  // Wrapping is the editor's, not this file's: toggled here, it stays for every file and in Settings.
+  const wordWrap = useEditorWordWrap((state) => state.value);
+  const setWordWrap = useEditorWordWrap((state) => state.set);
+  const diskText = entry?.content?.kind === "text" ? (entry.content.text ?? "") : "";
+  const addon = useEditorAddons({ path, root, appearance, diskText });
   if (entry?.error) {
     return (
       <Text
@@ -87,12 +91,16 @@ export default function EditorPane({ path }: { path: string }) {
   }
   // A file read again keeps its text on screen until the new one arrives.
   if (!entry?.content) return <EditorSkeleton path={path} />;
-  // The key gives the editor a fresh draft whenever the file is read again.
+  // The key gives the editor a fresh draft whenever the file is read again, or an add-on (a live
+  // session) starts it from another text.
   return (
     <FileEditor
-      key={`${path}:${entry.loadNonce}`}
+      key={`${path}:${entry.loadNonce}:${addon.document?.key ?? ""}`}
       path={path}
       content={entry.content}
+      appearance={appearance}
+      addon={addon}
+      actions={actions}
       wordWrap={wordWrap}
       onToggleWordWrap={() => setWordWrap((wrap) => !wrap)}
     />
@@ -102,11 +110,17 @@ export default function EditorPane({ path }: { path: string }) {
 function FileEditor({
   path,
   content,
+  appearance,
+  addon,
+  actions,
   wordWrap,
   onToggleWordWrap,
 }: {
   path: string;
   content: FileContent;
+  appearance: EditorAppearance;
+  addon: EditorAddon;
+  actions?: EditorPaneActions;
   wordWrap: boolean;
   onToggleWordWrap(): void;
 }) {
@@ -121,8 +135,10 @@ function FileEditor({
   const isHtml = isHtmlFile(name);
   const canPreview = canPreviewFile(name);
 
-  const [draft, setDraft] = useState(content.text ?? "");
-  const [savedText, setSavedText] = useState(content.text ?? "");
+  // A live session's shared text, when it has one, stands in for the file as read.
+  const startText = addon.document?.text ?? content.text ?? "";
+  const [draft, setDraft] = useState(startText);
+  const [savedText, setSavedText] = useState(startText);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<EditorViewMode>(
@@ -145,6 +161,19 @@ function FileEditor({
   });
   const searchOpenRef = useRef(false);
   const navigateRef = useRef<((direction: EditorSearchDirection) => void) | null>(null);
+  // A search result asked for a line of this file: put the cursor there and show it.
+  const revealTarget = useEditorReveal((state) => state.target);
+  useEffect(() => {
+    if (!editorView || !revealTarget || revealTarget.path !== path) return;
+    const doc = editorView.state.doc;
+    const line = doc.line(Math.min(Math.max(1, revealTarget.line), doc.lines));
+    editorView.dispatch({
+      selection: { anchor: line.from },
+      effects: EditorView.scrollIntoView(line.from, { y: "center" }),
+    });
+    editorView.focus();
+    useEditorReveal.getState().clear();
+  }, [editorView, revealTarget, path]);
   const readOnlyRef = useRef(readOnly);
   useEffect(() => {
     readOnlyRef.current = readOnly;
@@ -224,7 +253,9 @@ function FileEditor({
     close: () => closeEditorSearch(),
   });
 
-  const dirty = !readOnly && draft !== savedText;
+  // A live session writes the file itself, so there is never anything left to save.
+  const savesItself = Boolean(addon.savesItself);
+  const dirty = !readOnly && !savesItself && draft !== savedText;
   const save = useCallback(async () => {
     setSaving(true);
     setSaveError(null);
@@ -240,10 +271,12 @@ function FileEditor({
   const saveRef = useRef(save);
   const dirtyRef = useRef(dirty);
   const savingRef = useRef(saving);
+  const actionsRef = useRef(actions);
   useEffect(() => {
     saveRef.current = save;
     dirtyRef.current = dirty;
     savingRef.current = saving;
+    actionsRef.current = actions;
   });
 
   const searchExtensions = useMemo(
@@ -265,16 +298,38 @@ function FileEditor({
       ]),
     [],
   );
+  // What vim's `:w`, `:q` and `:e` do here, always calling the latest save and the pane's actions.
+  const commands = useMemo(
+    () =>
+      editorCommands.of({
+        save: () => {
+          if (dirtyRef.current && !savingRef.current) void saveRef.current();
+        },
+        close: () => actionsRef.current?.close(path),
+        quickOpen: () => actionsRef.current?.quickOpen(),
+      }),
+    [path],
+  );
   const extensions = useMemo(
     () => [
-      PANEL_THEME,
+      ...(appearance === "panel" ? [PANEL_THEME] : []),
       LINE_SELECTION,
       saveKeymap,
+      commands,
       ...languageExtension,
       ...searchExtensions,
       ...(wordWrap ? [EditorView.lineWrapping] : []),
+      ...addon.extensions,
     ],
-    [languageExtension, wordWrap, searchExtensions, saveKeymap],
+    [
+      appearance,
+      languageExtension,
+      wordWrap,
+      searchExtensions,
+      saveKeymap,
+      commands,
+      addon.extensions,
+    ],
   );
 
   // The tab strip marks a tab with unsaved edits and asks before closing it.
@@ -342,11 +397,16 @@ function FileEditor({
     [],
   );
 
-  if (content.kind === "image") return <ImageFileView name={name} dataUrl={content.dataUrl} />;
+  if (content.kind === "image") {
+    return (
+      <ImageFileView name={name} src={imageFileUrl(path, content.mtimeMs)} size={content.size} />
+    );
+  }
   if (content.kind === "binary") return <BinaryFileView name={name} />;
 
   return (
-    <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+    // Clipped so the editor keeping its cursor in view never scrolls the pane around it.
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-clip">
       <FileEditorHeader
         path={path}
         name={name}
@@ -364,6 +424,7 @@ function FileEditor({
         onToggleSearch={() => setPreviewSearchOpen((open) => !open)}
         wordWrap={wordWrap}
         onToggleWordWrap={onToggleWordWrap}
+        appearance={appearance}
       />
       {saveError ? (
         <Text
@@ -389,22 +450,8 @@ function FileEditor({
           <HtmlPreview path={path} name={name} reloadKey={previewReloadKey} active={isActiveTab} />
         )
       ) : (
-        // In the chat's floating panel the code sits on the panel's own fill.
-        <div className={editorFrameClass}>
-          <CodeMirror
-            className="min-h-0 flex-1 overflow-hidden"
-            height="100%"
-            value={draft}
-            theme="dark"
-            onCreateEditor={(view) => {
-              editorRef.current = view;
-              setEditorView(view);
-            }}
-            onChange={setDraft}
-            extensions={extensions}
-            readOnly={readOnly}
-            basicSetup={BASIC_SETUP}
-          />
+        <>
+          {/* Find docks over the code, the same bar every document uses. */}
           <EditorSearchPanel
             view={editorView}
             open={searchOpen}
@@ -417,7 +464,24 @@ function FileEditor({
             onClose={closeEditorSearch}
             navigateRef={navigateRef}
           />
-        </div>
+          {/* In the chat's floating panel the code sits on the panel's own fill. */}
+          <div className={editorFrameClass}>
+            <CodeMirror
+              className="min-h-0 flex-1 overflow-hidden"
+              height="100%"
+              value={draft}
+              theme={appearance === "page" ? "none" : "dark"}
+              onCreateEditor={(view) => {
+                editorRef.current = view;
+                setEditorView(view);
+              }}
+              onChange={setDraft}
+              extensions={extensions}
+              readOnly={readOnly}
+              basicSetup={BASIC_SETUP}
+            />
+          </div>
+        </>
       )}
     </div>
   );

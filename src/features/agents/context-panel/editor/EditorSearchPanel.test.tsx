@@ -178,8 +178,8 @@ describe("EditorSearchPanel", () => {
     act(() => {
       vi.advanceTimersByTime(200);
     });
-    act(() => button("Next match (Enter)").click());
-    act(() => button("Next match (Enter)").click());
+    act(() => button("Next match").click());
+    act(() => button("Next match").click());
     expect(selectedRange()).toEqual([8, 11]);
 
     act(() => button("Match case").click());
@@ -257,7 +257,7 @@ describe("EditorSearchPanel", () => {
     );
     expect(statusText()).toBe("1/2");
 
-    act(() => button("Next match (Enter)").click());
+    act(() => button("Next match").click());
     expect(statusText()).toBe("2/2");
   });
 

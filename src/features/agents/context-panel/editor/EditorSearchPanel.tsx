@@ -10,17 +10,7 @@ import {
 import { EditorSelection } from "@codemirror/state";
 import type { EditorView } from "@codemirror/view";
 import { findNext, findPrevious, replaceAll, replaceNext } from "@codemirror/search";
-import { ChevronDown, ChevronRight } from "lucide-react";
-import { ActionBar, Button, iconBarItem, Input } from "@/shared/ui";
-import {
-  FindCard,
-  FindField,
-  FindRow,
-  FindStatus,
-  FindSteps,
-  FindToggles,
-  keepFindInputFocus,
-} from "./FindControls";
+import { FindBar } from "@/shared/ui";
 import {
   EDITOR_SEARCH_MATCH_LIMIT,
   EMPTY_EDITOR_SEARCH_MATCH_INFO,
@@ -59,7 +49,7 @@ interface EditorSearchPanelProps {
 }
 
 /**
- * The code editor's floating find and replace card.
+ * The code editor's find and replace, on the shared find bar docked over the code.
  *
  * CodeMirror owns the search state, match highlighting and navigation
  * commands; this component owns the visible UI. The native CodeMirror panel is
@@ -377,121 +367,61 @@ export function EditorSearchPanel({
       ? `${matchInfo.index}/${matchInfo.total}${matchInfo.truncated ? "+" : ""}`
       : "No results";
 
+  const canStep = hasQuery && matchInfo.total > 0;
+
+  // The shared find bar, docked over the code as in every other document.
   return (
-    <FindCard
-      role="search"
-      aria-label="Find and replace"
-      onKeyDown={handlePanelKeyDown}
+    <FindBar
+      label="Find and replace"
       hidden={!open}
-    >
-      <FindRow>
-        {!readOnly ? (
-          <ActionBar
-            label="Replace"
-            size="sm"
-            width="content"
-            items={[
-              iconBarItem({
-                id: "replace",
-                icon: showReplace ? ChevronDown : ChevronRight,
-                label: showReplace ? "Hide replace" : "Show replace",
-                size: "sm",
-                priority: 1,
-                expanded: showReplace,
-                onMouseDown: keepFindInputFocus,
-                onSelect: () => onShowReplaceChange(!showReplace),
-              }),
-            ]}
-          />
-        ) : null}
-        <FindField>
-          <Input
-            variant="bare"
-            className="flex-1 text-caption"
-            ref={findInputRef}
-            value={searchText}
-            onChange={(event) => setSearchText(event.target.value)}
-            onKeyDown={handleSearchKeyDown}
-            onCompositionStart={() => {
-              composingRef.current = true;
-            }}
-            onCompositionEnd={() => {
-              composingRef.current = false;
-              setSearchNonce((value) => value + 1);
-            }}
-            autoCapitalize="off"
-            autoCorrect="off"
-            spellCheck={false}
-            placeholder="Find"
-            aria-label="Find"
-          />
-          <FindToggles
-            caseSensitive={caseSensitive}
-            wholeWord={wholeWord}
-            regexp={useRegex}
-            onToggle={(option) =>
-              (option === "caseSensitive"
-                ? setCaseSensitive
-                : option === "wholeWord"
-                  ? setWholeWord
-                  : setUseRegex)((value) => !value)
-            }
-          />
-        </FindField>
-        <FindStatus role="status" aria-live="polite" empty={noMatches}>
-          {statusText}
-        </FindStatus>
-        <FindSteps
-          disabled={!hasQuery || matchInfo.total === 0}
-          onSelectAll={selectAllMatches}
-          onStep={goToMatch}
-          onClose={onClose}
-        />
-      </FindRow>
-      {showReplace && !readOnly ? (
-        <FindRow>
-          <span className="size-6 shrink-0" aria-hidden />
-          <FindField>
-            <Input
-              variant="bare"
-              className="flex-1 text-caption"
-              ref={replaceInputRef}
-              value={replaceText}
-              onChange={(event) => handleReplaceTextChange(event.target.value)}
-              onKeyDown={handleReplaceKeyDown}
-              onCompositionStart={() => {
+      onKeyDown={handlePanelKeyDown}
+      find={{
+        value: searchText,
+        onChange: setSearchText,
+        inputRef: findInputRef,
+        onKeyDown: handleSearchKeyDown,
+        onCompositionStart: () => {
+          composingRef.current = true;
+        },
+        onCompositionEnd: () => {
+          composingRef.current = false;
+          setSearchNonce((value) => value + 1);
+        },
+      }}
+      caseSensitive={caseSensitive}
+      onCaseSensitive={() => setCaseSensitive((value) => !value)}
+      wholeWord={wholeWord}
+      onWholeWord={() => setWholeWord((value) => !value)}
+      regex={useRegex}
+      onRegex={() => setUseRegex((value) => !value)}
+      count={statusText}
+      empty={noMatches}
+      canStep={canStep}
+      onPrevious={() => goToMatch("prev")}
+      onNext={() => goToMatch("next")}
+      onSelectAll={selectAllMatches}
+      onClose={onClose}
+      replace={
+        readOnly
+          ? undefined
+          : {
+              open: showReplace,
+              onToggle: () => onShowReplaceChange(!showReplace),
+              canReplace,
+              onReplace: replaceCurrent,
+              onReplaceAll: replaceEvery,
+              value: replaceText,
+              onChange: handleReplaceTextChange,
+              inputRef: replaceInputRef,
+              onKeyDown: handleReplaceKeyDown,
+              onCompositionStart: () => {
                 composingRef.current = true;
-              }}
-              onCompositionEnd={() => {
+              },
+              onCompositionEnd: () => {
                 composingRef.current = false;
-              }}
-              autoCapitalize="off"
-              autoCorrect="off"
-              spellCheck={false}
-              placeholder="Replace"
-              aria-label="Replace"
-            />
-          </FindField>
-          <Button
-            variant="secondary"
-            size="sm"
-            disabled={!canReplace}
-            onMouseDown={keepFindInputFocus}
-            onClick={replaceCurrent}
-          >
-            Replace
-          </Button>
-          <Button
-            variant="secondary"
-            size="sm"
-            disabled={!canReplace}
-            onMouseDown={keepFindInputFocus}
-            onClick={replaceEvery}
-          >
-            Replace all
-          </Button>
-        </FindRow>
-      ) : null}
-    </FindCard>
+              },
+            }
+      }
+    />
   );
 }

@@ -41,6 +41,10 @@ interface FileTreeOperations {
   sendPath(): void;
   openInBrowser(): void;
   reveal(): void;
+  /** Reveal and Copy path for a path named outright, as the Code page's toolbar does for the
+   * folder, with no menu target. */
+  revealPath(path: string): void;
+  copyPathOf(path: string): void;
   startTrash(): void;
   submitPrompt(name: string): void;
   cancelPrompt(): void;
@@ -310,6 +314,11 @@ export function useFileTreeOperations(): FileTreeOperations {
     sendPath,
     openInBrowser,
     reveal,
+    revealPath: useCallback((path: string) => void filesApi.reveal(path).catch(failed), [failed]),
+    copyPathOf: useCallback(
+      (path: string) => void navigator.clipboard.writeText(path).catch(failed),
+      [failed],
+    ),
     startTrash: useCallback(() => {
       if (target && target.path !== root) setTrashTarget(target);
     }, [target, root]),

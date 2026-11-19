@@ -1,5 +1,6 @@
+import { fileRoute, isCodePageShown } from "../../code/codePageStore";
 import { useContextPanel } from "../contextPanelStore";
-import { useSpaceFolders } from "../../engines/enginesApi";
+import { useChatFolders } from "../../shared-folders/chatFolder";
 import { useFileIndex, type IndexEntry } from "./fileIndex";
 import { joinPath, useFilesStore } from "./filesStore";
 
@@ -39,15 +40,14 @@ function entriesOf(folder: string, wait: number): Promise<IndexEntry[]> {
 }
 
 /**
- * The files in a Space's linked folders on this computer that `match` scores above 0, best first.
- * Matching is the caller's, so search ranks them as it ranks everything else.
+ * The files in the person's project folders on this computer that `match` scores above 0, best
+ * first. Matching is the caller's, so search ranks them as it ranks everything else.
  */
 export async function searchFolderFiles(
-  space: string,
   match: (name: string, rel: string) => number,
   limit = 8,
 ): Promise<FolderFileHit[]> {
-  const folders = await useSpaceFolders.getState().load(space);
+  const folders = (await useChatFolders.getState().loadProjects()).map((project) => project.path);
   const lists = await Promise.all(folders.map((folder) => entriesOf(folder, 2500)));
   const hits: FolderFileHit[] = [];
   lists.forEach((entries, index) => {
@@ -68,8 +68,12 @@ export async function searchFolderFiles(
   return hits.sort((a, b) => b.match - a.match || a.rel.length - b.rel.length).slice(0, limit);
 }
 
-/** Shows a file in the context panel's Files tab, beside the chat. */
-export function openFolderFile(path: string) {
-  useContextPanel.getState().show("files");
+/**
+ * Opens a file in the Code page's editor while the page shows, else in the context panel's Files
+ * tab beside the chat. Returns the route that shows it.
+ */
+export function openFolderFile(path: string): string {
+  if (!isCodePageShown()) useContextPanel.getState().show("files");
   void useFilesStore.getState().openFile(path);
+  return fileRoute();
 }

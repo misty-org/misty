@@ -173,11 +173,14 @@ function PrPreviewCard({
  */
 export function WorktreeCreateDialog({
   folder,
+  conversationId,
   listing,
   open,
   onOpenChange,
 }: {
   folder: string;
+  /** The chat whose folder switches to the new worktree, when that is asked for. */
+  conversationId: string;
   listing: WorktreeListing;
   open: boolean;
   onOpenChange(open: boolean): void;
@@ -241,7 +244,7 @@ export function WorktreeCreateDialog({
       prNumber: tab === "pr" ? prNumber : null,
       existingBranch: tab === "existing",
     };
-    store.start(folder, args, { switchAfter });
+    store.start(folder, args, { switchAfter, conversationId });
     onOpenChange(false);
   };
 

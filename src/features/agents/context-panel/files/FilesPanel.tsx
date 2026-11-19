@@ -1,6 +1,6 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 import { FolderTree, X } from "lucide-react";
-import { lazy, Suspense, useEffect, useState, type DragEvent, type MouseEvent } from "react";
+import { useEffect, useState, type DragEvent, type MouseEvent } from "react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -16,67 +16,96 @@ import {
   Surface,
   Text,
   Tooltip,
+  lazyTool,
+  ToolSuspense,
 } from "@/shared/ui";
-import { EditorSkeleton } from "../PanelSkeletons";
 import { FileSearchOverlay } from "./FileSearchOverlay";
 import { FileTree } from "./FileTree";
 import { getFileTreeIconSvg } from "./fileIcons";
 import { fileName, useFilesStore } from "./filesStore";
 import { useTreePreferences } from "./treePreferences";
 
-const EditorPane = lazy(() => import("../editor/EditorPane"));
+const EditorPane = lazyTool(() => import("../editor/EditorPane"));
 
 /** A tab in the strip over the panel: 28px, its icon and name in the caption role. */
 const tabClass = "flex h-7 min-w-0 max-w-45 flex-none items-center gap-1 text-caption";
+/**
+ * A tab as the Code page draws it: a square block the strip's full 40px tall, ruled off from the
+ * next by a hairline, so the editor's tabs never pass for the window's rounded ones. The open one
+ * takes the page's fill and drops its bottom rule, running on into the editor under it.
+ */
+const blockClass =
+  "flex h-full min-w-0 max-w-48 flex-none items-center gap-1 border-r text-caption";
 /** What a tab shows: its icon and name, bright while it is the one open. */
 const tabContentClass = "flex h-full min-w-0 flex-1 items-center";
 
 /** The strip over the panel: the tree, then each open file. Tabs close, reorder by dragging,
- * and are kept per folder. */
-function FileTabs({ onClose }: { onClose(path: string): void }) {
+ * and are kept per folder. The Code page, whose tree has a column of its own, leaves out the
+ * tree's tab (`withTree`) and draws them as square blocks (`blocks`). */
+export function FileTabs({
+  onClose,
+  withTree = true,
+  blocks = false,
+}: {
+  onClose(path: string): void;
+  withTree?: boolean;
+  /** Square, ruled-off tabs on the window's chrome, for the Code page's editor. */
+  blocks?: boolean;
+}) {
   const openFiles = useFilesStore((state) => state.openFiles);
   const active = useFilesStore((state) => state.activeFilePath);
   const dirty = useFilesStore((state) => state.dirtyPaths);
   const activateFile = useFilesStore((state) => state.activateFile);
   const [dragging, setDragging] = useState<string | null>(null);
   if (openFiles.length === 0) return null;
-  return (
+  const strip = (
     // Tabs read muted and brighten under the pointer (the wash); the open one is bright.
     <Text
       bare
       as="div"
       tone="muted"
-      className="flex flex-none gap-1 overflow-x-auto border-b px-2 py-1 [scrollbar-width:none]"
+      className={
+        blocks
+          ? "flex h-10 overflow-x-auto [scrollbar-width:none]"
+          : "flex flex-none gap-1 overflow-x-auto border-b px-2 py-1 [scrollbar-width:none]"
+      }
       role="tablist"
       aria-label="Open files"
     >
-      <Surface
-        as={Pressable}
-        tone="none"
-        radius="md"
-        wash="control"
-        role="tab"
-        data-selected={active === null || undefined}
-        className={cn(tabClass, "px-2")}
-        aria-selected={active === null}
-        onClick={() => activateFile(null)}
-      >
-        <Text
-          bare
-          tone={active === null ? "bright" : undefined}
-          className={cn(tabContentClass, "gap-1")}
-        >
-          <FolderTree aria-hidden />
-          <Text className="min-w-0">Files</Text>
-        </Text>
-      </Surface>
-      {openFiles.map((path, index) => (
+      {withTree ? (
         <Surface
-          key={path}
+          as={Pressable}
           tone="none"
           radius="md"
           wash="control"
-          className={cn(tabClass, "pr-1 pl-2 data-[dragging]:opacity-50")}
+          role="tab"
+          data-selected={active === null || undefined}
+          className={cn(tabClass, "px-2")}
+          aria-selected={active === null}
+          onClick={() => activateFile(null)}
+        >
+          <Text
+            bare
+            tone={active === null ? "bright" : undefined}
+            className={cn(tabContentClass, "gap-1")}
+          >
+            <FolderTree aria-hidden />
+            <Text className="min-w-0">Files</Text>
+          </Text>
+        </Surface>
+      ) : null}
+      {openFiles.map((path, index) => (
+        <Surface
+          key={path}
+          tone={blocks && active === path ? "page" : "none"}
+          radius={blocks ? "none" : "md"}
+          wash={blocks && active === path ? undefined : "control"}
+          className={cn(
+            blocks ? blockClass : tabClass,
+            blocks ? "pr-1 pl-3" : "pr-1 pl-2",
+            blocks && active !== path && "border-b",
+            "data-[dragging]:opacity-50",
+          )}
           role="tab"
           aria-selected={active === path}
           data-selected={active === path || undefined}
@@ -133,7 +162,18 @@ function FileTabs({ onClose }: { onClose(path: string): void }) {
           </IconButton>
         </Surface>
       ))}
+      {/* The rest of the strip keeps the rule under the tabs, out to the editor's edge. */}
+      {blocks ? <div aria-hidden className="min-w-0 flex-1 border-b" /> : null}
     </Text>
+  );
+  // On the Code page the strip sits on the window's chrome, so the open block in the page's fill
+  // stands out from the rest.
+  return blocks ? (
+    <Surface tone="chrome" className="flex-none">
+      {strip}
+    </Surface>
+  ) : (
+    strip
   );
 }
 
@@ -176,33 +216,40 @@ export function FilesPanel({ folder }: { folder: string }) {
         {/* Open tabs stay mounted, so each keeps its draft, cursor and scroll. */}
         {openFiles.map((path) => (
           <div key={path} className={viewClass} hidden={active !== path}>
-            <Suspense fallback={<EditorSkeleton path={path} />}>
+            <ToolSuspense tool="code editor">
               <EditorPane path={path} />
-            </Suspense>
+            </ToolSuspense>
           </div>
         ))}
       </div>
-      <AlertDialog open={closing !== null} onOpenChange={(open) => !open && setClosing(null)}>
-        <AlertDialogContent className="max-w-sm">
-          <AlertDialogHeader>
-            <AlertDialogTitle>Close without saving?</AlertDialogTitle>
-            <AlertDialogDescription className="break-words">
-              {closing ? `Your edits to “${fileName(closing)}” will be lost.` : ""}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Keep editing</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                if (closing) useFilesStore.getState().closeFile(closing);
-                setClosing(null);
-              }}
-            >
-              Close
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <CloseFileDialog path={closing} onDone={() => setClosing(null)} />
     </div>
+  );
+}
+
+/** Asks before closing a tab with unsaved edits; `path` null keeps it shut. */
+export function CloseFileDialog({ path, onDone }: { path: string | null; onDone(): void }) {
+  return (
+    <AlertDialog open={path !== null} onOpenChange={(open) => !open && onDone()}>
+      <AlertDialogContent className="max-w-sm">
+        <AlertDialogHeader>
+          <AlertDialogTitle>Close without saving?</AlertDialogTitle>
+          <AlertDialogDescription className="break-words">
+            {path ? `Your edits to “${fileName(path)}” will be lost.` : ""}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Keep editing</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={() => {
+              if (path) useFilesStore.getState().closeFile(path);
+              onDone();
+            }}
+          >
+            Close
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }

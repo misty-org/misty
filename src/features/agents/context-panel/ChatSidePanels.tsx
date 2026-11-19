@@ -5,12 +5,13 @@ import {
   Globe,
   ListOrdered,
   Pin,
+  ScrollText,
   SquareTerminal,
   type LucideIcon,
 } from "lucide-react";
-import { lazy, Suspense, useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 import type { AgentProfile } from "@/shared/schemas";
-import { cn, IconButton, SideCard, SidePanel } from "@/shared/ui";
+import { cn, IconButton, SideCard, SidePanel, lazyTool, ToolSuspense } from "@/shared/ui";
 import { AgentBrowser } from "../agent-browser/AgentBrowser";
 import {
   closeAgentBrowser,
@@ -20,12 +21,12 @@ import {
 } from "../agent-browser/agentBrowserStore";
 import { useContextPanel, type ContextPanelSurface } from "./contextPanelStore";
 import { chatKey } from "../conversations/state/draftChat";
-import { ContextPanelSkeleton, SessionSkeleton } from "./PanelSkeletons";
+import { closeBrowserLog, useBrowserLog } from "../browser-log/browserLogStore";
 
-const AgentContextPanel = lazy(async () => ({
+const AgentContextPanel = lazyTool(async () => ({
   default: (await import("./AgentContextPanel")).AgentContextPanel,
 }));
-const SessionPanel = lazy(async () => ({
+const SessionPanel = lazyTool(async () => ({
   default: (await import("./SessionPanel")).SessionPanel,
 }));
 
@@ -50,7 +51,10 @@ function useOnePanel(conversationId: string, tab: ContextPanelSurface | null, br
     const was = previous.current;
     previous.current = { tab, browser };
     if (browser && !was.browser && tab) useContextPanel.getState().close();
-    else if (tab && tab !== was.tab && browser) setBrowserExpanded(conversationId, false);
+    else if (tab && tab !== was.tab && browser) {
+      setBrowserExpanded(conversationId, false);
+      closeBrowserLog(conversationId);
+    }
   }, [conversationId, tab, browser]);
 }
 
@@ -63,7 +67,8 @@ export function useSidePanelShown(conversationId: string) {
   const browserOpen = useAgentBrowser((state) =>
     isBrowserOpen(state.chats[chatKey(conversationId)]),
   );
-  return tab !== null || browserOpen;
+  const logOpen = useBrowserLog((state) => Boolean(state.chats[chatKey(conversationId)]));
+  return tab !== null || browserOpen || logOpen;
 }
 
 // How the panel gives way on a narrow Agents page (its `agent-studio` container). Important,
@@ -86,11 +91,18 @@ export function ChatSidePanels(props: { conversationId: string; agent: AgentProf
   const expanded = useContextPanel((state) => state.expanded);
   // A chat that hasn't started keeps its browser under the draft key until it does.
   const browserChat = chatKey(props.conversationId);
-  const browserOpen = useAgentBrowser((state) => isBrowserOpen(state.chats[browserChat]));
+  const browserShown = useAgentBrowser((state) => isBrowserOpen(state.chats[browserChat]));
+  // A run's browser log shows in the browser's slot, with or without a page beside it.
+  const logOpen = useBrowserLog((state) => Boolean(state.chats[browserChat]));
+  const browserOpen = browserShown || logOpen;
   useOnePanel(browserChat, tab, browserOpen);
   const surface = tab ?? (browserOpen ? "browser" : null);
   const panel = useContextPanel.getState();
-  const [name, icon] = surface ? surfaces[surface] : ["", Globe];
+  const [name, icon] = surface
+    ? surface === "browser" && logOpen
+      ? (["Browser log", ScrollText] as const)
+      : surfaces[surface]
+    : ["", Globe];
   return (
     <>
       {surface ? (
@@ -102,21 +114,25 @@ export function ChatSidePanels(props: { conversationId: string; agent: AgentProf
           expanded={expanded}
           onResize={panel.setWidth}
           onToggleExpanded={panel.toggleExpanded}
-          onClose={() => (surface === "browser" ? closeAgentBrowser(browserChat) : panel.close())}
+          onClose={() => {
+            if (surface !== "browser") return panel.close();
+            closeBrowserLog(browserChat);
+            closeAgentBrowser(browserChat);
+          }}
           className={cn("agent-studio-context context-panel", narrowPanelClass)}
           data-panel={surface}
         >
           {surface === "browser" ? (
             <AgentBrowser key={browserChat} conversationId={browserChat} />
           ) : (
-            // While the panel's code loads, the open view's own shape, never a blank box.
-            <Suspense fallback={<ContextPanelSkeleton tab={surface} />}>
+            // While the panel's code loads, the view says it is getting ready, never a blank box.
+            <ToolSuspense tool={surface === "terminal" ? "terminal" : `${surface} view`}>
               <AgentContextPanel
                 tab={surface}
                 conversationId={props.conversationId}
                 agent={props.agent}
               />
-            </Suspense>
+            </ToolSuspense>
           )}
         </SidePanel>
       ) : null}
@@ -158,9 +174,9 @@ export function ChatSessionCard(props: { conversationId: string; agent: AgentPro
       tucked={tucked}
       className="agent-studio-session context-panel"
     >
-      <Suspense fallback={<SessionSkeleton />}>
+      <ToolSuspense tool="session card" size="inline">
         <SessionPanel conversationId={props.conversationId} agent={props.agent} corner={corner} />
-      </Suspense>
+      </ToolSuspense>
     </SideCard>
   );
 }

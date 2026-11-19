@@ -14,9 +14,10 @@ import {
   Text,
   Tooltip,
 } from "@/shared/ui";
-import { currentSpaceKey, folderOf, useSpaceFolders } from "../../engines/enginesApi";
+import { currentSpaceKey } from "../../engines/enginesApi";
 import { useMistyStore } from "../../conversations/state/useMistyStore";
 import { multirunFolderOf } from "../../multirun/multirunFolders";
+import { useChatFolders } from "../../shared-folders/chatFolder";
 import { useTerminalStore } from "../terminal/terminalStore";
 import { defaultBaseRef, dirNameOf } from "./prInput";
 import { worktreeApi, type BranchInfo, type WorktreeInfo } from "./worktreeApi";
@@ -79,14 +80,14 @@ const samePath = (a: string, b: string) => a.replace(/[\\/]+$/, "") === b.replac
 
 /**
  * Whether something works in the worktree now: a chat's reply running there (a multi-run lane's,
- * or any chat while the worktree is the Space's folder), or a terminal open in it.
+ * or any chat whose folder it is), or a terminal open in it.
  */
 function useWorktreeBusy(path: string, open: boolean): boolean {
   const terminals = useTerminalStore((s) =>
     Object.values(s.tabsByChat).some((tabs) => tabs.some((tab) => samePath(tab.folder, path))),
   );
   const running = useMistyStore((s) => (s.working ? (s.invocationConversationId ?? "") : null));
-  const spaceFolder = useSpaceFolders((s) => folderOf(s, currentSpaceKey()));
+  const chatFolder = useChatFolders((s) => (running ? s.byConversation[running]?.path : undefined));
   const [runHere, setRunHere] = useState(false);
   useEffect(() => {
     if (!open || running === null) {
@@ -97,13 +98,13 @@ function useWorktreeBusy(path: string, open: boolean): boolean {
     void multirunFolderOf(running)
       .catch(() => undefined)
       .then((lane) => {
-        const folder = lane ?? spaceFolder;
-        if (live) setRunHere(Boolean(folder) && samePath(folder, path));
+        const folder = lane ?? chatFolder;
+        if (live) setRunHere(Boolean(folder) && samePath(folder ?? "", path));
       });
     return () => {
       live = false;
     };
-  }, [open, running, spaceFolder, path]);
+  }, [open, running, chatFolder, path]);
   return terminals || runHere;
 }
 

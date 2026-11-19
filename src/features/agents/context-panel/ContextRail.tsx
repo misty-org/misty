@@ -121,9 +121,11 @@ export function ContextRail(props: {
   };
   return (
     <nav
-      // Its 32px buttons are the tab row's layout button's size, 12px from the page's edge like
-      // it, the first centred on the header band (`--ui-header`) the tab row centres its buttons in.
-      className="flex flex-none flex-col pt-[calc((var(--ui-header)-2rem)/2)] pr-3 pb-2 pl-1"
+      // Its 32px buttons are the tab row's layout button's size and sit under it, the first centred
+      // on the header band (`--ui-header`) the tab row centres its buttons in. 12px each side, as
+      // the sidebar keeps at the window's other edge: with a button's own 8px around its glyph,
+      // each glyph is 20px from the window's edge and from the chat, centred in the rail.
+      className="flex flex-none flex-col px-3 pt-[calc((var(--ui-header)-2rem)/2)] pb-2"
       aria-label="Panels"
       data-misty-window-drag-block="true"
       data-tour="chat-panels"

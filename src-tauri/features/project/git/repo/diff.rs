@@ -20,7 +20,11 @@ pub struct GitImageDiff {
 }
 
 // The file panel's own image rules, so a diff and an opened file agree on what an image is.
-pub(crate) use crate::project::files::{image_mime, is_image, MAX_IMAGE_BYTES};
+pub(crate) use crate::project::files::{image_mime, is_image};
+
+/// The largest image version a diff shows. Diff images come from Git's objects, not from a file on
+/// disk the webview could load by URL, so they still cross as data URLs and need a cap.
+pub(crate) const MAX_IMAGE_BYTES: usize = 5 * 1024 * 1024;
 
 /// The most patch text sent to the panel. An untracked file is shown as all added, so a large
 /// new file (a build output, a log) would otherwise cross over whole.

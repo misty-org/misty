@@ -5,7 +5,7 @@ import type { DirEntry } from "./filesApi";
 
 const mocks = vi.hoisted(() => ({
   listDir: vi.fn(),
-  readFile: vi.fn(async () => ({ kind: "text", text: "", dataUrl: null, truncated: false })),
+  readFile: vi.fn(async () => ({ kind: "text", text: "", size: 0, mtimeMs: 0, truncated: false })),
   writeFile: vi.fn(),
   gitTreeStatus: vi.fn(),
 }));

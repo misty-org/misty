@@ -38,8 +38,11 @@ import { useAgentHomeSpace } from "../personal/AgentSpaceField";
 import { ChatFolderMenu } from "../plans/AgentFolderMenu";
 import { useContextPanel } from "./contextPanelStore";
 import { chatKey } from "../conversations/state/draftChat";
-import { ProjectFolderPicker, noFolderLine, useProjectFolder } from "./FolderPicker";
+import { useChatFolder, isDraftChat } from "../shared-folders/chatFolder";
+import { OpenInCodeButton } from "../code/OpenInCodeDialog";
+import { ChatFolderPicker } from "./ChatFolderPicker";
 import { gitApi, type GitStatus } from "./git/gitApi";
+import { LineCounts } from "./git/LineCounts";
 import { chatUsage, formatCost, type ChatUsage } from "./chatUsage";
 import { formatTokens } from "../conversations/view/meta/format";
 import { Row, Section } from "./SessionRows";
@@ -186,27 +189,6 @@ function windowName(window: LimitWindow): string {
   return "Plan";
 }
 
-/** Lines added and removed across the folder's changed files, in their own colors. */
-function LineCounts({ git }: { git: GitStatus }) {
-  let added = 0;
-  let removed = 0;
-  for (const entry of [...git.staged, ...git.unstaged, ...git.untracked]) {
-    added += entry.additions ?? 0;
-    removed += entry.deletions ?? 0;
-  }
-  if (!added && !removed) return null;
-  return (
-    <span className="flex gap-1.5">
-      <Text bare tone="added">
-        +{added}
-      </Text>
-      <Text bare tone="removed">
-        −{removed}
-      </Text>
-    </span>
-  );
-}
-
 /**
  * The chat's session at a glance, in the narrow card beside the chat: the engine's model and how
  * full its context is, what the chat cost and took in tokens, how much the engine's cache served,
@@ -223,7 +205,7 @@ export function SessionPanel(props: {
   const engineId = props.agent.engine || mistyEngine;
   const outside = engineId !== mistyEngine;
   const engine = useEngine(engineId);
-  const { folder } = useProjectFolder(props.agent);
+  const { folder, kind } = useChatFolder(props.conversationId);
   const home = useAgentHomeSpace(props.agent);
   const git = useGitStatus(folder);
   const goal = useSessionGoals((state) => state.goals[chatKey(props.conversationId)]);
@@ -346,7 +328,21 @@ export function SessionPanel(props: {
           home ? <OverflowFadeText>{home.space?.name ?? "No Space"}</OverflowFadeText> : null
         }
       >
-        <Row icon={Folder} label="Folder" value={<ProjectFolderPicker agent={props.agent} />} />
+        <Row
+          icon={Folder}
+          label="Folder"
+          value={
+            // A chat in its scratch folder moves to Code to become a project; Code's chats switch
+            // between projects.
+            kind === "project" ? (
+              <ChatFolderPicker conversationId={props.conversationId} compact />
+            ) : isDraftChat(props.conversationId) ? (
+              "Scratch"
+            ) : (
+              <OpenInCodeButton conversationId={props.conversationId} />
+            )
+          }
+        />
         {outside ? null : (
           <Row
             icon={FolderOpen}
@@ -354,9 +350,7 @@ export function SessionPanel(props: {
             value={<ChatFolderMenu conversationId={props.conversationId} />}
           />
         )}
-        {!folder ? (
-          <Empty>{noFolderLine(props.agent)}</Empty>
-        ) : git ? (
+        {!folder ? null : git ? (
           <>
             <Row
               icon={GitBranch}

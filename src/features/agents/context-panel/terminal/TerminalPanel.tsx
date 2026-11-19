@@ -72,8 +72,8 @@ export default function TerminalPanel({ chat, folder }: { chat: string; folder: 
 
   return (
     <div className="terminal-panel">
-      {/* The tabs are the panel's header row. */}
-      <SidePanelHeader>
+      {/* The tabs are the panel's header row; on the Code page, a bar of their own. */}
+      <SidePanelHeader bar>
         <div className="terminal-tabs" role="tablist" aria-label="Terminals">
           {tabs.map((tab, index) => {
             const selected = tab.id === active?.id;
