@@ -156,13 +156,7 @@ fn gemini_settings_get_only_the_sign_in_choice() {
 
 #[test]
 fn engines_without_a_status_command_remember_a_sign_in() {
-    for engine in [
-        "agy",
-        "hermes",
-        "kimi",
-        "codebuddy",
-        "minimax",
-    ] {
+    for engine in ["agy", "hermes", "kimi", "codebuddy", "minimax"] {
         assert!(remembers_sign_in(engine), "{engine}");
         assert!(remembered_sign_in(engine).is_some_and(|(signed_in, _)| signed_in.is_some()));
     }

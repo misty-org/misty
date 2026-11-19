@@ -242,10 +242,7 @@ pub(super) fn sign_in_plan(
 /// finish, or one the person said they finished in the CLI's own screen. Pi and Oh My Pi say
 /// it in their own stores, and Qoder CLI and Grok Build through a command (`engine_cli_signed_in`).
 pub(super) fn remembers_sign_in(engine: &str) -> bool {
-    matches!(
-        engine,
-        "agy" | "hermes" | "kimi" | "codebuddy" | "minimax"
-    )
+    matches!(engine, "agy" | "hermes" | "kimi" | "codebuddy" | "minimax")
 }
 
 /// Whether the person is signed in to an engine with no status command, as far as Misty can

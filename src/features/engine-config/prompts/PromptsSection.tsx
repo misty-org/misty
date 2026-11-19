@@ -58,7 +58,7 @@ type ScopeFilter = "all" | PromptScope;
 
 const scopeLabel = (scope: PromptScope) => (scope === "workspace" ? "This folder" : "Everywhere");
 
-/** The folder this window's Space works in, or "" when it has none linked. */
+/** The person's latest project folder, or "" when they have none. */
 function useCurrentFolder(): string {
   const { folders, picked } = useLinkedFolders();
   return picked && folders.includes(picked) ? picked : (folders[0] ?? "");

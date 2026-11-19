@@ -188,7 +188,7 @@ function FetchModelsControl({
 }) {
   return (
     <div className="flex min-w-0 items-center gap-2">
-      <Button type="button" size="sm" onClick={onFetch} loading={fetching} disabled={disabled}>
+      <Button type="button" size="sm" onClick={onFetch} disabled={disabled || fetching}>
         Fetch models
       </Button>
       {error ? (

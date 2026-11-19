@@ -3378,7 +3378,10 @@ mod tests {
         // Older parts without a cache still total what they have.
         let part = serde_json::json!({"tokens": {"input": 10, "output": 5}});
         assert_eq!(opencode_usage(&part).unwrap()["total_tokens"], 15);
-        assert_eq!(opencode_usage(&serde_json::json!({"type": "step-finish"})), None);
+        assert_eq!(
+            opencode_usage(&serde_json::json!({"type": "step-finish"})),
+            None
+        );
     }
 
     #[test]

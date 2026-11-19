@@ -17,8 +17,10 @@ use denials::{
 
 pub struct ClaudeEngine {
     /// Per-block partial JSON for tool_use inputs. Streamed as
-    /// `input_json_delta` after a name-only `content_block_start`.
-    pending_tool_json: Mutex<HashMap<u64, PendingTool>>,
+    /// `input_json_delta` after a name-only `content_block_start`. Keyed by the agent streaming it
+    /// (its `parent_tool_use_id`, empty for the main agent) and the block's index: helper agents
+    /// stream at the same time as the main one, and their block indexes start at 0 too.
+    pending_tool_json: Mutex<HashMap<(String, u64), PendingTool>>,
     /// tool_use id -> tool name, recorded at `content_block_start` so a
     /// later `tool_result` (user message) can be attributed to its call.
     tool_names: Mutex<HashMap<String, String>>,
@@ -790,7 +792,7 @@ fn format_api_retry(value: &Value) -> String {
 
 /// Anthropic SSE wrapped events (requires --include-partial-messages).
 fn parse_stream_event(
-    pending: &Mutex<HashMap<u64, PendingTool>>,
+    pending: &Mutex<HashMap<(String, u64), PendingTool>>,
     tool_names: &Mutex<HashMap<String, String>>,
     tool_paths: &Mutex<HashMap<String, String>>,
     value: &Value,
@@ -799,23 +801,30 @@ fn parse_stream_event(
     let Some(event) = value.get("event") else {
         return;
     };
+    let agent = value
+        .get("parent_tool_use_id")
+        .and_then(Value::as_str)
+        .unwrap_or("");
     match event.get("type").and_then(Value::as_str) {
         Some("message_start") => out.push(EngineEvent::Generation { active: true }),
         // Decode window closes after the last block (tool arguments included).
         Some("message_stop") => out.push(EngineEvent::Generation { active: false }),
-        Some("content_block_delta") => parse_content_block_delta(pending, event, out),
+        Some("content_block_delta") => parse_content_block_delta(pending, agent, event, out),
         // Tool calls surface at block start with `input: {}`; the real
         // arguments stream in as `input_json_delta` and flush on stop.
         Some("content_block_start") => {
-            parse_content_block_start(pending, tool_names, tool_paths, event, out)
+            parse_content_block_start(pending, agent, tool_names, tool_paths, event, out)
         }
-        Some("content_block_stop") => parse_content_block_stop(pending, tool_paths, event, out),
+        Some("content_block_stop") => {
+            parse_content_block_stop(pending, agent, tool_paths, event, out)
+        }
         _ => {}
     }
 }
 
 fn parse_content_block_delta(
-    pending: &Mutex<HashMap<u64, PendingTool>>,
+    pending: &Mutex<HashMap<(String, u64), PendingTool>>,
+    agent: &str,
     event: &Value,
     out: &mut Vec<EngineEvent>,
 ) {
@@ -849,7 +858,7 @@ fn parse_content_block_delta(
                 return;
             };
             if let Ok(mut map) = pending.lock() {
-                if let Some(tool) = map.get_mut(&index) {
+                if let Some(tool) = map.get_mut(&(agent.to_string(), index)) {
                     tool.json.push_str(partial);
                 }
             }
@@ -859,7 +868,8 @@ fn parse_content_block_delta(
 }
 
 fn parse_content_block_start(
-    pending: &Mutex<HashMap<u64, PendingTool>>,
+    pending: &Mutex<HashMap<(String, u64), PendingTool>>,
+    agent: &str,
     tool_names: &Mutex<HashMap<String, String>>,
     tool_paths: &Mutex<HashMap<String, String>>,
     event: &Value,
@@ -893,7 +903,7 @@ fn parse_content_block_start(
     if let Some(index) = event.get("index").and_then(Value::as_u64) {
         if let Ok(mut map) = pending.lock() {
             map.insert(
-                index,
+                (agent.to_string(), index),
                 PendingTool {
                     name: name.clone(),
                     id: block.get("id").and_then(Value::as_str).map(str::to_string),
@@ -913,7 +923,8 @@ fn parse_content_block_start(
 }
 
 fn parse_content_block_stop(
-    pending: &Mutex<HashMap<u64, PendingTool>>,
+    pending: &Mutex<HashMap<(String, u64), PendingTool>>,
+    agent: &str,
     tool_paths: &Mutex<HashMap<String, String>>,
     event: &Value,
     out: &mut Vec<EngineEvent>,
@@ -921,7 +932,11 @@ fn parse_content_block_stop(
     let Some(index) = event.get("index").and_then(Value::as_u64) else {
         return;
     };
-    let Some(tool) = pending.lock().ok().and_then(|mut map| map.remove(&index)) else {
+    let Some(tool) = pending
+        .lock()
+        .ok()
+        .and_then(|mut map| map.remove(&(agent.to_string(), index)))
+    else {
         return;
     };
     let trimmed = tool.json.trim();
@@ -1357,6 +1372,66 @@ mod tests {
             }
             _ => panic!("expected patched tool message"),
         }
+    }
+
+    #[test]
+    fn helper_agents_streaming_together_keep_their_own_tool_args() {
+        let engine = ClaudeEngine::new();
+        let line = |agent: &str, event: serde_json::Value| {
+            let mut value = serde_json::json!({ "type": "stream_event", "event": event });
+            if !agent.is_empty() {
+                value["parent_tool_use_id"] = serde_json::json!(agent);
+            }
+            value.to_string()
+        };
+        let start = |id: &str| {
+            serde_json::json!({
+                "type": "content_block_start",
+                "index": 1,
+                "content_block": { "type": "tool_use", "id": id, "name": "Read", "input": {} }
+            })
+        };
+        let delta = |path: &str| {
+            serde_json::json!({
+                "type": "content_block_delta",
+                "index": 1,
+                "delta": { "type": "input_json_delta", "partial_json": format!("{{\"file_path\":\"{path}\"}}") }
+            })
+        };
+        let stop = serde_json::json!({ "type": "content_block_stop", "index": 1 });
+        let mut out = Vec::new();
+        // Both agents' first tool call is block 1, streamed interleaved.
+        engine.parse_line(&line("", start("toolu_main")), &mut out);
+        engine.parse_line(&line("toolu_task", start("toolu_helper")), &mut out);
+        engine.parse_line(&line("", delta("main.ts")), &mut out);
+        engine.parse_line(&line("toolu_task", delta("helper.ts")), &mut out);
+        engine.parse_line(&line("", stop.clone()), &mut out);
+        engine.parse_line(&line("toolu_task", stop), &mut out);
+        let patched: Vec<(Option<String>, Option<serde_json::Value>)> = out
+            .iter()
+            .filter_map(|event| match event {
+                EngineEvent::Message {
+                    patch: true,
+                    tool_call_id,
+                    args,
+                    ..
+                } => Some((tool_call_id.clone(), args.clone())),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(
+            patched,
+            vec![
+                (
+                    Some("toolu_main".into()),
+                    Some(serde_json::json!({ "file_path": "main.ts" }))
+                ),
+                (
+                    Some("toolu_helper".into()),
+                    Some(serde_json::json!({ "file_path": "helper.ts" }))
+                ),
+            ]
+        );
     }
 
     #[test]

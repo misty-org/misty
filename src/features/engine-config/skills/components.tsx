@@ -101,11 +101,7 @@ function TargetEngineButton({
       }
       className="relative disabled:cursor-not-allowed disabled:opacity-100 aria-disabled:cursor-not-allowed"
     >
-      {busy ? (
-        <Spinner size="sm" label={false} />
-      ) : (
-        <EngineGlyph engine={target.id} label={target.label} />
-      )}
+      <EngineGlyph engine={target.id} label={target.label} />
       {state === "orphan" && !busy ? <IndicatorDot /> : null}
     </IconButton>
   );

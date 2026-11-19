@@ -415,7 +415,9 @@ fn a_compaction_summary_clears_the_context_count() {
     let summary = json!({ "role": "assistant", "summary": true, "mode": "compaction" });
     assert!(is_compaction_summary(&summary));
     assert!(is_compaction_summary(&json!({ "agent": "compaction" })));
-    assert!(!is_compaction_summary(&json!({ "agent": "build", "summary": false })));
+    assert!(!is_compaction_summary(
+        &json!({ "agent": "build", "summary": false })
+    ));
     // 1.x tokens come out in the same flat fields as 2.x's, with the cache counted.
     let tokens = json!({ "input": 580, "output": 165, "reasoning": 0,
                          "cache": { "read": 5504, "write": 0 } });

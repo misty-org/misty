@@ -41,8 +41,8 @@ const engineSettingsApi = {
 /**
  * The settings, and a save that reports its error instead of throwing. The last copy is kept on
  * this computer (program paths, models, the DeepSeek Harness address: nothing secret), so the
- * page paints it at once and reads them again behind it. A first read that fails shows the
- * defaults, as before.
+ * page paints it at once and reads them again behind it. A first read that fails gives
+ * `loadError`, never defaults that could be saved over the real ones.
  */
 export function useEngineSettings() {
   const resource = useCachedResource(ENGINE_SETTINGS_KEY, engineSettingsApi.get, {
@@ -60,8 +60,15 @@ export function useEngineSettings() {
     },
     [set],
   );
-  const settings = resource.data ?? (resource.error ? {} : null);
-  return { settings, save };
+  const loadError =
+    !resource.data && !resource.loading && resource.error
+      ? resource.error instanceof Error
+        ? resource.error.message
+        : String(resource.error)
+      : null;
+  const { reload } = resource;
+  const retry = useCallback(() => void reload(), [reload]);
+  return { settings: resource.data ?? null, loadError, retry, save };
 }
 
 // ── Pi and Oh My Pi ─────────────────────────────────────────────────────────

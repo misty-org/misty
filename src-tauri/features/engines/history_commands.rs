@@ -1,7 +1,7 @@
 //! What a window may ask about the sessions in the engines' own history files: list, search,
 //! read and rename them. Every folder the history shows a chat in is listed (`history/past_folders.rs`),
-//! not only folders linked to a Space or owned by an agent. Listing a chat gives nothing access to
-//! its folder: continuing one there goes through `agent_folder_history.rs`.
+//! not only the person's projects. Listing a chat gives nothing access to its folder: continuing
+//! one works there only if it is one of their projects (`engine_chat_resume`).
 
 use std::sync::Arc;
 
@@ -27,6 +27,24 @@ pub async fn engine_history_list(
     let sessions = super::history::reader::list_sessions(state).await?;
     super::history::scanner::spawn_scan(db, sink);
     Ok(sessions)
+}
+
+/// The sessions each engine's own files hold right now: their files are read again first, so an
+/// agent's sync finds chats started outside Misty since the last scan. Waits for a scan already
+/// running.
+#[tauri::command]
+pub async fn engine_history_rescan(
+    webview: tauri::Webview,
+    state: State<'_, EngineState>,
+) -> Result<Vec<super::history::SessionMeta>, String> {
+    person_window(&webview)?;
+    let (db, sink) = (Arc::clone(&state.db), Arc::clone(&state.sink));
+    tauri::async_runtime::spawn_blocking(move || {
+        super::history::scanner::scan_now(&db, &sink)?;
+        super::history::reader::list_sessions_from(&db)
+    })
+    .await
+    .map_err(|error| error.to_string())?
 }
 
 /// Full-text search over every indexed session's messages.

@@ -57,81 +57,7 @@ pub async fn engine_models(
     Ok(super::models(&engine).await)
 }
 
-/// The project folders linked to a Space on this computer.
-#[tauri::command]
-pub async fn space_folder_list(
-    webview: tauri::Webview,
-    state: State<'_, MistyRuntime>,
-    account: String,
-    space: String,
-) -> Result<Vec<String>, String> {
-    person_window(&webview)?;
-    let (db, space) = (state.environment.store(), space_key(&space)?);
-    blocking(move || store::folders(&db, &account, &space)).await
-}
-
-/// Links the folder the person picks to a Space, or nothing if they cancel.
-#[tauri::command]
-pub async fn space_folder_link(
-    app: tauri::AppHandle,
-    webview: tauri::Webview,
-    state: State<'_, MistyRuntime>,
-    account: String,
-    space: String,
-) -> Result<Option<String>, String> {
-    use tauri_plugin_dialog::DialogExt;
-    person_window(&webview)?;
-    let space = space_key(&space)?;
-    let (send, receive) = tokio::sync::oneshot::channel();
-    app.dialog()
-        .file()
-        .set_title("Choose a project folder for this Space")
-        .pick_folder(move |folder| {
-            let _ = send.send(folder);
-        });
-    let Some(folder) = receive
-        .await
-        .map_err(|_| "No folder was chosen.".to_string())?
-    else {
-        return Ok(None);
-    };
-    let path = folder
-        .into_path()
-        .map_err(|_| "Choose a folder on this computer.".to_string())?;
-    // The person chose it in the system's own dialog, which is what lets Misty reach it.
-    file_access::allow_linked_folder(&path);
-    let real = file_access::fs::canonicalize(&path).map_err(|error| error.to_string())?;
-    if real != path {
-        file_access::revoke_linked_folder(&path);
-        file_access::allow_linked_folder(&real);
-    }
-    let text = real.to_string_lossy().to_string();
-    let (db, kept) = (state.environment.store(), text.clone());
-    blocking(move || store::link_folder(&db, &account, &space, &kept)).await?;
-    let linked = text.clone();
-    tokio::task::spawn_blocking(move || super::folder_linked(&linked));
-    Ok(Some(text))
-}
-
-/// Unlinks a folder from a Space. Its files are left as they are.
-#[tauri::command]
-pub async fn space_folder_unlink(
-    webview: tauri::Webview,
-    state: State<'_, MistyRuntime>,
-    account: String,
-    space: String,
-    path: String,
-) -> Result<(), String> {
-    person_window(&webview)?;
-    let (db, space, gone) = (state.environment.store(), space_key(&space)?, path.clone());
-    let still_linked = blocking(move || store::unlink_folder(&db, &account, &space, &gone)).await?;
-    if !still_linked {
-        file_access::revoke_linked_folder(std::path::Path::new(&path));
-    }
-    Ok(())
-}
-
-/// Lets the file gate reach every folder linked on this computer. Runs once as the app starts.
+/// Lets the file gate reach every project folder on this computer. Runs once as the app starts.
 pub fn allow_linked_folders(db: &database::store::Store) {
     for folder in store::all_folders(db).unwrap_or_default() {
         file_access::allow_linked_folder(&folder);
@@ -380,8 +306,17 @@ pub async fn engine_chat_resume(
     }
     let db = state.environment.store();
     blocking(move || {
-        if !store::is_linked(&db, &account, std::path::Path::new(&folder))? {
-            return Err("That folder isn't linked to a Space on this computer.".into());
+        let path = std::path::Path::new(&folder);
+        // A session that ran in one of the person's projects (or a scratch folder) continues
+        // there, and the chat works there too. One from a folder that isn't a project on this
+        // computer can't be resumed by its engine anywhere else: the chat keeps its turns as
+        // history and works in its own scratch folder, where the next turn starts afresh.
+        if !store::is_linked(&db, &account, path)? || !file_access::fs::is_dir(path) {
+            return Ok(());
+        }
+        if !super::chat_folder::is_scratch(&db, path) {
+            store::set_chat_folder(&db, &account, &conversation, &folder, "project")?;
+            store::add_project(&db, &account, &folder)?;
         }
         store::keep_session(&db, &account, &conversation, &engine, &folder, &session_id)
     })

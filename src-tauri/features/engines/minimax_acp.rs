@@ -189,9 +189,17 @@ async fn turn_inner(
         }
     };
     let session_id = warm.item.session_id.clone();
-    let result = prompt(&mut warm.item.spawned.acp, core, state, view, req, killed, &session_id)
-        .await
-        .map_err(|error| terminal_message(error, &warm.item.spawned.stderr_buf));
+    let result = prompt(
+        &mut warm.item.spawned.acp,
+        core,
+        state,
+        view,
+        req,
+        killed,
+        &session_id,
+    )
+    .await
+    .map_err(|error| terminal_message(error, &warm.item.spawned.stderr_buf));
     // A clean turn leaves the process warm for the chat's next message; anything else ends it.
     let clean = result.is_ok() && !killed.load(Ordering::SeqCst);
     super::warm::park_acp(core, req, fingerprint, clean, warm);

@@ -1,6 +1,6 @@
 //! A folder an engine was refused, granted from the chat: the chat names the path the engine
 //! wanted, and native code works out the folder, asks the person in a system dialog nothing in a
-//! window can answer, and links that folder to the Space. The renderer never decides.
+//! window can answer, and makes that folder one of their projects. The renderer never decides.
 //!
 //! Adapted from desktop-cc-gui's directory grants (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 //! See NOTICE.
@@ -50,8 +50,9 @@ pub fn space_folder_grant_scope(webview: tauri::Webview, path: String) -> Result
     Ok(grant_dir_for(&path)?.to_string_lossy().to_string())
 }
 
-/// Asks the person, natively, to let this Space's agents work in the folder `path` is in, and
-/// links it to the Space if they agree. Returns the folder linked, or nothing if they declined.
+/// Asks the person, natively, to let their agents work in the folder `path` is in, and makes it
+/// one of their projects if they agree. Returns the folder, or nothing if they declined. `space`
+/// is only checked: projects belong to the person on this computer, not to a Space.
 #[tauri::command]
 pub async fn space_folder_grant(
     app: tauri::AppHandle,
@@ -71,8 +72,8 @@ pub async fn space_folder_grant(
     let (send, receive) = tokio::sync::oneshot::channel();
     app.dialog()
         .message(format!(
-            "Agents in this Space will be able to read and change files in \u{201c}{}\u{201d}. \
-             You can unlink it from the Space at any time.",
+            "Your agents will be able to read and change files in \u{201c}{}\u{201d}. \
+             You can forget it from your projects at any time.",
             folder.display()
         ))
         .title("Allow folder")
@@ -104,7 +105,8 @@ pub async fn space_folder_grant(
     }
     let text = real.to_string_lossy().to_string();
     let (db, kept) = (state.environment.store(), text.clone());
-    tokio::task::spawn_blocking(move || store::link_folder(&db, &account, &space, &kept))
+    let _ = space;
+    tokio::task::spawn_blocking(move || store::add_project(&db, &account, &kept))
         .await
         .map_err(|error| error.to_string())??;
     // Engine CLIs get every folder the person granted as an extra directory (`--add-dir` and the

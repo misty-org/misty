@@ -24,7 +24,7 @@ import {
   DropdownMenuSeparator,
   MenuItem,
   MenuTrigger,
-  SkeletonControl,
+  SetupState,
   Text,
   Tooltip,
 } from "@/shared/ui";
@@ -62,13 +62,12 @@ function StatusLine({
   signInDetail: string | null;
 }) {
   if (status === null) {
+    // Until the first check answers, the row's control says it is checking.
     return error ? (
       <Tooltip content={error}>
         <span>Couldn’t check</span>
       </Tooltip>
-    ) : (
-      <>Checking…</>
-    );
+    ) : null;
   }
   if (!status.installed) return <>Not installed</>;
   const facts: ReactNode[] = [status.localVersion ? versionText(status.localVersion) : "Installed"];
@@ -96,6 +95,8 @@ function CliRow({ engine }: { engine: EngineId }) {
   const { status, signIn, loading, error, updating, refresh } = useCliVersionStatus(engine);
   const flow = useCliUpdateFlow(engine);
   const name = ENGINE_NAMES[engine];
+  // The CLI's `--version` probe hasn't answered yet.
+  const checking = status === null && !error;
   const canAct =
     status !== null && status.updateKind !== null && (!status.installed || status.updateAvailable);
   // The sign-in to start, or null. Some engines ask which region or provider first.
@@ -116,7 +117,6 @@ function CliRow({ engine }: { engine: EngineId }) {
     action = (
       <Button
         icon={installing ? Download : ArrowUp}
-        loading={updating}
         disabled={updating || loading}
         onClick={() => void flow.begin()}
       >
@@ -139,16 +139,21 @@ function CliRow({ engine }: { engine: EngineId }) {
           </Text>
         }
         description={
-          <StatusLine
-            status={status}
-            error={error}
-            signedIn={status?.installed ? (signIn?.signedIn ?? null) : null}
-            signInDetail={signIn?.detail ?? null}
-          />
+          checking ? undefined : (
+            <StatusLine
+              status={status}
+              error={error}
+              signedIn={status?.installed ? (signIn?.signedIn ?? null) : null}
+              signInDetail={signIn?.detail ?? null}
+            />
+          )
         }
       >
-        {/* Before the first probe answers, the button holds its place so the row doesn't move. */}
-        {status === null && !error ? <SkeletonControl kind="button" /> : action}
+        {checking ? (
+          <SetupState size="row" tool="check" label={`Checking ${name}`} onRetry={refresh} />
+        ) : (
+          action
+        )}
         <DropdownMenu>
           <MenuTrigger label={`${name} actions`} iconOnly icon={MoreHorizontal} />
           <DropdownMenuContent align="end">

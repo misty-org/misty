@@ -25,12 +25,12 @@ pub mod codex;
 pub mod dsh;
 pub mod files;
 pub mod gemini;
-pub mod opencode;
-pub mod pi;
-pub mod qoder;
 /// A real chat turn on Misty's own path, for the ignored live tests of `/tasks` and `/approve`.
 #[cfg(all(test, unix))]
 mod live_turn;
+pub mod opencode;
+pub mod pi;
+pub mod qoder;
 
 /// Where a listed command runs.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]

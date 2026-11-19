@@ -42,7 +42,9 @@ pub(crate) async fn apply(command: &mut Command) {
     let mut known = HashMap::new();
     let mut unknown = Vec::new();
     {
-        let mut cache = CACHE.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let mut cache = CACHE
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         cache.retain(|_, (at, _)| at.elapsed() < CACHE_TTL);
         for key in missing {
             match cache.get(&key) {
@@ -59,7 +61,9 @@ pub(crate) async fn apply(command: &mut Command) {
         };
         if let Some(resolved) = resolve_from_shell(&probe, &unknown).await {
             let now = Instant::now();
-            let mut cache = CACHE.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+            let mut cache = CACHE
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
             for key in unknown {
                 let value = resolved.get(&key).cloned();
                 cache.insert(key.clone(), (now, value.clone()));

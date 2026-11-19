@@ -141,8 +141,7 @@ function RepoDialog({
           <Button
             size="lg"
             variant="primary"
-            loading={busy}
-            disabled={!owner.trim() || !name.trim()}
+            disabled={!owner.trim() || !name.trim() || busy}
             onClick={() => void add()}
           >
             {t("repos.add")}

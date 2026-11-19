@@ -22,7 +22,7 @@ fn query_rows<T>(
     Ok(out)
 }
 
-fn list_sessions_from(db: &crate::engines::support::db::Db) -> Result<Vec<SessionMeta>, String> {
+pub(crate) fn list_sessions_from(db: &crate::engines::support::db::Db) -> Result<Vec<SessionMeta>, String> {
     query_rows(
         db,
         "SELECT s.engine, s.session_id, s.workspace_path, s.file_path, s.file_size, s.file_mtime_ms,
@@ -101,7 +101,11 @@ fn rename_session_in(
     Ok(())
 }
 
-fn session_file(db: &crate::engines::support::db::Db, engine: &str, session_id: &str) -> Option<String> {
+fn session_file(
+    db: &crate::engines::support::db::Db,
+    engine: &str,
+    session_id: &str,
+) -> Option<String> {
     db.read()
         .query_row(
             "SELECT file_path FROM cli_sessions WHERE engine=?1 AND session_id=?2",

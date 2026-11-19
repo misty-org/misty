@@ -29,25 +29,33 @@ mod agent_servers;
 
 pub(crate) use agent_servers::agent_servers;
 
+#[path = "mcp_tools.rs"]
+mod tools;
+
+pub(crate) use tools::names_misty_tool;
+use tools::*;
+
 /// The tools Misty's own agent is offered, in MCP's shape already.
 const CATALOG: &str = include_str!("../agents/runs/local_prompt/catalog.json");
 
 /// The families of tools that work on a Space. An outside engine brings its own tools for files
 /// on disk, the shell and the web; these are what only Misty has. `integration.` is the person's
-/// connected apps (`agents/connected_apps`), signed in once in Misty for every engine, and
-/// `studio.` the engine's own figure in the studio, which the person watches it work as.
-const SPACE_TOOLS: [&str; 11] = [
+/// connected apps (`agents/connected_apps`), signed in once in Misty for every engine.
+const SPACE_TOOLS: [&str; 14] = [
     "space.",
     "note.",
     "file.",
     "thread.",
     "message.",
     "drawing.",
+    "deck.",
+    "workbook.",
     "image.",
+    "video.",
+    "media.",
     "search.",
     "item.",
     "integration.",
-    "studio.",
 ];
 
 /// Misty's browser, as an engine drives it: a tab of its own that the person watches and can take
@@ -80,11 +88,6 @@ browser_request_user_action instead of asking in text.";
 const APPS_INSTRUCTIONS: &str = "The integration_* tools reach the apps the user connected in \
 Misty (such as Notion, Linear or Gmail), signed in as them: find a tool with integration_search, \
 then run it with integration_execute. Prefer them to the app's web page.";
-/// The engine's figure in Misty's studio, so "take a coffee break" is something it does.
-const STUDIO_INSTRUCTIONS: &str = "The person watches you as a figure in Misty's studio, a \
-virtual office. When they tell you to go somewhere or take a break (\"go to your desk and work \
-on...\", \"take a coffee break\", \"come here\"), call studio_go, then carry on with the work they \
-asked for.";
 /// browser_run's file for an engine: the program's value is written in the run's folder, so page
 /// data reaches a file without the model typing it out again.
 const SAVE_AS: &str = "saveAs";
@@ -98,6 +101,9 @@ tab you open stays open, and each one costs the person's computer memory, until 
 const SAVED_PREVIEW_CHARS: usize = 1_200;
 const ASK_MISTY: &str = "ask_misty";
 const MISTY_WAIT: &str = "misty_wait";
+/// Offers the person "Open in Code" for this chat (`engines/open_in_code.rs`): the app shows a card
+/// under the reply, and the person decides. Nothing moves until they do.
+const OPEN_IN_CODE: &str = "open_in_code";
 
 const INSTRUCTIONS: &str = "These tools reach the Misty Space this chat belongs to: its notes, \
 files, drawings and threads, shared with the people in it. Save anything worth keeping to the \
@@ -123,264 +129,6 @@ fn tokens() -> std::sync::MutexGuard<'static, HashMap<String, String>> {
     TOKENS
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner())
-}
-
-/// MCP clients accept only letters, digits, `_` and `-` in a tool's name.
-fn wire_name(name: &str) -> String {
-    name.replace('.', "_")
-}
-
-fn is_space_tool(name: &str) -> bool {
-    SPACE_TOOLS.iter().any(|family| name.starts_with(family))
-}
-
-fn is_browser_tool(name: &str) -> bool {
-    BROWSER_TOOLS.contains(&name)
-}
-
-/// A tool as an engine sees it. Opening a screen is described for an engine and always opens a tab
-/// of the run's own: the desktop and the person's tabs are not offered here.
-fn offered_tool(tool: &Value) -> Value {
-    let name = tool["name"].as_str().unwrap_or("");
-    let mut offered = json!({
-        "name": wire_name(name),
-        "description": tool["description"],
-        "inputSchema": tool["inputSchema"],
-        "annotations": tool["annotations"],
-    });
-    if name == "screen.open" {
-        offered["description"] = json!(SCREEN_OPEN);
-        if let Some(properties) = offered["inputSchema"]["properties"].as_object_mut() {
-            properties.remove("target");
-        }
-    }
-    if name == "browser.run" {
-        offered["description"] = json!(format!(
-            "{}{SAVE_AS_HINT}",
-            tool["description"].as_str().unwrap_or("")
-        ));
-        if let Some(properties) = offered["inputSchema"]["properties"].as_object_mut() {
-            properties.insert(
-                SAVE_AS.into(),
-                json!({
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 200,
-                    "description": "A file in your working folder to write the program's return value to.",
-                }),
-            );
-        }
-    }
-    offered
-}
-
-/// Where `saveAs` writes: a relative path inside the run's folder, never one that leaves it.
-fn save_path(folder: &std::path::Path, name: &str) -> Result<std::path::PathBuf, String> {
-    let relative = std::path::Path::new(name.trim());
-    let inside = !name.trim().is_empty()
-        && relative
-            .components()
-            .all(|part| matches!(part, std::path::Component::Normal(_)));
-    if !inside {
-        return Err(format!(
-            "saveAs must name a file inside your working folder, such as \"outputs/data.json\"; \
-{name:?} doesn't. Nothing was run."
-        ));
-    }
-    Ok(folder.join(relative))
-}
-
-/// Writes a finished program's value (or its notes, when it returned nothing) to `path`, and puts
-/// the path, size and a preview where the value was.
-fn save_value(path: &std::path::Path, output: &mut Value) -> Result<(), String> {
-    let saved = match &output["value"] {
-        Value::Null => output["notes"].clone(),
-        value => value.clone(),
-    };
-    let text = match &saved {
-        Value::String(text) => text.clone(),
-        value => serde_json::to_string_pretty(value).unwrap_or_default(),
-    };
-    let failed = |error: std::io::Error| {
-        format!(
-            "The program ran, but Misty couldn't write {}: {error}",
-            path.display()
-        )
-    };
-    if let Some(parent) = path.parent() {
-        file_access::fs::create_dir_all(parent).map_err(failed)?;
-    }
-    file_access::fs::write(path, &text).map_err(failed)?;
-    let preview: String = text.chars().take(SAVED_PREVIEW_CHARS).collect();
-    output["value"] = json!({
-        "savedTo": path.display().to_string(),
-        "bytes": text.len(),
-        "preview": preview,
-        "previewCut": preview.len() < text.len(),
-    });
-    Ok(())
-}
-
-/// A picture in a result (`data:image/...;base64,...`) as an MCP image block.
-fn image_block(url: &str) -> Option<Value> {
-    let (media_type, data) = url.strip_prefix("data:")?.split_once(";base64,")?;
-    media_type
-        .starts_with("image/")
-        .then(|| json!({ "type": "image", "data": data, "mimeType": media_type }))
-}
-
-/// A tool's result as MCP content. Pictures (`browser_visual`'s `image`, a step's
-/// `displayCaptures`) go as image blocks the engine sees, as Misty's own agent gets them
-/// (`agents/runs/model_tools.rs`, `visual_tool_output`); as text they were a base64 string far
-/// over an engine's limit for one result, which it set aside unread.
-fn result_content(mut value: Value) -> Value {
-    let mut pictures = Vec::new();
-    if let Some(image) = value.get_mut("image").and_then(Value::as_object_mut) {
-        if let Some(block) = image
-            .get("dataUrl")
-            .and_then(Value::as_str)
-            .and_then(image_block)
-        {
-            image.remove("dataUrl");
-            pictures.push(block);
-        }
-    }
-    if let Some(captures) = value
-        .get_mut("displayCaptures")
-        .and_then(Value::as_array_mut)
-    {
-        for capture in captures.iter_mut() {
-            let Some(block) = capture["dataUrl"].as_str().and_then(image_block) else {
-                continue;
-            };
-            pictures.push(json!({
-                "type": "text",
-                "text": format!(
-                    "{} screenshot: {} x {} pixels, top-left origin",
-                    capture["name"].as_str().unwrap_or("Screen"),
-                    capture["width"],
-                    capture["height"],
-                ),
-            }));
-            pictures.push(block);
-            if let Some(fields) = capture.as_object_mut() {
-                fields.remove("dataUrl");
-            }
-        }
-    }
-    let mut content = vec![json!({ "type": "text", "text": value.to_string() })];
-    content.extend(pictures);
-    json!({ "content": content })
-}
-
-fn tool_error(text: String) -> Value {
-    json!({ "isError": true, "content": [{ "type": "text", "text": text }] })
-}
-
-fn space_tools() -> &'static Vec<Value> {
-    static TOOLS: LazyLock<Vec<Value>> = LazyLock::new(|| {
-        let catalog: Vec<Value> = serde_json::from_str(CATALOG).unwrap_or_default();
-        let mut tools: Vec<Value> = catalog
-            .iter()
-            .filter(|tool| {
-                tool["name"]
-                    .as_str()
-                    .is_some_and(|name| is_space_tool(name) || is_browser_tool(name))
-            })
-            .map(offered_tool)
-            .collect();
-        tools.push(json!({
-            "name": ASK_MISTY,
-            "description": "Hand a task to Misty's own agent, which works on its own in the \
-background. State the finished result fully: it does not see this conversation. Waits up to about four minutes, then returns what is still \
-running so you can call misty_wait.",
-            "inputSchema": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": ["goal"],
-                "properties": {
-                    "goal": { "type": "string", "minLength": 1, "maxLength": 4000 },
-                    "context": {
-                        "type": "string",
-                        "maxLength": 8000,
-                        "description": "Facts, URLs or constraints it needs.",
-                    },
-                },
-            },
-        }));
-        tools.push(json!({
-            "name": MISTY_WAIT,
-            "description": "Wait up to about four minutes for work handed to Misty with ask_misty, \
-        and return its state and answer.",
-            "inputSchema": { "type": "object", "additionalProperties": false, "properties": {} },
-        }));
-        tools
-    });
-    &TOOLS
-}
-
-/// Whether an engine's request names one of this server's tools. Each engine spells it its own
-/// way (`mcp__misty__note_read`, `misty_note_read`, a title with the server beside it), so this
-/// looks for the server's name together with a tool this server offers, in the name the engine
-/// gave or in the call it described.
-pub(crate) fn names_misty_tool(tool: &str, call: &Value) -> bool {
-    let named = |text: &str| {
-        let text = text.to_ascii_lowercase();
-        text.contains("misty")
-            && space_tools()
-                .iter()
-                .filter_map(|offered| offered["name"].as_str())
-                .any(|name| text.contains(name))
-    };
-    named(tool) || named(&call.to_string())
-}
-
-/// Whether an engine's request is for one of the studio tools, which only move its own figure, so
-/// they go ahead while a chat plans too. Only the tool's own name counts (`mcp__misty__studio_go`,
-/// `misty_studio_go`), never what its input says, so no call that changes something passes for one.
-pub(crate) fn names_studio_tool(tool: &str) -> bool {
-    let tool = tool.trim().to_ascii_lowercase();
-    tool.contains("misty")
-        && space_tools()
-            .iter()
-            .filter_map(|offered| offered["name"].as_str())
-            .filter(|name| name.starts_with("studio_"))
-            .any(|name| tool.ends_with(name))
-}
-
-/// Misty's own name for a tool an engine called, and the input Misty's tool takes.
-fn misty_call(name: &str, arguments: Value) -> Option<(String, Value)> {
-    if name == ASK_MISTY {
-        let mut task = json!({ "goal": arguments["goal"] });
-        if let Some(context) = arguments["context"]
-            .as_str()
-            .filter(|text| !text.is_empty())
-        {
-            task["context"] = json!(context);
-        }
-        return Some((
-            "agent.delegate".into(),
-            json!({ "tasks": [task], "browser": true }),
-        ));
-    }
-    if name == MISTY_WAIT {
-        return Some(("agent.wait".into(), json!({})));
-    }
-    let catalog: Vec<Value> = serde_json::from_str(CATALOG).unwrap_or_default();
-    catalog.iter().find_map(|tool| {
-        let known = tool["name"].as_str()?;
-        if !(is_space_tool(known) || is_browser_tool(known)) || wire_name(known) != name {
-            return None;
-        }
-        let mut input = arguments.clone();
-        // A screen an engine opens is always a tab of its own.
-        if known == "screen.open" {
-            if let Some(fields) = input.as_object_mut() {
-                fields.remove("target");
-            }
-        }
-        Some((known.to_string(), input))
-    })
 }
 
 fn reply(id: &Value, result: Value) -> Response {
@@ -426,7 +174,7 @@ impl Caller {
         } else {
             INSTRUCTIONS
         };
-        let base = format!("{space} {APPS_INSTRUCTIONS} {STUDIO_INSTRUCTIONS}");
+        let base = format!("{space} {APPS_INSTRUCTIONS}");
         if self.computer() {
             format!("{base} {}", crate::computer_use::tools::INSTRUCTIONS)
         } else {
@@ -469,6 +217,24 @@ async fn call_tool(app: &AppHandle, caller: &Caller, params: &Value) -> Value {
         let arguments = params["arguments"].clone();
         return crate::computer_use::tools::call(app, &caller.run_id, name, arguments).await;
     }
+    // The offer is the card the app draws from this call; the person answers it there.
+    if name == OPEN_IN_CODE {
+        return json!({
+            "content": [{
+                "type": "text",
+                "text": "Misty showed the person an Open in Code card. They choose where the \
+project goes and confirm it; until then, carry on in this chat and don't move any files.",
+            }],
+        });
+    }
+    // Claude Code names its own id for the call; the chat's row for it is found by that id even
+    // when the engine's stream never showed the call start (a helper agent's).
+    let wire = params["_meta"]["claudecode/toolUseId"]
+        .as_str()
+        .filter(|id| !id.is_empty());
+    if let Some(wire) = wire {
+        super::bridge::note_mcp_call(wire, &format!("mcp__misty__{name}"), &params["arguments"]);
+    }
     let offered = caller.offers(&json!({ "name": name }));
     let found = offered
         .then(|| misty_call(name, params["arguments"].clone()))
@@ -493,11 +259,16 @@ async fn call_tool(app: &AppHandle, caller: &Caller, params: &Value) -> Value {
         }
     };
     let run_id = caller.run_id.clone();
+    let drives_browser = tool.starts_with("browser.") || tool.starts_with("screen.");
     let host = AppToolHost { app: app.clone() };
     let outcome = host
         .call(LocalToolCall {
             run_id,
-            call_id: format!("mcp_{}", uuid::Uuid::new_v4().simple()),
+            // The engine's own id when it gave one, so the browser log's rows for this call line
+            // up with the chat's row for it (activity steps are keyed by that id).
+            call_id: wire
+                .map(str::to_string)
+                .unwrap_or_else(|| format!("mcp_{}", uuid::Uuid::new_v4().simple())),
             turn: 0,
             name: tool,
             input,
@@ -505,6 +276,12 @@ async fn call_tool(app: &AppHandle, caller: &Caller, params: &Value) -> Value {
         .await;
     match outcome {
         LocalToolOutcome::Result(mut value) => {
+            if drives_browser
+                && value.is_object()
+                && crate::agents::run_control::take_over::take_returned(&caller.run_id)
+            {
+                value["handedBack"] = json!(crate::agents::run_control::take_over::HANDED_BACK);
+            }
             if let Some(path) = save_to.filter(|_| value["ok"] == true) {
                 if let Err(message) = save_value(&path, &mut value) {
                     return tool_error(message);

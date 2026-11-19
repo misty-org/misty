@@ -37,7 +37,11 @@ fn sign_in_comes_from_the_cli_answer() {
         (Some(false), Some("Account: Not logged in".into()))
     );
     assert_eq!(
-        parse_sign_in(&output("You are not authenticated.\n\nDefault model: grok-4.6", 0)).0,
+        parse_sign_in(&output(
+            "You are not authenticated.\n\nDefault model: grok-4.6",
+            0
+        ))
+        .0,
         Some(false)
     );
     assert!(sign_in_status_args("claude").is_some());

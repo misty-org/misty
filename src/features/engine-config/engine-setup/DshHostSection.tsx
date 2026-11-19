@@ -17,7 +17,7 @@ import {
   DesktopSettingsRowSkeleton,
   DesktopSettingsSection as Section,
 } from "@/features/settings";
-import { Badge, Button, cn, Input, Surface, Switch, Text } from "@/shared/ui";
+import { Badge, Button, cn, ErrorState, Input, Surface, Switch, Text } from "@/shared/ui";
 import { CliUpdateDialog } from "../clis/CliUpdateDialog";
 import { useCliUpdateFlow } from "../clis/useCliUpdateFlow";
 import { binKey, dshHostApi, useEngineSettings, type DshHostStatus } from "./api";
@@ -205,7 +205,7 @@ function HostCard({
 /** The DeepSeek Harness host and its connection settings. */
 export function DshHostSection() {
   const probe = useDshHostProbe();
-  const { settings, save } = useEngineSettings();
+  const { settings, loadError, retry, save } = useEngineSettings();
   const [saveError, setSaveError] = useState<string | null>(null);
   const [hostDraft, setHostDraft] = useState<string | null>(null);
   const [portDraft, setPortDraft] = useState<string | null>(null);
@@ -332,6 +332,13 @@ export function DshHostSection() {
               />
             </DesktopSettingsRow>
           </>
+        ) : loadError ? (
+          <ErrorState
+            inline
+            title="Couldn't read the engine's settings"
+            line={loadError}
+            action={{ label: "Try again", onClick: retry }}
+          />
         ) : (
           // The three rows it stands for: the program path's Choose, the address fields and
           // the switch.

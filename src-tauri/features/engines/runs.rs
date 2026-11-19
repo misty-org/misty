@@ -19,14 +19,18 @@ use tauri::{AppHandle, Manager};
 use crate::agents::run_control::engine_modes;
 use crate::agents::run_control::tool_policy::RunFacts;
 use crate::app::runtime::MistyRuntime;
-use crate::browser::agent_pages::action_confirm::{ask_tool, Answer, ToolAsk};
 
 use super::bridge::{self, RunNote};
-use super::gate::Decision;
 use super::run_prompt::{
     save_files, save_images, with_attached_files, with_browser_hint, with_history, with_teammates,
 };
 use super::{store, support};
+
+#[path = "runs_permission.rs"]
+mod permission;
+use permission::decide;
+#[cfg(test)]
+use permission::summarize;
 
 /// A live run: the request it started with, and what to tidy when it ends.
 struct LiveRun {
@@ -139,98 +143,6 @@ pub fn stop_all() {
     }
 }
 
-/// Whether the engine may go ahead with what it asked for. Auto runs don't stop for ordinary
-/// work, a plan changes nothing, Bypass never asks (the engine skips its own asks), and in Ask
-/// the person answers the same question Misty's own agent would raise.
-async fn decide(app: &AppHandle, run_id: &str, tool: &str, input: &Value) -> Decision {
-    let Some(body) = request_of(run_id) else {
-        return Decision::Deny("This run has ended.".into());
-    };
-    let facts = RunFacts::of_request(run_id, &body);
-    // A call into Misty's own server is journaled and gated there, under this run's mode, so the
-    // person isn't asked once here and once more by the tool itself. A plan still changes nothing,
-    // though the agent may still move its figure in the studio.
-    let misty = super::mcp::names_misty_tool(tool, input);
-    if misty && (!facts.planning || super::mcp::names_studio_tool(tool)) {
-        return Decision::Allow;
-    }
-    match (facts.planning, facts.auto) {
-        (true, _) => Decision::Deny(
-            "This chat is planning, so nothing is changed yet. Finish the plan instead.".into(),
-        ),
-        (false, true) => Decision::Allow,
-        (false, false) => {
-            let about = summarize(input);
-            let control = if about.is_empty() {
-                tool.to_string()
-            } else {
-                format!("{tool}: {about}")
-            };
-            let answer = ask_tool(
-                app,
-                ToolAsk {
-                    account: &facts.account,
-                    kind: "action",
-                    control: &control,
-                    reason: "This chat asks before an agent changes files or runs a command.",
-                    site: "",
-                    agent_id: &facts.agent_id,
-                    task_id: &facts.task_id,
-                },
-            )
-            .await;
-            match answer {
-                Answer::Allowed => Decision::Allow,
-                Answer::Refused => Decision::Deny(
-                    "The person declined this. Do not retry it; continue without it or ask them."
-                        .into(),
-                ),
-                Answer::Unanswered => Decision::Deny("Nobody answered in time.".into()),
-            }
-        }
-    }
-}
-
-/// What a permission ask is about, in one line. Engines spell the same field differently
-/// (`file_path`, `filePath`, Antigravity's `Path` and `CommandLine`), so keys are matched without
-/// case or underscores.
-fn summarize(input: &Value) -> String {
-    let fields = input.as_object();
-    let named = |name: &str| {
-        fields?.iter().find_map(|(key, value)| {
-            let key = key.replace('_', "").to_ascii_lowercase();
-            (key == name).then_some(value)
-        })
-    };
-    let names = [
-        "command",
-        "commandline",
-        "filepath",
-        "path",
-        "targetfile",
-        "absolutepath",
-        "url",
-        "pattern",
-        "query",
-    ];
-    let field = names
-        .iter()
-        .find_map(|name| named(name)?.as_str())
-        .map(str::to_string)
-        .or_else(|| {
-            named("command")?
-                .as_array()
-                .and_then(|parts| parts.last()?.as_str())
-                .map(str::to_string)
-        })
-        .unwrap_or_default();
-    let mut text: String = field.chars().take(600).collect();
-    if field.chars().count() > 600 {
-        text.push('…');
-    }
-    text
-}
-
 /// Opens the engine layer with its events going to the bridge, and installs the gate's decider.
 /// Called once as the app starts.
 pub(crate) fn install(app: &AppHandle) -> Result<support::EngineState, String> {
@@ -317,12 +229,23 @@ fn note(run_id: &str, note: RunNote) {
                 for image in run.images {
                     let _ = std::fs::remove_file(image);
                 }
+                // A run with no chat worked in a scratch folder of its own (`chat_folder.rs`).
+                if run.conversation.is_empty() {
+                    if let Some(app) = APP.get() {
+                        let db = app.state::<MistyRuntime>().environment.store();
+                        super::chat_folder::end_run(&db, run_id);
+                    }
+                }
             }
             STOPPED
                 .lock()
                 .unwrap_or_else(|poisoned| poisoned.into_inner())
                 .remove(run_id);
             super::mcp::forget(run_id);
+            SPACE_DIRS
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .remove(run_id);
             crate::agents::run_control::take_over::release(run_id);
         }
     }
@@ -330,15 +253,18 @@ fn note(run_id: &str, note: RunNote) {
 
 static APP: std::sync::OnceLock<AppHandle> = std::sync::OnceLock::new();
 
-/// Where an engine works when the chat names no folder: `~/.misty/shared/projects`, made on first
-/// use and shared by every build, since the engines know their sessions by its path. Not a data
-/// folder of its own, which holds Misty's database and credential store.
-fn default_workspace() -> Result<PathBuf, String> {
-    let folder = file_access::paths::misty_shared_dir("projects")
-        .ok_or("Misty couldn't find your home folder.")?;
-    std::fs::create_dir_all(&folder)
-        .map_err(|error| format!("Misty couldn't make {}: {error}", folder.display()))?;
-    Ok(folder)
+/// Each running turn's Space folders: the shared folders of its Space downloaded on this computer,
+/// which its engine may read beside its own folder (`launch_dirs`). Gone when the run ends.
+static SPACE_DIRS: std::sync::LazyLock<std::sync::Mutex<HashMap<String, Vec<String>>>> =
+    std::sync::LazyLock::new(Default::default);
+
+pub(super) fn space_dirs(run_id: &str) -> Vec<String> {
+    SPACE_DIRS
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .get(run_id)
+        .cloned()
+        .unwrap_or_default()
 }
 
 /// Starts a turn on the engine the request names. Returns once it is running; its events follow.
@@ -351,14 +277,11 @@ pub(crate) async fn start(app: &AppHandle, run_id: String, body: Value) -> Resul
     let state = support::state().ok_or_else(super::not_ready)?;
     // An engine Misty installed in shared/engines is brought up to this build's minimum first; a
     // failed update leaves the run on the version that is there.
-    if let Err(error) =
-        crate::engine_config::cli_lifecycle::upkeep::ensure_minimum(&engine).await
-    {
+    if let Err(error) = crate::engine_config::cli_lifecycle::upkeep::ensure_minimum(&engine).await {
         eprintln!("[engines] updating {engine} before the run failed: {error}");
     }
     let facts = RunFacts::of_request(&run_id, &body);
     let named = body["engine"]["folder"].as_str().unwrap_or("").to_string();
-    let agent_name = body["agent"]["name"].as_str().unwrap_or("").to_string();
     let db = app.state::<MistyRuntime>().environment.store();
     let conversation = body["conversation_id"].as_str().unwrap_or("").to_string();
     let fresh = body["engine"]["fresh"].as_bool() == Some(true);
@@ -367,31 +290,19 @@ pub(crate) async fn start(app: &AppHandle, run_id: String, body: Value) -> Resul
     // session of its own, which it carries on.
     let companion_turn = body["mode"].as_str() == Some("companion");
     let tutor_voice = tutor_voice(&body);
-    // Every chat with an agent works in that agent's one folder, worked out here in native code
-    // (`agent_folder.rs`): a page can't point an engine at a folder the person didn't choose. A
-    // run with no agent works in Misty's own workspace folder.
-    let (folder, linked, session) = {
-        let (db, account, agent, conversation, engine) = (
+    // Every chat works in its own folder, worked out here in native code (`chat_folder.rs`): the
+    // project the person picked for it, or a scratch folder of its own. A page can't point an
+    // engine at a folder the person didn't choose; a run with no chat gets a scratch folder too.
+    let (folder, session) = {
+        let (db, account, conversation, engine, run) = (
             db.clone(),
             facts.account.clone(),
-            facts.agent_id.clone(),
             conversation.clone(),
             engine.clone(),
+            run_id.clone(),
         );
         tokio::task::spawn_blocking(move || -> Result<_, String> {
-            let (folder, linked) =
-                match super::agent_folder::for_run(&db, &account, &agent, &agent_name, &named)? {
-                    Some(folder) => (folder, true),
-                    None if named.is_empty() => (default_workspace()?, true),
-                    // A run with no agent that names a folder: one the person linked themselves,
-                    // or a multi-run worktree made for this account (multirun.rs).
-                    None => {
-                        let folder = PathBuf::from(&named);
-                        let linked = store::is_linked(&db, &account, &folder).unwrap_or(false)
-                            || super::multirun::is_worktree(&db, &account, &folder);
-                        (folder, linked)
-                    }
-                };
+            let folder = super::chat_folder::for_run(&db, &account, &conversation, &run, &named)?;
             let folder_text = folder.to_string_lossy().into_owned();
             let session = if companion_turn && !tutor_voice {
                 None
@@ -401,14 +312,27 @@ pub(crate) async fn start(app: &AppHandle, run_id: String, body: Value) -> Resul
             } else {
                 store::session(&db, &account, &conversation, &engine, &folder_text)
             };
-            Ok((folder, linked, session))
+            Ok((folder, session))
         })
         .await
         .map_err(|error| error.to_string())??
     };
+    if let Some(space) = body["engine"]["space"].as_str().filter(|space| !space.is_empty()) {
+        let misty_dir = app.state::<MistyRuntime>().environment.misty_dir();
+        let dirs: Vec<String> = crate::spaces_folders::downloaded_folders(&misty_dir, space)
+            .into_iter()
+            .map(|dir| dir.to_string_lossy().into_owned())
+            .collect();
+        if !dirs.is_empty() {
+            SPACE_DIRS
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .insert(run_id.clone(), dirs);
+        }
+    }
     let folder_text = folder.to_string_lossy().into_owned();
-    if !linked || !file_access::fs::is_dir(&folder) {
-        return Err("That folder isn't linked to a Space on this computer.".into());
+    if !file_access::fs::is_dir(&folder) {
+        return Err("That folder isn't one of your projects on this computer.".into());
     }
     let engine_impl = super::engine_by_id(&engine).ok_or("That engine has no adapter.")?;
     // The engine's own mode, checked against what it offers here, and that mode's flags.

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useLinkedFolders } from "../host";
 
-/** The folder whose project config is read: the Space's chosen linked folder, or none. */
+/** The folder whose project config is read: the person's latest project folder, or none. */
 export function useMcpFolder(): [string[], string | null, (folder: string | null) => void] {
   const { folders, picked: chosen } = useLinkedFolders();
   const [picked, setPicked] = useState<string | null | undefined>(undefined);

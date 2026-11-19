@@ -11,8 +11,8 @@
 //! may do is decided by the run's mode in native code (`agents/run_control/engine_modes.rs`), with
 //! every permission ask answered by Misty's own gate (`gate.rs`). See NOTICE.
 
-pub mod agent_folder;
-pub mod agent_folder_history;
+pub mod chat_folder;
+pub mod chat_media;
 pub mod agy;
 mod bridge;
 pub mod catalog;
@@ -53,6 +53,7 @@ mod minimax_acp;
 pub mod models;
 pub mod modes;
 pub mod multirun;
+pub mod open_in_code;
 pub mod opencode;
 pub mod opencode_server;
 mod opencode_session;
@@ -1050,15 +1051,15 @@ async fn send_message_inner_with_sink(
     let followup = (matches!(engine.as_str(), "claude" | "codebuddy")
         && Arc::ptr_eq(&sink, &state.sink))
     .then(|| registry::FollowupPrefs {
-            model: model.clone(),
-            effort: effort.clone(),
-            permission: permission.clone(),
-            provider_id: provider_id.clone(),
-            allowed_tools: allowed_tools.clone(),
-            launch: extras.key.clone(),
-            dirs: launch_dirs(state, run_id.as_deref()),
-            warm: extras.warm,
-        });
+        model: model.clone(),
+        effort: effort.clone(),
+        permission: permission.clone(),
+        provider_id: provider_id.clone(),
+        allowed_tools: allowed_tools.clone(),
+        launch: extras.key.clone(),
+        dirs: launch_dirs(state, run_id.as_deref()),
+        warm: extras.warm,
+    });
     if let Some(prefs) = followup.as_ref() {
         let workspace = PathBuf::from(&workspace_path);
         let images = image_paths.clone().unwrap_or_default();
@@ -1158,6 +1159,10 @@ async fn send_message_inner_with_sink(
 /// reused (`FollowupPrefs::dirs`, `warm::fingerprint`).
 fn launch_dirs(state: &crate::engines::support::EngineState, run_id: Option<&str>) -> Vec<String> {
     let mut dirs = state.db.granted_roots().unwrap_or_default();
+    // The shared folders of the run's Space this computer downloaded (`runs.rs`).
+    if let Some(run_id) = run_id {
+        dirs.extend(runs::space_dirs(run_id));
+    }
     // The documents attached to this turn, so the engine may read them (run_prompt.rs).
     if let Some(run_id) = run_id {
         let attached = run_prompt::attached_files_dir(run_id);
@@ -1472,7 +1477,13 @@ async fn send_host_stream(
     {
         warm::intend(
             &run_id,
-            warm::fingerprint(&engine, &launch.bin, &launch.req, launch.channel, &launch_key),
+            warm::fingerprint(
+                &engine,
+                &launch.bin,
+                &launch.req,
+                launch.channel,
+                &launch_key,
+            ),
         );
     }
     let pid = next_virtual_pid();

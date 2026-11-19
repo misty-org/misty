@@ -33,13 +33,13 @@ export function EngineNextStep({
   return (
     <>
       {state === "failed" ? (
-        <Button icon={RefreshCw} loading={view.loading} onClick={view.refresh}>
+        <Button icon={RefreshCw} disabled={view.loading} onClick={view.refresh}>
           Check again
         </Button>
       ) : state === "install" ? (
         <Button
           icon={Download}
-          loading={view.updating}
+          disabled={view.updating}
           aria-label={`Install ${name}`}
           onClick={() => void flow.begin()}
         >

@@ -204,8 +204,7 @@ async fn turn_inner(
             // it later, making `answer_question` work by either key).
             core.registry
                 .set_stdin(&core.run_id, Arc::clone(&spawned.acp.stdin));
-            let (session_id, effort) = match handshake(&mut spawned.acp, core, req, killed).await
-            {
+            let (session_id, effort) = match handshake(&mut spawned.acp, core, req, killed).await {
                 Ok(opened) => opened,
                 Err(error) => {
                     // ACP is a session protocol: the CLI stays resident after the prompt

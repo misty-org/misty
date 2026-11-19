@@ -14,7 +14,7 @@ import {
   DesktopSettingsRow,
   DesktopSettingsSection as Section,
 } from "@/features/settings";
-import { Button, Input, Skeleton, Switch } from "@/shared/ui";
+import { Button, ErrorState, Input, Skeleton, Switch } from "@/shared/ui";
 import { proxyApi, type ProxySettings } from "./api";
 
 /** The draft when no proxy has been set yet. */
@@ -57,7 +57,8 @@ export function NetworkSection() {
     setEnabledDraft(settings.enabled);
     setUrlDraft(settings.url ?? DEFAULT_PROXY_URL);
   }, [settings]);
-  const loadError = proxy.error && !settings ? errorText(proxy.error) : null;
+  // A proxy never read says so in place of its rows, with Try again.
+  const loadError = proxy.error && !settings && !proxy.loading ? errorText(proxy.error) : null;
 
   // The saved notice goes away by itself; an error stays until the next edit.
   useEffect(() => {
@@ -124,50 +125,63 @@ export function NetworkSection() {
 
   return (
     <>
-      {(error ?? loadError) ? (
-        <DesktopSettingsNotice>{error ?? loadError}</DesktopSettingsNotice>
-      ) : null}
+      {error ? <DesktopSettingsNotice>{error}</DesktopSettingsNotice> : null}
       {notice ? <DesktopSettingsNotice>{notice}</DesktopSettingsNotice> : null}
       <Section title="Proxy">
-        <DesktopSettingsRow
-          label="Use a proxy"
-          description="For the engines Misty starts and its downloads of skills, versions and prices."
-        >
-          {settings ? (
-            <Switch
-              aria-label="Use a proxy"
-              checked={enabledDraft}
-              disabled={saving}
-              onCheckedChange={onToggle}
-            />
-          ) : (
-            <Skeleton className="h-5 w-9 rounded-full" />
-          )}
-        </DesktopSettingsRow>
-        {/* The address only applies while the proxy is on, so it shows only then. */}
-        {enabledDraft ? (
-          <DesktopSettingsRow
-            label="Proxy address"
-            description="http, https or socks5. SOCKS reaches the engines only."
-          >
-            <div className="flex items-center gap-2">
-              <Input
-                aria-label="Proxy address"
-                className="w-64"
-                value={urlDraft}
-                placeholder={DEFAULT_PROXY_URL}
-                disabled={!settings}
-                onChange={(event) => {
-                  setUrlDraft(event.target.value);
-                  setError(null);
-                }}
-              />
-              <Button variant="primary" disabled={!settings || saving || !dirty} onClick={onSave}>
-                Save
-              </Button>
-            </div>
-          </DesktopSettingsRow>
-        ) : null}
+        {loadError ? (
+          <ErrorState
+            inline
+            title="Couldn't read the proxy"
+            line={loadError}
+            action={{ label: "Try again", onClick: () => void proxy.reload() }}
+          />
+        ) : (
+          <>
+            <DesktopSettingsRow
+              label="Use a proxy"
+              description="For the engines Misty starts and its downloads of skills, versions and prices."
+            >
+              {settings ? (
+                <Switch
+                  aria-label="Use a proxy"
+                  checked={enabledDraft}
+                  disabled={saving}
+                  onCheckedChange={onToggle}
+                />
+              ) : (
+                <Skeleton className="h-5 w-9 rounded-full" />
+              )}
+            </DesktopSettingsRow>
+            {/* The address only applies while the proxy is on, so it shows only then. */}
+            {enabledDraft ? (
+              <DesktopSettingsRow
+                label="Proxy address"
+                description="http, https or socks5. SOCKS reaches the engines only."
+              >
+                <div className="flex items-center gap-2">
+                  <Input
+                    aria-label="Proxy address"
+                    className="w-64"
+                    value={urlDraft}
+                    placeholder={DEFAULT_PROXY_URL}
+                    disabled={!settings}
+                    onChange={(event) => {
+                      setUrlDraft(event.target.value);
+                      setError(null);
+                    }}
+                  />
+                  <Button
+                    variant="primary"
+                    disabled={!settings || saving || !dirty}
+                    onClick={onSave}
+                  >
+                    Save
+                  </Button>
+                </div>
+              </DesktopSettingsRow>
+            ) : null}
+          </>
+        )}
       </Section>
     </>
   );

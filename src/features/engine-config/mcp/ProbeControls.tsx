@@ -79,11 +79,7 @@ export function ProbeActionButton({
       disabled={pending}
       onClick={() => void probe(entry, workspacePath)}
     >
-      {pending ? (
-        <Spinner size="sm" label={false} className="size-3.5" />
-      ) : (
-        <Activity aria-hidden />
-      )}
+      <Activity aria-hidden />
     </IconButton>
   );
 }

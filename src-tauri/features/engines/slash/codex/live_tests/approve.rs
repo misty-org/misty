@@ -103,7 +103,10 @@ async fn approve_retries_an_action_the_auto_review_denied() {
         .filter(|warning| warning.contains("/approve"))
         .collect();
     assert!(!notices.is_empty(), "Misty says /approve is there");
-    assert!(!scratch.folder.join(FILE).exists(), "the denied write didn't happen");
+    assert!(
+        !scratch.folder.join(FILE).exists(),
+        "the denied write didn't happen"
+    );
 
     let approved = show(context(&scratch, Some(&thread), ""), "approve")
         .await
@@ -149,7 +152,10 @@ async fn approve_retries_an_action_the_auto_review_denied() {
         .into_iter()
         .filter(|warning| warning.contains("/approve"))
         .collect();
-    assert!(denied_again.is_empty(), "the retry was denied: {denied_again:?}");
+    assert!(
+        denied_again.is_empty(),
+        "the retry was denied: {denied_again:?}"
+    );
     let written = std::fs::read_to_string(scratch.folder.join(FILE)).expect("the retried write");
     assert!(written.contains("hello"), "{written}");
 }

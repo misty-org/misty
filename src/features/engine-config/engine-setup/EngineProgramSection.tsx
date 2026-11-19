@@ -26,6 +26,7 @@ import {
   Dialog,
   DialogContent,
   DialogTitle,
+  ErrorState,
   Input,
   IconButton,
   Surface,
@@ -320,7 +321,7 @@ function CustomModelsRow({
 
 /** The engine's program path (or Codex's home) and its custom models. */
 export function EngineProgramSection({ engine }: { engine: EngineId }) {
-  const { settings, save } = useEngineSettings();
+  const { settings, loadError, retry, save } = useEngineSettings();
   return (
     <Section title="Program">
       {settings ? (
@@ -331,6 +332,13 @@ export function EngineProgramSection({ engine }: { engine: EngineId }) {
           {engine === "codex" ? <CodexHomeRow settings={settings} save={save} /> : null}
           <CustomModelsRow engine={engine} settings={settings} save={save} />
         </>
+      ) : loadError ? (
+        <ErrorState
+          inline
+          title="Couldn't read the engine's settings"
+          line={loadError}
+          action={{ label: "Try again", onClick: retry }}
+        />
       ) : (
         // The rows it stands for: the program path (or Codex home) and custom models, each ending
         // in its button. DeepSeek Harness keeps its path beside the host, so it has one row.

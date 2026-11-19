@@ -83,3 +83,34 @@ fn failed_results_are_recognised() {
     assert!(result_failed(&json!({ "success": false })).is_some());
     assert!(result_failed(&json!("ok")).is_none());
 }
+
+#[test]
+fn a_result_for_a_call_never_seen_settles_no_other_row() {
+    let open = |wire: Option<&str>, name: &str| OpenTool {
+        wire: wire.map(str::to_string),
+        name: name.to_string(),
+        id: wire.unwrap_or(name).to_string(),
+        started: Instant::now(),
+    };
+    let view = RunView {
+        tools: vec![
+            open(Some("toolu_lamer"), "mcp__misty__browser_navigate"),
+            open(None, "mcp__misty__browser_run"),
+        ],
+        ..RunView::default()
+    };
+    assert_eq!(find_tool(&view, Some("toolu_lamer"), ""), Some(0));
+    // A helper's call this run never saw start, with no name to go by.
+    assert_eq!(find_tool(&view, Some("toolu_dior"), ""), None);
+    // One with a name may only be a row that came without an id.
+    assert_eq!(
+        find_tool(&view, Some("toolu_dior"), "mcp__misty__browser_navigate"),
+        None
+    );
+    assert_eq!(
+        find_tool(&view, Some("toolu_dior"), "mcp__misty__browser_run"),
+        Some(1)
+    );
+    // Engines that give no ids still pair by name.
+    assert_eq!(find_tool(&view, None, "mcp__misty__browser_run"), Some(1));
+}

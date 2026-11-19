@@ -6,7 +6,7 @@
  */
 import { RefreshCw } from "lucide-react";
 import { useMemo, useState } from "react";
-import { Badge, Button, cn, Skeleton, SkeletonControl, Spinner, Text } from "@/shared/ui";
+import { Badge, Button, cn, Skeleton, SkeletonControl, Text } from "@/shared/ui";
 import { EmptyLine, InlineError } from "./components";
 import { t } from "./strings";
 import type { SkillActivityEntry, SkillUsageResult } from "./types";
@@ -253,7 +253,7 @@ export function SkillUsagePane() {
             {t("usage.invocations")}
           </Text>
           <Button disabled={usage.usageLoading || refreshing} onClick={refresh}>
-            {refreshing ? <Spinner size="sm" label={false} /> : <RefreshCw aria-hidden />}
+            <RefreshCw aria-hidden />
             {t("common.refresh")}
           </Button>
         </div>

@@ -2,7 +2,7 @@ import { Check } from "lucide-react";
 import { useEffect, type KeyboardEvent } from "react";
 import { EngineMark, hasEngineMark } from "@/features/engine-config/EngineMark";
 import { ENGINE_NAMES, type EngineId } from "@/features/engine-config/channels";
-import { cn, Skeleton, Surface, Text } from "@/shared/ui";
+import { cn, SetupState, Surface, Text } from "@/shared/ui";
 import { useEngineReadiness } from "./engineReadiness";
 import { EngineNextStep } from "./EngineNextStep";
 
@@ -86,7 +86,13 @@ export function EngineSetupRow({
         ) : null}
       </span>
       {state === "checking" ? (
-        <Skeleton aria-label={`Checking ${name}`} className="h-8 w-22 rounded-md" />
+        <SetupState
+          size="row"
+          tool="check"
+          label={`Checking ${name}`}
+          onRetry={view.refresh}
+          className="shrink-0"
+        />
       ) : state !== "ready" ? null : onChoose && unfit ? (
         <Text bare size="meta" tone="muted" className="shrink-0">
           Can't run Misty's own work

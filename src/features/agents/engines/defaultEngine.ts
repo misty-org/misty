@@ -69,7 +69,12 @@ export function useDefaultEngine() {
     const value = document?.[settingSection]?.[settingKey];
     return typeof value === "string" ? value : "";
   });
-  return resolveDefaultEngine(engines.data ?? undefined, saved);
+  return {
+    ...resolveDefaultEngine(engines.data ?? undefined, saved),
+    /** The engine list couldn't be read and there is none to show. */
+    failed: !engines.data && !engines.loading && Boolean(engines.error),
+    retry: () => void engines.reload(),
+  };
 }
 
 /**

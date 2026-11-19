@@ -32,7 +32,7 @@ import {
   FieldError,
   Input,
   Label,
-  Skeleton,
+  SetupState,
   Spinner,
   Surface,
   Text,
@@ -147,6 +147,8 @@ function SignInTerminal({ request, onClose }: { request: SignInRequest; onClose:
   const [ended, setEnded] = useState<boolean | null>(null);
   const [details, setDetails] = useState(false);
   const [codeSent, setCodeSent] = useState(false);
+  // Trying again makes the terminal again, which starts the CLI once more.
+  const [attempt, setAttempt] = useState(0);
   const name = engineName(request.engine);
   const signOut = Boolean(request.signOut);
   const title = signOut ? `Sign out of ${name}` : `Sign in to ${name}`;
@@ -173,6 +175,14 @@ function SignInTerminal({ request, onClose }: { request: SignInRequest; onClose:
     line = `Signing you in to ${name}. If nothing happens, Show details has what it says.`;
   else line = signInSteps(started, request.engine, signOut, request.provider);
 
+  const retry = () => {
+    setStarted(null);
+    setStartError(null);
+    setEnded(null);
+    setCodeSent(false);
+    setAttempt((value) => value + 1);
+  };
+
   // Done on a sign-in answered in the CLI's own screen says the person finished it there.
   const finish = async () => {
     const id = idRef.current;
@@ -194,15 +204,8 @@ function SignInTerminal({ request, onClose }: { request: SignInRequest; onClose:
           <div className="flex items-start gap-3" role="status">
             {codeSent && running ? <Spinner label={false} className="mt-0.5" /> : null}
             {line === null ? (
-              // The sentence it stands for wraps to two body lines (22px each).
-              <div className="grid min-w-0 flex-1">
-                <div className="flex h-5.5 items-center">
-                  <Skeleton className="h-4 w-full" />
-                </div>
-                <div className="flex h-5.5 items-center">
-                  <Skeleton className="h-4 w-1/2" />
-                </div>
-              </div>
+              // The CLI is starting in its terminal; what to do follows once it has.
+              <SetupState size="row" tool="sign-in" onRetry={retry} />
             ) : (
               <Text size="body" tone={startError === null ? undefined : "danger"} wrap>
                 {line}
@@ -228,7 +231,13 @@ function SignInTerminal({ request, onClose }: { request: SignInRequest; onClose:
             </CollapsibleTrigger>
             {/* Mounted while folded, so the CLI keeps running behind it. */}
             <CollapsibleContent forceMount className="grid gap-3 pt-3">
-              <CliTerminal height={300} start={start} onEnded={setEnded} />
+              <CliTerminal
+                key={attempt}
+                height={300}
+                start={start}
+                onEnded={setEnded}
+                onError={setStartError}
+              />
             </CollapsibleContent>
           </Collapsible>
         </div>
@@ -305,7 +314,7 @@ function CodeField({ onSubmit }: { onSubmit: (code: string) => Promise<void> }) 
             setError(null);
           }}
         />
-        <Button type="submit" variant="primary" loading={sending}>
+        <Button type="submit" variant="primary" disabled={sending}>
           Continue
         </Button>
       </div>
@@ -317,22 +326,26 @@ function CodeField({ onSubmit }: { onSubmit: (code: string) => Promise<void> }) 
 /**
  * The terminal native code runs for a sign-in: the line that runs, then the program's screen,
  * which the person types into. `start` is called once, as the terminal mounts; unmounting ends
- * the program. `onEnded` gets whether it exited cleanly.
+ * the program. `onEnded` gets whether it exited cleanly; `onError` gets why it couldn't start.
  */
 export function CliTerminal({
   start,
   onEnded,
+  onError,
   height = 380,
 }: {
   start: (id: string, cols: number, rows: number) => Promise<{ command: string }>;
   onEnded: (ok: boolean) => void;
+  onError?: (message: string) => void;
   height?: number;
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const startRef = useRef(start);
   const endedRef = useRef(onEnded);
+  const errorRef = useRef(onError);
   useEffect(() => {
     endedRef.current = onEnded;
+    errorRef.current = onError;
   });
   const [command, setCommand] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -403,7 +416,11 @@ export function CliTerminal({
         setReady(true);
         live.focus();
       } catch (reason) {
-        if (!disposed) setError(errorText(reason));
+        if (disposed) return;
+        // xterm, the listener or the CLI failing ends the setup where the dialog says so too.
+        const message = errorText(reason);
+        setError(message);
+        errorRef.current?.(message);
       }
     })();
 
@@ -423,9 +440,7 @@ export function CliTerminal({
         <Text size="caption" tone="muted" wrap>
           {command}
         </Text>
-      ) : error ? null : (
-        <Skeleton className="h-4 w-1/3" />
-      )}
+      ) : null}
       <Surface
         tone="card"
         edge="hairline"
@@ -434,7 +449,11 @@ export function CliTerminal({
         style={{ height }}
       >
         <div ref={hostRef} className="size-full" />
-        {!ready && !error ? <Skeleton className="absolute inset-2" /> : null}
+        {!ready && !error ? (
+          <div className="absolute inset-2">
+            <SetupState tool="terminal" />
+          </div>
+        ) : null}
       </Surface>
       {error ? (
         <Text role="alert" tone="muted" wrap className="text-sm">

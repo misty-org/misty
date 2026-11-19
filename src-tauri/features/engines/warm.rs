@@ -295,8 +295,10 @@ pub(crate) fn take_acp(
         warm.retire();
         return None;
     }
-    core.registry
-        .set_stdin(&core.run_id, std::sync::Arc::clone(&warm.item.spawned.acp.stdin));
+    core.registry.set_stdin(
+        &core.run_id,
+        std::sync::Arc::clone(&warm.item.spawned.acp.stdin),
+    );
     warm.hand_to(&core.run_id);
     Some(warm)
 }

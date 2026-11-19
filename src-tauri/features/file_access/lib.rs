@@ -72,6 +72,9 @@ pub enum Reach {
     /// `~/.claude.json`, `~/.codex` and the like), which Settings › Engines reads and edits: their
     /// MCP servers, skills, commands, provider channels and session logs for usage.
     EngineConfig,
+    /// The person's own Neovim configuration folder (`~/.config/nvim`), read-only, once they turn on
+    /// "Use my Neovim mappings" for the code editor (`code/nvim.rs`).
+    EditorConfig,
     /// A read-only folder Misty ships with itself, such as the bundled agent catalog.
     BundledResources,
     /// WebKit's folder of this app's website data stores on macOS
@@ -216,6 +219,12 @@ pub fn allow_bundled_resources(folder: &Path) {
 /// Only a debug build's benchmark run calls this, for the one file it reads its keys from.
 pub fn allow_benchmark_keys(path: &Path) {
     with_policy(|policy| policy.add(Reach::BenchmarkKeys, path, Shape::Exact, Access::Read));
+}
+
+/// The person's Neovim configuration folder, read-only. Only the code editor's mapping import
+/// calls this, with the folder it worked out itself, never one a window named.
+pub fn allow_editor_config_folder(folder: &Path) {
+    with_policy(|policy| policy.add(Reach::EditorConfig, folder, Shape::Folder, Access::Read));
 }
 
 /// An engine's own configuration folder, such as `~/.codex`, and everything in it.

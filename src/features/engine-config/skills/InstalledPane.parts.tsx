@@ -71,7 +71,7 @@ export function InstalledToolbar({
         value={query}
         onChange={(event) => onQueryChange(event.target.value)}
       />
-      <Button icon={RefreshCw} loading={refreshing} disabled={loading} onClick={onRefresh}>
+      <Button icon={RefreshCw} disabled={loading || refreshing} onClick={onRefresh}>
         {t("refresh")}
       </Button>
       <Button icon={Plus} disabled={loading} onClick={onOpenImport}>

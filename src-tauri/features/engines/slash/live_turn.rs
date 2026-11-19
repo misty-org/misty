@@ -41,15 +41,16 @@ pub(super) fn engines(allow: bool) -> &'static EngineState {
     if let Some(state) = support::state() {
         return state;
     }
-    let root = tempfile::tempdir()
-        .expect("a scratch folder")
-        .keep();
+    let root = tempfile::tempdir().expect("a scratch folder").keep();
     let store = database::store::Store::at(root.join("misty.db"));
     EngineState::open(&store, &root, Arc::new(Collect)).expect("the engine layer opens");
     gate::install(|run, tool, _input| {
         Box::pin(async move {
             let allow = ALLOW.load(Ordering::SeqCst);
-            println!("  gate: {tool} on {run} -> {}", if allow { "allow" } else { "deny" });
+            println!(
+                "  gate: {tool} on {run} -> {}",
+                if allow { "allow" } else { "deny" }
+            );
             if allow {
                 Decision::Allow
             } else {

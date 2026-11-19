@@ -6,7 +6,7 @@ import { createPort } from "@/shared/lib/seams";
  * (`app/featureSeams.ts`). Agents sit above engine settings, so engine settings never import them.
  */
 interface EngineConfigHost {
-  /** This window's Space's linked folders and the one picked, read on first use. */
+  /** The person's project folders and the most recently used one, read on first use. */
   useLinkedFolders(): { folders: string[]; picked?: string };
   /** Markdown drawn the way chats draw it. */
   Markdown: ComponentType<{ children: string }>;
@@ -18,7 +18,7 @@ export const engineConfigHost = createPort<EngineConfigHost>("engine settings' h
 
 const noFolders = { folders: [] as string[] };
 
-/** The Space's linked folders, or none where no app filled the host (a preview, a test). */
+/** The person's project folders, or none where no app filled the host (a preview, a test). */
 export function useLinkedFolders(): { folders: string[]; picked?: string } {
   const host = engineConfigHost.maybe();
   return host ? host.useLinkedFolders() : noFolders;

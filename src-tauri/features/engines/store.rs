@@ -1,5 +1,5 @@
-// What the engines keep in `misty.db`, on this computer only: the project folders linked to each
-// Space, and each chat's session in its engine. Neither ever syncs.
+// What the engines keep in `misty.db`, on this computer only: the project folders the person
+// picked, the folder each chat works in, and each chat's session in its engine. None ever syncs.
 
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -16,26 +16,11 @@ fn text(error: rusqlite::Error) -> String {
     error.to_string()
 }
 
-/// The folders linked to one Space, oldest first.
-pub fn folders(store: &Store, account: &str, space: &str) -> Result<Vec<String>, String> {
-    let connection = store.connect().map_err(text)?;
-    let mut statement = connection
-        .prepare(
-            "SELECT path FROM space_folders WHERE account = ?1 AND space = ?2 ORDER BY added_at",
-        )
-        .map_err(text)?;
-    let rows = statement
-        .query_map([account, space], |row| row.get::<_, String>(0))
-        .map_err(text)?;
-    rows.collect::<Result<_, _>>().map_err(text)
-}
-
-/// Every linked folder on this computer, to let the file gate reach them as the app starts. An
-/// agent's own folder counts as linked: the person chose it or Misty made it for them.
+/// Every project folder on this computer, to let the file gate reach them as the app starts.
 pub fn all_folders(store: &Store) -> Result<Vec<PathBuf>, String> {
     let connection = store.connect().map_err(text)?;
     let mut statement = connection
-        .prepare("SELECT path FROM space_folders UNION SELECT path FROM agent_folders")
+        .prepare("SELECT DISTINCT path FROM project_folders")
         .map_err(text)?;
     let rows = statement
         .query_map([], |row| row.get::<_, String>(0))
@@ -45,15 +30,15 @@ pub fn all_folders(store: &Store) -> Result<Vec<PathBuf>, String> {
         .map_err(text)
 }
 
-/// Whether the account linked this folder, or one that holds it, to any Space or gave it to one
-/// of its agents.
+/// Whether the account may work in this folder: one of its project folders or inside one, or a
+/// chat's scratch folder Misty keeps (`chat_folder.rs`).
 pub fn is_linked(store: &Store, account: &str, folder: &Path) -> Result<bool, String> {
+    if super::chat_folder::is_scratch(store, folder) {
+        return Ok(true);
+    }
     let connection = store.connect().map_err(text)?;
     let mut statement = connection
-        .prepare(
-            "SELECT path FROM space_folders WHERE account = ?1
-             UNION SELECT path FROM agent_folders WHERE account = ?1",
-        )
+        .prepare("SELECT path FROM project_folders WHERE account = ?1")
         .map_err(text)?;
     let rows = statement
         .query_map([account], |row| row.get::<_, String>(0))
@@ -66,40 +51,153 @@ pub fn is_linked(store: &Store, account: &str, folder: &Path) -> Result<bool, St
     Ok(false)
 }
 
-pub fn link_folder(store: &Store, account: &str, space: &str, path: &str) -> Result<(), String> {
+/// Adds a project folder, or marks one already there as just used.
+pub fn add_project(store: &Store, account: &str, path: &str) -> Result<(), String> {
+    let at = now();
     store
         .connect()
         .map_err(text)?
         .execute(
-            "INSERT OR IGNORE INTO space_folders (account, space, path, added_at) VALUES (?1, ?2, ?3, ?4)",
-            rusqlite::params![account, space, path, now()],
+            "INSERT INTO project_folders (account, path, added_at, last_used_at) VALUES (?1, ?2, ?3, ?3)
+             ON CONFLICT (account, path) DO UPDATE SET last_used_at = ?3",
+            rusqlite::params![account, path, at],
         )
         .map(|_| ())
         .map_err(text)
 }
 
-/// Unlinks a folder from a Space. Returns whether any Space or agent on this computer still has it.
-pub fn unlink_folder(
-    store: &Store,
-    account: &str,
-    space: &str,
-    path: &str,
-) -> Result<bool, String> {
+/// Forgets a project folder. Returns whether any account on this computer still has it.
+pub fn remove_project(store: &Store, account: &str, path: &str) -> Result<bool, String> {
     let connection = store.connect().map_err(text)?;
     connection
         .execute(
-            "DELETE FROM space_folders WHERE account = ?1 AND space = ?2 AND path = ?3",
-            [account, space, path],
+            "DELETE FROM project_folders WHERE account = ?1 AND path = ?2",
+            [account, path],
         )
         .map_err(text)?;
     connection
         .query_row(
-            "SELECT EXISTS (SELECT 1 FROM space_folders WHERE path = ?1)
-                 OR EXISTS (SELECT 1 FROM agent_folders WHERE path = ?1)",
+            "SELECT EXISTS (SELECT 1 FROM project_folders WHERE path = ?1)",
             [path],
             |row| row.get::<_, bool>(0),
         )
         .map_err(text)
+}
+
+/// The account's project folders, most recently used first, as (path, last used).
+pub fn projects(store: &Store, account: &str) -> Result<Vec<(String, i64)>, String> {
+    let connection = store.connect().map_err(text)?;
+    let mut statement = connection
+        .prepare(
+            "SELECT path, last_used_at FROM project_folders WHERE account = ?1
+             ORDER BY last_used_at DESC",
+        )
+        .map_err(text)?;
+    let rows = statement
+        .query_map([account], |row| Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?)))
+        .map_err(text)?;
+    rows.collect::<Result<_, _>>().map_err(text)
+}
+
+/// The folder a chat works in, as (path, kind), kind being `project` or `scratch`.
+pub fn chat_folder(store: &Store, account: &str, conversation: &str) -> Option<(String, String)> {
+    store
+        .connect()
+        .ok()?
+        .query_row(
+            "SELECT path, kind FROM chat_folders WHERE account = ?1 AND conversation_id = ?2",
+            [account, conversation],
+            |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
+        )
+        .ok()
+}
+
+/// The chats that work in a project, with its path: the Code page lists them, the sidebar doesn't.
+pub fn project_chats(store: &Store, account: &str) -> Result<Vec<(String, String)>, String> {
+    let connection = store.connect().map_err(text)?;
+    let mut statement = connection
+        .prepare(
+            "SELECT conversation_id, path FROM chat_folders WHERE account = ?1 AND kind = 'project'",
+        )
+        .map_err(text)?;
+    let rows = statement
+        .query_map([account], |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)))
+        .map_err(text)?;
+    rows.collect::<Result<_, _>>().map_err(text)
+}
+
+/// The folder new projects go in, chosen in the system's dialog during setup; `None` before then.
+pub fn projects_home(store: &Store, account: &str) -> Option<String> {
+    store
+        .connect()
+        .ok()?
+        .query_row(
+            "SELECT path FROM projects_home WHERE account = ?1",
+            [account],
+            |row| row.get::<_, String>(0),
+        )
+        .ok()
+}
+
+/// Sets the folder new projects go in.
+pub fn set_projects_home(store: &Store, account: &str, path: &str) -> Result<(), String> {
+    store
+        .connect()
+        .map_err(text)?
+        .execute(
+            "INSERT INTO projects_home (account, path, updated_at) VALUES (?1, ?2, ?3)
+             ON CONFLICT (account) DO UPDATE SET path = ?2, updated_at = ?3",
+            rusqlite::params![account, path, now()],
+        )
+        .map(|_| ())
+        .map_err(text)
+}
+
+/// Sets the folder a chat works in, replacing the one it had.
+pub fn set_chat_folder(
+    store: &Store,
+    account: &str,
+    conversation: &str,
+    path: &str,
+    kind: &str,
+) -> Result<(), String> {
+    store
+        .connect()
+        .map_err(text)?
+        .execute(
+            "INSERT INTO chat_folders (account, conversation_id, path, kind, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5)
+             ON CONFLICT (account, conversation_id) DO UPDATE SET path = ?3, kind = ?4, updated_at = ?5",
+            rusqlite::params![account, conversation, path, kind, now()],
+        )
+        .map(|_| ())
+        .map_err(text)
+}
+
+/// Forgets what a deleted chat kept: its folder and its engine sessions.
+pub fn forget_chat(store: &Store, account: &str, conversation: &str) -> Result<(), String> {
+    let connection = store.connect().map_err(text)?;
+    for statement in [
+        "DELETE FROM chat_folders WHERE account = ?1 AND conversation_id = ?2",
+        "DELETE FROM engine_sessions WHERE account = ?1 AND conversation_id = ?2",
+    ] {
+        connection
+            .execute(statement, [account, conversation])
+            .map_err(text)?;
+    }
+    Ok(())
+}
+
+/// Every chat id this computer keeps, whatever the account, to find scratch folders left behind.
+pub fn all_chat_ids(store: &Store) -> Result<std::collections::HashSet<String>, String> {
+    let connection = store.connect().map_err(text)?;
+    let mut statement = connection
+        .prepare("SELECT id FROM agent_chats WHERE kind = 'conversation'")
+        .map_err(text)?;
+    let rows = statement
+        .query_map([], |row| row.get::<_, String>(0))
+        .map_err(text)?;
+    rows.collect::<Result<_, _>>().map_err(text)
 }
 
 /// The engine's own session for a chat, to continue it in the same folder.
@@ -172,60 +270,25 @@ pub fn forget_session(store: &Store, account: &str, conversation: &str) -> Resul
         .map_err(text)
 }
 
-/// The one folder an agent works in on this computer, if it has one yet.
-pub fn agent_folder(store: &Store, account: &str, agent: &str) -> Option<String> {
-    store
-        .connect()
-        .ok()?
-        .query_row(
-            "SELECT path FROM agent_folders WHERE account = ?1 AND agent_id = ?2",
-            [account, agent],
-            |row| row.get::<_, String>(0),
-        )
-        .ok()
+/// The folders Misty made for agents before chats owned their folders, as (account, path), for
+/// the one-time move to projects or the Trash (`chat_folder::retire_agent_folders`).
+pub fn old_agent_folders(store: &Store) -> Result<Vec<(String, String)>, String> {
+    let connection = store.connect().map_err(text)?;
+    let mut statement = connection
+        .prepare("SELECT account, path FROM agent_folders")
+        .map_err(text)?;
+    let rows = statement
+        .query_map([], |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)))
+        .map_err(text)?;
+    rows.collect::<Result<_, _>>().map_err(text)
 }
 
-/// Gives an agent its folder, replacing the one it had.
-pub fn set_agent_folder(
-    store: &Store,
-    account: &str,
-    agent: &str,
-    path: &str,
-) -> Result<(), String> {
+/// Forgets every agent folder row once they were moved or thrown away.
+pub fn clear_old_agent_folders(store: &Store) -> Result<(), String> {
     store
         .connect()
         .map_err(text)?
-        .execute(
-            "INSERT INTO agent_folders (account, agent_id, path, updated_at) VALUES (?1, ?2, ?3, ?4)
-             ON CONFLICT (account, agent_id) DO UPDATE SET path = ?3, updated_at = ?4",
-            rusqlite::params![account, agent, path, now()],
-        )
+        .execute("DELETE FROM agent_folders", [])
         .map(|_| ())
         .map_err(text)
-}
-
-/// Every agent's folder for this account, as (agent, path).
-pub fn agent_folders(store: &Store, account: &str) -> Result<Vec<(String, String)>, String> {
-    let connection = store.connect().map_err(text)?;
-    let mut statement = connection
-        .prepare("SELECT agent_id, path FROM agent_folders WHERE account = ?1")
-        .map_err(text)?;
-    let rows = statement
-        .query_map([account], |row| {
-            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
-        })
-        .map_err(text)?;
-    rows.collect::<Result<_, _>>().map_err(text)
-}
-
-/// The folders this account linked to its Spaces, never agent folders.
-pub fn folders_of_account(store: &Store, account: &str) -> Result<Vec<String>, String> {
-    let connection = store.connect().map_err(text)?;
-    let mut statement = connection
-        .prepare("SELECT DISTINCT path FROM space_folders WHERE account = ?1")
-        .map_err(text)?;
-    let rows = statement
-        .query_map([account], |row| row.get::<_, String>(0))
-        .map_err(text)?;
-    rows.collect::<Result<_, _>>().map_err(text)
 }

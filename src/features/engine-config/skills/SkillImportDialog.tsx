@@ -20,7 +20,6 @@ import {
   DialogTitle,
   Input,
   Label,
-  Spinner,
   Text,
 } from "@/shared/ui";
 import { EngineGlyph } from "./components";
@@ -122,10 +121,9 @@ export function SkillImportDialog({
           <Button
             size="lg"
             variant="primary"
-            disabled={!canImport}
+            disabled={!canImport || busy}
             onClick={() => onImport(trimmed, selected)}
           >
-            {busy ? <Spinner size="sm" label={false} /> : null}
             {t("import.confirm")}
           </Button>
         </DialogFooter>

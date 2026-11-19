@@ -235,6 +235,7 @@ fn grants_for(reach: Reach) -> &'static [&'static str] {
         | Reach::RecordedDownload
         | Reach::BenchmarkKeys
         | Reach::EngineConfig
+        | Reach::EditorConfig
         | Reach::BundledResources
         | Reach::WebsiteData
         | Reach::TestFixtures => &[],
@@ -260,6 +261,7 @@ fn the_list_matches_grants_toml() {
         Reach::LinkedFolder,
         Reach::PickedFile,
         Reach::EngineConfig,
+        Reach::EditorConfig,
         Reach::BenchmarkKeys,
         Reach::TestFixtures,
     ]

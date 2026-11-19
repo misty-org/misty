@@ -318,7 +318,11 @@ fn parse_context_windows(config: &Value) -> HashMap<String, u64> {
 /// 1.x prices a whole assistant message, every step of the turn, as its `cost`: it goes on the
 /// message's usage report as `cost_usd`, which the chat shows. A message with no price adds none.
 pub(super) fn with_message_cost(mut usage: Value, info: &Value) -> Value {
-    if let Some(cost) = info.get("cost").and_then(Value::as_f64).filter(|cost| *cost > 0.0) {
+    if let Some(cost) = info
+        .get("cost")
+        .and_then(Value::as_f64)
+        .filter(|cost| *cost > 0.0)
+    {
         usage["cost_usd"] = serde_json::json!(cost);
     }
     usage

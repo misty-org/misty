@@ -61,9 +61,8 @@ export function EngineUpdatesPrompt({ accountScope }: { accountScope: string }) 
         (statuses) => {
           if (closed) return;
           setBehind(
-            statuses.filter(
-              (status): status is CliVersionStatus =>
-                Boolean(status?.installed && status.updateAvailable && status.updateKind),
+            statuses.filter((status): status is CliVersionStatus =>
+              Boolean(status?.installed && status.updateAvailable && status.updateKind),
             ),
           );
         },
@@ -144,7 +143,7 @@ export function EngineUpdatesPrompt({ accountScope }: { accountScope: string }) 
               <Button
                 variant="primary"
                 autoFocus
-                loading={running}
+                disabled={running}
                 onClick={() => void updateAll()}
               >
                 Update all

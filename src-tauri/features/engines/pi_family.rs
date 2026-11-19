@@ -1539,7 +1539,9 @@ mod tests {
         // A resumed session has no verifiable human wait point (planModeState is memory only).
         let mut req = plan_req(Some("plan"));
         req.session_id = Some("01JOLD".to_string());
-        let error = home_locked(|| omp().build_command(&req, "fake-omp")).err().unwrap();
+        let error = home_locked(|| omp().build_command(&req, "fake-omp"))
+            .err()
+            .unwrap();
         assert!(error.contains("new session"), "{error}");
         // The auto/bypass paths are unaffected.
         assert!(home_locked(|| omp().build_command(&plan_req(Some("auto")), "fake-omp")).is_ok());
