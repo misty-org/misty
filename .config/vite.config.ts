@@ -101,6 +101,18 @@ export default defineConfig(({ command, mode }) => {
     resolve: {
       alias: [
         { find: "@", replacement: fileURLToPath(new URL("../src", import.meta.url)) },
+        // OpenCut's editor, vendored (vendor/opencut/README.md), under its own name.
+        {
+          find: "@opencut",
+          replacement: fileURLToPath(new URL("../vendor/opencut/src", import.meta.url)),
+        },
+        // OpenCut's Rust core, loaded once before the editor opens (vendor/opencut/src/wasm/load.ts).
+        {
+          find: /^opencut-wasm$/,
+          replacement: fileURLToPath(
+            new URL("../vendor/opencut/src/wasm/load.ts", import.meta.url),
+          ),
+        },
         // Midscene's planner runs in the app; its Node-only helpers get browser stubs.
         ...Object.entries(nodeShims).map(([name, file]) => ({
           find: new RegExp(`^node:${name}$`),

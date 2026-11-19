@@ -6,9 +6,14 @@ export default defineConfig({
   server: { fs: { allow: [process.cwd()] } },
   resolve: {
     dedupe: ["react", "react-dom"],
-    alias: {
-      "@": new URL("../src", import.meta.url).pathname,
-    },
+    alias: [
+      { find: "@", replacement: new URL("../src", import.meta.url).pathname },
+      { find: "@opencut", replacement: new URL("../vendor/opencut/src", import.meta.url).pathname },
+      {
+        find: /^opencut-wasm$/,
+        replacement: new URL("../vendor/opencut/src/wasm/load.ts", import.meta.url).pathname,
+      },
+    ],
   },
   test: {
     environment: "jsdom",

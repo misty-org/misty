@@ -67,6 +67,29 @@ desktop-cc-gui (https://github.com/zhukunpenglinyutong/desktop-cc-gui)
   DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+Fluxer (https://github.com/fluxerapp/fluxer)
+  Space chat (src/features/spaces/chat/fluxer) copies Fluxer's chat layout, in Misty's colors,
+  type and icons: the design tokens, the channel column, guild header menu, channel rows, user
+  area, channel header and message search, member list, message list, markup, dividers,
+  welcome, reactions, message action bar, context menu, composer, autocomplete, inline editing,
+  tooltip, scroller, emoji picker and avatar presence. Its CSS modules are copied with sizes
+  converted from rem to px, and its components are adapted to Misty's Spaces; each file names
+  its Fluxer source. The emoji data (src/features/spaces/chat/fluxer/assets/emojis.json, from
+  Unicode emoji-test and CLDR annotations) comes from its app source.
+
+  GNU Affero General Public License, version 3 or later (the license Misty is under).
+
+  Copyright Fluxer Platform AB and contributors.
+
+Twemoji (https://github.com/jdecked/twemoji)
+  Space chat draws emoji with Twemoji graphics, bundled from @twemoji/svg, and matches them with
+  @twemoji/api.
+
+  Graphics: Creative Commons Attribution 4.0 International
+  (https://creativecommons.org/licenses/by/4.0/). Copyright 2014-2021 Twitter, Inc and other
+  contributors; copyright 2022-present Jason Sofonia, Justine De Caires and other contributors.
+  Code: MIT License.
+
 lobe-icons (https://github.com/lobehub/lobe-icons)
   The engines' marks in src/features/engine-config/engineMarks.json and the providers' marks in
   src/features/engine-config/brands/brandMarks.json are generated from
@@ -268,6 +291,13 @@ Inter (https://rsms.me/inter, https://github.com/rsms/inter)
   Licensed under the SIL Open Font License, Version 1.1 (https://openfontlicense.org).
   Copyright 2016 The Inter Project Authors.
 
+JetBrains Mono (https://www.jetbrains.com/lp/mono, https://github.com/JetBrains/JetBrainsMono)
+  The code editor's default font, bundled through @fontsource-variable/jetbrains-mono and loaded
+  by src/styles/styles.css.
+
+  Licensed under the SIL Open Font License, Version 1.1 (https://openfontlicense.org).
+  Copyright 2020 The JetBrains Mono Project Authors.
+
 Excalidraw (https://github.com/excalidraw/excalidraw)
   The drawing canvas, bundled through @excalidraw/excalidraw (src/features/spaces/journal/drawings).
 
@@ -289,3 +319,42 @@ Excalidraw (https://github.com/excalidraw/excalidraw)
   NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
   DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+OpenCut (https://github.com/opencut-app/opencut-classic)
+  The video editor on a Space's Media page: OpenCut's web editor (its timeline, commands,
+  preview, properties, renderer and exporter, effects, masks, keyframes, scenes, stickers and
+  captions) vendored in vendor/opencut, with its interface drawn by Misty's components; see
+  vendor/opencut/README.md for what changed. Its Rust core is bundled through opencut-wasm.
+
+  MIT License
+
+  Copyright 2025-2026 OpenCut
+
+  Permission is hereby granted, free of charge, to any person obtaining a copy of this software
+  and associated documentation files (the "Software"), to deal in the Software without
+  restriction, including without limitation the rights to use, copy, modify, merge, publish,
+  distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the
+  Software is furnished to do so, subject to the following conditions:
+
+  The above copyright notice and this permission notice shall be included in all copies or
+  substantial portions of the Software.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING
+  BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+  NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+  DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+Mediabunny (https://github.com/Vanilagy/mediabunny)
+  Reads and writes the video editor's media files (decoding clips, muxing exports), bundled
+  unmodified through the mediabunny package.
+
+  Mozilla Public License, version 2.0 (https://mozilla.org/MPL/2.0/). Its source is available
+  from the address above and in the published package.
+
+SoundTouchJS (https://github.com/cutterbl/SoundTouchJS)
+  Keeps a clip's pitch when the video editor changes its speed, bundled unmodified through the
+  soundtouchjs package.
+
+  GNU Lesser General Public License, version 2.1. Its source is available from the address above
+  and in the published package.
