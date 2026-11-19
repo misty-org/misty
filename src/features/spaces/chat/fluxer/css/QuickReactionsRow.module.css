@@ -1,0 +1,31 @@
+/* SPDX-License-Identifier: AGPL-3.0-or-later
+ * Adapted from Fluxer (https://github.com/fluxerapp/fluxer), fluxer_app/src/features/channel/components/QuickReactionsRow.module.css.
+ * Sizes converted from rem to px so they render at Fluxer's size under Misty's 110% root;
+ * hover no longer waits on Fluxer's window-focus class; .theme-light is Misty's light theme. */
+
+.row {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	padding: 4px 6px 6px;
+}
+
+.button {
+	composes: item fluidItem from './ActionToolbar.module.css';
+	--action-toolbar-item-border-width: 0px;
+	--action-toolbar-item-radius: 8px;
+	--action-toolbar-item-background: var(--background-modifier-hover);
+	flex: 1;
+	aspect-ratio: 1;
+}
+
+.button:hover,
+.button:is([data-highlighted], [data-hovered], [data-focused], [data-focus-visible]) {
+	background-color: var(--background-modifier-selected);
+}
+
+.emojiImg {
+	width: 24px;
+	height: 24px;
+	object-fit: contain;
+}

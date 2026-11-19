@@ -56,14 +56,12 @@ export function MessageAttachments(props: MessageAttachmentsProps) {
                     if (!item) return;
                     void copyLibraryItemsToClipboard(props.spaceId, [item]).catch((error) =>
                       props.onError(
-                        error instanceof Error
-                          ? error.message
-                          : "The Library item could not be copied.",
+                        error instanceof Error ? error.message : "The file could not be copied.",
                       ),
                     );
                   }}
                 >
-                  {item?.display_name ?? "Unavailable Library item"}
+                  {item?.display_name ?? "Unavailable file"}
                 </Button>
               </Tooltip>
             );

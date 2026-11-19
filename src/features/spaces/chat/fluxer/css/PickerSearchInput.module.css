@@ -1,0 +1,59 @@
+/* SPDX-License-Identifier: AGPL-3.0-or-later
+ * Adapted from Fluxer (https://github.com/fluxerapp/fluxer), fluxer_app/src/features/channel/components/shared/PickerSearchInput.module.css.
+ * Sizes converted from rem to px so they render at Fluxer's size under Misty's 110% root;
+ * hover no longer waits on Fluxer's window-focus class; .theme-light is Misty's light theme. */
+
+.searchInputContainer {
+	display: flex;
+	align-items: center;
+	gap: var(--spacing-2);
+	flex: 1;
+}
+
+.backButton {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 36px;
+	height: 36px;
+	border-radius: var(--radius-md);
+	color: var(--text-primary);
+	cursor: pointer;
+	transition: background-color 0.1s ease-out;
+	flex-shrink: 0;
+}
+
+.backButton:hover {
+	background-color: var(--background-modifier-hover);
+}
+
+.searchInput {
+	min-height: 36px;
+	padding-block: 8px;
+	padding-inline: 36px 40px;
+	font-size: 16px;
+	border-radius: var(--radius-md);
+	background-color: color-mix(in srgb, var(--form-surface-background) 85%, black);
+	flex: 1;
+}
+
+.clearButton {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 4px;
+	border-radius: var(--radius-sm);
+	color: var(--text-primary-muted);
+	cursor: pointer;
+	transition: color 0.1s ease-out;
+}
+
+.clearButton:hover {
+	color: var(--text-primary);
+}
+
+.rightElementContainer {
+	display: flex;
+	align-items: center;
+	gap: var(--spacing-2);
+}

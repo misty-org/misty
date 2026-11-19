@@ -1,0 +1,424 @@
+/* SPDX-License-Identifier: AGPL-3.0-or-later
+ * Adapted from Fluxer (https://github.com/fluxerapp/fluxer), fluxer_app/src/features/app/components/layout/ChannelItem.module.css.
+ * Sizes converted from rem to px so they render at Fluxer's size under Misty's 110% root;
+ * hover no longer waits on Fluxer's window-focus class; .theme-light is Misty's light theme. */
+
+.channelItemCore {
+	position: relative;
+	margin-inline-start: 8px;
+	margin-inline-end: 0;
+	display: flex;
+	min-width: 0;
+	flex: 1;
+	cursor: pointer;
+	align-items: center;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	border-radius: 6px;
+	padding-inline-start: 8px;
+	padding-inline-end: 8px;
+	gap: 6px;
+	padding-top: 6px;
+	padding-bottom: 6px;
+}
+
+.channelItemCoreSelected {
+	background-color: var(--background-modifier-selected);
+	color: var(--surface-interactive-selected-color);
+}
+
+.channelItemCoreUnselected {
+	color: var(--text-tertiary-muted);
+	cursor: pointer;
+}
+
+.channelItemCoreUnselected:hover {
+	background-color: var(--background-modifier-hover);
+}
+
+.channelItemCoreHovered {
+	background-color: var(--background-modifier-hover);
+}
+
+.typingTooltip {
+	max-width: 512px;
+	white-space: break-spaces;
+	word-break: break-word;
+	color: var(--text-chat);
+}
+
+.channelTypingIndicator {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 2px;
+	color: var(--text-primary);
+	flex-shrink: 0;
+	min-width: 20px;
+	height: 20px;
+	line-height: 20px;
+}
+
+.typingIndicatorIcon {
+	width: 20px;
+	height: 20px;
+	flex-shrink: 0;
+}
+
+:global(:root[data-theme='light']) .channelItemSelected .typingIndicatorIcon {
+	--typing-indicator-color: var(--surface-interactive-selected-color);
+	color: var(--surface-interactive-selected-color);
+}
+
+.typingAvatars {
+	height: 20px;
+	--avatar-stack-padding-block-start: 0px;
+	--avatar-stack-padding-block-end: 0px;
+	--avatar-stack-extra-height: 0px;
+	--avatar-stack-outline-color: var(--background-secondary);
+}
+
+.channelItemIcon {
+	height: 20px;
+	width: 20px;
+}
+
+.channelItemIconSelected {
+	color: var(--surface-interactive-selected-color);
+}
+
+.categoryContainer {
+	display: flex;
+	align-items: center;
+	flex: 1;
+	min-width: 0;
+}
+
+.categoryName {
+	flex: 1;
+	overflow: 'hidden';
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.iconContainer {
+	margin-inline-end: 8px;
+	display: flex;
+	align-items: center;
+}
+
+.channelName {
+	flex: 1;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.actionsContainer {
+	display: flex;
+	align-items: center;
+	margin-inline-start: 8px;
+}
+
+.channelItemIconUnselected {
+	color: var(--text-tertiary-muted);
+}
+
+.channelItemIconHighlight {
+	color: var(--text-secondary);
+}
+
+.channelItemLabel {
+	flex: 1 1 auto;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-weight: 500;
+	font-size: 16px;
+	line-height: 20px;
+	max-height: 20px;
+	min-width: 0;
+}
+
+.channelItemActions {
+	margin-inline-start: auto;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 4px;
+}
+
+.container {
+	position: relative;
+	width: 100%;
+}
+
+.channelReorderTarget {
+	box-sizing: border-box;
+	padding-top: 1px;
+}
+
+.channelCategoryReorderTarget {
+	padding-top: 4px;
+}
+
+.unreadIndicator {
+	position: absolute;
+	top: 50%;
+	inset-inline-start: -4px;
+	transform: translateY(-50%);
+	height: 8px;
+	width: 8px;
+	border-radius: 0 9999px 9999px 0;
+	background-color: var(--text-primary);
+}
+
+.unreadIndicatorMuted {
+	opacity: 0.4;
+}
+
+.channelItem {
+	position: relative;
+	margin-inline-start: 8px;
+	margin-inline-end: 0;
+	display: flex;
+	min-width: 0;
+	flex: 1;
+	cursor: pointer;
+	align-items: center;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	border-radius: 6px;
+	padding-inline-start: 8px;
+	padding-inline-end: 8px;
+}
+
+.channelItemCategory {
+	margin-top: 0;
+	margin-bottom: 0;
+	gap: 4px;
+	padding-top: 6px;
+	padding-bottom: 6px;
+	color: var(--text-tertiary-muted);
+	cursor: pointer;
+}
+
+@media (hover: hover) and (pointer: fine) {
+	.channelItemCategory:hover {
+		color: var(--text-primary);
+	}
+}
+
+.channelItemRegular {
+	gap: 6px;
+	padding-top: 6px;
+	padding-bottom: 6px;
+	color: var(--text-tertiary-muted);
+}
+
+.channelItemHighlight {
+	color: var(--text-secondary);
+}
+
+.channelItemMuted {
+	color: var(--text-tertiary-muted);
+}
+
+.channelItemSelected {
+	background-color: var(--background-modifier-selected);
+	color: var(--text-primary);
+}
+
+.channelItemSelectedWithUnread {
+	color: var(--text-primary);
+}
+
+@media (hover: hover) and (pointer: fine) {
+	.channelItemHoverable:hover {
+		background-color: var(--background-modifier-hover);
+		color: var(--text-chat);
+	}
+}
+
+.channelItemPressed {
+	background-color: var(--background-modifier-hover);
+	color: var(--text-chat);
+}
+
+.channelItemOver {
+	background-color: var(--background-modifier-hover);
+	color: var(--text-chat);
+}
+
+.channelItemContextMenu {
+	background-color: var(--background-modifier-hover) !important;
+	color: var(--text-chat) !important;
+}
+
+.channelItemCategoryContextMenu {
+	color: var(--text-primary) !important;
+}
+
+.channelItemDragging {
+	opacity: 0.3;
+}
+
+.channelItemDimmed {
+	opacity: 0.6;
+}
+
+.channelItemMutedState {
+	color: var(--text-tertiary-muted);
+	opacity: 0.5;
+}
+
+.hoverAffordance {
+	display: none;
+}
+
+.channelItemCategoryContextMenu .hoverAffordance,
+.channelItemCategory.keyboardFocus .hoverAffordance,
+.channelItemContextMenu .hoverAffordance,
+.channelItem.keyboardFocus .hoverAffordance,
+.channelItemSelected .hoverAffordance {
+	display: flex;
+}
+
+@media (hover: hover) and (pointer: fine) {
+	.channelItemCategory:hover
+		.hoverAffordance,
+	.channelItemHoverable:hover
+		.hoverAffordance {
+		display: flex;
+	}
+}
+
+.channelItemAutocompleteHighlight {
+	box-shadow: 0 0 0 2px var(--brand-primary-foreground);
+}
+
+.categoryContent {
+	display: flex;
+	min-width: 0;
+	flex: 1;
+	align-items: center;
+	gap: 4px;
+}
+
+.categoryName {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-weight: 600;
+	font-size: 14px;
+	line-height: 20px;
+	max-height: 20px;
+	min-width: 0;
+}
+
+.categoryIcon {
+	height: 12px;
+	width: 12px;
+	flex-shrink: 0;
+	color: var(--text-tertiary-muted);
+}
+
+.channelName {
+	flex: 1 1 auto;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-weight: 500;
+	font-size: 16px;
+	line-height: 20px;
+	max-height: 20px;
+	min-width: 0;
+}
+
+.createChannelButton {
+	display: flex;
+	height: 16px;
+	width: 16px;
+	cursor: pointer;
+	align-items: center;
+	justify-content: center;
+	border-radius: 9999px;
+	border: none;
+	background-color: transparent;
+	padding: 0;
+	color: var(--text-tertiary-muted);
+}
+
+.createChannelButton:hover {
+	color: var(--text-primary);
+}
+
+.createChannelIcon {
+	height: 16px;
+	width: 16px;
+}
+
+.voiceUserCount {
+	display: flex;
+	flex-shrink: 0;
+	margin-inline-end: 8px;
+}
+
+.channelItemVoice.contextMenuOpen .voiceUserCount {
+	display: none;
+}
+
+.channelItemVoice:hover
+	.voiceUserCount {
+	display: none;
+}
+
+.channelItemVoice.channelItemHoverAffordancesActive.contextMenuOpen .voiceUserCount {
+	display: flex;
+}
+
+.channelItemVoice.channelItemHoverAffordancesActive:hover
+	.voiceUserCount {
+	display: flex;
+}
+
+:global(:root[data-theme='light']) {
+	.channelItemCategory {
+		color: var(--text-primary);
+	}
+
+	.channelItemRegular {
+		color: var(--text-tertiary);
+	}
+
+	.channelItemMuted {
+		color: var(--text-tertiary-muted);
+	}
+
+	.channelItemHighlight {
+		color: var(--text-primary);
+	}
+
+	.channelItemSelected,
+	.channelItemSelectedWithUnread {
+		color: var(--text-primary);
+	}
+
+	.channelItemIconUnselected {
+		color: var(--text-tertiary);
+	}
+
+	.channelItemIconHighlight {
+		color: var(--text-primary);
+	}
+
+	.categoryIcon {
+		color: var(--text-primary);
+	}
+
+	.createChannelButton {
+		color: var(--text-primary);
+	}
+}

@@ -1,0 +1,19 @@
+/* SPDX-License-Identifier: AGPL-3.0-or-later
+ * Adapted from Fluxer (https://github.com/fluxerapp/fluxer), fluxer_app/src/features/app/components/layout/ChannelItemSurface.module.css.
+ * Sizes converted from rem to px so they render at Fluxer's size under Misty's 110% root;
+ * hover no longer waits on Fluxer's window-focus class; .theme-light is Misty's light theme. */
+
+.channelItemSurface {
+	--channel-item-hover-background: var(--surface-interactive-hover-bg);
+	--channel-item-selected-background: var(--surface-interactive-selected-bg);
+	--background-modifier-hover: var(--channel-item-hover-background);
+	--background-modifier-selected: var(--channel-item-selected-background);
+}
+
+.channelItemSurfaceSelected {
+	color: var(--surface-interactive-selected-color);
+}
+
+.channelItemFocusRing {
+	border-radius: 8px;
+}

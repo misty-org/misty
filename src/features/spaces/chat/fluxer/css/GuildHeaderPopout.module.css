@@ -1,0 +1,94 @@
+/* SPDX-License-Identifier: AGPL-3.0-or-later
+ * Adapted from Fluxer (https://github.com/fluxerapp/fluxer), fluxer_app/src/features/guild/components/popouts/GuildHeaderPopout.module.css.
+ * Sizes converted from rem to px so they render at Fluxer's size under Misty's 110% root;
+ * hover no longer waits on Fluxer's window-focus class; .theme-light is Misty's light theme. */
+
+.container {
+	--guild-header-popout-surface: var(--settings-surface-background, var(--form-surface-background));
+	--guild-header-popout-border: var(--settings-border-color, var(--background-modifier-accent));
+	--guild-header-popout-hover-background: var(--settings-hover-background, var(--surface-interactive-hover-bg));
+	--guild-header-popout-danger-text: var(
+		--settings-danger-text,
+		color-mix(in srgb, var(--status-danger) 78%, var(--text-primary) 22%)
+	);
+	--guild-header-popout-danger-background: var(
+		--settings-danger-background,
+		color-mix(in srgb, var(--status-danger) 6%, var(--surface-interactive-hover-bg))
+	);
+	display: flex;
+	box-sizing: border-box;
+	width: max-content;
+	min-width: var(--layout-header-popout-width);
+	max-width: min(352px, calc(100vw - 16px));
+	flex-direction: column;
+	gap: 2px;
+	border-radius: 8px;
+	border: 1px solid var(--guild-header-popout-border);
+	background: var(--guild-header-popout-surface);
+	padding: 8px;
+	box-shadow: 0 8px 16px rgb(0 0 0 / 0.24);
+}
+
+:global(:root[data-theme='light']) .container {
+	box-shadow: 0 8px 16px rgb(0 0 0 / 0.14);
+}
+
+.itemButton.itemDanger {
+	color: var(--guild-header-popout-danger-text);
+}
+
+.itemButton.itemDanger:is(:hover, :focus, :focus-visible, [data-hovered], [data-focus-visible]) {
+	background: var(--guild-header-popout-danger-background);
+	color: var(--guild-header-popout-danger-text);
+}
+
+.checkboxIcon {
+	--checkbox-border-color: currentColor;
+	display: flex;
+	height: 20px;
+	width: 20px;
+	flex: 0 0 auto;
+	align-items: center;
+	justify-content: center;
+}
+
+.iconMedium {
+	height: 20px;
+	width: 20px;
+	flex: 0 0 auto;
+}
+
+.itemButton {
+	display: flex;
+	box-sizing: border-box;
+	width: 100%;
+	min-height: 32px;
+	min-width: 0;
+	cursor: pointer;
+	align-items: center;
+	justify-content: space-between;
+	gap: 16px;
+	border-radius: 6px;
+	border: 1px solid transparent;
+	background: transparent;
+	padding: 5px 8px;
+	text-align: start;
+	font-size: 13px;
+	line-height: 18px;
+	color: var(--text-primary);
+	transition: none;
+}
+
+.itemTitle {
+	min-width: 0;
+	flex: 0 1 auto;
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+	font-weight: 500;
+}
+
+.itemButton:not(.itemDanger):is(:hover, :focus, :focus-visible, [data-hovered], [data-focus-visible]) {
+	background: var(--guild-header-popout-hover-background);
+	color: var(--text-primary);
+}

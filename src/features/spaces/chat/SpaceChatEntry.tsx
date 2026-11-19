@@ -4,7 +4,11 @@ import type { SpaceConversation } from "../api/dto/entities";
 import { useAuth } from "@/features/account";
 import { useSpacesStore } from "../list/useSpacesStore";
 import { spaceChatConversationPath, spaceChatPath } from "./chatRoute";
-import { ChatSidebar } from "./sidebar/ChatSidebar";
+import { FluxerSidebar } from "./fluxer/FluxerSidebar";
+import { FluxerChatRoot } from "./fluxer/FluxerChatRoot";
+import { cx } from "./fluxer/cx";
+import guildLayout from "./fluxer/css/GuildLayout.module.css";
+import shell from "./fluxer/css/SpaceChatShell.module.css";
 import { CreateEditConversationDialog } from "./sidebar/CreateEditConversationDialog";
 import { NewDirectMessageDialog } from "./sidebar/NewDirectMessageDialog";
 import { useSpaceChatAccess } from "./hooks/useSpaceChatAccess";
@@ -22,13 +26,15 @@ import {
 import { useSpaceConversations } from "./sidebar/useSpaceConversations";
 import { useSpaceEveryoneUnread } from "./spaceConversationsResource";
 import { SpaceChat } from "./SpaceChat";
+import { spaceCan } from "../roles/useSpaceRoles";
 import { useEffect } from "react";
 import { useRangeSelection } from "@/shared/hooks/useRangeSelection";
 import { confirmAction } from "@/shared/lib/confirmAction";
 
 /**
- * A Space's chat: a sidebar of channels and conversations with people, and the open chat
- * beside it. Agents are not in the sidebar; mention one in a message to ask it for work.
+ * A Space's chat, laid out like Discord: the channel column (the Space's channels, or the
+ * person's direct messages), then the open channel with its member list. Agents are not in the
+ * column; mention one in a message to ask it for work.
  */
 export function SpaceChatEntry(props: React.ComponentProps<typeof SpaceChat>) {
   const { spaceId } = props;
@@ -44,6 +50,8 @@ export function SpaceChatEntry(props: React.ComponentProps<typeof SpaceChat>) {
   const nodesLoaded = useSpacesStore((s) => Boolean(s.nodesBySpace[spaceId]));
   const loadNodes = useSpacesStore((s) => s.loadNodes);
   const { isOwner } = useSpaceChatAccess(spaceId);
+  const space = useSpacesStore((s) => s.spaces.find((item) => item.id === spaceId));
+  const canManageChannels = spaceCan(space, "channels.manage") || isOwner;
   const [editing, setEditing] = useState<SpaceConversation | null>();
   const [directMessageOpen, setDirectMessageOpen] = useState(false);
   const [deleting, setDeleting] = useState<SpaceConversation | null>(null);
@@ -51,12 +59,12 @@ export function SpaceChatEntry(props: React.ComponentProps<typeof SpaceChat>) {
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const deletableConversationIds = useMemo(
     () =>
-      isOwner
+      canManageChannels
         ? data.conversations
             .filter((conversation) => conversation.kind !== "dm")
             .map((conversation) => conversation.id)
         : [],
-    [data.conversations, isOwner],
+    [data.conversations, canManageChannels],
   );
   const selection = useRangeSelection(deletableConversationIds);
   useNotice(Boolean(deleteError), {
@@ -76,7 +84,7 @@ export function SpaceChatEntry(props: React.ComponentProps<typeof SpaceChat>) {
     }
   };
   const deleteMany = async (ids: string[]) => {
-    if (bulkDeleting || !isOwner || !ids.length) return;
+    if (bulkDeleting || !canManageChannels || !ids.length) return;
     if (
       !(await confirmAction(
         `Delete ${ids.length} selected ${ids.length === 1 ? "channel" : "channels"} and their ` +
@@ -115,32 +123,32 @@ export function SpaceChatEntry(props: React.ComponentProps<typeof SpaceChat>) {
     );
 
   return (
-    <div className="flex h-full min-h-0 min-w-0">
-      <ChatSidebar
-        spaceName={props.spaceName}
-        conversations={data.conversations}
-        everyoneUnread={everyoneUnread}
-        loading={data.loading}
-        currentUserId={user?.id}
-        selected={conversationId || "everyone"}
-        canWrite={!referenceOnly}
-        isOwner={isOwner}
-        onSelect={select}
-        onEdit={setEditing}
-        onDelete={(conversation) => {
-          setDeleteError("");
-          setDeleting(conversation);
-        }}
-        onDeleteMany={(ids) => void deleteMany(ids)}
-        selectedIds={selection.selectedIds}
-        onRangeSelect={selection.select}
-        onClearSelection={selection.clear}
-        onNewConversation={() => setEditing(null)}
-        onNewDirectMessage={() => setDirectMessageOpen(true)}
-      />
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <SpaceChat {...props} />
-      </div>
+    <FluxerChatRoot className={cx(guildLayout.guildLayoutContent, shell.layout)}>
+      {space ? (
+        <FluxerSidebar
+          space={space}
+          conversations={data.conversations}
+          everyoneUnread={everyoneUnread}
+          loading={data.loading}
+          currentUserId={user?.id}
+          selected={conversationId || "everyone"}
+          canWrite={!referenceOnly}
+          canManageChannels={canManageChannels && !referenceOnly}
+          onSelect={select}
+          onEdit={setEditing}
+          onDelete={(conversation) => {
+            setDeleteError("");
+            setDeleting(conversation);
+          }}
+          onDeleteMany={(ids) => void deleteMany(ids)}
+          selectedIds={selection.selectedIds}
+          onRangeSelect={selection.select}
+          onClearSelection={selection.clear}
+          onNewConversation={() => setEditing(null)}
+          onNewDirectMessage={() => setDirectMessageOpen(true)}
+        />
+      ) : null}
+      <SpaceChat {...props} />
       <AlertDialog open={deleting !== null} onOpenChange={(open) => !open && setDeleting(null)}>
         <AlertDialogContent>
           <AlertDialogTitle>Delete this channel?</AlertDialogTitle>
@@ -181,6 +189,6 @@ export function SpaceChatEntry(props: React.ComponentProps<typeof SpaceChat>) {
           navigate(spaceChatConversationPath(spaceId, saved.id));
         }}
       />
-    </div>
+    </FluxerChatRoot>
   );
 }

@@ -1,0 +1,17 @@
+/* SPDX-License-Identifier: AGPL-3.0-or-later
+ * Adapted from Fluxer (https://github.com/fluxerapp/fluxer), fluxer_app/src/features/channel/components/MessageCharacterCounter.module.css.
+ * Sizes converted from rem to px so they render at Fluxer's size under Misty's 110% root;
+ * hover no longer waits on Fluxer's window-focus class; .theme-light is Misty's light theme. */
+
+.container {
+	position: absolute;
+	inset-inline-end: var(--composer-box-padding-inline, 0px);
+	bottom: var(--composer-status-safe-gap, 8px);
+	z-index: 4;
+	padding: 0 4px;
+	border-radius: 4px;
+	background: var(--composer-surface-fill, var(--background-secondary-lighter));
+	text-shadow:
+		0 0 3px var(--composer-surface-fill),
+		0 0 8px var(--composer-surface-fill);
+}

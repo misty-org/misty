@@ -1,17 +1,23 @@
 import { createDeviceSetting } from "@/shared/lib/deviceSetting";
 
 /**
- * Which chat sidebar sections are collapsed, kept in `misty.db` for this device and the same in
- * every Space. Earlier versions kept it in webview storage, which moves in once.
+ * The channel column's choices, kept in `misty.db` for this device and the same in every Space:
+ * `direct` is which list the toggle shows (direct messages when true, channels when false, the
+ * one holding the open chat until the person flips it); `hideMembers` folds the member list
+ * away. Earlier versions kept sections' folds
+ * here, read from webview storage once; those keys are dropped.
  */
 export const useChatSidebarPreferences = createDeviceSetting<Record<string, boolean>>({
   scope: "spaces.chat.sidebar",
   defaults: {},
-  legacyKey: "misty:chat-sidebar-collapsed",
+  legacyKey: "misty:chat-sidebar-choices",
   normalize: (stored) => {
-    const collapsed: Record<string, boolean> = {};
-    if (!stored || typeof stored !== "object" || Array.isArray(stored)) return collapsed;
-    for (const [id, value] of Object.entries(stored)) if (value === true) collapsed[id] = true;
-    return collapsed;
+    const choices: Record<string, boolean> = {};
+    if (!stored || typeof stored !== "object" || Array.isArray(stored)) return choices;
+    for (const key of ["direct", "hideMembers"]) {
+      const value = (stored as Record<string, unknown>)[key];
+      if (typeof value === "boolean") choices[key] = value;
+    }
+    return choices;
   },
 });

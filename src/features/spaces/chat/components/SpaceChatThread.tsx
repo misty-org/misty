@@ -6,9 +6,13 @@ import type { MessageEditingState } from "../hooks/useMessageEditing";
 import type { useSpaceChatScope, useSpaceChatStore } from "../hooks/useSpaceChatData";
 import type { useSpaceChatMessageActions } from "../hooks/useSpaceChatMessageActions";
 import type { SpaceChatAccess } from "../hooks/useSpaceChatAccess";
-import { SpaceChatMessages } from "./ChatMessages";
+import type { SpaceChatMessagesProps } from "./ChatMessages";
+import { FluxerMessages } from "../fluxer/FluxerMessages";
 
-export interface SpaceChatThreadProps {
+export interface SpaceChatThreadProps extends Pick<
+  SpaceChatMessagesProps,
+  "memberColors" | "myRoleIds" | "canManageMessages" | "firstUnreadId" | "channel"
+> {
   spaceId: string;
   access: SpaceChatAccess;
   scope: ReturnType<typeof useSpaceChatScope>;
@@ -39,7 +43,7 @@ export function SpaceChatThread(props: SpaceChatThreadProps) {
   const { spaceId, access, scope, store, editing, actions, suggestions } = props;
 
   return (
-    <SpaceChatMessages
+    <FluxerMessages
       error={props.error}
       loading={props.loading}
       messages={scope.messages}
@@ -53,6 +57,11 @@ export function SpaceChatThread(props: SpaceChatThreadProps) {
       libraryItems={suggestions.libraryItems}
       spaceId={spaceId}
       directRecipient={scope.directRecipient}
+      memberColors={props.memberColors}
+      myRoleIds={props.myRoleIds}
+      canManageMessages={props.canManageMessages}
+      firstUnreadId={props.firstUnreadId}
+      channel={props.channel}
       onStarter={(starter) => {
         if (starter === "files" || starter === "library") return props.onOpenPicker(starter);
         props.onBeginMention();

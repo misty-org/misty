@@ -84,7 +84,8 @@ it("shows existing Everyone messages when opening Misty without a conversation s
       <SpaceChat spaceId="space-a" spaceName="Our Space" />
     </MemoryRouter>,
   );
-  expect(ui.getByRole("heading", { name: "Everyone" })).toBeTruthy();
+  // The Space-wide channel, named in the channel header as Discord names a channel.
+  expect(ui.getByRole("heading", { name: "everyone" })).toBeTruthy();
   expect(ui.getByText("Our earlier Space conversation")).toBeTruthy();
   expect(ui.queryByText("No Misty conversations yet")).toBeNull();
   expect(conversations).not.toHaveBeenCalled();

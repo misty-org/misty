@@ -1,0 +1,65 @@
+/* SPDX-License-Identifier: AGPL-3.0-or-later
+ * Space chat's root, as Fluxer's <html> is styled (https://github.com/fluxerapp/fluxer):
+ * fluxer_app/src/app/globals.css (html) and features/theme/styles/preflight.css. The type is
+ * Misty's own (--font-sans and --font-mono from src/styles/theme.css), not Fluxer Sans. */
+
+.fluxer-chat {
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.5;
+  font-optical-sizing: auto;
+  font-feature-settings: normal;
+  font-variation-settings: normal;
+  font-variant-emoji: unicode;
+  letter-spacing: normal;
+  color: var(--text-primary);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.fluxer-chat :where(button, input, select, optgroup, textarea) {
+  font: inherit;
+  letter-spacing: inherit;
+  color: inherit;
+}
+
+.fluxer-chat :where(b, strong) {
+  font-weight: 600;
+}
+
+.fluxer-chat :where(button, input, a, [role="button"], [tabindex]) {
+  outline: none;
+}
+
+.fluxer-chat ::selection {
+  background-color: var(--text-selection);
+}
+
+/* fluxer_app/src/app/globals.css: emoji (Twemoji images, or the character when it has none). */
+.fluxer-chat .emoji {
+  display: inline-block;
+  width: var(--emoji-size-emoji);
+  height: var(--emoji-size-emoji);
+  object-fit: contain;
+  vertical-align: -0.4em;
+}
+
+.fluxer-chat .emoji.jumboable {
+  width: var(--emoji-size-jumbo-emoji);
+  height: var(--emoji-size-jumbo-emoji);
+  min-height: var(--emoji-size-jumbo-emoji);
+}
+
+.fluxer-chat .emoji:not(img) {
+  font-size: var(--emoji-size-emoji);
+  font-variant-emoji: emoji;
+  line-height: 1;
+  width: 1em;
+  height: 1em;
+}
+
+.fluxer-chat .emoji.jumboable:not(img) {
+  font-size: var(--emoji-size-jumbo-emoji);
+  width: 1em;
+  height: 1em;
+  min-height: 1em;
+}

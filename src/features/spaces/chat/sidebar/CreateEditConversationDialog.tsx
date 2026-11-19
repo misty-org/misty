@@ -8,12 +8,21 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  ChoiceList,
   Input,
+  Switch,
   Text,
 } from "@/shared/ui";
+import { Lock } from "lucide-react";
+import { useSpaceRoles } from "../../roles/useSpaceRoles";
+import { allowedRoleIds, withPrivacy } from "../../roles/channelPrivacy";
+import { isPrivateChannel } from "./conversationGroups";
 import { useEffect, useState, type FormEvent } from "react";
 
-/** Creates or renames a group chat, which is public to the Space, so it has no member list. */
+/**
+ * Creates or edits a channel: its name, and whether it is private, seen only by the roles picked
+ * (and whoever may manage channels), as in Discord.
+ */
 export function CreateEditConversationDialog({
   spaceId,
   open,
@@ -31,12 +40,19 @@ export function CreateEditConversationDialog({
   const [title, setTitle] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const roles = useSpaceRoles(spaceId);
+  const defaultRoleId = roles?.find((role) => role.is_default)?.id ?? "";
+  const pickable = (roles ?? []).filter((role) => !role.is_default);
+  const [isPrivate, setPrivate] = useState(false);
+  const [allowed, setAllowed] = useState<string[]>([]);
 
   useEffect(() => {
     if (!open) return;
     setError("");
     setTitle(conversation?.title ?? "");
-  }, [open, conversation]);
+    setPrivate(Boolean(conversation && isPrivateChannel(conversation, defaultRoleId)));
+    setAllowed(allowedRoleIds(conversation));
+  }, [open, conversation, defaultRoleId]);
 
   const canSave = Boolean(title.trim()) && !saving;
 
@@ -52,9 +68,20 @@ export function CreateEditConversationDialog({
     setError("");
     try {
       const name = title.trim().slice(0, 80);
-      const saved = conversation
+      let saved = conversation
         ? await spacesApi.updateConversation(spaceId, conversation.id, name)
         : await spacesApi.createConversation(spaceId, name);
+      const wasPrivate = Boolean(conversation && isPrivateChannel(conversation, defaultRoleId));
+      const before = allowedRoleIds(conversation).sort().join();
+      if (
+        defaultRoleId &&
+        (isPrivate !== wasPrivate || (isPrivate && before !== [...allowed].sort().join()))
+      )
+        saved = await spacesApi.setChannelOverwrites(
+          spaceId,
+          saved.id,
+          withPrivacy(saved.overwrites ?? [], defaultRoleId, isPrivate, allowed),
+        );
       onSaved(saved);
       onOpenChange(false);
     } catch (reason) {
@@ -69,7 +96,7 @@ export function CreateEditConversationDialog({
       <DialogContent aria-describedby={undefined} className="max-w-sm">
         <form onSubmit={(event) => void submit(event)}>
           <DialogHeader>
-            <DialogTitle>{conversation ? "Rename channel" : "New channel"}</DialogTitle>
+            <DialogTitle>{conversation ? "Edit channel" : "New channel"}</DialogTitle>
           </DialogHeader>
           <Text bare as="label" tone="muted" weight="medium" className="mt-5 grid gap-2 text-xs">
             Name
@@ -79,6 +106,37 @@ export function CreateEditConversationDialog({
               onChange={(event) => setTitle(event.target.value)}
             />
           </Text>
+          {defaultRoleId ? (
+            <Text
+              bare
+              as="label"
+              tone="default"
+              weight="medium"
+              className="mt-5 flex items-center justify-between gap-3 text-control"
+            >
+              <span className="flex items-center gap-2">
+                <Lock aria-hidden="true" />
+                Private channel
+              </span>
+              <Switch checked={isPrivate} onCheckedChange={setPrivate} />
+            </Text>
+          ) : null}
+          {isPrivate && pickable.length ? (
+            <ChoiceList
+              className="mt-3"
+              label="Roles that can see this channel"
+              multiple
+              options={pickable.map((role) => ({ value: role.id, label: role.name }))}
+              selected={allowed}
+              onSelect={(roleId) =>
+                setAllowed((current) =>
+                  current.includes(roleId)
+                    ? current.filter((id) => id !== roleId)
+                    : [...current, roleId],
+                )
+              }
+            />
+          ) : null}
           {error ? (
             <SystemErrorNotice
               error={error}

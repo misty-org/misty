@@ -60,16 +60,23 @@ export function useSpaceChatTyping(options: {
     return () => clearTimeout(timer);
   }, [typingByUser]);
 
+  // Who is typing now, besides the person, by name.
+  const names = useMemo(
+    () =>
+      Object.entries(typingByUser)
+        .filter(([userId, expiresAt]) => userId !== currentUserId && expiresAt > now)
+        .map(([userId]) => members.find((member) => member.user_id === userId))
+        .filter((member): member is NonNullable<typeof member> => Boolean(member))
+        .map((member) => ({ userId: member.user_id, name: member.name })),
+    [currentUserId, members, now, typingByUser],
+  );
   const label = useMemo(() => {
-    const names = Object.entries(typingByUser)
-      .filter(([userId, expiresAt]) => userId !== currentUserId && expiresAt > now)
-      .map(([userId]) => members.find((member) => member.user_id === userId)?.name)
-      .filter((name): name is string => Boolean(name));
-    if (names.length === 0) return "";
-    if (names.length === 1) return `${names[0]} is typing…`;
-    if (names.length === 2) return `${names[0]} and ${names[1]} are typing…`;
-    return `${names[0]}, ${names[1]} and ${names.length - 2} others are typing…`;
-  }, [currentUserId, members, now, typingByUser]);
+    const named = names.map((person) => person.name);
+    if (named.length === 0) return "";
+    if (named.length === 1) return `${named[0]} is typing…`;
+    if (named.length === 2) return `${named[0]} and ${named[1]} are typing…`;
+    return `${named[0]}, ${named[1]} and ${named.length - 2} others are typing…`;
+  }, [names]);
 
-  return { label, onTextInput, stop };
+  return { label, names, onTextInput, stop };
 }

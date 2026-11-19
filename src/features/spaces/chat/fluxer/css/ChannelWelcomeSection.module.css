@@ -1,0 +1,58 @@
+/* SPDX-License-Identifier: AGPL-3.0-or-later
+ * Adapted from Fluxer (https://github.com/fluxerapp/fluxer), fluxer_app/src/features/channel/components/ChannelWelcomeSection.module.css.
+ * Sizes converted from rem to px so they render at Fluxer's size under Misty's 110% root;
+ * hover no longer waits on Fluxer's window-focus class; .theme-light is Misty's light theme. */
+
+.channelIcon {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	height: 80px;
+	width: 80px;
+	flex-shrink: 0;
+	border-radius: var(--radius-full);
+	background-color: var(--channel-welcome-icon-bg, var(--guild-list-foreground));
+	background-size: cover;
+	background-position: center;
+	font-weight: 600;
+	font-size: 20px;
+	color: var(--text-primary);
+	container-type: size;
+}
+
+:global(:root[data-theme='light']) .channelIcon {
+	--channel-welcome-icon-bg: color-mix(in srgb, var(--guild-list-foreground) 55%, var(--background-primary) 45%);
+}
+
+.container {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	margin: 16px;
+	margin-top: auto;
+	margin-bottom: 32px;
+	min-width: 0;
+	padding-top: 120px;
+	color: var(--text-primary);
+}
+
+.heading {
+	margin-top: 12px;
+	font-size: 30px;
+	font-weight: 600;
+	word-break: break-word;
+	overflow-wrap: break-word;
+	overflow: hidden;
+}
+
+.description {
+	min-width: 0;
+	font-size: 18px;
+	color: var(--text-primary-muted);
+	overflow: hidden;
+}
+
+.iconSize {
+	height: 48px;
+	width: 48px;
+}

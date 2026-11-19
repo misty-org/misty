@@ -1,0 +1,35 @@
+/* SPDX-License-Identifier: AGPL-3.0-or-later
+ * Adapted from Fluxer (https://github.com/fluxerapp/fluxer), fluxer_app/src/features/ui/character_counter/CharacterCounter.module.css.
+ * Sizes converted from rem to px so they render at Fluxer's size under Misty's 110% root;
+ * hover no longer waits on Fluxer's window-focus class; .theme-light is Misty's light theme. */
+
+.counter {
+	font-family: ui-monospace, monospace;
+	font-size: 12px;
+	line-height: 16px;
+}
+
+.counterButton {
+	composes: counter;
+	cursor: pointer;
+	transition-property: opacity;
+	transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+	transition-duration: 150ms;
+}
+
+.counterButton:hover {
+	opacity: 0.8;
+}
+
+.counterSpan {
+	composes: counter;
+	cursor: default;
+}
+
+.textDanger {
+	color: var(--status-danger);
+}
+
+.textTertiary {
+	color: var(--text-tertiary);
+}

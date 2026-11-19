@@ -1,16 +1,27 @@
 import type { MistyPickerSource } from "@/features/files";
-import { Surface } from "@/shared/ui";
+import { FluxerChatRoot } from "./fluxer/FluxerChatRoot";
+import { FluxerChannelHeader } from "./fluxer/FluxerChannelHeader";
+import { FluxerComposer } from "./fluxer/FluxerComposer";
+import { FluxerMemberList } from "./fluxer/FluxerMemberList";
+import { FluxerSearchResults } from "./fluxer/FluxerSearchResults";
+import { cx } from "./fluxer/cx";
+import indexPage from "./fluxer/css/ChannelIndexPage.module.css";
+import chatLayout from "./fluxer/css/ChannelChatLayout.module.css";
+import { useSpacesStore } from "../list/useSpacesStore";
+import { spaceCan, useMemberColors, useSpaceRoles } from "../roles/useSpaceRoles";
+import { isPrivateChannel } from "./sidebar/conversationGroups";
+import { useChatSidebarPreferences } from "./sidebar/chatSidebarPreferences";
+import { useSpaceEveryoneUnread } from "./spaceConversationsResource";
 import { useAuth } from "@/features/account";
 import { useNativeSessionStore } from "@/features/account";
 import { useSpaceChatDraft } from "./composer/useSpaceChatDraft";
 import { useWorkspaceViewTitle } from "@/features/app-windows";
 import { SpaceSetupCards } from "../components/SpaceSetupCards";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { spaceChatPath } from "./chatRoute";
+import { spaceChatConversationPath, spaceChatPath } from "./chatRoute";
 import { DeleteMessageDialog } from "./components/ChatMessages";
 import { conversationName } from "./sidebar/conversationGroups";
-import { SpaceChatComposerArea } from "./components/SpaceChatComposerArea";
 import { SpaceChatThread } from "./components/SpaceChatThread";
 import { useChatScrollRestoration } from "./hooks/useChatScrollRestoration";
 import { useChatSuggestions } from "./hooks/useChatSuggestions";
@@ -24,11 +35,7 @@ import { useSpaceChatTyping } from "./hooks/useSpaceChatTyping";
 import { useSpaceConversationChat } from "./hooks/useSpaceConversationChat";
 import { useSpaceChatAiAdapter } from "./hooks/useSpaceChatAiAdapter";
 import { useChatReadReceipts } from "./hooks/useChatReadReceipts";
-import {
-  ChatTitleBar,
-  ConversationLoadState,
-  ConversationUnavailable,
-} from "./components/ConversationStates";
+import { ConversationLoadState, ConversationUnavailable } from "./components/ConversationStates";
 import { useBringMentionedAgents, useOwnMentionableAgents } from "./ownAgents";
 import { ChatThreadColumn } from "./components/ChatThreadColumn";
 import { useChatSidePanel } from "./chatSidePanelStore";
@@ -78,7 +85,53 @@ export function SpaceChat({
     currentUserId: user?.id,
     members: scope.members,
   });
-  useWorkspaceViewTitle(workspaceTabId, `${spaceName} Chat`);
+  const space = useSpacesStore((state) => state.spaces.find((item) => item.id === spaceId));
+  const roles = useSpaceRoles(spaceId);
+  const myRoleIds = useSpacesStore(
+    (state) =>
+      state.membersBySpace[spaceId]?.find((member) => member.user_id === user?.id)?.role_ids,
+  );
+  // The roles the person may @mention: those open to it, or every one for the owner and admins.
+  const mentionableRoles = useMemo(() => {
+    const anyRole = space?.role === "owner" || spaceCan(space, "administrator");
+    return (roles ?? []).filter((role) => !role.is_default && (role.mentionable || anyRole));
+  }, [roles, space]);
+  const memberColors = useMemberColors(spaceId);
+  const everyoneUnread = useSpaceEveryoneUnread(spaceId);
+  const preferences = useChatSidebarPreferences((state) => state.value);
+  const savePreferences = useChatSidebarPreferences((state) => state.set);
+  const membersShown = !preferences.hideMembers;
+  const conversation = scope.activeConversation;
+  const isDirect = conversation?.kind === "dm";
+  const channelName = conversation ? conversationName(conversation, user?.id) : "everyone";
+  const defaultRoleId = roles?.find((role) => role.is_default)?.id;
+  const privateChannel = Boolean(conversation && isPrivateChannel(conversation, defaultRoleId));
+  // In a channel the server says what the person may do there; elsewhere the Space's word holds.
+  const canManageMessages = conversation?.permissions
+    ? conversation.permissions.includes("messages.manage") ||
+      spaceCan(space, "administrator") ||
+      space?.role === "owner"
+    : spaceCan(space, "messages.manage");
+  useWorkspaceViewTitle(
+    workspaceTabId,
+    isDirect ? `@${channelName} · ${spaceName}` : `#${channelName} · ${spaceName}`,
+  );
+  // Where the unread messages begin, as they were when the chat opened: reading them clears the
+  // count, but the line stays until another chat opens.
+  const unreadAtOpen = useRef<{ key: string; count: number } | null>(null);
+  const openKey = `${spaceId}:${conversationId}`;
+  if (unreadAtOpen.current?.key !== openKey && (conversationId ? conversation : true))
+    unreadAtOpen.current = {
+      key: openKey,
+      count: conversationId ? (conversation?.unread_count ?? 0) : everyoneUnread,
+    };
+  const unreadCount = unreadAtOpen.current?.count ?? 0;
+  const fromOthers = unreadCount
+    ? scope.messages.filter((message) => message.sender_user_id !== user?.id)
+    : [];
+  const firstUnreadId = unreadCount
+    ? fromOthers[Math.max(0, fromOthers.length - unreadCount)]?.id
+    : undefined;
   const draft = useSpaceChatDraft(spaceId, conversationId);
   const editing = useMessageEditing();
   // Only the person's own agents can be @mentioned, and so run; nobody runs anyone else's.
@@ -92,8 +145,14 @@ export function SpaceChat({
     canBrowseLibrary: access.canWriteMessages,
     canReadLibrary: true,
     selectedLibraryIds: draft.selectedLibraryIds,
+    roles: mentionableRoles,
     attachmentSlotsLeft: draft.attachmentSlotsLeft,
   });
+  // The search Enter last ran in the header; its results take the member list's place.
+  const [searchedText, setSearchedText] = useState("");
+  const closeSearch = () => {
+    setSearchedText("");
+  };
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerSource, setPickerSource] = useState<MistyPickerSource>("files");
   const deleting = useMessageDeleteTarget([user?.id, spaceId, conversationId]);
@@ -130,6 +189,7 @@ export function SpaceChat({
     activeConversation: scope.activeConversation,
     members: scope.members,
     agents,
+    roles: mentionableRoles,
     beforeSend: bringMentionedAgents,
     draft,
     editing,
@@ -243,29 +303,29 @@ export function SpaceChat({
         onBack={() => (onBack ? onBack() : navigate(spaceChatPath(spaceId), { replace: true }))}
       />
     );
-  return (
-    <Surface ref={chatRootRef} tone="page" className="relative flex h-full min-h-0 overflow-hidden">
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        {panel ? null : (
-          <ChatTitleBar
-            spaceId={spaceId}
-            title={
-              scope.activeConversation
-                ? conversationName(scope.activeConversation, user?.id)
-                : "Everyone"
-            }
-          />
-        )}
+  const thread = threadRootId ? (
+    <ChatThreadColumn
+      rootId={threadRootId}
+      messages={scope.messages}
+      canWrite={access.canWriteMessages}
+      typingLabel={typing.label}
+      onTypingInput={typing.onTextInput}
+      onStopTyping={typing.stop}
+      onSend={actions.sendReply}
+    />
+  ) : null;
+  const chat = (
+    <div ref={chatRootRef} className={chatLayout.container}>
+      {!conversationId ? (
+        <SpaceSetupCards
+          spaceId={spaceId}
+          isOwner={access.isOwner}
+          showInvitation={searchParams.get("created") === "1"}
+          dismissible
+        />
+      ) : null}
 
-        {!conversationId ? (
-          <SpaceSetupCards
-            spaceId={spaceId}
-            isOwner={access.isOwner}
-            showInvitation={searchParams.get("created") === "1"}
-            dismissible
-          />
-        ) : null}
-
+      <div className={chatLayout.messagesArea}>
         <SpaceChatThread
           spaceId={spaceId}
           access={access}
@@ -283,6 +343,11 @@ export function SpaceChat({
           onScroll={chatScroll.onScroll}
           hasOlderMessages={history !== "complete"}
           onJumpToMessage={setJumpTargetId}
+          memberColors={memberColors}
+          myRoleIds={myRoleIds}
+          canManageMessages={canManageMessages}
+          firstUnreadId={firstUnreadId}
+          channel={isDirect ? undefined : { name: channelName, private: privateChannel }}
           onOpenPicker={openPicker}
           onBeginMention={input.beginMention}
           onReply={(id) => {
@@ -295,49 +360,131 @@ export function SpaceChat({
             else void store.loadMessages(spaceId);
           }}
         />
+      </div>
 
-        <SpaceChatComposerArea
-          spaceId={spaceId}
-          canWrite={access.canWriteMessages}
-          isConversation={Boolean(conversationId)}
-          draft={draft}
-          suggestions={suggestions}
-          input={input}
-          typing={typing}
-          members={scope.members}
-          agents={agents}
-          messages={scope.messages}
-          pickerOpen={pickerOpen}
-          pickerSource={pickerSource}
-          onOpenPicker={openPicker}
-          onClosePicker={() => setPickerOpen(false)}
-          onSubmit={(event) => void actions.submit(event)}
-        />
+      <FluxerComposer
+        spaceId={spaceId}
+        canWrite={access.canWriteMessages}
+        isConversation={Boolean(conversationId)}
+        draft={draft}
+        suggestions={suggestions}
+        input={input}
+        typing={typing}
+        members={scope.members}
+        agents={agents}
+        messages={scope.messages}
+        memberColors={memberColors}
+        pickerOpen={pickerOpen}
+        pickerSource={pickerSource}
+        onOpenPicker={openPicker}
+        onClosePicker={() => setPickerOpen(false)}
+        onSubmit={(event) => void actions.submit(event)}
+        onEditLast={() => {
+          const mine = [...scope.messages]
+            .reverse()
+            .find(
+              (message) =>
+                message.sender_kind === "person" &&
+                message.sender_user_id === user?.id &&
+                !message.local_delivery_state,
+            );
+          if (mine) editing.begin(mine);
+        }}
+        placeholder={isDirect ? `Message @${channelName}` : `Message #${channelName}`}
+      />
 
-        <DeleteMessageDialog
-          open={Boolean(messageToDelete)}
-          onOpenChange={(open) => {
-            if (!open) deleting.clear();
+      <DeleteMessageDialog
+        open={Boolean(messageToDelete)}
+        onOpenChange={(open) => {
+          if (!open) deleting.clear();
+        }}
+        onConfirm={() => {
+          if (!messageToDelete) return;
+          void actions.remove(messageToDelete).then((removed) => {
+            if (removed) deleting.clear();
+          });
+        }}
+      />
+    </div>
+  );
+  const members =
+    membersShown && space ? (
+      <FluxerMemberList
+        space={space}
+        spaceId={spaceId}
+        ownerUserId={space.owner_user_id}
+        currentUserId={user?.id}
+        visibleTo={
+          // A DM, or a private channel, lists only the people who can read it.
+          conversation && (isDirect || privateChannel)
+            ? (member) =>
+                conversation.participants.some((person) => person.user_id === member.user_id)
+            : undefined
+        }
+      />
+    ) : null;
+  const searchResults = searchedText ? (
+    <FluxerSearchResults
+      spaceId={spaceId}
+      query={searchedText}
+      whereSaid={(message) => {
+        const said = conversationChat.conversations.find(
+          (item) => item.id === message.conversation_id,
+        );
+        return said
+          ? { name: conversationName(said, user?.id), direct: said.kind === "dm" }
+          : { name: "everyone", direct: false };
+      }}
+      colorOf={(message) => memberColors?.get(message.sender_user_id)}
+      onOpen={(message) => {
+        const path = message.conversation_id
+          ? spaceChatConversationPath(spaceId, message.conversation_id)
+          : spaceChatPath(spaceId);
+        navigate(
+          `${path}${path.includes("?") ? "&" : "?"}message=${encodeURIComponent(message.id)}`,
+        );
+      }}
+    />
+  ) : null;
+  // The side panel has no room for a header or a member list: the chat and its thread alone.
+  if (panel)
+    return (
+      <FluxerChatRoot
+        className={cx(indexPage.channelGrid)}
+        style={{ display: "flex", height: "100%" }}
+      >
+        {chat}
+        {thread}
+      </FluxerChatRoot>
+    );
+  // Search results, then a thread, take the member list's place, as in Fluxer.
+  const side = searchResults ?? thread ?? members;
+  const body = (
+    <div className={indexPage.channelGrid}>
+      <div>
+        <FluxerChannelHeader
+          name={channelName}
+          direct={
+            isDirect && scope.directRecipient
+              ? { id: scope.directRecipient.userId, name: scope.directRecipient.name }
+              : undefined
+          }
+          locked={privateChannel}
+          membersShown={membersShown && !searchedText && !thread}
+          onToggleMembers={() => {
+            closeSearch();
+            savePreferences((current) => ({ ...current, hideMembers: membersShown }));
           }}
-          onConfirm={() => {
-            if (!messageToDelete) return;
-            void actions.remove(messageToDelete).then((removed) => {
-              if (removed) deleting.clear();
-            });
-          }}
+          searchQuery={searchedText}
+          onSearch={(query) => (query ? setSearchedText(query) : closeSearch())}
         />
       </div>
-      {threadRootId ? (
-        <ChatThreadColumn
-          rootId={threadRootId}
-          messages={scope.messages}
-          canWrite={access.canWriteMessages}
-          typingLabel={typing.label}
-          onTypingInput={typing.onTextInput}
-          onStopTyping={typing.stop}
-          onSend={actions.sendReply}
-        />
-      ) : null}
-    </Surface>
+      <div className={indexPage.contentGrid}>
+        {side === members && members ? <div className={indexPage.memberListDivider} /> : null}
+        <div className={indexPage.chatAreaSlot}>{chat}</div>
+        {side}
+      </div>
+    </div>
   );
+  return body;
 }

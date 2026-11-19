@@ -7,8 +7,8 @@ import { useEffect, useMemo, useState } from "react";
 const MAX_SUGGESTIONS = 24;
 
 /**
- * The `@` autocomplete: People, then the person's own agents, then unattached
- * Library items. Mentioning one of your agents runs it on your computer; nobody
+ * The `@` autocomplete: people, then the roles the person may mention, then their own agents,
+ * then unattached Library items. Mentioning one of your agents runs it on your computer; nobody
  * else's agents are offered.
  *
  * Library items are only offered while there is room left in the attachment
@@ -18,6 +18,8 @@ export function useChatSuggestions(options: {
   spaceId: string;
   members: SpaceMember[];
   agents?: readonly MentionableAgent[];
+  /** The roles the person may @mention here. */
+  roles?: readonly { id: string; name: string; color: string }[];
   currentUserId: string | undefined;
   canBrowseLibrary: boolean;
   canReadLibrary: boolean;
@@ -44,7 +46,7 @@ export function useChatSuggestions(options: {
       .then((result) => setLibraryItems(result.items))
       .catch((reason: unknown) => {
         setLibraryItems([]);
-        setError(reason instanceof Error ? reason.message : "Library items could not be loaded.");
+        setError(reason instanceof Error ? reason.message : "Media could not be loaded.");
       })
       .finally(() => setLoading(false));
   }, [options.canReadLibrary, options.spaceId]);
@@ -65,6 +67,13 @@ export function useChatSuggestions(options: {
       label: agent.agent_name,
       detail: "Your agent",
     }));
+    const roles: ChatComposerSuggestion[] = (options.roles ?? []).map((role) => ({
+      kind: "role",
+      id: role.id,
+      label: role.name,
+      detail: "Role",
+      color: role.color,
+    }));
     const library: ChatComposerSuggestion[] =
       canBrowseLibrary && options.attachmentSlotsLeft > 0
         ? libraryItems
@@ -77,7 +86,7 @@ export function useChatSuggestions(options: {
               item,
             }))
         : [];
-    return [...people, ...agents, ...library]
+    return [...people, ...roles, ...agents, ...library]
       .filter(
         (item) => !needle || `${item.label} ${item.detail}`.toLocaleLowerCase().includes(needle),
       )
@@ -88,6 +97,7 @@ export function useChatSuggestions(options: {
     libraryItems,
     members,
     options.agents,
+    options.roles,
     options.attachmentSlotsLeft,
     query,
     selectedLibraryIds,

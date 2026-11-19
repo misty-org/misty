@@ -1,0 +1,16 @@
+/* SPDX-License-Identifier: AGPL-3.0-or-later
+ * Adapted from Fluxer (https://github.com/fluxerapp/fluxer), fluxer_app/src/features/channel/components/TimestampWithTooltip.module.css.
+ * Sizes converted from rem to px so they render at Fluxer's size under Misty's 110% root;
+ * hover no longer waits on Fluxer's window-focus class; .theme-light is Misty's light theme. */
+
+.container {
+	position: relative;
+}
+
+.hiddenSpacer {
+	position: absolute;
+	z-index: -1;
+	display: inline-block;
+	font-style: normal;
+	opacity: 0;
+}

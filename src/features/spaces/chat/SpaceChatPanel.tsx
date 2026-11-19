@@ -1,8 +1,7 @@
 import { ArrowUpRight, X } from "lucide-react";
-import { lazy, Suspense } from "react";
 import { useAuth } from "@/features/account";
 import { createDeviceSettingMap } from "@/shared/lib/deviceSettingMap";
-import { IconButton, Surface } from "@/shared/ui";
+import { IconButton, Surface, lazyTool, ToolSuspense } from "@/shared/ui";
 import { spaceNavigationName } from "../routes/defaultSpace";
 import { useSpacesStore } from "../list/useSpacesStore";
 import { ChatPanelPicker } from "./ChatPanelPicker";
@@ -10,7 +9,7 @@ import { ChatMessagesSkeleton } from "./components/ChatMessagesSkeleton";
 import { useSpaceConversations } from "./sidebar/useSpaceConversations";
 import { homeChatSpace, useOpenSpaceChat } from "./useOpenSpaceChat";
 
-const SpaceChat = lazy(async () => {
+const SpaceChat = lazyTool(async () => {
   const { SpaceChat } = await import("./SpaceChat");
   return { default: SpaceChat };
 });
@@ -21,7 +20,7 @@ const panelConversations = createDeviceSettingMap<string>({
   normalize: (stored) => (typeof stored === "string" ? stored : undefined),
 });
 
-// The chat's code or its Space is still on its way: its messages' own shape stands in.
+// The panel's Space is still on its way: its messages' own shape stands in.
 const chatSkeleton = <ChatMessagesSkeleton framed />;
 
 /**
@@ -77,7 +76,8 @@ export function SpaceChatPanel(props: { side: "left" | "right"; onClose: () => v
       </header>
       <div className="flex min-h-0 flex-1 flex-col">
         {space ? (
-          <Suspense fallback={chatSkeleton}>
+          // The chat's own code is still loading: the chat says it is getting ready.
+          <ToolSuspense tool="chat">
             <SpaceChat
               spaceId={space.id}
               spaceName={spaceNavigationName(space)}
@@ -85,7 +85,7 @@ export function SpaceChatPanel(props: { side: "left" | "right"; onClose: () => v
               panel
               onBack={() => setConversationId("")}
             />
-          </Suspense>
+          </ToolSuspense>
         ) : (
           chatSkeleton
         )}

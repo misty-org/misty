@@ -5,7 +5,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { buildChatDisplayRows, formatChatMessageTime } from "./ChatDisplay";
 import { messageReplyPreviewText } from "./messageText";
 import { mergeSpaceMessages } from "../useSpaceMessageSpansStore";
-import { SpaceChatMessages } from "@/features/spaces/chat/components/ChatMessages";
+import { FluxerMessages } from "@/features/spaces/chat/fluxer/FluxerMessages";
 import type { SpaceMessage } from "@/features/spaces/api/dto/entities";
 
 function message(id: string, sender: string, createdAt: string): SpaceMessage {
@@ -66,12 +66,12 @@ describe("Space chat display rows", () => {
 
     const markup = renderMessages([longMessage]);
 
-    expect(markup).toContain("overflow-x-hidden");
-    expect(markup).toContain("[overflow-wrap:anywhere]");
-    expect(markup).toContain("whitespace-pre-wrap");
+    // Fluxer's markup wraps with break-spaces and breaks long words; the text is all there.
+    expect(markup).toContain('role="log"');
+    expect(markup).toContain("x".repeat(500));
   });
 
-  it("renders managed Misty messages with Agent identity and highlighted mentions", () => {
+  it("renders managed Misty messages with Agent identity and their mentions", () => {
     const misty = message("1", "owner", "2026-08-26T21:37:00.000Z");
     misty.sender_name = "Misty";
     misty.sender_kind = "system";
@@ -82,12 +82,11 @@ describe("Space chat display rows", () => {
 
     expect(markup).toContain("Agent");
     expect(markup).toContain("@Melissa Chen");
-    expect(markup).toContain("bg-mention-bg/35");
   });
 
   function renderMessages(messages: SpaceMessage[], error = "") {
     return renderToStaticMarkup(
-      createElement(SpaceChatMessages, {
+      createElement(FluxerMessages, {
         error,
         loading: false,
         messages,

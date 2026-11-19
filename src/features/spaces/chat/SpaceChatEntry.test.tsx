@@ -38,7 +38,12 @@ function Route() {
 }
 afterEach(cleanup);
 const mount = (path: string) => {
-  useSpacesStore.setState({ membersBySpace: { test: [] }, nodesBySpace: { test: [] }, spaces: [] });
+  // The channel column shows once the Space itself is known.
+  useSpacesStore.setState({
+    membersBySpace: { test: [] },
+    nodesBySpace: { test: [] },
+    spaces: [{ id: "test", name: "Test", owner_user_id: "owner" } as never],
+  });
   render(
     <MemoryRouter initialEntries={[path]}>
       <SpaceChatEntry spaceId="test" spaceName="Test" />

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { Separator, Text } from "@/shared/ui";
+import { ChannelDivider } from "@/shared/ui";
 
 import { spacesApi } from "../../api/api";
 import { useSpacesStore } from "../../list/useSpacesStore";
@@ -55,6 +55,20 @@ export function formatChatMessageTime(value: string): string {
   }).format(new Date(value));
 }
 
+/**
+ * A message's time beside its sender, as Discord writes it: "Today at 10:50 PM", "Yesterday at
+ * 10:50 PM", then the date with the time.
+ */
+export function formatChatMessageStamp(value: string, now = new Date()): string {
+  const date = new Date(value);
+  const time = formatChatMessageTime(value);
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  if (sameLocalDate(date.toISOString(), now.toISOString())) return `Today at ${time}`;
+  if (sameLocalDate(date.toISOString(), yesterday.toISOString())) return `Yesterday at ${time}`;
+  return `${new Intl.DateTimeFormat(undefined, { dateStyle: "short" }).format(date)} ${time}`;
+}
+
 function formatChatDateDivider(value: string): string {
   return new Intl.DateTimeFormat(undefined, {
     month: "long",
@@ -81,20 +95,9 @@ function messageIdentity(message: SpaceMessage): string {
   ].join(":");
 }
 
-/**
- * `first:mt-0` because the leading divider sits directly under the header,
- * where its own top margin only compounds the scroller's padding.
- */
+/** A day's line across the history. */
 export function ChatDateDivider({ label }: { label: string }) {
-  return (
-    <div className="my-6 flex items-center gap-3 first:mt-0" role="separator" aria-label={label}>
-      <Separator className="flex-1" />
-      <Text bare tone="muted" weight="semibold" className="text-2xs">
-        {label}
-      </Text>
-      <Separator className="flex-1" />
-    </div>
-  );
+  return <ChannelDivider label={label} />;
 }
 
 export function useMemberAvatarUrls(

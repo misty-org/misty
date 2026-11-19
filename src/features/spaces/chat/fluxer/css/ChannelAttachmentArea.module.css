@@ -1,0 +1,317 @@
+/* SPDX-License-Identifier: AGPL-3.0-or-later
+ * Adapted from Fluxer (https://github.com/fluxerapp/fluxer), fluxer_app/src/features/channel/components/ChannelAttachmentArea.module.css.
+ * Sizes converted from rem to px so they render at Fluxer's size under Misty's 110% root;
+ * hover no longer waits on Fluxer's window-focus class; .theme-light is Misty's light theme. */
+
+.scroller {
+	margin-block: 0 2px;
+	margin-inline: 6px 0;
+}
+
+.channelAttachmentArea {
+	display: flex;
+	gap: 24px;
+	padding: 20px 10px 10px;
+	position: relative;
+	z-index: 1;
+}
+
+.upload {
+	display: inline-flex;
+	flex-direction: column;
+	background: var(--background-primary);
+	border-radius: 4px;
+	margin: 0;
+	padding: 8px;
+	position: relative;
+	min-width: 200px;
+	max-width: 200px;
+	min-height: 200px;
+	max-height: 200px;
+}
+
+.uploadContainer {
+	display: flex;
+	position: relative;
+	flex-direction: column;
+	height: 100%;
+	justify-content: space-between;
+}
+
+.mediaContainer {
+	position: relative;
+	flex: 1;
+	min-height: 0;
+	background-color: var(--background-tertiary);
+	border-radius: 4px;
+}
+
+.clickableMedia {
+	cursor: pointer;
+	width: 100%;
+	height: 100%;
+	display: block;
+	border: none;
+	background: none;
+	padding: 0;
+	margin: 0;
+}
+
+.mediaContainer > div:not([aria-expanded='false']),
+.mediaContainer > div:not([aria-expanded='false']) > div {
+	height: 100%;
+}
+
+.spoilerContainer {
+	height: 100%;
+	position: relative;
+	filter: blur(0);
+	border-radius: 4px;
+	background-color: hsla(0, 0%, 100%, 0.1);
+}
+
+.spoilerContainer.hidden {
+	overflow: hidden;
+}
+
+.spoilerContainer.hiddenSpoiler {
+	cursor: pointer;
+}
+
+.spoilerWarning {
+	font-size: 15px;
+	background-color: hsla(0, 0%, 0%, 0.6);
+	cursor: pointer;
+	font-weight: 600;
+	border-radius: 20px;
+	transition: background-color 0.2s;
+}
+
+.spoilerWarning:hover {
+	background-color: hsla(0, 0%, 0%, 0.8);
+}
+
+.obscureWarning {
+	position: absolute;
+	left: 50%;
+	top: 50%;
+	transform: translate(-50%, -50%);
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	z-index: 1;
+	padding: 8px 12px;
+	user-select: none;
+	-webkit-user-select: none;
+	color: hsl(216, 10%, 90%);
+}
+
+.spoilerInnerContainer {
+	width: 100%;
+	height: 100%;
+}
+
+.spoilerWrapper {
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	height: 100%;
+	width: 100%;
+	position: relative;
+}
+
+.spoiler {
+	filter: blur(44px);
+	pointer-events: none;
+}
+
+.media {
+	border-radius: 4px;
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	object-position: center;
+	color: transparent;
+	font-size: 0;
+}
+
+.tags {
+	position: absolute;
+	inset-inline-start: 3px;
+	bottom: 6px;
+}
+
+.filenameContainer {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	margin-top: 8px;
+	padding: 0 4px;
+	min-height: 40px;
+	flex-shrink: 0;
+	z-index: 1;
+}
+
+.filename {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-size: 13px;
+	font-weight: 500;
+	line-height: 1.2;
+	color: var(--text-primary);
+}
+
+.fileDetails {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	font-size: 11px;
+	color: var(--text-tertiary);
+	font-weight: 400;
+}
+
+.fileSize {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.fileExtension {
+	text-transform: uppercase;
+	font-weight: 600;
+	color: var(--brand-primary-light);
+	flex-shrink: 0;
+	margin-inline-start: 4px;
+}
+
+.actionBarContainer {
+	position: absolute;
+	top: 0;
+	inset-inline-end: 0;
+}
+
+.actionBar {
+	composes: toolbar from './ActionToolbar.module.css';
+	--attachment-action-bar-surface: var(--form-surface-background);
+	--attachment-action-bar-border: var(--background-modifier-accent);
+	--attachment-action-bar-hover-background: var(--surface-interactive-hover-bg);
+	--attachment-action-bar-danger-text: color-mix(in srgb, var(--status-danger) 78%, var(--text-primary) 22%);
+	--attachment-action-bar-danger-background: color-mix(
+		in srgb,
+		var(--status-danger) 6%,
+		var(--surface-interactive-hover-bg)
+	);
+	--action-toolbar-surface: var(--attachment-action-bar-surface);
+	--action-toolbar-border: var(--attachment-action-bar-border);
+	position: relative;
+	z-index: 1;
+	transform: translate(25%, -25%);
+}
+
+:global(html[dir='rtl']) .actionBar {
+	transform: translate(-25%, -25%);
+}
+
+.button {
+	composes: item from './ActionToolbar.module.css';
+}
+
+.button:not(.danger):hover {
+	color: var(--text-primary);
+	background: var(--attachment-action-bar-hover-background);
+}
+
+.button.danger {
+	color: var(--attachment-action-bar-danger-text);
+}
+
+.button.danger:hover {
+	background: var(--attachment-action-bar-danger-background);
+}
+
+.actionBarIcon {
+	width: 18px;
+	height: 18px;
+	display: block;
+	flex: 0 0 auto;
+	object-fit: contain;
+}
+
+.altTag {
+	color: black;
+	mix-blend-mode: screen;
+	background: var(--text-primary);
+	margin-inline-end: 4px;
+	text-transform: uppercase;
+	font-size: 10px;
+	font-weight: 600;
+	padding: 4px;
+	border-radius: 4px;
+}
+
+.icon {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	flex: 1;
+	min-height: 0;
+	background-color: var(--background-tertiary);
+	border-radius: 4px;
+}
+
+.iconImage {
+	width: 100px;
+	height: 100px;
+	color: var(--brand-primary-light);
+}
+
+.videoModal {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	border: none;
+	border-radius: 0;
+	background-color: transparent;
+	box-shadow: none;
+}
+
+.videoContainer {
+	position: relative;
+}
+
+.divider {
+	height: 1px;
+	background-color: var(--user-area-divider-color);
+	margin-inline-start: -16px;
+	margin-inline-end: -16px;
+}
+
+.dropIndicatorLeft::before {
+	content: '';
+	position: absolute;
+	top: 8px;
+	bottom: 8px;
+	inset-inline-start: 0;
+	width: 2px;
+	background: var(--brand-primary-light);
+	border-radius: 1px;
+	z-index: 1;
+}
+
+.dropIndicatorRight::after {
+	content: '';
+	position: absolute;
+	top: 8px;
+	bottom: 8px;
+	inset-inline-end: 0;
+	width: 2px;
+	background: var(--brand-primary-light);
+	border-radius: 1px;
+	z-index: 1;
+}
+
+:global(:root[data-theme='light']) .dropIndicatorLeft::before,
+:global(:root[data-theme='light']) .dropIndicatorRight::after {
+	background: var(--brand-primary-foreground);
+}

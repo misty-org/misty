@@ -95,10 +95,13 @@ export function buildMessageSpans(
   text: string,
   members: SpaceMember[],
   agents: readonly MentionableAgent[] = [],
+  /** The roles the sender may mention here. */
+  roles: readonly { id: string; name: string }[] = [],
 ): MessageSpan[] {
-  const candidates: { label: string; userId?: string; agentId?: string }[] = [
+  const candidates: { label: string; userId?: string; agentId?: string; roleId?: string }[] = [
     ...members.map((member) => ({ label: member.name, userId: member.user_id })),
     ...agents.map((agent) => ({ label: agent.agent_name, agentId: agent.agent_id })),
+    ...roles.map((role) => ({ label: role.name, roleId: role.id })),
   ]
     .filter((item) => item.label.trim())
     .sort((left, right) => right.label.length - left.label.length);
@@ -121,6 +124,8 @@ export function buildMessageSpans(
       spans.push({ type: "mention", user_id: candidate.userId, label: candidate.label });
     else if (candidate?.agentId)
       spans.push({ type: "mention", agent_id: candidate.agentId, label: candidate.label });
+    else if (candidate?.roleId)
+      spans.push({ type: "mention", role_id: candidate.roleId, label: candidate.label });
     else spans.push({ type: "text", text: match[0] });
     offset = index + match[0].length;
   }

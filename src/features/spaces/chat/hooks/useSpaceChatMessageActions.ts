@@ -20,6 +20,8 @@ export interface SpaceChatMessageActionsOptions {
   members: SpaceMember[];
   /** The person's own agents, the only ones they can @mention and so run. */
   agents?: MentionableAgent[];
+  /** The roles the person may @mention here. */
+  roles?: readonly { id: string; name: string }[];
   /** Runs before a message goes out, such as bringing a mentioned agent into the Space. */
   beforeSend?: (content: SpaceMessage["content"]) => Promise<void>;
   draft: SpaceChatDraft;
@@ -68,7 +70,7 @@ export function useSpaceChatMessageActions(options: SpaceChatMessageActionsOptio
     event.preventDefault();
     if (draft.isEmpty) return;
     const value = draft.text.trim();
-    const content = buildMessageSpans(value, members, options.agents);
+    const content = buildMessageSpans(value, members, options.agents, options.roles);
     const clientNonce = createClientNonce();
     const optimisticMessage: SpaceMessage = {
       seq: Date.now(),
@@ -107,7 +109,7 @@ export function useSpaceChatMessageActions(options: SpaceChatMessageActionsOptio
         sender_user_id: options.currentUser?.id ?? "",
         sender_name: options.currentUser?.name || "You",
         sender_kind: "person",
-        content: buildMessageSpans(value, members, options.agents),
+        content: buildMessageSpans(value, members, options.agents, options.roles),
         file_node_ids: [],
         library_item_ids: [],
         attachments: [],
@@ -201,7 +203,7 @@ export function useSpaceChatMessageActions(options: SpaceChatMessageActionsOptio
           spaceId,
           conversationId,
           message.id,
-          buildMessageSpans(value, members, options.agents),
+          buildMessageSpans(value, members, options.agents, options.roles),
           message.file_node_ids,
         );
         setGroupMessages((current) => mergeSpaceMessages(current, [saved]));
