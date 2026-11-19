@@ -1,4 +1,4 @@
-import { FolderOpen, LibraryBig } from "lucide-react";
+import { Clapperboard, FolderOpen } from "lucide-react";
 import { useState, type ComponentType } from "react";
 import type { MistyPickerProps, MistyPickerSource } from "./mistyPickerOptions";
 import { LibraryPickerPanel } from "./LibraryPickerSeam";
@@ -64,7 +64,7 @@ export function MistyPickerShell({
       onChange={setSource}
       options={[
         { value: "files", label: "Files", icon: FolderOpen },
-        { value: "library", label: "Library", icon: LibraryBig },
+        { value: "library", label: "Media", icon: Clapperboard },
       ]}
     />
   );
@@ -83,7 +83,7 @@ export function MistyPickerShell({
             <div className="min-w-0">
               <DialogTitle className="text-base">
                 {source === "library"
-                  ? "Choose from Library"
+                  ? "Choose from Media"
                   : title || (fileMode === "folder" ? "Choose a folder" : "Choose a file")}
               </DialogTitle>
             </div>
@@ -105,7 +105,11 @@ export function MistyPickerShell({
           </div>
 
           {spaceId && onChooseLibraryItems ? (
-            <div style={{ display: source === "library" ? "contents" : "none" }}>
+            // Its search bar, grid and footer are three rows of their own inside the body row.
+            <div
+              className="min-h-0 grid-rows-[auto_minmax(0,1fr)_auto]"
+              style={{ display: source === "library" ? "grid" : "none" }}
+            >
               <LibraryPickerPanel
                 embedded
                 active={source === "library"}

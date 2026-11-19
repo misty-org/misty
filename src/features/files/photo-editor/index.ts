@@ -20,5 +20,15 @@ export {
   type ImageEdit,
   type Mark,
 } from "./imageEdit";
-export { canvasToBlob, loadPhoto, preloadPhoto, renderFinal } from "./imageRender";
+export {
+  canvasToBlob,
+  loadPhoto,
+  preloadPhoto,
+  renderEdit,
+  renderFinal,
+  saveFormatFor,
+  type ImageMimeType,
+} from "./imageRender";
+export { applyImageChanges, ImageChangeRejected } from "./imageChanges";
+export { canRemoveBackground, removeBackground } from "./cutout";
 export { applyLibraryEditDefinition } from "./libraryEditDefinition";

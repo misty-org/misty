@@ -1,16 +1,8 @@
 import {
-  Button,
   ImageCropFrame,
   LivePointer,
-  Popover,
-  PopoverActions,
-  PopoverAnchor,
-  PopoverBody,
-  PopoverContent,
-  PopoverHeader,
   ShapeSelection,
   Surface,
-  Textarea,
   cn,
   type CropRect,
 } from "@/shared/ui";
@@ -19,23 +11,32 @@ import {
   useMemo,
   useRef,
   useState,
+  type DragEvent as ReactDragEvent,
   type PointerEvent as ReactPointerEvent,
 } from "react";
-import type { EditorMode, MarkStyle, MarkupTool, TextDraft } from "./editorTypes";
+import {
+  stickerDragType,
+  type EditorMode,
+  type MarkStyle,
+  type MarkupTool,
+  type TextDraft,
+} from "./editorTypes";
 import {
   defaultImageEdit,
   sourceToDrawing,
   topZ,
-  turnedSize,
   newMarkId,
   type ImageEdit,
   type Mark,
   type Point,
 } from "./imageEdit";
 import type { ImagePeer } from "./imagePresence";
-import { drawMarks, renderPhoto, workingCopy, type Drawn, type PhotoSource } from "./imageRender";
+import { renderPhoto, workingCopy, type Drawn, type PhotoSource } from "./imageRender";
+import { drawMarks } from "./markRender";
 import { markBounds, unionBounds } from "./markGeometry";
 import { MarkupLayer } from "./MarkupLayer";
+import { TextBox } from "./TextBox";
+import { useStickersLoaded } from "./stickers";
 import type { ImageDocument } from "./useImageDocument";
 import type { Viewport } from "./useViewport";
 
@@ -44,18 +45,6 @@ const previewSide = 2560;
 const quickSide = 1024;
 /** How soon after the last change a preview counts as settled, in milliseconds. */
 const settleMs = 260;
-
-/** The image's size on the stage, in its own pixels: what the viewport fits and zooms. */
-export function stageContent(
-  photo: { width: number; height: number },
-  edit: ImageEdit,
-  mode: { cropping: boolean; compare: boolean },
-) {
-  if (mode.compare) return { width: photo.width, height: photo.height };
-  const frame = turnedSize(photo.width, photo.height, edit.rotation);
-  if (mode.cropping) return frame;
-  return { width: frame.width * edit.crop.width, height: frame.height * edit.crop.height };
-}
 
 /**
  * The image being edited, as large as the viewport makes it: the photo with its edit, its marks
@@ -71,6 +60,8 @@ export function ImageStage(props: {
   /** The crop being dragged out while cropping, applied only when the person says so. */
   cropDraft: CropRect | null;
   onCropDraft: (crop: CropRect) => void;
+  /** The width over height, in pixels, the crop frame keeps to; null for any shape. */
+  cropRatio?: number | null;
   compare: boolean;
   readonly: boolean;
   viewport: Viewport;
@@ -87,6 +78,8 @@ export function ImageStage(props: {
   panning: boolean;
   textDraft: TextDraft | null;
   onTextDraft: (draft: TextDraft | null) => void;
+  /** A sticker dragged from the Stickers tab was let go over the image, at `at`. */
+  onPlaceSticker?: (id: string, at: Point) => void;
 }) {
   const { photo, edit, viewport, compare, readonly } = props;
   const cropping = props.mode === "crop" && Boolean(props.cropDraft) && !readonly && !compare;
@@ -160,7 +153,8 @@ export function ImageStage(props: {
   }, [photoKey, cropping, full, quick]);
 
   // ------------------------------------------------------------------------------------------
-  // Drawing the marks over it, with what is being drawn right now by anyone.
+  // Drawing the marks over it, with what is being drawn right now by anyone. Stickers still
+  // loading are drawn once they arrive.
 
   const [ownDraft, setOwnDraft] = useState<Mark | null>(null);
   const onDraft = props.onDraft;
@@ -174,6 +168,7 @@ export function ImageStage(props: {
     if (ownDraft) list.push(ownDraft);
     return list;
   }, [ownDraft, props.peers]);
+  const stickersArrived = useStickersLoaded(edit.marks);
   useEffect(() => {
     const frame = requestAnimationFrame(() => {
       const canvas = marksCanvas.current;
@@ -194,7 +189,7 @@ export function ImageStage(props: {
       }
     });
     return () => cancelAnimationFrame(frame);
-  }, [compare, drafts, drawnVersion, edit.marks]);
+  }, [compare, drafts, drawnVersion, edit.marks, stickersArrived]);
 
   // ------------------------------------------------------------------------------------------
   // Zooming with the wheel or a pinch, and moving the stage by dragging it.
@@ -276,6 +271,21 @@ export function ImageStage(props: {
     const inside = x >= 0 && y >= 0 && x <= box.width && y <= box.height;
     props.onPointer(inside ? toUnits(x, y) : null);
   };
+  // A sticker dragged in from the Stickers tab lands where it is let go.
+  const placeSticker = props.onPlaceSticker;
+  const takesStickers = Boolean(placeSticker) && !readonly && !compare && !cropping;
+  const onDragOver = (event: ReactDragEvent<HTMLElement>) => {
+    if (!takesStickers || !event.dataTransfer.types.includes(stickerDragType)) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "copy";
+  };
+  const onDrop = (event: ReactDragEvent<HTMLElement>) => {
+    const id = event.dataTransfer.getData(stickerDragType);
+    const box = boxRef.current?.getBoundingClientRect();
+    if (!takesStickers || !id || !box) return;
+    event.preventDefault();
+    placeSticker?.(id, toUnits(event.clientX - box.left, event.clientY - box.top));
+  };
   const endPan = (event: ReactPointerEvent<HTMLElement>) => {
     if (panGesture.current?.id !== event.pointerId) return;
     panGesture.current = null;
@@ -319,6 +329,8 @@ export function ImageStage(props: {
       onPointerUp={endPan}
       onPointerCancel={endPan}
       onPointerLeave={() => props.onPointer?.(null)}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
     >
       <div
         ref={boxRef}
@@ -345,7 +357,12 @@ export function ImageStage(props: {
           className="pointer-events-none absolute inset-0 block size-full"
         />
         {cropping && props.cropDraft ? (
-          <ImageCropFrame rect={props.cropDraft} label="Crop area" onChange={props.onCropDraft} />
+          <ImageCropFrame
+            rect={props.cropDraft}
+            ratio={props.cropRatio ?? null}
+            label="Crop area"
+            onChange={props.onCropDraft}
+          />
         ) : null}
         {peerSelections.map((selection) => (
           <ShapeSelection key={selection.key} outline={selection.outline} tone={selection.tone} />
@@ -426,76 +443,3 @@ export function ImageStage(props: {
 }
 
 const pointerAt = (point: { x: number; y: number }) => ({ left: point.x, top: point.y });
-
-/** The box text is written in: anchored where the text goes, Enter to add, Shift+Enter for a new line. */
-function TextBox(props: {
-  draft: TextDraft | null;
-  anchor: { x: number; y: number } | null;
-  onChange: (draft: TextDraft | null) => void;
-  onDone: (draft: TextDraft) => void;
-}) {
-  const { draft, anchor } = props;
-  const escaped = useRef(false);
-  return (
-    <Popover
-      open={Boolean(draft)}
-      onOpenChange={(open) => {
-        if (open || !draft) return;
-        // Clicking away keeps what was written; Escape drops it.
-        if (!escaped.current && draft.text.trim()) props.onDone(draft);
-        else props.onChange(null);
-        escaped.current = false;
-      }}
-    >
-      <PopoverAnchor asChild>
-        <span
-          aria-hidden="true"
-          className="pointer-events-none absolute size-px"
-          style={anchor ? { left: anchor.x, top: anchor.y } : undefined}
-        />
-      </PopoverAnchor>
-      <PopoverContent
-        size="md"
-        side="bottom"
-        align="start"
-        onOpenAutoFocus={(event) => event.preventDefault()}
-        onEscapeKeyDown={() => {
-          escaped.current = true;
-        }}
-      >
-        {draft ? (
-          <>
-            <PopoverHeader title={draft.markId ? "Edit text" : "Add text"} />
-            <PopoverBody>
-              <Textarea
-                aria-label="Text"
-                autoFocus
-                value={draft.text}
-                rows={2}
-                onChange={(event) => props.onChange({ ...draft, text: event.target.value })}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
-                    event.preventDefault();
-                    props.onDone(draft);
-                  }
-                }}
-              />
-            </PopoverBody>
-            <PopoverActions>
-              <Button variant="quiet" onClick={() => props.onChange(null)}>
-                Cancel
-              </Button>
-              <Button
-                variant="primary"
-                disabled={!draft.markId && !draft.text.trim()}
-                onClick={() => props.onDone(draft)}
-              >
-                {draft.markId ? "Done" : "Add"}
-              </Button>
-            </PopoverActions>
-          </>
-        ) : null}
-      </PopoverContent>
-    </Popover>
-  );
-}

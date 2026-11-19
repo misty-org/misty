@@ -1,5 +1,5 @@
 import { positiveBox, type Box, type Mark, type Point } from "./imageEdit";
-import { orderedMarks, textMetrics } from "./imageRender";
+import { orderedMarks, textMetrics } from "./markRender";
 
 /**
  * Where marks are and how they move, in the image's own space (fractions of its longer side).
@@ -12,7 +12,8 @@ const measureSide = 1000;
 
 /** A mark's bounds, its stroke included, in the image's own space. */
 export function markBounds(mark: Mark): Box {
-  const pad = mark.kind === "text" || mark.kind === "redact" ? 0 : mark.size / 2;
+  const pad =
+    mark.kind === "text" || mark.kind === "redact" || mark.kind === "sticker" ? 0 : mark.size / 2;
   switch (mark.kind) {
     case "pen": {
       const xs = mark.points.map((point) => point.x);
@@ -41,6 +42,7 @@ export function markBounds(mark: Mark): Box {
     case "ellipse":
       return padded(mark.box, mark.fill ? 0 : pad);
     case "redact":
+    case "sticker":
       return mark.box;
     case "text": {
       const metrics = textMetrics(mark.text || " ", mark.size, measureSide);
@@ -106,6 +108,7 @@ export function hitsMark(mark: Mark, point: Point, slack: number): boolean {
     // Shapes and boxes are picked anywhere inside them, which is how people point at them.
     case "rect":
     case "redact":
+    case "sticker":
       return inside(point, mark.box, slack);
     case "ellipse": {
       const { x, y, width, height } = mark.box;
@@ -157,6 +160,7 @@ export function moveMark(mark: Mark, dx: number, dy: number): Mark {
     case "rect":
     case "ellipse":
     case "redact":
+    case "sticker":
       return { ...mark, box: { ...mark.box, x: mark.box.x + dx, y: mark.box.y + dy } };
     case "text":
       return { ...mark, at: shift(mark.at) };
@@ -243,6 +247,7 @@ export function fitMark(mark: Mark, from: Box, to: Box): Mark {
     case "rect":
     case "ellipse":
     case "redact":
+    case "sticker":
       return { ...mark, box: mapBox(mark.box) };
     case "text": {
       const scale = Math.max(0.05, sy);

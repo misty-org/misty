@@ -9,6 +9,7 @@ import {
   type ImageEdit,
   type Mark,
   type Point,
+  type TextMark,
 } from "./imageEdit";
 import {
   boxHandles,
@@ -27,7 +28,14 @@ import type { ImageDocument } from "./useImageDocument";
 
 type Gesture =
   | { kind: "draw"; start: Point; mark: Mark }
-  | { kind: "move"; start: Point; origin: Record<string, Mark>; moved: boolean }
+  | {
+      kind: "move";
+      start: Point;
+      origin: Record<string, Mark>;
+      moved: boolean;
+      /** A text picked with the text tool: let go without moving it, and it opens to edit. */
+      opens?: TextMark;
+    }
   | {
       kind: "resize";
       start: Point;
@@ -128,11 +136,24 @@ export function MarkupLayer(props: {
       return;
     }
     if (tool === "text") {
-      event.preventDefault();
       const hit = markAt(edit.marks, point, slack);
-      if (hit?.kind === "text") props.onText({ at: hit.at, markId: hit.id, text: hit.text });
+      // A text is picked and can be dragged; let go where it was and it opens to edit.
+      if (hit?.kind === "text") {
+        capture(event);
+        props.onSelection([hit.id]);
+        gesture.current = {
+          kind: "move",
+          start: point,
+          origin: picked([hit.id]),
+          moved: false,
+          opens: hit,
+        };
+        return;
+      }
+      event.preventDefault();
+      props.onSelection([]);
       // The text's first line sits centered on where the person clicked.
-      else props.onText({ at: { x: point.x, y: point.y - style.text * 0.6 }, text: "" });
+      props.onText({ at: { x: point.x, y: point.y - style.text * 0.6 }, text: "" });
       return;
     }
     capture(event);
@@ -148,6 +169,8 @@ export function MarkupLayer(props: {
     if (!current) {
       if (tool === "select")
         setOverMark(Boolean(markAt(edit.marks, point, pickSlack * unitsPerPixel)));
+      else if (tool === "text")
+        setOverMark(markAt(edit.marks, point, pickSlack * unitsPerPixel)?.kind === "text");
       return;
     }
     const dx = point.x - current.start.x;
@@ -231,6 +254,12 @@ export function MarkupLayer(props: {
         return;
       }
       case "move":
+        if (current.moved) props.document.commit();
+        else if (current.opens && !cancelled) {
+          const { at, id, text } = current.opens;
+          props.onText({ at, markId: id, text });
+        }
+        return;
       case "resize":
       case "end":
         if (current.moved) props.document.commit();
@@ -326,13 +355,13 @@ export function MarkupLayer(props: {
       className={cn(
         "absolute inset-0 touch-none select-none",
         props.panning && "pointer-events-none",
-        tool === "select"
-          ? overMark
-            ? "cursor-move"
-            : "cursor-default"
-          : tool === "text"
-            ? "cursor-text"
-            : "cursor-crosshair",
+        overMark && (tool === "select" || tool === "text")
+          ? "cursor-move"
+          : tool === "select"
+            ? "cursor-default"
+            : tool === "text"
+              ? "cursor-text"
+              : "cursor-crosshair",
       )}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
@@ -410,6 +439,7 @@ function extendMark(
       return { ...mark, box: { x: start.x, y: start.y, width, height } };
     }
     case "text":
+    case "sticker":
       return mark;
   }
 }
@@ -433,6 +463,7 @@ function finishMark(mark: Mark, unitsPerPixel: number): Mark | null {
         : null;
     }
     case "text":
+    case "sticker":
       return mark;
   }
 }

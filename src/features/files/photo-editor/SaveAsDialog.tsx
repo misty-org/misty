@@ -41,8 +41,9 @@ export function SaveAsDialog(props: {
   onOpenChange: (open: boolean) => void;
   /** The image's own name, which the new one starts from. */
   name: string;
-  /** The format it would save in otherwise. */
+  /** The format it would save in otherwise, and its quality (0 to 1): where the dialog starts. */
   mimeType: string;
+  quality: number;
   size: { width: number; height: number };
   busy: boolean;
   onSave: (choice: SaveAsChoice) => void;
@@ -51,14 +52,15 @@ export function SaveAsDialog(props: {
     ?.mimeType ?? "image/png") as ImageMimeType;
   const [name, setName] = useState(() => suggestedName(props.name));
   const [mimeType, setMimeType] = useState<ImageMimeType>(startFormat);
-  const [quality, setQuality] = useState(90);
-  // Each time it opens it starts from the image's own name and format.
+  const startQuality = Math.round(Math.min(1, Math.max(0.4, props.quality)) * 100);
+  const [quality, setQuality] = useState(startQuality);
+  // Each time it opens it starts from the image's own name and the format chosen for it.
   useEffect(() => {
     if (!props.open) return;
     setName(suggestedName(props.name));
     setMimeType(startFormat);
-    setQuality(90);
-  }, [props.name, props.open, startFormat]);
+    setQuality(startQuality);
+  }, [props.name, props.open, startFormat, startQuality]);
 
   const format =
     imageFormats.find((candidate) => candidate.mimeType === mimeType) ?? imageFormats[0];
@@ -140,7 +142,7 @@ export function SaveAsDialog(props: {
             >
               Cancel
             </Button>
-            <Button type="submit" variant="primary" size="lg" loading={props.busy} disabled={empty}>
+            <Button type="submit" variant="primary" size="lg" disabled={empty || props.busy}>
               Save
             </Button>
           </DialogFooter>

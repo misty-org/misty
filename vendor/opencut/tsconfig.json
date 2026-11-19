@@ -1,0 +1,5 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": { "lib": ["DOM", "DOM.Iterable", "ES2023"], "baseUrl": "../.." },
+  "include": ["src", "../../src/vite-env.d.ts"]
+}

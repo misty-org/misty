@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { turnedSize, type ImageEdit } from "./imageEdit";
 
 /** Room kept around the image when it fits, so the crop's handles never touch the stage's edge. */
 const margin = 32;
@@ -145,3 +146,15 @@ export function useViewport(content: { width: number; height: number }) {
 }
 
 export type Viewport = ReturnType<typeof useViewport>;
+
+/** The image's size on the stage, in its own pixels: what the viewport fits and zooms. */
+export function stageContent(
+  photo: { width: number; height: number },
+  edit: ImageEdit,
+  mode: { cropping: boolean; compare: boolean },
+) {
+  if (mode.compare) return { width: photo.width, height: photo.height };
+  const frame = turnedSize(photo.width, photo.height, edit.rotation);
+  if (mode.cropping) return frame;
+  return { width: frame.width * edit.crop.width, height: frame.height * edit.crop.height };
+}

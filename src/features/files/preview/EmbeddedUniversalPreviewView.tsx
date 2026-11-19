@@ -1,7 +1,7 @@
 import type { PreviewErrorComponent, PreviewResource } from "./previewTypes";
 import { errorText } from "@/shared/lib/format";
 import { FileQuestion } from "lucide-react";
-import { lazy, Suspense, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { friendlyType, sourceExtension } from "./previewFormat";
 import {
   audioMimeTypes,
@@ -11,10 +11,19 @@ import {
   videoMimeTypes,
 } from "./previewMediaTables";
 import { PreviewMessage } from "./PreviewPrimitives";
-import { cn, PlaceholderIcon, Skeleton, SkeletonDocument, Surface, Text } from "@/shared/ui";
+import {
+  cn,
+  PlaceholderIcon,
+  Skeleton,
+  SkeletonDocument,
+  Surface,
+  Text,
+  lazyTool,
+  ToolSuspense,
+} from "@/shared/ui";
 import ReactMarkdown from "react-markdown";
 
-const PdfViewer = lazy(() => import("./PdfViewerView"));
+const PdfViewer = lazyTool(() => import("./PdfViewerView"));
 
 export function EmbeddedUniversalPreviewView(props: {
   runtime: EmbeddedPreviewRuntime;
@@ -115,9 +124,16 @@ export function EmbeddedUniversalPreviewView(props: {
     );
   if (isPdf && props.url)
     return (
-      <Suspense fallback={<Surface tone="card" className="h-full min-h-130 w-full" />}>
+      <ToolSuspense
+        tool="PDF viewer"
+        frame={(state) => (
+          <Surface tone="card" className="h-full min-h-130 w-full">
+            {state}
+          </Surface>
+        )}
+      >
         <PdfViewer Error={props.runtime.Error} url={props.url} name={props.name} />
-      </Suspense>
+      </ToolSuspense>
     );
   if (resource?.kind === "markdown")
     return (

@@ -1,0 +1,29 @@
+/* Misty: OpenCut's components name their colors the shadcn way (background, foreground, muted,
+   primary, accent, destructive…). In the vendored editor those names carry an `oc-` prefix, so
+   they reach nothing else in Misty, and here each points at Misty's own theme: the editor wears
+   Misty's surfaces and text in either theme, and is neutral where OpenCut uses its brand blue
+   (selections, the playhead), since Misty keeps color for meaning. Imported once by Misty's
+   stylesheet (src/styles/styles.css). */
+@theme inline {
+  --color-oc-background: var(--misty-theme-bg);
+  --color-oc-foreground: var(--misty-theme-text);
+  --color-oc-card: var(--misty-theme-card);
+  --color-oc-card-foreground: var(--misty-theme-text);
+  --color-oc-popover: var(--misty-theme-card);
+  --color-oc-popover-foreground: var(--misty-theme-text);
+  --color-oc-muted: color-mix(in srgb, var(--misty-theme-text) 6%, transparent);
+  --color-oc-muted-foreground: var(--misty-theme-text-muted);
+  --color-oc-accent: color-mix(in srgb, var(--misty-theme-text) 9%, transparent);
+  --color-oc-accent-foreground: var(--misty-theme-text-bright);
+  --color-oc-primary: var(--misty-theme-text-bright);
+  --color-oc-primary-foreground: var(--misty-theme-bg);
+  --color-oc-secondary: color-mix(in srgb, var(--misty-theme-text) 9%, transparent);
+  --color-oc-secondary-foreground: var(--misty-theme-text);
+  --color-oc-destructive: var(--misty-theme-danger);
+  --color-oc-destructive-foreground: var(--misty-theme-text-bright);
+  --color-oc-border: var(--misty-theme-border);
+  --color-oc-input: var(--misty-theme-border);
+  --color-oc-ring: var(--misty-theme-text-muted);
+  --color-oc-constructive: var(--tone-done);
+  --color-oc-caution: var(--tone-waiting);
+}

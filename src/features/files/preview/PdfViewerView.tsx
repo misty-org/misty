@@ -1,5 +1,5 @@
 import type { PreviewErrorComponent } from "./previewTypes";
-import { IconButton, Skeleton, Surface, Text } from "@/shared/ui";
+import { IconButton, SetupState, Surface, Text } from "@/shared/ui";
 import { Minus, Plus } from "lucide-react";
 import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -144,20 +144,7 @@ export default function PdfViewerView({
             onLoadError={(error) =>
               setLoadError(error instanceof Error ? error.message : "This PDF could not be opened.")
             }
-            loading={
-              <div
-                role="status"
-                aria-label="PDF"
-                aria-busy="true"
-                className="grid justify-items-center"
-              >
-                {/* The first page's own frame: its width, its letter shape and its corners. */}
-                <Skeleton
-                  className="aspect-[8.5/11] rounded-md"
-                  style={{ width: pageWidth > 0 ? pageWidth : "min(100%, 640px)" }}
-                />
-              </div>
-            }
+            loading={<SetupState tool="PDF viewer" size="inline" />}
           >
             {pageWidth <= 0
               ? null
