@@ -3,7 +3,13 @@ import { spaceRequest } from "../../api/api";
 
 export const MAX_JOURNAL_ASSET_BYTES = 15 * 1024 * 1024;
 
-type JournalAssetKind = "note" | "drawing";
+type JournalAssetKind = "note" | "drawing" | "deck";
+
+const assetResource: Record<JournalAssetKind, string> = {
+  note: "notes",
+  drawing: "drawings",
+  deck: "decks",
+};
 
 interface JournalAssetRecord {
   id: string;
@@ -27,6 +33,7 @@ interface UploadResult {
   drawing_asset?: JournalAssetRecord & {
     excalidraw_file_id: string;
   };
+  deck_asset?: JournalAssetRecord;
 }
 
 interface SignedJournalAssetDownload {
@@ -50,7 +57,7 @@ export async function uploadJournalAsset(input: {
   }
   const bytes = await input.file.arrayBuffer();
   const sha256 = await sha256Hex(bytes);
-  const resource = input.kind === "note" ? "notes" : "drawings";
+  const resource = assetResource[input.kind];
   const basePath = `/spaces/${encodeURIComponent(input.spaceId)}/${resource}/${encodeURIComponent(input.resourceId)}/assets`;
   const reservation = await spaceRequest<UploadReservation>(`${basePath}/uploads`, {
     method: "POST",
@@ -73,7 +80,12 @@ export async function uploadJournalAsset(input: {
       },
     ),
   );
-  const asset = input.kind === "note" ? completed.note_asset : completed.drawing_asset;
+  const asset =
+    input.kind === "note"
+      ? completed.note_asset
+      : input.kind === "deck"
+        ? completed.deck_asset
+        : completed.drawing_asset;
   if (!asset?.id) throw new Error("Misty did not return the uploaded file.");
   return asset;
 }
@@ -84,7 +96,7 @@ export function journalAssetDownloadPath(
   resourceId: string,
   assetId: string,
 ): string {
-  const resource = kind === "note" ? "notes" : "drawings";
+  const resource = assetResource[kind];
   return `/spaces/${encodeURIComponent(spaceId)}/${resource}/${encodeURIComponent(resourceId)}/assets/${encodeURIComponent(assetId)}/download`;
 }
 

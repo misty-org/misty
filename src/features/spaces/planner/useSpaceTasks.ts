@@ -6,8 +6,6 @@ import { plannerApi, type SpaceTask, type SpaceTaskInput, type SpaceTaskStatus }
 import { notifyPlannerChanged, subscribeToPlannerChanges } from "./plannerEvents";
 import { mergeTasks, optimisticMove } from "./taskOrdering";
 
-const noTasks: SpaceTask[] = [];
-
 /**
  * A Space's tasks and what a person does to them. A move shows at once and is put back if the
  * server refuses it. The last list paints at once on a revisit or relaunch, from the one cached
@@ -19,8 +17,10 @@ export function useSpaceTasks(spaceId: string) {
     () => plannerApi.tasks(spaceId).then((result) => result.tasks),
   );
   const { reload: reloadTasks, set: setTasks } = resource;
-  // With nothing saved and the read refused, the board shows empty beside the error.
-  const tasks = resource.data ?? (resource.error ? noTasks : undefined);
+  const tasks = resource.data;
+  // With nothing saved and the read refused, there is no list to show: the page says it failed
+  // rather than that there are no tasks.
+  const loadFailed = !resource.data && Boolean(resource.error);
   const [changeError, setError] = useState("");
   const error = changeError || (resource.error ? errorText(resource.error) : "");
   const [busy, setBusy] = useState("");
@@ -52,6 +52,8 @@ export function useSpaceTasks(spaceId: string) {
   return {
     /** `undefined` until the first load answers. */
     tasks,
+    /** The first read failed with nothing saved, so `tasks` stays `undefined`. */
+    loadFailed,
     error,
     busy,
     reload: load,

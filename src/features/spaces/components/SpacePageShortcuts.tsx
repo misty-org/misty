@@ -5,12 +5,12 @@ import { useShortcutHandler } from "@/features/shortcuts";
 import { useWorkspaceViewFocused } from "@/features/app-windows";
 import { preloadSpaceSection } from "../overview/SpaceSectionView";
 
-/** ⌘1 to ⌘5 open these Space home tabs. */
-const shortcutFilters = ["", "notes", "drawings", "files"] as const;
+/** ⌘1 to ⌘4: the home, the Docs and Whiteboards pages, and the home's files. */
+const shortcutPages = ["home", "notes", "drawings", "home?filter=files"] as const;
 
 /**
- * A Space's page shortcuts (⌘1 to ⌘5 open the home's filters). There is no bar: the
- * tab strip names the page, and the home carries the Space's name and members.
+ * A Space's page shortcuts (⌘1 to ⌘4). There is no bar: the tab strip names the page, and the
+ * home carries the Space's name and members.
  */
 export function SpacePageShortcuts({ space }: { space: Space }) {
   const location = useLocation();
@@ -33,14 +33,13 @@ export function SpacePageShortcuts({ space }: { space: Space }) {
     }
   }
 
-  const home = `/spaces/${encodeURIComponent(space.id)}/home`;
+  const base = `/spaces/${encodeURIComponent(space.id)}`;
   const focused = useWorkspaceViewFocused();
-  const homeTab = (index: number) =>
-    shortcutFilters[index] ? `${home}?filter=${shortcutFilters[index]}` : home;
-  useShortcutHandler("space.section_1", () => void openPage(homeTab(0)), focused);
-  useShortcutHandler("space.section_2", () => void openPage(homeTab(1)), focused);
-  useShortcutHandler("space.section_3", () => void openPage(homeTab(2)), focused);
-  useShortcutHandler("space.section_4", () => void openPage(homeTab(3)), focused);
+  const page = (index: number) => `${base}/${shortcutPages[index]}`;
+  useShortcutHandler("space.section_1", () => void openPage(page(0)), focused);
+  useShortcutHandler("space.section_2", () => void openPage(page(1)), focused);
+  useShortcutHandler("space.section_3", () => void openPage(page(2)), focused);
+  useShortcutHandler("space.section_4", () => void openPage(page(3)), focused);
 
   return null;
 }

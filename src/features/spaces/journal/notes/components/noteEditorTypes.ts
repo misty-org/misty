@@ -1,6 +1,7 @@
 import type { AiContextReference, AiSelectionSnapshot, AiSurfaceAdapter } from "@/features/agents";
 import type { JournalImageLease } from "../../journalAssets";
 import type { ReactNode } from "react";
+import type { ItemVisibility } from "../../../api/visibility";
 import type { NoteBodyFormat } from "../noteTypes";
 import type { UploadNoteAssetInput } from "../noteAssets";
 import type { NoteCollaborationSession } from "../noteCollaboration";
@@ -54,6 +55,8 @@ export interface NoteBlockEditorProps {
   aiContext?: AiContextReference;
   /** Why the note can't be edited, shown inline and as the error for AI edits. */
   readOnlyReason?: string;
+  /** The doc's layer, which decides what its embeds may show. */
+  visibility?: ItemVisibility;
 }
 export type NoteAiSelection = {
   snapshot: AiSelectionSnapshot;

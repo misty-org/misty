@@ -8,12 +8,10 @@ import {
 } from "../list/memberAgents";
 import { useSpaceResource } from "../api/spaceResource";
 import { useSpaceItemCreator } from "../overview/useSpaceItemCreator";
-import { OverviewCard } from "./OverviewCard";
+import { OverviewCard, OverviewEmpty } from "./OverviewCard";
 import { useNow } from "@/shared/hooks/useNow";
 
 const shown = 12;
-
-const noLines: AgentActivityLine[] = [];
 
 const timeOf = (value: string, now: number) => {
   const date = new Date(value);
@@ -27,7 +25,7 @@ const what = (line: AgentActivityLine) =>
   line.state === "resting" ? "Finished" : doingLabel(line.doing, line.state);
 
 /**
- * A shared Space's activity log: what each member's agents started, finished and stopped to ask,
+ * The Space's recent activity: what each member's agents started, finished and stopped to ask,
  * newest first. It shows the kind of work only, never what an agent wrote.
  */
 export function SpaceActivityLog({ spaceId }: { spaceId: string }) {
@@ -36,7 +34,9 @@ export function SpaceActivityLog({ spaceId }: { spaceId: string }) {
   const log = useSpaceResource(`/spaces/${encodeURIComponent(spaceId)}/agent-activity`, () =>
     agentActivityApi.list(spaceId).then((result) => result.activity),
   );
-  const lines = log.data ?? (log.error ? noLines : null);
+  const lines = log.data ?? null;
+  // The log couldn't be read with nothing saved: the block says so quietly instead of vanishing.
+  const failed = !log.data && Boolean(log.error);
   const who = useSpaceItemCreator(spaceId);
   const heard = useMemberAgents((state) => state.bySpace[spaceId]);
   const { reload } = log;
@@ -50,8 +50,10 @@ export function SpaceActivityLog({ spaceId }: { spaceId: string }) {
   }, [heard, reload]);
   if (lines && !lines.length) return null;
   return (
-    <OverviewCard title="Activity">
-      {!lines ? (
+    <OverviewCard title="Recent activity">
+      {failed ? (
+        <OverviewEmpty>Couldn’t load activity</OverviewEmpty>
+      ) : !lines ? (
         <ActivityRowsSkeleton rows={3} />
       ) : (
         <ul className="m-0 grid list-none p-0">

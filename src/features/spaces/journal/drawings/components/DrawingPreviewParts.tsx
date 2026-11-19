@@ -44,6 +44,6 @@ export function PreviewMessage(props: { children: ReactNode }) {
 }
 
 export function drawingExportFilename(title: string, extension: string): string {
-  const safeTitle = title.trim().replace(/[\\/:*?"<>|]/g, "-") || "Untitled drawing";
+  const safeTitle = title.trim().replace(/[\\/:*?"<>|]/g, "-") || "Untitled whiteboard";
   return `${safeTitle}.${extension}`;
 }

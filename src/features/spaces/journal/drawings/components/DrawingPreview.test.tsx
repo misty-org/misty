@@ -43,7 +43,9 @@ describe("DrawingPreview", () => {
     expect(toolbar?.textContent).not.toContain("Save to…");
     expect(toolbar?.textContent).not.toContain("Find");
     expect(toolbar?.textContent).not.toContain("Help");
-    expect(container.querySelector('[role="status"][aria-label="Drawing preview"]')).not.toBeNull();
+    expect(
+      container.querySelector('[role="status"][aria-label="Setting up the whiteboard preview"]'),
+    ).not.toBeNull();
     const exportButton = Array.from(container.querySelectorAll("button")).find((button) =>
       button.textContent?.includes("Export image"),
     );
@@ -75,7 +77,7 @@ function drawingFixture(): SpaceDrawing {
     id: "drawing-1",
     space_id: "space-1",
     creator_user_id: "user-1",
-    title: "Home Drawing",
+    title: "Home Whiteboard",
     lifecycle_state: "active",
     collaboration_revision: 1,
     acl_version: 1,

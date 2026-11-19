@@ -14,4 +14,6 @@ export interface SpaceMember {
   read_message_seq: number;
   /** Names the member's profile picture; 0 or missing when they have none. */
   avatar_version?: number;
+  /** The roles the member has besides the default one; missing from servers before roles. */
+  role_ids?: string[];
 }

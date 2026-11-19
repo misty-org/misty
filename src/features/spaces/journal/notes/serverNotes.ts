@@ -29,6 +29,7 @@ export function mapServerNote(note: ServerSpaceNote, spaceName = ""): UnifiedNot
     collaborationRevision: note.collaboration_revision,
     syncStatus: "synced",
     canDelete: note.can_delete ?? note.role === "creator",
+    visibility: note.visibility ?? "public",
   };
 }
 

@@ -2,6 +2,7 @@ import { CollectionHeading, CollectionPage, Skeleton, SkeletonControl, Surface }
 import { HomeSection } from "./HomeSection";
 import { homeChipsClass, homePairClass, spaceHomeClass } from "./homeLayout";
 import { OverviewCard, OverviewRowsSkeleton } from "./OverviewCard";
+import { ActivityRowsSkeleton } from "./SpaceActivityLog";
 
 const placeWidths = ["w-10", "w-12", "w-14", "w-16", "w-12", "w-10"];
 
@@ -40,8 +41,8 @@ export function SpaceHomeSkeleton() {
           </div>
         </HomeSection>
         <div className={homePairClass}>
-          <OverviewCard title="Space chat">
-            <OverviewRowsSkeleton rows={3} />
+          <OverviewCard title="Recent activity">
+            <ActivityRowsSkeleton rows={3} />
           </OverviewCard>
           <OverviewCard title="Coming up">
             <OverviewRowsSkeleton rows={3} kind="schedule" trailing="w-14" />

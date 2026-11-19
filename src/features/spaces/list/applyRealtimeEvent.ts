@@ -1,3 +1,4 @@
+import { useSpaceRolesStore } from "../roles/useSpaceRoles";
 import * as accessErrors from "../api/access-errors";
 import type { SpaceEvent } from "../api/dto/entities";
 import { writeRealtimeCursor } from "../api/realtime-cursor";
@@ -23,6 +24,8 @@ interface RealtimeScope {
 const itemEventPages: Record<string, string> = {
   library_item: "misty:space-library-event",
   note: "misty:space-note-event",
+  deck: "misty:space-deck-event",
+  workbook: "misty:space-workbook-event",
   drawing: "misty:space-drawing-event",
 };
 
@@ -83,7 +86,14 @@ async function applyRealtimeEvent(
     window.dispatchEvent(new CustomEvent("misty:space-conversation-event", { detail: event }));
   else if (event.type.startsWith("node."))
     await coalescedReload(`nodes:${event.space_id}`, () => get().loadNodes(event.space_id));
-  else if (
+  else if (event.type.startsWith("role.") || event.type.startsWith("roles.")) {
+    // Roles change what each person may do, which channels they see and the colors of names.
+    await coalescedReload(`roles:${event.space_id}`, () =>
+      useSpaceRolesStore.getState().load(event.space_id),
+    );
+    await coalescedReload("spaces", () => get().load({ force: true }));
+    void Promise.resolve(reloadSpaceConversations(event.space_id)).catch(() => undefined);
+  } else if (
     event.type.startsWith("member.") ||
     event.type.startsWith("owner.") ||
     event.type.startsWith("space.")
@@ -105,6 +115,10 @@ async function applyRealtimeEvent(
     window.dispatchEvent(new CustomEvent("misty:space-note-event", { detail: event }));
   else if (event.type.startsWith("drawing."))
     window.dispatchEvent(new CustomEvent("misty:space-drawing-event", { detail: event }));
+  else if (event.type.startsWith("deck."))
+    window.dispatchEvent(new CustomEvent("misty:space-deck-event", { detail: event }));
+  else if (event.type.startsWith("workbook."))
+    window.dispatchEvent(new CustomEvent("misty:space-workbook-event", { detail: event }));
   else if (event.type.startsWith("task.") || event.type.startsWith("calendar."))
     window.dispatchEvent(new CustomEvent(realtimePlannerEvent, { detail: event }));
   else if (event.type.startsWith("item.")) {

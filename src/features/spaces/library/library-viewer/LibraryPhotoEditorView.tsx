@@ -1,17 +1,21 @@
-import { useAiSurfaceAdapter } from "@/features/agents";
+import { ImageAgentPanel, useAiSurfaceAdapter, useMediaAgent } from "@/features/agents";
 import {
   PhotoEditor,
+  applyImageChanges,
   applyLibraryEditDefinition,
+  canvasToBlob,
+  defaultImageEdit,
   imageDocParts,
+  loadPhoto,
   readImageEdit,
+  renderEdit,
   writeImageEdit,
+  type ImageEdit,
 } from "@/features/files";
 import type { AiArtifact, AiSurfaceAdapter } from "@/features/agents";
 import { spacesApi } from "../../api/api";
 import type { SpaceLibraryItem } from "../../api/dto/entities";
 import { editedImageFilename, editedImageMimeType } from "./libraryMediaKind";
-import { defaultLibraryEdit } from "../SpaceLibraryViewerUtils";
-import type { LibraryEditDefinition } from "../../api/dto/common";
 import { useMemo, useRef } from "react";
 import { useLibraryImageCollaboration } from "./useLibraryImageCollaboration";
 
@@ -21,8 +25,12 @@ import { useLibraryImageCollaboration } from "./useLibraryImageCollaboration";
  * Everyone with the image open edits it together, live, with their agents: the edit is shared
  * in the image's room until someone saves it. It shows the item's preview and saves from its
  * full-size file. "Save" replaces the item in place, "Save as copy" and "Save as" upload a new
- * item. No server-side edit rendering is involved. Errors propagate so the editor surfaces them
- * itself.
+ * item, each in the format picked in the editor. No server-side edit rendering is involved.
+ * Errors propagate so the editor surfaces them itself.
+ *
+ * The AI pane's image edits are the same checked change an agent sends `image.edit`
+ * (`applyImageChanges`): light and color, a filter, a crop or a crop to a shape, a turn, a
+ * mirror, a size and marks.
  */
 export function LibraryPhotoEditorView({
   spaceId,
@@ -54,7 +62,9 @@ export function LibraryPhotoEditorView({
   onPrevious?: () => void;
   onNext?: () => void;
 }) {
-  const filename = () => editedImageFilename(item.display_name, mimeType);
+  // Named for the format it was saved in, which the editor may have changed.
+  const filename = (rendered: Blob) =>
+    editedImageFilename(item.display_name, rendered.type || mimeType);
   // The parent hands new callbacks on every render. The adapter calls the latest ones through a
   // ref instead of depending on them: a new adapter is pushed into the AI pane host, which
   // re-renders the Library, which hands new callbacks again ("Maximum update depth exceeded").
@@ -81,7 +91,16 @@ export function LibraryPhotoEditorView({
       intrinsic_metadata: item.file.intrinsic_metadata,
       editable: canEdit,
     }).slice(0, 32 << 10);
-    const applicableEdit = (artifact: AiArtifact) => {
+    const natural = {
+      width: Number(item.file.intrinsic_metadata.width ?? 0),
+      height: Number(item.file.intrinsic_metadata.height ?? 0),
+    };
+    /**
+     * The proposal as a change to an edit, or null when it isn't for this version of this image or
+     * doesn't check out. `changes` is `image.edit`'s change; an older proposal's `edit_definition`
+     * (the Library's adjustments) still lands the way it used to.
+     */
+    const applicableEdit = (artifact: AiArtifact): ((edit: ImageEdit) => ImageEdit) | null => {
       if (
         artifact.kind !== "image_edit" ||
         !canEdit ||
@@ -94,7 +113,8 @@ export function LibraryPhotoEditorView({
         asset_id?: string;
         output?: string;
         preserve_original?: boolean;
-        edit_definition?: Record<string, unknown>;
+        changes?: unknown;
+        edit_definition?: unknown;
       };
       if (
         operations.asset_id !== item.id ||
@@ -102,7 +122,25 @@ export function LibraryPhotoEditorView({
         operations.preserve_original !== true
       )
         return null;
-      return normalizeAiImageEdit(operations.edit_definition);
+      const plain = (value: unknown): value is Record<string, unknown> =>
+        Boolean(value) && typeof value === "object" && !Array.isArray(value);
+      if (plain(operations.changes)) {
+        const changes = operations.changes;
+        const apply = (edit: ImageEdit) =>
+          applyImageChanges(edit, changes, { author: "Agent", natural });
+        try {
+          // Checked once up front, so a proposal that can't land is never offered to apply.
+          apply(defaultImageEdit);
+        } catch {
+          return null;
+        }
+        return apply;
+      }
+      if (plain(operations.edit_definition)) {
+        const definition = operations.edit_definition;
+        return (edit: ImageEdit) => applyLibraryEditDefinition(edit, definition);
+      }
+      return null;
     };
     return {
       surfaceId: "photo-editor",
@@ -115,7 +153,7 @@ export function LibraryPhotoEditorView({
           privacy: "shared",
           spaceId,
           revision: item.version,
-          href: `/spaces/${encodeURIComponent(spaceId)}/library?item=${encodeURIComponent(item.id)}`,
+          href: `/spaces/${encodeURIComponent(spaceId)}/media?item=${encodeURIComponent(item.id)}`,
           metadata: { mime_type: mimeType, editable: canEdit },
         },
       ],
@@ -145,37 +183,50 @@ export function LibraryPhotoEditorView({
           id: "photo-new-version",
           label: "Plan AI edit",
           prompt:
-            "Propose a non-destructive AI image edit as a new version. Preserve the original and make the instruction specific and reviewable.",
+            "Propose a non-destructive edit of this image as a new version: light and color, a " +
+            "filter, a crop, a turn, a size or marks. Preserve the original and make the " +
+            "instruction specific and reviewable.",
           requestedArtifactKind: "image_edit",
         },
       ],
       canApply: (artifact) => Boolean(applicableEdit(artifact)),
       applyArtifact: async (artifact) => {
-        const definition = applicableEdit(artifact);
-        if (!definition)
+        const apply = applicableEdit(artifact);
+        if (!apply)
           throw new Error("The image version changed. Ask your agent to regenerate this edit.");
         // With the editor open the edit lands in it, live for everyone, as one step undo takes back.
         const parts = liveDoc.current;
         if (parts) {
-          writeImageEdit(
-            parts,
-            applyLibraryEditDefinition(
-              readImageEdit(parts),
-              definition as unknown as Record<string, unknown>,
-            ),
-          );
+          writeImageEdit(parts, apply(readImageEdit(parts)));
           return;
         }
-        const result = await spacesApi.createEditVersion(spaceId, item, definition);
-        if (!result.edit || !result.item)
-          throw new Error("Misty could not create the image version.");
-        await spacesApi.renderEditVersion(spaceId, item.id, result.edit.id);
-        callbacks.current.onReplaceItem(result.item);
+        // Without the live edit, it is drawn here from the original and saved as a new version.
+        const original = await loadPhoto(await spacesApi.libraryContent(spaceId, item.id));
+        const rendered = await canvasToBlob(
+          await renderEdit(original, apply(defaultImageEdit)),
+          editedImageMimeType(mimeType),
+        );
+        const result = await spacesApi.replaceLibraryItemContent(
+          spaceId,
+          item,
+          rendered,
+          editedImageFilename(item.display_name, rendered.type || mimeType),
+        );
+        if (result.item) callbacks.current.onReplaceItem(result.item);
         callbacks.current.onRenditionReady();
       },
     };
   }, [canEdit, item, mimeType, spaceId]);
   useAiSurfaceAdapter(aiAdapter);
+  // The Agent tab, where the person's agent can work on this image (its home Space is here).
+  const agent = useMediaAgent(spaceId);
+  const agentPanel = useMemo(
+    () =>
+      canEdit && agent ? (
+        <ImageAgentPanel spaceId={spaceId} itemId={item.id} name={item.display_name} />
+      ) : undefined,
+    [agent, canEdit, item.display_name, item.id, spaceId],
+  );
 
   return (
     <>
@@ -188,6 +239,7 @@ export function LibraryPhotoEditorView({
         outputMimeType={editedImageMimeType(mimeType)}
         naturalSize={naturalSize}
         collaboration={live.state === "live" ? live.collaboration : null}
+        agentPanel={agentPanel}
         loading={contentLoading}
         error={contentError || undefined}
         // The image shows as soon as it's loaded; editing waits for the live edit, so nothing
@@ -203,7 +255,7 @@ export function LibraryPhotoEditorView({
             spaceId,
             item,
             rendered,
-            filename(),
+            filename(rendered),
           );
           if (result.item) onReplaceItem(result.item);
           onRenditionReady();
@@ -211,77 +263,17 @@ export function LibraryPhotoEditorView({
           return String(result.item?.version ?? item.version + 1);
         }}
         onSaveAsCopy={async (rendered: Blob, name?: string) => {
-          await spacesApi.uploadLibraryBlob(spaceId, rendered, name ?? filename(), "library");
+          await spacesApi.uploadLibraryBlob(
+            spaceId,
+            rendered,
+            name ?? filename(rendered),
+            "library",
+          );
           onRenditionReady();
         }}
       />
     </>
   );
-}
-
-function normalizeAiImageEdit(value?: Record<string, unknown>): LibraryEditDefinition | null {
-  if (!value) return null;
-  const allowed = new Set([
-    "auto_enhance",
-    "filter",
-    "brightness",
-    "contrast",
-    "saturation",
-    "grayscale",
-    "exposure",
-    "brilliance",
-    "highlights",
-    "shadows",
-    "black_point",
-    "vibrance",
-    "warmth",
-    "tint",
-    "sharpness",
-    "definition",
-    "noise_reduction",
-    "vignette",
-    "straighten",
-  ]);
-  if (Object.keys(value).some((key) => !allowed.has(key))) return null;
-  const filters = new Set(["", "vivid", "dramatic", "warm", "cool", "mono", "noir"]);
-  if (value.auto_enhance !== undefined && typeof value.auto_enhance !== "boolean") return null;
-  if (
-    value.filter !== undefined &&
-    (typeof value.filter !== "string" || !filters.has(value.filter))
-  )
-    return null;
-  const ranges: Record<string, [number, number]> = {
-    brightness: [0, 3],
-    contrast: [0, 3],
-    saturation: [0, 3],
-    grayscale: [0, 1],
-    exposure: [-2, 2],
-    brilliance: [-1, 1],
-    highlights: [-1, 1],
-    shadows: [-1, 1],
-    black_point: [-1, 1],
-    vibrance: [-1, 1],
-    warmth: [-1, 1],
-    tint: [-1, 1],
-    sharpness: [0, 2],
-    definition: [0, 2],
-    noise_reduction: [0, 1],
-    vignette: [0, 1],
-    straighten: [-45, 45],
-  };
-  for (const [key, [minimum, maximum]] of Object.entries(ranges)) {
-    const candidate = value[key];
-    if (
-      candidate !== undefined &&
-      (typeof candidate !== "number" ||
-        !Number.isFinite(candidate) ||
-        candidate < minimum ||
-        candidate > maximum)
-    )
-      return null;
-  }
-  const definition = { ...defaultLibraryEdit(), ...value } as LibraryEditDefinition;
-  return JSON.stringify(definition) === JSON.stringify(defaultLibraryEdit()) ? null : definition;
 }
 
 function photoEditorAiHash(value: string) {

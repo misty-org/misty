@@ -1,3 +1,4 @@
+import type { ChannelOverwrite, SpacePermission } from "./role-types";
 interface SpaceParticipant {
   kind: "person";
   user_id?: string;
@@ -26,6 +27,13 @@ export interface SpaceConversation {
   participants: SpaceParticipant[];
   /** Messages from others the person hasn't read, up to 100; only the conversation list has it. */
   unread_count?: number;
+  /**
+   * Per-role changes to what may be done here. A channel whose default role may not read it is
+   * private: only the roles allowed to see it.
+   */
+  overwrites?: ChannelOverwrite[];
+  /** What the person may do in this channel; missing from servers before roles. */
+  permissions?: SpacePermission[];
   created_at: string;
   updated_at: string;
 }

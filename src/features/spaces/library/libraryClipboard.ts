@@ -29,7 +29,7 @@ async function copyBlobFilesToClipboard(files: Array<{ name: string; blob: Blob 
 }
 
 function clipboardFileName(item: SpaceLibraryItem): string {
-  const originalName = item.file.original_filename || "Library item";
+  const originalName = item.file.original_filename || "File";
   const displayName = item.display_name.trim() || originalName;
   if (/\.[^./\\]+$/.test(displayName)) return displayName;
   const extension = originalName.match(/\.[^./\\]+$/)?.[0] ?? "";

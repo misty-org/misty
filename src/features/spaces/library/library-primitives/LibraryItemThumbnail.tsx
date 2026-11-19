@@ -1,6 +1,7 @@
 import { spacesApi } from "../../api/api";
 import type { SpaceLibraryItem } from "../../api/dto/entities";
-import { File } from "lucide-react";
+import { Clapperboard, File } from "lucide-react";
+import { isVideoProjectFile } from "@/features/files";
 import { useCallback, useEffect, useState } from "react";
 import {
   cachedContent,
@@ -37,11 +38,14 @@ export function LibraryItemThumbnail({
 }) {
   const mimeType = libraryItemMIME(item);
   const size = Number(item.file.intrinsic_metadata.byte_size ?? 0);
+  // A video project is the editor's file, not text to preview: it shows as a video project.
+  const project = isVideoProjectFile(mimeType, item.file.original_filename);
   const textKind =
-    size > 0 && size <= TEXT_PREVIEW_MAX_BYTES
+    !project && size > 0 && size <= TEXT_PREVIEW_MAX_BYTES
       ? textPreviewKind(mimeType, item.file.original_filename)
       : null;
   const visual =
+    !project &&
     !textKind &&
     (libraryItemThumbnailEligible(mimeType, item.file.original_filename) ||
       Number(item.file.intrinsic_metadata.width ?? 0) > 0);
@@ -103,6 +107,7 @@ export function LibraryItemThumbnail({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [api, key, mimeType]);
 
+  if (project) return <PlaceholderIcon icon={Clapperboard} />;
   if (textKind)
     return <LibraryTextPreview kind={textKind} name={item.display_name} load={loadText} />;
   const shown = preview?.key === key ? preview : null;

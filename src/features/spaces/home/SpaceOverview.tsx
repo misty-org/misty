@@ -1,16 +1,16 @@
 import { useUserStore } from "@/features/account/core";
+import { SpaceFoldersSection } from "../folders/SpaceFoldersSection";
 import { ComingUpCard } from "./ComingUpCard";
 import { HandoffsCard } from "./HandoffsCard";
 import { HereNowCard, type HereNowPerson } from "./HereNow";
 import { homePairClass } from "./homeLayout";
-import { ProjectFoldersCard } from "./ProjectFoldersCard";
-import { SpaceChatCard } from "./SpaceChatCard";
+import { SpaceActivityLog } from "./SpaceActivityLog";
 import { WorkingOn } from "./WorkingOn";
 
 /**
  * The middle of a Space's home, about the Space itself rather than anyone's agents: handoffs
- * waiting for the person, who's here beside the Space chat, what members are working on beside
- * what's coming up, and the folders the Space works in. A Space of one skips the panels about
+ * waiting for the person, who's here beside what the Space's agents did lately, what members are
+ * working on beside what's coming up, and the folders members shared into it. A Space of one skips the panels about
  * other people, and a panel with nothing in it leaves itself out. The panels flow two to a row;
  * the Space's things are the home's own collection below them.
  */
@@ -30,10 +30,10 @@ export function SpaceOverview({
     <div className={`${homePairClass} empty:hidden`}>
       {shared && <HandoffsCard spaceId={spaceId} />}
       {shared && <HereNowCard spaceId={spaceId} here={here} />}
-      <SpaceChatCard spaceId={spaceId} />
+      <SpaceActivityLog spaceId={spaceId} />
       {shared && <WorkingOn spaceId={spaceId} me={me} />}
       <ComingUpCard spaceId={spaceId} />
-      <ProjectFoldersCard />
+      <SpaceFoldersSection spaceId={spaceId} />
     </div>
   );
 }

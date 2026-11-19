@@ -186,7 +186,7 @@ describe("Journal binary asset transfer", () => {
     ).rejects.toThrow("checksum");
   });
 
-  it("shares only an R2 asset reference in the drawing CRDT metadata", async () => {
+  it("shares only an R2 asset reference in the whiteboard CRDT metadata", async () => {
     spaceRequestMock
       .mockResolvedValueOnce({
         upload: { id: "upload-2" },

@@ -1,4 +1,5 @@
 export type * from "./list/spacesStoreTypes";
+export { SpaceSettings } from "./home/SpaceSettings";
 export type * from "./list/realtimeTypes";
 export * from "./list/reference-mode";
 export * from "./list/useSpacesStore";
@@ -13,6 +14,8 @@ export { uploadLibraryBlob, uploadLibraryPath } from "./api/library-upload";
 export { arcadeGateway } from "./handoffs/arcadeGateway";
 export { handoffGateway } from "./handoffs/handoffGateway";
 export { liveGateway } from "./handoffs/liveGateway";
+export { spaceRequest } from "./api/api";
+export { createYjsProvider } from "./journal/notes/createYjsProvider";
 export { drawingsApi } from "./journal/drawings/api/api";
 export { resetNotesAccountState } from "./journal/notes";
 export { MistyLibraryPicker } from "./library";

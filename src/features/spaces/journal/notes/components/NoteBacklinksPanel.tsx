@@ -1,5 +1,6 @@
 import {
   cn,
+  ErrorState,
   IconButton,
   PlaceholderIcon,
   Pressable,
@@ -71,6 +72,8 @@ function BacklinksInspector(props: {
   );
   const links = backlinks.data ?? noLinks;
   const loading = backlinks.loading;
+  // The list couldn't be read and none was saved: it says so rather than that none link here.
+  const failed = !backlinks.data && Boolean(backlinks.error);
   return (
     <>
       <InspectorHeader title="Backlinks" icon={<Link2 />} onClose={props.onClose} />
@@ -80,6 +83,16 @@ function BacklinksInspector(props: {
             <Skeleton className="h-8 w-full rounded-md" />
             <Skeleton className="h-8 w-4/5 rounded-md" />
           </div>
+        ) : failed ? (
+          <ErrorState
+            inline
+            title="Backlinks couldn’t load"
+            action={{
+              label: "Try again",
+              variant: "secondary",
+              onClick: () => void backlinks.reload(),
+            }}
+          />
         ) : links.length ? (
           <div className="grid gap-1">
             {links.map((backlink) => (

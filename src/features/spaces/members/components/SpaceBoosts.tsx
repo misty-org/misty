@@ -45,9 +45,11 @@ export function SpaceBoosts({ spaceId }: { spaceId: string }) {
   if (!state?.enabled || !state.level) return null;
 
   const boost = () =>
-    void openOnWebsite(`/settings/boosts?space=${encodeURIComponent(spaceId)}`).catch((error: unknown) => {
-      reportSystemError({ scope: "spaces:boost", title: "Boosts could not be opened", error });
-    });
+    void openOnWebsite(`/settings/boosts?space=${encodeURIComponent(spaceId)}`).catch(
+      (error: unknown) => {
+        reportSystemError({ scope: "spaces:boost", title: "Boosts could not be opened", error });
+      },
+    );
 
   return (
     <div className="mb-4 flex min-w-0 items-center justify-between gap-3">

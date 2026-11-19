@@ -5,13 +5,15 @@ import { spansToText } from "../chat/components/messageText";
 import { dayKey, eventTimes } from "../calendar/calendarDates";
 import { notesApi } from "../journal/notes/api/api";
 import { plannerApi, type SpaceCalendarEvent, type SpaceTask } from "../planner/api";
+import { isSpaceMadeKind, spaceMadeKind, type SpaceMadeKind } from "@/shared/ui";
 
 /**
- * What ⌘K search finds in a Space. Notes and messages are searched by the server, which reads
- * Space content anyway; tasks and events are read whole (a Space has few) and matched here.
+ * What ⌘K search finds in a Space. Docs, decks, workbooks, whiteboards and messages are searched by
+ * the server, which reads Space content anyway; tasks and events are read whole (a Space has few)
+ * and matched here.
  */
 export interface SpaceSearchHit {
-  kind: "note" | "message" | "task" | "event";
+  kind: SpaceMadeKind | "message" | "task" | "event";
   id: string;
   title: string;
   /** The text the words were found in, or what the item says about itself. */
@@ -22,7 +24,22 @@ export interface SpaceSearchHit {
 
 const base = (spaceId: string) => `/spaces/${encodeURIComponent(spaceId)}`;
 
-/** Notes and messages whose text has the words, best match first. */
+/** Messages in the Space (every channel the person can read) that have the words, best first. */
+export async function searchSpaceMessages(
+  spaceId: string,
+  query: string,
+  signal?: AbortSignal,
+): Promise<SpaceMessage[]> {
+  const words = query.trim();
+  if (!spaceId || !words) return [];
+  const found = await spaceRequest<{ messages: SpaceMessage[] }>(
+    `${base(spaceId)}/messages/search?${new URLSearchParams({ q: words, limit: "25" })}`,
+    { signal },
+  );
+  return found.messages ?? [];
+}
+
+/** Docs, decks, workbooks, whiteboards and messages whose text has the words, best match first. */
 export async function searchSpaceText(
   spaceId: string,
   query: string,
@@ -30,7 +47,12 @@ export async function searchSpaceText(
 ): Promise<SpaceSearchHit[]> {
   const words = query.trim();
   if (!spaceId || !words) return [];
-  const notes = new URLSearchParams({ q: words, space_id: spaceId, kinds: "note", limit: "20" });
+  const notes = new URLSearchParams({
+    q: words,
+    space_id: spaceId,
+    kinds: "note,deck,workbook,drawing",
+    limit: "20",
+  });
   const [found, said] = await Promise.allSettled([
     spaceRequest<{ results: { kind: string; id: string; title: string; excerpt: string }[] }>(
       `/search?${notes}`,
@@ -44,14 +66,16 @@ export async function searchSpaceText(
   const hits: SpaceSearchHit[] = [];
   if (found.status === "fulfilled")
     for (const result of found.value.results ?? [])
-      if (result.kind === "note")
+      if (isSpaceMadeKind(result.kind)) {
+        const made = spaceMadeKind(result.kind);
         hits.push({
-          kind: "note",
+          kind: result.kind,
           id: result.id,
-          title: result.title || "Untitled doc",
+          title: result.title || made.untitled,
           text: result.excerpt,
-          href: `${base(spaceId)}/notes?note=${encodeURIComponent(result.id)}`,
+          href: made.href(spaceId, result.id),
         });
+      }
   if (said.status === "fulfilled")
     for (const message of said.value.messages ?? [])
       hits.push({

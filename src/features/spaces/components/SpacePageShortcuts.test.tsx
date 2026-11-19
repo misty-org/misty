@@ -88,10 +88,13 @@ it("opens the Space home in the owning tab after loading it", async () => {
   expect(activeLayoutView(useWorkspaceStore.getState().layout)?.id).toBe(before);
 });
 
-it("opens the home's filters with the other section shortcuts", async () => {
+it("opens Docs, Whiteboards and the home's files with the other section shortcuts", async () => {
   mount();
+  await press("space.section_3");
+  await waitFor(() => expect(route()).toBe("/spaces/family/drawings"));
+  expect(preload).toHaveBeenCalledWith("drawings");
   await press("space.section_2");
-  await waitFor(() => expect(route()).toBe("/spaces/family/home?filter=notes"));
+  await waitFor(() => expect(route()).toBe("/spaces/family/notes"));
   await press("space.section_4");
   await waitFor(() => expect(route()).toBe("/spaces/family/home?filter=files"));
 });

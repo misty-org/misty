@@ -32,7 +32,7 @@ export function SpaceSwitcher({ space }: { space: Space }) {
                   label={`${name}, switch Space`}
                   value={name}
                   fit
-                  className="-ml-2 gap-2 text-sm font-semibold"
+                  className="-ml-2.5 gap-2 text-sm font-semibold"
                   icon={
                     <SpaceAvatar
                       space={space}

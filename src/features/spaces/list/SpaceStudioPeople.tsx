@@ -1,14 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useUserStore } from "@/features/account/core";
-import {
-  useStudioOpen,
-  useStudioRequests,
-  useTeamMembers,
-  type TeamMember,
-} from "@/features/agents";
+import { useStudioOpen, useTeamMembers, type TeamMember } from "@/features/agents";
 import { useWindowSpace } from "../components/space-row/useWindowSpace";
-import { markHandoffHandled } from "../handoffs/handledHandoffs";
-import { useIncomingHandoffs } from "../handoffs/useIncomingHandoffs";
 import { notesApi } from "../journal/notes/api/api";
 import { memberPicture } from "../members/memberPictures";
 import { useSpacesStore } from "./useSpacesStore";
@@ -17,9 +10,9 @@ import { useSpacesStore } from "./useSpacesStore";
 const NOTEBOOK_PREFIX = "Notebook: ";
 
 /**
- * While a studio is open, tells it who else is in the window's Space and where (from the Space's
- * live presence), and which requests members sent this person for their agents. Nothing is read
- * while no studio is open.
+ * While something that shows the Space's members is open (the Lab), tells it who else is in the
+ * window's Space and which notebook each has open, from the Space's live presence. Nothing is
+ * read while nothing shows them.
  */
 export function SpaceStudioPeople() {
   const open = useStudioOpen((state) => state.open > 0);
@@ -34,7 +27,6 @@ function StudioPeople({ spaceId }: { spaceId: string }) {
   const members = useSpacesStore((state) => state.membersBySpace[spaceId]);
   const [faces, setFaces] = useState<Record<string, string | null>>({});
   const [titles, setTitles] = useState<Record<string, string>>({});
-  const { handoffs } = useIncomingHandoffs(spaceId);
 
   useEffect(() => {
     if (!members) void useSpacesStore.getState().loadMembers(spaceId);
@@ -52,9 +44,10 @@ function StudioPeople({ spaceId }: { spaceId: string }) {
           userId: viewer.user_id,
           name: member.name || member.email,
           picture: faces[viewer.user_id] ?? undefined,
-          place: viewer.place,
-          notebook: viewer.item_id ? titles[viewer.item_id] : undefined,
-          notebookDoc: viewer.item_id || undefined,
+          place: viewer.place === "lab" ? ("lab" as const) : undefined,
+          // The notebook they have open in the Lab.
+          notebook: viewer.place === "lab" && viewer.item_id ? titles[viewer.item_id] : undefined,
+          notebookDoc: (viewer.place === "lab" && viewer.item_id) || undefined,
           active: viewer.active,
         },
       ];
@@ -83,7 +76,10 @@ function StudioPeople({ spaceId }: { spaceId: string }) {
   }, [people, members, faces, spaceId]);
 
   // A notebook someone has open is named from the Space's docs, read again only for a new one.
-  const unknown = (viewers ?? []).some((viewer) => viewer.item_id && !(viewer.item_id in titles));
+  // Only the Lab's ids are notebooks.
+  const unknown = (viewers ?? []).some(
+    (viewer) => viewer.place === "lab" && viewer.item_id && !(viewer.item_id in titles),
+  );
   useEffect(() => {
     if (!unknown) return;
     let live = true;
@@ -98,7 +94,8 @@ function StudioPeople({ spaceId }: { spaceId: string }) {
             : note.title;
         // Ids that aren't docs here stay unnamed, so they aren't asked about again.
         for (const viewer of useSpacesStore.getState().presenceBySpace[spaceId] ?? [])
-          if (viewer.item_id && !(viewer.item_id in named)) named[viewer.item_id] = "";
+          if (viewer.place === "lab" && viewer.item_id && !(viewer.item_id in named))
+            named[viewer.item_id] = "";
         setTitles((known) => ({ ...known, ...named }));
       })
       .catch(() => undefined);
@@ -106,21 +103,6 @@ function StudioPeople({ spaceId }: { spaceId: string }) {
       live = false;
     };
   }, [unknown, spaceId]);
-
-  useEffect(() => {
-    useStudioRequests.getState().show(
-      (handoffs ?? []).map((handoff) => ({
-        id: handoff.id,
-        fromUserId: handoff.fromUserId,
-        fromName: handoff.fromName,
-        text: handoff.text,
-        agentId: handoff.agentId,
-        createdAt: handoff.createdAt,
-        done: () => markHandoffHandled(me, spaceId, handoff.id),
-      })),
-    );
-  }, [handoffs, me, spaceId]);
-  useEffect(() => () => useStudioRequests.getState().show([]), []);
 
   return null;
 }

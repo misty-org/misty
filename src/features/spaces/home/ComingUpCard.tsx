@@ -2,14 +2,18 @@ import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { spaceIcons } from "@/shared/ui";
 import { useNow } from "@/shared/hooks/useNow";
+import { useSettingsStore } from "@/features/settings";
+import { comingUpDays } from "./comingUpDays";
 import { useSpaceCalendar } from "../calendar/useSpaceCalendar";
+import type { SpaceCalendarEvent, SpaceTask } from "../planner/api";
 import { useSpaceTasks } from "../planner/useSpaceTasks";
-import { OverviewCard, OverviewRow, OverviewRowsSkeleton } from "./OverviewCard";
+import { OverviewCard, OverviewEmpty, OverviewRow, OverviewRowsSkeleton } from "./OverviewCard";
+
+const noTasks: SpaceTask[] = [];
+const noEvents: SpaceCalendarEvent[] = [];
 
 /** How many events and tasks the card shows. */
 const shown = 5;
-/** How far ahead a task's due date counts as coming up. */
-const taskHorizonDays = 14;
 const dayMs = 86_400_000;
 
 type Upcoming = {
@@ -53,16 +57,22 @@ const nextMonth = (now: number) => {
 
 /**
  * What's next in the Space: its calendar events that haven't ended, and its open tasks due in the
- * next two weeks or already overdue, soonest first. Each row opens the event or task itself.
+ * next two weeks (or as far ahead as Settings › Space says) or already overdue, soonest first. Each row opens the event or task itself.
  */
 export function ComingUpCard({ spaceId }: { spaceId: string }) {
   const now = useNow();
   const navigate = useNavigate();
   const base = `/spaces/${encodeURIComponent(spaceId)}`;
-  const { tasks } = useSpaceTasks(spaceId);
+  const planner = useSpaceTasks(spaceId);
   // This month and the next, so the last days of a month still see what follows.
-  const thisMonth = useSpaceCalendar(spaceId, new Date(now)).events;
-  const followingMonth = useSpaceCalendar(spaceId, nextMonth(now)).events;
+  const current = useSpaceCalendar(spaceId, new Date(now));
+  const following = useSpaceCalendar(spaceId, nextMonth(now));
+  // A read that failed with nothing saved counts as empty, so what did load still shows.
+  const tasks = planner.tasks ?? (planner.loadFailed ? noTasks : undefined);
+  const thisMonth = current.events ?? (current.loadFailed ? noEvents : undefined);
+  const followingMonth = following.events;
+  const failed = planner.loadFailed || current.loadFailed || following.loadFailed;
+  const horizonDays = useSettingsStore((state) => comingUpDays(state.settings?.document));
 
   const upcoming = useMemo<Upcoming[] | undefined>(() => {
     if (!tasks || !thisMonth) return undefined;
@@ -84,7 +94,7 @@ export function ComingUpCard({ spaceId }: { spaceId: string }) {
         },
       ];
     });
-    const horizon = startOfDay(now).getTime() + (taskHorizonDays + 1) * dayMs;
+    const horizon = startOfDay(now).getTime() + (horizonDays + 1) * dayMs;
     const fromTasks = tasks.flatMap((task): Upcoming[] => {
       if (!task.due_at || task.status === "done" || task.status === "canceled") return [];
       const due = new Date(task.due_at);
@@ -105,14 +115,17 @@ export function ComingUpCard({ spaceId }: { spaceId: string }) {
     return [...fromEvents, ...fromTasks]
       .sort((a, b) => a.at.getTime() - b.at.getTime())
       .slice(0, shown);
-  }, [tasks, thisMonth, followingMonth, now, base]);
+  }, [tasks, thisMonth, followingMonth, now, base, horizonDays]);
 
-  // Nothing ahead: the home leaves the block out rather than show an empty one.
-  if (upcoming && !upcoming.length) return null;
+  // Nothing ahead: the home leaves the block out rather than show an empty one. When a read
+  // failed, "nothing ahead" isn't known, so the block stays and says so quietly.
+  if (upcoming && !upcoming.length && !failed) return null;
   return (
     <OverviewCard title="Coming up">
       {!upcoming ? (
         <OverviewRowsSkeleton rows={3} kind="schedule" trailing="w-14" />
+      ) : !upcoming.length ? (
+        <OverviewEmpty>Couldn’t load what’s coming up</OverviewEmpty>
       ) : (
         upcoming.map((item) => {
           const Icon = item.kind === "event" ? spaceIcons.calendar : spaceIcons.planner;

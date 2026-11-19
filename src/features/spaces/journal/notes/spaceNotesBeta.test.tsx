@@ -222,20 +222,16 @@ describe("SpaceNotes beta simplification", () => {
     });
 
     await act(async () => {
-      root.render(notesSurface());
+      root.render(notesSurface("/spaces/space-product/notes?note=note_delete"));
     });
     await wait(180);
 
-    await act(async () => buttonByText("Docs").click());
-
-    const noteRow = Array.from(document.body.querySelectorAll("button"))
-      .find((candidate) => candidate.getAttribute("aria-label") === "Delete me")
-      ?.closest<HTMLButtonElement>("button");
-    expect(noteRow).toBeTruthy();
+    const actions = document.body.querySelector<HTMLButtonElement>(
+      'button[aria-label="Actions for Delete me"]',
+    );
+    expect(actions).toBeTruthy();
     await act(async () => {
-      noteRow?.dispatchEvent(
-        new MouseEvent("contextmenu", { bubbles: true, cancelable: true, button: 2 }),
-      );
+      actions?.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true, button: 0 }));
     });
     await wait();
     const deleteAction = Array.from(document.body.querySelectorAll('[role="menuitem"]')).find(
@@ -309,8 +305,9 @@ describe("SpaceNotes beta simplification", () => {
     });
     await wait(180);
 
-    expect(document.body.textContent).toContain("First note");
-    expect(document.body.textContent).not.toContain("Second note");
+    // There is no list here any more (the Docs page is the Space home's); the store is what a
+    // realtime change has to refresh.
+    expect(useNotesStore.getState().notes.map((note) => note.title)).toEqual(["First note"]);
 
     changed = true;
     window.dispatchEvent(
@@ -328,12 +325,12 @@ describe("SpaceNotes beta simplification", () => {
     expect(noteListReads).toBeGreaterThanOrEqual(2);
   });
 
-  it("renders the searchable note list by default and allows navigation to doc and back to list", async () => {
-    const note1 = {
-      id: "note-1",
+  it("opens the doc the address names, and Back leaves for the Docs page", async () => {
+    const note = (id: string, title: string) => ({
+      id,
       space_id: "space-product",
       creator_user_id: "account-beta",
-      title: "Alpha Roadmap Note",
+      title,
       plain_text: "",
       lifecycle_state: "active",
       collaboration_revision: 0,
@@ -341,91 +338,32 @@ describe("SpaceNotes beta simplification", () => {
       role: "creator",
       created_at: "2026-07-20T12:00:00.000Z",
       updated_at: "2026-07-20T12:00:00.000Z",
-    };
-    const note2 = {
-      id: "note-2",
-      space_id: "space-product",
-      creator_user_id: "account-beta",
-      title: "Beta Sprint Plan",
-      plain_text: "",
-      lifecycle_state: "active",
-      collaboration_revision: 0,
-      acl_version: 1,
-      role: "creator",
-      created_at: "2026-07-20T12:00:00.000Z",
-      updated_at: "2026-07-20T12:00:00.000Z",
-    };
+    });
     spaceRequestMock.mockImplementation(async (path: string) => {
       if (path.endsWith("/status")) return { connected: false };
-      if (path.endsWith("/notes")) return { notes: [note1, note2] };
+      if (path.endsWith("/notes"))
+        return {
+          notes: [note("note-1", "Alpha Roadmap Note"), note("note-2", "Beta Sprint Plan")],
+        };
       return undefined;
     });
 
     await act(async () => {
-      root.render(notesSurface());
+      root.render(notesSurface("/spaces/space-product/notes?note=note-2"));
     });
     await wait(180);
 
-    // Initial view is the note list
-    expect(container.querySelector("h1")?.textContent).toBe("Docs");
-    expect(container.querySelector("h1")?.closest(".rounded-2xl")).toBeNull();
-    expect(container.textContent).toContain("Alpha Roadmap Note");
-    expect(container.textContent).toContain("Beta Sprint Plan");
-
-    // Search notes in List view
-    const searchInput = container.querySelector<HTMLInputElement>(
-      'input[aria-label="Search journal"]',
-    );
-    expect(searchInput).not.toBeNull();
-
-    await act(async () => {
-      useNotesStore.getState().setQuery("Beta");
-    });
-
-    expect(container.querySelector('section[aria-label="Recently edited"]')).toBeNull();
-    const resultsPanel = container.querySelector("table");
-    expect(resultsPanel?.textContent).toContain("Beta Sprint Plan");
-    expect(resultsPanel?.textContent).not.toContain("Alpha Roadmap Note");
-
-    await act(async () => {
-      useNotesStore.getState().setQuery("");
-    });
-
-    // Opening the row enters the existing document editor directly.
     expect(
-      container.querySelector('button[aria-label="More actions for Beta Sprint Plan"]'),
-    ).toBeTruthy();
+      document.body.querySelector("[data-testid='block-editor']")?.getAttribute("data-note-id"),
+    ).toBe("note-2");
+    // The list lives on the Docs page now; the doc view has none of its own.
+    expect(container.querySelector('input[aria-label="Search journal"]')).toBeNull();
+
     await act(async () => {
-      buttonByText("Beta Sprint Plan").click();
+      container.querySelector<HTMLButtonElement>('button[aria-label="Back to docs"]')?.click();
     });
     expect(container.querySelector('[data-testid="location-probe"]')?.textContent).toBe(
-      "/spaces/space-product/notes?note=note-2&view=doc",
+      "/spaces/space-product/notes",
     );
-
-    // Now in document view with Back button
-    const backButton = container.querySelector<HTMLButtonElement>(
-      'button[aria-label="Back to docs"]',
-    );
-    expect(backButton).not.toBeNull();
-    expect(backButton?.textContent).toContain("Back");
-
-    // Click Back to return to List view
-    await act(async () => {
-      backButton?.click();
-    });
-
-    expect(container.textContent).toContain("Alpha Roadmap Note");
-    expect(container.textContent).toContain("Beta Sprint Plan");
-    expect(container.querySelector('[data-testid="location-probe"]')?.textContent).toBe(
-      "/spaces/space-product/notes?note=note-2&view=list",
-    );
-
-    // A tab remount must follow the remembered list route instead of reopening the document.
-    await act(async () => {
-      root.render(notesSurface("/spaces/space-product/notes?note=note-2&view=list"));
-    });
-    await wait();
-    expect(container.querySelector('button[aria-label="Back to docs"]')).toBeNull();
-    expect(container.querySelector('input[aria-label="Search journal"]')).not.toBeNull();
   });
 });

@@ -23,22 +23,6 @@
   display: none;
 }
 
-.misty-tiptap-search {
-  position: absolute;
-  z-index: var(--stack-overlay-top);
-  top: 3.375rem;
-  right: 0.875rem;
-  display: grid;
-  grid-template-columns: minmax(7.5rem, 1fr) minmax(7.5rem, 1fr) repeat(5, auto);
-  gap: 0.375rem;
-  width: min(48.75rem, calc(100% - 1.75rem));
-  padding: 0.5rem;
-  border: 1px solid var(--color-charcoal-border);
-  border-radius: 0.625rem;
-  background: var(--color-charcoal-card);
-  box-shadow: 0 1rem 3rem rgb(0 0 0 / 0.3);
-}
-
 .misty-tiptap-canvas {
   position: relative;
   max-width: 61.25rem;
@@ -131,6 +115,93 @@
   padding-top: 2rem;
 }
 
+/* Tables: hairline cells, a header row in the card's fill. */
+.misty-tiptap-prosemirror .tableWrapper {
+  overflow-x: auto;
+}
+.misty-tiptap-prosemirror table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  overflow: hidden;
+}
+.misty-tiptap-prosemirror th,
+.misty-tiptap-prosemirror td {
+  position: relative;
+  min-width: 4rem;
+  border: var(--hairline) solid var(--color-charcoal-border);
+  padding: 0.375rem 0.625rem;
+  vertical-align: top;
+  text-align: left;
+}
+.misty-tiptap-prosemirror th {
+  background: var(--color-charcoal-card);
+  font-weight: 600;
+}
+.misty-tiptap-prosemirror th > p,
+.misty-tiptap-prosemirror td > p {
+  margin: 0;
+}
+.misty-tiptap-prosemirror .selectedCell::after {
+  position: absolute;
+  inset: 0;
+  background: var(--color-row-hover);
+  content: "";
+  pointer-events: none;
+}
+
+/* Live embeds sit in the text as blocks of their own. */
+.misty-tiptap-prosemirror .misty-tiptap-embed {
+  margin: 1em 0;
+}
+.misty-tiptap-prosemirror .misty-tiptap-embed[data-selected] {
+  outline: var(--hairline) solid var(--color-charcoal-border-strong);
+  outline-offset: 0.25rem;
+  border-radius: 0.75rem;
+}
+
+/* Code highlighting (lowlight, highlight.js classes), neutral like chat's code blocks. */
+.misty-tiptap-prosemirror pre code .hljs-keyword,
+.misty-tiptap-prosemirror pre code .hljs-selector-tag,
+.misty-tiptap-prosemirror pre code .hljs-built_in,
+.misty-tiptap-prosemirror pre code .hljs-type {
+  color: var(--color-cream-bright);
+  font-weight: 600;
+}
+.misty-tiptap-prosemirror pre code :is(.hljs-title, .hljs-section, .hljs-name, .hljs-selector-id) {
+  color: var(--color-cream-bright);
+}
+.misty-tiptap-prosemirror
+  pre
+  code
+  :is(
+    .hljs-string,
+    .hljs-regexp,
+    .hljs-attr,
+    .hljs-attribute,
+    .hljs-symbol,
+    .hljs-template-variable
+  ) {
+  color: color-mix(in srgb, var(--color-cream) 82%, var(--color-cream-muted));
+}
+.misty-tiptap-prosemirror pre code :is(.hljs-number, .hljs-literal, .hljs-variable, .hljs-params) {
+  color: var(--color-cream-bright);
+}
+.misty-tiptap-prosemirror pre code :is(.hljs-comment, .hljs-quote, .hljs-meta, .hljs-doctag) {
+  color: var(--color-cream-muted);
+  font-style: italic;
+}
+.misty-tiptap-prosemirror pre code .hljs-deletion {
+  color: var(--color-cream-muted);
+  text-decoration: line-through;
+}
+.misty-tiptap-prosemirror pre code :is(.hljs-addition, .hljs-strong) {
+  font-weight: 600;
+}
+.misty-tiptap-prosemirror pre code .hljs-emphasis {
+  font-style: italic;
+}
+
 .misty-tiptap-block-handle {
   display: flex;
   align-items: center;
@@ -165,12 +236,5 @@
 @media (max-width: 836px) {
   .misty-tiptap-canvas {
     padding: 1.875rem 1.625rem 7.5rem 2.625rem;
-  }
-  .misty-tiptap-search {
-    grid-template-columns: 1fr auto auto;
-  }
-  .misty-tiptap-search input:nth-child(2),
-  .misty-tiptap-search button:nth-of-type(n + 3) {
-    display: none;
   }
 }

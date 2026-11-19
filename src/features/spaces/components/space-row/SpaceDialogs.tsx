@@ -125,7 +125,7 @@ function SpacePictureField({ space }: { space: Space }) {
         <Button
           variant="secondary"
           type="button"
-          loading={working}
+          disabled={working}
           onClick={() => input.current?.click()}
         >
           Change picture

@@ -3,7 +3,7 @@ import { Text, useNotice } from "@/shared/ui";
 import { HandoffActions } from "../handoffs/HandoffActions";
 import { postedAgo } from "../handoffs/spacePosts";
 import { useIncomingHandoffs } from "../handoffs/useIncomingHandoffs";
-import { OverviewCard } from "./OverviewCard";
+import { OverviewCard, OverviewRowsSkeleton } from "./OverviewCard";
 import { useNow } from "@/shared/hooks/useNow";
 
 /**
@@ -15,7 +15,14 @@ export function HandoffsCard({ spaceId }: { spaceId: string }) {
   const [error, setError] = useState("");
   const now = useNow();
   useNotice(Boolean(error), { message: error, tone: "error", onDismiss: () => setError("") });
-  if (!handoffs?.length) return null;
+  // The first read: the card's shape stands in. Once read, the card is left out with none waiting.
+  if (!handoffs)
+    return (
+      <OverviewCard title="Handoffs waiting for you">
+        <OverviewRowsSkeleton rows={2} trailing={false} />
+      </OverviewCard>
+    );
+  if (!handoffs.length) return null;
   return (
     <OverviewCard title="Handoffs waiting for you" count={handoffs.length} tone="attention">
       <ul className="m-0 grid list-none gap-1 p-0">

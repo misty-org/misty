@@ -43,9 +43,9 @@ describe("DrawingPreviewHeader", () => {
       );
     });
 
-    expect(container.querySelector("h2")?.textContent).toBe("Home Drawing");
+    expect(container.querySelector("h2")?.textContent).toBe("Home Whiteboard");
     const openButton = container.querySelector<HTMLButtonElement>(
-      'button[aria-label="Open Home Drawing"]',
+      'button[aria-label="Open Home Whiteboard"]',
     );
     expect(openButton?.dataset.variant).toBe("secondary");
     expect(openButton?.querySelector('[data-icon="inline-end"]')).not.toBeNull();
@@ -53,7 +53,7 @@ describe("DrawingPreviewHeader", () => {
     expect(onOpen).toHaveBeenCalledOnce();
 
     const actions = container.querySelector<HTMLButtonElement>(
-      'button[aria-label="Actions for Home Drawing"]',
+      'button[aria-label="Actions for Home Whiteboard"]',
     );
     await act(async () => {
       actions?.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true, button: 0 }));
@@ -66,8 +66,8 @@ describe("DrawingPreviewHeader", () => {
     );
     await act(async () => renameItem?.click());
 
-    const input = container.querySelector<HTMLInputElement>('input[aria-label="Drawing title"]');
-    expect(input?.value).toBe("Home Drawing");
+    const input = container.querySelector<HTMLInputElement>('input[aria-label="Whiteboard title"]');
+    expect(input?.value).toBe("Home Whiteboard");
     await act(async () => {
       if (!input) return;
       Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(
@@ -90,7 +90,7 @@ function drawingFixture(): SpaceDrawing {
     id: "drawing-1",
     space_id: "space-1",
     creator_user_id: "user-1",
-    title: "Home Drawing",
+    title: "Home Whiteboard",
     lifecycle_state: "active",
     collaboration_revision: 1,
     acl_version: 1,

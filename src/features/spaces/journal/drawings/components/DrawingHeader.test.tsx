@@ -30,28 +30,28 @@ describe("DrawingHeader", () => {
   it("shows the bordered title field and reveals a disabled Save button only while active", async () => {
     await renderHeader();
 
-    const input = container.querySelector<HTMLInputElement>('input[aria-label="Drawing title"]');
+    const input = container.querySelector<HTMLInputElement>('input[aria-label="Whiteboard title"]');
     expect(input).not.toBeNull();
-    expect(input?.value).toBe("Home Drawing");
+    expect(input?.value).toBe("Home Whiteboard");
     expect(input?.className).toContain("border-charcoal-border-strong");
-    expect(container.querySelector('button[aria-label="Save drawing title"]')).toBeNull();
+    expect(container.querySelector('button[aria-label="Save whiteboard title"]')).toBeNull();
     await act(async () => input?.focus());
     expect(
-      container.querySelector<HTMLButtonElement>('button[aria-label="Save drawing title"]')
+      container.querySelector<HTMLButtonElement>('button[aria-label="Save whiteboard title"]')
         ?.disabled,
     ).toBe(true);
     expect(container.textContent).not.toContain("Cancel");
     expect(container.textContent).not.toContain("Search");
     expect(container.textContent).not.toContain("New");
     expect(container.textContent).not.toContain("Live");
-    expect(container.querySelector('button[aria-label="Delete drawing"]')).toBeNull();
+    expect(container.querySelector('button[aria-label="Delete whiteboard"]')).toBeNull();
   });
 
   it("enables Save after a local change and saves on Enter", async () => {
     const onRename = vi.fn(async () => undefined);
     await renderHeader(onRename);
 
-    const input = container.querySelector<HTMLInputElement>('input[aria-label="Drawing title"]');
+    const input = container.querySelector<HTMLInputElement>('input[aria-label="Whiteboard title"]');
     await act(async () => input?.focus());
     await act(async () => {
       if (!input) return;
@@ -63,7 +63,7 @@ describe("DrawingHeader", () => {
     });
 
     expect(
-      container.querySelector<HTMLButtonElement>('button[aria-label="Save drawing title"]')
+      container.querySelector<HTMLButtonElement>('button[aria-label="Save whiteboard title"]')
         ?.disabled,
     ).toBe(false);
 
@@ -75,12 +75,12 @@ describe("DrawingHeader", () => {
     expect(onRename).toHaveBeenCalledWith("Project map");
     expect(input?.value).toBe("Project map");
     expect(
-      container.querySelector<HTMLButtonElement>('button[aria-label="Save drawing title"]')
+      container.querySelector<HTMLButtonElement>('button[aria-label="Save whiteboard title"]')
         ?.disabled,
     ).toBe(true);
 
     await act(async () => input?.blur());
-    expect(container.querySelector('button[aria-label="Save drawing title"]')).toBeNull();
+    expect(container.querySelector('button[aria-label="Save whiteboard title"]')).toBeNull();
   });
 
   async function renderHeader(onRename = vi.fn(async () => undefined)) {
@@ -102,7 +102,7 @@ function drawingFixture(): SpaceDrawing {
     id: "drawing-1",
     space_id: "space-1",
     creator_user_id: "user-1",
-    title: "Home Drawing",
+    title: "Home Whiteboard",
     lifecycle_state: "active",
     collaboration_revision: 1,
     acl_version: 1,

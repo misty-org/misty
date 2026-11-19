@@ -28,7 +28,8 @@ export function NewDrawingDialog({
   const [failed, setFailed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   useNotice(failed, {
-    message: "Drawing could not be created. Your title is saved here; try Create drawing again.",
+    message:
+      "Whiteboard could not be created. Your title is saved here; try Create whiteboard again.",
     tone: "error",
     onDismiss: () => setFailed(false),
   });
@@ -52,7 +53,7 @@ export function NewDrawingDialog({
       reportError?.({
         error: cause,
         scope: "drawings:create",
-        title: "Drawing could not be created",
+        title: "Whiteboard could not be created",
       });
     } finally {
       setSubmitting(false);
@@ -63,7 +64,7 @@ export function NewDrawingDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-95">
         <DialogHeader>
-          <DialogTitle className="text-sm">New drawing</DialogTitle>
+          <DialogTitle className="text-sm">New whiteboard</DialogTitle>
         </DialogHeader>
         <div className="space-y-1.5">
           <Label htmlFor="new-drawing-title" className="text-2xs">
@@ -73,7 +74,7 @@ export function NewDrawingDialog({
             id="new-drawing-title"
             value={title}
             autoFocus
-            placeholder="Untitled drawing"
+            placeholder="Untitled whiteboard"
             className="text-ui"
             onChange={(event) => setTitle(event.target.value)}
             onKeyDown={(event) => {
@@ -85,8 +86,8 @@ export function NewDrawingDialog({
           <Button type="button" variant="quiet" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button type="button" loading={submitting} onClick={() => void submit()}>
-            Create drawing
+          <Button type="button" disabled={submitting} onClick={() => void submit()}>
+            Create whiteboard
           </Button>
         </DialogFooter>
       </DialogContent>

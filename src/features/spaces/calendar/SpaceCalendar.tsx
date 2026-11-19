@@ -1,6 +1,15 @@
 import { confirmAction } from "@/shared/lib/confirmAction";
 import { createDeviceSetting } from "@/shared/lib/deviceSetting";
-import { Button, ChoiceGroup, IconButton, PageHeader, Surface, Text, useNotice } from "@/shared/ui";
+import {
+  Button,
+  ChoiceGroup,
+  ErrorState,
+  IconButton,
+  PageHeader,
+  Surface,
+  Text,
+  useNotice,
+} from "@/shared/ui";
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
@@ -91,7 +100,10 @@ export function SpaceCalendar({ spaceId }: { spaceId: string }) {
   };
   const View = view === "month" ? CalendarMonth : CalendarAgenda;
   const error = calendar.error || planner.error;
-  useNotice(Boolean(error), { message: error, tone: "error" });
+  // The month or the tasks couldn't be read with nothing saved: the grid says so instead of
+  // showing an empty month. The notice is for what goes wrong after.
+  const loadFailed = calendar.loadFailed || planner.loadFailed;
+  useNotice(Boolean(error) && !loadFailed, { message: error, tone: "error" });
 
   return (
     <Surface tone="page" className="grid h-full min-h-0 grid-rows-[auto_auto_minmax(0,1fr)]">
@@ -145,7 +157,21 @@ export function SpaceCalendar({ spaceId }: { spaceId: string }) {
       </div>
 
       <div className="min-h-0 overflow-x-auto" data-tour="calendar-grid">
-        <View anchor={anchor} entries={entries} onOpen={open} onNew={newEvent} />
+        {loadFailed ? (
+          <ErrorState
+            title="The calendar couldn’t load"
+            action={{
+              label: "Try again",
+              variant: "secondary",
+              onClick: () => {
+                if (calendar.loadFailed) void calendar.reload();
+                if (planner.loadFailed) void planner.reload();
+              },
+            }}
+          />
+        ) : (
+          <View anchor={anchor} entries={entries} onOpen={open} onNew={newEvent} />
+        )}
       </div>
 
       {editing ? (

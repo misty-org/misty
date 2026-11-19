@@ -43,7 +43,7 @@ export function useSpaceDrawingsView(spaceId: string, services: DrawingsListServ
       setDrawings((current = []) => [drawing, ...current]);
       services.changed(spaceId);
       if (current !== version.generation)
-        throw new Error("This drawing view closed while creating.");
+        throw new Error("This whiteboard view closed while creating.");
       return drawing;
     },
     [spaceId, services, setDrawings, version],
@@ -58,7 +58,7 @@ export function useSpaceDrawingsView(spaceId: string, services: DrawingsListServ
       );
       services.changed(spaceId);
       if (current !== version.generation)
-        throw new Error("This drawing view closed while renaming.");
+        throw new Error("This whiteboard view closed while renaming.");
       return drawing;
     },
     [spaceId, services, setDrawings, version],
@@ -85,7 +85,7 @@ export function useSpaceDrawingsView(spaceId: string, services: DrawingsListServ
       resource.error && !resource.data
         ? resource.error instanceof Error
           ? resource.error.message
-          : "Could not load drawings."
+          : "Could not load whiteboards."
         : null,
     reload: load,
     create,

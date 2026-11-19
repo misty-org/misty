@@ -13,7 +13,8 @@ import { LabNoteBodyEditor } from "../journal/notes/components/LabNoteBodyEditor
 import { handoffBody } from "./spacePosts";
 import { SpaceCrumb } from "../components/space-row/SpaceCrumb";
 import { VisibilityMenu } from "../components/VisibilityMenu";
-import { setItemVisibility, type ItemVisibility } from "../api/visibility";
+import type { ItemVisibility } from "../api/visibility";
+import { setHostVisibility } from "../embeds/hostVisibility";
 import { spaceRequest } from "../api/api";
 import type { SpaceLibraryItem } from "../api/dto/entities";
 import { libraryItemMIME } from "../library/library-primitives/libraryMediaTypes";
@@ -22,7 +23,19 @@ import {
   acquireImageSession,
   releaseImageSession,
 } from "../library/library-viewer/imageCollaboration";
-import { clearImageEdit, imageDocBase, imageDocParts } from "@/features/files";
+import {
+  clearImageEdit,
+  imageDocBase,
+  imageDocParts,
+  isVideoProjectFile,
+  newerProject,
+  parseVideoProject,
+  readRoomProject,
+  VIDEO_PROJECT_MIME,
+  writeRoomProject,
+  type VideoProjectDocument,
+} from "@/features/files";
+import { libraryFileById } from "../library/library-viewer/useVideoEditorSpace";
 
 /** Tells the open Library a file changed, so it shows the new one. */
 const notifyLibraryChanged = (spaceId: string) =>
@@ -44,7 +57,7 @@ export const liveGateway = {
   /** The signed-in person, as others in a Space see them. */
   me(): { userId: string; name: string } | undefined {
     const me = useUserStore.getState().me;
-    return me ? { userId: me.id, name: me.name || me.email } : undefined;
+    return me ? { userId: me.id, name: me.username || me.email } : undefined;
   },
 
   /** A notebook's live room: its shared doc and awareness, held until `close`. */
@@ -156,6 +169,62 @@ export const liveGateway = {
     };
   },
 
+  /** One of a Space's Media files, read whole. */
+  libraryFile: (spaceId: string, itemId: string) => libraryFileById(spaceId, itemId),
+
+  /**
+   * A video project in Media, for an agent: read as the newer of its file and its live room, and
+   * kept as a new version of its file and in the room, so open editors show the change at once.
+   */
+  async openLibraryVideo(spaceId: string, itemId: string) {
+    const itemPath = `/spaces/${encodeURIComponent(spaceId)}/library/items/${encodeURIComponent(itemId)}`;
+    const item = await spaceRequest<SpaceLibraryItem>(itemPath);
+    if (!isVideoProjectFile(libraryItemMIME(item), item.file.original_filename))
+      throw new Error("This Media item isn't a video project.");
+    const session = await acquireImageSession(spaceId, itemId);
+    const provider = session.provider;
+    const synced = provider.synced
+      ? Promise.resolve()
+      : new Promise<void>((resolve) => {
+          const onSync = (done: boolean) => {
+            if (!done) return;
+            provider.off("synced", onSync);
+            resolve();
+          };
+          provider.on("synced", onSync);
+          // A room that can't be reached doesn't hold the project back: the file still is.
+          window.setTimeout(resolve, 8000);
+        });
+    let closed = false;
+    return {
+      name: item.display_name.replace(/\.mistyvideo$/i, ""),
+      role: session.role,
+      async read() {
+        await synced;
+        const blob = await spacesApi.libraryContent(spaceId, itemId);
+        return newerProject(parseVideoProject(await blob.text()), readRoomProject(session.doc));
+      },
+      async keep(document: VideoProjectDocument) {
+        if (session.role === "viewer") throw new Error("This video can only be viewed here.");
+        const current = await spaceRequest<SpaceLibraryItem>(itemPath);
+        await spacesApi.replaceLibraryItemContent(
+          spaceId,
+          current,
+          new Blob([JSON.stringify(document)], { type: VIDEO_PROJECT_MIME }),
+          current.file.original_filename || `${current.display_name}.mistyvideo`,
+        );
+        writeRoomProject(session.doc, document);
+        notifyLibraryChanged(spaceId);
+      },
+      loadMedia: (mediaId: string) => libraryFileById(spaceId, mediaId),
+      close() {
+        if (closed) return;
+        closed = true;
+        releaseImageSession(spaceId, itemId);
+      },
+    };
+  },
+
   /** Makes the Space doc a new notebook lives in. */
   async createNotebookDoc(spaceId: string, title: string, markdown: string) {
     const note = await notesApi.createWithMarkdown(spaceId, title, markdown);
@@ -172,7 +241,8 @@ export const liveGateway = {
 
   /** Puts the person's own doc on a layer: private to them, or shared with the Space. */
   async setDocVisibility(spaceId: string, docId: string, visibility: ItemVisibility) {
-    await setItemVisibility(spaceId, "note", docId, visibility);
+    // A doc turning shared shares what it embeds first; declined, it stays as it was.
+    await setHostVisibility(spaceId, "note", docId, visibility);
     noteChanged(spaceId);
   },
 

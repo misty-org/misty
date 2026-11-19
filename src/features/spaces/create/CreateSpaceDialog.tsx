@@ -69,12 +69,7 @@ export function CreateSpaceDialog({ dialog }: { dialog: ReturnType<typeof useCre
             >
               Cancel
             </Button>
-            <Button
-              type="submit"
-              size="lg"
-              loading={dialog.creating}
-              disabled={!dialog.name.trim()}
-            >
+            <Button type="submit" size="lg" disabled={!dialog.name.trim() || dialog.creating}>
               Create Space
             </Button>
           </footer>

@@ -1,15 +1,27 @@
 import { BackButton, Button, Input, Surface, Text, useNotice } from "@/shared/ui";
 import { useEffect, useState } from "react";
 import type { SpaceDrawing } from "../drawingTypes";
+import { DrawingActionsMenu } from "./DrawingActionsMenu";
 
 interface DrawingHeaderProps {
   reportError?: (input: { title: string; error: unknown; scope: string }) => void;
   drawing: SpaceDrawing;
   onBack?: () => void;
   onRename: (title: string) => Promise<void>;
+  /** Deletes the whiteboard, after asking; from its ⋯ menu. */
+  onDelete?: () => void;
+  /** Opens another whiteboard, one just imported from a file. */
+  onOpenDrawing?: (drawingId: string) => void;
 }
 
-export function DrawingHeader({ reportError, drawing, onBack, onRename }: DrawingHeaderProps) {
+export function DrawingHeader({
+  reportError,
+  drawing,
+  onBack,
+  onRename,
+  onDelete,
+  onOpenDrawing,
+}: DrawingHeaderProps) {
   const [title, setTitle] = useState(drawing.title);
   const [savedTitle, setSavedTitle] = useState(drawing.title);
   const [inputActive, setInputActive] = useState(false);
@@ -30,7 +42,7 @@ export function DrawingHeader({ reportError, drawing, onBack, onRename }: Drawin
 
   const saveTitle = async () => {
     if (!titleChanged || saving || drawing.role === "viewer") return;
-    const next = title.trim() || "Untitled drawing";
+    const next = title.trim() || "Untitled whiteboard";
     setTitle(next);
     if (next === savedTitle) {
       setSaveFailed(false);
@@ -44,7 +56,7 @@ export function DrawingHeader({ reportError, drawing, onBack, onRename }: Drawin
     } catch (cause) {
       setSaveFailed(true);
       reportError?.({
-        title: "Drawing title could not be saved",
+        title: "Whiteboard title could not be saved",
         error: cause,
         scope: `drawings:${drawing.id}:rename`,
       });
@@ -60,7 +72,7 @@ export function DrawingHeader({ reportError, drawing, onBack, onRename }: Drawin
       className="flex min-h-12 shrink-0 items-center gap-2 border-b py-1.5 pl-1 pr-3"
     >
       {onBack ? (
-        <BackButton onClick={onBack} aria-label="Back to drawings" />
+        <BackButton onClick={onBack} aria-label="Back to whiteboards" />
       ) : (
         <Text bare tone="muted" className="shrink-0 text-sm font-semibold">
           Docs -
@@ -79,7 +91,7 @@ export function DrawingHeader({ reportError, drawing, onBack, onRename }: Drawin
       >
         <Input
           value={title}
-          aria-label="Drawing title"
+          aria-label="Whiteboard title"
           aria-invalid={saveFailed || undefined}
           aria-busy={saving || undefined}
           readOnly={saving || drawing.role === "viewer"}
@@ -100,15 +112,15 @@ export function DrawingHeader({ reportError, drawing, onBack, onRename }: Drawin
           <Button
             type="button"
             className="shrink-0 text-xs"
-            disabled={!titleChanged}
-            loading={saving}
-            aria-label="Save drawing title"
+            disabled={!titleChanged || saving}
+            aria-label="Save whiteboard title"
             onClick={() => void saveTitle()}
           >
             Save
           </Button>
         ) : null}
       </div>
+      <DrawingActionsMenu drawing={drawing} onDelete={onDelete} onOpenDrawing={onOpenDrawing} />
     </Surface>
   );
 }

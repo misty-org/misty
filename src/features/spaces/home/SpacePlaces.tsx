@@ -1,19 +1,25 @@
 import type { LucideIcon } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { PlaceChip, spaceIcons } from "@/shared/ui";
+import { PlaceChip, spaceIcons, spaceMadeKinds } from "@/shared/ui";
 import { preloadSpaceSection } from "../overview/SpaceSectionView";
 import { HomeSection } from "./HomeSection";
 import { homeChipsClass } from "./homeLayout";
 
-/** A page is a section of the Space. */
+/**
+ * A page is a section of the Space. The Space's chat isn't one: it is a place, reached by its
+ * icon in the home's bar.
+ */
 const places: { section: string; label: string; icon: LucideIcon }[] = [
-  { section: "chat", label: "Chat", icon: spaceIcons.chat },
-  { section: "notes", label: "Docs", icon: spaceIcons.docs },
+  ...spaceMadeKinds.map(({ section, page, pageIcon }) => ({
+    section,
+    label: page,
+    icon: pageIcon,
+  })),
   // The Lab's notebooks save into their agent's Space, so the Lab is one of its pages.
   { section: "lab", label: "Lab", icon: spaceIcons.lab },
   { section: "planner", label: "Planner", icon: spaceIcons.planner },
   { section: "calendar", label: "Calendar", icon: spaceIcons.calendar },
-  { section: "library", label: "Library", icon: spaceIcons.library },
+  { section: "media", label: "Media", icon: spaceIcons.media },
 ];
 
 /**

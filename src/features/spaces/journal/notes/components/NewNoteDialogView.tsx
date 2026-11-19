@@ -64,7 +64,7 @@ export function NewNoteDialogView(props: NewNoteDialogProps) {
           <Button type="button" variant="quiet" onClick={() => props.onOpenChange(false)}>
             Cancel
           </Button>
-          <Button type="button" loading={submitting} onClick={() => void submit()}>
+          <Button type="button" disabled={submitting} onClick={() => void submit()}>
             Create doc
           </Button>
         </DialogFooter>

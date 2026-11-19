@@ -84,38 +84,33 @@ describe("SpaceDrawings route-backed page state", () => {
     container.remove();
   });
 
-  it("keeps the listing page after a tab remount even when a drawing remains selected", async () => {
-    const listRoute = "/spaces/space-product/drawings/drawing-1?view=list";
+  it("opens the whiteboard its address names, and Back leaves for the Whiteboards page", async () => {
     await act(async () => {
-      root.render(drawingSurface(listRoute));
+      root.render(drawingSurface("/spaces/space-product/drawings/drawing-1"));
       await import("./SpaceDrawings");
     });
 
-    expect(container.textContent).not.toContain("Sign in to open drawings");
-    expect(container.textContent).toContain("Docs");
-    expect(container.querySelector('button[aria-label="Back to drawings"]')).toBeNull();
-
-    await act(async () => {
-      Array.from(container.querySelectorAll("button"))
-        .find((button) => button.getAttribute("aria-label") === "System design")
-        ?.click();
-    });
-    expect(container.querySelector('[data-testid="location-probe"]')?.textContent).toBe(
-      "/spaces/space-product/drawings/drawing-1?view=canvas",
+    expect(container.textContent).not.toContain("Sign in to open whiteboards");
+    const back = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Back to whiteboards"]',
     );
-    expect(container.querySelector('button[aria-label="Back to drawings"]')).not.toBeNull();
+    expect(back).not.toBeNull();
+    expect(
+      container.querySelector('button[aria-label="Actions for System design"]'),
+    ).not.toBeNull();
 
-    await act(async () => {
-      container.querySelector<HTMLButtonElement>('button[aria-label="Back to drawings"]')?.click();
-    });
-    expect(container.querySelector('[data-testid="location-probe"]')?.textContent).toBe(listRoute);
+    await act(async () => back?.click());
+    expect(container.querySelector('[data-testid="location-probe"]')?.textContent).toBe(
+      "/spaces/space-product/drawings",
+    );
+  });
 
+  it("draws no list of its own without a whiteboard", async () => {
     await act(async () => {
-      root.render(drawingSurface(listRoute));
+      root.render(drawingSurface("/spaces/space-product/drawings"));
       await import("./SpaceDrawings");
     });
-    expect(container.textContent).not.toContain("Sign in to open drawings");
-    expect(container.textContent).toContain("Docs");
-    expect(container.querySelector('button[aria-label="Back to drawings"]')).toBeNull();
+    expect(container.querySelector('button[aria-label="Back to whiteboards"]')).toBeNull();
+    expect(container.querySelector("table")).toBeNull();
   });
 });

@@ -1,3 +1,5 @@
+import type { ItemVisibility } from "../../api/visibility";
+
 export type NoteSource = "misty";
 
 export type NoteBodyFormat = "markdown" | "tiptap-json" | "html";
@@ -29,6 +31,8 @@ export type UnifiedNote = {
   syncStatus: NoteSyncStatus;
   /** Server-authoritative delete access for the current user. */
   canDelete?: boolean;
+  /** The doc's layer: private opens only for its creator. */
+  visibility?: ItemVisibility;
 };
 
 /**

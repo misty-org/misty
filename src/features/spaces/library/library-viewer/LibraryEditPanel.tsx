@@ -142,7 +142,7 @@ export function LibraryEditPanel(props: LibraryEditPanelProps) {
         >
           Cancel
         </Button>
-        <Button className="flex-1" type="button" loading={props.editSaving} onClick={props.onSave}>
+        <Button className="flex-1" type="button" disabled={props.editSaving} onClick={props.onSave}>
           Save edit
         </Button>
       </div>

@@ -46,11 +46,6 @@ const meeting: SpaceCalendarEvent = {
   updated_at: "",
 };
 
-const todayKey = vi.hoisted(() => {
-  const date = new Date();
-  const pad = (part: number) => String(part).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
-});
 const api = vi.hoisted(() => ({
   tasks: vi.fn(),
   createTask: vi.fn(),
@@ -66,6 +61,8 @@ vi.mock("./api", () => ({ plannerApi: api }));
 vi.mock("../list/useSpacesStore", () => {
   const state = {
     membersBySpace: { "space-1": [{ user_id: "user-1", name: "Matt", email: "m@example.com" }] },
+    // The page's crumb names its Space.
+    spaces: [{ id: "space-1", name: "Trip" }],
     loadMembers: () => Promise.resolve(),
   };
   return { useSpacesStore: (select: (value: typeof state) => unknown) => select(state) };

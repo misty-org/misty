@@ -5,7 +5,7 @@ import {
   DropdownMenuTrigger,
   MenuItem,
   useNotice,
-  Skeleton,
+  SetupState,
   Surface,
 } from "@/shared/ui";
 import type { ExcalidrawElement, NonDeleted } from "@excalidraw/excalidraw/element/types";
@@ -63,9 +63,10 @@ export function DrawingPreviewView(props: {
   const [previewSurface, setPreviewSurface] = useState(previewSurfaceColors[0]);
   const [empty, setEmpty] = useState(false);
   const [renderFailed, setRenderFailed] = useState(false);
+  // Bumped by Try again after the preview couldn't be drawn: the effect below draws it afresh.
+  const [renderAttempt, setRenderAttempt] = useState(0);
   const previewBlobRef = useRef<Blob | null>(null);
   const previewUrlRef = useRef("");
-  useNotice(Boolean(room.error) || renderFailed, { message: "Preview unavailable", tone: "error" });
   useNotice(Boolean(exportError), {
     message: exportError,
     tone: "error",
@@ -154,7 +155,7 @@ export function DrawingPreviewView(props: {
       previewUrlRef.current = "";
       previewBlobRef.current = null;
     };
-  }, [props.drawing.id, props.drawing.space_id, room.session, room.synced, runtime]);
+  }, [props.drawing.id, props.drawing.space_id, room.session, room.synced, runtime, renderAttempt]);
 
   const reportExportFailure = (title: string, error: unknown) => {
     setExportError(`${title}. Try the action again or choose another export format.`);
@@ -232,29 +233,33 @@ export function DrawingPreviewView(props: {
     </>
   );
 
+  const joined = Boolean(room.session && room.synced);
+  // The room couldn't be joined, or its connection failed before it synced.
+  const roomError =
+    room.error ??
+    (room.connection === "error" && !joined ? "The whiteboard couldn't be reached." : null);
+  const redraw = () => setRenderAttempt((current) => current + 1);
   let content: ReactNode;
-  if (room.error || renderFailed) {
-    content = null;
+  if (roomError || renderFailed) {
+    content = (
+      <SetupState
+        tool="whiteboard preview"
+        error={roomError ?? "The whiteboard couldn't be drawn."}
+        onRetry={roomError ? room.retry : redraw}
+      />
+    );
   } else if (empty) {
     content = <PreviewMessage>This canvas is empty</PreviewMessage>;
   } else if (!previewUrl) {
-    content = (
-      <div className="h-full min-h-0 p-4">
-        <Skeleton
-          role="status"
-          aria-label="Drawing preview"
-          aria-hidden={false}
-          className="h-full w-full rounded-lg"
-        />
-      </div>
-    );
+    // Joining the room, then loading the drawing tools and drawing the image.
+    content = <SetupState tool="whiteboard preview" onRetry={joined ? redraw : room.retry} />;
   } else {
     content = (
       <div className="grid h-full min-h-0 place-items-center overflow-hidden p-4">
         <img
           className="max-h-full max-w-full object-contain"
           src={previewUrl}
-          alt={`Preview of ${props.drawing.title || "untitled drawing"}`}
+          alt={`Preview of ${props.drawing.title || "untitled whiteboard"}`}
         />
       </div>
     );

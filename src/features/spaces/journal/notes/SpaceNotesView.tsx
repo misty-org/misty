@@ -1,16 +1,13 @@
 import { JournalDeleteDialog } from "..";
-import { confirmAction } from "@/shared/lib/confirmAction";
 import { Surface, Text } from "@/shared/ui";
-import { JournalCollection } from "./components/JournalCollection";
 import { useWorkspaceViewTitle } from "@/features/app-windows";
-import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useCallback, useEffect, useRef, useState, type ComponentType } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
 import type { NotePreviewProps } from "./components/NotePreviewView";
 import type { NoteReadingPaneProps } from "./components/NoteReadingPaneView";
 import type { NewNoteDialogProps } from "./components/NewNoteDialogView";
 import type { UnifiedNote } from "./noteTypes";
-import { selectVisibleNotes } from "./noteFilters";
 import type { createNotesStore } from "./createNotesStore";
 export interface SpaceNotesProps {
   spaceId: string;
@@ -49,11 +46,9 @@ export function SpaceNotesView(
     ReadingPane: NoteReadingPane,
     NewNoteDialog,
   } = props.runtime;
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const noteTarget = searchParams.get("note");
-  const requestedView = searchParams.get("view");
-  const view =
-    requestedView === "list" ? "list" : requestedView === "doc" || noteTarget ? "doc" : "list";
   const store = useNotesStore(
     useShallow((state) => ({
       phase: state.phase,
@@ -61,13 +56,11 @@ export function SpaceNotesView(
       error: state.error,
       selectedNoteId: state.selectedNoteId,
       accountId: state.accountId,
-      query: state.query,
     })),
   );
   const actions = useNotesStore(
     useShallow((state) => ({
       load: state.load,
-      setQuery: state.setQuery,
       selectNote: state.selectNote,
       createNote: state.createNote,
       deleteNote: state.deleteNote,
@@ -76,7 +69,6 @@ export function SpaceNotesView(
   );
   const [newNoteOpen, setNewNoteOpen] = useState(false);
   const [deleteNoteId, setDeleteNoteId] = useState<string | null>(null);
-  const [deleteManyError, setDeleteManyError] = useState("");
   const createQueryConsumedRef = useRef(false);
   useEffect(() => {
     if (searchParams.get("create") !== "note") {
@@ -126,105 +118,62 @@ export function SpaceNotesView(
     if (!resolved) return;
     actions.selectNote(resolved.id);
   }, [actions, noteTarget, store.notes]);
-  const visibleNotes = useMemo(
-    () => selectVisibleNotes(store.notes, store.query, Date.now(), props.spaceId),
-    [store.notes, store.query, props.spaceId],
-  );
   const selectedNote = store.notes.find((note) => note.id === store.selectedNoteId);
   useWorkspaceViewTitle(props.workspaceTabId, selectedNote?.title?.trim() || "Docs");
-  const rememberNoteView = useCallback(
-    (nextView: "doc" | "list", note?: UnifiedNote) => {
+  // The Docs page itself (its collection) is the Space's home narrowed to docs: going back, or
+  // losing the open doc, leaves for it.
+  const docsPage = `/spaces/${encodeURIComponent(props.spaceId)}/notes`;
+  const leaveForDocsPage = useCallback(
+    (replace = false) => navigate(docsPage, { replace }),
+    [docsPage, navigate],
+  );
+  const rememberNote = useCallback(
+    (note: UnifiedNote) => {
       const next = new URLSearchParams(searchParams);
-      next.set("view", nextView);
-      if (note) next.set("note", note.sourceId || note.id);
+      next.delete("view");
+      next.set("note", note.sourceId || note.id);
       setSearchParams(next);
     },
     [searchParams, setSearchParams],
   );
-  const openNote = (note: UnifiedNote, rename = false) => {
-    actions.selectNote(note.id);
-    rememberNoteView("doc", note);
-    if (!rename) return;
-    window.setTimeout(() => props.runtime.renameNote(note.sourceId), 0);
-  };
-  const deleteManyNotes = async (ids: string[]) => {
-    if (!ids.length || referenceOnly) return;
-    const count = ids.length;
-    if (
-      !(await confirmAction(
-        `Permanently delete ${count} selected ${count === 1 ? "doc" : "docs"}?`,
-      ))
-    )
-      return;
-    setDeleteManyError("");
-    const removed: string[] = [];
-    try {
-      for (const id of ids) {
-        await actions.deleteNote(id);
-        removed.push(id);
-      }
-      if (removed.includes(selectedNote?.id ?? "")) {
-        const next = new URLSearchParams(searchParams);
-        next.delete("note");
-        next.set("view", "list");
-        setSearchParams(next, { replace: true });
-      }
-    } catch {
-      setDeleteManyError("Some selected docs couldn't be deleted. Try again.");
-    }
-  };
   return (
     <Surface tone="page" className={shellClass}>
       <Text bare as="div" tone="default" className="contents">
-        {view === "list" ? (
-          <JournalCollection
-            spaceId={props.spaceId}
-            notes={visibleNotes}
+        <div className="min-h-0 flex-1 overflow-hidden">
+          <NoteReadingPane
+            note={selectedNote}
+            hasNotes={store.notes.length > 0}
+            accountId={store.accountId}
             loading={loading}
             error={store.phase === "error" || Boolean(store.error)}
             onRetry={() => void actions.refresh()}
-            query={store.query}
-            onQueryChange={actions.setQuery}
-            readOnly={referenceOnly}
-            onCreate={() => setNewNoteOpen(true)}
-            onOpen={openNote}
-            onRename={(note) => openNote(note, true)}
-            onDelete={(note) => setDeleteNoteId(note.id)}
-            onDeleteMany={(ids) => void deleteManyNotes(ids)}
-            bulkError={deleteManyError}
+            onBack={() => leaveForDocsPage()}
+            referenceOnly={referenceOnly}
+            renameRequested={
+              searchParams.get("rename") === "1" && selectedNote?.sourceId === noteTarget
+            }
+            onRenameHandled={() => {
+              const next = new URLSearchParams(searchParams);
+              next.delete("rename");
+              setSearchParams(next, { replace: true });
+            }}
+            onNewNote={() => {
+              if (!referenceOnly) setNewNoteOpen(true);
+            }}
+            linkableNotes={store.notes}
+            onSelectNote={(noteId) => {
+              const note = store.notes.find(
+                (candidate) => candidate.id === noteId || candidate.sourceId === noteId,
+              );
+              if (!note) return;
+              actions.selectNote(note.id);
+              rememberNote(note);
+            }}
+            onDelete={
+              referenceOnly || !selectedNote ? undefined : () => setDeleteNoteId(selectedNote.id)
+            }
           />
-        ) : (
-          <div className="min-h-0 flex-1 overflow-hidden">
-            <NoteReadingPane
-              note={selectedNote}
-              hasNotes={store.notes.length > 0}
-              accountId={store.accountId}
-              loading={loading}
-              onBack={() => rememberNoteView("list", selectedNote)}
-              referenceOnly={referenceOnly}
-              renameRequested={
-                searchParams.get("rename") === "1" && selectedNote?.sourceId === noteTarget
-              }
-              onRenameHandled={() => {
-                const next = new URLSearchParams(searchParams);
-                next.delete("rename");
-                setSearchParams(next, { replace: true });
-              }}
-              onNewNote={() => {
-                if (!referenceOnly) setNewNoteOpen(true);
-              }}
-              linkableNotes={store.notes}
-              onSelectNote={(noteId) => {
-                const note = store.notes.find(
-                  (candidate) => candidate.id === noteId || candidate.sourceId === noteId,
-                );
-                if (!note) return;
-                actions.selectNote(note.id);
-                rememberNoteView("doc", note);
-              }}
-            />
-          </div>
-        )}
+        </div>
 
         <NewNoteDialog
           open={newNoteOpen}
@@ -233,7 +182,7 @@ export function SpaceNotesView(
             const note = await actions.createNote(input);
             if (note) {
               actions.selectNote(note.id);
-              rememberNoteView("doc", note);
+              rememberNote(note);
             }
           }}
         />
@@ -248,14 +197,7 @@ export function SpaceNotesView(
             if (!deleteNoteId) return;
             const deletedSelectedNote = deleteNoteId === selectedNote?.id;
             await actions.deleteNote(deleteNoteId);
-            if (deletedSelectedNote) {
-              const next = new URLSearchParams(searchParams);
-              next.delete("note");
-              next.set("view", "list");
-              setSearchParams(next, {
-                replace: true,
-              });
-            }
+            if (deletedSelectedNote) leaveForDocsPage(true);
           }}
         />
       </Text>

@@ -1,4 +1,3 @@
-import { lazy } from "react";
 import { notesApi } from "../api/api";
 import { useMemo } from "react";
 import { useNoteCollaborationRoom } from "../hooks/useNoteCollaborationRoom";
@@ -7,6 +6,7 @@ import {
   type NoteReadingRuntime,
   type NoteReadingPaneProps,
 } from "./NoteReadingPaneView";
+import { lazyTool } from "@/shared/ui";
 const runtime: NoteReadingRuntime = {
   useCollaborationRoom(spaceId, noteId) {
     const room = useNoteCollaborationRoom(spaceId, noteId);
@@ -28,7 +28,7 @@ const runtime: NoteReadingRuntime = {
     window.addEventListener("misty:journal-rename-note", receive);
     return () => window.removeEventListener("misty:journal-rename-note", receive);
   },
-  Editor: lazy(() => import("./NoteBlockEditor")),
+  Editor: lazyTool(() => import("./NoteBlockEditor")),
 };
 export function NoteReadingPane(props: NoteReadingPaneProps) {
   return <NoteReadingPaneView {...props} runtime={runtime} />;

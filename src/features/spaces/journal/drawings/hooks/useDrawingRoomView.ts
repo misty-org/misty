@@ -2,7 +2,7 @@ import {
   journalDocumentStatusMessage,
   parseJournalDocumentStatus,
 } from "../../collaborationStatus";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { collaborationAccessMessage } from "../../notes/createYjsProvider";
 import type { DrawingSession } from "../drawingRuntime";
 import type { DrawingConnectionState } from "../drawingTypes";
@@ -35,6 +35,8 @@ export function useDrawingRoomView(
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [lostNotice, setLostNotice] = useState<string | null>(null);
+  // Bumped by `retry` when joining failed before a session came back: the room is joined afresh.
+  const [attempt, setAttempt] = useState(0);
   const acquiredRef = useRef(false);
   const publishPresence = options?.publishPresence !== false;
 
@@ -54,7 +56,7 @@ export function useDrawingRoomView(
     try {
       pending = owner.acquire(spaceId, drawingId, { publishPresence });
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Could not connect to this drawing.");
+      setError(cause instanceof Error ? cause.message : "Could not connect to this whiteboard.");
       return;
     }
     pending
@@ -109,8 +111,12 @@ export function useDrawingRoomView(
           if (status === "connected") {
             publishUserPresence();
             setConnection("connected");
-          } else if (status === "disconnected") setConnection("disconnected");
-          else setConnection("connecting");
+            return;
+          }
+          // A failed connection stays failed through the provider's own reconnect attempts until
+          // one connects, so the person sees the failure instead of a join that never ends.
+          const next = status === "disconnected" ? "disconnected" : "connecting";
+          setConnection((current) => (current === "error" ? current : next));
         };
         const onConnectionError = () => {
           if (active) setConnection("error");
@@ -137,7 +143,7 @@ export function useDrawingRoomView(
       .catch((cause) => {
         if (!active) return;
         setConnection("error");
-        setError(cause instanceof Error ? cause.message : "Could not connect to this drawing.");
+        setError(cause instanceof Error ? cause.message : "Could not connect to this whiteboard.");
       });
 
     return () => {
@@ -149,10 +155,22 @@ export function useDrawingRoomView(
         owner.release(spaceId, drawingId, { publishPresence });
       }
     };
-  }, [owner, drawingId, publishPresence, spaceId, user.email, user.id, user.name]);
+  }, [owner, drawingId, publishPresence, spaceId, user.email, user.id, user.name, attempt]);
+
+  /** Tries the room again: reconnects a session whose connection failed, or joins afresh. */
+  const retry = useCallback(() => {
+    if (!session) {
+      setAttempt((current) => current + 1);
+      return;
+    }
+    setConnection("connecting");
+    session.provider.disconnect();
+    // The room's provider connects asynchronously; a failed attempt reports through its events.
+    void Promise.resolve(session.provider.connect()).catch(() => undefined);
+  }, [session]);
 
   // Losing the drawing outranks a size warning.
-  return { session, connection, synced, error, notice: lostNotice ?? notice };
+  return { session, connection, synced, error, notice: lostNotice ?? notice, retry };
 }
 
 function collaborationColor(id: string) {

@@ -64,11 +64,7 @@ export function TextDialog({ model }: { model: TextDialogModel }) {
               >
                 Cancel
               </Button>
-              <Button
-                type="submit"
-                disabled={missingPrimary || missingSecondary}
-                loading={model.saving}
-              >
+              <Button type="submit" disabled={missingPrimary || missingSecondary || model.saving}>
                 Save changes
               </Button>
             </DialogFooter>

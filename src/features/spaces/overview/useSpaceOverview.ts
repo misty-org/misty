@@ -8,6 +8,10 @@ import { notesApi } from "../journal/notes/api/api";
 import { useSpaceNoteList } from "../journal/notes/api/notesResource";
 import { drawingsApi } from "../journal/drawings/api/api";
 import { useSpaceDrawingList } from "../journal/drawings/api/drawingsResource";
+import { useSpaceDeckList, useSpaceWorkbookList } from "../api/madeLists";
+import { decksApi } from "../slides/api";
+import { workbooksApi } from "../data/api";
+import { spaceMadeKind } from "@/shared/ui";
 import { useSpaceConversationList } from "../chat/spaceConversationsResource";
 import { spacesApi } from "../api/api";
 import { libraryItemsPath } from "../api/library-items-query";
@@ -31,8 +35,8 @@ import {
 export type SpaceOverviewItem = {
   id: string;
   title: string;
-  area: "Chat" | "Journal" | "Library";
-  kind: "note" | "drawing" | "file" | "chat";
+  area: "Chat" | "Journal" | "Media";
+  kind: "note" | "deck" | "workbook" | "drawing" | "file" | "chat";
   updatedAt: string;
   createdAt?: string;
   libraryItem?: SpaceLibraryItem;
@@ -137,6 +141,8 @@ function useSpaceOverviewData(
   const base = `/spaces/${encodeURIComponent(space.id)}`;
   const notes = useSpaceNoteList(spaceId);
   const drawings = useSpaceDrawingList(spaceId);
+  const decks = useSpaceDeckList(spaceId);
+  const workbooks = useSpaceWorkbookList(spaceId);
   const conversations = useSpaceConversationList(libraryId);
   const library = useSpaceResource(
     libraryId ? `${libraryItemsPath(space.id, { visibility: "visible" })}&pages=all` : null,
@@ -145,8 +151,8 @@ function useSpaceOverviewData(
   // Files agents saved keep who made them; the list itself still loads without it.
   const artifacts = useSpaceAgentArtifacts(libraryId);
   const sources = allAreas
-    ? [notes, drawings, conversations, library, artifacts]
-    : [notes, drawings];
+    ? [notes, decks, workbooks, drawings, conversations, library, artifacts]
+    : [notes, decks, workbooks, drawings];
 
   const reloadNotes = notes.reload;
   const reloadDrawings = drawings.reload;
@@ -210,7 +216,7 @@ function useSpaceOverviewData(
       if (d.lifecycle_state !== "active") continue;
       result.push({
         id: `drawing:${d.id}`,
-        title: d.title || "Untitled drawing",
+        title: d.title || "Untitled whiteboard",
         area: "Journal",
         kind: "drawing",
         creatorUserId: d.creator_user_id,
@@ -223,6 +229,31 @@ function useSpaceOverviewData(
             : undefined,
         remove: d.can_delete ? () => drawingsApi.remove(space.id, d.id) : undefined,
       });
+    }
+    const madeLists = [
+      ["deck", decks.data ?? [], decksApi],
+      ["workbook", workbooks.data ?? [], workbooksApi],
+    ] as const;
+    for (const [kind, list, api] of madeLists) {
+      const made = spaceMadeKind(kind);
+      for (const m of list) {
+        if (m.lifecycle_state !== "active") continue;
+        result.push({
+          id: `${kind}:${m.id}`,
+          title: m.title || made.untitled,
+          area: "Journal",
+          kind,
+          creatorUserId: m.creator_user_id,
+          createdAt: m.created_at,
+          updatedAt: m.updated_at,
+          route: made.href(space.id, m.id),
+          rename:
+            m.role === "creator" || m.role === "editor"
+              ? (title: string) => api.rename(space.id, m.id, title)
+              : undefined,
+          remove: m.can_delete ? () => api.remove(space.id, m.id) : undefined,
+        });
+      }
     }
     if (allAreas) {
       for (const c of conversations.data ?? [])
@@ -252,14 +283,14 @@ function useSpaceOverviewData(
           id: `file:${i.id}`,
           libraryItem: i,
           title: i.display_name,
-          area: "Library",
+          area: "Media",
           kind: "file",
           creatorUserId: i.added_by_user_id,
           creatorAgentId: artifact?.agent_id ?? (artifact ? "agent" : undefined),
           creatorAgentName: artifact ? agentArtifactCredit(artifact, accountId) : undefined,
           createdAt: i.added_at,
           updatedAt: i.updated_at,
-          route: `${base}/library?item=${encodeURIComponent(i.id)}`,
+          route: `${base}/media?item=${encodeURIComponent(i.id)}`,
           rename: (title: string) =>
             spacesApi.updateLibraryItem(space.id, i, { display_name: title }),
           remove: () => spacesApi.trashLibraryItem(space.id, i.id),
@@ -282,11 +313,13 @@ function useSpaceOverviewData(
     artifacts.data,
     base,
     conversations.data,
+    decks.data,
     drawings.data,
     library.data,
     notes.data,
     space.id,
     space.role,
+    workbooks.data,
   ]);
 
   const loading = enabled && sources.some((source) => source.loading);

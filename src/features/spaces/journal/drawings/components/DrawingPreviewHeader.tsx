@@ -59,7 +59,7 @@ export function DrawingPreviewHeader({
 
   const saveTitle = async () => {
     if (saving) return;
-    const nextTitle = title.trim() || "Untitled drawing";
+    const nextTitle = title.trim() || "Untitled whiteboard";
     if (nextTitle === drawing.title) {
       setTitle(nextTitle);
       setRenaming(false);
@@ -74,7 +74,7 @@ export function DrawingPreviewHeader({
     } catch (error) {
       setFailed(true);
       reportError?.({
-        title: "Drawing title could not be saved",
+        title: "Whiteboard title could not be saved",
         error,
         scope: `drawings:${drawing.id}:rename`,
       });
@@ -97,7 +97,7 @@ export function DrawingPreviewHeader({
             ref={inputRef}
             value={title}
             className="min-w-0 flex-1 px-2 text-sm font-semibold shadow-none"
-            aria-label="Drawing title"
+            aria-label="Whiteboard title"
             disabled={saving}
             onChange={(event) => setTitle(event.target.value)}
             onKeyDown={(event) => {
@@ -107,7 +107,7 @@ export function DrawingPreviewHeader({
               }
             }}
           />
-          <Button type="submit" className="shrink-0 text-xs" loading={saving}>
+          <Button type="submit" className="shrink-0 text-xs" disabled={saving}>
             Save
           </Button>
           <Button
@@ -122,14 +122,14 @@ export function DrawingPreviewHeader({
         </form>
       ) : (
         <Text as="h2" full tone="bright" className="m-0 min-w-0 flex-1 text-sm font-semibold">
-          {title || "Untitled drawing"}
+          {title || "Untitled whiteboard"}
         </Text>
       )}
 
       {!renaming && hasActions ? (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <IconButton label={`Actions for ${title || "untitled drawing"}`}>
+            <IconButton label={`Actions for ${title || "untitled whiteboard"}`}>
               <MoreHorizontal />
             </IconButton>
           </DropdownMenuTrigger>
@@ -148,7 +148,7 @@ export function DrawingPreviewHeader({
         <Button
           type="button"
           className="shrink-0 gap-1.5 text-xs"
-          aria-label={`Open ${title || "Untitled drawing"}`}
+          aria-label={`Open ${title || "Untitled whiteboard"}`}
           onClick={onOpen}
         >
           Open

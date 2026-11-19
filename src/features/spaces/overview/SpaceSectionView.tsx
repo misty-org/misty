@@ -1,6 +1,6 @@
 import { useAuth } from "@/features/account";
 import { useWorkspaceViewTitle } from "@/features/app-windows";
-import { EmptyState } from "@/shared/ui";
+import { EmptyState, spaceKindsWithItemPath, spaceMadeKindForSection } from "@/shared/ui";
 import { lazy, Suspense, useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
@@ -15,6 +15,16 @@ const Drawings = lazy(() =>
     default: m.SpaceDrawings,
   })),
 );
+async function loadSlides() {
+  const { SpaceSlides } = await import("@/features/spaces/slides/SpaceSlides");
+  return { default: SpaceSlides };
+}
+const Slides = lazy(loadSlides);
+async function loadData() {
+  const { SpaceData } = await import("@/features/spaces/data/SpaceData");
+  return { default: SpaceData };
+}
+const Data = lazy(loadData);
 async function loadLibrary() {
   const { SpaceLibrary } = await import("@/features/spaces/library/SpaceLibrary");
   return { default: SpaceLibrary };
@@ -57,9 +67,14 @@ export async function preloadSpaceSection(section: string) {
     case "drawings":
       await import("@/features/spaces/journal/drawings/SpaceDrawings");
       break;
-    case "library":
-      await loadLibrary();
+    case "slides":
+      await loadSlides();
       break;
+    case "data":
+      await loadData();
+      break;
+    case "media":
+      await loadLibrary();
       break;
     case "planner":
       await import("@/features/spaces/planner/SpacePlanner");
@@ -73,8 +88,8 @@ export async function preloadSpaceSection(section: string) {
   }
 }
 
-/** The tab's name for the pages that don't name it themselves (Docs, Drawings, Library and Chat
- * do), so a tab that moves to one of them never keeps the last page's name. */
+/** The tab's name for the pages that don't name it themselves (Docs, Slides, Data, Whiteboards,
+ * Library and Chat do), so a tab that moves to one of them never keeps the last page's name. */
 const sectionTabTitles: Record<string, string> = {
   home: "Space",
   settings: "Space",
@@ -95,10 +110,11 @@ const sectionTabTitles: Record<string, string> = {
 export function SpaceSectionView(props: {
   spaceId: string;
   section: string;
-  studioKind?: string;
+  /** The whiteboard, deck or workbook open on its page. */
+  itemId?: string;
   workspaceTabId?: string;
 }) {
-  const { spaceId, studioKind = "" } = props;
+  const { spaceId, itemId = "" } = props;
   const section = props.section || "home";
   const { user, transitioning } = useAuth();
   const location = useLocation();
@@ -119,7 +135,7 @@ export function SpaceSectionView(props: {
   }, [loadSpace, spaceId, user]);
   useWorkspaceViewTitle(props.workspaceTabId, sectionTabTitles[section] ?? "");
 
-  // Switching accounts isn't a read of this page: the quiet page holds its place.
+  // Switching accounts isn't a read of this page: it says so in words until the new account opens.
   if (transitioning) return <SpacePageLoadingPlaceholder label="Switching accounts" />;
 
   if (!snapshotReady && error) {
@@ -135,18 +151,15 @@ export function SpaceSectionView(props: {
     );
   }
 
+  // The page this opens, for its first-load skeleton.
+  const shape = {
+    section,
+    item:
+      (section === "notes" && Boolean(new URLSearchParams(location.search).get("note"))) ||
+      (spaceKindsWithItemPath.has(section) && Boolean(itemId)),
+  };
   // The Space itself is read for the first time: the page it opens, in that page's shape.
-  if (!snapshotReady || (!space && loading))
-    return (
-      <SpacePageLoadingPlaceholder
-        shape={{
-          section,
-          item:
-            (section === "notes" && Boolean(new URLSearchParams(location.search).get("note"))) ||
-            (section === "drawings" && Boolean(studioKind)),
-        }}
-      />
-    );
+  if (!snapshotReady || (!space && loading)) return <SpacePageLoadingPlaceholder shape={shape} />;
 
   if (!space) {
     return (
@@ -159,24 +172,26 @@ export function SpaceSectionView(props: {
 
   return (
     <div className="relative h-full min-h-0 overflow-hidden">
-      {/* The page's code is on its way, not its data: the quiet page holds its place. */}
-      <Suspense fallback={<SpacePageLoadingPlaceholder />}>
-        {/* Notes and Drawings without an item show the Journal: the home's collection, narrowed. */}
+      {/* The page's code is on its way just ahead of its data: the page's own first-load
+          skeleton holds its place, so it never flashes blank. */}
+      <Suspense fallback={<SpacePageLoadingPlaceholder shape={shape} />}>
+        {/* Docs, Slides, Data and Whiteboards without an item show their page: the home's
+            collection, narrowed to that kind. */}
         {section === "home" ||
         (section === "notes" && !new URLSearchParams(location.search).get("note")) ||
-        (section === "drawings" && !studioKind) ||
+        (spaceKindsWithItemPath.has(section) && !itemId) ||
         // There is no settings page: its links land on the home, and the Space menu has the rest.
         section === "settings" ? (
-          <Home space={space} journal={section === "notes" || section === "drawings"} />
+          <Home space={space} page={spaceMadeKindForSection(section)?.kind} />
         ) : section === "notes" ? (
           <Notes spaceId={spaceId} spaceName={space.name} workspaceTabId={props.workspaceTabId} />
         ) : section === "drawings" ? (
-          <Drawings
-            spaceId={spaceId}
-            drawingId={studioKind}
-            workspaceTabId={props.workspaceTabId}
-          />
-        ) : section === "library" ? (
+          <Drawings spaceId={spaceId} drawingId={itemId} workspaceTabId={props.workspaceTabId} />
+        ) : section === "slides" ? (
+          <Slides spaceId={spaceId} deckId={itemId} workspaceTabId={props.workspaceTabId} />
+        ) : section === "data" ? (
+          <Data spaceId={spaceId} workbookId={itemId} workspaceTabId={props.workspaceTabId} />
+        ) : section === "media" ? (
           <Library spaceId={spaceId} workspaceTabId={props.workspaceTabId} />
         ) : section === "planner" ? (
           <Planner spaceId={spaceId} />

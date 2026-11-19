@@ -7,7 +7,7 @@ import type {
 import { describe, expect, it } from "vitest";
 import { collaboratorsFromAwareness, DrawingFollowTracker } from "./drawingPresence";
 
-describe("drawing presence", () => {
+describe("whiteboard presence", () => {
   it("keeps the same Excalidraw collaborator key after a Yjs client reconnects", () => {
     const first = collaboratorsFromAwareness(
       awareness([[101, { user: { id: "user-7", name: "Sam" } }]]),

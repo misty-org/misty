@@ -1,7 +1,7 @@
 import type { AiArtifact, AiSelectionSnapshot, AiSurfaceAdapter } from "@/features/agents";
-import { EmptyState, Surface } from "@/shared/ui";
+import { SetupState, Surface, ToolSuspense } from "@/shared/ui";
 import { DrawingCanvasSkeleton } from "./DrawingCanvasSkeleton";
-import { Suspense, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import type { DrawingUser } from "../hooks/useDrawingRoomView";
 import type { DrawingsViewRuntime } from "../SpaceDrawingsView";
 import type { SpaceDrawing } from "../drawingTypes";
@@ -18,6 +18,8 @@ export function DrawingWorkspace(props: {
   onBack?: () => void;
   user: DrawingUser;
   onRename: (title: string) => Promise<void>;
+  onDelete?: () => void;
+  onOpenDrawing?: (drawingId: string) => void;
 }) {
   const { runtime } = props;
   const { Header: DrawingHeader, Canvas: CollaborativeDrawingCanvas } = runtime;
@@ -85,7 +87,7 @@ export function DrawingWorkspace(props: {
           id: "drawing-cluster",
           label: "Suggest clusters",
           prompt:
-            "Suggest a clear grouping and labeling scheme for the current canvas selection. Do not change the drawing.",
+            "Suggest a clear grouping and labeling scheme for the current canvas selection. Do not change the whiteboard.",
         },
         {
           id: "drawing-layout",
@@ -107,7 +109,7 @@ export function DrawingWorkspace(props: {
         const patch = applicablePatch(artifact);
         if (!patch || !aiController)
           throw new Error(
-            "The drawing selection changed. Ask your agent to regenerate this layout.",
+            "The whiteboard selection changed. Ask your agent to regenerate this layout.",
           );
         aiController.apply(patch);
       },
@@ -121,6 +123,8 @@ export function DrawingWorkspace(props: {
         drawing={{ ...props.drawing, role: room.session?.role ?? props.drawing.role }}
         onBack={props.onBack}
         onRename={props.onRename}
+        onDelete={props.onDelete}
+        onOpenDrawing={props.onOpenDrawing}
       />
       <div className="relative min-h-0 overflow-hidden">
         {room.notice ? (
@@ -138,24 +142,34 @@ export function DrawingWorkspace(props: {
             {runtime.renderError(
               room.error,
               `drawings:${props.drawing.space_id}:${props.drawing.id}:room`,
-              "Drawing collaboration failed",
+              "Whiteboard collaboration failed",
             )}
-            <EmptyState
-              title="Could not join this drawing"
-              line="The live canvas couldn't be opened. Try again later."
+            <SetupState
+              tool="drawing"
+              error="The live canvas couldn't be opened."
+              onRetry={room.retry}
             />
           </>
         ) : room.session && room.synced ? (
-          <Suspense fallback={<DrawingCanvasSkeleton label="Opening drawing" />}>
+          <ToolSuspense tool="whiteboard canvas">
             <CollaborativeDrawingCanvas
               drawing={props.drawing}
               session={room.session}
               onAiSnapshot={setAiSnapshot}
               onAiController={setAiController}
             />
-          </Suspense>
+          </ToolSuspense>
         ) : (
-          <DrawingCanvasSkeleton label="Joining the drawing" />
+          <SetupState
+            tool="drawing"
+            label="Joining the whiteboard"
+            error={
+              room.connection === "error"
+                ? "The live canvas couldn't be reached. Check your connection."
+                : null
+            }
+            onRetry={room.retry}
+          />
         )}
       </div>
     </Surface>

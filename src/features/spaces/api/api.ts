@@ -19,6 +19,7 @@ import type {
   SpacesSnapshot,
 } from "./dto/entities";
 import { createSpaceMembersApi } from "./members";
+import { createSpaceRolesApi } from "./roles";
 import { createSpaceChatApi } from "./chat";
 import { createSpaceLibraryEditsApi } from "./library-edits";
 import { createSpaceLibraryItemsApi } from "./library-items";
@@ -127,7 +128,7 @@ export function spaceErrorMessage(code: string | undefined, fallback: string): s
     account_suspended: accountLimitMessages.account_suspended!,
     account_closing: accountLimitMessages.account_closing!,
     model_key_needed: "Pick a default engine in Settings › Agents.",
-    library_uploads_disabled: "Library uploads are temporarily unavailable.",
+    library_uploads_disabled: "Uploads to Media are temporarily unavailable.",
     library_media_processor_unavailable: "Edited media rendering is temporarily unavailable.",
     upload_verification_failed: "Misty could not verify the uploaded file.",
     dangerous_file_type: "This file type cannot be stored safely.",
@@ -146,6 +147,9 @@ export function spaceErrorMessage(code: string | undefined, fallback: string): s
     library_object_mismatch: "The uploaded file didn't match what was sent. Try again.",
     library_preview_mismatch: "The preview didn't match the file. Try again.",
     library_direct_transfer_required: "This file has to be uploaded directly. Try again.",
+    folder_direct_transfer_unavailable:
+      "This server can't share folders yet: its file storage isn't set up for direct uploads.",
+    folder_blobs_missing: "Some files didn't finish uploading. Try again.",
     invalid_request: "Misty could not validate that request.",
     internal_error: "Misty could not load this Space right now. Try again in a moment.",
   };
@@ -200,6 +204,7 @@ export const spacesApi = {
       method: "DELETE",
     }),
   ...createSpaceMembersApi(spaceRequest, fetchProtectedBlob),
+  ...createSpaceRolesApi(spaceRequest),
   ...createSpaceConversationsApi(spaceRequest),
   ...createSpaceChatApi(spaceRequest),
   nodes: (spaceId: string, onCached?: (value: { nodes: SpaceNode[] }) => void) =>

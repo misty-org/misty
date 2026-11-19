@@ -1,4 +1,4 @@
-import { lazy, useMemo } from "react";
+import { useMemo } from "react";
 import { useAuth } from "@/features/account";
 import { useSpacesStore } from "../../list/useSpacesStore";
 import { SystemErrorNotice, reportSystemError } from "@/shared/platform/systemErrors";
@@ -12,7 +12,8 @@ import { DrawingPreviewHeader } from "./components/DrawingPreviewHeader";
 import { DrawingPreview } from "./components/DrawingPreview";
 import { NewDrawingDialog } from "./components/NewDrawingDialog";
 import { SpaceDrawingsView, type DrawingsViewRuntime } from "./SpaceDrawingsView";
-const Canvas = lazy(() => import("./components/CollaborativeDrawingCanvas"));
+import { lazyTool } from "@/shared/ui";
+const Canvas = lazyTool(() => import("./components/CollaborativeDrawingCanvas"));
 const emptyMembers: never[] = [];
 function Title({ title, tab }: { title: string; tab?: string }) {
   useWorkspaceViewTitle(tab, title);

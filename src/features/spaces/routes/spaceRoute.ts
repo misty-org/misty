@@ -1,19 +1,24 @@
 import { useMemo } from "react";
 import { useLocation } from "react-router-dom";
+import { spaceKindsWithItemPath } from "@/shared/ui";
 
 const validSections = new Set([
   "home",
   "social",
   "chat",
   "notes",
+  "slides",
+  "data",
   "drawings",
   "planner",
   "calendar",
   "lab",
-  "library",
+  "media",
   "members",
   "settings",
 ]);
+/** Old names for a page, still accepted in links: the Library became Media. */
+const renamedSections: Record<string, string> = { files: "media", library: "media" };
 const validSettingsSections = new Set(["general", "members", "connections", "suggestions"]);
 
 interface SpaceRoute {
@@ -22,7 +27,8 @@ interface SpaceRoute {
   settingsSection: string;
   libraryCollection: string;
   conversationId: string | null;
-  drawingId: string;
+  /** The whiteboard, deck or workbook open on its page (`/drawings/<id>`, `/slides/<id>`, …). */
+  itemId: string;
 }
 
 /**
@@ -37,7 +43,7 @@ export function useSpaceRoute(): SpaceRoute {
   const routeParts = location.pathname.split("/").filter(Boolean);
   const defaultSection = "home";
   const requestedSection = routeParts[2] ?? defaultSection;
-  const routeSection = requestedSection === "files" ? "library" : requestedSection;
+  const routeSection = renamedSections[requestedSection] ?? requestedSection;
   const requestedSettingsSection =
     routeParts[3] === "integrations" ? "connections" : (routeParts[3] ?? "");
 
@@ -49,8 +55,21 @@ export function useSpaceRoute(): SpaceRoute {
       : "general",
     libraryCollection: search.get("collection") ?? "recent",
     conversationId: search.get("conversation"),
-    drawingId: routeSection === "drawings" ? decodeRouteSegment(routeParts[3] ?? "") : "",
+    itemId: spaceKindsWithItemPath.has(routeSection) ? decodeRouteSegment(routeParts[3] ?? "") : "",
   };
+}
+
+/**
+ * The same address under a page's current name, when it uses an old one (`/spaces/:id/library`
+ * opens `/spaces/:id/media`), or null when it already uses the current one.
+ */
+export function renamedSectionPath(pathname: string): string | null {
+  const parts = pathname.split("/");
+  // "", "spaces", the Space's id, then the page.
+  const renamed = parts[1] === "spaces" ? renamedSections[parts[3] ?? ""] : undefined;
+  if (!renamed) return null;
+  parts[3] = renamed;
+  return parts.join("/");
 }
 
 function decodeRouteSegment(value: string): string {

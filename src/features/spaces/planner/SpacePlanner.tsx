@@ -1,5 +1,13 @@
 import { confirmAction } from "@/shared/lib/confirmAction";
-import { Button, EmptyState, PageHeader, SearchField, Surface, useNotice } from "@/shared/ui";
+import {
+  Button,
+  EmptyState,
+  ErrorState,
+  PageHeader,
+  SearchField,
+  Surface,
+  useNotice,
+} from "@/shared/ui";
 import { Plus } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
@@ -76,7 +84,11 @@ export function SpacePlanner({ spaceId }: { spaceId: string }) {
     if (!(await confirmAction(`Delete “${task.title}”? This can’t be undone.`))) return;
     if (await planner.archive(task)) setEditing(undefined);
   };
-  useNotice(Boolean(planner.error), { message: planner.error, tone: "error" });
+  // A failed first read says so in the page itself; the notice is for what goes wrong after.
+  useNotice(Boolean(planner.error) && !planner.loadFailed, {
+    message: planner.error,
+    tone: "error",
+  });
   // With no tasks at all, the empty state offers New task, so the bar doesn't repeat it.
   const empty = planner.tasks?.length === 0;
   const newTask = () => {
@@ -115,7 +127,16 @@ export function SpacePlanner({ spaceId }: { spaceId: string }) {
         }
       />
 
-      {empty ? (
+      {planner.loadFailed ? (
+        <ErrorState
+          title="Tasks couldn’t load"
+          action={{
+            label: "Try again",
+            variant: "secondary",
+            onClick: () => void planner.reload(),
+          }}
+        />
+      ) : empty ? (
         <span data-tour="planner-new" className="contents">
           <EmptyState
             title="No tasks yet"

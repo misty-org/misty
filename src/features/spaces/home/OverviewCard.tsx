@@ -4,9 +4,9 @@ import { overviewRowClass } from "./homeLayout";
 import { HomeSection, OverviewDot } from "./HomeSection";
 
 /**
- * One block of the Space overview: the shared heading, then its rows on the page itself, with no
- * panel around them. Each row washes under the pointer; the rows sit a step out to each side so
- * their marks and titles line up with the heading above them.
+ * One block of the Space overview: the shared heading, then its rows, in a panel with a hairline
+ * edge so each block reads as its own place on the home. Each row washes under the pointer; the
+ * rows sit a step out to each side so their marks and titles line up with the heading above them.
  */
 export function OverviewCard(props: {
   title: string;
@@ -22,8 +22,9 @@ export function OverviewCard(props: {
       count={props.count}
       attention={props.tone === "attention"}
       action={props.action}
+      panel
     >
-      {/* Something waiting shows in the heading's dot, not an edge: there is no panel to edge. */}
+      {/* Something waiting shows in the heading's dot, so every panel keeps the same edge. */}
       <div className="-mx-2 grid min-w-0 content-start has-[>[data-overview-empty]]:content-stretch">
         {props.children}
       </div>

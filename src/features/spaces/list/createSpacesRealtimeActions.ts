@@ -235,11 +235,14 @@ function resyncSpaces(get: () => SpacesStore) {
     for (const spaceId of Object.keys(get().messagesBySpace))
       void coalescedReload(`messages:${spaceId}`, () => get().loadMessages(spaceId));
     window.dispatchEvent(new Event(spacesResyncEvent));
-    // Docs, drawings and the planner read again as on any change of theirs, for every Space.
+    // Docs, decks, workbooks, whiteboards and the planner read again as on any change of theirs,
+    // for every Space.
     // The planner listens by family, so its tasks and its calendar are told separately.
     const pages: [string, string][] = [
       ["misty:space-note-event", "note.resync"],
       ["misty:space-drawing-event", "drawing.resync"],
+      ["misty:space-deck-event", "deck.resync"],
+      ["misty:space-workbook-event", "workbook.resync"],
       [realtimePlannerEvent, "task.resync"],
       [realtimePlannerEvent, "calendar.resync"],
     ];

@@ -1,7 +1,7 @@
-import { lazy } from "react";
 import { reportSystemError } from "@/shared/platform/systemErrors";
 import { NotePreviewView, type NotePreviewProps } from "./NotePreviewView";
-const Editor = lazy(() => import("./NoteBlockEditor"));
+import { lazyTool } from "@/shared/ui";
+const Editor = lazyTool(() => import("./NoteBlockEditor"));
 export function NotePreview(props: NotePreviewProps) {
   return (
     <NotePreviewView

@@ -1,4 +1,5 @@
 import type { MessageSpan, SpaceRole } from "./common";
+import type { SpacePermission } from "./role-types";
 import type { MessageAttachment, StorageQuotaDimension } from "./library";
 import type { SpaceMessageSender } from "./conversation-types";
 export type * from "./member-types";
@@ -16,6 +17,8 @@ export interface Space {
   is_shared: boolean;
   /** Names the Space's uploaded picture; 0 or missing when it has none and shows its initials. */
   avatar_version?: number;
+  /** What the person may do in this Space, from their roles; missing from servers before roles. */
+  permissions?: SpacePermission[];
   created_at: string;
   updated_at: string;
 }

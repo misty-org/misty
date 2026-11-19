@@ -79,9 +79,13 @@ describe("TipTap Journal editor", () => {
       container.querySelector<HTMLButtonElement>('[aria-label="Search and replace"]')?.click();
     });
 
-    expect(container.querySelector('[aria-label="Find text"]')).not.toBeNull();
-    expect(container.querySelector('[aria-label="Replacement text"]')).not.toBeNull();
-    expect(container.textContent).toContain("Previous");
+    // The shared find bar (FindBar): its field, stepping between matches, and replace on demand.
+    expect(container.querySelector('input[aria-label="Find"]')).not.toBeNull();
+    expect(container.querySelector('[aria-label="Previous match"]')).not.toBeNull();
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>('[aria-label="Show replace"]')?.click();
+    });
+    expect(container.querySelector('input[aria-label="Replace"]')).not.toBeNull();
     expect(container.textContent).toContain("Replace");
   });
 });

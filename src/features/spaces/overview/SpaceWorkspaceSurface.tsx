@@ -11,7 +11,7 @@ import { preferredDefaultSpace, windowSpace } from "../routes/defaultSpace";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { defaultSpaceRoute } from "../routes/defaultSpaceRoute";
 import { useSpacesStore } from "../list/useSpacesStore";
-import { useSpaceRoute } from "../routes/spaceRoute";
+import { renamedSectionPath, useSpaceRoute } from "../routes/spaceRoute";
 import { SpacePageLoadingPlaceholder } from "../components/SpacePageLoadingPlaceholder";
 import { SpacePageShortcuts } from "../components/SpacePageShortcuts";
 import { SpaceInvitationsNotice } from "../create/SpaceInvitationsNotice";
@@ -53,6 +53,9 @@ export function SpaceWorkspaceSurface({ tab }: { tab: WorkspaceView }) {
     if (location.pathname === base) {
       navigate(`${base}/home${location.search}${location.hash}`, { replace: true });
     }
+    // A link to a page by its old name (the Library) opens the page under its new one.
+    const renamed = renamedSectionPath(location.pathname);
+    if (renamed) navigate(`${renamed}${location.search}${location.hash}`, { replace: true });
   }, [location.hash, location.pathname, location.search, navigate, route.activeSpaceId]);
 
   // Signed out, the window shows only the sign-in pages.
@@ -66,7 +69,7 @@ export function SpaceWorkspaceSurface({ tab }: { tab: WorkspaceView }) {
         <SpacePageLoadingPlaceholder
           shape={{
             section: route.section || "home",
-            item: Boolean(route.drawingId) || new URLSearchParams(location.search).has("note"),
+            item: Boolean(route.itemId) || new URLSearchParams(location.search).has("note"),
           }}
         />
       </Surface>
@@ -122,7 +125,7 @@ export function SpaceWorkspaceSurface({ tab }: { tab: WorkspaceView }) {
             <SpaceSectionView
               spaceId={route.activeSpaceId}
               section={route.section}
-              studioKind={route.drawingId}
+              itemId={route.itemId}
               workspaceTabId={tab.id}
             />
           </div>

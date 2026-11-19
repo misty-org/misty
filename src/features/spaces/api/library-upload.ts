@@ -1,20 +1,9 @@
-import { hasTauriInternals } from "@/shared/platform/tauri";
-import { httpRequest } from "@/api/client/http";
 import type { LibraryUploadResult, SpaceLibraryItem } from "./dto/entities";
-import {
-  isApiSessionTransitioning,
-  readApiAuthToken,
-  readApiSessionGeneration,
-} from "@/api/client/session";
+import { isApiSessionTransitioning, readApiSessionGeneration } from "@/api/client/session";
 import { assertUploadLimit } from "./upload-limits";
 import { safeTauriAssetUrl } from "@/shared/platform/tauri";
 
-import {
-  assertStableSpaceAccount,
-  resolveSpacesApiBase,
-  spaceRequest,
-  SpaceRequestError,
-} from "./api";
+import { assertStableSpaceAccount, spaceRequest, SpaceRequestError } from "./api";
 export async function uploadLibraryPath(
   spaceId: string,
   path: string,
@@ -164,6 +153,10 @@ async function uploadLibraryFile(
   }
 }
 
+/**
+ * Sends a file straight to object storage on the signed address the server handed out. File
+ * bytes never pass through the Space server, which only signs and tracks them.
+ */
 export async function transferLibraryObject(
   transfer: { url: string; method?: string; headers: Record<string, string> },
   file: File,
@@ -171,37 +164,18 @@ export async function transferLibraryObject(
   options?: LibraryUploadOptions,
 ): Promise<void> {
   assertStableSpaceAccount(accountGeneration);
-  const direct = /^https?:\/\//i.test(transfer.url);
-  const base = direct ? "" : await resolveSpacesApiBase();
-  const token = direct ? "" : await readApiAuthToken();
-  assertStableSpaceAccount(accountGeneration);
-  const url = direct ? transfer.url : `${base}${transfer.url}`;
-  if (!direct && hasTauriInternals()) {
-    const response = await httpRequest(url, {
-      method: transfer.method || "PUT",
-      headers: transfer.headers,
-      body: file,
-      signal: options?.signal,
-      onUploadProgress: options?.onProgress,
-    });
-    assertStableSpaceAccount(accountGeneration);
-    if (!response.ok) throw new Error(`Upload failed (${response.status}).`);
-    await response.body?.cancel();
-    options?.onProgress?.(1);
-    return;
-  }
+  if (!/^https:\/\//i.test(transfer.url))
+    throw new Error("The Space server didn't give a direct upload address. Try again.");
 
   await new Promise<void>((resolve, reject) => {
     const request = new XMLHttpRequest();
     const abort = () => request.abort();
-    request.open(transfer.method || "PUT", url, true);
-    request.withCredentials = !direct;
+    request.open(transfer.method || "PUT", transfer.url, true);
+    request.withCredentials = false;
     for (const [name, value] of Object.entries(transfer.headers ?? {})) {
       if (!value || /^(host|content-length|connection|origin)$/i.test(name)) continue;
       request.setRequestHeader(name, value);
     }
-    if (!direct) request.setRequestHeader("X-Misty-CSRF", "1");
-    if (!direct && token) request.setRequestHeader("Authorization", `Bearer ${token}`);
     request.upload.onprogress = (event) => {
       if (isApiSessionTransitioning() || accountGeneration !== readApiSessionGeneration()) {
         request.abort();
@@ -216,14 +190,12 @@ export async function transferLibraryObject(
         options?.onProgress?.(1);
         resolve();
       } else {
-        reject(
-          new SpaceRequestError(directTransferErrorMessage(direct, request.status), request.status),
-        );
+        reject(new SpaceRequestError(directTransferErrorMessage(request.status), request.status));
       }
     };
     request.onerror = () => {
       options?.signal?.removeEventListener("abort", abort);
-      reject(new Error(directTransferErrorMessage(direct, 0)));
+      reject(new Error(directTransferErrorMessage(0)));
     };
     request.onabort = () => reject(new DOMException("The upload was canceled.", "AbortError"));
     if (options?.signal?.aborted) return abort();
@@ -233,8 +205,7 @@ export async function transferLibraryObject(
   assertStableSpaceAccount(accountGeneration);
 }
 
-function directTransferErrorMessage(direct: boolean, status: number): string {
-  if (!direct) return "The cloud upload failed.";
+function directTransferErrorMessage(status: number): string {
   if (status === 403 || status === 0) {
     return "The direct R2 upload was blocked by the bucket CORS/preflight policy.";
   }

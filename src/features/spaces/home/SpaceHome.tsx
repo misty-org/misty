@@ -3,7 +3,8 @@ import { Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import type { Space } from "../api/dto/entities";
-import { setItemVisibility, type ItemVisibility } from "../api/visibility";
+import type { ItemVisibility } from "../api/visibility";
+import { setHostVisibility } from "../embeds/hostVisibility";
 import { useAuth } from "@/features/account";
 import { OrderedCollectionFilters } from "@/features/settings/OrderedCollectionFilters";
 import {
@@ -14,14 +15,19 @@ import {
   CollectionSkeleton,
   CollectionViewToggle,
   EmptyState,
+  ErrorState,
   MenuItem,
+  spaceMadeKind,
   useCollectionRefinement,
   useNotice,
+  type SpaceMadeKind,
 } from "@/shared/ui";
 import { useRangeSelection } from "@/shared/hooks/useRangeSelection";
 import { confirmAction } from "@/shared/lib/confirmAction";
 import { useSpacesStore } from "@/features/spaces/core";
 import { closeDrawingCollaborationSession, notifyDrawingListChanged } from "../journal";
+import { closeDeckCollaborationSession } from "../slides/session";
+import { closeWorkbookCollaborationSession } from "../data/session";
 import { preloadSpaceSection } from "../overview/SpaceSectionView";
 import { useSpaceItemCreator } from "../overview/useSpaceItemCreator";
 import { SpaceOptionsMenu } from "../components/space-row/SpaceOptionsMenu";
@@ -35,11 +41,10 @@ import { MakeSomethingNew } from "./MakeSomethingNew";
 import { SpaceItemCard, SpaceItemCardsSkeleton } from "./SpaceItemCard";
 import { SpaceOverview } from "./SpaceOverview";
 import { SpacePlaces } from "./SpacePlaces";
+import { SpaceChatButton } from "../chat/SpaceChatButton";
 import { useSpaceGallery } from "./useSpaceGallery";
 import { HereFaces, useHereNow } from "./HereNow";
 import { useNow } from "@/shared/hooks/useNow";
-
-const journalKinds = ["note", "drawing"] as const;
 
 const removalVerb = (items: GalleryItem[]) => {
   const labels = new Set(items.map((item) => item.removeLabel ?? "Remove"));
@@ -79,10 +84,10 @@ const scopes = [
  * layout. Its title switches the window to another Space. A search narrows the collection and
  * puts it at the top. All or Yours picks whose things show; the filter menu narrows by type and sets the
  * order. This device remembers the view, All or Yours, and the filter menu's picks. New in the
- * head makes a note or drawing, or adds files. As the Journal it holds the Space's docs and
- * drawings, without the home's overview.
+ * head makes a doc or whiteboard, or adds files. As a kind's page (Docs, Whiteboards) it holds
+ * only that kind, without the home's overview.
  */
-export function SpaceHome({ space, journal = false }: { space: Space; journal?: boolean }) {
+export function SpaceHome({ space, page }: { space: Space; page?: SpaceMadeKind }) {
   const now = useNow();
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -94,6 +99,8 @@ export function SpaceHome({ space, journal = false }: { space: Space; journal?: 
     ? (galleryFilters.find((option) => option.id === asked)?.kind ?? "all")
     : undefined;
   const me = user?.id ?? "";
+  const pageKind = page ? spaceMadeKind(page) : undefined;
+  const remember = pageKind ? `space-${pageKind.section}` : "space-home";
   const referenceOnly = useSpacesStore((state) => state.referenceOnly);
   const gallery = useSpaceGallery(space.id, me, !referenceOnly, space.role === "owner");
   // Who is in the Space now and where, for the bar's faces and the Here now panel.
@@ -111,27 +118,30 @@ export function SpaceHome({ space, journal = false }: { space: Space; journal?: 
     const words = query.trim().toLocaleLowerCase();
     return gallery.items.filter(
       (item) =>
-        (!journal || item.kind === "note" || item.kind === "drawing") &&
+        (!page || item.kind === page) &&
         (scope !== "yours" || item.creatorId === me) &&
         (!words ||
           item.title.toLocaleLowerCase().includes(words) ||
           item.excerpt?.toLocaleLowerCase().includes(words)),
     );
-  }, [gallery.items, journal, scope, me, query]);
+  }, [gallery.items, page, scope, me, query]);
   const refinement = useCollectionRefinement(searched, {
     label: "Filter this Space",
     requestedFacet,
-    remember: journal ? "space-journal" : "space-home",
+    remember,
     title: (item) => item.title,
     date: (item) => item.updatedAt,
-    facet: {
-      label: "Type",
-      value: (item) => item.kind,
-      options: galleryFilters.map((option) => ({
-        value: option.kind ?? "all",
-        label: option.kind ? option.label : "Everything",
-      })),
-    },
+    // A kind's page holds one type, so only the home filters by it.
+    facet: page
+      ? undefined
+      : {
+          label: "Type",
+          value: (item) => item.kind,
+          options: galleryFilters.map((option) => ({
+            value: option.kind ?? "all",
+            label: option.kind ? option.label : "Everything",
+          })),
+        },
   });
   const selection = useRangeSelection(
     refinement.items.filter((item) => item.remove).map((item) => item.key),
@@ -144,10 +154,12 @@ export function SpaceHome({ space, journal = false }: { space: Space; journal?: 
     try {
       for (const item of items) {
         await item.remove!();
+        const id = item.key.slice(item.key.indexOf(":") + 1);
         if (item.kind === "drawing") {
-          closeDrawingCollaborationSession(space.id, item.key.slice("drawing:".length));
+          closeDrawingCollaborationSession(space.id, id);
           notifyDrawingListChanged(space.id);
-        }
+        } else if (item.kind === "deck") closeDeckCollaborationSession(space.id, id);
+        else if (item.kind === "workbook") closeWorkbookCollaborationSession(space.id, id);
         const eventKind =
           item.kind === "chat" ? "conversation" : item.kind === "file" ? "library" : item.kind;
         window.dispatchEvent(
@@ -186,13 +198,14 @@ export function SpaceHome({ space, journal = false }: { space: Space; journal?: 
     );
   };
 
-  // Only the owner flips an item; the gallery reloads in the background.
+  // Only the owner flips an item; the gallery reloads in the background. A doc or deck turning
+  // shared shares what it embeds first, or stays private when the person declines.
   const changeVisibility = async (item: GalleryItem, visibility: ItemVisibility) => {
     if (!item.toggle) return;
     setOpenError("");
     try {
-      await setItemVisibility(space.id, item.toggle.kind, item.toggle.id, visibility);
-      gallery.reload();
+      if (await setHostVisibility(space.id, item.toggle.kind, item.toggle.id, visibility))
+        gallery.reload();
     } catch {
       setOpenError(`Couldn't make ${item.title} ${visibility}. Try again.`);
     }
@@ -219,7 +232,8 @@ export function SpaceHome({ space, journal = false }: { space: Space; journal?: 
     tone: "error",
     onDismiss: () => setOpenError(""),
   });
-  useNotice(gallery.failed.length > 0, {
+  // With every read failed the section says so itself, so the notice is for a partial failure.
+  useNotice(gallery.failed.length > 0 && !gallery.unavailable, {
     message: `Couldn't load ${gallery.failed.join(" and ")}. The rest is shown.`,
     tone: "error",
     action: { label: "Retry", onSelect: gallery.reload },
@@ -229,8 +243,8 @@ export function SpaceHome({ space, journal = false }: { space: Space; journal?: 
     <CollectionPage>
       <CollectionHeading
         title={
-          journal ? (
-            <SpaceCrumb spaceId={space.id} here="Docs" />
+          pageKind ? (
+            <SpaceCrumb spaceId={space.id} here={pageKind.page} />
           ) : (
             <span data-tour="space-switcher" className="contents">
               <SpaceSwitcher space={space} />
@@ -239,10 +253,11 @@ export function SpaceHome({ space, journal = false }: { space: Space; journal?: 
         }
         end={
           <div className="flex min-w-0 items-center gap-2">
-            {!journal && <HereFaces spaceId={space.id} here={here} />}
+            {!page && <HereFaces spaceId={space.id} here={here} />}
+            {!page && <SpaceChatButton spaceId={space.id} />}
             <CollectionSearch
               data-tour="space-search"
-              aria-label={journal ? "Search the journal" : "Search this Space"}
+              aria-label={pageKind ? `Search ${pageKind.page}` : "Search this Space"}
               placeholder="Search"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
@@ -251,10 +266,10 @@ export function SpaceHome({ space, journal = false }: { space: Space; journal?: 
               <MakeSomethingNew
                 spaceId={space.id}
                 onCreated={gallery.reload}
-                only={journal ? journalKinds : undefined}
+                only={page ? [page] : undefined}
               />
             </span>
-            {!journal && (
+            {!page && (
               <span data-tour="space-options" className="contents">
                 <SpaceOptionsMenu space={space} />
               </span>
@@ -265,7 +280,7 @@ export function SpaceHome({ space, journal = false }: { space: Space; journal?: 
       {/* After the Lab's home: the Space's pages to go to, what is going on in it, then its
           things as the page's one collection, with their count, whose, filters and view. */}
       <div className={spaceHomeClass}>
-        {!journal && !searching && (
+        {!page && !searching && (
           <>
             <span data-tour="space-places" className="contents">
               <SpacePlaces spaceId={space.id} />
@@ -274,8 +289,10 @@ export function SpaceHome({ space, journal = false }: { space: Space; journal?: 
           </>
         )}
         <HomeSection
-          title={searching ? "Results" : journal ? "Docs" : "In this Space"}
-          count={gallery.loading ? undefined : refinement.items.length}
+          title={searching ? "Results" : (pageKind?.page ?? "In this Space")}
+          count={gallery.loading || gallery.unavailable ? undefined : refinement.items.length}
+          // Under the overview's panels, a hairline starts the Space's own things.
+          divided={!page && !searching}
           action={
             <span data-tour="space-filters" className="contents">
               <OrderedCollectionFilters
@@ -307,6 +324,12 @@ export function SpaceHome({ space, journal = false }: { space: Space; journal?: 
             ) : (
               <CollectionSkeleton label="Space contents" view="list" icons />
             )
+          ) : gallery.unavailable ? (
+            <ErrorState
+              inline
+              title="This Space’s things couldn’t load"
+              action={{ label: "Try again", variant: "secondary", onClick: gallery.reload }}
+            />
           ) : !refinement.items.length ? (
             <EmptyState
               inline
@@ -314,7 +337,9 @@ export function SpaceHome({ space, journal = false }: { space: Space; journal?: 
               line={
                 searching
                   ? "Try other words, or show everyone's things."
-                  : "Docs, drawings, notebooks and files made in this Space show up here."
+                  : pageKind
+                    ? `${pageKind.page} made in this Space show up here.`
+                    : "Docs, whiteboards, notebooks and files made in this Space show up here."
               }
             />
           ) : view === "grid" ? (
@@ -344,7 +369,7 @@ export function SpaceHome({ space, journal = false }: { space: Space; journal?: 
             <CollectionItems
               listIcons
               columnSetId="space-home"
-              remember={journal ? "space-journal" : "space-home"}
+              remember={remember}
               view={view}
               sortResetKey={refinement.sortKey}
               categoryLabel="Type"

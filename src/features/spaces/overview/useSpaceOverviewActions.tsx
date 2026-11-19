@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { ArrowUpRight, Pencil, Trash2 } from "lucide-react";
 import { MenuItem, RenameItemDialog, useConfirmDelete } from "@/shared/ui";
 import { notifyDrawingListChanged, closeDrawingCollaborationSession } from "../journal";
+import { closeDeckCollaborationSession } from "../slides/session";
+import { closeWorkbookCollaborationSession } from "../data/session";
 import { useSpacesStore } from "../list/useSpacesStore";
 import type { SpaceOverviewItem } from "./useSpaceOverview";
 
@@ -50,6 +52,9 @@ export function useSpaceOverviewActions(
         const item = latest(target, "remove");
         await item.remove!();
         if (item.kind === "drawing") closeDrawingCollaborationSession(spaceId, sourceId(item));
+        else if (item.kind === "deck") closeDeckCollaborationSession(spaceId, sourceId(item));
+        else if (item.kind === "workbook")
+          closeWorkbookCollaborationSession(spaceId, sourceId(item));
         changed(item);
       },
     });

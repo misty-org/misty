@@ -1,3 +1,4 @@
+import { ErrorState } from "@/shared/ui";
 import { useSpaceLibraryContext } from "../SpaceLibraryContext";
 import { SpaceLibraryEmptyState } from "../components/SpaceLibraryEmptyState";
 import { LibraryItemsSkeleton } from "../components/LibraryItemSkeletons";
@@ -6,7 +7,8 @@ import { normalizeLibraryItemScale } from "../libraryFormat";
 import { useLibraryUploadState } from "./useLibraryUploadState";
 
 /**
- * The item grid, or whatever stands in for it: the empty state, or a skeleton of the view it
+ * The item grid, or whatever stands in for it: the empty state, an error when the first read
+ * failed with nothing saved, or a skeleton of the view it
  * will show on a Space's first load with nothing saved. A new search, sort or filter keeps the
  * items on screen until its answer arrives.
  */
@@ -20,6 +22,14 @@ export function LibraryItemsRegion() {
       <LibraryItemsSkeleton
         view={data.libraryViewMode}
         scale={normalizeLibraryItemScale(data.libraryItemScale)}
+      />
+    );
+
+  if (data.loadFailed)
+    return (
+      <ErrorState
+        title="Files couldn’t load"
+        action={{ label: "Try again", variant: "secondary", onClick: data.retryItems }}
       />
     );
 

@@ -1,3 +1,5 @@
+import { spaceMadeKindForSection } from "@/shared/ui";
+
 /** Canonical content identity. Tool indexes and UI-only query parameters never become recents. */
 export function spaceItemKeyFromRoute(route: string, spaceId: string): string | undefined {
   const url = new URL(route, "https://misty.invalid");
@@ -10,12 +12,14 @@ export function spaceItemKeyFromRoute(route: string, spaceId: string): string | 
     kind = "note";
     id = url.searchParams.get("note");
   }
-  if (section === "drawings") {
-    kind = "drawing";
+  // Whiteboards, decks and workbooks open at /<section>/<id>.
+  const made = spaceMadeKindForSection(section);
+  if (made && made.kind !== "note") {
+    kind = made.kind;
     id = detail;
   }
   if (
-    section === "library" &&
+    (section === "media" || section === "library") &&
     url.searchParams.get("collection") !== "deleted" &&
     url.searchParams.get("collection") !== "recently-deleted"
   ) {

@@ -6,7 +6,8 @@ import { SpaceAvatar } from "../SpaceAvatar";
 
 /**
  * A page of a Space as its bar's title: the Space's mark and name, which go back to its home,
- * then the page's own name.
+ * then the page's own name. The mark and name sit where the home's Space switcher shows them, so
+ * the bar doesn't shift from page to page.
  */
 export function SpaceCrumb({ spaceId, here }: { spaceId: string; here: string }) {
   const navigate = useNavigate();
@@ -22,9 +23,11 @@ export function SpaceCrumb({ spaceId, here }: { spaceId: string; here: string })
   return (
     <span className="flex min-w-0 items-center gap-1">
       {space ? (
+        // Its mark lands on the page's edge, where the Space switcher's does on the home.
         <Button
           variant="quiet"
           snug
+          className="-ml-1 gap-2"
           aria-label={`${space.name} home`}
           icon={mark}
           onClick={() => navigate(`/spaces/${encodeURIComponent(spaceId)}`)}

@@ -11,7 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { setFilePickerOpen, libraryData } = vi.hoisted(() => ({
   setFilePickerOpen: vi.fn(),
-  libraryData: { canUploadLibrary: true },
+  libraryData: { canUploadLibrary: true, selectedItems: [] as unknown[] },
 }));
 
 vi.mock("@/features/spaces/library/useSpaceLibraryData", () => ({
@@ -49,6 +49,15 @@ vi.mock("@/features/spaces/library/library-surfaces/LibraryItemsRegion", () => (
 }));
 
 import { SpaceLibrary } from "@/features/spaces/library/SpaceLibrary";
+import { useAiSurfaceAdapter } from "@/features/agents/runs/markdown/AiPaneHost";
+import type { AiSurfaceAdapter } from "@/features/agents";
+
+const libraryItem = (id: string, name: string, mime: string) => ({
+  id,
+  display_name: name,
+  version: 1,
+  file: { intrinsic_metadata: { client_declared_mime_type: mime }, original_filename: name },
+});
 
 function LocationProbe() {
   return <output data-testid="location">{useLocation().search}</output>;
@@ -63,6 +72,7 @@ describe("Space Library upload query action", () => {
       globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
     ).IS_REACT_ACT_ENVIRONMENT = true;
     libraryData.canUploadLibrary = true;
+    libraryData.selectedItems = [];
     setFilePickerOpen.mockClear();
     container = document.createElement("div");
     document.body.append(container);
@@ -89,5 +99,37 @@ describe("Space Library upload query action", () => {
     expect(container.querySelector('[data-testid="location"]')?.textContent).toBe(
       "?collection=recent",
     );
+  });
+});
+
+describe("the Media page's AI pane", () => {
+  it("tells the agent which photos are picked in the grid, by item id and name", async () => {
+    libraryData.selectedItems = [
+      libraryItem("p1", "Beach.jpg", "image/jpeg"),
+      libraryItem("d1", "Notes.pdf", "application/pdf"),
+      libraryItem("p2", "Dunes.png", "image/png"),
+    ];
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => {
+      root.render(
+        <MemoryRouter initialEntries={["/spaces/space-1/library"]}>
+          <SpaceLibrary spaceId="space-1" />
+        </MemoryRouter>,
+      );
+      await Promise.resolve();
+    });
+    const adapter = vi.mocked(useAiSurfaceAdapter).mock.calls.at(-1)?.[0] as AiSurfaceAdapter;
+    const selection = adapter.getSelection?.();
+    expect(selection?.kind).toBe("objects");
+    expect(JSON.parse(selection?.content ?? "{}")).toEqual({
+      selected_photos: [
+        { item_id: "p1", name: "Beach.jpg" },
+        { item_id: "p2", name: "Dunes.png" },
+      ],
+    });
+    await act(async () => root.unmount());
+    container.remove();
   });
 });

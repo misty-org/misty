@@ -47,7 +47,7 @@ export function LibraryViewerToolbar(props: LibraryViewerToolbarProps) {
         </Button>
       ) : null}
       {canEdit && props.editing ? (
-        <Button type="button" loading={props.editSaving} onClick={props.onSaveEdit}>
+        <Button type="button" disabled={props.editSaving} onClick={props.onSaveEdit}>
           Save
         </Button>
       ) : null}

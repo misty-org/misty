@@ -106,7 +106,11 @@ export function useLibraryItems(options: UseLibraryItemsOptions) {
     void reload();
   }, [reload, reloadKey]);
 
-  const loading = firstPage.loading && !loaded;
+  // An answer that arrived but isn't adopted yet (the effect above) still counts as loading, so
+  // the empty state never flashes for the render between the two.
+  const loading = !loaded && (firstPage.loading || Boolean(page));
+  // The open Space's first read failed with nothing saved: there are no items to say are absent.
+  const loadFailed = !loaded && !page && !firstPage.loading && Boolean(pageError);
 
   return {
     items,
@@ -118,6 +122,8 @@ export function useLibraryItems(options: UseLibraryItemsOptions) {
     loadingMore,
     setLoadingMore,
     loading,
+    loadFailed,
+    retryItems: () => void reload(),
     libraryQuery,
   };
 }

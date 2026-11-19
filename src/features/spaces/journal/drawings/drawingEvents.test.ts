@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { notifyDrawingListChanged, subscribeToDrawingListChanges } from "./drawingEvents";
 
-describe("drawing list events", () => {
+describe("whiteboard list events", () => {
   it("observes local and realtime changes for the selected Space", () => {
     const listener = vi.fn();
     const unsubscribe = subscribeToDrawingListChanges("space_1", listener);

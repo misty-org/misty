@@ -21,6 +21,12 @@ vi.mock("@/features/spaces/journal/drawings/api/api", () => ({
   drawingsApi: { list: api.drawings, rename: api.renameDrawing, remove: api.removeDrawing },
 }));
 vi.mock("@/features/spaces/api/api", () => ({ spacesApi: api }));
+vi.mock("@/features/spaces/slides/api", () => ({
+  decksApi: { list: async () => ({ decks: [] }), rename: vi.fn(), remove: vi.fn() },
+}));
+vi.mock("@/features/spaces/data/api", () => ({
+  workbooksApi: { list: async () => ({ workbooks: [] }), rename: vi.fn(), remove: vi.fn() },
+}));
 // Each source's copy is kept per signed-in account, so a switch shows nothing of the old one.
 const session = vi.hoisted(() => ({ account: "" }));
 vi.mock("@/api/client/session", async (importOriginal) => ({

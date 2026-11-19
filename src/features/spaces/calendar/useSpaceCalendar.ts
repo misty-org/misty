@@ -6,8 +6,6 @@ import { plannerApi, type SpaceCalendarEvent, type SpaceCalendarEventInput } fro
 import { notifyPlannerChanged, subscribeToPlannerChanges } from "../planner/plannerEvents";
 import { monthRange } from "./calendarDates";
 
-const noEvents: SpaceCalendarEvent[] = [];
-
 /**
  * The Space's own events for the month around `anchor`, and what a person does to them. Each
  * month paints its last copy at once on a revisit or relaunch while a fresh one loads; a month
@@ -33,7 +31,10 @@ export function useSpaceCalendar(spaceId: string, anchor: Date) {
   if (resource.data && (shown?.events !== resource.data || shown.spaceId !== spaceId))
     setShown({ spaceId, events: resource.data });
   const kept = shown?.spaceId === spaceId ? shown.events : undefined;
-  const events = resource.data ?? kept ?? (resource.error ? noEvents : undefined);
+  // A month whose read failed with nothing saved shows the failure, not another month's events
+  // or an empty month.
+  const loadFailed = !resource.data && Boolean(resource.error);
+  const events = resource.data ?? (loadFailed ? undefined : kept);
   const error = changeError || (resource.error ? errorText(resource.error) : "");
 
   useEffect(
@@ -61,6 +62,9 @@ export function useSpaceCalendar(spaceId: string, anchor: Date) {
   return {
     /** `undefined` until the Space's first month answers, with nothing saved. */
     events,
+    /** The month's read failed with nothing saved, so `events` stays `undefined`. */
+    loadFailed,
+    reload,
     error,
     busy,
     save: (input: SpaceCalendarEventInput, editing?: SpaceCalendarEvent) =>

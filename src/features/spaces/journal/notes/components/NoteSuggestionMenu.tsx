@@ -1,5 +1,6 @@
-import { SuggestionItem, SuggestionList, Text } from "@/shared/ui";
+import { spaceMadeKind, SuggestionItem, SuggestionList, Text } from "@/shared/ui";
 import type { Editor } from "@tiptap/react";
+import type { EmbedKind } from "../../../embeds/embedTypes";
 import {
   Braces,
   Heading,
@@ -9,6 +10,7 @@ import {
   ListOrdered,
   Pilcrow,
   Quote,
+  Table,
 } from "lucide-react";
 
 export type SuggestionState = {
@@ -45,7 +47,11 @@ export function NoteSuggestionMenu(props: {
     title: string;
   }>;
   onClose: () => void;
+  /** Opens the embed picker for these kinds where the slash was; unset where embeds can't go. */
+  onEmbed?: (kinds: EmbedKind[], at: { x: number; y: number }) => void;
 }) {
+  const { onEmbed } = props;
+  const at = { x: props.suggestion.x, y: props.suggestion.y };
   const slashItems = [
     {
       label: "Text",
@@ -101,6 +107,26 @@ export function NoteSuggestionMenu(props: {
       icon: Braces,
       run: () => props.editor.chain().focus().toggleCodeBlock().run(),
     },
+    {
+      label: "Table",
+      icon: Table,
+      run: () =>
+        props.editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(),
+    },
+    ...(onEmbed
+      ? [
+          {
+            label: "Data chart or range",
+            icon: spaceMadeKind("workbook").icon,
+            run: () => onEmbed(["data-chart", "data-range"], at),
+          },
+          {
+            label: "Whiteboard frame",
+            icon: spaceMadeKind("drawing").icon,
+            run: () => onEmbed(["board-frame"], at),
+          },
+        ]
+      : []),
   ].filter((item) => item.label.toLowerCase().includes(props.suggestion.query.toLowerCase()));
   const notes = props.notes
     .filter((note) => note.title.toLowerCase().includes(props.suggestion.query.toLowerCase()))

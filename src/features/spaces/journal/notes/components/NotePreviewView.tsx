@@ -1,10 +1,9 @@
-import { Button, EmptyState, Surface, useNotice } from "@/shared/ui";
+import { Button, EmptyState, Surface, useNotice, ToolSuspense } from "@/shared/ui";
 import { ClipboardCopy } from "lucide-react";
-import { Suspense, useState, type ComponentType } from "react";
+import { useState, type ComponentType } from "react";
 import type { UnifiedNote } from "../noteTypes";
 
 import type { NoteBlockEditorProps } from "./NoteBlockEditorView";
-import { NoteDocumentSkeleton } from "./NoteDocumentSkeleton";
 interface NotePreviewRuntime {
   Editor: ComponentType<Omit<NoteBlockEditorProps, "runtime">>;
   copy(text: string): Promise<void>;
@@ -64,7 +63,7 @@ export function NotePreviewView(props: NotePreviewProps & { runtime: NotePreview
 
       <div className="misty-scrollbar min-h-0 overflow-auto">
         {noteText.trim() ? (
-          <Suspense fallback={<NoteDocumentSkeleton label="Preparing doc preview" />}>
+          <ToolSuspense tool="doc editor">
             <NoteBlockEditor
               key={props.note.id}
               editable={false}
@@ -76,7 +75,7 @@ export function NotePreviewView(props: NotePreviewProps & { runtime: NotePreview
               bodyMarkdown={props.note.bodyMarkdown}
               linkableNotes={linkableNotes}
             />
-          </Suspense>
+          </ToolSuspense>
         ) : (
           <EmptyState title="This doc is empty" line="Open the doc to start writing." />
         )}

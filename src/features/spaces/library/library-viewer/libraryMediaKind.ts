@@ -26,7 +26,15 @@ export function libraryMediaKind(
 }
 
 export function editedImageFilename(displayName: string, mimeType: string) {
-  const extension = mimeType === "image/jpeg" ? "jpg" : mimeType === "image/webp" ? "webp" : "png";
+  // A GIF arrives only as a file an agent saved over the item as it was made.
+  const extension =
+    mimeType === "image/jpeg"
+      ? "jpg"
+      : mimeType === "image/webp"
+        ? "webp"
+        : mimeType === "image/gif"
+          ? "gif"
+          : "png";
   const base = (displayName || "image").replace(/\.[^./\\]+$/, "");
   return `${base}.${extension}`;
 }

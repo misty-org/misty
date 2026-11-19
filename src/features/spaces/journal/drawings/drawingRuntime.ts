@@ -12,7 +12,10 @@ export interface DrawingSession {
   elements: Y.Map<OrderedExcalidrawElement>;
   scene: Y.Map<unknown>;
   files: Y.Map<DrawingAssetReference>;
-  provider: Pick<WebsocketProvider, "awareness" | "on" | "off" | "synced">;
+  provider: Pick<
+    WebsocketProvider,
+    "awareness" | "on" | "off" | "synced" | "connect" | "disconnect"
+  >;
   /** Whether this person can still reach the drawing; a view without it never loses access. */
   access?: Pick<CollaborationAccess, "lost" | "subscribe" | "retry">;
 }

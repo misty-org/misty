@@ -55,7 +55,7 @@ export async function acquireDrawingSession(
       const current = sessions.get(key);
       if (current !== sessionEntry) {
         destroySession(session);
-        throw new Error("Drawing collaboration session was closed.");
+        throw new Error("Whiteboard collaboration session was closed.");
       }
       current.session = session;
       current.promise = undefined;

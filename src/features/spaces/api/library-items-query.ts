@@ -2,6 +2,7 @@ import type {
   LibraryItemQuery,
   LibraryItemsResult,
   LibrarySearchFacets,
+  SpaceLibraryItem,
   SpaceStorageUsage,
 } from "./dto/entities";
 
@@ -21,6 +22,11 @@ export function createLibraryQueryApi(spaceRequest: SpaceRequest) {
   return {
     libraryItems: (spaceId: string, query: LibraryItemQuery = {}) =>
       spaceRequest<LibraryItemsResult>(libraryItemsPath(spaceId, query)),
+    /** One item, by its id. */
+    libraryItem: (spaceId: string, itemId: string) =>
+      spaceRequest<SpaceLibraryItem>(
+        `/spaces/${encodeURIComponent(spaceId)}/library/items/${encodeURIComponent(itemId)}`,
+      ),
     libraryFacets: (spaceId: string, query = "") =>
       spaceRequest<LibrarySearchFacets>(
         `/spaces/${encodeURIComponent(spaceId)}/library/facets${query ? `?q=${encodeURIComponent(query)}` : ""}`,

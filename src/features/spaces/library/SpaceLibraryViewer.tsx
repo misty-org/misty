@@ -14,6 +14,9 @@ import { useState } from "react";
 import { copyLibraryItemsToClipboard } from "./libraryClipboard";
 import { libraryMediaKind } from "./library-viewer/libraryMediaKind";
 import { LibraryPhotoEditorView } from "./library-viewer/LibraryPhotoEditorView";
+import { LibraryVideoEditorView } from "./library-viewer/LibraryVideoEditorView";
+import { LibraryVideoProjectView } from "./library-viewer/LibraryVideoProjectView";
+import { canEditVideo, isVideoProjectFile } from "@/features/files";
 import { LibraryViewerSidebar } from "./library-viewer/LibraryViewerSidebar";
 import { LibraryViewerStage } from "./library-viewer/LibraryViewerStage";
 import { LibraryViewerToolbar } from "./library-viewer/LibraryViewerToolbar";
@@ -101,9 +104,7 @@ function LibraryItemViewerContent(
     try {
       await copyLibraryItemsToClipboard(spaceId, [target]);
     } catch (error) {
-      edits.setEditError(
-        error instanceof Error ? error.message : "The Library item could not be copied.",
-      );
+      edits.setEditError(error instanceof Error ? error.message : "The file could not be copied.");
     }
   };
   if (isImage)
@@ -122,6 +123,30 @@ function LibraryItemViewerContent(
         onRenditionReady={props.onRenditionReady}
         onPrevious={index > 0 ? goPrevious : undefined}
         onNext={index >= 0 && index < items.length - 1 ? goNext : undefined}
+      />
+    );
+  // A video project always opens in the video editor, kept in Media for those who can edit it.
+  if (isVideoProjectFile(mimeType, item.file.original_filename))
+    return (
+      <LibraryVideoProjectView
+        spaceId={spaceId}
+        item={item}
+        canEdit={canEdit}
+        onClose={onClose}
+        onReplaceItem={props.onReplaceItem}
+        onSaved={props.onRenditionReady}
+      />
+    );
+  // A video opens in the video editor where it can be saved back; read-only, or where this
+  // computer can't edit video, it plays here.
+  if (isVideo && canEdit && canEditVideo())
+    return (
+      <LibraryVideoEditorView
+        spaceId={spaceId}
+        item={item}
+        mimeType={mimeType}
+        onClose={onClose}
+        onSaved={props.onRenditionReady}
       />
     );
   return (

@@ -1,5 +1,5 @@
 import { useAuth } from "@/features/account";
-import { cn, Surface } from "@/shared/ui";
+import { cn, SetupState, Surface } from "@/shared/ui";
 import { isChangeOrigin } from "@tiptap/extension-collaboration";
 import DragHandle from "@tiptap/extension-drag-handle-react";
 import type { JSONContent } from "@tiptap/react";
@@ -8,7 +8,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createNoteAiAdapter, updateAiSelection } from "./noteAiAdapter";
 import { NoteBlockHandle } from "./NoteBlockHandle";
 import { LabNotebookDocView, useIsLabNotebook } from "./LabNotebookDocView";
-import { NoteDocumentSkeleton } from "./NoteDocumentSkeleton";
 import {
   collectNoteLinks,
   initialContent,
@@ -21,6 +20,9 @@ import { NoteEditorToolbar } from "./NoteEditorToolbar";
 import type { NoteAiSelection, NoteBlockEditorProps, NoteEditorSession } from "./noteEditorTypes";
 import { findCommands, NoteSearchReplacePanel } from "./NoteSearchReplacePanel";
 import { NoteSuggestionMenu, updateSuggestion, type SuggestionState } from "./NoteSuggestionMenu";
+import { EmbedPicker } from "../../../embeds/EmbedPicker";
+import type { EmbedKind } from "../../../embeds/embedTypes";
+import { noteEmbedContent } from "../embeds/noteEmbedNode";
 import "./noteTiptapEditor.css";
 
 export type {
@@ -50,8 +52,8 @@ function CollaborativeNoteEditor(
   if (error) {
     return <>{props.runtime.renderError(error, props.spaceId, props.noteId)}</>;
   }
-  // The doc's live copy is still being joined: the editor's own shape stands in.
-  if (!session) return <NoteDocumentSkeleton label="Opening doc" toolbar={props.editable} />;
+  // The doc's live copy is still being joined: the editor says so until it can show the doc.
+  if (!session) return <SetupState tool="doc editor" label="Opening the doc" />;
   if (labNotebook)
     return (
       <LabNotebookDocView
@@ -98,6 +100,11 @@ function MistyTipTapEditor(
   } | null>(null);
   const [suggestion, setSuggestion] = useState<SuggestionState | null>(null);
   const [aiSelection, setAiSelection] = useState<NoteAiSelection | null>(null);
+  const [embedPicker, setEmbedPicker] = useState<{
+    kinds: EmbedKind[];
+    x: number;
+    y: number;
+  } | null>(null);
   // Others see this person's caret under their own name, as in drawings.
   const { user } = useAuth();
   const userName = user?.username || user?.email || "";
@@ -108,8 +115,10 @@ function MistyTipTapEditor(
         session: props.session,
         accountId: props.accountId,
         userName,
+        spaceId: props.spaceId,
+        visibility: props.visibility,
       }),
-    [props.accountId, props.session, props.runtime, userName],
+    [props.accountId, props.session, props.runtime, userName, props.spaceId, props.visibility],
   );
   const editor = useEditor({
     immediatelyRender: false,
@@ -279,7 +288,33 @@ function MistyTipTapEditor(
               suggestion={suggestion}
               notes={props.linkableNotes ?? []}
               onClose={() => setSuggestion(null)}
+              onEmbed={
+                props.spaceId && props.editable
+                  ? (kinds, at) => setEmbedPicker({ kinds, ...at })
+                  : undefined
+              }
             />
+          ) : null}
+          {props.spaceId ? (
+            <EmbedPicker
+              spaceId={props.spaceId}
+              hostVisibility={props.visibility ?? "public"}
+              kinds={embedPicker?.kinds}
+              open={Boolean(embedPicker)}
+              onOpenChange={(open) => {
+                if (!open) setEmbedPicker(null);
+              }}
+              onPick={(embed) => {
+                editor.chain().focus().insertContent(noteEmbedContent(embed)).run();
+              }}
+              anchored
+            >
+              <span
+                aria-hidden="true"
+                className="fixed"
+                style={{ left: embedPicker?.x ?? 0, top: embedPicker?.y ?? 0 }}
+              />
+            </EmbedPicker>
           ) : null}
         </div>
         {imagePickerOpen

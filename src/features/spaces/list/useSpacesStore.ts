@@ -26,6 +26,33 @@ const snapshotServerErrorCooldownMs = 5_000;
 let snapshotLoadPromise: Promise<void> | null = null;
 let snapshotLastRequestedAt = 0;
 let snapshotCooldownUntil = 0;
+// A first snapshot that fails (the server or the native side still starting after a reload) is
+// asked for again, waiting twice as long each time up to 30s, past any cooldown, until one lands:
+// nothing else asks while the realtime socket stays up, and the sidebar would wait on it forever.
+let snapshotRetryTimer: ReturnType<typeof setTimeout> | null = null;
+let snapshotRetryAttempt = 0;
+const snapshotRetryMaxMs = 30_000;
+
+function clearSnapshotRetry(resetAttempts: boolean) {
+  if (snapshotRetryTimer) clearTimeout(snapshotRetryTimer);
+  snapshotRetryTimer = null;
+  if (resetAttempts) snapshotRetryAttempt = 0;
+}
+
+function retrySnapshotLater(generation: number) {
+  clearSnapshotRetry(false);
+  const backoff = Math.min(snapshotRetryMaxMs, 1_000 * 2 ** snapshotRetryAttempt);
+  snapshotRetryAttempt += 1;
+  const delay = Math.max(backoff, snapshotCooldownUntil - Date.now());
+  snapshotRetryTimer = setTimeout(() => {
+    snapshotRetryTimer = null;
+    const state = useSpacesStore.getState();
+    // Done once a live snapshot is in; a stand-in list (reference mode) keeps asking.
+    if (generation !== spacesAccountGeneration || (state.snapshotReady && !state.referenceOnly))
+      return;
+    void useSpacesStore.getState().load({ force: true });
+  }, delay);
+}
 // The Space we last told the server we're viewing. Re-sent on every reconnect
 // since the server only knows about it for the lifetime of a WebSocket.
 // Whether Misty is currently in focus (vs. tabbed/alt-tabbed away — "idle").
@@ -85,6 +112,7 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
         });
         if (generation !== spacesAccountGeneration) return;
         snapshotCooldownUntil = 0;
+        clearSnapshotRetry(true);
         set(referenceMode.liveSpaceSnapshotState(snapshot));
       } catch (error) {
         if (generation !== spacesAccountGeneration) return;
@@ -99,6 +127,11 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
         }
         const fallback = await referenceMode.referenceSpaceSnapshotState(error);
         if (generation !== spacesAccountGeneration) return;
+        // Signed out (401) is the account's to settle; anything else is asked again until the
+        // Spaces arrive.
+        const signedOut = error instanceof SpaceRequestError && error.status === 401;
+        if (!signedOut && (!get().snapshotReady || get().referenceOnly))
+          retrySnapshotLater(generation);
         if (fallback) {
           set(fallback);
           return;
@@ -237,9 +270,10 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
       set((state) => ({
         messagesBySpace: {
           ...state.messagesBySpace,
-          [spaceId]: mergeSpaceMessages(state.messagesBySpace[spaceId] ?? [], [
-            ...messages,
-          ].reverse()),
+          [spaceId]: mergeSpaceMessages(
+            state.messagesBySpace[spaceId] ?? [],
+            [...messages].reverse(),
+          ),
         },
         messageHistoryBySpace: {
           ...state.messageHistoryBySpace,
@@ -300,6 +334,7 @@ export function resetSpacesAccountState(): void {
   snapshotLoadPromise = null;
   snapshotLastRequestedAt = 0;
   snapshotCooldownUntil = 0;
+  clearSnapshotRetry(true);
   // Bump the generation first so any request already in flight for the
   // account we're leaving can no longer write into the state we're about to
   // clear for the new one, no matter when it resolves.

@@ -1,13 +1,16 @@
+import type { SpaceDeck } from "../slides/api";
+import type { SpaceWorkbook } from "../data/api";
 import type { SpaceDrawing } from "../journal/drawings/api/drawingApiTypes";
 import type { ServerSpaceNote } from "../journal/notes/api/api";
 import type { SpaceConversation } from "../api/dto/conversation-types";
 import type { SpaceLibraryItem } from "../api/dto/entities";
 import type { ItemVisibility, VisibilityItemKind } from "../api/visibility";
 import { libraryItemMIME } from "../library";
+import { spaceMadeKind } from "@/shared/ui";
 import { conversationPath } from "../chat/chatRoute";
 
 /** One thing made in a Space, as the Space home shows it. */
-export type GalleryKind = "chat" | "note" | "drawing" | "image" | "file";
+export type GalleryKind = "chat" | "note" | "deck" | "workbook" | "drawing" | "image" | "file";
 
 export interface GalleryItem {
   /** Unique across kinds, for React keys. */
@@ -39,7 +42,15 @@ export interface GalleryItem {
 /** A Lab notebook's doc is titled with this, the way the Lab finds them among a Space's docs. */
 const notebookPrefix = "Notebook: ";
 
-type GalleryFilter = "all" | "chats" | "notes" | "drawings" | "images" | "files";
+type GalleryFilter =
+  | "all"
+  | "chats"
+  | "notes"
+  | "slides"
+  | "data"
+  | "drawings"
+  | "images"
+  | "files";
 
 /** The Space home's tabs, in order. */
 export const galleryFilters: ReadonlyArray<{
@@ -49,8 +60,10 @@ export const galleryFilters: ReadonlyArray<{
 }> = [
   { id: "all", label: "All" },
   { id: "chats", label: "Chats", kind: "chat" },
-  { id: "notes", label: "Docs", kind: "note" },
-  { id: "drawings", label: "Drawings", kind: "drawing" },
+  { id: "notes", label: spaceMadeKind("note").page, kind: "note" },
+  { id: "slides", label: spaceMadeKind("deck").page, kind: "deck" },
+  { id: "data", label: spaceMadeKind("workbook").page, kind: "workbook" },
+  { id: "drawings", label: spaceMadeKind("drawing").page, kind: "drawing" },
   { id: "images", label: "Images", kind: "image" },
   { id: "files", label: "Files", kind: "file" },
 ];
@@ -100,7 +113,7 @@ export function noteItem(spaceId: string, note: ServerSpaceNote): GalleryItem {
   return {
     key: `note:${note.id}`,
     kind: "note",
-    title: note.title.trim() || "Untitled doc",
+    title: note.title.trim() || spaceMadeKind("note").untitled,
     updatedAt: note.updated_at ?? note.created_at ?? "",
     creatorId: note.creator_user_id,
     href: `${base(spaceId)}/notes?note=${encodeURIComponent(note.id)}`,
@@ -114,7 +127,7 @@ export function drawingItem(spaceId: string, drawing: SpaceDrawing): GalleryItem
   return {
     key: `drawing:${drawing.id}`,
     kind: "drawing",
-    title: drawing.title.trim() || "Untitled drawing",
+    title: drawing.title.trim() || spaceMadeKind("drawing").untitled,
     updatedAt: drawing.updated_at,
     creatorId: drawing.creator_user_id,
     href: `${base(spaceId)}/drawings/${encodeURIComponent(drawing.id)}`,
@@ -122,6 +135,31 @@ export function drawingItem(spaceId: string, drawing: SpaceDrawing): GalleryItem
     toggle: { kind: "drawing", id: drawing.id },
   };
 }
+
+/** A deck or workbook, with the words the server keeps of it for a preview. */
+function madeItem(
+  spaceId: string,
+  kind: "deck" | "workbook",
+  item: SpaceDeck | SpaceWorkbook,
+): GalleryItem {
+  const made = spaceMadeKind(kind);
+  return {
+    key: `${kind}:${item.id}`,
+    kind,
+    title: item.title.trim() || made.untitled,
+    updatedAt: item.updated_at,
+    creatorId: item.creator_user_id,
+    href: made.href(spaceId, item.id),
+    excerpt: (item.plain_text ?? "").replace(/\s+/g, " ").trim().slice(0, 220) || undefined,
+    visibility: item.visibility,
+    toggle: { kind, id: item.id },
+  };
+}
+
+export const deckItem = (spaceId: string, deck: SpaceDeck) => madeItem(spaceId, "deck", deck);
+
+export const workbookItem = (spaceId: string, workbook: SpaceWorkbook) =>
+  madeItem(spaceId, "workbook", workbook);
 
 /** Pictures and videos are Images; everything else uploaded or made is a File. */
 export function libraryKind(item: SpaceLibraryItem): "image" | "file" {
@@ -136,7 +174,7 @@ export function libraryGalleryItem(spaceId: string, item: SpaceLibraryItem): Gal
     title: item.display_name || item.file.original_filename || "Untitled file",
     updatedAt: item.updated_at || item.added_at,
     creatorId: item.added_by_user_id || item.contributing_user_id,
-    href: `${base(spaceId)}/library?item=${encodeURIComponent(item.id)}`,
+    href: `${base(spaceId)}/media?item=${encodeURIComponent(item.id)}`,
     libraryItem: item,
     visibility: item.visibility,
     toggle: { kind: "library_item", id: item.id },

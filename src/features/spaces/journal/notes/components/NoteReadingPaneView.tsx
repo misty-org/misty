@@ -1,9 +1,21 @@
-import { BackButton, Badge, Button, cn, EmptyState, Skeleton, Surface, Text } from "@/shared/ui";
+import {
+  BackButton,
+  Badge,
+  Button,
+  cn,
+  EmptyState,
+  ErrorState,
+  Skeleton,
+  Surface,
+  Text,
+  ToolSuspense,
+} from "@/shared/ui";
 import { Link2 } from "lucide-react";
-import { Suspense, useEffect, useState, type ComponentType } from "react";
+import { useEffect, useState, type ComponentType } from "react";
 import type { UnifiedNote } from "../noteTypes";
 import type { NativeNotesApi } from "../noteServices";
 import type { NoteBlockEditorProps, NoteEditorRuntime } from "./NoteBlockEditorView";
+import { NoteActionsMenu } from "./NoteActionsMenu";
 import { NoteBacklinksPanel } from "./NoteBacklinksPanel";
 import { NoteDocumentSkeleton } from "./NoteDocumentSkeleton";
 import { NoteTitleInput } from "./NoteTitleInput";
@@ -29,16 +41,29 @@ export function NoteReadingPaneView(
     return (
       <Surface tone="page" className={paneClass}>
         <div className="row-span-2 grid place-items-center">
-          <EmptyState
-            inline
-            title={props.hasNotes ? "Select a doc" : "No docs yet"}
-            line={
-              props.hasNotes
-                ? "Choose a doc from the list to open it."
-                : "Create a doc to keep this Space's work close by."
-            }
-            action={props.hasNotes ? undefined : { label: "New doc", onClick: props.onNewNote }}
-          />
+          {/* A list that couldn't be read says so, rather than that there are no docs. */}
+          {props.error && !props.hasNotes ? (
+            <ErrorState
+              inline
+              title="Docs couldn’t load"
+              action={
+                props.onRetry
+                  ? { label: "Try again", variant: "secondary", onClick: props.onRetry }
+                  : undefined
+              }
+            />
+          ) : (
+            <EmptyState
+              inline
+              title={props.hasNotes ? "Select a doc" : "No docs yet"}
+              line={
+                props.hasNotes
+                  ? "Choose a doc from the list to open it."
+                  : "Create a doc to keep this Space's work close by."
+              }
+              action={props.hasNotes ? undefined : { label: "New doc", onClick: props.onNewNote }}
+            />
+          )}
         </div>
       </Surface>
     );
@@ -84,6 +109,9 @@ export function NoteReadingPaneView(
             <span className="hidden xl:inline">Backlinks</span>
             {note.backlinkCount ? <Badge variant="count">{note.backlinkCount}</Badge> : null}
           </Button>
+          {collaborative && note.spaceId ? (
+            <NoteActionsMenu note={note} spaceId={note.spaceId} onDelete={props.onDelete} />
+          ) : null}
         </div>
       </Surface>
 
@@ -94,7 +122,7 @@ export function NoteReadingPaneView(
         )}
       >
         <div className={cn("misty-scrollbar min-h-0 overflow-auto overscroll-contain", false)}>
-          <Suspense fallback={<NoteDocumentSkeleton label="Opening doc" toolbar={collaborative} />}>
+          <ToolSuspense tool="doc editor">
             <NoteBlockEditor
               key={note.id}
               editable={collaborative}
@@ -108,6 +136,7 @@ export function NoteReadingPaneView(
               bodyMarkdown={note.bodyMarkdown}
               linkableNotes={linkableNotes}
               onOpenNote={props.onSelectNote}
+              visibility={note.visibility}
               aiContext={{
                 kind: note.source === "misty" ? "note" : "provider-note",
                 id: note.sourceId,
@@ -117,7 +146,7 @@ export function NoteReadingPaneView(
                 privacy: note.source === "misty" ? "shared" : "provider",
               }}
             />
-          </Suspense>
+          </ToolSuspense>
         </div>
         {inspector ? (
           <NoteBacklinksPanel
@@ -154,9 +183,14 @@ export interface NoteReadingPaneProps {
   hasNotes?: boolean;
   accountId?: string;
   loading: boolean;
+  /** The docs list couldn't be read: with no docs to show, the pane says so instead of empty. */
+  error?: boolean;
+  onRetry?: () => void;
   referenceOnly?: boolean;
   onBack?: () => void;
   onNewNote: () => void;
   linkableNotes?: UnifiedNote[];
   onSelectNote?: (noteId: string) => void;
+  /** Deletes the open doc, after asking; from its ⋯ menu. */
+  onDelete?: () => void;
 }
