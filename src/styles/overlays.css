@@ -2,7 +2,11 @@
    The edge is the popup-edge utility's (components.css; keep the two in sync):
    an outline over the card's rim, above its contents, never a ring outside it
    or a colored border under them, either of which leaves the rounded corners
-   faint and cut off. No shadow: depth is the edge and the card's fill. */
+   faint and cut off. No shadow: depth is the edge and the card's fill.
+   The outline is !important because Radix writes `outline: none` into the inline
+   style of every menu (dropdown, context, sub) and Select list, which beats any
+   rule, so menus drew no edge at all. It also outranks base.css's focus reset,
+   which would take the edge off a focused menu or dialog. */
 :root
   :is(
     [data-slot="dialog-content"],
@@ -10,14 +14,16 @@
     [data-slot="popover-content"],
     [data-slot="dropdown-menu-content"],
     [data-slot="dropdown-menu-sub-content"],
+    [data-slot="context-menu-content"],
+    [data-slot="context-menu-sub-content"],
     [data-slot="select-content"],
     [data-slot="workspace-overlay-panel"],
     [role="menu"],
     [data-popup-surface]
   ) {
   border: 1px solid transparent;
-  outline: 1px solid color-mix(in srgb, currentColor 24%, transparent);
-  outline-offset: -1px;
+  outline: 1px solid color-mix(in srgb, currentColor 24%, transparent) !important;
+  outline-offset: -1px !important;
   --tw-ring-shadow: 0 0 #0000;
   box-shadow: none;
 }
@@ -35,6 +41,8 @@
       [data-slot="popover-content"],
       [data-slot="dropdown-menu-content"],
       [data-slot="dropdown-menu-sub-content"],
+      [data-slot="context-menu-content"],
+      [data-slot="context-menu-sub-content"],
       [data-slot="select-content"],
       [data-slot="workspace-overlay-panel"],
       [role="menu"],

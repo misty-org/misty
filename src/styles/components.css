@@ -121,11 +121,12 @@
    the card, which meets the card's own antialiased corner and leaves a dark seam on the curve.
    Both read as faint, cut-off corners on 1x and scaled displays. The transparent border keeps
    the card's size and padding as they were with a real border. overlays.css draws the same edge
-   on every popup primitive; keep the two in sync. */
+   on every popup primitive; keep the two in sync. !important, as there: Radix writes
+   `outline: none` inline on menus and Select lists, which no plain rule can beat. */
 @utility popup-edge {
   border: 1px solid transparent;
-  outline: 1px solid color-mix(in srgb, currentColor 24%, transparent);
-  outline-offset: -1px;
+  outline: 1px solid color-mix(in srgb, currentColor 24%, transparent) !important;
+  outline-offset: -1px !important;
 }
 
 /* A scroller that shows no scrollbar, for a bar's row that scrolls sideways (SidewaysScroll):

@@ -8,8 +8,9 @@
  * One settings row per engine: its mark and name, one quiet line under the name with what is true
  * (its version, signed in or out, an update waiting), then at most one button for what to do next
  * (Install, else Sign in, else Update), and a ⋯ menu with the rest: updating when Sign in took the
- * button, the docs, checking again and, for an engine Misty installed in `~/.misty/shared/engines`,
- * Remove. Versions are checked when the page opens and on refresh, never on a timer.
+ * button, the docs, checking again and Uninstall, the way the copy was installed (Misty's own
+ * folder, npm, Homebrew or the maker's installer). Versions are checked when the page opens and on
+ * refresh, never on a timer.
  */
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { ArrowUp, BookOpen, Download, MoreHorizontal, RefreshCw, Trash2 } from "lucide-react";
@@ -29,7 +30,7 @@ import {
   Tooltip,
 } from "@/shared/ui";
 import { ENGINE_DOCS_URLS, ENGINE_IDS, ENGINE_NAMES, type EngineId } from "../channels/engines";
-import { cliApi, type CliVersionStatus } from "./api";
+import { cliApi, type CliRemoveKind, type CliVersionStatus } from "./api";
 import { CliUpdateDialog } from "./CliUpdateDialog";
 import { SignInButton } from "./SignInButton";
 import { SignInDialog } from "./SignInDialog";
@@ -47,6 +48,21 @@ function openDocs(url: string) {
 export function versionText(raw: string): string {
   const number = raw.match(/\d+(?:\.\d+)+(?:-[0-9A-Za-z.]+)?/);
   return `v${number ? number[0] : raw.trim().replace(/^v/i, "")}`;
+}
+
+/** What Uninstall's confirmation says goes, by how the copy was installed. */
+function uninstallText(kind: CliRemoveKind, name: string): string {
+  const stays = `${name}'s sign-in and settings stay, and you can install it again.`;
+  switch (kind) {
+    case "misty":
+      return `Misty deletes the copy it installed. ${stays}`;
+    case "npm":
+      return `npm uninstalls it from this computer. ${stays}`;
+    case "brew":
+      return `Homebrew uninstalls it from this computer. ${stays}`;
+    case "maker":
+      return `Misty deletes the program and the versions its installer kept. ${stays}`;
+  }
 }
 
 /** The row's one line under the name: what is true about this CLI now. */
@@ -101,9 +117,13 @@ function CliRow({ engine }: { engine: EngineId }) {
     status !== null && status.updateKind !== null && (!status.installed || status.updateAvailable);
   // The sign-in to start, or null. Some engines ask which region or provider first.
   const [signingIn, setSigningIn] = useState<{ provider?: string } | null>(null);
-  const [removing, setRemoving] = useState(false);
-  // Only a copy Misty installed can go; one that was on the computer before is the person's own.
-  const canRemove = status?.installedByMisty === true && !updating;
+  // Uninstall's confirmation, and the kind of copy it names; the kind stays while it closes.
+  const [removing, setRemoving] = useState<{ open: boolean; kind: CliRemoveKind }>({
+    open: false,
+    kind: "misty",
+  });
+  // Uninstall goes the way the copy was installed; one Misty can't place isn't offered.
+  const removeKind = updating ? null : (status?.removeKind ?? null);
   // Signed out, or a CLI that can't say: its own login is a click away. DeepSeek Harness keeps
   // its providers in its own web page (Channels › DeepSeek Harness).
   const canSignIn =
@@ -176,21 +196,26 @@ function CliRow({ engine }: { engine: EngineId }) {
               disabled={loading || updating}
               onSelect={refresh}
             />
-            {canRemove ? (
+            {removeKind ? (
               <>
                 <DropdownMenuSeparator />
-                <MenuItem icon={Trash2} label="Remove" danger onSelect={() => setRemoving(true)} />
+                <MenuItem
+                  icon={Trash2}
+                  label="Uninstall"
+                  danger
+                  onSelect={() => setRemoving({ open: true, kind: removeKind })}
+                />
               </>
             ) : null}
           </DropdownMenuContent>
         </DropdownMenu>
       </DesktopSettingsRow>
       <ConfirmDeleteDialog
-        open={removing}
-        onOpenChange={setRemoving}
-        title={`Remove ${name}?`}
-        what={`Misty deletes the copy it installed. ${name}'s sign-in and settings stay, and you can install it again.`}
-        confirmLabel="Remove"
+        open={removing.open}
+        onOpenChange={(open) => setRemoving((current) => ({ ...current, open }))}
+        title={`Uninstall ${name}?`}
+        what={uninstallText(removing.kind, name)}
+        confirmLabel="Uninstall"
         onConfirm={async () => {
           await cliApi.remove(engine);
           await refreshCliStatus(engine);

@@ -1,12 +1,12 @@
 import type { MistyPickerSource } from "@/features/files";
 import { FluxerChatRoot } from "./fluxer/FluxerChatRoot";
-import { FluxerChannelHeader } from "./fluxer/FluxerChannelHeader";
 import { FluxerComposer } from "./fluxer/FluxerComposer";
 import { FluxerMemberList } from "./fluxer/FluxerMemberList";
 import { FluxerSearchResults } from "./fluxer/FluxerSearchResults";
 import { cx } from "./fluxer/cx";
 import indexPage from "./fluxer/css/ChannelIndexPage.module.css";
 import chatLayout from "./fluxer/css/ChannelChatLayout.module.css";
+import shell from "./fluxer/css/SpaceChatShell.module.css";
 import { useSpacesStore } from "../list/useSpacesStore";
 import { spaceCan, useMemberColors, useSpaceRoles } from "../roles/useSpaceRoles";
 import { isPrivateChannel } from "./sidebar/conversationGroups";
@@ -46,6 +46,7 @@ export function SpaceChat({
   conversationId: openConversationId,
   panel = false,
   onBack,
+  searchedText = "",
 }: {
   spaceId: string;
   spaceName: string;
@@ -56,6 +57,8 @@ export function SpaceChat({
   panel?: boolean;
   /** Where "Back to chat" goes when the open chat is gone; defaults to the chat page. */
   onBack?: () => void;
+  /** The message search run from the page's bar; its results take the member list's place. */
+  searchedText?: string;
 }) {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -99,7 +102,6 @@ export function SpaceChat({
   const memberColors = useMemberColors(spaceId);
   const everyoneUnread = useSpaceEveryoneUnread(spaceId);
   const preferences = useChatSidebarPreferences((state) => state.value);
-  const savePreferences = useChatSidebarPreferences((state) => state.set);
   const membersShown = !preferences.hideMembers;
   const conversation = scope.activeConversation;
   const isDirect = conversation?.kind === "dm";
@@ -148,11 +150,6 @@ export function SpaceChat({
     roles: mentionableRoles,
     attachmentSlotsLeft: draft.attachmentSlotsLeft,
   });
-  // The search Enter last ran in the header; its results take the member list's place.
-  const [searchedText, setSearchedText] = useState("");
-  const closeSearch = () => {
-    setSearchedText("");
-  };
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerSource, setPickerSource] = useState<MistyPickerSource>("files");
   const deleting = useMessageDeleteTarget([user?.id, spaceId, conversationId]);
@@ -294,7 +291,7 @@ export function SpaceChat({
       <ConversationLoadState
         error={conversationChat.error}
         onRetry={conversationChat.reload}
-        panel={panel}
+        bare
       />
     );
   if (!conversationAvailable)
@@ -459,32 +456,12 @@ export function SpaceChat({
     );
   // Search results, then a thread, take the member list's place, as in Fluxer.
   const side = searchResults ?? thread ?? members;
-  const body = (
-    <div className={indexPage.channelGrid}>
-      <div>
-        <FluxerChannelHeader
-          name={channelName}
-          direct={
-            isDirect && scope.directRecipient
-              ? { id: scope.directRecipient.userId, name: scope.directRecipient.name }
-              : undefined
-          }
-          locked={privateChannel}
-          membersShown={membersShown && !searchedText && !thread}
-          onToggleMembers={() => {
-            closeSearch();
-            savePreferences((current) => ({ ...current, hideMembers: membersShown }));
-          }}
-          searchQuery={searchedText}
-          onSearch={(query) => (query ? setSearchedText(query) : closeSearch())}
-        />
-      </div>
-      <div className={indexPage.contentGrid}>
-        {side === members && members ? <div className={indexPage.memberListDivider} /> : null}
-        <div className={indexPage.chatAreaSlot}>{chat}</div>
-        {side}
-      </div>
+  // The page's bar (SpaceChatEntry) names the chat and holds the members toggle and search.
+  return (
+    <div className={cx(indexPage.contentGrid, shell.channelBody)}>
+      {side === members && members ? <div className={indexPage.memberListDivider} /> : null}
+      <div className={indexPage.chatAreaSlot}>{chat}</div>
+      {side}
     </div>
   );
-  return body;
 }

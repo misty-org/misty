@@ -5,6 +5,8 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { invoke } from "@/native/invoke";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 
+export type CliRemoveKind = "misty" | "npm" | "brew" | "maker";
+
 export interface CliVersionStatus {
   engine: string;
   installed: boolean;
@@ -14,8 +16,10 @@ export interface CliVersionStatus {
   /** How install and update run, always inside the app: "npm", or "native" for the maker's own
    *  build or installer; null when Misty can't install it. */
   updateKind: "npm" | "native" | null;
-  /** The copy found is the one Misty installed in `~/.misty/shared/engines`, so it can be removed. */
-  installedByMisty?: boolean;
+  /** How Uninstall removes the copy found: the one Misty installed in `~/.misty/shared/engines`,
+   *  npm's or Homebrew's copy through them, or the maker's installer copy. null when Misty can't
+   *  tell how it was installed, and then it isn't offered. */
+  removeKind?: CliRemoveKind | null;
 }
 
 export interface CliUpdatePlan {

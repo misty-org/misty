@@ -445,3 +445,90 @@ fn hermes_wrappers_for_mistys_checkout_are_mistys_and_go_with_remove() {
     assert!(theirs.exists());
     assert!(!root.engine_dir("hermes").exists());
 }
+
+/// The person's folders inside the scratch home, for finding where an engine came from.
+fn homes(home: &Scratch) -> super::uninstall::Homes {
+    super::uninstall::Homes {
+        home: home.dir.clone(),
+        codex_home: home.dir.join(".codex"),
+        hermes_home: home.dir.join(".hermes"),
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn uninstall_follows_how_each_copy_was_installed_and_leaves_settings() {
+    use super::uninstall::{removal_in, Removal};
+    use std::os::unix::fs::symlink;
+    let home = Scratch::new();
+    let (root, homes) = (&home.root, homes(&home));
+    let removal = |engine: &str, bin: &Path| {
+        removal_in(root, &homes, engine, &bin.to_string_lossy(), false)
+    };
+
+    // Misty's own copy.
+    let misty = root.program_dirs("gemini")[1].join("gemini");
+    write_program(&misty);
+    assert_eq!(removal("gemini", &misty), Some(Removal::Misty));
+
+    // npm's global copy (nvm here): a link from the prefix's bin into its node_modules.
+    let prefix = home.dir.join(".nvm/versions/node/v22");
+    let package = prefix.join("lib/node_modules/@google/gemini-cli");
+    write_program(&package.join("bundle/gemini.js"));
+    let npm_bin = prefix.join("bin/gemini");
+    std::fs::create_dir_all(npm_bin.parent().unwrap()).unwrap();
+    symlink(package.join("bundle/gemini.js"), &npm_bin).unwrap();
+    assert_eq!(
+        removal("gemini", &npm_bin),
+        Some(Removal::Npm {
+            prefix: prefix.clone(),
+            package: "@google/gemini-cli"
+        })
+    );
+
+    // Homebrew's copy, even a formula built on npm, goes through that Homebrew's brew.
+    let brew_prefix = home.dir.join("homebrew");
+    write_program(&brew_prefix.join("bin/brew"));
+    let cellar = brew_prefix.join("Cellar/gemini-cli/1.0.0/libexec/lib/node_modules/x/gemini");
+    write_program(&cellar);
+    let brew_bin = brew_prefix.join("bin/gemini");
+    symlink(&cellar, &brew_bin).unwrap();
+    assert_eq!(
+        removal("gemini", &brew_bin),
+        Some(Removal::Brew {
+            brew: brew_prefix.join("bin/brew"),
+            name: "gemini-cli".into(),
+            cask: false
+        })
+    );
+
+    // Claude Code's installer: the link and its versions go, `~/.claude` stays.
+    let versions = home.dir.join(".local/share/claude");
+    write_program(&versions.join("versions/2.1.0"));
+    let claude = home.dir.join(".local/bin/claude");
+    std::fs::create_dir_all(claude.parent().unwrap()).unwrap();
+    symlink(versions.join("versions/2.1.0"), &claude).unwrap();
+    assert_eq!(
+        removal("claude", &claude),
+        Some(Removal::Files(vec![claude.clone(), versions.clone()]))
+    );
+
+    // Codex's script: the link, its code-mode host and the standalone releases, not `~/.codex`.
+    let standalone = home.dir.join(".codex/packages/standalone");
+    write_program(&standalone.join("releases/1/bin/codex"));
+    write_program(&standalone.join("releases/1/bin/codex-code-mode-host"));
+    let codex = home.dir.join(".local/bin/codex");
+    let host = home.dir.join(".local/bin/codex-code-mode-host");
+    symlink(standalone.join("releases/1/bin/codex"), &codex).unwrap();
+    symlink(standalone.join("releases/1/bin/codex-code-mode-host"), &host).unwrap();
+    assert_eq!(
+        removal("codex", &codex),
+        Some(Removal::Files(vec![codex.clone(), host, standalone]))
+    );
+
+    // A copy found anywhere else is left alone.
+    let stray = home.dir.join("tools/gemini");
+    write_program(&stray);
+    assert_eq!(removal("gemini", &stray), None);
+    assert_eq!(removal("gemini", Path::new("gemini")), None);
+}

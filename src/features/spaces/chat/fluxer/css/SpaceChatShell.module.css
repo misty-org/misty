@@ -33,6 +33,12 @@
   color: var(--text-primary);
 }
 
+/* The open channel under the chat page's bar: Fluxer's channel grid (ChannelIndexPage
+   .channelGrid) without its own header row, which Misty's page bar stands in for. */
+.channelBody {
+  background: var(--background-secondary-lighter);
+}
+
 /* Several channels picked for deleting together (Misty's range selection), as Fluxer's
    selected-row tint. */
 .channelPicked {

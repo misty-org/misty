@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Adapted from Fluxer (https://github.com/fluxerapp/fluxer): features/app/components/layout/
-// GuildNavbar.tsx, GuildHeader.tsx, ChannelListContent.tsx, ChannelItem.tsx,
+// GuildNavbar.tsx, ChannelListContent.tsx, ChannelItem.tsx,
 // GenericChannelItem.tsx, ChannelItemContent.tsx and ChannelItemIcon.tsx,
 // features/guild/components/popouts/GuildHeaderPopout.tsx and features/channel/components/
 // direct_message/DMListItem.tsx, wired to Misty's Spaces.
@@ -8,41 +8,28 @@ import { useState, type KeyboardEvent, type MouseEvent } from "react";
 import * as Popover from "@radix-ui/react-popover";
 import {
   ChevronDown,
-  CirclePlus,
   Hash,
   Lock,
-  LogOut,
-  Pencil,
   Plus,
   Settings,
-  ShieldCheck,
   Trash2,
   UserPlus,
-  Users,
   type LucideIcon,
 } from "lucide-react";
 import type { Space, SpaceConversation } from "../../api/dto/entities";
 import { spaceCan } from "../../roles/useSpaceRoles";
-import { canManageSpaceLifecycle, spaceNavigationName } from "../../routes/defaultSpace";
-import { RolesDialog } from "../../roles/RolesDialog";
-import {
-  isSpacePanel,
-  SpaceDialogs,
-  type SpaceDialog,
-} from "../../components/space-row/SpaceDialogs";
+import { SpaceDialogs, type SpaceDialog } from "../../components/space-row/SpaceDialogs";
 import {
   conversationName,
   groupConversations,
   isPrivateChannel,
 } from "../sidebar/conversationGroups";
 import { useChatSidebarPreferences } from "../sidebar/chatSidebarPreferences";
-import { Popover as MistyPopover, PopoverAnchor } from "@/shared/ui";
 import { FluxerScroller } from "./FluxerScroller";
 import { FluxerTooltip } from "./FluxerTooltip";
 import { FluxerAvatar } from "./FluxerAvatar";
 import { cx } from "./cx";
 import navbar from "./css/GuildNavbar.module.css";
-import header from "./css/GuildHeader.module.css";
 import popout from "./css/GuildHeaderPopout.module.css";
 import list from "./css/ChannelListContent.module.css";
 import item from "./css/ChannelItem.module.css";
@@ -77,9 +64,10 @@ export interface FluxerSidebarProps {
 }
 
 /**
- * The channel column, as Fluxer draws a guild's: the Space's name and menu on top, its channels
- * (or the person's direct messages, Misty's Channels | Direct switch). Misty's own sidebar
- * already shows the person, so Fluxer's user area is left out.
+ * The channel column, as Fluxer draws a guild's: its channels (or the person's direct messages,
+ * Misty's Channels | Direct switch). The chat page's bar names the Space, as on every Space page,
+ * so Fluxer's guild header is left out; Misty's own sidebar already shows the person, so its user
+ * area is too.
  */
 export function FluxerSidebar(props: FluxerSidebarProps) {
   const stored = useChatSidebarPreferences((state) => state.value);
@@ -90,26 +78,11 @@ export function FluxerSidebar(props: FluxerSidebarProps) {
   const setView = (next: ChatSidebarView) =>
     save((current) => ({ ...current, direct: next === "direct" }));
   const [dialog, setDialog] = useState<SpaceDialog>(null);
-  const [rolesOpen, setRolesOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const canInvite = spaceCan(props.space, "space.invite");
   return (
     <nav aria-label={`Channels in ${props.space.name}`} className={navbar.guildNavbarContainer}>
-      <MistyPopover open={isSpacePanel(dialog)} onOpenChange={(next) => !next && setDialog(null)}>
-        <PopoverAnchor asChild>
-          <div>
-            <SpaceHeader
-              space={props.space}
-              canManageChannels={props.canManageChannels}
-              onDialog={setDialog}
-              onRoles={() => setRolesOpen(true)}
-              onNewChannel={props.onNewConversation}
-            />
-          </div>
-        </PopoverAnchor>
-      </MistyPopover>
       <SpaceDialogs space={props.space} open={dialog} onClose={() => setDialog(null)} />
-      <RolesDialog space={props.space} open={rolesOpen} onOpenChange={setRolesOpen} />
       <div className={list.channelListScrollerWrapper}>
         <FluxerScroller className={list.channelListScroller}>
           <div className={list.navigationContainer} role="navigation">
@@ -267,98 +240,6 @@ function activate(event: KeyboardEvent, run: () => void) {
   if (event.key !== "Enter" && event.key !== " ") return;
   event.preventDefault();
   run();
-}
-
-/** GuildHeader + GuildHeaderPopout: the Space's name, opening its menu below it. */
-function SpaceHeader(props: {
-  space: Space;
-  canManageChannels: boolean;
-  onDialog(dialog: SpaceDialog): void;
-  onRoles(): void;
-  onNewChannel(): void;
-}) {
-  const { space } = props;
-  const [open, setOpen] = useState(false);
-  const isOwner = space.role === "owner";
-  const later = (run: () => void) => () => {
-    setOpen(false);
-    window.setTimeout(run, 0);
-  };
-  const items: { label: string; icon: LucideIcon; danger?: boolean; run: () => void }[] = [];
-  if (spaceCan(space, "space.invite"))
-    items.push({ label: "Invite people", icon: UserPlus, run: () => props.onDialog("invite") });
-  if (spaceCan(space, "roles.manage"))
-    items.push({ label: "Roles", icon: ShieldCheck, run: props.onRoles });
-  if (props.canManageChannels)
-    items.push({ label: "Create channel", icon: CirclePlus, run: props.onNewChannel });
-  items.push({ label: "People", icon: Users, run: () => props.onDialog("members") });
-  if (isOwner && canManageSpaceLifecycle(space, "rename"))
-    items.push({
-      label: "Edit name and picture",
-      icon: Pencil,
-      run: () => props.onDialog("rename"),
-    });
-  if (isOwner && canManageSpaceLifecycle(space, "delete"))
-    items.push({
-      label: "Delete Space",
-      icon: Trash2,
-      danger: true,
-      run: () => props.onDialog("delete"),
-    });
-  else if (!isOwner && canManageSpaceLifecycle(space, "leave"))
-    items.push({
-      label: "Leave Space",
-      icon: LogOut,
-      danger: true,
-      run: () => props.onDialog("leave"),
-    });
-  const name = spaceNavigationName(space);
-  return (
-    <Popover.Root open={open} onOpenChange={setOpen}>
-      <div className={header.headerWrapper}>
-        <div
-          className={cx(
-            header.headerContainer,
-            header.headerContainerNoBanner,
-            open && header.headerContainerActive,
-          )}
-        >
-          <Popover.Trigger asChild>
-            <div
-              role="button"
-              tabIndex={0}
-              aria-haspopup="menu"
-              aria-label={`${name} menu`}
-              className={header.headerContent}
-            >
-              <span className={cx(header.guildName, header.guildNameDefault)}>{name}</span>
-              <ChevronDown
-                className={cx(
-                  header.caretIcon,
-                  header.caretIconDefault,
-                  open && header.caretIconOpen,
-                )}
-              />
-            </div>
-          </Popover.Trigger>
-        </div>
-      </div>
-      <Popover.Portal>
-        <Popover.Content
-          side="bottom"
-          sideOffset={8}
-          collisionPadding={8}
-          aria-label={`${name} menu`}
-          className={cx("fluxer-chat", popout.container, shell.popoutMotion)}
-          style={{ zIndex: 50 }}
-        >
-          {items.map((entry) => (
-            <PopoutItem key={entry.label} {...entry} onSelect={later(entry.run)} />
-          ))}
-        </Popover.Content>
-      </Popover.Portal>
-    </Popover.Root>
-  );
 }
 
 /** GuildHeaderPopout's item: the label, its icon on the right; hovering moves focus to it. */

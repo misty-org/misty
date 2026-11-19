@@ -159,7 +159,7 @@ fn npm_global_args(package: &str) -> Vec<String> {
 }
 
 /// The computer's own npm, when there is one outside Misty's folder.
-fn computer_npm() -> Option<String> {
+pub(super) fn computer_npm() -> Option<String> {
     let found = support::find_program("npm")?;
     let runtime = crate::engines::support::paths::node_runtime_dir();
     (!found.starts_with(&runtime)).then(|| found.to_string_lossy().into_owned())

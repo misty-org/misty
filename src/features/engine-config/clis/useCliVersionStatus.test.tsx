@@ -37,7 +37,7 @@ function versionStatus(engine: string, over: Partial<CliVersionStatus> = {}): Cl
     latestVersion: "2.1.267",
     updateAvailable: true,
     updateKind: "native",
-    installedByMisty: false,
+    removeKind: null,
     ...over,
   };
 }

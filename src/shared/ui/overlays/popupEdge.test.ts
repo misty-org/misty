@@ -25,10 +25,12 @@ describe("popup edges", () => {
   });
 
   it("the global popup rule and popup-edge draw the same outline over a transparent border", () => {
+    // !important: Radix writes `outline: none` inline on menus and Select lists, which beats any
+    // plain rule, so without it every menu draws no edge. It also outranks base.css's focus reset.
     const edge = [
       "border: 1px solid transparent;",
-      "outline: 1px solid color-mix(in srgb, currentColor 24%, transparent);",
-      "outline-offset: -1px;",
+      "outline: 1px solid color-mix(in srgb, currentColor 24%, transparent) !important;",
+      "outline-offset: -1px !important;",
     ];
     const overlays = read("src/styles/overlays.css");
     const utility = read("src/styles/components.css").match(/@utility popup-edge \{[^}]*\}/)?.[0];
@@ -41,6 +43,21 @@ describe("popup edges", () => {
     const chrome = overlays.match(/\)\s*\{([^}]*)\}/)?.[1] ?? "";
     expect(chrome).not.toMatch(/border:\s*1px solid (?!transparent)/);
     expect(chrome).toContain("box-shadow: none;");
+    expect(chrome).toContain(edge[1]);
+  });
+
+  it("every Radix popup that sets an inline outline is covered by the edge rule", () => {
+    // The Radix packages that write `outline: none` into a popup's inline style, and the slots
+    // Misty's primitives give those popups. A new one needs its slot in overlays.css.
+    const overlays = read("src/styles/overlays.css");
+    for (const slot of [
+      "dropdown-menu-content",
+      "dropdown-menu-sub-content",
+      "context-menu-content",
+      "context-menu-sub-content",
+      "select-content",
+    ])
+      expect(overlays).toContain(`[data-slot="${slot}"]`);
   });
 
   it("no shared popup or dialog surface adds a shadow or a ring edge of its own", () => {

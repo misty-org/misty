@@ -9,13 +9,14 @@ import { ChatMessagesSkeleton } from "./ChatMessagesSkeleton";
 export function ConversationLoadState(props: {
   error: string;
   onRetry: () => void;
-  /** Shown in the side panel, which has no title bar of its own. */
-  panel?: boolean;
+  /** Drawn under a bar that is already there (the chat page's), or in the side panel, which has
+   *  none: the messages' shape alone. */
+  bare?: boolean;
 }) {
   if (!props.error)
     return (
       <Surface tone="page" className="flex h-full min-h-0 flex-col overflow-hidden">
-        {props.panel ? null : (
+        {props.bare ? null : (
           <PageHeader title={<Skeleton className="h-4 w-32" aria-hidden="true" />} />
         )}
         <ChatMessagesSkeleton framed />

@@ -38,6 +38,7 @@ mod node_runtime;
 mod plan;
 mod routes;
 pub mod sign_in;
+mod uninstall;
 pub(crate) mod upkeep;
 mod user_path;
 
@@ -91,8 +92,10 @@ pub struct CliVersionStatus {
     /// How the install/update button acts: "npm" | "native"; null when the
     /// engine has no lifecycle action (grok).
     pub update_kind: Option<&'static str>,
-    /// The program found is the one Misty installed in `~/.misty/shared/engines`, so Remove applies.
-    pub installed_by_misty: bool,
+    /// How Uninstall removes the copy found (`uninstall.rs`): "misty" for the one Misty installed
+    /// in `~/.misty/shared/engines`, "npm", "brew" or "maker"; null when Misty can't tell, and then
+    /// the row offers no Uninstall.
+    pub remove_kind: Option<&'static str>,
 }
 
 /// The program each engine is started as, when it differs from the engine id.
@@ -319,7 +322,11 @@ pub async fn engine_cli_status(engine: String) -> Result<CliVersionStatus, Strin
     };
     Ok(CliVersionStatus {
         update_kind: route_for(&engine, &bin, local.installed).map(Route::kind),
-        installed_by_misty: local.installed && routes::installed_by_misty(&engine, &bin),
+        remove_kind: local
+            .installed
+            .then(|| uninstall::removal(&engine, &bin))
+            .flatten()
+            .map(|removal| removal.kind()),
         engine,
         installed: local.installed,
         local_version: local.version,
@@ -366,15 +373,17 @@ pub async fn engine_cli_update(engine: String, run_id: String) -> Result<UpdateR
     })
 }
 
-/// Removes an engine Misty installed (its folder in `~/.misty/shared/engines`). A copy that was on the
-/// computer before Misty is never removed here.
+/// Uninstalls an engine the way its copy was installed (`uninstall.rs`): Misty's own folder in
+/// `~/.misty/shared/engines`, npm's or Homebrew's copy through them, or a maker's installer copy. Its
+/// sign-in and settings stay.
 #[tauri::command]
 pub async fn engine_cli_remove(engine: String) -> Result<(), String> {
     let engine = checked_engine(&engine)?;
     let bin = engine_bin(&engine);
-    tokio::task::spawn_blocking(move || routes::remove(&engine, &bin))
-        .await
-        .map_err(|error| error.to_string())?
+    let removal = uninstall::removal(&engine, &bin).ok_or_else(|| {
+        "Misty can't tell how this copy was installed, so it leaves it alone.".to_string()
+    })?;
+    uninstall::run(&engine, &bin, removal).await
 }
 
 #[allow(clippy::disallowed_methods)]

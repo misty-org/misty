@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { ShieldCheck, UserPlus, Users } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import type { SpaceConversation } from "../api/dto/entities";
 import { useAuth } from "@/features/account";
@@ -13,6 +14,11 @@ import { CreateEditConversationDialog } from "./sidebar/CreateEditConversationDi
 import { NewDirectMessageDialog } from "./sidebar/NewDirectMessageDialog";
 import { useSpaceChatAccess } from "./hooks/useSpaceChatAccess";
 import { spacesApi } from "../api/api";
+import { SpaceCrumb } from "../components/space-row/SpaceCrumb";
+import { SpaceDialogs, type SpaceDialog } from "../components/space-row/SpaceDialogs";
+import { RolesDialog } from "../roles/RolesDialog";
+import { useChatSidebarPreferences } from "./sidebar/chatSidebarPreferences";
+import { useChatSidePanel } from "./chatSidePanelStore";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -21,7 +27,11 @@ import {
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogTitle,
+  PageHeader,
+  SearchField,
+  Surface,
   useNotice,
+  type ActionBarItem,
 } from "@/shared/ui";
 import { useSpaceConversations } from "./sidebar/useSpaceConversations";
 import { useSpaceEveryoneUnread } from "./spaceConversationsResource";
@@ -32,9 +42,10 @@ import { useRangeSelection } from "@/shared/hooks/useRangeSelection";
 import { confirmAction } from "@/shared/lib/confirmAction";
 
 /**
- * A Space's chat, laid out like Discord: the channel column (the Space's channels, or the
- * person's direct messages), then the open channel with its member list. Agents are not in the
- * column; mention one in a message to ask it for work.
+ * A Space's chat, one of its pages: the bar every Space page wears (the Space, then Chat, with the
+ * member list's toggle and message search), then Discord's layout under it: the channel column
+ * (the Space's channels, or the person's direct messages) and the open channel with its member
+ * list. Agents are not in the column; mention one in a message to ask it for work.
  */
 export function SpaceChatEntry(props: React.ComponentProps<typeof SpaceChat>) {
   const { spaceId } = props;
@@ -57,6 +68,20 @@ export function SpaceChatEntry(props: React.ComponentProps<typeof SpaceChat>) {
   const [deleting, setDeleting] = useState<SpaceConversation | null>(null);
   const [deleteError, setDeleteError] = useState("");
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [spaceDialog, setSpaceDialog] = useState<SpaceDialog>(null);
+  const [rolesOpen, setRolesOpen] = useState(false);
+  // The search Enter ran in the bar, and what is typed there now.
+  const [searchText, setSearchText] = useState("");
+  const [searchedText, setSearchedText] = useState("");
+  const closeSearch = () => {
+    setSearchText("");
+    setSearchedText("");
+  };
+  // Search results, then an open thread, take the member list's place, as in Fluxer.
+  const threadOpen = useChatSidePanel((panel) => Boolean(panel.threadRootId));
+  const preferences = useChatSidebarPreferences((state) => state.value);
+  const savePreferences = useChatSidebarPreferences((state) => state.set);
+  const membersShown = !preferences.hideMembers;
   const deletableConversationIds = useMemo(
     () =>
       canManageChannels
@@ -117,78 +142,143 @@ export function SpaceChatEntry(props: React.ComponentProps<typeof SpaceChat>) {
     if (!nodesLoaded) void loadNodes(spaceId).catch(() => {});
   }, [nodesLoaded, loadNodes, spaceId]);
 
+  const actions: ActionBarItem[] = [
+    {
+      id: "members",
+      icon: Users,
+      label: "Members",
+      variant: "quiet",
+      pressed: membersShown && !searchedText && !threadOpen,
+      priority: 3,
+      onSelect: () => {
+        closeSearch();
+        savePreferences((current) => ({ ...current, hideMembers: membersShown }));
+      },
+    },
+  ];
+  if (space && spaceCan(space, "space.invite") && !referenceOnly)
+    actions.push({
+      id: "invite",
+      icon: UserPlus,
+      label: "Invite people",
+      variant: "quiet",
+      priority: 2,
+      onSelect: () => setSpaceDialog("invite"),
+    });
+  if (space && spaceCan(space, "roles.manage") && !referenceOnly)
+    actions.push({
+      id: "roles",
+      icon: ShieldCheck,
+      label: "Roles",
+      variant: "quiet",
+      priority: 1,
+      onSelect: () => setRolesOpen(true),
+    });
+
   const select = (next: string) =>
     navigate(
       next === "everyone" ? spaceChatPath(spaceId) : spaceChatConversationPath(spaceId, next),
     );
 
   return (
-    <FluxerChatRoot className={cx(guildLayout.guildLayoutContent, shell.layout)}>
-      {space ? (
-        <FluxerSidebar
-          space={space}
-          conversations={data.conversations}
-          everyoneUnread={everyoneUnread}
-          loading={data.loading}
-          currentUserId={user?.id}
-          selected={conversationId || "everyone"}
-          canWrite={!referenceOnly}
-          canManageChannels={canManageChannels && !referenceOnly}
-          onSelect={select}
-          onEdit={setEditing}
-          onDelete={(conversation) => {
-            setDeleteError("");
-            setDeleting(conversation);
-          }}
-          onDeleteMany={(ids) => void deleteMany(ids)}
-          selectedIds={selection.selectedIds}
-          onRangeSelect={selection.select}
-          onClearSelection={selection.clear}
-          onNewConversation={() => setEditing(null)}
-          onNewDirectMessage={() => setDirectMessageOpen(true)}
-        />
-      ) : null}
-      <SpaceChat {...props} />
-      <AlertDialog open={deleting !== null} onOpenChange={(open) => !open && setDeleting(null)}>
-        <AlertDialogContent>
-          <AlertDialogTitle>Delete this channel?</AlertDialogTitle>
-          <AlertDialogDescription>Its messages are deleted for everyone.</AlertDialogDescription>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={(event) => {
+    <Surface tone="page" className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)]">
+      <PageHeader
+        title={<SpaceCrumb spaceId={spaceId} here="Chat" />}
+        actions={actions}
+        actionsLabel="Chat actions"
+        end={
+          <SearchField
+            containerClassName="w-56"
+            aria-label="Search messages"
+            placeholder="Search messages"
+            value={searchText}
+            onChange={(event) => {
+              setSearchText(event.target.value);
+              if (!event.target.value) setSearchedText("");
+            }}
+            onClear={closeSearch}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
                 event.preventDefault();
-                void confirmDelete();
-              }}
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-      <NewDirectMessageDialog
-        spaceId={spaceId}
-        open={directMessageOpen}
-        onOpenChange={setDirectMessageOpen}
-        members={members ?? []}
-        currentUserId={user?.id}
-        onOpened={(opened) => {
-          data.upsert(opened);
-          setDirectMessageOpen(false);
-          navigate(spaceChatConversationPath(spaceId, opened.id));
-        }}
+                setSearchedText(searchText.trim());
+              }
+            }}
+          />
+        }
       />
-      <CreateEditConversationDialog
-        spaceId={spaceId}
-        open={editing !== undefined}
-        onOpenChange={(isOpen) => !isOpen && setEditing(undefined)}
-        conversation={editing}
-        onSaved={(saved) => {
-          data.upsert(saved);
-          setEditing(undefined);
-          navigate(spaceChatConversationPath(spaceId, saved.id));
-        }}
-      />
-    </FluxerChatRoot>
+      {space ? (
+        <>
+          <SpaceDialogs space={space} open={spaceDialog} onClose={() => setSpaceDialog(null)} />
+          <RolesDialog space={space} open={rolesOpen} onOpenChange={setRolesOpen} />
+        </>
+      ) : null}
+      <FluxerChatRoot className={cx(guildLayout.guildLayoutContent, shell.layout)}>
+        {space ? (
+          <FluxerSidebar
+            space={space}
+            conversations={data.conversations}
+            everyoneUnread={everyoneUnread}
+            loading={data.loading}
+            currentUserId={user?.id}
+            selected={conversationId || "everyone"}
+            canWrite={!referenceOnly}
+            canManageChannels={canManageChannels && !referenceOnly}
+            onSelect={select}
+            onEdit={setEditing}
+            onDelete={(conversation) => {
+              setDeleteError("");
+              setDeleting(conversation);
+            }}
+            onDeleteMany={(ids) => void deleteMany(ids)}
+            selectedIds={selection.selectedIds}
+            onRangeSelect={selection.select}
+            onClearSelection={selection.clear}
+            onNewConversation={() => setEditing(null)}
+            onNewDirectMessage={() => setDirectMessageOpen(true)}
+          />
+        ) : null}
+        <SpaceChat {...props} searchedText={searchedText} />
+        <AlertDialog open={deleting !== null} onOpenChange={(open) => !open && setDeleting(null)}>
+          <AlertDialogContent>
+            <AlertDialogTitle>Delete this channel?</AlertDialogTitle>
+            <AlertDialogDescription>Its messages are deleted for everyone.</AlertDialogDescription>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={(event) => {
+                  event.preventDefault();
+                  void confirmDelete();
+                }}
+              >
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+        <NewDirectMessageDialog
+          spaceId={spaceId}
+          open={directMessageOpen}
+          onOpenChange={setDirectMessageOpen}
+          members={members ?? []}
+          currentUserId={user?.id}
+          onOpened={(opened) => {
+            data.upsert(opened);
+            setDirectMessageOpen(false);
+            navigate(spaceChatConversationPath(spaceId, opened.id));
+          }}
+        />
+        <CreateEditConversationDialog
+          spaceId={spaceId}
+          open={editing !== undefined}
+          onOpenChange={(isOpen) => !isOpen && setEditing(undefined)}
+          conversation={editing}
+          onSaved={(saved) => {
+            data.upsert(saved);
+            setEditing(undefined);
+            navigate(spaceChatConversationPath(spaceId, saved.id));
+          }}
+        />
+      </FluxerChatRoot>
+    </Surface>
   );
 }
